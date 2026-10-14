@@ -1,6 +1,7 @@
 import { Flags } from "@oclif/core";
 
 import { CommandGroups, type JsonEnvelope, nonBlankArg, PreviewCommand } from "../../lib/oclif";
+import { collectPages } from "../../lib/oclif/crud/paging";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { deletedData } from "../../lib/oclif/envelope";
 import { shellArg } from "../../lib/shell";
@@ -50,6 +51,22 @@ export default class PreviewRm extends PreviewCommand {
     // Resolved before the confirmation, so the prompt is answered knowing
     // which project it removes from, and a missing token fails first.
     const { client, projectId } = await this.connect();
+
+    // The server answers 204 whether or not the URL was live, so a typo would
+    // otherwise read as a removal. Checked before asking, so nobody confirms
+    // removing what is not there.
+    const { items } = await collectPages(
+      (token) => client.listPreviews(projectId, token === undefined ? {} : { page_token: token }),
+      { items: "previews", all: true, nextPageToken: "next_page_token" },
+    );
+    if (!(items as Array<{ origin: string }>).some((preview) => preview.origin === url)) {
+      return this.emit({
+        status: "skipped",
+        reason: "not-live",
+        pretty: `${url} is not a live preview of the project; nothing was removed`,
+        nextCommands: [this.suggest("preview list")],
+      });
+    }
 
     const confirmed = await this.input({
       kind: "confirm",

@@ -8,6 +8,23 @@ const platform = usePlatformMock();
 const PREVIEW_PATTERN = "https://*-acme.vercel.app";
 const PREVIEW_URL = "https://x-acme.vercel.app";
 
+type Listed = { items: { origin: string }[]; count: number; next_page_token: string | null };
+
+/** Arranges a project with one live preview deployed to {@link PREVIEW_URL}. */
+async function anAppWithAPreview() {
+  const app = await aSetUpApp();
+  await app.addOrigin(PREVIEW_PATTERN, "preview");
+  await app.run(["preview", "--origin", PREVIEW_URL, "--json"]);
+  return app;
+}
+
+/** Arranges a project with two live previews. */
+async function anAppWithTwoPreviews() {
+  const app = await anAppWithAPreview();
+  await app.run(["preview", "--origin", "https://y-acme.vercel.app", "--json"]);
+  return app;
+}
+
 describe("preview list", () => {
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
@@ -52,42 +69,49 @@ describe("preview list", () => {
 
         const result = await app.run(["preview", "list", "--json"]);
 
-        expect(result).toSucceed();
-        expect(app.envelopeOf<{ items: unknown[] }>(result).data.items).toEqual([]);
+        expect(app.envelopeOf<Listed>(result).data.items).toEqual([]);
       });
 
       it("shows a preview that was deployed", async () => {
-        const app = await aSetUpApp();
-        await app.addOrigin(PREVIEW_PATTERN, "preview");
-        await app.run(["preview", "--origin", PREVIEW_URL, "--json"]);
+        const app = await anAppWithAPreview();
 
         const result = await app.run(["preview", "list", "--json"]);
 
-        expect(result).toSucceed();
-        expect(
-          app
-            .envelopeOf<{ items: { origin: string }[] }>(result)
-            .data.items.map((preview) => preview.origin),
-        ).toEqual([PREVIEW_URL]);
+        expect(app.envelopeOf<Listed>(result).data.items.map((preview) => preview.origin)).toEqual([
+          PREVIEW_URL,
+        ]);
       });
 
-      it("reports the canonical list envelope and drains pages with --all", async () => {
-        const app = await aSetUpApp();
-        await app.addOrigin(PREVIEW_PATTERN, "preview");
-        await app.run(["preview", "--origin", PREVIEW_URL, "--json"]);
+      it("counts the previews it lists", async () => {
+        const app = await anAppWithAPreview();
 
         const result = await app.run(["preview", "list", "--all", "--json"]);
 
-        expect(result).toSucceed();
-        const data = app.envelopeOf<{
-          items: { origin: string }[];
-          count: number;
-          next_page_token: string | null;
-        }>(result).data;
-        expect(data.items.map((preview) => preview.origin)).toEqual([PREVIEW_URL]);
-        expect(data.count).toBe(1);
-        // `--all` drains every page, so no continuation token is reported.
-        expect(data.next_page_token).toBeNull();
+        expect(app.envelopeOf<Listed>(result).data.count).toBe(1);
+      });
+
+      it("reports no continuation token once --all has drained every page", async () => {
+        const app = await anAppWithTwoPreviews();
+
+        const result = await app.run(["preview", "list", "--all", "--limit", "1", "--json"]);
+
+        expect(app.envelopeOf<Listed>(result).data.next_page_token).toBeNull();
+      });
+
+      it("lists every preview with --all across pages", async () => {
+        const app = await anAppWithTwoPreviews();
+
+        const result = await app.run(["preview", "list", "--all", "--limit", "1", "--json"]);
+
+        expect(app.envelopeOf<Listed>(result).data.count).toBe(2);
+      });
+
+      it("suggests the next page, repeating the limit", async () => {
+        const app = await anAppWithTwoPreviews();
+
+        const result = await app.run(["preview", "list", "--limit", "1", "--json"]);
+
+        expect(result).toSuggest("preview list --limit 1 --page-token");
       });
     });
   });

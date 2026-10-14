@@ -83,19 +83,26 @@ describe("preview rm", () => {
       it("removes a live preview, so it stops being listed", async () => {
         const app = await anAppWithAPreview();
 
-        const result = await app.run(["preview", "rm", PREVIEW_URL, "--force", "--json"]);
+        await app.run(["preview", "rm", PREVIEW_URL, "--force", "--json"]);
 
-        expect(result).toSucceed();
         const listed = await app.run(["preview", "list", "--json"]);
         expect(app.envelopeOf<{ items: unknown[] }>(listed).data.items).toEqual([]);
       });
 
-      it("succeeds when the preview is already gone", async () => {
+      it("is skipped when the URL is not a live preview", async () => {
         const app = await aSetUpApp();
 
         const result = await app.run(["preview", "rm", PREVIEW_URL, "--force", "--json"]);
 
-        expect(result).toSucceed();
+        expect(result).toBeSkipped();
+      });
+
+      it("suggests listing the live previews when the URL is not one", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["preview", "rm", PREVIEW_URL, "--force", "--json"]);
+
+        expect(result).toSuggest("preview list");
       });
 
       it("requires --force when non-interactive", async () => {
@@ -114,6 +121,14 @@ describe("preview rm", () => {
         const result = await app.run(["preview", "rm", PREVIEW_URL, "--force"]);
 
         expect(result).toPrint(`Stopped serving ${PREVIEW_URL}`);
+      });
+
+      it("says nothing was removed when the URL is not a live preview", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["preview", "rm", PREVIEW_URL, "--force"]);
+
+        expect(result).toPrint("is not a live preview of the project; nothing was removed");
       });
     });
   });

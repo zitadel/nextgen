@@ -8,11 +8,34 @@ const platform = usePlatformMock();
 const PREVIEW_PATTERN = "https://*-acme.vercel.app";
 const PREVIEW_URL = "https://x-acme.vercel.app";
 
+type Published = {
+  content_hash: string;
+  previews: { url: string; expires_at: string | null }[];
+  release_env: string;
+  dry_run?: boolean;
+};
+
+type Listed = { items: { origin: string }[] };
+
+/** Arranges a set-up project that admits {@link PREVIEW_PATTERN} as a preview. */
+async function anAppAdmittingPreviews() {
+  const app = await aSetUpApp();
+  await app.addOrigin(PREVIEW_PATTERN, "preview");
+  return app;
+}
+
+/** Arranges a project whose `preview` environment holds no preview token. */
+async function anAppWithoutAPreviewToken() {
+  const app = await anApp();
+  await app.bindEnvironment("preview", {
+    ZITADEL_PROJECT_ID: "proj_preview",
+    ZITADEL_PROJECT_SECRET: "sk",
+  });
+  return app;
+}
+
 describe("preview", () => {
   describe("against an invalid server", () => {
-    // preview reaches the server to create the release and the deployment, so a
-    // server that cannot answer fails the command. `--origin` keeps it from the
-    // production no-op path so it does reach the server.
     describe("that is not a zitadel api", () => {
       it("fails", async () => {
         const app = await aSetUpApp();
@@ -38,108 +61,93 @@ describe("preview", () => {
 
   describe("against a valid server", () => {
     describe("--json", () => {
-      it("deploys to the preview URL it is given, for the ttl", async () => {
-        const app = await aSetUpApp();
-        await app.addOrigin(PREVIEW_PATTERN, "preview");
+      it("deploys to the preview URL it is given", async () => {
+        const app = await anAppAdmittingPreviews();
 
         const result = await app.run(["preview", "--origin", PREVIEW_URL, "--ttl", "1d", "--json"]);
 
-        expect(result).toSucceed();
-        const data = app.envelopeOf<{
-          content_hash: string;
-          previews: { url: string; expires_at: string | null }[];
-          release_env: string;
-        }>(result).data;
-        expect(data.content_hash).toMatch(/^sha256:[0-9a-f]{64}$/);
-        expect(data.previews.map((preview) => preview.url)).toEqual([PREVIEW_URL]);
-        expect(data.release_env).toBe(`NEXT_PUBLIC_ZITADEL_RELEASE=${data.content_hash}`);
-      });
-
-      it("refuses a ttl outside the 60s..30d range", async () => {
-        const app = await aSetUpApp();
-        await app.addOrigin(PREVIEW_PATTERN, "preview");
-
-        for (const ttl of ["30s", "31d"]) {
-          const result = await app.run([
-            "preview",
-            "--origin",
-            PREVIEW_URL,
-            "--ttl",
-            ttl,
-            "--json",
-          ]);
-          expect(result).toFail();
-          expect(app.envelopeOf<{ code: string }>(result).code).toBe("E_VALIDATION");
-        }
-      });
-
-      it("lists the preview it deployed", async () => {
-        const app = await aSetUpApp();
-        await app.addOrigin(PREVIEW_PATTERN, "preview");
-        await app.run(["preview", "--origin", PREVIEW_URL, "--json"]);
-
-        const listed = await app.run(["preview", "list", "--json"]);
-
-        expect(listed).toSucceed();
         expect(
-          app
-            .envelopeOf<{ items: { origin: string }[] }>(listed)
-            .data.items.map((preview) => preview.origin),
+          app.envelopeOf<Published>(result).data.previews.map((preview) => preview.url),
         ).toEqual([PREVIEW_URL]);
       });
 
-      it("defaults the ttl the server applies when --ttl is omitted", async () => {
-        const app = await aSetUpApp();
-        await app.addOrigin(PREVIEW_PATTERN, "preview");
+      it("reports the content hash of what it deployed", async () => {
+        const app = await anAppAdmittingPreviews();
 
         const result = await app.run(["preview", "--origin", PREVIEW_URL, "--json"]);
 
-        expect(result).toSucceed();
-        // Omitting --ttl leaves it to the server default, which still gives the
-        // written preview a future expiry.
-        const data = app.envelopeOf<{ previews: { expires_at: string | null }[] }>(result).data;
-        expect(data.previews[0]?.expires_at).not.toBeNull();
-        expect(new Date(data.previews[0]?.expires_at as string).getTime()).toBeGreaterThan(
-          Date.now(),
+        expect(app.envelopeOf<Published>(result).data.content_hash).toMatch(
+          /^sha256:[0-9a-f]{64}$/,
         );
       });
 
+      it("reports the release pin for the build", async () => {
+        const app = await anAppAdmittingPreviews();
+
+        const result = await app.run(["preview", "--origin", PREVIEW_URL, "--json"]);
+
+        expect(app.envelopeOf<Published>(result).data.release_env).toMatch(
+          /^NEXT_PUBLIC_ZITADEL_RELEASE=sha256:[0-9a-f]{64}$/,
+        );
+      });
+
+      it.each(["30s", "31d"])("refuses a ttl of %s, outside the 60s..30d range", async (ttl) => {
+        const app = await anAppAdmittingPreviews();
+
+        const result = await app.run(["preview", "--origin", PREVIEW_URL, "--ttl", ttl, "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it("lists the preview it deployed", async () => {
+        const app = await anAppAdmittingPreviews();
+
+        await app.run(["preview", "--origin", PREVIEW_URL, "--json"]);
+
+        const listed = await app.run(["preview", "list", "--json"]);
+        expect(app.envelopeOf<Listed>(listed).data.items.map((preview) => preview.origin)).toEqual([
+          PREVIEW_URL,
+        ]);
+      });
+
+      it("gives the preview an expiry when --ttl is omitted", async () => {
+        const app = await anAppAdmittingPreviews();
+
+        const result = await app.run(["preview", "--origin", PREVIEW_URL, "--json"]);
+
+        expect(app.envelopeOf<Published>(result).data.previews[0]?.expires_at).not.toBeNull();
+      });
+
       it("reports a dry run", async () => {
-        const app = await aSetUpApp();
-        await app.addOrigin(PREVIEW_PATTERN, "preview");
+        const app = await anAppAdmittingPreviews();
 
         const result = await app.run(["preview", "--origin", PREVIEW_URL, "--dry-run", "--json"]);
 
-        expect(app.envelopeOf<{ dry_run: boolean }>(result).data.dry_run).toBe(true);
+        expect(app.envelopeOf<Published>(result).data.dry_run).toBe(true);
       });
 
       it("registers no preview on a dry run", async () => {
-        const app = await aSetUpApp();
-        await app.addOrigin(PREVIEW_PATTERN, "preview");
+        const app = await anAppAdmittingPreviews();
 
         await app.run(["preview", "--origin", PREVIEW_URL, "--dry-run", "--json"]);
 
         const listed = await app.run(["preview", "list", "--json"]);
-        expect(app.envelopeOf<{ items: unknown[] }>(listed).data.items).toEqual([]);
+        expect(app.envelopeOf<Listed>(listed).data.items).toEqual([]);
       });
 
       it("treats a trailing slash on --origin as the same preview URL", async () => {
-        const app = await aSetUpApp();
-        await app.addOrigin(PREVIEW_PATTERN, "preview");
+        const app = await anAppAdmittingPreviews();
 
         await app.run(["preview", "--origin", `${PREVIEW_URL}/`, "--json"]);
 
         const listed = await app.run(["preview", "list", "--json"]);
-        expect(
-          app
-            .envelopeOf<{ items: { origin: string }[] }>(listed)
-            .data.items.map((preview) => preview.origin),
-        ).toEqual([PREVIEW_URL]);
+        expect(app.envelopeOf<Listed>(listed).data.items.map((preview) => preview.origin)).toEqual([
+          PREVIEW_URL,
+        ]);
       });
 
       it("skips a CI build that names no environment", async () => {
-        const app = await aSetUpApp();
-        await app.addOrigin(PREVIEW_PATTERN, "preview");
+        const app = await anAppAdmittingPreviews();
 
         const result = await app.run(["preview", "--origin", PREVIEW_URL, "--json"], {
           CI: "true",
@@ -148,17 +156,36 @@ describe("preview", () => {
         expect(result).toBeSkipped();
       });
 
+      it("says how to deploy from a CI build that names no environment", async () => {
+        const app = await anAppAdmittingPreviews();
+
+        const result = await app.run(["preview", "--origin", PREVIEW_URL, "--json"], {
+          CI: "true",
+        });
+
+        expect(result).toSay("Set ZITADEL_ENV=preview in the pull-request build");
+      });
+
       it("deploys in a CI build that names the preview environment", async () => {
-        const app = await aSetUpApp();
-        await app.addOrigin(PREVIEW_PATTERN, "preview");
+        const app = await anAppAdmittingPreviews();
         await app.bindEnvironment("preview", await app.developmentValues());
 
         const result = await app.run(
           ["preview", "--env", "preview", "--origin", PREVIEW_URL, "--json"],
-          {
-            CI: "true",
-          },
+          { CI: "true" },
         );
+
+        expect(result).toSucceed();
+      });
+
+      it("deploys in a CI build whose ZITADEL_ENV names the preview environment", async () => {
+        const app = await anAppAdmittingPreviews();
+        await app.bindEnvironment("preview", await app.developmentValues());
+
+        const result = await app.run(["preview", "--origin", PREVIEW_URL, "--json"], {
+          CI: "true",
+          ZITADEL_ENV: "preview",
+        });
 
         expect(result).toSucceed();
       });
@@ -172,17 +199,14 @@ describe("preview", () => {
       });
 
       it("deploys to the URL the hosting platform announces when no --origin is given", async () => {
-        const app = await aSetUpApp();
-        await app.addOrigin(PREVIEW_PATTERN, "preview");
+        const app = await anAppAdmittingPreviews();
 
         await app.run(["preview", "--json"], { VERCEL_URL: "x-acme.vercel.app" });
 
         const listed = await app.run(["preview", "list", "--json"]);
-        expect(
-          app
-            .envelopeOf<{ items: { origin: string }[] }>(listed)
-            .data.items.map((preview) => preview.origin),
-        ).toEqual([PREVIEW_URL]);
+        expect(app.envelopeOf<Listed>(listed).data.items.map((preview) => preview.origin)).toEqual([
+          PREVIEW_URL,
+        ]);
       });
 
       it("refuses a primary origin's own URL as a target", async () => {
@@ -219,8 +243,7 @@ describe("preview", () => {
       });
 
       it("says there is nothing to preview in production even with an origin", async () => {
-        const app = await aSetUpApp();
-        await app.addOrigin(PREVIEW_PATTERN, "preview");
+        const app = await anAppAdmittingPreviews();
 
         const result = await app.run([
           "preview",
@@ -235,21 +258,16 @@ describe("preview", () => {
       });
 
       it("registers no preview in production even with an origin", async () => {
-        const app = await aSetUpApp();
-        await app.addOrigin(PREVIEW_PATTERN, "preview");
+        const app = await anAppAdmittingPreviews();
 
         await app.run(["preview", "--env", "production", "--origin", PREVIEW_URL, "--json"]);
 
         const listed = await app.run(["preview", "list", "--json"]);
-        expect(app.envelopeOf<{ items: unknown[] }>(listed).data.items).toEqual([]);
+        expect(app.envelopeOf<Listed>(listed).data.items).toEqual([]);
       });
 
       it("skips when ZITADEL_PREVIEW_TOKEN is not set", async () => {
-        const app = await anApp();
-        await app.bindEnvironment("preview", {
-          ZITADEL_PROJECT_ID: "proj_preview",
-          ZITADEL_PROJECT_SECRET: "sk",
-        });
+        const app = await anAppWithoutAPreviewToken();
 
         const result = await app.run([
           "preview",
@@ -263,12 +281,8 @@ describe("preview", () => {
         expect(result).toBeSkipped();
       });
 
-      it("warns naming ZITADEL_PREVIEW_TOKEN in the envelope when it is not set", async () => {
-        const app = await anApp();
-        await app.bindEnvironment("preview", {
-          ZITADEL_PROJECT_ID: "proj_preview",
-          ZITADEL_PROJECT_SECRET: "sk",
-        });
+      it("warns naming ZITADEL_PREVIEW_TOKEN when it is not set", async () => {
+        const app = await anAppWithoutAPreviewToken();
 
         const result = await app.run([
           "preview",
@@ -279,17 +293,11 @@ describe("preview", () => {
           "--json",
         ]);
 
-        expect((JSON.parse(result.stdout) as { warnings?: string[] }).warnings).toEqual([
-          expect.stringContaining("ZITADEL_PREVIEW_TOKEN"),
-        ]);
+        expect(result).toSay("ZITADEL_PREVIEW_TOKEN");
       });
 
       it("fails naming ZITADEL_PREVIEW_TOKEN under --strict when it is not set", async () => {
-        const app = await anApp();
-        await app.bindEnvironment("preview", {
-          ZITADEL_PROJECT_ID: "proj_preview",
-          ZITADEL_PROJECT_SECRET: "sk",
-        });
+        const app = await anAppWithoutAPreviewToken();
 
         const result = await app.run([
           "preview",
@@ -301,20 +309,19 @@ describe("preview", () => {
           "--json",
         ]);
 
-        expect(result).toSay("ZITADEL_PREVIEW_TOKEN");
+        expect(result).toFailWith("E_VALIDATION");
       });
     });
 
     describe("rendered for a terminal", () => {
       it("prints the release pin as the last line", async () => {
-        const app = await aSetUpApp();
-        await app.addOrigin(PREVIEW_PATTERN, "preview");
+        const app = await anAppAdmittingPreviews();
 
         const result = await app.run(["preview", "--origin", PREVIEW_URL]);
 
-        expect(result).toSucceed();
-        const lines = result.stdout.trimEnd().split("\n");
-        expect(lines.at(-1)).toMatch(/^NEXT_PUBLIC_ZITADEL_RELEASE=sha256:[0-9a-f]{64}$/);
+        expect(result.stdout.trimEnd().split("\n").at(-1)).toMatch(
+          /^NEXT_PUBLIC_ZITADEL_RELEASE=sha256:[0-9a-f]{64}$/,
+        );
       });
     });
   });

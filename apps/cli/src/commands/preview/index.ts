@@ -178,6 +178,7 @@ export default class Preview extends PreviewCommand {
       color,
       bundle,
       brandingSources,
+      suggest: (args) => this.suggest(args),
     };
 
     // Validation only: the IdP sync step is deploy-only, so a pull-request build
