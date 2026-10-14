@@ -258,25 +258,39 @@ func TestVariables(t *testing.T) {
 	// The store holds primary values only until it carries a kind.
 	t.Run("a preview request is not implemented yet", func(t *testing.T) {
 		preview := api.NewOptVariableKind(api.VariableKindPreview)
-
-		read, err := client.GetVariables(t.Context(), api.GetVariablesParams{
-			ProjectID: projectID,
-			Kind:      preview,
+		update(t, api.OptVariableKind{}, api.UpdateVariablesRequest{
+			"KEPT": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("x")),
 		})
-		require.NoError(t, err)
-		status, code, _, ok := errorResponseParts(t, read)
-		require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, read))
-		assert.Equal(t, http.StatusNotImplemented, status)
-		assert.Equal(t, domain.ErrNotImplemented().Code, code)
 
-		written := update(t, preview, api.UpdateVariablesRequest{
-			"NEVER_LANDS": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("x")),
-		})
-		status, code, _, ok = errorResponseParts(t, written)
-		require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, written))
-		assert.Equal(t, http.StatusNotImplemented, status)
-		assert.Equal(t, domain.ErrNotImplemented().Code, code)
-		assert.NotContains(t, get(t, api.OptVariableKind{}), "NEVER_LANDS")
+		for name, call := range map[string]func() (any, error){
+			"list": func() (any, error) {
+				return client.GetVariables(t.Context(), api.GetVariablesParams{ProjectID: projectID, Kind: preview})
+			},
+			"get": func() (any, error) {
+				return client.GetVariable(t.Context(), api.GetVariableParams{ProjectID: projectID, VariableName: "KEPT", Kind: preview})
+			},
+			"update": func() (any, error) {
+				return client.UpdateVariables(t.Context(), api.UpdateVariablesRequest{
+					"NEVER_LANDS": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("x")),
+				}, api.UpdateVariablesParams{ProjectID: projectID, Kind: preview})
+			},
+			"delete": func() (any, error) {
+				return client.DeleteVariable(t.Context(), api.DeleteVariableParams{ProjectID: projectID, VariableName: "KEPT", Kind: preview})
+			},
+		} {
+			t.Run(name, func(t *testing.T) {
+				res, err := call()
+				require.NoError(t, err)
+				status, code, _, ok := errorResponseParts(t, res)
+				require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, res))
+				assert.Equal(t, http.StatusNotImplemented, status)
+				assert.Equal(t, domain.ErrNotImplemented().Code, code)
+			})
+		}
+
+		vars := get(t, api.OptVariableKind{})
+		assert.NotContains(t, vars, "NEVER_LANDS")
+		assert.Contains(t, vars, "KEPT", "a refused preview delete must leave the primary value")
 	})
 }
 

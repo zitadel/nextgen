@@ -1373,6 +1373,14 @@ export function setupPlatformHandlers() {
     // publishes the client id and secret here, so without them a scaffolded
     // provider has no credentials and sign-in fails at the token endpoint.
 
+    // Registered ahead of `*/variables`, which would otherwise match it. The
+    // server answers 501 until it stores frozen sets, and so does the mock.
+    http.get("*/deployments/:deploymentId/variables", () =>
+      HttpResponse.json(errorBody("not_implemented", "This feature is not implemented yet."), {
+        status: 501,
+      }),
+    ),
+
     http.get("*/variables", ({ request }) => {
       const query = parse(GetVariablesQueryParams, queryRecord(request), "invalid_query");
       if (!query.ok) {

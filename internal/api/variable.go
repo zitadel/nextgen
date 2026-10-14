@@ -244,9 +244,8 @@ func variableErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	}
 }
 
-// environmentErrorResponse maps the environment error codes onto statuses:
-// a variables request naming an environment, and the deployment access check
-// answering env.project_not_found for a foreign project.
+// environmentErrorResponse maps the environment error codes the deployment
+// service and its access check answer onto statuses.
 func environmentErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	switch err.Code {
 	case domain.ErrEnvironmentNotFound().Code, domain.ErrEnvironmentProjectNotFound().Code:

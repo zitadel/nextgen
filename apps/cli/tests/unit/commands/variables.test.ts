@@ -388,6 +388,18 @@ describe("variables get", () => {
     expect(empty.stdout).toMatch(/value\s+""/);
   });
 
+  it("fails with E_NOT_FOUND when the answer has no primary value", async () => {
+    const cwd = await makeProject();
+    server.use(http.get("*/variables/:name", () => HttpResponse.json({ preview: "x" })));
+
+    const res = await runCliForTest(["variables", "get", "TOKEN", "--project-level", ...base(cwd)]);
+
+    expect(res.exitCode).not.toBe(0);
+    const json = parseJson(res.stdout) as { code: string; message: string };
+    expect(json.code).toBe("E_NOT_FOUND");
+    expect(json.message).toContain("TOKEN has no primary value");
+  });
+
   it("reports a secret as held and carries no value", async () => {
     const cwd = await makeProject();
     server.use(

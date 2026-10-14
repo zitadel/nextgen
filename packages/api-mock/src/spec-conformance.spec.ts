@@ -1484,6 +1484,17 @@ describe("api-mock idp and variable contract details", () => {
     });
   });
 
+  test("answers not_implemented for a deployment's variables", async () => {
+    const projectId = await newProject("vars-deployment");
+
+    const res = await fetch(
+      `${BASE}/deployments/dep_01KX5N7C9D2E7F0N9WD3P2E4YM6/variables?project_id=${projectId}`,
+    );
+
+    expect(res.status).toBe(501);
+    expect(((await res.json()) as { code?: string }).code).toBe("not_implemented");
+  });
+
   test("reads back what the write did not touch", async () => {
     const projectId = await newProject("vars-readback");
     const url = `${BASE}/variables?project_id=${projectId}`;
