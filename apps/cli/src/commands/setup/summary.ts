@@ -131,26 +131,32 @@ async function fileExists(p: string): Promise<boolean> {
   }
 }
 
+/**
+ * How the summary names each framework, and the package whose declared range
+ * is the framework version it shows ("SvelteKit 2.5 · TypeScript · npm").
+ */
+const FRAMEWORKS: Readonly<Record<string, { readonly name: string; readonly dependency: string }>> =
+  {
+    next: { name: "Next.js", dependency: "next" },
+    nuxt: { name: "Nuxt", dependency: "nuxt" },
+    react: { name: "React", dependency: "react" },
+    vue: { name: "Vue", dependency: "vue" },
+    angular: { name: "Angular", dependency: "@angular/core" },
+    solid: { name: "Solid", dependency: "solid-js" },
+    svelte: { name: "Svelte", dependency: "svelte" },
+    qwik: { name: "Qwik", dependency: "@qwik.dev/core" },
+    sveltekit: { name: "SvelteKit", dependency: "@sveltejs/kit" },
+    "solid-start": { name: "SolidStart", dependency: "@solidjs/start" },
+    "qwik-city": { name: "Qwik City", dependency: "@qwik.dev/router" },
+    "tanstack-start": { name: "TanStack Start", dependency: "@tanstack/react-start" },
+  };
+
 function depFromFramework(framework: string): string {
-  switch (framework) {
-    case "next":
-      return "next";
-    case "nuxt":
-      return "nuxt";
-    default:
-      return framework;
-  }
+  return FRAMEWORKS[framework]?.dependency ?? framework;
 }
 
 function prettyFramework(framework: string): string {
-  switch (framework) {
-    case "next":
-      return "Next.js";
-    case "nuxt":
-      return "Nuxt";
-    default:
-      return framework;
-  }
+  return FRAMEWORKS[framework]?.name ?? framework;
 }
 
 /** Strips `^`/`~`/`>=`/`v` prefixes from an npm range so the version reads cleanly in the summary. */
