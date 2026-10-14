@@ -253,6 +253,40 @@ describe("<zitadel-session>", () => {
     expect(loc.current).toBe("");
   });
 
+  it("asks again once put back after the answer it missed, then announces and navigates", async () => {
+    let requests = 0;
+    let answer: () => void = () => undefined;
+    server.use(
+      http.get(`${API_BASE}/sessions/me`, async () => {
+        requests += 1;
+        if (requests === 1) {
+          await new Promise<void>((resolve) => {
+            answer = resolve;
+          });
+        }
+        return unauthorized();
+      }),
+    );
+    const loc = stubLocation();
+    const missing: Event[] = [];
+    const element = mount(
+      '<zitadel-session post-sign-out-url="https://app.test/login"></zitadel-session>',
+    );
+    element.addEventListener("zitadel-session-missing", (e) => missing.push(e));
+    await flush(element);
+    element.remove();
+    answer();
+    await flush(element);
+    expect(requests).toBe(1);
+
+    host.appendChild(element);
+    await flush(element);
+
+    expect(requests).toBe(2);
+    expect(missing).toHaveLength(1);
+    expect(loc.current).toBe("https://app.test/login");
+  });
+
   it.each([...OUTAGES, ...UNREADABLE_SESSIONS])(
     "keeps the card and shows the error, without announcing or navigating, for %s",
     async (_, answer) => {

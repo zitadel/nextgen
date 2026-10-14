@@ -182,6 +182,36 @@ describe("<zitadel-logout>", () => {
     expect(events[0]?.bubbles && events[0]?.composed).toBe(true);
   });
 
+  it("announces a missing session once put back after removal swallowed the answer", async () => {
+    let requests = 0;
+    let answer: () => void = () => undefined;
+    server.use(
+      http.get(`${API_BASE}/sessions/me`, async () => {
+        requests += 1;
+        if (requests === 1) {
+          await new Promise<void>((resolve) => {
+            answer = resolve;
+          });
+        }
+        return unauthorized();
+      }),
+    );
+    const events: Event[] = [];
+    const element = mount();
+    element.addEventListener("zitadel-session-missing", (event) => events.push(event));
+    await flush(element);
+    element.remove();
+    answer();
+    await flush(element);
+    expect(events).toHaveLength(0);
+
+    host.appendChild(element);
+    await flush(element);
+
+    expect(requests).toBe(2);
+    expect(events).toHaveLength(1);
+  });
+
   it("stays on the page when there is no active session", async () => {
     sessionAnswer = unauthorized;
     Object.defineProperty(window, "location", {

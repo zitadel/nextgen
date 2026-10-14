@@ -201,6 +201,9 @@ export class SessionController implements ReactiveController {
   }
 
   private maybeLoadIdentity(): void {
+    // A detached host loads when it is connected again (`hostConnected`), not
+    // from an update it receives meanwhile.
+    if (!this.host.isConnected) return;
     let resolved: Resolved;
     try {
       resolved = this.resolve();
@@ -249,11 +252,15 @@ export class SessionController implements ReactiveController {
     }
     this.host.requestUpdate();
     this.options.onIdentityChanged?.();
-    // A host removed while the request was in flight no longer speaks for the
-    // page, so it must not announce or navigate.
-    if (missing && this.host.isConnected) {
-      emit(this.host, "zitadel-session-missing", {});
-      this.options.onSessionMissing?.();
+    if (!missing) return;
+    if (!this.host.isConnected) {
+      // A host removed while the request was in flight no longer speaks for
+      // the page, so it must not announce or navigate. Put back (a kept-alive
+      // tab, a reparenting portal), it asks again and announces then.
+      this.loadedKey = undefined;
+      return;
     }
+    emit(this.host, "zitadel-session-missing", {});
+    this.options.onSessionMissing?.();
   }
 }
