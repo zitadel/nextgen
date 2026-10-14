@@ -27,14 +27,18 @@ import "../atoms/zl-icon.js";
  * It renders an avatar trigger with a dropdown that exposes a "Sign out"
  * action, and calls the typed `revokeMySession` operation in `@zitadel/api`
  * (`DELETE /sessions/me`). The server clears the session cookie via
- * `Set-Cookie: Max-Age=0`; on success (a 401 or 404 counts, the session is
- * already gone) the element fires `zitadel-signout` and navigates to
- * `post-sign-out-url`, or without one renders nothing.
+ * `Set-Cookie: Max-Age=0`; on success (the backend's `401 auth.unauthorized`
+ * or `404 sess.not_found` counts, the session is already gone) the element
+ * fires `zitadel-signout` and navigates to `post-sign-out-url`, or without one
+ * renders nothing. Any other failure shows the error and signs nobody out.
  *
- * When `GET /sessions/me` answers 401 or 404 the visitor has no session: the
+ * When `GET /sessions/me` answers `401 auth.unauthorized` or
+ * `404 sess.not_found`, or names no user, the visitor has no session: the
  * element fires `zitadel-session-missing` and renders nothing (no avatar, no
  * projected template). It does not navigate: the menu sits in an app's own
- * chrome, often on public pages. A network error or a 5xx keeps the control.
+ * chrome, often on public pages. Anything else (a network error, a 5xx, a
+ * gateway's 401 or 404 without the backend's code, a 200 that is not a
+ * session) keeps the control and shows the error.
  *
  * ## Template-slot mode
  *

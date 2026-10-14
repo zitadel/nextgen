@@ -41,17 +41,19 @@ const DEFAULT_LOGOUT_LABEL = "Sign out";
  *   always-present `user_id`. NOTE: the current server response includes only
  *   the `user_id`, so the card displays the raw id until the backend returns a
  *   human-readable `name`/`email` on `/sessions/me`.
- * - **No session.** When that request answers 401 or 404 (or names no user)
- *   the visitor is signed out: the element fires `zitadel-session-missing`,
- *   then navigates to `post-sign-out-url` when one is set and otherwise
- *   renders nothing. A network error or a 5xx is not "signed out": the card
- *   stays and shows the error.
+ * - **No session.** When that request answers the backend's
+ *   `401 auth.unauthorized` or `404 sess.not_found` (or names no user) the
+ *   visitor is signed out: the element fires `zitadel-session-missing`, then
+ *   navigates to `post-sign-out-url` when one is set and otherwise renders
+ *   nothing. Anything else is not "signed out": a network error, a 5xx, a
+ *   gateway's 401 or 404 without the backend's code, or a 200 that is not a
+ *   session keeps the card and shows the error.
  * - **Sign out** calls the typed `revokeMySession` operation
  *   (`DELETE /sessions/me`); the server clears the session cookie. On success
- *   (a 401 or 404 counts, the session is already gone) the element fires
- *   `zitadel-signout` (detail `{ display, identifier }`, matching the shared
- *   SPA contract), then navigates to `post-sign-out-url`, or without one
- *   renders nothing.
+ *   (the backend's no-session answers count, the session is already gone) the
+ *   element fires `zitadel-signout` (detail `{ display, identifier }`,
+ *   matching the shared SPA contract), then navigates to `post-sign-out-url`,
+ *   or without one renders nothing. Any other failure shows the error.
  *
  * A "Continue" action is intentionally omitted for now: the post-sign-in
  * destination contract is still being decided. Consumers redirect after

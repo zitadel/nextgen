@@ -1,8 +1,8 @@
 import type { ReactiveController, ReactiveControllerHost } from "lit";
 
-import { ApiError } from "@zitadel/api/runtime/fetch";
+import { ApiError, apiErrorCode } from "@zitadel/api/runtime/fetch";
 
-import { getSession, revokeSession } from "./api-client.js";
+import { getSession, revokeSession, type SessionIdentity } from "./api-client.js";
 import type { resolveApi } from "./resolve-api.js";
 import { onConfigChange } from "../internal/config-change.js";
 import { emit } from "../internal/emit.js";
@@ -14,12 +14,12 @@ type Api = Resolved["api"];
  * What the host knows about the visitor's session:
  *
  * - `unknown` until the identity request settles, while no project is
- *   configured, or when the request failed without an answer (a network error
- *   or a 5xx: the session may well be fine, so the host keeps its surface and
- *   shows the error);
+ *   configured, or when the request failed without the backend answering
+ *   (see {@link isNoSession}): the session may well be fine, so the host keeps
+ *   its surface and shows the error;
  * - `signed-in` once `GET /sessions/me` named a user;
- * - `signed-out` when it answered that there is no session (401, 404, or no
- *   user), or after a sign-out that stays on the page.
+ * - `signed-out` when the backend answered that there is no session, or named
+ *   no user, or after a sign-out that stays on the page.
  */
 export type SessionState = "unknown" | "signed-in" | "signed-out";
 
@@ -33,9 +33,34 @@ function projectKey({ project }: Resolved): string {
   ]);
 }
 
-/** The server answered that the request carries no live session. */
+/**
+ * The backend itself answered that the request carries no live session: a
+ * `401` with its `auth.unauthorized` code (a missing, invalid, expired or
+ * revoked cookie) or a `404` with `sess.not_found`. A gateway, a WAF, an
+ * ingress default backend or a wrong base path answers 401 and 404 too, but
+ * without the backend's code. That says nothing about the session, so it is an
+ * error like a 5xx. The server SDKs decide a session check the same way.
+ */
 function isNoSession(error: unknown): boolean {
-  return error instanceof ApiError && (error.status === 401 || error.status === 404);
+  if (!(error instanceof ApiError)) return false;
+  const code = apiErrorCode(error);
+  return (
+    (error.status === 401 && code === "auth.unauthorized") ||
+    (error.status === 404 && code === "sess.not_found")
+  );
+}
+
+/**
+ * Whether a `GET /sessions/me` 200 carries the session JSON, which always has
+ * its `session_id`. Anything else (an SPA host's `index.html` served for an
+ * unrewritten proxy path) did not come from the backend.
+ */
+function isSessionBody(body: unknown): body is SessionIdentity {
+  return (
+    typeof body === "object" &&
+    body !== null &&
+    typeof (body as { session_id?: unknown }).session_id === "string"
+  );
 }
 
 export interface SessionControllerOptions {
@@ -145,10 +170,11 @@ export class SessionController implements ReactiveController {
 
   /**
    * Revokes the session with credentials; the server clears the cookie. Fires
-   * `zitadel-signout` (after `onRevoked`) and resolves `true` on success. A 401
-   * or 404 means the session is already gone, which is what signing out asks
-   * for, so it succeeds the same way. Any other failure sets `errorMessage` and
-   * resolves `false`.
+   * `zitadel-signout` (after `onRevoked`) and resolves `true` on success. The
+   * backend answering that there is no session (see {@link isNoSession}) means
+   * it is already gone, which is what signing out asks for, so it succeeds the
+   * same way. Any other failure, a gateway's 401 or 404 included, revoked
+   * nothing: it sets `errorMessage` and resolves `false`.
    */
   async signOut(onRevoked?: () => void): Promise<boolean> {
     this.loading = true;
@@ -199,8 +225,11 @@ export class SessionController implements ReactiveController {
   private async loadIdentity(api: Api, seq: number): Promise<void> {
     let missing: boolean;
     try {
-      const session = await getSession(api);
+      const session: unknown = await getSession(api);
       if (seq !== this.loadSeq) return;
+      if (!isSessionBody(session)) {
+        throw new Error("Could not load the session: the response is not a session.");
+      }
       this.display = session.user?.display ?? "";
       this.identifier = session.user?.identifier ?? "";
       this.userId = session.user_id ?? "";
