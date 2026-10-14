@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -226,12 +226,16 @@ describe("release artifact helpers", () => {
       repoRoot,
       outDir,
       version: "0.1.0-alpha.6",
-      // tar -czf <archive> … and zip -qr <archive> . both name the archive second.
       run: async (_command, args) => {
+        // tar -czf <archive> … and zip -qr <archive> . both name the archive second.
+        const archivePath = args[1];
+        if (!archivePath) {
+          throw new Error(`no archive path in: ${args.join(" ")}`);
+        }
         running += 1;
         mostRunning = Math.max(mostRunning, running);
         await new Promise((resolve) => setTimeout(resolve, 20));
-        await writeFile(args[1], `archive ${args[1].split("/").at(-1)}`);
+        await writeFile(archivePath, `archive ${basename(archivePath)}`);
         running -= 1;
       },
     });
@@ -243,7 +247,7 @@ describe("release artifact helpers", () => {
           platform.goos === "windows" ? "zip" : "tar.gz"
         }`,
     );
-    expect(archives.map((archive) => archive.split("/").at(-1))).toEqual(names);
+    expect(archives.map((archive) => basename(archive))).toEqual(names);
     const checksums = await readFile(checksumPath, "utf8");
     expect(checksums.trimEnd().split("\n")).toEqual(
       names.map(
