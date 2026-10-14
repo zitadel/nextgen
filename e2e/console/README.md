@@ -4,13 +4,13 @@ Playwright coverage for the console's runtime boundaries. Each lane serves the
 console differently, and the differences are the point — pick by which boundary
 you need proven.
 
-| Lane             | Serves the console | Backend                | Proves                              |
-| ---------------- | ------------------ | ---------------------- | ----------------------------------- |
-| `e2e`            | `vite preview`     | none                   | the SPA mounts under `/ui/console/` |
-| `e2e-real`       | Vite dev server    | real, via dev proxy    | resource screens against real data  |
-| `e2e-embedded`   | the Go binary      | real, same origin      | the production request path         |
-| `e2e-platform`   | the Go binary      | real, platform project | a platform operator on the cookie   |
-| `e2e-deployment` | a cloud deployment | the deployment's own   | the cloud's routing, signed out     |
+| Lane                 | Serves the console | Backend                | Proves                              |
+| -------------------- | ------------------ | ---------------------- | ----------------------------------- |
+| `console-smoke`      | `vite preview`     | none                   | the SPA mounts under `/ui/console/` |
+| `console-real`       | Vite dev server    | real, via dev proxy    | resource screens against real data  |
+| `console-embedded`   | the Go binary      | real, same origin      | the production request path         |
+| `console-platform`   | the Go binary      | real, platform project | a platform operator on the cookie   |
+| `console-deployment` | a cloud deployment | the deployment's own   | the cloud's routing, signed out     |
 
 ## Embedded shell smoke
 
@@ -46,13 +46,13 @@ fresh user per test.
 
 The dev proxy is also this lane's blind spot: it rewrites `/api/*` onto the API
 root, so the console's API base is correct here by construction. That is what
-`e2e-embedded` is for.
+`console-embedded` is for.
 
 This lane boots the binary with its embedded console off (Vite serves the
 console here) but its hosted-login surface on: the mux mounts
 `/console/runtime.json` only alongside a UI surface, and that document carries
 the publishable key the login widget needs for the sign-in exchange (see
-[`moon.yml`](moon.yml)). The proxy forwards it like any other request, and the
+[`moon.yml`](../moon.yml)). The proxy forwards it like any other request, and the
 same document names the project the console signs into: the instance's
 first-created project, the harness one. Nothing pins it on the client.
 
@@ -77,7 +77,7 @@ deployment state cannot produce. The stubbed retry falls through to the real
 server, so recovery is asserted against a genuine document rather than a
 fixture.
 
-Keep feature coverage out of it — that is `e2e-real`'s job. This lane asserts
+Keep feature coverage out of it — that is `console-real`'s job. This lane asserts
 that the surfaces reach the API at all. Management screens work here too: they
 authorize with the signed-in user's session cookie and grants (#1300), so a
 test that needs one grants its user access through the API first.
@@ -94,7 +94,7 @@ defaults `platform.bootstrap_project` to off. An operator signs up through the c
 project by email, and uses the screens on the session cookie alone. The console
 selects that project itself (the operator's only grant, as `?project=`), so the
 screens run in a project other than the one the console signs into.
-`e2e-embedded` cannot cover this: it switches the platform project off to sign
+`console-embedded` cannot cover this: it switches the platform project off to sign
 its seeded users into the harness project.
 
 ## Deployment coverage

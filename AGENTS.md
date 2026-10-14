@@ -183,13 +183,13 @@ scripts so server processes are signaled and cleaned up directly.
 startup, then runs `go run .`. Direct `go run .` callers must build the embedded
 UI surfaces themselves or disable both embedded UI surfaces.
 
-Checked-in end-to-end tests run in CI inside the same graph as the builds: the
-root `e2e` project's `all` task depends on every lane (console
+Checked-in end-to-end tests run in CI as one moon target: the root `e2e`
+project's `all` task depends on every lane (console
 smoke/real/embedded/platform, demo mock/real, the CLI journey matrix, and the
-kit's real-instance suite), and ci.yml's `moon ci` call names `e2e:all`. A
-plain `:test` (and `pnpm run check`) stays unit tests; `moon run e2e:all` runs
-the whole suite locally, which boots real servers and needs browsers
-installed. The canonical details are in
+kit's real-instance suite), and ci.yml runs `e2e:all` in a step of its own
+after the build-and-test graph, whenever moon finds it affected. A plain
+`:test` (and `pnpm run check`) stays unit tests; `moon run e2e:all` runs the
+whole suite locally, which boots real servers and needs browsers installed. The canonical details are in
 [packages/testing/AGENTS.md](packages/testing/AGENTS.md). (More in
 [CONTRIBUTING.md](CONTRIBUTING.md#running-integration-and-end-to-end-tests)):
 

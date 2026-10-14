@@ -297,7 +297,7 @@ Typical timings with the SQLite local default (dated estimates from a July 2026 
 | Stop | typically under a second |
 | Bootstrap (project + schema + flow) | ~100ms |
 | Seed one user (create + password) | ~50ms |
-| Full `e2e-real` suite (boot + Next dev + 2 browser tests) | ~25s |
+| Full `e2e:demo-next-real` suite (boot + Next dev + 2 browser tests) | ~25s |
 
 **Instance-per-worker is not worth it for browser e2e**: the app dev server
 boots once with one project's env, and every extra worker would pay the full

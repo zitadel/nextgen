@@ -29,14 +29,16 @@ ADR 044) — both shapes run the same CLI path and browser journeys.
   CI needs gets a variable there too.
 - CI runs all journey variants (fresh-app matrix, passkey preset,
   pre-existing app, testkit, remote https) concurrently in a single `--ci`
-  invocation of the runner (one step in `.github/workflows/ci.yml`), which
+  invocation of the runner (the `e2e:journey-local` lane, run with every other
+  lane by the e2e step in `.github/workflows/ci.yml` through `e2e:all`), which
   parallelizes them through its own concurrency pool so one process shares
   one port allocator.
-  The step is gated on `snapshot` (i.e. any journey surface is affected,
-  computed by `scripts/ci-mode.mjs`), and the fresh-app framework set is
-  collapsed per-PR via `--matrix single|full` (the `journey_matrix` output,
-  using `scripts/frameworks.mjs`). New variants belong in the runner's `--ci`
-  set, not as new workflow steps.
+  The tarballs come from the snapshot step, gated on `snapshot` (a journey
+  surface is affected or the e2e step runs, computed by
+  `scripts/ci-mode.mjs`), and the fresh-app framework set is collapsed per-PR
+  through `JOURNEY_MATRIX=single|full` (the `journey_matrix` output, using
+  `scripts/frameworks.mjs`). New variants belong in the runner's `--ci` set,
+  not as new workflow steps.
 - CI must install Zitadel packages from current workflow tarballs through the
   temporary Verdaccio registry, not from public npm.
 - CI must run `npx @zitadel/cli@alpha doctor --runtime binary`,

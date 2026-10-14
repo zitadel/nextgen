@@ -180,7 +180,7 @@ as they were.
 | demo-next | `build` (outputs .next) | `#build` | outputs `.next/**`, `!.next/cache/**` |
 | demo-next, demo-nuxt | `dev`, `start` | same | existing |
 | demo-nuxt | `build` (outputs .output, mutex sdk-nuxt-dist) | `#build` | outputs `.output/**` |
-| e2e | `test` (journey harness unit tests); lanes `console-smoke`, `console-real`, `console-embedded`, `console-platform`, `console-deployment`, `demo-next-mock`, `demo-next-real`, `demo-nuxt-mock`, `journey`, `journey-local` (env, mutex `e2e-serial`); `all` (noop over every lane, the one target ci.yml names) | `@zitadel/e2e#…`, same lane names, plus `e2e-local`; no `all` | scripts carry the `NEXTGEN_*` and `ZITADEL_TELEMETRY` defaults; the demo-next pair holds the guard's `demo-next-app` lock; ci-turbo.yml runs the lanes as gated steps |
+| e2e | `test` (journey harness unit tests); lanes `console-smoke`, `console-real`, `console-embedded`, `console-platform`, `console-deployment`, `demo-next-mock`, `demo-next-real`, `demo-nuxt-mock`, `journey`, `journey-local` (env, mutex `e2e-serial`); `all` (noop over every lane; ci.yml's e2e step runs it) | `@zitadel/e2e#…`, same lane names, plus `e2e-local`; no `all` | scripts carry the `NEXTGEN_*` and `ZITADEL_TELEMETRY` defaults; the demo-next pair holds the guard's `demo-next-app` lock; ci-turbo.yml runs the lanes as gated steps |
 | docs | `generate` (inputs openapi + redocly) | `#generate` | same inputs and outputs |
 | docs | `build` (`next build`, mergeArgs replace) | `#build` | existing script (`pnpm run generate && next build`): bundles once more than moon; the Vercel docs service runs the script without a runner |
 | docs | `dev`, `start` | same | existing |
@@ -209,7 +209,7 @@ as they were.
 | `browser-tests` (components, api-mock, storybook, sdk-qwik `test`) | one real-Chromium Vite server at a time (#1490) | `task-guard --mutex browser-tests` in the four `test` scripts: a lock held across the retries. Ordering edges were rejected: with `--continue=dependencies-successful` one failing browser suite would skip the other three. |
 | `generated-sources` (server `generate`, `clean-generated`, `check-generate`, `check-generate-pruned`; api `generate`; config `sync-schemas`) | generation rewriting files other tasks read mid-graph | `task-guard --mutex generated-sources` in the six scripts. Ordering edges were rejected: they would put the Go generation on the critical path of every TypeScript build. |
 | `public-dist` (api, config, sdk-next `build-release`; cli `test`) | release builds cleaning a dist the CLI tests import | an edge: the release chain starts after `@zitadel/cli#test`. Moon could not express that edge (cli depends on those packages, a project-graph cycle); turbo has no project graph. |
-| `e2e-serial` (e2e `console-real`, `console-embedded`, `console-platform`, `demo-next-mock`, `demo-next-real`, `demo-nuxt-mock`, `journey-local`; testing `test-integration`) | the lanes that boot servers inside `moon ci`, one at a time (both demo-next lanes serve :3002) | ci-turbo.yml runs the lane groups as separate steps; within a turbo run only the demo-next pair collides, so their two scripts hold `task-guard --mutex demo-next-app`. |
+| `e2e-serial` (e2e `console-real`, `console-embedded`, `console-platform`, `demo-next-mock`, `demo-next-real`, `demo-nuxt-mock`, `journey-local`; testing `test-integration`) | the lanes that boot servers in ci.yml's e2e step (`moon exec e2e:all`), one at a time (both demo-next lanes serve :3002) | ci-turbo.yml runs the lane groups as separate steps; within a turbo run only the demo-next pair collides, so their two scripts hold `task-guard --mutex demo-next-app`. |
 | `sdk-nuxt-dist` (sdk-nuxt `build`, `build-release`; demo-nuxt `build`) | demo-nuxt bundling from sdk-nuxt/dist | the existing `demo-nuxt#build → sdk-nuxt#build` edge orders the dev builds; the release build never shares a turbo invocation with demo-nuxt. If that ever changes, the guard covers it. |
 
 The lock lives in the OS temp dir under a hash of the repository root, so two
@@ -234,11 +234,13 @@ scripts go with moon at the cutover.
 Turbo runs what is named. The gate names `lint typecheck build test
 check-adrs check-moon-graph`; every `runInCI: false` task has another name
 (`build-release`, `dev`, …) and is never reached. Moon's e2e lanes are
-`runInCI: true` but reached only through `e2e:all`, which ci.yml names; turbo
+`runInCI: "skip"`, which keeps them out of the `moon ci` graph, and ci.yml runs
+them in a step of its own with `moon exec e2e:all --ignore-ci-checks`; turbo
 has no `all`, and ci-turbo.yml runs the lanes as steps gated by ci-mode. One
 known difference: the console real-instance configs retry once when `CI` is
-set (`retries: process.env.CI ? 1 : 0`); moon's lanes clear `CI`, turbo leaves
-it set, so only turbo retries them. The e2e lanes and
+set (`retries: process.env.CI ? 1 : 0`); moon's lane commands unset `CI`
+(`env -u`: a task `env` entry would not override the runner's value), turbo
+leaves it set, so only turbo retries them. The e2e lanes and
 the dev/runtime tasks also get `cache: false`, which moon mostly left cached.
 `runInCI: true` on the database lanes existed only to keep `moon run` from
 hiding them in CI; it has no counterpart and needs none, and the `env -u CI`
@@ -341,14 +343,15 @@ set.
 | `MOON_SUMMARY=detailed` | `--summarize` + `report-turbo-failures.mjs` |
 | `node scripts/ci-mode.mjs <base>` | same, with `NEXTGEN_TASK_RUNNER=turbo` |
 | `moon run server:check-generate-pruned` | `turbo run check-generate-pruned --filter=@zitadel/server`, on pushes to main too, so that its result is in the remote cache |
-| `moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph e2e:all --downstream deep --include-relations` (the e2e lanes run inside it through `e2e:all`) | `turbo run lint typecheck build test check-adrs check-moon-graph --continue=dependencies-successful --summarize`, then the lanes as gated steps (rows below) |
+| `moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph --downstream deep --include-relations` | `turbo run lint typecheck build test check-adrs check-moon-graph --continue=dependencies-successful --summarize` |
 | `moon run server:test` | dropped: part of the gate (moon re-ran it because `moon ci` selects by affectedness) |
 | `moon run server:test-postgres` / `test-sqlite` | `turbo run test-postgres --filter=@zitadel/server` / `test-sqlite` |
 | `env -u CI -u GITHUB_ACTIONS moon run release:snapshot -- --skip-container` | `RELEASE_SKIP_CONTAINER=1 turbo run snapshot --filter=@zitadel/release` (no `env -u`; no arguments after `--`, see turborepo.md) |
-| `e2e:journey-local` inside `moon ci` (`JOURNEY_*` env on the step) | `JOURNEY_CI=1 JOURNEY_MATRIX=… turbo run e2e-local --filter=@zitadel/e2e` |
-| `testing:test-integration`, `e2e:demo-next-real` inside `moon ci` | `turbo run test:integration demo-next-real --filter=@zitadel/testing --filter=@zitadel/e2e` |
-| `e2e:console-real` (embedded, platform) inside `moon ci` | `turbo run console-real --filter=@zitadel/e2e` (…) |
-| `e2e:console-smoke`, `e2e:demo-next-mock`, `e2e:demo-nuxt-mock` inside `moon ci` | `turbo run console-smoke demo-next-mock demo-nuxt-mock --filter=@zitadel/e2e` (gate `suites_mock`) |
+| `moon exec e2e:all --ignore-ci-checks` (gate `e2e`): every lane below, in one step after the graph | the lanes as gated steps (rows below) |
+| `e2e:journey-local` in the e2e step (`JOURNEY_*` env on the step) | `JOURNEY_CI=1 JOURNEY_MATRIX=… turbo run e2e-local --filter=@zitadel/e2e` |
+| `testing:test-integration`, `e2e:demo-next-real` in the e2e step | `turbo run test:integration demo-next-real --filter=@zitadel/testing --filter=@zitadel/e2e` |
+| `e2e:console-real` (embedded, platform) in the e2e step | `turbo run console-real --filter=@zitadel/e2e` (…) |
+| `e2e:console-smoke`, `e2e:demo-next-mock`, `e2e:demo-nuxt-mock` in the e2e step | `turbo run console-smoke demo-next-mock demo-nuxt-mock --filter=@zitadel/e2e` (gate `suites_mock`) |
 | `… moon run release:version` / `release:pack` | `turbo run version --filter=@zitadel/release` / `pack` |
 | Depot's remote cache (implicit) | the remote-cache step, see below |
 

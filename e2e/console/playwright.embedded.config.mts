@@ -59,7 +59,7 @@ export default defineConfig({
     port: zitadelPort,
     // The binary serves the UI, so the app origin *is* the instance origin.
     appOrigin: origin,
-    // Not the default handshake.json: e2e-real shares this configDir, and a
+    // Not the default handshake.json: console-real shares this configDir, and a
     // concurrent run of both lanes must not have one supervisor delete and
     // rewrite the other's live handshake.
     handshakePath: join(appDir, ".zitadel-testing", "handshake-embedded.json"),

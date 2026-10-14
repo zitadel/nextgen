@@ -265,31 +265,39 @@ dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
 - Playwright Chromium install for the e2e lanes. The `components`/`api-mock`
   browser projects pull in their own Chromium through a moon `install-browsers`
   dep on their `:test` task.
-- `moon run release:snapshot -- --skip-container` — a non-publishing release
-  snapshot, built here (outside the main graph) and handed to the journey via
-  `JOURNEY_TARBALLS_DIR`, whenever the journey can run. The journey must not
-  pack inside `moon ci` (a nested moon graph is forbidden), so in GitHub
-  Actions it refuses to run without the snapshot. The journey's Verdaccio
-  storage comes back from the Actions cache.
-- `moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph e2e:all`.
-  `e2e:all` runs every e2e lane as its dependencies: console, demo, the journey
-  (with ci-mode's framework matrix), and `testing:test-integration`.
+- `moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph` —
+  builds, lint, typecheck and unit tests.
 - `moon run server:test-postgres`, then `moon run server:test-sqlite` — Go
   integration lanes. They depend on the UI builds their binary embeds, so
   `moon ci` also runs them when one of those builds is affected; on such runs
   they run twice until a follow-up folds them into the graph step.
+- `moon run release:snapshot -- --skip-container` — a non-publishing release
+  snapshot, built outside any moon graph and handed to the journey via
+  `JOURNEY_TARBALLS_DIR`, whenever the journey can run. The journey must not
+  pack inside the e2e step (a nested moon graph is forbidden), so in GitHub
+  Actions it refuses to run without the snapshot. The journey's Verdaccio
+  storage comes back from the Actions cache.
+- `moon exec e2e:all --ignore-ci-checks` — the e2e suite, in a step of its own
+  so its browsers and dev servers do not compete with the unit suites. Its
+  lanes are `runInCI: "skip"`, which keeps them out of the `moon ci` graph.
+  `e2e:all` runs every e2e lane as its dependencies: console, demo, the journey
+  (with ci-mode's framework matrix), and `testing:test-integration`.
 
 Within full mode the `moon ci` graph selects only the tasks the diff affects
 (`--downstream deep --include-relations`): a lane is skipped when the diff
 provably cannot reach it — a docs-only PR runs almost nothing, a frontend-only
 PR skips the Go suites. The e2e lanes run, all together, whenever one of them
-is affected (its folder, or something it depends on: the server, CLI, console,
-SDKs, api-mock or testing kit), so most code PRs run them.
+is affected (its folder, a demo app it serves, or something it depends on: the
+server, CLI, console, SDKs, api-mock or testing kit), so most code PRs run
+them.
 `scripts/ci-mode.mjs` picks the mode (full vs version-only) and the gates for
-the steps outside the graph: the Go suites, the release snapshot (on when a
-journey trigger moved or `e2e:all` is affected) and the journey's framework
-matrix, which collapses to Next unless an SDK, the CLI, the test kit or the
-journey's own files moved. ci-turbo.yml uses the same gates for its per-lane steps. The gates fail
+the steps outside the graph: the Go suites, the e2e step (on when moon finds
+`e2e:all` affected), the release snapshot (on when a journey trigger moved or
+the e2e step runs) and the journey's framework matrix, which collapses to Next
+unless an SDK, the CLI, the test kit or the journey's own files moved. It asks
+moon as a local run would: in CI, moon leaves `runInCI: "skip"` tasks such as
+the lanes out of its affected set when only their own files changed.
+ci-turbo.yml uses the same gates for its per-lane steps. The gates fail
 open: known repo-wide
 files no moon task claims (workflow definitions, `scripts/`, moon config,
 root manifests and compiler/release inputs such as `tsconfig.base.json`), an

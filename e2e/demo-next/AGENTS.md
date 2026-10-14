@@ -1,18 +1,19 @@
 # Agent Instructions — `e2e/demo-next/`
 
 Playwright project that exercises `apps/demo-next/` end-to-end. It has two
-suites: the **mock lane** (`e2e`, against the standalone `@zitadel/api-mock`
-TCP server, specs under `src/`) and the **real lane** (`e2e-real`, specs under
-`src-real/` with `playwright.real.config.mts`), which boots a real server
+suites: the **mock lane** (`demo-next-mock`, against the standalone
+`@zitadel/api-mock` TCP server, specs under `src/`) and the **real lane**
+(`demo-next-real`, specs under `src-real/` with
+`playwright.real.config.mts`), which boots a real server
 instance through `@zitadel/testing` (`ZITADEL_SERVER_BINARY`,
 `NEXTGEN_SERVER_{LOGIN,CONSOLE}_ENABLED=false`) and covers registration,
 password sign-in, and authenticated navigation against real storage. It does
 not cover passkeys: the lane seeds the shipped `password-first` default flow,
 which offers no passkey action, and the real-server passkey round trip is
 covered by the journey's (`e2e/journey`) `passkey-first` preset lane. This project is the flagship Playwright consumer of the test kit —
-see [`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md). The
-real lane runs in CI through an explicit `full-pr` step even though its moon
-task carries `runInCI: false`. Defer to root
+see [`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md). Both
+lanes run in CI as dependencies of `e2e:all` (the `full-pr` job's e2e step),
+whenever one of them, the demo app or a dependency is affected. Defer to root
 [`AGENTS.md`](../../AGENTS.md) for repo-wide rules.
 
 ## Scope

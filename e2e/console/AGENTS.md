@@ -35,20 +35,21 @@ secret-handling caveat live in [`README.md`](README.md).
   and writes no HTML report.
 
 Console screens act on the selected project (`?project=`, see
-[`apps/console/AGENTS.md`](../console/AGENTS.md)). The guard only ever selects
+[`apps/console/AGENTS.md`](../../apps/console/AGENTS.md)). The guard only ever selects
 a project the signed-in person holds a grant on: their only project, else
-none. `e2e-real` grants each signed-in user the harness project (`signIn` in
+none. `console-real` grants each signed-in user the harness project (`signIn` in
 `src-real/support.ts`), so it is selected there; a user with no grant lands on
 Projects with nothing selected. The project the console signs into comes from
 the instance's `/console/runtime.json` in every lane; no lane pins it. A spec
 that navigates by URL either lets the guard fill it in or names it, and asserts
 it survives navigation where that is the point.
 
-All five tasks carry `runInCI: false` — that only keeps them out of moon's
-automatic selection. The `full-pr` job explicitly runs `e2e-real`,
-`e2e-embedded` and `e2e-platform` in separate, sequential workflow steps;
-`deployment-checks.yml` runs `e2e-deployment` against every cloud deployment;
-the shell smoke stays local-only. The `@zitadel/testing` interaction is documented in
+The first four lanes are dependencies of `e2e:all`, which the `full-pr` job
+runs in its own e2e step whenever one of them is affected (they carry
+`runInCI: "skip"`, which only keeps them out of the build-and-test graph; see
+[`../moon.yml`](../moon.yml)). `console-deployment` is not part of it
+(`runInCI: false`): `deployment-checks.yml` runs it against every cloud
+deployment. The `@zitadel/testing` interaction is documented in
 [`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md).
 
 ## Hard rules
