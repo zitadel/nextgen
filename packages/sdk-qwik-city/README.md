@@ -11,7 +11,7 @@ Qwik City request handler and helpers for Nextgen Auth.
 ## Installation
 
 ```bash
-pnpm add -D @zitadel/sdk-qwik-city
+pnpm add -D @zitadel/sdk-qwik-city@alpha
 ```
 
 Install it as a dev dependency: Qwik bundles `devDependencies` into the server
@@ -118,7 +118,7 @@ Install the Qwik component library and render its `ZitadelLogin` component.
 Qwik bundles ecosystem packages, so install it as a dev dependency:
 
 ```bash
-pnpm add -D @zitadel/sdk-qwik
+pnpm add -D @zitadel/sdk-qwik@alpha
 ```
 
 ```tsx

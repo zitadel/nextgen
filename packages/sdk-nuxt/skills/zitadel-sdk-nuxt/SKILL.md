@@ -27,10 +27,10 @@ wiring the middleware without the module.
 ## Install
 
 ```bash
-pnpm add @zitadel/sdk-nuxt
+pnpm add @zitadel/sdk-nuxt@alpha
 # login/logout web components are a separate, non-transitive dependency under
 # strict package managers (pnpm, Yarn PnP) — declare it explicitly:
-pnpm add @zitadel/components
+pnpm add @zitadel/components@alpha
 ```
 
 Peer deps: `nuxt >=4`, `h3 >=1`.

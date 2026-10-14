@@ -46,6 +46,9 @@ away. A callback whose code has loaded runs before the widget navigates away (af
 redirect, or a completed flow with a redirect); one still loading runs once it has loaded, so no
 event is dropped.
 
+`ZitadelLogin` also takes `resumeFlowId`, an existing flow to resume instead of starting a new
+one. Unset, `null` or `""` falls back to the `flow` query parameter.
+
 Children are passed through to the element, so `<ZitadelLogout>` accepts a `<template>` for its
 template mode and `<ZitadelLogin>` accepts content for its `attribution-trailing` slot.
 `<ZitadelSession>` takes no children: its element has no slot to show them in.
@@ -56,8 +59,8 @@ Qwik binds JSX props on a custom element as attributes only, so the SDK uses bot
 
 - **Attributes**, rendered in the JSX (and so in the server HTML under Qwik City):
   `project-id`, `proxy-path` and `url` (taken from `project` or from the discrete props),
-  `purpose`, `flow-name`, `post-sign-in-url`, `post-sign-out-url`, `variant`, `theme`, `heading`,
-  `logout-label`, `suppress-header` and `lang`. The widget reads these as soon as it upgrades,
+  `purpose`, `flow-name`, `resume-flow-id`, `post-sign-in-url`, `post-sign-out-url`, `variant`,
+  `theme`, `heading`, `logout-label`, `suppress-header` and `lang`. The widget reads these as soon as it upgrades,
   before Qwik resumes.
 - **Properties**, set on the element by the component once it is mounted (or resumed): every
   config prop again, plus the property-only `project` handle and `locales`.
