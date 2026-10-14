@@ -762,8 +762,6 @@ export type PlatformStoreSnapshot = {
   releaseContentHashes: string[];
   /** Deployment ids, newest first. */
   deploymentIds: string[];
-  /** Live preview origins across every project, newest first. */
-  previewOrigins: string[];
   /**
    * Variable names entered at the project, secrets included. Names only: a
    * secret's value is not readable over the API, and a snapshot that returned
@@ -800,10 +798,6 @@ export function snapshotPlatformStore(): PlatformStoreSnapshot {
     deploymentIds: [...store.deployments.values()]
       .sort((a, b) => b.seq - a.seq)
       .map((deployment) => deployment.id),
-    previewOrigins: [...store.previews.values()]
-      .filter((preview) => previewIsLive(preview))
-      .sort(compareNewestFirst)
-      .map((preview) => preview.origin),
     variableNames: [
       ...new Set([...store.variables.values()].flatMap((owned) => [...owned.keys()])),
     ],

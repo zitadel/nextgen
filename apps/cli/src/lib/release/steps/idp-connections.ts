@@ -128,6 +128,14 @@ async function heldVariables(ctx: StepContext): Promise<Map<string, boolean> | u
   let held: Awaited<ReturnType<StepContext["client"]["getVariables"]>>;
   try {
     held = await ctx.client.getVariables({ project_id: ctx.projectId });
+    // A preview deploy freezes the preview overrides too, so a credential set
+    // only for previews (`variable set NAME --preview`) is one it holds.
+    if (ctx.mode === "preview") {
+      held = {
+        ...held,
+        ...(await ctx.client.getVariables({ project_id: ctx.projectId, applies_to: "preview" })),
+      };
+    }
   } catch (error) {
     if (ctx.mode === "preview" && error instanceof ApiError && error.status === 403) {
       return undefined;

@@ -109,6 +109,17 @@ describe("idp-connections step", () => {
     });
   });
 
+  it("counts a credential a preview holds only as a preview override", async () => {
+    const cwd = await project({ "google.json": googleBody() });
+    const getVariables = vi.fn(async (params: { applies_to?: string }) =>
+      params.applies_to === "preview" ? { GOOGLE_CLIENT_SECRET: { secret: true } } : {},
+    );
+
+    await expect(
+      idpConnectionsStep.run(ctx(cwd, { mode: "preview", client: { getVariables } as never })),
+    ).resolves.toBeUndefined();
+  });
+
   it("leaves the variable check to the deploy when a preview's token may not read them", async () => {
     const cwd = await project({ "google.json": googleBody() });
     const getVariables = vi
