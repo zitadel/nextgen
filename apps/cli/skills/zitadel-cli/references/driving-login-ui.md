@@ -40,7 +40,7 @@ carries no hook. A `<zitadel-logout>` with a `<template>` child shows no menu:
 click the app's own element marked `data-action="logout"`. The canonical
 component hook list lives in `packages/components/README.md`.
 
-The checked-in automated regression path is `moon run workspace:journey`, which
+The checked-in automated regression path is `moon run e2e:journey`, which
 exercises fresh-app setup plus registration, logout, and login across the
 supported frameworks.
 

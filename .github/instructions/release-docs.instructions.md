@@ -9,8 +9,8 @@ state of the repo.
 
 - The CI gate is the `full-pr` job in `.github/workflows/ci.yml`: a Moon graph
   run plus per-database Go integration lanes, four gated journey variants
-  (contract: [`apps/cli-journey-e2e/AGENTS.md`](../../apps/cli-journey-e2e/AGENTS.md),
-  the project id is `cli-journey-e2e`), real-instance suite lanes, the
+  (contract: [`e2e/journey/AGENTS.md`](../../e2e/journey/AGENTS.md),
+  the project id is `e2e`), real-instance suite lanes, the
   binary-served console embedded-surface lane, and the version-PR path. Mirror
   locally with `moon run workspace:check -- --full`
   ([CONTRIBUTING.md](../../CONTRIBUTING.md#what-ci-runs)).

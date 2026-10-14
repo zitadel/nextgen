@@ -221,8 +221,8 @@ Every deployment is tested once Vercel built it, on its own URL
 [`deployment-checks.yml`](../../.github/workflows/deployment-checks.yml) runs each
 service's contract suite against the deployment, today the docs'
 (`moon run docs:e2e-deployment`, [`apps/docs/AGENTS.md`](../../apps/docs/AGENTS.md))
-and the console's (`moon run console-e2e:e2e-deployment`,
-[`apps/console-e2e/README.md`](../../apps/console-e2e/README.md)). The console's
+and the console's (`moon run e2e:console-deployment`,
+[`e2e/console/README.md`](../../e2e/console/README.md)). The console's
 signs nobody in: it checks how `vercel.json` routes the console's paths and
 that the signed-out console comes up, down to the login widget's first step,
 which needs the server and its database behind it.
@@ -272,7 +272,7 @@ What starts it, and where the result lands, depends on the environment:
   again from that run's page: it reports on the same commit again.
 - By hand, against any deployment:
   `DOCS_BASE_URL=https://cloud-….vercel.app VERCEL_AUTOMATION_BYPASS_SECRET=… moon run docs:e2e-deployment`
-  and `CONSOLE_DEPLOYMENT_URL=https://cloud-….vercel.app VERCEL_AUTOMATION_BYPASS_SECRET=… moon run console-e2e:e2e-deployment`,
+  and `CONSOLE_DEPLOYMENT_URL=https://cloud-….vercel.app VERCEL_AUTOMATION_BYPASS_SECRET=… moon run e2e:console-deployment`,
   or `gh workflow run deployment-checks.yml --ref <branch> -f url=https://cloud-….vercel.app`
   for a run without a new deployment; it reports `docs (dispatch)` and
   `console (dispatch)`, never production's statuses. A change to `deployment-checks.yml` needs no

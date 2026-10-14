@@ -80,11 +80,11 @@ import {
   RENDERER_IDS,
 } from "../../lib/orca/patchers/rule/next/renderers/registry";
 import type { PatchContext } from "../../lib/orca/patchers/types";
+import { type Asker, input } from "../../lib/input";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
 import { publicCliCommand } from "../../lib/public-cli";
 import { derivePosture } from "../../lib/orca/patchers/posture";
 import { writeScaffoldManifest } from "../../lib/scaffold-manifest";
-import { readStdin } from "../../lib/variables";
 import {
   assertNoSetupResourceConflicts,
   materializeSetupResources,
@@ -288,7 +288,19 @@ export default class Setup extends BaseCommand {
     // inconsistent set of --sso flags is a mistake in the command line, and
     // reporting it after a project has been created would leave the developer
     // to clean up.
-    const ssoFromCommandLine = await ssoFromFlags(flags, nonInteractive, dryRun);
+    // Not `this.input`: that one answers a confirm when `--force` is given, and
+    // here `--force` permits overwriting files, so it must never answer a
+    // question. Interactive only when a person is there, which is also the only
+    // time the wizard runs.
+    const wizardInput: Asker = (question) =>
+      input(question, { interactive: !nonInteractive, force: false });
+    const ssoFromCommandLine = await ssoFromFlags(
+      flags,
+      nonInteractive,
+      dryRun,
+      wizardInput,
+      this.config.version,
+    );
 
     const orca = createOrca();
 
@@ -320,6 +332,7 @@ export default class Setup extends BaseCommand {
             retry: retryOptionsFromFlags(flags),
             serverFlag: this.meta.serverFlag,
             cliVersion: this.config.version,
+            ask: wizardInput,
           }),
           force,
         );
@@ -375,6 +388,7 @@ export default class Setup extends BaseCommand {
     if (!nonInteractive && !dryRun) {
       intro("Zitadel setup");
       const promptCtx = {
+        input: wizardInput,
         framework,
         cwd,
         frameworkChosen: scaffoldedFramework || flags.framework !== undefined,
@@ -920,7 +934,7 @@ async function resolveScaffoldFramework(
   framework: string | undefined,
   nonInteractive: boolean,
   orca: Orca,
-  guidance: { retry: SetupRetryOptions; serverFlag?: string; cliVersion: string },
+  guidance: { retry: SetupRetryOptions; serverFlag?: string; cliVersion: string; ask: Asker },
 ): Promise<string> {
   if (framework) {
     return framework;
@@ -950,7 +964,7 @@ async function resolveScaffoldFramework(
       details: { frameworks: choices },
     });
   }
-  return new PickFrameworkPrompt().ask(orca.availableFrameworks());
+  return new PickFrameworkPrompt().ask(orca.availableFrameworks(), guidance.ask);
 }
 
 /**
@@ -1082,6 +1096,8 @@ export async function ssoFromFlags(
   },
   nonInteractive: boolean,
   dryRun: boolean,
+  ask: Asker,
+  cliVersion: string,
 ): Promise<SsoDraft | undefined> {
   const customValues = customFlagValues(flags, SETUP_FLAG_KEYS);
   if (flags.sso === undefined) {
@@ -1106,7 +1122,7 @@ export async function ssoFromFlags(
   const selection = selectionFromFlags(
     flags.sso,
     flags.sso === CUSTOM_PROVIDER && !nonInteractive
-      ? await askCustomSettings(customValues)
+      ? await askCustomSettings(customValues, ask)
       : customValues,
     SETUP_FLAG_NAMES,
     SSO_CUSTOM_EXAMPLE,
@@ -1144,16 +1160,17 @@ export async function ssoFromFlags(
   // sign-in button that fails at the provider with `invalid_client`, long
   // after setup reports success. It is never a flag — that would put it in
   // shell history, a process listing and CI logs.
-  const secret = parseClientSecret(process.stdin.isTTY ? "" : await readStdin(process.stdin));
-  if (!secret.ok) {
-    throw new ZitadelError("E_VALIDATION", `--sso ${flags.sso} needs the client secret on stdin`, {
-      // The client id is the developer's own, already on their command line,
-      // so the example names the flag rather than echoing the value back into
-      // a line they may paste somewhere else.
-      hint: `Pipe it in, e.g. \`printf '%s' "$CLIENT_SECRET" | zitadel setup --sso ${flags.sso} --sso-client-id <id> ...\`.`,
-    });
-  }
-  return { selection, credentials: { clientId: clientId.value, secret: secret.value } };
+  const secret = await ask({
+    kind: "secret",
+    name: "client secret",
+    message: "Client secret",
+    parse: parseClientSecret,
+    stdin: true,
+    // A concrete rerun for an agent, never carrying the value: the secret is
+    // piped from the caller's own environment.
+    retry: `printf '%s' "$CLIENT_SECRET" | ${publicCliCommand(`setup --sso ${flags.sso} --sso-client-id <id> ...`, cliVersion)}`,
+  });
+  return { selection, credentials: { clientId: clientId.value, secret } };
 }
 
 /**

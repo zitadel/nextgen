@@ -5,10 +5,7 @@ import { Flags } from "@oclif/core";
 import { consola } from "consola";
 
 import {
-  type ClientId,
-  type ClientSecret,
   type ClientIdVariable,
-  type ClientSecretVariable,
   type ConnectionSlug,
   credentialVariables,
   CUSTOM_PROVIDER,
@@ -25,7 +22,6 @@ import type { ZitadelClient } from "../../lib/api-client";
 import { isDevelopmentBuild } from "../../lib/build-channel";
 import { isErrno, ZitadelError } from "../../lib/errors";
 import { publicCliCommand } from "../../lib/public-cli";
-import { askParsed } from "../../lib/prompt-cancel";
 import { stableStringify } from "../../lib/json";
 import {
   applySsoToFlow,
@@ -69,7 +65,6 @@ import {
   nonBlankString,
 } from "../../lib/oclif";
 import { readState } from "../../lib/sync/state";
-import { readStdin } from "../../lib/variables";
 import { reportWarning } from "../../lib/warnings";
 
 /**
@@ -145,6 +140,12 @@ export default class SsoEnable extends EnvironmentCommand {
       customExample(ENABLE_FLAG_NAMES),
     );
     const entry = providerOf(selection);
+    // What an agent can run once the missing credential is to hand. Only for a
+    // catalog provider: a custom connection needs its settings repeated too.
+    const retryFor = (clientId: string, pipe = ""): string | undefined =>
+      selection.kind === "catalog"
+        ? `${pipe}${publicCliCommand(`sso enable --provider ${provider} --client-id ${clientId}`, this.meta.cliVersion)}`
+        : undefined;
     const loopback = loopbackIssuerWarning(selection);
     if (loopback !== undefined) {
       reportWarning(loopback);
@@ -260,7 +261,17 @@ export default class SsoEnable extends EnvironmentCommand {
           });
         }
       }
-      const piped = nonInteractive ? await this.pipedSecret() : undefined;
+      // Reuse never demands a secret: the project may already hold it, and
+      // refusing an unattended rerun for a credential that has not changed
+      // would be noise. It is only read so that a rerun can replace it.
+      const piped = await this.input({
+        kind: "secret",
+        name: "client secret",
+        message: "Client secret",
+        parse: parseClientSecret,
+        stdin: true,
+        optional: true,
+      });
       if (piped !== undefined) {
         if (variable === undefined) {
           reportWarning(
@@ -291,11 +302,31 @@ export default class SsoEnable extends EnvironmentCommand {
           ? await askConnectionEndpoints({
               provider: selection.id,
               developmentBuild: isDevelopmentBuild() && !nonInteractive,
-              command: "Enable",
+              ask: this.input,
             })
           : undefined;
-      const clientId = clientIdFlag ?? (await this.askClientId(entry.displayName, nonInteractive));
-      const secretValue = await this.askClientSecret(scaffolded.clientSecret, nonInteractive);
+      const clientId = await this.input({
+        kind: "text",
+        name: `client id for ${entry.displayName}`,
+        message: "Client ID",
+        flag: "--client-id",
+        parse: parseClientId,
+        given: flags["client-id"],
+        retry: retryFor("<client-id>"),
+      });
+      // Required, like the client id. The connection document references the
+      // secret as `${{ NAME }}` and the engine resolves that from the project's
+      // variables, so enabling a provider without one writes a sign-in button
+      // that fails at the token endpoint with `invalid_client` -- a failure
+      // that surfaces in a browser, not here. Refusing now is the cheaper answer.
+      const secretValue = await this.input({
+        kind: "secret",
+        name: `client secret for ${scaffolded.clientSecret}`,
+        message: `Client secret (published to the project as ${scaffolded.clientSecret})`,
+        parse: parseClientSecret,
+        stdin: true,
+        retry: retryFor(clientId, `printf '%s' "$CLIENT_SECRET" | `),
+      });
 
       const publish = this.publisher(client, projectId);
       const connection = entry.connection({
@@ -531,60 +562,6 @@ export default class SsoEnable extends EnvironmentCommand {
           ? null
           : { variable: input.secret.name, published: input.secret.published },
     };
-  }
-
-  private async askClientId(displayName: string, nonInteractive: boolean): Promise<ClientId> {
-    if (nonInteractive) {
-      throw new ZitadelError("E_VALIDATION", `No client id supplied for ${displayName}.`, {
-        hint: "Pass --client-id, or run without --non-interactive to be asked for it.",
-      });
-    }
-    return askParsed({ message: "Client ID", parse: parseClientId, command: "Enable" });
-  }
-
-  /**
-   * A secret piped in on a scripted rerun, or `undefined` when nothing was.
-   *
-   * Reuse never demands one: the project may already hold it, and refusing an
-   * unattended rerun for a credential that has not changed would be noise. It
-   * is only read so that a rerun *can* replace it. A terminal on stdin means
-   * nothing was piped, and reading would block forever on a stream with no
-   * data and no end, so that case is answered rather than waited on.
-   */
-  private async pipedSecret(): Promise<ClientSecret | undefined> {
-    if (process.stdin.isTTY) {
-      return undefined;
-    }
-    const parsed = parseClientSecret(await readStdin(process.stdin));
-    return parsed.ok ? parsed.value : undefined;
-  }
-
-  /**
-   * Required, like the client id. The connection document references the
-   * secret as `${{ NAME }}` and the engine resolves that from the project's
-   * variables, so enabling a provider without one writes a sign-in button
-   * that fails at the token endpoint with `invalid_client` — a failure that
-   * surfaces in a browser, not here. Refusing now is the cheaper answer.
-   */
-  private async askClientSecret(
-    variable: ClientSecretVariable,
-    nonInteractive: boolean,
-  ): Promise<ClientSecret> {
-    if (nonInteractive) {
-      const piped = await this.pipedSecret();
-      if (piped === undefined) {
-        throw new ZitadelError("E_VALIDATION", `No client secret supplied for ${variable}.`, {
-          hint: "Pipe it in on stdin, or run without --non-interactive to be asked for it. It is never a flag: that would put it in shell history, a process listing and CI logs.",
-        });
-      }
-      return piped;
-    }
-    return askParsed({
-      message: `Client secret (published to the project as ${variable})`,
-      parse: parseClientSecret,
-      secret: true,
-      command: "Enable",
-    });
   }
 }
 

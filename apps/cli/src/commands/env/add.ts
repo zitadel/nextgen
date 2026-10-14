@@ -2,7 +2,6 @@ import { stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 
 import { Flags } from "@oclif/core";
-import { text } from "@clack/prompts";
 import { consola } from "consola";
 
 import { createZitadelClient } from "../../lib/api-client";
@@ -19,7 +18,7 @@ import {
 } from "../../lib/oclif";
 import { PUBLIC_PROJECT_ID_VARIABLE } from "../../lib/orca/patchers/rule/public-project-id";
 import { readZitadelConfig } from "../../lib/project";
-import { bailOnCancel } from "../../lib/prompt-cancel";
+import { publicCliCommand } from "../../lib/public-cli";
 import { DEFAULT_SERVER, resolveServer, serverOrigin } from "../../lib/server";
 
 /** A variable to set on a hosting platform or in a pipeline. A secret is named, never printed. */
@@ -93,28 +92,36 @@ export default class EnvAdd extends BaseCommand {
       });
     }
 
-    let server: string;
-    if (serverFlag) {
-      server = (await resolveServer({ cwd, serverFlag })).value;
-    } else if (nonInteractive) {
-      throw new ZitadelError("E_VALIDATION", "No server given", {
-        hint: "Pass --server, e.g. --server https://api.zitadel.cloud.",
-      });
-    } else {
-      const answer = await text({ message: "Server URL", initialValue: DEFAULT_SERVER });
-      bailOnCancel(answer, "Env add");
-      server = serverOrigin(String(answer).trim());
-    }
+    const server = serverFlag
+      ? (await resolveServer({ cwd, serverFlag })).value
+      : await this.input({
+          kind: "text",
+          name: "server",
+          message: "Server URL",
+          flag: "--server",
+          initialValue: DEFAULT_SERVER,
+          parse: (answer: string) =>
+            answer.trim() === ""
+              ? ({ ok: false, problem: "Enter the server URL." } as const)
+              : ({ ok: true, value: serverOrigin(answer.trim()) } as const),
+          retry: publicCliCommand(
+            `env add ${name} --server https://api.zitadel.cloud`,
+            this.meta.cliVersion,
+          ),
+        });
 
-    let appUrl = flags["app-url"];
-    if (appUrl === undefined && !nonInteractive) {
-      const answer = await text({
-        message: "URL the app is served from (leave empty to skip)",
-        placeholder: "https://app.acme.com",
-      });
-      bailOnCancel(answer, "Env add");
-      appUrl = String(answer).trim() || undefined;
-    }
+    const appUrl =
+      flags["app-url"] ??
+      (nonInteractive
+        ? undefined
+        : await this.input({
+            kind: "text",
+            name: "app URL",
+            message: "URL the app is served from (leave empty to skip)",
+            flag: "--app-url",
+            placeholder: "https://app.acme.com",
+            parse: (answer: string) => ({ ok: true, value: answer.trim() || undefined }) as const,
+          }));
     if (
       appUrl !== undefined &&
       !(URL.canParse(appUrl) && /^https?:$/.test(new URL(appUrl).protocol))

@@ -57,7 +57,7 @@ const seedOnly = process.argv.includes("--seed-only");
  * to the seeded project instead. Opt-in, not the default: making
  * `proj_platform` the deployment's default project is exactly the
  * standalone-semantics change the demo and embedded suites must not see (see
- * `cli-journey-e2e/scripts/run-local.mjs`).
+ * `e2e/journey/scripts/run-local.mjs`).
  */
 const claimMode = process.argv.includes("--claim");
 

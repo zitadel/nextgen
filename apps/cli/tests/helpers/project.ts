@@ -437,6 +437,23 @@ export class ScaffoldedApp {
     );
   }
 
+  /**
+   * Sets a project variable when nothing was piped in: stdin is the keyboard,
+   * which is what a script that forgot the pipe has.
+   */
+  setVariableWithNothingPiped(name: string, { secret = false } = {}): Promise<CliResult> {
+    return this.withKeyboardOnStdin(() =>
+      this.cli([
+        "variable",
+        "set",
+        name,
+        "--non-interactive",
+        "--json",
+        ...(secret ? ["--secret"] : []),
+      ]),
+    );
+  }
+
   getVariable(name: string, { preview = false } = {}): Promise<CliResult> {
     return this.cli(["variable", "get", name, "--json", ...(preview ? ["--preview"] : [])]);
   }
@@ -738,6 +755,19 @@ export class ScaffoldedApp {
 
   private pipingSecret<T>(secret: string, run: () => Promise<T>): Promise<T> {
     return this.pipingStdin(secret, run);
+  }
+
+  /** Runs with a terminal on stdin, so a read would never end and has to be refused. */
+  private async withKeyboardOnStdin<T>(run: () => Promise<T>): Promise<T> {
+    const original = Object.getOwnPropertyDescriptor(process, "stdin");
+    Object.defineProperty(process, "stdin", { value: { isTTY: true }, configurable: true });
+    try {
+      return await run();
+    } finally {
+      if (original) {
+        Object.defineProperty(process, "stdin", original);
+      }
+    }
   }
 
   /**

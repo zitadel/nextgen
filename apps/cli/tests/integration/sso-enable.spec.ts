@@ -588,8 +588,14 @@ describe("sso enable", () => {
             missing: "client secret",
             args: [...provider, "--client-id", "a-client-id"],
             secret: "",
+            hint: "Pipe it in on stdin.",
           },
-          { missing: "client id", args: provider, secret: "a-client-secret" },
+          {
+            missing: "client id",
+            args: provider,
+            secret: "a-client-secret",
+            hint: "Pass --client-id.",
+          },
         ];
 
         it.each(SCENARIOS)("is refused for want of a $missing", async ({ args, secret }) => {
@@ -598,6 +604,15 @@ describe("sso enable", () => {
           const result = await app.enableSsoWith(args, secret);
 
           expect(result).toFailWith("E_VALIDATION");
+        });
+
+        it.each(SCENARIOS)("says what to supply for want of a $missing", async (scenario) => {
+          const app = await aSetUpApp();
+
+          const result = await app.enableSsoWith(scenario.args, scenario.secret);
+
+          expect(result).toExplain(`No ${scenario.missing}`);
+          expect(result).toHintAt(scenario.hint);
         });
 
         it.each(SCENARIOS)("writes no file for want of a $missing", async ({ args, secret }) => {
@@ -619,6 +634,29 @@ describe("sso enable", () => {
             expect(await app.projectVariables()).toEqual([]);
           },
         );
+      });
+    });
+
+    describe.each([
+      {
+        missing: "client secret",
+        args: ["--provider", "google", "--client-id", "a-client-id"],
+        secret: "",
+        suggests: "sso enable --provider google --client-id a-client-id",
+      },
+      {
+        missing: "client id",
+        args: ["--provider", "google"],
+        secret: "a-client-secret",
+        suggests: "sso enable --provider google --client-id <client-id>",
+      },
+    ])("a catalog provider without a $missing", ({ args, secret, suggests }) => {
+      it("suggests the command to run once it is to hand", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.enableSsoWith(args, secret);
+
+        expect(result).toSuggest(suggests);
       });
     });
 

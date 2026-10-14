@@ -1,6 +1,5 @@
-import { text } from "@clack/prompts";
+import type { Parsed } from "@zitadel/config/idp";
 
-import { bail } from "./cancel";
 import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
 
 /**
@@ -15,16 +14,19 @@ export class DevPortPrompt implements SetupPrompt {
     if (ctx.devPortFromFlag) {
       return answers;
     }
-    const value = await text({
+    const devPort = await ctx.input({
+      kind: "text",
+      name: "dev server port",
       message: "Dev server port",
       placeholder: String(answers.devPort),
       initialValue: String(answers.devPort),
-      validate: (input) => {
-        const num = Number.parseInt(input ?? "", 10);
-        return Number.isFinite(num) && num > 0 && num < 65536 ? undefined : "Must be a port number";
+      parse: (value): Parsed<number> => {
+        const port = Number.parseInt(value, 10);
+        return Number.isFinite(port) && port > 0 && port < 65536
+          ? { ok: true, value: port }
+          : { ok: false, problem: "Must be a port number" };
       },
     });
-    bail(value);
-    return { ...answers, devPort: Number.parseInt(String(value), 10) };
+    return { ...answers, devPort };
   }
 }
