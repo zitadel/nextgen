@@ -19,7 +19,8 @@ hide it. The setting belongs to the embedding page and is not stored with the
 branding.
 
 The button replaces the clear button on password fields, so the field shows
-one icon, and like the clear button it is out of the tab order. A revealed
+one icon. It sits in the tab order right after the input, so keyboard users
+can reach it, while a pointer click keeps focus in the field. A revealed
 field opts out of spellcheck and autocorrect, and it is hidden again on
 submit, form reset and step change. The widget applies the setting to its
 fields directly, so it also holds for ejected templates; it is not a

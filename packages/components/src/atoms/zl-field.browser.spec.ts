@@ -268,6 +268,40 @@ describe("<zl-field> password toggle (chromium)", () => {
     expect(blurred).toBe(false);
   });
 
+  it("is reachable with Tab and toggles from the keyboard without submitting", async () => {
+    host.innerHTML = `<form><zl-field name="pw" type="password" value="hunter2"></zl-field></form>`;
+    const form = host.querySelector("form") as HTMLFormElement;
+    const field = host.querySelector("zl-field") as ZlField;
+    field.passwordToggle = true;
+    await field.updateComplete;
+    let submitted = 0;
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      submitted += 1;
+    });
+    const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
+    const button = () =>
+      field.shadowRoot?.querySelector<HTMLButtonElement>(
+        '[part~="password-toggle"]',
+      ) as HTMLButtonElement;
+
+    input.focus();
+    await userEvent.tab();
+    expect(field.shadowRoot?.activeElement).toBe(button());
+
+    await userEvent.keyboard(" ");
+    await field.updateComplete;
+    expect(input.type).toBe("text");
+    expect(button().getAttribute("aria-pressed")).toBe("true");
+    // Focus stays on the button, so the new state is what a screen reader hears next.
+    expect(field.shadowRoot?.activeElement).toBe(button());
+
+    await userEvent.keyboard("{Enter}");
+    await field.updateComplete;
+    expect(input.type).toBe("password");
+    expect(submitted).toBe(0);
+  });
+
   it("hides the value when the owning form is reset", async () => {
     const { form, field, input } = await mountRevealed(
       `<form><zl-field name="pw" type="password" value="hunter2"></zl-field></form>`,

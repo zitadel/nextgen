@@ -232,14 +232,14 @@ describe("<zl-field> password toggle", () => {
     expect(field.shadowRoot?.querySelector('zl-icon[name="alert-circle"]')).toBeNull();
   });
 
-  it("reveals and hides the value, keeping it out of the tab order", async () => {
+  it("reveals and hides the value from a button in the tab order", async () => {
     const field = await mount(`<zl-field name="pw" type="password" value="hunter2"></zl-field>`, {
       passwordToggle: true,
       showPasswordLabel: "Anzeigen",
       hidePasswordLabel: "Verbergen",
     });
     const button = toggle(field)!;
-    expect(button.tabIndex).toBe(-1);
+    expect(button.tabIndex).toBe(0);
     expect(button.getAttribute("aria-pressed")).toBe("false");
     expect(input(field).type).toBe("password");
 

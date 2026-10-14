@@ -40,9 +40,10 @@ export type ZlFieldInputDetail = { name: string; value: string };
  *   trailing     cross (clear) | alert-circle (error) | check (success), or
  *                eye / eye-off on a password field with `passwordToggle` — the
  *                toggle takes the slot in every state, so the field never
- *                shows two icons. Both buttons are pointer-only affordances
- *                (`tabindex="-1"`) so Tab moves from one input straight to
- *                the next; keyboard users clear via the input itself.
+ *                shows two icons. The clear button is a pointer-only affordance
+ *                (`tabindex="-1"`) — keyboard users clear via the input
+ *                itself. The toggle has no keyboard equivalent, so it sits in
+ *                the tab order right after the input.
  *   description  14/20 in `--zl-muted-foreground`
  *   read-only    `--zl-muted` fill at full contrast, no hover edge and no
  *                clear button; still focusable and still submitted
@@ -361,7 +362,6 @@ export class ZlField extends FormAtom {
           aria-controls=${this.inputId}
           aria-describedby=${ifDefined(labelId)}
           title=${label}
-          tabindex="-1"
           @mousedown=${this.keepInputFocus}
           @click=${this.handlePasswordToggle}
         >
@@ -372,8 +372,9 @@ export class ZlField extends FormAtom {
   }
 
   /**
-   * Out of the tab order is not out of reach of the pointer: pressing the
-   * button would still move focus to it and blur the field mid-typing.
+   * A pointer press would move focus to the button and blur the field
+   * mid-typing, so focus stays in the input. Keyboard users reach the button
+   * with Tab, and focus stays on it so they hear the new state.
    */
   private keepInputFocus = (event: MouseEvent): void => {
     event.preventDefault();
@@ -389,9 +390,6 @@ export class ZlField extends FormAtom {
     const end = input?.selectionEnd ?? null;
     const direction = input?.selectionDirection ?? undefined;
     this.revealed = !this.revealed;
-    // Focus normally never left (see keepInputFocus); this covers a touch or
-    // assistive-tech activation that did move it.
-    input?.focus();
     await this.updateComplete;
     if (input && start !== null && end !== null) {
       // The reset is lazy: Chrome applies it when it next lays the input out.
