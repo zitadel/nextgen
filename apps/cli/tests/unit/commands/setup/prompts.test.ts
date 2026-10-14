@@ -41,6 +41,7 @@ import {
   googleSelection,
 } from "../../../helpers/idp-values";
 
+import { type Asker, input } from "../../../../src/lib/input";
 import { takeReportedWarnings } from "../../../../src/lib/warnings";
 import { detectHealthyLocalServer } from "../../../../src/lib/local-server/runtime";
 
@@ -76,7 +77,9 @@ function baseAnswers(over: Partial<SetupAnswers> = {}): SetupAnswers {
   };
 }
 
-const ctx: PromptContext = { framework: FRAMEWORK, cwd: "/tmp/app" };
+const ask: Asker = (question) => input(question, { interactive: true, force: false });
+
+const ctx: PromptContext = { input: ask, framework: FRAMEWORK, cwd: "/tmp/app" };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -128,6 +131,15 @@ describe("FrameworkConfirmPrompt", () => {
 
     await expect(new FrameworkConfirmPrompt().ask(baseAnswers(), ctx)).rejects.toMatchObject({
       code: "E_UNSUPPORTED_PROJECT_SHAPE",
+    });
+  });
+
+  it("says it stopped because the framework was declined, not that anything was cancelled", async () => {
+    vi.mocked(confirm).mockResolvedValueOnce(false);
+
+    await expect(new FrameworkConfirmPrompt().ask(baseAnswers(), ctx)).rejects.toMatchObject({
+      message: "Setup stopped — the detected framework was declined",
+      hint: "Re-run with --framework next when ready.",
     });
   });
 
@@ -235,7 +247,7 @@ describe("PickFrameworkPrompt", () => {
   it("returns the selected framework id", async () => {
     vi.mocked(select).mockResolvedValueOnce("next" as never);
 
-    const id = await new PickFrameworkPrompt().ask([{ id: "next", displayName: "Next.js" }]);
+    const id = await new PickFrameworkPrompt().ask([{ id: "next", displayName: "Next.js" }], ask);
 
     expect(id).toBe("next");
   });
@@ -245,7 +257,7 @@ describe("PickFrameworkPrompt", () => {
     vi.mocked(isCancel).mockReturnValueOnce(true);
 
     await expect(
-      new PickFrameworkPrompt().ask([{ id: "next", displayName: "Next.js" }]),
+      new PickFrameworkPrompt().ask([{ id: "next", displayName: "Next.js" }], ask),
     ).rejects.toMatchObject({ code: "E_VALIDATION" });
   });
 });
@@ -681,18 +693,74 @@ describe("askCustomSettings", () => {
       scopes: "openid",
     };
 
-    expect(await askCustomSettings(given)).toEqual(given);
+    expect(await askCustomSettings(given, ask)).toEqual(given);
     expect(text).not.toHaveBeenCalled();
+  });
+
+  const EVERYTHING = {
+    slug: "acme-sso",
+    displayName: "Acme SSO",
+    issuer: "https://sso.acme.example",
+    scopes: "openid",
+  };
+  const QUESTIONS = {
+    slug: "Name for this connection",
+    displayName: "Name shown on the sign-in button",
+    issuer: "Issuer URL of the provider",
+    scopes: "Scopes to request",
+  };
+
+  it.each([
+    [["slug"], ["displayName", "issuer", "scopes"]],
+    [
+      ["displayName", "scopes"],
+      ["slug", "issuer"],
+    ],
+    [["slug", "displayName", "issuer"], ["scopes"]],
+    [[], ["slug", "displayName", "issuer", "scopes"]],
+  ] as const)("given %j asks only for %j, in that order", async (givenKeys, askedKeys) => {
+    const given = Object.fromEntries(givenKeys.map((key) => [key, EVERYTHING[key]]));
+    vi.mocked(text).mockImplementation(
+      (async ({ message }: { message: string }) =>
+        Object.values(EVERYTHING)[
+          Object.values(QUESTIONS).findIndex((question) => message.startsWith(question))
+        ]) as never,
+    );
+
+    await askCustomSettings(given, ask);
+
+    expect(vi.mocked(text).mock.calls.map(([options]) => options.message)).toEqual(
+      askedKeys.map((key) => expect.stringContaining(QUESTIONS[key])),
+    );
+  });
+
+  it.each([
+    ["slug", "Not A Slug"],
+    ["issuer", "not a url"],
+  ] as const)("refuses a given %s that does not parse, without asking", async (key, value) => {
+    await expect(askCustomSettings({ ...EVERYTHING, [key]: value }, ask)).rejects.toMatchObject({
+      code: "E_VALIDATION",
+    });
+    expect(text).not.toHaveBeenCalled();
+  });
+
+  it("returns the scopes that were given as one string", async () => {
+    const values = await askCustomSettings({ ...EVERYTHING, scopes: "openid  email" }, ask);
+
+    expect(values.scopes).toBe("openid email");
   });
 
   it("asks only for the settings that were left out", async () => {
     vi.mocked(text).mockResolvedValueOnce("Acme SSO" as never);
     vi.mocked(text).mockResolvedValueOnce("openid groups" as never);
 
-    const values = await askCustomSettings({
-      slug: "acme-sso",
-      issuer: "https://sso.acme.example",
-    });
+    const values = await askCustomSettings(
+      {
+        slug: "acme-sso",
+        issuer: "https://sso.acme.example",
+      },
+      ask,
+    );
 
     expect(vi.mocked(text)).toHaveBeenCalledTimes(2);
     expect(values).toEqual({

@@ -112,8 +112,8 @@ describe("renderScalar", () => {
 
 describe("parseVariableValue", () => {
   it("keeps a string exactly as entered", () => {
-    expect(parseVariableValue("5", "string")).toBe("5");
-    expect(parseVariableValue(" padded ", "string")).toBe(" padded ");
+    expect(parseVariableValue("5", "string")).toEqual({ ok: true, value: "5" });
+    expect(parseVariableValue(" padded ", "string")).toEqual({ ok: true, value: " padded " });
   });
 
   it.each([
@@ -122,29 +122,41 @@ describe("parseVariableValue", () => {
     ["0", 0],
     ["1e3", 1000],
   ])("reads %j as the number %j", (raw, expected) => {
-    expect(parseVariableValue(raw, "number")).toBe(expected);
+    expect(parseVariableValue(raw, "number")).toEqual({ ok: true, value: expected });
   });
 
   it.each(["abc", "", " 5", "5 ", "0x10", "05", "1,000", "NaN", "Infinity"])(
     "refuses %j, which is not a JSON number",
     (raw) => {
-      expect(() => parseVariableValue(raw, "number")).toThrow(/Expected a number/);
+      expect(parseVariableValue(raw, "number")).toMatchObject({
+        ok: false,
+        problem: expect.stringMatching(/Expected a number.*JSON number/),
+      });
     },
   );
 
   it("refuses an integer too large to store exactly, rather than rounding it", () => {
     // 2^53 + 1 has no exact double; stored as a number it would change digits.
-    expect(() => parseVariableValue("9007199254740993", "number")).toThrow(/too large/);
-    expect(parseVariableValue("9007199254740991", "number")).toBe(9007199254740991);
+    expect(parseVariableValue("9007199254740993", "number")).toMatchObject({
+      ok: false,
+      problem: expect.stringMatching(/too large.*string/),
+    });
+    expect(parseVariableValue("9007199254740991", "number")).toEqual({
+      ok: true,
+      value: 9007199254740991,
+    });
   });
 
   it("reads exactly true and false as booleans", () => {
-    expect(parseVariableValue("true", "boolean")).toBe(true);
-    expect(parseVariableValue("false", "boolean")).toBe(false);
+    expect(parseVariableValue("true", "boolean")).toEqual({ ok: true, value: true });
+    expect(parseVariableValue("false", "boolean")).toEqual({ ok: true, value: false });
   });
 
   it.each(["True", "1", "yes", ""])("refuses %j as a boolean", (raw) => {
-    expect(() => parseVariableValue(raw, "boolean")).toThrow(/Expected true or false/);
+    expect(parseVariableValue(raw, "boolean")).toMatchObject({
+      ok: false,
+      problem: expect.stringMatching(/Expected true or false.*`true` or `false`/),
+    });
   });
 });
 
