@@ -278,8 +278,10 @@ jobs:
         id: passed
         run: echo "result=success" >> "$GITHUB_OUTPUT"
 
+      # Not when the suite lookup failed: an empty results path would turn the
+      # glob into /**/*.png, every PNG on the runner.
       - name: Upload the screenshots
-        if: ${{ failure() }}
+        if: ${{ failure() && steps.suite.outputs.results != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: console-deployment-screenshots
