@@ -30,7 +30,13 @@ import {
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { environmentFlags, environmentSelectorSuffix } from "../../lib/oclif/environment-flags";
 import { createOrca } from "../../lib/orca";
-import { hasZitadelConfig, hasZitadelSecret, readZitadelSecret } from "../../lib/project";
+import {
+  hasZitadelConfig,
+  hasZitadelSecret,
+  readProjectServer,
+  readZitadelConfig,
+  readZitadelSecret,
+} from "../../lib/project";
 import { listenersForPort } from "../../lib/prober/ports";
 import { SANITY_CHECKS, type CheckContext, type CheckOutcome } from "./checks";
 import {
@@ -144,25 +150,36 @@ export default class Doctor extends BaseCommand {
       server: typeof flags.server === "string" ? flags.server : undefined,
     });
     // The claim check reads the local `.zitadel/secret`, which is setup's
-    // project, so the claim it suggests is pinned to the file setup wrote for
-    // it, as setup's own claim suggestion is: this run's `--env`, or a
-    // production project exported in the shell, would claim a different one.
-    // `--env-file` outranks the process environment. Only a file that names
-    // that very project is pinned: one a developer keeps for their own
-    // values, or one bound to another project, would claim the wrong one or
-    // none; without it only `--cwd` and `--server` (where doctor checked it)
-    // are carried.
-    const warningAdvice = advisoryForWarnings(
-      warnings,
-      this.meta.cliVersion,
-      environmentSelectorSuffix({
-        cwd: cwdFlag,
-        server: serverFlag,
-        ...((await namesProject(join(cwd, ".env.development.local"), secretProjectId(cwd)))
-          ? { envFile: ".env.development.local" }
-          : {}),
-      }),
-    );
+    // project, so a claim is suggested only pinned to the file setup wrote for
+    // it, as setup's own claim suggestion is: `--env-file` outranks the
+    // process environment and the other `.env` files, which a bare claim
+    // would read first and could name another project. Without a file that
+    // names that very project nothing a command can carry selects it, so the
+    // advice says so instead. The server is the project's own, from
+    // `zitadel.json` where the claim check read it, not this run's `--server`.
+    const projectId = await secretProjectId(cwd);
+    const projectServer = hasConfig ? readProjectServer(await readZitadelConfig(cwd)) : serverFlag;
+    // A bare claim resolves as this shell does, so it is offered unpinned only
+    // when that resolution lands on the very project the check read.
+    const bareResolves =
+      projectId !== undefined &&
+      (await resolveEnvironment({ cwd, env: this.meta.env }).then(
+        (environment) => environment.values.ZITADEL_PROJECT_ID?.value === projectId,
+        () => false,
+      ));
+    const claimSelector = (await namesProject(
+      join(cwd, ".env.development.local"),
+      Promise.resolve(projectId),
+    ))
+      ? environmentSelectorSuffix({
+          cwd: cwdFlag,
+          envFile: ".env.development.local",
+          server: projectServer,
+        })
+      : bareResolves
+        ? environmentSelectorSuffix({ cwd: cwdFlag, server: projectServer })
+        : undefined;
+    const warningAdvice = advisoryForWarnings(warnings, this.meta.cliVersion, claimSelector);
     this.recordTelemetry({
       runtime: runtimeBackend,
       checks_total: checks.length,
@@ -325,8 +342,11 @@ function failureAdvice(
 export function advisoryForWarnings(
   warnings: CheckOutcome[],
   cliVersion: string,
-  /** The selector for the local project, which is the one the claim check reads. */
-  local: EnvironmentSelector,
+  /**
+   * The selector for the local project, which is the one the claim check
+   * reads, or nothing when no selector reaches it.
+   */
+  local: EnvironmentSelector | undefined,
 ): { nextActions: string[]; nextCommands: SuggestedCommand[] } | undefined {
   const nextActions: string[] = [];
   const nextCommands: SuggestedCommand[] = [];
@@ -344,12 +364,18 @@ export function advisoryForWarnings(
     // (claimed from another machine reads detached), and the server checks
     // the grant before the window, so running claim is safe and answers
     // authoritatively.
-    nextActions.push(
-      claimWindowClosed(claimWarning)
-        ? claimWindowClosedAction(cliVersion, local)
-        : claimAction(cliVersion, undefined, local),
-    );
-    nextCommands.push(claimCommand(cliVersion, local));
+    if (local === undefined) {
+      nextActions.push(
+        "Claim this project with `zitadel claim` once .env.development.local sets ZITADEL_PROJECT_ID to the project in .zitadel/secret; until then claim would resolve a different project.",
+      );
+    } else {
+      nextActions.push(
+        claimWindowClosed(claimWarning)
+          ? claimWindowClosedAction(cliVersion, local)
+          : claimAction(cliVersion, undefined, local),
+      );
+      nextCommands.push(claimCommand(cliVersion, local));
+    }
   }
 
   const managedRuntimeWarning = warnings.find(
