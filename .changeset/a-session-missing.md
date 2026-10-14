@@ -1,5 +1,5 @@
 ---
-"@zitadel/components": minor
+"@zitadel/components": major
 "@zitadel/sdk-core": minor
 "@zitadel/sdk-react": minor
 "@zitadel/sdk-vue": minor
