@@ -157,7 +157,7 @@ async function readNormalBuildDeps() {
 
   let tasksByProject;
   try {
-    ({ tasks: tasksByProject } = JSON.parse(result.stdout.slice(result.stdout.indexOf("{"))));
+    ({ tasks: tasksByProject } = JSON.parse(result.stdout));
   } catch (error) {
     throw new Error(
       `failed to parse moon build tasks: ${formatError(error)}\n${result.stdout.slice(0, 1000)}`,
