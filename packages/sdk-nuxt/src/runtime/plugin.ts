@@ -25,7 +25,10 @@ export default defineNuxtPlugin(() => {
           display: auth.session.display,
         },
       }
-    : { isAuthenticated: false, session: null };
+    : // An outage keeps its reason, so a page guard can tell it from signed out.
+      auth.reason
+      ? { isAuthenticated: false, session: null, reason: auth.reason }
+      : { isAuthenticated: false, session: null };
 
   useState<ClientAuthResult>("nextgen-auth", () => clientAuth);
 

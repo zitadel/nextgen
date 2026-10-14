@@ -126,7 +126,7 @@ export function createNextgenMiddleware(
   } = options;
 
   // Guard against open-redirect: loginPath must be a path on this app.
-  assertLoginPath(loginPath);
+  assertLoginPath(loginPath, { protectedRoutes, ignoredRoutes });
 
   return defineEventHandler(async (event: H3Event) => {
     const urlObj = getRequestURL(event);
@@ -391,7 +391,7 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<Res
     if (check.status === "unknown") {
       // The backend could not be asked. The session may be live, so its cookie
       // survives the outage; a protected route is retryable, not a sign-in.
-      event.context.nextgenAuth = { isAuthenticated: false, session: null };
+      event.context.nextgenAuth = { isAuthenticated: false, session: null, reason: "unavailable" };
       if (matchesRoutes(pathname, protectedRoutes)) {
         return sessionUnavailableResponse();
       }
@@ -429,7 +429,11 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<Res
  *
  * export default defineEventHandler((event) => {
  *   const auth = getAuth(event);
- *   if (!auth.isAuthenticated) throw createError({ statusCode: 401 });
+ *   if (!auth.isAuthenticated) {
+ *     // Zitadel could not be asked: an outage, not a sign-out.
+ *     if (auth.reason === "unavailable") throw createError({ statusCode: 503 });
+ *     throw createError({ statusCode: 401 });
+ *   }
  *   return { userId: auth.session.userId };
  * });
  * ```

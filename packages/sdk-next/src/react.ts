@@ -30,4 +30,5 @@ export type {
   ClientSession,
   NextgenSession,
   UnauthState,
+  UnauthReason,
 } from "./types.js";

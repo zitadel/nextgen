@@ -292,7 +292,7 @@ async function handleAuth(
     if (check.status === "unknown") {
       // The backend could not be asked. The session may be live, so its cookie
       // survives the outage; a protected route is retryable, not a sign-in.
-      event.locals.nextgenAuth = { isAuthenticated: false, session: null };
+      event.locals.nextgenAuth = { isAuthenticated: false, session: null, reason: "unavailable" };
       if (matchesRoutes(pathname, protectedRoutes)) {
         return sessionUnavailableResponse();
       }
@@ -378,7 +378,7 @@ export function createNextgenHandle(
   } = options;
 
   // Guard against open-redirect: loginPath must be a path on this app.
-  assertLoginPath(loginPath);
+  assertLoginPath(loginPath, { protectedRoutes, ignoredRoutes });
 
   return async ({ event, resolve }) => {
     const { pathname } = event.url;
@@ -420,7 +420,11 @@ export function createNextgenHandle(
  *
  * export const load = (event) => {
  *   const auth = getAuth(event);
- *   if (!auth.isAuthenticated) throw redirect(302, "/login");
+ *   if (!auth.isAuthenticated) {
+ *     // Zitadel could not be asked: an outage, not a sign-out.
+ *     if (auth.reason === "unavailable") error(503, "Try again shortly");
+ *     redirect(302, "/login");
+ *   }
  *   return { userId: auth.session.userId };
  * };
  * ```

@@ -8,6 +8,7 @@ export type {
   NextgenSession,
   AuthState,
   UnauthState,
+  UnauthReason,
   ClientSession,
   ClientAuthState,
   ClientAuthResult,

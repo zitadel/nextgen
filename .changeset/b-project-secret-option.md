@@ -1,6 +1,6 @@
 ---
-"@zitadel/sdk-next": patch
-"@zitadel/sdk-nuxt": patch
+"@zitadel/sdk-next": minor
+"@zitadel/sdk-nuxt": minor
 ---
 
 `nextgenMiddleware`, `createProxy` and `createNextgenMiddleware` accept a `projectSecret`

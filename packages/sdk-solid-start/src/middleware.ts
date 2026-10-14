@@ -250,7 +250,7 @@ async function handleAuth(
     if (check.status === "unknown") {
       // The backend could not be asked. The session may be live, so its cookie
       // survives the outage; a protected route is retryable, not a sign-in.
-      event.locals.nextgenAuth = { isAuthenticated: false, session: null };
+      event.locals.nextgenAuth = { isAuthenticated: false, session: null, reason: "unavailable" };
       return matchesRoutes(pathname, protectedRoutes) ? sessionUnavailableResponse() : undefined;
     }
   }
@@ -334,7 +334,7 @@ export function createNextgenMiddleware(
   } = options;
 
   // Guard against open-redirect: loginPath must be a path on this app.
-  assertLoginPath(loginPath);
+  assertLoginPath(loginPath, { protectedRoutes, ignoredRoutes });
 
   const onRequest = async (event: SolidFetchEvent): Promise<Response | undefined> => {
     const url2 = new URL(event.request.url);

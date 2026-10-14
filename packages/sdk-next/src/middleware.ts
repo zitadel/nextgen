@@ -22,11 +22,18 @@ import { verifyJwt, isJwtShaped } from "./lib/jwt.js";
  * and registers them with the Next.js header-tunnelling mechanism so that
  * server components can read them via `headers()`.
  *
+ * `x-nextgen-auth-state` is always tunnelled, empty unless `extra` sets it, so
+ * a client-sent value never reaches `auth()` on a route the middleware covers.
+ *
  * @param req   - The incoming edge request.
  * @param extra - Additional headers to inject (e.g. `x-nextgen-auth-token`).
  * @returns A new `Headers` instance with the injected values registered.
  */
-function tunnelHeaders(req: NextRequest, extra: Readonly<Record<string, string>>): Headers {
+function tunnelHeaders(req: NextRequest, extraHeaders: Readonly<Record<string, string>>): Headers {
+  const extra: Readonly<Record<string, string>> = {
+    "x-nextgen-auth-state": "",
+    ...extraHeaders,
+  };
   const headers = new Headers(req.headers);
 
   // Security: strip any x-middleware-override-headers the client may have sent.
@@ -98,7 +105,7 @@ export async function nextgenMiddleware(
   } = options;
 
   // Guard against open-redirect: loginPath must be a path on this app.
-  assertLoginPath(loginPath);
+  assertLoginPath(loginPath, { protectedRoutes, ignoredRoutes });
 
   const { pathname } = new URL(req.url);
 
@@ -346,7 +353,11 @@ async function handleAuth(
       if (matchesRoutes(pathname, protectedRoutes)) {
         return sessionUnavailableResponse();
       }
-      const tunnelled = tunnelHeaders(req, { "x-nextgen-auth-token": "" });
+      // auth() reports `reason: "unavailable"` without asking the backend again.
+      const tunnelled = tunnelHeaders(req, {
+        "x-nextgen-auth-token": "",
+        "x-nextgen-auth-state": "unavailable",
+      });
       return NextResponse.next({ request: { headers: tunnelled } });
     }
   }
@@ -427,7 +438,7 @@ export type ProxyHandler = (req: NextRequest) => Promise<NextResponse | Response
  */
 export function createProxy(config: ZitadelProject, options: ProxyOptions = {}): ProxyHandler {
   // Fail at setup, not with a 500 on every request.
-  assertLoginPath(options.loginPath ?? "/login");
+  assertLoginPath(options.loginPath ?? "/login", options);
   const mergedOptions: NextgenMiddlewareOptions & { projectSecret?: string } = {
     ...options,
     proxyPath: config.proxyPath,

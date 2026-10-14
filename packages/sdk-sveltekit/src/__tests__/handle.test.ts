@@ -11,16 +11,24 @@ import type { RequestEvent } from "@sveltejs/kit";
 import type { Handle } from "@sveltejs/kit/hooks";
 
 import { generateKeyPairSync, createSign } from "node:crypto";
-import { describe, it, expect, expectTypeOf, vi, beforeEach } from "vitest";
+import { describe, it, expect, expectTypeOf, vi, beforeEach, afterEach } from "vitest";
 
 import { createNextgenHandle } from "../handle";
 import { clearJwksCache } from "@zitadel/sdk-core/jwt";
+import { clearSessionCheckBackoff } from "@zitadel/sdk-core/middleware";
 import { DEAD, OUTAGES, PROXY_FAILURES } from "./outages";
 
-// The JWKS cache is module-level and per issuer: start every case from a cold
-// cache, so each one fetches the keys its own mock publishes.
+// The JWKS cache and the session-check backoff are module-level and per
+// issuer: start every case cold, so each one asks its own mock, and keep the
+// expected outage warnings out of the output.
 beforeEach(() => {
   clearJwksCache();
+  clearSessionCheckBackoff();
+  vi.spyOn(console, "warn").mockImplementation(() => undefined);
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 function base64url(buf: Buffer): string {
@@ -380,6 +388,28 @@ describe("createNextgenHandle", () => {
   });
 
   describe("loginPath validation", () => {
+    // A visitor without a session would be redirected from /login to /login forever.
+    it("throws at setup when protectedRoutes match the loginPath", () => {
+      expect(() =>
+        createNextgenHandle({
+          url: "http://localhost:4000",
+          loginPath: "/login",
+          protectedRoutes: ["/*"],
+        }),
+      ).toThrow(/is matched by protectedRoutes/);
+    });
+
+    it("accepts a loginPath that ignoredRoutes exempt from protectedRoutes", () => {
+      expect(() =>
+        createNextgenHandle({
+          url: "http://localhost:4000",
+          loginPath: "/login",
+          protectedRoutes: ["/*"],
+          ignoredRoutes: ["/login"],
+        }),
+      ).not.toThrow();
+    });
+
     it("throws synchronously when loginPath is an absolute URL", () => {
       expect(() =>
         createNextgenHandle({
@@ -672,7 +702,7 @@ describe("opaque session cookie", () => {
   });
 
   it("clears a dead session cookie on a public page", async () => {
-    sessionsMe(new Response(null, { status: 401 }));
+    sessionsMe(Response.json({ code: "auth.unauthorized", message: "gone" }, { status: 401 }));
     const { event, resolve } = makeEvent("http://localhost:3000/", { cookie: COOKIE });
     const deleteCookie = vi.spyOn(event.cookies, "delete");
 
@@ -704,7 +734,7 @@ describe("opaque session cookie", () => {
     expect([response.status, deleteCookie.mock.calls, event.locals.nextgenAuth]).toEqual([
       200,
       [],
-      { isAuthenticated: false, session: null },
+      { isAuthenticated: false, session: null, reason: "unavailable" },
     ]);
   });
 

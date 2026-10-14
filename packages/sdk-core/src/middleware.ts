@@ -40,7 +40,10 @@ export const HOP_BY_HOP: ReadonlySet<string> = new Set([
  * These headers carry session data between the middleware and server components;
  * forwarding them upstream would expose internal state and allow header injection.
  */
-export const INTERNAL_HEADERS: ReadonlySet<string> = new Set(["x-nextgen-auth-token"]);
+export const INTERNAL_HEADERS: ReadonlySet<string> = new Set([
+  "x-nextgen-auth-token",
+  "x-nextgen-auth-state",
+]);
 
 // ─── Route matching ──────────────────────────────────────────────────────────
 
@@ -84,20 +87,47 @@ function withoutTrailingSlash(path: string): string {
 }
 
 /**
+ * The routes {@link assertLoginPath} checks a login path against, so the login
+ * page is never one a signed-out visitor is redirected away from.
+ */
+export type LoginPathRoutes = {
+  readonly protectedRoutes?: readonly string[];
+  readonly ignoredRoutes?: readonly string[];
+};
+
+/**
  * Throws unless `loginPath` is a path on this app: it must start with a single
  * `/`. An absolute URL (`https://evil.com/phish`) or a protocol-relative one
  * (`//evil.com`) would turn the protected-route redirect into an open redirect.
+ *
+ * Given the middleware's routes, it also throws when `protectedRoutes` matches
+ * the login page itself (and `ignoredRoutes` does not exempt it): a visitor
+ * without a session would be redirected from the login page to the login page
+ * forever.
+ *
  * Every SDK calls this once, when its middleware is created, so a bad value
  * fails at startup instead of on every request.
  *
  * @param loginPath - The configured login path.
+ * @param routes    - The middleware's protected and ignored routes.
  */
-export function assertLoginPath(loginPath: string): void {
+export function assertLoginPath(loginPath: string, routes: LoginPathRoutes = {}): void {
   if (!loginPath.startsWith("/") || loginPath.startsWith("//")) {
     throw new Error(
       `[nextgen] loginPath must be a relative path starting with a single "/". ` +
         `Received: "${loginPath}". Using an absolute or protocol-relative URL ` +
         `would allow open-redirect attacks.`,
+    );
+  }
+  const pathname = loginPath.split(/[?#]/, 1)[0] ?? loginPath;
+  if (
+    matchesRoutes(pathname, routes.protectedRoutes ?? []) &&
+    !matchesRoutes(pathname, routes.ignoredRoutes ?? [])
+  ) {
+    throw new Error(
+      `[nextgen] loginPath "${loginPath}" is matched by protectedRoutes, so a visitor ` +
+        `without a session would be redirected to the login page from the login page ` +
+        `forever. Narrow protectedRoutes or add the login path to ignoredRoutes.`,
     );
   }
 }
@@ -229,8 +259,22 @@ export type NextgenSession = {
 /** Auth state when the user is signed in. */
 export type AuthState = { isAuthenticated: true; session: NextgenSession };
 
-/** Auth state when the user is not signed in. */
-export type UnauthState = { isAuthenticated: false; session: null };
+/**
+ * Why a request is not signed in, when that is not simply "no session".
+ *
+ * - `unavailable`: the request carries a session the backend could not check
+ *   (it is unreachable, slow or failing). The session may well be live and its
+ *   cookie is kept, so an app guard should answer a retryable error (a `503`)
+ *   instead of sending the user to the login page.
+ */
+export type UnauthReason = "unavailable";
+
+/**
+ * Auth state when the user is not signed in. `reason` is set only when the
+ * session could not be checked ({@link UnauthReason}); it is absent for a
+ * visitor who has no session, a dead one, or one that names no user yet.
+ */
+export type UnauthState = { isAuthenticated: false; session: null; reason?: UnauthReason };
 
 /** Union of all possible auth states. */
 export type AuthResult = AuthState | UnauthState;
@@ -425,20 +469,65 @@ export interface OpaqueSession {
  *
  * - `live`: the backend holds the session. Its `userId` is `null` when it is
  *   anonymous (see {@link OpaqueSession}).
- * - `dead`: the backend answered that the token names no session — `401` for
- *   an invalid, expired or revoked token, `404` for a session that is gone.
- *   Only this outcome justifies clearing the cookie.
- * - `unknown`: the backend could not say — a network error, a timeout, a `5xx`
- *   or any other unexpected answer. The session may well be live, so callers
- *   keep the cookie and treat the request as not signed in for now; a
- *   protected route answers {@link sessionUnavailableResponse} instead of
- *   sending a signed-in user to the login page. Clearing the cookie here would
- *   sign every user out whenever the backend restarts.
+ * - `dead`: the backend itself answered that the token names no session — a
+ *   `401` carrying its `auth.unauthorized` error code (an invalid, expired or
+ *   revoked token) or a `404` carrying `sess.not_found` (a session that is
+ *   gone). Only this outcome justifies clearing the cookie.
+ * - `unknown`: the backend could not say — a network error, a timeout, any
+ *   other status, a `401`/`404` without the backend's error code (a gateway,
+ *   WAF or wrong base path answers those too) or an unreadable body. The
+ *   session may well be live, so callers keep the cookie and treat the request
+ *   as not signed in for now (`reason: "unavailable"`); a protected route
+ *   answers {@link sessionUnavailableResponse} instead of sending a signed-in
+ *   user to the login page. Clearing the cookie here would sign every user out
+ *   whenever the backend restarts.
  */
 export type OpaqueSessionCheck =
   | { readonly status: "live"; readonly session: OpaqueSession }
   | { readonly status: "dead" }
   | { readonly status: "unknown" };
+
+/**
+ * How long, after a session check came back `unknown`, further checks against
+ * the same backend answer `unknown` at once instead of asking it again. An
+ * outage that hangs would otherwise cost every request from every signed-in
+ * user the full `opaqueTokenTimeoutMs`, and send each of those requests to a
+ * backend that is already struggling.
+ */
+export const SESSION_CHECK_BACKOFF_MS = 5_000;
+
+/** Per backend URL: until when a session check answers `unknown` without asking. */
+const sessionCheckBackoff = new Map<string, number>();
+
+/**
+ * Ends every session-check backoff ({@link SESSION_CHECK_BACKOFF_MS}), so the
+ * next check asks the backend again. For tests, and for a process that knows
+ * the backend is back.
+ */
+export function clearSessionCheckBackoff(): void {
+  sessionCheckBackoff.clear();
+}
+
+/** The `code` of the backend's error envelope, or `undefined` when the body is not one. */
+async function errorCode(res: Response): Promise<string | undefined> {
+  try {
+    const body = (await res.json()) as { code?: unknown } | null;
+    return typeof body?.code === "string" ? body.code : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Why a check came back `unknown`, for the log line. */
+function describeFailure(error: unknown, timeoutMs: number): string {
+  if ((error as { name?: unknown } | null)?.name === "TimeoutError") {
+    return `no answer within ${timeoutMs}ms`;
+  }
+  if (error instanceof SyntaxError) {
+    return "an unreadable response body";
+  }
+  return `a network error (${error instanceof Error ? error.message : String(error)})`;
+}
 
 /**
  * Validates an opaque session token by asking the backend
@@ -448,17 +537,39 @@ export type OpaqueSessionCheck =
  * (an empty `display`, a numeric `user_id`) reads as `null`, so a UI rendering
  * `display ?? identifier` never shows an empty name.
  *
+ * An `unknown` outcome is logged once and starts a backoff of
+ * {@link SESSION_CHECK_BACKOFF_MS} for `issuerUrl`: until it ends, checks
+ * answer `unknown` at once, without asking the backend or logging again.
+ *
  * @param token     - The opaque session token from the `__nextgen_session` cookie.
  * @param issuerUrl - Base URL of the auth backend.
  * @param timeoutMs - How long to wait for the backend before giving up.
  * @returns An {@link OpaqueSessionCheck}: `live` with the session, `dead` only
- *   when the backend answered `401` or `404`, else `unknown`.
+ *   when the backend answered `401 auth.unauthorized` or `404 sess.not_found`,
+ *   else `unknown`.
  */
 export async function validateOpaqueSessionToken(
   token: string,
   issuerUrl: string,
   timeoutMs: number,
 ): Promise<OpaqueSessionCheck> {
+  const backoffUntil = sessionCheckBackoff.get(issuerUrl);
+  if (backoffUntil !== undefined) {
+    if (Date.now() < backoffUntil) {
+      return { status: "unknown" };
+    }
+    sessionCheckBackoff.delete(issuerUrl);
+  }
+  const unknown = (why: string): OpaqueSessionCheck => {
+    sessionCheckBackoff.set(issuerUrl, Date.now() + SESSION_CHECK_BACKOFF_MS);
+    console.warn(
+      `[nextgen] could not check the session at ${issuerUrl}/sessions/me: ${why}. ` +
+        "Requests carrying a session are treated as signed out for now (the cookie is " +
+        "kept, protected routes answer 503), and the backend is not asked again for " +
+        `${SESSION_CHECK_BACKOFF_MS}ms. If this persists, check ZITADEL_URL or the url option.`,
+    );
+    return { status: "unknown" };
+  };
   try {
     const res = await fetch(`${issuerUrl}/sessions/me`, {
       method: "GET",
@@ -466,10 +577,19 @@ export async function validateOpaqueSessionToken(
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (res.status === 401 || res.status === 404) {
-      return { status: "dead" };
+      // A gateway, a WAF or a wrong base path answers 401/404 too; only the
+      // backend's own error code says the session is gone.
+      const code = await errorCode(res);
+      if (
+        (res.status === 401 && code === "auth.unauthorized") ||
+        (res.status === 404 && code === "sess.not_found")
+      ) {
+        return { status: "dead" };
+      }
+      return unknown(`HTTP ${res.status} without the backend's error code`);
     }
     if (!res.ok) {
-      return { status: "unknown" };
+      return unknown(`HTTP ${res.status}`);
     }
     const body = (await res.json()) as {
       user_id?: unknown;
@@ -486,10 +606,10 @@ export async function validateOpaqueSessionToken(
         display: text(body?.user?.display),
       },
     };
-  } catch {
+  } catch (error) {
     // A network error, a timeout or an unreadable body: the backend did not
     // say the session is dead.
-    return { status: "unknown" };
+    return unknown(describeFailure(error, timeoutMs));
   }
 }
 

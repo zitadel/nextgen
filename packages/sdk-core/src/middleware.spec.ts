@@ -1,8 +1,11 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { DEAD, OUTAGES } from "./__tests__/outages.js";
 import {
+  SESSION_CHECK_BACKOFF_MS,
   assertLoginPath,
   clearCookie,
+  clearSessionCheckBackoff,
   filterResponseHeaders,
   matchesRoutes,
   parseCookieHeader,
@@ -11,6 +14,17 @@ import {
   sessionUnavailableResponse,
   validateOpaqueSessionToken,
 } from "./middleware.js";
+
+// An unknown session check is logged and starts a backoff; neither may leak
+// from one test into the next.
+beforeEach(() => {
+  vi.spyOn(console, "warn").mockImplementation(() => undefined);
+});
+
+afterEach(() => {
+  clearSessionCheckBackoff();
+  vi.restoreAllMocks();
+});
 
 /** The upstream response headers for one proxied call. */
 function upstream(entries: Record<string, string>): Headers {
@@ -242,11 +256,8 @@ describe("validateOpaqueSessionToken", () => {
     });
   });
 
-  it.each([
-    ["a 401", new Response(null, { status: 401 })],
-    ["a 404", new Response(null, { status: 404 })],
-  ])("reports the session dead for %s", async (_label, response) => {
-    backend(response);
+  it.each(DEAD)("reports the session dead for %s", async (_label, response) => {
+    backend(response());
 
     expect(await validateOpaqueSessionToken("tok", "http://auth.test", 1000)).toEqual({
       status: "dead",
@@ -261,13 +272,97 @@ describe("validateOpaqueSessionToken", () => {
     ["a 502", new Response(null, { status: 502 })],
     ["a 503", new Response(null, { status: 503 })],
     ["a 429", new Response(null, { status: 429 })],
+    ["a 403", new Response(null, { status: 403 })],
     ["an unreadable body", new Response("not json", { status: 200 })],
+    ["a 401 without a body", new Response(null, { status: 401 })],
+    ["a 404 without a body", new Response(null, { status: 404 })],
+    ["a 401 with another code", Response.json({ code: "req.invalid" }, { status: 401 })],
+    ["a 404 with the 401 code", Response.json({ code: "auth.unauthorized" }, { status: 404 })],
   ])("reports the session unknown for %s", async (_label, response) => {
     backend(response);
 
     expect(await validateOpaqueSessionToken("tok", "http://auth.test", 1000)).toEqual({
       status: "unknown",
     });
+  });
+
+  it.each(OUTAGES)("reports the session unknown for the shared outage %s", async (_l, answer) => {
+    vi.stubGlobal("fetch", vi.fn(answer));
+
+    expect(await validateOpaqueSessionToken("tok", "http://auth.test", 1000)).toEqual({
+      status: "unknown",
+    });
+  });
+});
+
+describe("validateOpaqueSessionToken backoff", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    clearSessionCheckBackoff();
+  });
+
+  function outage() {
+    const fetchMock = vi.fn(
+      (): Promise<Response> => Promise.reject(new DOMException("timed out", "TimeoutError")),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  it("answers unknown without asking the backend again within the backoff", async () => {
+    const fetchMock = outage();
+    await validateOpaqueSessionToken("tok", "http://auth.test", 1000);
+    vi.advanceTimersByTime(SESSION_CHECK_BACKOFF_MS - 1);
+
+    expect(await validateOpaqueSessionToken("tok", "http://auth.test", 1000)).toEqual({
+      status: "unknown",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks the backend again once the backoff has passed", async () => {
+    const fetchMock = outage();
+    await validateOpaqueSessionToken("tok", "http://auth.test", 1000);
+    fetchMock.mockImplementation(async () => Response.json({ user_id: "u1" }));
+    vi.advanceTimersByTime(SESSION_CHECK_BACKOFF_MS);
+
+    expect(await validateOpaqueSessionToken("tok", "http://auth.test", 1000)).toMatchObject({
+      status: "live",
+    });
+  });
+
+  it("keeps asking a different backend during another's backoff", async () => {
+    const fetchMock = outage();
+    await validateOpaqueSessionToken("tok", "http://auth.test", 1000);
+
+    await validateOpaqueSessionToken("tok", "http://other.test", 1000);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("logs an unknown outcome once per backoff window, with its reason", async () => {
+    outage();
+    for (let i = 0; i < 5; i++) {
+      await validateOpaqueSessionToken("tok", "http://auth.test", 1000);
+    }
+
+    expect(console.warn).toHaveBeenCalledTimes(1);
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining("http://auth.test/sessions/me: no answer within 1000ms"),
+    );
+  });
+
+  it("does not log a dead session", async () => {
+    vi.stubGlobal("fetch", vi.fn(DEAD[0]?.[1]));
+
+    await validateOpaqueSessionToken("tok", "http://auth.test", 1000);
+
+    expect(console.warn).not.toHaveBeenCalled();
   });
 });
 
@@ -323,5 +418,25 @@ describe("assertLoginPath", () => {
 
   it.each(["https://evil.com/phish", "//evil.com", "login", ""])("rejects %j", (loginPath) => {
     expect(() => assertLoginPath(loginPath)).toThrow(/loginPath must be a relative path/);
+  });
+
+  // A visitor without a session would be redirected from /login to /login forever.
+  it.each([
+    ["/login", ["/*"]],
+    ["/login", ["/login"]],
+    ["/login/", ["/login"]],
+    ["/login?x=1", ["/login"]],
+  ])("rejects %s when protectedRoutes %j match it", (loginPath, protectedRoutes) => {
+    expect(() => assertLoginPath(loginPath, { protectedRoutes })).toThrow(
+      /is matched by protectedRoutes/,
+    );
+  });
+
+  it.each([
+    ["/login", { protectedRoutes: ["/profile", "/admin*"] }],
+    ["/login", { protectedRoutes: ["/*"], ignoredRoutes: ["/login"] }],
+    ["/login", { protectedRoutes: ["/*"], ignoredRoutes: ["/log*"] }],
+  ])("accepts %s with routes %j", (loginPath, routes) => {
+    expect(() => assertLoginPath(loginPath, routes)).not.toThrow();
   });
 });

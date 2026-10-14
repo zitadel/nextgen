@@ -8,6 +8,7 @@ export type {
   NextgenSession,
   AuthState,
   UnauthState,
+  UnauthReason,
   AuthResult,
   NextgenMiddlewareOptions,
   // Client-safe auth shapes returned by getSession() — same shape as

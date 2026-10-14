@@ -40,21 +40,20 @@ export type AuthOptions = Pick<
  *
  * Fail-closed: a dead session (401/404) and an anonymous one (no user yet) are
  * signed out. So is a backend that cannot answer — a network error, a timeout
- * or a 5xx — which is also logged, so a broken proxy or unreachable backend is
- * distinguishable from a genuinely missing session. `auth()` never clears the
- * cookie, so the session survives the outage.
+ * or a 5xx — which sdk-core logs, so a broken proxy or unreachable backend is
+ * distinguishable from a genuinely missing session; that outcome is returned
+ * as `"unavailable"` so `auth()` can say so. `auth()` never clears the cookie,
+ * so the session survives the outage.
  */
 const validateOpaqueSession = cache(
-  async (token: string, issuerUrl: string, timeoutMs: number): Promise<ClientSession | null> => {
+  async (
+    token: string,
+    issuerUrl: string,
+    timeoutMs: number,
+  ): Promise<ClientSession | "unavailable" | null> => {
     const check = await validateOpaqueSessionToken(token, issuerUrl, timeoutMs);
     if (check.status === "unknown") {
-      console.warn(
-        `[nextgen] auth(): could not validate the session token at ${issuerUrl}/sessions/me ` +
-          `(the backend is unreachable, too slow or failing) — treating as signed out. If ` +
-          `this persists, the backend URL is likely misconfigured (ZITADEL_URL or the ` +
-          `\`url\` option).`,
-      );
-      return null;
+      return "unavailable";
     }
     // An anonymous session (no verified user factor yet) has no user id —
     // for server-rendered UI that is "not signed in".
@@ -114,10 +113,18 @@ const validateOpaqueSession = cache(
  *
  * export default async function Page() {
  *   const session = await auth();
- *   if (!session.isAuthenticated) return <p>Not signed in</p>;
+ *   if (!session.isAuthenticated) {
+ *     // The session could not be checked: an outage, not a sign-out.
+ *     if (session.reason === "unavailable") return <p>Try again shortly</p>;
+ *     return <p>Not signed in</p>;
+ *   }
  *   return <p>Hello {session.session.userId}</p>;
  * }
  * ```
+ *
+ * When the backend cannot be asked (unreachable, too slow or failing), the
+ * result is `{ isAuthenticated: false, reason: "unavailable" }` and the cookie
+ * is kept: answer a retryable error rather than redirecting to the login page.
  *
  * @param options - Optional verification settings; see {@link AuthOptions}.
  * @returns The current {@link AuthResult}. `session.token` is the raw session
@@ -129,7 +136,11 @@ export async function auth(options: AuthOptions = {}): Promise<AuthResult> {
   const token = headerStore.get("x-nextgen-auth-token");
 
   if (!token) {
-    return { isAuthenticated: false, session: null };
+    // The middleware could not check the session (the backend is unreachable,
+    // slow or failing); it kept the cookie and says so on this header.
+    return headerStore.get("x-nextgen-auth-state") === "unavailable"
+      ? { isAuthenticated: false, session: null, reason: "unavailable" }
+      : { isAuthenticated: false, session: null };
   }
 
   const {
@@ -181,6 +192,9 @@ export async function auth(options: AuthOptions = {}): Promise<AuthResult> {
   }
 
   const session = await validateOpaqueSession(token, url, opaqueTokenTimeoutMs);
+  if (session === "unavailable") {
+    return { isAuthenticated: false, session: null, reason: "unavailable" };
+  }
   if (session) {
     return { isAuthenticated: true, session: { ...session, token } };
   }

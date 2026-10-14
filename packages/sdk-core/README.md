@@ -32,8 +32,10 @@ middleware runs (`verifyJwt`):
    default) are rejected immediately — no JWKS fetch.
 4. Tokens with a `typ` not in `allowedTokenTypes` are rejected immediately.
 5. The public key is fetched from `{url}/auth/keys` (JWKS) using the Web
-   Crypto API, with a timeout (`jwksTimeoutMs`), and cached per `kid`
-   (`JWKS_TTL_MS`).
+   Crypto API, with a timeout (`jwksTimeoutMs`). The issuer's whole JWKS
+   document is cached for `JWKS_TTL_MS` (5 minutes); a token naming a `kid`
+   the cached document lacks refreshes it, at most once per
+   `JWKS_MIN_REFRESH_MS`.
 6. The signature is verified **before** any claim checks.
 7. `iss` must be present and equal `url` — tokens without an issuer are
    rejected.
@@ -42,13 +44,19 @@ middleware runs (`verifyJwt`):
 9. `nbf` and `iat` are validated with `clockSkewMs` tolerance when present.
 
 Opaque (non-JWT) session tokens are validated against the backend's
-`GET /sessions/me` instead, bounded by `opaqueTokenTimeoutMs`. Only a `401` or
-`404` from the backend means the session is dead and its cookie is cleared. A
-network error, a timeout or a `5xx` leaves the outcome unknown: every SDK keeps
-the cookie, treats the request as signed out for now, and answers a protected
-route with a retryable `503` instead of the login redirect, so a backend
-restart signs nobody out. A JWKS refresh that fails the same way keeps
-verifying against the keys already cached.
+`GET /sessions/me` instead, bounded by `opaqueTokenTimeoutMs`. Only the
+backend's own answer that the session is gone, a `401` with the code
+`auth.unauthorized` or a `404` with `sess.not_found`, means the session is dead
+and its cookie is cleared. Anything else (a network error, a timeout, a `5xx`,
+an unreadable body, or a `401`/`404` page from a gateway in front of the
+backend) leaves the outcome unknown: every SDK keeps the cookie, treats the
+request as signed out for now with `reason: "unavailable"` on its auth result,
+and answers a protected route with a retryable `503` instead of the login
+redirect. An unknown outcome is logged once and the backend is not asked again
+for `SESSION_CHECK_BACKOFF_MS` (5 seconds), so a hanging backend does not cost
+every request the full timeout. A JWKS refresh that fails (including a `5xx`)
+keeps verifying against the keys already cached, is logged once, and is not
+retried for `JWKS_FAILURE_BACKOFF_MS` (5 seconds).
 
 A proxied `/__nextgen/*` call the backend does not answer comes back as a `502`
 (unreachable) or `504` (`proxyTimeoutMs` elapsed) with an `{ code, message }`
