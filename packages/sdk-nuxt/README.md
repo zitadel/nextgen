@@ -14,52 +14,50 @@ for hand-rolled setups.
 
 ## Surface 1 — the Nuxt module (recommended, CLI-scaffolded)
 
-Register the module under the `nextgen` config key, and give the client
-plugin your project id via `runtimeConfig.public.zitadelProjectId` — without
-it the plugin skips `configureZitadel()`, `useZitadelProject()` returns
-`null`, and the login widget cannot initialize:
+Register the module under the `nextgen` config key:
 
 ```ts
 export default defineNuxtConfig({
   modules: ['@zitadel/sdk-nuxt/module'],
   nextgen: {
-    url: process.env.ZITADEL_URL ?? 'http://localhost:8080',
     protectedRoutes: ['/admin', '/dashboard*'],
     loginPath: '/login',
-  },
-  runtimeConfig: {
-    public: {
-      zitadelProjectId: process.env.NUXT_PUBLIC_ZITADEL_PROJECT_ID ?? '',
-    },
   },
 });
 ```
 
-(This mirrors what `zitadel setup` writes into `nuxt.config.ts`.)
-
 The module registers the Nitro server middleware, the auth plugin (which
 seeds server-side auth state, hydrates it on the client, and calls
-`configureZitadel()` from the runtime config above), and auto-imports the
+`configureZitadel()` from runtime config), and auto-imports the
 composables — no `server/middleware/auth.ts`, no manual plugin.
 
-### Module options (what the module actually forwards)
+It takes three settings from the environment, or from `.env.local` when the
+environment has none. Nuxt itself loads only `.env`; `zitadel setup` writes
+all three to `.env.local` and the module registration to `nuxt.config.ts`:
 
-| Option | Type | Default | Description |
-| --- | --- | --- | --- |
-| `url` | `string` | `ZITADEL_URL` env, else `http://localhost:8080` | Full URL of the Zitadel auth backend |
-| `proxyPath` | `string` | `"/__nextgen"` | The path the **client** widgets call (exposed via public runtime config). The registered server handler currently always serves `/__nextgen` regardless of this option — to actually move the server prefix, use the direct-middleware surface |
-| `protectedRoutes` | `string[]` | `[]` | Paths requiring a valid session. Trailing `*` matches sub-paths |
-| `loginPath` | `string` | `"/login"` | Where to redirect unauthenticated users |
+| Variable | Sets | Without it |
+| --- | --- | --- |
+| `ZITADEL_URL` | `nextgen.url`, unless `nuxt.config.ts` sets it | `http://localhost:8080` |
+| `NUXT_PUBLIC_ZITADEL_PROJECT_ID` | `runtimeConfig.public.zitadelProjectId`, unless `nuxt.config.ts` sets it | the plugin skips `configureZitadel()`, `useZitadelProject()` returns `null`, and the login widget cannot initialize |
+| `ZITADEL_PROJECT_SECRET` | the server-only `runtimeConfig.nextgen.projectSecret` | sign-in cannot finish: the session exchange has no credential |
 
-The module's registered handler reads only `url`, `protectedRoutes`, and
-`loginPath` from runtime config; `proxyPath` configures the client side only
-(see its row above). The fine-tuning options of the direct-middleware surface
-(`ignoredRoutes`, `allowedAlgorithms`, `allowedTokenTypes`, `clockSkewMs`,
-`jwksTimeoutMs`, `opaqueTokenTimeoutMs`, `proxyTimeoutMs`, `audience`) are
-**not currently forwarded by the module** — if you need them, use Surface 2.
-The module also loads the server-only project secret into runtime config at
-startup, from the `ZITADEL_PROJECT_SECRET` environment variable or the
-scaffolded `.env.local`.
+The module reads them when `nuxt dev` or `nuxt build` runs, and a build keeps
+what it found. For a built server, set `NUXT_NEXTGEN_URL`,
+`NUXT_PUBLIC_ZITADEL_PROJECT_ID`, and `NUXT_NEXTGEN_PROJECT_SECRET` in its
+runtime environment instead.
+
+### Module options
+
+The module takes every option in the [options table](#options) under
+`nextgen` and hands it to the server middleware, so `audience`,
+`ignoredRoutes`, and the others apply just as they do in Surface 2; the
+widgets call the same `proxyPath` the server proxies. A built server also takes
+each option from its runtime environment as `NUXT_NEXTGEN_<OPTION>`, for
+example `NUXT_NEXTGEN_AUDIENCE=my-api` or
+`NUXT_NEXTGEN_IGNORED_ROUTES='["/health"]'`: a list as JSON, or one entry as a
+plain string. `proxyPath` is the exception: the widgets read their copy from
+public runtime config, so change it in `nuxt.config.ts`, where the module sets
+both.
 
 ### Reading auth state
 
@@ -126,8 +124,7 @@ const project = useZitadelProject();
 
 ## Surface 2 — direct middleware (hand-rolled)
 
-Create `server/middleware/auth.ts` yourself when you need the full option
-set:
+Without the module, create `server/middleware/auth.ts` yourself:
 
 ```ts
 import { createNextgenMiddleware } from '@zitadel/sdk-nuxt/server';
@@ -147,11 +144,14 @@ The middleware runs on every request and does three things in one pass:
 2. **Verifies** the session JWT via JWKS using the Web Crypto API
 3. **Redirects** unauthenticated requests to `loginPath` for protected routes
 
-### Direct-middleware options
+### Options
+
+Both surfaces take these options: the module under `nextgen` in
+`nuxt.config.ts`, the middleware as its argument.
 
 | Option              | Type                 | Default                  | Description                                                                                                                |
 | ------------------- | -------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| `url`                 | `string`             | `ZITADEL_URL` env        | Full URL of the Zitadel auth backend                                                                                       |
+| `url`                 | `string`             | `ZITADEL_URL` env (the module also reads `.env.local`), else `http://localhost:8080` | Full URL of the Zitadel auth backend                                                                                       |
 | `proxyPath`         | `string`             | `"/__nextgen"`           | Path prefix proxied to the auth backend. Sign-in with an external provider currently requires the default: the provider returns to `/__nextgen/idp/{slug}/callback` |
 | `protectedRoutes`   | `string[]`           | `[]`                     | Paths requiring a valid session. Trailing `*` matches sub-paths                                                            |
 | `ignoredRoutes`     | `string[]`           | `[]`                     | Paths skipped entirely — no JWT check, no tunnelling. Useful for webhooks or health checks. Trailing `*` matches sub-paths |

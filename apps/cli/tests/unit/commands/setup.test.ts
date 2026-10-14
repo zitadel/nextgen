@@ -5,11 +5,30 @@ import { join } from "node:path";
 import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { localServerHostsPlatform } from "../../../src/commands/setup";
+vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
+
+vi.mock("../../../src/commands/setup/prompts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  askCustomSettings: vi.fn(),
+}));
+
+import { confirm } from "@clack/prompts";
+
+import { customExample, SETUP_FLAG_NAMES } from "../../../src/lib/idp";
+import {
+  localServerHostsPlatform,
+  retryOptionsFromFlags,
+  setupRetryFlags,
+  ssoFromFlags,
+} from "../../../src/commands/setup";
+import { askCustomSettings } from "../../../src/commands/setup/prompts";
+import type { Asker } from "../../../src/lib/input";
 import { writeRuntimeMetadata } from "../../../src/lib/local-server/runtime";
+import Setup from "../../../src/commands/setup";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { asTerminal } from "../../helpers/terminal";
 
 const tempDirs: string[] = [];
 const server = setupServer(...setupPlatformHandlers());
@@ -267,6 +286,119 @@ describe("setup command", () => {
     const output = `${res.stdout}${res.stderr}`;
     expect(output).toContain("Redirect URI");
     expect(output).toMatch(/http:\/\/localhost:\d+\/__nextgen\/idp\/google\/callback/);
+  });
+
+  describe("a custom provider", () => {
+    const ACME = [
+      "--sso",
+      "custom",
+      "--sso-slug",
+      "acme-sso",
+      "--sso-display-name",
+      "Acme SSO",
+      "--sso-issuer",
+      "https://sso.acme.example",
+    ];
+
+    it("is reported under the slug the developer gave it", async () => {
+      const cwd = await makeNextProject();
+
+      const res = await setup(cwd, [
+        "--dry-run",
+        "--framework",
+        "next",
+        ...ACME,
+        "--sso-client-id",
+        "acme-client-id",
+      ]);
+
+      expect(res.exitCode).toBe(0);
+      const json = parseJson(res.stdout) as {
+        data: { sso: Array<Record<string, unknown>> };
+      };
+      expect(json.data.sso).toHaveLength(1);
+      expect(json.data.sso[0]).toMatchObject({
+        provider: "custom",
+        slug: "acme-sso",
+        client_id: "acme-client-id",
+        connection: ".zitadel/idps/acme-sso.json",
+      });
+    });
+
+    it("must be described completely, before anything is created", async () => {
+      const cwd = await makeNextProject();
+
+      const res = await setup(cwd, [
+        "--framework",
+        "next",
+        "--sso",
+        "custom",
+        "--sso-slug",
+        "acme-sso",
+        "--sso-client-id",
+        "acme-client-id",
+      ]);
+
+      expect(res.exitCode).not.toBe(0);
+      const json = parseJson(res.stdout) as { code: string; message: string };
+      expect(json.code).toBe("E_VALIDATION");
+      expect(json.message).toBe("A custom connection needs --sso-display-name, --sso-issuer");
+    });
+
+    it("refuses a name belonging to a built-in provider", async () => {
+      const cwd = await makeNextProject();
+
+      const res = await setup(cwd, [
+        "--dry-run",
+        "--framework",
+        "next",
+        "--sso",
+        "custom",
+        "--sso-slug",
+        "google",
+        "--sso-display-name",
+        "Mine",
+        "--sso-issuer",
+        "https://sso.acme.example",
+        "--sso-client-id",
+        "id",
+      ]);
+
+      expect(res.exitCode).not.toBe(0);
+      expect((parseJson(res.stdout) as { message: string }).message).toContain("built-in provider");
+    });
+
+    it("refuses the --sso-* description for a provider the catalog describes", async () => {
+      const cwd = await makeNextProject();
+
+      const res = await setup(cwd, [
+        "--dry-run",
+        "--framework",
+        "next",
+        "--sso",
+        "google",
+        "--sso-issuer",
+        "https://sso.acme.example",
+        "--sso-client-id",
+        "id",
+      ]);
+
+      expect(res.exitCode).not.toBe(0);
+      expect((parseJson(res.stdout) as { message: string }).message).toBe(
+        "--sso-issuer only applies to a custom connection",
+      );
+    });
+
+    it("refuses a description with no --sso to attach it to", async () => {
+      const cwd = await makeNextProject();
+
+      const res = await setup(cwd, ["--dry-run", "--framework", "next", "--sso-slug", "acme-sso"]);
+
+      expect(res.exitCode).not.toBe(0);
+      expect((parseJson(res.stdout) as { message: string }).message).toBe(
+        "--sso-slug needs --sso custom",
+      );
+    });
   });
 
   // No provider is an empty list, not a missing key or null: a consumer can
@@ -705,11 +837,21 @@ describe("setup command", () => {
     const res = await setup(cwd);
 
     expect(res.exitCode).toBe(3);
-    const json = parseJson(res.stdout) as { status: string; code: string; hint: string };
+    const json = parseJson(res.stdout) as {
+      status: string;
+      code: string;
+      hint: string;
+      next_commands?: string[];
+      details?: { frameworks?: string[] };
+    };
     expect(json.status).toBe("error");
     expect(json.code).toBe("E_FRAMEWORK_NOT_DETECTED");
-    expect(json.hint).toContain("Run without --json/--non-interactive");
-    expect(json.hint).not.toContain("next");
+    // Every choice, not a prompt the caller cannot see. And no rerun: the
+    // suggested command pins `--server local`, which this run did not ask for.
+    expect(json.hint).toContain("only in a terminal");
+    expect(json.hint).toContain("next, nuxt");
+    expect(json.details?.frameworks).toContain("next");
+    expect(json.next_commands ?? []).toEqual([]);
   });
 
   it("reproduces a non-default --use-case in the retry guidance when project creation fails", async () => {
@@ -739,5 +881,173 @@ describe("setup command", () => {
     // `--use-case business` only appears in the reconstructed retry flags, so
     // its presence proves the non-default use case survived into the guidance.
     expect(res.stdout).toContain("--use-case business");
+  });
+});
+
+describe("a retry after a failure before the wizard", () => {
+  it("keeps the custom settings that were typed, though they do not make a connection yet", () => {
+    const retry = retryOptionsFromFlags({ sso: "custom", "sso-slug": "acme-sso" });
+
+    expect(setupRetryFlags(retry)).toContain("--sso custom --sso-slug acme-sso");
+  });
+
+  it("quotes what was typed for a shell", () => {
+    const retry = retryOptionsFromFlags({
+      sso: "custom",
+      "sso-slug": "acme-sso",
+      "sso-display-name": "Acme's SSO",
+    });
+
+    expect(setupRetryFlags(retry)).toContain("--sso-display-name 'Acme'\\''s SSO'");
+  });
+
+  it("restates a whole connection as before", () => {
+    const retry = retryOptionsFromFlags({
+      sso: "custom",
+      "sso-slug": "acme-sso",
+      "sso-display-name": "Acme",
+      "sso-issuer": "https://sso.acme.example",
+    });
+
+    expect(setupRetryFlags(retry)).toContain("--sso-issuer https://sso.acme.example");
+  });
+
+  it("drops --non-interactive while a provider is being configured, typed in part or not", () => {
+    const retry = retryOptionsFromFlags({
+      sso: "custom",
+      "sso-slug": "acme-sso",
+      "non-interactive": true,
+    });
+
+    expect(setupRetryFlags(retry)).not.toContain("--non-interactive");
+  });
+
+  it("does not carry a provider this CLI does not offer", () => {
+    const retry = retryOptionsFromFlags({ sso: "nonesuch", "sso-slug": "acme-sso" });
+
+    expect(setupRetryFlags(retry)).not.toContain("--sso");
+  });
+});
+
+describe("a custom provider named with --sso", () => {
+  const partial = { sso: "custom", "sso-slug": "acme-sso" };
+  const ask = vi.fn() as unknown as Asker;
+
+  it("has the settings it was not given asked for when a person is there", async () => {
+    vi.mocked(askCustomSettings).mockResolvedValueOnce({
+      slug: "acme-sso",
+      displayName: "Acme",
+      issuer: "https://sso.acme.example",
+      scopes: "openid",
+    });
+
+    const draft = await ssoFromFlags(partial, false, false, ask, "0.0.0-test");
+
+    expect(draft?.selection).toMatchObject({ kind: "custom", connection: { displayName: "Acme" } });
+  });
+
+  it("is asked about with what was already typed", async () => {
+    vi.mocked(askCustomSettings).mockClear();
+    vi.mocked(askCustomSettings).mockResolvedValueOnce({
+      slug: "acme-sso",
+      displayName: "Acme",
+      issuer: "https://sso.acme.example",
+      scopes: "openid",
+    });
+
+    await ssoFromFlags(partial, false, false, ask, "0.0.0-test");
+
+    expect(askCustomSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ slug: "acme-sso" }),
+      ask,
+    );
+  });
+
+  it("is not asked about when nobody is there to answer", async () => {
+    vi.mocked(askCustomSettings).mockClear();
+
+    await expect(ssoFromFlags(partial, true, false, ask, "0.0.0-test")).rejects.toMatchObject({
+      code: "E_VALIDATION",
+    });
+    expect(askCustomSettings).not.toHaveBeenCalled();
+  });
+});
+
+describe("setup with a custom provider described in part", () => {
+  it("names what is missing when the run cannot ask, whatever the server is doing", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-sso-"));
+    tempDirs.push(cwd);
+
+    const res = await setup(cwd, ["--sso", "custom", "--sso-slug", "acme-sso"]);
+
+    expect(parseJson(res.stdout)).toMatchObject({ code: "E_VALIDATION" });
+  });
+
+  it("names what is missing before it looks for the local server", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-sso-"));
+    tempDirs.push(cwd);
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--json",
+      "--server",
+      "local",
+      "--sso",
+      "custom",
+      "--sso-slug",
+      "acme-sso",
+    ]);
+
+    expect(parseJson(res.stdout)).toMatchObject({ code: "E_VALIDATION" });
+  });
+
+  it("shows the example with setup's own flags", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-sso-"));
+    tempDirs.push(cwd);
+
+    const res = await setup(cwd, ["--sso", "custom", "--sso-slug", "acme-sso"]);
+
+    expect(parseJson(res.stdout)).toMatchObject({
+      hint: expect.stringContaining(customExample(SETUP_FLAG_NAMES)),
+    });
+  });
+
+  it("refuses a setting that is wrong before anything else", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-sso-"));
+    tempDirs.push(cwd);
+
+    const res = await setup(cwd, ["--sso", "custom", "--sso-slug", "Acme"]);
+
+    expect(parseJson(res.stdout)).toMatchObject({ message: expect.stringContaining("--sso-slug") });
+  });
+});
+
+describe("setup asked on a terminal", () => {
+  // The built CLI bundles its own prompts, so a prompt can only be answered
+  // by running the command from source, where `input` is the one module asked.
+  const settingUp = (cwd: string, ...extra: string[]) =>
+    asTerminal(() => Setup.run(["--cwd", cwd, "--server", "https://api.zitadel.cloud", ...extra]));
+
+  it("still asks whether to proceed with the detected framework when --force is given", async () => {
+    // --force permits overwriting files here. It must never answer a question.
+    const cwd = await makeNextProject();
+    vi.mocked(confirm).mockResolvedValueOnce(false as never);
+
+    await settingUp(cwd, "--force").catch(() => undefined);
+
+    expect(confirm).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Detected next. Proceed?" }),
+    );
+  });
+
+  it("stops without writing anything when the framework is declined", async () => {
+    const cwd = await makeNextProject();
+    vi.mocked(confirm).mockResolvedValueOnce(false as never);
+
+    await expect(settingUp(cwd)).rejects.toThrow();
+
+    await expect(readFile(join(cwd, "zitadel.json"), "utf8")).rejects.toThrow();
   });
 });

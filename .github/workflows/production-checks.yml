@@ -1,11 +1,11 @@
 name: production-checks
 
 # Tests a production deployment of the Vercel project `cloud` before Vercel
-# assigns it the production domains, and reports the result as the commit
-# status `docs (Production)` on the deployed commit. Vercel's Deployment
-# Checks hold the domains until that status passes, once the check is added
-# to the project (docs/runbooks/cloud.md, "Deployment checks"); until then it
-# only reports.
+# assigns it the production domains, and reports each suite's result as a
+# commit status of its own on the deployed commit: `docs (Production)` and
+# `console (Production)`. Vercel's Deployment Checks hold the domains until
+# the statuses they list pass, once they are added to the project
+# (docs/runbooks/cloud.md, "Deployment checks"); until then they only report.
 #
 # Why not `deployment_status`, like the previews: Vercel posts its GitHub
 # deployment when it assigns the domains, which is exactly what a blocking
@@ -32,8 +32,9 @@ permissions:
   contents: read
 
 env:
-  # What Vercel's Deployment Checks match on: renaming it means updating them.
-  STATUS: docs (Production)
+  # Every suite reports the status "<suite> (Production)", which is what
+  # Vercel's Deployment Checks match on: renaming one means updating them.
+  SUITES: docs console
   SHA: ${{ github.event.client_payload.git.sha }}
   RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
@@ -49,13 +50,15 @@ jobs:
     permissions:
       statuses: write
     steps:
-      - name: Report the check as running
+      - name: Report the checks as running
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >-
-          gh api --silent "repos/$GITHUB_REPOSITORY/statuses/$SHA"
-          -f state=pending -f context="$STATUS" -f target_url="$RUN_URL"
-          -f description="Running the docs suite against the deployment"
+        run: |
+          for suite in $SUITES; do
+            gh api --silent "repos/$GITHUB_REPOSITORY/statuses/$SHA" \
+              -f state=pending -f context="$suite (Production)" -f target_url="$RUN_URL" \
+              -f description="Running the $suite suite against the deployment"
+          done
 
   suites:
     if: >-
@@ -79,14 +82,21 @@ jobs:
     permissions:
       statuses: write
     steps:
-      - name: Report the result on the deployed commit
+      - name: Report the results on the deployed commit
         env:
           GH_TOKEN: ${{ github.token }}
           RESULT: ${{ needs.suites.result }}
+          # `success` from each suite that passed, empty from one that did
+          # not (deployment-checks.yml); read below as PASSED_<SUITE>.
+          PASSED_DOCS: ${{ needs.suites.outputs.docs }}
+          PASSED_CONSOLE: ${{ needs.suites.outputs.console }}
         run: |
-          state=failure
-          [ "$RESULT" = success ] && state=success
-          gh api --silent "repos/$GITHUB_REPOSITORY/statuses/$SHA" \
-            -f state="$state" -f context="$STATUS" -f target_url="$RUN_URL" \
-            -f description="The docs suite against the deployment: $RESULT"
-          echo "$STATUS: $state on ${SHA:0:8}" >> "$GITHUB_STEP_SUMMARY"
+          for suite in $SUITES; do
+            passed="$(printenv "PASSED_$(echo "$suite" | tr a-z A-Z)" || true)"
+            state=failure result="$RESULT"
+            [ "$passed" = success ] && state=success result=success
+            gh api --silent "repos/$GITHUB_REPOSITORY/statuses/$SHA" \
+              -f state="$state" -f context="$suite (Production)" -f target_url="$RUN_URL" \
+              -f description="The $suite suite against the deployment: $result"
+            echo "$suite (Production): $state on ${SHA:0:8}" >> "$GITHUB_STEP_SUMMARY"
+          done

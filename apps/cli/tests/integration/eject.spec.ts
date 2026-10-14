@@ -119,6 +119,27 @@ describe("eject", () => {
       });
     });
 
+    describe("without --force when no one can be asked", () => {
+      it("is refused", async () => {
+        const app = await aPatchedApp();
+
+        const result = await app.run(["eject", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toHintAt("--force");
+        expect(result).toSuggest("eject --force");
+      });
+
+      it("removes nothing", async () => {
+        const app = await aPatchedApp();
+        const before = await app.snapshot();
+
+        await app.run(["eject", "--json"]);
+
+        expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+      });
+    });
+
     it("changes nothing on a dry run", async () => {
       const app = await aPatchedApp();
       const before = await app.snapshot();

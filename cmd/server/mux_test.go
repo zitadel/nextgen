@@ -184,7 +184,7 @@ func TestBuildHTTPMuxServesRuntimeDocumentForTheLoginSurfaceAlone(t *testing.T) 
 
 // With neither surface enabled there is nothing to bootstrap, so the path
 // carries no special meaning and belongs to the API's namespace like any
-// other. (`console-e2e:e2e-real` runs in exactly this configuration.)
+// other. (`e2e:console-real` runs in exactly this configuration.)
 func TestBuildHTTPMuxOmitsRuntimeDocumentWhenNoUISurfaceIsEnabled(t *testing.T) {
 	mux := newTestMux(t, uiConfig(false, false))
 

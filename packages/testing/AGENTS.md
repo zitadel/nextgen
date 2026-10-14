@@ -16,11 +16,11 @@ drives the `<zitadel-login>` widget through whole auth ceremonies
 
 In-repo consumers, which double as the dogfood proof:
 
-- `apps/demo-next-e2e` (`e2e-real`) — flagship Playwright consumer.
-- `apps/console-e2e` (`e2e-real`) and `console:dev-real` — kit as suite
+- `e2e/demo-next` (`e2e:demo-next-real`) — flagship Playwright consumer.
+- `e2e/console` (`e2e:console-real`) and `console:dev-real` — kit as suite
   bootstrapper and as dev-loop seeder.
-- `apps/cli-journey-e2e` — the product journey imports kit helpers as a
-  workspace dep; the `e2e-testkit` lane installs the kit **from the local
+- `e2e/journey` — the product journey imports kit helpers as a
+  workspace dep; its testkit variant installs the kit **from the local
   registry** exactly as a customer would. Breaking the customer install
   path shows up there, not in unit tests.
 
@@ -157,13 +157,15 @@ a `testing:build` task dep.
 - `moon run testing:test testing:lint testing:typecheck` — unit gate.
 - `moon run testing:test-integration` — boots real instances
   (binary + SQLite local default).
-- Dogfood: `moon run demo-next-e2e:e2e-real`, `moon run console-e2e:e2e-real`,
-  `env -u CI moon run cli-journey-e2e:e2e-testkit` (customer install path).
+- Dogfood: `moon run e2e:demo-next-real`, `moon run e2e:console-real`,
+  `moon run e2e:journey-local` (runs the testkit variant among others).
 
-The real-instance lanes carry `runInCI: false`, but that only keeps them
-out of moon's automatic CI selection — `full-pr` runs all of them through
-explicit `env -u CI` workflow steps (`.github/workflows/ci.yml`). Locally,
-use the same `env -u CI` incantation.
+The real-instance lanes are dependencies of `e2e:all`, which
+`.github/workflows/ci.yml` runs in its own e2e step after the build-and-test
+graph, so moon still orders them through the DAG. They are `runInCI: "skip"`
+only to stay out of that graph, where they would compete with the unit suites;
+`:test` alone stays unit tests. Run one locally with `moon run e2e:<lane>`, or
+all of them with `moon run e2e:all`.
 
 Serialize moon invocations — two concurrent graphs produce spurious
 failures. Orphaned runtimes from aborted e2e runs squat fixed ports;

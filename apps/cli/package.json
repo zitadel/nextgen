@@ -112,7 +112,8 @@
     "undici": "^7.24.7",
     "wrap-ansi": "^7.0.0",
     "zod": "catalog:",
-    "picocolors": "^1.1.1"
+    "picocolors": "^1.1.1",
+    "rosie-skills": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
@@ -125,6 +126,7 @@
     "oclif": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
+    "vite": "catalog:",
     "vitest": "catalog:"
   }
 }

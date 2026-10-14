@@ -33,9 +33,11 @@ by re-applying an earlier template.
   decides which fields it renders: `centered` uses `logo_url`; `minimal` uses
   none until you add it to `login.liquid`. Set the typeface with
   `typography.font_family`. `typography.font_url` is loaded when the component
-  runs as `variant="page"`, which the sign-in pages `zitadel setup` generates
-  use: the component then adds that stylesheet to your page. With
-  `variant="widget"` it is not loaded, and your page loads the font.
+  runs as `variant="page"`: the component then adds that stylesheet to your
+  page. `zitadel setup` generates page-variant sign-in pages only when it
+  creates a Next.js or Nuxt app itself, in an empty directory. Everywhere else
+  the component runs as `variant="widget"`, which doesn't load it, so your page
+  loads the font.
 
   ```json
   {

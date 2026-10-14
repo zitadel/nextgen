@@ -36,12 +36,16 @@ properties:
   user_schema:
     type: string
     description: |
-      Server-assigned identifier of the user schema this flow operates on,
-      as returned by `POST /schemas`. Opaque to the client — the shape is a
-      server implementation detail. Step `fields` reference properties
-      defined in the resolved schema; the engine resolves field types, validation, and
+      The user schema this flow operates on, named by its `objectType`. The
+      flow runs against the project's newest revision of that schema, so
+      publishing a schema revision needs no change to the flow. A schema id
+      as returned by `POST /schemas` is also accepted and is stored as that
+      schema's `objectType`; reading the definition back returns the
+      `objectType`. A value naming no schema of the project is refused with
+      `flowdef.invalid`. Step `fields` reference properties defined in the
+      resolved schema; the engine resolves field types, validation, and
       implicit outcomes from schema annotations at runtime.
-    example: sch_01KWHF18816ZQESRCS7Z2STJ05
+    example: human-user
 
   purposes:
     type: object

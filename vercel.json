@@ -11,12 +11,12 @@
       "root": "apps/console",
       "framework": "vite",
       "installCommand": "sh ../cloud/install.sh",
-      "buildCommand": "cd ../.. && CONSOLE_VERCEL_INSIGHTS=1 sh apps/cloud/turbo-build.sh @zitadel/console && rm -rf apps/console/dist && mkdir -p apps/console/dist/ui/console && cp -R internal/staticui/console/dist/. apps/console/dist/ui/console/",
+      "buildCommand": "cd ../.. && CONSOLE_BASE_PATH=/console/ CONSOLE_VERCEL_INSIGHTS=1 sh apps/cloud/turbo-build.sh @zitadel/console && rm -rf apps/console/dist && mkdir -p apps/console/dist/console && cp -R internal/staticui/console/dist/. apps/console/dist/console/",
       "outputDirectory": "dist",
       "rewrites": [
         {
-          "source": "/ui/console/(.*)",
-          "destination": "/ui/console/index.html"
+          "source": "/console/(.*)",
+          "destination": "/console/index.html"
         }
       ]
     },
@@ -42,9 +42,19 @@
   },
   "redirects": [
     {
-      "source": "/ui/console",
-      "destination": "/ui/console/",
+      "source": "/console",
+      "destination": "/console/",
       "permanent": true
+    },
+    {
+      "source": "/ui/console",
+      "destination": "/console/",
+      "permanent": false
+    },
+    {
+      "source": "/ui/console/:path(.*)",
+      "destination": "/console/:path",
+      "permanent": false
     },
     {
       "source": "/storybook",
@@ -54,7 +64,13 @@
   ],
   "rewrites": [
     {
-      "source": "/ui/console/(.*)",
+      "source": "/console/runtime.json",
+      "destination": {
+        "service": "server"
+      }
+    },
+    {
+      "source": "/console/(.*)",
       "destination": {
         "service": "console"
       }
@@ -90,6 +106,18 @@
       }
     },
     {
+      "source": "/favicon.ico",
+      "destination": {
+        "service": "website"
+      }
+    },
+    {
+      "source": "/favicons/(.*)",
+      "destination": {
+        "service": "website"
+      }
+    },
+    {
       "source": "/(.*)",
       "destination": {
         "service": "server"
@@ -99,7 +127,8 @@
   "regions": ["fra1"],
   "git": {
     "deploymentEnabled": {
-      "changeset-release/*": false
+      "changeset-release/*": false,
+      "gh-readonly-queue/**": false
     }
   }
 }

@@ -1,0 +1,10 @@
+{
+  "title": "Variables",
+  "pages": [
+    "getVariables",
+    "updateVariables",
+    "getVariable",
+    "deleteVariable",
+    "..."
+  ]
+}
