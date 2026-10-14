@@ -257,8 +257,7 @@ type Invoker interface {
 	// that did not resolve, for example
 	// `flow_definition default-login: user_schema human-user not found`,
 	// because a release pins many and the code alone does not say which one
-	// failed. A flow a switch or pivot transition targets by name is such a
-	// handle too.
+	// failed.
 	// Every flow definition is then checked against the user schema revision
 	// the release carries under its `user_schema` handle, as
 	// `POST /flow_definitions` checks it against the newest revision. A flow
@@ -2747,8 +2746,7 @@ func (c *Client) sendCreateProject(ctx context.Context, request *CreateProjectRe
 // that did not resolve, for example
 // `flow_definition default-login: user_schema human-user not found`,
 // because a release pins many and the code alone does not say which one
-// failed. A flow a switch or pivot transition targets by name is such a
-// handle too.
+// failed.
 // Every flow definition is then checked against the user schema revision
 // the release carries under its `user_schema` handle, as
 // `POST /flow_definitions` checks it against the newest revision. A flow

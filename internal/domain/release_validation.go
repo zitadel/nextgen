@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
-	"slices"
 
 	"github.com/ianlancetaylor/jsonschema"
 )
@@ -38,23 +36,9 @@ type releaseHandleRef struct {
 func (r ReleaseRevision) handleRefs() []releaseHandleRef {
 	switch r.Pointer.Kind {
 	case ReleasePointerKindFlowDefinition:
-		refs := []releaseHandleRef{
+		return []releaseHandleRef{
 			{kind: ReleasePointerKindSchema, field: "user_schema", handle: r.FlowDefinition.UserSchema},
 		}
-		// A switch or pivot targets another flow by name. Sorted so the first
-		// miss reported is the same on every run.
-		for _, step := range r.FlowDefinition.Steps {
-			for _, key := range slices.Sorted(maps.Keys(step.Transitions)) {
-				if transition := step.Transitions[key]; !transition.IsCurrentFlow() {
-					refs = append(refs, releaseHandleRef{
-						kind:   ReleasePointerKindFlowDefinition,
-						field:  fmt.Sprintf("step %s transition %s flow", step.Name, key),
-						handle: transition.Target,
-					})
-				}
-			}
-		}
-		return refs
 	default:
 		return nil
 	}

@@ -26,13 +26,13 @@ var (
 }`)
 )
 
-func flowRevision(name string, transitions map[string]domain.FlowStepTransition) domain.ReleaseRevision {
+func loginFlowRevision() domain.ReleaseRevision {
 	return domain.ReleaseRevision{
 		Pointer: domain.ReleasePointer{
-			Kind: domain.ReleasePointerKindFlowDefinition, Handle: name, RevisionID: "flowdef_" + name,
+			Kind: domain.ReleasePointerKindFlowDefinition, Handle: "default-login", RevisionID: "flowdef_1",
 		},
 		FlowDefinition: &domain.FlowDefinition{
-			Name:       name,
+			Name:       "default-login",
 			UserSchema: "human-user",
 			Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identify"},
 			Steps: []domain.FlowDefinitionStep{
@@ -40,16 +40,12 @@ func flowRevision(name string, transitions map[string]domain.FlowStepTransition)
 					Name:        "identify",
 					Fields:      []domain.Field{"email"},
 					Actions:     []domain.FlowStepAction{{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true}},
-					Transitions: transitions,
+					Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "done"}},
 				},
 				{Name: "done", Complete: new(domain.FlowStepCompleteRedirect)},
 			},
 		},
 	}
-}
-
-func loginFlowRevision() domain.ReleaseRevision {
-	return flowRevision("default-login", map[string]domain.FlowStepTransition{"submit": {Target: "done"}})
 }
 
 func schemaRevision(document []byte) domain.ReleaseRevision {
@@ -88,33 +84,6 @@ func TestValidateReleaseMatchesKind(t *testing.T) {
 
 	err := domain.ValidateRelease([]domain.ReleaseRevision{loginFlowRevision(), sameName})
 	assert.ErrorIs(t, err, domain.ErrReleaseUnresolvedReference())
-}
-
-// A switch or pivot names its target flow by handle, so that flow has to be
-// in the release as well.
-func TestValidateReleaseUnresolvedTargetFlow(t *testing.T) {
-	t.Parallel()
-
-	switching := flowRevision("default-login", map[string]domain.FlowStepTransition{
-		"submit":   {Target: "done"},
-		"register": {Target: "registration", Action: new(domain.Switch)},
-	})
-	identify := &switching.FlowDefinition.Steps[0]
-	identify.Actions = append(identify.Actions, domain.FlowStepAction{Name: "register", Kind: domain.FlowActionKindNavigate})
-
-	err := domain.ValidateRelease([]domain.ReleaseRevision{switching, schemaRevision(humanUserDocument)})
-	require.Error(t, err)
-	domErr, ok := errors.AsType[domain.Error](err)
-	require.True(t, ok)
-	assert.Equal(t, domain.ErrReleaseUnresolvedReference().Code, domErr.Code)
-	assert.Equal(t, "flow_definition default-login: step identify transition register flow registration not found", domErr.Message)
-
-	err = domain.ValidateRelease([]domain.ReleaseRevision{
-		switching,
-		flowRevision("registration", map[string]domain.FlowStepTransition{"submit": {Target: "done"}}),
-		schemaRevision(humanUserDocument),
-	})
-	assert.NoError(t, err)
 }
 
 // The flow was saved against a revision that had email; the release pairs
