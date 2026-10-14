@@ -25,7 +25,7 @@ const SECRET_MODE = 0o600;
  * refuse it rather than write a file we cannot read back faithfully. Every other
  * value is quoted as much as it needs to read back exactly.
  */
-function envLine(key: string, value: string): string {
+export function envLine(key: string, value: string): string {
   if (/[\n\r]/.test(value)) {
     throw new ZitadelError(
       "E_VALIDATION",
