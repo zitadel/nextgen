@@ -1013,6 +1013,9 @@ func TestCallbackLeaksNothing(t *testing.T) {
 		conn    func(p *provider) Connection
 		handler func(t *testing.T, p *provider) http.HandlerFunc
 		req     func() CallbackRequest
+		// timeout bounds the call; only the case that waits on a silent
+		// server shortens it, so a loaded runner cannot trip the others.
+		timeout time.Duration
 		wantErr error
 	}{
 		{
@@ -1046,6 +1049,7 @@ func TestCallbackLeaksNothing(t *testing.T) {
 			handler: func(t *testing.T, p *provider) http.HandlerFunc {
 				return func(w http.ResponseWriter, r *http.Request) { time.Sleep(200 * time.Millisecond) }
 			},
+			timeout: 50 * time.Millisecond,
 			wantErr: domain.ErrIDPExchangeFailed(nil),
 		},
 		{
@@ -1117,7 +1121,11 @@ func TestCallbackLeaksNothing(t *testing.T) {
 			if tt.req != nil {
 				request = tt.req()
 			}
-			ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+			timeout := tt.timeout
+			if timeout == 0 {
+				timeout = 10 * time.Second
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			t.Cleanup(cancel)
 
 			_, err := c.Callback(ctx, request)
