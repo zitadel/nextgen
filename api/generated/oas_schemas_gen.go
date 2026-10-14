@@ -61267,13 +61267,10 @@ func (s *SchemaURL) SetURL(val url.URL) {
 // that the value is secret; it never carries the value itself.
 // A secret is stored encrypted and reads back as ciphertext, so there is
 // nothing here that could be returned honestly: the plaintext would defeat the
-// encryption, and the ciphertext would be a value no caller can use. Whether
-// secrets ever become readable — and if so under which permission — is left
-// open by ADR 062 §9; this shape is what keeps that question open rather than
-// answering it by accident.
+// encryption, and the ciphertext would be a value no caller can use.
 // Secrets are still usable without being readable: a configuration document
 // referencing `${{ NAME }}` resolves against the decrypted value when it is
-// served (§7).
+// served.
 // Ref: #
 type SecretVariable struct {
 	// Always `true`. A non-secret variable is returned as a bare scalar instead.
@@ -61292,7 +61289,7 @@ func (s *SecretVariable) SetSecret(val bool) {
 
 // A variable written with its secrecy stated explicitly.
 // Use this form to enter a secret. `{"value": "s3cr3t", "secret": true}` is
-// stored encrypted with the project's active `secret` key (ADR 062 §7) and
+// stored encrypted with the project's active `secret` key and
 // never reads back; the bare-scalar form is the same write with
 // `secret: false`.
 // Ref: #
@@ -61301,7 +61298,7 @@ type SecretVariableInput struct {
 	// Whether the value is stored encrypted. Changing it on an existing name
 	// re-writes the value under the new flag — the documents referencing that
 	// name do not change, because secrecy is a property of the value, not of
-	// the reference to it (ADR 062 §2).
+	// the reference to it.
 	Secret bool `json:"secret"`
 }
 
@@ -70788,13 +70785,12 @@ func (s *VariableKind) UnmarshalText(data []byte) error {
 
 type VariableName string
 
-// A variable's value. JSON scalars only — a string, a number, or a boolean
-// (ADR 062 §1).
+// A variable's value. JSON scalars only — a string, a number, or a boolean.
 // The value travels through JSON in both directions, so the set of types is
 // JSON's. A number always reads back as a JSON number however it was written;
 // a type JSON has no scalar for (a timestamp, say) is rejected rather than
 // quietly coming back as the string it serialized to. Strings are capped at
-// 16 KiB: a variable is a configuration value, not a payload (§8).
+// 16 KiB: a variable is a configuration value, not a payload.
 // Ref: #
 // VariableScalar represents sum type.
 type VariableScalar struct {
