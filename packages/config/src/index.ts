@@ -6,4 +6,4 @@ export * from "./normalize.js";
 export * from "./readmes.js";
 export * from "./schemas.js";
 export * from "./template.js";
-export * from "./validate.js";
+export * from "./validation/index.js";

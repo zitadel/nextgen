@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
+  moveInState,
   readState,
   removeFromState,
   updateState,
@@ -143,5 +144,57 @@ describe("removeFromState", () => {
 
     const result = await readStateFile();
     expect(result).toEqual(state);
+  });
+});
+
+describe("moveInState", () => {
+  const before: ZitadelState = {
+    framework: "next",
+    resources: {
+      ".zitadel/idps/old.json": { id: "idp_1", hash: "old" },
+      ".zitadel/idps/other.json": { id: "idp_2", hash: "other" },
+    },
+  };
+
+  it("tracks the resource under the new path", async () => {
+    await writeStateFile(before);
+
+    await moveInState(cwd, ".zitadel/idps/old.json", ".zitadel/idps/new.json", {
+      id: "idp_1",
+      hash: "new",
+    });
+
+    expect((await readStateFile()).resources[".zitadel/idps/new.json"]).toEqual({
+      id: "idp_1",
+      hash: "new",
+    });
+  });
+
+  it("stops tracking the old path in the same write", async () => {
+    await writeStateFile(before);
+
+    await moveInState(cwd, ".zitadel/idps/old.json", ".zitadel/idps/new.json", {
+      id: "idp_1",
+      hash: "new",
+    });
+
+    expect(Object.keys((await readStateFile()).resources).sort()).toEqual([
+      ".zitadel/idps/new.json",
+      ".zitadel/idps/other.json",
+    ]);
+  });
+
+  it("leaves everything else in the file alone", async () => {
+    await writeStateFile({ ...before, scaffold: undefined });
+
+    await moveInState(cwd, ".zitadel/idps/old.json", ".zitadel/idps/new.json", {
+      id: "idp_1",
+      hash: "new",
+    });
+
+    expect((await readStateFile()).resources[".zitadel/idps/other.json"]).toEqual({
+      id: "idp_2",
+      hash: "other",
+    });
   });
 });

@@ -4,12 +4,18 @@ import { join } from "node:path";
 import { Readable } from "node:stream";
 
 import { HttpResponse, http } from "msw";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { setupServer } from "msw/node";
 
 import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
 
+vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
+
+import { cancel, confirm, isCancel } from "@clack/prompts";
+
+import VariablesDelete from "../../../src/commands/variables/delete";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { asTerminal as asPerson } from "../../helpers/terminal";
 
 const server = setupServer(...setupPlatformHandlers());
 
@@ -495,7 +501,7 @@ describe("variables set", () => {
       expect(res.exitCode).not.toBe(0);
       const json = parseJson(res.stdout) as { code: string; hint: string };
       expect(json.code).toBe("E_VALIDATION");
-      expect(json.hint).toContain("Pipe the value in");
+      expect(json.hint).toContain("Pipe it in on stdin");
     } finally {
       if (original) {
         Object.defineProperty(process, "stdin", original);
@@ -813,6 +819,26 @@ describe("variables set --as", () => {
     expect(json.code).toBe("E_VALIDATION");
   });
 
+  it("says what is wrong with the value and how to write it", async () => {
+    const cwd = await makeProject();
+
+    const res = await withStdin("abc", () =>
+      runCliForTest([
+        "variables",
+        "set",
+        "RETRY_COUNT",
+        "--project-level",
+        "--as",
+        "number",
+        "--non-interactive",
+        ...base(cwd),
+      ]),
+    );
+
+    const json = parseJson(res.stdout) as { message: string };
+    expect(json.message).toMatch(/Expected a number.*JSON number/);
+  });
+
   it("refuses a typed secret before reading the value", async () => {
     const cwd = await makeProject();
     const bodies = capture();
@@ -867,13 +893,64 @@ describe("variables set --as", () => {
         ...base(cwd),
       ]);
 
-      const json = parseJson(res.stdout) as { next_commands: string[] };
+      const json = parseJson(res.stdout) as { next_commands: string[]; hint: string };
       expect(json.next_commands.join(" ")).toContain("--as number");
     } finally {
       if (original) {
         Object.defineProperty(process, "stdin", original);
       }
     }
+  });
+});
+
+describe("variables delete asked on a terminal", () => {
+  // The built CLI bundles its own prompts, so a prompt can only be answered
+  // by running the command from source, where `input` is the one module asked.
+  const deleting = (cwd: string) =>
+    asPerson(() =>
+      VariablesDelete.run(["SUPPORT_EMAIL", "--project-level", "--cwd", cwd, "--server", SERVER]),
+    );
+  const watchingDeletes = () => {
+    const seen = { deleted: false };
+    server.use(
+      http.delete("*/variables/:name", () => {
+        seen.deleted = true;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    return seen;
+  };
+
+  afterEach(() => {
+    vi.mocked(confirm).mockReset();
+    vi.mocked(isCancel).mockReset();
+    vi.mocked(isCancel).mockReturnValue(false);
+  });
+
+  it("is skipped, deleting nothing, when the answer is no", async () => {
+    const cwd = await makeProject();
+    const seen = watchingDeletes();
+    vi.mocked(confirm).mockResolvedValueOnce(false as never);
+
+    const envelope = await deleting(cwd);
+
+    expect(JSON.parse(JSON.stringify(envelope))).toMatchObject({
+      status: "skipped",
+      reason: "delete-cancelled",
+    });
+    expect(seen.deleted).toBe(false);
+  });
+
+  it("fails, deleting nothing, on Ctrl-C", async () => {
+    const cwd = await makeProject();
+    const seen = watchingDeletes();
+    vi.mocked(isCancel).mockReturnValue(true);
+    vi.mocked(confirm).mockResolvedValueOnce(Symbol("cancel") as never);
+
+    await expect(deleting(cwd)).rejects.toThrow();
+
+    expect(cancel).toHaveBeenCalledWith("Cancelled.");
+    expect(seen.deleted).toBe(false);
   });
 });
 

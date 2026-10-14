@@ -9,7 +9,7 @@ import {
   localRegistryPort,
   prepareLocalRegistry,
   stopLocalRegistry,
-} from "../apps/cli-journey-e2e/scripts/local-registry.mjs";
+} from "../e2e/journey/scripts/local-registry.mjs";
 import { buildLocalRuntimeImage, LOCAL_RUNTIME_IMAGE } from "./build-local-runtime-image.mjs";
 import { forwardedArgs, isDirectRun, run, runCapture } from "./dev-process.mjs";
 import { readServerBuildMetadata } from "./server-build.mjs";

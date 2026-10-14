@@ -207,11 +207,11 @@
     // neither turbo's cache nor Go's (-count=1 in the scripts) may replay
     // them. They see the Docker and test-database variables. Their inputs
     // still matter: they decide when a change marks the lane affected
-    // (scripts/ci-mode.mjs), as the server inputs do in moon.
+    // (scripts/ci-mode.mjs), as the server inputs do in moon. They wait for
+    // check-generate, which rewrites api/generated, a package they compile and
+    // type-load (api/internal/erroranalysis).
     "test-postgres": {
       "cache": false,
-      // Same as moon: go test type-loads api/generated, so wait for
-      // check-generate to finish rewriting it (full-pr run 38377623149).
       "dependsOn": ["check-generate", "@zitadel/console#build", "@zitadel/login-ui#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "passThroughEnv": ["ZITADEL_TEST_*", "DOCKER_*", "TESTCONTAINERS_*"],
