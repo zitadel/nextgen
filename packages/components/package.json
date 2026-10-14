@@ -16,15 +16,6 @@
     "dist"
   ],
   "type": "module",
-  "sideEffects": [
-    "./dist/index.mjs",
-    "./dist/standalone.mjs",
-    "./dist/atoms/index.mjs",
-    "./dist/orchestrator/index.mjs",
-    "./dist/atoms-*.mjs",
-    "./dist/orchestrator-*.mjs",
-    "./dist/internal/*.mjs"
-  ],
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
