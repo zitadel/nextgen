@@ -1,6 +1,6 @@
 # @zitadel/cli
 
-Scaffolds Zitadel auth (login, register, profile, middleware/proxy) into a Next.js, Nuxt, React, Vue, Angular, Solid, Svelte, or Qwik app.
+Scaffolds Zitadel auth (login, register, profile, middleware/proxy) into a Next.js, Nuxt, SvelteKit, SolidStart, Qwik City, TanStack Start, React, Vue, Angular, Solid, Svelte, or Qwik app.
 
 ```sh
 npx @zitadel/cli@alpha start
