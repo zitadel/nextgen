@@ -11,8 +11,13 @@ Qwik City request handler and helpers for Nextgen Auth.
 ## Installation
 
 ```bash
-pnpm add @zitadel/sdk-qwik-city
+pnpm add -D @zitadel/sdk-qwik-city
 ```
+
+Install it as a dev dependency: Qwik bundles `devDependencies` into the server
+build and leaves `dependencies` external, and ecosystem packages belong in the
+bundle. Qwik's starter `vite.config.ts` also throws if a package is listed in
+both sections.
 
 ## Setup
 
@@ -36,8 +41,9 @@ them explicitly only to override that.
 
 The handler runs on every request and does three things in one pass:
 
-1. **Proxies** `/__nextgen/*` requests to the auth backend, attaching the
-   project service-key as the bearer (the secret never reaches the browser).
+1. **Proxies** `/__nextgen/*` requests to the auth backend. The project secret
+   is attached as the bearer only on the `POST /sessions/exchange` handoff, and
+   never reaches the browser.
 2. **Verifies** the session JWT via JWKS using the Web Crypto API and stores the
    result on `requestEvent.sharedMap`.
 3. **Redirects** unauthenticated requests to `loginPath` for protected routes.
@@ -88,7 +94,7 @@ export default component$(() => {
 | Option              | Type                 | Default                      | Description                                                          |
 | ------------------- | -------------------- | ---------------------------- | -------------------------------------------------------------------- |
 | `url`               | `string`             | `ZITADEL_URL` env            | Full URL of the Zitadel auth backend                                 |
-| `projectSecret`     | `string`             | `ZITADEL_PROJECT_SECRET` env | Project service-key sent as the bearer on proxied requests           |
+| `projectSecret`     | `string`             | `ZITADEL_PROJECT_SECRET` env | Project secret, sent as the bearer on the handoff exchange only           |
 | `proxyPath`         | `string`             | `"/__nextgen"`               | Path prefix proxied to the auth backend                              |
 | `protectedRoutes`   | `string[]`           | `[]`                         | Paths requiring a valid session. Trailing `*` matches sub-paths      |
 | `ignoredRoutes`     | `string[]`           | `[]`                         | Paths skipped entirely — no JWT check. Trailing `*` matches sub-paths |

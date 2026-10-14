@@ -317,7 +317,7 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
  * `process.env`.
  *
  * @param options - Configuration. `projectSecret` is the project service-key
- *   forwarded as the bearer on proxied requests.
+ *   sent as the bearer on the `POST /sessions/exchange` handoff only.
  * @returns A Qwik City `RequestHandler`.
  */
 export function createNextgenOnRequest(

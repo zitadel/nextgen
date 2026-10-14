@@ -36,29 +36,44 @@ export const startInstance = createStart(() => ({
 
 The middleware runs on every request and does three things in one pass:
 
-1. **Proxies** `/__nextgen/*` requests to the auth backend, attaching the
-   project service-key as the bearer (the secret never reaches the browser).
+1. **Proxies** `/__nextgen/*` requests to the auth backend. The project secret
+   is attached as the bearer only on the `POST /sessions/exchange` handoff, and
+   never reaches the browser.
 2. **Verifies** the session JWT via JWKS using the Web Crypto API and places the
-   result on the router context as `nextgenAuth`.
+   result on the request context as `nextgenAuth`, which server functions
+   receive.
 3. **Redirects** unauthenticated requests to `loginPath` for protected routes.
 
 The proxy/verify/protect decision is also exported as the framework-agnostic
 `handleNextgenRequest(request, options)` if you prefer to wire it into a custom
 server entry.
 
-### 2. Reading auth in a server function or `beforeLoad`
+### 2. Reading auth in a server function, and guarding a route
+
+Server functions receive the request middleware's context, so read auth there
+with `getAuth(context)`. A route's own `beforeLoad` context does **not** carry
+it — and on client-side navigation `beforeLoad` runs in the browser, where no
+request middleware ran at all. Guard a route by calling a server function from
+`beforeLoad`; the call goes to the server on every navigation:
 
 ```ts
+import { createServerFn } from '@tanstack/react-start';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 import { getAuth } from '@zitadel/sdk-tanstack-start/server';
 
+const fetchAuth = createServerFn().handler(({ context }) => getAuth(context));
+
 export const Route = createFileRoute('/admin')({
-  beforeLoad: ({ context }) => {
-    const auth = getAuth(context);
+  beforeLoad: async () => {
+    const auth = await fetchAuth();
     if (!auth.isAuthenticated) throw redirect({ to: '/login' });
     return { userId: auth.session.userId };
   },
 });
 ```
+
+`protectedRoutes` alone only guards full document requests (a hard load or
+reload), not client-side `<Link>` navigation.
 
 ### 3. Render the login widget
 
@@ -80,7 +95,7 @@ export function LoginPage() {
 | Option              | Type                 | Default                      | Description                                                          |
 | ------------------- | -------------------- | ---------------------------- | -------------------------------------------------------------------- |
 | `url`               | `string`             | `ZITADEL_URL` env            | Full URL of the Zitadel auth backend                                 |
-| `projectSecret`     | `string`             | `ZITADEL_PROJECT_SECRET` env | Project service-key sent as the bearer on proxied requests           |
+| `projectSecret`     | `string`             | `ZITADEL_PROJECT_SECRET` env | Project secret, sent as the bearer on the handoff exchange only           |
 | `proxyPath`         | `string`             | `"/__nextgen"`               | Path prefix proxied to the auth backend                              |
 | `protectedRoutes`   | `string[]`           | `[]`                         | Paths requiring a valid session. Trailing `*` matches sub-paths      |
 | `ignoredRoutes`     | `string[]`           | `[]`                         | Paths skipped entirely — no JWT check. Trailing `*` matches sub-paths |

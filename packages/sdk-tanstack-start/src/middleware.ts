@@ -30,7 +30,7 @@ export type NextgenRequestDecision =
 
 /** Options accepted by {@link handleNextgenRequest} and the middleware factory. */
 export type NextgenRequestOptions = NextgenMiddlewareOptions & {
-  /** Project service-key forwarded as the bearer on proxied requests. */
+  /** Project secret, sent as the bearer on the `POST /sessions/exchange` handoff only. */
   readonly projectSecret?: string;
   /** Direct client address appended to the `X-Forwarded-For` chain. */
   readonly clientAddress?: string;
@@ -359,9 +359,12 @@ export function createNextgenRequestMiddleware(
 }
 
 /**
- * Reads the auth state from the TanStack Start router context populated by
- * {@link createNextgenRequestMiddleware}. Pass the `context` available in a
- * server function or `beforeLoad`.
+ * Reads the auth state from the request context populated by
+ * {@link createNextgenRequestMiddleware}. Pass the `context` a server function
+ * handler receives. A route's `beforeLoad` context does not carry it (TanStack
+ * nests request-middleware context under `serverContext`, and on client-side
+ * navigation `beforeLoad` runs in the browser) — call a server function from
+ * `beforeLoad` instead.
  *
  * @param context - The router/middleware context.
  * @returns The current {@link AuthResult}.

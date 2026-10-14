@@ -334,7 +334,7 @@ async function handleAuth(
  * `createMiddleware({ onRequest: [...createNextgenMiddleware(...).onRequest, mine] })`.
  *
  * @param options - Middleware configuration. `projectSecret` is the project
- *   service-key forwarded as the bearer on proxied requests.
+ *   service-key, sent as the bearer on the `POST /sessions/exchange` handoff only.
  * @returns A SolidStart middleware config object.
  */
 export function createNextgenMiddleware(

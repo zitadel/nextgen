@@ -385,7 +385,7 @@ async function handleAuth(
  * Compose it with other hooks via `sequence()` from `@sveltejs/kit/hooks`.
  *
  * @param options - Middleware configuration options. `projectSecret` is the
- *   project service-key forwarded as the bearer on proxied requests.
+ *   project service-key, sent as the bearer on the `POST /sessions/exchange` handoff only.
  * @returns A SvelteKit `Handle` hook.
  */
 export function createNextgenHandle(

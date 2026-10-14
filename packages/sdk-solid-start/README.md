@@ -22,13 +22,15 @@ import { createNextgenMiddleware } from '@zitadel/sdk-solid-start/server';
 
 export default createMiddleware(
   createNextgenMiddleware({
-    url: process.env.ZITADEL_URL,
-    projectSecret: process.env.ZITADEL_PROJECT_SECRET,
     protectedRoutes: ['/admin', '/dashboard*'],
     loginPath: '/login',
   }),
 );
 ```
+
+`url` and `projectSecret` default to `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET`
+from the server environment (Nitro loads `.env` / `.env.local` in dev); pass
+them only to override.
 
 SolidStart 2 registers this module's default export as an array of h3
 middleware, so the config must be wrapped in SolidStart's `createMiddleware`.
@@ -39,9 +41,10 @@ Exporting the bare `createNextgenMiddleware(...)` object registers nothing and
 // vite.config.ts
 import { defineConfig } from 'vite';
 import { solidStart } from '@solidjs/start/config';
+import { nitro } from 'nitro/vite';
 
 export default defineConfig({
-  plugins: [solidStart({ middleware: './src/middleware.ts' })],
+  plugins: [solidStart({ middleware: './src/middleware.ts' }), nitro()],
 });
 ```
 
@@ -50,8 +53,9 @@ export default defineConfig({
 
 The middleware runs on every request and does three things in one pass:
 
-1. **Proxies** `/__nextgen/*` requests to the auth backend, attaching the
-   project service-key as the bearer (the secret never reaches the browser).
+1. **Proxies** `/__nextgen/*` requests to the auth backend. The project secret
+   is attached as the bearer only on the `POST /sessions/exchange` handoff, and
+   never reaches the browser.
 2. **Verifies** the session JWT via JWKS using the Web Crypto API and writes the
    result to `event.locals.nextgenAuth`.
 3. **Redirects** unauthenticated requests to `loginPath` for protected routes.
@@ -90,22 +94,41 @@ Install the Solid component library and render its `ZitadelLogin` component.
 pnpm add @zitadel/sdk-solid
 ```
 
-```tsx
-import { ZitadelLogin, configureZitadel } from '@zitadel/sdk-solid';
+Load it with SolidStart's `clientOnly`. The widget registers custom elements
+(`customElements.define`) when its module is imported, which throws during
+SSR — a top-level `import … from '@zitadel/sdk-solid'` in a route crashes the
+server render and the page comes back empty. `clientOnly` defers the import to
+the browser:
 
-const project = configureZitadel({ projectId: 'demo', proxyPath: '/__nextgen' });
+```tsx
+import { clientOnly } from '@solidjs/start';
+
+const ZitadelLogin = clientOnly(() =>
+  import('@zitadel/sdk-solid').then((m) => ({ default: m.ZitadelLogin })),
+);
 
 export default function Login() {
-  return <ZitadelLogin project={project} purpose="login" postSignInUrl="/admin" />;
+  return (
+    <ZitadelLogin
+      projectId={import.meta.env.VITE_ZITADEL_PROJECT_ID}
+      proxyPath="/__nextgen"
+      purpose="login"
+      postSignInUrl="/admin"
+    />
+  );
 }
 ```
+
+Pass `projectId` / `proxyPath` as props rather than a `configureZitadel`
+handle: building the handle means importing `@zitadel/sdk-solid` at module
+scope, which brings the SSR crash back.
 
 ## Middleware options
 
 | Option              | Type                 | Default                      | Description                                                          |
 | ------------------- | -------------------- | ---------------------------- | -------------------------------------------------------------------- |
 | `url`               | `string`             | `ZITADEL_URL` env            | Full URL of the Zitadel auth backend                                 |
-| `projectSecret`     | `string`             | `ZITADEL_PROJECT_SECRET` env | Project service-key sent as the bearer on proxied requests           |
+| `projectSecret`     | `string`             | `ZITADEL_PROJECT_SECRET` env | Project secret, sent as the bearer on the handoff exchange only           |
 | `proxyPath`         | `string`             | `"/__nextgen"`               | Path prefix proxied to the auth backend                              |
 | `protectedRoutes`   | `string[]`           | `[]`                         | Paths requiring a valid session. Trailing `*` matches sub-paths      |
 | `ignoredRoutes`     | `string[]`           | `[]`                         | Paths skipped entirely — no JWT check. Trailing `*` matches sub-paths |
