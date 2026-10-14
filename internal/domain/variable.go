@@ -55,7 +55,7 @@ type Variable struct {
 	// that applies to both is two variables, one per kind, and nothing falls
 	// back from one kind to the other (ADR 069). The zero value is primary,
 	// which is what the constructors leave it at.
-	Kind     OriginKind
+	Kind     TargetKind
 	Value    any
 	IsSecret bool
 }

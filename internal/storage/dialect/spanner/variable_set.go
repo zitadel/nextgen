@@ -42,7 +42,7 @@ func newVariableSetStatements(db queryExecutor) variableSetStatements {
 }
 
 // FreezeDeploymentVariables implements [service.VariableSetStatements].
-func (s variableSetStatements) FreezeDeploymentVariables(ctx context.Context, projectID, deploymentID string, kind domain.OriginKind) (*domain.VariableSet, error) {
+func (s variableSetStatements) FreezeDeploymentVariables(ctx context.Context, projectID, deploymentID string, kind domain.TargetKind) (*domain.VariableSet, error) {
 	// Set inside the callback and reset per attempt: ReadWriteTransaction
 	// retries an aborted attempt by running the whole callback again, and the
 	// retry must not report the set an aborted attempt read.

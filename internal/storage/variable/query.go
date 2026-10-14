@@ -20,7 +20,7 @@ import (
 // variable out of a read. The domain predicate is not applied a second time, so
 // unlike the settings ladder this replaced, an unfiltered caller is not safe --
 // every read goes through here.
-func VisibleTo(owner domain.VariableOwner, kind domain.OriginKind, names ...string) *database.ListOptions[VariableStorageField] {
+func VisibleTo(owner domain.VariableOwner, kind domain.TargetKind, names ...string) *database.ListOptions[VariableStorageField] {
 	filters := []database.Filter[VariableStorageField]{
 		database.Equal(database.Col(VariableStorageFieldProjectID), owner.ProjectID),
 		database.Equal(database.Col(VariableStorageFieldKind), kind.String()),

@@ -24,7 +24,7 @@ func TestVisibleTo_AgreesWithHasAccessTo(t *testing.T) {
 	t.Parallel()
 
 	owner := domain.VariableOwner{ProjectID: "match"}
-	kind := domain.OriginKindPreview
+	kind := domain.TargetKindPreview
 
 	opts := variable.VisibleTo(owner, kind)
 	require.NotNil(t, opts)
@@ -53,7 +53,7 @@ func TestVisibleTo_AgreesWithHasAccessTo(t *testing.T) {
 	// empty string is an ordinary value here, not a wildcard, and primary is
 	// not a fallback for preview.
 	for _, project := range []string{"", "match", "other"} {
-		for _, rowKind := range domain.OriginKindValues() {
+		for _, rowKind := range domain.TargetKindValues() {
 			v := &domain.Variable{Owner: domain.VariableOwner{ProjectID: project}, Kind: rowKind}
 			admitted := bound[variable.VariableStorageFieldProjectID] == project &&
 				bound[variable.VariableStorageFieldKind] == rowKind.String()
@@ -81,8 +81,8 @@ func TestToDomain_MapsRowsInOrder(t *testing.T) {
 	t.Parallel()
 
 	rows := []*variable.VariableStorage{
-		{Name: "a_variable", ProjectID: "project-1", Kind: domain.OriginKindPrimary, Value: "a-prod"},
-		{Name: "b_variable", ProjectID: "project-1", Kind: domain.OriginKindPreview, Value: "b-preview", IsSecret: true},
+		{Name: "a_variable", ProjectID: "project-1", Kind: domain.TargetKindPrimary, Value: "a-prod"},
+		{Name: "b_variable", ProjectID: "project-1", Kind: domain.TargetKindPreview, Value: "b-preview", IsSecret: true},
 	}
 
 	got := variable.ToDomain(rows)
@@ -93,6 +93,6 @@ func TestToDomain_MapsRowsInOrder(t *testing.T) {
 
 	assert.Equal(t, "b_variable", got[1].Name)
 	assert.Equal(t, domain.VariableOwner{ProjectID: "project-1"}, got[1].Owner)
-	assert.Equal(t, domain.OriginKindPreview, got[1].Kind)
+	assert.Equal(t, domain.TargetKindPreview, got[1].Kind)
 	assert.True(t, got[1].IsSecret)
 }

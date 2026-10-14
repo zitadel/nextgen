@@ -21,7 +21,7 @@ type VariableToSet struct {
 // are #1587, and the default kind on write -- a plain value to both kinds, a
 // secret to primary only -- is #1566. Until those land, everything the API
 // enters or reads is the primary target's.
-const apiVariableKind = domain.OriginKindPrimary
+const apiVariableKind = domain.TargetKindPrimary
 
 // VariableService reads and writes the variables one owner entered (ADR 062,
 // ADR 069).

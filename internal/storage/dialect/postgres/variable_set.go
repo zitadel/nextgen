@@ -42,7 +42,7 @@ func newVariableSetStatements(client queryExecutor) variableSetStatements {
 }
 
 // FreezeDeploymentVariables implements [service.VariableSetStatements].
-func (s variableSetStatements) FreezeDeploymentVariables(ctx context.Context, projectID, deploymentID string, kind domain.OriginKind) (*domain.VariableSet, error) {
+func (s variableSetStatements) FreezeDeploymentVariables(ctx context.Context, projectID, deploymentID string, kind domain.TargetKind) (*domain.VariableSet, error) {
 	// Set inside the callback and reset per attempt. Postgres never replays
 	// the callback, but the Spanner dialect does, and the three dialects
 	// keep the same shape so a reader of one knows the others.

@@ -42,7 +42,7 @@ func newVariableSetStatements(client queryExecutor) variableSetStatements {
 }
 
 // FreezeDeploymentVariables implements [service.VariableSetStatements].
-func (s variableSetStatements) FreezeDeploymentVariables(ctx context.Context, projectID, deploymentID string, kind domain.OriginKind) (*domain.VariableSet, error) {
+func (s variableSetStatements) FreezeDeploymentVariables(ctx context.Context, projectID, deploymentID string, kind domain.TargetKind) (*domain.VariableSet, error) {
 	// Stamped in Go, as everywhere else in this dialect. Only the first freeze
 	// of a set keeps it: a later one finds the row and inserts nothing.
 	now := nowUnixNano()

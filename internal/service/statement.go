@@ -557,7 +557,7 @@ type VariableStatements interface {
 	// The primary key is the name plus the owner and kind, so at most one
 	// variable comes back per name and the caller has nothing to choose
 	// between.
-	GetVariables(ctx context.Context, owner domain.VariableOwner, kind domain.OriginKind, names ...string) ([]*domain.Variable, error)
+	GetVariables(ctx context.Context, owner domain.VariableOwner, kind domain.TargetKind, names ...string) ([]*domain.Variable, error)
 	// SetVariable writes variable under its own name, owner and kind,
 	// replacing the value and IsSecret flag of an existing variable with the
 	// same name, owner and kind. A value that applies to both kinds is two
@@ -569,7 +569,7 @@ type VariableStatements interface {
 	// deletes a variable with a different owner or kind, since both must
 	// match exactly, so one owner cannot remove what another entered and
 	// removing the primary value leaves the preview one.
-	DeleteVariable(ctx context.Context, owner domain.VariableOwner, kind domain.OriginKind, name string) error
+	DeleteVariable(ctx context.Context, owner domain.VariableOwner, kind domain.TargetKind, name string) error
 }
 
 // VariableSetStatements freezes the variables a deployment is created with
@@ -593,7 +593,7 @@ type VariableSetStatements interface {
 	//
 	// Secrets are copied as the ciphertext stored, never decrypted. The set
 	// returned is what a later GetDeploymentVariables reads back.
-	FreezeDeploymentVariables(ctx context.Context, projectID, deploymentID string, kind domain.OriginKind) (*domain.VariableSet, error)
+	FreezeDeploymentVariables(ctx context.Context, projectID, deploymentID string, kind domain.TargetKind) (*domain.VariableSet, error)
 	// GetDeploymentVariables returns the set deploymentID was frozen with,
 	// as it was then, whatever the project's variables have become since. A
 	// deployment that was never frozen -- or does not exist, or belongs to
