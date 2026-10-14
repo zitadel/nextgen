@@ -35,6 +35,7 @@ func newSSOCollectionFixture(t *testing.T) *ssoCollectionFixture {
 		"metaSchema": "https://test.example.schemas.com/schemas/user-schema.json",
 		"$id": "https://sso-collection.example.com/schemas/user.json",
 		"kind": "user-schema",
+		"objectType": "sso-collection-user",
 		"type": "object",
 		"x-identifier": "email",
 		"x-auth-methods": {

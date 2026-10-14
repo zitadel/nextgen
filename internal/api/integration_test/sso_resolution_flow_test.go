@@ -107,6 +107,7 @@ func (f *ssoResolutionFixture) createStaffSchema(t *testing.T) string {
 		"metaSchema": "https://test.example.schemas.com/schemas/user-schema.json",
 		"$id": "https://sso-staff.example.com/schemas/staff-user.json",
 		"kind": "user-schema",
+		"objectType": "sso-staff-user",
 		"type": "object",
 		"x-identifier": "email",
 		"x-auth-methods": {"password": {"enabled": true}},

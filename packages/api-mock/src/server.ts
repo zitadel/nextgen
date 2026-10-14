@@ -40,7 +40,7 @@ import cookieParser from "cookie-parser";
 import express from "express";
 
 import { applyBranding } from "./branding.js";
-import { HandoffError, JWK, verifyHandoffToken } from "./crypto.js";
+import { JWK, verifyHandoffToken } from "./crypto.js";
 import { defaultDevBranding } from "./default-dev-branding.js";
 import { setupMockHandlers } from "./handlers.js";
 import { buildOpenIdConfiguration } from "./openid-configuration.js";
@@ -54,9 +54,9 @@ const SESSION_TTL_SECONDS = 3600;
 export const PLATFORM_PROJECT_ID = "platform";
 
 /**
- * Tracks handoff tokens (by `jti`) we've already consumed so a replay
- * surfaces as 410 Gone. Per the spec a handoff is single-use — a real
- * backend rejects the second exchange.
+ * Tracks handoff tokens (by `jti`) we've already consumed so a replay is
+ * refused. Per the spec a handoff is single-use — a real backend rejects the
+ * second exchange.
  *
  * Module-scoped because each process keeps one set; for the dev loop the
  * mock runs for the whole session and we want consumption state to persist
@@ -251,26 +251,29 @@ export function createMockApp(options: { issuer: string }): express.Express {
           );
         return;
       }
+      // The server answers every token it will not exchange alike: it deletes
+      // the attempt on exchange, so a replay looks exactly like a token it
+      // never issued, and an expired one gets the same answer.
+      const refuseHandoff = () => {
+        res
+          .status(400)
+          .json(
+            errorBody(
+              "sess.invalid_handoff_token",
+              "handoff token is unknown, already exchanged, or expired",
+            ),
+          );
+      };
       let claims: { sub: string; iss: string; jti?: string };
       try {
         claims = await verifyHandoffToken(handoff_token, { expectedIss: iss });
-      } catch (err) {
-        if (err instanceof HandoffError && err.kind === "expired") {
-          res
-            .status(410)
-            .json(errorBody("handoff_consumed", "handoff token expired or already consumed"));
-          return;
-        }
-        res
-          .status(401)
-          .json(errorBody("invalid_handoff_token", "handoff token failed verification"));
+      } catch {
+        refuseHandoff();
         return;
       }
       const { jti } = claims;
       if (jti !== undefined && consumedHandoffJtis.has(jti)) {
-        res
-          .status(410)
-          .json(errorBody("handoff_consumed", "handoff token expired or already consumed"));
+        refuseHandoff();
         return;
       }
       if (jti !== undefined) {

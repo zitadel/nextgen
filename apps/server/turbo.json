@@ -207,10 +207,12 @@
     // neither turbo's cache nor Go's (-count=1 in the scripts) may replay
     // them. They see the Docker and test-database variables. Their inputs
     // still matter: they decide when a change marks the lane affected
-    // (scripts/ci-mode.mjs), as the server inputs do in moon.
+    // (scripts/ci-mode.mjs), as the server inputs do in moon. They wait for
+    // check-generate, which rewrites api/generated, a package they compile and
+    // type-load (api/internal/erroranalysis).
     "test-postgres": {
       "cache": false,
-      "dependsOn": ["@zitadel/console#build", "@zitadel/login-ui#build"],
+      "dependsOn": ["check-generate", "@zitadel/console#build", "@zitadel/login-ui#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "passThroughEnv": ["ZITADEL_TEST_*", "DOCKER_*", "TESTCONTAINERS_*"],
       "inputs": [
@@ -231,7 +233,7 @@
     },
     "test-spanner": {
       "cache": false,
-      "dependsOn": ["@zitadel/console#build", "@zitadel/login-ui#build"],
+      "dependsOn": ["check-generate", "@zitadel/console#build", "@zitadel/login-ui#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH", "ZITADEL_TEST_SPANNER_INSTANCE"],
       "passThroughEnv": ["ZITADEL_TEST_*", "DOCKER_*", "TESTCONTAINERS_*", "GOOGLE_*", "CLOUDSDK_*"],
       "inputs": [
@@ -252,7 +254,7 @@
     },
     "test-sqlite": {
       "cache": false,
-      "dependsOn": ["@zitadel/console#build", "@zitadel/login-ui#build"],
+      "dependsOn": ["check-generate", "@zitadel/console#build", "@zitadel/login-ui#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "passThroughEnv": ["ZITADEL_TEST_*"],
       "inputs": [

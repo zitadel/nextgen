@@ -22,6 +22,8 @@
  */
 import { randomBytes, randomUUID } from "node:crypto";
 
+import { serverCanonicalFlow } from "./server-canonical-flow.js";
+
 import type {
   CompleteClaim200,
   CreateFlowDefinition201,
@@ -333,7 +335,7 @@ function flowResponse(r: FlowDefinitionRecord): GetFlowDefinition200 {
     project_id: r.projectId,
     flow_definition: {
       audience: {},
-      ...(r.body as Record<string, unknown>),
+      ...serverCanonicalFlow(r.body as Record<string, unknown>),
       // After the spread: an update that omits `status` keeps the stored one,
       // which is what the endpoint documents.
       status: r.status,
@@ -366,7 +368,7 @@ function seedDefaultProjectResources(projectID: string, createdAt: string): void
     createdAt,
     updatedAt: createdAt,
     seq: ++store.lastSeq,
-    body: getDefaultLoginFlow({ userSchemaUrl: schemaId }) as unknown as Record<string, unknown>,
+    body: getDefaultLoginFlow() as unknown as Record<string, unknown>,
   });
 }
 
@@ -709,17 +711,19 @@ export function completeClaimChallenge(
  * (`internal/domain/flow_definition_validator.go`, ported to
  * `@zitadel/config/validate`): same rules, same fail-fast single-detail
  * `flowdef.invalid` envelope. Divergence kept deliberately lenient: the
- * schema-dependent subset runs only when the pinned `user_schema` resolves
- * in the mock store — the real server would fail such a flow with
- * `schema_fetch_failed`, but fixtures here may pin external URLs.
+ * schema-dependent subset runs only when `user_schema` resolves in the mock
+ * store — the real server would refuse such a flow, but fixtures here may
+ * name external URLs.
  * Returns null when the definition is valid.
  */
-function invalidFlowDefinitionResponse(flowDefinition: Record<string, unknown>): Response | null {
-  const ref = flowDefinition.user_schema;
-  const schema = typeof ref === "string" ? store.schemas.get(ref)?.body : undefined;
-  const firstError = validateFlowDefinition(flowDefinition, schema as object | undefined).find(
-    (issue) => issue.severity === "error",
-  );
+function invalidFlowDefinitionResponse(
+  flowDefinition: Record<string, unknown>,
+  schema: SchemaRecord | undefined,
+): Response | null {
+  const firstError = validateFlowDefinition(
+    flowDefinition,
+    schema?.body as object | undefined,
+  ).find((issue) => issue.severity === "error");
   if (!firstError) {
     return null;
   }
@@ -734,6 +738,20 @@ function invalidFlowDefinitionResponse(flowDefinition: Record<string, unknown>):
     },
     { status: 400 },
   );
+}
+
+/**
+ * The newest revision of the schema a flow's `user_schema` names, as the
+ * server resolves it: a schema id stands for its `objectType`.
+ */
+function resolveUserSchema(projectId: string, ref: unknown): SchemaRecord | undefined {
+  if (typeof ref !== "string") {
+    return undefined;
+  }
+  const objectType = store.schemas.get(ref)?.objectType ?? ref;
+  return [...store.schemas.values()]
+    .filter((record) => record.projectId === projectId && record.objectType === objectType)
+    .sort(compareNewestFirst)[0];
 }
 
 export function setupPlatformHandlers() {
@@ -1138,9 +1156,9 @@ export function setupPlatformHandlers() {
       if (!body.ok) {
         return body.response;
       }
-      const invalid = invalidFlowDefinitionResponse(
-        body.data.flow_definition as Record<string, unknown>,
-      );
+      const flowDefinition = body.data.flow_definition as unknown as Record<string, unknown>;
+      const schema = resolveUserSchema(body.data.project_id, flowDefinition.user_schema);
+      const invalid = invalidFlowDefinitionResponse(flowDefinition, schema);
       if (invalid) {
         return invalid;
       }
@@ -1154,7 +1172,10 @@ export function setupPlatformHandlers() {
         createdAt: now,
         updatedAt: now,
         seq: ++store.lastSeq,
-        body: body.data.flow_definition as unknown as Record<string, unknown>,
+        // Stored as the `objectType` it names, like the server.
+        body: schema?.objectType
+          ? { ...flowDefinition, user_schema: schema.objectType }
+          : flowDefinition,
       };
       store.flowDefinitions.set(id, record);
       const responseBody: CreateFlowDefinition201 = flowResponse(record);

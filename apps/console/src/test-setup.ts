@@ -1,7 +1,7 @@
 import { format } from "node:util";
 
 import { cleanup, configure } from "@testing-library/react";
-import { afterAll, afterEach, beforeAll, beforeEach } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, vi } from "vitest";
 import { _resetConfigForTesting } from "@zitadel/api/config";
 import "@testing-library/jest-dom/vitest";
 
@@ -66,6 +66,23 @@ for (const method of ["error", "warn"] as const) {
     }
   });
 }
+
+// The app router preloads a link's route when it is hovered (`defaultPreload:
+// "intent"`), so a hover followed by a click loads a screen twice whenever the
+// two are far enough apart — which a busy machine makes them. Specs assert on
+// what a screen asked for, not on when a hover happened, so every router a spec
+// builds starts with preload off. Production keeps it.
+vi.mock("./router", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./router")>();
+  return {
+    ...actual,
+    createAppRouter: (...args: Parameters<typeof actual.createAppRouter>) => {
+      const router = actual.createAppRouter(...args);
+      router.update({ ...router.options, defaultPreload: false });
+      return router;
+    },
+  };
+});
 
 // jsdom has no matchMedia; the theme hook (src/theme.ts) reads it. Default to
 // dark (no light-scheme match) and provide the add/removeEventListener surface.
