@@ -31,7 +31,8 @@ The signed-in session card is `<ZitadelSession :project="project" />` (exported 
 `flowError` (listen with `@flow-step` and so on); `ZitadelLogout` and
 `ZitadelSession` emit `signout` and `sessionMissing` (listen with
 `@session-missing`) (the visitor has no session: the widget renders nothing, and the session card
-goes to its `postSignOutUrl` when one is set). Each payload is the event detail. An unset or
+goes to its `postSignOutUrl` when one is set, unless that URL is the page it is on). Each
+payload is the event detail. An unset or
 cleared prop leaves the widget on its default (for example the "Signed in as"
 heading).
 

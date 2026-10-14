@@ -101,7 +101,8 @@ redirects before anything renders. Client-side navigation, such as following a
 link to `/profile`, does not request the page from the server, so the hook does
 not run. There the `ZitadelSession` card is the guard: when it finds no session
 it navigates to its `postSignOutUrl`, so a signed-out visitor still ends at
-`/login`.
+`/login`. When that URL is the page the card is on, the card renders nothing
+instead of navigating, so it guards nothing there.
 
 To keep a page from rendering at all without a session, guard it on the server
 with a load like the one above in its `+page.server.ts`. SvelteKit fetches that

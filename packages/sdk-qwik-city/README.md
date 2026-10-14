@@ -82,7 +82,9 @@ without the token.
 handler redirects before anything renders. Do not rely on it for client-side
 `<Link>` navigation, which does not load the page from the server. There the
 `ZitadelSession` card is the guard: when it finds no session it navigates to its
-`postSignOutUrl`, so a signed-out visitor still ends at `/login`.
+`postSignOutUrl`, so a signed-out visitor still ends at `/login`. When that URL
+is the page the card is on, the card renders nothing instead of navigating, so
+it guards nothing there.
 
 To keep a route from rendering at all without a session, export a loader like
 the one above from the route itself. Qwik City runs a route's `routeLoader$` on

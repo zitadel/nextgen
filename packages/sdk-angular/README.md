@@ -53,7 +53,8 @@ the widget's own default (e.g. `purpose` is `"login"`).
 | `<zitadel-auth-session>` | `signout`, `sessionMissing`                                          |
 
 `sessionMissing` fires when the visitor has no session: the widget renders nothing, and the
-session card goes to its `postSignOutUrl` when one is set.
+session card goes to its `postSignOutUrl` when one is set, unless that URL is the page it is
+on.
 
 ```html
 <zitadel-auth-login [project]="project" (flowComplete)="onComplete($event)"

@@ -35,7 +35,8 @@ The widget's events are surfaced as optional QRL callbacks:
 | `ZitadelLogout`, `ZitadelSession` | `onSignout$`, `onSessionMissing$` |
 
 `onSessionMissing$` runs when the visitor has no session: the widget renders nothing, and the
-session card goes to its `postSignOutUrl` when one is set.
+session card goes to its `postSignOutUrl` when one is set, unless that URL is the page it is
+on.
 
 The SDK listens from the moment the element exists and starts loading every callback's code right
 away. A callback whose code has loaded runs before the widget navigates away (after a sign-out, a

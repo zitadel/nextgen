@@ -92,7 +92,8 @@ export const Route = createFileRoute('/admin')({
 reload), not client-side `<Link>` navigation. Without a `beforeLoad` guard, the
 `ZitadelSession` card is the guard on client-side navigation: when it finds no
 session it navigates to its `postSignOutUrl`, so a signed-out visitor still ends
-at `/login`. The `beforeLoad` guard above keeps the route from rendering at all.
+at `/login`. When that URL is the page the card is on, the card renders nothing
+instead of navigating, so it guards nothing there. The `beforeLoad` guard above keeps the route from rendering at all.
 
 ### 3. Render the login widget
 
