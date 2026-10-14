@@ -8,7 +8,8 @@ import { AGENTS_HEADER, removeGuidanceSection } from "../lib/orca/patchers/rule/
 import type { EjectActions } from "../lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../lib/paths";
 import { readRendererId, readZitadelConfig } from "../lib/project";
-import { shellCommand, type SuggestedCommand, unscopedCommand } from "../lib/suggestion";
+import { shellArg } from "../lib/shell";
+import { shellCommand, type SuggestedCommand } from "../lib/suggestion";
 import { nextCommandsData } from "../lib/oclif/envelope";
 
 /**
@@ -53,17 +54,22 @@ async function resolveEjectActions(cwd: string): Promise<EjectActions> {
 function assembleNextCommands(
   backedUp: ReadonlyArray<string>,
   dependencies: ReadonlyArray<string>,
+  // `--cwd` as typed: the backups and the package.json are in that directory,
+  // so a command run from the shell's would miss them or touch another project.
+  dir: string | undefined,
 ): ReadonlyArray<SuggestedCommand> {
+  const inDir = (command: string) =>
+    shellCommand(dir === undefined ? command : `cd ${shellArg(dir)} && ${command}`);
   const commands: SuggestedCommand[] = [];
   if (backedUp.length > 0) {
     // Name only the backups eject actually created (each `backedUp` entry is
     // `<rel> -> <backup>`), so this destructive glob can't also sweep up
     // unrelated `.env*.ejected-*` files a user happens to keep.
     const patterns = backedUp.map((entry) => `${entry.split(" -> ")[0]}.ejected-*`);
-    commands.push(shellCommand(`rm -f ${patterns.join(" ")}`));
+    commands.push(inDir(`rm -f ${patterns.join(" ")}`));
   }
   for (const dep of dependencies) {
-    commands.push(shellCommand(`npm uninstall ${dep}`));
+    commands.push(inDir(`npm uninstall ${dep}`));
   }
   return commands;
 }
@@ -115,7 +121,7 @@ export default class Eject extends BaseCommand {
         kind: "confirm",
         name: "remove the managed files and local state",
         message: "Remove the managed files and local Zitadel state?",
-        retry: unscopedCommand("eject --force", this.meta.cliVersion),
+        retry: this.suggestUnscoped("eject --force"),
       }));
     if (!confirmed) {
       return this.emit({ status: "skipped", reason: "eject-cancelled" });
@@ -226,7 +232,11 @@ export default class Eject extends BaseCommand {
       return this.emit({ status: "skipped", reason: "nothing-to-eject", data: { cwd } });
     }
 
-    const nextCommands = assembleNextCommands(backedUp, actions.dependencies);
+    const nextCommands = assembleNextCommands(
+      backedUp,
+      actions.dependencies,
+      typeof flags.cwd === "string" ? flags.cwd : undefined,
+    );
 
     return this.emit({
       status: "ok",

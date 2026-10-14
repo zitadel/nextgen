@@ -12,7 +12,6 @@ import {
 } from "../lib/local-server/runtime";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { resolveCwd } from "../lib/paths";
-import { unscopedCommand } from "../lib/suggestion";
 import { nextCommandsData } from "../lib/oclif/envelope";
 
 export default class Reset extends BaseCommand {
@@ -49,7 +48,7 @@ export default class Reset extends BaseCommand {
               : { container_name: containerName }),
             data_deleted: true,
           },
-          ...nextCommandsData([unscopedCommand("reset --force", this.meta.cliVersion)]),
+          ...nextCommandsData([this.suggestUnscoped("reset --force")]),
         },
       });
     }
@@ -58,7 +57,7 @@ export default class Reset extends BaseCommand {
       kind: "confirm",
       name: "delete the local runtime and its data",
       message: "Delete the local Zitadel runtime and .zitadel/local/nextgen-data?",
-      retry: unscopedCommand("reset --force", this.meta.cliVersion),
+      retry: this.suggestUnscoped("reset --force"),
     });
     if (!confirmed) {
       return this.emit({ status: "skipped", reason: "reset-cancelled" });

@@ -115,7 +115,6 @@ export default class EnvAdd extends BaseCommand {
                 ? []
                 : [`--app-url ${shellArg(flags["app-url"])}`]),
               ...(flags.force ? ["--force"] : []),
-              ...(typeof flags.cwd === "string" ? [`--cwd ${shellArg(flags.cwd)}`] : []),
             ].join(" "),
           ),
         });

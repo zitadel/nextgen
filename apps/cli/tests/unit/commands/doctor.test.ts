@@ -204,6 +204,22 @@ describe("doctor command", () => {
     );
   });
 
+  it("pins the claim it suggests to setup's file when there is one", async () => {
+    const cwd = await makeHealthyProject();
+    await writeDetachedSecret(cwd);
+    await writeFile(join(cwd, ".env.development.local"), "ZITADEL_PROJECT_ID=proj-001\n");
+
+    const res = await doctor(cwd);
+
+    expect(
+      (parseJson(res.stdout) as { data: { next_commands?: string[] } }).data.next_commands,
+    ).toContain(
+      expectedPublicCliCommand(
+        `claim --env-file .env.development.local --server https://api.zitadel.cloud --cwd ${cwd}`,
+      ),
+    );
+  });
+
   // Same advisory posture, reconciliation wording: past the 14-day window
   // the warning explains both outcomes, and the claim command stays
   // suggested because the local record can be stale (claimed from another

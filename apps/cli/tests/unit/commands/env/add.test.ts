@@ -108,6 +108,23 @@ describe("env add", () => {
     expect(envelope.next_commands?.[0]).toContain("--project proj_existing");
   });
 
+  it("names --cwd once in the retry it suggests for a missing server", async () => {
+    const cwd = await makeProject("next");
+
+    const result = await runCliForTest([
+      "env",
+      "add",
+      "staging",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+      "--json",
+    ]);
+
+    const envelope = parseJson(result.stdout) as { next_commands?: string[] };
+    expect(envelope.next_commands?.[0]?.split(" --cwd ")).toHaveLength(2);
+  });
+
   describe("the file it writes", () => {
     it("holds the server, the project and both credentials, and the framework's twin of the id", async () => {
       const cwd = await makeProject("next");

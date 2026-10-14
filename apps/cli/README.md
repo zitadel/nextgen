@@ -53,7 +53,7 @@ attaches the new project to the local admin's team, so the project is owned
 from the start and `zitadel claim` reports it as already owned. If you opted
 out with `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false`, there is no local admin
 and the project has no owning team; that server cannot claim projects.
-Setup writes `.env.local` and `.zitadel/`, and installs
+Setup writes `.env.local`, `.env.development.local` and `.zitadel/`, and installs
 dependencies with the detected package manager. Pass `--skip-install` to install
 them yourself. The project's default user schema and login flow are provisioned
 from versioned local defaults; setup writes editable copies into
@@ -202,7 +202,8 @@ USAGE
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -303,7 +304,8 @@ ARGUMENTS
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -344,7 +346,8 @@ USAGE
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -386,7 +389,8 @@ USAGE
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -500,7 +504,8 @@ USAGE
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -573,7 +578,8 @@ USAGE
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -654,12 +660,13 @@ List the environments bound in this directory's .env files.
 USAGE
   $ zitadel env list [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
-    <value>]
+    <value>] [--plain]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -670,6 +677,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
                           process environment. Cannot be combined with --env.
+      --plain             Tab-separated rows with no header, for piping. Implied
+                          when stdout is not a terminal.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
@@ -681,6 +690,8 @@ DESCRIPTION
 
 EXAMPLES
   $ zitadel env list
+
+  $ zitadel env list --plain
 ```
 
 ## `zitadel events get ID`
@@ -699,7 +710,8 @@ ARGUMENTS
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -747,6 +759,7 @@ FLAGS
 
   -e, --env=<value>
       Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then
+      the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then
       development.
 
   -n, --non-interactive
@@ -830,7 +843,8 @@ ARGUMENTS
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -873,7 +887,9 @@ FLAGS
   -a, --all                 Fetch every page instead of one.
   -c, --cwd=<value>         Project directory to operate on.
   -e, --env=<value>         Environment to run against, e.g. production.
-                            Defaults to ZITADEL_ENV, then development.
+                            Defaults to ZITADEL_ENV, then the hosting platform's
+                            build (VERCEL_ENV, or Netlify's CONTEXT), then
+                            development.
   -n, --non-interactive     Disable prompts. Required when scripting or running
                             as an agent.
   -s, --server=<value>      Override the resolved server URL.
@@ -925,7 +941,8 @@ USAGE
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -978,7 +995,8 @@ ARGUMENTS
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -f, --force             Delete the grant without the confirmation prompt.
                           Required when non-interactive.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
@@ -1020,7 +1038,8 @@ ARGUMENTS
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -1068,6 +1087,7 @@ FLAGS
 
   -e, --env=<value>
       Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then
+      the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then
       development.
 
   -n, --non-interactive
@@ -1172,7 +1192,8 @@ USAGE
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -1218,7 +1239,8 @@ ARGUMENTS
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -1266,6 +1288,7 @@ FLAGS
 
   -e, --env=<value>
       Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then
+      the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then
       development.
 
   -n, --non-interactive
@@ -1376,7 +1399,8 @@ USAGE
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -1413,7 +1437,8 @@ ARGUMENTS
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -1456,7 +1481,9 @@ FLAGS
   -a, --all                 Fetch every page instead of one.
   -c, --cwd=<value>         Project directory to operate on.
   -e, --env=<value>         Environment to run against, e.g. production.
-                            Defaults to ZITADEL_ENV, then development.
+                            Defaults to ZITADEL_ENV, then the hosting platform's
+                            build (VERCEL_ENV, or Netlify's CONTEXT), then
+                            development.
   -n, --non-interactive     Disable prompts. Required when scripting or running
                             as an agent.
   -s, --server=<value>      Override the resolved server URL.
@@ -1514,7 +1541,8 @@ ARGUMENTS
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -1564,7 +1592,8 @@ ARGUMENTS
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -1607,7 +1636,9 @@ FLAGS
   -a, --all                 Fetch every page instead of one.
   -c, --cwd=<value>         Project directory to operate on.
   -e, --env=<value>         Environment to run against, e.g. production.
-                            Defaults to ZITADEL_ENV, then development.
+                            Defaults to ZITADEL_ENV, then the hosting platform's
+                            build (VERCEL_ENV, or Netlify's CONTEXT), then
+                            development.
   -n, --non-interactive     Disable prompts. Required when scripting or running
                             as an agent.
   -s, --server=<value>      Override the resolved server URL.
@@ -1678,7 +1709,7 @@ List the resources this CLI manages and what can be done to each.
 ```
 USAGE
   $ zitadel resources [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--plain]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -1690,6 +1721,8 @@ FLAGS
                          NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
+      --plain            Tab-separated rows with no header, for piping. Implied
+                         when stdout is not a terminal.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
                          --no-telemetry.
 
@@ -1723,7 +1756,8 @@ ARGUMENTS
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -1766,7 +1800,9 @@ FLAGS
   -a, --all                 Fetch every page instead of one.
   -c, --cwd=<value>         Project directory to operate on.
   -e, --env=<value>         Environment to run against, e.g. production.
-                            Defaults to ZITADEL_ENV, then development.
+                            Defaults to ZITADEL_ENV, then the hosting platform's
+                            build (VERCEL_ENV, or Netlify's CONTEXT), then
+                            development.
   -n, --non-interactive     Disable prompts. Required when scripting or running
                             as an agent.
   -s, --server=<value>      Override the resolved server URL.
@@ -1837,7 +1873,8 @@ ARGUMENTS
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -1885,6 +1922,7 @@ FLAGS
 
   -e, --env=<value>
       Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then
+      the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then
       development.
 
   -n, --non-interactive
@@ -1970,7 +2008,8 @@ ARGUMENTS
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -f, --force             Revoke the session without the confirmation prompt.
                           Required when non-interactive.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
@@ -2110,12 +2149,17 @@ Enable an identity provider for a user schema.
 ```
 USAGE
   $ zitadel sso enable [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--provider
-    google|custom] [--slug <value>] [--display-name <value>] [--issuer <value>]
-    [--scopes <value>] [--schema <value>] [--client-id <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
+    <value>] [--provider google|custom] [--slug <value>] [--display-name
+    <value>] [--issuer <value>] [--scopes <value>] [--schema <value>]
+    [--client-id <value>]
 
 FLAGS
   -c, --cwd=<value>           Project directory to operate on.
+  -e, --env=<value>           Environment to run against, e.g. production.
+                              Defaults to ZITADEL_ENV, then the hosting
+                              platform's build (VERCEL_ENV, or Netlify's
+                              CONTEXT), then development.
   -n, --non-interactive       Disable prompts. Required when scripting or
                               running as an agent.
   -s, --server=<value>        Override the resolved server URL.
@@ -2128,6 +2172,9 @@ FLAGS
       --display-name=<value>  Name shown on the custom connection's sign-in
                               button.
       --dry-run               Preview without mutating files or the platform.
+      --env-file=<value>      Read ZITADEL_* values from this file ahead of the
+                              process environment. Cannot be combined with
+                              --env.
       --issuer=<value>        Issuer URL of the custom provider. Its endpoints
                               are found by OIDC discovery.
       --provider=<option>     Identity provider to enable, or "custom" for any
@@ -2208,7 +2255,8 @@ USAGE
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -2273,7 +2321,8 @@ USAGE
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -2324,7 +2373,8 @@ ARGUMENTS
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -f, --force             Deactivate the team without the confirmation prompt.
                           Required when non-interactive.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
@@ -2366,7 +2416,8 @@ ARGUMENTS
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -2414,6 +2465,7 @@ FLAGS
 
   -e, --env=<value>
       Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then
+      the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then
       development.
 
   -n, --non-interactive
@@ -2497,7 +2549,8 @@ ARGUMENTS
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -2578,7 +2631,8 @@ USAGE
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -2633,7 +2687,8 @@ ARGUMENTS
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -f, --force             Delete the user without the confirmation prompt.
                           Required when non-interactive.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
@@ -2675,7 +2730,8 @@ ARGUMENTS
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -2723,6 +2779,7 @@ FLAGS
 
   -e, --env=<value>
       Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then
+      the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then
       development.
 
   -n, --non-interactive
@@ -2813,7 +2870,8 @@ ARGUMENTS
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -2864,7 +2922,8 @@ ARGUMENTS
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -f, --force             Delete the variable without the confirmation prompt.
                           Required when non-interactive.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
@@ -2910,7 +2969,8 @@ ARGUMENTS
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -2951,7 +3011,8 @@ USAGE
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then development.
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -2995,23 +3056,28 @@ ARGUMENTS
   NAME  Variable name (letters, digits and underscores).
 
 FLAGS
-  -c, --cwd=<value>      Project directory to operate on.
-  -n, --non-interactive  Disable prompts. Required when scripting or running as
-                         an agent.
-  -s, --server=<value>   Override the resolved server URL.
-  -v, --verbose          Verbose logging.
-      --as=<option>      [default: string] Store the value as this JSON type.
-                         <options: string|number|boolean>
-      --[no-]color       Colorize human output. Disable with --no-color;
-                         NO_COLOR and FORCE_COLOR are honored too.
-      --debug            Debug logging.
-      --dry-run          Preview without mutating files or the platform.
-      --project-level    Address the project level. Required: it is the only
-                         owner the CLI can address today.
-      --secret           Store the value encrypted. It can be replaced later but
-                         never read back.
-      --[no-]telemetry   Send anonymous usage analytics. Disable with
-                         --no-telemetry.
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment to run against, e.g. production. Defaults
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as
+                          an agent.
+  -s, --server=<value>    Override the resolved server URL.
+  -v, --verbose           Verbose logging.
+      --as=<option>       [default: string] Store the value as this JSON type.
+                          <options: string|number|boolean>
+      --[no-]color        Colorize human output. Disable with --no-color;
+                          NO_COLOR and FORCE_COLOR are honored too.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
+                          process environment. Cannot be combined with --env.
+      --project-level     Address the project level. Required: it is the only
+                          owner the CLI can address today.
+      --secret            Store the value encrypted. It can be replaced later
+                          but never read back.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with
+                          --no-telemetry.
 
 GLOBAL FLAGS
   --json  Format output as json.
