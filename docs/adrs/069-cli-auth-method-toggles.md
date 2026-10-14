@@ -111,11 +111,11 @@ afterwards.
 The schema already accepts `otp` and `magic_link`, but the login screen cannot
 use them yet. They get their own `auth-method` commands once it can.
 
-### 6. `sso enable` stays as a deprecated alias
+### 6. `sso enable` is replaced, not kept as an alias
 
-`zitadel sso enable` keeps working and does the same as
-`zitadel auth-method sso enable`. It prints a warning that names the new
-command. Removing it is a separate change.
+`zitadel sso enable` is removed, and `zitadel auth-method sso enable` takes its
+place with the same flags. The CLI is still pre-release, so a clean rename is
+cheaper than carrying an alias and removing it later.
 
 ## Consequences
 
