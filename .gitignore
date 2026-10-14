@@ -123,3 +123,6 @@ tsconfig.tsbuildinfo
 
 # Turborepo (pilot, see turbo.json)
 .turbo
+
+# The hosted cloud install marker (apps/cloud/install.sh)
+/.cloud-installed
