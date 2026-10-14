@@ -6,7 +6,11 @@ import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 
 import { baseTest } from "../../vitest.shared.mjs";
-import { optimizeDepsExclude, optimizeDepsInclude } from "./.storybook/optimize-deps.ts";
+import {
+  apiClientInclude,
+  optimizeDepsExclude,
+  optimizeDepsInclude,
+} from "./.storybook/optimize-deps.ts";
 
 const dir = dirname(fileURLToPath(import.meta.url));
 
@@ -48,7 +52,7 @@ export default defineConfig({
         ],
         optimizeDeps: {
           exclude: optimizeDepsExclude,
-          include: optimizeDepsInclude,
+          include: [...optimizeDepsInclude, ...apiClientInclude],
           // Forbid on-the-fly discovery: optimize ONLY the `include` list up
           // front and never re-optimize mid-run. A dep discovered after the
           // browser has started makes Vite re-optimize, which invalidates the
@@ -60,6 +64,10 @@ export default defineConfig({
           // aborting requests on a network change instead; see ci.yml's "Keep
           // Docker's interface churn away from Chromium" step. (#1490)
           noDiscovery: true,
+          // Re-bundle on every start, as a cold CI run does: the pre-bundled API
+          // client is workspace source, which Vite's cache key does not cover
+          // (see `apiClientInclude`). Bundling takes under a second.
+          force: true,
         },
         test: {
           name: "storybook",
