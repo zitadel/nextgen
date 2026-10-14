@@ -4,7 +4,15 @@ import type {
   ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
 
-import { $, component$, createSignal, render, type QRL, type Signal } from "@qwik.dev/core";
+import {
+  $,
+  component$,
+  createSignal,
+  render,
+  type Component,
+  type QRL,
+  type Signal,
+} from "@qwik.dev/core";
 import { qrl } from "@qwik.dev/core/internal";
 import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import {
@@ -650,6 +658,17 @@ describe("children", () => {
     const el = host.querySelector("zitadel-logout");
     expect(el?.querySelector("template")).not.toBeNull();
     await expect.poll(() => el?.querySelector("span [data-action='logout']")).not.toBeNull();
+  });
+
+  // `<zitadel-session>` has no slot, so content passed in would never render.
+  it("are not put into <zitadel-session>", async () => {
+    const Session = ZitadelSession as unknown as Component<Record<string, unknown>>;
+    const host = await renderWidget(
+      <Session project={project}>
+        <span>extra</span>
+      </Session>,
+    );
+    expect(host.querySelector("zitadel-session")?.childElementCount).toBe(0);
   });
 
   it("fill <zitadel-login>'s attribution-trailing slot", async () => {

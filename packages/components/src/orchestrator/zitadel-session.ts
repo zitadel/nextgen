@@ -91,10 +91,9 @@ function writeLastLeave(value: LastLeave): void {
  *
  * - Identity is fetched from the typed `getMySession` operation
  *   (`GET /sessions/me`), sent with credentials so the session cookie
- *   authenticates it. The card shows `name`, then `email`, then the
- *   always-present `user_id`. NOTE: the current server response includes only
- *   the `user_id`, so the card displays the raw id until the backend returns a
- *   human-readable `name`/`email` on `/sessions/me`.
+ *   authenticates it. The card names the user by `user.display`, then
+ *   `user.identifier` (the login identifier), then `user_id`, the first that
+ *   is set.
  * - **No session.** When that request answers the backend's
  *   `401 auth.unauthorized` or `404 sess.not_found` (or names no user) the
  *   visitor is signed out: the element fires `zitadel-session-missing`, then

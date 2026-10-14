@@ -57,6 +57,10 @@ export default component$(() => {
   `proxyPath` props; the widget uses whichever is present.
 - Widget events are surfaced as optional `on…$` QRL callbacks on the components;
   the README and the prop types list which component has which.
+- **No session.** When the visitor has no session, the session widgets render nothing and call
+  `onSessionMissing$`; the session card also goes to its `postSignOutUrl` (unless that is the page it
+  is on), so point it at the login page. Any other failure (a 5xx, a network
+  error) keeps the widget, shows the error and calls `onSessionError$`.
 
 ## Read these, don't guess
 

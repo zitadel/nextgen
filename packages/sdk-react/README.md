@@ -51,7 +51,8 @@ Children go into the element's light DOM, so `ZitadelLogout` accepts a
 `<template>` for a custom sign-out control (`{{display}}`, `{{identifier}}`
 and `{{initial}}` are filled in, and an element with `data-action="logout"`
 signs out), and `ZitadelLogin` accepts content for its
-`slot="attribution-trailing"` slot. JSX reads `{{display}}` as an object
+`slot="attribution-trailing"` slot. `ZitadelSession` takes no children: its
+element has no slot to show them in. JSX reads `{{display}}` as an object
 literal, so write each placeholder inside a string literal:
 
 ```tsx

@@ -70,6 +70,13 @@ describe("ZitadelLogin", () => {
     expect(el!.querySelector('[slot="attribution-trailing"]')?.textContent).toBe("Terms");
   });
 
+  // `<zitadel-session>` has no slot, so content passed in would never render.
+  it("puts no children into <zitadel-session>", () => {
+    const props = { project, children: <span>extra</span> } as Parameters<typeof ZitadelSession>[0];
+    const { container } = render(() => <ZitadelSession {...props} />);
+    expect(container.querySelector("zitadel-session")?.childElementCount).toBe(0);
+  });
+
   it("forwards the ref to the underlying element", () => {
     let captured: ZitadelLoginElement | undefined;
     const { container } = render(() => (

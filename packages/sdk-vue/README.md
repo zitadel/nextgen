@@ -42,7 +42,7 @@ The default slot goes into the element's light DOM, so `ZitadelLogout` accepts a
 `<template>` for a custom sign-out control (`{{display}}`, `{{identifier}}` and
 `{{initial}}` are filled in, and an element with `data-action="logout"` signs
 out), and `ZitadelLogin` accepts content for its `slot="attribution-trailing"`
-slot. Vue compiles `{{display}}` as its own interpolation (to an empty string),
+slot. `ZitadelSession` takes no slot content: its element has no slot to show it in. Vue compiles `{{display}}` as its own interpolation (to an empty string),
 so mark the template `v-pre` to hand the placeholders to the element as written:
 
 ```vue

@@ -74,7 +74,11 @@ The components are **standalone** — import them directly into a component's
    component that imports `ZitadelLogoutComponent`. `purpose="login"` vs
    `purpose="register"` on `<zitadel-auth-login>` selects sign-in vs
    registration; `postSignInUrl` / `postSignOutUrl` are where the widget sends
-   the user afterwards.
+   the user afterwards. When the visitor has no session, the session widgets
+   render nothing and emit `(sessionMissing)`; `<zitadel-auth-session>` also goes
+   to its `postSignOutUrl` (unless that is the page it is on), so point it at the
+   login page. Any other failure (a 5xx, a network error) keeps the widget, shows
+   the error and emits `(sessionError)`.
 
 4. The widgets call `${proxyPath}/…` **same-origin** (default `/__nextgen`). For
    local development you can instead point `proxyPath` straight at the backend

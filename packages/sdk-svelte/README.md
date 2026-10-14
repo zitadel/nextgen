@@ -39,7 +39,8 @@ Children go into the element's light DOM, so `ZitadelLogout` accepts a
 `<template>` for a custom sign-out control (`{{display}}`, `{{identifier}}`
 and `{{initial}}` are filled in, and an element with `data-action="logout"`
 signs out), and `ZitadelLogin` accepts content for its
-`slot="attribution-trailing"` slot. Svelte reads `{{display}}` as an
+`slot="attribution-trailing"` slot. `ZitadelSession` takes no children: its
+element has no slot to show them in. Svelte reads `{{display}}` as an
 expression, so write each placeholder as a string expression:
 
 ```svelte

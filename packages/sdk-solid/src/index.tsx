@@ -185,16 +185,16 @@ export function ZitadelLogout(
  * Solid component wrapping the `<zitadel-session>` web component — the
  * post-sign-in "signed in as" card. Binds every prop (the {@link ZitadelProject}
  * handle, or the discrete project id / proxy path, and the rest) as a DOM
- * property, forwards the widget's `zitadel-signout`, `zitadel-session-missing`
- * and `zitadel-session-error` events as optional callbacks, and renders `children` into the element. An unset or `undefined`
- * prop leaves the element's own default in place.
+ * property and forwards the widget's `zitadel-signout`, `zitadel-session-missing`
+ * and `zitadel-session-error` events as optional callbacks. It takes no
+ * `children`: `<zitadel-session>` has no slot. An unset or `undefined` prop
+ * leaves the element's own default in place.
  *
  * A forwarded `ref` resolves to the underlying `<zitadel-session>` DOM element.
  */
 export function ZitadelSession(
   props: ZitadelSessionProps & {
     ref?: ZitadelSessionElement | ((el: ZitadelSessionElement) => void);
-    children?: JSX.Element;
   },
 ): JSX.Element {
   return (
@@ -212,8 +212,6 @@ export function ZitadelSession(
       on:zitadel-signout={(event) => props.onSignout?.(event.detail)}
       on:zitadel-session-missing={(event) => props.onSessionMissing?.(event.detail)}
       on:zitadel-session-error={(event) => props.onSessionError?.(event.detail)}
-    >
-      {props.children}
-    </zitadel-session>
+    />
   );
 }

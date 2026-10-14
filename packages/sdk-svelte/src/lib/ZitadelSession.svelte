@@ -1,5 +1,4 @@
 <script lang="ts">
-  import type { Snippet } from 'svelte';
   import '@zitadel/components';
   import type { ZitadelSession as ZitadelSessionElement } from '@zitadel/components';
 
@@ -23,8 +22,7 @@
     onSignout,
     onSessionMissing,
     onSessionError,
-    children,
-  }: ZitadelSessionProps & { children?: Snippet } = $props();
+  }: ZitadelSessionProps = $props();
 
   let el: ZitadelSessionElement | undefined = $state();
 
@@ -70,7 +68,4 @@
   {variant}
   {theme}
   {suppressHeader}
->
-  <!-- Light-DOM content for the element (see README). -->
-  {@render children?.()}
-</zitadel-session>
+></zitadel-session>

@@ -453,8 +453,6 @@ export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
         wire(el, props, SESSION_LISTENERS);
       }}
       {...sessionAttrs(props)}
-    >
-      <Slot />
-    </zitadel-session>
+    />
   );
 });

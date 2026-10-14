@@ -47,6 +47,15 @@ class LoginWithAttribution {
   project = project;
 }
 
+@Component({
+  standalone: true,
+  imports: [ZitadelSessionComponent],
+  template: `<zitadel-auth-session [project]="project"><span>extra</span></zitadel-auth-session>`,
+})
+class SessionWithContent {
+  project = project;
+}
+
 // `'zitadel-flow-step'` → `'flowStep'`: the camelCased `@Output()` name Angular
 // exposes for the event (the `zitadel-` prefix dropped, the rest camelCased).
 const outputName = (event: string): string =>
@@ -310,6 +319,12 @@ describe("ZitadelLogout template mode", () => {
 });
 
 describe("ZitadelSession", () => {
+  // `<zitadel-session>` has no slot, so projected content would never render.
+  it("projects no content into the element", async () => {
+    const { container } = await render(SessionWithContent);
+    expect(container.querySelector("zitadel-session")?.childElementCount).toBe(0);
+  });
+
   it("binds the project handle as a property", async () => {
     const { container } = await render(ZitadelSessionComponent, {
       inputs: { project },

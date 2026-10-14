@@ -48,6 +48,7 @@ event is dropped.
 
 Children are passed through to the element, so `<ZitadelLogout>` accepts a `<template>` for its
 template mode and `<ZitadelLogin>` accepts content for its `attribution-trailing` slot.
+`<ZitadelSession>` takes no children: its element has no slot to show them in.
 
 ### How props reach the element
 

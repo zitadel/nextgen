@@ -67,7 +67,8 @@ back, its `status` and `code`.
 ### Projected content
 
 Content placed inside a component is projected into the underlying element (for example
-`<zitadel-auth-login>`'s `attribution-trailing` slot). A `<template>`
+`<zitadel-auth-login>`'s `attribution-trailing` slot). `<zitadel-auth-session>` projects
+nothing: its element has no slot to show content in. A `<template>`
 inside `<zitadel-auth-logout>` replaces the avatar menu with your own markup: `{{display}}`,
 `{{identifier}}` and `{{initial}}` are filled in, and any element with `data-action="logout"`
 signs the user out. Mark the `<template>` `ngNonBindable` so Angular leaves the

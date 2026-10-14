@@ -235,9 +235,18 @@ describe.each([
   });
 });
 
+describe("ZitadelSession children", () => {
+  // `<zitadel-session>` has no slot, so the wrapper must not offer children
+  // that would never render.
+  it("are not part of its props", () => {
+    // @ts-expect-error ZitadelSession takes no children.
+    const element = <ZitadelSession project={project}>ignored</ZitadelSession>;
+    expect(element).toBeTruthy();
+  });
+});
+
 describe.each([
   ["ZitadelLogout", "zitadel-logout", ZitadelLogout],
-  ["ZitadelSession", "zitadel-session", ZitadelSession],
   ["ZitadelLogin", "zitadel-login", ZitadelLogin],
 ] as const)("%s children", (_name, tag, Component) => {
   const Wrapper = Component as React.ComponentType<Record<string, unknown>>;

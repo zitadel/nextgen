@@ -258,9 +258,19 @@ describe.each([
   );
 });
 
+describe("ZitadelSession slot content", () => {
+  // `<zitadel-session>` has no slot, so content passed in would never render.
+  it("puts no slot content into the element", () => {
+    const { container } = render(ZitadelSession, {
+      props: { project },
+      slots: { default: () => h("span", "extra") },
+    });
+    expect(container.querySelector("zitadel-session")?.childElementCount).toBe(0);
+  });
+});
+
 describe.each([
   ["ZitadelLogout", "zitadel-logout", ZitadelLogout],
-  ["ZitadelSession", "zitadel-session", ZitadelSession],
   ["ZitadelLogin", "zitadel-login", ZitadelLogin],
 ] as const)("%s slot content", (_name, tag, component) => {
   it("renders the default slot into the element's light DOM", () => {

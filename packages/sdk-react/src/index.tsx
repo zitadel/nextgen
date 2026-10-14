@@ -191,8 +191,12 @@ ZitadelLogout.displayName = "ZitadelLogout";
  *
  * A forwarded `ref` resolves to the underlying `<zitadel-session>` DOM element.
  */
-/** `ZitadelSessionProps` plus `children`, forwarded into the element's light DOM. */
-export type ZitadelSessionReactProps = ZitadelSessionProps & { children?: React.ReactNode };
+/**
+ * The React props of {@link ZitadelSession}: exactly `ZitadelSessionProps`.
+ * There is no `children`: `<zitadel-session>` has no slot, so content passed
+ * into it would never render.
+ */
+export type ZitadelSessionReactProps = ZitadelSessionProps;
 
 export const ZitadelSession = React.forwardRef<ZitadelSessionElement, ZitadelSessionReactProps>(
   function ZitadelSession({ onSignout, onSessionMissing, onSessionError, ...props }, ref) {

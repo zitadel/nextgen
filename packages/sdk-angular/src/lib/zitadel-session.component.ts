@@ -50,7 +50,7 @@ import "@zitadel/components";
     (zitadel-signout)="onSignout($event)"
     (zitadel-session-missing)="onSessionMissing($event)"
     (zitadel-session-error)="onSessionError($event)"
-  ><ng-content /></zitadel-session>`,
+  ></zitadel-session>`,
 })
 export class ZitadelSessionComponent implements ZitadelSessionConfig {
   @Input() project?: ZitadelProject;

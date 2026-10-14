@@ -16,7 +16,7 @@ import "@zitadel/components";
  * discrete `:project-id` / `:proxy-path` the widget reads instead. The widget's
  * `zitadel-signout` event is re-emitted with its detail as `signout`,
  * `zitadel-session-missing` as `sessionMissing`, and `zitadel-session-error` as
- * `sessionError`.
+ * `sessionError`. It takes no slot content: `<zitadel-session>` has no slot.
  *
  * A Vue `ref` on this component resolves to the component *instance*; the
  * rendered `<zitadel-session>` DOM node is exposed as `element`.
@@ -35,7 +35,7 @@ export default defineComponent({
     suppressHeader: { type: Boolean, default: undefined },
   },
   emits: ["signout", "sessionMissing", "sessionError"],
-  setup(props, { emit, expose, slots }) {
+  setup(props, { emit, expose }) {
     const element = ref<ZitadelSessionElement | null>(null);
     expose({ element });
 
@@ -64,10 +64,7 @@ export default defineComponent({
             emit("sessionError", event.detail);
           },
         },
-        // Slot content goes into the element's light DOM: the `<template>`
-        // `<zitadel-logout>` clones for a custom control, or login's
-        // `attribution-trailing` slot.
-        slots.default?.(),
+        // No slot content: `<zitadel-session>` has no slot to show it in.
       );
   },
 });

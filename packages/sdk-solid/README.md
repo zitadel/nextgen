@@ -41,7 +41,8 @@ example the session card's "Signed in as" heading).
 Children are rendered into the element. Give `ZitadelLogout` a `<template>` child to replace its
 avatar menu with your own markup, filled with `{{display}}`, `{{identifier}}` and `{{initial}}`,
 where any `data-action="logout"` element signs out. Content with `slot="attribution-trailing"`
-inside `ZitadelLogin` is shown next to its attribution.
+inside `ZitadelLogin` is shown next to its attribution. `ZitadelSession` takes no children: its
+element has no slot to show them in.
 
 ```tsx
 <ZitadelLogout project={project}>
