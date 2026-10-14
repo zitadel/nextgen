@@ -42,18 +42,19 @@ tasks:
       - "build"
 
   # Boots a real local server (binary runtime + SQLite by default). Not cached
-  # (it spawns OS processes). Runs in CI as a dependency of `e2e:test` — the
-  # kit's own real-instance suite, alongside the e2e app lanes.
+  # (it spawns OS processes). Runs in CI as a dependency of `e2e:all` — the
+  # kit's own real-instance suite, alongside the e2e app lanes — and so, like
+  # them, is `runInCI: "skip"`: CI's e2e step runs it, not the build-and-test
+  # graph. The command unsets CI / GITHUB_ACTIONS to behave as a local run
+  # (the old workflow used `env -u CI`); a task `env` entry would not override
+  # the runner's values.
   test-integration:
-    command: "corepack pnpm run test:integration"
+    command: "env -u CI -u GITHUB_ACTIONS corepack pnpm run test:integration"
     deps:
       - "build"
       - "cli:build"
       - "server:build"
     env:
-      # Behave as a local run (the old workflow used `env -u CI`).
-      CI: ""
-      GITHUB_ACTIONS: ""
       ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
       # server:build embeds the console/login UIs via its task deps; keep the
       # server-hosted surfaces off anyway — these tests drive the API and
@@ -62,5 +63,5 @@ tasks:
       NEXTGEN_SERVER_CONSOLE_ENABLED: "false"
     options:
       cache: false
-      runInCI: true
+      runInCI: "skip"
       mutex: "e2e-serial"

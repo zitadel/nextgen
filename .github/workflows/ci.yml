@@ -66,12 +66,13 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: node scripts/check-pr-title.mjs --title "$PR_TITLE" --base "$BASE_SHA" --summary
 
-      # Emits `mode`, per-lane affected gates (go_tests, snapshot,
+      # Emits `mode`, per-lane affected gates (go_tests, e2e, snapshot,
       # journey_fresh_app, journey_passkey, journey_preexisting,
       # journey_testkit, suites_*, browsers), and the journey_matrix scope,
-      # computed from moon's affected task selection. Gates fail open — unclaimed files, empty
-      # diffs, and query failures all force a full run. Logic + tests:
-      # scripts/ci-mode.mjs.
+      # computed from moon's affected task selection. This workflow reads
+      # go_tests, e2e, snapshot and journey_matrix. Gates fail open — unclaimed
+      # files, empty diffs, and query failures all force a full run. Logic +
+      # tests: scripts/ci-mode.mjs.
       - name: Detect CI mode
         id: ci-mode
         run: node scripts/ci-mode.mjs "${{ github.event.pull_request.base.sha || 'origin/main' }}"
@@ -84,7 +85,7 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
         run: moon run server:check-generate-pruned
 
-      # Chromium for the e2e lanes (`e2e:all` in the graph step below). moon's
+      # Chromium for the e2e lanes (`e2e:all`, in the e2e step below). moon's
       # component/storybook browser lanes install their own through an
       # `install-browsers` dep; this covers the Playwright e2e specs.
       - name: Cache Playwright browsers
@@ -108,11 +109,37 @@ jobs:
         # interfaces only; loopback and the runner's NIC keep it. (#1490)
         run: sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
 
-      # Build the journey's release tarballs OUTSIDE the main graph, then hand
+      # Builds, lint, typecheck and unit tests. `:test` is unit tests here as in
+      # a local `pnpm run check`; the e2e suite runs in its own step below.
+      - name: Run Moon build and test graph
+        id: moon-ci
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        # moon ci only selects tasks whose own inputs changed. --downstream deep
+        # with --include-relations also runs the tasks of every project that
+        # depends on a changed one, so an api change re-tests its consumers.
+        run: moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph --downstream deep --include-relations
+
+      # The Go database lanes depend on the console and login UI builds their
+      # binary embeds, so `moon ci` above also runs them whenever one of those
+      # builds is affected, and these steps then run them a second time.
+      # Folding them into the graph step (and dropping these) is a follow-up.
+      - name: Run Go integration tests (postgres)
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
+        run: moon run server:test-postgres
+
+      # The Spanner emulator lane is not part of this job: it runs in
+      # spanner.yml (nightly and on demand) and is not a required check.
+
+      - name: Run Go integration tests (sqlite)
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
+        run: moon run server:test-sqlite
+
+      # Build the journey's release tarballs outside any moon graph, then hand
       # them to the journey via JOURNEY_TARBALLS_DIR. The journey must not pack
-      # inside `moon ci` below: that would spawn a second, concurrent moon graph
-      # (forbidden — see packages/testing/AGENTS.md) and race the dist-rewriting
-      # build tasks. `release:*` are runInCI:false, so unset CI to run them.
+      # inside the e2e step below: that would spawn a second, concurrent moon
+      # graph (forbidden — see packages/testing/AGENTS.md) and race the
+      # dist-rewriting build tasks. `release:*` are runInCI:false, so unset CI
+      # to run them.
       - name: Build release snapshot for the journey
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
         run: |
@@ -135,47 +162,35 @@ jobs:
           restore-keys: |
             journey-verdaccio-${{ runner.os }}-
 
-      # The e2e suites run here too: `e2e:all` depends on every lane (console
-      # smoke/real/embedded/platform, demo mock/real, the CLI journey matrix, the
-      # kit's real-instance suite), which depend on server:build / cli:build, so
-      # moon orders and runs them through the DAG — no hand-written per-lane
-      # steps. `:test` alone stays unit tests, here as in a local `pnpm run check`.
-      # The journey reads the prebuilt JOURNEY_TARBALLS_DIR from the step above.
-      - name: Run Moon build and test graph
-        id: moon-ci
-        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        # moon ci only selects tasks whose own inputs changed. --downstream deep
-        # with --include-relations also runs the tasks of every project that
-        # depends on a changed one, so an api change re-tests its consumers.
-        run: moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph e2e:all --downstream deep --include-relations
+      # The e2e suite, after the graph rather than inside it: run alongside the
+      # unit suites, its browsers and dev servers slowed both sides into
+      # timeouts (run 38496066612). `e2e:all` depends on every lane (console
+      # smoke/real/embedded/platform, demo mock/real, the CLI journey matrix,
+      # the kit's real-instance suite) and moon orders them through the DAG.
+      # The lanes are `runInCI: "skip"`, which keeps them out of the graph step
+      # above; `--ignore-ci-checks` runs them here. ci-mode's `e2e` gate says
+      # when: moon finds e2e:all affected, or the run is forced full (a
+      # workflow, root-script or moon.yml edit, which no lane lists as input).
+      # The journey reads the prebuilt JOURNEY_TARBALLS_DIR from the snapshot
+      # step.
+      - name: Run e2e suites
+        id: moon-e2e
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.e2e == 'true' }}
+        run: moon exec e2e:all --ignore-ci-checks --on-failure continue
         env:
           # The journey's options, as ci-turbo.yml passes them: the work dir the
           # diagnostics upload below reads, ci-mode's framework scope (`single`
           # unless an SDK, the CLI, the test kit or the journey's own files
-          # moved), and the Verdaccio
-          # storage the cache step above restores.
+          # moved), and the Verdaccio storage the cache step above restores.
           JOURNEY_WORK_DIR: ${{ runner.temp }}/ci-journey
           JOURNEY_MATRIX: ${{ steps.ci-mode.outputs.journey_matrix }}
           JOURNEY_REGISTRY_STORAGE: ${{ runner.temp }}/journey-verdaccio-storage
 
+      # Reads moon's newest run report, so it names the failures of whichever
+      # moon step failed.
       - name: Report Moon CI failures
-        if: ${{ failure() && steps.moon-ci.conclusion == 'failure' }}
+        if: ${{ failure() && (steps.moon-ci.conclusion == 'failure' || steps.moon-e2e.conclusion == 'failure') }}
         run: node scripts/report-moon-failures.mjs
-
-      # The Go database lanes depend on the console and login UI builds their
-      # binary embeds, so `moon ci` above also runs them whenever one of those
-      # builds is affected, and these steps then run them a second time.
-      # Folding them into the graph step (and dropping these) is a follow-up.
-      - name: Run Go integration tests (postgres)
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
-        run: moon run server:test-postgres
-
-      # The Spanner emulator lane is not part of this job: it runs in
-      # spanner.yml (nightly and on demand) and is not a required check.
-
-      - name: Run Go integration tests (sqlite)
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
-        run: moon run server:test-sqlite
 
       - name: Validate version PR
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
