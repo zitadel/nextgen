@@ -3690,6 +3690,7 @@ func TestFlowStepErrorContract(t *testing.T) {
 		domain.FlowStepErrorUserNotFound,
 		domain.FlowStepErrorSSOUserNotFound,
 		domain.FlowStepErrorOutcomeUnhandled,
+		domain.FlowStepErrorSignInFirst,
 	}
 	for _, key := range stepErrorConsts {
 		assert.True(t, strings.HasPrefix(key, "error."), "step-error const %q must honor the contract", key)
@@ -4150,9 +4151,10 @@ func TestFlowStateMachine_Back_ToIdentifierRotatesAuthAttempt(t *testing.T) {
 	require.Equal(t, "password", afterWrongPassword.State.CurrentStep)
 	require.NotNil(t, afterWrongPassword.Step.Error)
 	require.Equal(t, domain.FlowStepErrorInvalidCredentials, *afterWrongPassword.Step.Error)
-	// mergeCollected banks the password before the proof is checked, so the
-	// rejected one is sitting in state at this point.
-	require.Equal(t, "not-the-password", afterWrongPassword.State.CollectedData.AuthMethods.Password)
+	// mergeCollected banks the password before the proof is checked; the
+	// sign-in submit drops it again rather than leaving it for whoever comes
+	// next.
+	require.Empty(t, afterWrongPassword.State.CollectedData.AuthMethods.Password)
 
 	back, err := w.sm.Process(t.Context(), def, afterWrongPassword.State, domain.FlowSubmitInput{
 		Action: "back",
