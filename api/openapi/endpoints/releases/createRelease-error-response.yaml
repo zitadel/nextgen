@@ -79,7 +79,7 @@ content:
         summary: rel.unresolved_reference
         value:
           code: rel.unresolved_reference
-          message: 'release: referenced handle is not pinned'
+          message: 'release: handle is not in the release'
       req.invalid:
         summary: req.invalid
         value:

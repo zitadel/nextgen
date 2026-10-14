@@ -247,9 +247,9 @@ func TestReleaseServiceCreateRejectsSchemaWithoutObjectType(t *testing.T) {
 	assert.Equal(t, domain.ErrReleaseRevisionUnpinnable(nil).Code, domErr.Code)
 }
 
-// A flow names its user schema by objectType, and the release must pin that
-// schema too, so a miss fails here rather than on a login request.
-func TestReleaseServiceCreateRejectsUnpinnedUserSchema(t *testing.T) {
+// A flow names its user schema by objectType, and the release must reference
+// that schema too, so a miss fails here rather than on a login request.
+func TestReleaseServiceCreateRejectsMissingUserSchema(t *testing.T) {
 	svc, statements := newMockedReleaseService(t)
 	expectHandleReads(statements)
 

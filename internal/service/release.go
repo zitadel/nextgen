@@ -73,7 +73,7 @@ func (s *releaseService) Create(ctx context.Context, input CreateReleaseInput) (
 	if err != nil {
 		return nil, err
 	}
-	// Only what the caller pinned resolves a reference here; building from a
+	// Only what the caller references resolves a handle here; building from a
 	// bundle passes a lookup into the project instead.
 	pointers, err := domain.CloseReleaseReferences(referrers, nil)
 	if err != nil {
@@ -210,7 +210,7 @@ func (s *releaseService) resolvePointers(ctx context.Context, projectID string, 
 // no identifying field at all because a project has exactly one.
 func (s *releaseService) resolveReferrer(ctx context.Context, projectID string, pointer CreateReleasePointer) (domain.ReleaseReferrer, error) {
 	stmts := s.v2Pool.Statements()
-	pinned := func(handle string, references []domain.ReleaseReference) (domain.ReleaseReferrer, error) {
+	referrer := func(handle string, references []domain.ReleaseReference) (domain.ReleaseReferrer, error) {
 		return domain.ReleaseReferrer{
 			Pointer:    domain.ReleasePointer{Kind: pointer.Kind, Handle: handle, RevisionID: pointer.RevisionID},
 			References: references,
@@ -228,14 +228,14 @@ func (s *releaseService) resolveReferrer(ctx context.Context, projectID string, 
 			return domain.ReleaseReferrer{}, domain.ErrReleaseRevisionUnpinnable(
 				fmt.Sprintf("schema %q declares no objectType", pointer.RevisionID))
 		}
-		return pinned(*schema.ObjectType, nil)
+		return referrer(*schema.ObjectType, nil)
 
 	case domain.ReleasePointerKindFlowDefinition:
 		definition, err := stmts.GetFlowDefinitionByID(ctx, projectID, pointer.RevisionID)
 		if err != nil {
 			return domain.ReleaseReferrer{}, mapRevisionLookupError(err, pointer)
 		}
-		return pinned(definition.Name, domain.FlowDefinitionReleaseReferences(definition))
+		return referrer(definition.Name, domain.FlowDefinitionReleaseReferences(definition))
 
 	case domain.ReleasePointerKindBranding:
 		if _, err := stmts.GetBrandingByID(ctx, projectID, pointer.RevisionID); err != nil {
@@ -244,7 +244,7 @@ func (s *releaseService) resolveReferrer(ctx context.Context, projectID string, 
 		// A project has one branding, so there is nothing to distinguish it
 		// from; the constant still collides correctly when a caller pins two
 		// branding revisions in one release.
-		return pinned(domain.ReleaseBrandingHandle, nil)
+		return referrer(domain.ReleaseBrandingHandle, nil)
 
 	default:
 		// Unreachable over HTTP: the wire enum admits only the three kinds

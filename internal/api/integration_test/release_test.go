@@ -181,9 +181,9 @@ func TestCreateRelease(t *testing.T) {
 		assert.NotEmpty(t, message)
 	})
 
-	// The flow names its user schema by objectType, so a release pinning the
+	// The flow names its user schema by objectType, so a release referencing the
 	// flow without that schema would fail on a login request rather than here.
-	t.Run("pinning a flow without its user schema is rejected", func(t *testing.T) {
+	t.Run("referencing a flow without its user schema is rejected", func(t *testing.T) {
 		resp := fixture.create(t, &api.CreateReleaseRequest{
 			Pointers: []api.CreateReleasePointer{
 				{Kind: api.ReleasePointerKindFlowDefinition, RevisionID: fixture.flowdefID},

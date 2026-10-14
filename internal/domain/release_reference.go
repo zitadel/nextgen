@@ -5,15 +5,15 @@ import (
 	"slices"
 )
 
-// ErrReleaseUnresolvedReference reports a handle a pinned revision references
-// that the release does not pin. [CloseReleaseReferences] names the pointer
-// and the handle in the message.
+// ErrReleaseUnresolvedReference reports a handle a revision in the release
+// names that the release does not reference. [CloseReleaseReferences] names
+// the pointer and the handle in the message.
 func ErrReleaseUnresolvedReference() Error {
-	return newError(PrefixRelease.ErrorCodePrefix("unresolved_reference"), "release: referenced handle is not pinned", nil, nil)
+	return newError(PrefixRelease.ErrorCodePrefix("unresolved_reference"), "release: handle is not in the release", nil, nil)
 }
 
-// ReleaseReference is a handle a pinned revision names in Field, resolved
-// against the release's pointers of Kind.
+// ReleaseReference is a handle a revision in the release names in Field,
+// resolved against the release's pointers of Kind.
 type ReleaseReference struct {
 	Kind   ReleasePointerKind
 	Field  string
@@ -26,7 +26,7 @@ type ReleaseReferrer struct {
 	References []ReleaseReference
 }
 
-// ReleaseReferenceLookup supplies a revision for a handle the pinned set lacks.
+// ReleaseReferenceLookup supplies a revision for a handle the release lacks.
 // It returns nil without an error when there is none.
 type ReleaseReferenceLookup func(ReleaseReference) (*ReleaseReferrer, error)
 
@@ -39,8 +39,8 @@ func FlowDefinitionReleaseReferences(definition *FlowDefinition) []ReleaseRefere
 }
 
 // CloseReleaseReferences checks that every reference of every referrer is
-// pinned under its kind and returns the pointers to release. A missing handle
-// is passed to lookup, when set, and the revision it returns is pinned too,
+// in the release under its kind and returns the pointers to release. A missing
+// handle is passed to lookup, when set, and the revision it returns is added,
 // its own references checked in turn; a handle neither holds is
 // rel.unresolved_reference.
 func CloseReleaseReferences(referrers []ReleaseReferrer, lookup ReleaseReferenceLookup) ([]ReleasePointer, error) {
@@ -48,10 +48,10 @@ func CloseReleaseReferences(referrers []ReleaseReferrer, lookup ReleaseReference
 		kind   ReleasePointerKind
 		handle string
 	}
-	pinned := make(map[key]bool, len(referrers))
+	included := make(map[key]bool, len(referrers))
 	pointers := make([]ReleasePointer, 0, len(referrers))
 	for _, referrer := range referrers {
-		pinned[key{referrer.Pointer.Kind, referrer.Pointer.Handle}] = true
+		included[key{referrer.Pointer.Kind, referrer.Pointer.Handle}] = true
 		pointers = append(pointers, referrer.Pointer)
 	}
 
@@ -60,7 +60,7 @@ func CloseReleaseReferences(referrers []ReleaseReferrer, lookup ReleaseReference
 	for i := 0; i < len(referrers); i++ {
 		referrer := referrers[i]
 		for _, ref := range referrer.References {
-			if pinned[key{ref.Kind, ref.Handle}] {
+			if included[key{ref.Kind, ref.Handle}] {
 				continue
 			}
 			var found *ReleaseReferrer
@@ -73,7 +73,7 @@ func CloseReleaseReferences(referrers []ReleaseReferrer, lookup ReleaseReference
 			if found == nil {
 				return nil, ErrReleaseUnresolvedReference().WithMessage(ref.unresolved(referrer.Pointer))
 			}
-			pinned[key{found.Pointer.Kind, found.Pointer.Handle}] = true
+			included[key{found.Pointer.Kind, found.Pointer.Handle}] = true
 			pointers = append(pointers, found.Pointer)
 			referrers = append(referrers, *found)
 		}

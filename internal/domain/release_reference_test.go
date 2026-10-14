@@ -28,7 +28,7 @@ func loginFlow() domain.ReleaseReferrer {
 	}
 }
 
-func TestCloseReleaseReferencesPinnedHandle(t *testing.T) {
+func TestCloseReleaseReferencesIncludedHandle(t *testing.T) {
 	t.Parallel()
 
 	pointers, err := domain.CloseReleaseReferences(
@@ -37,7 +37,7 @@ func TestCloseReleaseReferencesPinnedHandle(t *testing.T) {
 	assert.Equal(t, []domain.ReleasePointer{loginFlow().Pointer, humanUserSchema}, pointers)
 }
 
-func TestCloseReleaseReferencesUnpinnedHandle(t *testing.T) {
+func TestCloseReleaseReferencesMissingHandle(t *testing.T) {
 	t.Parallel()
 
 	_, err := domain.CloseReleaseReferences([]domain.ReleaseReferrer{loginFlow()}, nil)
@@ -61,9 +61,9 @@ func TestCloseReleaseReferencesMatchesKind(t *testing.T) {
 	assert.True(t, errors.Is(err, domain.ErrReleaseUnresolvedReference()))
 }
 
-// A lookup pins what the set lacks, once per handle however many revisions
+// A lookup adds what the release lacks, once per handle however many revisions
 // reference it.
-func TestCloseReleaseReferencesLookupPins(t *testing.T) {
+func TestCloseReleaseReferencesLookupAdds(t *testing.T) {
 	t.Parallel()
 
 	other := loginFlow()
@@ -81,7 +81,7 @@ func TestCloseReleaseReferencesLookupPins(t *testing.T) {
 	assert.Equal(t, []domain.ReleasePointer{loginFlow().Pointer, other.Pointer, humanUserSchema}, pointers)
 }
 
-// A revision the lookup pins has its own references checked.
+// A revision the lookup adds has its own references checked.
 func TestCloseReleaseReferencesChecksLookedUpRevision(t *testing.T) {
 	t.Parallel()
 
