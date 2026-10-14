@@ -75,6 +75,26 @@ describe("deployment create", () => {
         expect(app.envelopeOf<{ count: number }>(listed).data.count).toBe(0);
       });
 
+      it("refuses an --origin a preview pattern covers", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.addOrigin("https://*-acme.vercel.app", "preview");
+        const release = await aRelease(app);
+
+        const result = await app.run([
+          "deployment",
+          "create",
+          "--release",
+          release,
+          "--origin",
+          "https://pr-7-acme.vercel.app",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
       it("fails with no primary origin to deploy to", async () => {
         const app = await aSetUpApp();
         const releaseId = await aRelease(app);

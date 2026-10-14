@@ -85,6 +85,22 @@ async function add(cwd: string, ...extra: string[]) {
   return { result, envelope: parseJson(result.stdout) as { data: Added; code?: string } };
 }
 
+/** The same, rendered for a terminal: what a person reads. */
+async function addRendered(cwd: string, ...extra: string[]): Promise<string> {
+  const result = await runCliForTest([
+    "env",
+    "add",
+    "production",
+    "--cwd",
+    cwd,
+    "--server",
+    SERVER,
+    "--non-interactive",
+    ...extra,
+  ]);
+  return result.stdout;
+}
+
 const names = (variables: Added["platform"]["production"]): string[] =>
   variables.map((variable) => variable.name);
 
@@ -124,6 +140,22 @@ describe("env add", () => {
       );
 
       expect(suggested(envelope).some((command) => command.includes("origin add"))).toBe(false);
+    });
+
+    it("quotes an IPv6 app origin in the follow-up a person reads", async () => {
+      const cwd = await makeProject("next");
+
+      const out = await addRendered(cwd, "--app-url", "http://[::1]:3000");
+
+      expect(out).toContain("origin add 'http://[::1]:3000' --kind primary --env production");
+    });
+
+    it("tells a person the origin step waits on the project secret when none was written", async () => {
+      const cwd = await makeProject("next");
+
+      const out = await addRendered(cwd, "--project", "proj_existing");
+
+      expect(out).toContain("once ZITADEL_PROJECT_SECRET is in .env.production.local");
     });
 
     it("restricts the project to the app's origin first", async () => {

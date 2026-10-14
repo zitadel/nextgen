@@ -45,6 +45,11 @@ export default class OriginRm extends EnvironmentCommand {
       return this.emit({ ...preview, pretty: `${preview.pretty} from the project` });
     }
 
+    // Resolved before the confirmation, so the prompt is answered knowing
+    // which project it removes from: `connect` names it on a terminal, and
+    // asks for a missing value before, not after, the removal is agreed.
+    const { client, projectId } = await this.connect();
+
     // A preview pattern can carry a `*`, so the retry is copy-pasteable only if
     // the shell will not expand it: `shellArg` single-quotes any pattern holding
     // a glob or other special character before interpolating it.
@@ -57,8 +62,6 @@ export default class OriginRm extends EnvironmentCommand {
     if (!confirmed) {
       return this.emit({ status: "skipped", reason: "remove-cancelled" });
     }
-
-    const { client, projectId } = await this.connect();
 
     await client.removeOrigin(projectId, { pattern });
 

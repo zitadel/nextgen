@@ -21,3 +21,4 @@ export { runSteps, type PipelineMode, type Step, type StepContext } from "./pipe
 export { validateStep } from "./steps/validate";
 export { idpConnectionsStep } from "./steps/idp-connections";
 export { diffStep } from "./steps/diff";
+export { assertPrimaryOrigin, originMatchesPattern, type ProjectOriginEntry } from "./origins";

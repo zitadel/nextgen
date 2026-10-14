@@ -5,8 +5,8 @@ import { join } from "node:path";
 import defaultLogin from "@zitadel/config/defaults/default-login.json" with { type: "json" };
 import { afterEach, describe, expect, it } from "vitest";
 
-import { validateStep } from "../../../../src/lib/release/steps/validate";
-import type { StepContext } from "../../../../src/lib/release/pipeline";
+import { validateStep } from "../../../../../src/lib/release/steps/validate";
+import type { StepContext } from "../../../../../src/lib/release/pipeline";
 
 /** A valid user-schema the server would accept, so schema parsing passes. */
 const validSchema = {
@@ -156,6 +156,15 @@ describe("validate step", () => {
     await expect(
       validateStep.run(ctx(bundle, { brandingSources: [badBranding] })),
     ).rejects.toMatchObject({ code: "E_VALIDATION" });
+  });
+
+  it("tells a descriptor with the retired liquid_template_file key how to migrate", async () => {
+    const descriptor = { layout: "centered", liquid_template_file: "./login.liquid" };
+    const bundle = { schemas: [], flow_definitions: [], brandings: [{ layout: "centered" }] };
+
+    await expect(validateStep.run(ctx(bundle, { brandingSources: [descriptor] }))).rejects.toThrow(
+      /"liquid_template": \{ "\$file": "\.\/login\.liquid" \}/,
+    );
   });
 
   it("rejects a login template that leaves out the mandatory gates", async () => {
