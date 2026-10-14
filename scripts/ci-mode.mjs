@@ -120,13 +120,16 @@ const CONSOLE_E2E_TARGETS = ["e2e:console-real", "e2e:console-embedded"];
 // against api-mock. ci-turbo.yml runs them in one step; moon runs them as part
 // of e2e:all.
 const MOCK_E2E_TARGETS = ["e2e:console-smoke", "e2e:demo-next-mock", "e2e:demo-nuxt-mock"];
-// The aggregate ci.yml names in its `moon ci` call. When moon selects it, every
-// lane runs as its dependency, the journey included, whether or not a journey
-// trigger above moved (an api-mock change reaches it through the mock lanes).
+// The aggregate ci.yml runs in its own e2e step (`moon exec e2e:all`) when the
+// `e2e` gate is on: moon counts it affected whenever any lane is, and running it
+// runs every lane as its dependency, the journey included, whether or not a
+// journey trigger above moved (an api-mock change reaches it through the mock
+// lanes). ci-turbo.yml gates its lane steps one by one and ignores this gate.
 const E2E_SUITE_TARGET = "e2e:all";
 
 const ALL_GATES = [
   "go_tests",
+  "e2e",
   "snapshot",
   "journey_fresh_app",
   "journey_passkey",
@@ -195,15 +198,18 @@ export function resolveGates({ mode, files, targets }) {
   const suitesConsole = CONSOLE_E2E_TARGETS.some((t) => set.has(t));
   const suitesMock = MOCK_E2E_TARGETS.some((t) => set.has(t));
   const anyJourney = journeyFreshApp || journeyNextScaffold || journeyPreexisting;
+  const e2eSuite = set.has(E2E_SUITE_TARGET);
 
   const gates = {
     go_tests: GO_TEST_TARGETS.some((t) => set.has(t)),
+    // ci.yml's e2e step. A forced run (above) turns it on too: a workflow,
+    // root-script or moon.yml edit moves no lane's inputs, so moon alone would
+    // select nothing there.
+    e2e: e2eSuite,
     // The snapshot exists in PR CI to feed the journey (the tarball handoff is
     // a filesystem contract moon cannot see), so it runs whenever the journey
-    // can: a journey trigger moved, or moon will run the whole suite. This
-    // query is a superset of what `moon ci` selects, so the gate may build a
-    // snapshot nothing reads, but never leaves the journey without one.
-    snapshot: anyJourney || set.has(E2E_SUITE_TARGET),
+    // can: a journey trigger moved, or the e2e step runs the whole suite.
+    snapshot: anyJourney || e2eSuite,
     journey_fresh_app: journeyFreshApp,
     journey_passkey: journeyNextScaffold,
     journey_preexisting: journeyPreexisting,
@@ -239,9 +245,17 @@ export function queryAffectedTargets(
 }
 
 function queryMoonAffectedTargets(base, spawn) {
+  // Asked as a local run would be. In CI, moon drops a task that does not run
+  // there (`runInCI: false` or "skip") from the affected set when its own
+  // inputs changed, yet the gates exist for exactly such tasks: the e2e lanes
+  // are "skip" and run in ci.yml's own e2e step, so a spec edit must still
+  // count. The gates ask what a change reaches, not what `moon ci` would run.
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter(([name]) => name !== "CI" && name !== "GITHUB_ACTIONS"),
+  );
   const result = spawn("moon", ["query", "tasks", "--affected", "--downstream", "deep"], {
     encoding: "utf8",
-    env: { ...process.env, MOON_BASE: base },
+    env: { ...env, MOON_BASE: base, MOON_HEAD: "HEAD" },
   });
   if (result.status !== 0) {
     // A failed query fails open; make the failure diagnosable from the run

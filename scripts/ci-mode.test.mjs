@@ -292,6 +292,17 @@ const CONSOLE_SPEC_CLASS = [
   "e2e:test",
   "e2e:typecheck",
 ];
+// A demo app edit: the demo lanes list the app they serve as an input.
+const DEMO_NEXT_CLASS = [
+  "demo-next:build",
+  "demo-next:dev",
+  "demo-next:lint",
+  "demo-next:start",
+  "demo-next:typecheck",
+  "e2e:all",
+  "e2e:demo-next-mock",
+  "e2e:demo-next-real",
+];
 
 function allTrue(gates) {
   return Object.values(gates).every(Boolean);
@@ -508,6 +519,51 @@ test("unclaimed files force a full run with the full matrix", () => {
   }
 });
 
+test("a workflow-only edit runs the e2e step although moon selects no task", () => {
+  // Probed on moon 2.6.1: a ci.yml-only diff selects nothing, an e2e/moon.yml-
+  // only diff no lane. Neither file is a lane input, so only the forced run
+  // puts ci.yml's e2e step (and the snapshot it needs) back on.
+  for (const file of [".github/workflows/ci.yml", "e2e/moon.yml", "scripts/release-manifest.mjs"]) {
+    const { gates, reason } = resolveGates({ mode: "full", files: [file], targets: [] });
+    assert.match(reason, /unclaimed file/, file);
+    assert.equal(gates.e2e, true, file);
+    assert.equal(gates.snapshot, true, file);
+  }
+});
+
+test("the e2e step follows e2e:all", () => {
+  for (const [file, targets, expected] of [
+    ["packages/api-mock/src/crypto.ts", API_MOCK_CLASS, true],
+    ["e2e/console/src-real/console-real.spec.ts", CONSOLE_SPEC_CLASS, true],
+    ["packages/sdk-vue/src/index.ts", SDK_VUE_CLASS, true],
+    ["apps/demo-next/src/app/admin/page.tsx", DEMO_NEXT_CLASS, true],
+    ["internal/a.go", GO_CLASS, true],
+    ["docs/adrs/001-server-cli-cobra-viper.md", DOCS_CLASS, false],
+  ]) {
+    const { gates, reason } = resolveGates({ mode: "full", files: [file], targets });
+    assert.equal(reason, null, file);
+    assert.equal(gates.e2e, expected, file);
+    // The step runs the journey, which reads the snapshot.
+    if (gates.e2e) assert.equal(gates.snapshot, true, file);
+  }
+});
+
+test("a demo app edit runs its lanes, on one framework, without the Go suites", () => {
+  // The demo lanes list the demo app as an input: they serve it, and no task
+  // dependency reaches its source.
+  const { gates, matrix } = resolveGates({
+    mode: "full",
+    files: ["apps/demo-next/src/app/admin/page.tsx"],
+    targets: DEMO_NEXT_CLASS,
+  });
+  assert.equal(gates.e2e, true);
+  assert.equal(gates.suites_mock, true);
+  assert.equal(gates.suites_testing_demo, true);
+  assert.deepEqual(journeys(gates), [false, false, false, false]);
+  assert.equal(gates.go_tests, false);
+  assert.equal(matrix, "single");
+});
+
 test("an empty diff forces a full run", () => {
   const { gates, reason } = resolveGates({ mode: "full", files: [], targets: [] });
   assert.ok(allTrue(gates));
@@ -562,6 +618,35 @@ test("queryAffectedTargets parses the grouped task map", () => {
     moon,
   );
   assert.deepEqual(targets?.sort(), ["release:snapshot", "server:build", "server:test"]);
+});
+
+test("queryAffectedTargets asks moon as a local run would, against the given base", () => {
+  // In CI, moon leaves runInCI false/"skip" tasks out of the affected set when
+  // only their own inputs changed — the e2e lanes, which ci.yml's e2e step
+  // runs anyway — so the query must not see CI (verified on moon 2.6.1: a
+  // console spec edit lists e2e:console-real only without CI in the env).
+  const seen = [];
+  const spawn = (command, args, options) => {
+    seen.push({ command, args, env: options.env });
+    return { status: 0, stdout: '{"tasks":{}}', stderr: "" };
+  };
+  const previous = { CI: process.env.CI, GITHUB_ACTIONS: process.env.GITHUB_ACTIONS };
+  process.env.CI = "true";
+  process.env.GITHUB_ACTIONS = "true";
+  try {
+    queryAffectedTargets("abc123", spawn, moon);
+  } finally {
+    for (const [name, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
+  assert.equal(seen.length, 1);
+  assert.deepEqual(seen[0].args, ["query", "tasks", "--affected", "--downstream", "deep"]);
+  assert.equal(seen[0].env.MOON_BASE, "abc123");
+  assert.equal(seen[0].env.MOON_HEAD, "HEAD");
+  assert.equal("CI" in seen[0].env, false);
+  assert.equal("GITHUB_ACTIONS" in seen[0].env, false);
 });
 
 test("queryAffectedTargets returns an empty set for an empty tasks map", () => {
