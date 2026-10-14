@@ -37,9 +37,16 @@ function envLine(key: string, value: string): string {
   }
   // Written as the first form the reader gives back unchanged: bare, then
   // single- then double-quoted. A bare `#` starts a comment and a bare quote is
-  // stripped, so a secret holding one would otherwise read back truncated.
+  // stripped, so a secret holding one would otherwise read back truncated. A
+  // quote the value opens and never closes would run on into the next line, so
+  // each form is read with a line after it, which must come back untouched.
   const forms = [`${key}=${value}`, `${key}='${value}'`, `${key}="${value}"`];
-  const faithful = forms.find((line) => parseEnv(line)[key] === value);
+  const faithful = forms.find((line) => {
+    // Followed by lines quoted every way a later value might be, any of which
+    // would close a quote this line left open.
+    const read = parseEnv(`${line}\nNEXT_A='a'\nNEXT_B="b"\nNEXT_C=\`c\`\n`);
+    return read[key] === value && read.NEXT_A === "a" && read.NEXT_B === "b" && read.NEXT_C === "c";
+  });
   if (faithful === undefined) {
     throw new ZitadelError(
       "E_VALIDATION",

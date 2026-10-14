@@ -46,6 +46,17 @@ describe("fs-safe managed env writers", () => {
     expect(parseEnv(await readFile(path, "utf8")).ZITADEL_PROJECT_SECRET).toBe(value);
   });
 
+  it("keeps a value with an unclosed quote from swallowing the line after it", async () => {
+    const path = await tmpFile();
+
+    await writeManagedEnvFile(path, { ZITADEL_PROJECT_ID: "'p1", ZITADEL_PROJECT_SECRET: "s#1" });
+
+    expect(parseEnv(await readFile(path, "utf8"))).toMatchObject({
+      ZITADEL_PROJECT_ID: "'p1",
+      ZITADEL_PROJECT_SECRET: "s#1",
+    });
+  });
+
   it("refuses a value with a line break as a typed E_VALIDATION error, writing nothing", async () => {
     const path = await tmpFile();
 
