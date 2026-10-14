@@ -21,6 +21,6 @@ session or signing out fails with anything other than the backend's no-session a
 `{ status?, code?, message, phase }`, with `phase` set to `"load"` or `"signout"`, so an app can tell
 an outage from a signed-out visitor and end its own "signing out" state when a sign-out fails. The
 widgets still keep their surface and show the error. The SDKs surface the event as `onSessionError`
-(React, Svelte, Solid and the meta-framework SDKs that re-export them), `sessionError` (Vue,
+(React, Svelte, Solid, and TanStack Start, which re-exports the React widgets), `sessionError` (Vue,
 Angular) and `onSessionError$` (Qwik), with the detail typed as `ZitadelSessionErrorDetail`; Nuxt
 and Next templates listen to `zitadel-session-error` on the raw elements.
