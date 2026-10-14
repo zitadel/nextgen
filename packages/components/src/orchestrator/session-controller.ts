@@ -285,9 +285,16 @@ export class SessionController implements ReactiveController {
     }
     this.host.requestUpdate();
     this.options.onIdentityChanged?.();
-    // A host removed while the request was in flight reports nothing: it no
-    // longer speaks for the page.
-    if (failure && this.host.isConnected) emit(this.host, "zitadel-session-error", failure);
+    if (failure) {
+      if (this.host.isConnected) {
+        emit(this.host, "zitadel-session-error", failure);
+      } else {
+        // A host removed while the request was in flight reports nothing: it
+        // no longer speaks for the page. Put back, it asks again and reports
+        // that answer instead.
+        this.loadedKey = undefined;
+      }
+    }
     if (!missing) return;
     if (!this.host.isConnected) {
       // A host removed while the request was in flight no longer speaks for
