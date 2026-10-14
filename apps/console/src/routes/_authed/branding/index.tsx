@@ -8,7 +8,7 @@ import {
   type PreviewState,
 } from "@/components/branding/login-preview";
 import { SettingsPanel } from "@/components/branding/settings-panel";
-import { ResourcePage, ResourceTitle } from "@/components/resource-list";
+import { ResourceTitle } from "@/components/resource-list";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -25,6 +25,7 @@ import { flowDisplayName } from "@/lib/flow-definition";
 
 import { api } from "@/api/zitadel";
 import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
+import { Page } from "@/components/layout";
 
 export const Route = createFileRoute("/_authed/branding/")({
   // Nested under Login flows, as in the design: branding is how those flows
@@ -150,7 +151,7 @@ function BrandingScreen() {
   const revisionMode = revision.theme?.mode ?? "auto";
 
   return (
-    <ResourcePage>
+    <Page>
       <ResourceTitle>Branding</ResourceTitle>
 
       {/* Three rows on a phone, one on a desktop: the flow selector, then the
@@ -268,7 +269,7 @@ function BrandingScreen() {
           <SettingsPanel revision={revision} />
         </Card>
       </div>
-    </ResourcePage>
+    </Page>
   );
 }
 

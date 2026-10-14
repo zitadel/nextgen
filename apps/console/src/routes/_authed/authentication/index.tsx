@@ -13,7 +13,6 @@ import {
   ResourceHeadCell,
   ResourceHeaderRow,
   ResourceMenuHead,
-  ResourcePage,
   ResourceRow,
   ResourceTitle,
   RowMenu,
@@ -35,6 +34,7 @@ import {
 } from "@/lib/idp";
 import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { fetchAllSchemas, type SchemaEntry } from "@/lib/schema";
+import { Page } from "@/components/layout";
 
 /**
  * Authentication — the sign-in methods in use across the project's user
@@ -93,7 +93,7 @@ function AuthenticationScreen() {
   const tab = canReadIdps && search.tab === "identity-providers" ? search.tab : "sign-in";
 
   return (
-    <ResourcePage>
+    <Page>
       <ResourceTitle>Authentication</ResourceTitle>
 
       {/* 8px under the title and 16px over the table, as the page header
@@ -128,7 +128,7 @@ function AuthenticationScreen() {
           </TabsContent>
         )}
       </Tabs>
-    </ResourcePage>
+    </Page>
   );
 }
 

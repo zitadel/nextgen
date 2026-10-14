@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
 
@@ -40,6 +40,11 @@ async function renderDetail() {
 }
 
 describe("team detail", () => {
+  // The top bar's team switcher lists the project's teams beside the open one.
+  beforeEach(() =>
+    server.use(http.post("*/api/teams/query", () => HttpResponse.json({ teams: [team()] }))),
+  );
+
   it("renders the name, the id and the created date", async () => {
     server.use(http.get(TEAM_URL, () => HttpResponse.json(team())));
     await renderDetail();

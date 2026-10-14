@@ -207,11 +207,11 @@ describe("authentication guard", () => {
   it("signs out from the sidebar user menu and lands on /login", async () => {
     fetchSession.mockResolvedValue(makeTestSession());
     const router = await renderAt("/");
-    await screen.findByRole("button", { name: /Account: Test User/ });
+    await screen.findByRole("button", { name: /Account: test\.user@example\.com/ });
 
     // After sign-out the guard must see no session again.
     fetchSession.mockResolvedValue(null);
-    await userEvent.click(screen.getByRole("button", { name: /Account: Test User/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Account: test\.user@example\.com/ }));
     await userEvent.click(await screen.findByRole("menuitem", { name: "Log out" }));
 
     expect(await screen.findByTestId("zitadel-login")).toBeInTheDocument();

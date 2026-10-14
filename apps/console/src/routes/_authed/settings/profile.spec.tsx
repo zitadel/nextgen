@@ -1,6 +1,7 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
@@ -14,6 +15,25 @@ vi.mock("@/auth/session", async (importOriginal) => {
 });
 
 const ME_URL = "http://localhost/api/users/me";
+const SCHEMA_URL = "*/api/schemas/schema_1";
+
+/** The shipped default: email only, nothing designated for display. */
+const DEFAULT_SCHEMA = {
+  "x-identifier": "email",
+  required: ["email"],
+  properties: { email: { type: "string", format: "email" } },
+};
+
+/** The platform project's: the default plus an optional name shown as `display`. */
+const PLATFORM_SCHEMA = {
+  ...DEFAULT_SCHEMA,
+  "x-display": ["name"],
+  properties: { ...DEFAULT_SCHEMA.properties, name: { type: "string" } },
+};
+
+function schema(doc: Record<string, unknown>) {
+  return http.get(SCHEMA_URL, () => HttpResponse.json({ id: "schema_1", schema: doc }));
+}
 
 function me(overrides: Record<string, unknown> = {}) {
   return {
@@ -37,19 +57,22 @@ async function renderAt(path: string) {
 }
 
 describe("settings profile", () => {
+  beforeEach(() => server.use(schema(DEFAULT_SCHEMA)));
+
   it("shows the signed-in person's email, disabled", async () => {
     server.use(http.get(ME_URL, () => HttpResponse.json(me())));
     await renderAt("/settings/profile");
 
     expect(await screen.findByRole("heading", { name: "Profile" })).toBeInTheDocument();
-    const email = screen.getByLabelText("Email address");
+    const email = screen.getByLabelText("Email");
     expect(email).toHaveValue("maya@example.com");
     expect(email).toBeDisabled();
   });
 
-  it("shows the email alone, with nothing to save", async () => {
-    // D16: no name fields are pulled in from the schema, and the one field
-    // shown cannot change, so the screen has no Save.
+  it("shows the email alone, with nothing to save, when the schema names no one", async () => {
+    // D16: the default schema designates nothing for display, so no name is
+    // offered — the `givenName` it does not declare included — and the one
+    // field shown cannot change, so the screen has no Save.
     server.use(http.get(ME_URL, () => HttpResponse.json(me())));
     await renderAt("/settings/profile");
     await screen.findByRole("heading", { name: "Profile" });
@@ -73,12 +96,12 @@ describe("settings profile", () => {
     );
     await renderAt("/settings/profile");
 
-    const email = await screen.findByLabelText("Email address");
+    const email = await screen.findByLabelText("Email");
     expect(email).toHaveValue("");
     expect(email).toHaveAttribute("placeholder", "No email address");
   });
 
-  it("lists Profile under ACCOUNT, and no WORKSPACE heading", async () => {
+  it("lists Profile under ACCOUNT, and the account under WORKSPACE", async () => {
     server.use(http.get(ME_URL, () => HttpResponse.json(me())));
     await renderAt("/settings/profile");
     await screen.findByRole("heading", { name: "Profile" });
@@ -88,6 +111,93 @@ describe("settings profile", () => {
       "aria-current",
       "page",
     );
-    expect(screen.queryByRole("navigation", { name: "WORKSPACE" })).not.toBeInTheDocument();
+    const workspace = screen.getByRole("navigation", { name: "WORKSPACE" });
+    expect(within(workspace).getByRole("link", { name: "Account" })).not.toHaveAttribute(
+      "aria-current",
+    );
+  });
+
+  it("offers the name the schema designates for display, and saves it", async () => {
+    let patched: unknown;
+    server.use(
+      schema(PLATFORM_SCHEMA),
+      http.get(ME_URL, () => HttpResponse.json(me({ attributes: { email: "maya@example.com" } }))),
+      http.patch(ME_URL, async ({ request }) => {
+        patched = await request.json();
+        return HttpResponse.json(
+          me({ attributes: { email: "maya@example.com", name: "Maya Patel" } }),
+        );
+      }),
+    );
+    await renderAt("/settings/profile");
+
+    const name = await screen.findByLabelText("Name");
+    expect(name).toHaveValue("");
+    // Nothing to save until it changes.
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+
+    await userEvent.type(name, "  Maya Patel ");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(patched).toEqual({ attributes: { name: "Maya Patel" } }));
+  });
+
+  it("deletes the name when it is cleared", async () => {
+    let patched: unknown;
+    server.use(
+      schema(PLATFORM_SCHEMA),
+      http.get(ME_URL, () =>
+        HttpResponse.json(me({ attributes: { email: "maya@example.com", name: "Maya" } })),
+      ),
+      http.patch(ME_URL, async ({ request }) => {
+        patched = await request.json();
+        return HttpResponse.json(me({ attributes: { email: "maya@example.com" } }));
+      }),
+    );
+    await renderAt("/settings/profile");
+
+    const name = await screen.findByLabelText("Name");
+    expect(name).toHaveValue("Maya");
+    await userEvent.clear(name);
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(patched).toEqual({ attributes: { name: null } }));
+  });
+});
+
+describe("settings profile, generated from the schema", () => {
+  it("renders every property the schema declares, the identifier read-only", async () => {
+    server.use(
+      schema({
+        "x-identifier": "username",
+        required: ["username"],
+        properties: {
+          username: { type: "string" },
+          companyName: { type: "string", title: "Company" },
+          age: { type: "integer" },
+        },
+      }),
+      http.get(ME_URL, () =>
+        HttpResponse.json(me({ attributes: { username: "maya", companyName: "Acme", age: 30 } })),
+      ),
+    );
+    await renderAt("/settings/profile");
+
+    expect(await screen.findByLabelText("Username")).toBeDisabled();
+    expect(screen.getByLabelText("Company")).toHaveValue("Acme");
+    expect(screen.getByLabelText("Age")).toHaveValue(30);
+    expect(screen.getByLabelText("Company")).toBeEnabled();
+  });
+
+  it("falls back to the record's own identifier when the schema cannot be read", async () => {
+    server.use(
+      http.get(SCHEMA_URL, () => new HttpResponse(null, { status: 403 })),
+      http.get(ME_URL, () =>
+        HttpResponse.json(me({ identifier: "maya@example.com", identifier_property: "email" })),
+      ),
+    );
+    await renderAt("/settings/profile");
+
+    expect(await screen.findByLabelText("Identifier")).toHaveValue("maya@example.com");
+    expect(screen.getAllByRole("textbox")).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
   });
 });

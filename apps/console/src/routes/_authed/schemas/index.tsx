@@ -15,7 +15,6 @@ import {
   ResourceHeadCell,
   ResourceHeaderRow,
   ResourceMenuHead,
-  ResourcePage,
   ResourceRow,
   ResourceTitle,
   RowMenu,
@@ -30,6 +29,7 @@ import {
   useRequiredProjectScope,
 } from "@/lib/project-scope";
 import { type UserSchema, schemaDisplayName, schemaSignInSummary } from "@/lib/schema";
+import { Page } from "@/components/layout";
 
 export const Route = createFileRoute("/_authed/schemas/")({
   staticData: { scope: "project", nav: { label: "User schemas", order: 1, parent: "/users" } },
@@ -102,7 +102,7 @@ function SchemasScreen() {
   const schemas = [...loaded.schemas, ...paging.extra];
 
   return (
-    <ResourcePage>
+    <Page>
       {/* The design titles this screen `Schemas`; D8 keeps the noun qualified
           everywhere it appears, which is also what the sidebar entry says. */}
       <ResourceTitle>User schemas</ResourceTitle>
@@ -129,7 +129,7 @@ function SchemasScreen() {
         </Table>
       </div>
       <LoadMore paging={paging} />
-    </ResourcePage>
+    </Page>
   );
 }
 

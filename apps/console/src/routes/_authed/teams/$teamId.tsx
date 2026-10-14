@@ -3,10 +3,11 @@ import { Box } from "lucide-react";
 
 import { api } from "@/api/zitadel";
 import { MetaRule, MetaValue } from "@/components/detail-meta";
-import { DETAIL_BODY, DetailHeader, DetailPage } from "@/components/detail-page";
+import { DETAIL_BODY, DetailHeader } from "@/components/detail-page";
 import { RenameCard } from "@/components/rename-card";
 import { StatusBadge } from "@/components/status-badge";
 import { formatDate } from "@/lib/date";
+import { Page } from "@/components/layout";
 
 /**
  * Team detail.
@@ -28,7 +29,7 @@ function TeamDetail() {
   const router = useRouter();
 
   return (
-    <DetailPage>
+    <Page>
       <DetailHeader
         icon={Box}
         title={team.name}
@@ -56,6 +57,6 @@ function TeamDetail() {
         errorFallback="Could not save the team."
         className={DETAIL_BODY}
       />
-    </DetailPage>
+    </Page>
   );
 }
