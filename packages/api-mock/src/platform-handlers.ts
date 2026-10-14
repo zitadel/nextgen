@@ -598,12 +598,6 @@ function variableOwner(
 }
 
 /**
- * A non-fatal condition a deployment reports back in its response. The only one
- * today: a preview deployment that froze an `all` secret because the name has
- * no preview override, so the preview URL serves the production credential —
- * allowed, but worth flagging (ADR 062 §7, #1617).
- */
-/**
  * The project's variables as a deployment freezes them. A primary deployment
  * runs the `all` values alone; a preview deployment prefers each name's
  * `preview` override and falls back to the `all` value where none exists. The

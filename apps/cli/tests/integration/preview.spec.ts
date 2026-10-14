@@ -117,6 +117,30 @@ describe("preview", () => {
         expect(app.envelopeOf<{ items: unknown[] }>(listed).data.items).toEqual([]);
       });
 
+      it("refuses the primary origins as a target", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["preview", "--origin", "primary", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it("refuses a ttl outside the range even where it would skip", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["preview", "--env", "production", "--ttl", "45d", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it("fails when no preview URL is given or detected", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["preview", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
       it("says there is nothing to preview in production without an origin", async () => {
         const app = await aSetUpApp();
 

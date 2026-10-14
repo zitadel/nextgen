@@ -4,9 +4,10 @@
  * environment and returns the preview URLs it finds, already normalised; a
  * platform that set none of its variables contributes nothing.
  *
- * Vercel exposes bare hosts, so a scheme is prepended; Netlify and Cloudflare
- * Pages expose the full deployment URL, which is used as-is. (Cloudflare's
- * stable per-branch alias is not reconstructed here — see #1692.)
+ * Vercel exposes bare hosts, so a scheme is prepended; Netlify exposes the full
+ * deployment URL, which is used as-is. Cloudflare Pages is not detected: it
+ * sets `CF_PAGES_URL` on production deployments too, and nothing in its build
+ * environment marks a preview, so its URLs are passed with `--origin` (#1692).
  *
  * Only a build's preview / per-deploy URLs belong here: a platform's
  * production or canonical-site variable (e.g. `VERCEL_PROJECT_PRODUCTION_URL`,
@@ -29,10 +30,6 @@ const PREVIEW_PLATFORMS: ReadonlyArray<{
     variables: ["DEPLOY_PRIME_URL", "DEPLOY_URL"],
     urls: (env) =>
       [env.DEPLOY_PRIME_URL, env.DEPLOY_URL].filter((url): url is string => Boolean(url)),
-  },
-  {
-    variables: ["CF_PAGES_URL"],
-    urls: (env) => [env.CF_PAGES_URL].filter((url): url is string => Boolean(url)),
   },
 ];
 

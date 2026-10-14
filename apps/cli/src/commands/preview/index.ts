@@ -24,7 +24,7 @@ import { reportWarning } from "../../lib/warnings";
  * never touch the live identity-provider connections the deploy step syncs —
  * and deploys to the preview URLs with a time-to-live rather than to the
  * primary origins. The URLs come from `--origin` or, failing that, from the
- * hosting platform's own build variables (Vercel, Netlify, Cloudflare Pages).
+ * hosting platform's own build variables (Vercel, Netlify).
  *
  * It authenticates with the narrower preview credential and never falls back
  * to the project secret. A fork pull-request build has no `ZITADEL_PREVIEW_TOKEN`
@@ -69,6 +69,28 @@ export default class Preview extends PreviewCommand {
     // an explicit origin only selects which targets to preview, it never
     // authorizes a preview deploy into an environment that must not take writes.
     const requested = flags.origin ?? [];
+    // `primary` is the deployment keyword for every primary origin. A preview
+    // build carries the preview credential and must never be able to reach
+    // production with it, so the keyword is refused outright.
+    if (requested.includes("primary")) {
+      throw new ZitadelError("E_VALIDATION", "A preview cannot target the primary origins", {
+        hint: "Pass the preview URLs with --origin; production is deployed by `zitadel deploy`, after merge.",
+      });
+    }
+
+    // `--ttl` is optional: omitted, nothing is sent and the server applies the
+    // project's default, rather than the CLI pinning a lifetime of its own.
+    // Checked before anything that can skip the run, so a bad value fails every
+    // build rather than only the trusted ones that reach the deploy.
+    const ttl = flags.ttl === undefined ? undefined : parseTtl(flags.ttl);
+    // A preview lives a minute at least and thirty days at most — the product
+    // rule, applied here rather than in the generic TTL parser.
+    if (ttl !== undefined && (ttl.ms < 60 * 1000 || ttl.ms > 30 * 24 * 60 * 60 * 1000)) {
+      throw new ZitadelError("E_VALIDATION", `${flags.ttl} is outside the allowed range`, {
+        hint: "A preview lives between 60s and 30d.",
+      });
+    }
+
     const envName = this.environment.name.value;
     if (envName !== "preview" && envName !== "development") {
       return this.emit({
@@ -112,16 +134,6 @@ export default class Preview extends PreviewCommand {
       urls = [...detected.urls];
     }
 
-    // `--ttl` is optional: omitted, nothing is sent and the server applies the
-    // project's default, rather than the CLI pinning a lifetime of its own.
-    const ttl = flags.ttl === undefined ? undefined : parseTtl(flags.ttl);
-    // A preview lives a minute at least and thirty days at most — the product
-    // rule, applied here rather than in the generic TTL parser.
-    if (ttl !== undefined && (ttl.ms < 60 * 1000 || ttl.ms > 30 * 24 * 60 * 60 * 1000)) {
-      throw new ZitadelError("E_VALIDATION", `${flags.ttl} is outside the allowed range`, {
-        hint: "A preview lives between 60s and 30d.",
-      });
-    }
     const { client, projectId } = await this.connect();
 
     const { bundle, brandingSources } = await buildBundle(cwd);
