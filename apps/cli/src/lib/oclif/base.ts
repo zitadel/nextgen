@@ -33,6 +33,7 @@ import type {
   JsonEnvelope,
   SkippedEnvelope,
 } from "./types";
+import { shellArg } from "../shell";
 
 /**
  * Base class for every oclif command. Owns the global flags, builds the
@@ -114,6 +115,9 @@ export abstract class BaseCommand extends Command {
    */
   protected telemetryProps: Readonly<Properties> = Object.freeze({});
 
+  /** `--cwd` as typed, carried into the unscoped follow-ups this run suggests. */
+  private typedCwd: string | undefined;
+
   /** Correlates the started/completed pair; minted at instance construction. */
   private readonly telemetryInvocationId = randomUUID();
 
@@ -162,7 +166,12 @@ export abstract class BaseCommand extends Command {
    * deliberate opt-out.
    */
   protected suggestUnscoped(args: string): SuggestedCommand {
-    return unscopedCommand(args, this.meta.cliVersion);
+    // A follow-up run from the shell's directory would act on whatever project
+    // is there, so the directory this run addressed goes with it.
+    return unscopedCommand(
+      this.typedCwd === undefined ? args : `${args} --cwd ${shellArg(this.typedCwd)}`,
+      this.meta.cliVersion,
+    );
   }
 
   /**
@@ -187,6 +196,7 @@ export abstract class BaseCommand extends Command {
     options: { resolveServer?: boolean; source?: string } = {},
   ): Promise<GlobalOptions> {
     const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
+    this.typedCwd = typeof flags.cwd === "string" ? flags.cwd : undefined;
     const serverFlag = typeof flags.server === "string" ? flags.server : undefined;
     const source =
       options.resolveServer === false

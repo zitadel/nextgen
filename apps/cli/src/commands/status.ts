@@ -21,6 +21,7 @@ import {
   type JsonEnvelope,
 } from "../lib/oclif";
 import { resolveCwd } from "../lib/paths";
+import { shellArg } from "../lib/shell";
 import {
   hasZitadelConfig,
   hasZitadelSecret,
@@ -77,6 +78,9 @@ export default class Status extends EnvironmentCommand {
       this.meta.cwd,
       this.environment.values.ZITADEL_ISSUER?.value,
       this.environment.values.ZITADEL_PROJECT_ID?.value,
+      this.environment.envFile !== undefined || this.environment.name.value !== "development"
+        ? { name: this.environment.name.value, envFile: this.environment.envFile }
+        : undefined,
     );
     const users =
       project.lifecycle === "configured"
@@ -88,6 +92,9 @@ export default class Status extends EnvironmentCommand {
       users,
       this.meta.cliVersion,
       this.environmentSelector(),
+      // `--cwd` as typed, for the follow-ups the selector does not carry: the
+      // runtime and the project files they act on live in that directory.
+      typeof flags.cwd === "string" ? ` --cwd ${shellArg(flags.cwd)}` : "",
     );
     const nextActions = nextActionsFor(
       project,
@@ -157,6 +164,13 @@ type ProjectStatus =
   | {
       lifecycle: "not-configured";
       message: string;
+      /**
+       * The environment that names no project, when it is not the default
+       * development one: `setup` would not bind it, `env add` does.
+       */
+      environment?: string;
+      /** The `--env-file` that names no project. */
+      env_file?: string;
     }
   | {
       lifecycle: "orphaned-config";
@@ -185,12 +199,31 @@ async function projectStatus(
   cwd: string,
   issuer: string | undefined,
   resolvedProjectId: string | undefined,
+  // Set when the run named an environment other than the default development
+  // one, or a file: its project is whatever it resolves, never setup's.
+  named: { name: string; envFile?: string } | undefined,
 ): Promise<ProjectStatus> {
   if (!(await hasZitadelConfig(cwd))) {
     return {
       lifecycle: "not-configured",
       message: "zitadel.json has not been created yet.",
     };
+  }
+  // The local `zitadel.json` and `.zitadel/secret` describe the development
+  // project. Reported under another environment's name, they would send every
+  // suggested `--env` follow-up at a project that environment never binds.
+  if (resolvedProjectId === undefined && named !== undefined) {
+    return named.envFile === undefined
+      ? {
+          lifecycle: "not-configured",
+          environment: named.name,
+          message: `The ${named.name} environment names no project.`,
+        }
+      : {
+          lifecycle: "not-configured",
+          env_file: named.envFile,
+          message: `${named.envFile} sets no ZITADEL_PROJECT_ID.`,
+        };
   }
 
   const config = await readZitadelConfig(cwd);
@@ -272,9 +305,11 @@ function nextActionsFor(
   selector: EnvironmentSelector,
 ): string[] {
   if (project.lifecycle === "not-configured") {
-    return [
-      "From your app directory, run setup; the CLI will detect the framework or ask in an empty directory.",
-    ];
+    return project.environment === undefined && project.env_file === undefined
+      ? [
+          "From your app directory, run setup; the CLI will detect the framework or ask in an empty directory.",
+        ]
+      : [];
   }
   if (project.lifecycle !== "configured") {
     return [];
@@ -317,16 +352,23 @@ function nextCommandsFor(
   // an agent running them stays on the environment `status` reported, rather than
   // silently falling back to the default development project.
   selector: EnvironmentSelector,
+  cwdSuffix: string,
 ): SuggestedCommand[] {
   const commands: SuggestedCommand[] = [];
   if (serverLifecycle !== "running") {
-    commands.push(unscopedCommand("start", cliVersion));
+    commands.push(unscopedCommand(`start${cwdSuffix}`, cliVersion));
   }
-  if (project.lifecycle === "not-configured") {
-    commands.push(unscopedCommand("setup --server local", cliVersion));
+  if (project.lifecycle === "not-configured" && project.environment !== undefined) {
+    commands.push(
+      unscopedCommand(`env add ${shellArg(project.environment)}${cwdSuffix}`, cliVersion),
+    );
+  } else if (project.lifecycle === "not-configured") {
+    if (project.env_file === undefined) {
+      commands.push(unscopedCommand(`setup --server local${cwdSuffix}`, cliVersion));
+    }
   } else if (project.lifecycle === "orphaned-config") {
     commands.push(
-      unscopedCommand("setup --force", cliVersion),
+      unscopedCommand(`setup --force${cwdSuffix}`, cliVersion),
       projectCommand("doctor --fix", selector, cliVersion),
     );
   } else {
