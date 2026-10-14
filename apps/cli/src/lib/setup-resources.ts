@@ -23,7 +23,13 @@ import {
   type SetupPreset,
   type SetupUseCase,
 } from "@zitadel/config/defaults";
-import { type ConnectionEndpoints, idpProvider } from "@zitadel/config/idp";
+import {
+  type ConnectionEndpoints,
+  type ConnectionSlug,
+  type ProviderSelection,
+  providerOf,
+  selectionName,
+} from "@zitadel/config/idp";
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
 
 import { FLOWS_DIR } from "./flows";
@@ -32,7 +38,12 @@ import {
   applySsoToSchema,
   authMethods,
   CONNECTION_SCHEMA_REF,
+  customFlagText,
+  ENABLE_FLAG_NAMES,
+  SETUP_FLAG_NAMES,
   IDPS_DIR,
+  planConnection,
+  readConnectionFiles,
   refuseResolvedSecret,
 } from "./idp";
 import { stableStringify } from "./json";
@@ -75,7 +86,7 @@ export async function materializeSetupResources(opts: {
    * The providers to enable, in the order they were chosen. One connection is
    * created per entry, and every slug is added to the schema and the flow.
    */
-  sso?: readonly { provider: string; clientId: string; endpoints?: ConnectionEndpoints }[];
+  sso?: readonly { selection: ProviderSelection; endpoints?: ConnectionEndpoints }[];
   /**
    * CLI version used to render `zitadel …` command mentions in the scaffolded
    * READMEs as runnable `npx @zitadel/cli@<version> …` commands — the CLI is
@@ -107,8 +118,8 @@ export async function materializeSetupResources(opts: {
   const planned = planConnections(schemaTemplate, opts.sso);
   await refuseResourceConflicts(opts.cwd, opts.force, planned);
 
-  const slugs: string[] = planned.map((entry) => entry.slug);
-  for (const { connectionPath, connection } of planned) {
+  const slugs = planned.map((entry) => entry.slug);
+  for (const { connectionPath, connection, selection } of planned) {
     // The create comes before the file. Setup does not remove a connection
     // file it wrote -- that rule is what keeps a developer's own file safe --
     // so writing first would leave one behind on any failure here and the
@@ -126,7 +137,15 @@ export async function materializeSetupResources(opts: {
     await mkdir(join(opts.cwd, IDPS_DIR), { recursive: true });
     // Still `wx` rather than `opts.force`: the check above is the early
     // refusal, this is the one that cannot be raced.
-    if (await writeResourceFile(opts.cwd, connectionPath, connection, false, CONNECTION_EXISTS)) {
+    if (
+      await writeResourceFile(
+        opts.cwd,
+        connectionPath,
+        connection,
+        false,
+        connectionExists(selection),
+      )
+    ) {
       filesWritten.push(join(opts.cwd, connectionPath));
     }
     // The same guard the syncer applies: this write puts the canonical body
@@ -267,7 +286,7 @@ export async function assertNoSetupResourceConflicts(opts: {
   force: boolean;
   preset?: SetupPreset;
   useCase?: SetupUseCase;
-  sso?: readonly { provider: string; endpoints?: ConnectionEndpoints }[];
+  sso?: readonly { selection: ProviderSelection; endpoints?: ConnectionEndpoints }[];
 }): Promise<void> {
   const schemaTemplate = defaultSchemaTemplate(
     opts.preset ?? DEFAULT_SETUP_PRESET,
@@ -289,23 +308,32 @@ function defaultSchemaTemplate(
   return schemaTemplate;
 }
 
-type PlannedConnection = { slug: string; connectionPath: string; connection: object };
+type PlannedConnection = {
+  slug: ConnectionSlug;
+  connectionPath: string;
+  connection: object;
+  selection: ProviderSelection;
+};
 
 /** The connection each chosen provider gets, and the file it is written to. */
 function planConnections(
   schemaTemplate: Record<string, unknown>,
-  sso: readonly { provider: string; endpoints?: ConnectionEndpoints }[] | undefined,
+  sso: readonly { selection: ProviderSelection; endpoints?: ConnectionEndpoints }[] | undefined,
 ): PlannedConnection[] {
   const planned: PlannedConnection[] = [];
   for (const chosen of sso ?? []) {
-    const connection = idpProvider(chosen.provider).connection({
+    const provider = providerOf(chosen.selection);
+    const connection = provider.connection({
       endpoints: chosen.endpoints,
       schemaProperties: Object.keys((schemaTemplate.properties as object | undefined) ?? {}),
       schemaRef: CONNECTION_SCHEMA_REF,
     });
-    const slug = typeof connection.slug === "string" ? connection.slug : undefined;
-    if (!slug) continue;
-    planned.push({ slug, connectionPath: `${IDPS_DIR}/${slug}.json`, connection });
+    planned.push({
+      slug: provider.slug,
+      connectionPath: `${IDPS_DIR}/${provider.slug}.json`,
+      connection,
+      selection: chosen.selection,
+    });
   }
   return planned;
 }
@@ -313,17 +341,28 @@ function planConnections(
 /**
  * Throws on the first file setup would refuse to write. A connection is
  * refused with or without `force`, for two reasons: the file is the
- * developer's (see {@link CONNECTION_EXISTS}), and finding out after the
+ * developer's (see {@link connectionExists}), and finding out after the
  * create would leave the project holding a connection no local file tracks.
+ *
+ * The same questions `sso enable` asks: which file holds the slug, and whose
+ * variables would collide. A plan that throws names the conflict; one that
+ * says reuse means a connection file already holds this provider.
  */
 async function refuseResourceConflicts(
   cwd: string,
   force: boolean,
   connections: readonly PlannedConnection[],
 ): Promise<void> {
-  for (const { connectionPath } of connections) {
-    if (await exists(join(cwd, connectionPath))) {
-      throw resourceExists(connectionPath, CONNECTION_EXISTS);
+  // Read only when a provider was chosen: a leftover file that does not parse
+  // is no reason for a plain setup to fail.
+  const files = connections.length > 0 ? await readConnectionFiles(cwd) : [];
+  for (const { connectionPath, selection } of connections) {
+    const existing = planConnection({ selection, files, slugFlag: SETUP_FLAG_NAMES.slug });
+    if (existing.action === "reuse" || (await exists(join(cwd, connectionPath)))) {
+      throw resourceExists(
+        existing.action === "reuse" ? existing.file.path : connectionPath,
+        connectionExists(selection),
+      );
     }
   }
   if (force) {
@@ -364,13 +403,21 @@ async function writeReadmeFile(cwd: string, relPath: string, content: string): P
  * tenant-owned. So the one rule is that setup does not write there, and the
  * developer decides what happens to the file.
  */
-const CONNECTION_EXISTS: { hint: string; nextCommands: string[] } = {
-  hint:
-    "A connection file is yours to keep, so setup never replaces or removes one. " +
-    "Remove it and run setup again to scaffold a fresh one, or keep it and enable the " +
-    "provider afterwards to reuse it.",
-  nextCommands: ["zitadel sso enable --provider google"],
-};
+function connectionExists(selection: ProviderSelection): { hint: string; nextCommands: string[] } {
+  return {
+    hint:
+      "A connection file is yours to keep, so setup never replaces or removes one. " +
+      "Remove it and run setup again to scaffold a fresh one, or keep it and enable the " +
+      "provider afterwards to reuse it.",
+    nextCommands: [
+      `zitadel sso enable --provider ${selectionName(selection)}${
+        selection.kind === "custom"
+          ? ` ${customFlagText(selection.connection, ENABLE_FLAG_NAMES)}`
+          : ""
+      }`,
+    ],
+  };
+}
 
 /** Whether a path is there, without caring why it is not. */
 async function exists(path: string): Promise<boolean> {

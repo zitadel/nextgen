@@ -12,6 +12,8 @@
  * rewriting it would discard deliberate work.
  */
 
+import type { ConnectionSlug } from "@zitadel/config/idp";
+
 import { ZitadelError } from "../errors";
 
 /**
@@ -212,7 +214,7 @@ function stepNamed(flow: Json, name: string): Step | undefined {
  * belongs to whoever set it, and a provider is added to the list rather than
  * replacing it, so enabling a second one later keeps the first.
  */
-export function applySsoToSchema(schema: object, slug: string): SsoResult<object> {
+export function applySsoToSchema(schema: object, slug: ConnectionSlug): SsoResult<object> {
   const document = clone(schema) as Json;
   const methods = isObject(document["x-auth-methods"]) ? { ...document["x-auth-methods"] } : {};
   const existing = isObject(methods.sso) ? methods.sso : undefined;
@@ -295,7 +297,7 @@ function registerSsoStep(fields: string[], terminal: string): Step {
  * without passwords is a dead end.
  */
 function ssoConflictStep(
-  slug: string,
+  slug: ConnectionSlug,
   methods: { password: boolean; passkey: boolean },
   loginStep: string | undefined,
   terminal: string,
@@ -355,11 +357,43 @@ function ssoConflictStep(
  * output as hand-edited.
  */
 function matches(step: Step, expected: Step): boolean {
-  return canonical(step) === canonical(expected);
+  return canonical(withoutServerDefaults(step)) === canonical(withoutServerDefaults(expected));
+}
+
+/**
+ * A step without what the platform leaves out when it answers.
+ *
+ * `apply` writes the canonical definition back into the file, and the server
+ * omits an action's `primary: false` (a default), an empty `fields` list, and
+ * an empty `gates` map, so the step in the file is not byte for byte what this
+ * generator wrote though it is the same step. Reading it as hand-edited would
+ * skip the step on the next provider.
+ */
+function withoutServerDefaults(step: Step): Step {
+  const copy: Step = { ...step };
+  for (const key of ["fields", "gates"]) {
+    const value = copy[key];
+    const empty = Array.isArray(value)
+      ? value.length === 0
+      : isObject(value) && Object.keys(value).length === 0;
+    if (empty) {
+      delete copy[key];
+    }
+  }
+  if (Array.isArray(copy.actions)) {
+    copy.actions = copy.actions.map((action) => {
+      if (!isObject(action) || action.primary !== false) {
+        return action;
+      }
+      const { primary: _default, ...rest } = action;
+      return rest;
+    });
+  }
+  return copy;
 }
 
 /** The provider list a step should end up with: what it has, plus this slug. */
-function mergedProviders(step: Step, slug: string): unknown[] {
+function mergedProviders(step: Step, slug: ConnectionSlug): unknown[] {
   const providers = Array.isArray(step.sso_providers) ? [...(step.sso_providers as unknown[])] : [];
   return providers.includes(slug) ? providers : [...providers, slug];
 }
@@ -368,7 +402,7 @@ function mergedProviders(step: Step, slug: string): unknown[] {
  * Offer a provider on a step, keeping any already there. Returns whether the
  * step changed, so a rerun is a no-op.
  */
-function addProvider(step: Step, slug: string): boolean {
+function addProvider(step: Step, slug: ConnectionSlug): boolean {
   const providers = Array.isArray(step.sso_providers) ? [...(step.sso_providers as unknown[])] : [];
   if (providers.includes(slug)) {
     return false;
@@ -507,7 +541,7 @@ function refuseOutcomeActionCollision(document: Json): void {
  */
 export function applySsoToFlow(
   flow: object,
-  slug: string,
+  slug: ConnectionSlug,
   enabled: { password: boolean; passkey: boolean },
 ): SsoResult<object> {
   const document = clone(flow) as Json;

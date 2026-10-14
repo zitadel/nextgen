@@ -185,7 +185,9 @@ the conversation: you clarify with the human, then drive the CLI headlessly.
 Ask about:
 
 - **Sign-in methods** — password (the usual default), passkeys, and single
-  sign-on. If they want SSO, which providers?
+  sign-on. If they want SSO, which providers? A provider the CLI does not list
+  by name is still possible: run `zitadel sso enable --help` to see whether the
+  installed CLI takes one, and which settings it needs, and ask for those too.
 - **Profile fields** — the user schema starts with first name, last name, and
   the login identifier plus a password. Which additional fields do they want
   (for example phone, username, or a display name)?

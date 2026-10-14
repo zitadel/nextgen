@@ -7,6 +7,7 @@ import {
   referencedVariable,
   variableReference,
 } from "./provider.js";
+import { secretVariable, slug } from "./test-support.js";
 
 describe("credential variable names", () => {
   it("uppercases the slug and suffixes it", () => {
@@ -22,7 +23,7 @@ describe("credential variable names", () => {
   });
 
   it("names both of a slug's credentials", () => {
-    expect(credentialVariables("google_work")).toEqual({
+    expect(credentialVariables(slug("google_work"))).toEqual({
       clientId: "GOOGLE_WORK_CLIENT_ID",
       clientSecret: "GOOGLE_WORK_CLIENT_SECRET",
     });
@@ -31,11 +32,15 @@ describe("credential variable names", () => {
 
 describe("variable references", () => {
   it("references a name as a whole value", () => {
-    expect(variableReference("GOOGLE_CLIENT_SECRET")).toBe("${{ GOOGLE_CLIENT_SECRET }}");
+    expect(variableReference(secretVariable("GOOGLE_CLIENT_SECRET"))).toBe(
+      "${{ GOOGLE_CLIENT_SECRET }}",
+    );
   });
 
   it("reads back the name it wrote", () => {
-    expect(referencedVariable(variableReference("ACME_SECRET"))).toBe("ACME_SECRET");
+    expect(referencedVariable(variableReference(secretVariable("ACME_SECRET")))).toBe(
+      "ACME_SECRET",
+    );
   });
 
   it("tolerates the spacing a hand-edited file may use", () => {

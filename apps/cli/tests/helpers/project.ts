@@ -187,6 +187,27 @@ class CommittedFiles {
   }
 }
 
+/** What a developer says about a connection the catalog does not list. */
+export type CustomConnection = {
+  slug: string;
+  displayName: string;
+  issuer: string;
+  scopes?: string;
+};
+
+/** The flags describing a connection, under `--` for `sso enable` or `--sso-` for `setup`. */
+function customFlags(connection: CustomConnection, prefix: string): string[] {
+  return [
+    `${prefix}slug`,
+    connection.slug,
+    `${prefix}display-name`,
+    connection.displayName,
+    `${prefix}issuer`,
+    connection.issuer,
+    ...(connection.scopes === undefined ? [] : [`${prefix}scopes`, connection.scopes]),
+  ];
+}
+
 /**
  * A scaffolded app for the specs to drive the CLI against.
  *
@@ -259,6 +280,46 @@ export class ScaffoldedApp {
         "--client-id",
         credentials.clientId,
       ]),
+    );
+  }
+
+  /** `sso enable` for a connection the developer describes, secret piped as a script would. */
+  enableCustomSso(connection: CustomConnection, credentials: Credentials): Promise<CliResult> {
+    return this.enableSsoWith(
+      [
+        "--provider",
+        "custom",
+        ...customFlags(connection, "--"),
+        "--client-id",
+        credentials.clientId,
+      ],
+      credentials.secret,
+    );
+  }
+
+  /** `sso enable` with exactly these flags, for a spec asserting how it refuses. */
+  enableSsoWith(args: string[], secret = "a-client-secret"): Promise<CliResult> {
+    return this.pipingSecret(secret, () =>
+      this.cli(["sso", "enable", "--non-interactive", "--json", ...args]),
+    );
+  }
+
+  /** `setup` with exactly these flags and this on stdin, for a spec asserting how it refuses. */
+  setupSsoWith(args: string[], secret: string): Promise<CliResult> {
+    return this.pipingSecret(secret, () => this.setup(["--framework", "next", ...args]));
+  }
+
+  /** `setup` with a custom connection described on the command line. */
+  setupWithCustomSso(connection: CustomConnection, credentials: Credentials): Promise<CliResult> {
+    return this.setupSsoWith(
+      [
+        "--sso",
+        "custom",
+        ...customFlags(connection, "--sso-"),
+        "--sso-client-id",
+        credentials.clientId,
+      ],
+      credentials.secret,
     );
   }
 
