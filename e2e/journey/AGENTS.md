@@ -39,6 +39,10 @@ ADR 044) — both shapes run the same CLI path and browser journeys.
   through `JOURNEY_MATRIX=single|full` (the `journey_matrix` output, using
   `scripts/frameworks.mjs`). New variants belong in the runner's `--ci` set,
   not as new workflow steps.
+- `e2e:journey-local` never packs its own tarballs: the lanes beside it read
+  the dist folders that `moon run release:pack` wipes and rebuilds. The lane
+  sets `JOURNEY_TARBALLS_REQUIRED=1`, so the runner refuses to start without
+  `JOURNEY_TARBALLS_DIR`; by hand, `moon run e2e:journey -- --ci` packs its own.
 - CI must install Zitadel packages from current workflow tarballs through the
   temporary Verdaccio registry, not from public npm.
 - CI restores Verdaccio's storage from an earlier run, so the registry serves

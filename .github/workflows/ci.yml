@@ -195,7 +195,8 @@ jobs:
       # unit suites, its browsers and dev servers slowed both sides into
       # timeouts (run 38496066612). `e2e:all` depends on every lane (console
       # smoke/real/embedded/platform, demo mock/real, the CLI journey matrix,
-      # the kit's real-instance suite) and moon orders them through the DAG.
+      # the kit's real-instance suite), and moon runs them side by side: only
+      # the two demo-next lanes share a mutex (e2e/moon.yml).
       # The lanes are `runInCI: "skip"`, which keeps them out of the graph step
       # above; `--ignore-ci-checks` runs them here. ci-mode's `e2e` gate says
       # when: moon finds e2e:all affected, or the run is forced full (a

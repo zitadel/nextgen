@@ -285,7 +285,9 @@ dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
   so its browsers and dev servers do not compete with the unit suites. Its
   lanes are `runInCI: "skip"`, which keeps them out of the `moon ci` graph.
   `e2e:all` runs every e2e lane as its dependencies: console, demo, the journey
-  (with ci-mode's framework matrix), and `testing:test-integration`.
+  (with ci-mode's framework matrix), and `testing:test-integration`. They run
+  side by side; only the two demo-next lanes, which serve the same app on one
+  port, wait for each other.
 
 Within full mode the `moon ci` graph selects only the tasks the diff affects
 (`--downstream deep --include-relations`): a lane is skipped when the diff

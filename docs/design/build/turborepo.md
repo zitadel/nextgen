@@ -108,7 +108,7 @@ runs the task (turbo sets `TURBO_HASH` for every task); under moon and when run
 by hand it runs the command once, unchanged. Names in use: `generated-sources`
 (the generation tasks and the tasks that read what they rewrite) and
 `demo-next-app` (the two demo-next e2e lanes, which both serve the demo on
-:3002; moon's `e2e-serial` covers them and the other server lanes).
+:3002; moon has a mutex of the same name on them).
 
 Moon keeps its own `mutex` and `retryCount` until the cutover. Its `test`
 task runs each package's `test:all` script, which in the four browser-test

@@ -180,7 +180,7 @@ as they were.
 | demo-next | `build` (outputs .next) | `#build` | outputs `.next/**`, `!.next/cache/**` |
 | demo-next, demo-nuxt | `dev`, `start` | same | existing |
 | demo-nuxt | `build` (outputs .output, mutex sdk-nuxt-dist) | `#build` | outputs `.output/**` |
-| e2e | `test` (journey harness unit tests); lanes `console-smoke`, `console-real`, `console-embedded`, `console-platform`, `console-deployment`, `demo-next-mock`, `demo-next-real`, `demo-nuxt-mock`, `journey`, `journey-local` (env, mutex `e2e-serial`); `all` (noop over every lane; ci.yml's e2e step runs it) | `@zitadel/e2e#…`, same lane names, plus `e2e-local`; no `all` | scripts carry the `NEXTGEN_*` and `ZITADEL_TELEMETRY` defaults; the demo-next pair holds the guard's `demo-next-app` lock; ci-turbo.yml runs the lanes as gated steps |
+| e2e | `test` (journey harness unit tests); lanes `console-smoke`, `console-real`, `console-embedded`, `console-platform`, `console-deployment`, `demo-next-mock`, `demo-next-real`, `demo-nuxt-mock`, `journey`, `journey-local` (env; the demo-next pair's mutex `demo-next-app`); `all` (noop over every lane; ci.yml's e2e step runs it) | `@zitadel/e2e#…`, same lane names, plus `e2e-local`; no `all` | scripts carry the `NEXTGEN_*`, `ZITADEL_TELEMETRY` and `JOURNEY_TARBALLS_REQUIRED` defaults; the demo-next pair holds the guard's `demo-next-app` lock; ci-turbo.yml runs the lanes as gated steps |
 | docs | `generate` (inputs openapi + redocly) | `#generate` | same inputs and outputs |
 | docs | `build` (`next build`, mergeArgs replace) | `#build` | existing script (`pnpm run generate && next build`): bundles once more than moon; the Vercel docs service runs the script without a runner |
 | docs | `dev`, `start` | same | existing |
@@ -202,13 +202,13 @@ as they were.
 
 ## What replaces each moon feature
 
-### `mutex` (21 uses, 4 names)
+### `mutex` (15 uses, 4 names)
 
 | mutex | protected | replacement |
 |---|---|---|
 | `generated-sources` (server `generate`, `clean-generated`, `check-generate`, `check-generate-pruned`; api `generate`; config `sync-schemas`) | generation rewriting files other tasks read mid-graph | `task-guard --mutex generated-sources` in the six scripts. Ordering edges were rejected: they would put the Go generation on the critical path of every TypeScript build. |
 | `public-dist` (api, config, sdk-next `build-release`; cli `test`) | release builds cleaning a dist the CLI tests import | an edge: the release builds start after `@zitadel/cli#test`. Moon could not express that edge (cli depends on those packages, a project-graph cycle); turbo has no project graph. |
-| `e2e-serial` (e2e `console-real`, `console-embedded`, `console-platform`, `demo-next-mock`, `demo-next-real`, `demo-nuxt-mock`, `journey-local`; testing `test-integration`) | the lanes that boot servers in ci.yml's e2e step (`moon exec e2e:all`), one at a time (both demo-next lanes serve :3002) | ci-turbo.yml runs the lane groups as separate steps; within a turbo run only the demo-next pair collides, so their two scripts hold `task-guard --mutex demo-next-app`. |
+| `demo-next-app` (e2e `demo-next-mock`, `demo-next-real`) | the two lanes that serve apps/demo-next with `next dev` on :3002 from one `.next` folder; the other lanes of ci.yml's e2e step (`moon exec e2e:all`) run beside them | their two scripts hold `task-guard --mutex demo-next-app`; ci-turbo.yml also runs the lane groups as separate steps. |
 | `sdk-nuxt-dist` (sdk-nuxt `build`, `build-release`; demo-nuxt `build`) | demo-nuxt bundling from sdk-nuxt/dist | the existing `demo-nuxt#build → sdk-nuxt#build` edge orders the dev builds; the release build never shares a turbo invocation with demo-nuxt. If that ever changes, the guard covers it. |
 
 The lock lives in the OS temp dir under a hash of the repository root, so two
