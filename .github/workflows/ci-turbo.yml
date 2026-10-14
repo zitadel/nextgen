@@ -1,11 +1,19 @@
 name: ci-turbo
 
 # The Turborepo version of ci.yml's moon steps, for the dual-run period of
-# docs/design/build/turborepo-migration.md: every pull request runs both, and
-# the two are compared (pass/fail per task, the lanes ci-mode gated, the job
-# time). It is not a required check: branch protection stays on `ci /
-# full-pr`, and this job may fail without blocking a merge. At the cutover
-# these steps replace the moon steps in ci.yml and this file goes.
+# docs/design/build/turborepo-migration.md. It is not a required check:
+# branch protection stays on `ci / full-pr`, and this job may fail without
+# blocking a merge. At the cutover these steps replace the moon steps in
+# ci.yml and this file goes.
+#
+# Pull requests and the merge queue stopped running it on 2026-10-14
+# (decision 9 of the plan): it took more runner minutes than ci.yml, and its
+# checks read as a second gate that nothing waited for. Pushes to main run
+# it, and anyone can start it by hand (`gh workflow run ci-turbo.yml --ref
+# <branch>`): on main that runs every lane (ci-mode forces a full run on an
+# empty diff), on a branch the lanes a pull request of it would get. For
+# the parity weeks before the cutover, put `pull_request:` and `merge_group:`
+# back into `on:`; the steps still handle both.
 #
 # What differs from ci.yml, step by step, is commented inline. The intent is
 # the same: install, decide the lanes, run the gate, then the explicit lanes
@@ -13,8 +21,7 @@ name: ci-turbo
 #
 # Every run writes the remote cache (TURBO_CACHE below). A push to main runs
 # the generated-files check and the gate alone, so that the cache holds
-# main's results for the branches cut from it, also where the merge queue
-# skipped the gate (a version PR).
+# main's results for the runs on branches cut from it.
 #
 # Arguments never go after `--` in a turbo run here: turbo puts them into
 # the cache key of every task in the run, not just the task they are for
@@ -22,8 +29,6 @@ name: ci-turbo
 # built. The scripts take those options from the environment instead.
 
 on:
-  pull_request:
-  merge_group:
   push:
     branches: [main]
   workflow_dispatch:
@@ -152,8 +157,8 @@ jobs:
 
       # Same outputs and gates as ci.yml; the affected set comes from turbo's
       # task graph (NEXTGEN_TASK_RUNNER above) instead of `moon query`. On a
-      # push to main every lane gate stays off: its pull request ran them,
-      # and main only refreshes the cache, through the gate and the
+      # push to main every lane gate stays off: its pull request ran them in
+      # ci.yml, and main only refreshes the cache, through the gate and the
       # generated-files check.
       - name: Detect CI mode
         id: ci-mode
