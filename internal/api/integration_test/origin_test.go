@@ -101,16 +101,16 @@ func TestOriginsAddRemove(t *testing.T) {
 		require.True(t, ok, helpers.MustMarshal(t, again))
 	})
 
-	t.Run("rejects unbounded shared host", func(t *testing.T) {
+	t.Run("accepts shared-host preview wildcard as written", func(t *testing.T) {
 		resp, err := client.AddOrigin(t.Context(), &api.ProjectOrigin{
 			Pattern: "https://*.vercel.app",
 			Kind:    api.ProjectOriginKindPreview,
 		}, api.AddOriginParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
-		status, code, _, ok := errorResponseParts(t, resp)
+		added, ok := resp.(*api.AddOriginCreated)
 		require.True(t, ok, helpers.MustMarshal(t, resp))
-		assert.Equal(t, http.StatusBadRequest, status)
-		assert.Equal(t, domain.ErrOriginUnbounded().Code, code)
+		assert.Equal(t, "https://*.vercel.app", added.Pattern)
+		assert.Equal(t, api.ProjectOriginKindPreview, added.Kind)
 	})
 
 	t.Run("rejects primary wildcard", func(t *testing.T) {
