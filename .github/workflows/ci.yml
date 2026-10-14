@@ -180,7 +180,11 @@ jobs:
       - name: Run e2e suites
         id: moon-e2e
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.e2e == 'true' }}
-        run: moon exec e2e:all --ignore-ci-checks --on-failure continue
+        # Streamed rather than buffered: buffered, a task's output reached the
+        # log only when the task ended, every line under one timestamp (run
+        # 38585094551). Each line still names its task, and MOON_SUMMARY still
+        # replays the failed tasks' output after the run.
+        run: moon exec e2e:all --ignore-ci-checks --on-failure continue --output-style stream
         env:
           # The journey's options, as ci-turbo.yml passes them: the work dir the
           # diagnostics upload below reads, ci-mode's framework scope (`single`
