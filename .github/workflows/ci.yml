@@ -42,8 +42,8 @@ jobs:
       # several GB. A sync waits for all of it, and Docker syncs the root
       # filesystem on every container create (it unmounts the container's
       # init layer, an overlay): the postgres lane's first testcontainer
-      # waited 22-29 s there, 2-4 s on Depot's microVMs. Writing back from
-      # 64 MB on cut that to 8-22 s. The cost: writers get throttled from
+      # waited 22-29 s there, 2-4 s on Depot's microVMs. With writeback from
+      # 64 MB on, it waited 8-22 s. The cost: writers get throttled from
       # about 10 % of the memory dirty instead of 15 %.
       - name: Write dirty pages back early
         run: sudo sysctl -w vm.dirty_background_bytes=67108864
