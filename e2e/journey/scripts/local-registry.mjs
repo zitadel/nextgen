@@ -23,7 +23,7 @@ export const packageDirs = [...PUBLIC_PACKAGE_DIRS];
 // which has adopted a new nuxt release as soon as two hours after it was
 // published. A packument cached past that point lacks the version the
 // template asks for, and the nuxt install fails until the entry expires.
-const UPLINK_MAXAGE = "1h";
+export const UPLINK_MAXAGE = "1h";
 
 export function localRegistryPaths(workDir) {
   return {
