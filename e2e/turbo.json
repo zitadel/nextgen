@@ -83,26 +83,27 @@
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     // The journey harness drives the real CLI binary and imports the kit's
-    // virtual-passkey helper. The scripts default ZITADEL_TELEMETRY to 0.
+    // virtual-passkey helper, and its claim suite the console copy in
+    // console/support/copy.ts. The scripts default ZITADEL_TELEMETRY to 0.
     // `e2e-local` is the runner with caller-supplied flags (ci-turbo.yml passes
     // `--ci …`); `journey` is the by-hand alias; `journey-local` bakes in the
     // `--ci` set and, like moon's lane of the same name, also depends on every
     // framework SDK build so an SDK-only change selects it (sdk-next arrives via
     // cli#build).
     "e2e-local": {
-      "inputs": ["journey/**", "package.json"],
+      "inputs": ["journey/**", "package.json", "console/support/copy.ts"],
       "dependsOn": ["@zitadel/cli#build", "@zitadel/testing#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey": {
-      "inputs": ["journey/**", "package.json"],
+      "inputs": ["journey/**", "package.json", "console/support/copy.ts"],
       "dependsOn": ["@zitadel/cli#build", "@zitadel/testing#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey-local": {
-      "inputs": ["journey/**", "package.json"],
+      "inputs": ["journey/**", "package.json", "console/support/copy.ts"],
       "dependsOn": [
         "@zitadel/cli#build",
         "@zitadel/testing#build",

@@ -3,6 +3,8 @@ import { join } from "node:path";
 
 import { expect, test } from "@playwright/test";
 
+import { requiredEnv } from "./support";
+
 test("setup completed and installed local registry packages", async () => {
   const outputDir = requiredEnv("JOURNEY_OUTPUT_DIR");
   const appDir = requiredEnv("JOURNEY_APP_DIR");
@@ -102,10 +104,4 @@ async function readOptionalFile(path: string): Promise<string | null> {
     }
     throw error;
   }
-}
-
-function requiredEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`${name} is required`);
-  return value;
 }

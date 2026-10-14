@@ -1,6 +1,7 @@
 import { expect, test } from "@zitadel/testing/playwright";
 
-import { expectNoErrorBoundary, signIn } from "./support";
+import { expectNoErrorBoundary } from "../support/screens";
+import { signIn } from "../support/sign-in";
 
 /**
  * The branding screen against a real instance.

@@ -6,6 +6,9 @@ import { promisify } from "node:util";
 import { expect, test } from "@playwright/test";
 import { identity, registerWithPassword } from "@zitadel/testing/playwright";
 
+import { ERROR_STATE_TITLE, NEUTRAL_MESSAGE } from "../../console/support/copy";
+import { requiredEnv } from "./support";
+
 /**
  * The local ownership journey. `zitadel start` boots the server with the
  * platform project and a local admin, and `zitadel setup --server local`
@@ -35,24 +38,6 @@ type JourneyMetadata = {
   registryUrl: string;
   runtime: string;
 };
-
-/**
- * Labels and copy owned by the console, retyped rather than imported: this
- * project does not compile console source, and the real-instance lane
- * (`e2e/console/src-real/console-real.spec.ts`) mirrors them the same way.
- */
-const NEUTRAL_MESSAGE =
-  "If the user exists in our system, they have been granted access to your project.";
-/**
- * The headings `describeError` gives the error boundary in
- * `apps/console/src/components/boundaries.tsx`: "Not authorized" for a 403,
- * "Request failed (<status>)" for any other refusal, and the generic fallback.
- * One locator, so which status the read answers with does not decide whether
- * the boundary is found. A failed loader always lands here rather than in the
- * not-found state, which the router only renders for a path that matches no
- * route.
- */
-const ERROR_BOUNDARY_HEADING = /Not authorized|Request failed \(\d+\)|Something went wrong/;
 
 test("a local project is owned from setup, and the console signs the local admin in", async ({
   page,
@@ -166,8 +151,10 @@ test("the setup admin can add and remove a project admin, and the colleague sees
 
     // The colleague loses the project with the grant: the page's loader fails,
     // so the route's error boundary replaces the screen it rendered before.
+    // Any of the error states' titles: which status the read answers with does
+    // not decide whether the boundary is found.
     await colleaguePage.reload();
-    await expect(colleaguePage.getByText(ERROR_BOUNDARY_HEADING)).toBeVisible();
+    await expect(colleaguePage.getByText(ERROR_STATE_TITLE)).toBeVisible();
   } finally {
     await colleagueContext.close();
   }
@@ -224,10 +211,4 @@ async function runCli(metadata: JourneyMetadata, args: string[]): Promise<unknow
     },
   );
   return JSON.parse(stdout) as unknown;
-}
-
-function requiredEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`${name} is required`);
-  return value;
 }

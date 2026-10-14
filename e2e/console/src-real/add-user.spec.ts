@@ -1,7 +1,8 @@
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@zitadel/testing/playwright";
 
-import { expectNoErrorBoundary, signIn } from "./support";
+import { expectNoErrorBoundary } from "../support/screens";
+import { signIn } from "../support/sign-in";
 
 /**
  * End-to-end coverage for the Add user drawer (issue #633) against a real

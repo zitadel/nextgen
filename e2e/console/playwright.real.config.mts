@@ -25,7 +25,7 @@ const consoleOrigin = process.env.REAL_CONSOLE_ORIGIN ?? "http://localhost:5174"
  * instance's `/console/runtime.json` (its first-created project, the harness
  * one), as in production. No credential: the browser authenticates with the
  * signed-in user's session cookie (#1300), and the specs grant that user
- * access through the API (`src-real/support.ts`).
+ * access through the API (`support/sign-in.ts`).
  */
 const consoleAppEnv: AppEnvTemplate = {
   CONSOLE_BACKEND_URL: "baseUrl",

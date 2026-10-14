@@ -1,7 +1,8 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@zitadel/testing/playwright";
 
-import { expectNoErrorBoundary, signIn } from "./support";
+import { expectNoErrorBoundary } from "../support/screens";
+import { signIn } from "../support/sign-in";
 
 /**
  * End-to-end coverage for the delete-user dialog (issue #632) against a real

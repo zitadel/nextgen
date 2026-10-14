@@ -39,7 +39,7 @@ moon run e2e:console-real
 
 Boots one ephemeral Zitadel instance through `@zitadel/testing`, starts the
 console Vite dev server with its API proxy, and exercises real project and user
-API data. The proxy adds no credential: `signIn` in `src-real/support.ts`
+API data. The proxy adds no credential: `signIn` in `support/sign-in.ts`
 grants each test's user admin through the API, and the console authorizes with
 that user's session cookie (#1300). Playwright workers share the instance and seed a
 fresh user per test.

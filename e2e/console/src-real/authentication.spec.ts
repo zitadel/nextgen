@@ -1,6 +1,8 @@
 import { expect, test } from "@zitadel/testing/playwright";
 
-import { createIdpConnection, expectNoErrorBoundary, signIn } from "./support";
+import { createIdpConnection } from "../support/api";
+import { expectNoErrorBoundary } from "../support/screens";
+import { signIn } from "../support/sign-in";
 
 /**
  * The Authentication screen against a real instance, read on the session

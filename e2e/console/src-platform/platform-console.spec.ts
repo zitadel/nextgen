@@ -1,6 +1,7 @@
 import { expect, registerWithPassword, test } from "@zitadel/testing/playwright";
 
-import { expectNoErrorBoundary, withErrorBody } from "../src-real/support";
+import { withErrorBody } from "../support/api";
+import { expectNoErrorBoundary } from "../support/screens";
 
 /**
  * A platform operator in the embedded console (#1300): signed up through the

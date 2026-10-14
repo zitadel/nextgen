@@ -1,14 +1,8 @@
 import { expect, test } from "@zitadel/testing/playwright";
 
-import { expectNoErrorBoundary, signIn } from "./support";
-
-/**
- * What Settings → Admins says on every accepted submit. Retyped rather than
- * imported: this project does not compile console source, so the constant it
- * mirrors (`apps/console/src/components/add-admin-dialog.tsx`) is out of reach.
- */
-const NEUTRAL_MESSAGE =
-  "If the user exists in our system, they have been granted access to your project.";
+import { NEUTRAL_MESSAGE } from "../support/copy";
+import { expectNoErrorBoundary } from "../support/screens";
+import { signIn } from "../support/sign-in";
 
 test("shows the bootstrapped project in the list and detail views", async ({
   page,

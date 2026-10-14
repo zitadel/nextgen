@@ -245,6 +245,8 @@ tasks:
     inputs:
       - "journey/**/*"
       - "package.json"
+      # The console copy the claim suite asserts on.
+      - "console/support/copy.ts"
     env:
       ZITADEL_TELEMETRY: "0"
     deps:
@@ -273,6 +275,7 @@ tasks:
     inputs:
       - "journey/**/*"
       - "package.json"
+      - "console/support/copy.ts"
     env:
       ZITADEL_TELEMETRY: "0"
     deps:
