@@ -17,6 +17,7 @@ import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import { ZitadelError } from "../lib/errors";
 import { reportWarning } from "../lib/warnings";
+import { nextCommandsData } from "../lib/oclif/envelope";
 
 /**
  * `zitadel deploy` — publish `.zitadel/` to the project's primary origins.
@@ -107,7 +108,7 @@ export default class Deploy extends EnvironmentCommand {
         }
         throw new ZitadelError("E_VALIDATION", `${origin} is not an origin of the project`, {
           hint: `Pass a primary origin, or add it first with \`zitadel origin add${this.environmentSelector()}\`.`,
-          nextCommands: [`zitadel origin list${this.environmentSelector()}`],
+          nextCommands: [this.suggest("origin list")],
         });
       }
     } else if (!dryRun) {
@@ -122,7 +123,7 @@ export default class Deploy extends EnvironmentCommand {
       if (!origins.some((entry) => entry.kind === "primary")) {
         throw new ZitadelError("E_VALIDATION", "The project has no primary origin to deploy to", {
           hint: `Add one with \`zitadel origin add <url> --kind primary${this.environmentSelector()}\`, then deploy.`,
-          nextCommands: [`zitadel origin list${this.environmentSelector()}`],
+          nextCommands: [this.suggest("origin list")],
         });
       }
     }
@@ -208,7 +209,7 @@ export default class Deploy extends EnvironmentCommand {
         {
           hint: `Re-run \`zitadel deploy${this.environmentSelector()}\`; it will build and deploy against the current state.`,
           details: current === undefined ? undefined : { current_deployment: current },
-          nextCommands: [`zitadel deployment list --live${this.environmentSelector()}`],
+          nextCommands: [this.suggest("deployment list --live")],
         },
       );
     }
@@ -223,7 +224,7 @@ export default class Deploy extends EnvironmentCommand {
         deployment_id: deployment.id,
         resources: resourceCount,
         origins: servedOrigins,
-        next_commands: [`zitadel deployment list${this.environmentSelector()}`],
+        ...nextCommandsData([this.suggest("deployment list")]),
       },
       pretty: [
         `Deployed ${release.content_hash}`,

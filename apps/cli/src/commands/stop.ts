@@ -14,7 +14,7 @@ import {
 } from "../lib/local-server/runtime";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { resolveCwd } from "../lib/paths";
-import { publicCliCommand } from "../lib/public-cli";
+import { nextCommandsData } from "../lib/oclif/envelope";
 
 export default class Stop extends BaseCommand {
   static override description = "Stop the local Zitadel server.";
@@ -54,7 +54,7 @@ export default class Stop extends BaseCommand {
             data_preserved: true,
             data_dir: runtime?.data_dir,
           },
-          next_commands: [publicCliCommand("stop", this.meta.cliVersion)],
+          ...nextCommandsData([this.suggestUnscoped("stop")]),
         },
       });
     }

@@ -2,7 +2,7 @@ import { Flags } from "@oclif/core";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
-import { publicCliCommand } from "../../lib/public-cli";
+import { nextCommandsData } from "../../lib/oclif/envelope";
 
 /** The two kinds an origin pattern can be, as the `--kind` flag accepts them. */
 const ORIGIN_KINDS = ["primary", "preview"] as const;
@@ -59,9 +59,7 @@ export default class OriginAdd extends EnvironmentCommand {
         kind: added.kind,
         // Carry the in-effect selectors so the follow-up list reads the same
         // environment this add targeted, not the default one.
-        next_commands: [
-          publicCliCommand(`origin list${this.environmentSelector()}`, this.meta.cliVersion),
-        ],
+        ...nextCommandsData([this.suggest("origin list")]),
       },
       pretty: `Added ${added.pattern} (${added.kind})`,
     });

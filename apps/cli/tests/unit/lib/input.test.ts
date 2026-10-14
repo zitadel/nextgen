@@ -22,6 +22,7 @@ import type { ZitadelError } from "../../../src/lib/errors";
 import { clackInputImports } from "../../helpers/clack-imports";
 import { sourceFiles } from "../../helpers/source-files";
 import { input } from "../../../src/lib/input";
+import { unscopedCommand } from "../../../src/lib/suggestion";
 
 const SRC = join(import.meta.dirname, "../../../src");
 
@@ -219,7 +220,7 @@ describe("input", () => {
           name: "client secret",
           message: "Secret",
           stdin: true,
-          retry: "zitadel x",
+          retry: unscopedCommand("x"),
           parse: (): Parsed<string> => ({ ok: false, problem: "Too short." }),
         },
         { ...scripted, stdin: piped("hunter2") },
@@ -275,13 +276,13 @@ describe("input", () => {
 
     it("offers the command to run again as the next command", async () => {
       await expect(
-        input({ ...typed(), retry: "zitadel sso enable --client-id <id>" }, scripted),
+        input({ ...typed(), retry: unscopedCommand("sso enable --client-id <id>") }, scripted),
       ).rejects.toMatchObject({ nextCommands: ["zitadel sso enable --client-id <id>"] });
     });
 
     it("quotes the command to run again in the hint as an example", async () => {
       await expect(
-        input({ ...typed(), retry: "zitadel sso enable --client-id <id>" }, scripted),
+        input({ ...typed(), retry: unscopedCommand("sso enable --client-id <id>") }, scripted),
       ).rejects.toMatchObject({
         hint: "For example: zitadel sso enable --client-id <id>",
       });
@@ -292,7 +293,7 @@ describe("input", () => {
       ["a multiselect", { kind: "multiselect" as const, options: [{ value: "a", label: "A" }] }],
     ])("offers the command to run again for %s too", async (_kind, extra) => {
       await expect(
-        input({ name: "x", message: "X", retry: "zitadel x --y", ...extra }, scripted),
+        input({ name: "x", message: "X", retry: unscopedCommand("x --y"), ...extra }, scripted),
       ).rejects.toMatchObject({ nextCommands: ["zitadel x --y"] });
     });
 
@@ -441,7 +442,7 @@ describe("input", () => {
 
     it("requires --force when nobody is there to ask", async () => {
       await expect(
-        input({ ...question, retry: "zitadel x --force" }, scripted),
+        input({ ...question, retry: unscopedCommand("x --force") }, scripted),
       ).rejects.toMatchObject({
         code: "E_VALIDATION",
         message: "Cannot delete the thing without --force in non-interactive mode",

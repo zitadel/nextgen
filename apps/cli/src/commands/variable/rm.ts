@@ -4,7 +4,6 @@ import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } fro
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { deletedData } from "../../lib/oclif/envelope";
 import { assertVariableName, variableScope } from "../../lib/variables";
-import { publicCliCommand } from "../../lib/public-cli";
 
 /**
  * `zitadel variable rm NAME` — remove one variable from the project.
@@ -40,7 +39,7 @@ export default class VariableRm extends EnvironmentCommand {
   async run(): Promise<JsonEnvelope> {
     const { args, flags } = await this.parse(VariableRm);
     await this.toMeta(flags);
-    const { dryRun, cliVersion } = this.meta;
+    const { dryRun } = this.meta;
     const name = args.name;
 
     assertVariableName(name);
@@ -64,10 +63,7 @@ export default class VariableRm extends EnvironmentCommand {
       kind: "confirm",
       name: `remove ${name} from the project`,
       message: `Remove ${name} from the project?`,
-      retry: publicCliCommand(
-        `variable rm ${name}${flags.preview ? " --preview" : ""} --force${this.environmentSelector()}`,
-        cliVersion,
-      ),
+      retry: this.suggest(`variable rm ${name}${flags.preview ? " --preview" : ""} --force`),
     });
     if (!confirmed) {
       return this.emit({ status: "skipped", reason: "remove-cancelled" });

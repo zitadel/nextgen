@@ -16,7 +16,7 @@ import {
   type VariableType,
   variableScope,
 } from "../../lib/variables";
-import { publicCliCommand } from "../../lib/public-cli";
+import { inShell } from "../../lib/suggestion";
 
 /**
  * `zitadel variable set NAME [VALUE]` — enter or replace one variable on the
@@ -73,7 +73,7 @@ export default class VariableSet extends EnvironmentCommand {
   async run(): Promise<JsonEnvelope> {
     const { args, flags } = await this.parse(VariableSet);
     await this.toMeta(flags);
-    const { dryRun, cliVersion } = this.meta;
+    const { dryRun } = this.meta;
     const name = args.name;
     const type = flags.as as VariableType;
 
@@ -124,14 +124,10 @@ export default class VariableSet extends EnvironmentCommand {
       message: `Value for ${name}`,
       ...(flags.secret || args.value === undefined ? {} : { given: args.value }),
       stdin: true,
-      retry: pipeHint(
-        name,
-        flags.secret,
-        type,
-        flags.preview,
-        cliVersion,
-        this.environmentSelector(),
-      ),
+      // The selector this.suggest appends must precede the stdin redirection.
+      retry: inShell(this.suggest(pipeArgs(name, flags.secret, type, flags.preview)), {
+        after: " < value.txt",
+      }),
       parse: (raw: string) => parseVariableValue(raw, type),
     });
 
@@ -209,15 +205,8 @@ function slotCell(slot: SlotState): string {
  * used. Dropping any of them would hand back a command that writes a credential
  * as a readable value, stores a number as a string, or writes the wrong value.
  */
-function pipeHint(
-  name: string,
-  secret: boolean,
-  type: VariableType,
-  preview: boolean,
-  cliVersion: string,
-  selector: string,
-): string {
-  const args = [
+function pipeArgs(name: string, secret: boolean, type: VariableType, preview: boolean): string {
+  return [
     "variable",
     "set",
     name,
@@ -225,7 +214,4 @@ function pipeHint(
     ...(type === "string" ? [] : ["--as", type]),
     ...(preview ? ["--preview"] : []),
   ].join(" ");
-  // The selector carries this invocation's --env/--env-file/--server so the
-  // retry writes to the same project, and it must precede the stdin redirection.
-  return `${publicCliCommand(`${args}${selector}`, cliVersion)} < value.txt`;
 }

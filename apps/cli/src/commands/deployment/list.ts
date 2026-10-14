@@ -9,7 +9,6 @@ import {
 import { collectPages } from "../../lib/oclif/crud/paging";
 import { renderList } from "../../lib/oclif/crud/table";
 import { listData } from "../../lib/oclif/envelope";
-import { publicCliCommand } from "../../lib/public-cli";
 import { shellArg } from "../../lib/shell";
 
 /** The columns `list` renders, in order. */
@@ -67,7 +66,6 @@ export default class DeploymentList extends EnvironmentCommand {
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(DeploymentList);
     await this.toMeta(flags);
-    const { cliVersion } = this.meta;
     const { client, projectId } = await this.connect();
 
     const request = (token?: string): Promise<unknown> =>
@@ -101,7 +99,7 @@ export default class DeploymentList extends EnvironmentCommand {
     // token. `--all` already drained everything, so it suggests nothing.
     const nextCommand =
       next && flags.all !== true
-        ? publicCliCommand(
+        ? this.suggest(
             [
               "deployment list",
               ...(flags.origin === undefined ? [] : [`--origin ${shellArg(flags.origin)}`]),
@@ -112,8 +110,7 @@ export default class DeploymentList extends EnvironmentCommand {
               // text or break the suggestion.
               `--page-token ${shellArg(next)}`,
               "--json",
-            ].join(" ") + this.environmentSelector(),
-            cliVersion,
+            ].join(" "),
           )
         : undefined;
 

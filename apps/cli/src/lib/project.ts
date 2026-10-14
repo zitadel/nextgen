@@ -5,6 +5,7 @@ import { ZitadelError } from "./errors";
 import { enforceMode } from "./fs-safe";
 import { isObject, parseJsonObject, stableStringify } from "./json";
 import { DEFAULT_SERVER } from "./server";
+import { unscopedCommand } from "./suggestion";
 
 /**
  * Reports whether `cwd` has already been initialized, i.e. a committed
@@ -68,7 +69,7 @@ export async function readZitadelConfig(cwd: string): Promise<Record<string, unk
     if (isNotFound(error)) {
       throw new ZitadelError("E_VALIDATION", "zitadel.json was not found", {
         hint: "Run `zitadel setup` first.",
-        nextCommands: ["zitadel setup"],
+        nextCommands: [unscopedCommand("setup")],
       });
     }
     throw error;
@@ -101,7 +102,7 @@ export async function readZitadelSecret(cwd: string): Promise<ZitadelSecret> {
     if (isNotFound(error)) {
       throw new ZitadelError("E_VALIDATION", ".zitadel/secret was not found", {
         hint: "Run `zitadel setup` first, or restore the project secret with `zitadel doctor --fix`.",
-        nextCommands: ["zitadel setup", "zitadel doctor --fix"],
+        nextCommands: [unscopedCommand("setup"), unscopedCommand("doctor --fix")],
       });
     }
     throw error;
