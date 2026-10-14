@@ -54,6 +54,22 @@ describe("release revoke", () => {
         ).not.toBeNull();
       });
 
+      it("confirms the revoke the way every revoke does", async () => {
+        const app = await aSetUpApp();
+        const releaseId = await aRelease(app);
+
+        const result = await app.run([
+          "release",
+          "revoke",
+          releaseId,
+          "--force",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf<{ revoked: boolean }>(result).data.revoked).toBe(true);
+      });
+
       it("revokes nothing on a dry run, needing no --force", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();

@@ -1723,19 +1723,21 @@ export function setupPlatformHandlers() {
       const targets = [...resolved].sort();
       const expectedId =
         typeof data.expected_deployment_id === "string" ? data.expected_deployment_id : undefined;
+      // The contract's guard: the newest deployment to any of the targets.
       if (expectedId !== undefined) {
-        for (const origin of targets) {
-          const newest = newestDeploymentForOrigin(project.id, origin);
-          if (newest && newest.id !== expectedId) {
-            return HttpResponse.json(
-              errorBody(
-                "dep.conflict",
-                "deployment: the newest deployment to the targets does not match expected_deployment_id",
-                { deployment: deploymentResponse(newest) },
-              ),
-              { status: 409 },
-            );
-          }
+        const newest = targets
+          .map((origin) => newestDeploymentForOrigin(project.id, origin))
+          .filter((deployment): deployment is DeploymentRecord => deployment !== undefined)
+          .sort((a, b) => b.seq - a.seq)[0];
+        if (newest && newest.id !== expectedId) {
+          return HttpResponse.json(
+            errorBody(
+              "dep.conflict",
+              "deployment: the newest deployment to the targets does not match expected_deployment_id",
+              { deployment: deploymentResponse(newest) },
+            ),
+            { status: 409 },
+          );
         }
       }
 

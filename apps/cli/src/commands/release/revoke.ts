@@ -1,6 +1,7 @@
 import { Flags } from "@oclif/core";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
+import { mutatedData } from "../../lib/oclif/envelope";
 import { revokeRelease } from "../../lib/release";
 
 /**
@@ -61,7 +62,11 @@ export default class ReleaseRevoke extends EnvironmentCommand {
 
     return this.emit({
       status: "ok",
-      data: { release_id: release.id, revoked_at: release.revoked_at },
+      // The lifecycle-mutation shape every revoke answers with, plus when.
+      data: {
+        ...mutatedData({ release_id: release.id }, "revoked"),
+        revoked_at: release.revoked_at,
+      },
       pretty: `Revoked ${release.id}`,
     });
   }

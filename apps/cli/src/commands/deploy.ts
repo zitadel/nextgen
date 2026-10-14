@@ -157,24 +157,15 @@ export default class Deploy extends EnvironmentCommand {
       gitDirty,
     });
 
-    // What the targets serve right now. The guard id must be the newest
-    // deployment for every target the create resolves, so it is sent only
-    // when all of them agree on one: after a `deploy --origin` the primary
-    // origins serve different deployments, and any single id would be
-    // refused on every run. A live preview is never a primary's deployment,
-    // so the list is read per origin rather than taking the newest overall.
-    // When they agree, the id guards the create against another deploy that
-    // raced in since we inspected: the server refuses with 409 rather than
-    // overwriting that deploy unseen (#538).
+    // What the targets serve right now. The guard id is the newest deployment
+    // to any origin this deploy lands on — the contract's rule — so a live
+    // preview, which never targets a primary, is never it. It guards the
+    // create against another deploy that raced in since we inspected: the
+    // server refuses with 409 rather than overwriting that deploy unseen (#538).
     const live = await listLiveDeployments(client, projectId, origin ? { origin } : {});
-    const newest = new Set(
-      landing.map(
-        (target) =>
-          live.find((deployment) => deployment.targets.some((entry) => entry.origin === target))
-            ?.id,
-      ),
-    );
-    const observed = newest.size === 1 ? [...newest][0] : undefined;
+    const observed = live.find((deployment) =>
+      deployment.targets.some((entry) => landing.includes(entry.origin)),
+    )?.id;
     const targets = origin ? [origin] : ["primary"];
     let deployment: Awaited<ReturnType<typeof createDeployment>>;
     try {

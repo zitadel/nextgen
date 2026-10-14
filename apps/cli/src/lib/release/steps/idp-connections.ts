@@ -3,12 +3,12 @@ import { join } from "node:path";
 import type { CreateIdpBodyIdp } from "@zitadel/api/generated/model";
 import { consola } from "consola";
 
-import { isVariableReference } from "@zitadel/config/idp";
+import { isVariableReference, referencedVariable } from "@zitadel/config/idp";
 import { idpConnectionConfigSchema } from "@zitadel/config/schemas";
 
 import { ZitadelError } from "../../errors";
 import { IDPS_DIR, refuseResolvedSecret } from "../../idp";
-import { readJsonDir } from "../../json-dir";
+import { readJsonDirEntries } from "../../json-dir";
 import type { Step, StepContext } from "../pipeline";
 
 /**
@@ -28,7 +28,8 @@ export const idpConnectionsStep: Step = {
   // `ctx.dryRun` below rather than the whole step being skipped, so a dry run
   // reports what it would sync without a bad file slipping past validation.
   async run(ctx: StepContext): Promise<void> {
-    const connections = await readJsonDir(join(ctx.cwd, IDPS_DIR));
+    const entries = await readJsonDirEntries(join(ctx.cwd, IDPS_DIR));
+    const connections = entries.map((entry) => entry.body);
     // Validate every file before creating any. `POST /idps` writes one
     // connection at a time, so a malformed file partway through would leave the
     // earlier ones already created — a partial write. Checking the whole set
@@ -36,6 +37,15 @@ export const idpConnectionsStep: Step = {
     // A dry run surfaces the same failures, which is why it validates here too.
     for (const connection of connections) {
       validateConnection(connection);
+    }
+    // The credentials a connection names must be variables the project holds,
+    // the client id a plain one and the secret a secret one: otherwise the
+    // deploy publishes a sign-in button that fails at the provider.
+    if (connections.length > 0) {
+      const held = await heldVariables(ctx);
+      for (const entry of entries) {
+        checkCredentialVariables(entry.body, `${IDPS_DIR}/${entry.name}`, held);
+      }
     }
     for (const connection of connections) {
       if (ctx.dryRun) {
@@ -79,7 +89,7 @@ function validateConnection(data: object): void {
         : "Connection file is not a valid identity provider connection",
       {
         hint: literalSecret
-          ? 'Use "client_secret": "${{ NAME }}" and publish the value with `variable set NAME --secret`.'
+          ? 'Use "client_secret": "${{ NAME }}" and publish the value with `variables set NAME --project-level --secret`.'
           : undefined,
         details: { issues: result.error.issues },
       },
@@ -99,4 +109,72 @@ function valueAt(data: object, path: ReadonlyArray<PropertyKey>): unknown {
     current = (current as Record<PropertyKey, unknown>)[key];
   }
   return current;
+}
+
+/** The project's variables, by name, and whether each is a secret. */
+async function heldVariables(ctx: StepContext): Promise<Map<string, boolean>> {
+  const held = await ctx.client.getVariables({ project_id: ctx.projectId });
+  // A secret reads back as `{ secret: true }`, a plain value as the value.
+  return new Map(Object.entries(held).map(([name, value]) => [name, typeof value === "object"]));
+}
+
+/**
+ * What the engine needs from the variables a connection names: they exist,
+ * the client id is a plain one it can put in the authorize URL, the client
+ * secret is a secret one, and they are not one and the same.
+ */
+function checkCredentialVariables(
+  connection: object,
+  file: string,
+  held: ReadonlyMap<string, boolean>,
+): void {
+  const body = connection as {
+    oidc?: { client_id?: unknown; client_secret?: unknown };
+    oauth2?: { client_id?: unknown; client_secret?: unknown };
+  };
+  const block = body.oidc ?? body.oauth2;
+  const nameOf = (value: unknown) =>
+    typeof value === "string" ? referencedVariable(value) : undefined;
+  const named = [
+    { field: "client_id", secret: false, name: nameOf(block?.client_id) },
+    { field: "client_secret", secret: true, name: nameOf(block?.client_secret) },
+  ].flatMap((credential) =>
+    credential.name === undefined ? [] : [{ ...credential, name: credential.name }],
+  );
+  const [id, secret] = named;
+  if (id !== undefined && secret !== undefined && id.name === secret.name) {
+    throw new ZitadelError(
+      "E_VALIDATION",
+      `${file}: client_id and client_secret both name the variable ${id.name}`,
+      {
+        hint: "Give each its own variable: a plain one for the client id, a secret one for the client secret.",
+        details: { variable: id.name, file },
+      },
+    );
+  }
+  for (const { field, secret: wantsSecret, name } of named) {
+    const isSecret = held.get(name);
+    if (isSecret === undefined) {
+      throw new ZitadelError(
+        "E_CREDENTIAL_MISSING",
+        `${file}: ${field} names the variable ${name}, which the project does not have`,
+        {
+          hint: `Publish it with \`variables set ${name} --project-level${wantsSecret ? " --secret" : ""}\`, then deploy again.`,
+          details: { variable: name, field, file },
+        },
+      );
+    }
+    if (isSecret !== wantsSecret) {
+      throw new ZitadelError(
+        "E_VALIDATION",
+        `${file}: ${field} names the variable ${name}, which is ${isSecret ? "a secret" : "not a secret"}`,
+        {
+          hint: wantsSecret
+            ? `The client secret must be a secret variable: publish it with \`variables set ${name} --project-level --secret\`.`
+            : `The client id must be a plain variable the engine can read back: publish it with \`variables set ${name} --project-level\`, without --secret.`,
+          details: { variable: name, field, file, secret: isSecret },
+        },
+      );
+    }
+  }
 }
