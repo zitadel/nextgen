@@ -35,7 +35,12 @@ import { checkJwt, isJwtShaped } from "../lib/jwt";
 
 declare module "h3" {
   interface H3EventContext {
-    nextgenAuth: AuthResult;
+    /**
+     * Set by the middleware on every request it runs for. Absent where it did
+     * not run (an ignored route, a handler outside its reach), so read it
+     * through {@link getAuth}, which answers signed out then.
+     */
+    nextgenAuth?: AuthResult;
   }
 }
 
