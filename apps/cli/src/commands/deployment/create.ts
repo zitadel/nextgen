@@ -1,7 +1,7 @@
 import { Flags } from "@oclif/core";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
-import { createDeployment } from "../../lib/release";
+import { assertPrimaryOrigin, createDeployment } from "../../lib/release";
 import { nextCommandsData } from "../../lib/oclif/envelope";
 
 /**
@@ -46,6 +46,15 @@ export default class DeploymentCreate extends EnvironmentCommand {
     }
 
     const { client, projectId } = await this.connect();
+
+    // `--origin` names one primary origin, as for `deploy`; a preview URL is
+    // served by pull-request builds and is refused before anything is written.
+    if (flags.origin !== undefined) {
+      assertPrimaryOrigin((await client.getProject(projectId)).origins ?? [], flags.origin, {
+        hint: `Pass a primary origin, or add it first with \`zitadel origin add${this.environmentSelector()}\`.`,
+        nextCommands: [this.suggest("origin list")],
+      });
+    }
 
     const deployment = await createDeployment(client, projectId, {
       releaseId: flags.release,

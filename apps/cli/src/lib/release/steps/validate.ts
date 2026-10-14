@@ -5,7 +5,7 @@ import {
   schemaConfigSchema,
 } from "@zitadel/config/schemas";
 
-import { readDescriptorTemplate } from "../../branding";
+import { assertNoLegacyTemplateKey, readDescriptorTemplate } from "../../branding";
 import { ZitadelError } from "../../errors";
 import { flowEnvRefs } from "../../flows";
 import { reportWarning } from "../../warnings";
@@ -75,6 +75,15 @@ function validateBundleShapes(ctx: StepContext): void {
   });
   ctx.brandingSources.forEach((descriptor, index) => {
     const handle = `branding #${index + 1}`;
+    // The retired `liquid_template_file` key gets its migration, not the bare
+    // unrecognised-key error the schema would give.
+    try {
+      assertNoLegacyTemplateKey(descriptor);
+    } catch (error) {
+      const hint = error instanceof ZitadelError && error.hint ? ` ${error.hint}` : "";
+      failures.push(`${handle}: ${error instanceof Error ? error.message : String(error)}.${hint}`);
+      return;
+    }
     const result = brandingConfigSchema.safeParse(descriptor);
     if (!result.success) {
       for (const issue of result.error.issues) {

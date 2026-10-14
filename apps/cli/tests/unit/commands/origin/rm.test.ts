@@ -101,11 +101,34 @@ describe("origin rm", () => {
 
   it("keeps the active --env in the suggested retry command", async () => {
     const cwd = await anAppDir();
+    await writeFile(
+      join(cwd, ".env.production.local"),
+      "ZITADEL_PROJECT_ID=proj_unit\nZITADEL_PROJECT_SECRET=sk_unit\n",
+    );
 
     const result = await remove(cwd, ["--env", "production"]);
 
     const envelope = parseJson(result.stdout) as { code: string; next_commands?: string[] };
     expect(envelope.code).toBe("E_VALIDATION");
     expect(envelope.next_commands?.[0]).toContain("--env production");
+  });
+
+  it("quotes a wildcard pattern in the suggested retry, so the shell cannot expand it", async () => {
+    const cwd = await anAppDir();
+
+    const result = await runCliForTest([
+      "origin",
+      "rm",
+      "https://*-acme.vercel.app",
+      "--cwd",
+      cwd,
+      "--server",
+      SERVER,
+      "--non-interactive",
+      "--json",
+    ]);
+
+    const envelope = parseJson(result.stdout) as { next_commands?: string[] };
+    expect(envelope.next_commands?.[0]).toContain("origin rm 'https://*-acme.vercel.app' --force");
   });
 });

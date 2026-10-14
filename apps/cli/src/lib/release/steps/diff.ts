@@ -28,7 +28,11 @@ export const diffStep: Step = {
       expand: ["release"],
       ...(ctx.origin === undefined ? {} : { origin: ctx.origin }),
     });
-    const sha = deployments[0]?.release?.metadata?.git_sha;
+    // What the primary origins serve: a live preview deployment is never the
+    // baseline, even when it is the newest one in the project.
+    const sha = deployments.find((deployment) =>
+      deployment.targets.some((target) => target.expires_at == null),
+    )?.release?.metadata?.git_sha;
     if (!sha) {
       note("No diff available: nothing is deployed yet, or the live release has no commit.");
       return;

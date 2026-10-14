@@ -100,7 +100,7 @@ describe("release revoke", () => {
           "--json",
         ]);
 
-        expect(result).toFail();
+        expect(result).toFailWith("E_CONFLICT");
       });
 
       it("requires --force when non-interactive", async () => {

@@ -166,6 +166,17 @@ describe("toZitadelError", () => {
     expect(result.details).toBe("just a string");
   });
 
+  it("reports a 409 as a conflict with the state the platform holds", () => {
+    const err = new ApiError(
+      409,
+      "http://mock/releases/rel_1/revoke?project_id=proj_1",
+      { code: "rel.in_use", message: "release: still served by an origin" },
+      "POST http://mock/releases/rel_1/revoke returned 409",
+    );
+
+    expect(toZitadelError(err).code).toBe("E_CONFLICT");
+  });
+
   it("surfaces the server's message + nested details.details on ApiError 400", () => {
     const err = new ApiError(
       400,

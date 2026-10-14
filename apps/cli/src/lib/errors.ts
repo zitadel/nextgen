@@ -115,12 +115,17 @@ export function toZitadelError(error: unknown): ZitadelError {
         : apiErrorMessage(error);
       return new ZitadelError("E_NOT_FOUND", message, { details });
     }
+    // A 409 is the platform refusing because of the state it holds — a
+    // release still served, a deploy that raced in, a revoked release — not
+    // because the request was malformed, so it is a conflict.
     const code: ZitadelErrorCode =
       error.status === 401 || error.status === 403
         ? "E_AUTH"
-        : error.status >= 500
-          ? "E_NETWORK"
-          : "E_VALIDATION";
+        : error.status === 409
+          ? "E_CONFLICT"
+          : error.status >= 500
+            ? "E_NETWORK"
+            : "E_VALIDATION";
     // The platform names the fields it rejected, and the message does not
     // repeat them: `idp.field_immutable` says only "the field is fixed for the
     // life of the connection", which leaves the reader to guess which of a
