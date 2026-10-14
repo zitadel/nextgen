@@ -11,6 +11,7 @@ import { flowEnvRefs } from "../../flows";
 import { reportWarning } from "../../warnings";
 import type { Step, StepContext } from "../pipeline";
 import { brandingAssetWarnings } from "./asset-probe";
+import { validateSsoConsistency } from "./sso-consistency";
 
 /**
  * Validate the bundle the way the server does before it builds the release, so
@@ -34,6 +35,7 @@ export const validateStep: Step = {
     // has already written.
     validateBundleShapes(ctx);
     validateFlows(ctx);
+    await validateSsoConsistency(ctx.cwd);
     for (const warning of await brandingAssetWarnings(ctx.bundle.brandings)) {
       reportWarning(warning);
     }

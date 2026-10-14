@@ -3,10 +3,20 @@ import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
 import { PUBLIC_PROJECT_ID_VARIABLE } from "../public-project-id";
+import { assertMountsRootComponent, type RootMount, viteEntry } from "../root-component";
 import { type ViteSupport, buildViteProxyOp } from "../vite-support";
 import { appTemplate } from "./templates";
 
 const SDK_DEPENDENCY = "@zitadel/sdk-solid";
+
+/** The managed root component, and how `index.tsx` renders it. */
+const ROOT: RootMount = {
+  path: "src/App.tsx",
+  binding: { name: "App", named: false },
+  extension: true,
+  calls: ["render", "hydrate"],
+  mounts: "jsx",
+};
 
 /**
  * Rule-based patcher for a Vite + Solid single-page app. Inherits the shared
@@ -31,9 +41,13 @@ export class SolidPatcher extends AbstractRulePatcher implements ViteSupport {
     return buildViteProxyOp(devPort, server);
   }
 
+  protected override async preflight(_ctx: PatchContext, cwd: string): Promise<void> {
+    await assertMountsRootComponent(cwd, await viteEntry(cwd), ROOT);
+  }
+
   protected routeOps(ctx: PatchContext): FileOp[] {
     return [
-      { kind: "write", path: "src/App.tsx", contents: appTemplate(ctx) },
+      { kind: "write", path: ROOT.path, contents: appTemplate(ctx) },
       this.viteProxyOp(ctx.framework.devPort, ctx.server),
       // Vite only exposes VITE_-prefixed vars to client code (import.meta.env).
       {
@@ -55,7 +69,7 @@ export class SolidPatcher extends AbstractRulePatcher implements ViteSupport {
   }
 
   protected routeFiles(_view: PatchView): ReadonlyArray<string> {
-    return ["src/App.tsx"];
+    return [ROOT.path];
   }
 
   protected routeDeps(_view: PatchView): ReadonlyArray<string> {

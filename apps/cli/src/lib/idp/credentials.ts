@@ -1,3 +1,9 @@
+import type {
+  ClientId,
+  ClientIdVariable,
+  ClientSecret,
+  ClientSecretVariable,
+} from "@zitadel/config/idp";
 import { consola } from "consola";
 
 import { publicCliCommand } from "../public-cli";
@@ -12,8 +18,8 @@ import { reportWarning } from "../warnings";
  * connection to the project they just addressed.
  */
 export type SecretPublisher = (
-  name: string,
-  value: string,
+  name: ClientIdVariable | ClientSecretVariable,
+  value: ClientId | ClientSecret,
   options: { readonly secret: boolean },
 ) => Promise<void>;
 
@@ -22,7 +28,7 @@ export type PublishState = "stored" | "deferred" | "failed";
 
 /** Where a captured client secret ended up, for the command's summary. */
 export type SecretOutcome = {
-  readonly name: string;
+  readonly name: ClientSecretVariable;
 
   /**
    * The project's variables — the only place a credential is written. The
@@ -50,12 +56,12 @@ export type SecretOutcome = {
  * intend to publish it themselves.
  */
 export async function storeClientSecret(options: {
-  readonly name: string;
-  readonly value?: string;
+  readonly name: ClientSecretVariable;
+  readonly value?: ClientSecret;
   readonly publish?: SecretPublisher;
 }): Promise<SecretOutcome> {
   const { name, value, publish } = options;
-  if (value === undefined || value === "") {
+  if (value === undefined) {
     return { name, published: "deferred" };
   }
   return { name, published: await publishSecret(publish, name, value) };
@@ -69,8 +75,8 @@ export async function storeClientSecret(options: {
  * the developer the ability to read back what was configured.
  */
 export async function publishClientId(options: {
-  readonly name: string;
-  readonly value: string;
+  readonly name: ClientIdVariable;
+  readonly value: ClientId;
   readonly publish?: SecretPublisher;
 }): Promise<PublishState> {
   return publishSecret(options.publish, options.name, options.value, false);
@@ -86,8 +92,8 @@ export async function publishClientId(options: {
  */
 async function publishSecret(
   publish: SecretPublisher | undefined,
-  name: string,
-  value: string,
+  name: ClientIdVariable | ClientSecretVariable,
+  value: ClientId | ClientSecret,
   secret = true,
 ): Promise<PublishState> {
   if (publish === undefined) {
@@ -111,7 +117,7 @@ async function publishSecret(
  * that list is the only place the recovery step appears.
  */
 export function republishCommand(
-  name: string,
+  name: ClientIdVariable | ClientSecretVariable,
   secret: boolean,
   cliVersion: string,
   selector: string,
@@ -131,7 +137,7 @@ export function republishCommand(
 /** A credential, and whether the project ended up holding it. */
 export type CredentialRecovery = {
   /** `undefined` when there is no such credential in this run at all. */
-  readonly name: string | undefined;
+  readonly name: ClientIdVariable | ClientSecretVariable | undefined;
   readonly secret: boolean;
   readonly published: PublishState | undefined;
 };
@@ -166,7 +172,7 @@ export function republishCommands(
  * code and call for different things from the developer.
  */
 function reportPublished(
-  name: string,
+  name: ClientIdVariable | ClientSecretVariable,
   state: PublishState,
   republish: string,
   noValue: boolean,
@@ -210,7 +216,7 @@ export function reportSecretOutcome(
  * id, so the only way here is a project it could not reach.
  */
 export function reportClientIdOutcome(
-  name: string,
+  name: ClientIdVariable,
   state: PublishState,
   cliVersion: string,
   selector: string,

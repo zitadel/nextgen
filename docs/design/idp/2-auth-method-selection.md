@@ -265,7 +265,7 @@ it (emitting an error like
 | :--- | :--- |
 | **Pair-level `claim_mapping` intersection:** warn when an offered provider's `claim_mapping` shares zero properties with the pinned schema (the [Validation Rules](#validation-rules) row). | `validate.ts` and the Go server mirror, at flow create and update |
 | **Pair-level `verified_claims` intersection:** warn when a provider's `verified_claims` keys share no properties with the pinned schema. | `validate.ts` and the Go server mirror, at flow create and update |
-| **Register-step topology:** whether registration shares the entry steps' `sso_providers` or carries its own step. Both shapes pass the validator and run, so the choice is scaffolding, not validation. | [`4-cli-provider-setup.md`](4-cli-provider-setup.md#flow-architecture-decisions) (settled: `sso_providers` on both shared entry steps and the conflict step) |
+| **Register-step topology:** whether registration shares the entry steps' `sso_providers` or carries its own step. Both shapes pass the validator and run, so the choice is scaffolding, not validation. | [`4-cli-provider-setup.md`](4-cli-provider-setup.md#flow-architecture-decisions) (settled: `sso_providers` on both shared entry steps, the password step and the conflict step) |
 
 The two pairing rows live here because the flow definition is the only document
 that references both sides: its `user_schema` pins the schema revision and its
@@ -284,7 +284,7 @@ the Go mirror of the new error-grade rules is tracked in area 1's
 - [ADR 020](../../adrs/020-credentials-out-of-user-schema.md) (`x-auth-methods`
   as policy input)
 - `api/openapi/endpoints/schemas/auth-methods.json`, `auth-method.json`
-- `packages/config/src/validate.ts` (`validateFlowDefinition`,
+- `packages/config/src/validation/` (`validateFlowDefinition`,
   `RESERVED_OUTCOMES`, `PURPOSE_FLIP_TARGETS`; internal `authMethodEnabled`,
   `resolveFieldChallenge`, `AUTH_METHOD_PREFIX`)
 - `packages/config/defaults/default-login.json` (step shapes)

@@ -14,6 +14,35 @@ this page uses, under the website's names (`bg-background`, `text-foreground`,
 use `@zitadel/design-tokens`, the palette of the console, the login and the
 docs.
 
+## The fonts
+
+All three faces load through `next/font/local` from `app/fonts/`, so the build
+fetches nothing. `next/font/google`, which `zitadel/new-website` still uses for
+Arimo and Azeret Mono, downloads them from Google at build time, and that
+download has failed builds: Google served a CI runner font URLs that Turbopack
+cannot parse, and a local build stalls when the network blips.
+
+- `Arimo-latin.woff2` is Arimo's variable font, every weight from 400 to 700;
+  `layout.tsx` declares it at the two weights the page uses, 400 and 600.
+  `AzeretMono-Medium-latin.woff2` is Azeret Mono at 500.
+- Each is the latin subset, byte for byte the file Google Fonts serves
+  `next/font/google` (Arimo v36, Azeret Mono v21). A character outside it
+  draws in the next face of the stack.
+- Both are under the SIL Open Font License 1.1, which has to travel with the
+  files: `Arimo-OFL.txt` and `AzeretMono-OFL.txt` beside them, as Google Fonts
+  publishes them. APK Futural is a licensed webfont, not an open one.
+
+To update one, fetch the stylesheet with the user agent `next/font/google`
+sends and take the file under `/* latin */`:
+
+```sh
+curl -A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36' \
+  'https://fonts.googleapis.com/css2?family=Arimo:wght@400..700&display=swap'
+```
+
+Azeret Mono's is `family=Azeret+Mono:wght@500`. The docs keep a copy of the
+same Arimo file (`apps/docs/app/fonts/`); update both.
+
 ## The animation
 
 `app/hero.avif` is the website's homepage hero, the Lottie
