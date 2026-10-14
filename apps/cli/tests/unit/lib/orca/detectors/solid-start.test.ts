@@ -24,7 +24,7 @@ afterEach(async () => {
 describe("SolidStartDetector", () => {
   it("recognises a SolidStart app by solid-js + @solidjs/start and reports appDir 'src'", async () => {
     const facts = await new SolidStartDetector().detect(
-      await project({ "solid-js": "^1", "@solidjs/start": "^1", vinxi: "^0" }),
+      await project({ "solid-js": "^1", "@solidjs/start": "^2", vite: "^8" }),
     );
     expect(facts?.id).toBe("solid-start");
     expect(facts?.appDir).toBe("src");
@@ -40,5 +40,25 @@ describe("SolidStartDetector", () => {
     const cwd = await mkdtemp(join(tmpdir(), "solid-start-empty-"));
     dirs.push(cwd);
     expect(await new SolidStartDetector().detect(cwd)).toBeNull();
+  });
+});
+
+describe("SolidStartDetector version floor", () => {
+  it("refuses a SolidStart 1 app, which registers middleware where the patch cannot", async () => {
+    await expect(
+      new SolidStartDetector().detect(
+        await project({ "solid-js": "^1", "@solidjs/start": "^1.3.5" }),
+      ),
+    ).rejects.toMatchObject({
+      code: "E_UNSUPPORTED_PROJECT_SHAPE",
+    });
+  });
+
+  it("accepts a spec that may resolve to a supported version", async () => {
+    expect(
+      await new SolidStartDetector().detect(
+        await project({ "solid-js": "^1", "@solidjs/start": "latest", vite: "^8" }),
+      ),
+    ).not.toBeNull();
   });
 });

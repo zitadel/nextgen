@@ -42,3 +42,23 @@ describe("SvelteKitDetector", () => {
     expect(await new SvelteKitDetector().detect(cwd)).toBeNull();
   });
 });
+
+describe("SvelteKitDetector version floor", () => {
+  it("refuses a Svelte 4 app, which cannot run the Svelte 5 widgets", async () => {
+    await expect(
+      new SvelteKitDetector().detect(
+        await project({ "@sveltejs/kit": "^2", svelte: "^4", vite: "^5" }),
+      ),
+    ).rejects.toMatchObject({
+      code: "E_UNSUPPORTED_PROJECT_SHAPE",
+    });
+  });
+
+  it("accepts a spec that may resolve to a supported version", async () => {
+    expect(
+      await new SvelteKitDetector().detect(
+        await project({ "@sveltejs/kit": "^2", svelte: ">=4", vite: "^5" }),
+      ),
+    ).not.toBeNull();
+  });
+});
