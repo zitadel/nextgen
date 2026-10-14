@@ -120,10 +120,10 @@ describe("LiquidJS engine", () => {
     expect(result).toBe("Password or provider");
   });
 
-  it("an SSO description with no plain one still falls through to the raw key", () => {
+  it("an SSO description with no plain one shows the plain key, which is the one to add", () => {
     const engine = createLiquidEngine({ locale });
     const result = engine.parseAndRenderSync("{{ key | t }}", { key: "custom.description.sso" });
-    expect(result).toBe("custom.description.sso");
+    expect(result).toBe("custom.description");
   });
 
   it.each(Object.entries(builtinLocales))(

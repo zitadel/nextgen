@@ -48,6 +48,21 @@ describe("mergeLocale", () => {
     expect(merged["password.description.sso"]).toBe("Use your Acme password or Acme SSO");
   });
 
+  it("drops it too when the integrator spread a built-in dictionary and rewrote the description", () => {
+    const merged = mergeLocale(builtin, {
+      ...builtin,
+      "password.description": "Enter your Acme password",
+    });
+
+    expect(merged).not.toHaveProperty("password.description.sso");
+  });
+
+  it("keeps it when a spread dictionary leaves the description as it was", () => {
+    const merged = mergeLocale(builtin, { ...builtin, "identifier.title": "Welcome" });
+
+    expect(merged["password.description.sso"]).toBe(builtin["password.description.sso"]);
+  });
+
   it("keeps the built-in provider wording when the integrator left the description alone", () => {
     const merged = mergeLocale(builtin, { "identifier.title": "Welcome" });
 
