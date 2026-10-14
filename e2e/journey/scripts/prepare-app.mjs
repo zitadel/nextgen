@@ -6,6 +6,7 @@ import { spawn } from "node:child_process";
 
 import { appPortFromUrl, frameworkForId } from "./frameworks.mjs";
 import { errorMessage, packageName, parsePort } from "./lib.mjs";
+import { timePhase } from "./timings.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const defaultRepoRoot = resolve(here, "../../..");
@@ -70,63 +71,74 @@ export async function prepareApp(options = {}) {
     });
   }
 
+  // How long each CLI step took, for the runner's timing table (timings.mjs).
+  // Written in `finally`, so a failed step is in it too.
+  const phases = [];
   let startJson;
   let setupJson;
   try {
-    await runCliJsonStep({
-      appDir,
-      cliPackage,
-      env: npmEnv,
-      outputDir,
-      runCapture: runCaptureFn,
-      step: "doctor",
-      stepArgs: withRuntime(withPort(["doctor"], zitadelPort), runtime),
-      writeFile: fs.writeFile,
-    });
-    startJson = await runCliJsonStep({
-      appDir,
-      cliPackage,
-      env: npmEnv,
-      outputDir,
-      runCapture: runCaptureFn,
-      step: "start",
-      stepArgs: withRuntime(withPort(["start"], zitadelPort), runtime),
-      writeFile: fs.writeFile,
-    });
-    setupJson = await runCliJsonStep({
-      appDir,
-      cliPackage,
-      env: npmEnv,
-      outputDir,
-      runCapture: runCaptureFn,
-      step: "setup",
-      stepArgs: [
-        "setup",
-        "--framework",
-        framework.id,
-        "--server",
-        setupServer,
-        "--dev-port",
-        String(appPort),
-        // A fresh app dir holds only what `start` just left there, which setup
-        // scaffolds beside as the quickstart does: no --force. The pre-existing
-        // lane keeps the --force it has always passed; there setup patches a
-        // detected app.
-        ...(preexistingApp ? ["--force"] : []),
-        ...(preset ? ["--preset", preset] : []),
-      ],
-      writeFile: fs.writeFile,
-    });
-    if (framework.id === "next" && suite === "frameworks" && !preset && !preexistingApp) {
-      await runManagedFileDriftProbe({
+    await timePhase(phases, "doctor", () =>
+      runCliJsonStep({
         appDir,
         cliPackage,
         env: npmEnv,
-        fs,
         outputDir,
         runCapture: runCaptureFn,
-        stepArgsFor: (base) => withRuntime(withPort(base, zitadelPort), runtime),
-      });
+        step: "doctor",
+        stepArgs: withRuntime(withPort(["doctor"], zitadelPort), runtime),
+        writeFile: fs.writeFile,
+      }),
+    );
+    startJson = await timePhase(phases, "start", () =>
+      runCliJsonStep({
+        appDir,
+        cliPackage,
+        env: npmEnv,
+        outputDir,
+        runCapture: runCaptureFn,
+        step: "start",
+        stepArgs: withRuntime(withPort(["start"], zitadelPort), runtime),
+        writeFile: fs.writeFile,
+      }),
+    );
+    setupJson = await timePhase(phases, "setup", () =>
+      runCliJsonStep({
+        appDir,
+        cliPackage,
+        env: npmEnv,
+        outputDir,
+        runCapture: runCaptureFn,
+        step: "setup",
+        stepArgs: [
+          "setup",
+          "--framework",
+          framework.id,
+          "--server",
+          setupServer,
+          "--dev-port",
+          String(appPort),
+          // A fresh app dir holds only what `start` just left there, which setup
+          // scaffolds beside as the quickstart does: no --force. The pre-existing
+          // lane keeps the --force it has always passed; there setup patches a
+          // detected app.
+          ...(preexistingApp ? ["--force"] : []),
+          ...(preset ? ["--preset", preset] : []),
+        ],
+        writeFile: fs.writeFile,
+      }),
+    );
+    if (framework.id === "next" && suite === "frameworks" && !preset && !preexistingApp) {
+      await timePhase(phases, "drift", () =>
+        runManagedFileDriftProbe({
+          appDir,
+          cliPackage,
+          env: npmEnv,
+          fs,
+          outputDir,
+          runCapture: runCaptureFn,
+          stepArgsFor: (base) => withRuntime(withPort(base, zitadelPort), runtime),
+        }),
+      );
     }
   } catch (error) {
     await collectLocalRuntimeLogs({
@@ -138,6 +150,8 @@ export async function prepareApp(options = {}) {
       writeFile: fs.writeFile,
     });
     throw error;
+  } finally {
+    await fs.writeFile(join(outputDir, "timings.json"), `${JSON.stringify(phases, null, 2)}\n`);
   }
 
   await assertNoNestedApp(appDir, fs.readFile);
