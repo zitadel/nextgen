@@ -10,7 +10,8 @@ tasks, one per package for the rest — described in
 [docs/design/build/turborepo.md](../docs/design/build/turborepo.md). Until the
 cutover in [docs/design/build/turborepo-migration.md](../docs/design/build/turborepo-migration.md),
 a change to a task's command, dependencies, inputs or outputs goes into both
-files. CI runs the turbo version as the non-required `ci-turbo` job. Moon
+files. CI runs the turbo version as the non-required `ci-turbo` job, on
+pushes to main and by hand (not on pull requests). Moon
 stays the runner of record, and the migration's first phase leaves its
 configuration exactly as on main.
 

@@ -1,7 +1,9 @@
 # Migrating from moon to Turborepo: the plan
 
 > **Status:** accepted for phase 1 (dual run) on 2026-10-12; the decisions
-> are recorded at the end. Turborepo 2.11.7 against moon 2.6.1. The research
+> are recorded at the end. Since 2026-10-14 pull requests no longer run
+> `ci-turbo`, which pauses the dual run's comparison (decision 9).
+> Turborepo 2.11.7 against moon 2.6.1. The research
 > and the reasons to consider the switch are in
 > [turborepo-pilot.md](turborepo-pilot.md); this document is the how, and
 > [turborepo.md](turborepo.md) is the contributor-facing description of the
@@ -39,7 +41,7 @@ workflow, not the task graph.
 | Inline scripts | `scripts/go-format-check.mjs`, `scripts/go-lint.mjs` | Turbo's versions of the `format` and `lint` inline scripts of the two Go projects; moon keeps its inline scripts until the cutover. |
 | Runner selection | `scripts/task-runner.mjs` (+ `.d.mts`) | `NEXTGEN_TASK_RUNNER=moon\|turbo` picks the runner the contributor scripts build through; maps `project:task` to turbo tasks and back. |
 | Ported scripts | `ci-mode.mjs`, `check.mjs`, `run-server.mjs`, `run-server-debug.mjs`, `run-cli.mjs`, `apps/console/scripts/dev-real.mts`, `e2e/journey/scripts/local-registry.mjs`, new `report-turbo-failures.mjs` | Work under either runner; tests added for the turbo paths. |
-| CI | `.github/workflows/ci-turbo.yml` | The turbo version of ci.yml's moon steps, run on every pull request and merge-group entry as a non-required job for the parity period. |
+| CI | `.github/workflows/ci-turbo.yml` | The turbo version of ci.yml's moon steps, a non-required job: on every pull request and merge-group entry until 2026-10-14, since then on pushes to main and by hand (decision 9). |
 | Unchanged | all `moon.yml`, `.moon/`, ci.yml, the required check | Moon runs exactly as before. |
 
 Verified in the prototype, 2026-10-12:
@@ -422,7 +424,7 @@ Two workable setups; the prototype's draft uses the first.
 | Shared with | the cloud deployments (same team cache): a build CI did is a hit on Vercel and the reverse | CI only |
 | Cost | free, within a fair-use limit of 1 TB/month of uploads on Pro; artifacts expire after 7 days | part of the Depot plan (as moon's cache today) |
 | Forks | no token, local cache only | same |
-| Write policy | `TURBO_CACHE=local:rw,remote:rw` on every run: pull requests, the merge queue and pushes to main (which run the gate alone), as moon's runs write Depot's cache; on Vercel, every build reads and writes, Vercel's default, production and previews in separate entries (see "Who may write to the cache") | same flags |
+| Write policy | `TURBO_CACHE=local:rw,remote:rw` on every run: pushes to main (which run the gate alone), runs by hand, and pull requests and the merge queue while they run it (decision 9), as moon's runs write Depot's cache; on Vercel, every build reads and writes, Vercel's default, production and previews in separate entries (see "Who may write to the cache") | same flags |
 
 Recommendation: Vercel's, for the one shared cache and because the cloud
 deployments use it already. Set up on 2026-10-12: the variable
@@ -501,6 +503,9 @@ pass/fail per task (the two run summaries), what `ci-mode` gated under each
 runner (its step summary line), and the job durations. Divergences are bugs
 in the turbo configuration until proven otherwise. Exit criterion: two
 consecutive weeks without a divergence that was turbo's fault.
+
+Paused on 2026-10-14 (decision 9): pull requests and the merge queue no
+longer run `ci-turbo`. They go back into the workflow for the two weeks.
 
 ### Phase 2: cutover (1 week)
 
@@ -609,3 +614,16 @@ the release graph.
    current number of pull-request runs, against the 1 TB fair-use limit of
    Vercel's cache on Pro. The read-only flag kept honest branches out of the
    cache and no one else (see "Who may write to the cache").
+9. **Pull requests stop running `ci-turbo`** (2026-10-14). It runs on
+   pushes to main (the gate, so the cache keeps main's results) and by
+   hand, `gh workflow run ci-turbo.yml --ref <branch>`: every lane on main,
+   a pull request's lanes on a branch. In the 21.5 hours before, `ci-turbo`
+   took 3,514 runner minutes and ci.yml 3,147 on the same runners; its
+   pushes to main took 103 of them. The merge queue never waited for it:
+   of the last 47 merged entries, 31 merged while their `ci-turbo` run was
+   still going and two after it had failed, each about half a minute after
+   `ci / full-pr` passed. On pull requests the two disagreed on 21 of 287
+   commits (`ci-turbo` alone failed 8, ci.yml alone 13), the divergences
+   the parity period is there to explain. That period is paused: the two
+   weeks of decision 7 count from when `pull_request` and `merge_group`
+   are back in the workflow.
