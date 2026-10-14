@@ -51,7 +51,7 @@ describe("SolidStartPatcher.plan", () => {
     expect(writeContents(plan, "src/routes/index.tsx")).toContain(MANAGED_MARKER);
     expect(writeContents(plan, "src/routes/login.tsx")).toContain('purpose="login"');
     expect(writeContents(plan, "src/routes/register.tsx")).toContain('purpose="register"');
-    expect(writeContents(plan, "src/routes/profile.tsx")).toContain("ZitadelLogout");
+    expect(writeContents(plan, "src/routes/profile.tsx")).toContain("ZitadelSession");
     expect(writeContents(plan, "src/routes/login.tsx")).toContain("background:#0f0f11");
     expect(writeContents(plan, "src/routes/login.tsx")).toContain("@zitadel/sdk-solid");
     expect(writeContents(plan, "src/routes/login.tsx")).toContain("ZitadelLogin");

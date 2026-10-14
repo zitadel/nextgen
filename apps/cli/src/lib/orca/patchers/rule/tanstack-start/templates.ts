@@ -122,7 +122,7 @@ export function registerRouteTemplate(): string {
 }
 
 /**
- * `src/routes/profile.tsx` — the signed-in view with the logout widget.
+ * `src/routes/profile.tsx` — the signed-in view: the "signed in as" session card, with sign-out.
  *
  * `protectedRoutes` in `src/start.ts` only guards document requests: a
  * client-side `<Link to="/profile">` never reaches the request middleware. So
@@ -135,7 +135,7 @@ export function profileRouteTemplate(): string {
   return `${MANAGED_MARKER}
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { ZitadelLogout } from "@zitadel/sdk-tanstack-start/react";
+import { ZitadelSession } from "@zitadel/sdk-tanstack-start/react";
 import { configureZitadel } from "@zitadel/sdk-tanstack-start/client";
 import { getAuth } from "@zitadel/sdk-tanstack-start/server";
 
@@ -159,7 +159,7 @@ export const Route = createFileRoute("/profile")({
 function ProfilePage() {
   return (
     <div style={{ position: "fixed", inset: 0, overflow: "auto", background: "#0f0f11", colorScheme: "dark" }}>
-      <ZitadelLogout project={project} postSignOutUrl="/login" />
+      <ZitadelSession project={project} postSignOutUrl="/login" />
     </div>
   );
 }

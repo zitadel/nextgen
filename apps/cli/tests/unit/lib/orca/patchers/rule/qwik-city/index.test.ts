@@ -46,7 +46,7 @@ describe("QwikCityPatcher.plan", () => {
     expect(writeContents(plan, "src/routes/index.tsx")).toContain(MANAGED_MARKER);
     expect(writeContents(plan, "src/routes/login/index.tsx")).toContain('purpose="login"');
     expect(writeContents(plan, "src/routes/register/index.tsx")).toContain('purpose="register"');
-    expect(writeContents(plan, "src/routes/profile/index.tsx")).toContain("ZitadelLogout");
+    expect(writeContents(plan, "src/routes/profile/index.tsx")).toContain("ZitadelSession");
     expect(writeContents(plan, "src/routes/login/index.tsx")).toContain("background:#0f0f11");
     expect(writeContents(plan, "src/routes/login/index.tsx")).toContain("@zitadel/sdk-qwik");
     expect(writeContents(plan, "src/routes/login/index.tsx")).toContain("ZitadelLogin");

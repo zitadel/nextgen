@@ -55,7 +55,7 @@ describe("TanStackStartPatcher.plan", () => {
     );
     expect(writeContents(plan, "src/routes/login.tsx")).toContain('purpose="login"');
     expect(writeContents(plan, "src/routes/register.tsx")).toContain('purpose="register"');
-    expect(writeContents(plan, "src/routes/profile.tsx")).toContain("ZitadelLogout");
+    expect(writeContents(plan, "src/routes/profile.tsx")).toContain("ZitadelSession");
     expect(writeContents(plan, "src/routes/login.tsx")).toContain("#0f0f11");
   });
 

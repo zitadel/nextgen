@@ -81,11 +81,11 @@ export function registerPageTemplate(): string {
   return authPage("register");
 }
 
-/** `src/routes/profile/index.tsx` — the signed-in view with the logout widget. */
+/** `src/routes/profile/index.tsx` — the signed-in view: the "signed in as" session card, with sign-out. */
 export function profilePageTemplate(): string {
   return `${MANAGED_MARKER}
 import { component$ } from "@qwik.dev/core";
-import { ZitadelLogout, configureZitadel } from "@zitadel/sdk-qwik";
+import { ZitadelSession, configureZitadel } from "@zitadel/sdk-qwik";
 
 const project = configureZitadel({
   projectId: import.meta.env.PUBLIC_ZITADEL_PROJECT_ID ?? "",
@@ -95,7 +95,7 @@ const project = configureZitadel({
 export default component$(() => {
   return (
     <div style="${WIDGET_WRAP}">
-      <ZitadelLogout project={project} postSignOutUrl="/login" />
+      <ZitadelSession project={project} postSignOutUrl="/login" />
     </div>
   );
 });

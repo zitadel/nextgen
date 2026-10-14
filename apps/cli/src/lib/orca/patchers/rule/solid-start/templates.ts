@@ -103,7 +103,7 @@ export function registerPageTemplate(): string {
 }
 
 /**
- * `src/routes/profile.tsx` — the signed-in view with the logout widget. Loaded
+ * `src/routes/profile.tsx` — the signed-in view: the "signed in as" session card, with sign-out. Loaded
  * with `clientOnly` for the same reason as the auth pages: `@zitadel/sdk-solid`
  * registers Lit custom elements at import time, which would crash SSR.
  */
@@ -111,14 +111,14 @@ export function profilePageTemplate(): string {
   return `${MANAGED_MARKER}
 import { clientOnly } from "@solidjs/start";
 
-const ZitadelLogout = clientOnly(() =>
-  import("@zitadel/sdk-solid").then((m) => ({ default: m.ZitadelLogout })),
+const ZitadelSession = clientOnly(() =>
+  import("@zitadel/sdk-solid").then((m) => ({ default: m.ZitadelSession })),
 );
 
 export default function Profile() {
   return (
     <main style="${WIDGET_WRAP}">
-      <ZitadelLogout
+      <ZitadelSession
         projectId={import.meta.env.VITE_ZITADEL_PROJECT_ID ?? ""}
         proxyPath="${PROXY_PATH}"
         postSignOutUrl="/login"

@@ -46,12 +46,17 @@ export const handle = createNextgenHandle({
 
 /**
  * `src/routes/+layout.svelte` — applies the dark surface to every page and
- * renders the routed page. Uses `<slot />` so it compiles under both Svelte 4
- * and 5. The marker lives in an HTML comment (no `<script>` needed).
+ * renders the routed page with Svelte 5's `{@render children()}`; `<slot />`
+ * is deprecated there and warns on every dev start. The detectors refuse
+ * Svelte 4, which the widget library does not support either.
  */
 export function layoutTemplate(): string {
-  return `<!-- ${MANAGED_MARKER} -->
-<slot />
+  return `<script lang="ts">
+  ${MANAGED_MARKER}
+  let { children } = $props();
+</script>
+
+{@render children()}
 
 <style>
   :global(:root) {
@@ -133,12 +138,12 @@ export function registerPageTemplate(projectId: string): string {
   return authPage("register", projectId);
 }
 
-/** `src/routes/profile/+page.svelte` — the signed-in view with the logout widget. */
+/** `src/routes/profile/+page.svelte` — the signed-in view: the "signed in as" session card, with sign-out. */
 export function profilePageTemplate(projectId: string): string {
   return `<script lang="ts">
   ${MANAGED_MARKER}
   import { onMount } from "svelte";
-  import { ZitadelLogout, configureZitadel } from "@zitadel/sdk-svelte";
+  import { ZitadelSession, configureZitadel } from "@zitadel/sdk-svelte";
 
   const project = configureZitadel({
     projectId: ${JSON.stringify(projectId)},
@@ -154,7 +159,7 @@ export function profilePageTemplate(projectId: string): string {
 
 <main style="${WIDGET_WRAP}">
   {#if mounted}
-    <ZitadelLogout {project} postSignOutUrl="/login" />
+    <ZitadelSession {project} postSignOutUrl="/login" />
   {/if}
 </main>
 `;

@@ -45,7 +45,7 @@ describe("SvelteKitPatcher.plan", () => {
     expect(writeContents(plan, "src/routes/+page.svelte")).toContain(MANAGED_MARKER);
     expect(writeContents(plan, "src/routes/login/+page.svelte")).toContain('purpose="login"');
     expect(writeContents(plan, "src/routes/register/+page.svelte")).toContain('purpose="register"');
-    expect(writeContents(plan, "src/routes/profile/+page.svelte")).toContain("ZitadelLogout");
+    expect(writeContents(plan, "src/routes/profile/+page.svelte")).toContain("ZitadelSession");
     expect(writeContents(plan, "src/routes/login/+page.svelte")).toContain("background:#0f0f11");
     expect(writeContents(plan, "src/routes/login/+page.svelte")).toContain("@zitadel/sdk-svelte");
     expect(writeContents(plan, "src/routes/login/+page.svelte")).toContain("ZitadelLogin");
@@ -140,5 +140,20 @@ describe("SvelteKitPatcher dev server port", () => {
     const pkg = JSON.parse(op!.edit(JSON.stringify({ scripts: { dev: "vite dev" } })));
 
     expect(pkg.scripts.dev).toBe(`vite dev --port ${port} --strictPort`);
+  });
+});
+
+describe("SvelteKitPatcher layout", () => {
+  // <slot /> is deprecated in Svelte 5 and warns on every dev-server start.
+  it("renders the routed page with Svelte 5's render tag, not a slot", () => {
+    const layout = writeContents(new SvelteKitPatcher().plan(ctx()), "src/routes/+layout.svelte");
+
+    expect(layout).toContain("{@render children()}");
+  });
+
+  it("does not use the deprecated <slot />", () => {
+    expect(
+      writeContents(new SvelteKitPatcher().plan(ctx()), "src/routes/+layout.svelte"),
+    ).not.toContain("<slot");
   });
 });
