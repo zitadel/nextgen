@@ -229,6 +229,31 @@ describe("doctor command", () => {
     );
   });
 
+  it("does not pin the claim to a file that names the project but not its secret", async () => {
+    const cwd = await makeHealthyProject();
+    await writeDetachedSecret(cwd);
+    await writeFile(join(cwd, ".env.development.local"), "ZITADEL_PROJECT_ID=proj-001\n");
+
+    const res = await doctor(cwd);
+
+    const data = (parseJson(res.stdout) as { data: { next_commands?: string[] } }).data;
+    expect((data.next_commands ?? []).some((command) => command.includes("--env-file"))).toBe(
+      false,
+    );
+  });
+
+  it("reports an unparseable zitadel.json as a failed config check rather than failing itself", async () => {
+    const cwd = await makeHealthyProject();
+    await writeFile(join(cwd, "zitadel.json"), "{");
+
+    const res = await doctor(cwd);
+
+    const json = parseJson(res.stdout) as {
+      details?: { checks?: Array<{ name: string; status: string }> };
+    };
+    expect(json.details?.checks?.find((check) => check.name === "config")?.status).toBe("fail");
+  });
+
   it("suggests no claim when .env.development.local names another project", async () => {
     const cwd = await makeHealthyProject();
     await writeDetachedSecret(cwd);
@@ -243,7 +268,10 @@ describe("doctor command", () => {
   it("pins the claim it suggests to setup's file when there is one", async () => {
     const cwd = await makeHealthyProject();
     await writeDetachedSecret(cwd);
-    await writeFile(join(cwd, ".env.development.local"), "ZITADEL_PROJECT_ID=proj-001\n");
+    await writeFile(
+      join(cwd, ".env.development.local"),
+      "ZITADEL_PROJECT_ID=proj-001\nZITADEL_PROJECT_SECRET=sk_test\n",
+    );
 
     const res = await doctor(cwd);
 

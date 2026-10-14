@@ -1488,3 +1488,15 @@ describe("flow definitions list the current flows", () => {
     expect(url?.searchParams.get("revisions")).toBe("all");
   });
 });
+
+describe("the release resource", () => {
+  it("lists whether each release is revoked", () => {
+    expect(RESOURCES.release.columns).toContain("revoked_at");
+  });
+
+  it("shows a release's content hash and revocation", () => {
+    expect(RESOURCES.release.detail).toEqual(
+      expect.arrayContaining(["content_hash", "revoked_at"]),
+    );
+  });
+});

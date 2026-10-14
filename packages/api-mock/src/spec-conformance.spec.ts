@@ -1885,6 +1885,24 @@ describe("api-mock releases and deployments", () => {
     expect(deployed.status).toBe(201);
   });
 
+  test("writes a new preview deployment for a release the URL already serves", async () => {
+    const project = await newProject("deploy-preview-renewal");
+    await fetch(`${BASE}/projects/${project.id}/origins`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+      body: JSON.stringify({ pattern: "https://*-acme.vercel.app", kind: "preview" }),
+    });
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const body = { release_id: release.id, targets: ["https://x-acme.vercel.app"], ttl: "1h" };
+    await createDeployment(project.id, project.secret, body);
+
+    const renewed = await createDeployment(project.id, project.secret, { ...body, ttl: "30d" });
+
+    expect(renewed.status).toBe(201);
+  });
+
   test("gives a preview deployment without a ttl the project's default expiry", async () => {
     const project = await newProject("deploy-preview-default-ttl");
     await fetch(`${BASE}/projects/${project.id}/origins`, {

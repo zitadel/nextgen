@@ -63,16 +63,23 @@ describe("variable rm", () => {
         );
       });
 
-      it("removes the preview override and leaves the frozen value", async () => {
+      it("removes the preview override", async () => {
         const app = await aSetUpApp();
-        expect(await app.setVariable("API_URL", "https://api.acme.com")).toSucceed();
-        expect(
-          await app.setVariable("API_URL", "https://preview.acme.com", { preview: true }),
-        ).toSucceed();
+        await app.setVariable("API_URL", "https://api.acme.com");
+        await app.setVariable("API_URL", "https://preview.acme.com", { preview: true });
 
-        expect(await app.removeVariable("API_URL", { preview: true })).toSucceed();
+        await app.removeVariable("API_URL", { preview: true });
 
         expect(await app.projectVariables({ preview: true })).toEqual([]);
+      });
+
+      it("leaves the value every deploy freezes when removing the preview override", async () => {
+        const app = await aSetUpApp();
+        await app.setVariable("API_URL", "https://api.acme.com");
+        await app.setVariable("API_URL", "https://preview.acme.com", { preview: true });
+
+        await app.removeVariable("API_URL", { preview: true });
+
         expect(await app.projectVariables()).toEqual([
           { name: "API_URL", secret: false, value: "https://api.acme.com" },
         ]);
