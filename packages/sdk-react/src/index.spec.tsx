@@ -261,6 +261,31 @@ describe("ZitadelLogout template children", () => {
   });
 });
 
+/** The text a `<template>` carries, wherever the renderer put its children. */
+function templateText(host: Element): string {
+  const template = host.querySelector("template");
+  return `${template?.content.textContent ?? ""}${template?.textContent ?? ""}`;
+}
+
+describe("ZitadelLogout template placeholders", () => {
+  // JSX reads `{{display}}` as an object literal; a string literal is the
+  // escape the README documents, so the element receives the placeholder.
+  it("reach the element verbatim from a string literal", () => {
+    const { container } = render(
+      <ZitadelLogout project={project}>
+        <template>
+          <button type="button" data-action="logout">
+            {"Sign out {{display}}"}
+          </button>
+        </template>
+      </ZitadelLogout>,
+    );
+    expect(templateText(container.querySelector("zitadel-logout")!)).toContain(
+      "Sign out {{display}}",
+    );
+  });
+});
+
 describe("published build", () => {
   // Next's App Router renders server components with the `react-server`
   // build of React, which has no `useRef`/`useLayoutEffect`; the directive
