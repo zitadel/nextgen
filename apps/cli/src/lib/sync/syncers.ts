@@ -10,7 +10,7 @@ import { consola } from "consola";
 
 import type { ZitadelClient } from "@zitadel/api/client";
 import { DEFAULT_FLOW_SCHEMA_URI } from "@zitadel/config/defaults";
-import { isVariableReference, referencedVariable } from "@zitadel/config/idp";
+import { isVariableReference, missingEndpoints, referencedVariable } from "@zitadel/config/idp";
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
 import {
   brandingConfigSchema,
@@ -107,20 +107,15 @@ function assertEnvRefs(data: object, env: EnvLookup): void {
   }
 }
 
-type Endpoints = {
-  issuer?: string;
-  token_endpoint?: string;
-  userinfo_endpoint?: string;
-  client_id?: string;
-  client_secret?: string;
-};
-
 type ConnectionBody = {
   slug?: string;
   protocol?: string;
   subject_claim?: string;
-  oidc?: Endpoints;
-  oauth2?: Endpoints;
+  oidc?: {
+    issuer?: string;
+    client_id?: string;
+    client_secret?: string;
+  };
 };
 
 /** The fields that make a connection the one its linked users came through. */
@@ -128,17 +123,11 @@ const IDENTITY_FIELDS = [
   { name: "slug", read: (body: ConnectionBody) => body.slug },
   { name: "protocol", read: (body: ConnectionBody) => body.protocol },
   { name: "oidc.issuer", read: (body: ConnectionBody) => body.oidc?.issuer },
-  { name: "oauth2.token_endpoint", read: (body: ConnectionBody) => body.oauth2?.token_endpoint },
-  {
-    name: "oauth2.userinfo_endpoint",
-    read: (body: ConnectionBody) => body.oauth2?.userinfo_endpoint,
-  },
   {
     name: "subject_claim",
-    // The engine reads an absent OIDC subject claim as `sub`, so a file that
+    // The engine reads an absent subject claim as `sub`, so a file that
     // leaves it out and one that says `sub` are the same connection.
-    read: (body: ConnectionBody) =>
-      body.subject_claim ?? (body.protocol === "oauth2" ? undefined : "sub"),
+    read: (body: ConnectionBody) => body.subject_claim ?? "sub",
   },
 ] as const;
 
@@ -182,10 +171,28 @@ class IdpConnectionSyncer implements ResourceSyncer {
    * equivalent of `idp-connection.json`. A literal `client_secret` fails that
    * pattern, so it is caught here and named plainly: it is the one mistake
    * that would publish a credential.
+   *
+   * A valid document is then held to the server's endpoint rule: an `oidc`
+   * block names no endpoint or every one it needs. The server refuses anything
+   * in between, so it is refused here, before an apply could stop part-way.
    */
-  validate(data: object): void {
+  validate(data: object, path = "Connection file"): void {
     const result = idpConnectionConfigSchema.safeParse(data);
     if (result.success) {
+      const missing = missingEndpoints((data as ConnectionBody).oidc);
+      if (missing.length > 0) {
+        throw new ZitadelError(
+          "E_VALIDATION",
+          `${path}: oidc names some endpoints but not ${missing.join(", ")}`,
+          {
+            hint:
+              "Name every endpoint (authorization_endpoint, jwks_uri, token_endpoint, and " +
+              "userinfo_endpoint unless id_token_mapping is true), or none to read them from " +
+              "the issuer's discovery document.",
+            details: { file: path, missing },
+          },
+        );
+      }
       return;
     }
     // Only a stored value that is not a reference is the mistake this names.
@@ -351,7 +358,7 @@ class IdpConnectionSyncer implements ResourceSyncer {
    * run, like a stored copy that cannot be.
    */
   private async checkVariables(path: string, next: ConnectionBody): Promise<void> {
-    const block = next.oidc ?? next.oauth2;
+    const block = next.oidc;
     const named = [
       { field: "client_id", secret: false, name: referencedVariable(block?.client_id ?? "") },
       {

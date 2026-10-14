@@ -619,8 +619,8 @@ describe("planConnection for a custom connection", () => {
     ).toThrow(/already named acme-sso and connects to https:\/\/sso\.acme\.example/);
   });
 
-  it("stops when the slug belongs to a connection that is not OIDC", () => {
-    const existing = file("acme-sso.json", { slug: "acme-sso", protocol: "oauth2" });
+  it("stops when the slug belongs to a connection without an oidc block", () => {
+    const existing = file("acme-sso.json", { slug: "acme-sso", protocol: "oidc" });
 
     expect(() =>
       planConnection({ slugFlag: "--slug", selection: custom(acme), files: [existing] }),

@@ -1183,6 +1183,77 @@ describe("api-mock idp connections and variables", () => {
     expect((body.definition as Record<string, unknown>).display_name).toBe("Google Workspace");
   });
 
+  describe("an oidc block that names only some endpoints", () => {
+    // The server's rule: none (discovery), or authorization_endpoint, jwks_uri,
+    // token_endpoint, and userinfo_endpoint unless id_token_mapping is true.
+    const endpoints = {
+      authorization_endpoint: "https://idp.test/authorize",
+      jwks_uri: "https://idp.test/jwks",
+      token_endpoint: "https://idp.test/token",
+      userinfo_endpoint: "https://idp.test/userinfo",
+    };
+    const withOidc = (over: object) =>
+      connection({
+        oidc: {
+          issuer: "https://idp.test",
+          scopes: ["openid"],
+          client_id: "${{ GOOGLE_CLIENT_ID }}",
+          client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+          ...over,
+        },
+      });
+
+    test.each<[string, object, string[]]>([
+      [
+        "one endpoint",
+        { token_endpoint: endpoints.token_endpoint },
+        ["authorization_endpoint", "jwks_uri", "userinfo_endpoint"],
+      ],
+      ["all but jwks_uri", { ...endpoints, jwks_uri: undefined }, ["jwks_uri"]],
+      [
+        "userinfo_endpoint alone under id_token_mapping",
+        { userinfo_endpoint: endpoints.userinfo_endpoint, id_token_mapping: true },
+        ["authorization_endpoint", "jwks_uri", "token_endpoint"],
+      ],
+    ])(
+      "refuses %s with idp.endpoints_partial, listing what is missing",
+      async (_case, over, missing) => {
+        const projectId = await newProject("idp-endpoints-partial");
+
+        const res = await putIdp(projectId, withOidc(over));
+
+        expect(res.status).toBe(400);
+        expect(await res.json()).toEqual({
+          code: "idp.endpoints_partial",
+          message: "identity provider connection: the endpoints are partially set",
+          details: { details: { missing } },
+        });
+      },
+    );
+
+    test("refuses a revision too, before the slug is looked up", async () => {
+      const projectId = await newProject("idp-endpoints-partial-revise");
+      expect((await putIdp(projectId, connection())).status).toBe(201);
+
+      const res = await putIdp(projectId, withOidc({ jwks_uri: endpoints.jwks_uri }));
+
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as { code: string }).code).toBe("idp.endpoints_partial");
+    });
+
+    test.each<[string, object]>([
+      ["every endpoint", endpoints],
+      [
+        "every endpoint but userinfo under id_token_mapping",
+        { ...endpoints, userinfo_endpoint: undefined, id_token_mapping: true },
+      ],
+    ])("accepts %s", async (_case, over) => {
+      const projectId = await newProject("idp-endpoints-full");
+
+      expect((await putIdp(projectId, withOidc(over))).status).toBe(201);
+    });
+  });
+
   test("reads one back by id, and 404s an id the project does not own", async () => {
     const mine = await newProject("idp-read-mine");
     const other = await newProject("idp-read-other");

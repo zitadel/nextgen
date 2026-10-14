@@ -12617,6 +12617,7 @@ type CreateIdpErrorResponse struct {
 	IdpNotFound         IdpNotFound
 	IdpPermissionDenied IdpPermissionDenied
 	IdpRevisionConflict IdpRevisionConflict
+	IdpEndpointsPartial IdpEndpointsPartial
 	Internal            Internal
 	ReqInvalid          ReqInvalid
 }
@@ -12632,6 +12633,7 @@ const (
 	IdpNotFoundCreateIdpErrorResponse         CreateIdpErrorResponseType = "idp.not_found"
 	IdpPermissionDeniedCreateIdpErrorResponse CreateIdpErrorResponseType = "idp.permission_denied"
 	IdpRevisionConflictCreateIdpErrorResponse CreateIdpErrorResponseType = "idp.revision_conflict"
+	IdpEndpointsPartialCreateIdpErrorResponse CreateIdpErrorResponseType = "idp.endpoints_partial"
 	InternalCreateIdpErrorResponse            CreateIdpErrorResponseType = "internal"
 	ReqInvalidCreateIdpErrorResponse          CreateIdpErrorResponseType = "req.invalid"
 )
@@ -12664,6 +12666,11 @@ func (s CreateIdpErrorResponse) IsIdpPermissionDenied() bool {
 // IsIdpRevisionConflict reports whether CreateIdpErrorResponse is IdpRevisionConflict.
 func (s CreateIdpErrorResponse) IsIdpRevisionConflict() bool {
 	return s.Type == IdpRevisionConflictCreateIdpErrorResponse
+}
+
+// IsIdpEndpointsPartial reports whether CreateIdpErrorResponse is IdpEndpointsPartial.
+func (s CreateIdpErrorResponse) IsIdpEndpointsPartial() bool {
+	return s.Type == IdpEndpointsPartialCreateIdpErrorResponse
 }
 
 // IsInternal reports whether CreateIdpErrorResponse is Internal.
@@ -12797,6 +12804,27 @@ func (s CreateIdpErrorResponse) GetIdpRevisionConflict() (v IdpRevisionConflict,
 func NewIdpRevisionConflictCreateIdpErrorResponse(v IdpRevisionConflict) CreateIdpErrorResponse {
 	var s CreateIdpErrorResponse
 	s.SetIdpRevisionConflict(v)
+	return s
+}
+
+// SetIdpEndpointsPartial sets CreateIdpErrorResponse to IdpEndpointsPartial.
+func (s *CreateIdpErrorResponse) SetIdpEndpointsPartial(v IdpEndpointsPartial) {
+	s.Type = IdpEndpointsPartialCreateIdpErrorResponse
+	s.IdpEndpointsPartial = v
+}
+
+// GetIdpEndpointsPartial returns IdpEndpointsPartial and true boolean if CreateIdpErrorResponse is IdpEndpointsPartial.
+func (s CreateIdpErrorResponse) GetIdpEndpointsPartial() (v IdpEndpointsPartial, ok bool) {
+	if !s.IsIdpEndpointsPartial() {
+		return v, false
+	}
+	return s.IdpEndpointsPartial, true
+}
+
+// NewIdpEndpointsPartialCreateIdpErrorResponse returns new CreateIdpErrorResponse from IdpEndpointsPartial.
+func NewIdpEndpointsPartialCreateIdpErrorResponse(v IdpEndpointsPartial) CreateIdpErrorResponse {
+	var s CreateIdpErrorResponse
+	s.SetIdpEndpointsPartial(v)
 	return s
 }
 
@@ -25186,41 +25214,39 @@ func (*GetFlowStepConflict) getFlowStepRes() {}
 
 // GetFlowStepErrorResponse represents sum type.
 type GetFlowStepErrorResponse struct {
-	Type                          GetFlowStepErrorResponseType // switch on this field
-	AttAlreadyHandedOff           AttAlreadyHandedOff
-	AttInvalidRequest             AttInvalidRequest
-	AttInvalidState               AttInvalidState
-	AttNotCompleted               AttNotCompleted
-	AttNotFound                   AttNotFound
-	EncKeyDecryptFailed           EncKeyDecryptFailed
-	EncKeyEncryptFailed           EncKeyEncryptFailed
-	EncKeyNotFound                EncKeyNotFound
-	EvtInvalid                    EvtInvalid
-	FlowCompleted                 FlowCompleted
-	FlowCookieExpired             FlowCookieExpired
-	FlowCookieInvalid             FlowCookieInvalid
-	FlowIntegrity                 FlowIntegrity
-	FlowInvalidAction             FlowInvalidAction
-	FlowNotFound                  FlowNotFound
-	FlowRestartRequired           FlowRestartRequired
-	FlowUnsupported               FlowUnsupported
-	IdpNotFound                   IdpNotFound
-	IdpEndpointCleartext          IdpEndpointCleartext
-	IdpEndpointsPartial           IdpEndpointsPartial
-	IdpOAuth2Unsupported          IdpOAuth2Unsupported
-	IdpProtocolBlockMissing       IdpProtocolBlockMissing
-	IdpScopesMissingOpenid        IdpScopesMissingOpenid
-	IdpStrategyPointerUnsupported IdpStrategyPointerUnsupported
-	Internal                      Internal
-	TknInvalid                    TknInvalid
-	ReqInvalid                    ReqInvalid
-	EncKeyUnknownAlg              EncKeyUnknownAlg
-	UserAlreadyExists             UserAlreadyExists
-	UserConflict                  UserConflict
-	UserInvalid                   UserInvalid
-	UserNotFound                  UserNotFound
-	UserPasswordEmpty             UserPasswordEmpty
-	UserPasswordTooLong           UserPasswordTooLong
+	Type                    GetFlowStepErrorResponseType // switch on this field
+	AttAlreadyHandedOff     AttAlreadyHandedOff
+	AttInvalidRequest       AttInvalidRequest
+	AttInvalidState         AttInvalidState
+	AttNotCompleted         AttNotCompleted
+	AttNotFound             AttNotFound
+	EncKeyDecryptFailed     EncKeyDecryptFailed
+	EncKeyEncryptFailed     EncKeyEncryptFailed
+	EncKeyNotFound          EncKeyNotFound
+	EvtInvalid              EvtInvalid
+	FlowCompleted           FlowCompleted
+	FlowCookieExpired       FlowCookieExpired
+	FlowCookieInvalid       FlowCookieInvalid
+	FlowIntegrity           FlowIntegrity
+	FlowInvalidAction       FlowInvalidAction
+	FlowNotFound            FlowNotFound
+	FlowRestartRequired     FlowRestartRequired
+	FlowUnsupported         FlowUnsupported
+	IdpNotFound             IdpNotFound
+	IdpEndpointCleartext    IdpEndpointCleartext
+	IdpEndpointsPartial     IdpEndpointsPartial
+	IdpProtocolBlockMissing IdpProtocolBlockMissing
+	IdpScopesMissingOpenid  IdpScopesMissingOpenid
+	Internal                Internal
+	TknInvalid              TknInvalid
+	ReqInvalid              ReqInvalid
+	EncKeyUnknownAlg        EncKeyUnknownAlg
+	UserAlreadyExists       UserAlreadyExists
+	UserConflict            UserConflict
+	UserInvalid             UserInvalid
+	UserNotFound            UserNotFound
+	UserPasswordEmpty       UserPasswordEmpty
+	UserPasswordTooLong     UserPasswordTooLong
 }
 
 // GetFlowStepErrorResponseType is oneOf type of GetFlowStepErrorResponse.
@@ -25228,40 +25254,38 @@ type GetFlowStepErrorResponseType string
 
 // Possible values for GetFlowStepErrorResponseType.
 const (
-	AttAlreadyHandedOffGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "att.already_handed_off"
-	AttInvalidRequestGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "att.invalid_request"
-	AttInvalidStateGetFlowStepErrorResponse               GetFlowStepErrorResponseType = "att.invalid_state"
-	AttNotCompletedGetFlowStepErrorResponse               GetFlowStepErrorResponseType = "att.not_completed"
-	AttNotFoundGetFlowStepErrorResponse                   GetFlowStepErrorResponseType = "att.not_found"
-	EncKeyDecryptFailedGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "enc_key.decrypt_failed"
-	EncKeyEncryptFailedGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "enc_key.encrypt_failed"
-	EncKeyNotFoundGetFlowStepErrorResponse                GetFlowStepErrorResponseType = "enc_key.not_found"
-	EvtInvalidGetFlowStepErrorResponse                    GetFlowStepErrorResponseType = "evt.invalid"
-	FlowCompletedGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "flow.completed"
-	FlowCookieExpiredGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "flow.cookie_expired"
-	FlowCookieInvalidGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "flow.cookie_invalid"
-	FlowIntegrityGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "flow.integrity"
-	FlowInvalidActionGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "flow.invalid_action"
-	FlowNotFoundGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "flow.not_found"
-	FlowRestartRequiredGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "flow.restart_required"
-	FlowUnsupportedGetFlowStepErrorResponse               GetFlowStepErrorResponseType = "flow.unsupported"
-	IdpNotFoundGetFlowStepErrorResponse                   GetFlowStepErrorResponseType = "idp.not_found"
-	IdpEndpointCleartextGetFlowStepErrorResponse          GetFlowStepErrorResponseType = "idp.endpoint_cleartext"
-	IdpEndpointsPartialGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "idp.endpoints_partial"
-	IdpOAuth2UnsupportedGetFlowStepErrorResponse          GetFlowStepErrorResponseType = "idp.oauth2_unsupported"
-	IdpProtocolBlockMissingGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "idp.protocol_block_missing"
-	IdpScopesMissingOpenidGetFlowStepErrorResponse        GetFlowStepErrorResponseType = "idp.scopes_missing_openid"
-	IdpStrategyPointerUnsupportedGetFlowStepErrorResponse GetFlowStepErrorResponseType = "idp.strategy_pointer_unsupported"
-	InternalGetFlowStepErrorResponse                      GetFlowStepErrorResponseType = "internal"
-	TknInvalidGetFlowStepErrorResponse                    GetFlowStepErrorResponseType = "tkn.invalid"
-	ReqInvalidGetFlowStepErrorResponse                    GetFlowStepErrorResponseType = "req.invalid"
-	EncKeyUnknownAlgGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "enc_key.unknown_alg"
-	UserAlreadyExistsGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "user.already_exists"
-	UserConflictGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "user.conflict"
-	UserInvalidGetFlowStepErrorResponse                   GetFlowStepErrorResponseType = "user.invalid"
-	UserNotFoundGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "user.not_found"
-	UserPasswordEmptyGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "user.password_empty"
-	UserPasswordTooLongGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "user.password_too_long"
+	AttAlreadyHandedOffGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "att.already_handed_off"
+	AttInvalidRequestGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "att.invalid_request"
+	AttInvalidStateGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "att.invalid_state"
+	AttNotCompletedGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "att.not_completed"
+	AttNotFoundGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "att.not_found"
+	EncKeyDecryptFailedGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "enc_key.decrypt_failed"
+	EncKeyEncryptFailedGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "enc_key.encrypt_failed"
+	EncKeyNotFoundGetFlowStepErrorResponse          GetFlowStepErrorResponseType = "enc_key.not_found"
+	EvtInvalidGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "evt.invalid"
+	FlowCompletedGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "flow.completed"
+	FlowCookieExpiredGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "flow.cookie_expired"
+	FlowCookieInvalidGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "flow.cookie_invalid"
+	FlowIntegrityGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "flow.integrity"
+	FlowInvalidActionGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "flow.invalid_action"
+	FlowNotFoundGetFlowStepErrorResponse            GetFlowStepErrorResponseType = "flow.not_found"
+	FlowRestartRequiredGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "flow.restart_required"
+	FlowUnsupportedGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "flow.unsupported"
+	IdpNotFoundGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "idp.not_found"
+	IdpEndpointCleartextGetFlowStepErrorResponse    GetFlowStepErrorResponseType = "idp.endpoint_cleartext"
+	IdpEndpointsPartialGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "idp.endpoints_partial"
+	IdpProtocolBlockMissingGetFlowStepErrorResponse GetFlowStepErrorResponseType = "idp.protocol_block_missing"
+	IdpScopesMissingOpenidGetFlowStepErrorResponse  GetFlowStepErrorResponseType = "idp.scopes_missing_openid"
+	InternalGetFlowStepErrorResponse                GetFlowStepErrorResponseType = "internal"
+	TknInvalidGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "tkn.invalid"
+	ReqInvalidGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "req.invalid"
+	EncKeyUnknownAlgGetFlowStepErrorResponse        GetFlowStepErrorResponseType = "enc_key.unknown_alg"
+	UserAlreadyExistsGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "user.already_exists"
+	UserConflictGetFlowStepErrorResponse            GetFlowStepErrorResponseType = "user.conflict"
+	UserInvalidGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "user.invalid"
+	UserNotFoundGetFlowStepErrorResponse            GetFlowStepErrorResponseType = "user.not_found"
+	UserPasswordEmptyGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "user.password_empty"
+	UserPasswordTooLongGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "user.password_too_long"
 )
 
 // IsAttAlreadyHandedOff reports whether GetFlowStepErrorResponse is AttAlreadyHandedOff.
@@ -25364,11 +25388,6 @@ func (s GetFlowStepErrorResponse) IsIdpEndpointsPartial() bool {
 	return s.Type == IdpEndpointsPartialGetFlowStepErrorResponse
 }
 
-// IsIdpOAuth2Unsupported reports whether GetFlowStepErrorResponse is IdpOAuth2Unsupported.
-func (s GetFlowStepErrorResponse) IsIdpOAuth2Unsupported() bool {
-	return s.Type == IdpOAuth2UnsupportedGetFlowStepErrorResponse
-}
-
 // IsIdpProtocolBlockMissing reports whether GetFlowStepErrorResponse is IdpProtocolBlockMissing.
 func (s GetFlowStepErrorResponse) IsIdpProtocolBlockMissing() bool {
 	return s.Type == IdpProtocolBlockMissingGetFlowStepErrorResponse
@@ -25377,11 +25396,6 @@ func (s GetFlowStepErrorResponse) IsIdpProtocolBlockMissing() bool {
 // IsIdpScopesMissingOpenid reports whether GetFlowStepErrorResponse is IdpScopesMissingOpenid.
 func (s GetFlowStepErrorResponse) IsIdpScopesMissingOpenid() bool {
 	return s.Type == IdpScopesMissingOpenidGetFlowStepErrorResponse
-}
-
-// IsIdpStrategyPointerUnsupported reports whether GetFlowStepErrorResponse is IdpStrategyPointerUnsupported.
-func (s GetFlowStepErrorResponse) IsIdpStrategyPointerUnsupported() bool {
-	return s.Type == IdpStrategyPointerUnsupportedGetFlowStepErrorResponse
 }
 
 // IsInternal reports whether GetFlowStepErrorResponse is Internal.
@@ -25854,27 +25868,6 @@ func NewIdpEndpointsPartialGetFlowStepErrorResponse(v IdpEndpointsPartial) GetFl
 	return s
 }
 
-// SetIdpOAuth2Unsupported sets GetFlowStepErrorResponse to IdpOAuth2Unsupported.
-func (s *GetFlowStepErrorResponse) SetIdpOAuth2Unsupported(v IdpOAuth2Unsupported) {
-	s.Type = IdpOAuth2UnsupportedGetFlowStepErrorResponse
-	s.IdpOAuth2Unsupported = v
-}
-
-// GetIdpOAuth2Unsupported returns IdpOAuth2Unsupported and true boolean if GetFlowStepErrorResponse is IdpOAuth2Unsupported.
-func (s GetFlowStepErrorResponse) GetIdpOAuth2Unsupported() (v IdpOAuth2Unsupported, ok bool) {
-	if !s.IsIdpOAuth2Unsupported() {
-		return v, false
-	}
-	return s.IdpOAuth2Unsupported, true
-}
-
-// NewIdpOAuth2UnsupportedGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from IdpOAuth2Unsupported.
-func NewIdpOAuth2UnsupportedGetFlowStepErrorResponse(v IdpOAuth2Unsupported) GetFlowStepErrorResponse {
-	var s GetFlowStepErrorResponse
-	s.SetIdpOAuth2Unsupported(v)
-	return s
-}
-
 // SetIdpProtocolBlockMissing sets GetFlowStepErrorResponse to IdpProtocolBlockMissing.
 func (s *GetFlowStepErrorResponse) SetIdpProtocolBlockMissing(v IdpProtocolBlockMissing) {
 	s.Type = IdpProtocolBlockMissingGetFlowStepErrorResponse
@@ -25914,27 +25907,6 @@ func (s GetFlowStepErrorResponse) GetIdpScopesMissingOpenid() (v IdpScopesMissin
 func NewIdpScopesMissingOpenidGetFlowStepErrorResponse(v IdpScopesMissingOpenid) GetFlowStepErrorResponse {
 	var s GetFlowStepErrorResponse
 	s.SetIdpScopesMissingOpenid(v)
-	return s
-}
-
-// SetIdpStrategyPointerUnsupported sets GetFlowStepErrorResponse to IdpStrategyPointerUnsupported.
-func (s *GetFlowStepErrorResponse) SetIdpStrategyPointerUnsupported(v IdpStrategyPointerUnsupported) {
-	s.Type = IdpStrategyPointerUnsupportedGetFlowStepErrorResponse
-	s.IdpStrategyPointerUnsupported = v
-}
-
-// GetIdpStrategyPointerUnsupported returns IdpStrategyPointerUnsupported and true boolean if GetFlowStepErrorResponse is IdpStrategyPointerUnsupported.
-func (s GetFlowStepErrorResponse) GetIdpStrategyPointerUnsupported() (v IdpStrategyPointerUnsupported, ok bool) {
-	if !s.IsIdpStrategyPointerUnsupported() {
-		return v, false
-	}
-	return s.IdpStrategyPointerUnsupported, true
-}
-
-// NewIdpStrategyPointerUnsupportedGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from IdpStrategyPointerUnsupported.
-func NewIdpStrategyPointerUnsupportedGetFlowStepErrorResponse(v IdpStrategyPointerUnsupported) GetFlowStepErrorResponse {
-	var s GetFlowStepErrorResponse
-	s.SetIdpStrategyPointerUnsupported(v)
 	return s
 }
 
@@ -29529,22 +29501,17 @@ type IdpConnection struct {
 	Template OptString `json:"template"`
 	// Shown to the user on the sign-in button.
 	DisplayName string `json:"display_name"`
-	// Claim carrying the provider's stable subject identifier. Optional for OIDC (the engine uses `sub`
-	// per spec; override where `sub` is pairwise, e.g. Entra `oid`). Required for OAuth2 — no `sub`
-	// guarantee.
+	// Claim carrying the provider's stable subject identifier. Optional; the engine uses `sub` per spec.
+	// Override it where `sub` is pairwise, e.g. Entra `oid`.
 	SubjectClaim OptString `json:"subject_claim"`
 	// Maps user-schema property names (keys) to provider claim names (values). A value is an exact
 	// top-level claim key: no path syntax, and a dot is part of the key, so nested claims (OIDC
-	// `address`, GitHub `plan`) are not addressable yet. `$`-prefixed strings and non-string values are
-	// reserved for future mapping forms. Add properties defined in the user schemas; unmatched entries
-	// are ignored.
+	// `address`) are not addressable yet. `$`-prefixed strings and non-string values are reserved for
+	// future mapping forms. Add properties defined in the user schemas; unmatched entries are ignored.
 	ClaimMapping OptIdpConnectionClaimMapping `json:"claim_mapping"`
-	// Maps a verifiable user-schema property to its verification source: a claim name (read the claim),
-	// the literal `true` (trust this provider unconditionally), or the `$`-pointer
-	// `"$supplementary_fetch"` (verified by the selected supplementary_fetch strategy per its contract -
-	// e.g. github_primary_email verifies `email` via primary && verified). Values starting with `$` are
-	// reserved; only `$supplementary_fetch` is defined. Distinct from claim_mapping, which carries
-	// values, not verification state.
+	// Maps a verifiable user-schema property to its verification source: a claim name (read the claim)
+	// or the literal `true` (trust this provider unconditionally). Values starting with `$` are reserved
+	// for future sources. Distinct from claim_mapping, which carries values, not verification state.
 	VerifiedClaims OptIdpConnectionVerifiedClaims `json:"verified_claims"`
 	// How far this provider's data is trusted. `creation` defines what happens to a subject that has no
 	// account yet. With `disabled`, a user is not created. With `auto`, the user is created without a
@@ -29559,11 +29526,9 @@ type IdpConnection struct {
 	Provisioning OptIdpConnectionProvisioning `json:"provisioning"`
 	// OIDC connection details. Endpoints come from the issuer's discovery document. A provider that
 	// exposes no .well-known document names them all instead: authorization_endpoint, token_endpoint,
-	// jwks_uri, and userinfo_endpoint unless id_token_mapping is set. Setting some but not all is
-	// rejected.
+	// jwks_uri, and userinfo_endpoint unless id_token_mapping is set. Setting any endpoint without the
+	// others is rejected with idp.endpoints_partial.
 	Oidc OptIdpConnectionOidc `json:"oidc"`
-	// OAuth 2.0 connection details.
-	OAuth2 OptIdpConnectionOAuth2 `json:"oauth2"`
 }
 
 // GetSchema returns the value of Schema.
@@ -29616,11 +29581,6 @@ func (s *IdpConnection) GetOidc() OptIdpConnectionOidc {
 	return s.Oidc
 }
 
-// GetOAuth2 returns the value of OAuth2.
-func (s *IdpConnection) GetOAuth2() OptIdpConnectionOAuth2 {
-	return s.OAuth2
-}
-
 // SetSchema sets the value of Schema.
 func (s *IdpConnection) SetSchema(val OptString) {
 	s.Schema = val
@@ -29671,16 +29631,10 @@ func (s *IdpConnection) SetOidc(val OptIdpConnectionOidc) {
 	s.Oidc = val
 }
 
-// SetOAuth2 sets the value of OAuth2.
-func (s *IdpConnection) SetOAuth2(val OptIdpConnectionOAuth2) {
-	s.OAuth2 = val
-}
-
 // Maps user-schema property names (keys) to provider claim names (values). A value is an exact
 // top-level claim key: no path syntax, and a dot is part of the key, so nested claims (OIDC
-// `address`, GitHub `plan`) are not addressable yet. `$`-prefixed strings and non-string values are
-// reserved for future mapping forms. Add properties defined in the user schemas; unmatched entries
-// are ignored.
+// `address`) are not addressable yet. `$`-prefixed strings and non-string values are reserved for
+// future mapping forms. Add properties defined in the user schemas; unmatched entries are ignored.
 type IdpConnectionClaimMapping map[string]string
 
 func (s *IdpConnectionClaimMapping) init() IdpConnectionClaimMapping {
@@ -29692,234 +29646,10 @@ func (s *IdpConnectionClaimMapping) init() IdpConnectionClaimMapping {
 	return m
 }
 
-// OAuth 2.0 connection details.
-type IdpConnectionOAuth2 struct {
-	// Where the user is sent to authorize.
-	AuthorizationEndpoint string `json:"authorization_endpoint"`
-	// Where the authorization code is exchanged.
-	TokenEndpoint string `json:"token_endpoint"`
-	// Where the authenticated user's profile is fetched.
-	UserinfoEndpoint string `json:"userinfo_endpoint"`
-	// Either a literal in case the same client is used in all environments, or a `${{ NAME }}` reference
-	// to a variable in case of separate clients per environment.
-	ClientID string `json:"client_id"`
-	// A reference to the variable holding the client secret, never the secret itself. A secret may only
-	// be referenced as the entire value: text around the placeholder would be rendered into the resolved
-	// credential, so it is rejected. The engine resolves it against the environment serving the request.
-	ClientSecret string `json:"client_secret"`
-	// How the client authenticates at the token endpoint.
-	TokenEndpointAuthMethod OptIdpConnectionOAuth2TokenEndpointAuthMethod `json:"token_endpoint_auth_method"`
-	// Provider-specific; OAuth 2.0 defines no universal scope.
-	Scopes []string `json:"scopes"`
-	// Send PKCE (code_challenge/code_verifier). Providers that do not support PKCE typically ignore the
-	// parameters, so `true` is safe and future-proofs; set `false` only for a provider whose token
-	// endpoint rejects them.
-	PkceEnabled OptBool `json:"pkce_enabled"`
-	// Extra provider-specific authorize parameters (for example `prompt`). Engine-owned protocol
-	// parameters are reserved and rejected by `propertyNames`: the engine composes them itself, and an
-	// override of `state` or `nonce` would silently defeat CSRF and token binding. `client_secret` and
-	// `client_assertion` are rejected as they could be appended to the public authorize URL.
-	StaticAuthorizeParameters OptIdpConnectionOAuth2StaticAuthorizeParameters `json:"static_authorize_parameters"`
-	// Provider-specific follow-up call after userinfo. New values are non-breaking.
-	SupplementaryFetch OptIdpConnectionOAuth2SupplementaryFetch `json:"supplementary_fetch"`
-}
-
-// GetAuthorizationEndpoint returns the value of AuthorizationEndpoint.
-func (s *IdpConnectionOAuth2) GetAuthorizationEndpoint() string {
-	return s.AuthorizationEndpoint
-}
-
-// GetTokenEndpoint returns the value of TokenEndpoint.
-func (s *IdpConnectionOAuth2) GetTokenEndpoint() string {
-	return s.TokenEndpoint
-}
-
-// GetUserinfoEndpoint returns the value of UserinfoEndpoint.
-func (s *IdpConnectionOAuth2) GetUserinfoEndpoint() string {
-	return s.UserinfoEndpoint
-}
-
-// GetClientID returns the value of ClientID.
-func (s *IdpConnectionOAuth2) GetClientID() string {
-	return s.ClientID
-}
-
-// GetClientSecret returns the value of ClientSecret.
-func (s *IdpConnectionOAuth2) GetClientSecret() string {
-	return s.ClientSecret
-}
-
-// GetTokenEndpointAuthMethod returns the value of TokenEndpointAuthMethod.
-func (s *IdpConnectionOAuth2) GetTokenEndpointAuthMethod() OptIdpConnectionOAuth2TokenEndpointAuthMethod {
-	return s.TokenEndpointAuthMethod
-}
-
-// GetScopes returns the value of Scopes.
-func (s *IdpConnectionOAuth2) GetScopes() []string {
-	return s.Scopes
-}
-
-// GetPkceEnabled returns the value of PkceEnabled.
-func (s *IdpConnectionOAuth2) GetPkceEnabled() OptBool {
-	return s.PkceEnabled
-}
-
-// GetStaticAuthorizeParameters returns the value of StaticAuthorizeParameters.
-func (s *IdpConnectionOAuth2) GetStaticAuthorizeParameters() OptIdpConnectionOAuth2StaticAuthorizeParameters {
-	return s.StaticAuthorizeParameters
-}
-
-// GetSupplementaryFetch returns the value of SupplementaryFetch.
-func (s *IdpConnectionOAuth2) GetSupplementaryFetch() OptIdpConnectionOAuth2SupplementaryFetch {
-	return s.SupplementaryFetch
-}
-
-// SetAuthorizationEndpoint sets the value of AuthorizationEndpoint.
-func (s *IdpConnectionOAuth2) SetAuthorizationEndpoint(val string) {
-	s.AuthorizationEndpoint = val
-}
-
-// SetTokenEndpoint sets the value of TokenEndpoint.
-func (s *IdpConnectionOAuth2) SetTokenEndpoint(val string) {
-	s.TokenEndpoint = val
-}
-
-// SetUserinfoEndpoint sets the value of UserinfoEndpoint.
-func (s *IdpConnectionOAuth2) SetUserinfoEndpoint(val string) {
-	s.UserinfoEndpoint = val
-}
-
-// SetClientID sets the value of ClientID.
-func (s *IdpConnectionOAuth2) SetClientID(val string) {
-	s.ClientID = val
-}
-
-// SetClientSecret sets the value of ClientSecret.
-func (s *IdpConnectionOAuth2) SetClientSecret(val string) {
-	s.ClientSecret = val
-}
-
-// SetTokenEndpointAuthMethod sets the value of TokenEndpointAuthMethod.
-func (s *IdpConnectionOAuth2) SetTokenEndpointAuthMethod(val OptIdpConnectionOAuth2TokenEndpointAuthMethod) {
-	s.TokenEndpointAuthMethod = val
-}
-
-// SetScopes sets the value of Scopes.
-func (s *IdpConnectionOAuth2) SetScopes(val []string) {
-	s.Scopes = val
-}
-
-// SetPkceEnabled sets the value of PkceEnabled.
-func (s *IdpConnectionOAuth2) SetPkceEnabled(val OptBool) {
-	s.PkceEnabled = val
-}
-
-// SetStaticAuthorizeParameters sets the value of StaticAuthorizeParameters.
-func (s *IdpConnectionOAuth2) SetStaticAuthorizeParameters(val OptIdpConnectionOAuth2StaticAuthorizeParameters) {
-	s.StaticAuthorizeParameters = val
-}
-
-// SetSupplementaryFetch sets the value of SupplementaryFetch.
-func (s *IdpConnectionOAuth2) SetSupplementaryFetch(val OptIdpConnectionOAuth2SupplementaryFetch) {
-	s.SupplementaryFetch = val
-}
-
-// Extra provider-specific authorize parameters (for example `prompt`). Engine-owned protocol
-// parameters are reserved and rejected by `propertyNames`: the engine composes them itself, and an
-// override of `state` or `nonce` would silently defeat CSRF and token binding. `client_secret` and
-// `client_assertion` are rejected as they could be appended to the public authorize URL.
-type IdpConnectionOAuth2StaticAuthorizeParameters map[string]string
-
-func (s *IdpConnectionOAuth2StaticAuthorizeParameters) init() IdpConnectionOAuth2StaticAuthorizeParameters {
-	m := *s
-	if m == nil {
-		m = map[string]string{}
-		*s = m
-	}
-	return m
-}
-
-// Provider-specific follow-up call after userinfo. New values are non-breaking.
-type IdpConnectionOAuth2SupplementaryFetch string
-
-const (
-	IdpConnectionOAuth2SupplementaryFetchGithubPrimaryEmail IdpConnectionOAuth2SupplementaryFetch = "github_primary_email"
-)
-
-// AllValues returns all IdpConnectionOAuth2SupplementaryFetch values.
-func (IdpConnectionOAuth2SupplementaryFetch) AllValues() []IdpConnectionOAuth2SupplementaryFetch {
-	return []IdpConnectionOAuth2SupplementaryFetch{
-		IdpConnectionOAuth2SupplementaryFetchGithubPrimaryEmail,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s IdpConnectionOAuth2SupplementaryFetch) MarshalText() ([]byte, error) {
-	switch s {
-	case IdpConnectionOAuth2SupplementaryFetchGithubPrimaryEmail:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *IdpConnectionOAuth2SupplementaryFetch) UnmarshalText(data []byte) error {
-	switch IdpConnectionOAuth2SupplementaryFetch(data) {
-	case IdpConnectionOAuth2SupplementaryFetchGithubPrimaryEmail:
-		*s = IdpConnectionOAuth2SupplementaryFetchGithubPrimaryEmail
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
-}
-
-// How the client authenticates at the token endpoint.
-type IdpConnectionOAuth2TokenEndpointAuthMethod string
-
-const (
-	IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretBasic IdpConnectionOAuth2TokenEndpointAuthMethod = "client_secret_basic"
-	IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretPost  IdpConnectionOAuth2TokenEndpointAuthMethod = "client_secret_post"
-)
-
-// AllValues returns all IdpConnectionOAuth2TokenEndpointAuthMethod values.
-func (IdpConnectionOAuth2TokenEndpointAuthMethod) AllValues() []IdpConnectionOAuth2TokenEndpointAuthMethod {
-	return []IdpConnectionOAuth2TokenEndpointAuthMethod{
-		IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretBasic,
-		IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretPost,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s IdpConnectionOAuth2TokenEndpointAuthMethod) MarshalText() ([]byte, error) {
-	switch s {
-	case IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretBasic:
-		return []byte(s), nil
-	case IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretPost:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *IdpConnectionOAuth2TokenEndpointAuthMethod) UnmarshalText(data []byte) error {
-	switch IdpConnectionOAuth2TokenEndpointAuthMethod(data) {
-	case IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretBasic:
-		*s = IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretBasic
-		return nil
-	case IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretPost:
-		*s = IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretPost
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
-}
-
 // OIDC connection details. Endpoints come from the issuer's discovery document. A provider that
 // exposes no .well-known document names them all instead: authorization_endpoint, token_endpoint,
-// jwks_uri, and userinfo_endpoint unless id_token_mapping is set. Setting some but not all is
-// rejected.
+// jwks_uri, and userinfo_endpoint unless id_token_mapping is set. Setting any endpoint without the
+// others is rejected with idp.endpoints_partial.
 type IdpConnectionOidc struct {
 	// Discovery base. Endpoints are resolved from its .well-known document unless the connection names
 	// them all.
@@ -30203,12 +29933,9 @@ func (s *IdpConnectionProvisioningCreation) UnmarshalText(data []byte) error {
 	}
 }
 
-// Maps a verifiable user-schema property to its verification source: a claim name (read the claim),
-// the literal `true` (trust this provider unconditionally), or the `$`-pointer
-// `"$supplementary_fetch"` (verified by the selected supplementary_fetch strategy per its contract -
-// e.g. github_primary_email verifies `email` via primary && verified). Values starting with `$` are
-// reserved; only `$supplementary_fetch` is defined. Distinct from claim_mapping, which carries
-// values, not verification state.
+// Maps a verifiable user-schema property to its verification source: a claim name (read the claim)
+// or the literal `true` (trust this provider unconditionally). Values starting with `$` are reserved
+// for future sources. Distinct from claim_mapping, which carries values, not verification state.
 type IdpConnectionVerifiedClaims map[string]IdpConnectionVerifiedClaimsItem
 
 func (s *IdpConnectionVerifiedClaims) init() IdpConnectionVerifiedClaims {
@@ -31467,59 +31194,6 @@ func (s *IdpNotFoundDetails) init() IdpNotFoundDetails {
 	return m
 }
 
-// Merged schema.
-// Ref: #
-type IdpOAuth2Unsupported struct {
-	// Merged property.
-	Code string `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Additional error-specific context.
-	Details OptIdpOAuth2UnsupportedDetails `json:"details"`
-}
-
-// GetCode returns the value of Code.
-func (s *IdpOAuth2Unsupported) GetCode() string {
-	return s.Code
-}
-
-// GetMessage returns the value of Message.
-func (s *IdpOAuth2Unsupported) GetMessage() string {
-	return s.Message
-}
-
-// GetDetails returns the value of Details.
-func (s *IdpOAuth2Unsupported) GetDetails() OptIdpOAuth2UnsupportedDetails {
-	return s.Details
-}
-
-// SetCode sets the value of Code.
-func (s *IdpOAuth2Unsupported) SetCode(val string) {
-	s.Code = val
-}
-
-// SetMessage sets the value of Message.
-func (s *IdpOAuth2Unsupported) SetMessage(val string) {
-	s.Message = val
-}
-
-// SetDetails sets the value of Details.
-func (s *IdpOAuth2Unsupported) SetDetails(val OptIdpOAuth2UnsupportedDetails) {
-	s.Details = val
-}
-
-// Additional error-specific context.
-type IdpOAuth2UnsupportedDetails map[string]jx.Raw
-
-func (s *IdpOAuth2UnsupportedDetails) init() IdpOAuth2UnsupportedDetails {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
 // Shared allowlisted fields for `idp.created` (snapshot) and `idp.updated`
 // (delta: only changed fields present, plus the new `revision_id`). The
 // connection id is the event's `entity_id`. The connection document, and with
@@ -31639,20 +31313,18 @@ func (s *IdpPermissionDeniedDetails) init() IdpPermissionDeniedDetails {
 	return m
 }
 
-// The protocol used by the identity provider.
+// The protocol used by the identity provider. OIDC is the only protocol.
 // Ref: #
 type IdpProtocol string
 
 const (
-	IdpProtocolOidc   IdpProtocol = "oidc"
-	IdpProtocolOAuth2 IdpProtocol = "oauth2"
+	IdpProtocolOidc IdpProtocol = "oidc"
 )
 
 // AllValues returns all IdpProtocol values.
 func (IdpProtocol) AllValues() []IdpProtocol {
 	return []IdpProtocol{
 		IdpProtocolOidc,
-		IdpProtocolOAuth2,
 	}
 }
 
@@ -31660,8 +31332,6 @@ func (IdpProtocol) AllValues() []IdpProtocol {
 func (s IdpProtocol) MarshalText() ([]byte, error) {
 	switch s {
 	case IdpProtocolOidc:
-		return []byte(s), nil
-	case IdpProtocolOAuth2:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -31673,9 +31343,6 @@ func (s *IdpProtocol) UnmarshalText(data []byte) error {
 	switch IdpProtocol(data) {
 	case IdpProtocolOidc:
 		*s = IdpProtocolOidc
-		return nil
-	case IdpProtocolOAuth2:
-		*s = IdpProtocolOAuth2
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -31918,59 +31585,6 @@ func (s *IdpScopesMissingOpenid) SetDetails(val OptIdpScopesMissingOpenidDetails
 type IdpScopesMissingOpenidDetails map[string]jx.Raw
 
 func (s *IdpScopesMissingOpenidDetails) init() IdpScopesMissingOpenidDetails {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
-// Merged schema.
-// Ref: #
-type IdpStrategyPointerUnsupported struct {
-	// Merged property.
-	Code string `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Additional error-specific context.
-	Details OptIdpStrategyPointerUnsupportedDetails `json:"details"`
-}
-
-// GetCode returns the value of Code.
-func (s *IdpStrategyPointerUnsupported) GetCode() string {
-	return s.Code
-}
-
-// GetMessage returns the value of Message.
-func (s *IdpStrategyPointerUnsupported) GetMessage() string {
-	return s.Message
-}
-
-// GetDetails returns the value of Details.
-func (s *IdpStrategyPointerUnsupported) GetDetails() OptIdpStrategyPointerUnsupportedDetails {
-	return s.Details
-}
-
-// SetCode sets the value of Code.
-func (s *IdpStrategyPointerUnsupported) SetCode(val string) {
-	s.Code = val
-}
-
-// SetMessage sets the value of Message.
-func (s *IdpStrategyPointerUnsupported) SetMessage(val string) {
-	s.Message = val
-}
-
-// SetDetails sets the value of Details.
-func (s *IdpStrategyPointerUnsupported) SetDetails(val OptIdpStrategyPointerUnsupportedDetails) {
-	s.Details = val
-}
-
-// Additional error-specific context.
-type IdpStrategyPointerUnsupportedDetails map[string]jx.Raw
-
-func (s *IdpStrategyPointerUnsupportedDetails) init() IdpStrategyPointerUnsupportedDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -40796,190 +40410,6 @@ func (o OptIdpConnectionClaimMapping) Or(d IdpConnectionClaimMapping) IdpConnect
 	return d
 }
 
-// NewOptIdpConnectionOAuth2 returns new OptIdpConnectionOAuth2 with value set to v.
-func NewOptIdpConnectionOAuth2(v IdpConnectionOAuth2) OptIdpConnectionOAuth2 {
-	return OptIdpConnectionOAuth2{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptIdpConnectionOAuth2 is optional IdpConnectionOAuth2.
-type OptIdpConnectionOAuth2 struct {
-	Value IdpConnectionOAuth2
-	Set   bool
-}
-
-// IsSet returns true if OptIdpConnectionOAuth2 was set.
-func (o OptIdpConnectionOAuth2) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptIdpConnectionOAuth2) Reset() {
-	var v IdpConnectionOAuth2
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptIdpConnectionOAuth2) SetTo(v IdpConnectionOAuth2) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptIdpConnectionOAuth2) Get() (v IdpConnectionOAuth2, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptIdpConnectionOAuth2) Or(d IdpConnectionOAuth2) IdpConnectionOAuth2 {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptIdpConnectionOAuth2StaticAuthorizeParameters returns new OptIdpConnectionOAuth2StaticAuthorizeParameters with value set to v.
-func NewOptIdpConnectionOAuth2StaticAuthorizeParameters(v IdpConnectionOAuth2StaticAuthorizeParameters) OptIdpConnectionOAuth2StaticAuthorizeParameters {
-	return OptIdpConnectionOAuth2StaticAuthorizeParameters{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptIdpConnectionOAuth2StaticAuthorizeParameters is optional IdpConnectionOAuth2StaticAuthorizeParameters.
-type OptIdpConnectionOAuth2StaticAuthorizeParameters struct {
-	Value IdpConnectionOAuth2StaticAuthorizeParameters
-	Set   bool
-}
-
-// IsSet returns true if OptIdpConnectionOAuth2StaticAuthorizeParameters was set.
-func (o OptIdpConnectionOAuth2StaticAuthorizeParameters) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptIdpConnectionOAuth2StaticAuthorizeParameters) Reset() {
-	var v IdpConnectionOAuth2StaticAuthorizeParameters
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptIdpConnectionOAuth2StaticAuthorizeParameters) SetTo(v IdpConnectionOAuth2StaticAuthorizeParameters) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptIdpConnectionOAuth2StaticAuthorizeParameters) Get() (v IdpConnectionOAuth2StaticAuthorizeParameters, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptIdpConnectionOAuth2StaticAuthorizeParameters) Or(d IdpConnectionOAuth2StaticAuthorizeParameters) IdpConnectionOAuth2StaticAuthorizeParameters {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptIdpConnectionOAuth2SupplementaryFetch returns new OptIdpConnectionOAuth2SupplementaryFetch with value set to v.
-func NewOptIdpConnectionOAuth2SupplementaryFetch(v IdpConnectionOAuth2SupplementaryFetch) OptIdpConnectionOAuth2SupplementaryFetch {
-	return OptIdpConnectionOAuth2SupplementaryFetch{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptIdpConnectionOAuth2SupplementaryFetch is optional IdpConnectionOAuth2SupplementaryFetch.
-type OptIdpConnectionOAuth2SupplementaryFetch struct {
-	Value IdpConnectionOAuth2SupplementaryFetch
-	Set   bool
-}
-
-// IsSet returns true if OptIdpConnectionOAuth2SupplementaryFetch was set.
-func (o OptIdpConnectionOAuth2SupplementaryFetch) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptIdpConnectionOAuth2SupplementaryFetch) Reset() {
-	var v IdpConnectionOAuth2SupplementaryFetch
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptIdpConnectionOAuth2SupplementaryFetch) SetTo(v IdpConnectionOAuth2SupplementaryFetch) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptIdpConnectionOAuth2SupplementaryFetch) Get() (v IdpConnectionOAuth2SupplementaryFetch, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptIdpConnectionOAuth2SupplementaryFetch) Or(d IdpConnectionOAuth2SupplementaryFetch) IdpConnectionOAuth2SupplementaryFetch {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptIdpConnectionOAuth2TokenEndpointAuthMethod returns new OptIdpConnectionOAuth2TokenEndpointAuthMethod with value set to v.
-func NewOptIdpConnectionOAuth2TokenEndpointAuthMethod(v IdpConnectionOAuth2TokenEndpointAuthMethod) OptIdpConnectionOAuth2TokenEndpointAuthMethod {
-	return OptIdpConnectionOAuth2TokenEndpointAuthMethod{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptIdpConnectionOAuth2TokenEndpointAuthMethod is optional IdpConnectionOAuth2TokenEndpointAuthMethod.
-type OptIdpConnectionOAuth2TokenEndpointAuthMethod struct {
-	Value IdpConnectionOAuth2TokenEndpointAuthMethod
-	Set   bool
-}
-
-// IsSet returns true if OptIdpConnectionOAuth2TokenEndpointAuthMethod was set.
-func (o OptIdpConnectionOAuth2TokenEndpointAuthMethod) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptIdpConnectionOAuth2TokenEndpointAuthMethod) Reset() {
-	var v IdpConnectionOAuth2TokenEndpointAuthMethod
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptIdpConnectionOAuth2TokenEndpointAuthMethod) SetTo(v IdpConnectionOAuth2TokenEndpointAuthMethod) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptIdpConnectionOAuth2TokenEndpointAuthMethod) Get() (v IdpConnectionOAuth2TokenEndpointAuthMethod, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptIdpConnectionOAuth2TokenEndpointAuthMethod) Or(d IdpConnectionOAuth2TokenEndpointAuthMethod) IdpConnectionOAuth2TokenEndpointAuthMethod {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptIdpConnectionOidc returns new OptIdpConnectionOidc with value set to v.
 func NewOptIdpConnectionOidc(v IdpConnectionOidc) OptIdpConnectionOidc {
 	return OptIdpConnectionOidc{
@@ -41532,52 +40962,6 @@ func (o OptIdpNotFoundDetails) Or(d IdpNotFoundDetails) IdpNotFoundDetails {
 	return d
 }
 
-// NewOptIdpOAuth2UnsupportedDetails returns new OptIdpOAuth2UnsupportedDetails with value set to v.
-func NewOptIdpOAuth2UnsupportedDetails(v IdpOAuth2UnsupportedDetails) OptIdpOAuth2UnsupportedDetails {
-	return OptIdpOAuth2UnsupportedDetails{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptIdpOAuth2UnsupportedDetails is optional IdpOAuth2UnsupportedDetails.
-type OptIdpOAuth2UnsupportedDetails struct {
-	Value IdpOAuth2UnsupportedDetails
-	Set   bool
-}
-
-// IsSet returns true if OptIdpOAuth2UnsupportedDetails was set.
-func (o OptIdpOAuth2UnsupportedDetails) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptIdpOAuth2UnsupportedDetails) Reset() {
-	var v IdpOAuth2UnsupportedDetails
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptIdpOAuth2UnsupportedDetails) SetTo(v IdpOAuth2UnsupportedDetails) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptIdpOAuth2UnsupportedDetails) Get() (v IdpOAuth2UnsupportedDetails, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptIdpOAuth2UnsupportedDetails) Or(d IdpOAuth2UnsupportedDetails) IdpOAuth2UnsupportedDetails {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptIdpPermissionDeniedDetails returns new OptIdpPermissionDeniedDetails with value set to v.
 func NewOptIdpPermissionDeniedDetails(v IdpPermissionDeniedDetails) OptIdpPermissionDeniedDetails {
 	return OptIdpPermissionDeniedDetails{
@@ -41756,52 +41140,6 @@ func (o OptIdpScopesMissingOpenidDetails) Get() (v IdpScopesMissingOpenidDetails
 
 // Or returns value if set, or given parameter if does not.
 func (o OptIdpScopesMissingOpenidDetails) Or(d IdpScopesMissingOpenidDetails) IdpScopesMissingOpenidDetails {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptIdpStrategyPointerUnsupportedDetails returns new OptIdpStrategyPointerUnsupportedDetails with value set to v.
-func NewOptIdpStrategyPointerUnsupportedDetails(v IdpStrategyPointerUnsupportedDetails) OptIdpStrategyPointerUnsupportedDetails {
-	return OptIdpStrategyPointerUnsupportedDetails{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptIdpStrategyPointerUnsupportedDetails is optional IdpStrategyPointerUnsupportedDetails.
-type OptIdpStrategyPointerUnsupportedDetails struct {
-	Value IdpStrategyPointerUnsupportedDetails
-	Set   bool
-}
-
-// IsSet returns true if OptIdpStrategyPointerUnsupportedDetails was set.
-func (o OptIdpStrategyPointerUnsupportedDetails) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptIdpStrategyPointerUnsupportedDetails) Reset() {
-	var v IdpStrategyPointerUnsupportedDetails
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptIdpStrategyPointerUnsupportedDetails) SetTo(v IdpStrategyPointerUnsupportedDetails) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptIdpStrategyPointerUnsupportedDetails) Get() (v IdpStrategyPointerUnsupportedDetails, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptIdpStrategyPointerUnsupportedDetails) Or(d IdpStrategyPointerUnsupportedDetails) IdpStrategyPointerUnsupportedDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -63451,43 +62789,41 @@ func (*SubmitFlowStepBadRequest) submitFlowStepRes() {}
 
 // SubmitFlowStepErrorResponse represents sum type.
 type SubmitFlowStepErrorResponse struct {
-	Type                          SubmitFlowStepErrorResponseType // switch on this field
-	AttAlreadyHandedOff           AttAlreadyHandedOff
-	AttInvalidRequest             AttInvalidRequest
-	AttInvalidState               AttInvalidState
-	AttNotCompleted               AttNotCompleted
-	AttNotFound                   AttNotFound
-	AttProofRejected              AttProofRejected
-	AttStaleChallenge             AttStaleChallenge
-	EncKeyDecryptFailed           EncKeyDecryptFailed
-	EncKeyEncryptFailed           EncKeyEncryptFailed
-	EncKeyNotFound                EncKeyNotFound
-	EvtInvalid                    EvtInvalid
-	FlowCookieExpired             FlowCookieExpired
-	FlowCookieInvalid             FlowCookieInvalid
-	FlowIntegrity                 FlowIntegrity
-	FlowInvalidAction             FlowInvalidAction
-	FlowNotFound                  FlowNotFound
-	FlowRestartRequired           FlowRestartRequired
-	FlowUnsupported               FlowUnsupported
-	IdpEndpointCleartext          IdpEndpointCleartext
-	IdpEndpointsPartial           IdpEndpointsPartial
-	IdpOAuth2Unsupported          IdpOAuth2Unsupported
-	IdpProtocolBlockMissing       IdpProtocolBlockMissing
-	IdpScopesMissingOpenid        IdpScopesMissingOpenid
-	IdpStrategyPointerUnsupported IdpStrategyPointerUnsupported
-	Internal                      Internal
-	TknInvalid                    TknInvalid
-	NotImplemented                NotImplemented
-	ReqInvalid                    ReqInvalid
-	EncKeyUnknownAlg              EncKeyUnknownAlg
-	Unavailable                   Unavailable
-	UserAlreadyExists             UserAlreadyExists
-	UserConflict                  UserConflict
-	UserInvalid                   UserInvalid
-	UserNotFound                  UserNotFound
-	UserPasswordEmpty             UserPasswordEmpty
-	UserPasswordTooLong           UserPasswordTooLong
+	Type                    SubmitFlowStepErrorResponseType // switch on this field
+	AttAlreadyHandedOff     AttAlreadyHandedOff
+	AttInvalidRequest       AttInvalidRequest
+	AttInvalidState         AttInvalidState
+	AttNotCompleted         AttNotCompleted
+	AttNotFound             AttNotFound
+	AttProofRejected        AttProofRejected
+	AttStaleChallenge       AttStaleChallenge
+	EncKeyDecryptFailed     EncKeyDecryptFailed
+	EncKeyEncryptFailed     EncKeyEncryptFailed
+	EncKeyNotFound          EncKeyNotFound
+	EvtInvalid              EvtInvalid
+	FlowCookieExpired       FlowCookieExpired
+	FlowCookieInvalid       FlowCookieInvalid
+	FlowIntegrity           FlowIntegrity
+	FlowInvalidAction       FlowInvalidAction
+	FlowNotFound            FlowNotFound
+	FlowRestartRequired     FlowRestartRequired
+	FlowUnsupported         FlowUnsupported
+	IdpEndpointCleartext    IdpEndpointCleartext
+	IdpEndpointsPartial     IdpEndpointsPartial
+	IdpProtocolBlockMissing IdpProtocolBlockMissing
+	IdpScopesMissingOpenid  IdpScopesMissingOpenid
+	Internal                Internal
+	TknInvalid              TknInvalid
+	NotImplemented          NotImplemented
+	ReqInvalid              ReqInvalid
+	EncKeyUnknownAlg        EncKeyUnknownAlg
+	Unavailable             Unavailable
+	UserAlreadyExists       UserAlreadyExists
+	UserConflict            UserConflict
+	UserInvalid             UserInvalid
+	UserNotFound            UserNotFound
+	UserPasswordEmpty       UserPasswordEmpty
+	UserPasswordTooLong     UserPasswordTooLong
 }
 
 // SubmitFlowStepErrorResponseType is oneOf type of SubmitFlowStepErrorResponse.
@@ -63495,42 +62831,40 @@ type SubmitFlowStepErrorResponseType string
 
 // Possible values for SubmitFlowStepErrorResponseType.
 const (
-	AttAlreadyHandedOffSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "att.already_handed_off"
-	AttInvalidRequestSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "att.invalid_request"
-	AttInvalidStateSubmitFlowStepErrorResponse               SubmitFlowStepErrorResponseType = "att.invalid_state"
-	AttNotCompletedSubmitFlowStepErrorResponse               SubmitFlowStepErrorResponseType = "att.not_completed"
-	AttNotFoundSubmitFlowStepErrorResponse                   SubmitFlowStepErrorResponseType = "att.not_found"
-	AttProofRejectedSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "att.proof_rejected"
-	AttStaleChallengeSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "att.stale_challenge"
-	EncKeyDecryptFailedSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "enc_key.decrypt_failed"
-	EncKeyEncryptFailedSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "enc_key.encrypt_failed"
-	EncKeyNotFoundSubmitFlowStepErrorResponse                SubmitFlowStepErrorResponseType = "enc_key.not_found"
-	EvtInvalidSubmitFlowStepErrorResponse                    SubmitFlowStepErrorResponseType = "evt.invalid"
-	FlowCookieExpiredSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "flow.cookie_expired"
-	FlowCookieInvalidSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "flow.cookie_invalid"
-	FlowIntegritySubmitFlowStepErrorResponse                 SubmitFlowStepErrorResponseType = "flow.integrity"
-	FlowInvalidActionSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "flow.invalid_action"
-	FlowNotFoundSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "flow.not_found"
-	FlowRestartRequiredSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "flow.restart_required"
-	FlowUnsupportedSubmitFlowStepErrorResponse               SubmitFlowStepErrorResponseType = "flow.unsupported"
-	IdpEndpointCleartextSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "idp.endpoint_cleartext"
-	IdpEndpointsPartialSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "idp.endpoints_partial"
-	IdpOAuth2UnsupportedSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "idp.oauth2_unsupported"
-	IdpProtocolBlockMissingSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "idp.protocol_block_missing"
-	IdpScopesMissingOpenidSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "idp.scopes_missing_openid"
-	IdpStrategyPointerUnsupportedSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "idp.strategy_pointer_unsupported"
-	InternalSubmitFlowStepErrorResponse                      SubmitFlowStepErrorResponseType = "internal"
-	TknInvalidSubmitFlowStepErrorResponse                    SubmitFlowStepErrorResponseType = "tkn.invalid"
-	NotImplementedSubmitFlowStepErrorResponse                SubmitFlowStepErrorResponseType = "not_implemented"
-	ReqInvalidSubmitFlowStepErrorResponse                    SubmitFlowStepErrorResponseType = "req.invalid"
-	EncKeyUnknownAlgSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "enc_key.unknown_alg"
-	UnavailableSubmitFlowStepErrorResponse                   SubmitFlowStepErrorResponseType = "unavailable"
-	UserAlreadyExistsSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "user.already_exists"
-	UserConflictSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "user.conflict"
-	UserInvalidSubmitFlowStepErrorResponse                   SubmitFlowStepErrorResponseType = "user.invalid"
-	UserNotFoundSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "user.not_found"
-	UserPasswordEmptySubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "user.password_empty"
-	UserPasswordTooLongSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "user.password_too_long"
+	AttAlreadyHandedOffSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "att.already_handed_off"
+	AttInvalidRequestSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "att.invalid_request"
+	AttInvalidStateSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "att.invalid_state"
+	AttNotCompletedSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "att.not_completed"
+	AttNotFoundSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "att.not_found"
+	AttProofRejectedSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "att.proof_rejected"
+	AttStaleChallengeSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "att.stale_challenge"
+	EncKeyDecryptFailedSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "enc_key.decrypt_failed"
+	EncKeyEncryptFailedSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "enc_key.encrypt_failed"
+	EncKeyNotFoundSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "enc_key.not_found"
+	EvtInvalidSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "evt.invalid"
+	FlowCookieExpiredSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "flow.cookie_expired"
+	FlowCookieInvalidSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "flow.cookie_invalid"
+	FlowIntegritySubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "flow.integrity"
+	FlowInvalidActionSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "flow.invalid_action"
+	FlowNotFoundSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "flow.not_found"
+	FlowRestartRequiredSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "flow.restart_required"
+	FlowUnsupportedSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "flow.unsupported"
+	IdpEndpointCleartextSubmitFlowStepErrorResponse    SubmitFlowStepErrorResponseType = "idp.endpoint_cleartext"
+	IdpEndpointsPartialSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "idp.endpoints_partial"
+	IdpProtocolBlockMissingSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "idp.protocol_block_missing"
+	IdpScopesMissingOpenidSubmitFlowStepErrorResponse  SubmitFlowStepErrorResponseType = "idp.scopes_missing_openid"
+	InternalSubmitFlowStepErrorResponse                SubmitFlowStepErrorResponseType = "internal"
+	TknInvalidSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "tkn.invalid"
+	NotImplementedSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "not_implemented"
+	ReqInvalidSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "req.invalid"
+	EncKeyUnknownAlgSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "enc_key.unknown_alg"
+	UnavailableSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "unavailable"
+	UserAlreadyExistsSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "user.already_exists"
+	UserConflictSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "user.conflict"
+	UserInvalidSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "user.invalid"
+	UserNotFoundSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "user.not_found"
+	UserPasswordEmptySubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "user.password_empty"
+	UserPasswordTooLongSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "user.password_too_long"
 )
 
 // IsAttAlreadyHandedOff reports whether SubmitFlowStepErrorResponse is AttAlreadyHandedOff.
@@ -63633,11 +62967,6 @@ func (s SubmitFlowStepErrorResponse) IsIdpEndpointsPartial() bool {
 	return s.Type == IdpEndpointsPartialSubmitFlowStepErrorResponse
 }
 
-// IsIdpOAuth2Unsupported reports whether SubmitFlowStepErrorResponse is IdpOAuth2Unsupported.
-func (s SubmitFlowStepErrorResponse) IsIdpOAuth2Unsupported() bool {
-	return s.Type == IdpOAuth2UnsupportedSubmitFlowStepErrorResponse
-}
-
 // IsIdpProtocolBlockMissing reports whether SubmitFlowStepErrorResponse is IdpProtocolBlockMissing.
 func (s SubmitFlowStepErrorResponse) IsIdpProtocolBlockMissing() bool {
 	return s.Type == IdpProtocolBlockMissingSubmitFlowStepErrorResponse
@@ -63646,11 +62975,6 @@ func (s SubmitFlowStepErrorResponse) IsIdpProtocolBlockMissing() bool {
 // IsIdpScopesMissingOpenid reports whether SubmitFlowStepErrorResponse is IdpScopesMissingOpenid.
 func (s SubmitFlowStepErrorResponse) IsIdpScopesMissingOpenid() bool {
 	return s.Type == IdpScopesMissingOpenidSubmitFlowStepErrorResponse
-}
-
-// IsIdpStrategyPointerUnsupported reports whether SubmitFlowStepErrorResponse is IdpStrategyPointerUnsupported.
-func (s SubmitFlowStepErrorResponse) IsIdpStrategyPointerUnsupported() bool {
-	return s.Type == IdpStrategyPointerUnsupportedSubmitFlowStepErrorResponse
 }
 
 // IsInternal reports whether SubmitFlowStepErrorResponse is Internal.
@@ -64133,27 +63457,6 @@ func NewIdpEndpointsPartialSubmitFlowStepErrorResponse(v IdpEndpointsPartial) Su
 	return s
 }
 
-// SetIdpOAuth2Unsupported sets SubmitFlowStepErrorResponse to IdpOAuth2Unsupported.
-func (s *SubmitFlowStepErrorResponse) SetIdpOAuth2Unsupported(v IdpOAuth2Unsupported) {
-	s.Type = IdpOAuth2UnsupportedSubmitFlowStepErrorResponse
-	s.IdpOAuth2Unsupported = v
-}
-
-// GetIdpOAuth2Unsupported returns IdpOAuth2Unsupported and true boolean if SubmitFlowStepErrorResponse is IdpOAuth2Unsupported.
-func (s SubmitFlowStepErrorResponse) GetIdpOAuth2Unsupported() (v IdpOAuth2Unsupported, ok bool) {
-	if !s.IsIdpOAuth2Unsupported() {
-		return v, false
-	}
-	return s.IdpOAuth2Unsupported, true
-}
-
-// NewIdpOAuth2UnsupportedSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from IdpOAuth2Unsupported.
-func NewIdpOAuth2UnsupportedSubmitFlowStepErrorResponse(v IdpOAuth2Unsupported) SubmitFlowStepErrorResponse {
-	var s SubmitFlowStepErrorResponse
-	s.SetIdpOAuth2Unsupported(v)
-	return s
-}
-
 // SetIdpProtocolBlockMissing sets SubmitFlowStepErrorResponse to IdpProtocolBlockMissing.
 func (s *SubmitFlowStepErrorResponse) SetIdpProtocolBlockMissing(v IdpProtocolBlockMissing) {
 	s.Type = IdpProtocolBlockMissingSubmitFlowStepErrorResponse
@@ -64193,27 +63496,6 @@ func (s SubmitFlowStepErrorResponse) GetIdpScopesMissingOpenid() (v IdpScopesMis
 func NewIdpScopesMissingOpenidSubmitFlowStepErrorResponse(v IdpScopesMissingOpenid) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetIdpScopesMissingOpenid(v)
-	return s
-}
-
-// SetIdpStrategyPointerUnsupported sets SubmitFlowStepErrorResponse to IdpStrategyPointerUnsupported.
-func (s *SubmitFlowStepErrorResponse) SetIdpStrategyPointerUnsupported(v IdpStrategyPointerUnsupported) {
-	s.Type = IdpStrategyPointerUnsupportedSubmitFlowStepErrorResponse
-	s.IdpStrategyPointerUnsupported = v
-}
-
-// GetIdpStrategyPointerUnsupported returns IdpStrategyPointerUnsupported and true boolean if SubmitFlowStepErrorResponse is IdpStrategyPointerUnsupported.
-func (s SubmitFlowStepErrorResponse) GetIdpStrategyPointerUnsupported() (v IdpStrategyPointerUnsupported, ok bool) {
-	if !s.IsIdpStrategyPointerUnsupported() {
-		return v, false
-	}
-	return s.IdpStrategyPointerUnsupported, true
-}
-
-// NewIdpStrategyPointerUnsupportedSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from IdpStrategyPointerUnsupported.
-func NewIdpStrategyPointerUnsupportedSubmitFlowStepErrorResponse(v IdpStrategyPointerUnsupported) SubmitFlowStepErrorResponse {
-	var s SubmitFlowStepErrorResponse
-	s.SetIdpStrategyPointerUnsupported(v)
 	return s
 }
 

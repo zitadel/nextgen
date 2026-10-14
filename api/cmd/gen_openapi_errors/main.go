@@ -930,6 +930,15 @@ var operationExcludedErrors = map[string][]string{
 	// re-renders the step with error.sso_unavailable, and a parked row that is
 	// gone renders the step again.
 	"submitFlowStep": {"domain.ErrFlowSSOUnavailable", "domain.ErrIDPConnectionNotFound", "domain.ErrSSOStateInvalid"},
+	// Create and revise run the engine's connection parse after the schema
+	// check. The schema already refuses a missing protocol block, scopes
+	// without openid, and a cleartext endpoint as req.invalid, so only the
+	// parse's own rule, the partial endpoint block, reaches the caller.
+	"createIdp": {
+		"domain.ErrIDPEndpointCleartext",
+		"domain.ErrIDPProtocolBlockMissing",
+		"domain.ErrIDPScopesMissingOpenID",
+	},
 	// A new flow has no parked SSO row, so the collection step's prefill
 	// returns before it reads the attempt's row or a connection.
 	"createFlow": {
@@ -938,10 +947,8 @@ var operationExcludedErrors = map[string][]string{
 		"domain.ErrIDPConnectionNotFound",
 		"domain.ErrIDPEndpointCleartext",
 		"domain.ErrIDPEndpointsPartial",
-		"domain.ErrIDPOAuth2Unsupported",
 		"domain.ErrIDPProtocolBlockMissing",
 		"domain.ErrIDPScopesMissingOpenID",
-		"domain.ErrIDPStrategyPointerUnsupported",
 	},
 }
 

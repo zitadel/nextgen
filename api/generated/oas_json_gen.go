@@ -20376,6 +20376,22 @@ func (s CreateIdpErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case IdpEndpointsPartialCreateIdpErrorResponse:
+		e.FieldStart("code")
+		e.Str("idp.endpoints_partial")
+		{
+			s := s.IdpEndpointsPartial
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalCreateIdpErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
@@ -20452,6 +20468,9 @@ func (s *CreateIdpErrorResponse) Decode(d *jx.Decoder) error {
 				case "idp.revision_conflict":
 					s.Type = IdpRevisionConflictCreateIdpErrorResponse
 					found = true
+				case "idp.endpoints_partial":
+					s.Type = IdpEndpointsPartialCreateIdpErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalCreateIdpErrorResponse
 					found = true
@@ -20494,6 +20513,10 @@ func (s *CreateIdpErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case IdpRevisionConflictCreateIdpErrorResponse:
 		if err := s.IdpRevisionConflict.Decode(d); err != nil {
+			return err
+		}
+	case IdpEndpointsPartialCreateIdpErrorResponse:
+		if err := s.IdpEndpointsPartial.Decode(d); err != nil {
 			return err
 		}
 	case InternalCreateIdpErrorResponse:
@@ -46025,22 +46048,6 @@ func (s GetFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case IdpOAuth2UnsupportedGetFlowStepErrorResponse:
-		e.FieldStart("code")
-		e.Str("idp.oauth2_unsupported")
-		{
-			s := s.IdpOAuth2Unsupported
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
 	case IdpProtocolBlockMissingGetFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("idp.protocol_block_missing")
@@ -46062,22 +46069,6 @@ func (s GetFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("idp.scopes_missing_openid")
 		{
 			s := s.IdpScopesMissingOpenid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case IdpStrategyPointerUnsupportedGetFlowStepErrorResponse:
-		e.FieldStart("code")
-		e.Str("idp.strategy_pointer_unsupported")
-		{
-			s := s.IdpStrategyPointerUnsupported
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -46335,17 +46326,11 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "idp.endpoints_partial":
 					s.Type = IdpEndpointsPartialGetFlowStepErrorResponse
 					found = true
-				case "idp.oauth2_unsupported":
-					s.Type = IdpOAuth2UnsupportedGetFlowStepErrorResponse
-					found = true
 				case "idp.protocol_block_missing":
 					s.Type = IdpProtocolBlockMissingGetFlowStepErrorResponse
 					found = true
 				case "idp.scopes_missing_openid":
 					s.Type = IdpScopesMissingOpenidGetFlowStepErrorResponse
-					found = true
-				case "idp.strategy_pointer_unsupported":
-					s.Type = IdpStrategyPointerUnsupportedGetFlowStepErrorResponse
 					found = true
 				case "internal":
 					s.Type = InternalGetFlowStepErrorResponse
@@ -46471,20 +46456,12 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.IdpEndpointsPartial.Decode(d); err != nil {
 			return err
 		}
-	case IdpOAuth2UnsupportedGetFlowStepErrorResponse:
-		if err := s.IdpOAuth2Unsupported.Decode(d); err != nil {
-			return err
-		}
 	case IdpProtocolBlockMissingGetFlowStepErrorResponse:
 		if err := s.IdpProtocolBlockMissing.Decode(d); err != nil {
 			return err
 		}
 	case IdpScopesMissingOpenidGetFlowStepErrorResponse:
 		if err := s.IdpScopesMissingOpenid.Decode(d); err != nil {
-			return err
-		}
-	case IdpStrategyPointerUnsupportedGetFlowStepErrorResponse:
-		if err := s.IdpStrategyPointerUnsupported.Decode(d); err != nil {
 			return err
 		}
 	case InternalGetFlowStepErrorResponse:
@@ -51797,26 +51774,19 @@ func (s *IdpConnection) encodeFields(e *jx.Encoder) {
 			s.Oidc.Encode(e)
 		}
 	}
-	{
-		if s.OAuth2.Set {
-			e.FieldStart("oauth2")
-			s.OAuth2.Encode(e)
-		}
-	}
 }
 
-var jsonFieldsNameOfIdpConnection = [11]string{
-	0:  "$schema",
-	1:  "slug",
-	2:  "protocol",
-	3:  "template",
-	4:  "display_name",
-	5:  "subject_claim",
-	6:  "claim_mapping",
-	7:  "verified_claims",
-	8:  "provisioning",
-	9:  "oidc",
-	10: "oauth2",
+var jsonFieldsNameOfIdpConnection = [10]string{
+	0: "$schema",
+	1: "slug",
+	2: "protocol",
+	3: "template",
+	4: "display_name",
+	5: "subject_claim",
+	6: "claim_mapping",
+	7: "verified_claims",
+	8: "provisioning",
+	9: "oidc",
 }
 
 // Decode decodes IdpConnection from json.
@@ -51932,16 +51902,6 @@ func (s *IdpConnection) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"oidc\"")
 			}
-		case "oauth2":
-			if err := func() error {
-				s.OAuth2.Reset()
-				if err := s.OAuth2.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"oauth2\"")
-			}
 		default:
 			return errors.Errorf("unexpected field %q", k)
 		}
@@ -52051,404 +52011,6 @@ func (s IdpConnectionClaimMapping) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *IdpConnectionClaimMapping) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s *IdpConnectionOAuth2) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields encodes fields.
-func (s *IdpConnectionOAuth2) encodeFields(e *jx.Encoder) {
-	{
-		e.FieldStart("authorization_endpoint")
-		e.Str(s.AuthorizationEndpoint)
-	}
-	{
-		e.FieldStart("token_endpoint")
-		e.Str(s.TokenEndpoint)
-	}
-	{
-		e.FieldStart("userinfo_endpoint")
-		e.Str(s.UserinfoEndpoint)
-	}
-	{
-		e.FieldStart("client_id")
-		e.Str(s.ClientID)
-	}
-	{
-		e.FieldStart("client_secret")
-		e.Str(s.ClientSecret)
-	}
-	{
-		if s.TokenEndpointAuthMethod.Set {
-			e.FieldStart("token_endpoint_auth_method")
-			s.TokenEndpointAuthMethod.Encode(e)
-		}
-	}
-	{
-		if s.Scopes != nil {
-			e.FieldStart("scopes")
-			e.ArrStart()
-			for _, elem := range s.Scopes {
-				e.Str(elem)
-			}
-			e.ArrEnd()
-		}
-	}
-	{
-		if s.PkceEnabled.Set {
-			e.FieldStart("pkce_enabled")
-			s.PkceEnabled.Encode(e)
-		}
-	}
-	{
-		if s.StaticAuthorizeParameters.Set {
-			e.FieldStart("static_authorize_parameters")
-			s.StaticAuthorizeParameters.Encode(e)
-		}
-	}
-	{
-		if s.SupplementaryFetch.Set {
-			e.FieldStart("supplementary_fetch")
-			s.SupplementaryFetch.Encode(e)
-		}
-	}
-}
-
-var jsonFieldsNameOfIdpConnectionOAuth2 = [10]string{
-	0: "authorization_endpoint",
-	1: "token_endpoint",
-	2: "userinfo_endpoint",
-	3: "client_id",
-	4: "client_secret",
-	5: "token_endpoint_auth_method",
-	6: "scopes",
-	7: "pkce_enabled",
-	8: "static_authorize_parameters",
-	9: "supplementary_fetch",
-}
-
-// Decode decodes IdpConnectionOAuth2 from json.
-func (s *IdpConnectionOAuth2) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode IdpConnectionOAuth2 to nil")
-	}
-	var requiredBitSet [2]uint8
-	s.setDefaults()
-
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "authorization_endpoint":
-			requiredBitSet[0] |= 1 << 0
-			if err := func() error {
-				v, err := d.Str()
-				s.AuthorizationEndpoint = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"authorization_endpoint\"")
-			}
-		case "token_endpoint":
-			requiredBitSet[0] |= 1 << 1
-			if err := func() error {
-				v, err := d.Str()
-				s.TokenEndpoint = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"token_endpoint\"")
-			}
-		case "userinfo_endpoint":
-			requiredBitSet[0] |= 1 << 2
-			if err := func() error {
-				v, err := d.Str()
-				s.UserinfoEndpoint = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"userinfo_endpoint\"")
-			}
-		case "client_id":
-			requiredBitSet[0] |= 1 << 3
-			if err := func() error {
-				v, err := d.Str()
-				s.ClientID = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"client_id\"")
-			}
-		case "client_secret":
-			requiredBitSet[0] |= 1 << 4
-			if err := func() error {
-				v, err := d.Str()
-				s.ClientSecret = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"client_secret\"")
-			}
-		case "token_endpoint_auth_method":
-			if err := func() error {
-				s.TokenEndpointAuthMethod.Reset()
-				if err := s.TokenEndpointAuthMethod.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"token_endpoint_auth_method\"")
-			}
-		case "scopes":
-			if err := func() error {
-				s.Scopes = make([]string, 0)
-				if err := d.Arr(func(d *jx.Decoder) error {
-					var elem string
-					v, err := d.Str()
-					elem = string(v)
-					if err != nil {
-						return err
-					}
-					s.Scopes = append(s.Scopes, elem)
-					return nil
-				}); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"scopes\"")
-			}
-		case "pkce_enabled":
-			if err := func() error {
-				s.PkceEnabled.Reset()
-				if err := s.PkceEnabled.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"pkce_enabled\"")
-			}
-		case "static_authorize_parameters":
-			if err := func() error {
-				s.StaticAuthorizeParameters.Reset()
-				if err := s.StaticAuthorizeParameters.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"static_authorize_parameters\"")
-			}
-		case "supplementary_fetch":
-			if err := func() error {
-				s.SupplementaryFetch.Reset()
-				if err := s.SupplementaryFetch.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"supplementary_fetch\"")
-			}
-		default:
-			return errors.Errorf("unexpected field %q", k)
-		}
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode IdpConnectionOAuth2")
-	}
-	// Validate required fields.
-	var failures []validate.FieldError
-	for i, mask := range [2]uint8{
-		0b00011111,
-		0b00000000,
-	} {
-		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
-			// Mask only required fields and check equality to mask using XOR.
-			//
-			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
-			// Bits of fields which would be set are actually bits of missed fields.
-			missed := bits.OnesCount8(result)
-			for bitN := 0; bitN < missed; bitN++ {
-				bitIdx := bits.TrailingZeros8(result)
-				fieldIdx := i*8 + bitIdx
-				var name string
-				if fieldIdx < len(jsonFieldsNameOfIdpConnectionOAuth2) {
-					name = jsonFieldsNameOfIdpConnectionOAuth2[fieldIdx]
-				} else {
-					name = strconv.Itoa(fieldIdx)
-				}
-				failures = append(failures, validate.FieldError{
-					Name:  name,
-					Error: validate.ErrFieldRequired,
-				})
-				// Reset bit.
-				result &^= 1 << bitIdx
-			}
-		}
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *IdpConnectionOAuth2) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *IdpConnectionOAuth2) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s IdpConnectionOAuth2StaticAuthorizeParameters) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields implements json.Marshaler.
-func (s IdpConnectionOAuth2StaticAuthorizeParameters) encodeFields(e *jx.Encoder) {
-	for k, elem := range s {
-		e.FieldStart(k)
-
-		e.Str(elem)
-	}
-}
-
-// Decode decodes IdpConnectionOAuth2StaticAuthorizeParameters from json.
-func (s *IdpConnectionOAuth2StaticAuthorizeParameters) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode IdpConnectionOAuth2StaticAuthorizeParameters to nil")
-	}
-	m := s.init()
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		var elem string
-		if err := func() error {
-			v, err := d.Str()
-			elem = string(v)
-			if err != nil {
-				return err
-			}
-			return nil
-		}(); err != nil {
-			return errors.Wrapf(err, "decode field %q", k)
-		}
-		m[string(k)] = elem
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode IdpConnectionOAuth2StaticAuthorizeParameters")
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s IdpConnectionOAuth2StaticAuthorizeParameters) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *IdpConnectionOAuth2StaticAuthorizeParameters) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes IdpConnectionOAuth2SupplementaryFetch as json.
-func (s IdpConnectionOAuth2SupplementaryFetch) Encode(e *jx.Encoder) {
-	e.Str(string(s))
-}
-
-// Decode decodes IdpConnectionOAuth2SupplementaryFetch from json.
-func (s *IdpConnectionOAuth2SupplementaryFetch) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode IdpConnectionOAuth2SupplementaryFetch to nil")
-	}
-	v, err := d.StrBytes()
-	if err != nil {
-		return err
-	}
-	// Try to use constant string.
-	switch IdpConnectionOAuth2SupplementaryFetch(v) {
-	case IdpConnectionOAuth2SupplementaryFetchGithubPrimaryEmail:
-		*s = IdpConnectionOAuth2SupplementaryFetchGithubPrimaryEmail
-	default:
-		*s = IdpConnectionOAuth2SupplementaryFetch(v)
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s IdpConnectionOAuth2SupplementaryFetch) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *IdpConnectionOAuth2SupplementaryFetch) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes IdpConnectionOAuth2TokenEndpointAuthMethod as json.
-func (s IdpConnectionOAuth2TokenEndpointAuthMethod) Encode(e *jx.Encoder) {
-	e.Str(string(s))
-}
-
-// Decode decodes IdpConnectionOAuth2TokenEndpointAuthMethod from json.
-func (s *IdpConnectionOAuth2TokenEndpointAuthMethod) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode IdpConnectionOAuth2TokenEndpointAuthMethod to nil")
-	}
-	v, err := d.StrBytes()
-	if err != nil {
-		return err
-	}
-	// Try to use constant string.
-	switch IdpConnectionOAuth2TokenEndpointAuthMethod(v) {
-	case IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretBasic:
-		*s = IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretBasic
-	case IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretPost:
-		*s = IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretPost
-	default:
-		*s = IdpConnectionOAuth2TokenEndpointAuthMethod(v)
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s IdpConnectionOAuth2TokenEndpointAuthMethod) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *IdpConnectionOAuth2TokenEndpointAuthMethod) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -55130,194 +54692,6 @@ func (s *IdpNotFoundDetails) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
-func (s *IdpOAuth2Unsupported) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields encodes fields.
-func (s *IdpOAuth2Unsupported) encodeFields(e *jx.Encoder) {
-	{
-		e.FieldStart("code")
-		e.Str("idp.oauth2_unsupported")
-	}
-	{
-		e.FieldStart("message")
-		e.Str(s.Message)
-	}
-	{
-		if s.Details.Set {
-			e.FieldStart("details")
-			s.Details.Encode(e)
-		}
-	}
-}
-
-var jsonFieldsNameOfIdpOAuth2Unsupported = [3]string{
-	0: "code",
-	1: "message",
-	2: "details",
-}
-
-// Decode decodes IdpOAuth2Unsupported from json.
-func (s *IdpOAuth2Unsupported) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode IdpOAuth2Unsupported to nil")
-	}
-	var requiredBitSet [1]uint8
-
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "code":
-			requiredBitSet[0] |= 1 << 0
-			if err := func() error {
-				v, err := d.Str()
-				s.Code = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"code\"")
-			}
-		case "message":
-			requiredBitSet[0] |= 1 << 1
-			if err := func() error {
-				v, err := d.Str()
-				s.Message = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"message\"")
-			}
-		case "details":
-			if err := func() error {
-				s.Details.Reset()
-				if err := s.Details.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"details\"")
-			}
-		default:
-			return d.Skip()
-		}
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode IdpOAuth2Unsupported")
-	}
-	// Validate required fields.
-	var failures []validate.FieldError
-	for i, mask := range [1]uint8{
-		0b00000011,
-	} {
-		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
-			// Mask only required fields and check equality to mask using XOR.
-			//
-			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
-			// Bits of fields which would be set are actually bits of missed fields.
-			missed := bits.OnesCount8(result)
-			for bitN := 0; bitN < missed; bitN++ {
-				bitIdx := bits.TrailingZeros8(result)
-				fieldIdx := i*8 + bitIdx
-				var name string
-				if fieldIdx < len(jsonFieldsNameOfIdpOAuth2Unsupported) {
-					name = jsonFieldsNameOfIdpOAuth2Unsupported[fieldIdx]
-				} else {
-					name = strconv.Itoa(fieldIdx)
-				}
-				failures = append(failures, validate.FieldError{
-					Name:  name,
-					Error: validate.ErrFieldRequired,
-				})
-				// Reset bit.
-				result &^= 1 << bitIdx
-			}
-		}
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *IdpOAuth2Unsupported) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *IdpOAuth2Unsupported) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s IdpOAuth2UnsupportedDetails) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields implements json.Marshaler.
-func (s IdpOAuth2UnsupportedDetails) encodeFields(e *jx.Encoder) {
-	for k, elem := range s {
-		e.FieldStart(k)
-
-		if len(elem) != 0 {
-			e.Raw(elem)
-		}
-	}
-}
-
-// Decode decodes IdpOAuth2UnsupportedDetails from json.
-func (s *IdpOAuth2UnsupportedDetails) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode IdpOAuth2UnsupportedDetails to nil")
-	}
-	m := s.init()
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		var elem jx.Raw
-		if err := func() error {
-			v, err := d.RawAppend(nil)
-			elem = jx.Raw(v)
-			if err != nil {
-				return err
-			}
-			return nil
-		}(); err != nil {
-			return errors.Wrapf(err, "decode field %q", k)
-		}
-		m[string(k)] = elem
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode IdpOAuth2UnsupportedDetails")
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s IdpOAuth2UnsupportedDetails) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *IdpOAuth2UnsupportedDetails) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
 func (s *IdpPayload) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
@@ -55687,8 +55061,6 @@ func (s *IdpProtocol) Decode(d *jx.Decoder) error {
 	switch IdpProtocol(v) {
 	case IdpProtocolOidc:
 		*s = IdpProtocolOidc
-	case IdpProtocolOAuth2:
-		*s = IdpProtocolOAuth2
 	default:
 		*s = IdpProtocol(v)
 	}
@@ -56448,194 +55820,6 @@ func (s IdpScopesMissingOpenidDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *IdpScopesMissingOpenidDetails) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s *IdpStrategyPointerUnsupported) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields encodes fields.
-func (s *IdpStrategyPointerUnsupported) encodeFields(e *jx.Encoder) {
-	{
-		e.FieldStart("code")
-		e.Str("idp.strategy_pointer_unsupported")
-	}
-	{
-		e.FieldStart("message")
-		e.Str(s.Message)
-	}
-	{
-		if s.Details.Set {
-			e.FieldStart("details")
-			s.Details.Encode(e)
-		}
-	}
-}
-
-var jsonFieldsNameOfIdpStrategyPointerUnsupported = [3]string{
-	0: "code",
-	1: "message",
-	2: "details",
-}
-
-// Decode decodes IdpStrategyPointerUnsupported from json.
-func (s *IdpStrategyPointerUnsupported) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode IdpStrategyPointerUnsupported to nil")
-	}
-	var requiredBitSet [1]uint8
-
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "code":
-			requiredBitSet[0] |= 1 << 0
-			if err := func() error {
-				v, err := d.Str()
-				s.Code = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"code\"")
-			}
-		case "message":
-			requiredBitSet[0] |= 1 << 1
-			if err := func() error {
-				v, err := d.Str()
-				s.Message = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"message\"")
-			}
-		case "details":
-			if err := func() error {
-				s.Details.Reset()
-				if err := s.Details.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"details\"")
-			}
-		default:
-			return d.Skip()
-		}
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode IdpStrategyPointerUnsupported")
-	}
-	// Validate required fields.
-	var failures []validate.FieldError
-	for i, mask := range [1]uint8{
-		0b00000011,
-	} {
-		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
-			// Mask only required fields and check equality to mask using XOR.
-			//
-			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
-			// Bits of fields which would be set are actually bits of missed fields.
-			missed := bits.OnesCount8(result)
-			for bitN := 0; bitN < missed; bitN++ {
-				bitIdx := bits.TrailingZeros8(result)
-				fieldIdx := i*8 + bitIdx
-				var name string
-				if fieldIdx < len(jsonFieldsNameOfIdpStrategyPointerUnsupported) {
-					name = jsonFieldsNameOfIdpStrategyPointerUnsupported[fieldIdx]
-				} else {
-					name = strconv.Itoa(fieldIdx)
-				}
-				failures = append(failures, validate.FieldError{
-					Name:  name,
-					Error: validate.ErrFieldRequired,
-				})
-				// Reset bit.
-				result &^= 1 << bitIdx
-			}
-		}
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *IdpStrategyPointerUnsupported) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *IdpStrategyPointerUnsupported) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s IdpStrategyPointerUnsupportedDetails) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields implements json.Marshaler.
-func (s IdpStrategyPointerUnsupportedDetails) encodeFields(e *jx.Encoder) {
-	for k, elem := range s {
-		e.FieldStart(k)
-
-		if len(elem) != 0 {
-			e.Raw(elem)
-		}
-	}
-}
-
-// Decode decodes IdpStrategyPointerUnsupportedDetails from json.
-func (s *IdpStrategyPointerUnsupportedDetails) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode IdpStrategyPointerUnsupportedDetails to nil")
-	}
-	m := s.init()
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		var elem jx.Raw
-		if err := func() error {
-			v, err := d.RawAppend(nil)
-			elem = jx.Raw(v)
-			if err != nil {
-				return err
-			}
-			return nil
-		}(); err != nil {
-			return errors.Wrapf(err, "decode field %q", k)
-		}
-		m[string(k)] = elem
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode IdpStrategyPointerUnsupportedDetails")
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s IdpStrategyPointerUnsupportedDetails) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *IdpStrategyPointerUnsupportedDetails) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -65965,139 +65149,6 @@ func (s *OptIdpConnectionClaimMapping) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes IdpConnectionOAuth2 as json.
-func (o OptIdpConnectionOAuth2) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	o.Value.Encode(e)
-}
-
-// Decode decodes IdpConnectionOAuth2 from json.
-func (o *OptIdpConnectionOAuth2) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptIdpConnectionOAuth2 to nil")
-	}
-	o.Set = true
-	if err := o.Value.Decode(d); err != nil {
-		return err
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptIdpConnectionOAuth2) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptIdpConnectionOAuth2) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes IdpConnectionOAuth2StaticAuthorizeParameters as json.
-func (o OptIdpConnectionOAuth2StaticAuthorizeParameters) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	o.Value.Encode(e)
-}
-
-// Decode decodes IdpConnectionOAuth2StaticAuthorizeParameters from json.
-func (o *OptIdpConnectionOAuth2StaticAuthorizeParameters) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptIdpConnectionOAuth2StaticAuthorizeParameters to nil")
-	}
-	o.Set = true
-	o.Value = make(IdpConnectionOAuth2StaticAuthorizeParameters)
-	if err := o.Value.Decode(d); err != nil {
-		return err
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptIdpConnectionOAuth2StaticAuthorizeParameters) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptIdpConnectionOAuth2StaticAuthorizeParameters) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes IdpConnectionOAuth2SupplementaryFetch as json.
-func (o OptIdpConnectionOAuth2SupplementaryFetch) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	e.Str(string(o.Value))
-}
-
-// Decode decodes IdpConnectionOAuth2SupplementaryFetch from json.
-func (o *OptIdpConnectionOAuth2SupplementaryFetch) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptIdpConnectionOAuth2SupplementaryFetch to nil")
-	}
-	o.Set = true
-	if err := o.Value.Decode(d); err != nil {
-		return err
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptIdpConnectionOAuth2SupplementaryFetch) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptIdpConnectionOAuth2SupplementaryFetch) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes IdpConnectionOAuth2TokenEndpointAuthMethod as json.
-func (o OptIdpConnectionOAuth2TokenEndpointAuthMethod) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	e.Str(string(o.Value))
-}
-
-// Decode decodes IdpConnectionOAuth2TokenEndpointAuthMethod from json.
-func (o *OptIdpConnectionOAuth2TokenEndpointAuthMethod) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptIdpConnectionOAuth2TokenEndpointAuthMethod to nil")
-	}
-	o.Set = true
-	if err := o.Value.Decode(d); err != nil {
-		return err
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptIdpConnectionOAuth2TokenEndpointAuthMethod) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptIdpConnectionOAuth2TokenEndpointAuthMethod) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode encodes IdpConnectionOidc as json.
 func (o OptIdpConnectionOidc) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -66500,40 +65551,6 @@ func (s *OptIdpNotFoundDetails) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes IdpOAuth2UnsupportedDetails as json.
-func (o OptIdpOAuth2UnsupportedDetails) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	o.Value.Encode(e)
-}
-
-// Decode decodes IdpOAuth2UnsupportedDetails from json.
-func (o *OptIdpOAuth2UnsupportedDetails) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptIdpOAuth2UnsupportedDetails to nil")
-	}
-	o.Set = true
-	o.Value = make(IdpOAuth2UnsupportedDetails)
-	if err := o.Value.Decode(d); err != nil {
-		return err
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptIdpOAuth2UnsupportedDetails) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptIdpOAuth2UnsupportedDetails) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode encodes IdpPermissionDeniedDetails as json.
 func (o OptIdpPermissionDeniedDetails) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -66666,40 +65683,6 @@ func (s OptIdpScopesMissingOpenidDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptIdpScopesMissingOpenidDetails) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes IdpStrategyPointerUnsupportedDetails as json.
-func (o OptIdpStrategyPointerUnsupportedDetails) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	o.Value.Encode(e)
-}
-
-// Decode decodes IdpStrategyPointerUnsupportedDetails from json.
-func (o *OptIdpStrategyPointerUnsupportedDetails) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptIdpStrategyPointerUnsupportedDetails to nil")
-	}
-	o.Set = true
-	o.Value = make(IdpStrategyPointerUnsupportedDetails)
-	if err := o.Value.Decode(d); err != nil {
-		return err
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptIdpStrategyPointerUnsupportedDetails) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptIdpStrategyPointerUnsupportedDetails) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -99038,22 +98021,6 @@ func (s SubmitFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case IdpOAuth2UnsupportedSubmitFlowStepErrorResponse:
-		e.FieldStart("code")
-		e.Str("idp.oauth2_unsupported")
-		{
-			s := s.IdpOAuth2Unsupported
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
 	case IdpProtocolBlockMissingSubmitFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("idp.protocol_block_missing")
@@ -99075,22 +98042,6 @@ func (s SubmitFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("idp.scopes_missing_openid")
 		{
 			s := s.IdpScopesMissingOpenid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case IdpStrategyPointerUnsupportedSubmitFlowStepErrorResponse:
-		e.FieldStart("code")
-		e.Str("idp.strategy_pointer_unsupported")
-		{
-			s := s.IdpStrategyPointerUnsupported
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -99380,17 +98331,11 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "idp.endpoints_partial":
 					s.Type = IdpEndpointsPartialSubmitFlowStepErrorResponse
 					found = true
-				case "idp.oauth2_unsupported":
-					s.Type = IdpOAuth2UnsupportedSubmitFlowStepErrorResponse
-					found = true
 				case "idp.protocol_block_missing":
 					s.Type = IdpProtocolBlockMissingSubmitFlowStepErrorResponse
 					found = true
 				case "idp.scopes_missing_openid":
 					s.Type = IdpScopesMissingOpenidSubmitFlowStepErrorResponse
-					found = true
-				case "idp.strategy_pointer_unsupported":
-					s.Type = IdpStrategyPointerUnsupportedSubmitFlowStepErrorResponse
 					found = true
 				case "internal":
 					s.Type = InternalSubmitFlowStepErrorResponse
@@ -99522,20 +98467,12 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.IdpEndpointsPartial.Decode(d); err != nil {
 			return err
 		}
-	case IdpOAuth2UnsupportedSubmitFlowStepErrorResponse:
-		if err := s.IdpOAuth2Unsupported.Decode(d); err != nil {
-			return err
-		}
 	case IdpProtocolBlockMissingSubmitFlowStepErrorResponse:
 		if err := s.IdpProtocolBlockMissing.Decode(d); err != nil {
 			return err
 		}
 	case IdpScopesMissingOpenidSubmitFlowStepErrorResponse:
 		if err := s.IdpScopesMissingOpenid.Decode(d); err != nil {
-			return err
-		}
-	case IdpStrategyPointerUnsupportedSubmitFlowStepErrorResponse:
-		if err := s.IdpStrategyPointerUnsupported.Decode(d); err != nil {
 			return err
 		}
 	case InternalSubmitFlowStepErrorResponse:

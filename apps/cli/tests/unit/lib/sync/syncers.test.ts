@@ -743,6 +743,58 @@ describe("IdpConnectionSyncer", () => {
     }
   });
 
+  describe("the endpoints an oidc block names", () => {
+    const file = ".zitadel/idps/google.json";
+    const all = {
+      authorization_endpoint: "https://idp.test/authorize",
+      jwks_uri: "https://idp.test/jwks",
+      token_endpoint: "https://idp.test/token",
+      userinfo_endpoint: "https://idp.test/userinfo",
+    };
+    const withEndpoints = (endpoints: object) => ({
+      ...connection,
+      oidc: { ...connection.oidc, ...endpoints },
+    });
+    const idp = () =>
+      makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" })[1];
+
+    it.each([
+      ["every one", all],
+      [
+        "every one but userinfo under id_token_mapping",
+        { ...all, userinfo_endpoint: undefined, id_token_mapping: true },
+      ],
+    ])("accepts %s", (_case, endpoints) => {
+      expect(() => idp().validate(withEndpoints(endpoints), file)).not.toThrow();
+    });
+
+    it.each([
+      [
+        { token_endpoint: all.token_endpoint },
+        "authorization_endpoint, jwks_uri, userinfo_endpoint",
+      ],
+      [{ ...all, jwks_uri: undefined }, "jwks_uri"],
+      [
+        { userinfo_endpoint: all.userinfo_endpoint, id_token_mapping: true },
+        "authorization_endpoint, jwks_uri, token_endpoint",
+      ],
+    ])("refuses %o, naming the file and %s", (endpoints, missing) => {
+      try {
+        idp().validate(withEndpoints(endpoints), file);
+        expect.unreachable("should have thrown");
+      } catch (error) {
+        expect((error as ZitadelError).code).toBe("E_VALIDATION");
+        expect((error as ZitadelError).message).toBe(
+          `${file}: oidc names some endpoints but not ${missing}`,
+        );
+        expect((error as ZitadelError).details).toMatchObject({
+          file,
+          missing: missing.split(", "),
+        });
+      }
+    });
+  });
+
   it("fetch returns the stored definition, so an update plans with a diff", async () => {
     let url: string | undefined;
     server.use(
@@ -1080,7 +1132,9 @@ describe("IdpConnectionSyncer", () => {
         ["slug", { ...stored, slug: "google2" }],
         ["oidc.issuer", { ...stored, oidc: { ...stored.oidc, issuer: "https://other.test" } }],
         ["subject_claim", { ...stored, subject_claim: "email" }],
-        ["protocol", { ...stored, protocol: "oauth2" }],
+        // `oidc` is the only protocol today; the rule is what stops a later one
+        // from re-keying a connection already applied.
+        ["protocol", { ...stored, protocol: "saml" }],
       ])("refuses an edit of %s before anything is sent", async (field, edited) => {
         holding(["GOOGLE_CLIENT_SECRET"]);
 
@@ -1096,36 +1150,6 @@ describe("IdpConnectionSyncer", () => {
         );
 
         expect((error as ZitadelError).message).toContain(file);
-      });
-
-      describe("an OAuth2 connection", () => {
-        const oauth2 = {
-          slug: "acme",
-          protocol: "oauth2",
-          subject_claim: "id",
-          oauth2: {
-            authorization_endpoint: "https://acme.test/authorize",
-            token_endpoint: "https://acme.test/token",
-            userinfo_endpoint: "https://acme.test/me",
-            client_id: "id",
-            client_secret: "${{ ACME_CLIENT_SECRET }}",
-          },
-        };
-
-        it.each([
-          ["oauth2.token_endpoint", { token_endpoint: "https://other.test/token" }],
-          ["oauth2.userinfo_endpoint", { userinfo_endpoint: "https://other.test/me" }],
-        ])("refuses an edit of %s", async (field, over) => {
-          const error = await failure(
-            idpSyncer().preflight?.(
-              file,
-              { ...oauth2, oauth2: { ...oauth2.oauth2, ...over } },
-              oauth2,
-            ),
-          );
-
-          expect((error as ZitadelError).message).toContain(field);
-        });
       });
 
       describe("an OIDC subject claim the file leaves out", () => {
