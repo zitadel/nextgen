@@ -186,7 +186,8 @@ load without extra wiring; to react in place, listen for the widgets'
 signed-out visitor. When `<zitadel-session>`
 finds no session as it loads, it fires `zitadel-session-missing` and goes to
 its `post-sign-out-url`, so a signed-out visit to a client-rendered profile page
-ends on the login page.
+ends on the login page. When that URL is the page the card is on, it renders
+nothing there instead of reloading the page.
 
 ### 5. Login page
 
