@@ -3,10 +3,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { Config } from "@oclif/core";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@clack/prompts", async () => (await import("../../../helpers/clack")).clackDouble());
+
+import { password, text } from "@clack/prompts";
 
 import { CREDENTIALS } from "../../../../src/lib/oclif/credentials";
-import { EnvironmentCommand } from "../../../../src/lib/oclif/environment-command";
+import { EnvironmentCommand, PreviewCommand } from "../../../../src/lib/oclif/environment-command";
+import { asTerminal } from "../../../helpers/terminal";
 import { cliPackageRoot } from "../../../helpers/oclif-build";
 
 /** Connects with the project secret, the default credential. */
@@ -26,6 +31,15 @@ class PreviewProbe extends EnvironmentCommand {
     const { flags } = await this.parse(PreviewProbe);
     await this.toMeta(flags);
     return { connection: await this.connect(), telemetry: this.telemetryProps };
+  }
+}
+
+/** A real preview command's base, connecting as `preview list` does. */
+class PreviewCommandProbe extends PreviewCommand {
+  async run() {
+    const { flags } = await this.parse(PreviewCommandProbe);
+    await this.toMeta(flags);
+    return { connection: await this.connect() };
   }
 }
 
@@ -182,5 +196,17 @@ describe("EnvironmentCommand.environmentSelector", () => {
     ).run();
 
     expect(selector).toBe(` --server https://staging.example --cwd ${dir}`);
+  });
+});
+
+describe("PreviewCommand.connect", () => {
+  it("fails on a terminal rather than asking for a missing preview token", async () => {
+    const file = await envFile(URL_AND_PROJECT);
+
+    await expect(
+      asTerminal(() => new PreviewCommandProbe(["--cwd", dir, "--env-file", file], config).run()),
+    ).rejects.toMatchObject({ code: "E_VALIDATION" });
+    expect(text).not.toHaveBeenCalled();
+    expect(password).not.toHaveBeenCalled();
   });
 });

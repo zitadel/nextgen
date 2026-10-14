@@ -72,6 +72,14 @@ describe("preview rm", () => {
         expect(app.envelopeOf<{ items: unknown[] }>(listed).data.items).toEqual([]);
       });
 
+      it("answers a dry run without a preview token", async () => {
+        const app = await anApp();
+
+        const result = await app.run(["preview", "rm", PREVIEW_URL, "--dry-run", "--json"]);
+
+        expect(result).toSucceed();
+      });
+
       it("removes a live preview, so it stops being listed", async () => {
         const app = await anAppWithAPreview();
 

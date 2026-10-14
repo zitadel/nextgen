@@ -103,6 +103,20 @@ export default class Preview extends PreviewCommand {
         pretty: "nothing to preview — production is deployed by `zitadel deploy`, after merge",
       });
     }
+    // `development` by default is a developer's machine. In a CI build it is
+    // only a platform the resolver cannot read (anything but Vercel and
+    // Netlify), which may be a production build, so it must say it is a
+    // preview build rather than be taken for one.
+    if (this.environment.name.source === "default" && runsInCi(env)) {
+      reportWarning(
+        "This CI build names no environment, so the preview is skipped. Set ZITADEL_ENV=preview in the pull-request build that should deploy one.",
+      );
+      return this.emit({
+        status: "skipped",
+        reason: "nothing-to-preview",
+        pretty: "nothing to preview — set ZITADEL_ENV=preview in the pull-request build",
+      });
+    }
 
     // A fork pull-request build cannot read the preview credential — a secret
     // is never exposed to a fork — so a missing `ZITADEL_PREVIEW_TOKEN` is not
@@ -237,4 +251,9 @@ async function primaryOrigins(client: ZitadelClient, projectId: string): Promise
     }
     throw error;
   }
+}
+
+/** Whether this runs in a CI build: the variable every major CI sets, or Cloudflare Pages' own. */
+function runsInCi(env: NodeJS.ProcessEnv): boolean {
+  return (env.CI !== undefined && env.CI !== "" && env.CI !== "false") || env.CF_PAGES === "1";
 }

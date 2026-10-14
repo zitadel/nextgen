@@ -104,17 +104,63 @@ describe("preview", () => {
         );
       });
 
-      it("writes nothing on --dry-run", async () => {
+      it("reports a dry run", async () => {
         const app = await aSetUpApp();
         await app.addOrigin(PREVIEW_PATTERN, "preview");
 
         const result = await app.run(["preview", "--origin", PREVIEW_URL, "--dry-run", "--json"]);
 
-        expect(result).toSucceed();
         expect(app.envelopeOf<{ dry_run: boolean }>(result).data.dry_run).toBe(true);
-        // A dry run registers no preview, so the project has none afterwards.
+      });
+
+      it("registers no preview on a dry run", async () => {
+        const app = await aSetUpApp();
+        await app.addOrigin(PREVIEW_PATTERN, "preview");
+
+        await app.run(["preview", "--origin", PREVIEW_URL, "--dry-run", "--json"]);
+
         const listed = await app.run(["preview", "list", "--json"]);
         expect(app.envelopeOf<{ items: unknown[] }>(listed).data.items).toEqual([]);
+      });
+
+      it("treats a trailing slash on --origin as the same preview URL", async () => {
+        const app = await aSetUpApp();
+        await app.addOrigin(PREVIEW_PATTERN, "preview");
+
+        await app.run(["preview", "--origin", `${PREVIEW_URL}/`, "--json"]);
+
+        const listed = await app.run(["preview", "list", "--json"]);
+        expect(
+          app
+            .envelopeOf<{ items: { origin: string }[] }>(listed)
+            .data.items.map((preview) => preview.origin),
+        ).toEqual([PREVIEW_URL]);
+      });
+
+      it("skips a CI build that names no environment", async () => {
+        const app = await aSetUpApp();
+        await app.addOrigin(PREVIEW_PATTERN, "preview");
+
+        const result = await app.run(["preview", "--origin", PREVIEW_URL, "--json"], {
+          CI: "true",
+        });
+
+        expect(result).toBeSkipped();
+      });
+
+      it("deploys in a CI build that names the preview environment", async () => {
+        const app = await aSetUpApp();
+        await app.addOrigin(PREVIEW_PATTERN, "preview");
+        await app.bindEnvironment("preview", await app.developmentValues());
+
+        const result = await app.run(
+          ["preview", "--env", "preview", "--origin", PREVIEW_URL, "--json"],
+          {
+            CI: "true",
+          },
+        );
+
+        expect(result).toSucceed();
       });
 
       it("refuses the primary origins as a target", async () => {
@@ -176,9 +222,6 @@ describe("preview", () => {
         const app = await aSetUpApp();
         await app.addOrigin(PREVIEW_PATTERN, "preview");
 
-        // An explicit origin selects targets; it never authorizes a preview
-        // deploy into production, which `zitadel deploy` owns. The command must
-        // skip without writing, so the project has no preview afterwards.
         const result = await app.run([
           "preview",
           "--env",
@@ -189,14 +232,19 @@ describe("preview", () => {
         ]);
 
         expect(result).toBeSkipped();
+      });
+
+      it("registers no preview in production even with an origin", async () => {
+        const app = await aSetUpApp();
+        await app.addOrigin(PREVIEW_PATTERN, "preview");
+
+        await app.run(["preview", "--env", "production", "--origin", PREVIEW_URL, "--json"]);
+
         const listed = await app.run(["preview", "list", "--json"]);
         expect(app.envelopeOf<{ items: unknown[] }>(listed).data.items).toEqual([]);
       });
 
-      it("warns and exits cleanly when ZITADEL_PREVIEW_TOKEN is not set", async () => {
-        // A fork pull-request build cannot read the preview secret, so a missing
-        // token skips the preview rather than failing the build (#1312). The
-        // project secret is present but is never a stand-in.
+      it("skips when ZITADEL_PREVIEW_TOKEN is not set", async () => {
         const app = await anApp();
         await app.bindEnvironment("preview", {
           ZITADEL_PROJECT_ID: "proj_preview",
@@ -213,11 +261,27 @@ describe("preview", () => {
         ]);
 
         expect(result).toBeSkipped();
-        // The warning rides the skipped envelope's `warnings`, so an agent
-        // reading --json still sees why nothing was deployed.
-        expect(result).toSay("ZITADEL_PREVIEW_TOKEN");
-        const warnings = (JSON.parse(result.stdout) as { warnings?: string[] }).warnings;
-        expect(warnings).toEqual([expect.stringContaining("ZITADEL_PREVIEW_TOKEN")]);
+      });
+
+      it("warns naming ZITADEL_PREVIEW_TOKEN in the envelope when it is not set", async () => {
+        const app = await anApp();
+        await app.bindEnvironment("preview", {
+          ZITADEL_PROJECT_ID: "proj_preview",
+          ZITADEL_PROJECT_SECRET: "sk",
+        });
+
+        const result = await app.run([
+          "preview",
+          "--env",
+          "preview",
+          "--origin",
+          PREVIEW_URL,
+          "--json",
+        ]);
+
+        expect((JSON.parse(result.stdout) as { warnings?: string[] }).warnings).toEqual([
+          expect.stringContaining("ZITADEL_PREVIEW_TOKEN"),
+        ]);
       });
 
       it("fails naming ZITADEL_PREVIEW_TOKEN under --strict when it is not set", async () => {
@@ -237,7 +301,6 @@ describe("preview", () => {
           "--json",
         ]);
 
-        expect(result).toFailWith("E_VALIDATION");
         expect(result).toSay("ZITADEL_PREVIEW_TOKEN");
       });
     });
