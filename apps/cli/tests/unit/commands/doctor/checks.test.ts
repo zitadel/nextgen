@@ -186,6 +186,59 @@ async function makeAngularProject(): Promise<string> {
   return cwd;
 }
 
+/**
+ * A Nuxt 4 app as an older setup left it: every page and plugin it wrote is
+ * on disk, and its manifest also records the retired
+ * `app/plugins/auth.server.ts` as infrastructure.
+ */
+async function makeOlderNuxtProject(): Promise<string> {
+  const cwd = await mkdtemp(join(tmpdir(), "zitadel-checks-nuxt-"));
+  tempDirs.push(cwd);
+  await mkdir(join(cwd, ".zitadel"), { recursive: true });
+  await mkdir(join(cwd, "app/pages"), { recursive: true });
+  await mkdir(join(cwd, "app/plugins"), { recursive: true });
+  await writeFile(
+    join(cwd, "package.json"),
+    JSON.stringify({
+      name: "demo",
+      dependencies: {
+        nuxt: "^4.1.0",
+        "@zitadel/sdk-nuxt": "latest",
+        "@zitadel/components": "latest",
+      },
+    }),
+  );
+  await writeFile(
+    join(cwd, "zitadel.json"),
+    JSON.stringify({
+      project: "proj-001",
+      server: "https://api.zitadel.cloud",
+      framework: { id: "nuxt" },
+      environments: { development: { issuer: "http://localhost:3000" } },
+    }),
+  );
+  await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
+  await chmod(join(cwd, ".zitadel/secret"), 0o600);
+  await writeFile(join(cwd, "nuxt.config.ts"), "export default defineNuxtConfig({});\n");
+  const files: ScaffoldManifest["files"] = {};
+  for (const [path, cls] of [
+    ["app/pages/login.vue", "presentation"],
+    ["app/pages/register.vue", "presentation"],
+    ["app/pages/profile.vue", "presentation"],
+    ["app/plugins/zitadel-components.client.ts", "infrastructure"],
+    ["app/plugins/auth.server.ts", "infrastructure"],
+  ] as const) {
+    const contents = `// ${MANAGED_MARKER}\n`;
+    await writeFile(join(cwd, path), contents);
+    files[path] = { hash: hashScaffoldFile(contents), class: cls };
+  }
+  await writeFile(
+    join(cwd, ".zitadel/state.json"),
+    JSON.stringify({ framework: "nuxt", resources: {}, scaffold: { files } }),
+  );
+  return cwd;
+}
+
 /** Rewrites angular.json with the serve proxyConfig wiring removed. */
 async function detachAngularProxy(cwd: string): Promise<void> {
   await writeFile(
@@ -1106,6 +1159,26 @@ function setBearer(proxyReq) {
 
     expect((await check.run(ctxFor(cwd))).status).toBe("pass");
     expect(await readFile(join(cwd, "app/page.tsx"), "utf8")).toContain(MANAGED_MARKER);
+  });
+
+  it("drops the retired Nuxt auth plugin an older setup recorded once the user deleted it", async () => {
+    const cwd = await makeOlderNuxtProject();
+    await rm(join(cwd, "app/plugins/auth.server.ts"));
+    const check = new ManagedFilesCheck();
+    expect((await check.run(ctxFor(cwd))).message).toContain("app/plugins/auth.server.ts");
+
+    await check.fix(ctxFor(cwd));
+
+    expect((await readScaffoldState(cwd)).files).not.toHaveProperty("app/plugins/auth.server.ts");
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("keeps the retired Nuxt auth plugin an older setup recorded while it is on disk", async () => {
+    const cwd = await makeOlderNuxtProject();
+
+    await new ManagedFilesCheck().fix(ctxFor(cwd));
+
+    expect((await readScaffoldState(cwd)).files).toHaveProperty("app/plugins/auth.server.ts");
   });
 });
 

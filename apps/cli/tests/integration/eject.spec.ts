@@ -7,7 +7,7 @@ const platform = usePlatformMock();
 
 /** A Next 15 app through setup, carrying a README the developer wrote. */
 async function aPatchedApp(): Promise<ScaffoldedApp> {
-  const app = await anApp({ nextVersion: "^15.0.0" });
+  const app = await anApp({ version: "^15.0.0" });
   await app.writeProjectFile("README.md", "# demo-next-app\n\nDeploy notes.\n");
   expect(await app.setup()).toSucceed();
   return app;

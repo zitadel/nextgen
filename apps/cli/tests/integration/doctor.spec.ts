@@ -12,6 +12,21 @@ function downgradeTheFramework(app: ScaffoldedApp): Promise<void> {
   });
 }
 
+/** Swaps the app's SDK dependency for the CLI, leaving `@zitadel/cli` its only Zitadel package. */
+function keepOnlyTheCli(app: ScaffoldedApp): Promise<void> {
+  return app.editPackageJson((pkg) => {
+    delete pkg.dependencies["@zitadel/sdk-next"];
+    pkg.dependencies["@zitadel/cli"] = "latest";
+  });
+}
+
+/** A Nuxt app an older setup scaffolded, whose retired auth plugin the developer deleted. */
+async function anOlderNuxtApp(): Promise<ScaffoldedApp> {
+  const app = await aSetUpApp([], { framework: "nuxt" });
+  await app.deletedTheRetiredNuxtAuthPlugin();
+  return app;
+}
+
 describe("doctor", () => {
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
@@ -94,6 +109,40 @@ describe("doctor", () => {
 
         expect(result).toSucceed();
         expect((await before.changes()).added).toContain("app/login/page.tsx");
+      });
+
+      it("reports an app that kept only the CLI in place of its SDK", async () => {
+        const app = await aSetUpApp();
+        await keepOnlyTheCli(app);
+
+        const result = await app.doctor();
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it("re-adds the SDK an app kept only the CLI in place of", async () => {
+        const app = await aSetUpApp();
+        await keepOnlyTheCli(app);
+
+        const result = await app.doctor(["--fix"]);
+
+        expect(result).toSucceed();
+      });
+
+      it("reports the retired Nuxt auth plugin an older setup recorded", async () => {
+        const app = await anOlderNuxtApp();
+
+        const result = await app.doctor();
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it("clears the retired Nuxt auth plugin an older setup recorded", async () => {
+        const app = await anOlderNuxtApp();
+
+        const result = await app.doctor(["--fix"]);
+
+        expect(result).toSucceed();
       });
 
       it("removes nothing while repairing", async () => {

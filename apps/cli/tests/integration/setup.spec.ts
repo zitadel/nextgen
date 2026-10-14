@@ -3,7 +3,7 @@ import { realpath } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { anApp, type ScaffoldedApp } from "../helpers/project";
+import { type AppFramework, anApp, type ScaffoldedApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 
@@ -20,6 +20,14 @@ const ACME = {
   issuer: "https://sso.acme.example",
 };
 const ACME_CREDENTIALS = { clientId: "acme-client-id", secret: "acme-client-secret" };
+
+/** Apps below the framework version their SDK supports. */
+const UNSUPPORTED_APPS: Array<{ name: string; framework: AppFramework; version: string }> = [
+  { name: "a Next 14 app", framework: "next", version: "^14.2.0" },
+  { name: "a Nuxt 3 app", framework: "nuxt", version: "^3.13.0" },
+  { name: "a Vue 2 app", framework: "vue", version: "^2.7.0" },
+  { name: "a Solid 1.7 app", framework: "solid", version: "~1.7.0" },
+];
 
 /** The providers setup can enable, with how to ask for each and what it publishes. */
 const PROVIDERS = [
@@ -166,17 +174,24 @@ describe("setup", () => {
         expect(result.stderr).toContain("fake npm stdout");
       });
 
-      it("refuses an app below the supported framework version", async () => {
-        const app = await anApp({ nextVersion: "^14.2.0" });
+      it.each(UNSUPPORTED_APPS)("refuses $name", async ({ framework, version }) => {
+        const app = await anApp({ framework, version });
 
         const result = await app.setup();
 
         expect(result).toFailWith("E_UNSUPPORTED_PROJECT_SHAPE");
+      });
+
+      it.each(UNSUPPORTED_APPS)("explains the floor to $name", async ({ framework, version }) => {
+        const app = await anApp({ framework, version });
+
+        const result = await app.setup();
+
         expect(result).toExplain("below the supported floor");
       });
 
-      it("writes nothing to an app it refuses", async () => {
-        const app = await anApp({ nextVersion: "^14.2.0" });
+      it.each(UNSUPPORTED_APPS)("writes nothing to $name", async ({ framework, version }) => {
+        const app = await anApp({ framework, version });
         const before = await app.snapshot();
 
         await app.setup();

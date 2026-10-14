@@ -207,13 +207,15 @@ export class ManagedFilesCheck implements SanityCheck {
     // *new* boundary, so a retired entry whose file stays absent must be
     // dropped — keeping it would fail doctor forever, since setup skips
     // initialized projects. Paths the repair newly introduced are adopted
-    // with their class and on-disk hash.
+    // with their class and on-disk hash. A conditional path the repair did
+    // not bring back is one the current plan does not write for this app
+    // (Nuxt's retired `plugins/auth.server.ts`), so it is dropped the same way.
     const current = new Set(actions.markedFiles);
     const conditional = new Set(actions.conditionalFiles ?? []);
     const files: ScaffoldManifest["files"] = {};
     for (const [path, entry] of Object.entries(manifest.files)) {
       const contents = await readIfExists(join(ctx.cwd, path));
-      if (contents === undefined && !current.has(path)) {
+      if (contents === undefined && (!current.has(path) || conditional.has(path))) {
         continue; // retired by a template migration and gone from disk
       }
       files[path] =
