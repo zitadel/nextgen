@@ -5,7 +5,7 @@ SvelteKit handle hook and helpers for Nextgen Auth.
 ## Installation
 
 ```bash
-pnpm add @zitadel/sdk-sveltekit
+pnpm add @zitadel/sdk-sveltekit@alpha
 ```
 
 ## Setup
@@ -112,7 +112,7 @@ Install the Svelte component library and render its `ZitadelLogin` component.
 `@zitadel/sdk-sveltekit` is server-only; the widget comes from `@zitadel/sdk-svelte`:
 
 ```bash
-pnpm add @zitadel/sdk-svelte
+pnpm add @zitadel/sdk-svelte@alpha
 ```
 
 ```svelte
