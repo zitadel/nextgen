@@ -78,7 +78,9 @@ jobs:
       # which keeps depot-* files there); turbo's strict env drops
       # GOCACHEPROG, so the builds here use Go's own files. Whichever job
       # saved a shared entry first chose the format for both. The key names
-      # both modules' go.sum (tools/bench is a module of its own).
+      # the installed Go, whose patch differs between Depot's runner images
+      # (a build result serves only the compiler that made it), and both
+      # modules' go.sum (tools/bench is a module of its own).
       - uses: actions/setup-go@v6
         id: setup-go
         with:
