@@ -49,9 +49,10 @@ hosted cloud's builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
   build reaches `api`'s through its package edges). From there they run in
   parallel on the same package edges as their dev builds: a release build
   depends on the release build of every package its dev build depends on.
-  The console and login UI release builds wait for
-  `@zitadel/release#build-public-packages`. Give a new public package those
-  edges and add it to `release-manifest.mjs`.
+  The console and login UI release builds follow the same rule (never a dev
+  build: its output would replace the release output they bundle) and wait
+  for `@zitadel/release#build-public-packages`. Give a new public package
+  those edges and add it to `release-manifest.mjs`.
 
 ## Inputs and outputs
 
