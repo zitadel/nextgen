@@ -352,9 +352,13 @@ export default class SsoEnable extends BaseCommand {
       consola.success(`Updated ${file}`);
     }
     for (const skipped of edits.skipped) {
-      reportWarning(
-        `Left ${skipped.region} alone: it has been edited by hand. Update it yourself.`,
-      );
+      const toDo =
+        skipped.step === "password"
+          ? `Add ${plan.slug} to its sso_providers, and route sso_authenticated to the step a sign-in ends on, sso_user_not_found to register-sso and user_already_exists to sso-conflict.`
+          : skipped.step === "sso-conflict"
+            ? `Add ${plan.slug} to its sso_providers.`
+            : "Update it yourself.";
+      reportWarning(`Left ${skipped.region} alone: it has been edited by hand. ${toDo}`);
     }
     if (edits.written.length === 0 && edits.skipped.length === 0) {
       consola.info(`${schema.name} and its login flow already offer ${entry.displayName}`);

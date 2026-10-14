@@ -410,6 +410,28 @@ login and registration in one definition.
 `sso_providers` goes on both entry steps, which settles area 2's register-step
 topology [dependency](2-auth-method-selection.md#dependencies).
 
+The `password` step carries the providers too. Someone who signed up with a
+provider has no password, and if they type their email instead of clicking the
+button the `identifier` step sends them there: a step with only a password
+field is a dead end for them. The step routes what comes back from a provider
+like the entry steps do, including `user_already_exists` to `sso-conflict`: the
+collision binds to the identified user either way, and the conflict step says
+why they are back and offers the other ways in, where the step itself would
+show an unchanged form and put itself on the back stack twice. Under
+`creation: auto`, when the provider account is someone else's, or unknown, the
+engine restarts the flow rather than creating a user; under `creation:
+disabled` an unknown account shows `error.sso_creation_disabled` on the step.
+The step is edited only when the generator recognises it: the shipped step of
+either preset, once the providers and the routes it writes are set aside. A
+hand-edited one, including one whose provider routes were pointed elsewhere, is
+left alone and reported, as for every other generated step.
+A password step that is exactly the shipped one reads as unedited, so a button the
+developer removed on purpose comes back on the next `sso enable`; nothing in the file
+distinguishes that from a project enabled before the step offered providers.
+Showing only the providers linked to the identified user, or skipping the step
+for a user without a password, would tell anyone who types an email which
+sign-in method that account uses, so neither is done.
+
 #### 2. The Three-Outcome Rule for SSO Steps
 Every step carrying `sso_providers` must explicitly handle three outcomes:
 `sso_authenticated`, `sso_user_not_found`, and `user_already_exists`.
@@ -417,7 +439,9 @@ The first two are SSO-only routes; `user_already_exists` is shared with typed
 collisions ([decision 5](#5-retargeting-registration-collisions)).
 *   **`sso_user_not_found` → `register-sso`** on every step, so an unknown
     user reaches the collection step after one ceremony whether they started
-    on the sign-in or the register page
+    on the sign-in or the register page. The `password` step carries the route
+    only because the rule requires it: the attempt there is already bound to the
+    identified user, so under `creation: auto` an unknown provider account restarts the flow instead
     ([area 3](3-social-login-flow.md#resolution-branches)).
     The engine flips `CurrentPurpose` to `register` on the way.
 *   **`user_not_found` is untouched.**
@@ -459,9 +483,9 @@ The engine binds the attempt to the colliding account.
     three-outcome rule:
     *   `sso_authenticated` routes to `done`: the user signed in with a
         provider already linked to that account.
-    *   `user_already_exists` targets the step itself: clicking the colliding
-        provider again re-runs the ceremony and resolves identically, so the
-        step re-renders with the same options.
+    *   `user_already_exists` targets `sso-conflict`: the account the provider
+        returned is the one already identified, and the conflict step explains
+        that and offers the password, passkey and providers.
     *   `sso_user_not_found` routes to `register-sso`: reachable only if the
         provider returns a different, unknown subject (the user switched
         provider accounts mid-loop).

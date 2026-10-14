@@ -24,6 +24,7 @@
  *                            password   --SUBMIT(submit)--> done
  *                                       --SUBMIT(back)----> identifier
  *                                       --SUBMIT(passkey)--> passkey-login
+ *                                       --SUBMIT(sso)-----> sso-redirect
  *      \--START(register)--> register --SUBMIT--> register-password --SUBMIT--> done
  *                                     --SUBMIT(sign_in)--> identifier
  *                                     --SUBMIT(sso)-----> sso-redirect
@@ -75,6 +76,8 @@ export type FlowMachineContext = {
   purpose: CreateFlowBodyPurpose | null;
   capturedFields: Record<string, string>;
   ssoProviderId: string | null;
+  /** The step the provider button was pressed on, which decides where a return from it goes. */
+  ssoOrigin: string | null;
 };
 
 export type FlowMachineEvent =
@@ -94,6 +97,7 @@ const initialContext = {
   purpose: null,
   capturedFields: {},
   ssoProviderId: null,
+  ssoOrigin: null,
 } satisfies FlowMachineContext;
 
 const rotateToken = assign<
@@ -135,20 +139,23 @@ const captureFields = assign<
  */
 type SubmitEvent = Extract<FlowMachineEvent, { type: "SUBMIT" }>;
 
-const chooseProvider = {
-  guard: ({ event }: { event: SubmitEvent }) =>
-    event.action === "sso" &&
-    typeof event.sso_provider_id === "string" &&
-    event.sso_provider_id.length > 0,
-  target: "sso-redirect",
-  actions: [
-    captureFields,
-    assign<FlowMachineContext, SubmitEvent, undefined, FlowMachineEvent, never>({
-      ssoProviderId: ({ event }) => event.sso_provider_id ?? null,
-    }),
-    rotateToken,
-  ],
-} as const;
+/** The transition every step that offers providers takes when one is pressed, remembering where. */
+const chooseProviderOn = (origin: string) =>
+  ({
+    guard: ({ event }: { event: SubmitEvent }) =>
+      event.action === "sso" &&
+      typeof event.sso_provider_id === "string" &&
+      event.sso_provider_id.length > 0,
+    target: "sso-redirect",
+    actions: [
+      captureFields,
+      assign<FlowMachineContext, SubmitEvent, undefined, FlowMachineEvent, never>({
+        ssoProviderId: ({ event }) => event.sso_provider_id ?? null,
+        ssoOrigin: () => origin,
+      }),
+      rotateToken,
+    ],
+  }) as const;
 
 const setPurpose = assign<
   FlowMachineContext,
@@ -193,7 +200,7 @@ export const flowMachine = createMachine({
     identifier: {
       on: {
         SUBMIT: [
-          chooseProvider,
+          chooseProviderOn("identifier"),
           {
             guard: ({ event }) => event.action === "register",
             target: "register",
@@ -221,7 +228,7 @@ export const flowMachine = createMachine({
     register: {
       on: {
         SUBMIT: [
-          chooseProvider,
+          chooseProviderOn("register"),
           {
             guard: ({ event }) => event.action === "sign_in",
             target: "identifier",
@@ -254,6 +261,7 @@ export const flowMachine = createMachine({
     password: {
       on: {
         SUBMIT: [
+          chooseProviderOn("password"),
           {
             // ADR 022 back-navigation: the engine injects a `back` action on
             // any step that has a predecessor.
@@ -314,6 +322,15 @@ export const flowMachine = createMachine({
       on: {
         SUBMIT: [
           {
+            // From the password step the attempt is already bound to the
+            // identified user, so the engine restarts the flow instead of
+            // collecting a new account.
+            guard: ({ context, event }) =>
+              event.sso_outcome === "sso_user_not_found" && context.ssoOrigin === "password",
+            target: "identifier",
+            actions: [rotateToken],
+          },
+          {
             guard: ({ event }) => event.sso_outcome === "sso_user_not_found",
             target: "register-sso",
             actions: [captureFields, rotateToken],
@@ -363,7 +380,7 @@ export const flowMachine = createMachine({
     "sso-conflict": {
       on: {
         SUBMIT: [
-          chooseProvider,
+          chooseProviderOn("sso-conflict"),
           {
             guard: ({ event }) => event.action === "passkey",
             target: "passkey-login",

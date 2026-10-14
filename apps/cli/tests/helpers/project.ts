@@ -117,6 +117,7 @@ export interface FlowDocument {
   steps: Array<{
     name: string;
     fields?: string[];
+    actions?: Array<{ name: string; text_key?: string }>;
     transitions?: Record<string, unknown>;
     sso_providers?: string[];
   }>;
@@ -522,6 +523,17 @@ export class ScaffoldedApp {
   /** Edits the committed user schema, as the developer owning it would. */
   editUserSchema(edit: (schema: UserSchemaDocument) => void): Promise<void> {
     return this.editDocument(SCHEMA_FILE, edit);
+  }
+
+  /** Edits the password step of the committed login flow, as the developer owning it would. */
+  editPasswordStep(edit: (step: FlowDocument["steps"][number]) => void): Promise<void> {
+    return this.editLoginFlow((flow) => {
+      const step = flow.steps.find((candidate) => candidate.name === "password");
+      if (step === undefined) {
+        throw new Error("the login flow has no password step");
+      }
+      edit(step);
+    });
   }
 
   /** Edits a committed connection file, as the developer owning it would. */
