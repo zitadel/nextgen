@@ -5,6 +5,8 @@ import type { FileOp } from "./file-writer/types";
 import { PROXY_PATH } from "./proxy";
 import {
   assertNoUnreviewedProjectSecretProxy,
+  EXCHANGE_REDACTION_MARKER,
+  exchangeRedactionFunctions,
   PROXY_CREDENTIAL_POLICY_MARKER,
 } from "./proxy-credential-policy";
 import {
@@ -32,10 +34,15 @@ import {
  * `X-Forwarded-Proto` (`xfwd`), which the server reads before `Host`, as the
  * Next and Nuxt middleware send it. The WebAuthn relying party comes from the
  * browser's `Origin`, which the proxy passes on untouched.
+ *
+ * The exchange's response carries the HttpOnly session token in its body, so
+ * the proxy handles responses itself (`selfHandleResponse`) and drops the token
+ * from that one body; see {@link exchangeRedactionFunctions}.
  */
 function proxyEntryCode(server: string): string {
   return `/* ${PROXY_CREDENTIAL_POLICY_MARKER} */ {
   target: ${JSON.stringify(server)},
+  selfHandleResponse: true,
   changeOrigin: true,
   xfwd: true,
   rewrite: (path) => path.replace(/^\\${PROXY_PATH}/, "").replace(/^(?!\\/)/, "/"),
@@ -55,8 +62,19 @@ function proxyEntryCode(server: string): string {
         proxyReq.setHeader("authorization", bearer);
       }
     });
+${exchangeRedactionCode("    ")}
   },
 }`;
+}
+
+/**
+ * The redaction functions of {@link exchangeRedactionFunctions} and the two
+ * listeners that use them, as statements inside the entry's `configure`.
+ */
+function exchangeRedactionCode(indent: string): string {
+  return `${exchangeRedactionFunctions(indent)}
+${indent}proxy.on("proxyReq", requestPlainExchange);
+${indent}proxy.on("proxyRes", relayResponse);`;
 }
 
 const LEGACY_PROXY_REQUEST_LISTENER =
@@ -122,6 +140,61 @@ function forwardAppOrigin(source: string): string {
   );
 }
 
+/** Escapes `text` for use as a literal inside a regular expression. */
+function literal(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
+}
+
+/**
+ * The generated exchange-only bearer listener, at any indent (captured as
+ * group 1), with any line ending.
+ */
+const EXCHANGE_ONLY_LISTENER = new RegExp(
+  `(^[\\t ]*)${exchangeOnlyProxyRequestListener("")
+    .split("\n")
+    .slice(1)
+    .map(literal)
+    .join("\\r?\\n\\1")}`,
+  "m",
+);
+
+/**
+ * The head of the generated `/__nextgen` entry up to its `target` line; group
+ * 2 is the entry's indent and group 3 its line ending.
+ */
+const GENERATED_ENTRY_HEAD =
+  /(["']\/__nextgen["']:\s*(?:\/\* zitadel:proxy:v2 \*\/\s*)?\{(\r?\n)([\t ]+)target: [^\r\n]+,\r?\n)/;
+
+/**
+ * Adds the session-token redaction to the generated entry written before it
+ * existed: `selfHandleResponse` after `target`, and the redaction code after
+ * the generated bearer listener. Both anchors must be the CLI's own bytes —
+ * a response handler without `selfHandleResponse`, or the reverse, would break
+ * every proxied call — so an entry changed by hand, or one that already made
+ * its own `selfHandleResponse` choice, is left alone.
+ */
+function redactExchange(source: string): string {
+  if (
+    !source.includes(PROXY_CREDENTIAL_POLICY_MARKER) ||
+    source.includes(EXCHANGE_REDACTION_MARKER) ||
+    /\bselfHandleResponse\b/.test(source) ||
+    !GENERATED_ENTRY_HEAD.test(source) ||
+    !EXCHANGE_ONLY_LISTENER.test(source)
+  ) {
+    return source;
+  }
+  return source
+    .replace(
+      GENERATED_ENTRY_HEAD,
+      (_head, head: string, eol: string, indent: string) =>
+        `${head}${indent}selfHandleResponse: true,${eol}`,
+    )
+    .replace(EXCHANGE_ONLY_LISTENER, (listener: string, indent: string) => {
+      const eol = listener.includes("\r\n") ? "\r\n" : "\n";
+      return `${listener}${eol}${exchangeRedactionCode(indent).replace(/\n/g, eol)}`;
+    });
+}
+
 /** The imports that the injected proxy entry depends on. */
 const PROXY_IMPORTS = [{ from: "vite", imported: "loadEnv", local: "loadEnv" }] as const;
 
@@ -133,8 +206,8 @@ const PROXY_IMPORTS = [{ from: "vite", imported: "loadEnv", local: "loadEnv" }] 
  * alone so the user can still opt into network binding (`--host`/`host: true`);
  * the issuer/origin requirement is about the port, not the bind host. Idempotent
  * — entries already present are left as-is, except the CLI's own earlier proxy
- * shapes, which are migrated in place: the unconditional bearer listener and
- * the host-keeping entry. Throws `E_VALIDATION` when the file is absent or the
+ * shapes, which are migrated in place: the unconditional bearer listener, the
+ * host-keeping entry, and the entry without the session-token redaction. Throws `E_VALIDATION` when the file is absent or the
  * config object cannot be reached (function-built/exotic configs), with a hint
  * to add the block manually.
  */
@@ -156,7 +229,7 @@ export function viteProxyEdit(
       assertNoUnreviewedProjectSecretProxy(workingSource, label);
     }
     if (workingSource !== undefined) {
-      workingSource = forwardAppOrigin(workingSource);
+      workingSource = redactExchange(forwardAppOrigin(workingSource));
     }
 
     const mod = parseConfigModule(workingSource, label);

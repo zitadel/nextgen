@@ -7,7 +7,12 @@ import type {
 } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
 import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
-import { REMOTE_HOST, useRemoteServer } from "../../../../../../helpers/remote-server";
+import {
+  EXCHANGE_BODY,
+  REMOTE_HOST,
+  SESSION_COOKIE,
+  useRemoteServer,
+} from "../../../../../../helpers/remote-server";
 import { aProxyConfApp, type DevApp } from "../../../../../../helpers/vite";
 
 function ctx(): PatchContext {
@@ -62,12 +67,33 @@ function proxyConfigEdit(): (source: string | undefined) => string {
 }
 
 /**
+ * The managed proxy as setup wrote it before it kept the session token out of
+ * the browser: it relayed every response body as the server sent it.
+ */
+function unredactedProxyConf(): string {
+  const current = proxyConfigEdit()(undefined);
+  const unredacted = current
+    .replace(
+      /\n\n\/\* zitadel:proxy:exchange-redaction \*\/[\s\S]*?(?=\n\nfunction stripPrefix)/,
+      "",
+    )
+    .replace(
+      / {4}selfHandleResponse: true,\n[\s\S]*?\n {4}},\n(?= {2}},\n};)/,
+      '    onProxyReq: setBearer,\n    configure: (proxy) => proxy.on("proxyReq", setBearer),\n',
+    );
+  if (unredacted.includes("exchange-redaction") || unredacted.includes("selfHandleResponse")) {
+    throw new Error("expected the exchange redaction in the managed proxy");
+  }
+  return unredacted;
+}
+
+/**
  * The managed proxy as setup wrote it before it forwarded the app's origin:
  * `changeOrigin: false` kept the browser's `Host`, and with it `localhost` as
  * the TLS server name.
  */
 function previousProxyConf(): string {
-  const current = proxyConfigEdit()(undefined);
+  const current = unredactedProxyConf();
   const previous = current.replace(
     "    changeOrigin: true,\n    xfwd: true,\n",
     "    changeOrigin: false,\n",
@@ -163,7 +189,40 @@ describe("AngularPatcher.plan", () => {
       "    changeOrigin: false,\n    xfwd: false,\n",
     );
 
+    expect(proxyConfigEdit()(chosen)).toContain("    changeOrigin: false,\n    xfwd: false,\n");
+  });
+
+  it("handles the proxied responses itself, so it can redact the exchange", () => {
+    const proxy = proxyConfigEdit()(undefined);
+
+    expect(proxy).toContain("    selfHandleResponse: true,\n");
+  });
+
+  it("drops the session token from the exchange's body", () => {
+    const proxy = proxyConfigEdit()(undefined);
+
+    expect(proxy).toContain('const EXCHANGE_CREDENTIAL_FIELDS = ["session_token"];');
+  });
+
+  it("adds the redaction to the managed proxy it wrote without it", () => {
+    const edit = proxyConfigEdit();
+
+    expect(edit(unredactedProxyConf())).toBe(edit(undefined));
+  });
+
+  it("keeps a managed proxy whose response handling was already chosen by hand", () => {
+    const chosen = unredactedProxyConf().replace(
+      "    onProxyReq: setBearer,\n",
+      "    selfHandleResponse: false,\n    onProxyReq: setBearer,\n",
+    );
+
     expect(proxyConfigEdit()(chosen)).toBe(chosen);
+  });
+
+  it("leaves an unmanaged proxy without the redaction alone", () => {
+    const custom = unredactedProxyConf().replace(`${MANAGED_MARKER}\n`, "");
+
+    expect(proxyConfigEdit()(custom)).toBe(custom);
   });
 
   it("migrates only the legacy managed proxy bearer hook", () => {
@@ -307,6 +366,66 @@ describe("the generated proxy.conf.cjs, run by Vite against a remote https serve
     const [exchange, me] = remote.requests.slice(-2);
     expect(exchange?.headers.authorization).toBe("Bearer sk_proj_test");
     expect(me?.headers.authorization).toBeUndefined();
+  });
+
+  it("keeps the session token out of the exchange's body", async () => {
+    const { origin } = await serve(proxyConfigEdit()(undefined));
+
+    const response = await fetch(`${origin}/__nextgen/sessions/exchange`, { method: "POST" });
+
+    expect(await response.json()).toEqual({ session: EXCHANGE_BODY.session });
+  });
+
+  it("sends the exchange's body with its own length", async () => {
+    const { origin } = await serve(proxyConfigEdit()(undefined));
+
+    const response = await fetch(`${origin}/__nextgen/sessions/exchange`, { method: "POST" });
+
+    expect(Number(response.headers.get("content-length"))).toBe(
+      JSON.stringify({ session: EXCHANGE_BODY.session }).length,
+    );
+  });
+
+  it("still delivers the session cookie with the exchange", async () => {
+    const { origin } = await serve(proxyConfigEdit()(undefined));
+
+    const response = await fetch(`${origin}/__nextgen/sessions/exchange`, { method: "POST" });
+
+    expect(response.headers.getSetCookie()).toEqual([SESSION_COOKIE]);
+  });
+
+  it("asks the server for an unencoded exchange answer", async () => {
+    const { origin } = await serve(proxyConfigEdit()(undefined));
+
+    await fetch(`${origin}/__nextgen/sessions/exchange`, { method: "POST" });
+
+    expect(remote.requests.at(-1)?.headers["accept-encoding"]).toBeUndefined();
+  });
+
+  it("relays an exchange answer that is not JSON as it came", async () => {
+    const { origin } = await serve(proxyConfigEdit()(undefined));
+
+    const response = await fetch(`${origin}/__nextgen/sessions/exchange?as=text`, {
+      method: "POST",
+    });
+
+    expect(await response.text()).toBe("ok");
+  });
+
+  it("relays every other call's body as the server sent it", async () => {
+    const { origin } = await serve(proxyConfigEdit()(undefined));
+
+    const response = await fetch(`${origin}/__nextgen/sessions/me`);
+
+    expect(await response.json()).toEqual(EXCHANGE_BODY);
+  });
+
+  it("handed the browser the session token with the proxy it wrote before", async () => {
+    const { origin } = await serve(unredactedProxyConf());
+
+    const response = await fetch(`${origin}/__nextgen/sessions/exchange`, { method: "POST" });
+
+    expect(await response.json()).toEqual(EXCHANGE_BODY);
   });
 
   it("could not reach it with the entry it wrote before", async () => {

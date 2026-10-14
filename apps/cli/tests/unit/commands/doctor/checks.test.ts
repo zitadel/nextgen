@@ -877,6 +877,30 @@ describe("ManagedFilesCheck", () => {
     expect(angularJson.projects.demo.architect.serve.options.proxyConfig).toBe("proxy.conf.cjs");
   });
 
+  it("fails on a managed proxy that relays the session token, and --fix adds the redaction", async () => {
+    const cwd = await makeAngularProject();
+    const proxyPath = join(cwd, "proxy.conf.cjs");
+    const unredacted = proxyConfTemplate()
+      .replace(
+        /\n\n\/\* zitadel:proxy:exchange-redaction \*\/[\s\S]*?(?=\n\nfunction stripPrefix)/,
+        "",
+      )
+      .replace(
+        / {4}selfHandleResponse: true,\n[\s\S]*?\n {4}},\n(?= {2}},\n};)/,
+        '    onProxyReq: setBearer,\n    configure: (proxy) => proxy.on("proxyReq", setBearer),\n',
+      );
+    await writeFile(proxyPath, unredacted);
+    const check = new ManagedFilesCheck();
+    const before = await check.run(ctxFor(cwd));
+    expect(before.status).toBe("fail");
+    expect(before.message).toContain("detached managed config wiring: proxy.conf.cjs");
+
+    await check.fix(ctxFor(cwd));
+
+    expect(await readFile(proxyPath, "utf8")).toBe(proxyConfTemplate());
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+  });
+
   it("fails when a wiring's host config file is deleted outright", async () => {
     const cwd = await makeAngularProject();
     await rm(join(cwd, "angular.json"));

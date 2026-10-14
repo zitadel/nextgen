@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import { viteProxyEdit } from "../../../../../../src/lib/orca/patchers/rule/vite-support";
-import { REMOTE_HOST, useRemoteServer } from "../../../../../helpers/remote-server";
+import {
+  EXCHANGE_BODY,
+  REMOTE_HOST,
+  SESSION_COOKIE,
+  useRemoteServer,
+} from "../../../../../helpers/remote-server";
 import { aViteApp, type DevApp } from "../../../../../helpers/vite";
 
 const edit = viteProxyEdit(5173, "http://127.0.0.1:8099");
@@ -48,6 +53,16 @@ export default defineConfig({
   }
 });
 `;
+
+/**
+ * What setup wrote into {@link BARE_CONFIG} before the proxy kept the session
+ * token out of the browser: it forwarded the app's origin, but relayed every
+ * response body as the server sent it.
+ */
+const UNREDACTED_CONFIG = PREVIOUS_CONFIG.replace(
+  "changeOrigin: false,",
+  "changeOrigin: true,\n        xfwd: true,",
+);
 
 describe("viteProxyEdit", () => {
   it("adds the /__nextgen proxy with an exchange-only project-secret bearer", () => {
@@ -140,6 +155,48 @@ export default defineConfig({
     expect(edit(PREVIOUS_CONFIG)).toBe(current);
   });
 
+  it("handles the proxied responses itself, so it can redact the exchange", () => {
+    const out = edit(BARE_CONFIG);
+
+    expect(out).toContain("selfHandleResponse: true,");
+  });
+
+  it("drops the session token from the exchange's body", () => {
+    const out = edit(BARE_CONFIG);
+
+    expect(out).toContain('const EXCHANGE_CREDENTIAL_FIELDS = ["session_token"];');
+  });
+
+  it("adds the redaction to the entry it wrote without it", () => {
+    const current = viteProxyEdit(5173, "https://zitadel.example.com")(BARE_CONFIG);
+
+    expect(edit(UNREDACTED_CONFIG)).toBe(current);
+  });
+
+  it("adds the redaction to an entry written with CRLF line endings", () => {
+    const current = viteProxyEdit(5173, "https://zitadel.example.com")(BARE_CONFIG);
+
+    expect(edit(UNREDACTED_CONFIG.replace(/\n/g, "\r\n")).replace(/\r\n/g, "\n")).toBe(current);
+  });
+
+  it("keeps a generated entry whose response handling was already chosen by hand", () => {
+    const chosen = UNREDACTED_CONFIG.replace(
+      "xfwd: true,",
+      "xfwd: true,\n        selfHandleResponse: false,",
+    );
+
+    expect(edit(chosen)).toBe(chosen);
+  });
+
+  it("leaves a generated entry whose bearer listener was changed by hand alone", () => {
+    const changed = UNREDACTED_CONFIG.replace(
+      'proxyReq.setHeader("authorization", bearer);',
+      'proxyReq.setHeader("authorization", bearer);\n              console.debug("exchange");',
+    );
+
+    expect(edit(changed)).toBe(changed);
+  });
+
   it("leaves a hand-written entry that keeps the browser's Host alone", () => {
     const custom = `export default defineConfig({
   server: {
@@ -165,7 +222,7 @@ export default defineConfig({
       "changeOrigin: false,\n        xfwd: false,",
     );
 
-    expect(edit(chosen)).toBe(chosen);
+    expect(edit(chosen)).toContain("changeOrigin: false,\n        xfwd: false,");
   });
 
   it("flags an unguarded write even when a v2 marker and decoy guard remain", () => {
@@ -266,6 +323,68 @@ describe("the generated proxy, run by Vite against a remote https server", () =>
     const [exchange, me] = remote.requests.slice(-2);
     expect(exchange?.headers.authorization).toBe("Bearer sk_proj_test");
     expect(me?.headers.authorization).toBeUndefined();
+  });
+
+  it("keeps the session token out of the exchange's body", async () => {
+    const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG));
+
+    const response = await fetch(`${origin}/__nextgen/sessions/exchange`, { method: "POST" });
+
+    expect(await response.json()).toEqual({ session: EXCHANGE_BODY.session });
+  });
+
+  it("sends the exchange's body with its own length", async () => {
+    const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG));
+
+    const response = await fetch(`${origin}/__nextgen/sessions/exchange`, { method: "POST" });
+
+    expect(Number(response.headers.get("content-length"))).toBe(
+      JSON.stringify({ session: EXCHANGE_BODY.session }).length,
+    );
+  });
+
+  it("still delivers the session cookie with the exchange", async () => {
+    const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG));
+
+    const response = await fetch(`${origin}/__nextgen/sessions/exchange`, { method: "POST" });
+
+    expect(response.headers.getSetCookie()).toEqual([SESSION_COOKIE]);
+  });
+
+  it("asks the server for an unencoded exchange answer", async () => {
+    const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG));
+
+    await fetch(`${origin}/__nextgen/sessions/exchange`, { method: "POST" });
+
+    expect(remote.requests.at(-1)?.headers["accept-encoding"]).toBeUndefined();
+  });
+
+  it("relays an exchange answer that is not JSON as it came", async () => {
+    const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG));
+
+    const response = await fetch(`${origin}/__nextgen/sessions/exchange?as=text`, {
+      method: "POST",
+    });
+
+    expect(await response.text()).toBe("ok");
+  });
+
+  it("relays every other call's body as the server sent it", async () => {
+    const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG));
+
+    const response = await fetch(`${origin}/__nextgen/sessions/me`);
+
+    expect(await response.json()).toEqual(EXCHANGE_BODY);
+  });
+
+  it("handed the browser the session token with the entry it wrote before", async () => {
+    const { origin } = await serve(
+      UNREDACTED_CONFIG.replace("https://zitadel.example.com", remote.url),
+    );
+
+    const response = await fetch(`${origin}/__nextgen/sessions/exchange`, { method: "POST" });
+
+    expect(await response.json()).toEqual(EXCHANGE_BODY);
   });
 
   it("could not reach it with the entry it wrote before", async () => {
