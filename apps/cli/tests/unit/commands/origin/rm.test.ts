@@ -136,6 +136,25 @@ describe("origin rm", () => {
     expect(envelope.next_commands?.[0]).toContain("--env production");
   });
 
+  it("suggests adding an origin back in the environment the last one was removed from", async () => {
+    const cwd = await anAppDir();
+    await writeFile(
+      join(cwd, ".env.production.local"),
+      "ZITADEL_PROJECT_ID=proj_unit\nZITADEL_PROJECT_SECRET=sk_unit\n",
+    );
+    server.use(
+      http.get(`${SERVER}/projects/:id`, ({ params }) =>
+        HttpResponse.json({ id: params.id, origins: [] }),
+      ),
+    );
+
+    const result = await remove(cwd, ["--env", "production", "--force"]);
+
+    expect(
+      (parseJson(result.stdout) as { data: { next_commands?: string[] } }).data.next_commands,
+    ).toEqual([expect.stringMatching(/origin add <url> --kind primary --env production/)]);
+  });
+
   it("quotes a wildcard pattern in the suggested retry, so the shell cannot expand it", async () => {
     const cwd = await anAppDir();
 
