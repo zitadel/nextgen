@@ -6,15 +6,15 @@ import (
 	"testing"
 )
 
-// TestSaveTargetTightensExistingFile: the state file holds the project
+// TestSaveManifestTightensExistingFile: the manifest holds the project
 // secret, so an existing world-readable file is tightened to 0600 rather
 // than kept as os.WriteFile would.
-func TestSaveTargetTightensExistingFile(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "target.json")
+func TestSaveManifestTightensExistingFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "manifest.json")
 	if err := os.WriteFile(path, []byte("{}"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := SaveTarget(path, Target{Base: "http://x", ProjectSecret: "s3cret"}); err != nil {
+	if err := SaveManifest(path, Manifest{Target: Target{Base: "http://x", ProjectSecret: "s3cret"}}); err != nil {
 		t.Fatal(err)
 	}
 	info, err := os.Stat(path)
