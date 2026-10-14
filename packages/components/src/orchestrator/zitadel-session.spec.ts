@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
@@ -78,6 +78,8 @@ afterEach(() => {
   currentUserId = "user_test";
   sessionAnswer = undefined;
   server.resetHandlers(getHandler, deleteHandler, otherHandler);
+  window.sessionStorage.clear();
+  vi.restoreAllMocks();
 });
 
 afterAll(() => {
@@ -214,6 +216,68 @@ describe("<zitadel-session>", () => {
     expect(missing).toHaveLength(1);
     expect(loc.current).toBe("");
     expect(element.shadowRoot?.querySelector(".title")).toBeNull();
+  });
+
+  it.each([
+    ["https://app.test/account/", "/account"],
+    ["https://app.test/account", "/account/"],
+    ["https://app.test/", ""],
+    ["https://app.test/account?b=2&a=1", "/account?a=1&b=2"],
+  ])("renders nothing and stays on %s when post-sign-out-url is %j", async (href, url) => {
+    sessionAnswer = unauthorized;
+    const loc = stubLocation(href);
+    const missing: Event[] = [];
+    host.addEventListener("zitadel-session-missing", (e) => missing.push(e));
+    const element = mount(`<zitadel-session post-sign-out-url="${url || "/"}"></zitadel-session>`);
+    await flush(element);
+    expect(missing).toHaveLength(1);
+    expect(loc.current).toBe("");
+  });
+
+  /** Mounts the card on `href` as a fresh page load would, and returns where it went. */
+  async function loadPage(href: string, url: string): Promise<string> {
+    host.innerHTML = "";
+    const loc = stubLocation(href);
+    const element = mount(`<zitadel-session post-sign-out-url="${url}"></zitadel-session>`);
+    await flush(element);
+    return loc.current;
+  }
+
+  it("does not navigate again when the target sends the visitor straight back", async () => {
+    sessionAnswer = unauthorized;
+    const missing: Event[] = [];
+    host.addEventListener("zitadel-session-missing", (e) => missing.push(e));
+    expect(await loadPage("https://app.test/account", "/")).toBe("/");
+    // `/` redirected back to `/account`: the reloaded page must stay put.
+    expect(await loadPage("https://app.test/account", "/")).toBe("");
+    expect(missing).toHaveLength(2);
+    expect(host.querySelector("zitadel-session")?.shadowRoot?.querySelector(".title")).toBeNull();
+  });
+
+  it("navigates again once the loop window has passed", async () => {
+    sessionAnswer = unauthorized;
+    const now = Date.now();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(now);
+    expect(await loadPage("https://app.test/account", "/")).toBe("/");
+    clock.mockReturnValue(now + 10_001);
+    expect(await loadPage("https://app.test/account", "/")).toBe("/");
+  });
+
+  it("navigates from another page within the loop window", async () => {
+    sessionAnswer = unauthorized;
+    expect(await loadPage("https://app.test/account", "/")).toBe("/");
+    expect(await loadPage("https://app.test/settings", "/")).toBe("/");
+  });
+
+  it("navigates when session storage is unavailable", async () => {
+    sessionAnswer = unauthorized;
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("denied");
+    });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("denied");
+    });
+    expect(await loadPage("https://app.test/account", "/")).toBe("/");
   });
 
   it.each([

@@ -13,6 +13,60 @@ import "../atoms/index.js";
 const DEFAULT_HEADING = "Signed in as";
 const DEFAULT_LOGOUT_LABEL = "Sign out";
 
+// How long a no-session navigation from one page to another is remembered.
+// Long enough to span a redirect back and the reload it causes, short enough
+// that a visitor who returns on purpose later is sent on again.
+const LEAVE_LOOP_WINDOW_MS = 10_000;
+const LEAVE_STORAGE_KEY = "zitadel-session:no-session-leave";
+
+interface LastLeave {
+  readonly from: string;
+  readonly to: string;
+  readonly at: number;
+}
+
+/**
+ * A page's identity for the same-page and loop checks: origin, path without
+ * a trailing slash (hosts add or strip it with a redirect) and the query
+ * parameters in key order. The fragment is ignored, since assigning one does
+ * not reload.
+ */
+function pageKey(url: URL): string {
+  const path = url.pathname.replace(/\/+$/, "") || "/";
+  const params = new URLSearchParams(url.search);
+  params.sort();
+  return `${url.origin}${path}?${params.toString()}`;
+}
+
+function samePage(a: URL, b: URL): boolean {
+  return pageKey(a) === pageKey(b);
+}
+
+// Storage can be missing or throw (privacy modes, sandboxed frames); the
+// guard is then off and the card navigates as before.
+function readLastLeave(): LastLeave | undefined {
+  try {
+    const raw = window.sessionStorage.getItem(LEAVE_STORAGE_KEY);
+    if (!raw) return undefined;
+    const value: unknown = JSON.parse(raw);
+    if (typeof value !== "object" || value === null) return undefined;
+    const { from, to, at } = value as Record<string, unknown>;
+    return typeof from === "string" && typeof to === "string" && typeof at === "number"
+      ? { from, to, at }
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeLastLeave(value: LastLeave): void {
+  try {
+    window.sessionStorage.setItem(LEAVE_STORAGE_KEY, JSON.stringify(value));
+  } catch {
+    // See readLastLeave.
+  }
+}
+
 /**
  * `<zitadel-session>` — the "signed in" card.
  *
@@ -45,9 +99,12 @@ const DEFAULT_LOGOUT_LABEL = "Sign out";
  *   `401 auth.unauthorized` or `404 sess.not_found` (or names no user) the
  *   visitor is signed out: the element fires `zitadel-session-missing`, then
  *   navigates to `post-sign-out-url` when one is set and otherwise renders
- *   nothing. It never navigates to the page it is on (same origin, path and
- *   query): it renders nothing there instead, so a card whose sign-out comes
- *   back to its own page does not reload it forever. Anything else is not
+ *   nothing. It never navigates to the page it is on (same origin, path with
+ *   or without a trailing slash, and query): it renders nothing there instead,
+ *   so a card whose sign-out comes back to its own page does not reload it
+ *   forever. Nor does it repeat a navigation this page made within the last
+ *   ten seconds (kept in `sessionStorage`), which stops the loop when the
+ *   target redirects back here. Anything else is not
  *   "signed out": a network error, a 5xx, a
  *   gateway's 401 or 404 without the backend's code, or a 200 that is not a
  *   session keeps the card and shows the error.
@@ -115,7 +172,9 @@ export class ZitadelSession extends ZitadelSurface {
 
   /**
    * URL to navigate to after a successful sign-out, and when the visitor has no
-   * session, unless it is the page the card is on.
+   * session, unless it is the page the card is on (a trailing slash, the query
+   * order and the fragment aside) or this page sent the visitor there moments
+   * ago and got them back.
    */
   @property({ type: String, attribute: "post-sign-out-url" }) accessor postSignOutUrl = "";
 
@@ -146,9 +205,7 @@ export class ZitadelSession extends ZitadelSurface {
       // A card on the page its `post-sign-out-url` names ("sign out and come
       // back here") would otherwise reload that page on every signed-out
       // visit, and find no session again each time.
-      onSessionMissing: () => {
-        if (!this.isOnPostSignOutPage()) this.leave();
-      },
+      onSessionMissing: () => this.leaveWithoutSession(),
     },
   );
 
@@ -159,20 +216,32 @@ export class ZitadelSession extends ZitadelSurface {
     return true;
   }
 
-  /** `postSignOutUrl` resolves to this page: the same origin, path and query. */
-  private isOnPostSignOutPage(): boolean {
-    if (!this.postSignOutUrl || typeof window === "undefined") return false;
+  /**
+   * The no-session navigation to `postSignOutUrl`, skipped when that URL is
+   * this page, or when this page made the same navigation moments ago: the
+   * host or the server sent the visitor back here (a redirect from the target
+   * to this page), and navigating again would reload the two pages forever.
+   */
+  private leaveWithoutSession(): void {
+    if (!this.postSignOutUrl || typeof window === "undefined") return;
+    let here: URL;
+    let target: URL;
     try {
-      const here = new URL(window.location.href);
-      const target = new URL(this.postSignOutUrl, here);
-      return (
-        target.origin === here.origin &&
-        target.pathname === here.pathname &&
-        target.search === here.search
-      );
+      here = new URL(window.location.href);
+      target = new URL(this.postSignOutUrl, here);
     } catch {
-      return false;
+      return;
     }
+    if (samePage(here, target)) return;
+    const from = pageKey(here);
+    const to = pageKey(target);
+    const now = Date.now();
+    const last = readLastLeave();
+    if (last && last.from === from && last.to === to && now - last.at < LEAVE_LOOP_WINDOW_MS) {
+      return;
+    }
+    writeLastLeave({ from, to, at: now });
+    this.leave();
   }
 
   override willUpdate(): void {

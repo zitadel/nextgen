@@ -377,11 +377,19 @@ Events (both bubble and are composed):
   `<zitadel-logout>` above.
 
 The card never redirects to the page it is on. When `post-sign-out-url`
-resolves to the current page (same origin, path and query; the fragment is
-ignored), a visit without a session renders nothing instead of navigating, so
-a page that shows the card and is also its sign-out target (`/account` with
-`post-sign-out-url="/account"`) does not reload itself forever. A sign-out on
-that page still navigates there, which reloads it once.
+resolves to the current page (same origin, path with or without a trailing
+slash, and query parameters in any order; the fragment is ignored), a visit
+without a session renders nothing instead of navigating, so a page that shows
+the card and is also its sign-out target (`/account` with
+`post-sign-out-url="/account"`, or `/account/` once the host adds the slash)
+does not reload itself forever. A sign-out on that page still navigates there,
+which reloads it once.
+
+The card also does not repeat a no-session navigation from the same page to
+the same target within ten seconds (remembered in `sessionStorage`). When the
+target sends the visitor straight back, for example `post-sign-out-url="/"`
+where `/` redirects to the card's page, the second visit renders nothing and
+only fires `zitadel-session-missing`.
 
 The framework wrappers surface these as `onSignout` / `onSessionMissing`, except
 Vue and Angular, which emit `signout` / `sessionMissing`, and Qwik, which takes
