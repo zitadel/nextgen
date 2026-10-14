@@ -1,13 +1,8 @@
 import { join } from "node:path";
 
 import { defineConfig, devices } from "@playwright/test";
-import {
-  e2eActionTimeouts,
-  e2eTimeouts,
-  fastChromiumLaunchOptions,
-  withZitadel,
-  type AppEnvTemplate,
-} from "@zitadel/testing/playwright";
+import { withZitadel, type AppEnvTemplate } from "@zitadel/testing/playwright";
+import { e2eActionTimeouts, e2eTimeouts } from "../playwright.shared";
 
 /**
  * Real-instance console coverage:
@@ -71,7 +66,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"], launchOptions: fastChromiumLaunchOptions },
+      use: { ...devices["Desktop Chrome"] },
     },
   ],
 });

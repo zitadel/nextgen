@@ -1,10 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 import { resolve } from "node:path";
-import {
-  e2eActionTimeouts,
-  e2eTimeouts,
-  fastChromiumLaunchOptions,
-} from "@zitadel/testing/playwright";
+import { e2eActionTimeouts, e2eTimeouts } from "../playwright.shared";
 
 const workspaceRoot = resolve(import.meta.dirname, "../..");
 
@@ -40,7 +36,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"], launchOptions: fastChromiumLaunchOptions },
+      use: { ...devices["Desktop Chrome"] },
     },
   ],
 });

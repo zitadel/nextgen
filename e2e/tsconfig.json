@@ -13,6 +13,7 @@
     ]
   },
   "include": [
+    "playwright.shared.ts",
     "console/playwright*.config.mts",
     "console/scripts/**/*.mts",
     "console/src/**/*.ts",

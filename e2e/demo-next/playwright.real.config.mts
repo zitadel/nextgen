@@ -1,13 +1,8 @@
 import { join } from "node:path";
 
 import { defineConfig, devices } from "@playwright/test";
-import {
-  e2eActionTimeouts,
-  e2eTimeouts,
-  fastChromiumLaunchOptions,
-  nextAppEnv,
-  withZitadel,
-} from "@zitadel/testing/playwright";
+import { nextAppEnv, withZitadel } from "@zitadel/testing/playwright";
+import { e2eActionTimeouts, e2eTimeouts } from "../playwright.shared";
 
 /**
  * Real-instance variant of the embedded sign-in e2e:
@@ -57,7 +52,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"], launchOptions: fastChromiumLaunchOptions },
+      use: { ...devices["Desktop Chrome"] },
     },
   ],
 });

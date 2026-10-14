@@ -73,8 +73,6 @@ tasks:
       CI: ""
       GITHUB_ACTIONS: ""
     deps:
-      # Its config imports @zitadel/testing/playwright (shared launch options).
-      - "testing:build"
       - "console:build"
     options:
       runInCI: true
@@ -156,8 +154,6 @@ tasks:
       CI: ""
       GITHUB_ACTIONS: ""
     deps:
-      # Its config imports @zitadel/testing/playwright (shared launch options).
-      - "testing:build"
       - "api-mock:build"
       - "sdk-next:build"
     options:
@@ -193,8 +189,6 @@ tasks:
       CI: ""
       GITHUB_ACTIONS: ""
     deps:
-      # Its config imports @zitadel/testing/playwright (shared launch options).
-      - "testing:build"
       - "api-mock:build"
       - "sdk-nuxt:build"
     options:

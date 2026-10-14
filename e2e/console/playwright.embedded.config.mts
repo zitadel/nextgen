@@ -1,12 +1,8 @@
 import { join } from "node:path";
 
 import { defineConfig, devices } from "@playwright/test";
-import {
-  e2eActionTimeouts,
-  e2eTimeouts,
-  fastChromiumLaunchOptions,
-  withZitadel,
-} from "@zitadel/testing/playwright";
+import { withZitadel } from "@zitadel/testing/playwright";
+import { e2eActionTimeouts, e2eTimeouts } from "../playwright.shared";
 
 /**
  * The embedded surfaces, served the way a customer gets them.
@@ -80,7 +76,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"], launchOptions: fastChromiumLaunchOptions },
+      use: { ...devices["Desktop Chrome"] },
     },
   ],
 });

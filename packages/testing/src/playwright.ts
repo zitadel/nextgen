@@ -114,50 +114,6 @@ export const test = base.extend<ZitadelTestFixtures, ZitadelWorkerFixtures>({
 });
 
 export { expect } from "@playwright/test";
-
-/**
- * Chromium launch flags that keep headless runs fast and CI-safe:
- * - `--disable-dev-shm-usage`: use /tmp instead of the small /dev/shm, the
- *   usual cause of renderer crashes in CI containers.
- * - `--disable-gpu`: no GPU path in headless.
- * - `--no-sandbox` / `--disable-setuid-sandbox`: CI containers run as root
- *   where the sandbox cannot start; a no-op on a normal local machine.
- * - the backgrounding flags: a hidden/occluded page (e.g. a second worker's
- *   tab) is not throttled, so parallel workers do not slow each other.
- * Spread into a project's `use.launchOptions`.
- */
-/**
- * Timeouts that make a wedged or unresponsive server fail fast instead of
- * hanging the whole run. A stale server answering `/healthz` can let readiness
- * pass against the wrong instance; these caps turn that into a quick, clear
- * failure. Spread `e2eTimeouts` at the top level of `defineConfig` and
- * `e2eActionTimeouts` into `use`.
- */
-export const e2eTimeouts = {
-  /** Per-test cap. */
-  timeout: 60_000,
-  /** Whole-lane hard cap — the backstop against a run that never ends. */
-  globalTimeout: 600_000,
-};
-export const e2eActionTimeouts = {
-  /** A single click/fill that hangs fails here, not after the test timeout. */
-  actionTimeout: 15_000,
-  /** A goto/redirect that hangs (e.g. a wedged server) fails here. */
-  navigationTimeout: 30_000,
-};
-
-export const fastChromiumLaunchOptions = {
-  args: [
-    "--disable-dev-shm-usage",
-    "--disable-gpu",
-    "--no-sandbox",
-    "--disable-setuid-sandbox",
-    "--disable-background-timer-throttling",
-    "--disable-backgrounding-occluded-windows",
-    "--disable-renderer-backgrounding",
-    "--disable-features=TranslateUI",
-  ],
-};
 export { applyAppEnvTemplate, nextAppEnv } from "./app-env";
 export type { AppEnvTemplate } from "./app-env";
 export {
