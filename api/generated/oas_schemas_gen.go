@@ -19060,10 +19060,6 @@ func (s *ExchangeHandoffErrorResponseStatusCode) SetResponse(val ExchangeHandoff
 
 func (*ExchangeHandoffErrorResponseStatusCode) exchangeHandoffRes() {}
 
-type ExchangeHandoffGone ErrorDetails
-
-func (*ExchangeHandoffGone) exchangeHandoffRes() {}
-
 type ExchangeHandoffUnauthorized ErrorDetails
 
 func (*ExchangeHandoffUnauthorized) exchangeHandoffRes() {}
@@ -19072,7 +19068,8 @@ func (*ExchangeHandoffUnauthorized) exchangeHandoffRes() {}
 // Ref: #
 type ExchangeRequest struct {
 	// The one-time handoff token minted by `POST /auth_attempts/{id}/handoff`.
-	// Single-use — replaying it after a successful exchange returns `410 Gone`.
+	// Single-use — replaying it after a successful exchange returns `400` with
+	// `sess.invalid_handoff_token`, the same answer as an unknown or expired token.
 	HandoffToken string `json:"handoff_token"`
 	// Optional session lifetime after exchange as an ISO-8601 duration. When omitted, the server
 	// uses the configured default. Must not exceed the configured maximum.
