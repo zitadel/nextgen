@@ -166,6 +166,9 @@ export const Route = createFileRoute("/profile")({
   beforeLoad: async () => {
     const auth = await fetchAuth();
     if (!auth.isAuthenticated) {
+      // The session could not be checked (the auth backend is down): an
+      // error, not a sign-in prompt, since the visitor may well be signed in.
+      if (auth.reason === "unavailable") throw new Error("Try again shortly");
       throw redirect({ to: "/login" });
     }
   },

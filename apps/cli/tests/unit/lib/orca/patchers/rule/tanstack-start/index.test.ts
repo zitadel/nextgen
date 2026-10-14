@@ -33,6 +33,23 @@ function writeContents(plan: ScaffoldPlan, path: string): string | undefined {
   return op?.contents;
 }
 
+/**
+ * Runs the scaffolded profile route's `beforeLoad` against an auth state the
+ * server function returns, with `redirect` stubbed to a plain object.
+ */
+function runProfileGuard(auth: Record<string, unknown>): Promise<unknown> {
+  const profile = writeContents(new TanStackStartPatcher().plan(ctx()), "src/routes/profile.tsx");
+  const source = profile?.match(/beforeLoad: (async \(\) => \{[\s\S]*?\n {2}\}),\n/)?.[1];
+  if (source === undefined) {
+    throw new Error("the profile route has no beforeLoad guard");
+  }
+  const guard = new Function("fetchAuth", "redirect", `return (${source});`)(
+    async () => auth,
+    (to: unknown) => ({ redirect: to }),
+  ) as () => Promise<unknown>;
+  return guard();
+}
+
 describe("TanStackStartPatcher.plan", () => {
   it("writes the request-middleware start entry and file-based routes under src/", () => {
     const plan = new TanStackStartPatcher().plan(ctx());
@@ -77,12 +94,20 @@ describe("TanStackStartPatcher.plan", () => {
     );
   });
 
-  it("redirects a signed-out profile visit to login from beforeLoad", () => {
-    const profile = writeContents(new TanStackStartPatcher().plan(ctx()), "src/routes/profile.tsx");
+  it("redirects a signed-out profile visit to login from beforeLoad", async () => {
+    await expect(runProfileGuard({ isAuthenticated: false, session: null })).rejects.toEqual({
+      redirect: { to: "/login" },
+    });
+  });
 
-    expect(profile).toMatch(
-      /beforeLoad: async \(\) => \{\s+const auth = await fetchAuth\(\);\s+if \(!auth\.isAuthenticated\) \{\s+throw redirect\(\{ to: "\/login" \}\);/,
-    );
+  it("fails a profile visit whose session could not be checked instead of redirecting", async () => {
+    await expect(
+      runProfileGuard({ isAuthenticated: false, session: null, reason: "unavailable" }),
+    ).rejects.toThrow("Try again shortly");
+  });
+
+  it("lets a signed-in profile visit through", async () => {
+    await expect(runProfileGuard({ isAuthenticated: true, session: {} })).resolves.toBeUndefined();
   });
 
   it("seeds the public project id and edits no config but the dev script", () => {
