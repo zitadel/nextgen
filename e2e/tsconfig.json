@@ -21,6 +21,7 @@
     "console/src-platform/**/*.ts",
     "console/src-real/**/*.ts",
     "console/src-deployment/**/*.ts",
+    "console/support/**/*.ts",
     "demo-next/playwright*.config.mts",
     "demo-next/src/**/*.ts",
     "demo-next/src-real/**/*.ts",

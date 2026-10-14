@@ -8,15 +8,15 @@ import { spawn } from "node:child_process";
 
 import { frameworkForId, frameworkIds } from "./frameworks.mjs";
 import { remoteHostEnv, startHttpsEdge } from "./https-edge.mjs";
-import { canListen, createJourneyPortAllocator } from "./ports.mjs";
+import { errorMessage, packageName, parsePort } from "./lib.mjs";
 import {
   localRegistryPaths,
   npmEnvironment,
-  packageName,
   prepareLocalRegistry,
   stopLocalRegistry,
   waitForHttp,
 } from "./local-registry.mjs";
+import { canListen, createJourneyPortAllocator } from "./ports.mjs";
 import {
   assertPrebuiltTarballsOnGitHub,
   journeyArgsFromEnv,
@@ -362,6 +362,7 @@ async function runFrameworkJourney(context) {
         // leak-proofing as JOURNEY_PRESET above.
         JOURNEY_PREEXISTING_APP: context.preexistingApp ? "1" : "",
         JOURNEY_PRESET: context.preset,
+        JOURNEY_SUITE: context.suite,
         // What setup's --server points at: the local runtime, or the remote
         // lane's https edge in front of it.
         JOURNEY_SETUP_SERVER: edge?.url ?? "local",
@@ -482,6 +483,8 @@ async function runTestkitJourney(context) {
         // preceding CI journey step's GITHUB_ENV export cannot leak in.
         JOURNEY_PREEXISTING_APP: "",
         JOURNEY_PRESET: context.preset,
+        // Skips the scaffold checks only the journey specs read.
+        JOURNEY_SUITE: context.suite,
         JOURNEY_ZITADEL_PORT: String(context.zitadelPort),
         JOURNEY_REGISTRY_URL: registryUrl,
         JOURNEY_RUNTIME: options.runtime,
@@ -598,17 +601,9 @@ async function runWithConcurrency(items, limit, worker) {
 async function resolvePort(envName) {
   const value = process.env[envName];
   if (value) {
-    return validatePortValue(value, envName);
+    return parsePort(value, envName);
   }
   return reserveJourneyPort(usedPorts);
-}
-
-function validatePortValue(value, name) {
-  const port = Number(value);
-  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
-    throw new Error(`${name} must be a TCP port, got ${value}`);
-  }
-  return port;
 }
 
 async function ensurePlaywrightBrowsers() {
@@ -984,10 +979,6 @@ function npxEnv(context) {
 
 function log(message) {
   console.log(`[journey-local] ${message}`);
-}
-
-function errorMessage(error) {
-  return error instanceof Error ? error.message : String(error);
 }
 
 function isErrno(error, code) {
