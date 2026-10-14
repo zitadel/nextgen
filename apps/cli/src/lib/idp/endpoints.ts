@@ -5,7 +5,7 @@ import {
   parseIssuer,
 } from "@zitadel/config/idp";
 
-import { askParsed } from "../prompt-cancel";
+import type { Asker } from "../input";
 
 /**
  * Ask where a provider lives, on a development run only.
@@ -24,10 +24,10 @@ import { askParsed } from "../prompt-cancel";
 export async function askConnectionEndpoints(options: {
   readonly provider: CatalogProviderId;
   readonly developmentBuild: boolean;
-  /** The command being cancelled, for the wording a Ctrl-C produces. */
-  readonly command: string;
+  /** How the question is asked: the running command's `input`. */
+  readonly ask: Asker;
 }): Promise<ConnectionEndpoints | undefined> {
-  const { provider, developmentBuild, command } = options;
+  const { provider, developmentBuild, ask } = options;
   if (!developmentBuild) {
     return undefined;
   }
@@ -43,11 +43,12 @@ export async function askConnectionEndpoints(options: {
   // be written to a connection that then fails on apply. Refusing at the prompt
   // puts the complaint where the value was typed.
   return {
-    issuer: await askParsed({
+    issuer: await ask({
+      kind: "text",
+      name: "issuer",
       message: "Issuer",
       parse: parseIssuer,
       initialValue: idpProvider(provider).issuer,
-      command,
     }),
   };
 }
