@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 const execFile = promisify(execFileCallback);
 const repoRoot = fileURLToPath(new URL("../../../../../", import.meta.url));
-const verifyScript = join(repoRoot, "apps/cli-journey-e2e/scripts/verify-tarballs.mjs");
+const verifyScript = join(repoRoot, "e2e/journey/scripts/verify-tarballs.mjs");
 const tempDirs: string[] = [];
 
 afterEach(async () => {
