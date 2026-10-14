@@ -69,7 +69,7 @@ describe("setup dependency installation", () => {
     expect(result.nextActions.join("\n")).toContain(".zitadel/schemas/");
     expect(result.nextActions.join("\n")).toContain(".zitadel/flows/");
     expect(result.nextActions.join("\n")).toContain(
-      `See your changes before they go live: ${planCommand} to preview, then npx @zitadel/cli@latest deploy to publish.`,
+      `See your changes before they go live: ${planCommand} to preview, then npx @zitadel/cli@latest deploy -m '<what changed>' to publish.`,
     );
     expect(result.nextCommands).toEqual(["npm run dev", planCommand]);
   });

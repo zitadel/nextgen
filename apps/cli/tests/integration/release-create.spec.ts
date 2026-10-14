@@ -58,6 +58,23 @@ describe("release create", () => {
         expect((await app.registeredIdps()).map((idp) => idp.slug)).toEqual(["google"]);
       });
 
+      it("refuses content that builds back to a revoked release", async () => {
+        const app = await aSetUpApp();
+        const first = await createRelease(app);
+        await app.run([
+          "release",
+          "revoke",
+          app.envelopeOf<Release>(first).data.release_id,
+          "--force",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        const result = await createRelease(app);
+
+        expect(result).toFailWith("E_CONFLICT");
+      });
+
       it("creates no release on a dry run", async () => {
         const app = await aSetUpApp();
 

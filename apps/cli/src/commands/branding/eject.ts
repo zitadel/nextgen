@@ -26,6 +26,7 @@ import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from ".
 import { hasZitadelConfig } from "../../lib/project";
 import { normalizePublicCliJson, normalizePublicCliProse } from "../../lib/public-cli";
 import { nextCommandsData } from "../../lib/oclif/envelope";
+import { DEPLOY_ARGS } from "../../lib/release";
 
 /**
  * The `branding eject` command — take ownership of the login template.
@@ -131,7 +132,7 @@ export default class BrandingEject extends BaseCommand {
         // carry: the follow-ups run against whichever one the developer uses.
         ...nextCommandsData([
           this.suggestUnscoped("deploy --dry-run"),
-          this.suggestUnscoped("deploy"),
+          this.suggestUnscoped(DEPLOY_ARGS),
         ]),
       },
     });

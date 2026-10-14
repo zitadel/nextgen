@@ -22,3 +22,11 @@ export { validateStep } from "./steps/validate";
 export { idpConnectionsStep } from "./steps/idp-connections";
 export { diffStep } from "./steps/diff";
 export { assertPrimaryOrigin, originMatchesPattern, type ProjectOriginEntry } from "./origins";
+
+/**
+ * The arguments of a suggested publish. `deploy` refuses to run without `-m` when
+ * no one can be asked for a message, which is every agent and every `--json`
+ * run, so a suggested deploy carries one for the reader to fill in.
+ */
+export const DEPLOY_ARGS = "deploy -m '<what changed>'";
+export { type ListedDeployment, listLiveDeployments, servesPrimary } from "./deployment";

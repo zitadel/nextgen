@@ -442,6 +442,17 @@ describe("requireValue", () => {
     );
   });
 
+  it("sends no one to env add when the process environment already names the project", async () => {
+    const environment = await resolve({
+      envName: "production",
+      env: { ZITADEL_PROJECT_ID: "proj_ci" },
+    });
+
+    expect(() => requireValue(environment, "ZITADEL_PROJECT_SECRET")).toThrow(
+      expect.objectContaining({ nextCommands: undefined }),
+    );
+  });
+
   it("returns the value when it resolved", async () => {
     await write(".env.development.local", { ZITADEL_PROJECT_ID: "proj_file" });
 

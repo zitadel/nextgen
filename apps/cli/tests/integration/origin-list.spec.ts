@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp } from "../helpers/project";
+import { anApp, aSetUpApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 
@@ -43,6 +43,18 @@ describe("origin list", () => {
 
   describe("against a valid server", () => {
     describe("--json", () => {
+      it("refuses an environment holding only the preview token", async () => {
+        const app = await anApp();
+        await app.bindEnvironment("ci", {
+          ZITADEL_PROJECT_ID: "proj_ci",
+          ZITADEL_PREVIEW_TOKEN: "pk_ci",
+        });
+
+        const result = await app.run(["origin", "list", "--env", "ci", "--json"]);
+
+        expect(result).toSay("ZITADEL_PROJECT_SECRET");
+      });
+
       it("is empty on a fresh project", async () => {
         const app = await aSetUpApp();
 

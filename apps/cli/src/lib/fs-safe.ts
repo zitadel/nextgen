@@ -1,4 +1,5 @@
 import { chmod, readFile, writeFile } from "node:fs/promises";
+import { parseEnv } from "node:util";
 
 import { ZitadelError } from "./errors";
 import { reportWarning } from "./warnings";
@@ -21,7 +22,8 @@ const SECRET_MODE = 0o600;
  * One `key=value` per line is the whole file format, so a line break in a value
  * would inject a spurious line (or split a secret) that the next run reads back
  * as different keys. A break is never a legitimate credential, URL or id, so
- * refuse it rather than write a file we cannot read back faithfully.
+ * refuse it rather than write a file we cannot read back faithfully. Every other
+ * value is quoted as much as it needs to read back exactly.
  */
 function envLine(key: string, value: string): string {
   if (/[\n\r]/.test(value)) {
@@ -33,7 +35,19 @@ function envLine(key: string, value: string): string {
       },
     );
   }
-  return `${key}=${value}`;
+  // Written as the first form the reader gives back unchanged: bare, then
+  // single- then double-quoted. A bare `#` starts a comment and a bare quote is
+  // stripped, so a secret holding one would otherwise read back truncated.
+  const forms = [`${key}=${value}`, `${key}='${value}'`, `${key}="${value}"`];
+  const faithful = forms.find((line) => parseEnv(line)[key] === value);
+  if (faithful === undefined) {
+    throw new ZitadelError(
+      "E_VALIDATION",
+      `Cannot persist ${key}: no .env quoting reads its value back unchanged.`,
+      { hint: "Set it in the process environment instead of a .env file." },
+    );
+  }
+  return faithful;
 }
 
 /**

@@ -211,6 +211,17 @@ describe("deploy", () => {
         expect(result).toExplain("revoked");
       });
 
+      it("fails with a conflict when another deploy lands first", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.deployData();
+        platform.racesTheNextDeploy();
+
+        const result = await app.deploy();
+
+        expect(result).toFailWith("E_CONFLICT");
+      });
+
       it("validates and writes nothing on a dry run", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
