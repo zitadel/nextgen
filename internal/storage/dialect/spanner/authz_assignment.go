@@ -336,3 +336,37 @@ func owningTeamKey(a *domain.AuthzAssignment) *string {
 }
 
 var _ service.AuthzAssignmentStatements = (*authzAssignmentStatements)(nil)
+
+// ListProjectAdmins implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListProjectAdmins(ctx context.Context, projectID, viewerUserID string, page database.Page[domain.ProjectAdminField]) (*database.ListResult[*domain.ProjectAdminRecord], error) {
+	cursor, err := authz.ProjectAdminsCursorFrom(page)
+	if err != nil {
+		return nil, err
+	}
+	admins, next, err := pagination.Page(page, authz.ProjectAdminSchema, func(limit uint32) ([]*domain.ProjectAdminRecord, error) {
+		var c statementCompiler
+		authz.WriteProjectAdminSources(&c, spannerAuthzEnv(), projectID, viewerUserID, cursor, page.OrderBy.Direction == database.OrderDesc, limit)
+		var sources []authz.ProjectAdminSourceRow
+		err := s.db.Query(ctx, c.statement(), func(iter *spanner.RowIterator) error {
+			var qErr error
+			sources, qErr = collectRows(iter, func(row *spanner.Row) (authz.ProjectAdminSourceRow, error) {
+				var (
+					source   authz.ProjectAdminSourceRow
+					teamName spanner.NullString
+				)
+				err := row.Columns(&source.UserID, &source.HomeProjectID, &source.SourceRank, &source.GrantID, &source.TeamID, &teamName)
+				source.TeamName = teamName.StringVal
+				return source, err
+			})
+			return qErr
+		})
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		return authz.GroupProjectAdminSourcesByUser(sources), nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &database.ListResult[*domain.ProjectAdminRecord]{Items: admins, NextCursor: next}, nil
+}

@@ -67,6 +67,7 @@ var operationRolesNextgenSession = map[string][]string{
 	ListBrandingOperation:          []string{},
 	ListFlowDefinitionsOperation:   []string{},
 	ListMyProjectsOperation:        []string{},
+	ListProjectAdminsOperation:     []string{},
 	ListSchemasOperation:           []string{},
 	ListUserPasskeysOperation:      []string{},
 	PatchMyUserOperation:           []string{},
@@ -236,6 +237,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	ListPreviewsOperation: []string{
 		"deployment.read",
+	},
+	ListProjectAdminsOperation: []string{
+		"project.write",
 	},
 	ListReleasesOperation: []string{
 		"release.read",

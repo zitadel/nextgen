@@ -8,6 +8,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
 	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
 	storageproject "github.com/zitadel/nextgen/internal/storage/project"
 )
@@ -163,13 +164,18 @@ func (ps projectStatements) ListProjects(ctx context.Context, filter *database.L
 }
 
 func scanProject(rows *sql.Rows) (*domain.Project, error) {
+	return scanProjectWith(rows)
+}
+
+// scanProjectWith scans a project row followed by the extra columns.
+func scanProjectWith(rows *sql.Rows, extra ...any) (*domain.Project, error) {
 	project := new(domain.Project)
 	var (
 		originsStr           string
 		policyStr            sql.NullString
 		createdNano, updNano int64
 	)
-	if err := rows.Scan(&project.ID, &project.Name, &originsStr, &policyStr, &createdNano, &updNano); err != nil {
+	if err := rows.Scan(append([]any{&project.ID, &project.Name, &originsStr, &policyStr, &createdNano, &updNano}, extra...)...); err != nil {
 		return nil, err
 	}
 	origins, err := decodeJSONStrings(originsStr)
@@ -184,6 +190,39 @@ func scanProject(rows *sql.Rows) (*domain.Project, error) {
 	project.PasswordHashPolicy = policy
 	project.CreatedAt = timeFromUnixNano(createdNano)
 	project.UpdatedAt = timeFromUnixNano(updNano)
+	return project, nil
+}
+
+// writeProjectWithOwningTeam reads one project with its owning team as an extra
+// column, in one round trip. GetProject runs it only when asked for the owning
+// team: GetProjectByID runs on hot paths and stays a plain read.
+func writeProjectWithOwningTeam(c *statementCompiler, id string) {
+	c.WriteString("SELECT id, name, preview_origins, password_hash_policy, created_at, updated_at, (")
+	authz.WriteActiveOwningTeamID(c, sqliteAuthzEnv(), func(w authz.ArgWriter) { w.WriteString("projects.id") })
+	c.WriteString(") FROM projects WHERE id = ")
+	c.WriteArg(id)
+}
+
+// GetProject implements [service.ProjectStatements].
+func (ps projectStatements) GetProject(ctx context.Context, id string, opts service.ProjectQueryOptions) (*domain.Project, error) {
+	if !opts.OwningTeam {
+		return ps.GetProjectByID(ctx, id)
+	}
+	var c statementCompiler
+	writeProjectWithOwningTeam(&c, id)
+	rows, err := ps.client.Query(ctx, c.String(), c.args...)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	var owningTeamID sql.NullString
+	project, err := collectExactlyOneRow(rows, func(rows *sql.Rows) (*domain.Project, error) {
+		return scanProjectWith(rows, &owningTeamID)
+	})
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	project.OwningTeamID = owningTeamID.String
 	return project, nil
 }
 

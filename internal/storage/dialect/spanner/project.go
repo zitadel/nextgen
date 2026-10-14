@@ -8,6 +8,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
 	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
 	storageproject "github.com/zitadel/nextgen/internal/storage/project"
 )
@@ -147,12 +148,17 @@ func (ps projectStatements) ListProjects(ctx context.Context, filter *database.L
 }
 
 func (ps projectStatements) scanProject(row *spanner.Row) (*domain.Project, error) {
+	return ps.scanProjectWith(row)
+}
+
+// scanProjectWith scans a project row followed by the extra columns.
+func (ps projectStatements) scanProjectWith(row *spanner.Row, extra ...any) (*domain.Project, error) {
 	project := new(domain.Project)
 	var (
 		previewOriginsJSON string
 		policyJSON         spanner.NullJSON
 	)
-	if err := row.Columns(&project.ID, &project.Name, &previewOriginsJSON, &policyJSON, &project.CreatedAt, &project.UpdatedAt); err != nil {
+	if err := row.Columns(append([]any{&project.ID, &project.Name, &previewOriginsJSON, &policyJSON, &project.CreatedAt, &project.UpdatedAt}, extra...)...); err != nil {
 		return nil, err
 	}
 	origins, err := decodePreviewOrigins(previewOriginsJSON)
@@ -207,6 +213,43 @@ func decodePreviewOrigins(value string) ([]string, error) {
 		return nil, err
 	}
 	return origins, nil
+}
+
+// writeProjectWithOwningTeam reads one project with its owning team as an extra
+// column, in one round trip. GetProject runs it only when asked for the owning
+// team: GetProjectByID runs on hot paths and stays a plain read.
+func writeProjectWithOwningTeam(c *statementCompiler, id string) {
+	c.WriteString("SELECT id, name, preview_origins, password_hash_policy, created_at, updated_at, (")
+	authz.WriteActiveOwningTeamID(c, spannerAuthzEnv(), func(w authz.ArgWriter) { w.WriteString("projects.id") })
+	c.WriteString(") FROM projects WHERE id = ")
+	c.WriteArg(id)
+}
+
+// GetProject implements [service.ProjectStatements].
+func (ps projectStatements) GetProject(ctx context.Context, id string, opts service.ProjectQueryOptions) (*domain.Project, error) {
+	if !opts.OwningTeam {
+		return ps.GetProjectByID(ctx, id)
+	}
+	var project *domain.Project
+	var c statementCompiler
+	writeProjectWithOwningTeam(&c, id)
+	err := ps.db.Query(ctx, c.statement(), func(iter *spanner.RowIterator) error {
+		var err error
+		project, err = collectOneRow(iter, func(row *spanner.Row) (*domain.Project, error) {
+			var owningTeamID spanner.NullString
+			project, err := ps.scanProjectWith(row, &owningTeamID)
+			if err != nil {
+				return nil, err
+			}
+			project.OwningTeamID = owningTeamID.StringVal
+			return project, nil
+		})
+		return err
+	})
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return project, nil
 }
 
 var _ service.ProjectStatements = (*projectStatements)(nil)

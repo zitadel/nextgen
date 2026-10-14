@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -200,6 +201,32 @@ func TestProjectStatements_Get(t *testing.T) {
 		t.Run("not found returns NoRowFoundError", func(t *testing.T) {
 			_, err := d.stmts.GetProjectByID(t.Context(), uniqueProjectID(t))
 			assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		})
+
+		t.Run("GetProject reads the owning team when asked", func(t *testing.T) {
+			projectID := ensureProject(t, d.stmts)
+			otherID := ensureProject(t, d.stmts)
+			teamID := "team-owner-" + uniqueSuffix(t)
+			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, teamID)))
+			owningTeamID := func(id string) string {
+				t.Helper()
+				stored, err := d.stmts.GetProject(t.Context(), id, service.ProjectQueryOptions{OwningTeam: true})
+				require.NoError(t, err)
+				assert.Equal(t, id, stored.ID)
+				return stored.OwningTeamID
+			}
+			assert.Empty(t, owningTeamID(projectID), "an unclaimed project has no owning team")
+
+			claim := domain.NewClaimTeamAssignment(projectID, teamID)
+			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), claim))
+			assert.Equal(t, teamID, owningTeamID(projectID))
+			assert.Empty(t, owningTeamID(otherID), "another project's claim is not this one's")
+			plain, err := d.stmts.GetProject(t.Context(), projectID, service.ProjectQueryOptions{})
+			require.NoError(t, err)
+			assert.Empty(t, plain.OwningTeamID, "without the option the owning team is left out")
+
+			require.NoError(t, d.stmts.RevokeAuthzAssignment(t.Context(), projectID, claim.ID))
+			assert.Empty(t, owningTeamID(projectID), "a revoked claim owns nothing")
 		})
 	})
 }

@@ -45,7 +45,7 @@ func (h *Handler) GetProject(ctx context.Context, params api.GetProjectParams) (
 	if err := h.requireProjectAccess(ctx, projectID, projectAccess, opRead); err != nil {
 		return nil, err
 	}
-	project, err := h.projectService.Get(ctx, projectID)
+	project, err := h.projectService.Get(ctx, projectID, service.ProjectQueryOptions{OwningTeam: true})
 	if err != nil {
 		// The guard already found the project for this caller (its own project
 		// for a secret, a granted one for a session), so this only fires if the
@@ -56,7 +56,7 @@ func (h *Handler) GetProject(ctx context.Context, params api.GetProjectParams) (
 		}
 		return nil, err
 	}
-	return projectResponse(project), nil
+	return projectDetailResponse(project), nil
 }
 
 func (h *Handler) PatchProject(ctx context.Context, req *api.PatchProjectRequest, params api.PatchProjectParams) (api.PatchProjectRes, error) {
@@ -81,7 +81,7 @@ func (h *Handler) PatchProject(ctx context.Context, req *api.PatchProjectRequest
 	if err != nil {
 		return nil, err
 	}
-	return projectResponse(project), nil
+	return projectDetailResponse(project), nil
 }
 
 // QueryProjects has no project parameter: results are restricted to the
@@ -241,8 +241,9 @@ func mapQueryProjectsToService(projectID string, req *api.QueryProjectsRequest) 
 	return svcReq
 }
 
-// projectResponse is the shared project body: getProject, patchProject, and
-// every item in queryProjects answer with it.
+// projectResponse is the project body every item in queryProjects and
+// listMyProjects answers with. getProject and patchProject answer with
+// projectDetailResponse, which carries the same fields.
 func projectResponse(project *domain.Project) *api.ProjectResponse {
 	return &api.ProjectResponse{
 		ID:             project.ID,
@@ -252,6 +253,26 @@ func projectResponse(project *domain.Project) *api.ProjectResponse {
 		CreatedAt:      project.CreatedAt,
 		UpdatedAt:      project.UpdatedAt,
 	}
+}
+
+// projectDetailResponse is projectResponse plus the owning team, which only the
+// single-project reads carry: a listing would need one owning-team read per
+// row. TestProjectDetailResponseCarriesProjectResponse keeps the two in step.
+func projectDetailResponse(project *domain.Project) *api.ProjectDetailResponse {
+	resp := &api.ProjectDetailResponse{
+		ID:             project.ID,
+		Name:           project.Name,
+		PreviewOrigins: project.PreviewOrigins,
+		PasswordHash:   passwordHashPolicyResponse(project.PasswordHashPolicy),
+		CreatedAt:      project.CreatedAt,
+		UpdatedAt:      project.UpdatedAt,
+	}
+	if project.OwningTeamID != "" {
+		resp.OwningTeamID = api.NewNilTeamID(api.TeamID(project.OwningTeamID))
+	} else {
+		resp.OwningTeamID.SetToNull()
+	}
+	return resp
 }
 
 // ------------------ Errors ---------------
