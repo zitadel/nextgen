@@ -294,8 +294,7 @@ than one:
   `auth-method sso disable --provider google` removes a provider; a custom one
   is named by its slug, as in `auth-method sso disable --provider acme-sso`.
 
-`sso enable` is a deprecated alias of `auth-method sso enable`; use the new
-command. The commands change only local files, apart from
+The commands change only local files, apart from
 `auth-method sso enable`, which also stores the provider's credentials on the
 project. When they refuse, they write and publish nothing, on a dry run too.
 They refuse to disable a method a login flow still asks for, to change a method
