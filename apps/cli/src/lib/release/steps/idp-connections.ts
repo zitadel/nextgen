@@ -36,7 +36,7 @@ export const idpConnectionsStep: Step = {
     // first means a bad file stops the deploy before any connection is written.
     // A dry run surfaces the same failures, which is why it validates here too.
     for (const connection of connections) {
-      validateConnection(connection);
+      validateConnection(connection, ctx.suggest);
     }
     // The credentials a connection names must be variables the project holds,
     // the client id a plain one and the secret a secret one: otherwise the
@@ -72,7 +72,7 @@ export const idpConnectionsStep: Step = {
  * The connection's shape, and the one mistake that would publish a credential:
  * a `client_secret` held as a value rather than a `${{ NAME }}` reference.
  */
-function validateConnection(data: object): void {
+function validateConnection(data: object, suggest: StepContext["suggest"]): void {
   const result = idpConnectionConfigSchema.safeParse(data);
   if (!result.success) {
     const literalSecret = result.error.issues.some((issue) => {
@@ -89,7 +89,7 @@ function validateConnection(data: object): void {
         : "Connection file is not a valid identity provider connection",
       {
         hint: literalSecret
-          ? 'Use "client_secret": "${{ NAME }}" and publish the value with `variables set NAME --project-level --secret`.'
+          ? `Use "client_secret": "\${{ NAME }}" and publish the value with \`${suggest("variables set NAME --project-level --secret")}\`.`
           : undefined,
         details: { issues: result.error.issues },
       },

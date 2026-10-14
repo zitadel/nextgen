@@ -256,6 +256,17 @@ describe("deploy", () => {
         expect(result).toHintAt("deploy -m");
       });
 
+      it("keeps the --origin in the hint when another deploy lands first", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin("https://a.example.com");
+        await app.deployData(["--origin", "https://a.example.com"]);
+        platform.racesTheNextDeploy();
+
+        const result = await app.deploy(["--origin", "https://a.example.com"]);
+
+        expect(result).toHintAt("--origin https://a.example.com");
+      });
+
       it("validates and writes nothing on a dry run", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
