@@ -31,7 +31,6 @@
     "@redocly/openapi-core": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
-    "publint": "catalog:",
     "sharp": "catalog:",
     "tsx": "catalog:",
     "turbo": "catalog:",

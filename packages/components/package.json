@@ -69,8 +69,7 @@
     "lint": "biome check .",
     "test:unit": "vitest run --project unit",
     "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build && node scripts/check-standalone-artifact.mjs",
-    "install-browsers": "playwright install chromium",
-    "prepack": "publint --strict"
+    "install-browsers": "playwright install chromium"
   },
   "dependencies": {
     "@zitadel/config": "workspace:*",

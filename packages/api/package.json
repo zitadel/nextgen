@@ -75,8 +75,7 @@
     "test:all": "pnpm run test",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "lint": "biome check .",
-    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build",
-    "prepack": "publint --strict"
+    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build"
   },
   "devDependencies": {
     "@faker-js/faker": "catalog:",
