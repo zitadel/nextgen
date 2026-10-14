@@ -9,8 +9,7 @@
       "dependsOn": ["@zitadel/config#build"]
     },
     // The node `unit` and real-Chromium `browser` projects in one Vitest run.
-    // The script serialises the browser suites across packages
-    // (`browser-tests` lock) and retries a failed suite (#1490).
+    // The script retries a failed suite (#1490).
     "test": {
       "dependsOn": ["install-browsers", "@zitadel/config#build"]
     },
