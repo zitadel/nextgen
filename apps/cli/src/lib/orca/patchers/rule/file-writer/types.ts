@@ -39,6 +39,12 @@ export type FileOp =
        * them is added; a file that already carries the first line keeps it.
        */
       readonly comment?: ReadonlyArray<string>;
+      /**
+       * Replace the value of an entry the file already holds, rather than keep
+       * it. For a file the CLI owns, where a value saved earlier must not
+       * outrank the one this run just learned.
+       */
+      readonly overwrite?: boolean;
     }
   | {
       readonly kind: "merge-json";

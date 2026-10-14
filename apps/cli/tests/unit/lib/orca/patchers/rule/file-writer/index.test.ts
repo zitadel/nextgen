@@ -248,6 +248,24 @@ describe("scaffold - merge-env", () => {
     expect(text).toContain("BAZ=3");
   });
 
+  it("replaces an existing value in place when told to overwrite", async () => {
+    await writeFile(join(dir, ".env.local"), "# kept\nFOO=stale\nOTHER=1\n");
+    await scaffold(
+      plan({ kind: "merge-env", path: ".env.local", entries: { FOO: "fresh" }, overwrite: true }),
+      { cwd: dir, dryRun: false, force: false },
+    );
+    expect(await readFile(join(dir, ".env.local"), "utf8")).toBe("# kept\nFOO=fresh\nOTHER=1\n");
+  });
+
+  it("leaves the file alone under --dry-run even when told to overwrite", async () => {
+    await writeFile(join(dir, ".env.local"), "FOO=stale\n");
+    await scaffold(
+      plan({ kind: "merge-env", path: ".env.local", entries: { FOO: "fresh" }, overwrite: true }),
+      { cwd: dir, dryRun: true, force: false },
+    );
+    expect(await readFile(join(dir, ".env.local"), "utf8")).toBe("FOO=stale\n");
+  });
+
   it("writes the comment above the entries once, and not again on a later merge", async () => {
     const op = {
       kind: "merge-env" as const,

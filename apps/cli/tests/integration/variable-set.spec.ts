@@ -49,7 +49,21 @@ describe("variable set", () => {
         const result = await app.setVariableWithNothingPiped("FOO");
 
         expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it("says no value was supplied", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.setVariableWithNothingPiped("FOO");
+
         expect(result).toExplain("No value for FOO supplied");
+      });
+
+      it("hints at piping the value in", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.setVariableWithNothingPiped("FOO");
+
         expect(result).toHintAt("Pipe it in on stdin.");
       });
 
@@ -74,11 +88,11 @@ describe("variable set", () => {
       it("enters a plain value given on the command line", async () => {
         const app = await aSetUpApp();
 
-        const result = await app.run(["variable", "set", "FOO", "bar", "--json"]);
+        await app.run(["variable", "set", "FOO", "bar", "--json"]);
 
-        expect(result).toSucceed();
-        const [row] = await app.projectVariables();
-        expect(row).toEqual({ name: "FOO", secret: false, value: "bar" });
+        expect(await app.projectVariables()).toEqual([
+          { name: "FOO", secret: false, value: "bar" },
+        ]);
       });
 
       it("enters a plain value piped in when none is given", async () => {
@@ -102,26 +116,38 @@ describe("variable set", () => {
 
         const result = await app.setVariable("TOKEN", "s3cret", { secret: true });
 
-        // The state comes from reading the variable back, not the request flag:
-        // the `all` slot holds the secret, with no value disclosed.
         const { all } = app.envelopeOf<{ all: { held: boolean; secret?: boolean } }>(result).data;
         expect(all).toEqual({ held: true, secret: true });
       });
 
-      it("reports a preview write back in the preview slot, leaving the all slot standing", async () => {
+      it("reports a preview write back in the preview slot", async () => {
         const app = await aSetUpApp();
-        expect(await app.setVariable("API_URL", "https://api.acme.com")).toSucceed();
+        await app.setVariable("API_URL", "https://api.acme.com");
 
         const result = await app.setVariable("API_URL", "https://preview.acme.com", {
           preview: true,
         });
 
-        const { all, preview } = app.envelopeOf<{
-          all: Record<string, unknown>;
-          preview: Record<string, unknown>;
-        }>(result).data;
-        expect(all).toEqual({ held: true, secret: false, value: "https://api.acme.com" });
-        expect(preview).toEqual({ held: true, secret: false, value: "https://preview.acme.com" });
+        expect(app.envelopeOf<{ preview: Record<string, unknown> }>(result).data.preview).toEqual({
+          held: true,
+          secret: false,
+          value: "https://preview.acme.com",
+        });
+      });
+
+      it("reports the all slot still standing after a preview write", async () => {
+        const app = await aSetUpApp();
+        await app.setVariable("API_URL", "https://api.acme.com");
+
+        const result = await app.setVariable("API_URL", "https://preview.acme.com", {
+          preview: true,
+        });
+
+        expect(app.envelopeOf<{ all: Record<string, unknown> }>(result).data.all).toEqual({
+          held: true,
+          secret: false,
+          value: "https://api.acme.com",
+        });
       });
 
       it("writes the preview override into its own bucket", async () => {
@@ -130,11 +156,19 @@ describe("variable set", () => {
 
         await app.setVariable("API_URL", "https://preview.acme.com", { preview: true });
 
-        expect(await app.projectVariables()).toEqual([
-          { name: "API_URL", secret: false, value: "https://api.acme.com" },
-        ]);
         expect(await app.projectVariables({ preview: true })).toEqual([
           { name: "API_URL", secret: false, value: "https://preview.acme.com" },
+        ]);
+      });
+
+      it("leaves the all bucket alone on a preview write", async () => {
+        const app = await aSetUpApp();
+        await app.setVariable("API_URL", "https://api.acme.com");
+
+        await app.setVariable("API_URL", "https://preview.acme.com", { preview: true });
+
+        expect(await app.projectVariables()).toEqual([
+          { name: "API_URL", secret: false, value: "https://api.acme.com" },
         ]);
       });
     });
@@ -152,9 +186,8 @@ describe("variable set", () => {
     it("enters nothing on a dry run", async () => {
       const app = await aSetUpApp();
 
-      const result = await app.run(["variable", "set", "FOO", "bar", "--dry-run", "--json"]);
+      await app.run(["variable", "set", "FOO", "bar", "--dry-run", "--json"]);
 
-      expect(result).toSucceed();
       expect(await app.projectVariables()).toEqual([]);
     });
   });

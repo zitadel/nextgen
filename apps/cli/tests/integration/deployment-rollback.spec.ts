@@ -174,6 +174,29 @@ describe("deployment rollback", () => {
         expect(result).toFailWith("E_VALIDATION");
       });
 
+      it("undoes a deploy to one origin while the earlier deployment still serves the rest", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin("https://a.example.com");
+        await app.addPrimaryOrigin("https://b.example.com");
+        const everywhere = await app.deployData();
+        await app.editUserSchema((schema) => {
+          schema.properties.one = { type: "string" };
+        });
+        await app.deployData(["--origin", "https://a.example.com"]);
+
+        const result = await app.run([
+          "deployment",
+          "rollback",
+          "--force",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf<{ release_id: string }>(result).data.release_id).toBe(
+          everywhere.release_id,
+        );
+      });
+
       it("re-applies a named deployment after another origin moved on", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin("https://a.example.com");

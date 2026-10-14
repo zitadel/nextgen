@@ -1,5 +1,6 @@
 import type { ZitadelClient } from "@zitadel/api/client";
 
+import type { SuggestedCommand } from "../suggestion";
 import type { ConfigurationBundle } from "./bundle";
 
 /** Which publish a step runs for. `preview` lands with the preview command. */
@@ -28,6 +29,11 @@ export interface StepContext {
    * `validate` can report a missing reference the wire bundle has dropped.
    */
   readonly brandingSources: readonly Record<string, unknown>[];
+  /**
+   * A command against the project this run addresses, carrying its
+   * environment selector, for a step's error to suggest its own fix.
+   */
+  readonly suggest: (args: string) => SuggestedCommand;
 }
 
 /**

@@ -56,27 +56,47 @@ describe("variable resolve", () => {
       it("shows the variables the live deployment froze", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
-        expect(await app.setVariable("API_URL", "https://api.acme.com")).toSucceed();
+        await app.setVariable("API_URL", "https://api.acme.com");
         await app.deployData();
 
         const result = await app.resolveVariables();
 
-        expect(result).toSucceed();
-        const data = app.envelopeOf<Resolved>(result).data;
-        expect(data.items).toEqual([
+        expect(app.envelopeOf<Resolved>(result).data.items).toEqual([
           { name: "API_URL", secret: false, value: "https://api.acme.com" },
         ]);
-        // The chosen origin is named, so a bare resolve says which target the
-        // frozen map runs on (#1617).
-        expect(data.origins).toEqual(["https://app.example.com"]);
+      });
+
+      it("names the origin whose deployment it resolved", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.deployData();
+
+        const result = await app.resolveVariables();
+
+        expect(app.envelopeOf<Resolved>(result).data.origins).toEqual(["https://app.example.com"]);
+      });
+
+      it("refuses to pick between two live deployments", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin("https://a.example.com");
+        await app.addPrimaryOrigin("https://b.example.com");
+        await app.deployData(["--origin", "https://a.example.com"]);
+        await app.editUserSchema((schema) => {
+          schema.properties.one = { type: "string" };
+        });
+        await app.deployData(["--origin", "https://b.example.com"]);
+
+        const result = await app.resolveVariables();
+
+        expect(result).toFailWith("E_VALIDATION");
       });
 
       it("serves the frozen value, not a later write to the store", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
-        expect(await app.setVariable("API_URL", "https://api.acme.com")).toSucceed();
+        await app.setVariable("API_URL", "https://api.acme.com");
         await app.deployData();
-        expect(await app.setVariable("API_URL", "https://api.changed.com")).toSucceed();
+        await app.setVariable("API_URL", "https://api.changed.com");
 
         const result = await app.resolveVariables();
 

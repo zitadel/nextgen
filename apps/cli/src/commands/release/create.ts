@@ -57,6 +57,7 @@ export default class ReleaseCreate extends EnvironmentCommand {
       color: !json && isTTY && flags.color !== false && !process.env.NO_COLOR,
       bundle,
       brandingSources,
+      suggest: (args) => this.suggest(args),
     };
     // The IdP connections sync before the build, as `deploy` does: a release
     // names its connections by slug, and the server refuses to build one

@@ -87,6 +87,23 @@ describe("origin rm", () => {
     });
   });
 
+  it("still reports the removal when the remaining origins cannot be read", async () => {
+    const cwd = await anAppDir();
+    server.use(
+      http.get(`${SERVER}/projects/:id`, () =>
+        HttpResponse.json({ code: "internal" }, { status: 500 }),
+      ),
+    );
+
+    const result = await remove(cwd, ["--force"]);
+
+    expect(result.exitCode).toBe(0);
+    expect(parseJson(result.stdout)).toMatchObject({
+      data: { pattern: "https://app.acme.com", deleted: true },
+      warnings: [expect.stringContaining("remaining origins could not be read")],
+    });
+  });
+
   it("refuses without --force when non-interactive, and makes no request", async () => {
     const cwd = await anAppDir();
 
