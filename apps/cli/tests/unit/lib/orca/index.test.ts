@@ -127,6 +127,29 @@ describe("Orca detection", () => {
     });
   });
 
+  // Not detected would read as a directory to scaffold into, and setup's
+  // --force would then scaffold a new app over this one.
+  it("refuses a requested framework other than the app's own", async () => {
+    await expect(orca.detect(await nextProject(), "react")).rejects.toMatchObject({
+      code: "E_CONFLICT",
+      message: "Setup detects Next.js here, not React (Vite)",
+      hint: expect.stringContaining("--framework next"),
+      details: { requested: "react", detected: "next" },
+    });
+  });
+
+  it("reports an app it recognises but does not support, whatever was requested", async () => {
+    const pagesRouter = await tmp();
+    await writeFile(
+      join(pagesRouter, "package.json"),
+      JSON.stringify({ dependencies: { next: "^15" } }),
+    );
+
+    await expect(orca.detect(pagesRouter, "react")).rejects.toMatchObject({
+      code: "E_UNSUPPORTED_PROJECT_SHAPE",
+    });
+  });
+
   it("tryDetect returns undefined instead of throwing", async () => {
     expect(await orca.tryDetect(await tmp())).toBeUndefined();
     expect(await orca.tryDetect(await nextProject())).toMatchObject({ id: "next" });

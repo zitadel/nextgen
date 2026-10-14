@@ -99,8 +99,10 @@ export function assertVariableName(name: string): void {
 
 /**
  * The scalar types a variable can hold — the API's JSON scalars (ADR 062 §1).
- * A whole-field reference keeps its value's type, so `"retry": "${{ RETRY }}"`
- * resolves to `5`, not `"5"`, only when the value was stored as a number.
+ * The server resolves `${{ NAME }}` only in an OIDC connection's `client_id`
+ * and `client_secret` (`flow_sso_redirect_issuer.go`, `flow_sso_callback.go`),
+ * and both must hold a string, so no reference resolves to a number or boolean
+ * yet.
  */
 export const VARIABLE_TYPES = ["string", "number", "boolean"] as const;
 

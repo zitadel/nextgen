@@ -3,8 +3,9 @@
  * Zitadel auth UI.
  *
  * Importing this module side-effect-registers every shipped `<zl-*>` atom and
- * the `<zitadel-login>` orchestrator. Tree-shake by importing the leaf
- * subpaths instead (e.g. `@zitadel/components/atoms`).
+ * the `<zitadel-login>`, `<zitadel-logout>` and `<zitadel-session>`
+ * orchestrators. Tree-shake by importing the leaf subpaths instead (e.g.
+ * `@zitadel/components/atoms`).
  */
 
 import "./internal/lit-dev-mode.js";

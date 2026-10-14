@@ -245,6 +245,13 @@ directory. Any other non-empty directory stops setup with a hint to pass
 `--force`. Pass it only for a directory whose contents may be replaced: files
 the new app also has, such as `package.json`, are overwritten.
 
+In an existing app, `--framework` has to name the framework setup detects
+there; another one stops setup with `E_CONFLICT` instead of offering
+`--force`. Setup reports its conflicts with the app before it creates a
+project, and the error's `hint` says whether `--force` resolves one: it
+replaces a file at a path setup writes, but not the app's root component or
+request boundary at another path.
+
 The app may also live in a subdirectory of the one `start` ran in: `setup`,
 `console` and `--server local` read `.zitadel/local/` from the working
 directory or the nearest parent that has it (up to the home directory), so

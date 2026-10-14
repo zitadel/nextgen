@@ -11,7 +11,7 @@ import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 The Nuxt SDK registers server middleware and plugins so Nuxt pages can read Zitadel auth state.
 
 <Callout title="Generated setup" type="info">
-  The CLI edits the first matching `nuxt.config.{ts,mts,js,mjs}` and keeps the backend URL server-side while exposing only the project id publicly.
+  The CLI edits the first matching `nuxt.config.{ts,mts,js,mjs}` and writes the backend URL and the project id to `.env.local`. The module keeps the URL on the server and gives the browser only the project id and the proxy path.
 </Callout>
 
 ## Install
@@ -61,14 +61,8 @@ The Nuxt SDK registers server middleware and plugins so Nuxt pages can read Zita
     export default defineNuxtConfig({
       modules: ["@zitadel/sdk-nuxt/module"],
       nextgen: {
-        url: process.env.ZITADEL_URL ?? "http://localhost:8080",
         loginPath: "/login",
         protectedRoutes: ["/profile"],
-      },
-      runtimeConfig: {
-        public: {
-          zitadelProjectId: process.env.NUXT_PUBLIC_ZITADEL_PROJECT_ID,
-        },
       },
       build: {
         transpile: ["@zitadel/api", "@zitadel/components", "@zitadel/design-tokens"],
@@ -81,7 +75,7 @@ The Nuxt SDK registers server middleware and plugins so Nuxt pages can read Zita
     });
     ```
 
-    Nuxt loads `.env`, not the `.env.local` that setup writes. Put `ZITADEL_URL` and `NUXT_PUBLIC_ZITADEL_PROJECT_ID` in `.env` and keep it out of git, or start the dev server with `nuxt dev --dotenv .env.local`. The module finds `ZITADEL_PROJECT_SECRET` in `.env.local` on its own. It reads the URL and the secret when `nuxt dev` or `nuxt build` runs. For a built server, set `NUXT_NEXTGEN_URL` and `NUXT_NEXTGEN_PROJECT_SECRET` in its runtime environment instead, and build without the secret, in the environment and in files: the module also reads `.env.local`, Nuxt reads `.env`, and whatever the build finds is written into `.output/`.
+    The module reads `ZITADEL_URL`, `NUXT_PUBLIC_ZITADEL_PROJECT_ID`, and `ZITADEL_PROJECT_SECRET` from the environment, or from `.env.local` when the environment has none, so the `.env.local` that setup writes works even though Nuxt itself loads only `.env`. A `nextgen.url` or `runtimeConfig.public.zitadelProjectId` in the config wins over the variables. The module reads them when `nuxt dev` or `nuxt build` runs. For a built server, set `NUXT_NEXTGEN_URL`, `NUXT_PUBLIC_ZITADEL_PROJECT_ID`, and `NUXT_NEXTGEN_PROJECT_SECRET` in its runtime environment instead, and build without the secret, in the environment and in files: the module reads `.env.local`, Nuxt reads `.env`, and whatever the build finds is written into `.output/`.
 
     Register the web components on the client only, in `app/plugins/zitadel-components.client.ts` (`plugins/` in a project without an `app/` directory):
 
@@ -103,7 +97,7 @@ The Nuxt SDK registers server middleware and plugins so Nuxt pages can read Zita
 
 ## Verify
 
-- Start the app. A config that setup generated already carries the URL and the project id; for a manual setup, provide the variables as the Manual tab describes.
+- Start the app. Setup already wrote the URL, the project id, and the secret to `.env.local`; for a manual setup, provide them as the Manual tab describes.
 - Visit `/login` and register a user.
 - Confirm `/profile` shows signed-in state.
 - Log out and confirm protected pages redirect to `/login`.
