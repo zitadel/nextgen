@@ -194,7 +194,11 @@ describe("<zitadel-session> without a session (chromium)", () => {
   beforeEach(() => {
     _resetConfigForTesting();
     globalThis.fetch = vi.fn(
-      async (): Promise<Response> => new Response(null, { status: 401 }),
+      async (): Promise<Response> =>
+        Response.json(
+          { code: "auth.unauthorized", message: "Missing or invalid session token." },
+          { status: 401 },
+        ),
     ) as unknown as typeof fetch;
     host = document.createElement("div");
     document.body.appendChild(host);

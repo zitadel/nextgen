@@ -41,17 +41,22 @@ const DEFAULT_LOGOUT_LABEL = "Sign out";
  *   always-present `user_id`. NOTE: the current server response includes only
  *   the `user_id`, so the card displays the raw id until the backend returns a
  *   human-readable `name`/`email` on `/sessions/me`.
- * - **No session.** When that request answers 401 or 404 (or names no user)
- *   the visitor is signed out: the element fires `zitadel-session-missing`,
- *   then navigates to `post-sign-out-url` when one is set and otherwise
- *   renders nothing. A network error or a 5xx is not "signed out": the card
- *   stays and shows the error.
+ * - **No session.** When that request answers the backend's
+ *   `401 auth.unauthorized` or `404 sess.not_found` (or names no user) the
+ *   visitor is signed out: the element fires `zitadel-session-missing`, then
+ *   navigates to `post-sign-out-url` when one is set and otherwise renders
+ *   nothing. It never navigates to the page it is on (same origin, path and
+ *   query): it renders nothing there instead, so a card whose sign-out comes
+ *   back to its own page does not reload it forever. Anything else is not
+ *   "signed out": a network error, a 5xx, a
+ *   gateway's 401 or 404 without the backend's code, or a 200 that is not a
+ *   session keeps the card and shows the error.
  * - **Sign out** calls the typed `revokeMySession` operation
  *   (`DELETE /sessions/me`); the server clears the session cookie. On success
- *   (a 401 or 404 counts, the session is already gone) the element fires
- *   `zitadel-signout` (detail `{ display, identifier }`, matching the shared
- *   SPA contract), then navigates to `post-sign-out-url`, or without one
- *   renders nothing.
+ *   (the backend's no-session answers count, the session is already gone) the
+ *   element fires `zitadel-signout` (detail `{ display, identifier }`,
+ *   matching the shared SPA contract), then navigates to `post-sign-out-url`,
+ *   or without one renders nothing. Any other failure shows the error.
  *
  * A "Continue" action is intentionally omitted for now: the post-sign-in
  * destination contract is still being decided. Consumers redirect after
@@ -108,7 +113,10 @@ export class ZitadelSession extends ZitadelSurface {
     `,
   ];
 
-  /** URL to navigate to after a successful sign-out. */
+  /**
+   * URL to navigate to after a successful sign-out, and when the visitor has no
+   * session, unless it is the page the card is on.
+   */
   @property({ type: String, attribute: "post-sign-out-url" }) accessor postSignOutUrl = "";
 
   /** Heading text. Unset, `null` or `""` show the English default. */
@@ -134,7 +142,14 @@ export class ZitadelSession extends ZitadelSurface {
   private readonly session = new SessionController(
     this,
     () => resolveApi(this.project, this.projectAttrs, "<zitadel-session>"),
-    { onSessionMissing: () => this.leave() },
+    {
+      // A card on the page its `post-sign-out-url` names ("sign out and come
+      // back here") would otherwise reload that page on every signed-out
+      // visit, and find no session again each time.
+      onSessionMissing: () => {
+        if (!this.isOnPostSignOutPage()) this.leave();
+      },
+    },
   );
 
   /** Navigates to `postSignOutUrl` when one is set; reports whether it did. */
@@ -142,6 +157,22 @@ export class ZitadelSession extends ZitadelSurface {
     if (!this.postSignOutUrl || typeof window === "undefined") return false;
     window.location.assign(this.postSignOutUrl);
     return true;
+  }
+
+  /** `postSignOutUrl` resolves to this page: the same origin, path and query. */
+  private isOnPostSignOutPage(): boolean {
+    if (!this.postSignOutUrl || typeof window === "undefined") return false;
+    try {
+      const here = new URL(window.location.href);
+      const target = new URL(this.postSignOutUrl, here);
+      return (
+        target.origin === here.origin &&
+        target.pathname === here.pathname &&
+        target.search === here.search
+      );
+    } catch {
+      return false;
+    }
   }
 
   override willUpdate(): void {
