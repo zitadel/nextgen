@@ -4,15 +4,16 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "./defaults.js";
+import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "../defaults.js";
 import {
   FLOW_PURPOSES,
   FLOW_VALIDATION_RULES,
   PURPOSE_FLIP_TARGETS,
   RESERVED_OUTCOMES,
   validateFlowDefinition,
+  type FlowValidationRuleId,
   type FlowValidationIssue,
-} from "./validate.js";
+} from "./index.js";
 
 // ── fixtures ─────────────────────────────────────────────────────────────────
 
@@ -839,7 +840,7 @@ describe("warn/password-without-identifier", () => {
 describe("drift audit (Go validator)", () => {
   const goSource = join(
     dirname(fileURLToPath(import.meta.url)),
-    "../../..",
+    "../../../..",
     "internal/domain/flow_definition_validator.go",
   );
 
@@ -902,7 +903,7 @@ describe("drift audit (Go validator)", () => {
 
   const purposesSource = join(
     dirname(fileURLToPath(import.meta.url)),
-    "../../..",
+    "../../../..",
     "internal/domain/flow_definition.go",
   );
 
@@ -932,7 +933,7 @@ describe("drift audit (Go validator)", () => {
 
   const onSuccessSource = join(
     dirname(fileURLToPath(import.meta.url)),
-    "../../..",
+    "../../../..",
     "internal/domain/flow_on_success.go",
   );
 
@@ -951,4 +952,12 @@ describe("drift audit (Go validator)", () => {
       expect(body).toContain("FlowFieldChallengeIdentifier, FlowFieldChallengePassword");
     },
   );
+});
+
+describe("the rule id type names", () => {
+  it("keeps the old name for a flow rule id as an alias of the new one", () => {
+    const rule: FlowValidationRuleId = "step-names";
+
+    expect(Object.keys(FLOW_VALIDATION_RULES)).toContain(rule);
+  });
 });

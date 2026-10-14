@@ -139,9 +139,13 @@ Each invocation prints one JSON object:
 - A `list` verb emits `data: { items, count, next_page_token }`; when a page
   remains, `data.next_commands` carries the exact command for the next page.
 - `plan` and `apply` emit `data.changes`: one row per touched resource
-  (`{kind, action, file, id?, previous_id?}`, action ∈ create/update/revision/
-  delete). Plan rows preview; apply rows report, with the resulting platform
-  ids. Use it to verify an edit did what you intended.
+  (`{kind, action, file, id?, previous_id?, moved_from?}`, action ∈ create/
+  update/revision/delete/move). A `move` is a file that took over a resource
+  from a removed one (`moved_from`). Plan rows preview; apply rows report, with
+  the resulting platform ids. Use it to verify an edit did what you intended.
+  `data.unsupported_deletions` counts removed files whose resource cannot be
+  deleted yet (they are kept, and are not part of `total`); on `apply` the files
+  are listed in `data.unsupported_deletion_files`.
 - A write verb's `--dry-run` reports what it would send without calling the
   platform, so you can preview a mutation before making it.
 
@@ -149,6 +153,9 @@ Common error codes point at their own fix in `next_commands`:
 
 - `E_VALIDATION`: the body or flags are wrong; `message` names what, and
   `details` often lists the missing or available values.
+- `E_CREDENTIAL_MISSING`: a connection's `client_id` or `client_secret` names a
+  project variable that does not exist; `details.variable` is the name. Publish it
+  with `variables set NAME --project-level` (add `--secret` for the secret), then retry.
 - `E_LOCAL_SERVER_NOT_RUNNING`: start the local runtime, then retry with
   `--server local`.
 - `E_NOT_FOUND`: an HTTP 404 — a missing resource, or a `--server` that is not a
