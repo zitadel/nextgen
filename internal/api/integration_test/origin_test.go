@@ -107,10 +107,10 @@ func TestOriginsAddRemove(t *testing.T) {
 			Kind:    api.ProjectOriginKindPreview,
 		}, api.AddOriginParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
-		added, ok := resp.(*api.AddOriginCreated)
+		added, ok := resp.(*api.AddOriginResponse)
 		require.True(t, ok, helpers.MustMarshal(t, resp))
 		assert.Equal(t, "https://*.vercel.app", added.Pattern)
-		assert.Equal(t, api.ProjectOriginKindPreview, added.Kind)
+		assert.Equal(t, api.AddOriginResponseKindPreview, added.Kind)
 	})
 
 	t.Run("rejects primary wildcard", func(t *testing.T) {
