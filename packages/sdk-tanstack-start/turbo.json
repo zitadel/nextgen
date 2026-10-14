@@ -1,0 +1,23 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "typecheck": {
+      "dependsOn": ["@zitadel/components#build", "@zitadel/sdk-core#build"]
+    },
+    "build": {
+      "dependsOn": ["@zitadel/components#build", "@zitadel/sdk-core#build"]
+    },
+    "build-release": {
+      "dependsOn": ["@zitadel/components#build-release", "@zitadel/sdk-core#build-release", "@zitadel/sdk-qwik-city#build-release"]
+    },
+    "test": {
+      "dependsOn": ["build"]
+    },
+    // tsup's declaration pass resolves the workspace packages, which need
+    // api's generated client and the built dependencies.
+    "dev": {
+      "dependsOn": ["@zitadel/components#build", "@zitadel/sdk-core#build"]
+    }
+  }
+}
