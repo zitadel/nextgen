@@ -15,11 +15,11 @@
 set -eu
 cd "$(dirname "$0")/../.."
 
-# The other services' installs normally ran already; the Go preset does not
-# run this service's installCommand, so install when nothing is there.
-[ -x node_modules/.bin/turbo ] || sh apps/cloud/install.sh
-# The login UI through turbo, with the remote-cache policy every service
-# shares (turbo-build.sh: previews restore, production only uploads).
+# The Go preset runs no installCommand, so the install runs here; install.sh
+# skips it when a service built earlier installed for this deployment.
+sh apps/cloud/install.sh
+# The login UI through turbo, with the remote cache every service shares
+# (turbo-build.sh: every build reads and writes it).
 sh apps/cloud/turbo-build.sh @zitadel/login-ui
 
 version="$(sed -n 's/^  "version": *"\([^"]*\)".*/\1/p' apps/server/package.json | head -1)"

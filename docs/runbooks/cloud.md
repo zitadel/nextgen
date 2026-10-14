@@ -367,9 +367,14 @@ project and imports the root admin.
   the other platforms' native packages that the workspace installs
   everywhere else (`supportedArchitectures` in `pnpm-workspace.yaml`). That
   took the cache from 1.52 GB to 0.86 GB, a little over half of it the Go
-  caches. Go would keep each rebuild's compiled packages for five days, so
-  `build.sh` drops those no build used in the last two hours. Each build log
-  ends with the cache's size: `Uploading build cache [...]`.
+  caches. The services build one after another in one checkout, and only
+  the first one installs: it leaves the deployment's id in
+  `.cloud-installed` at the repository root, outside the cache, and the
+  others skip when they find it. A restored `node_modules` cannot tell them
+  the install ran, since it may hold an older lockfile's packages. Go would
+  keep each rebuild's compiled packages for five days, so `build.sh` drops
+  those no build used in the last two hours. Each build log ends with the
+  cache's size: `Uploading build cache [...]`.
 
 ## Later: read replicas in other regions
 
