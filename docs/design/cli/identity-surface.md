@@ -20,7 +20,7 @@ The product vision says "devs and AI agents manage IDPs, OIDC/SAML server config
 
 | Concept | What it is | Where it plugs in |
 |---|---|---|
-| **IdP** (identity provider) | An *external* system the end user signs in with: Google, Microsoft, Okta, Azure AD, corporate SAML. | Referenced by `identifier` / `credential` steps in flow definitions. Callback at `/idp/callback` for user provisioning and claim mapping. |
+| **IdP** (identity provider) | An *external* system the end user signs in with: Google, Microsoft, Okta, Azure AD, corporate SAML. | Referenced by `identifier` / `credential` steps in flow definitions. Callback at `/idp/{slug}/callback`, one per connection, for user provisioning and claim mapping. |
 | **External factor provider** — **reserved** | An *external MFA* system (Duo, YubiKey, RSA SecurID, etc.). | The upstream flow engine design for external factors is in flux; the prior research document was removed on `frontend-adr-001` pending consolidation. This CLI therefore does **not** yet expose an external-factor resource directory or command. A follow-up design will add `.zitadel/external-factors/` and `zitadel external-factor add` once upstream publishes the final step-type / protocol contract. |
 | **App** | A consumer of Zitadel's own OIDC/SAML server: an OIDC client, a SAML SP, an API audience. "The thing that has a client_id and client_secret." | Receives tokens from Zitadel after a flow completes. Optionally acts as a SAML *server* when the Zitadel instance is fronting its own customers' auth. |
 

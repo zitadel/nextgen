@@ -26,6 +26,7 @@ type statements struct {
 	userRecoveryCodesStatements
 	brandingStatements
 	variableStatements
+	variableSetStatements
 	claimStatements
 	resourceScopeStatements
 	authzAssignmentStatements
@@ -65,6 +66,7 @@ func newStatements(db queryExecutor) statements {
 		userRecoveryCodesStatements:   newUserRecoveryCodesStatements(db),
 		brandingStatements:            newBrandingStatements(db),
 		variableStatements:            newVariableStatements(db),
+		variableSetStatements:         newVariableSetStatements(db),
 		claimStatements:               newClaimStatements(db),
 		resourceScopeStatements:       newResourceScopeStatements(db),
 		authzAssignmentStatements:     newAuthzAssignmentStatements(db),
