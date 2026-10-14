@@ -3,7 +3,6 @@ import { Flags } from "@oclif/core";
 
 import { nonBlankString } from "../../flags";
 
-import { publicCliCommand } from "../../../public-cli";
 import type { CommandResult, GlobalOptions } from "../../types";
 import { collectPages } from "../paging";
 import { wireOf } from "../wire";
@@ -20,6 +19,7 @@ import {
   type OperationStatics,
   ResourceCommand,
 } from "./command";
+import { nextCommandsData } from "../../envelope";
 
 /**
  * `<topic> list`: one page by default, `--all` to drain, `--filter` / `--sort`
@@ -103,7 +103,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
 
   protected override async execute(
     { flags }: OperationInput,
-    meta: GlobalOptions,
+    _meta: GlobalOptions,
   ): Promise<CommandResult> {
     const { topic, resource, spec, options } = this.definition;
     const wire = wireOf(options.wire);
@@ -219,14 +219,13 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     const nextCommands =
       next && !all
         ? [
-            publicCliCommand(
+            this.suggest(
               [
                 `${topic} list`,
                 ...repeatedFlags(flags),
                 `--page-token ${shellArg(next)}`,
                 "--json",
-              ].join(" ") + this.environmentSelector(),
-              meta.cliVersion,
+              ].join(" "),
             ),
           ]
         : [];
@@ -236,7 +235,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
         items,
         count: items.length,
         [wire.nextPageToken]: next,
-        ...(nextCommands.length > 0 ? { next_commands: nextCommands } : {}),
+        ...(nextCommands.length > 0 ? nextCommandsData(nextCommands) : {}),
       },
       pretty: plain
         ? renderRows(columns, items)

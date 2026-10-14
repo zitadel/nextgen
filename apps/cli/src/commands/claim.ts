@@ -14,6 +14,7 @@ import { isObject } from "../lib/json";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
 import { hasZitadelSecret, readZitadelSecret, writeZitadelSecret } from "../lib/project";
 import { reportWarning } from "../lib/warnings";
+import type { SuggestedCommand } from "../lib/suggestion";
 
 /**
  * Poll cadence while a human completes the browser step. Starts responsive so
@@ -144,7 +145,7 @@ export default class Claim extends EnvironmentCommand {
             ? "Open a browser to claim this project, then record the owning team in .zitadel/secret."
             : "Open a browser to claim this project.",
         },
-        nextCommands: [`zitadel claim${this.environmentSelector()}`],
+        nextCommands: [this.suggest("claim")],
       });
     }
 
@@ -282,7 +283,7 @@ export default class Claim extends EnvironmentCommand {
           this.recordTelemetry({ claim_outcome: "expired", poll_count: polls });
           throw expiredError(
             "The link expired before the browser step finished.",
-            this.environmentSelector(),
+            this.suggest("claim"),
           );
         }
         if (error instanceof ApiError && error.status === 429) {
@@ -306,10 +307,7 @@ export default class Claim extends EnvironmentCommand {
     }
 
     this.recordTelemetry({ claim_outcome: "timeout", poll_count: polls });
-    throw expiredError(
-      "Stopped waiting for the browser step to finish.",
-      this.environmentSelector(),
-    );
+    throw expiredError("Stopped waiting for the browser step to finish.", this.suggest("claim"));
   }
 
   /**
@@ -370,10 +368,10 @@ function isClaimWindowExpired(error: unknown): boolean {
   );
 }
 
-function expiredError(message: string, selector: string): ZitadelError {
+function expiredError(message: string, claimAgain: SuggestedCommand): ZitadelError {
   return new ZitadelError("E_VALIDATION", message, {
     hint: "Links are valid for 10 minutes. Start a new one.",
-    nextCommands: [`zitadel claim${selector}`],
+    nextCommands: [claimAgain],
   });
 }
 

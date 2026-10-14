@@ -7,6 +7,7 @@ import { dirname, join, resolve } from "node:path";
 import { ZitadelError } from "../errors";
 import { isObject, parseJsonObject } from "../json";
 import { EMPTY_SUMMARY, type EnvSummary, isEnvSummary } from "./env-vars";
+import { unscopedCommand } from "../suggestion";
 
 export const LOCAL_SERVER_IMAGE_NAME = "ghcr.io/zitadel/nextgen";
 export const DEFAULT_LOCAL_SERVER_IMAGE = `${LOCAL_SERVER_IMAGE_NAME}:latest`;
@@ -340,7 +341,7 @@ export async function resolveLocalServer(cwd: string): Promise<string> {
 export function localServerNotRunning(serverUrl: string): ZitadelError {
   return new ZitadelError("E_LOCAL_SERVER_NOT_RUNNING", "Local Zitadel server is not running", {
     hint: `No healthy local server responded at ${serverUrl}.`,
-    nextCommands: ["zitadel start"],
+    nextCommands: [unscopedCommand("start")],
     details: { server_url: serverUrl },
   });
 }
@@ -529,7 +530,7 @@ function explicitUrlPort(value: string): number | undefined {
 function malformedRuntime(input: Record<string, unknown>): ZitadelError {
   return new ZitadelError("E_VALIDATION", `${LOCAL_RUNTIME_FILE} is malformed`, {
     hint: "Run `zitadel reset --force`, then `zitadel start`.",
-    nextCommands: ["zitadel reset --force", "zitadel start"],
+    nextCommands: [unscopedCommand("reset --force"), unscopedCommand("start")],
     details: input,
   });
 }

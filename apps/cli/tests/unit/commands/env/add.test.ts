@@ -89,6 +89,32 @@ const names = (variables: Added["platform"]["production"]): string[] =>
   variables.map((variable) => variable.name);
 
 describe("env add", () => {
+  describe("what it suggests next", () => {
+    const suggested = (envelope: { data: Added }): string[] =>
+      (envelope.data as unknown as { next_commands: string[] }).next_commands;
+
+    it("names the new environment in every follow-up, not this run's", async () => {
+      const cwd = await makeProject("next");
+
+      const { envelope } = await add(cwd, "--app-url", "https://app.acme.com");
+
+      expect(suggested(envelope).length).toBeGreaterThan(0);
+      for (const command of suggested(envelope)) {
+        expect(command).toMatch(/ --env production$/);
+      }
+    });
+
+    it("restricts the project to the app's origin first", async () => {
+      const cwd = await makeProject("next");
+
+      const { envelope } = await add(cwd, "--app-url", "https://app.acme.com");
+
+      expect(suggested(envelope)[0]).toContain(
+        "origin add https://app.acme.com --kind primary --env production",
+      );
+    });
+  });
+
   describe("the file it writes", () => {
     it("holds the server, the project and both credentials, and the framework's twin of the id", async () => {
       const cwd = await makeProject("next");

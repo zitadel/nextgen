@@ -24,11 +24,8 @@ import { ZitadelError } from "../../lib/errors";
 import { stableStringify } from "../../lib/json";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { hasZitadelConfig } from "../../lib/project";
-import {
-  normalizePublicCliJson,
-  normalizePublicCliProse,
-  publicCliCommand,
-} from "../../lib/public-cli";
+import { normalizePublicCliJson, normalizePublicCliProse } from "../../lib/public-cli";
+import { nextCommandsData } from "../../lib/oclif/envelope";
 
 /**
  * The `branding eject` command — take ownership of the login template.
@@ -68,7 +65,7 @@ export default class BrandingEject extends BaseCommand {
     if (!(await hasZitadelConfig(cwd))) {
       throw new ZitadelError("E_VALIDATION", "This directory is not a Zitadel project", {
         hint: "Run setup first; branding files live under .zitadel/.",
-        nextCommands: [publicCliCommand("setup", this.meta.cliVersion)],
+        nextCommands: [this.suggestUnscoped("setup")],
       });
     }
 
@@ -130,10 +127,9 @@ export default class BrandingEject extends BaseCommand {
           `Edit ${DEFAULT_BRANDING_TEMPLATE_PATH} — the login UI is yours now.`,
           "Plan validates the template and shows the pending revision; apply publishes it.",
         ],
-        next_commands: [
-          publicCliCommand("plan", this.meta.cliVersion),
-          publicCliCommand("apply", this.meta.cliVersion),
-        ],
+        // `branding eject` reads no environment, so it has no selector to
+        // carry: the follow-ups run against whichever one the developer uses.
+        ...nextCommandsData([this.suggestUnscoped("plan"), this.suggestUnscoped("apply")]),
       },
     });
   }

@@ -18,8 +18,11 @@ import {
 } from "../../lib/oclif";
 import { PUBLIC_PROJECT_ID_VARIABLE } from "../../lib/orca/patchers/rule/public-project-id";
 import { readZitadelConfig } from "../../lib/project";
-import { publicCliCommand } from "../../lib/public-cli";
 import { DEFAULT_SERVER, resolveServer, serverOrigin } from "../../lib/server";
+import { shellArg } from "../../lib/shell";
+import { environmentSelectorSuffix } from "../../lib/oclif/environment-flags";
+import { nextCommandsData } from "../../lib/oclif/envelope";
+import { projectCommand } from "../../lib/suggestion";
 
 /** A variable to set on a hosting platform or in a pipeline. A secret is named, never printed. */
 type PlatformVariable = { name: string; value?: string; secret?: boolean };
@@ -104,10 +107,7 @@ export default class EnvAdd extends BaseCommand {
             answer.trim() === ""
               ? ({ ok: false, problem: "Enter the server URL." } as const)
               : ({ ok: true, value: serverOrigin(answer.trim()) } as const),
-          retry: publicCliCommand(
-            `env add ${name} --server https://api.zitadel.cloud`,
-            this.meta.cliVersion,
-          ),
+          retry: this.suggestUnscoped(`env add ${name} --server https://api.zitadel.cloud`),
         });
 
     const appUrl =
@@ -207,6 +207,8 @@ export default class EnvAdd extends BaseCommand {
     // would send the user to a value that is not there — point them at the
     // project's own secret instead.
     const writtenKeys = new Set(Object.keys(values));
+    const newEnvironment = environmentSelectorSuffix({ envName: name });
+    const { cliVersion } = this.meta;
     const render = (variables: PlatformVariable[]): string[] =>
       variables.map((variable) =>
         variable.secret
@@ -234,15 +236,22 @@ export default class EnvAdd extends BaseCommand {
         // placeholder the shell reads as redirection) and a project secret in
         // the file for it to authenticate with (a `--project` bind with no
         // secret cannot). The human-facing line below still spells it out.
-        next_commands: [
+        // Both target the new environment by name: this run's own selection is
+        // not it.
+        ...nextCommandsData([
           ...(issuer !== undefined && writtenKeys.has("ZITADEL_PROJECT_SECRET")
-            ? // Single-quote the origin: an IPv6 issuer like http://[::1]:3000 carries
-              // brackets a shell such as zsh would treat as a glob. A URL cannot contain
-              // a single quote, so wrapping is always safe here.
-              [`zitadel origin add '${issuer}' --kind primary --env ${name}`]
+            ? // shellArg quotes the origin: an IPv6 issuer like http://[::1]:3000
+              // carries brackets a shell such as zsh would treat as a glob.
+              [
+                projectCommand(
+                  `origin add ${shellArg(issuer)} --kind primary`,
+                  newEnvironment,
+                  cliVersion,
+                ),
+              ]
             : []),
-          `zitadel env --env ${name}`,
-        ],
+          projectCommand("env", newEnvironment, cliVersion),
+        ]),
       },
       pretty: [
         `Wrote ${file} with ${Object.keys(values).join(", ")}`,

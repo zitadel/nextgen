@@ -11,6 +11,7 @@ import {
   type RuntimeMetadata,
   checkLocalServerHealth,
 } from "./runtime";
+import { shellCommand } from "../suggestion";
 
 export const SERVER_NPM_PACKAGE = "@zitadel/server";
 const START_COMMAND_ENV = "ZITADEL_SERVER_BINARY";
@@ -214,7 +215,7 @@ export async function assertServerPackageAvailable(): Promise<string> {
   } catch (error) {
     throw new ZitadelError("E_VALIDATION", "Zitadel server npm package is not available", {
       hint: "Reinstall @zitadel/cli so npm can install @zitadel/server and its platform package.",
-      nextCommands: ["npm install @zitadel/cli@alpha"],
+      nextCommands: [shellCommand("npm install @zitadel/cli@alpha")],
       details: { package: SERVER_NPM_PACKAGE, message: errorMessage(error) },
     });
   }
