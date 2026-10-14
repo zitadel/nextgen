@@ -111,6 +111,12 @@ test("prepares the customer local setup journey in the app root", async () => {
     await assert.rejects(readFile(join(appDir, "myapp/package.json"), "utf8"), {
       code: "ENOENT",
     });
+    // Each CLI step's duration, for the runner's timing table.
+    assert.deepEqual(await timedSteps(workDir), [
+      { phase: "doctor", ok: true },
+      { phase: "start", ok: true },
+      { phase: "setup", ok: true },
+    ]);
   } finally {
     await rm(workDir, { recursive: true, force: true });
   }
@@ -163,6 +169,11 @@ test("collects local runtime logs when a CLI step fails", async () => {
     assert.equal(logs.data.logs, "runtime log");
     const start = JSON.parse(await readFile(join(workDir, "start.json"), "utf8"));
     assert.equal(start.status, "error");
+    // The timings end at the failed step, so the table shows where the lane stopped.
+    assert.deepEqual(await timedSteps(workDir), [
+      { phase: "doctor", ok: true },
+      { phase: "start", ok: false },
+    ]);
   } finally {
     await rm(workDir, { recursive: true, force: true });
   }
@@ -215,6 +226,10 @@ test("probes doctor's managed-file drift in the fresh-app Next suite", async () 
     assert.ok(JSON.parse(await readFile(join(workDir, "doctor-fix.json"), "utf8")));
     const boundary = await readFile(join(workDir, "myapp", "proxy.ts"), "utf8");
     assert.ok(boundary.includes("zitadel-cli: managed-file"));
+    assert.deepEqual(
+      (await timedSteps(workDir)).map(({ phase }) => phase),
+      ["doctor", "start", "setup", "drift"],
+    );
   } finally {
     await rm(workDir, { recursive: true, force: true });
   }
@@ -548,6 +563,15 @@ function nextCli(calls, registryUrl) {
     }
     return { code: 0, stdout: `${JSON.stringify(okEnvelope(args))}\n`, stderr: "" };
   };
+}
+
+/** The steps prepare-app timed into `timings.json`, without their durations. */
+async function timedSteps(workDir) {
+  const phases = JSON.parse(await readFile(join(workDir, "timings.json"), "utf8"));
+  for (const { ms } of phases) {
+    assert.ok(Number.isInteger(ms) && ms >= 0, `duration ${ms} is whole milliseconds`);
+  }
+  return phases.map(({ phase, ok }) => ({ phase, ok }));
 }
 
 async function assertNoDriftProbe(calls, workDir) {
