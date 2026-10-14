@@ -245,14 +245,16 @@ export default class Preview extends PreviewCommand {
 
 /**
  * The project's primary origins, or none when the preview token may not read
- * the project: the server then decides alone what the token can deploy to.
+ * the project (403): the server then decides alone what the token can deploy
+ * to. A 401 is a token the server does not accept at all, which fails here
+ * rather than after the whole bundle is built.
  */
 async function primaryOrigins(client: ZitadelClient, projectId: string): Promise<string[]> {
   try {
     const origins = (await client.getProject(projectId)).origins ?? [];
     return origins.filter((entry) => entry.kind === "primary").map((entry) => entry.pattern);
   } catch (error) {
-    if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+    if (error instanceof ApiError && error.status === 403) {
       return [];
     }
     throw error;

@@ -22,6 +22,7 @@ import { ApiError } from "@zitadel/api/runtime/fetch";
 import { ZitadelError } from "../lib/errors";
 import { reportWarning } from "../lib/warnings";
 import { nextCommandsData } from "../lib/oclif/envelope";
+import { shellArg } from "../lib/shell";
 
 /**
  * `zitadel deploy` — publish `.zitadel/` to the project's primary origins.
@@ -210,7 +211,7 @@ export default class Deploy extends EnvironmentCommand {
         "E_CONFLICT",
         "Another deploy changed the targets since this one was prepared",
         {
-          hint: `Re-run \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`; it will build and deploy against the current state.`,
+          hint: `Re-run \`zitadel ${DEPLOY_ARGS}${origin === undefined ? "" : ` --origin ${shellArg(origin)}`}${this.environmentSelector()}\`; it will build and deploy against the current state.`,
           details: current === undefined ? undefined : { current_deployment: current },
           nextCommands: [this.suggest("deployment list --live")],
         },

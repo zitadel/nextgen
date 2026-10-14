@@ -110,6 +110,26 @@ describe("preview", () => {
         ]);
       });
 
+      it("expires the preview after the --ttl it is given", async () => {
+        const app = await anAppAdmittingPreviews();
+
+        const result = await app.run(["preview", "--origin", PREVIEW_URL, "--ttl", "1h", "--json"]);
+
+        expect(
+          Date.parse(app.envelopeOf<Published>(result).data.previews[0]?.expires_at ?? "") -
+            Date.now(),
+        ).toBeLessThan(2 * 60 * 60 * 1000);
+      });
+
+      it("deploys when the preview token may not read the project", async () => {
+        const app = await anAppAdmittingPreviews();
+        platform.refusesProjectReads();
+
+        const result = await app.run(["preview", "--origin", PREVIEW_URL, "--json"]);
+
+        expect(result).toSucceed();
+      });
+
       it("gives the preview an expiry when --ttl is omitted", async () => {
         const app = await anAppAdmittingPreviews();
 

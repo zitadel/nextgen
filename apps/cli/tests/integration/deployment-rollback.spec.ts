@@ -318,7 +318,7 @@ describe("deployment rollback", () => {
           schema.properties.one = { type: "string" };
         });
         await app.deployData();
-        await app.run(["preview", "--origin", "https://x-acme.vercel.app", "--json"]);
+        await app.previewData("https://x-acme.vercel.app");
 
         const result = await app.run([
           "deployment",

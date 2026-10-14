@@ -187,6 +187,15 @@ export default class VariableSet extends EnvironmentCommand {
     const other = otherSlot === undefined ? undefined : slotState(name, otherSlot);
     const all = flags.preview ? other : written;
     const preview = flags.preview ? written : other;
+    // The other half of the rule a plain `--preview` write is refused by: a
+    // name made a secret here may still hold a readable preview override,
+    // which a preview deploy would freeze in the clear. The write has landed,
+    // so it is said aloud with the command that replaces it.
+    if (!flags.preview && flags.secret && preview?.held === true && !preview.secret) {
+      reportWarning(
+        `${name} is now a secret, but its preview value is stored plain. Replace it with \`zitadel ${pipeArgs(name, true, "string", true)}${this.environmentSelector()} < value.txt\`.`,
+      );
+    }
 
     return this.emit({
       status: "ok",

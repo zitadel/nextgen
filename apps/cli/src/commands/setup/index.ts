@@ -111,6 +111,7 @@ import {
   type Row,
   type Section,
 } from "./summary";
+import { shellArg } from "../../lib/shell";
 import { showSkillsHint } from "../../lib/skills-hint";
 import { reportWarning } from "../../lib/warnings";
 import {
@@ -590,7 +591,7 @@ export default class Setup extends BaseCommand {
             "scaffolds. It does not cover a connection under .zitadel/idps/ -- those are " +
             "yours, so setup never replaces or removes one; delete it to scaffold a fresh " +
             "one, or keep it and enable the provider after setup to reuse it.",
-        nextCommands: cause.nextCommands ?? [unscopedCommand("setup --force")],
+        nextCommands: cause.nextCommands ?? [this.suggestUnscoped("setup --force")],
         details: cause.details,
       });
     }
@@ -974,8 +975,7 @@ async function resolveScaffoldFramework(
     throw new ZitadelError("E_FRAMEWORK_NOT_DETECTED", "Empty directory — pass --framework", {
       hint: (
         "Setup asks which framework to scaffold only in a terminal. Without one, or with " +
-        `--json or --non-interactive, pass --framework with one of: ${choices.join(", ")}. ` +
-        runFromHint(guidance.retry)
+        `--json or --non-interactive, pass --framework with one of: ${choices.join(", ")}.`
       ).trimEnd(),
       nextCommands:
         guidance.serverFlag === "local" && suggested
@@ -1208,12 +1208,9 @@ export async function ssoFromFlags(
  */
 export type SetupRetryOptions = {
   /**
-   * The directory setup was pointed at, when it was not the shell's own.
-   * Named in the guidance rather than passed as `--cwd` in the command text:
-   * a path can carry spaces and metacharacters, and nothing escapes a
-   * suggested command for a shell -- the same reason the client id is not
-   * interpolated either. Prose the developer reads, not an argument a shell
-   * splits.
+   * The directory setup was pointed at, as typed. Every suggested rerun
+   * carries it as `--cwd`, quoted for a shell, so it configures that project
+   * from wherever it is run.
    */
   cwd?: string;
   framework?: string;
@@ -1292,7 +1289,7 @@ export function setupRetryFlags(opts: SetupRetryOptions): string {
     parts.push("--non-interactive");
   }
   parts.push("--server local");
-  return parts.join(" ");
+  return `${parts.join(" ")}${cwdArg(opts)}`;
 }
 
 /** Whether `--sso` names a provider this CLI offers. */
@@ -1399,11 +1396,9 @@ function ssoCredentialPublisher(
  * failed project creation -- and the second was missed when this was written
  * inline, which is exactly the kind of thing one copy prevents.
  */
-function runFromHint(retry: SetupRetryOptions): string {
-  if (retry.cwd === undefined || retry.cwd === process.cwd()) {
-    return "";
-  }
-  return `Run these from ${retry.cwd}, which is the project they configure. `;
+/** `--cwd` for a suggested command, when setup was pointed at a directory. */
+function cwdArg(retry: SetupRetryOptions): string {
+  return retry.cwd === undefined ? "" : ` --cwd ${shellArg(retry.cwd)}`;
 }
 
 function ssoRecovery(
@@ -1482,9 +1477,9 @@ async function createProjectWithLocalHint(
       hint:
         `${normalized.hint ? `${normalized.hint} ` : ""}` +
         "If you meant to use a local Zitadel server, start it first " +
-        `and retry setup with ${retryFlags}. ${runFromHint(retry)}${sso.hint}`.trimEnd(),
+        `and retry setup with ${retryFlags}. ${sso.hint}`.trimEnd(),
       nextCommands: [
-        unscopedCommand("start", cliVersion),
+        unscopedCommand(`start${cwdArg(retry)}`, cliVersion),
         unscopedCommand(`setup ${retryFlags}`, cliVersion),
         ...sso.commands,
       ],
@@ -1545,7 +1540,7 @@ async function assertLocalServerVersion(
       hint:
         "A server another CLI release started serves that release's API, so setup would stop " +
         `halfway. Run start to restart it on ${expected}; its data stays. ${where}` +
-        `Then rerun setup. ${runFromHint(retry)}`.trimEnd(),
+        "Then rerun setup.",
       nextCommands: [
         unscopedCommand("start", cliVersion),
         unscopedCommand(`setup ${setupRetryFlags(retry)}`, cliVersion),
@@ -1572,7 +1567,6 @@ function localSetupHint(error: unknown, retry: SetupRetryOptions, cliVersion: st
     hint:
       `${normalized.hint ? `${normalized.hint} ` : ""}` +
       "Start local Zitadel first, then rerun setup. " +
-      runFromHint(retry) +
       (retry.sso && retry.sso.length > 0
         ? "The rerun asks for the client id and secret, because a command carries neither. " +
           "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
@@ -1580,7 +1574,7 @@ function localSetupHint(error: unknown, retry: SetupRetryOptions, cliVersion: st
       sso.hint +
       "After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
     nextCommands: [
-      unscopedCommand("start", cliVersion),
+      unscopedCommand(`start${cwdArg(retry)}`, cliVersion),
       unscopedCommand(setupCommand, cliVersion),
       ...sso.commands,
     ],
