@@ -185,3 +185,7 @@ minimumReleaseAgeExclude:
   - "@orval/swr@8.42.0"
   - "@orval/zod@8.42.0"
   - "orval@8.42.0"
+
+# pnpm 12 offers to link the agent skills dependencies ship; we use none.
+skills:
+  dirs: []
