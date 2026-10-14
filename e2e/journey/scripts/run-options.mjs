@@ -31,6 +31,24 @@ export function journeyArgsFromEnv(env) {
   return args;
 }
 
+/**
+ * Packing the tarballs takes a `moon run release:pack` of the runner's own,
+ * and inside a workflow that is a second moon graph racing the one that runs
+ * the journey (its build tasks rewrite the dist folders being packed). So in
+ * GitHub Actions the workflow hands over prebuilt tarballs, and a run without
+ * them stops here. The moon task unsets CI and GITHUB_ACTIONS, so
+ * GITHUB_RUN_ID is what tells a workflow run apart.
+ */
+export function assertPrebuiltTarballsOnGitHub(options, env) {
+  if (env.GITHUB_RUN_ID && !options.tarballsDir) {
+    throw new Error(
+      "in GitHub Actions the workflow must hand the journey prebuilt tarballs " +
+        "(JOURNEY_TARBALLS_DIR or --tarballs-dir); packing them here would start " +
+        "a second moon graph inside the running one",
+    );
+  }
+}
+
 export function parseLocalJourneyArgs(args) {
   const parsed = {
     ci: false,

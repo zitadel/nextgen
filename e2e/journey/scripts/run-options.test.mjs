@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 
-import { journeyArgsFromEnv, parseLocalJourneyArgs } from "./run-options.mjs";
+import {
+  assertPrebuiltTarballsOnGitHub,
+  journeyArgsFromEnv,
+  parseLocalJourneyArgs,
+} from "./run-options.mjs";
 
 test("local journey defaults to the full framework matrix", () => {
   assert.deepEqual(parseLocalJourneyArgs([]), {
@@ -229,6 +233,21 @@ test("the command line's arguments win over the JOURNEY_* variables", () => {
   ]);
   assert.equal(parsed.ci, true);
   assert.equal(parsed.workDir, "/tmp/from-args");
+});
+
+test("in GitHub Actions the journey refuses to pack its own tarballs", () => {
+  const ci = parseLocalJourneyArgs(["--ci"]);
+  assert.throws(
+    () => assertPrebuiltTarballsOnGitHub(ci, { GITHUB_RUN_ID: "1" }),
+    /prebuilt tarballs/,
+  );
+  const handedOver = parseLocalJourneyArgs([
+    ...journeyArgsFromEnv({ JOURNEY_TARBALLS_DIR: "dist/release/1.0.0/npm" }),
+    "--ci",
+  ]);
+  assert.doesNotThrow(() => assertPrebuiltTarballsOnGitHub(handedOver, { GITHUB_RUN_ID: "1" }));
+  // Run by hand, the runner still packs its own.
+  assert.doesNotThrow(() => assertPrebuiltTarballsOnGitHub(ci, {}));
 });
 
 test("local journey rejects invalid options", () => {

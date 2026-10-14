@@ -17,7 +17,11 @@ import {
   stopLocalRegistry,
   waitForHttp,
 } from "./local-registry.mjs";
-import { journeyArgsFromEnv, parseLocalJourneyArgs } from "./run-options.mjs";
+import {
+  assertPrebuiltTarballsOnGitHub,
+  journeyArgsFromEnv,
+  parseLocalJourneyArgs,
+} from "./run-options.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(here, "..");
@@ -150,7 +154,11 @@ process.exit(process.exitCode ?? 0);
 
 function parseArgsOrExit(args) {
   try {
-    return parseLocalJourneyArgs(args);
+    const parsed = parseLocalJourneyArgs(args);
+    if (!parsed.help) {
+      assertPrebuiltTarballsOnGitHub(parsed, process.env);
+    }
+    return parsed;
   } catch (error) {
     console.error(`[journey-local] ${errorMessage(error)}`);
     process.exit(1);

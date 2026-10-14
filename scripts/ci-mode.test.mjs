@@ -10,18 +10,28 @@ import {
 } from "./ci-mode.mjs";
 
 // Affected sets below are real `moon query tasks --affected --downstream deep`
-// results captured on main (2026-08-03/04) for one representative touched
-// file per change class. Constants named *_SLICE are hand-trimmed subsets
-// exercising one trigger path rather than full captures.
+// results (moon 2.6.1, 2026-10-14, after the e2e projects merged into `e2e`)
+// for one representative touched file per change class. Tests that pass an
+// inline list use a hand-made slice exercising one trigger path instead.
 
 const GO_CLASS = [
+  "bench:build",
+  "bench:summarize",
+  "bench:sweep",
+  "bench:test",
+  "bench:vet",
+  "e2e:all",
+  "e2e:console-embedded",
+  "e2e:console-platform",
   "e2e:console-real",
   "e2e:demo-next-real",
   "release:snapshot",
   "server:build",
   "server:check-generate",
+  "server:check-generate-pruned",
   "server:format",
   "server:generate",
+  "server:lint",
   "server:openapi",
   "server:test",
   "server:test-postgres",
@@ -32,32 +42,46 @@ const GO_CLASS = [
 ];
 const DOCS_CLASS = ["workspace:check-adrs"];
 const JOURNEY_CLASS = [
-  "e2e:journey-e2e",
-  "e2e:journey-e2e-local",
-  "e2e:journey-e2e-testkit",
-  "e2e:journey-lint",
-  "e2e:journey-test",
+  "e2e:all",
+  "e2e:journey",
+  "e2e:journey-local",
+  "e2e:lint",
+  "e2e:test",
+  "e2e:typecheck",
 ];
 const CONSOLE_CLASS = [
-  "e2e:console-smoke",
-  "e2e:console-embedded",
-  "e2e:console-real",
   "console:build",
   "console:build-release",
   "console:dev",
+  "console:dev-claim",
   "console:dev-real",
   "console:lint",
   "console:preview",
   "console:test",
   "console:typecheck",
+  "e2e:all",
+  "e2e:console-embedded",
+  "e2e:console-platform",
+  "e2e:console-real",
+  "e2e:console-smoke",
   "e2e:demo-next-real",
   "release:pack",
   "release:publish",
   "release:snapshot",
   "server:build",
+  "server:lint",
+  "server:test",
+  "server:test-postgres",
+  "server:test-spanner",
+  "server:test-sqlite",
+  "server:vet",
   "testing:test-integration",
+  "workspace:build-local-image",
+  "workspace:smoke-container",
 ];
 const SDK_VUE_CLASS = [
+  "e2e:all",
+  "e2e:journey-local",
   "release:build-public-packages",
   "release:pack",
   "release:publish",
@@ -69,6 +93,9 @@ const SDK_VUE_CLASS = [
   "sdk-vue:typecheck",
 ];
 const LOGIN_UI_CLASS = [
+  "e2e:all",
+  "e2e:console-embedded",
+  "e2e:console-platform",
   "e2e:console-real",
   "e2e:demo-next-real",
   "login-ui:build",
@@ -76,19 +103,31 @@ const LOGIN_UI_CLASS = [
   "login-ui:dev",
   "login-ui:lint",
   "login-ui:preview",
+  "login-ui:test",
   "login-ui:typecheck",
   "release:pack",
   "release:publish",
   "release:snapshot",
   "server:build",
+  "server:lint",
+  "server:test",
+  "server:test-postgres",
+  "server:test-spanner",
+  "server:test-sqlite",
+  "server:vet",
   "testing:test-integration",
+  "workspace:build-local-image",
+  "workspace:smoke-container",
 ];
 const TESTING_KIT_CLASS = [
-  "e2e:journey-e2e",
-  "e2e:journey-e2e-local",
-  "e2e:journey-e2e-testkit",
+  "e2e:all",
+  "e2e:console-embedded",
+  "e2e:console-platform",
   "e2e:console-real",
   "e2e:demo-next-real",
+  "e2e:journey",
+  "e2e:journey-local",
+  "e2e:typecheck",
   "release:build-public-packages",
   "release:pack",
   "release:publish",
@@ -100,48 +139,51 @@ const TESTING_KIT_CLASS = [
   "testing:test-integration",
   "testing:typecheck",
 ];
-// Full capture, 2026-08-04: components feeds every SDK, both UIs, the CLI,
-// and the journey project — 91 tasks, correctly close to "everything".
+// Components feeds every SDK, both UIs, the CLI and every e2e lane: 96 tasks,
+// correctly close to "everything".
 const COMPONENTS_CLASS = [
-  "e2e:journey-e2e",
-  "e2e:journey-e2e-local",
-  "e2e:journey-e2e-testkit",
   "cli:build",
   "cli:build-release",
-  "cli:lint",
   "cli:readme",
   "cli:test",
   "cli:typecheck",
   "components:build",
   "components:build-release",
+  "components:install-browsers",
   "components:lint",
   "components:test",
   "components:typecheck",
-  "e2e:console-smoke",
-  "e2e:console-real",
   "console:build",
   "console:build-release",
-  "console:lint",
+  "console:dev",
+  "console:dev-claim",
+  "console:dev-real",
   "console:preview",
   "console:test",
   "console:typecheck",
-  "e2e:demo-next-mock",
-  "e2e:demo-next-real",
   "demo-next:build",
   "demo-next:dev",
-  "demo-next:lint",
   "demo-next:start",
   "demo-next:typecheck",
-  "e2e:demo-nuxt-mock",
   "demo-nuxt:build",
   "demo-nuxt:dev",
-  "demo-nuxt:lint",
   "demo-nuxt:start",
   "demo-nuxt:typecheck",
+  "e2e:all",
+  "e2e:console-embedded",
+  "e2e:console-platform",
+  "e2e:console-real",
+  "e2e:console-smoke",
+  "e2e:demo-next-mock",
+  "e2e:demo-next-real",
+  "e2e:demo-nuxt-mock",
+  "e2e:journey",
+  "e2e:journey-local",
   "login-ui:build",
   "login-ui:build-release",
-  "login-ui:lint",
+  "login-ui:dev",
   "login-ui:preview",
+  "login-ui:test",
   "login-ui:typecheck",
   "release:build-public-packages",
   "release:pack",
@@ -149,50 +191,106 @@ const COMPONENTS_CLASS = [
   "release:snapshot",
   "sdk-angular:build",
   "sdk-angular:build-release",
-  "sdk-angular:lint",
   "sdk-angular:test",
   "sdk-angular:typecheck",
+  "sdk-core:test",
+  "sdk-core:typecheck",
   "sdk-next:build",
   "sdk-next:build-release",
-  "sdk-next:lint",
   "sdk-next:test",
   "sdk-next:typecheck",
   "sdk-nuxt:build",
   "sdk-nuxt:build-release",
-  "sdk-nuxt:lint",
+  "sdk-nuxt:dev",
   "sdk-nuxt:test",
   "sdk-nuxt:typecheck",
   "sdk-qwik:build",
   "sdk-qwik:build-release",
-  "sdk-qwik:lint",
   "sdk-qwik:test",
   "sdk-qwik:typecheck",
   "sdk-react:build",
   "sdk-react:build-release",
-  "sdk-react:lint",
   "sdk-react:test",
   "sdk-react:typecheck",
   "sdk-solid:build",
   "sdk-solid:build-release",
-  "sdk-solid:lint",
   "sdk-solid:test",
   "sdk-solid:typecheck",
   "sdk-svelte:build",
   "sdk-svelte:build-release",
-  "sdk-svelte:lint",
   "sdk-svelte:test",
   "sdk-svelte:typecheck",
   "sdk-vue:build",
   "sdk-vue:build-release",
-  "sdk-vue:lint",
   "sdk-vue:test",
   "sdk-vue:typecheck",
   "server:build",
+  "server:lint",
+  "server:test",
+  "server:test-postgres",
+  "server:test-spanner",
+  "server:test-sqlite",
+  "server:vet",
   "storybook:build",
-  "storybook:lint",
+  "storybook:dev",
   "storybook:test",
   "storybook:typecheck",
   "testing:test-integration",
+  "workspace:build-local-image",
+  "workspace:smoke-container",
+];
+// An api-mock change reaches the suite only through the mock lanes, so no
+// journey trigger moves, yet moon runs e2e:all and with it the journey.
+const API_MOCK_CLASS = [
+  "api-mock:build",
+  "api-mock:install-browsers",
+  "api-mock:lint",
+  "api-mock:start",
+  "api-mock:test",
+  "api-mock:typecheck",
+  "cli:build-release",
+  "cli:test",
+  "cli:typecheck",
+  "components:test",
+  "components:typecheck",
+  "e2e:all",
+  "e2e:demo-next-mock",
+  "e2e:demo-nuxt-mock",
+  "mock-zitadel:build",
+  "mock-zitadel:test",
+  "mock-zitadel:typecheck",
+  "release:build-public-packages",
+  "release:pack",
+  "release:publish",
+  "release:snapshot",
+  "sdk-angular:test",
+  "sdk-angular:typecheck",
+  "sdk-qwik:test",
+  "sdk-qwik:typecheck",
+  "sdk-react:test",
+  "sdk-react:typecheck",
+  "sdk-solid:test",
+  "sdk-solid:typecheck",
+  "sdk-svelte:test",
+  "sdk-svelte:typecheck",
+  "sdk-vue:test",
+  "sdk-vue:typecheck",
+  "storybook:build",
+  "storybook:dev",
+  "storybook:test",
+  "storybook:typecheck",
+];
+// A console spec edit: the console lanes' own inputs, not the journey's.
+const CONSOLE_SPEC_CLASS = [
+  "e2e:all",
+  "e2e:console-deployment",
+  "e2e:console-embedded",
+  "e2e:console-platform",
+  "e2e:console-real",
+  "e2e:console-smoke",
+  "e2e:lint",
+  "e2e:test",
+  "e2e:typecheck",
 ];
 
 function allTrue(gates) {
@@ -246,47 +344,75 @@ test("go change runs everything, but the journey matrix collapses to one framewo
   assert.equal(matrix, "single");
 });
 
-test("console change runs the suites but no journeys and no snapshot", () => {
-  const { gates } = resolveGates({
+test("console change runs everything, but the journey matrix collapses to one framework", () => {
+  // The server's test binary embeds the console build, so server:test (the Go
+  // signal) moves with it, and the console lanes pull in e2e:all.
+  const { gates, matrix } = resolveGates({
     mode: "full",
     files: ["apps/console/src/api/zitadel.ts"],
     targets: CONSOLE_CLASS,
   });
-  assert.deepEqual(journeys(gates), [false, false, false, false]);
-  assert.equal(gates.snapshot, false);
-  assert.equal(gates.go_tests, false);
-  assert.equal(gates.suites_console, true);
-  assert.equal(gates.suites_testing_demo, true);
-  assert.equal(gates.browsers, true);
+  assert.ok(allTrue(gates));
+  assert.equal(matrix, "single");
 });
 
-test("single-SDK change runs the fresh-app matrix but not the next-scaffold journeys", () => {
+test("single-SDK change runs the journey on the full matrix, without the Go or real-instance suites", () => {
+  // e2e:journey-local depends on every SDK build, so the journey project
+  // itself is affected.
   const { gates, matrix } = resolveGates({
     mode: "full",
     files: ["packages/sdk-vue/src/index.ts"],
     targets: SDK_VUE_CLASS,
   });
-  assert.deepEqual(journeys(gates), [true, false, false, false]);
+  assert.deepEqual(journeys(gates), [true, true, true, true]);
   assert.equal(gates.snapshot, true);
   assert.equal(matrix, "full");
   assert.equal(gates.suites_testing_demo, false);
+  assert.equal(gates.suites_console, false);
   assert.equal(gates.go_tests, false);
 });
 
-test("nuxt-SDK change additionally runs the pre-existing-app lane", () => {
-  // Synthetic slice on the SDK_VUE_CLASS shape: sdk-nuxt:build is the one
-  // per-framework surface the pre-existing lane answers to beyond the shared
-  // next-scaffold triggers (it drives Next AND Nuxt widget-posture apps).
+test("the nuxt SDK alone trips the pre-existing-app lane", () => {
+  // Hand-made slice: sdk-nuxt:build is the one per-framework surface the
+  // pre-existing lane answers to beyond the shared next-scaffold triggers (it
+  // drives Next AND Nuxt widget-posture apps). The real graph also marks the
+  // journey project through e2e:journey-local's SDK dependencies.
   const { gates } = resolveGates({
     mode: "full",
     files: ["packages/sdk-nuxt/src/module.ts"],
-    targets: SDK_VUE_CLASS.map((t) => t.replace("sdk-vue", "sdk-nuxt")),
+    targets: ["sdk-nuxt:build", "sdk-nuxt:test"],
   });
   assert.deepEqual(journeys(gates), [true, false, true, false]);
   assert.equal(gates.snapshot, true);
 });
 
-test("login-ui change runs all journeys on a single framework", () => {
+test("api-mock change builds the snapshot: moon runs the journey through e2e:all", () => {
+  const { gates, matrix } = resolveGates({
+    mode: "full",
+    files: ["packages/api-mock/src/crypto.ts"],
+    targets: API_MOCK_CLASS,
+  });
+  assert.equal(gates.snapshot, true);
+  assert.deepEqual(journeys(gates), [false, false, false, false]);
+  assert.equal(matrix, "single");
+  assert.equal(gates.go_tests, false);
+});
+
+test("console spec edit runs the console suites and the snapshot, on one framework", () => {
+  const { gates, matrix } = resolveGates({
+    mode: "full",
+    files: ["e2e/console/src-real/console-real.spec.ts"],
+    targets: CONSOLE_SPEC_CLASS,
+  });
+  assert.equal(gates.suites_console, true);
+  assert.equal(gates.snapshot, true);
+  assert.deepEqual(journeys(gates), [false, false, false, false]);
+  assert.equal(matrix, "single");
+  assert.equal(gates.go_tests, false);
+});
+
+test("login-ui change runs all journeys on a single framework, and the Go tests", () => {
+  // The server's test binary embeds the login UI build, so server:test moves.
   const { gates, matrix } = resolveGates({
     mode: "full",
     files: ["apps/login-ui/src/main.ts"],
@@ -294,7 +420,7 @@ test("login-ui change runs all journeys on a single framework", () => {
   });
   assert.deepEqual(journeys(gates), [true, true, true, true]);
   assert.equal(matrix, "single");
-  assert.equal(gates.go_tests, false);
+  assert.equal(gates.go_tests, true);
   assert.equal(gates.suites_console, true);
 });
 
@@ -321,7 +447,8 @@ test("journey-project change runs all journeys, full matrix, and the snapshot th
   assert.equal(gates.go_tests, false);
 });
 
-test("components change runs every journey and suite with the full matrix, but no Go suites", () => {
+test("components change runs every journey and suite with the full matrix, and the Go tests", () => {
+  // Components reach the console and login UI builds the server's tests embed.
   const { gates, matrix } = resolveGates({
     mode: "full",
     files: ["packages/components/src/atoms/index.ts"],
@@ -332,7 +459,7 @@ test("components change runs every journey and suite with the full matrix, but n
   assert.equal(gates.suites_testing_demo, true);
   assert.equal(gates.suites_console, true);
   assert.equal(gates.browsers, true);
-  assert.equal(gates.go_tests, false);
+  assert.equal(gates.go_tests, true);
   assert.equal(matrix, "full");
 });
 
@@ -459,6 +586,7 @@ function turboGraph() {
       task("@zitadel/console#build", "apps/console", ["src/main.tsx"], ["@zitadel/server#test"]),
       task("@zitadel/server#test", "apps/server", ["../../internal/server.go"], []),
       task("@zitadel/testing#test:integration", "packages/testing", ["src/kit.ts"], []),
+      task("@zitadel/e2e#console-real", "e2e", ["console/src-real/console-real.spec.ts"], []),
       task("//#check-adrs", "", ["docs/adrs/001.md"], []),
       task("@zitadel/docs#test", "apps/docs", ["package.json"], [], "<NONEXISTENT>"),
     ],
@@ -486,6 +614,11 @@ test("affectedTurboTargets maps root tasks, colon scripts and packages without a
   assert.deepEqual(affectedTurboTargets(turboGraph(), ["packages/testing/src/kit.ts"]), [
     "testing:test-integration",
   ]);
+  // The e2e package's lanes land on the moon names ci-mode's gates check.
+  assert.deepEqual(
+    affectedTurboTargets(turboGraph(), ["e2e/console/src-real/console-real.spec.ts"]),
+    ["e2e:console-real"],
+  );
   // apps/docs has no test script: its placeholder task is never affected.
   assert.deepEqual(affectedTurboTargets(turboGraph(), ["apps/docs/package.json"]), []);
   assert.deepEqual(affectedTurboTargets(turboGraph(), ["README.md"]), []);
@@ -493,7 +626,7 @@ test("affectedTurboTargets maps root tasks, colon scripts and packages without a
 
 test("affectedTurboTargets treats a changed global input as affecting every task", () => {
   const targets = affectedTurboTargets(turboGraph(), ["biome.json"]);
-  assert.equal(targets.length, 6);
+  assert.equal(targets.length, 7);
   assert.ok(targets.includes("workspace:check-adrs"));
 });
 

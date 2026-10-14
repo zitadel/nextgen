@@ -116,6 +116,10 @@ const TESTING_DEMO_TARGETS = ["testing:test-integration", "e2e:demo-next-real"];
 // runs the console gate — the workflow steps them sequentially so two local
 // instances do not contend.
 const CONSOLE_E2E_TARGETS = ["e2e:console-real", "e2e:console-embedded"];
+// The aggregate ci.yml names in its `moon ci` call. When moon selects it, every
+// lane runs as its dependency, the journey included, whether or not a journey
+// trigger above moved (an api-mock change reaches it through the mock lanes).
+const E2E_SUITE_TARGET = "e2e:all";
 
 const ALL_GATES = [
   "go_tests",
@@ -188,9 +192,12 @@ export function resolveGates({ mode, files, targets }) {
 
   const gates = {
     go_tests: GO_TEST_TARGETS.some((t) => set.has(t)),
-    // The snapshot exists in PR CI to feed the journeys (the tarball handoff
-    // is a filesystem contract moon cannot see), so it runs iff any does.
-    snapshot: anyJourney,
+    // The snapshot exists in PR CI to feed the journey (the tarball handoff is
+    // a filesystem contract moon cannot see), so it runs whenever the journey
+    // can: a journey trigger moved, or moon will run the whole suite. This
+    // query is a superset of what `moon ci` selects, so the gate may build a
+    // snapshot nothing reads, but never leaves the journey without one.
+    snapshot: anyJourney || set.has(E2E_SUITE_TARGET),
     journey_fresh_app: journeyFreshApp,
     journey_passkey: journeyNextScaffold,
     journey_preexisting: journeyPreexisting,

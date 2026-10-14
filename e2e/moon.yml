@@ -27,6 +27,16 @@ dependsOn:
   - "demo-nuxt"
   - "testing"
 
+# Each lane's inputs are its own folder plus what every browser lane reads (the
+# manifest pinning Playwright, the shared timeouts), so an edit in one area does
+# not mark the other lanes affected: ci-mode reads the journey's affectedness to
+# pick its framework matrix. The inherited lint/typecheck/test keep the whole
+# project. `all` still runs every lane whenever one of them is affected.
+fileGroups:
+  laneShared:
+    - "package.json"
+    - "playwright.shared.ts"
+
 workspace:
   inheritedTasks:
     # Nothing to build. `test` is inherited (it runs the journey harness unit
@@ -48,6 +58,9 @@ tasks:
   # boots a server.
   all:
     command: "noop"
+    # Affected only through its lanes (their folders and their dependencies),
+    # so an edit elsewhere in this project, a README say, runs no lane.
+    inputs: []
     deps:
       - "e2e:console-smoke"
       - "e2e:console-real"
@@ -69,6 +82,9 @@ tasks:
   # embed base. No live API, own port — safe to run alongside the serial lanes.
   console-smoke:
     command: "corepack pnpm exec playwright test --config console/playwright.config.mts"
+    inputs:
+      - "console/**/*"
+      - "@group(laneShared)"
     env:
       CI: ""
       GITHUB_ACTIONS: ""
@@ -80,6 +96,9 @@ tasks:
   # Live console resource coverage through the Vite server-side API proxy.
   console-real:
     command: "corepack pnpm exec playwright test --config console/playwright.real.config.mts"
+    inputs:
+      - "console/**/*"
+      - "@group(laneShared)"
     deps:
       - "testing:build"
       - "cli:build"
@@ -100,6 +119,9 @@ tasks:
   # only lane proving the console's API base and the Go mux routing table agree.
   console-embedded:
     command: "corepack pnpm exec playwright test --config console/playwright.embedded.config.mts"
+    inputs:
+      - "console/**/*"
+      - "@group(laneShared)"
     deps:
       - "testing:build"
       - "cli:build"
@@ -119,6 +141,9 @@ tasks:
   # bootstrapped (the server default).
   console-platform:
     command: "corepack pnpm exec playwright test --config console/playwright.platform.config.mts"
+    inputs:
+      - "console/**/*"
+      - "@group(laneShared)"
     deps:
       - "testing:build"
       - "cli:build"
@@ -141,6 +166,9 @@ tasks:
   # refuses to run without CONSOLE_DEPLOYMENT_URL.
   console-deployment:
     command: "corepack pnpm exec playwright test --config console/playwright.deployment.config.mts"
+    inputs:
+      - "console/**/*"
+      - "@group(laneShared)"
     options:
       cache: false
       runInCI: false
@@ -150,6 +178,9 @@ tasks:
   # Mock lane: the demo against the standalone @zitadel/api-mock TCP server.
   demo-next-mock:
     command: "corepack pnpm exec playwright test --config demo-next/playwright.config.mts"
+    inputs:
+      - "demo-next/**/*"
+      - "@group(laneShared)"
     env:
       CI: ""
       GITHUB_ACTIONS: ""
@@ -164,6 +195,9 @@ tasks:
   # via @zitadel/testing instead of api-mock.
   demo-next-real:
     command: "corepack pnpm exec playwright test --config demo-next/playwright.real.config.mts"
+    inputs:
+      - "demo-next/**/*"
+      - "@group(laneShared)"
     deps:
       - "testing:build"
       - "cli:build"
@@ -185,6 +219,9 @@ tasks:
   # Mock lane: the Vue / Nitro demo against @zitadel/api-mock.
   demo-nuxt-mock:
     command: "corepack pnpm exec playwright test --config demo-nuxt/playwright.config.mts"
+    inputs:
+      - "demo-nuxt/**/*"
+      - "@group(laneShared)"
     env:
       CI: ""
       GITHUB_ACTIONS: ""
@@ -202,6 +239,9 @@ tasks:
   # of `all`: the CI task below fixes the flags to the `--ci` set.
   journey:
     command: "corepack pnpm run e2e-local"
+    inputs:
+      - "journey/**/*"
+      - "package.json"
     env:
       ZITADEL_TELEMETRY: "0"
     deps:
@@ -215,8 +255,9 @@ tasks:
   # process (fresh-app framework matrix, passkey preset, pre-existing app,
   # testkit); `--runtime binary` drives the built server binary. In CI the
   # runner reads prebuilt tarballs from JOURNEY_TARBALLS_DIR (built by a prior
-  # workflow step, outside this graph); locally, with that env unset, it packs
-  # its own. Either way it never spawns a nested `moon run` inside this graph.
+  # workflow step, outside this graph) and refuses to run without them, so it
+  # never starts a nested `moon run` inside the workflow's graph. Run by hand
+  # with that env unset, it packs its own through `moon run release:pack`.
   #
   # The command unsets CI / GITHUB_ACTIONS outright (not just blanks them) so
   # the runner behaves as a local run, matching the old `env -u CI` step; a
@@ -227,6 +268,9 @@ tasks:
   # the affected-selection edge the old ci-mode gating provided by hand.
   journey-local:
     command: "env -u CI -u GITHUB_ACTIONS corepack pnpm run e2e-local -- --ci --matrix full --runtime binary"
+    inputs:
+      - "journey/**/*"
+      - "package.json"
     env:
       ZITADEL_TELEMETRY: "0"
     deps:
