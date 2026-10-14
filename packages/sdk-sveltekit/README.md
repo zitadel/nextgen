@@ -91,16 +91,24 @@ pnpm add @zitadel/sdk-svelte
 
 ```svelte
 <script lang="ts">
-  import { browser } from '$app/environment';
+  import { onMount } from 'svelte';
   import { ZitadelLogin, configureZitadel } from '@zitadel/sdk-svelte';
 
   const project = configureZitadel({ projectId: 'demo', proxyPath: '/__nextgen' });
+
+  let mounted = $state(false);
+  onMount(() => {
+    mounted = true;
+  });
 </script>
 
-{#if browser}
+{#if mounted}
   <ZitadelLogin {project} purpose="login" postSignInUrl="/admin" />
 {/if}
 ```
+
+The widget mounts on the client only. `onMount` never runs during SSR, and works
+on SvelteKit 2 and 3 alike (`$app/environment` is deprecated in SvelteKit 3).
 
 ## Middleware options
 

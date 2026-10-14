@@ -51,6 +51,26 @@ describe("SvelteKitPatcher.plan", () => {
     expect(writeContents(plan, "src/routes/login/+page.svelte")).toContain("ZitadelLogin");
   });
 
+  const widgetPages = [
+    "src/routes/login/+page.svelte",
+    "src/routes/register/+page.svelte",
+    "src/routes/profile/+page.svelte",
+  ];
+
+  // The widget must mount on the client only. onMount works on SvelteKit 2 and
+  // 3, where `$app/environment` is deprecated and warns on every dev render.
+  it.each(widgetPages)("mounts the widget in %s only after onMount", (path) => {
+    expect(writeContents(new SvelteKitPatcher().plan(ctx()), path)).toMatch(
+      /let mounted = \$state\(false\);\s+onMount\(\(\) => \{\s+mounted = true;\s+\}\);[\s\S]*\{#if mounted\}/,
+    );
+  });
+
+  it.each(widgetPages)("does not import the deprecated $app/environment in %s", (path) => {
+    expect(writeContents(new SvelteKitPatcher().plan(ctx()), path)).not.toContain(
+      'from "$app/environment"',
+    );
+  });
+
   it("seeds the public project id and no other config edit", () => {
     const plan = new SvelteKitPatcher().plan(ctx());
     const envOp = plan.ops.find(

@@ -86,7 +86,7 @@ export function indexPageTemplate(): string {
 
 /**
  * A login/register page. Renders the idiomatic `<ZitadelLogin>` Svelte component
- * from `@zitadel/sdk-svelte` (typed props, callback events) behind a `browser`
+ * from `@zitadel/sdk-svelte` (typed props, callback events) behind an `onMount`
  * guard so the widget only mounts on the client. `configureZitadel` returns the
  * project handle.
  *
@@ -102,17 +102,23 @@ export function indexPageTemplate(): string {
 function authPage(purpose: "login" | "register", projectId: string): string {
   return `<script lang="ts">
   ${MANAGED_MARKER}
-  import { browser } from "$app/environment";
+  import { onMount } from "svelte";
   import { ZitadelLogin, configureZitadel } from "@zitadel/sdk-svelte";
 
   const project = configureZitadel({
     projectId: ${JSON.stringify(projectId)},
     proxyPath: "${PROXY_PATH}",
   });
+  // Mount the widget on the client only. onMount never runs during SSR, and
+  // unlike $app/environment (deprecated in SvelteKit 3) it works on 2 and 3.
+  let mounted = $state(false);
+  onMount(() => {
+    mounted = true;
+  });
 </script>
 
 <main style="${WIDGET_WRAP}">
-  {#if browser}
+  {#if mounted}
     <ZitadelLogin {project} purpose="${purpose}" postSignInUrl="/profile" />
   {/if}
 </main>
@@ -131,17 +137,23 @@ export function registerPageTemplate(projectId: string): string {
 export function profilePageTemplate(projectId: string): string {
   return `<script lang="ts">
   ${MANAGED_MARKER}
-  import { browser } from "$app/environment";
+  import { onMount } from "svelte";
   import { ZitadelLogout, configureZitadel } from "@zitadel/sdk-svelte";
 
   const project = configureZitadel({
     projectId: ${JSON.stringify(projectId)},
     proxyPath: "${PROXY_PATH}",
   });
+  // Mount the widget on the client only. onMount never runs during SSR, and
+  // unlike $app/environment (deprecated in SvelteKit 3) it works on 2 and 3.
+  let mounted = $state(false);
+  onMount(() => {
+    mounted = true;
+  });
 </script>
 
 <main style="${WIDGET_WRAP}">
-  {#if browser}
+  {#if mounted}
     <ZitadelLogout {project} postSignOutUrl="/login" />
   {/if}
 </main>

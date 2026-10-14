@@ -1,4 +1,4 @@
-import type { Handle, RequestEvent } from "@sveltejs/kit";
+import type { RequestEvent } from "@sveltejs/kit";
 import type { AuthResult, NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
 
 import {
@@ -18,6 +18,19 @@ import { verifyJwt, base64UrlDecode } from "./lib/jwt";
  */
 const PROCESS_ENV: Record<string, string | undefined> =
   typeof process !== "undefined" && process.env ? process.env : {};
+
+/**
+ * A SvelteKit `handle` hook, typed structurally from `RequestEvent`. Kit 2
+ * exports `Handle` from `@sveltejs/kit`; Kit 3 declares it only under
+ * `@sveltejs/kit/hooks`, so importing it would type the hook as `any` there.
+ * `RequestEvent` is exported from `@sveltejs/kit` on both majors, and this shape
+ * is assignable to either `Handle` (it accepts a `resolve` with an options
+ * argument, and never passes one).
+ */
+export type NextgenHandle = (input: {
+  event: RequestEvent;
+  resolve: (event: RequestEvent) => Promise<Response> | Response;
+}) => Promise<Response>;
 
 declare global {
   // SvelteKit reads `App.Locals` to type `event.locals`. Declaring the
@@ -365,32 +378,31 @@ async function handleAuth(
 }
 
 /**
- * Creates a SvelteKit {@link Handle} hook that handles proxying, JWT
+ * Creates a SvelteKit {@link NextgenHandle} hook that handles proxying, JWT
  * verification, and route protection in a single pass.
  *
  * Place it in `src/hooks.server.ts`:
  *
  * ```ts
  * import { createNextgenHandle } from "@zitadel/sdk-sveltekit/server";
- * import { env } from "$env/dynamic/private";
  *
  * export const handle = createNextgenHandle({
- *   url: env.ZITADEL_URL,
- *   projectSecret: env.ZITADEL_PROJECT_SECRET,
  *   protectedRoutes: ["/admin*", "/dashboard*"],
  *   loginPath: "/login",
  * });
  * ```
  *
- * Compose it with other hooks via `sequence()` from `@sveltejs/kit/hooks`.
+ * `url` and `projectSecret` default to `ZITADEL_URL` / `ZITADEL_PROJECT_SECRET`
+ * from `process.env`. Compose it with other hooks via `sequence()` from
+ * `@sveltejs/kit/hooks`.
  *
  * @param options - Middleware configuration options. `projectSecret` is the
  *   project service-key, sent as the bearer on the `POST /sessions/exchange` handoff only.
- * @returns A SvelteKit `Handle` hook.
+ * @returns A SvelteKit `handle` hook.
  */
 export function createNextgenHandle(
   options: NextgenMiddlewareOptions & { projectSecret?: string } = {},
-): Handle {
+): NextgenHandle {
   const {
     url = PROCESS_ENV.ZITADEL_URL ?? "http://localhost:8080",
     proxyPath = "/__nextgen",

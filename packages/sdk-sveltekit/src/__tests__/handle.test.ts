@@ -10,7 +10,7 @@
 import type { Handle, RequestEvent } from "@sveltejs/kit";
 
 import { generateKeyPairSync, createSign } from "node:crypto";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, expectTypeOf, vi, beforeEach } from "vitest";
 
 import { createNextgenHandle } from "../handle";
 
@@ -596,3 +596,12 @@ describe("createNextgenHandle", () => {
 function ts(offsetSeconds: number): number {
   return Math.floor(Date.now() / 1000) + offsetSeconds;
 }
+
+// The hook is typed structurally (Kit 3 moved `Handle` out of `@sveltejs/kit`),
+// so pin that it still drops in wherever Kit expects a `Handle`. Checked by
+// `tsc -p tsconfig.spec.json`.
+describe("SvelteKit Handle compatibility", () => {
+  it("is assignable to SvelteKit's Handle", () => {
+    expectTypeOf(createNextgenHandle({ url: "http://localhost:4000" })).toExtend<Handle>();
+  });
+});
