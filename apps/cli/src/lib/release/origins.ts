@@ -11,8 +11,11 @@ export type ProjectOriginEntry = Readonly<{ pattern: string; kind: string }>;
  * deeper label. A pattern with no `*` matches only its exact self.
  */
 export function originMatchesPattern(pattern: string, origin: string): boolean {
-  const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, (ch) => (ch === "*" ? "\0" : `\\${ch}`));
-  return new RegExp(`^${escaped.replaceAll("\0", "[^.]+")}$`).test(origin);
+  // Every literal part is escaped whole, so only the `*` between them is a
+  // wildcard in the expression.
+  const literal = (part: string) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const expression = pattern.split("*").map(literal).join("[^.]+");
+  return new RegExp(`^${expression}$`).test(origin);
 }
 
 /**
