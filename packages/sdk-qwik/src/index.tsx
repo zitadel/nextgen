@@ -53,6 +53,69 @@ function setProp<E extends Element, K extends keyof E>(
   }
 }
 
+/**
+ * The attribute-backed config, emitted declaratively in the JSX. Under SSR
+ * (Qwik Router) the widget arrives as server-rendered markup and Qwik *resumes*
+ * it rather than re-rendering, so the `ref` binder never runs and the
+ * `useVisibleTask$` re-binds only after the widget has upgraded and rendered
+ * "requires a configured project" (and booted a `login` flow on a register
+ * page). Attributes are serialised into the SSR'd HTML, so the widget reads them
+ * the instant it upgrades. Qwik renders lower-case kebab-case attributes
+ * verbatim; `undefined` omits one, and a boolean attribute is present-or-absent.
+ * The property binders still run on the client, so property-only config (the
+ * full `project` handle, `locales`) is applied on top.
+ */
+type Attrs = Record<string, string | undefined>;
+
+function projectAttrs(props: {
+  readonly project?: ZitadelProject;
+  readonly projectId?: string;
+  readonly proxyPath?: string;
+}): Attrs {
+  return {
+    "project-id": props.project?.projectId ?? props.projectId,
+    "proxy-path": props.project?.proxyPath ?? props.proxyPath,
+    url: props.project?.url,
+  };
+}
+
+function flag(value: boolean | undefined): string | undefined {
+  return value ? "" : undefined;
+}
+
+function loginAttrs(props: ZitadelLoginProps): Attrs {
+  return {
+    ...projectAttrs(props),
+    purpose: props.purpose ?? "login",
+    "flow-name": props.flowName,
+    "post-sign-in-url": props.postSignInUrl,
+    variant: props.variant,
+    theme: props.theme,
+    "suppress-header": flag(props.suppressHeader),
+    lang: props.lang,
+  };
+}
+
+function logoutAttrs(props: ZitadelLogoutProps): Attrs {
+  return {
+    ...projectAttrs(props),
+    "post-sign-out-url": props.postSignOutUrl,
+    theme: props.theme,
+  };
+}
+
+function sessionAttrs(props: ZitadelSessionProps): Attrs {
+  return {
+    ...projectAttrs(props),
+    "post-sign-out-url": props.postSignOutUrl,
+    heading: props.heading,
+    "logout-label": props.logoutLabel,
+    variant: props.variant,
+    theme: props.theme,
+    "suppress-header": flag(props.suppressHeader),
+  };
+}
+
 /** Applies the `<zitadel-login>` surface config to the element as DOM properties. */
 function bindLoginConfig(el: ZitadelLoginElement, props: ZitadelLoginProps): void {
   setProp(el, "project", props.project);
@@ -174,6 +237,7 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
         }
         bindLoginConfig(el, props);
       }}
+      {...loginAttrs(props)}
     />
   );
 });
@@ -230,6 +294,7 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
         }
         bindLogoutConfig(el, props);
       }}
+      {...logoutAttrs(props)}
     />
   );
 });
@@ -286,6 +351,7 @@ export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
         }
         bindSessionConfig(el, props);
       }}
+      {...sessionAttrs(props)}
     />
   );
 });
