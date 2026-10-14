@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,6 +15,10 @@ import (
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
+
+const appOrigin = "https://app.acme.com"
+
+var deployedAt = time.Date(2026, 10, 2, 14, 52, 0, 0, time.UTC)
 
 func newMockedDeploymentService(t *testing.T) (*service.DeploymentService, *servicemocks.MockAllStatements) {
 	t.Helper()
@@ -35,16 +40,51 @@ func newMockedDeploymentService(t *testing.T) (*service.DeploymentService, *serv
 
 func deploymentInput() service.CreateDeploymentInput {
 	return service.CreateDeploymentInput{
-		ProjectID:     "proj_1",
-		EnvironmentID: "env_1",
-		ReleaseID:     "rel_1",
-		Reason:        domain.DeploymentReasonDeploy,
+		ProjectID:  "proj_1",
+		ReleaseID:  "rel_1",
+		OriginKind: domain.DeploymentOriginKindPrimary,
+		Origins:    []string{appOrigin},
+	}
+}
+
+// expectServing sets up the reads of one attempt: the release, and what
+// appOrigin serves (nothing when serving is nil). It returns what was read.
+func expectServing(statements *servicemocks.MockAllStatements, serving *domain.Deployment) []domain.OriginDeployment {
+	statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{ID: "rel_1"}, nil)
+	if serving == nil {
+		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", []string{appOrigin}).Return(nil, nil)
+		return nil
+	}
+	read := []domain.OriginDeployment{{
+		Origin: appOrigin, DeploymentID: serving.ID, ReleaseID: serving.ReleaseID, Kind: serving.OriginKind,
+		DeployedAt: serving.DeployedAt, Seq: 7,
+	}}
+	statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", []string{appOrigin}).Return(read, nil)
+	statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", serving.ID).Return(serving, nil)
+	return read
+}
+
+func expectInsert(statements *servicemocks.MockAllStatements, read []domain.OriginDeployment) {
+	statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), read).
+		DoAndReturn(func(_ context.Context, entity *domain.Deployment, _ []domain.OriginDeployment) error {
+			entity.ID = "dep_new"
+			entity.DeployedAt = deployedAt
+			return nil
+		})
+}
+
+func servingDeployment(releaseID string) *domain.Deployment {
+	return &domain.Deployment{
+		ProjectID: "proj_1", ID: "dep_serving", ReleaseID: releaseID,
+		OriginKind: domain.DeploymentOriginKindPrimary,
+		Targets:    []domain.DeploymentTarget{{Origin: appOrigin}},
+		DeployedAt: deployedAt.Add(-time.Hour),
 	}
 }
 
 func TestDeploymentServiceCreateRecordsActor(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
-	statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), gomock.Nil()).Return(true, nil)
+	expectInsert(statements, expectServing(statements, nil))
 
 	ctx := audit.WithActorContext(t.Context(), audit.ActorContext{
 		ActorID:   new("user_1"),
@@ -53,15 +93,14 @@ func TestDeploymentServiceCreateRecordsActor(t *testing.T) {
 	result, err := svc.Create(ctx, deploymentInput())
 	require.NoError(t, err)
 	assert.True(t, result.Created)
+	assert.Equal(t, "dep_new", result.Deployment.ID)
 	assert.Equal(t, "user_1", *result.Deployment.Metadata.DeployedBy)
 	assert.Equal(t, domain.EventActorTypeHuman, *result.Deployment.Metadata.DeployedByType)
 }
 
-// A deployment made with no actor on the context — a project secret from CI —
-// records neither field, rather than falling back to a placeholder identity.
 func TestDeploymentServiceCreateWithoutActor(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
-	statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), gomock.Nil()).Return(true, nil)
+	expectInsert(statements, expectServing(statements, nil))
 
 	result, err := svc.Create(t.Context(), deploymentInput())
 	require.NoError(t, err)
@@ -69,81 +108,206 @@ func TestDeploymentServiceCreateWithoutActor(t *testing.T) {
 	assert.Nil(t, result.Deployment.Metadata.DeployedByType)
 }
 
-// The guard rides through to the statement untouched and unpersisted.
-func TestDeploymentServiceCreatePassesExpectedCurrent(t *testing.T) {
+// The insert gets what was read: that is the optimistic lock.
+func TestDeploymentServiceCreateInsertsAgainstWhatItRead(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
-	expected := "dep_current"
-	statements.EXPECT().
-		CreateDeployment(gomock.Any(), gomock.Any(), &expected).
-		Return(true, nil)
+	read := expectServing(statements, servingDeployment("rel_0"))
+	expectInsert(statements, read)
+
+	result, err := svc.Create(t.Context(), deploymentInput())
+	require.NoError(t, err)
+	assert.True(t, result.Created)
+}
+
+// Losing the optimistic lock: an unguarded deploy retries on what the winner
+// left, a guarded one answers a conflict.
+func TestDeploymentServiceCreateRetriesALostLock(t *testing.T) {
+	t.Run("unguarded deploy writes on the retry", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		expectServing(statements, nil)
+		statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), gomock.Any()).Return(new(database.UniqueError))
+		read := expectServing(statements, servingDeployment("rel_0"))
+		expectInsert(statements, read)
+
+		result, err := svc.Create(t.Context(), deploymentInput())
+		require.NoError(t, err)
+		assert.True(t, result.Created)
+	})
+
+	t.Run("guarded deploy answers a conflict without retrying", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		before := servingDeployment("rel_0")
+		before.ID = "dep_before"
+		expectServing(statements, before)
+		statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), gomock.Any()).Return(new(database.UniqueError))
+		winner := servingDeployment("rel_0")
+		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", []string{appOrigin}).Return([]domain.OriginDeployment{{
+			Origin: appOrigin, DeploymentID: winner.ID, DeployedAt: winner.DeployedAt, Seq: 8,
+		}}, nil)
+		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", winner.ID).Return(winner, nil)
+
+		input := deploymentInput()
+		input.ExpectedDeploymentID = new("dep_before")
+		_, err := svc.Create(t.Context(), input)
+		de := assertServiceDomainCode(t, err, domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code)
+		assert.Equal(t, domain.DeploymentConflictDetails{Deployment: winner}, de.Details)
+	})
+
+	t.Run("gives up with a conflict", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		for range 3 {
+			expectServing(statements, nil)
+			statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), gomock.Any()).Return(new(database.UniqueError))
+		}
+		winner := servingDeployment("rel_0")
+		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", []string{appOrigin}).Return([]domain.OriginDeployment{{
+			Origin: appOrigin, DeploymentID: winner.ID, DeployedAt: winner.DeployedAt, Seq: 9,
+		}}, nil)
+		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", winner.ID).Return(winner, nil)
+
+		_, err := svc.Create(t.Context(), deploymentInput())
+		de := assertServiceDomainCode(t, err, domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code)
+		assert.Equal(t, domain.DeploymentConflictDetails{Deployment: winner}, de.Details)
+	})
+}
+
+// Deploying to primary origins that all serve the release writes nothing and
+// answers with what they serve.
+func TestDeploymentServiceCreateUnchangedPrimaryWritesNothing(t *testing.T) {
+	svc, statements := newMockedDeploymentService(t)
+	serving := servingDeployment("rel_1")
+	expectServing(statements, serving)
+
+	result, err := svc.Create(t.Context(), deploymentInput())
+	require.NoError(t, err)
+	assert.False(t, result.Created)
+	assert.Same(t, serving, result.Deployment)
+}
+
+// An origin last served by a preview of the same release still gets the
+// primary deploy written, or it would expire with the preview.
+func TestDeploymentServiceCreatePrimaryOverPreviewWrites(t *testing.T) {
+	svc, statements := newMockedDeploymentService(t)
+	serving := servingDeployment("rel_1")
+	serving.OriginKind = domain.DeploymentOriginKindPreview
+	expectInsert(statements, expectServing(statements, serving))
+
+	result, err := svc.Create(t.Context(), deploymentInput())
+	require.NoError(t, err)
+	assert.True(t, result.Created)
+}
+
+// A preview deploy is always written, and renews the previews from its stamp.
+func TestDeploymentServiceCreatePreviewAlwaysRenews(t *testing.T) {
+	svc, statements := newMockedDeploymentService(t)
+	serving := servingDeployment("rel_1")
+	serving.OriginKind = domain.DeploymentOriginKindPreview
+	read := expectServing(statements, serving)
+	expectInsert(statements, read)
+	statements.EXPECT().UpsertPreviews(gomock.Any(), "proj_1", []string{appOrigin}, deployedAt.Add(168*time.Hour), deployedAt).Return(nil)
 
 	input := deploymentInput()
-	input.ExpectedCurrentDeploymentID = &expected
-	_, err := svc.Create(t.Context(), input)
+	input.OriginKind = domain.DeploymentOriginKindPreview
+	input.PreviewTTL = 168 * time.Hour
+	result, err := svc.Create(t.Context(), input)
 	require.NoError(t, err)
+	assert.True(t, result.Created)
+}
+
+func TestDeploymentServiceCreateGuard(t *testing.T) {
+	t.Run("matching", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		serving := servingDeployment("rel_0")
+		expectInsert(statements, expectServing(statements, serving))
+
+		input := deploymentInput()
+		input.ExpectedDeploymentID = new(serving.ID)
+		_, err := svc.Create(t.Context(), input)
+		require.NoError(t, err)
+	})
+
+	t.Run("mismatch carries what is served", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		serving := servingDeployment("rel_0")
+		expectServing(statements, serving)
+
+		input := deploymentInput()
+		input.ExpectedDeploymentID = new("dep_stale")
+		_, err := svc.Create(t.Context(), input)
+		de := assertServiceDomainCode(t, err, domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code)
+		assert.Equal(t, domain.DeploymentConflictDetails{Deployment: serving}, de.Details)
+	})
+
+	// A stale guard is refused even when the deploy would change nothing.
+	t.Run("checked before the no-op", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		expectServing(statements, servingDeployment("rel_1"))
+
+		input := deploymentInput()
+		input.ExpectedDeploymentID = new("dep_stale")
+		_, err := svc.Create(t.Context(), input)
+		assertServiceDomainCode(t, err, domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code)
+	})
+
+	t.Run("nothing deployed yet", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		expectServing(statements, nil)
+
+		input := deploymentInput()
+		input.ExpectedDeploymentID = new("dep_any")
+		_, err := svc.Create(t.Context(), input)
+		de := assertServiceDomainCode(t, err, domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code)
+		assert.Equal(t, domain.DeploymentConflictDetails{}, de.Details)
+	})
 }
 
 func TestDeploymentServiceCreateErrorMapping(t *testing.T) {
-	t.Run("environment missing", func(t *testing.T) {
-		svc, statements := newMockedDeploymentService(t)
-		statements.EXPECT().
-			CreateDeployment(gomock.Any(), gomock.Any(), gomock.Nil()).
-			Return(false, new(database.NoRowFoundError))
-
-		_, err := svc.Create(t.Context(), deploymentInput())
-		assertServiceDomainCode(t, err, domain.ErrEnvironmentNotFound().Code)
-	})
-
 	t.Run("release missing", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
-		statements.EXPECT().
-			CreateDeployment(gomock.Any(), gomock.Any(), gomock.Nil()).
-			Return(false, new(database.ForeignKeyError))
+		statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(nil, new(database.NoRowFoundError))
 
 		_, err := svc.Create(t.Context(), deploymentInput())
-		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid(nil, nil).Code)
+		assertServiceDomainCode(t, err, domain.ErrReleaseNotFound().Code)
 	})
 
-	// The conflict is raised inside the statement with its details attached;
-	// the service must hand it through rather than rewrap it.
-	t.Run("conflict passes through", func(t *testing.T) {
+	// The release was read first, so a foreign key failing on insert is the
+	// project.
+	t.Run("project missing", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
-		conflict := domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{
-			CurrentDeploymentID: "dep_actual",
-			CurrentReleaseID:    "rel_actual",
-		})
-		statements.EXPECT().
-			CreateDeployment(gomock.Any(), gomock.Any(), gomock.Nil()).
-			Return(false, conflict)
+		expectServing(statements, nil)
+		statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), gomock.Any()).Return(new(database.ForeignKeyError))
 
 		_, err := svc.Create(t.Context(), deploymentInput())
-		de, ok := err.(domain.Error)
-		require.True(t, ok, "expected a domain error, got %T", err)
-		assert.Equal(t, conflict.Code, de.Code)
-		assert.Equal(t, conflict.Details, de.Details)
+		assertServiceDomainCode(t, err, domain.ErrProjectNotFound().Code)
 	})
 
-	// Validation fails before any statement runs: promote without a source
-	// never reaches storage.
 	t.Run("invalid input never reaches storage", func(t *testing.T) {
 		svc, _ := newMockedDeploymentService(t)
 		input := deploymentInput()
-		input.Reason = domain.DeploymentReasonPromote
+		input.Reason = domain.DeploymentReasonRollback
+		_, err := svc.Create(t.Context(), input)
+		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid(nil, nil).Code)
+	})
+
+	t.Run("preview without ttl never reaches storage", func(t *testing.T) {
+		svc, _ := newMockedDeploymentService(t)
+		input := deploymentInput()
+		input.OriginKind = domain.DeploymentOriginKindPreview
 		_, err := svc.Create(t.Context(), input)
 		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid(nil, nil).Code)
 	})
 }
 
-func assertServiceDomainCode(t *testing.T, err error, code string) {
+func assertServiceDomainCode(t *testing.T, err error, code string) domain.Error {
 	t.Helper()
 	require.Error(t, err)
 	de, ok := err.(domain.Error)
 	require.True(t, ok, "expected a domain error, got %T", err)
 	assert.Equal(t, code, de.Code)
+	return de
 }
 
-// Expanding hydrates the page's releases in one batched, deduplicated read —
-// a history is many deployments of few releases.
+// Expanding hydrates the page's releases in one batched, deduplicated read.
 func TestDeploymentServiceListExpandsReleases(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
 
@@ -171,8 +335,7 @@ func TestDeploymentServiceListExpandsReleases(t *testing.T) {
 	assert.Equal(t, "rel_a", result.ReleasesByID["rel_a"].ID)
 }
 
-// Not asking reads nothing: no release round trip, and a nil map so the
-// handler can distinguish "did not ask" from "none found".
+// Not asking reads nothing and leaves the map nil.
 func TestDeploymentServiceListWithoutExpand(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
 	statements.EXPECT().
@@ -184,17 +347,4 @@ func TestDeploymentServiceListWithoutExpand(t *testing.T) {
 	result, err := svc.List(t.Context(), service.ListDeploymentsInput{ProjectID: "proj_1"})
 	require.NoError(t, err)
 	assert.Nil(t, result.ReleasesByID)
-}
-
-// The idempotent answer reports Created false, so the handler can answer 200
-// with the deployment that made the release live.
-func TestDeploymentServiceCreateReportsReuse(t *testing.T) {
-	svc, statements := newMockedDeploymentService(t)
-	statements.EXPECT().
-		CreateDeployment(gomock.Any(), gomock.Any(), gomock.Nil()).
-		Return(false, nil)
-
-	result, err := svc.Create(t.Context(), deploymentInput())
-	require.NoError(t, err)
-	assert.False(t, result.Created)
 }

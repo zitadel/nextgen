@@ -33,6 +33,7 @@ type AllStatements interface {
 	IDPConnectionStatements
 	IDPIdentityLinkStatements
 	DeploymentStatements
+	PreviewStatements
 	TeamStatements
 	TeamMembershipStatements
 	TokenStatements
@@ -149,6 +150,9 @@ type ReleaseStatements interface {
 	// absent from the result, not an error.
 	GetReleasesByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Release, error)
 	ListReleases(ctx context.Context, filter *database.ListOptions[domain.ReleaseField]) (*database.ListResult[*domain.Release], error)
+	// RevokeRelease stamps revoked_at once; revoking again returns the first
+	// stamp.
+	RevokeRelease(ctx context.Context, projectID, id string) (*domain.Release, error)
 }
 
 // IDPConnectionStatements persists identity provider connections and their
@@ -214,23 +218,41 @@ type IDPIdentityLinkStatements interface {
 
 type DeploymentStatements interface {
 	Statements
-	// CreateDeployment inserts the deployment and points the environment's
-	// current_deployment_id at it, atomically. A non-nil
-	// expectedCurrentDeploymentID makes the swap conditional: when the
-	// environment's current deployment is not exactly that one, nothing is
-	// written and domain.ErrDeploymentConflict reports what actually runs.
-	// An environment that does not exist is a NoRowFoundError.
-	//
-	// Idempotent on the running release: when the environment's current
-	// deployment already points at entity's release, nothing is written,
-	// entity is overwritten with that existing record, and created is false.
-	CreateDeployment(ctx context.Context, entity *domain.Deployment, expectedCurrentDeploymentID *string) (created bool, err error)
+	// GetNewestPerOrigin returns, for each of origins that has one, the newest
+	// deployment to it.
+	GetNewestPerOrigin(ctx context.Context, projectID string, origins []string) ([]domain.OriginDeployment, error)
+	// CreateDeployment writes the deployment with every origin, under an
+	// optimistic lock: read is what GetNewestPerOrigin returned for its origins,
+	// and when another deploy wrote to one of them since, nothing is written
+	// and it fails with a UniqueError. The caller re-reads and retries.
+	CreateDeployment(ctx context.Context, entity *domain.Deployment, read []domain.OriginDeployment) error
 	GetDeploymentByID(ctx context.Context, projectID, id string) (*domain.Deployment, error)
-	// GetDeploymentsByIDs reads the named deployments in one round trip, for
-	// hydrating current_deployment on environment reads. Unknown ids are
-	// simply absent from the result, not an error.
+	// GetDeploymentsByIDs skips unknown ids.
 	GetDeploymentsByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Deployment, error)
+	// ListDeployments lists deployments with every origin they named.
 	ListDeployments(ctx context.Context, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error)
+	// ListLiveDeployments lists, with deployment.LiveListOptions, the
+	// deployments some origin serves at now, each narrowed to those origins.
+	ListLiveDeployments(ctx context.Context, now time.Time, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error)
+	// GetLiveDeployment is the deployment origin serves at now, narrowed to the
+	// origins it still serves; a NoRowFoundError when it serves nothing,
+	// including after its preview expired.
+	GetLiveDeployment(ctx context.Context, projectID, origin string, now time.Time) (*domain.Deployment, error)
+}
+
+type PreviewStatements interface {
+	Statements
+	// UpsertPreviews creates the previews of origins or renews their expiry,
+	// keeping created_at.
+	UpsertPreviews(ctx context.Context, projectID string, origins []string, expiresAt, createdAt time.Time) error
+	GetPreview(ctx context.Context, projectID, origin string) (*domain.Preview, error)
+	// ListPreviews takes preview.LiveListOptions or preview.ExpiredListOptions.
+	ListPreviews(ctx context.Context, filter *database.ListOptions[domain.PreviewField]) (*database.ListResult[*domain.Preview], error)
+	// DeletePreview is idempotent.
+	DeletePreview(ctx context.Context, projectID, origin string) (deleted bool, err error)
+	// DeleteExpiredPreview deletes only if the preview expired by now, so a
+	// racing renewal survives the sweep.
+	DeleteExpiredPreview(ctx context.Context, projectID, origin string, now time.Time) (deleted bool, err error)
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
