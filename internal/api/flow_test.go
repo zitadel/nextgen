@@ -374,6 +374,13 @@ func TestSubmitFlowStep_SSO_BindsTheBrowserAndResealsTheFlowCookie(t *testing.T)
 			wantCookie:   "__Host-_zsso=nonce-1; Path=/; Max-Age=900; HttpOnly; Secure; SameSite=Lax",
 		},
 		{
+			// Only a path that starts with an empty segment reads as a host.
+			name:         "return_target with an inner double slash",
+			origin:       "https://login.example.com",
+			returnTarget: "https://login.example.com/app//login?flow=flow_1",
+			wantCookie:   "__Host-_zsso=nonce-1; Path=/; Max-Age=900; HttpOnly; Secure; SameSite=Lax",
+		},
+		{
 			// Browsers send a bare origin; a trailing slash from another
 			// client must not end up in redirect_uri.
 			name:       "origin with a trailing slash is normalised",
@@ -502,6 +509,8 @@ func TestSubmitFlowStep_SSO_RejectsAnUnboundReturn(t *testing.T) {
 		name     string
 		noOrigin bool
 		body     map[string]any
+		// wantMessage, when set, is part of the request.invalid message.
+		wantMessage string
 	}{
 		{
 			name: "return_target on another origin",
@@ -516,6 +525,30 @@ func TestSubmitFlowStep_SSO_RejectsAnUnboundReturn(t *testing.T) {
 			// The host is the origin, but no page URL carries userinfo.
 			name: "return_target with userinfo on the origin host",
 			body: map[string]any{"action": "sso", "sso_provider_id": "google", "return_target": "https://evil.example.com@login.example.com/login"},
+		},
+		{
+			// On the origin, but a proxy re-basing the callback's Location
+			// onto its own host reads //evil.example as the host.
+			name:        "return_target path starting with two slashes",
+			body:        map[string]any{"action": "sso", "sso_provider_id": "google", "return_target": origin + "//evil.example/login?flow=flow_1"},
+			wantMessage: "has a path that starts with",
+		},
+		{
+			// A browser reads the backslash as a slash.
+			name:        "return_target path starting with a slash and a backslash",
+			body:        map[string]any{"action": "sso", "sso_provider_id": "google", "return_target": origin + `/\evil.example/login`},
+			wantMessage: "has a path that starts with",
+		},
+		{
+			// The dot segment is removed, which leaves //evil.example.
+			name:        "return_target path with a dot segment before two slashes",
+			body:        map[string]any{"action": "sso", "sso_provider_id": "google", "return_target": origin + "/.//evil.example/login"},
+			wantMessage: "has a path that starts with",
+		},
+		{
+			name:        "return_target path with a parent segment before two slashes",
+			body:        map[string]any{"action": "sso", "sso_provider_id": "google", "return_target": origin + "/app/..//evil.example/login"},
+			wantMessage: "has a path that starts with",
 		},
 		{
 			name: "return_target missing",
@@ -544,6 +577,9 @@ func TestSubmitFlowStep_SSO_RejectsAnUnboundReturn(t *testing.T) {
 
 			resp, body := doRequestWithOrigin(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", tt.body, ts.sealCookie(t, state), requestOrigin)
 			require.Equal(t, http.StatusBadRequest, resp.StatusCode, string(body))
+			if tt.wantMessage != "" {
+				require.Contains(t, string(body), tt.wantMessage)
+			}
 			require.Empty(t, ts.fake.gotSubmitReq.Action, "no sign-in is started")
 		})
 	}

@@ -204,6 +204,13 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 		if !strings.EqualFold(returnTarget.Scheme+"://"+returnTarget.Host, requestOrigin) {
 			return nil, domain.ErrRequestInvalid().WithMessage(fmt.Sprintf("return_target %q is not on the request origin %q", rawTarget, requestOrigin))
 		}
+		// The origin matches, but a path that starts with an empty segment
+		// reads as an authority once it is put back together without its
+		// origin, as a proxy re-basing the callback's Location onto its own
+		// host does: https://app.test//evil.example lands on evil.example.
+		if pathReadsAsAuthority(returnTarget.Path) {
+			return nil, domain.ErrRequestInvalid().WithMessage(fmt.Sprintf("return_target %q has a path that starts with %q", rawTarget, "//"))
+		}
 		// The engine refuses a missing provider or one the step does not
 		// offer, so the URI is never issued for a slug outside the flow.
 		slug, _ := req.SSOProviderID.Get()
@@ -785,4 +792,28 @@ func parseURI(s string) (url.URL, error) {
 		return url.URL{}, err
 	}
 	return *u, nil
+}
+
+// pathReadsAsAuthority reports whether a URL path, as a browser resolves it,
+// starts with "//". An http(s) URL reads a backslash as a slash, and "." and
+// ".." segments are removed, so "/\host" and "/.//host" count as well as
+// "//host".
+func pathReadsAsAuthority(p string) bool {
+	segments := strings.Split(strings.ReplaceAll(p, `\`, "/"), "/")
+	if len(segments) < 3 || segments[0] != "" {
+		return false
+	}
+	resolved := []string{""}
+	for _, segment := range segments[1:] {
+		switch segment {
+		case ".":
+		case "..":
+			if len(resolved) > 1 {
+				resolved = resolved[:len(resolved)-1]
+			}
+		default:
+			resolved = append(resolved, segment)
+		}
+	}
+	return len(resolved) > 2 && resolved[1] == ""
 }
