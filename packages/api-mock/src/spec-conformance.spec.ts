@@ -1595,6 +1595,17 @@ describe("api-mock project origins", () => {
     expect(((await res.json()) as { code: string }).code).toBe("origin.invalid");
   });
 
+  test.each(["https://*.vercel.app:*", "https://app.acme.com:abc"])(
+    "rejects %s, whose port is not digits, with origin.invalid",
+    async (pattern) => {
+      const project = await newProject("origins-bad-port");
+
+      const res = await addOrigin(project.id, project.projectSecret, { pattern, kind: "preview" });
+
+      expect(((await res.json()) as { code: string }).code).toBe("origin.invalid");
+    },
+  );
+
   test("removes a pattern and stops listing it", async () => {
     const project = await newProject("origins-remove");
     await addOrigin(project.id, project.projectSecret, {
