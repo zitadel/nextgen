@@ -122,6 +122,15 @@ The widgets' events surface as optional callbacks: `onFlowStep`, `onFlowInput`,
 `locales={businessLocales}` (also exported from `/react`) to show work-email copy
 for a business audience.
 
+`/react` also exports every type `@zitadel/sdk-react` does, so a callback can be
+typed without installing `@zitadel/sdk-react`:
+
+```tsx
+import type { ZitadelFlowCompleteDetail } from '@zitadel/sdk-tanstack-start/react';
+
+const onFlowComplete = (detail: ZitadelFlowCompleteDetail) => console.log(detail.redirect_uri);
+```
+
 ## Middleware options
 
 | Option              | Type                 | Default                      | Description                                                          |
