@@ -1,0 +1,148 @@
+name: go-cache-measure
+
+# Temporary, to drop before merge: an A/B of the Go cache set-up on Depot
+# runners, on one commit. Arm `setup-go` is main's ci.yml (setup-go
+# `cache: true`: GOMODCACHE and GOCACHE); arm `modules` is this PR's
+# (GOMODCACHE alone). Each job reports what its restore brought, times the Go
+# work every full ci.yml run does (the database lanes), then compiles the
+# server and bench with `depot gocache --verbose`, whose log tells local hits
+# from remote ones.
+on:
+  pull_request:
+    paths:
+      - .github/workflows/go-cache-measure.yml
+
+permissions:
+  contents: read
+
+jobs:
+  measure:
+    name: measure (${{ matrix.arm }} ${{ matrix.sample }})
+    strategy:
+      fail-fast: false
+      matrix:
+        arm: [setup-go, modules]
+        sample: [1, 2]
+    runs-on: depot-ubuntu-24.04-16
+    timeout-minutes: 40
+    env:
+      MOON_SUMMARY: detailed
+      DO_NOT_TRACK: "1"
+      NO_COLOR: ""
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Write the measuring scripts
+        run: |
+          cat > "$RUNNER_TEMP/caches.sh" <<'EOF'
+          mod="$(go env GOMODCACHE)"
+          build="$(go env GOCACHE)"
+          echo "GOMODCACHE $mod: $(du -sh "$mod" 2>/dev/null | cut -f1), $(find "$mod" -maxdepth 4 -type d -name '*@v*' 2>/dev/null | wc -l) module dirs, zips $(du -sh "$mod/cache/download" 2>/dev/null | cut -f1)"
+          echo "GOCACHE $build: $(du -sh "$build" 2>/dev/null | cut -f1)"
+          if [ -d "$build" ]; then
+            echo "  depot-* files: $(find "$build" -type f -name 'depot-*' | wc -l), $(find "$build" -type f -name 'depot-*' -print0 | du -ch --files0-from=- 2>/dev/null | tail -1 | cut -f1)"
+            echo "  go's own entries: $(find "$build" -type f \( -name '*-a' -o -name '*-d' \) ! -name 'depot-*' | wc -l)"
+            echo "  depot-* mtimes: $(find "$build" -type f -name 'depot-*' -printf '%TY-%Tm-%Td %TH:%TM\n' | sort | sed -n '1p;$p' | paste -sd' ' -)"
+            if [ -f "$RUNNER_TEMP/go-start" ]; then
+              echo "  depot-* files written since the restore: $(find "$build" -type f -name 'depot-*' -newer "$RUNNER_TEMP/go-start" | wc -l)"
+            fi
+          fi
+          EOF
+          cat > "$RUNNER_TEMP/verbose.sh" <<'EOF'
+          # Usage: verbose.sh <label> <go args...>; runs go with depot gocache
+          # in verbose mode and summarises its log.
+          label="$1"; shift
+          log="$RUNNER_TEMP/gocache-$label.log"
+          start=$(date +%s.%N)
+          if ! GOCACHEPROG="/usr/local/bin/depot gocache --verbose" go "$@" >/dev/null 2>"$log"; then
+            grep -v 'GET /gocache\|disk miss\|PUT /gocache' "$log" | tail -40
+            exit 1
+          fi
+          end=$(date +%s.%N)
+          awk -v start="$start" -v end="$end" -v label="$label" '
+            / GET \/gocache\/v1\/.* bytes in / {
+              n++; bytes += $(NF-3); d = $NF
+              if (d ~ /µs$/) { sub(/µs$/, "", d); t += d / 1e6 }
+              else if (d ~ /ms$/) { sub(/ms$/, "", d); t += d / 1e3 }
+              else if (d ~ /s$/) { sub(/s$/, "", d); t += d }
+            }
+            /disk miss/ { dm++ }
+            /^go: downloading/ { dl++ }
+            /cacher: closing/ { sub(/^.*cacher: /, ""); closing = closing "\n  " $0 }
+            END {
+              printf "%s: wall %.1f s; remote GETs %d (%.0f MB, %.1f s summed); disk misses %d; module downloads %d%s\n", label, end - start, n, bytes / 1e6, t, dm, dl, closing
+            }' "$log"
+          EOF
+
+      - name: Detect Depot's Go build cache
+        id: go-cache
+        run: |
+          echo "runner.environment: ${{ runner.environment }}"
+          echo "GO*/DEPOT* names in the step environment (names only):"
+          compgen -e | grep -E '^(GO|DEPOT)' | sort || true
+          if [ -f "$HOME/.config/go/env" ]; then echo "GOENV file keys:"; cut -d= -f1 "$HOME/.config/go/env"; else echo "no GOENV file"; fi
+          echo "remote=${GOCACHEPROG:+true}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: ${{ matrix.arm == 'setup-go' }}
+
+      - name: Cache Go modules
+        id: go-mod-cache
+        if: ${{ matrix.arm == 'modules' }}
+        uses: actions/cache@v5
+        with:
+          path: ~/go/pkg/mod
+          key: go-mod-${{ runner.os }}-${{ hashFiles('go.sum', 'tools/bench/go.sum') }}
+
+      - name: Download Go modules
+        if: ${{ matrix.arm == 'modules' && steps.go-mod-cache.outputs.cache-hit != 'true' }}
+        run: |
+          go mod download
+          go -C tools/bench mod download
+
+      - name: Measure the restored Go caches
+        run: |
+          bash "$RUNNER_TEMP/caches.sh"
+          touch "$RUNNER_TEMP/go-start"
+
+      - uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Put workspace binaries on PATH
+        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+
+      # The database lanes' deps, so the two steps after it time go alone.
+      - name: Prepare the UI builds and generated files
+        run: moon run console:build login-ui:build server:check-generate
+
+      - name: Run Go integration tests (postgres)
+        run: moon run server:test-postgres
+
+      - name: Run Go integration tests (sqlite)
+        run: moon run server:test-sqlite
+
+      - name: Vet the server (verbose cache)
+        run: bash "$RUNNER_TEMP/verbose.sh" vet vet ./...
+
+      - name: Compile every server test binary (verbose cache)
+        run: bash "$RUNNER_TEMP/verbose.sh" test-compile test -count=1 -run '^$' -exec /bin/true ./...
+
+      - name: Vet bench (verbose cache)
+        run: bash "$RUNNER_TEMP/verbose.sh" bench-vet -C tools/bench vet ./...
+
+      - name: Measure the Go caches after the run
+        if: ${{ always() }}
+        run: bash "$RUNNER_TEMP/caches.sh"
