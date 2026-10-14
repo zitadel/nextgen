@@ -1,5 +1,6 @@
 import { diffConfigAgainst } from "../git";
 import type { Step, StepContext } from "../pipeline";
+import { listLiveDeployments, servesPrimary } from "../deployment";
 
 /**
  * Show what `.zitadel/` changed since the release the target serves now.
@@ -22,17 +23,13 @@ export const diffStep: Step = {
       }
     };
 
-    const { deployments } = await ctx.client.listDeployments({
-      project_id: ctx.projectId,
-      live: true,
-      expand: ["release"],
+    const deployments = await listLiveDeployments(ctx.client, ctx.projectId, {
+      withRelease: true,
       ...(ctx.origin === undefined ? {} : { origin: ctx.origin }),
     });
     // What the primary origins serve: a live preview deployment is never the
     // baseline, even when it is the newest one in the project.
-    const sha = deployments.find((deployment) =>
-      deployment.targets.some((target) => target.expires_at == null),
-    )?.release?.metadata?.git_sha;
+    const sha = deployments.find(servesPrimary)?.release?.metadata?.git_sha;
     if (!sha) {
       note("No diff available: nothing is deployed yet, or the live release has no commit.");
       return;

@@ -133,15 +133,22 @@ export default class Doctor extends BaseCommand {
     // `doctor` is not an EnvironmentCommand but honours --env/--env-file/--server
     // to check a chosen environment, so a suggested rerun of a failed check has
     // to carry that same selection or it would check the default project.
+    const cwdFlag = typeof flags.cwd === "string" ? flags.cwd : undefined;
+    const serverFlag = typeof flags.server === "string" ? flags.server : undefined;
     const selector = environmentSelectorSuffix({
+      cwd: cwdFlag,
       envFile: typeof flags["env-file"] === "string" ? flags["env-file"] : undefined,
       envName: typeof flags.env === "string" ? flags.env : undefined,
       server: typeof flags.server === "string" ? flags.server : undefined,
     });
+    // The claim check reads the local `.zitadel/secret`, which is the default
+    // environment's project, so the claim it suggests keeps only `--cwd` and
+    // `--server` (where doctor checked it): this run's `--env` or `--env-file`
+    // would claim a different project.
     const warningAdvice = advisoryForWarnings(
       warnings,
       this.meta.cliVersion,
-      typeof flags.server === "string" ? flags.server : undefined,
+      environmentSelectorSuffix({ cwd: cwdFlag, server: serverFlag }),
     );
     this.recordTelemetry({
       runtime: runtimeBackend,
@@ -305,7 +312,8 @@ function failureAdvice(
 export function advisoryForWarnings(
   warnings: CheckOutcome[],
   cliVersion: string,
-  server: string | undefined,
+  /** The selector for the local project, which is the one the claim check reads. */
+  local: EnvironmentSelector,
 ): { nextActions: string[]; nextCommands: SuggestedCommand[] } | undefined {
   const nextActions: string[] = [];
   const nextCommands: SuggestedCommand[] = [];
@@ -322,11 +330,7 @@ export function advisoryForWarnings(
     // command stays suggested either way: the local record can be stale
     // (claimed from another machine reads detached), and the server checks
     // the grant before the window, so running claim is safe and answers
-    // authoritatively. The check reads the local `.zitadel/secret`, which is
-    // the default environment's project, so the claim it suggests keeps only
-    // `--server` (where doctor checked it): this run's `--env` or `--env-file`
-    // would claim a different project.
-    const local = environmentSelectorSuffix({ server });
+    // authoritatively.
     nextActions.push(
       claimWindowClosed(claimWarning)
         ? claimWindowClosedAction(cliVersion, local)

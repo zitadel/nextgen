@@ -67,6 +67,7 @@ import { readState } from "../../lib/sync/state";
 import { reportWarning } from "../../lib/warnings";
 import { inShell, type SuggestedCommand } from "../../lib/suggestion";
 import { nextCommandsData } from "../../lib/oclif/envelope";
+import { DEPLOY_ARGS } from "../../lib/release";
 
 /**
  * The `sso enable` command — add a provider to a Project's sign-in methods.
@@ -437,7 +438,7 @@ export default class SsoEnable extends EnvironmentCommand {
             this.environmentSelector(),
           ),
           this.suggest("deploy --dry-run"),
-          this.suggest("deploy"),
+          this.suggest(DEPLOY_ARGS),
         ]),
       },
       pretty: `Enabled ${entry.displayName} for ${schema.name}`,

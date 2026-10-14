@@ -6,7 +6,7 @@ import { ZitadelError } from "./errors";
 import { input } from "./input";
 import { hasZitadelSecret, readZitadelSecret } from "./project";
 import { appendManagedEnvValue } from "./fs-safe";
-import { resolveServer, serverOrigin } from "./server";
+import { parseServer, resolveServer, serverOrigin } from "./server";
 import { unscopedCommand } from "./suggestion";
 
 /**
@@ -293,18 +293,20 @@ export function requireValue(environment: Environment, key: EnvironmentKey): str
   const consulted = `Consulted, in order: ${environment.consulted.map((entry) => entry.source).join(", ")}.`;
   // The file to set the value in. An --env-file run reads that file; an
   // environment already bound by `env add` has its `.env.<name>.local`. Only an
-  // unbound environment is pointed at `env add` (or `setup` for development):
-  // re-running `env add` on a bound one would refuse, and with --force replace
-  // the binding with a new project.
+  // environment with no project at all is pointed at `env add` (or `setup` for
+  // development): re-running `env add` on a bound one would refuse, and with
+  // --force replace the binding with a new project, and creating one where the
+  // process environment already names a project would pair that project with
+  // another's credential.
   const boundFile = `.env.${name}.local`;
   const bound = environment.consulted.some((entry) => entry.source === boundFile && entry.present);
   const file = environment.envFile ?? (bound ? boundFile : undefined);
+  const unbound = file === undefined && environment.values.ZITADEL_PROJECT_ID === undefined;
   throw new ZitadelError("E_VALIDATION", `${key} is not set for the ${name} environment`, {
-    hint:
-      file === undefined
-        ? `${consulted} Set ${key} in ${boundFile} or the process environment, or run \`zitadel env add ${name}\`.`
-        : `${consulted} Set ${key} in ${file} or the process environment.`,
-    ...(file === undefined
+    hint: unbound
+      ? `${consulted} Set ${key} in ${boundFile} or the process environment, or run \`zitadel env add ${name}\`.`
+      : `${consulted} Set ${key} in ${file ?? `${boundFile} or the process environment`}${file === undefined ? "" : " or the process environment"}.`,
+    ...(unbound
       ? { nextCommands: [unscopedCommand(name === "development" ? "setup" : `env add ${name}`)] }
       : {}),
     details: {
@@ -360,7 +362,7 @@ export async function requireValueInteractive(
         if (typed === "") {
           return { ok: false, problem: `Enter ${key}.` } as const;
         }
-        return { ok: true, value: key === "ZITADEL_URL" ? serverOrigin(typed) : typed } as const;
+        return key === "ZITADEL_URL" ? parseServer(typed) : ({ ok: true, value: typed } as const);
       },
     },
     { interactive: true, force: false },

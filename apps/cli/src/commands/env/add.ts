@@ -18,7 +18,7 @@ import {
 } from "../../lib/oclif";
 import { PUBLIC_PROJECT_ID_VARIABLE } from "../../lib/orca/patchers/rule/public-project-id";
 import { readZitadelConfig } from "../../lib/project";
-import { DEFAULT_SERVER, resolveServer, serverOrigin } from "../../lib/server";
+import { DEFAULT_SERVER, parseServer, resolveServer } from "../../lib/server";
 import { shellArg } from "../../lib/shell";
 import { environmentSelectorSuffix } from "../../lib/oclif/environment-flags";
 import { nextCommandsData } from "../../lib/oclif/envelope";
@@ -103,11 +103,21 @@ export default class EnvAdd extends BaseCommand {
           message: "Server URL",
           flag: "--server",
           initialValue: DEFAULT_SERVER,
-          parse: (answer: string) =>
-            answer.trim() === ""
-              ? ({ ok: false, problem: "Enter the server URL." } as const)
-              : ({ ok: true, value: serverOrigin(answer.trim()) } as const),
-          retry: this.suggestUnscoped(`env add ${name} --server https://api.zitadel.cloud`),
+          parse: parseServer,
+          // The rerun keeps every choice this run made, so binding a project
+          // (`--project`) stays a bind rather than creating a new project.
+          retry: this.suggestUnscoped(
+            [
+              `env add ${shellArg(name)}`,
+              "--server https://api.zitadel.cloud",
+              ...(flags.project === undefined ? [] : [`--project ${shellArg(flags.project)}`]),
+              ...(flags["app-url"] === undefined
+                ? []
+                : [`--app-url ${shellArg(flags["app-url"])}`]),
+              ...(flags.force ? ["--force"] : []),
+              ...(typeof flags.cwd === "string" ? [`--cwd ${shellArg(flags.cwd)}`] : []),
+            ].join(" "),
+          ),
         });
 
     const appUrl =
@@ -260,7 +270,7 @@ export default class EnvAdd extends BaseCommand {
         // without the project secret in the file it would fail to authenticate.
         writtenKeys.has("ZITADEL_PROJECT_SECRET")
           ? `Allow this project's origin: zitadel origin add ${issuer === undefined ? "<your-app-url>" : shellArg(issuer)} --kind primary --env ${name}`
-          : `Allow this project's origin once ZITADEL_PROJECT_SECRET is in ${file}: zitadel origin add <your-app-url> --kind primary --env ${name}`,
+          : `Allow this project's origin once ZITADEL_PROJECT_SECRET is in ${file}: zitadel origin add ${issuer === undefined ? "<your-app-url>" : shellArg(issuer)} --kind primary --env ${name}`,
         `Check what resolves: zitadel env --env ${name}`,
         "",
         "The deployed app never reads that file. Set these where it is built and run.",

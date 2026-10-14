@@ -37,6 +37,8 @@ export const environmentFlags = {
  * value needs no flag because the next run in the same environment inherits it.
  */
 export function environmentSelectorSuffix(input: {
+  /** `--cwd` as typed: the project the run was about, and what `--env-file` resolves against. */
+  cwd?: string;
   envFile?: string;
   envName?: string;
   server?: string;
@@ -49,6 +51,10 @@ export function environmentSelectorSuffix(input: {
   }
   if (input.server !== undefined) {
     parts.push(`--server ${shellArg(input.server)}`);
+  }
+  // Last, as the least interesting part to read; flag order does not matter.
+  if (input.cwd !== undefined) {
+    parts.push(`--cwd ${shellArg(input.cwd)}`);
   }
   return asEnvironmentSelector(parts.length === 0 ? "" : ` ${parts.join(" ")}`);
 }

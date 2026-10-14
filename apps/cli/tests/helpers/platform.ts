@@ -57,6 +57,12 @@ export interface PlatformMock {
   /** Makes a stored connection unreadable while everything else answers. */
   cannotReadConnections(): void;
 
+  /**
+   * Answers the next deployment create with `409 dep.conflict`, as when another
+   * deploy lands between a deploy's inspection and its write.
+   */
+  racesTheNextDeploy(): void;
+
   /** Drops any arranged failure, so the platform answers normally again. */
   recovers(): void;
 
@@ -121,6 +127,24 @@ export function usePlatformMock(): PlatformMock {
           }),
         );
       });
+    },
+
+    racesTheNextDeploy() {
+      server.use(
+        http.post(
+          "*/deployments",
+          () =>
+            HttpResponse.json(
+              {
+                code: "dep.conflict",
+                message:
+                  "deployment: the newest deployment to the targets does not match expected_deployment_id",
+              },
+              { status: 409 },
+            ),
+          { once: true },
+        ),
+      );
     },
 
     cannotListVariables() {
