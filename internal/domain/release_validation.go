@@ -21,7 +21,7 @@ type ReleaseContent struct {
 	Branding        *Branding
 }
 
-// Pointers expects every schema to carry an objectType.
+// Pointers returns one pointer per revision, under the handle it declares.
 func (c ReleaseContent) Pointers() []ReleasePointer {
 	var pointers []ReleasePointer
 	for _, schema := range c.Schemas {
