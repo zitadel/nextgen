@@ -69,8 +69,18 @@ export default class OriginRm extends EnvironmentCommand {
     // An empty list admits every origin, so removing the last pattern opens the
     // project up rather than closing it: said aloud, since it is the opposite
     // of what removing one pattern otherwise does.
-    const remaining = (await client.getProject(projectId)).origins ?? [];
-    if (remaining.length === 0) {
+    // The pattern is already removed, so a failed read of what is left is said
+    // aloud rather than reported as a failed removal.
+    const remaining = await client.getProject(projectId).then(
+      (project) => project.origins ?? [],
+      (error: unknown) => {
+        reportWarning(
+          `${pattern} was removed, but the project's remaining origins could not be read: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        return undefined;
+      },
+    );
+    if (remaining?.length === 0) {
       reportWarning(
         `${pattern} was the project's last origin, so the project now admits every origin. Add the ones it should admit with "zitadel origin add".`,
       );
@@ -80,7 +90,7 @@ export default class OriginRm extends EnvironmentCommand {
       status: "ok",
       data: deletedData({ pattern }),
       pretty:
-        remaining.length === 0
+        remaining?.length === 0
           ? `Removed ${pattern}; the project has no origins left and admits every origin`
           : `Stopped admitting ${pattern}`,
     });
