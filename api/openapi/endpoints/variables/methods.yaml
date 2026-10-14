@@ -3,8 +3,7 @@ get:
   summary: Get variables
   description: |
     Returns the project's variables, keyed by name, each with its value per
-    kind. `kind` narrows the answer to one kind: every name stored for it,
-    which is what a deployment of that kind freezes.
+    kind. With `kind`, only that kind's values are returned.
 
     Secret values are not returned. A secret appears as `{"secret": true}`,
     which says a value is held without disclosing it.
@@ -30,13 +29,12 @@ patch:
   operationId: updateVariables
   summary: Update variables
   description: |
-    Enters, replaces and removes the project's variables for the kind `kind`
-    names. Names not in the body are untouched. Nothing here reaches a
-    deployment already made: each deployment keeps the values it froze.
+    Enters, replaces and removes the project's variables for the requested
+    kind. Names not in the body are untouched. Existing deployments keep the
+    values they froze.
 
     Without `kind`, a plain value is written for both kinds and a secret for
-    `primary` only, so a secret reaches previews only when written with
-    `kind=preview`. `null` removes the name from every kind addressed.
+    `primary` only. `null` removes the name from both.
 
     A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
     stores the value encrypted under the project's active `secret` key, after
@@ -64,9 +62,8 @@ patch:
   responses:
     '200':
       description: |
-        The variables were written. The body is the project's variables for
-        the kinds addressed, read back, so it also carries whatever the write
-        did not touch.
+        The variables were written. The body is the project's variables read
+        back, so it also carries whatever the write did not touch.
       content:
         application/json:
           schema:

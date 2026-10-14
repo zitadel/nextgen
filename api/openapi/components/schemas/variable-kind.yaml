@@ -1,8 +1,7 @@
 type: string
 description: |
-  Which deployments a variable's value reaches. `primary` values are frozen
-  by deployments to primary origins, `preview` values by deployments to
-  preview URLs. Nothing falls back from one kind to the other.
+  Which deployments a value reaches: `primary` for primary origins,
+  `preview` for preview URLs. There is no fallback between kinds.
 enum:
   - primary
   - preview

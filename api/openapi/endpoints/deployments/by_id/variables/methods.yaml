@@ -2,15 +2,9 @@ get:
   operationId: getDeploymentVariables
   summary: Get a deployment's variables
   description: |
-    Returns the variable values the deployment froze when it was made: the
-    values of its kind the project stored at that moment, not what it stores
-    now. Later writes and removals do not change them.
-
-    Secret values are not returned. A secret appears as `{"secret": true}`.
-
-    The lookup is scoped to the project in `project_id`: a deployment id
-    belonging to another project answers not found exactly as an unknown id
-    does.
+    Returns the variable values the deployment froze when it was made. Later
+    changes to the project's variables do not affect them. A secret reads
+    back as `{"secret": true}`.
   tags:
     - Deployments
   security:

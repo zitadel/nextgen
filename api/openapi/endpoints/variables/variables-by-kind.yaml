@@ -1,10 +1,8 @@
 title: VariablesByKind
 description: |
-  The project's variables, keyed by name, each with its value per kind. A
-  name with no value for any kind addressed is not listed.
+  The project's variables, keyed by name, each with its value per kind.
 
-  An empty object is an ordinary answer, not an error: nothing has been
-  entered for the kinds addressed.
+  An empty object is an ordinary answer, not an error.
 type: object
 propertyNames:
   $ref: ../../components/schemas/variable-name.yaml

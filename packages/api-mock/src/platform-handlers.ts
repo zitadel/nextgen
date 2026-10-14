@@ -460,7 +460,7 @@ function immutableFieldClash(
 
 type VariableKind = "primary" | "preview";
 
-/** The kinds a variables request addresses: the named one, or both. */
+/** The requested kind, or both. */
 function variableKinds(kind?: VariableKind): VariableKind[] {
   return kind === undefined ? ["primary", "preview"] : [kind];
 }
@@ -470,7 +470,7 @@ function variableOwner(projectId: string, kind: VariableKind): string {
   return `${projectId}/${kind}`;
 }
 
-/** A read of the addressed kinds, keyed by name, each with its value per kind. */
+/** The project's variables for the given kinds, keyed by name. */
 function variablesResponse(
   variables: Map<string, Map<string, VariableRecord>>,
   projectId: string,
@@ -479,8 +479,7 @@ function variablesResponse(
   const out: Record<string, Record<string, unknown>> = {};
   for (const kind of kinds) {
     for (const [name, held] of variables.get(variableOwner(projectId, kind)) ?? []) {
-      // A secret says that a value is held and withholds it: returning the
-      // plaintext would defeat the encryption it stands for.
+      // A secret is never returned.
       out[name] = { ...out[name], [kind]: held.secret ? { secret: true } : held.value };
     }
   }
@@ -1371,8 +1370,7 @@ export function setupPlatformHandlers() {
     }),
 
     // One variable by name, which `variables get` and `variables delete`
-    // address directly. A name with no value for any kind addressed answers
-    // `var.not_found`.
+    // address directly.
     http.get("*/variables/:variableName", ({ request, params }) => {
       const path = parse(
         GetVariableParams,
@@ -1469,8 +1467,7 @@ export function setupPlatformHandlers() {
           }
         }
       }
-      // 200 with the addressed kinds read back, so the response also carries
-      // what the project held and this write did not touch.
+      // 200 with the variables read back, including what the write did not touch.
       const response = variablesResponse(store.variables, projectId, kinds);
       const out = parse(UpdateVariablesResponse, response, "mock_response_invalid");
       if (!out.ok) {

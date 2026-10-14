@@ -330,12 +330,9 @@ type Handler interface {
 	DeleteUserByID(ctx context.Context, params DeleteUserByIDParams) (DeleteUserByIDRes, error)
 	// DeleteVariable implements deleteVariable operation.
 	//
-	// Removes the project's variable under this name for the kind `kind`
-	// names, leaving the other kind's value. Without `kind`, both are removed.
-	// A name with no value for any kind addressed answers `var.not_found`.
-	// Deployments already made keep the value they froze. The next deployment
-	// of that kind whose release references the name is refused with
-	// `dep.variables_missing`.
+	// Removes a variable for the requested kind, or for both kinds without
+	// `kind`. A name with no value for that kind answers `var.not_found`.
+	// Existing deployments keep the values they froze.
 	//
 	// DELETE /variables/{variable_name}
 	DeleteVariable(ctx context.Context, params DeleteVariableParams) (DeleteVariableRes, error)
@@ -421,13 +418,9 @@ type Handler interface {
 	GetDeploymentById(ctx context.Context, params GetDeploymentByIdParams) (GetDeploymentByIdRes, error)
 	// GetDeploymentVariables implements getDeploymentVariables operation.
 	//
-	// Returns the variable values the deployment froze when it was made: the
-	// values of its kind the project stored at that moment, not what it stores
-	// now. Later writes and removals do not change them.
-	// Secret values are not returned. A secret appears as `{"secret": true}`.
-	// The lookup is scoped to the project in `project_id`: a deployment id
-	// belonging to another project answers not found exactly as an unknown id
-	// does.
+	// Returns the variable values the deployment froze when it was made. Later
+	// changes to the project's variables do not affect them. A secret reads
+	// back as `{"secret": true}`.
 	//
 	// GET /deployments/{deployment_id}/variables
 	GetDeploymentVariables(ctx context.Context, params GetDeploymentVariablesParams) (GetDeploymentVariablesRes, error)
@@ -594,19 +587,16 @@ type Handler interface {
 	GetUserByID(ctx context.Context, params GetUserByIDParams) (GetUserByIDRes, error)
 	// GetVariable implements getVariable operation.
 	//
-	// Reads one of the project's variables by name, with its value per kind.
-	// `kind` narrows the answer to one kind. A name with no value for any kind
-	// addressed answers `var.not_found`, so `kind=preview` on a name stored for
-	// `primary` only is not found. A secret is found but not disclosed: its
-	// value is `{"secret": true}`.
+	// Reads one variable by name, with its value per kind. A name with no
+	// value for the requested kind answers `var.not_found`. A secret reads
+	// back as `{"secret": true}`.
 	//
 	// GET /variables/{variable_name}
 	GetVariable(ctx context.Context, params GetVariableParams) (GetVariableRes, error)
 	// GetVariables implements getVariables operation.
 	//
 	// Returns the project's variables, keyed by name, each with its value per
-	// kind. `kind` narrows the answer to one kind: every name stored for it,
-	// which is what a deployment of that kind freezes.
+	// kind. With `kind`, only that kind's values are returned.
 	// Secret values are not returned. A secret appears as `{"secret": true}`,
 	// which says a value is held without disclosing it.
 	//
@@ -972,12 +962,11 @@ type Handler interface {
 	UpdateTeam(ctx context.Context, req *UpdateTeamRequest, params UpdateTeamParams) (UpdateTeamRes, error)
 	// UpdateVariables implements updateVariables operation.
 	//
-	// Enters, replaces and removes the project's variables for the kind `kind`
-	// names. Names not in the body are untouched. Nothing here reaches a
-	// deployment already made: each deployment keeps the values it froze.
+	// Enters, replaces and removes the project's variables for the requested
+	// kind. Names not in the body are untouched. Existing deployments keep the
+	// values they froze.
 	// Without `kind`, a plain value is written for both kinds and a secret for
-	// `primary` only, so a secret reaches previews only when written with
-	// `kind=preview`. `null` removes the name from every kind addressed.
+	// `primary` only. `null` removes the name from both.
 	// A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
 	// stores the value encrypted under the project's active `secret` key, after
 	// which it can be referenced but not read back. `null` removes the name

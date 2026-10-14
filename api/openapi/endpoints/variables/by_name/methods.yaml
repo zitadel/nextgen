@@ -2,11 +2,9 @@ get:
   operationId: getVariable
   summary: Get a variable
   description: |
-    Reads one of the project's variables by name, with its value per kind.
-    `kind` narrows the answer to one kind. A name with no value for any kind
-    addressed answers `var.not_found`, so `kind=preview` on a name stored for
-    `primary` only is not found. A secret is found but not disclosed: its
-    value is `{"secret": true}`.
+    Reads one variable by name, with its value per kind. A name with no
+    value for the requested kind answers `var.not_found`. A secret reads
+    back as `{"secret": true}`.
   tags:
     - Variables
   parameters:
@@ -30,13 +28,9 @@ delete:
   operationId: deleteVariable
   summary: Delete a variable
   description: |
-    Removes the project's variable under this name for the kind `kind`
-    names, leaving the other kind's value. Without `kind`, both are removed.
-    A name with no value for any kind addressed answers `var.not_found`.
-
-    Deployments already made keep the value they froze. The next deployment
-    of that kind whose release references the name is refused with
-    `dep.variables_missing`.
+    Removes a variable for the requested kind, or for both kinds without
+    `kind`. A name with no value for that kind answers `var.not_found`.
+    Existing deployments keep the values they froze.
   tags:
     - Variables
   parameters:

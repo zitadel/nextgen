@@ -45,10 +45,7 @@ func (h *Handler) GetVariable(ctx context.Context, params api.GetVariableParams)
 	if err != nil {
 		return nil, err
 	}
-	// At most one row: the read admits one owner and the primary key makes a
-	// name unique within it, so there is nothing to choose between. Empty means
-	// this owner has not entered the name -- another owner of the same project
-	// may hold it, and that is still a miss here, because nothing is inherited.
+	// At most one row: a name is unique within the project.
 	if len(variables) == 0 {
 		return nil, domain.ErrVariableNotFound()
 	}
@@ -126,9 +123,8 @@ func (h *Handler) DeleteVariable(ctx context.Context, params api.DeleteVariableP
 
 /* ---------------- CONVERTERS ---------------- */
 
-// variableOwner turns the addressed scope into the owner storage matches on.
-// The store holds primary values only until it carries a kind, so a preview
-// request is not implemented yet.
+// variableOwner maps the request onto the store, which holds primary values
+// only until it carries a kind.
 func variableOwner(projectID api.ProjectID, kind api.OptVariableKind) (domain.VariableOwner, error) {
 	if kind.Set && kind.Value == api.VariableKindPreview {
 		return domain.VariableOwner{}, domain.ErrNotImplemented()
@@ -136,8 +132,7 @@ func variableOwner(projectID api.ProjectID, kind api.OptVariableKind) (domain.Va
 	return domain.VariableOwner{ProjectID: string(projectID)}, nil
 }
 
-// toAPIVariablesByKind keys a read by name. Every stored value is a primary
-// value until the store carries a kind.
+// toAPIVariablesByKind keys a read by name, every value as primary.
 func toAPIVariablesByKind(variables []*domain.Variable) (api.VariablesByKind, error) {
 	out := make(api.VariablesByKind, len(variables))
 	for _, variable := range variables {

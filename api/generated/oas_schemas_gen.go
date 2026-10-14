@@ -70742,9 +70742,8 @@ func NewSecretVariableInputVariableInput(v SecretVariableInput) VariableInput {
 	return s
 }
 
-// Which deployments a variable's value reaches. `primary` values are frozen
-// by deployments to primary origins, `preview` values by deployments to
-// preview URLs. Nothing falls back from one kind to the other.
+// Which deployments a value reaches: `primary` for primary origins,
+// `preview` for preview URLs. There is no fallback between kinds.
 // Ref: #
 type VariableKind string
 
@@ -70887,10 +70886,8 @@ func NewBoolVariableScalar(v bool) VariableScalar {
 	return s
 }
 
-// The variables a deployment froze, keyed by name. Every value is of the
-// deployment's kind.
-// An empty object is an ordinary answer, not an error: nothing was stored for
-// that kind when the deployment was made.
+// The variables a deployment froze, keyed by name.
+// An empty object is an ordinary answer, not an error.
 // Ref: #
 type Variables map[string]Variable
 
@@ -70905,10 +70902,8 @@ func (s *Variables) init() Variables {
 
 func (*Variables) getDeploymentVariablesRes() {}
 
-// The project's variables, keyed by name, each with its value per kind. A
-// name with no value for any kind addressed is not listed.
-// An empty object is an ordinary answer, not an error: nothing has been
-// entered for the kinds addressed.
+// The project's variables, keyed by name, each with its value per kind.
+// An empty object is an ordinary answer, not an error.
 // Ref: #
 type VariablesByKind map[string]VariableByKind
 

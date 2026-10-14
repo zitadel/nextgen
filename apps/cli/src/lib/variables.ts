@@ -17,10 +17,7 @@ export type VariableRow = {
 /** One value on the wire: a bare scalar, or `{"secret": true}` for a secret. */
 export type VariableValue = NonNullable<GetVariable200["primary"]>;
 
-/**
- * The primary values of a read, keyed by name. The CLI addresses primary
- * values until it carries a kind.
- */
+/** The primary values of a read, keyed by name. */
 export function primaryValues(body: GetVariables200): Record<string, VariableValue> {
   return Object.fromEntries(
     Object.entries(body).flatMap(([name, byKind]) =>
