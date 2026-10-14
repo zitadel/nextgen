@@ -10,11 +10,15 @@ import { mapWithConcurrency, runCapture } from "./dev-process.mjs";
 // installs an old version, and so do the apps the CLI scaffolds for every
 // framework but Next.js, which pins the exact version. One version outside the
 // tag avoids this: the early `0.0.0` builds most packages have, or the
-// server's `0.0.0-oidc-bootstrap.0`. A package that isn't on npm yet goes to
-// the tag on its first publish, but npm points `latest` at that version too,
-// so the next release would hit the rule. The publish preflight stops that
-// release. It skips a package whose local version is already on npm, as
-// `changeset publish` does.
+// server's `0.0.0-oidc-bootstrap.0`. The publish preflight stops a release
+// that would hit the rule. It skips a package whose local version is already
+// on npm, as `changeset publish` does.
+//
+// The preflight also stops a release that would publish a package npm has
+// never seen. Releases publish through npm trusted publishing, which cannot
+// create a package: a maintainer publishes a placeholder once and adds the
+// trusted publisher (.changeset/README.md, "Publishing"). The same placeholder
+// gives the package its version outside the prerelease tag.
 
 /** The prerelease tag from `.changeset/pre.json`, or undefined outside pre mode. */
 export async function readPrereleaseTag(root) {
@@ -73,30 +77,63 @@ export async function readPublishedVersions(name, { capture = runCapture } = {})
 }
 
 /**
- * The packages `changeset publish` would put on `latest` rather than `tag`:
- * those it would publish, because their local version isn't on npm yet, that
- * only have `tag` prereleases there.
+ * The packages `changeset publish` would publish, because their local version
+ * isn't on npm yet, that it cannot publish as they are: `unpublished` were
+ * never published, so trusted publishing cannot create them; `prereleaseOnly`
+ * only have `tag` prereleases on npm, so the new version would go to `latest`.
+ * Without a prerelease `tag` (outside pre mode) only `unpublished` applies.
  */
-export async function findPrereleaseOnlyPackages(packages, tag, options = {}) {
+export async function findPublishBlockers(packages, tag, options = {}) {
   const versions = await mapWithConcurrency(packages, 4, (pkg) =>
     readPublishedVersions(pkg.name, options),
   );
-  return packages.filter(
-    (pkg, index) =>
-      !versions[index].includes(pkg.version) && isPrereleaseOnly(versions[index], tag),
-  );
+  const pending = packages
+    .map((pkg, index) => ({ pkg, published: versions[index] }))
+    .filter(({ pkg, published }) => !published.includes(pkg.version));
+  return {
+    unpublished: pending.filter(({ published }) => published.length === 0).map(({ pkg }) => pkg),
+    prereleaseOnly:
+      tag === undefined
+        ? []
+        : pending.filter(({ published }) => isPrereleaseOnly(published, tag)).map(({ pkg }) => pkg),
+  };
 }
 
-/** The preflight failure: what is wrong, and the one-time commands that fix it. */
-export function prereleaseOnlyMessage(packages, tag) {
-  const names = packages.map((pkg) => pkg.name);
-  return [
-    `release publish preflight failed: ${names.join(", ")} only ${names.length === 1 ? "has" : "have"} \`${tag}\` prereleases on npm, so \`changeset publish\` would put the new version on \`latest\` and leave \`${tag}\` on an old build.`,
-    `Give each package one version outside \`${tag}\`, once, from an account that can publish @zitadel packages, then rerun the release:`,
+/** The one-time placeholder publish that puts a version of `pkg` outside `tag`. */
+function bootstrapCommand(pkg, tag) {
+  const install = tag === undefined ? pkg.name : `${pkg.name}@${tag}`;
+  return `dir=$(mktemp -d) && printf '{"name":"%s","version":"0.0.0-bootstrap.0","license":"%s","description":"Placeholder. Install %s."}\\n' "${pkg.name}" "${pkg.license}" "${install}" > "$dir/package.json" && (cd "$dir" && npm publish --access public --tag bootstrap)`;
+}
+
+function nameList(packages) {
+  return packages.map((pkg) => pkg.name).join(", ");
+}
+
+/** The preflight failure: what is wrong, and the one-time steps that fix it. */
+export function publishBlockersMessage({ unpublished, prereleaseOnly }, tag) {
+  const lines = ["release publish preflight failed:"];
+  if (unpublished.length > 0) {
+    lines.push(
+      `- ${nameList(unpublished)} ${unpublished.length === 1 ? "has" : "have"} never been published to npm. Releases publish through npm trusted publishing, which cannot create a package.`,
+    );
+  }
+  if (prereleaseOnly.length > 0) {
+    lines.push(
+      `- ${nameList(prereleaseOnly)} only ${prereleaseOnly.length === 1 ? "has" : "have"} \`${tag}\` prereleases on npm, so \`changeset publish\` would put the new version on \`latest\` and leave \`${tag}\` on an old build.`,
+    );
+  }
+  lines.push(
     "",
-    ...packages.map(
-      (pkg) =>
-        `dir=$(mktemp -d) && printf '{"name":"%s","version":"0.0.0-bootstrap.0","license":"%s","description":"Placeholder. Install %s@${tag}."}\\n' "${pkg.name}" "${pkg.license}" "${pkg.name}" > "$dir/package.json" && (cd "$dir" && npm publish --access public --tag bootstrap)`,
-    ),
-  ].join("\n");
+    `Once, from an account that can publish @zitadel packages, publish a placeholder version${tag === undefined ? "" : ` outside \`${tag}\``} of each package:`,
+    "",
+    ...[...unpublished, ...prereleaseOnly].map((pkg) => bootstrapCommand(pkg, tag)),
+  );
+  if (unpublished.length > 0) {
+    lines.push(
+      "",
+      `Then add a trusted publisher for ${nameList(unpublished)} on npmjs.com (package Settings → Trusted Publishing: GitHub Actions, repository zitadel/nextgen, workflow release-publish.yml), as .changeset/README.md describes under "Publishing".`,
+    );
+  }
+  lines.push("", "Then rerun the release.");
+  return lines.join("\n");
 }
