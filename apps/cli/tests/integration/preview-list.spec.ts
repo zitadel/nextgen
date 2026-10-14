@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp } from "../helpers/project";
+import { anApp, aSetUpApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 
@@ -35,6 +35,18 @@ describe("preview list", () => {
 
   describe("against a valid server", () => {
     describe("--json", () => {
+      it("fails naming ZITADEL_PREVIEW_TOKEN when it is not set", async () => {
+        const app = await anApp();
+        await app.bindEnvironment("preview", {
+          ZITADEL_PROJECT_ID: "proj_preview",
+          ZITADEL_PROJECT_SECRET: "sk",
+        });
+
+        const result = await app.run(["preview", "list", "--env", "preview", "--json"]);
+
+        expect(result).toSay("ZITADEL_PREVIEW_TOKEN");
+      });
+
       it("is empty on a project with no previews", async () => {
         const app = await aSetUpApp();
 

@@ -35,7 +35,9 @@ export default class PreviewRm extends PreviewCommand {
     const { args, flags } = await this.parse(PreviewRm);
     await this.toMeta(flags);
     const { dryRun } = this.meta;
-    const url = args.url;
+    // An origin has no path, so a trailing slash is the same URL; sent as
+    // typed it would remove nothing and still answer 204.
+    const url = args.url.replace(/\/+$/, "");
 
     // A dry run makes no request, so it answers before the connection — the
     // order the resource deletes use, which keeps `--dry-run --non-interactive`
@@ -44,6 +46,10 @@ export default class PreviewRm extends PreviewCommand {
       const preview = dryRunResult("remove", "preview", url);
       return this.emit({ ...preview, pretty: `${preview.pretty} from the project` });
     }
+
+    // Resolved before the confirmation, so the prompt is answered knowing
+    // which project it removes from, and a missing token fails first.
+    const { client, projectId } = await this.connect();
 
     const confirmed = await this.input({
       kind: "confirm",
@@ -54,8 +60,6 @@ export default class PreviewRm extends PreviewCommand {
     if (!confirmed) {
       return this.emit({ status: "skipped", reason: "remove-cancelled" });
     }
-
-    const { client, projectId } = await this.connect();
 
     await client.removePreview(projectId, { origin: url });
 

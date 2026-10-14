@@ -125,6 +125,29 @@ describe("preview", () => {
         expect(result).toFailWith("E_VALIDATION");
       });
 
+      it("deploys to the URL the hosting platform announces when no --origin is given", async () => {
+        const app = await aSetUpApp();
+        await app.addOrigin(PREVIEW_PATTERN, "preview");
+
+        await app.run(["preview", "--json"], { VERCEL_URL: "x-acme.vercel.app" });
+
+        const listed = await app.run(["preview", "list", "--json"]);
+        expect(
+          app
+            .envelopeOf<{ items: { origin: string }[] }>(listed)
+            .data.items.map((preview) => preview.origin),
+        ).toEqual([PREVIEW_URL]);
+      });
+
+      it("refuses a primary origin's own URL as a target", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin("https://app.acme.com");
+
+        const result = await app.run(["preview", "--origin", "https://app.acme.com", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
       it("refuses a ttl outside the range even where it would skip", async () => {
         const app = await aSetUpApp();
 

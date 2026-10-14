@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp } from "../helpers/project";
+import { anApp, aSetUpApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 
@@ -43,6 +43,35 @@ describe("preview rm", () => {
 
   describe("against a valid server", () => {
     describe("--json", () => {
+      it("fails naming ZITADEL_PREVIEW_TOKEN when it is not set", async () => {
+        const app = await anApp();
+        await app.bindEnvironment("preview", {
+          ZITADEL_PROJECT_ID: "proj_preview",
+          ZITADEL_PROJECT_SECRET: "sk",
+        });
+
+        const result = await app.run([
+          "preview",
+          "rm",
+          PREVIEW_URL,
+          "--env",
+          "preview",
+          "--force",
+          "--json",
+        ]);
+
+        expect(result).toSay("ZITADEL_PREVIEW_TOKEN");
+      });
+
+      it("removes a preview given with a trailing slash", async () => {
+        const app = await anAppWithAPreview();
+
+        await app.run(["preview", "rm", `${PREVIEW_URL}/`, "--force", "--json"]);
+
+        const listed = await app.run(["preview", "list", "--json"]);
+        expect(app.envelopeOf<{ items: unknown[] }>(listed).data.items).toEqual([]);
+      });
+
       it("removes a live preview, so it stops being listed", async () => {
         const app = await anAppWithAPreview();
 

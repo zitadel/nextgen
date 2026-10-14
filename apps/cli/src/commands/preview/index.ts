@@ -1,4 +1,6 @@
 import { Flags } from "@oclif/core";
+import type { ZitadelClient } from "@zitadel/api/client";
+import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import { CommandGroups, type JsonEnvelope, PreviewCommand, previewFlags } from "../../lib/oclif";
 import {
@@ -68,7 +70,9 @@ export default class Preview extends PreviewCommand {
     // `zitadel deploy` after merge. The environment gates this, not `--origin`:
     // an explicit origin only selects which targets to preview, it never
     // authorizes a preview deploy into an environment that must not take writes.
-    const requested = flags.origin ?? [];
+    // An origin has no path, so a trailing slash is the same URL: dropped
+    // here as detection drops it, so one preview is one spelling.
+    const requested = (flags.origin ?? []).map((url) => url.replace(/\/+$/, ""));
     // `primary` is the deployment keyword for every primary origin. A preview
     // build carries the preview credential and must never be able to reach
     // production with it, so the keyword is refused outright.
@@ -135,6 +139,18 @@ export default class Preview extends PreviewCommand {
     }
 
     const { client, projectId } = await this.connect();
+
+    // An exact primary origin is production as surely as the `primary`
+    // keyword is, so it is refused too. The server is the authority on what
+    // the preview token may reach; this catches the mistake before anything
+    // is built, whenever the token can read the project's origins.
+    const primaries = await primaryOrigins(client, projectId);
+    const production = urls.filter((url) => primaries.includes(url));
+    if (production.length > 0) {
+      throw new ZitadelError("E_VALIDATION", `${production.join(", ")} is a primary origin`, {
+        hint: "Pass the preview URLs with --origin; production is deployed by `zitadel deploy`, after merge.",
+      });
+    }
 
     const { bundle, brandingSources } = await buildBundle(cwd);
     const ctx: StepContext = {
@@ -204,5 +220,21 @@ export default class Preview extends PreviewCommand {
         `NEXT_PUBLIC_ZITADEL_RELEASE=${release.content_hash}`,
       ].join("\n"),
     });
+  }
+}
+
+/**
+ * The project's primary origins, or none when the preview token may not read
+ * the project: the server then decides alone what the token can deploy to.
+ */
+async function primaryOrigins(client: ZitadelClient, projectId: string): Promise<string[]> {
+  try {
+    const origins = (await client.getProject(projectId)).origins ?? [];
+    return origins.filter((entry) => entry.kind === "primary").map((entry) => entry.pattern);
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+      return [];
+    }
+    throw error;
   }
 }

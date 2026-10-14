@@ -161,4 +161,15 @@ export abstract class EnvironmentCommand extends BaseCommand {
  */
 export abstract class PreviewCommand extends EnvironmentCommand {
   static override credential: CredentialKind = "preview";
+
+  /**
+   * Never prompts: a pull-request build has no one to ask, and a missing
+   * value, the preview token above all, fails naming the variable rather
+   * than being typed in and saved to `.env.<name>.local`.
+   */
+  protected override connect(
+    options: { verbatim?: boolean; quiet?: boolean; prompt?: boolean } = {},
+  ): Promise<Connection> {
+    return super.connect({ ...options, prompt: false });
+  }
 }
