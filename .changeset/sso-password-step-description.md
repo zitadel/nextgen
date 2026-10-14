@@ -1,6 +1,6 @@
 ---
 "@zitadel/components": patch
-"@zitadel/api-mock": patch
+"@zitadel/server": patch
 ---
 
 A login step that offers sign-in providers now asks for `<step>.description.sso`
