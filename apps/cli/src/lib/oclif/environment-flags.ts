@@ -12,7 +12,7 @@ export const environmentFlags = {
   env: nonBlankString({
     char: "e",
     description:
-      "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then development.",
+      "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
   }),
   "env-file": nonBlankString({
     description:
