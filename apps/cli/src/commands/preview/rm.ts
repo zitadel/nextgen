@@ -3,7 +3,6 @@ import { Flags } from "@oclif/core";
 import { CommandGroups, type JsonEnvelope, nonBlankArg, PreviewCommand } from "../../lib/oclif";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { deletedData } from "../../lib/oclif/envelope";
-import { publicCliCommand } from "../../lib/public-cli";
 import { shellArg } from "../../lib/shell";
 
 /**
@@ -35,7 +34,7 @@ export default class PreviewRm extends PreviewCommand {
   async run(): Promise<JsonEnvelope> {
     const { args, flags } = await this.parse(PreviewRm);
     await this.toMeta(flags);
-    const { dryRun, cliVersion } = this.meta;
+    const { dryRun } = this.meta;
     const url = args.url;
 
     // A dry run makes no request, so it answers before the connection — the
@@ -50,10 +49,7 @@ export default class PreviewRm extends PreviewCommand {
       kind: "confirm",
       name: `remove ${url} from the project`,
       message: `Remove ${url} from the project?`,
-      retry: publicCliCommand(
-        `preview rm ${shellArg(url)} --force${this.environmentSelector()}`,
-        cliVersion,
-      ),
+      retry: this.suggest(`preview rm ${shellArg(url)} --force`),
     });
     if (!confirmed) {
       return this.emit({ status: "skipped", reason: "remove-cancelled" });

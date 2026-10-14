@@ -4,7 +4,6 @@ import { CommandGroups, type JsonEnvelope, nonBlankString, PreviewCommand } from
 import { collectPages } from "../../lib/oclif/crud/paging";
 import { renderList } from "../../lib/oclif/crud/table";
 import { listData } from "../../lib/oclif/envelope";
-import { publicCliCommand } from "../../lib/public-cli";
 import { shellArg } from "../../lib/shell";
 
 /** The columns `list` renders, in order. */
@@ -57,7 +56,6 @@ export default class PreviewList extends PreviewCommand {
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(PreviewList);
     await this.toMeta(flags);
-    const { cliVersion } = this.meta;
     const { client, projectId } = await this.connect();
 
     const request = (token?: string): Promise<unknown> =>
@@ -85,14 +83,13 @@ export default class PreviewList extends PreviewCommand {
     // token. `--all` already drained everything, so it suggests nothing.
     const nextCommand =
       next && flags.all !== true
-        ? publicCliCommand(
+        ? this.suggest(
             [
               "preview list",
               ...(flags.limit === undefined ? [] : [`--limit ${flags.limit}`]),
               `--page-token ${shellArg(next)}`,
               "--json",
-            ].join(" ") + this.environmentSelector(),
-            cliVersion,
+            ].join(" "),
           )
         : undefined;
 
