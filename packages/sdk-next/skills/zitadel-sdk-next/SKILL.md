@@ -30,7 +30,10 @@ the app is bespoke and you are integrating by hand.
 pnpm add @zitadel/sdk-next
 ```
 
-Peer deps the package expects: `next >=15`, `react >=18`, `react-dom >=18`.
+Peer deps the package expects: `next >=15.2.3`, `react >=18`, `react-dom >=18`.
+Next.js 15.0.0 to 15.2.2 skip middleware for a request that sends an
+`x-middleware-subrequest` header (CVE-2025-29927), which would bypass
+`protectedRoutes`; do not install a version below 15.2.3.
 TypeScript `>=5.0` (the SDK consumer floor; the package is built against a
 newer TypeScript, but that does not raise the floor for your project).
 
