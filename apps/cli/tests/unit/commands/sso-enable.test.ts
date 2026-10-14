@@ -232,6 +232,40 @@ describe("sso enable", () => {
     expect(await readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")).toBe(before);
   });
 
+  it("warns when the schema defines nothing the provider maps, so the connection has no mapping", async () => {
+    const cwd = await makeProject({
+      "default-human-user": {
+        properties: { staffNumber: { type: "string" } },
+        "x-auth-methods": { password: { enabled: true }, passkey: { enabled: true } },
+      },
+    });
+
+    const result = await withStdin("piped-secret", () =>
+      runCliForTest([
+        "sso",
+        "enable",
+        "--cwd",
+        cwd,
+        "--json",
+        "--non-interactive",
+        "--provider",
+        "custom",
+        "--slug",
+        "acme-sso",
+        "--display-name",
+        "Acme SSO",
+        "--issuer",
+        "https://sso.acme.example",
+        "--client-id",
+        "acme-client-id",
+      ]),
+    );
+
+    expect(result.exitCode).toBe(0);
+    const payload = parseJson(result.stdout) as { warnings?: string[] };
+    expect(payload.warnings?.join("\n")).toContain("has no claim_mapping");
+  });
+
   it("publishes a changed client id on reuse rather than ignoring it", async () => {
     // The connection references the id rather than holding it, so a rerun with
     // a different one has nothing in the file to disagree with. Republishing

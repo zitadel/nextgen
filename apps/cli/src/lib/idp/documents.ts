@@ -13,6 +13,7 @@
  */
 
 import { getDefaultLoginFlow, SETUP_PRESETS } from "@zitadel/config/defaults";
+import type { ConnectionSlug } from "@zitadel/config/idp";
 
 import { ZitadelError } from "../errors";
 
@@ -218,7 +219,7 @@ function stepNamed(flow: Json, name: string): Step | undefined {
  * belongs to whoever set it, and a provider is added to the list rather than
  * replacing it, so enabling a second one later keeps the first.
  */
-export function applySsoToSchema(schema: object, slug: string): SsoResult<object> {
+export function applySsoToSchema(schema: object, slug: ConnectionSlug): SsoResult<object> {
   const document = clone(schema) as Json;
   const methods = isObject(document["x-auth-methods"]) ? { ...document["x-auth-methods"] } : {};
   const existing = isObject(methods.sso) ? methods.sso : undefined;
@@ -301,7 +302,7 @@ function registerSsoStep(fields: string[], terminal: string): Step {
  * without passwords is a dead end.
  */
 function ssoConflictStep(
-  slug: string,
+  slug: ConnectionSlug,
   methods: { password: boolean; passkey: boolean },
   loginStep: string | undefined,
   terminal: string,
@@ -457,7 +458,7 @@ function offersAlready(step: Step, slug: string, terminal: string): boolean {
 }
 
 /** The provider list a step should end up with: what it has, plus this slug. */
-function mergedProviders(step: Step, slug: string): unknown[] {
+function mergedProviders(step: Step, slug: ConnectionSlug): unknown[] {
   const providers = Array.isArray(step.sso_providers) ? [...(step.sso_providers as unknown[])] : [];
   return providers.includes(slug) ? providers : [...providers, slug];
 }
@@ -605,7 +606,7 @@ function refuseOutcomeActionCollision(document: Json): void {
  */
 export function applySsoToFlow(
   flow: object,
-  slug: string,
+  slug: ConnectionSlug,
   enabled: { password: boolean; passkey: boolean },
 ): SsoResult<object> {
   const document = clone(flow) as Json;
