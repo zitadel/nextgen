@@ -13,6 +13,7 @@ content:
         - $ref: '../../components/schemas/errors/rel-project_not_found.yaml'
         - $ref: '../../components/schemas/errors/rel-revision_not_found.yaml'
         - $ref: '../../components/schemas/errors/rel-revision_unpinnable.yaml'
+        - $ref: '../../components/schemas/errors/rel-unresolved_reference.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
       discriminator:
         propertyName: code
@@ -26,6 +27,7 @@ content:
           rel.project_not_found: '../../components/schemas/errors/rel-project_not_found.yaml'
           rel.revision_not_found: '../../components/schemas/errors/rel-revision_not_found.yaml'
           rel.revision_unpinnable: '../../components/schemas/errors/rel-revision_unpinnable.yaml'
+          rel.unresolved_reference: '../../components/schemas/errors/rel-unresolved_reference.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
     examples:
       auth.unauthorized:
@@ -73,6 +75,11 @@ content:
         value:
           code: rel.revision_unpinnable
           message: 'release: pinned revision declares no handle'
+      rel.unresolved_reference:
+        summary: rel.unresolved_reference
+        value:
+          code: rel.unresolved_reference
+          message: 'release: referenced handle is not pinned'
       req.invalid:
         summary: req.invalid
         value:

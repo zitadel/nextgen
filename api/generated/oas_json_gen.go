@@ -21641,6 +21641,22 @@ func (s CreateReleaseErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case RelUnresolvedReferenceCreateReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.unresolved_reference")
+		{
+			s := s.RelUnresolvedReference
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidCreateReleaseErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -21710,6 +21726,9 @@ func (s *CreateReleaseErrorResponse) Decode(d *jx.Decoder) error {
 				case "rel.revision_unpinnable":
 					s.Type = RelRevisionUnpinnableCreateReleaseErrorResponse
 					found = true
+				case "rel.unresolved_reference":
+					s.Type = RelUnresolvedReferenceCreateReleaseErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidCreateReleaseErrorResponse
 					found = true
@@ -21761,6 +21780,10 @@ func (s *CreateReleaseErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case RelRevisionUnpinnableCreateReleaseErrorResponse:
 		if err := s.RelRevisionUnpinnable.Decode(d); err != nil {
+			return err
+		}
+	case RelUnresolvedReferenceCreateReleaseErrorResponse:
+		if err := s.RelUnresolvedReference.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidCreateReleaseErrorResponse:
@@ -70479,6 +70502,40 @@ func (s *OptRelRevisionUnpinnableDetails) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes RelUnresolvedReferenceDetails as json.
+func (o OptRelUnresolvedReferenceDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes RelUnresolvedReferenceDetails from json.
+func (o *OptRelUnresolvedReferenceDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptRelUnresolvedReferenceDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(RelUnresolvedReferenceDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptRelUnresolvedReferenceDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptRelUnresolvedReferenceDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes Release as json.
 func (o OptRelease) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -85824,6 +85881,194 @@ func (s RelRevisionUnpinnableDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *RelRevisionUnpinnableDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *RelUnresolvedReference) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *RelUnresolvedReference) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("rel.unresolved_reference")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfRelUnresolvedReference = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes RelUnresolvedReference from json.
+func (s *RelUnresolvedReference) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode RelUnresolvedReference to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode RelUnresolvedReference")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfRelUnresolvedReference) {
+					name = jsonFieldsNameOfRelUnresolvedReference[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *RelUnresolvedReference) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *RelUnresolvedReference) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s RelUnresolvedReferenceDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s RelUnresolvedReferenceDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes RelUnresolvedReferenceDetails from json.
+func (s *RelUnresolvedReferenceDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode RelUnresolvedReferenceDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode RelUnresolvedReferenceDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s RelUnresolvedReferenceDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *RelUnresolvedReferenceDetails) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

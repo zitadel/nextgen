@@ -13410,17 +13410,18 @@ func (*CreateReleaseCreated) createReleaseRes() {}
 
 // CreateReleaseErrorResponse represents sum type.
 type CreateReleaseErrorResponse struct {
-	Type                  CreateReleaseErrorResponseType // switch on this field
-	AuthUnauthorized      AuthUnauthorized
-	EvtInvalid            EvtInvalid
-	Internal              Internal
-	RelInvalid            RelInvalid
-	RelNotFound           RelNotFound
-	RelPermissionDenied   RelPermissionDenied
-	RelProjectNotFound    RelProjectNotFound
-	RelRevisionNotFound   RelRevisionNotFound
-	RelRevisionUnpinnable RelRevisionUnpinnable
-	ReqInvalid            ReqInvalid
+	Type                   CreateReleaseErrorResponseType // switch on this field
+	AuthUnauthorized       AuthUnauthorized
+	EvtInvalid             EvtInvalid
+	Internal               Internal
+	RelInvalid             RelInvalid
+	RelNotFound            RelNotFound
+	RelPermissionDenied    RelPermissionDenied
+	RelProjectNotFound     RelProjectNotFound
+	RelRevisionNotFound    RelRevisionNotFound
+	RelRevisionUnpinnable  RelRevisionUnpinnable
+	RelUnresolvedReference RelUnresolvedReference
+	ReqInvalid             ReqInvalid
 }
 
 // CreateReleaseErrorResponseType is oneOf type of CreateReleaseErrorResponse.
@@ -13428,16 +13429,17 @@ type CreateReleaseErrorResponseType string
 
 // Possible values for CreateReleaseErrorResponseType.
 const (
-	AuthUnauthorizedCreateReleaseErrorResponse      CreateReleaseErrorResponseType = "auth.unauthorized"
-	EvtInvalidCreateReleaseErrorResponse            CreateReleaseErrorResponseType = "evt.invalid"
-	InternalCreateReleaseErrorResponse              CreateReleaseErrorResponseType = "internal"
-	RelInvalidCreateReleaseErrorResponse            CreateReleaseErrorResponseType = "rel.invalid"
-	RelNotFoundCreateReleaseErrorResponse           CreateReleaseErrorResponseType = "rel.not_found"
-	RelPermissionDeniedCreateReleaseErrorResponse   CreateReleaseErrorResponseType = "rel.permission_denied"
-	RelProjectNotFoundCreateReleaseErrorResponse    CreateReleaseErrorResponseType = "rel.project_not_found"
-	RelRevisionNotFoundCreateReleaseErrorResponse   CreateReleaseErrorResponseType = "rel.revision_not_found"
-	RelRevisionUnpinnableCreateReleaseErrorResponse CreateReleaseErrorResponseType = "rel.revision_unpinnable"
-	ReqInvalidCreateReleaseErrorResponse            CreateReleaseErrorResponseType = "req.invalid"
+	AuthUnauthorizedCreateReleaseErrorResponse       CreateReleaseErrorResponseType = "auth.unauthorized"
+	EvtInvalidCreateReleaseErrorResponse             CreateReleaseErrorResponseType = "evt.invalid"
+	InternalCreateReleaseErrorResponse               CreateReleaseErrorResponseType = "internal"
+	RelInvalidCreateReleaseErrorResponse             CreateReleaseErrorResponseType = "rel.invalid"
+	RelNotFoundCreateReleaseErrorResponse            CreateReleaseErrorResponseType = "rel.not_found"
+	RelPermissionDeniedCreateReleaseErrorResponse    CreateReleaseErrorResponseType = "rel.permission_denied"
+	RelProjectNotFoundCreateReleaseErrorResponse     CreateReleaseErrorResponseType = "rel.project_not_found"
+	RelRevisionNotFoundCreateReleaseErrorResponse    CreateReleaseErrorResponseType = "rel.revision_not_found"
+	RelRevisionUnpinnableCreateReleaseErrorResponse  CreateReleaseErrorResponseType = "rel.revision_unpinnable"
+	RelUnresolvedReferenceCreateReleaseErrorResponse CreateReleaseErrorResponseType = "rel.unresolved_reference"
+	ReqInvalidCreateReleaseErrorResponse             CreateReleaseErrorResponseType = "req.invalid"
 )
 
 // IsAuthUnauthorized reports whether CreateReleaseErrorResponse is AuthUnauthorized.
@@ -13483,6 +13485,11 @@ func (s CreateReleaseErrorResponse) IsRelRevisionNotFound() bool {
 // IsRelRevisionUnpinnable reports whether CreateReleaseErrorResponse is RelRevisionUnpinnable.
 func (s CreateReleaseErrorResponse) IsRelRevisionUnpinnable() bool {
 	return s.Type == RelRevisionUnpinnableCreateReleaseErrorResponse
+}
+
+// IsRelUnresolvedReference reports whether CreateReleaseErrorResponse is RelUnresolvedReference.
+func (s CreateReleaseErrorResponse) IsRelUnresolvedReference() bool {
+	return s.Type == RelUnresolvedReferenceCreateReleaseErrorResponse
 }
 
 // IsReqInvalid reports whether CreateReleaseErrorResponse is ReqInvalid.
@@ -13676,6 +13683,27 @@ func (s CreateReleaseErrorResponse) GetRelRevisionUnpinnable() (v RelRevisionUnp
 func NewRelRevisionUnpinnableCreateReleaseErrorResponse(v RelRevisionUnpinnable) CreateReleaseErrorResponse {
 	var s CreateReleaseErrorResponse
 	s.SetRelRevisionUnpinnable(v)
+	return s
+}
+
+// SetRelUnresolvedReference sets CreateReleaseErrorResponse to RelUnresolvedReference.
+func (s *CreateReleaseErrorResponse) SetRelUnresolvedReference(v RelUnresolvedReference) {
+	s.Type = RelUnresolvedReferenceCreateReleaseErrorResponse
+	s.RelUnresolvedReference = v
+}
+
+// GetRelUnresolvedReference returns RelUnresolvedReference and true boolean if CreateReleaseErrorResponse is RelUnresolvedReference.
+func (s CreateReleaseErrorResponse) GetRelUnresolvedReference() (v RelUnresolvedReference, ok bool) {
+	if !s.IsRelUnresolvedReference() {
+		return v, false
+	}
+	return s.RelUnresolvedReference, true
+}
+
+// NewRelUnresolvedReferenceCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from RelUnresolvedReference.
+func NewRelUnresolvedReferenceCreateReleaseErrorResponse(v RelUnresolvedReference) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetRelUnresolvedReference(v)
 	return s
 }
 
@@ -47079,6 +47107,52 @@ func (o OptRelRevisionUnpinnableDetails) Or(d RelRevisionUnpinnableDetails) RelR
 	return d
 }
 
+// NewOptRelUnresolvedReferenceDetails returns new OptRelUnresolvedReferenceDetails with value set to v.
+func NewOptRelUnresolvedReferenceDetails(v RelUnresolvedReferenceDetails) OptRelUnresolvedReferenceDetails {
+	return OptRelUnresolvedReferenceDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptRelUnresolvedReferenceDetails is optional RelUnresolvedReferenceDetails.
+type OptRelUnresolvedReferenceDetails struct {
+	Value RelUnresolvedReferenceDetails
+	Set   bool
+}
+
+// IsSet returns true if OptRelUnresolvedReferenceDetails was set.
+func (o OptRelUnresolvedReferenceDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptRelUnresolvedReferenceDetails) Reset() {
+	var v RelUnresolvedReferenceDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptRelUnresolvedReferenceDetails) SetTo(v RelUnresolvedReferenceDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptRelUnresolvedReferenceDetails) Get() (v RelUnresolvedReferenceDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptRelUnresolvedReferenceDetails) Or(d RelUnresolvedReferenceDetails) RelUnresolvedReferenceDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptRelease returns new OptRelease with value set to v.
 func NewOptRelease(v Release) OptRelease {
 	return OptRelease{
@@ -56507,6 +56581,59 @@ func (s *RelRevisionUnpinnable) SetDetails(val OptRelRevisionUnpinnableDetails) 
 type RelRevisionUnpinnableDetails map[string]jx.Raw
 
 func (s *RelRevisionUnpinnableDetails) init() RelRevisionUnpinnableDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type RelUnresolvedReference struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptRelUnresolvedReferenceDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *RelUnresolvedReference) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *RelUnresolvedReference) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *RelUnresolvedReference) GetDetails() OptRelUnresolvedReferenceDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *RelUnresolvedReference) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *RelUnresolvedReference) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *RelUnresolvedReference) SetDetails(val OptRelUnresolvedReferenceDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type RelUnresolvedReferenceDetails map[string]jx.Raw
+
+func (s *RelUnresolvedReferenceDetails) init() RelUnresolvedReferenceDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}

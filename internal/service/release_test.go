@@ -47,7 +47,7 @@ func expectHandleReads(statements *servicemocks.MockAllStatements) {
 		}, nil).AnyTimes()
 	statements.EXPECT().
 		GetFlowDefinitionByID(gomock.Any(), "proj_1", "flowdef_1").
-		Return(&domain.FlowDefinition{ProjectID: "proj_1", ID: "flowdef_1", Name: "default-login"}, nil).AnyTimes()
+		Return(&domain.FlowDefinition{ProjectID: "proj_1", ID: "flowdef_1", Name: "default-login", UserSchema: "human-user"}, nil).AnyTimes()
 	statements.EXPECT().
 		GetBrandingByID(gomock.Any(), "proj_1", "brnd_1").
 		Return(&domain.Branding{ProjectID: "proj_1", ID: "brnd_1"}, nil).AnyTimes()
@@ -245,6 +245,27 @@ func TestReleaseServiceCreateRejectsSchemaWithoutObjectType(t *testing.T) {
 	domErr, ok := errors.AsType[domain.Error](err)
 	require.True(t, ok)
 	assert.Equal(t, domain.ErrReleaseRevisionUnpinnable(nil).Code, domErr.Code)
+}
+
+// A flow names its user schema by objectType, and the release must pin that
+// schema too, so a miss fails here rather than on a login request.
+func TestReleaseServiceCreateRejectsUnpinnedUserSchema(t *testing.T) {
+	svc, statements := newMockedReleaseService(t)
+	expectHandleReads(statements)
+
+	_, err := svc.Create(t.Context(), service.CreateReleaseInput{
+		ProjectID: "proj_1",
+		Pointers: []service.CreateReleasePointer{
+			{Kind: domain.ReleasePointerKindFlowDefinition, RevisionID: "flowdef_1"},
+			{Kind: domain.ReleasePointerKindBranding, RevisionID: "brnd_1"},
+		},
+	})
+	require.Error(t, err)
+
+	domErr, ok := errors.AsType[domain.Error](err)
+	require.True(t, ok)
+	assert.Equal(t, domain.ErrReleaseUnresolvedReference().Code, domErr.Code)
+	assert.Equal(t, "flow_definition default-login: user_schema human-user not found", domErr.Message)
 }
 
 // Two revisions of one resource cannot both be pinned: the release would

@@ -181,6 +181,22 @@ func TestCreateRelease(t *testing.T) {
 		assert.NotEmpty(t, message)
 	})
 
+	// The flow names its user schema by objectType, so a release pinning the
+	// flow without that schema would fail on a login request rather than here.
+	t.Run("pinning a flow without its user schema is rejected", func(t *testing.T) {
+		resp := fixture.create(t, &api.CreateReleaseRequest{
+			Pointers: []api.CreateReleasePointer{
+				{Kind: api.ReleasePointerKindFlowDefinition, RevisionID: fixture.flowdefID},
+				{Kind: api.ReleasePointerKindBranding, RevisionID: fixture.brandingID},
+			},
+		})
+		status, code, message, ok := errorResponseParts(t, resp)
+		require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, resp))
+		assert.Equal(t, http.StatusBadRequest, status)
+		assert.Equal(t, domain.ErrReleaseUnresolvedReference().Code, code)
+		assert.Contains(t, message, "user_schema human-user not found")
+	})
+
 	// A release describes one state of the project, so it cannot hold two
 	// revisions of the same resource. Both pointers below name the branding of
 	// this project, which has a single handle.

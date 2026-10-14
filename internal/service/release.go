@@ -69,7 +69,13 @@ func NewReleaseService(v2Pool *DB) ReleaseService {
 // them. That makes a re-run against unchanged content a no-op rather than a
 // growing pile of identical releases.
 func (s *releaseService) Create(ctx context.Context, input CreateReleaseInput) (*CreateReleaseOutput, error) {
-	pointers, err := s.resolvePointers(ctx, input.ProjectID, input.Pointers)
+	referrers, err := s.resolvePointers(ctx, input.ProjectID, input.Pointers)
+	if err != nil {
+		return nil, err
+	}
+	// Only what the caller pinned resolves a reference here; building from a
+	// bundle passes a lookup into the project instead.
+	pointers, err := domain.CloseReleaseReferences(referrers, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -179,75 +185,72 @@ func (s *releaseService) getByContentHash(ctx context.Context, projectID, conten
 }
 
 // resolvePointers turns the caller's (kind, revision_id) pairs into pinned
-// pointers, reading each revision's handle from the revision itself. Every
-// revision is read anyway to prove it exists, so binding the handle here costs
-// nothing extra and removes the class of error where a caller names a resource
-// its own revision disagrees with.
+// pointers, reading each revision's handle and the handles it references from
+// the revision itself. Every revision is read anyway to prove it exists, so
+// binding them here costs nothing extra and removes the class of error where a
+// caller names a resource its own revision disagrees with.
 //
 // Ordering, the empty set and duplicate handles are the domain constructor's
-// to reject; this only resolves.
-//
-// TODO(#1154): the pinned set is not checked for closure. A flow pinned here
-// may name a user schema objectType this release does not pin, and nothing
-// objects. The check belongs in this loop, which already holds every resolved
-// handle and has read each revision.
-func (s *releaseService) resolvePointers(ctx context.Context, projectID string, requested []CreateReleasePointer) ([]domain.ReleasePointer, error) {
-	pointers := make([]domain.ReleasePointer, 0, len(requested))
+// to reject, and references the closure check's; this only resolves.
+func (s *releaseService) resolvePointers(ctx context.Context, projectID string, requested []CreateReleasePointer) ([]domain.ReleaseReferrer, error) {
+	referrers := make([]domain.ReleaseReferrer, 0, len(requested))
 	for _, pointer := range requested {
-		handle, err := s.resolveHandle(ctx, projectID, pointer)
+		referrer, err := s.resolveReferrer(ctx, projectID, pointer)
 		if err != nil {
 			return nil, err
 		}
-		pointers = append(pointers, domain.ReleasePointer{
-			Kind:       pointer.Kind,
-			Handle:     handle,
-			RevisionID: pointer.RevisionID,
-		})
+		referrers = append(referrers, referrer)
 	}
-	return pointers, nil
+	return referrers, nil
 }
 
-// resolveHandle reads the handle a revision declares. It is per kind rather
-// than a shared column read: a schema's handle is its objectType, a flow
-// definition's is its name, and branding has no identifying field at all
-// because a project has exactly one.
-func (s *releaseService) resolveHandle(ctx context.Context, projectID string, pointer CreateReleasePointer) (string, error) {
+// resolveReferrer reads the handle a revision declares and the handles it
+// references. It is per kind rather than a shared column read: a schema's
+// handle is its objectType, a flow definition's is its name, and branding has
+// no identifying field at all because a project has exactly one.
+func (s *releaseService) resolveReferrer(ctx context.Context, projectID string, pointer CreateReleasePointer) (domain.ReleaseReferrer, error) {
 	stmts := s.v2Pool.Statements()
+	pinned := func(handle string, references []domain.ReleaseReference) (domain.ReleaseReferrer, error) {
+		return domain.ReleaseReferrer{
+			Pointer:    domain.ReleasePointer{Kind: pointer.Kind, Handle: handle, RevisionID: pointer.RevisionID},
+			References: references,
+		}, nil
+	}
 	switch pointer.Kind {
 	case domain.ReleasePointerKindSchema:
 		schema, err := stmts.GetJSONSchemaByID(ctx, projectID, pointer.RevisionID)
 		if err != nil {
-			return "", mapRevisionLookupError(err, pointer)
+			return domain.ReleaseReferrer{}, mapRevisionLookupError(err, pointer)
 		}
 		// A schema registered by URL whose document was never parsed declares
 		// no objectType, so nothing says which resource it is a revision of.
 		if schema.ObjectType == nil || *schema.ObjectType == "" {
-			return "", domain.ErrReleaseRevisionUnpinnable(
+			return domain.ReleaseReferrer{}, domain.ErrReleaseRevisionUnpinnable(
 				fmt.Sprintf("schema %q declares no objectType", pointer.RevisionID))
 		}
-		return *schema.ObjectType, nil
+		return pinned(*schema.ObjectType, nil)
 
 	case domain.ReleasePointerKindFlowDefinition:
 		definition, err := stmts.GetFlowDefinitionByID(ctx, projectID, pointer.RevisionID)
 		if err != nil {
-			return "", mapRevisionLookupError(err, pointer)
+			return domain.ReleaseReferrer{}, mapRevisionLookupError(err, pointer)
 		}
-		return definition.Name, nil
+		return pinned(definition.Name, domain.FlowDefinitionReleaseReferences(definition))
 
 	case domain.ReleasePointerKindBranding:
 		if _, err := stmts.GetBrandingByID(ctx, projectID, pointer.RevisionID); err != nil {
-			return "", mapRevisionLookupError(err, pointer)
+			return domain.ReleaseReferrer{}, mapRevisionLookupError(err, pointer)
 		}
 		// A project has one branding, so there is nothing to distinguish it
 		// from; the constant still collides correctly when a caller pins two
 		// branding revisions in one release.
-		return domain.ReleaseBrandingHandle, nil
+		return pinned(domain.ReleaseBrandingHandle, nil)
 
 	default:
 		// Unreachable over HTTP: the wire enum admits only the three kinds
 		// above. It stays mapped for the in-process callers that skip the
 		// decoder.
-		return "", domain.ErrReleaseInvalid(fmt.Sprintf("unknown pointer kind %d", pointer.Kind), nil)
+		return domain.ReleaseReferrer{}, domain.ErrReleaseInvalid(fmt.Sprintf("unknown pointer kind %d", pointer.Kind), nil)
 	}
 }
 
