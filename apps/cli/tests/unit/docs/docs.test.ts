@@ -58,6 +58,7 @@ describe("agent contract", () => {
     expect(skill).toContain("## Golden path");
     expect(skill).toContain("--non-interactive --json");
     expect(skill).toContain("E_PORT_IN_USE");
+    expect(skill).toContain("E_CREDENTIAL_MISSING");
   });
 
   it("delegates the command surface to runtime discovery instead of hardcoding it", async () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { idVariable, secretVariable } from "../../../helpers/idp-values";
 import { republishCommand, republishCommands } from "../../../../src/lib/idp";
 
 const VERSION = "1.0.0-alpha.23";
@@ -8,29 +9,33 @@ describe("the recovery command for a credential", () => {
   it("names the owner, without which every variables command refuses", () => {
     // `variables set NAME` alone fails with "Name the owner: --project-level"
     // before making a request, so the recovery step would repair nothing.
-    expect(republishCommand("GOOGLE_CLIENT_ID", false, VERSION, "")).toContain("--project-level");
+    expect(republishCommand(idVariable("GOOGLE_CLIENT_ID"), false, VERSION, "")).toContain(
+      "--project-level",
+    );
   });
 
   it("is runnable rather than a bare subcommand", () => {
     // A JSON result is read by agents, which execute these as shell commands.
-    expect(republishCommand("GOOGLE_CLIENT_ID", false, VERSION, "")).toMatch(
+    expect(republishCommand(idVariable("GOOGLE_CLIENT_ID"), false, VERSION, "")).toMatch(
       /^npx .+ variables set /,
     );
   });
 
   it("marks a secret as one, so the value is not stored in the clear", () => {
-    expect(republishCommand("GOOGLE_CLIENT_SECRET", true, VERSION, "")).toContain(
+    expect(republishCommand(secretVariable("GOOGLE_CLIENT_SECRET"), true, VERSION, "")).toContain(
       "variables set GOOGLE_CLIENT_SECRET --project-level --secret",
     );
-    expect(republishCommand("GOOGLE_CLIENT_ID", false, VERSION, "")).not.toContain("--secret");
+    expect(republishCommand(idVariable("GOOGLE_CLIENT_ID"), false, VERSION, "")).not.toContain(
+      "--secret",
+    );
   });
 
   it("carries the environment selector so the retry targets the same project", () => {
     // The selector reproduces the invocation's --env/--env-file/--server; a
     // retry without it would silently target the default project.
-    expect(republishCommand("GOOGLE_CLIENT_ID", false, VERSION, " --env production")).toContain(
-      "--project-level --env production",
-    );
+    expect(
+      republishCommand(idVariable("GOOGLE_CLIENT_ID"), false, VERSION, " --env production"),
+    ).toContain("--project-level --env production");
   });
 });
 
@@ -39,8 +44,8 @@ describe("the recovery commands a result carries", () => {
     expect(
       republishCommands(
         [
-          { name: "GOOGLE_CLIENT_ID", secret: false, published: "stored" },
-          { name: "GOOGLE_CLIENT_SECRET", secret: true, published: "stored" },
+          { name: idVariable("GOOGLE_CLIENT_ID"), secret: false, published: "stored" },
+          { name: secretVariable("GOOGLE_CLIENT_SECRET"), secret: true, published: "stored" },
         ],
         VERSION,
         "",
@@ -51,8 +56,8 @@ describe("the recovery commands a result carries", () => {
   it("names every credential that did not land, and only those", () => {
     const commands = republishCommands(
       [
-        { name: "GOOGLE_CLIENT_ID", secret: false, published: "stored" },
-        { name: "GOOGLE_CLIENT_SECRET", secret: true, published: "failed" },
+        { name: idVariable("GOOGLE_CLIENT_ID"), secret: false, published: "stored" },
+        { name: secretVariable("GOOGLE_CLIENT_SECRET"), secret: true, published: "failed" },
       ],
       VERSION,
       "",
@@ -67,7 +72,7 @@ describe("the recovery commands a result carries", () => {
     // fails at token exchange just the same.
     expect(
       republishCommands(
-        [{ name: "GOOGLE_CLIENT_ID", secret: false, published: "deferred" }],
+        [{ name: idVariable("GOOGLE_CLIENT_ID"), secret: false, published: "deferred" }],
         VERSION,
         "",
       ),
@@ -82,7 +87,7 @@ describe("the recovery commands a result carries", () => {
     ).toEqual([]);
     expect(
       republishCommands(
-        [{ name: "GOOGLE_CLIENT_ID", secret: false, published: undefined }],
+        [{ name: idVariable("GOOGLE_CLIENT_ID"), secret: false, published: undefined }],
         VERSION,
         "",
       ),

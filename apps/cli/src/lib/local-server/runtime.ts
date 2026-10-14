@@ -239,7 +239,7 @@ export function sameLocalServer(a: string, b: string): boolean {
 }
 
 /** Runtime metadata of the server started in `cwd` or the nearest parent with one. */
-async function readNearestRuntimeMetadata(
+export async function readNearestRuntimeMetadata(
   cwd: string,
 ): Promise<{ dir: string; runtime: RuntimeMetadata } | undefined> {
   const dir = await findUpward(cwd, LOCAL_RUNTIME_FILE);

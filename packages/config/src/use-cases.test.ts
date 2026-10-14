@@ -8,7 +8,7 @@ import {
   SETUP_USE_CASES,
 } from "./defaults.js";
 import { flowConfigSchema, schemaConfigSchema } from "./schemas.js";
-import { validateFlowDefinition } from "./validate.js";
+import { validateFlowDefinition } from "./validation/index.js";
 
 /** The field set each use case is contracted to collect (schema + register). */
 const EXPECTED_FIELDS: Record<string, string[]> = {

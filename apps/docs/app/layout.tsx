@@ -2,16 +2,19 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { RootProvider } from "fumadocs-ui/provider/next";
 import type { Metadata } from "next";
-import { Arimo } from "next/font/google";
 import localFont from "next/font/local";
 import "./global.css";
 
 // The console's faces: Arimo for text, APK Futural (a licensed webfont, Regular
-// only) for headings. next/font serves both from /docs/_next/, like every asset
-// of this app; global.css hands them to Tailwind and Fumadocs.
-const arimo = Arimo({
+// only) for headings, both from ./fonts so the build fetches nothing
+// (AGENTS.md). next/font serves them from /docs/_next/, like every asset of
+// this app; global.css hands them to Tailwind and Fumadocs.
+//
+// Arimo is one variable file, every weight from 400 to 700.
+const arimo = localFont({
+  src: "./fonts/Arimo-latin.woff2",
+  weight: "400 700",
   variable: "--font-arimo",
-  subsets: ["latin"],
 });
 
 const apkFutural = localFont({

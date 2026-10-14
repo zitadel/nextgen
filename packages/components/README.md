@@ -246,7 +246,12 @@ controls expose hooks such as `zitadel-input-email`, `zitadel-input-password`,
 and `zitadel-action-submit-button`. Hooks are method-named even when the flow
 engine names a credential field `x-auth-methods#<method>` — the `name`
 attribute keeps that raw form key, only the `data-testid` hooks are normalised
-(`hookName` in `src/internal/hook-name.ts`).
+(`hookName` in `src/internal/hook-name.ts`). For sign-out, `<zitadel-session>`'s
+button carries `zitadel-session-logout`, and its native button
+`zitadel-session-logout-button`. `<zitadel-logout>` has no hook. By default it
+shows an avatar menu: open it ("Open user menu"), then target the `.signout-btn`
+button in its shadow root. Given a `<template>` child, it shows that markup
+instead, and the element marked `data-action="logout"` signs out.
 
 A tenant Liquid template can already be supplied through the branding
 payload's `liquid_template` field; a dedicated declarative `template`
