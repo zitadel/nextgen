@@ -38,7 +38,7 @@ workflow, not the task graph.
 | Mutex and retry | `scripts/task-guard.mjs` | `--mutex <name>` (a lock directory in the OS temp dir, keyed by repository root, stale holders reclaimed) and `--retries <n>`. Used by the four browser-mode test scripts and the six generated-sources tasks. It acts only when turbo runs the task (`TURBO_HASH` is set); under moon, which has its own `mutex` and `retryCount`, and when a person runs the script, it runs the command once, unchanged. |
 | Inline scripts | `scripts/go-format-check.mjs`, `scripts/go-lint.mjs` | Turbo's versions of the `format` and `lint` inline scripts of the two Go projects; moon keeps its inline scripts until the cutover. |
 | Runner selection | `scripts/task-runner.mjs` (+ `.d.mts`) | `NEXTGEN_TASK_RUNNER=moon\|turbo` picks the runner the contributor scripts build through; maps `project:task` to turbo tasks and back. |
-| Ported scripts | `ci-mode.mjs`, `check.mjs`, `run-server.mjs`, `run-server-debug.mjs`, `run-cli.mjs`, `apps/console/scripts/dev-real.mts`, `apps/cli-journey-e2e/scripts/local-registry.mjs`, new `report-turbo-failures.mjs` | Work under either runner; tests added for the turbo paths. |
+| Ported scripts | `ci-mode.mjs`, `check.mjs`, `run-server.mjs`, `run-server-debug.mjs`, `run-cli.mjs`, `apps/console/scripts/dev-real.mts`, `e2e/journey/scripts/local-registry.mjs`, new `report-turbo-failures.mjs` | Work under either runner; tests added for the turbo paths. |
 | CI | `.github/workflows/ci-turbo.yml` | The turbo version of ci.yml's moon steps, run on every pull request and merge-group entry as a non-required job for the parity period. |
 | Unchanged | all `moon.yml`, `.moon/`, ci.yml, the required check | Moon runs exactly as before. |
 
@@ -173,17 +173,14 @@ as they were.
 | cli | `test` (inputs + `/apps/server/bin/**`, mutex public-dist) | `#test` | inputs `$TURBO_ROOT$/apps/server/bin/**`; the mutex becomes the release chain's first edge |
 | cli | `build-release` (runDepsInParallel false, dep test) | `#build-release` | **new** script; `dependsOn: ["test", "@zitadel/sdk-next#build-release"]` |
 | cli | `readme` | `#readme` | existing; `outputs: ["README.md"]` |
-| cli-journey-e2e | `e2e`, `e2e-local`, `e2e-testkit` (env ZITADEL_TELEMETRY=0) | same | scripts default `ZITADEL_TELEMETRY` to `0`; **new** `e2e-testkit` |
 | console | `build` (outputs staticui, env input) | `#build` | `env: ["CONSOLE_VERCEL_INSIGHTS"]`, outputs `$TURBO_ROOT$/internal/staticui/console/dist/**` |
 | console | `build-release` | `#build-release` | **new** `vite build`; waits for the release chain |
 | console | `dev`, `preview` (persistent) | `#dev`, `#preview` | existing |
 | console | `dev-real`, `dev-claim` (persistent) | `#dev:real`, `#dev:claim` | existing; the script builds the server through the selected runner |
-| console-e2e | `e2e`, `e2e-real`, `e2e-embedded`, `e2e-platform` (env) | same | **new** scripts carrying the `NEXTGEN_*` values; ports and binary path are the configs' defaults already |
 | demo-next | `build` (outputs .next) | `#build` | outputs `.next/**`, `!.next/cache/**` |
 | demo-next, demo-nuxt | `dev`, `start` | same | existing |
 | demo-nuxt | `build` (outputs .output, mutex sdk-nuxt-dist) | `#build` | outputs `.output/**` |
-| demo-next-e2e | `e2e`, `e2e-real` | same | **new** scripts |
-| demo-nuxt-e2e | `e2e` | same | **new** script |
+| e2e | `test` (journey harness unit tests); lanes `console-smoke`, `console-real`, `console-embedded`, `console-platform`, `console-deployment`, `demo-next-mock`, `demo-next-real`, `demo-nuxt-mock`, `journey`, `journey-local` (env, mutex `e2e-serial`); `all` (noop over every lane; ci.yml's e2e step runs it) | `@zitadel/e2e#…`, same lane names, plus `e2e-local`; no `all` | scripts carry the `NEXTGEN_*` and `ZITADEL_TELEMETRY` defaults; the demo-next pair holds the guard's `demo-next-app` lock; ci-turbo.yml runs the lanes as gated steps |
 | docs | `generate` (inputs openapi + redocly) | `#generate` | same inputs and outputs |
 | docs | `build` (`next build`, mergeArgs replace) | `#build` | existing script (`pnpm run generate && next build`): bundles once more than moon; the Vercel docs service runs the script without a runner |
 | docs | `dev`, `start` | same | existing |
@@ -199,19 +196,20 @@ as they were.
 | bench | `format`, `vet`, `lint`, `build`, `test`, `sweep`, `summarize` | `@zitadel/bench#…` | **new** `tools/bench/package.json`; `benchInputs` repeated. `vet` depends on `@zitadel/server#check-generate` in turbo: the first `ci-turbo` run caught it compiling `api/generated` while the server's generation rewrote it, a race moon's order could hit too, so moon's `bench:vet` has the same dependency since #1704 |
 | release | `changesets`, `check-graph`, `build-public-packages`, `version`, `pack`, `snapshot`, `publish` | `@zitadel/release#…` | **new** `tools/release/package.json` (`cd ../.. && node scripts/release.mjs …`) |
 | workspace | `test`, `check-typecheck`, `check-openapi-rules`, `check-moon-graph`, `check-adrs` | `//#…` | root scripts (**new** for the four checks), explicit inputs as in moon.yml |
-| workspace | `doctor`, `server`, `server-debug`, `journey`, `build-local-image`, `smoke-container`, `check` | `//#…` | root scripts (**new** `server-debug`, `build-local-image`, `smoke-container`) |
+| workspace | `doctor`, `server`, `server-debug`, `build-local-image`, `smoke-container`, `check` | `//#…` | root scripts (**new** `server-debug`, `build-local-image`, `smoke-container`); `journey` moved to `@zitadel/e2e#journey`, and moon keeps `workspace:journey` as a deprecated alias |
 | workspace | `cli` (interactive) | — | not a turbo task: interactive tasks need turbo's terminal UI. `pnpm run cli -- …` (the root script that exists today) |
 | cli-skill-e2e (no moon project) | — | — | its `test` script is renamed `eval` (`eval:fresh` for `FRESH=1`), otherwise `turbo run test` would run a Claude-driven eval |
 
 ## What replaces each moon feature
 
-### `mutex` (17 uses, 4 names)
+### `mutex` (25 uses, 5 names)
 
 | mutex | protected | replacement |
 |---|---|---|
 | `browser-tests` (components, api-mock, storybook, sdk-qwik `test`) | one real-Chromium Vite server at a time (#1490) | `task-guard --mutex browser-tests` in the four `test` scripts: a lock held across the retries. Ordering edges were rejected: with `--continue=dependencies-successful` one failing browser suite would skip the other three. |
 | `generated-sources` (server `generate`, `clean-generated`, `check-generate`, `check-generate-pruned`; api `generate`; config `sync-schemas`) | generation rewriting files other tasks read mid-graph | `task-guard --mutex generated-sources` in the six scripts. Ordering edges were rejected: they would put the Go generation on the critical path of every TypeScript build. |
 | `public-dist` (api, config, sdk-next `build-release`; cli `test`) | release builds cleaning a dist the CLI tests import | an edge: the release chain starts after `@zitadel/cli#test`. Moon could not express that edge (cli depends on those packages, a project-graph cycle); turbo has no project graph. |
+| `e2e-serial` (e2e `console-real`, `console-embedded`, `console-platform`, `demo-next-mock`, `demo-next-real`, `demo-nuxt-mock`, `journey-local`; testing `test-integration`) | the lanes that boot servers in ci.yml's e2e step (`moon exec e2e:all`), one at a time (both demo-next lanes serve :3002) | ci-turbo.yml runs the lane groups as separate steps; within a turbo run only the demo-next pair collides, so their two scripts hold `task-guard --mutex demo-next-app`. |
 | `sdk-nuxt-dist` (sdk-nuxt `build`, `build-release`; demo-nuxt `build`) | demo-nuxt bundling from sdk-nuxt/dist | the existing `demo-nuxt#build → sdk-nuxt#build` edge orders the dev builds; the release build never shares a turbo invocation with demo-nuxt. If that ever changes, the guard covers it. |
 
 The lock lives in the OS temp dir under a hash of the repository root, so two
@@ -235,7 +233,14 @@ scripts go with moon at the cutover.
 
 Turbo runs what is named. The gate names `lint typecheck build test
 check-adrs check-moon-graph`; every `runInCI: false` task has another name
-(`e2e*`, `build-release`, `dev`, …) and is never reached. The e2e lanes and
+(`build-release`, `dev`, …) and is never reached. Moon's e2e lanes are
+`runInCI: "skip"`, which keeps them out of the `moon ci` graph, and ci.yml runs
+them in a step of its own with `moon exec e2e:all --ignore-ci-checks`; turbo
+has no `all`, and ci-turbo.yml runs the lanes as steps gated by ci-mode. One
+known difference: the console real-instance configs retry once when `CI` is
+set (`retries: process.env.CI ? 1 : 0`); moon's lane commands unset `CI`
+(`env -u`: a task `env` entry would not override the runner's value), turbo
+leaves it set, so only turbo retries them. The e2e lanes and
 the dev/runtime tasks also get `cache: false`, which moon mostly left cached.
 `runInCI: true` on the database lanes existed only to keep `moon run` from
 hiding them in CI; it has no counterpart and needs none, and the `env -u CI`
@@ -317,7 +322,7 @@ somewhere other than the dev `dist/` (open decision 5). The order check
 | `scripts/check-typecheck-programs.mjs` | parses each `moon.yml` `typecheck` task | reads each package's `typecheck` script directly (the moon task only ever ran that script); the `moon.yml` existence check becomes "has a `typecheck` script" | not ported (half a day; test unchanged) |
 | `scripts/doctor.mjs` | `node_modules/.bin/moon --version` | checks turbo the same way (`turbo --version` from `node_modules/.bin`, the catalog pin); drops the PATH-shadowing warning or applies it to turbo | not ported (half a day) |
 | `scripts/check.mjs` | `moon run …`, `moon ci …` | phases call `runnerCommand` / `workspaceCommand`; the Node phase runs the whole gate under turbo (no `--affected`, see below) | done |
-| `scripts/run-server.mjs`, `run-server-debug.mjs`, `run-cli.mjs`, `apps/console/scripts/dev-real.mts`, `apps/cli-journey-e2e/scripts/local-registry.mjs` | `moon run <targets>` | `runnerCommand(targets)` | done; existing tests pass (default runner moon) |
+| `scripts/run-server.mjs`, `run-server-debug.mjs`, `run-cli.mjs`, `apps/console/scripts/dev-real.mts`, `e2e/journey/scripts/local-registry.mjs` | `moon run <targets>` | `runnerCommand(targets)` | done; existing tests pass (default runner moon) |
 | `scripts/go-generate.mjs`, `check-pr-title.mjs`, `clean-generated.mjs`, `generated-outputs.mjs`, `assert-file.mjs` | mention moon in skip lists or hints | `.turbo` is already skipped; hints say `moon run server:generate` → runner-neutral wording | cutover |
 | `scripts/release.mjs` | none (its deps came from the task graph) | reads `RELEASE_SKIP_CONTAINER=1` as `--skip-container`: under turbo, arguments after `--` would put new cache keys on the whole release graph (turborepo.md, Commands) | done |
 
@@ -342,9 +347,11 @@ set.
 | `moon run server:test` | dropped: part of the gate (moon re-ran it because `moon ci` selects by affectedness) |
 | `moon run server:test-postgres` / `test-sqlite` | `turbo run test-postgres --filter=@zitadel/server` / `test-sqlite` |
 | `env -u CI -u GITHUB_ACTIONS moon run release:snapshot -- --skip-container` | `RELEASE_SKIP_CONTAINER=1 turbo run snapshot --filter=@zitadel/release` (no `env -u`; no arguments after `--`, see turborepo.md) |
-| `… moon run cli-journey-e2e:e2e-local -- --ci …` | `JOURNEY_CI=1 JOURNEY_MATRIX=… turbo run e2e-local --filter=@zitadel/cli-journey-e2e` |
-| `… moon run testing:test-integration demo-next-e2e:e2e-real` | `turbo run test:integration e2e-real --filter=@zitadel/testing --filter=@zitadel/demo-next-e2e` |
-| `… moon run console-e2e:e2e-real` (embedded, platform) | `turbo run e2e-real --filter=@zitadel/console-e2e` (…) |
+| `moon exec e2e:all --ignore-ci-checks` (gate `e2e`): every lane below, in one step after the graph | the lanes as gated steps (rows below) |
+| `e2e:journey-local` in the e2e step (`JOURNEY_*` env on the step) | `JOURNEY_CI=1 JOURNEY_MATRIX=… turbo run e2e-local --filter=@zitadel/e2e` |
+| `testing:test-integration`, `e2e:demo-next-real` in the e2e step | `turbo run test:integration demo-next-real --filter=@zitadel/testing --filter=@zitadel/e2e` |
+| `e2e:console-real` (embedded, platform) in the e2e step | `turbo run console-real --filter=@zitadel/e2e` (…) |
+| `e2e:console-smoke`, `e2e:demo-next-mock`, `e2e:demo-nuxt-mock` in the e2e step | `turbo run console-smoke demo-next-mock demo-nuxt-mock --filter=@zitadel/e2e` (gate `suites_mock`) |
 | `… moon run release:version` / `release:pack` | `turbo run version --filter=@zitadel/release` / `pack` |
 | Depot's remote cache (implicit) | the remote-cache step, see below |
 
@@ -386,7 +393,7 @@ large, and it is the one piece that must land exactly at the cutover:
 | `AGENTS.md` | the front-door table (`moon run workspace:doctor` → `pnpm run doctor`, `moon ci :lint :typecheck :build :test` → `turbo run lint typecheck build test`, `moon run <project>:<task>` → `turbo run <task> --filter=@zitadel/<project>`), "Project Shape" (moon owns the graph), "General Guidelines for working with Moon" → a turbo section, the ADR note about Nx |
 | `CONTRIBUTING.md` | the four command tables, "What CI runs", the remote-cache paragraph (Depot → the chosen cache), "If you are new to Moon" (`turbo ls`, `turbo run --dry`), the release section |
 | `.moon/AGENTS.md` | replaced by `docs/design/build/turborepo.md`: the config layout (root vs package files), the inputs rule (`$TURBO_DEFAULT$` + `$TURBO_ROOT$`), the dependency rules (no `^build`; the release chain), what the guard is for |
-| `README.md`, `docs/runbooks/*.md`, `docs/design/**`, package `README.md`/`AGENTS.md` files (storybook, console, testing, api-mock, config, design-tokens, cli-journey-e2e, …), `apps/docs/content/**` (two pages) | command substitutions; the `env -u CI` incantations disappear |
+| `README.md`, `docs/runbooks/*.md`, `docs/design/**`, package `README.md`/`AGENTS.md` files (storybook, console, testing, api-mock, config, design-tokens, e2e, …), `apps/docs/content/**` (two pages) | command substitutions; the `env -u CI` incantations disappear |
 | code comments and error hints | `internal/staticui/*/embed.go`, `cmd/server/mux_test.go`, the Playwright configs, `packages/testing/src/playwright-config.ts`, `packages/design-tokens/scripts/build.ts` banners (regenerate), `apps/cli/vitest.config.ts`, `vitest.shared.mjs`, … — each says "run `moon run x:build`"; they become runner-neutral (`pnpm run server`, `turbo run build --filter=…`) |
 | ADRs | an ADR recording the switch (the repo rule: "Do not reintroduce Nx or GoReleaser without updating the ADRs first" applies to the task runner too) |
 

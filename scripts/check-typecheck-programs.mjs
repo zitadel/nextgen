@@ -45,6 +45,8 @@ function projectDirs() {
       }
     }
   }
+  // The root-level e2e project is a project itself, not a folder of them.
+  if (existsSync(join("e2e", "moon.yml"))) dirs.push("e2e");
   return dirs;
 }
 

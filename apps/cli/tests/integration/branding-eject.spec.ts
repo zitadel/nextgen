@@ -45,6 +45,15 @@ describe("branding eject", () => {
 
   describe("against a valid server", () => {
     describe("--json", () => {
+      it("starts from the default design when none is named and no one can be asked", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["branding", "eject", "--non-interactive", "--json"]);
+
+        expect(result).toSucceed();
+        expect(app.envelopeOf<{ design: string }>(result).data.design).toEqual(expect.any(String));
+      });
+
       it("publishes nothing by itself", async () => {
         const published = platform.capturesBrandingPublishes();
         const app = await aSetUpApp();

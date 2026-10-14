@@ -2,11 +2,9 @@ import { readdir, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { parseEnv } from "node:util";
 
-import { password, text } from "@clack/prompts";
-
 import { ZitadelError } from "./errors";
+import { input } from "./input";
 import { hasZitadelSecret, readZitadelSecret } from "./project";
-import { bailOnCancel } from "./prompt-cancel";
 import { appendManagedEnvValue } from "./fs-safe";
 import { resolveServer, serverOrigin } from "./server";
 
@@ -286,17 +284,23 @@ export async function requireValueInteractive(
     return requireValue(environment, key);
   }
   const name = environment.name.value;
-  const ask = SECRET_KEYS.has(key) ? password : text;
-  const answer = await ask({ message: `${key} for the ${name} environment` });
-  bailOnCancel(answer, `Resolving ${key}`);
-  const typed = String(answer).trim();
-  if (typed === "") {
-    // An empty answer is no answer; fall through to the same throw.
-    return requireValue(environment, key);
-  }
-  // Persist (and return) the normalized form, matching how the resolver stores
-  // a server value, so the file and this run agree with every later run.
-  const value = key === "ZITADEL_URL" ? serverOrigin(typed) : typed;
+  const value = await input(
+    {
+      kind: SECRET_KEYS.has(key) ? "secret" : "text",
+      name: key,
+      message: `${key} for the ${name} environment`,
+      // Persist (and return) the normalized form, matching how the resolver
+      // stores a server value, so the file and this run agree with every later run.
+      parse: (answer: string) => {
+        const typed = answer.trim();
+        if (typed === "") {
+          return { ok: false, problem: `Enter ${key}.` } as const;
+        }
+        return { ok: true, value: key === "ZITADEL_URL" ? serverOrigin(typed) : typed } as const;
+      },
+    },
+    { interactive: true, force: false },
+  );
   await persistEnvValue(join(options.cwd, `.env.${name}.local`), key, value);
   return value;
 }
