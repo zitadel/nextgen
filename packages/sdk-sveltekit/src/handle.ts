@@ -386,6 +386,11 @@ async function handleAuth(
  * ```ts
  * import { createNextgenHandle } from "@zitadel/sdk-sveltekit/server";
  *
+ * // SvelteKit does not surface .env files on process.env; load it in dev.
+ * try {
+ *   process.loadEnvFile?.(".env.local");
+ * } catch {}
+ *
  * export const handle = createNextgenHandle({
  *   protectedRoutes: ["/admin*", "/dashboard*"],
  *   loginPath: "/login",
@@ -393,8 +398,8 @@ async function handleAuth(
  * ```
  *
  * `url` and `projectSecret` default to `ZITADEL_URL` / `ZITADEL_PROJECT_SECRET`
- * from `process.env`. Compose it with other hooks via `sequence()` from
- * `@sveltejs/kit/hooks`.
+ * from `process.env` (version-independent, unlike SvelteKit's `$env` modules).
+ * Compose it with other hooks via `sequence()` from `@sveltejs/kit/hooks`.
  *
  * @param options - Middleware configuration options. `projectSecret` is the
  *   project service-key, sent as the bearer on the `POST /sessions/exchange` handoff only.
