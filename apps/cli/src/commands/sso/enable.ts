@@ -341,7 +341,7 @@ export default class SsoEnable extends EnvironmentCommand {
       });
       // A connection is scaffolded with the properties the provider maps by
       // default, narrowed to what the schema defines. A schema that defines none
-      // of them leaves it with no mapping, and `plan` refuses a connection that
+      // of them leaves it with no mapping, and `deploy` refuses a connection that
       // fills nothing, so say so now and not on the next command.
       if (!("claim_mapping" in connection)) {
         reportWarning(
@@ -478,8 +478,7 @@ export default class SsoEnable extends EnvironmentCommand {
       throw new ZitadelError("E_NOT_FOUND", `No login flow runs against ${schema.name}`, {
         hint:
           "The provider is offered by a flow, and none of the files under .zitadel/flows/ " +
-          "names this schema. Check the flow's user_schema, or run `deploy` first so the " +
-          "schema's published id is recorded in .zitadel/state.json.",
+          "names this schema. Check that the flow's user_schema names the schema's objectType.",
         details: { schema: schema.path },
       });
     }
@@ -641,7 +640,7 @@ async function publishedIdOf(cwd: string, path: string): Promise<string | undefi
       {
         hint:
           "The file records which platform resource each local file was synced as. " +
-          "Fix or remove it and run `zitadel deploy`, then run this command again.",
+          "Fix or remove it, then run this command again.",
         details: { file: ".zitadel/state.json" },
       },
     );

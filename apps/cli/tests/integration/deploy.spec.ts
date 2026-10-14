@@ -168,27 +168,47 @@ describe("deploy", () => {
         expect(second.content_hash).toBe(first.content_hash);
       });
 
-      it("fails with a conflict when the targets drifted since inspection", async () => {
+      it("deploys to every primary after a deploy to one of them", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin("https://a.example.com");
         await app.addPrimaryOrigin("https://b.example.com");
         await app.deployData();
-
-        // Deploying to one origin leaves the other behind, so the two primary
-        // origins no longer serve the same deployment.
         await app.editUserSchema((schema) => {
           schema.properties.one = { type: "string" };
         });
         await app.deployData(["--origin", "https://a.example.com"]);
-
-        // A deploy to every primary now finds the origins out of sync with the
-        // single deployment it observed, so the optimistic guard rejects it.
         await app.editUserSchema((schema) => {
           schema.properties.two = { type: "string" };
         });
+
         const result = await app.deploy();
 
-        expect(result).toFailWith("E_CONFLICT");
+        expect(result).toSucceed();
+      });
+
+      it("says a revoked release cannot be deployed rather than reporting a race", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        const first = await app.deployData();
+        await app.editUserSchema((schema) => {
+          schema.properties.one = { type: "string" };
+        });
+        await app.deployData();
+        await app.run([
+          "release",
+          "revoke",
+          first.release_id ?? "",
+          "--force",
+          "--non-interactive",
+          "--json",
+        ]);
+        await app.editUserSchema((schema) => {
+          delete schema.properties.one;
+        });
+
+        const result = await app.deploy();
+
+        expect(result).toExplain("revoked");
       });
 
       it("validates and writes nothing on a dry run", async () => {

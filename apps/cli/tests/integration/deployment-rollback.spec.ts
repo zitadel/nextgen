@@ -149,6 +149,31 @@ describe("deployment rollback", () => {
         expect(result).toFailWith("E_VALIDATION");
       });
 
+      it("refuses a bare rollback that would also move an origin the last deploy never touched", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin("https://a.example.com");
+        await app.addPrimaryOrigin("https://b.example.com");
+        await app.deployData();
+        await app.editUserSchema((schema) => {
+          schema.properties.one = { type: "string" };
+        });
+        await app.deployData(["--origin", "https://a.example.com"]);
+        await app.editUserSchema((schema) => {
+          schema.properties.two = { type: "string" };
+        });
+        await app.deployData(["--origin", "https://b.example.com"]);
+
+        const result = await app.run([
+          "deployment",
+          "rollback",
+          "--force",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
       it("rolls back nothing on a dry run, needing no --force", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();

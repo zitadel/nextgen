@@ -1774,6 +1774,39 @@ describe("api-mock releases and deployments", () => {
     expect(((await unknown.json()) as { code: string }).code).toBe("proj.origin_not_allowed");
   });
 
+  test("refuses a rollback whose expected deployment is no longer the newest", async () => {
+    const project = await newProject("deploy-rollback-guard");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const first = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const firstDeploy = (await (
+      await createDeployment(project.id, project.secret, {
+        release_id: first.id,
+        targets: ["primary"],
+      })
+    ).json()) as { id: string };
+    const second = (await (await createRelease(project.id, project.secret, rel2)).json()) as {
+      id: string;
+    };
+    await createDeployment(project.id, project.secret, {
+      release_id: second.id,
+      targets: ["primary"],
+    });
+
+    const rollback = await fetch(
+      `${BASE}/deployments/${firstDeploy.id}/rollback?project_id=${project.id}`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({ expected_deployment_id: firstDeploy.id }),
+      },
+    );
+
+    expect(rollback.status).toBe(409);
+    expect(((await rollback.json()) as { code: string }).code).toBe("dep.conflict");
+  });
+
   test("rolls back to an earlier deployment, reversing the live release", async () => {
     const project = await newProject("deploy-rollback");
     await addPrimary(project.id, project.secret, "https://app.acme.com");

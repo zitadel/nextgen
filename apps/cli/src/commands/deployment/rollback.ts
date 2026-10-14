@@ -93,12 +93,31 @@ export default class DeploymentRollback extends EnvironmentCommand {
           "E_VALIDATION",
           "The last deployment's origins have different histories, so one rollback can't undo it",
           {
-            hint: "Name the deployment to re-apply, or roll back one origin at a time with --origin.",
+            hint: "Name the deployment to re-apply; it goes live again on every origin it targeted.",
             nextCommands: [this.suggest("deployment list")],
           },
         );
       }
-      targetId = [...priorIds][0] as string;
+      // A rollback re-applies the named deployment to every origin it
+      // targeted, which the request cannot narrow. If that deployment also
+      // targeted an origin the undone deploy never touched, re-applying it
+      // would silently move that origin back too, so it is refused instead.
+      const prior = priors[0] as ListDeployments200DeploymentsItem;
+      const undone = new Set(origins);
+      const beyond = prior.targets
+        .map((target) => target.origin)
+        .filter((target) => !undone.has(target));
+      if (beyond.length > 0) {
+        throw new ZitadelError(
+          "E_VALIDATION",
+          `Rolling back to ${prior.id} would also change ${beyond.join(", ")}`,
+          {
+            hint: `A rollback re-applies ${prior.id} to every origin it targeted. Name it to re-apply it everywhere, or deploy the release you want to the origin instead.`,
+            nextCommands: [this.suggest("deployment list")],
+          },
+        );
+      }
+      targetId = prior.id;
     }
 
     // A dry run re-applies nothing, so it stops once the target is resolved,

@@ -44,13 +44,3 @@ export async function updateScaffold(cwd: string, scaffold: ScaffoldManifest): P
   const updated: ZitadelState = { ...current, scaffold };
   await writeFile(join(cwd, ".zitadel/state.json"), JSON.stringify(updated, null, 2));
 }
-
-/**
- * Remove an entry from the state file. No-op if the key is absent.
- */
-export async function removeFromState(cwd: string, key: string): Promise<void> {
-  const current = await readState(cwd);
-  const { [key]: _removed, ...rest } = current.resources;
-  const updated: ZitadelState = { ...current, resources: rest };
-  await writeFile(join(cwd, ".zitadel/state.json"), JSON.stringify(updated, null, 2));
-}

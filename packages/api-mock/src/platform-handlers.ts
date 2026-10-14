@@ -1955,6 +1955,29 @@ export function setupPlatformHandlers() {
       }
 
       const origins = target.targets.map((row) => row.origin);
+      // The optimistic guard: the deployment the caller believes is the newest
+      // one to any of the targets. A mismatch is a deploy that raced in.
+      const rollbackData = body.data as Record<string, unknown>;
+      const expectedRollbackId =
+        typeof rollbackData.expected_deployment_id === "string"
+          ? rollbackData.expected_deployment_id
+          : undefined;
+      if (expectedRollbackId !== undefined) {
+        const newestToTargets = origins
+          .map((origin) => newestDeploymentForOrigin(project.id, origin))
+          .filter((deployment): deployment is DeploymentRecord => deployment !== undefined)
+          .sort((a, b) => b.seq - a.seq)[0];
+        if (newestToTargets && newestToTargets.id !== expectedRollbackId) {
+          return HttpResponse.json(
+            errorBody(
+              "dep.conflict",
+              "deployment: the newest deployment to the targets does not match expected_deployment_id",
+              { deployment: deploymentResponse(newestToTargets) },
+            ),
+            { status: 409 },
+          );
+        }
+      }
       const alreadyServed = origins.every(
         (origin) => newestDeploymentForOrigin(project.id, origin)?.releaseId === target.releaseId,
       );

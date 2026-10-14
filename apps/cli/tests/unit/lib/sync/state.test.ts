@@ -4,12 +4,7 @@ import { tmpdir } from "node:os";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import {
-  readState,
-  removeFromState,
-  updateState,
-  type ZitadelState,
-} from "../../../../src/lib/sync/state";
+import { readState, updateState, type ZitadelState } from "../../../../src/lib/sync/state";
 
 let cwd: string;
 
@@ -24,11 +19,6 @@ afterEach(async () => {
 async function writeStateFile(state: ZitadelState): Promise<void> {
   await mkdir(join(cwd, ".zitadel"), { recursive: true });
   await writeFile(join(cwd, ".zitadel/state.json"), JSON.stringify(state));
-}
-
-async function readStateFile(): Promise<ZitadelState> {
-  const raw = await readFile(join(cwd, ".zitadel/state.json"), "utf8");
-  return JSON.parse(raw) as ZitadelState;
 }
 
 describe("readState", () => {
@@ -111,37 +101,5 @@ describe("updateState", () => {
 
     const raw = await readFile(join(cwd, ".zitadel/state.json"), "utf8");
     expect(raw).toContain('\n  "framework"');
-  });
-});
-
-describe("removeFromState", () => {
-  it("drops the named resource entry", async () => {
-    await writeStateFile({
-      framework: "next",
-      resources: {
-        ".zitadel/schemas/a.json": { id: "a", hash: "ha" },
-        ".zitadel/schemas/b.json": { id: "b", hash: "hb" },
-      },
-    });
-
-    await removeFromState(cwd, ".zitadel/schemas/a.json");
-
-    const result = await readState(cwd);
-    expect(result.resources).not.toHaveProperty(".zitadel/schemas/a.json");
-    expect(result.resources[".zitadel/schemas/b.json"]).toEqual({ id: "b", hash: "hb" });
-    expect(result.framework).toBe("next");
-  });
-
-  it("is a no-op when the key is absent", async () => {
-    const state: ZitadelState = {
-      framework: "next",
-      resources: { ".zitadel/schemas/a.json": { id: "a", hash: "ha" } },
-    };
-    await writeStateFile(state);
-
-    await removeFromState(cwd, ".zitadel/schemas/missing.json");
-
-    const result = await readStateFile();
-    expect(result).toEqual(state);
   });
 });
