@@ -439,6 +439,74 @@ describe("<zitadel-logout>", () => {
       expect(window.location.href).toBe("");
     },
   );
+
+  it.each(OUTAGES)(
+    "fires zitadel-session-error with phase signout when sign-out gets %s",
+    async (_, answer) => {
+      const element = mount();
+      await flush(element);
+      server.use(http.delete(`${API_BASE}/sessions/me`, answer));
+      const errors: CustomEvent[] = [];
+      element.addEventListener("zitadel-session-error", (e) => errors.push(e as CustomEvent));
+
+      shadowQuery<HTMLButtonElement>(element, ".trigger").click();
+      await element.updateComplete;
+      shadowQuery<HTMLButtonElement>(element, ".signout-btn").click();
+      await new Promise((resolve) => setTimeout(resolve, 32));
+      await element.updateComplete;
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]?.bubbles && errors[0]?.composed).toBe(true);
+      expect(errors[0]?.detail).toMatchObject({
+        phase: "signout",
+        message: shadowQuery<HTMLElement>(element, ".error-bar").textContent?.trim(),
+      });
+    },
+  );
+
+  it.each(NO_SESSION)("fires no zitadel-session-error when sign-out gets %s", async (_, a) => {
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...window.location, href: "" },
+      writable: true,
+    });
+    const element = mount();
+    await flush(element);
+    server.use(http.delete(`${API_BASE}/sessions/me`, a));
+    const errors: Event[] = [];
+    element.addEventListener("zitadel-session-error", (e) => errors.push(e));
+
+    shadowQuery<HTMLButtonElement>(element, ".trigger").click();
+    await element.updateComplete;
+    shadowQuery<HTMLButtonElement>(element, ".signout-btn").click();
+    await new Promise((resolve) => setTimeout(resolve, 32));
+
+    expect(errors).toHaveLength(0);
+  });
+
+  it.each([...OUTAGES, ...UNREADABLE_SESSIONS])(
+    "fires zitadel-session-error with phase load for %s",
+    async (_, answer) => {
+      sessionAnswer = answer;
+      const errors: CustomEvent[] = [];
+      host.addEventListener("zitadel-session-error", (e) => errors.push(e as CustomEvent));
+      await flush(mount());
+      expect(errors).toHaveLength(1);
+      expect(errors[0]?.detail).toMatchObject({ phase: "load" });
+      expect(typeof errors[0]?.detail.message).toBe("string");
+    },
+  );
+
+  it.each(NO_SESSION)(
+    "fires no zitadel-session-error when the request answers %s",
+    async (_, a) => {
+      sessionAnswer = a;
+      const errors: Event[] = [];
+      host.addEventListener("zitadel-session-error", (e) => errors.push(e));
+      await flush(mount());
+      expect(errors).toHaveLength(0);
+    },
+  );
 });
 
 describe("<zitadel-logout> after signing out in place", () => {

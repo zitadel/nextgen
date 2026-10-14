@@ -2,6 +2,8 @@ import "server-only";
 
 import type { ReactNode } from "react";
 
+import { toClientAuth } from "@zitadel/sdk-core/middleware";
+
 import type {
   AuthResult,
   ClientAuthResult,
@@ -13,19 +15,6 @@ import type {
 import { AuthContextProvider } from "./context.js";
 
 const signedOut: UnauthState = { isAuthenticated: false, session: null };
-
-/**
- * Explicit field pick — never a spread. The raw session token (and any future
- * server-only field) must not survive the conversion to the client shape.
- */
-function toClientSession(session: ClientSession | NextgenSession): ClientSession {
-  return {
-    userId: session.userId,
-    identifier: session.identifier,
-    identifierProperty: session.identifierProperty,
-    display: session.display,
-  };
-}
 
 /**
  * Seeds client components (the `useAuth()` hook) with the server-known auth
@@ -48,7 +37,9 @@ function toClientSession(session: ClientSession | NextgenSession): ClientSession
  * ```
  *
  * Executed in a Server Component, it converts the input to the client-safe
- * {@link ClientAuthResult} — dropping the raw session token — and only the
+ * {@link ClientAuthResult} with sdk-core's `toClientAuth` — dropping the raw
+ * session token but keeping `reason`, so `useAuth()` can tell an outage
+ * (`reason: "unavailable"`) from a signed-out visitor — and only the
  * stripped value is serialised across the server→client boundary. Passing the
  * full `auth()` result straight into a `"use client"` component would embed
  * the raw token in the RSC flight payload, readable by any script running on
@@ -83,11 +74,11 @@ export function NextgenProvider({
   if (!session) {
     value = signedOut;
   } else if ("isAuthenticated" in session) {
-    value = session.isAuthenticated
-      ? { isAuthenticated: true, session: toClientSession(session.session) }
-      : signedOut;
+    value = toClientAuth(session);
   } else {
-    value = { isAuthenticated: true, session: toClientSession(session) };
+    // A bare session: an explicit field pick, never a spread, so the raw token
+    // (and any future server-only field) cannot survive the conversion.
+    value = toClientAuth({ isAuthenticated: true, session });
   }
 
   return <AuthContextProvider value={value}>{children}</AuthContextProvider>;

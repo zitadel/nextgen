@@ -49,12 +49,16 @@ the widget's own default (e.g. `purpose` is `"login"`).
 | Component                | Outputs (each emits the event detail)                                |
 | ------------------------ | -------------------------------------------------------------------- |
 | `<zitadel-auth-login>`   | `flowStep`, `flowInput`, `flowComplete`, `flowRedirect`, `flowError` |
-| `<zitadel-auth-logout>`  | `signout`, `sessionMissing`                                          |
-| `<zitadel-auth-session>` | `signout`, `sessionMissing`                                          |
+| `<zitadel-auth-logout>`  | `signout`, `sessionMissing`, `sessionError`                          |
+| `<zitadel-auth-session>` | `signout`, `sessionMissing`, `sessionError`                          |
 
 `sessionMissing` fires when the visitor has no session: the widget renders nothing, and the
 session card goes to its `postSignOutUrl` when one is set, unless that URL is the page it is
-on.
+on, unless that URL is the page it is on.
+`sessionError` fires when loading the session (`phase: "load"`) or signing out
+(`phase: "signout"`) fails some other way, such as a 5xx or a network error: the widget keeps
+its surface and shows the error, and the detail carries `message` and, when a response came
+back, its `status` and `code`.
 
 ```html
 <zitadel-auth-login [project]="project" (flowComplete)="onComplete($event)"
@@ -64,7 +68,8 @@ on.
 ### Projected content
 
 Content placed inside a component is projected into the underlying element (for example
-`<zitadel-auth-login>`'s `attribution-trailing` slot). A `<template>`
+`<zitadel-auth-login>`'s `attribution-trailing` slot). `<zitadel-auth-session>` projects
+nothing: its element has no slot to show content in. A `<template>`
 inside `<zitadel-auth-logout>` replaces the avatar menu with your own markup: `{{display}}`,
 `{{identifier}}` and `{{initial}}` are filled in, and any element with `data-action="logout"`
 signs the user out. Mark the `<template>` `ngNonBindable` so Angular leaves the

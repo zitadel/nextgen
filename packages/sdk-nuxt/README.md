@@ -73,7 +73,7 @@ const auth = useAuth();
 </template>
 ```
 
-The returned state intentionally omits the raw JWT — use `getAuth(event)` in
+The returned state intentionally omits the raw session token — use `getAuth(event)` in
 a server route when you need the token to call upstream APIs:
 
 ```ts
@@ -159,7 +159,9 @@ const onSessionMissing = () => console.info("no session");
 ```
 
 A failure that is not the backend saying "no session" (a gateway's error
-page, a 5xx, a network error) keeps the widget and shows the error. See the
+page, a 5xx, a network error) keeps the widget, shows the error and fires
+`@zitadel-session-error`, whose detail carries `phase` (`load` or `signout`),
+`message` and, when a response came back, `status` and `code`. See the
 `@zitadel/components` README for the full rule.
 
 ## Surface 2 — direct middleware (hand-rolled)

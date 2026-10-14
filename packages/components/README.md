@@ -276,9 +276,11 @@ renders the bundled `default.liquid`. Tracked as a follow-up.
 | `lang` | `string` | BCP 47 tag (e.g. `"de"`, `"en-US"`). Resolves to a built-in dictionary; falls back to `<html lang>` / `navigator.language` |
 | `locales` | `Record<string, Locale>` | Custom locale dictionaries keyed by language code; spread over the built-in dictionary so partial overrides work |
 | `postSignInUrl` / `post-sign-in-url` | `string` | After `complete: "show"`, exchange the `handoff_token` for a session cookie and navigate here |
-| `resumeFlowId` / `resume-flow-id` | `string` | Resume an existing flow handle instead of starting fresh |
+| `resumeFlowId` / `resume-flow-id` | `string` | Resume an existing flow handle instead of starting fresh. Unset, `null` or `""` fall back to the `flow` query parameter. Every SDK's login wrapper takes it as `resumeFlowId` |
 | `previewState` / `preview-state` | `'default' \| 'validation_error' \| 'submission_error' \| 'loading' \| 'success'` | Preview mode for operator surfaces such as the console's branding screen. The flow still starts, so the step is the one the project serves; the element then shows it in this state and submits nothing. Only the purpose's entry step can be previewed. `LOGIN_PREVIEW_STATES` lists the values, and `loginPreviewStatesFor(step)` the ones that show a served step differently from `default`; any other value runs the flow for real |
 | `previewSuccessStep` / `preview-success-step` | `string` | The terminal step the `success` preview paints, for a flow definition that names it differently from the default flow's `done` |
+
+The two preview properties are for an operator surface, so only `@zitadel/sdk-react`'s `ZitadelLogin` (and TanStack Start's, which re-exports it) takes them as props. Elsewhere, set them on the element through the wrapper's element handle.
 
 Events: `zitadel-flow-input`, `zitadel-flow-step`, `zitadel-flow-complete`,
 `zitadel-flow-error`, `zitadel-flow-redirect`. `zitadel-flow-step` fires for
@@ -335,6 +337,13 @@ Events (both bubble and are composed):
   projected template) and stays on the page: the menu sits in an app's own
   chrome. Anything else is not "signed out": the control stays and the menu
   shows the error.
+- `zitadel-session-error` (detail `{ status?, code?, message, phase }`) when
+  loading the identity (`phase: "load"`) or signing out (`phase: "signout"`)
+  fails with anything other than the backend's no-session answer: a 5xx, a
+  network error, a gateway's page, a body that is not a session. `message` is
+  the text the element shows; `status` is set when a response came back and
+  `code` when it carried the backend's error code. Use it to tell an outage
+  from a visitor without a session, or to end your own "signing out" state.
 
 "No session" means the backend's own answer: `401` with the
 `auth.unauthorized` code or `404` with `sess.not_found`. A gateway, WAF or
@@ -375,17 +384,29 @@ Events (both bubble and are composed):
   when one is set and otherwise renders nothing. Anything else is not "signed
   out": the card stays and shows the error. "No session" is decided as for
   `<zitadel-logout>` above.
+- `zitadel-session-error` (detail `{ status?, code?, message, phase }`) for any
+  other failure of the identity request or the sign-out, as on
+  `<zitadel-logout>`.
 
 The card never redirects to the page it is on. When `post-sign-out-url`
-resolves to the current page (same origin, path and query; the fragment is
-ignored), a visit without a session renders nothing instead of navigating, so
-a page that shows the card and is also its sign-out target (`/account` with
-`post-sign-out-url="/account"`) does not reload itself forever. A sign-out on
-that page still navigates there, which reloads it once.
+resolves to the current page (same origin, path with or without a trailing
+slash, and query parameters in any order; the fragment is ignored), a visit
+without a session renders nothing instead of navigating, so a page that shows
+the card and is also its sign-out target (`/account` with
+`post-sign-out-url="/account"`, or `/account/` once the host adds the slash)
+does not reload itself forever. A sign-out on that page still navigates there,
+which reloads it once.
 
-The framework wrappers surface these as `onSignout` / `onSessionMissing`, except
-Vue and Angular, which emit `signout` / `sessionMissing`, and Qwik, which takes
-`onSignout$` / `onSessionMissing$`.
+The card also does not repeat a no-session navigation from the same page to
+the same target within ten seconds (remembered in `sessionStorage`). When the
+target sends the visitor straight back, for example `post-sign-out-url="/"`
+where `/` redirects to the card's page, the second visit renders nothing and
+only fires `zitadel-session-missing`.
+
+The framework wrappers surface these as `onSignout` / `onSessionMissing` /
+`onSessionError`, except Vue and Angular, which emit `signout` /
+`sessionMissing` / `sessionError`, and Qwik, which takes `onSignout$` /
+`onSessionMissing$` / `onSessionError$`.
 
 ### `<zl-field>`
 

@@ -45,6 +45,7 @@ export default defineComponent({
     // reads as "login", so clearing the prop behaves the same as never setting it.
     purpose: { type: String as PropType<CreateFlowBodyPurpose>, default: undefined },
     postSignInUrl: { type: String, default: undefined },
+    resumeFlowId: { type: String, default: undefined },
     locales: {
       type: Object as PropType<Record<string, Partial<Record<string, string>>>>,
       default: undefined,
@@ -75,6 +76,7 @@ export default defineComponent({
           proxyPath: props.proxyPath,
           purpose: props.purpose,
           "post-sign-in-url": props.postSignInUrl,
+          "resume-flow-id": props.resumeFlowId,
           // Same raw-unwrap rationale as `project`: hand the widget the plain
           // dictionaries, not Vue's reactive proxy.
           locales: props.locales === undefined ? undefined : toRaw(props.locales),

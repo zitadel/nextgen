@@ -69,4 +69,5 @@ export const UNREADABLE_SESSIONS: readonly (readonly [string, () => Response])[]
   ],
   ["an empty 200", () => new HttpResponse(null, { status: 200 })],
   ["a 200 JSON that is not a session", () => HttpResponse.json({ ok: true })],
+  ["a 200 with an empty session_id", () => HttpResponse.json({ session_id: "" })],
 ];

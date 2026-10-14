@@ -32,11 +32,15 @@ The widget's events are surfaced as optional QRL callbacks:
 | Component | Callbacks |
 | --- | --- |
 | `ZitadelLogin` | `onFlowStep$`, `onFlowInput$`, `onFlowComplete$`, `onFlowRedirect$`, `onFlowError$` |
-| `ZitadelLogout`, `ZitadelSession` | `onSignout$`, `onSessionMissing$` |
+| `ZitadelLogout`, `ZitadelSession` | `onSignout$`, `onSessionMissing$`, `onSessionError$` |
 
 `onSessionMissing$` runs when the visitor has no session: the widget renders nothing, and the
 session card goes to its `postSignOutUrl` when one is set, unless that URL is the page it is
-on.
+on, unless that URL is the page it is on.
+`onSessionError$` runs when loading the session (`phase: "load"`) or signing out
+(`phase: "signout"`) fails some other way, such as a 5xx or a network error: the widget keeps
+its surface and shows the error, and the detail carries `message` and, when a response came
+back, its `status` and `code`.
 
 The SDK listens from the moment the element exists and starts loading every callback's code right
 away. A callback whose code has loaded runs before the widget navigates away (after a sign-out, a
@@ -45,6 +49,7 @@ event is dropped.
 
 Children are passed through to the element, so `<ZitadelLogout>` accepts a `<template>` for its
 template mode and `<ZitadelLogin>` accepts content for its `attribution-trailing` slot.
+`<ZitadelSession>` takes no children: its element has no slot to show them in.
 
 ### How props reach the element
 

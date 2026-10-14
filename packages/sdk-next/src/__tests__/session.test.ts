@@ -90,10 +90,28 @@ describe("getSession()", () => {
     await expect(getSession()).resolves.toEqual({ isAuthenticated: false, session: null });
   });
 
+  // The code alone decides, as it does for the server SDKs and the widgets.
+  it.each([
+    [401, "auth.unauthorized"],
+    [404, "sess.not_found"],
+  ])("treats HTTP %i / %s without a message as signed out", async (status, code) => {
+    fetchMock.mockResolvedValue(jsonResponse({ code }, status));
+
+    await expect(getSession()).resolves.toEqual({ isAuthenticated: false, session: null });
+  });
+
+  it.each([[{}], [{ status: "ok" }], [{ session_id: "" }]])(
+    "throws on a 200 that is not a session (%j) instead of rendering signed-out",
+    async (body) => {
+      fetchMock.mockResolvedValue(jsonResponse(body));
+
+      await expect(getSession()).rejects.toThrow(/not a session/);
+    },
+  );
+
   it.each([
     [401, { error: "no session" }],
     [404, { error: "no session" }],
-    [401, { code: "auth.unauthorized" }],
     [404, { code: "route.not_found", message: "Wrong route" }],
     [401, { code: "sess.not_found", message: "Status/code mismatch" }],
     [404, { code: "auth.unauthorized", message: "Status/code mismatch" }],
@@ -123,7 +141,7 @@ describe("getSession()", () => {
   });
 
   it("strips trailing slashes from the proxy path before building the URL", async () => {
-    fetchMock.mockResolvedValue(jsonResponse({ user_id: "u" }));
+    fetchMock.mockResolvedValue(jsonResponse({ session_id: "s", user_id: "u" }));
 
     await getSession({ proxyPath: "/__nextgen/" });
 
@@ -132,7 +150,7 @@ describe("getSession()", () => {
 
   it("prefers an explicit proxyPath over the configured one", async () => {
     configureZitadel({ projectId: "proj", proxyPath: "/configured" });
-    fetchMock.mockResolvedValue(jsonResponse({ user_id: "u" }));
+    fetchMock.mockResolvedValue(jsonResponse({ session_id: "s", user_id: "u" }));
 
     await getSession({ proxyPath: "/explicit" });
 
@@ -141,7 +159,7 @@ describe("getSession()", () => {
 
   it("falls back to the configureZitadel() proxy path when set", async () => {
     configureZitadel({ projectId: "proj", proxyPath: "/configured" });
-    fetchMock.mockResolvedValue(jsonResponse({ user_id: "u" }));
+    fetchMock.mockResolvedValue(jsonResponse({ session_id: "s", user_id: "u" }));
 
     await getSession();
 

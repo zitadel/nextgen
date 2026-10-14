@@ -13,6 +13,7 @@ import {
   filterResponseHeaders,
   matchesRoutes,
   proxyFailureResponse,
+  redactExchangeBody,
   requiresProjectSecret,
   sessionUnavailableResponse,
   toClientAuth,
@@ -34,7 +35,12 @@ import { checkJwt, isJwtShaped } from "../lib/jwt";
 
 declare module "h3" {
   interface H3EventContext {
-    nextgenAuth: AuthResult;
+    /**
+     * Set by the middleware on every request it runs for. Absent where it did
+     * not run (an ignored route, a handler outside its reach), so read it
+     * through {@link getAuth}, which answers signed out then.
+     */
+    nextgenAuth?: AuthResult;
   }
 }
 
@@ -236,7 +242,10 @@ async function proxyRequest(
     responseHeaders.append("set-cookie", cookie);
   }
 
-  const response = new Response(upstream.body, {
+  // The exchange's answer echoes the HttpOnly session token; the browser
+  // gets the cookie, never the token in a script-readable body (ADR 036).
+  const browserBody = await redactExchangeBody(method, suffix, upstream, responseHeaders);
+  const response = new Response(browserBody, {
     status: upstream.status,
     headers: responseHeaders,
   });
@@ -406,7 +415,7 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<Res
     // survives the outage; a protected route is retryable, not a sign-in.
     event.context.nextgenAuth = { isAuthenticated: false, session: null, reason: "unavailable" };
     if (matchesRoutes(pathname, protectedRoutes)) {
-      return sessionUnavailableResponse();
+      return sessionUnavailableResponse(url);
     }
     return undefined;
   }

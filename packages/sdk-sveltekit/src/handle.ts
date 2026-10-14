@@ -13,6 +13,7 @@ import {
   filterResponseHeaders,
   matchesRoutes,
   proxyFailureResponse,
+  redactExchangeBody,
   requiresProjectSecret,
   sessionUnavailableResponse,
   toClientAuth,
@@ -175,7 +176,10 @@ async function proxyRequest(
     responseHeaders.append("set-cookie", cookie);
   }
 
-  return new Response(upstream.body, {
+  // The exchange's answer echoes the HttpOnly session token; the browser
+  // gets the cookie, never the token in a script-readable body (ADR 036).
+  const browserBody = await redactExchangeBody(method, suffix, upstream, responseHeaders);
+  return new Response(browserBody, {
     status: upstream.status,
     headers: responseHeaders,
   });
@@ -306,7 +310,7 @@ async function handleAuth(
     // survives the outage; a protected route is retryable, not a sign-in.
     event.locals.nextgenAuth = { isAuthenticated: false, session: null, reason: "unavailable" };
     if (matchesRoutes(pathname, protectedRoutes)) {
-      return sessionUnavailableResponse();
+      return sessionUnavailableResponse(url);
     }
     return resolve(event);
   }

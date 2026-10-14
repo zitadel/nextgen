@@ -177,7 +177,11 @@ browser-readable content.** OIDC access and refresh tokens keep their
 contracts in ADR 037. Wired enforcement today: `@zitadel/sdk-nuxt` strips the
 token before seeding its SSR payload; `@zitadel/sdk-next`'s `NextgenProvider`
 converts to the client-safe shape on the server and is `server-only`, so a
-client-side wrapper cannot move the boundary above the strip. A demo-next
+client-side wrapper cannot move the boundary above the strip. The handoff
+exchange's answer carries the session token in its body as well as in the
+cookie, so every SDK proxy relays it through sdk-core's `redactExchangeBody`,
+which drops `session_token` and keeps the status, the `Set-Cookie` and the
+other fields: the widget reads only the cookie. A demo-next
 e2e assertion additionally checks the raw token appears nowhere in a
 rendered response (PR #718) — today that lane is opt-in, not CI enforcement;
 promoting it into the CI-run e2e lane is remaining work below. Exposure
@@ -335,14 +339,17 @@ a failure to reach the backend at all (a network error, a timeout, or a `502`,
 `503` or `504`) starts a per-backend backoff (`SESSION_CHECK_BACKOFF_MS`,
 15 seconds, longer than the default timeout). It is logged once, and for the
 window every session check against that backend answers unknown without asking
-it. While one check has gone unanswered for `SESSION_CHECK_STALL_MS` (1 second),
-other checks answer unknown at once instead of each waiting out the timeout. So
-a hanging backend is probed by the requests of about one second per window,
-not by every request. Any other unknown answer, a `500` included, never starts
+it. A slow answer within `opaqueTokenTimeoutMs` is an answer, not an outage:
+every request waits for its own, because failing fast on elapsed time alone
+would turn a cold start or a busy database into `503`s for every signed-in
+user while the backend is healthy. So a hanging backend is probed by the
+requests that arrive before its first check times out, then not again for the
+window; a protected route's `503` carries the seconds left in it as
+`retry-after`. Any other unknown answer, a `500` included, never starts
 the backoff, because a request can provoke it with its own token: if it did,
 one anonymous request per window would make every signed-in user's session
-unavailable. Those answers are logged at most once per window. The backoff and
-the stall tracking are per process or isolate (each serverless instance, edge
+unavailable. Those answers are logged at most once per window. The backoff is
+per process or isolate (each serverless instance, edge
 isolate and worker has its own, and so do Next.js's edge middleware and its
 Node `auth()`).
 

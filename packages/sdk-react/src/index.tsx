@@ -21,6 +21,7 @@ import type {
   ZitadelFlowStepDetail,
   ZitadelLoginProps,
   ZitadelLogoutProps,
+  ZitadelSessionErrorDetail,
   ZitadelSessionMissingDetail,
   ZitadelSessionProps,
   ZitadelSignoutDetail,
@@ -84,6 +85,9 @@ const ZitadelLogoutElementReact = createComponent({
     onZitadelSessionMissing: "zitadel-session-missing" as EventName<
       CustomEvent<ZitadelSessionMissingDetail>
     >,
+    onZitadelSessionError: "zitadel-session-error" as EventName<
+      CustomEvent<ZitadelSessionErrorDetail>
+    >,
   },
 });
 
@@ -95,6 +99,9 @@ const ZitadelSessionElementReact = createComponent({
     onZitadelSignout: "zitadel-signout" as EventName<CustomEvent<ZitadelSignoutDetail>>,
     onZitadelSessionMissing: "zitadel-session-missing" as EventName<
       CustomEvent<ZitadelSessionMissingDetail>
+    >,
+    onZitadelSessionError: "zitadel-session-error" as EventName<
+      CustomEvent<ZitadelSessionErrorDetail>
     >,
   },
 });
@@ -148,8 +155,8 @@ ZitadelLogin.displayName = "ZitadelLogin";
 
 /**
  * React component wrapping the `<zitadel-logout>` web component. Binds the
- * `ZitadelProject` handle (and every other prop) as a DOM property and forwards the widget's `zitadel-signout` and
- * `zitadel-session-missing` events as optional callbacks.
+ * `ZitadelProject` handle (and every other prop) as a DOM property and forwards the widget's `zitadel-signout`,
+ * `zitadel-session-missing` and `zitadel-session-error` events as optional callbacks.
  *
  * A forwarded `ref` resolves to the underlying `<zitadel-logout>` DOM element,
  * so consumers can imperatively access the upgraded web component.
@@ -161,13 +168,14 @@ ZitadelLogin.displayName = "ZitadelLogin";
 export type ZitadelLogoutReactProps = ZitadelLogoutProps & { children?: React.ReactNode };
 
 export const ZitadelLogout = React.forwardRef<ZitadelLogoutElement, ZitadelLogoutReactProps>(
-  function ZitadelLogout({ onSignout, onSessionMissing, ...props }, ref) {
+  function ZitadelLogout({ onSignout, onSessionMissing, onSessionError, ...props }, ref) {
     return (
       <ZitadelLogoutElementReact
         {...props}
         ref={ref}
         onZitadelSignout={onSignout && ((event) => onSignout(event.detail))}
         onZitadelSessionMissing={onSessionMissing && ((event) => onSessionMissing(event.detail))}
+        onZitadelSessionError={onSessionError && ((event) => onSessionError(event.detail))}
       />
     );
   },
@@ -178,22 +186,27 @@ ZitadelLogout.displayName = "ZitadelLogout";
 /**
  * React component wrapping the `<zitadel-session>` web component — the
  * post-sign-in "signed in as" card. Binds the `ZitadelProject` handle (and every
- * other prop) as a DOM property and forwards the widget's `zitadel-signout` and `zitadel-session-missing`
- * events as optional callbacks.
+ * other prop) as a DOM property and forwards the widget's `zitadel-signout`, `zitadel-session-missing`
+ * and `zitadel-session-error` events as optional callbacks.
  *
  * A forwarded `ref` resolves to the underlying `<zitadel-session>` DOM element.
  */
-/** `ZitadelSessionProps` plus `children`, forwarded into the element's light DOM. */
-export type ZitadelSessionReactProps = ZitadelSessionProps & { children?: React.ReactNode };
+/**
+ * The React props of {@link ZitadelSession}: exactly `ZitadelSessionProps`.
+ * There is no `children`: `<zitadel-session>` has no slot, so content passed
+ * into it would never render.
+ */
+export type ZitadelSessionReactProps = ZitadelSessionProps;
 
 export const ZitadelSession = React.forwardRef<ZitadelSessionElement, ZitadelSessionReactProps>(
-  function ZitadelSession({ onSignout, onSessionMissing, ...props }, ref) {
+  function ZitadelSession({ onSignout, onSessionMissing, onSessionError, ...props }, ref) {
     return (
       <ZitadelSessionElementReact
         {...props}
         ref={ref}
         onZitadelSignout={onSignout && ((event) => onSignout(event.detail))}
         onZitadelSessionMissing={onSessionMissing && ((event) => onSessionMissing(event.detail))}
+        onZitadelSessionError={onSessionError && ((event) => onSessionError(event.detail))}
       />
     );
   },

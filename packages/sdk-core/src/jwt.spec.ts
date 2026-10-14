@@ -303,6 +303,53 @@ describe("checkJwt", () => {
   });
 });
 
+describe("checkJwt with a malformed token", () => {
+  const header = (fields: Record<string, unknown>) => b64url(Buffer.from(JSON.stringify(fields)));
+  const payload = b64url(Buffer.from(JSON.stringify({ iss: "x", exp: 1 })));
+  const rs256 = header({ alg: "RS256", typ: "JWT" });
+
+  // Every middleware runs checkJwt on the Bearer token, or the cookie, of any
+  // anonymous request: none of these may throw, or reach the error log.
+  const MALFORMED: ReadonlyArray<readonly [string, string]> = [
+    ["segments that are not base64url", "x.y.z"],
+    ["a header that is not base64 at all", "a!b.c.d"],
+    ["a base64 length no encoder produces", "a.b.c"],
+    ["a header that is not JSON", `${b64url(Buffer.from("not json"))}.${payload}.sig`],
+    ["a header that is JSON null", `${b64url(Buffer.from("null"))}.${payload}.sig`],
+    ["a header that is a JSON array", `${b64url(Buffer.from("[1]"))}.${payload}.sig`],
+    ["a numeric alg", `${header({ alg: 1 })}.${payload}.sig`],
+    ["an object alg", `${header({ alg: { x: 1 } })}.${payload}.sig`],
+    ["a numeric typ", `${header({ alg: "RS256", typ: 1 })}.${payload}.sig`],
+    ["a numeric kid", `${header({ alg: "RS256", typ: "JWT", kid: 7 })}.${payload}.sig`],
+    ["a payload that is JSON null", `${rs256}.${b64url(Buffer.from("null"))}.sig`],
+    ["a payload that is not base64url", `${rs256}.$$$.sig`],
+    ["a signature that is not base64url", `${rs256}.${payload}.$`],
+  ];
+
+  it.each(MALFORMED)("answers a token with %s invalid without logging", async (_label, token) => {
+    const fetchMock = serveJwks(() => [jwk(rsa.publicKey, { kid: "k1", alg: "RS256" })]);
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    expect([
+      await checkJwt(token, opts(freshIssuer())),
+      consoleError.mock.calls,
+      fetchMock.mock.calls,
+    ]).toEqual([{ status: "invalid" }, [], []]);
+  });
+
+  it("writes nothing to the error log for 100 malformed tokens", async () => {
+    serveJwks(() => [jwk(rsa.publicKey, { kid: "k1", alg: "RS256" })]);
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const issuer = freshIssuer();
+
+    for (let i = 0; i < 100; i++) {
+      await checkJwt(MALFORMED[i % MALFORMED.length]?.[1] ?? "", opts(issuer));
+    }
+
+    expect(consoleError).not.toHaveBeenCalled();
+  });
+});
+
 describe("verifyJwt key selection", () => {
   // RFC 7517 makes a JWK's alg optional; the curve decides an EC key's algorithm.
   it("verifies an ES256 token against an EC key that names no alg", async () => {

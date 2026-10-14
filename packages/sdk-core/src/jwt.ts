@@ -335,6 +335,29 @@ function splitToken(token: string): readonly [string, string, string] | null {
   return [h, p, s] as const;
 }
 
+/** The base64url alphabet, unpadded, as JWT segments use it (RFC 7515 §2). */
+const BASE64URL = /^[A-Za-z0-9_-]+$/;
+
+/**
+ * A token segment decoded as a JSON object, or `null` when it is not one: not
+ * base64url, not UTF-8 JSON, or JSON that is not an object. The header and
+ * payload are attacker input on every request, so a malformed one is answered
+ * as an invalid token, never thrown (and so never logged).
+ */
+function decodeJsonSegment(raw: string): Record<string, unknown> | null {
+  if (!BASE64URL.test(raw)) {
+    return null;
+  }
+  try {
+    const value = JSON.parse(DECODER.decode(base64UrlDecode(raw))) as unknown;
+    return typeof value === "object" && value !== null && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 // ─── JWT decode ───────────────────────────────────────────────────────────────
 
 /**
@@ -655,13 +678,25 @@ export async function checkJwt(token: string, opts: VerifyJwtOptions): Promise<J
     }
     const [rawHeader, rawPayload, rawSig] = segments;
 
-    const header = JSON.parse(DECODER.decode(base64UrlDecode(rawHeader))) as JwtHeader;
-    const payload = JSON.parse(DECODER.decode(base64UrlDecode(rawPayload))) as JwtPayload;
+    // Every check up to the key lookup reads attacker input, so a malformed
+    // token is answered `invalid` here, silently, instead of throwing: a throw
+    // is logged below, and must mean something went wrong on this side.
+    const header = decodeJsonSegment(rawHeader);
+    const payload = decodeJsonSegment(rawPayload) as JwtPayload | null;
+    if (header === null || payload === null || !BASE64URL.test(rawSig)) {
+      return INVALID;
+    }
 
     // RFC 7515 §4.1.1 requires 'alg' in the JWT header. A token that omits it
     // is structurally invalid — we reject it rather than guessing an algorithm.
-    const alg = header.alg;
-    if (!alg) {
+    const { alg, typ, kid } = header;
+    if (typeof alg !== "string" || alg === "") {
+      return INVALID;
+    }
+    if (
+      (typ !== undefined && typeof typ !== "string") ||
+      (kid !== undefined && typeof kid !== "string")
+    ) {
       return INVALID;
     }
     // Unconditionally reject the 'none' algorithm regardless of the allowlist.
@@ -676,13 +711,12 @@ export async function checkJwt(token: string, opts: VerifyJwtOptions): Promise<J
     }
 
     if (allowedTokenTypes.length > 0) {
-      const typ = header.typ ?? "";
-      if (!allowedTokenTypes.some((t) => t.toLowerCase() === typ.toLowerCase())) {
+      const type = typ ?? "";
+      if (!allowedTokenTypes.some((t) => t.toLowerCase() === type.toLowerCase())) {
         return INVALID;
       }
     }
 
-    const kid = header.kid;
     const cryptoKey = await resolveJwk(`${issuerUrl}/auth/keys`, kid, alg, jwksTimeoutMs);
     if (cryptoKey === "unavailable") {
       return { status: "unavailable" };
@@ -730,15 +764,10 @@ export async function checkJwt(token: string, opts: VerifyJwtOptions): Promise<J
 
     return { status: "valid", payload };
   } catch (err) {
-    // SyntaxError from JSON.parse means the token segments are not JSON —
-    // this is an opaque (non-JWT) token. Answer invalid silently; the
-    // middleware will fall back to opaque token validation via the backend.
-    if (err instanceof SyntaxError) {
-      return INVALID;
-    }
-    // Any other unexpected error (malformed JWKS, Web Crypto exception) is
-    // worth logging so operators can distinguish infrastructure failures from
-    // genuine bad tokens.
+    // A malformed token never gets here (it is `invalid` above, and an opaque
+    // token falls back to the backend's session check). What does is a
+    // failure on this side (a malformed JWKS key, a Web Crypto exception),
+    // worth logging so operators can tell it from a bad token.
     console.error("[nextgen] verifyJwt unexpected error:", err);
     return INVALID;
   }

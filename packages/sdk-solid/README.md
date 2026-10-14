@@ -29,9 +29,11 @@ The widgets' events are also surfaced as optional callbacks:
 
 - `ZitadelLogin`: `onFlowStep`, `onFlowInput`, `onFlowComplete`, `onFlowRedirect`, and
   `onFlowError`.
-- `ZitadelLogout` and `ZitadelSession`: `onSignout` and `onSessionMissing` (the visitor has no
+- `ZitadelLogout` and `ZitadelSession`: `onSignout`, `onSessionMissing` (the visitor has no
   session: the widget renders nothing, and the session card goes to its `postSignOutUrl` when
-  one is set, unless that URL is the page it is on).
+  one is set, unless that URL is the page it is on) and `onSessionError` (loading the session or signing out failed some other way,
+  such as a 5xx or a network error; the detail has `phase`, `message` and, when a response came
+  back, `status` and `code`).
 
 Leaving a prop unset, or setting it back to `undefined`, keeps the element's own default (for
 example the session card's "Signed in as" heading).
@@ -39,7 +41,8 @@ example the session card's "Signed in as" heading).
 Children are rendered into the element. Give `ZitadelLogout` a `<template>` child to replace its
 avatar menu with your own markup, filled with `{{display}}`, `{{identifier}}` and `{{initial}}`,
 where any `data-action="logout"` element signs out. Content with `slot="attribution-trailing"`
-inside `ZitadelLogin` is shown next to its attribution.
+inside `ZitadelLogin` is shown next to its attribution. `ZitadelSession` takes no children: its
+element has no slot to show them in.
 
 ```tsx
 <ZitadelLogout project={project}>

@@ -127,7 +127,8 @@ export function ProfilePage() {
 
 The widgets' events surface as optional callbacks: `onFlowStep`, `onFlowInput`,
 `onFlowComplete`, `onFlowRedirect` and `onFlowError` on `ZitadelLogin`, and
-`onSignout` and `onSessionMissing` (no session when the widget loads) on
+`onSignout`, `onSessionMissing` (no session when the widget loads) and
+`onSessionError` (loading the session or signing out failed some other way) on
 `ZitadelLogout` and `ZitadelSession`. Pass
 `locales={businessLocales}` (also exported from `/react`) to show work-email copy
 for a business audience.

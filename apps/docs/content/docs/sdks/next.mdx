@@ -107,7 +107,7 @@ export default async function Page() {
 
 `auth()` sees a session only on routes the middleware's `matcher` covers.
 
-The session widgets from `@zitadel/components` run in client components. `<zitadel-session>` (the generated profile page's card) and `<zitadel-logout>` fire `zitadel-signout` after a sign-out, and `zitadel-session-missing` when they find no session as they load. Without a session both render nothing, and the card goes to its `post-sign-out-url` unless that URL is the page it is on, so a signed-out visit to a client-rendered profile page ends on the login page. A failure that is not the backend saying "no session", such as a gateway's error page or a 5xx, keeps the widget and shows the error.
+The session widgets from `@zitadel/components` run in client components. `<zitadel-session>` (the generated profile page's card) and `<zitadel-logout>` fire `zitadel-signout` after a sign-out, and `zitadel-session-missing` when they find no session as they load. Without a session both render nothing, and the card goes to its `post-sign-out-url` unless that URL is the page it is on, so a signed-out visit to a client-rendered profile page ends on the login page. A failure that is not the backend saying "no session", such as a gateway's error page or a 5xx, keeps the widget, shows the error and fires `zitadel-session-error` (detail `{ status?, code?, message, phase }`).
 
 ## Verify
 

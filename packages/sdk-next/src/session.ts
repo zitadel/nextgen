@@ -1,6 +1,5 @@
-import type { GetMySession200 } from "@zitadel/api/generated/model";
-
 import { getZitadelConfig } from "@zitadel/api/config";
+import { readSessionAnswer } from "@zitadel/sdk-core/middleware";
 
 import type { ClientAuthResult } from "./types.js";
 
@@ -30,15 +29,19 @@ export type GetSessionOptions = {
  * the scaffolded request boundary always does), and it does not require
  * `configureZitadel()` to have run.
  *
- * - `200` with an authenticated user → `{ isAuthenticated: true, session }`
- *   with the client-safe identity (`userId`, `identifier`, `identifierProperty`,
- *   `display` — no token).
- * - `200` for an anonymous session, `401` with `auth.unauthorized`, or `404`
- *   with `sess.not_found` → signed out.
- * - Any other response throws — including a framework's HTML 404 page from
- *   a misrouted proxy: a failing proxy is a misconfiguration and must not
- *   silently render as "signed out". Treat a rejection as "unknown" —
- *   distinct from signed-out — as the example does.
+ * The answer is read by the same rule the server SDKs apply
+ * (`readSessionAnswer` from `@zitadel/sdk-core/middleware`):
+ *
+ * - A session (a `200` naming a non-empty `session_id`) with a user →
+ *   `{ isAuthenticated: true, session }` with the client-safe identity
+ *   (`userId`, `identifier`, `identifierProperty`, `display` — no token).
+ * - An anonymous session, a `401` carrying the backend's `auth.unauthorized`
+ *   code, or a `404` carrying `sess.not_found` → signed out. The code alone
+ *   decides.
+ * - Anything else throws — a `200` that is not a session (`{}` from a
+ *   misrouted proxy), a framework's HTML 404 page, a `5xx`: a failing proxy is
+ *   a misconfiguration and must not silently render as "signed out". Treat a
+ *   rejection as "unknown" — distinct from signed-out — as the example does.
  *
  * ```tsx
  * "use client";
@@ -89,63 +92,25 @@ export async function getSession(options: GetSessionOptions = {}): Promise<Clien
     headers: { accept: "application/json" },
   });
 
-  // Only the backend's canonical error envelope is definitive signed-out.
-  // A framework route, gateway, or WAF can also return 401/404; accepting the
-  // status or content type alone would turn a broken proxy into signed-out.
-  if (response.status === 401 || response.status === 404) {
-    const error = await readErrorEnvelope(response);
-    const isSignedOut =
-      (response.status === 401 && error?.code === "auth.unauthorized") ||
-      (response.status === 404 && error?.code === "sess.not_found");
-    if (isSignedOut) {
-      return { isAuthenticated: false, session: null };
-    }
+  const answer = await readSessionAnswer(response);
+  if (answer.status === "unknown") {
+    throw new Error(`[nextgen] Session read failed: ${answer.why} from ${proxyPath}/sessions/me`);
   }
-
-  if (!response.ok) {
-    throw new Error(
-      `[nextgen] Session read failed: HTTP ${response.status} from ${proxyPath}/sessions/me`,
-    );
-  }
-
-  const session = (await response.json()) as GetMySession200;
-
-  // An anonymous session (no verified user factor yet) has no user_id —
-  // for app chrome that is "not signed in".
-  if (!session.user_id) {
+  // A dead session, or an anonymous one (no verified user factor yet), is
+  // "not signed in" for app chrome.
+  if (answer.status === "dead" || answer.session.userId === null) {
     return { isAuthenticated: false, session: null };
   }
 
   return {
     isAuthenticated: true,
     session: {
-      userId: session.user_id,
-      identifier: session.user?.identifier ?? null,
-      identifierProperty: session.user?.identifier_property ?? null,
-      display: session.user?.display ?? null,
+      userId: answer.session.userId,
+      identifier: answer.session.identifier,
+      identifierProperty: answer.session.identifierProperty,
+      display: answer.session.display,
     },
   };
 }
 
 export type { ClientAuthResult, ClientAuthState, ClientSession } from "./types.js";
-
-type ErrorEnvelope = { code: string; message: string };
-
-async function readErrorEnvelope(response: Response): Promise<ErrorEnvelope | undefined> {
-  try {
-    const body = (await response.json()) as unknown;
-    if (
-      typeof body === "object" &&
-      body !== null &&
-      "code" in body &&
-      typeof body.code === "string" &&
-      "message" in body &&
-      typeof body.message === "string"
-    ) {
-      return { code: body.code, message: body.message };
-    }
-  } catch {
-    // The caller reports the HTTP failure below; parsing details are untrusted.
-  }
-  return undefined;
-}

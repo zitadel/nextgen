@@ -229,8 +229,16 @@ export class ZitadelLogin extends ZitadelSurface {
    * Leaving it empty falls back to the `flow` query parameter, which is how a
    * provider callback hands the flow back (see {@link flowIdFromLocation}), so
    * a host page needs no code of its own for external sign-in to finish.
+   * Unset, `null` or `""` all mean "no handle".
    */
-  @property({ type: String, attribute: "resume-flow-id" }) accessor resumeFlowId = "";
+  @property({ type: String, attribute: "resume-flow-id" })
+  get resumeFlowId(): string {
+    return this.#resumeFlowId;
+  }
+  set resumeFlowId(value: string | null | undefined) {
+    this.#resumeFlowId = orDefault(value, "");
+  }
+  #resumeFlowId = "";
 
   /**
    * Preview mode, for an operator surface such as the console's branding

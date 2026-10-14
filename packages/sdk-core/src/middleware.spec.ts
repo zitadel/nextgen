@@ -1,10 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { DEAD, OUTAGES } from "./__tests__/outages.js";
+import {
+  DEAD,
+  JWE_SESSION_TOKEN,
+  OFF_ORIGIN_LOCATIONS,
+  OUTAGES,
+  exchangeAnswer,
+} from "./__tests__/outages.js";
 import {
   MAX_SESSION_TOKEN_LENGTH,
   SESSION_CHECK_BACKOFF_MS,
-  SESSION_CHECK_STALL_MS,
+  SESSION_UNAVAILABLE_RETRY_AFTER_S,
   assertLoginPath,
   clearCookie,
   clearSessionCheckBackoff,
@@ -13,6 +19,8 @@ import {
   matchesRoutes,
   parseCookieHeader,
   proxyFailureResponse,
+  readSessionAnswer,
+  redactExchangeBody,
   requiresProjectSecret,
   sessionUnavailableResponse,
   toClientAuth,
@@ -96,6 +104,14 @@ describe("filterResponseHeaders", () => {
         location,
       ).toBe(`${APP}/x`);
     }
+  });
+
+  // A path that starts with `//` would read as protocol-relative if the path
+  // were re-parsed as a reference, and take its host from the path.
+  it.each(OFF_ORIGIN_LOCATIONS)("keeps %s on this app", (location) => {
+    const rewritten = filterResponseHeaders(upstream({ location }), CALLBACK).get("location");
+
+    expect(rewritten === null ? null : new URL(rewritten).origin).toBe(APP);
   });
 
   it("drops a redirect when the caller names no request URL", () => {
@@ -184,6 +200,93 @@ describe("requiresProjectSecret", () => {
     ["POST", "/sessions"],
   ])("withholds the secret from %s %s", (method, pathname) => {
     expect(requiresProjectSecret(method, pathname)).toBe(false);
+  });
+});
+describe("redactExchangeBody", () => {
+  async function redact(method: string, pathname: string, res: Response) {
+    const headers = new Headers(res.headers);
+    const body = await redactExchangeBody(method, pathname, res, headers);
+    return { text: await new Response(body).text(), headers };
+  }
+
+  it("drops the session token from the exchange answer", async () => {
+    const { text } = await redact("POST", "/sessions/exchange", exchangeAnswer());
+
+    expect(text).not.toContain(JWE_SESSION_TOKEN);
+  });
+
+  it("keeps the rest of the exchange answer", async () => {
+    const { text } = await redact("POST", "/sessions/exchange", exchangeAnswer());
+
+    expect(JSON.parse(text)).toEqual({
+      session: { session_id: "sess_1", user_id: "user_1", state: "active" },
+    });
+  });
+
+  it("states the length of the body it answers with", async () => {
+    const { text, headers } = await redact("POST", "/sessions/exchange", exchangeAnswer());
+
+    expect(headers.get("content-length")).toBe(String(new TextEncoder().encode(text).byteLength));
+  });
+
+  it("drops the content encoding fetch has already decoded", async () => {
+    const headers = new Headers({ "content-encoding": "gzip" });
+    await redactExchangeBody("POST", "/sessions/exchange", exchangeAnswer(), headers);
+
+    expect(headers.has("content-encoding")).toBe(false);
+  });
+
+  it("passes an exchange error through", async () => {
+    const error = { code: "sess.invalid_handoff_token", message: "The handoff token is invalid." };
+    const res = Response.json(error, { status: 400 });
+
+    expect(JSON.parse((await redact("POST", "/sessions/exchange", res)).text)).toEqual(error);
+  });
+
+  it("passes a body that is not JSON through", async () => {
+    const { text } = await redact("POST", "/sessions/exchange", new Response("<html>"));
+
+    expect(text).toBe("<html>");
+  });
+
+  it.each([
+    ["GET", "/sessions/exchange"],
+    ["POST", "/sessions/exchange/extra"],
+    ["POST", "/sessions"],
+  ])("leaves the body of %s %s alone", async (method, pathname) => {
+    const res = exchangeAnswer();
+    const stream = res.body;
+
+    expect(await redactExchangeBody(method, pathname, res, new Headers())).toBe(stream);
+  });
+});
+
+describe("readSessionAnswer", () => {
+  it.each(DEAD)("reads %s as dead", async (_label, answer) => {
+    expect(await readSessionAnswer(answer())).toEqual({ status: "dead" });
+  });
+
+  const NOT_A_SESSION = "an answer that is not a session";
+  it.each([
+    ["a 200 that is not a session", () => Response.json({}), NOT_A_SESSION],
+    ["an empty session_id", () => Response.json({ session_id: "" }), NOT_A_SESSION],
+    ["a numeric session_id", () => Response.json({ session_id: 1 }), NOT_A_SESSION],
+    ["an unreadable body", () => new Response("<html>"), "an unreadable response body"],
+    [
+      "a 401 without the code",
+      () => new Response(null, { status: 401 }),
+      "HTTP 401 without the backend's error code",
+    ],
+    ["a 500", () => new Response(null, { status: 500 }), "HTTP 500"],
+  ])("reads %s as unknown", async (_label, answer, why) => {
+    expect(await readSessionAnswer(answer())).toEqual({ status: "unknown", why });
+  });
+
+  it("reads an anonymous session as live with no user", async () => {
+    expect(await readSessionAnswer(Response.json({ session_id: "s1" }))).toEqual({
+      status: "live",
+      session: { userId: null, identifier: null, identifierProperty: null, display: null },
+    });
   });
 });
 
@@ -526,6 +629,15 @@ describe("toClientAuth", () => {
   ])("keeps the signed-out state %j as it is", (auth) => {
     expect(toClientAuth(auth)).toEqual(auth);
   });
+
+  it("keeps an already client-safe result as it is", () => {
+    const auth = {
+      isAuthenticated: true as const,
+      session: { userId: "u1", identifier: null, identifierProperty: null, display: null },
+    };
+
+    expect(toClientAuth(auth)).toEqual(auth);
+  });
 });
 
 describe("isWellFormedSessionToken", () => {
@@ -575,32 +687,30 @@ describe("validateOpaqueSessionToken under a hanging backend", () => {
     return { fetchMock, timeOutAll };
   }
 
-  it("answers other checks at once while one has been unanswered past the stall threshold", async () => {
-    const { fetchMock, timeOutAll } = hanging();
-    const first = validateOpaqueSessionToken("tok", "http://auth.test", 5000);
-    vi.advanceTimersByTime(SESSION_CHECK_STALL_MS);
-
-    const others = await Promise.all(
-      Array.from({ length: 20 }, () => validateOpaqueSessionToken("tok", "http://auth.test", 5000)),
+  // A slow answer is an answer: only a failure to reach the backend backs off.
+  it("waits for a backend that answers slowly but within the timeout", async () => {
+    const answers: Array<(res: Response) => void> = [];
+    const fetchMock = vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          answers.push(resolve);
+        }),
     );
-
-    expect([fetchMock.mock.calls.length, new Set(others.map((o) => o.status))]).toEqual([
-      1,
-      new Set(["unknown"]),
-    ]);
-    await timeOutAll();
-    await first;
-  });
-
-  it("still sends checks that arrive before the stall threshold", async () => {
-    const { fetchMock, timeOutAll } = hanging();
+    vi.stubGlobal("fetch", fetchMock);
     const checks = [validateOpaqueSessionToken("tok", "http://auth.test", 5000)];
-    vi.advanceTimersByTime(SESSION_CHECK_STALL_MS - 1);
-    checks.push(validateOpaqueSessionToken("tok", "http://auth.test", 5000));
+    vi.advanceTimersByTime(1_200);
+    for (let i = 0; i < 5; i++) {
+      checks.push(validateOpaqueSessionToken("tok", "http://auth.test", 5000));
+    }
+    for (const answer of answers.splice(0)) {
+      answer(Response.json({ session_id: "s1", user_id: "u1" }));
+    }
+    const outcomes = await Promise.all(checks);
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    await timeOutAll();
-    await Promise.all(checks);
+    expect([fetchMock.mock.calls.length, new Set(outcomes.map((o) => o.status))]).toEqual([
+      6,
+      new Set(["live"]),
+    ]);
   });
 
   it("logs a timed-out probe once, however many checks were waiting on it", async () => {
@@ -615,7 +725,7 @@ describe("validateOpaqueSessionToken under a hanging backend", () => {
     expect(console.warn).toHaveBeenCalledTimes(1);
   });
 
-  it("sends the backend one probe per backoff window under steady load", async () => {
+  it("stops asking a hanging backend once the first check times out", async () => {
     const { fetchMock, timeOutAll } = hanging();
     const checks: Promise<unknown>[] = [];
     // One request every 250ms for 20s against a backend that never answers;
@@ -630,10 +740,10 @@ describe("validateOpaqueSessionToken under a hanging backend", () => {
     await timeOutAll();
     await Promise.all(checks);
 
-    // Only the 4 checks of the first second are sent; from then on the stalled
-    // probe, and after its 5s timeout the 15s backoff, answer the rest at once.
+    // The 20 checks of the first 5s are sent and wait; the first timeout then
+    // starts the 15s backoff, which answers the rest at once.
     expect([fetchMock.mock.calls.length, vi.mocked(console.warn).mock.calls.length]).toEqual([
-      4, 1,
+      20, 1,
     ]);
   });
 });
@@ -666,7 +776,63 @@ describe("sessionUnavailableResponse", () => {
     expect(res.status).toBe(503);
     expect(res.headers.get("set-cookie")).toBeNull();
     expect(res.headers.get("cache-control")).toBe("no-store");
-    expect(res.headers.get("retry-after")).toBe("5");
+    expect(res.headers.get("retry-after")).toBe(String(SESSION_UNAVAILABLE_RETRY_AFTER_S));
+  });
+});
+
+describe("sessionUnavailableResponse during a backoff", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(new TypeError("fetch failed"))),
+    );
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("asks a client to come back when the backoff ends", async () => {
+    await validateOpaqueSessionToken("tok", "http://auth.test", 1000);
+    vi.advanceTimersByTime(4_500);
+
+    expect(sessionUnavailableResponse("http://auth.test").headers.get("retry-after")).toBe(
+      String(Math.ceil((SESSION_CHECK_BACKOFF_MS - 4_500) / 1000)),
+    );
+  });
+
+  it("asks for at least a second in the backoff's last moments", async () => {
+    await validateOpaqueSessionToken("tok", "http://auth.test", 1000);
+    vi.advanceTimersByTime(SESSION_CHECK_BACKOFF_MS - 1);
+
+    expect(sessionUnavailableResponse("http://auth.test").headers.get("retry-after")).toBe("1");
+  });
+
+  it("counts the longest backoff when no backend is named", async () => {
+    await validateOpaqueSessionToken("tok", "http://auth.test", 1000);
+
+    expect(sessionUnavailableResponse().headers.get("retry-after")).toBe(
+      String(SESSION_CHECK_BACKOFF_MS / 1000),
+    );
+  });
+
+  it("ignores another backend's backoff", async () => {
+    await validateOpaqueSessionToken("tok", "http://auth.test", 1000);
+
+    expect(sessionUnavailableResponse("http://other.test").headers.get("retry-after")).toBe(
+      String(SESSION_UNAVAILABLE_RETRY_AFTER_S),
+    );
+  });
+
+  it("falls back to the default once the backoff has passed", async () => {
+    await validateOpaqueSessionToken("tok", "http://auth.test", 1000);
+    vi.advanceTimersByTime(SESSION_CHECK_BACKOFF_MS);
+
+    expect(sessionUnavailableResponse("http://auth.test").headers.get("retry-after")).toBe(
+      String(SESSION_UNAVAILABLE_RETRY_AFTER_S),
+    );
   });
 });
 
@@ -688,7 +854,20 @@ describe("assertLoginPath", () => {
     expect(() => assertLoginPath(loginPath)).not.toThrow();
   });
 
-  it.each(["https://evil.com/phish", "//evil.com", "login", ""])("rejects %j", (loginPath) => {
+  it.each([
+    "https://evil.com/phish",
+    "//evil.com",
+    "login",
+    "",
+    "/\\evil.example/login",
+    "/\t/evil.example/login",
+    "/\n/evil.example/login",
+    "/ /evil.example/login",
+    "/%5Cevil.example/login",
+    "/%2F/evil.example/login",
+    "/%09/evil.example/login",
+    "/%E0%A4%A",
+  ])("rejects %j", (loginPath) => {
     expect(() => assertLoginPath(loginPath)).toThrow(/loginPath must be a relative path/);
   });
 });

@@ -182,6 +182,7 @@ const LOGIN_DEFAULTS = {
   theme: "",
   lang: "",
   suppressHeader: false,
+  resumeFlowId: "",
 } as const;
 const LOGIN_VALUES = {
   purpose: "register",
@@ -189,6 +190,7 @@ const LOGIN_VALUES = {
   theme: "light",
   lang: "de",
   suppressHeader: true,
+  resumeFlowId: "flow_123",
 } as const;
 const SESSION_DEFAULTS = {
   heading: "Signed in as",
@@ -232,9 +234,19 @@ describe.each([
   );
 });
 
+describe("ZitadelSession children", () => {
+  // `<zitadel-session>` has no slot, so content passed in would never render.
+  it("puts no children into the element", () => {
+    const children = createRawSnippet(() => ({ render: () => "<span>extra</span>" }));
+    const { container } = render(ZitadelSession as unknown as Component<Record<string, unknown>>, {
+      props: { project, children },
+    });
+    expect(container.querySelector("zitadel-session")?.childElementCount).toBe(0);
+  });
+});
+
 describe.each([
   ["ZitadelLogout", "zitadel-logout", ZitadelLogout],
-  ["ZitadelSession", "zitadel-session", ZitadelSession],
   ["ZitadelLogin", "zitadel-login", ZitadelLogin],
 ] as const)("%s children", (_name, tag, component) => {
   it("renders children into the element's light DOM", () => {

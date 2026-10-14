@@ -18,18 +18,26 @@ export {
   toClientAuth,
   isWellFormedSessionToken,
   MAX_SESSION_TOKEN_LENGTH,
-  SESSION_CHECK_STALL_MS,
   filterResponseHeaders,
   requiresProjectSecret,
+  redactExchangeBody,
+  EXCHANGE_CREDENTIAL_FIELDS,
+  readSessionAnswer,
   validateOpaqueSessionToken,
   SESSION_CHECK_BACKOFF_MS,
   clearSessionCheckBackoff,
   parseCookieHeader,
   clearCookie,
   sessionUnavailableResponse,
+  SESSION_UNAVAILABLE_RETRY_AFTER_S,
   proxyFailureResponse,
 } from "./middleware.js";
-export type { OpaqueSession, OpaqueSessionCheck, LoginPathRoutes } from "./middleware.js";
+export type {
+  OpaqueSession,
+  OpaqueSessionCheck,
+  SessionAnswer,
+  LoginPathRoutes,
+} from "./middleware.js";
 export {
   verifyJwt,
   checkJwt,

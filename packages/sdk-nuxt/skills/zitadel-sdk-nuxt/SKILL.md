@@ -92,7 +92,7 @@ nothing, and the session card goes to its `post-sign-out-url` unless that is
 the page it is on. The README has the details.
 
 Read auth state in any component via the auto-imported `useAuth()` (it omits the
-raw JWT by design). When you need the token to call upstream APIs, use
+raw session token by design). When you need the token to call upstream APIs, use
 `getAuth(event)` from `@zitadel/sdk-nuxt/server` inside a server route:
 
 ```ts

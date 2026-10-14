@@ -13,6 +13,7 @@ import {
   matchesRoutes,
   parseCookieHeader,
   proxyFailureResponse,
+  redactExchangeBody,
   requiresProjectSecret,
   sessionUnavailableResponse,
   validateOpaqueSessionToken,
@@ -141,7 +142,10 @@ async function proxyRequest(
     responseHeaders.append("set-cookie", cookie);
   }
 
-  return new Response(upstream.body, {
+  // The exchange's answer echoes the HttpOnly session token; the browser
+  // gets the cookie, never the token in a script-readable body (ADR 036).
+  const browserBody = await redactExchangeBody(method, suffix, upstream, responseHeaders);
+  return new Response(browserBody, {
     status: upstream.status,
     headers: responseHeaders,
   });
@@ -288,7 +292,7 @@ export async function handleNextgenRequest(
     // The backend could not be asked. The session may be live, so its cookie
     // survives the outage; a protected route is retryable, not a sign-in.
     return matchesRoutes(pathname, protectedRoutes)
-      ? { type: "unavailable", response: sessionUnavailableResponse() }
+      ? { type: "unavailable", response: sessionUnavailableResponse(url) }
       : {
           type: "continue",
           auth: { isAuthenticated: false, session: null, reason: "unavailable" },
@@ -358,10 +362,12 @@ const CONTEXT_KEY = "nextgenAuth";
  * }));
  * ```
  *
- * On an authenticated request it calls `next({ context: { nextgenAuth } })` so
- * loaders and server functions can read the session via {@link getAuth}. On a
- * proxy, a protected-route miss, or a protected route whose session the backend
- * could not check (`503`), it returns the `Response` directly.
+ * On every request it lets through (signed in, signed out, or with
+ * `reason: "unavailable"` on a public route) it calls
+ * `next({ context: { nextgenAuth } })`, so loaders and server functions read
+ * the state, `reason` included, via {@link getAuth} or {@link getClientAuth}.
+ * On a proxy, a protected-route miss, or a protected route whose session the
+ * backend could not check (`503`), it returns the `Response` directly.
  *
  * @param options - Configuration; see {@link NextgenRequestOptions}.
  * @returns A request-middleware server handler.
