@@ -57,6 +57,14 @@ describe("SolidStartPatcher.plan", () => {
     expect(writeContents(plan, "src/routes/login.tsx")).toContain("background:#0f0f11");
     expect(writeContents(plan, "src/routes/login.tsx")).toContain("@zitadel/sdk-solid");
     expect(writeContents(plan, "src/routes/login.tsx")).toContain("ZitadelLogin");
+    // The widget registers Lit custom elements (customElements.define) at import
+    // time, which crashes SSR. It must be loaded via SolidStart's clientOnly, not
+    // imported at module scope, or the server render of the route throws.
+    expect(writeContents(plan, "src/routes/login.tsx")).toContain(
+      'import { clientOnly } from "@solidjs/start"',
+    );
+    expect(writeContents(plan, "src/routes/login.tsx")).toContain("clientOnly(() =>");
+    expect(writeContents(plan, "src/routes/profile.tsx")).toContain("clientOnly(() =>");
   });
 
   it("seeds the public project id and edits vite.config", () => {

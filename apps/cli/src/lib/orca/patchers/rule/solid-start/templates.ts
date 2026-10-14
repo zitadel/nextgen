@@ -58,25 +58,36 @@ export default function Index() {
 }
 
 /**
- * A login/register page. Renders the idiomatic `<ZitadelLogin>` Solid component
- * from `@zitadel/sdk-solid` (typed props, callback events). `configureZitadel`
- * returns the project handle at module scope; the public project id comes from
- * `VITE_ZITADEL_PROJECT_ID` (Vite only exposes `VITE_`-prefixed env to the
- * client).
+ * A login/register page rendering the `<ZitadelLogin>` widget from
+ * `@zitadel/sdk-solid`, loaded with SolidStart's `clientOnly`. The widget module
+ * imports `@zitadel/components`, which registers Lit custom elements by calling
+ * `customElements.define` at import time — undefined during SSR, so a static
+ * import would crash the server render and the page would come back empty.
+ * `clientOnly` defers the import to the browser, so the route renders on the
+ * server and the widget mounts after hydration (like Nuxt's `<ClientOnly>`).
+ *
+ * The public project id (`VITE_ZITADEL_PROJECT_ID`; Vite only exposes
+ * `VITE_`-prefixed env to the client) and proxy path are passed as props rather
+ * than a `configureZitadel` handle — building the handle here would require
+ * importing `@zitadel/sdk-solid` at module scope, reintroducing the SSR crash.
  */
 function authPage(purpose: "login" | "register"): string {
   return `${MANAGED_MARKER}
-import { ZitadelLogin, configureZitadel } from "@zitadel/sdk-solid";
+import { clientOnly } from "@solidjs/start";
 
-const project = configureZitadel({
-  projectId: import.meta.env.VITE_ZITADEL_PROJECT_ID ?? "",
-  proxyPath: "${PROXY_PATH}",
-});
+const ZitadelLogin = clientOnly(() =>
+  import("@zitadel/sdk-solid").then((m) => ({ default: m.ZitadelLogin })),
+);
 
 export default function ${purpose === "login" ? "Login" : "Register"}() {
   return (
     <main style="${WIDGET_WRAP}">
-      <ZitadelLogin project={project} purpose="${purpose}" postSignInUrl="/profile" />
+      <ZitadelLogin
+        projectId={import.meta.env.VITE_ZITADEL_PROJECT_ID ?? ""}
+        proxyPath="${PROXY_PATH}"
+        purpose="${purpose}"
+        postSignInUrl="/profile"
+      />
     </main>
   );
 }
@@ -91,20 +102,27 @@ export function registerPageTemplate(): string {
   return authPage("register");
 }
 
-/** `src/routes/profile.tsx` — the signed-in view with the logout widget. */
+/**
+ * `src/routes/profile.tsx` — the signed-in view with the logout widget. Loaded
+ * with `clientOnly` for the same reason as the auth pages: `@zitadel/sdk-solid`
+ * registers Lit custom elements at import time, which would crash SSR.
+ */
 export function profilePageTemplate(): string {
   return `${MANAGED_MARKER}
-import { ZitadelLogout, configureZitadel } from "@zitadel/sdk-solid";
+import { clientOnly } from "@solidjs/start";
 
-const project = configureZitadel({
-  projectId: import.meta.env.VITE_ZITADEL_PROJECT_ID ?? "",
-  proxyPath: "${PROXY_PATH}",
-});
+const ZitadelLogout = clientOnly(() =>
+  import("@zitadel/sdk-solid").then((m) => ({ default: m.ZitadelLogout })),
+);
 
 export default function Profile() {
   return (
     <main style="${WIDGET_WRAP}">
-      <ZitadelLogout project={project} postSignOutUrl="/login" />
+      <ZitadelLogout
+        projectId={import.meta.env.VITE_ZITADEL_PROJECT_ID ?? ""}
+        proxyPath="${PROXY_PATH}"
+        postSignOutUrl="/login"
+      />
     </main>
   );
 }
