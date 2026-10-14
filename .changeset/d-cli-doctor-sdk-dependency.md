@@ -1,5 +1,5 @@
 ---
-"@zitadel/cli": patch
+"@zitadel/cli": minor
 ---
 
 `doctor`'s dependency check now requires the SDK packages the app's framework imports, such as

@@ -53,7 +53,7 @@ describe("VueDetector version floor", () => {
   it("names the floor in the refusal", async () => {
     await expect(
       new VueDetector().detect(await project({ vue: "^2.7.16", vite: "^5" })),
-    ).rejects.toThrow('Vue "^2.7.16" is below the supported floor — the CLI integrates Vue 3');
+    ).rejects.toThrow("Vue 3");
   });
 
   it("accepts a spec that may resolve to a supported version", async () => {

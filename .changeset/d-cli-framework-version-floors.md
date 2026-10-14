@@ -1,5 +1,5 @@
 ---
-"@zitadel/cli": patch
+"@zitadel/cli": minor
 ---
 
 `setup` and `doctor` now refuse a Nuxt 3, Vue 2 or pre-1.8 Solid app up front with

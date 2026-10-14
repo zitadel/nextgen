@@ -1,5 +1,5 @@
 ---
-"@zitadel/cli": patch
+"@zitadel/cli": minor
 ---
 
 `setup` now pins every framework's Zitadel SDK at the CLI's own version, as it already did for

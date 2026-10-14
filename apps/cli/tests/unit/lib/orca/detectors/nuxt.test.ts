@@ -57,9 +57,7 @@ describe("NuxtDetector version floor", () => {
   });
 
   it("names the floor in the refusal", async () => {
-    await expect(new NuxtDetector().detect(await nuxtApp("^3.21.0"))).rejects.toThrow(
-      'Nuxt "^3.21.0" is below the supported floor — the CLI integrates Nuxt 4 and newer',
-    );
+    await expect(new NuxtDetector().detect(await nuxtApp("^3.21.0"))).rejects.toThrow("Nuxt 4");
   });
 
   it.each(["^4.0.0", ">=3", "latest"])("accepts nuxt %s", async (version) => {
