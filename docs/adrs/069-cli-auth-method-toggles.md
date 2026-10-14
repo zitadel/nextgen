@@ -25,15 +25,18 @@ the JSON by hand.
 
 ### 1. One command per sign-in method
 
-| Command                                                                          | What it does                                                                                     |
-| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `zitadel auth-method password enable`                                            | Turns password sign-in on                                                                        |
-| `zitadel auth-method password disable`                                           | Turns password sign-in off                                                                       |
-| `zitadel auth-method passkey enable`                                             | Turns passkey sign-in on                                                                         |
-| `zitadel auth-method passkey disable`                                            | Turns passkey sign-in off                                                                        |
-| `zitadel auth-method sso enable --provider google`                               | Adds Google, prompting for the client id and secret                                              |
-| `zitadel auth-method sso enable --provider google --client-id <id> < secret.txt` | Adds Google without prompts, for scripts: the id as a flag, the secret on stdin, never as a flag |
-| `zitadel auth-method sso disable --provider google`                              | Removes Google                                                                                   |
+| Command                                                                                                                                                               | What it does                                                                                     |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `zitadel auth-method password enable`                                                                                                                                 | Turns password sign-in on                                                                        |
+| `zitadel auth-method password disable`                                                                                                                                | Turns password sign-in off                                                                       |
+| `zitadel auth-method passkey enable`                                                                                                                                  | Turns passkey sign-in on                                                                         |
+| `zitadel auth-method passkey disable`                                                                                                                                 | Turns passkey sign-in off                                                                        |
+| `zitadel auth-method sso enable --provider google`                                                                                                                    | Adds Google, prompting for the client id and secret                                              |
+| `zitadel auth-method sso enable --provider google --client-id <id> < secret.txt`                                                                                      | Adds Google without prompts, for scripts: the id as a flag, the secret on stdin, never as a flag |
+| `zitadel auth-method sso enable --provider custom --slug acme-sso --display-name 'Acme SSO' --issuer https://sso.acme.example`                                        | Adds any other OpenID Connect provider, prompting for the client id and secret                   |
+| `zitadel auth-method sso enable --provider custom --slug acme-sso --display-name 'Acme SSO' --issuer https://sso.acme.example --scopes 'openid profile email groups'` | The same, asking for more than the default scopes (`openid profile email`)                       |
+| `zitadel auth-method sso disable --provider google`                                                                                                                   | Removes Google                                                                                   |
+| `zitadel auth-method sso disable --provider acme-sso`                                                                                                                 | Removes a custom provider, named by its `--slug`                                                 |
 
 Every command also takes these flags:
 
@@ -43,8 +46,10 @@ Every command also takes these flags:
 | `--dry-run`       | Shows what would change, without changing anything.                        |
 | `--force`         | `disable` commands only: allows removing the last way to sign in (§3).     |
 
-`google` is the only provider today. Each new provider is another value for
-`--provider`, not a new command.
+`--provider` is `google`, or `custom` for any other OpenID Connect provider,
+which also takes `--slug`, `--display-name`, `--issuer` and optionally
+`--scopes`. A new built-in provider is another value for `--provider`, not a
+new command.
 
 - **Each method is its own command**, so each command only has the flags it
   needs. `sso` needs a provider and credentials; `password` and `passkey` need
