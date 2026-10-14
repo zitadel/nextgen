@@ -204,6 +204,10 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 		passkeys, err := session.ListUserPasskeys(t.Context(), api.ListUserPasskeysParams{UserID: api.UserID(foreignUserID)})
 		require.NoError(t, err)
 		require.IsType(t, &api.ListUserPasskeysNotFound{}, passkeys, helpers.MustMarshal(t, passkeys))
+
+		links, err := session.ListUserIdentityLinks(t.Context(), api.ListUserIdentityLinksParams{UserID: api.UserID(foreignUserID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListUserIdentityLinksNotFound{}, links, helpers.MustMarshal(t, links))
 	})
 
 	// The by-id operations resolve the path id before authorizing, so each is
@@ -384,10 +388,14 @@ func TestConsoleSessionReadsTargetProjectByID(t *testing.T) {
 		require.NoError(t, err)
 		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
 
-		// The user detail page's Authentication tab reads the passkeys too.
+		// The user detail page's Authentication tab reads the passkeys and the
+		// linked provider accounts too.
 		passkeys, err := session.ListUserPasskeys(t.Context(), api.ListUserPasskeysParams{UserID: api.UserID(customerUserID)})
 		require.NoError(t, err)
 		require.IsType(t, &api.ListUserPasskeysResponse{}, passkeys, helpers.MustMarshal(t, passkeys))
+		links, err := session.ListUserIdentityLinks(t.Context(), api.ListUserIdentityLinksParams{UserID: api.UserID(customerUserID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListUserIdentityLinksResponse{}, links, helpers.MustMarshal(t, links))
 	})
 
 	t.Run("team read and update", func(t *testing.T) {

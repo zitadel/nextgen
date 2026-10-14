@@ -929,6 +929,20 @@ func (UnimplementedHandler) ListSchemas(ctx context.Context, params ListSchemasP
 	return r, ht.ErrNotImplemented
 }
 
+// ListUserIdentityLinks implements listUserIdentityLinks operation.
+//
+// The identity provider accounts linked to the user, oldest first. A link is
+// created when a sign-in through a connection resolves to this user, and it
+// pins that provider account to the user from then on.
+// Each entry names the connection by its revision-stable id, which
+// `GET /idps/{id}` resolves. The provider's subject and claims are never
+// returned.
+//
+// GET /users/{user_id}/identity_links
+func (UnimplementedHandler) ListUserIdentityLinks(ctx context.Context, params ListUserIdentityLinksParams) (r ListUserIdentityLinksRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListUserPasskeys implements listUserPasskeys operation.
 //
 // List user passkeys.

@@ -741,6 +741,17 @@ type Handler interface {
 	//
 	// GET /schemas
 	ListSchemas(ctx context.Context, params ListSchemasParams) (ListSchemasRes, error)
+	// ListUserIdentityLinks implements listUserIdentityLinks operation.
+	//
+	// The identity provider accounts linked to the user, oldest first. A link is
+	// created when a sign-in through a connection resolves to this user, and it
+	// pins that provider account to the user from then on.
+	// Each entry names the connection by its revision-stable id, which
+	// `GET /idps/{id}` resolves. The provider's subject and claims are never
+	// returned.
+	//
+	// GET /users/{user_id}/identity_links
+	ListUserIdentityLinks(ctx context.Context, params ListUserIdentityLinksParams) (ListUserIdentityLinksRes, error)
 	// ListUserPasskeys implements listUserPasskeys operation.
 	//
 	// List user passkeys.

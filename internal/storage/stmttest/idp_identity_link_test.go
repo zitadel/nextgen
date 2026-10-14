@@ -264,3 +264,61 @@ func TestIDPIdentityLinkStatements_CreateInsideUserTransactionRollsBackTogether(
 		assert.Equal(t, f.userID, got.UserID, "the existing link is untouched")
 	})
 }
+
+func idpIdentityLinksOfUser(projectID, userID string, limit uint32, cursor []byte) *database.ListOptions[domain.IDPIdentityLinkField] {
+	return &database.ListOptions[domain.IDPIdentityLinkField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.IDPIdentityLinkFieldProjectID), projectID),
+			database.Equal(database.Col(domain.IDPIdentityLinkFieldUserID), userID),
+		),
+		Pagination: database.Page[domain.IDPIdentityLinkField]{
+			Limit:  limit,
+			Cursor: cursor,
+			OrderBy: database.OrderBy[domain.IDPIdentityLinkField]{
+				Columns: []database.Column[domain.IDPIdentityLinkField]{
+					database.Col(domain.IDPIdentityLinkFieldCreatedAt),
+					database.Col(domain.IDPIdentityLinkFieldID),
+				},
+				Direction: database.OrderAsc,
+			},
+		},
+	}
+}
+
+// A user's links page across connections, and another user's links stay out.
+func TestIDPIdentityLinkStatements_ListByUser(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		f := newIDPIdentityLinkFixture(t, d.stmts)
+		first := f.link("subject-1")
+		require.NoError(t, d.stmts.CreateIDPIdentityLink(t.Context(), first))
+		second := f.link("subject-1")
+		second.ConnectionID = createIDPConnection(t, d.stmts, f.projectID, "github", idpConnectionDocument("https://github.example.com")).ID
+		require.NoError(t, d.stmts.CreateIDPIdentityLink(t.Context(), second))
+		stranger := f.link("subject-2")
+		stranger.UserID = createLinkUser(t, d.stmts, f.projectID, f.schemaURL, "stranger")
+		require.NoError(t, d.stmts.CreateIDPIdentityLink(t.Context(), stranger))
+
+		page, err := d.stmts.ListIDPIdentityLinks(t.Context(), idpIdentityLinksOfUser(f.projectID, f.userID, 1, nil))
+		require.NoError(t, err)
+		require.Len(t, page.Items, 1)
+		require.NotEmpty(t, page.NextCursor)
+
+		rest, err := d.stmts.ListIDPIdentityLinks(t.Context(), idpIdentityLinksOfUser(f.projectID, f.userID, 1, page.NextCursor))
+		require.NoError(t, err)
+		require.Len(t, rest.Items, 1)
+		assert.Empty(t, rest.NextCursor)
+
+		assert.ElementsMatch(t, []string{first.ID, second.ID}, []string{page.Items[0].ID, rest.Items[0].ID})
+		assert.Equal(t, time.UTC, page.Items[0].CreatedAt.Location())
+	})
+}
+
+func TestIDPIdentityLinkStatements_ListUnlinkedUserIsEmpty(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		f := newIDPIdentityLinkFixture(t, d.stmts)
+		got, err := d.stmts.ListIDPIdentityLinks(t.Context(), idpIdentityLinksOfUser(f.projectID, f.userID, 10, nil))
+		require.NoError(t, err)
+		assert.Empty(t, got.Items)
+		assert.Empty(t, got.NextCursor)
+	})
+}

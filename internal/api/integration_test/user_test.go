@@ -1112,3 +1112,98 @@ func TestListPasskeys(t *testing.T) {
 		assert.IsType(t, &api.ListUserPasskeysNotFound{}, resp, helpers.MustMarshal(t, resp))
 	})
 }
+
+func TestListUserIdentityLinks(t *testing.T) {
+	t.Parallel()
+
+	dependencies := func(t *testing.T) (fixture idpFixture, user *domain.User) {
+		fixture = newIdpFixture(t)
+		user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+			ProjectID:  fixture.project.ID,
+			SchemaURL:  test_data.UserSchemaURL,
+			Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, "linked@example.com"),
+		})
+		require.NoError(t, err)
+		return fixture, user
+	}
+
+	link := func(t *testing.T, projectID, connectionID, subject, userID string) *domain.IDPIdentityLink {
+		t.Helper()
+		link := &domain.IDPIdentityLink{ProjectID: projectID, ConnectionID: connectionID, Subject: subject, UserID: userID}
+		require.NoError(t, harness.EnsureServiceDB(t).Statements().CreateIDPIdentityLink(t.Context(), link))
+		return link
+	}
+
+	t.Run("lists the linked accounts oldest first, without the subject", func(t *testing.T) {
+		t.Parallel()
+
+		fixture, user := dependencies(t)
+		google := fixture.create(t, helpers.OIDCConnection("google"))
+		github := fixture.create(t, helpers.OIDCConnection("github"))
+		first := link(t, fixture.project.ID, google.ID, "google-subject", user.ID)
+		second := link(t, fixture.project.ID, github.ID, "github-subject", user.ID)
+
+		resp, err := fixture.client.ListUserIdentityLinks(t.Context(), api.ListUserIdentityLinksParams{UserID: api.UserID(user.ID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListUserIdentityLinksResponse{}, resp, helpers.MustMarshal(t, resp))
+		links := resp.(*api.ListUserIdentityLinksResponse).IdentityLinks
+		require.Len(t, links, 2)
+		assert.Equal(t, first.ID, links[0].ID)
+		assert.Equal(t, google.ID, links[0].ConnectionID)
+		assert.Equal(t, second.ID, links[1].ID)
+		assert.Equal(t, github.ID, links[1].ConnectionID)
+		assert.False(t, links[0].CreatedAt.IsZero())
+		assert.NotContains(t, helpers.MustMarshal(t, resp), "google-subject")
+	})
+
+	t.Run("pages", func(t *testing.T) {
+		t.Parallel()
+
+		fixture, user := dependencies(t)
+		google := fixture.create(t, helpers.OIDCConnection("google"))
+		github := fixture.create(t, helpers.OIDCConnection("github"))
+		link(t, fixture.project.ID, google.ID, "google-subject", user.ID)
+		link(t, fixture.project.ID, github.ID, "github-subject", user.ID)
+
+		resp, err := fixture.client.ListUserIdentityLinks(t.Context(), api.ListUserIdentityLinksParams{
+			UserID: api.UserID(user.ID),
+			Limit:  api.NewOptLimit(1),
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListUserIdentityLinksResponse{}, resp, helpers.MustMarshal(t, resp))
+		page := resp.(*api.ListUserIdentityLinksResponse)
+		require.Len(t, page.IdentityLinks, 1)
+		require.True(t, page.NextPageToken.IsSet())
+
+		resp, err = fixture.client.ListUserIdentityLinks(t.Context(), api.ListUserIdentityLinksParams{
+			UserID:    api.UserID(user.ID),
+			Limit:     api.NewOptLimit(1),
+			PageToken: api.NewOptPageToken(page.NextPageToken.Value),
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListUserIdentityLinksResponse{}, resp, helpers.MustMarshal(t, resp))
+		next := resp.(*api.ListUserIdentityLinksResponse)
+		require.Len(t, next.IdentityLinks, 1)
+		assert.NotEqual(t, page.IdentityLinks[0].ID, next.IdentityLinks[0].ID)
+		assert.False(t, next.NextPageToken.IsSet())
+	})
+
+	t.Run("no links", func(t *testing.T) {
+		t.Parallel()
+
+		fixture, user := dependencies(t)
+		resp, err := fixture.client.ListUserIdentityLinks(t.Context(), api.ListUserIdentityLinksParams{UserID: api.UserID(user.ID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListUserIdentityLinksResponse{}, resp, helpers.MustMarshal(t, resp))
+		assert.Empty(t, resp.(*api.ListUserIdentityLinksResponse).IdentityLinks)
+	})
+
+	t.Run("unknown user returns 404", func(t *testing.T) {
+		t.Parallel()
+
+		fixture := newIdpFixture(t)
+		resp, err := fixture.client.ListUserIdentityLinks(t.Context(), api.ListUserIdentityLinksParams{UserID: "user_does_not_exist"})
+		require.NoError(t, err)
+		assert.IsType(t, &api.ListUserIdentityLinksNotFound{}, resp, helpers.MustMarshal(t, resp))
+	})
+}

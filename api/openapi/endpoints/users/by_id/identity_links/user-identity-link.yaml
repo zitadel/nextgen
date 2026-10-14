@@ -1,0 +1,22 @@
+title: UserIdentityLink
+type: object
+description: One provider account linked to the user.
+required:
+  - id
+  - connection_id
+  - created_at
+properties:
+  id:
+    type: string
+    description: The unique identifier of the link.
+    example: idplink_01KWH3B5Q8Z6V4N2M0X9C7R1TD
+  connection_id:
+    type: string
+    description: |
+      The IdP connection the account signs in through: the connection's id,
+      never a revision id, so the link survives edits to the connection.
+    example: idp_01KWH3A9F2J7K5P3Q1W8E6Y4UB
+  created_at:
+    type: string
+    format: date-time
+    description: When the account was linked to the user.

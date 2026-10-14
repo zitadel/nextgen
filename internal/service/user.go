@@ -88,6 +88,13 @@ type ListPasskeysInput struct {
 	Limit     int
 }
 
+type ListIdentityLinksInput struct {
+	ProjectID string
+	UserID    string
+	PageToken string
+	Limit     int
+}
+
 type ListUserTeamsInput struct {
 	ProjectID string
 	UserID    string
@@ -124,6 +131,7 @@ type UserService interface {
 	DeleteUser(ctx context.Context, input DeleteUserInput) error
 	ListUsers(ctx context.Context, input ListUsersInput) (*ListUsersOutput, error)
 	ListPasskeys(ctx context.Context, input ListPasskeysInput) (passkeys []*domain.UserPasskey, nextPage string, err error)
+	ListIdentityLinks(ctx context.Context, input ListIdentityLinksInput) (links []*domain.IDPIdentityLink, nextPage string, err error)
 	ListUserTeams(ctx context.Context, input ListUserTeamsInput) (*ListUserTeamsOutput, error)
 	GetUserByID(ctx context.Context, input GetUserInput) (*domain.User, error)
 	PatchUser(ctx context.Context, input PatchUserInput) (*domain.User, error)
@@ -454,6 +462,47 @@ func (s *userService) ListPasskeys(ctx context.Context, input ListPasskeysInput)
 	}
 
 	return dbpasskeys.Items, string(dbpasskeys.NextCursor), nil
+}
+
+// ListIdentityLinks pages the provider accounts linked to the user, oldest
+// first: the order they were linked in. The id breaks ties between links
+// created in the same instant, so a page boundary never skips or repeats one.
+func (s *userService) ListIdentityLinks(ctx context.Context, input ListIdentityLinksInput) (links []*domain.IDPIdentityLink, nextPage string, err error) {
+	result, err := s.v2Pool.Statements().ListIDPIdentityLinks(
+		ctx, &database.ListOptions[domain.IDPIdentityLinkField]{
+			Filter: database.And(
+				database.Equal(database.Col(domain.IDPIdentityLinkFieldProjectID), input.ProjectID),
+				database.Equal(database.Col(domain.IDPIdentityLinkFieldUserID), input.UserID),
+			),
+			Pagination: database.Page[domain.IDPIdentityLinkField]{
+				Limit:  uint32(normalizeLimit(input.Limit)),
+				Cursor: []byte(input.PageToken),
+				OrderBy: database.OrderBy[domain.IDPIdentityLinkField]{
+					Columns: []database.Column[domain.IDPIdentityLinkField]{
+						database.Col(domain.IDPIdentityLinkFieldCreatedAt),
+						database.Col(domain.IDPIdentityLinkFieldID),
+					},
+					Direction: database.OrderAsc,
+				},
+			},
+		},
+	)
+	if err != nil {
+		return nil, "", domain.ErrInternal(err).WithMessage("failed to get user identity links from database")
+	}
+
+	// Distinguish "user not found" from "user has no links".
+	if len(result.Items) == 0 {
+		exists, err := s.v2Pool.Statements().UserExists(ctx, input.ProjectID, input.UserID)
+		if err != nil {
+			return nil, "", domain.ErrInternal(err).WithMessage("failed to get user from database")
+		}
+		if !exists {
+			return nil, "", domain.ErrUserNotFound()
+		}
+	}
+
+	return result.Items, string(result.NextCursor), nil
 }
 
 // ListUserTeams serves the user's team roster one page at a time, each entry
