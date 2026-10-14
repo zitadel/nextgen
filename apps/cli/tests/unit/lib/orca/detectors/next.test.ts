@@ -21,7 +21,7 @@ afterEach(async () => {
 async function writeNextPackageJson(extra: Record<string, unknown> = {}): Promise<void> {
   await writeFile(
     join(dir, "package.json"),
-    JSON.stringify({ name: "demo", dependencies: { next: "15.0.0" }, ...extra }),
+    JSON.stringify({ name: "demo", dependencies: { next: "15.2.3" }, ...extra }),
   );
 }
 
@@ -58,7 +58,7 @@ describe("NextDetector", () => {
   it("recognizes next as a devDependency", async () => {
     await writeFile(
       join(dir, "package.json"),
-      JSON.stringify({ devDependencies: { next: "15.0.0" } }),
+      JSON.stringify({ devDependencies: { next: "15.2.3" } }),
     );
     await mkdir(join(dir, "app"));
     expect(await detector.detect(dir)).toMatchObject({ id: "next" });
@@ -119,6 +119,36 @@ describe("NextDetector", () => {
     expect(caught).toBeInstanceOf(ZitadelError);
     expect((caught as ZitadelError).code).toBe("E_UNSUPPORTED_PROJECT_SHAPE");
     expect((caught as ZitadelError).message).toContain("below the supported floor");
+  });
+
+  it.each(["15.2.2", "~15.1.0", "15.1.7"])(
+    "refuses next %s, which skips middleware for a forged subrequest header",
+    async (spec) => {
+      await mkdir(join(dir, "app"));
+      await writeNextPackageJson({ dependencies: { next: spec } });
+
+      await expect(detector.detect(dir)).rejects.toThrow(
+        `Next.js "${spec}" is below the supported floor — the CLI integrates Next.js 15.2.3 and newer`,
+      );
+    },
+  );
+
+  it("points a refused Next 15 app at the release that fixes the middleware bypass", async () => {
+    await mkdir(join(dir, "app"));
+    await writeNextPackageJson({ dependencies: { next: "15.2.2" } });
+
+    await expect(detector.detect(dir)).rejects.toMatchObject({
+      hint: expect.stringContaining("CVE-2025-29927"),
+    });
+  });
+
+  // A range that can resolve to a fixed release passes: the gate refuses only
+  // a spec that provably cannot, so `^15.0.0` is accepted.
+  it.each(["15.2.3", "^15.2.3", "^15.0.0", "16.0.0"])("accepts next %s", async (spec) => {
+    await mkdir(join(dir, "app"));
+    await writeNextPackageJson({ dependencies: { next: spec } });
+
+    expect(await detector.detect(dir)).toMatchObject({ id: "next" });
   });
 
   it("lets an unparseable next version through the floor", async () => {

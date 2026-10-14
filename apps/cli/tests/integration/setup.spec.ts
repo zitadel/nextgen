@@ -24,6 +24,7 @@ const ACME_CREDENTIALS = { clientId: "acme-client-id", secret: "acme-client-secr
 /** Apps below the framework version their SDK supports. */
 const UNSUPPORTED_APPS: Array<{ name: string; framework: AppFramework; version: string }> = [
   { name: "a Next 14 app", framework: "next", version: "^14.2.0" },
+  { name: "a Next 15.2.2 app", framework: "next", version: "15.2.2" },
   { name: "a Nuxt 3 app", framework: "nuxt", version: "^3.13.0" },
   { name: "a Vue 2 app", framework: "vue", version: "^2.7.0" },
   { name: "a Solid 1.7 app", framework: "solid", version: "~1.7.0" },

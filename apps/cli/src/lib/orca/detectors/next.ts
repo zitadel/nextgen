@@ -33,16 +33,20 @@ export class NextDetector implements Detector {
       return null;
     }
 
-    // Supported floor (ADR 043): the scaffolded templates target Next 15+
-    // (current App Router and request-boundary conventions). The floor is
-    // enforced here so setup and doctor share one loud gate instead of
-    // degrading silently; only a spec that provably cannot resolve to 15+
-    // is rejected — protocol specs and dist-tags pass.
+    // Supported floor (ADR 043): the scaffolded templates target Next 15
+    // (current App Router and request-boundary conventions), and 15.2.3 is
+    // the first 15.x that does not skip middleware for a request carrying
+    // `x-middleware-subrequest` (CVE-2025-29927), which would bypass the
+    // generated `protectedRoutes`. The floor is enforced here so setup and
+    // doctor share one loud gate instead of degrading silently; only a spec
+    // that provably cannot resolve to 15.2.3+ is rejected, so `^15.0.0`
+    // passes (it can resolve to a fixed release) while `15.2.2` and `~15.1.0`
+    // do not. Protocol specs and dist-tags pass.
     assertDependencyFloor(pkg, {
       dependency: "next",
-      minimum: "15",
+      minimum: "15.2.3",
       product: "Next.js",
-      hint: "Upgrade the app to Next 15+ (e.g. `npx @next/codemod@latest upgrade`) and rerun.",
+      hint: "Upgrade the app to Next.js 15.2.3 or later (e.g. `npx @next/codemod@latest upgrade`) and rerun: earlier releases let a request skip middleware (CVE-2025-29927).",
     });
 
     const appDir = (await dirExists(join(cwd, "app")))

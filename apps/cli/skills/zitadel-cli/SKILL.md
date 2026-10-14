@@ -156,7 +156,7 @@ Common error codes point at their own fix in `next_commands`:
   `details` often lists the missing or available values.
 - `E_UNSUPPORTED_PROJECT_SHAPE`: setup or doctor found an app it cannot
   integrate, such as a framework version below the one its SDK supports (Next.js
-  15, Nuxt 4, React 18, Vue 3, Angular 17, Solid 1.8, Svelte 5, SolidStart 2);
+  15.2.3, Nuxt 4, React 18, Vue 3, Angular 17, Solid 1.8, Svelte 5, SolidStart 2);
   `hint` says what to upgrade. Nothing was written.
 - `E_CREDENTIAL_MISSING`: a connection's `client_id` or `client_secret` names a
   project variable that does not exist; `details.variable` is the name. Publish it
