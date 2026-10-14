@@ -47,6 +47,12 @@ describe("ZitadelLogin", () => {
     expect(el!.lang).toBe("de");
   });
 
+  it("forwards resumeFlowId to the widget", () => {
+    const { container } = render(<ZitadelLogin project={project} resumeFlowId="flow_123" />);
+    const el = container.querySelector<ZitadelLoginElement>("zitadel-login");
+    expect(el!.resumeFlowId).toBe("flow_123");
+  });
+
   it("forwards the preview props to the widget", () => {
     const { container } = render(
       <ZitadelLogin project={project} previewState="success" previewSuccessStep="done" />,
@@ -172,6 +178,7 @@ const LOGIN_DEFAULTS = {
   theme: "",
   lang: "",
   suppressHeader: false,
+  resumeFlowId: "",
 } as const;
 const LOGIN_VALUES = {
   purpose: "register",
@@ -179,6 +186,7 @@ const LOGIN_VALUES = {
   theme: "light",
   lang: "de",
   suppressHeader: true,
+  resumeFlowId: "flow_123",
 } as const;
 const SESSION_DEFAULTS = {
   heading: "Signed in as",

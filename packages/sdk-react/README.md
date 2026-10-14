@@ -42,6 +42,11 @@ some other way, such as a 5xx or a network error; the detail has `phase`, `messa
 back, `status` and `code`). Each receives the event detail. An unset or cleared prop leaves
 the widget on its default (for example the "Signed in as" heading).
 
+`ZitadelLogin` also takes `resumeFlowId` (an existing flow to resume instead of starting a new
+one), like every other SDK's login wrapper, and the operator-preview props `previewState` and
+`previewSuccessStep`, which only the React wrapper exposes: they exist for the console's branding
+preview, not for a sign-in page.
+
 Children go into the element's light DOM, so `ZitadelLogout` accepts a
 `<template>` for a custom sign-out control (`{{display}}`, `{{identifier}}`
 and `{{initial}}` are filled in, and an element with `data-action="logout"`

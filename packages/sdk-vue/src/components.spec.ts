@@ -60,6 +60,15 @@ describe("ZitadelLogin", () => {
     expect(el!.proxyPath).toBe("/__nextgen");
   });
 
+  it("declares resumeFlowId as a prop and forwards it to the widget", () => {
+    const { container } = render(ZitadelLogin, {
+      props: { project, resumeFlowId: "flow_123" },
+    });
+    const el = container.querySelector<ZitadelLoginElement>("zitadel-login");
+    expect(Object.keys(ZitadelLogin.props)).toContain("resumeFlowId");
+    expect(el!.resumeFlowId).toBe("flow_123");
+  });
+
   it("forwards locales and lang to the widget", () => {
     const locales = { en: { "identifier.title": "Welcome back" } };
     const { container } = render(ZitadelLogin, {
@@ -198,6 +207,7 @@ const LOGIN_DEFAULTS = {
   theme: "",
   lang: "",
   suppressHeader: false,
+  resumeFlowId: "",
 } as const;
 const LOGIN_VALUES = {
   purpose: "register",
@@ -205,6 +215,7 @@ const LOGIN_VALUES = {
   theme: "light",
   lang: "de",
   suppressHeader: true,
+  resumeFlowId: "flow_123",
 } as const;
 const SESSION_DEFAULTS = {
   heading: "Signed in as",

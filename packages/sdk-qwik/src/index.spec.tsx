@@ -137,6 +137,7 @@ const DEFAULTS: readonly [Tag, string, unknown, unknown][] = [
   ["zitadel-login", "theme", "dark", ""],
   ["zitadel-login", "lang", "de", ""],
   ["zitadel-login", "suppressHeader", true, false],
+  ["zitadel-login", "resumeFlowId", "flow_123", ""],
   ["zitadel-session", "heading", "Hi", "Signed in as"],
   ["zitadel-session", "logoutLabel", "Leave", "Sign out"],
   ["zitadel-session", "variant", "page", "widget"],
@@ -201,6 +202,7 @@ describe("ZitadelLogin", () => {
         purpose="register"
         postSignInUrl="/profile"
         flowName="signup"
+        resumeFlowId="flow_123"
         suppressHeader
       />,
     );
@@ -213,6 +215,7 @@ describe("ZitadelLogin", () => {
         "purpose",
         "post-sign-in-url",
         "flow-name",
+        "resume-flow-id",
         "suppress-header",
       ]),
     ).toEqual({
@@ -222,6 +225,7 @@ describe("ZitadelLogin", () => {
       purpose: "register",
       "post-sign-in-url": "/profile",
       "flow-name": "signup",
+      "resume-flow-id": "flow_123",
       "suppress-header": "",
     });
   });

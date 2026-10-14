@@ -80,6 +80,7 @@ const loginInputs: ReadonlyArray<readonly [string, unknown]> = [
   ["purpose", "register"],
   ["flowName", "passkey-only"],
   ["postSignInUrl", "/home"],
+  ["resumeFlowId", "flow_123"],
   ["variant", "page"],
   ["theme", "light"],
   ["suppressHeader", true],
@@ -111,6 +112,7 @@ const loginDefaults: ReadonlyArray<readonly [string, unknown, unknown]> = [
   ["theme", "light", ""],
   ["lang", "de", ""],
   ["suppressHeader", true, false],
+  ["resumeFlowId", "flow_123", ""],
 ];
 
 const logoutDefaults: ReadonlyArray<readonly [string, unknown, unknown]> = [["theme", "dark", ""]];

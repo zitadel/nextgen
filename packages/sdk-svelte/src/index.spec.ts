@@ -182,6 +182,7 @@ const LOGIN_DEFAULTS = {
   theme: "",
   lang: "",
   suppressHeader: false,
+  resumeFlowId: "",
 } as const;
 const LOGIN_VALUES = {
   purpose: "register",
@@ -189,6 +190,7 @@ const LOGIN_VALUES = {
   theme: "light",
   lang: "de",
   suppressHeader: true,
+  resumeFlowId: "flow_123",
 } as const;
 const SESSION_DEFAULTS = {
   heading: "Signed in as",

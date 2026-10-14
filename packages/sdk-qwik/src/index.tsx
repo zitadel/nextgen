@@ -98,6 +98,7 @@ function loginAttrs(props: ZitadelLoginProps): Attrs {
     purpose: props.purpose,
     "flow-name": props.flowName,
     "post-sign-in-url": props.postSignInUrl,
+    "resume-flow-id": props.resumeFlowId,
     variant: props.variant,
     theme: props.theme,
     "suppress-header": flag(props.suppressHeader),
@@ -133,6 +134,7 @@ function bindLoginConfig(el: ZitadelLoginElement, props: ZitadelLoginProps): voi
   setProp(el, "purpose", props.purpose);
   setProp(el, "flowName", props.flowName);
   setProp(el, "postSignInUrl", props.postSignInUrl);
+  setProp(el, "resumeFlowId", props.resumeFlowId);
   setProp(el, "variant", props.variant);
   setProp(el, "theme", props.theme);
   setProp(el, "suppressHeader", props.suppressHeader);

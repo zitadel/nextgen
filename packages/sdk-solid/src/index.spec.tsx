@@ -254,6 +254,14 @@ const defaults: {
     fallback: false,
   },
   {
+    name: "ZitadelLogin",
+    Wrapper: ZitadelLogin,
+    tag: "zitadel-login",
+    prop: "resumeFlowId",
+    value: "flow_123",
+    fallback: "",
+  },
+  {
     name: "ZitadelSession",
     Wrapper: ZitadelSession,
     tag: "zitadel-session",
