@@ -134,7 +134,8 @@ export default component$(() => {
 
 The widgets' events surface as optional QRL callbacks: `onFlowStep$`,
 `onFlowInput$`, `onFlowComplete$`, `onFlowRedirect$` and `onFlowError$` on
-`ZitadelLogin`, and `onSignout$` on `ZitadelLogout` and `ZitadelSession`. Pass
+`ZitadelLogin`, and `onSignout$` and `onSessionMissing$` (no session when the widget
+loads) on `ZitadelLogout` and `ZitadelSession`. Pass
 `locales={businessLocales}` (exported from `@zitadel/sdk-qwik`) to show
 work-email copy for a business audience.
 
