@@ -189,7 +189,9 @@ smoke/real/embedded/platform, demo mock/real, the CLI journey matrix, and the
 kit's real-instance suite), and ci.yml runs `e2e:all` in a step of its own
 after the build-and-test graph, whenever moon finds it affected. A plain
 `:test` (and `pnpm run check`) stays unit tests; `moon run e2e:all` runs the
-whole suite locally, which boots real servers and needs browsers installed. The canonical details are in
+whole suite locally, which boots real servers and needs browsers installed; the
+journey lane also needs prebuilt tarballs (`moon run release:pack`, then
+`JOURNEY_TARBALLS_DIR`). The canonical details are in
 [packages/testing/AGENTS.md](packages/testing/AGENTS.md). (More in
 [CONTRIBUTING.md](CONTRIBUTING.md#running-integration-and-end-to-end-tests)):
 
