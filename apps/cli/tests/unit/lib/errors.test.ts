@@ -17,6 +17,7 @@ describe("EXIT_CODES", () => {
       E_CONFLICT: 5,
       E_PORT_IN_USE: 5,
       E_VALIDATION: 3,
+      E_CREDENTIAL_MISSING: 3,
       E_NOT_IMPLEMENTED: 2,
       E_CANCELLED: 130,
     });

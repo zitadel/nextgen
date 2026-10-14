@@ -148,6 +148,39 @@ describe("sso-conflict", () => {
   });
 });
 
+/** A user who typed their email and pressed a provider button on the password step. */
+function returnFromPassword(outcome: SsoOutcome): FlowStepName {
+  const actor = startFlowActor();
+  actor.send({ type: "START", purpose: "login" });
+  actor.send({ type: "SUBMIT", action: "submit", fields: { email: "ada@example.test" } });
+  actor.send({ type: "SUBMIT", action: "sso", fields: {}, sso_provider_id: "google" });
+  actor.send({
+    type: "SUBMIT",
+    action: "callback",
+    fields: { email: "ada@example.test" },
+    sso_outcome: outcome,
+  });
+  return actor.getSnapshot().value as FlowStepName;
+}
+
+describe("a return from the provider pressed on the password step", () => {
+  it("signs a linked identity in", () => {
+    expect(returnFromPassword("sso_authenticated")).toBe("done");
+  });
+
+  it("explains a collision on the conflict step, as the engine's written route does", () => {
+    expect(returnFromPassword("user_already_exists")).toBe("sso-conflict");
+  });
+
+  it("restarts the flow for an unknown provider account, because the attempt is bound to a user", () => {
+    expect(returnFromPassword("sso_user_not_found")).toBe("identifier");
+  });
+
+  it("still collects an unknown provider account on the entry step", () => {
+    expect(stepAfterReturn("sso_user_not_found")).toBe("register-sso");
+  });
+});
+
 /**
  * The mock offers provider buttons on every step in `PROVIDER_STEPS`
  * (`sso-providers.ts`), so every one of those steps has to act on the press.
@@ -162,6 +195,17 @@ describe("every step that offers providers acts on the press", () => {
 
     expect(actor.getSnapshot().value).toBe("sso-redirect");
     expect(actor.getSnapshot().context.ssoProviderId).toBe("google");
+  });
+
+  it("leaves for the provider from the password step, rather than signing in", () => {
+    const actor = startFlowActor();
+    actor.send({ type: "START", purpose: "login" });
+    actor.send({ type: "SUBMIT", action: "submit", fields: { email: "ada@example.test" } });
+    expect(actor.getSnapshot().value).toBe("password");
+
+    actor.send({ type: "SUBMIT", action: "sso", fields: {}, sso_provider_id: "google" });
+
+    expect(actor.getSnapshot().value).toBe("sso-redirect");
   });
 
   it("leaves for the provider from the conflict step, rather than signing in", () => {

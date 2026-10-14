@@ -1,24 +1,29 @@
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata } from "next";
-import { Arimo, Azeret_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
 
 // The website's faces: Arimo for text, APK Futural (a licensed webfont) for
-// headings, Azeret Mono for code. next/font serves them from /_next/, like
-// every asset of this app.
-const arimo = Arimo({
+// headings, Azeret Mono for code, all from ./fonts so the build fetches
+// nothing (AGENTS.md). next/font serves them from /_next/, like every asset of
+// this app.
+//
+// Arimo is one variable file, every weight from 400 to 700, declared as the
+// two weights the page uses.
+const arimo = localFont({
+  src: [
+    { path: "./fonts/Arimo-latin.woff2", weight: "400" },
+    { path: "./fonts/Arimo-latin.woff2", weight: "600" },
+  ],
   variable: "--font-arimo",
-  subsets: ["latin"],
-  weight: ["400", "600"],
   display: "swap",
 });
 
-const azeretMono = Azeret_Mono({
-  variable: "--font-azeret-mono",
-  subsets: ["latin"],
+const azeretMono = localFont({
+  src: "./fonts/AzeretMono-Medium-latin.woff2",
   weight: "500",
+  variable: "--font-azeret-mono",
   display: "swap",
 });
 

@@ -12,7 +12,7 @@ export default defineConfig({
     normalize: "src/normalize.ts",
     schemas: "src/schemas.ts",
     template: "src/template.ts",
-    validate: "src/validate.ts",
+    validate: "src/validation/index.ts",
   },
   outDir: "dist",
   format: ["esm"],

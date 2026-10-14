@@ -27,6 +27,7 @@ export {
 export {
   collectPlanWarnings,
   enumeratePlanResources,
+  isUnsupportedDeletion,
   renderPlan,
   summarizePlan,
   type PlanResourceChange,
