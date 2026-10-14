@@ -196,6 +196,7 @@ Options:
 
 Environment (the command line's arguments win):
   JOURNEY_CI=1             --ci
+  JOURNEY_CONCURRENCY      --concurrency
   JOURNEY_MATRIX           --matrix
   JOURNEY_RUNTIME          --runtime
   JOURNEY_TARBALLS_DIR     --tarballs-dir

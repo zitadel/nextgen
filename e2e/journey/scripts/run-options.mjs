@@ -9,8 +9,11 @@ const PREEXISTING_FRAMEWORK_IDS = ["next", "nuxt"];
 // The options CI sets, as environment variables beside the arguments. CI's
 // turbo job cannot pass them after `--`: turbo puts those arguments into the
 // cache key of every task in the run (vercel/turborepo#14770), so the
-// runner's dependencies would be rebuilt instead of restored.
+// runner's dependencies would be rebuilt instead of restored. ci.yml cannot
+// either: it runs the journey as a dependency of `e2e:all`, whose command
+// moon fixes.
 const ENV_VALUE_OPTIONS = [
+  ["JOURNEY_CONCURRENCY", "--concurrency"],
   ["JOURNEY_MATRIX", "--matrix"],
   ["JOURNEY_RUNTIME", "--runtime"],
   ["JOURNEY_TARBALLS_DIR", "--tarballs-dir"],

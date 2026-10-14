@@ -205,6 +205,7 @@ test("the JOURNEY_* variables stand for the options CI sets", () => {
   assert.deepEqual(
     journeyArgsFromEnv({
       JOURNEY_CI: "1",
+      JOURNEY_CONCURRENCY: "8",
       JOURNEY_MATRIX: "single",
       JOURNEY_RUNTIME: "binary",
       JOURNEY_TARBALLS_DIR: "dist/release/1.0.0/npm",
@@ -212,6 +213,8 @@ test("the JOURNEY_* variables stand for the options CI sets", () => {
     }),
     [
       "--ci",
+      "--concurrency",
+      "8",
       "--matrix",
       "single",
       "--runtime",
@@ -233,6 +236,23 @@ test("the command line's arguments win over the JOURNEY_* variables", () => {
   ]);
   assert.equal(parsed.ci, true);
   assert.equal(parsed.workDir, "/tmp/from-args");
+});
+
+test("JOURNEY_CONCURRENCY reaches the CI lane, whose command line fixes the rest", () => {
+  // e2e:journey-local runs `--ci --runtime binary`; the pool size has to come
+  // from the environment.
+  const parsed = parseLocalJourneyArgs([
+    ...journeyArgsFromEnv({ JOURNEY_CONCURRENCY: "8" }),
+    "--ci",
+    "--runtime",
+    "binary",
+  ]);
+  assert.equal(parsed.ci, true);
+  assert.equal(parsed.concurrency, 8);
+  assert.throws(
+    () => parseLocalJourneyArgs(journeyArgsFromEnv({ JOURNEY_CONCURRENCY: "0" })),
+    /--concurrency must be a positive integer/,
+  );
 });
 
 test("in GitHub Actions the journey refuses to pack its own tarballs", () => {

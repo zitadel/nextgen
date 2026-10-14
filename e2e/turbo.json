@@ -18,7 +18,7 @@
     // serve), like moon's, so ci-mode's affected walk over this graph does not
     // mark the journey for a console spec edit but does see a demo app edit. The
     // two demo-next lanes share a task-guard mutex in package.json (both serve
-    // the demo on :3002), standing in for moon's `e2e-serial`.
+    // the demo on :3002), standing in for moon's mutex of the same name.
     "typecheck": {
       "dependsOn": ["@zitadel/testing#build"]
     },
