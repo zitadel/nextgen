@@ -522,6 +522,44 @@ describe("setupMockHandlers — the provider round trip", () => {
     expect((await callback({ state: "s", code: "c" })).status).toBe(400);
   });
 
+  /** An sso submission straight over HTTP, so the test controls the headers. */
+  async function submitSso(returnTarget: string, headers: Record<string, string> = {}) {
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    return fetch(`http://localhost/flow/${start.id}/submit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify({
+        session_token: start.session_token,
+        action: "sso",
+        fields: {},
+        sso_provider_id: "google",
+        return_target: returnTarget,
+      }),
+    });
+  }
+
+  // The callback redirects to this value, and the mock is publicly deployed:
+  // a foreign target would turn it into an open redirect. The engine binds the
+  // target to the request origin the same way (`internal/api/flow.go`).
+  test.each([
+    ["on another origin", "https://evil.example/phish"],
+    ["carrying userinfo", "http://localhost@evil.example/"],
+    ["not a URL", "/login?flow=flow_mock"],
+  ])("refuses a return target %s", async (_case, target) => {
+    const res = await submitSso(target);
+
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { code: string }).code).toBe("req.invalid");
+  });
+
+  test("binds the return target to the Origin header over the request host", async () => {
+    // A browser names the page's origin; the request host is the fallback.
+    expect((await submitSso(RETURN_TARGET, { Origin: "http://app.example" })).status).toBe(400);
+    expect(
+      (await submitSso("http://app.example/login", { Origin: "http://app.example" })).status,
+    ).toBe(200);
+  });
+
   test("the submit handler takes no callback action", async () => {
     const { id, sessionToken } = await toProvider();
 

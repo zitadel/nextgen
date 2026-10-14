@@ -22,7 +22,16 @@ import type { ZitadelLogin } from "./zitadel-login.js";
  * Driven by the shared mock rather than bespoke handlers, so the request the
  * orchestrator actually sends is validated against the generated client.
  */
-const API_BASE = "https://flow-sso.test.invalid";
+// The SDK proxy on the page's own origin, the only setup external sign-in
+// supports: the provider returns to `/__nextgen/idp/callback` there, and the
+// engine binds the `return_target` to the request origin. Node's fetch sends no
+// `Origin` header, so the request host stands in for it, as on the engine.
+const API_BASE = `${window.location.origin}/__nextgen`;
+
+/** A request as `METHOD /path`, the path relative to the proxy. */
+function apiCall(request: Request): string {
+  return `${request.method} ${request.url.slice(API_BASE.length).split("?")[0]}`;
+}
 
 const GOOGLE = { id: "google", name: "Google", template: "google" };
 const ACME = { id: "acme-sso", name: "Acme SSO", template: "oidc-generic" };
@@ -100,7 +109,7 @@ describe("<zitadel-login> with identity providers", () => {
   ): Promise<{ element: ZitadelLogin; seen: string[]; url: string }> {
     const seen: string[] = [];
     const record = ({ request }: { request: Request }) => {
-      seen.push(`${request.method} ${new URL(request.url).pathname}`);
+      seen.push(apiCall(request));
     };
     server.events.on("request:start", record);
     const original = window.location.href;
@@ -336,7 +345,7 @@ describe("<zitadel-login> with identity providers", () => {
 
     /** The provider redirecting to the callback; answers where the callback sends the browser. */
     async function provider(query: Record<string, string>): Promise<string> {
-      const res = await fetch(`${API_BASE}/__nextgen/idp/callback?${new URLSearchParams(query)}`, {
+      const res = await fetch(`${API_BASE}/idp/callback?${new URLSearchParams(query)}`, {
         redirect: "manual",
       });
       expect(res.status).toBe(303);
@@ -490,7 +499,7 @@ describe("<zitadel-login> with identity providers", () => {
       // stuck on a startup error has no way forward.
       const seen: string[] = [];
       const record = ({ request }: { request: Request }) => {
-        seen.push(`${request.method} ${new URL(request.url).pathname}`);
+        seen.push(apiCall(request));
       };
       server.events.on("request:start", record);
       server.use(http.get("*/flow/:id", () => HttpResponse.json(body, { status })));

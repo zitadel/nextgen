@@ -116,6 +116,33 @@ const IDP_CALLBACK_ERROR_PAGE = `<!doctype html>
 `;
 
 /**
+ * Why an sso submission's `return_target` is refused, or null when it is not.
+ *
+ * The engine binds the return to the request origin (`internal/api/flow.go`):
+ * the `Origin` header, else the request's own host. The callback redirects to
+ * this value, so a target on another origin would make it an open redirect,
+ * and this mock is publicly deployed (`apps/mock-zitadel`).
+ */
+function returnTargetRefusal(request: Request, rawTarget: string): string | null {
+  const origin = request.headers.get("origin") ?? new URL(request.url).origin;
+  let target: URL;
+  try {
+    target = new URL(rawTarget);
+  } catch {
+    return `return_target "${rawTarget}" is not a URL`;
+  }
+  // No page URL carries userinfo; it is only ever a way to dress a foreign
+  // host up as the origin.
+  if (target.username || target.password) {
+    return "return_target must not carry userinfo";
+  }
+  if (target.origin.toLowerCase() !== origin.toLowerCase()) {
+    return `return_target "${rawTarget}" is not on the request origin "${origin}"`;
+  }
+  return null;
+}
+
+/**
  * Build the MSW handlers. Each call creates an independent closure (actor,
  * captured log, iss) so parallel test suites never share state. Callers
  * should hold onto the returned `reset` and `getCaptured` references instead
@@ -353,11 +380,13 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
       captured.push({ kind: "submitFlowStep", flowId, body });
       // The engine refuses an sso submission without `return_target`, the
       // page the callback sends the browser back to, before anything else.
-      if (body.action === "sso" && !body.return_target) {
-        return HttpResponse.json(
-          { code: "req.invalid", message: "return_target is required for action sso" },
-          { status: 400 },
-        );
+      if (body.action === "sso") {
+        const refusal = body.return_target
+          ? returnTargetRefusal(request, body.return_target)
+          : "return_target is required for action sso";
+        if (refusal) {
+          return HttpResponse.json({ code: "req.invalid", message: refusal }, { status: 400 });
+        }
       }
       const before = actor.getSnapshot().value as FlowStepName | "idle";
       // Only the provider's return to the callback route leaves for the
@@ -368,8 +397,8 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
           { status: 400 },
         );
       }
-      if (body.action === "sso" && body.return_target) {
-        returnTarget = body.return_target;
+      if (body.action === "sso") {
+        returnTarget = body.return_target ?? null;
       }
       const fields = (body.fields ?? {}) as Record<string, string>;
       const email = fields.email;
