@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "vitest";
 
 import {
-  assertPrebuiltTarballsOnGitHub,
+  assertPrebuiltTarballs,
   journeyArgsFromEnv,
   parseLocalJourneyArgs,
 } from "./run-options.mjs";
@@ -257,17 +257,25 @@ test("JOURNEY_CONCURRENCY reaches the CI lane, whose command line fixes the rest
 
 test("in GitHub Actions the journey refuses to pack its own tarballs", () => {
   const ci = parseLocalJourneyArgs(["--ci"]);
-  assert.throws(
-    () => assertPrebuiltTarballsOnGitHub(ci, { GITHUB_RUN_ID: "1" }),
-    /prebuilt tarballs/,
-  );
+  assert.throws(() => assertPrebuiltTarballs(ci, { GITHUB_RUN_ID: "1" }), /prebuilt tarballs/);
   const handedOver = parseLocalJourneyArgs([
     ...journeyArgsFromEnv({ JOURNEY_TARBALLS_DIR: "dist/release/1.0.0/npm" }),
     "--ci",
   ]);
-  assert.doesNotThrow(() => assertPrebuiltTarballsOnGitHub(handedOver, { GITHUB_RUN_ID: "1" }));
+  assert.doesNotThrow(() => assertPrebuiltTarballs(handedOver, { GITHUB_RUN_ID: "1" }));
   // Run by hand, the runner still packs its own.
-  assert.doesNotThrow(() => assertPrebuiltTarballsOnGitHub(ci, {}));
+  assert.doesNotThrow(() => assertPrebuiltTarballs(ci, {}));
+});
+
+test("the e2e:all lane refuses to pack beside the other lanes", () => {
+  const ci = parseLocalJourneyArgs(["--ci"]);
+  const lane = { JOURNEY_TARBALLS_REQUIRED: "1" };
+  assert.throws(() => assertPrebuiltTarballs(ci, lane), /runs beside the other e2e lanes/);
+  const handedOver = parseLocalJourneyArgs([
+    ...journeyArgsFromEnv({ JOURNEY_TARBALLS_DIR: "dist/release/1.0.0/npm" }),
+    "--ci",
+  ]);
+  assert.doesNotThrow(() => assertPrebuiltTarballs(handedOver, lane));
 });
 
 test("local journey rejects invalid options", () => {

@@ -70,8 +70,9 @@ tasks:
   # The whole suite: moon counts `e2e:all` affected whenever a lane is (a lane's
   # dependency changed, or a file the lane lists), and running it runs every
   # lane as its dependencies. CI runs it in a step of its own; run it by hand
-  # with `moon run e2e:all`. `test` stays the inherited unit run, so `:test`
-  # never boots a server.
+  # with `moon run e2e:all` and the journey's tarballs in JOURNEY_TARBALLS_DIR
+  # (see journey-local). `test` stays the inherited unit run, so `:test` never
+  # boots a server.
   all:
     command: "noop"
     # Affected only through its lanes (their folders and their dependencies),
@@ -259,11 +260,12 @@ tasks:
 
   # The CLI customer setup journey. `--ci` runs the fixed variant set in one
   # process (fresh-app framework matrix, passkey preset, pre-existing app,
-  # testkit); `--runtime binary` drives the built server binary. In CI the
-  # runner reads prebuilt tarballs from JOURNEY_TARBALLS_DIR (built by a prior
-  # workflow step, outside this graph) and refuses to run without them, so it
-  # never starts a nested `moon run` inside the workflow's graph. Run by hand
-  # with that env unset, it packs its own through `moon run release:pack`.
+  # testkit); `--runtime binary` drives the built server binary. It reads
+  # prebuilt tarballs from JOURNEY_TARBALLS_DIR (in CI built by a prior workflow
+  # step, outside this graph) and refuses to run without them
+  # (JOURNEY_TARBALLS_REQUIRED): packing its own takes a nested
+  # `moon run release:pack`, which wipes and rebuilds the dist folders the lanes
+  # beside it read. By hand, run `moon run e2e:journey -- --ci`, which packs.
   #
   # Like every lane, the command unsets CI / GITHUB_ACTIONS so the runner
   # behaves as a local run, matching the old `env -u CI` step.
@@ -279,6 +281,7 @@ tasks:
       - "console/support/copy.ts"
     env:
       ZITADEL_TELEMETRY: "0"
+      JOURNEY_TARBALLS_REQUIRED: "1"
     deps:
       - "cli:build"
       - "testing:build"

@@ -35,19 +35,34 @@ export function journeyArgsFromEnv(env) {
 }
 
 /**
- * Packing the tarballs takes a `moon run release:pack` of the runner's own,
- * and inside a workflow that is a second moon graph racing the one that runs
- * the journey (its build tasks rewrite the dist folders being packed). So in
- * GitHub Actions the workflow hands over prebuilt tarballs, and a run without
- * them stops here. The moon task unsets CI and GITHUB_ACTIONS, so
- * GITHUB_RUN_ID is what tells a workflow run apart.
+ * Packing the tarballs takes a `moon run release:pack` of the runner's own: a
+ * second moon graph, whose release builds wipe and rebuild the dist folders of
+ * the CLI, the SDKs, the test kit and the console. Inside a workflow it races
+ * the graph that runs the journey (its build tasks rewrite the dist folders
+ * being packed), and in `e2e:all` it races the lanes beside the journey, which
+ * read those folders. So there the caller hands over prebuilt tarballs, and a
+ * run without them stops here. The moon task unsets CI and GITHUB_ACTIONS, so
+ * GITHUB_RUN_ID is what tells a workflow run apart; the e2e:all lane sets
+ * JOURNEY_TARBALLS_REQUIRED.
  */
-export function assertPrebuiltTarballsOnGitHub(options, env) {
-  if (env.GITHUB_RUN_ID && !options.tarballsDir) {
+export function assertPrebuiltTarballs(options, env) {
+  if (options.tarballsDir) {
+    return;
+  }
+  if (env.GITHUB_RUN_ID) {
     throw new Error(
       "in GitHub Actions the workflow must hand the journey prebuilt tarballs " +
         "(JOURNEY_TARBALLS_DIR or --tarballs-dir); packing them here would start " +
         "a second moon graph inside the running one",
+    );
+  }
+  if (env.JOURNEY_TARBALLS_REQUIRED === "1") {
+    throw new Error(
+      "e2e:journey-local runs beside the other e2e lanes, and packing its own " +
+        "tarballs would rebuild the dist folders they read. Pack them first " +
+        "(`moon run release:pack`) and hand them over with " +
+        "JOURNEY_TARBALLS_DIR=dist/release/<version>/npm, or run the journey " +
+        "alone with `moon run e2e:journey -- --ci`, which packs its own",
     );
   }
 }
