@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { existsSync } from "node:fs";
 import { Flags } from "@oclif/core";
 import consola from "consola";
@@ -30,7 +30,7 @@ import {
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { environmentFlags, environmentSelectorSuffix } from "../../lib/oclif/environment-flags";
 import { createOrca } from "../../lib/orca";
-import { hasZitadelConfig } from "../../lib/project";
+import { hasZitadelConfig, hasZitadelSecret, readZitadelSecret } from "../../lib/project";
 import { listenersForPort } from "../../lib/prober/ports";
 import { SANITY_CHECKS, type CheckContext, type CheckOutcome } from "./checks";
 import {
@@ -147,15 +147,18 @@ export default class Doctor extends BaseCommand {
     // project, so the claim it suggests is pinned to the file setup wrote for
     // it, as setup's own claim suggestion is: this run's `--env`, or a
     // production project exported in the shell, would claim a different one.
-    // `--env-file` outranks the process environment; without that file only
-    // `--cwd` and `--server` (where doctor checked it) are carried.
+    // `--env-file` outranks the process environment. Only a file that names
+    // that very project is pinned: one a developer keeps for their own
+    // values, or one bound to another project, would claim the wrong one or
+    // none; without it only `--cwd` and `--server` (where doctor checked it)
+    // are carried.
     const warningAdvice = advisoryForWarnings(
       warnings,
       this.meta.cliVersion,
       environmentSelectorSuffix({
         cwd: cwdFlag,
         server: serverFlag,
-        ...(existsSync(join(cwd, ".env.development.local"))
+        ...((await namesProject(join(cwd, ".env.development.local"), secretProjectId(cwd)))
           ? { envFile: ".env.development.local" }
           : {}),
       }),
@@ -742,4 +745,32 @@ function imageUnavailableMessage(image: string, error: unknown): string {
   const detail = error instanceof Error ? error.message : String(error);
   const suffix = detail.trim() ? ` (${detail.trim()})` : "";
   return `Image ${image} is not available to Docker${suffix}; \`zitadel start\` may need a pull or a different image.`;
+}
+
+/** The project `.zitadel/secret` records, or nothing when it cannot be read. */
+async function secretProjectId(cwd: string): Promise<string | undefined> {
+  return (await hasZitadelSecret(cwd))
+    ? readZitadelSecret(cwd).then(
+        (secret) => secret.project_id,
+        () => undefined,
+      )
+    : undefined;
+}
+
+/** Whether an env file sets `ZITADEL_PROJECT_ID` to this project. */
+async function namesProject(
+  path: string,
+  projectId: Promise<string | undefined>,
+): Promise<boolean> {
+  const id = await projectId;
+  if (id === undefined || !existsSync(path)) {
+    return false;
+  }
+  // Read through the resolver, as `claim --env-file` would read it; the
+  // process environment is left out, so only the file answers.
+  const resolved = await resolveEnvironment({ cwd: dirname(path), env: {}, envFile: path }).then(
+    (environment) => environment.values.ZITADEL_PROJECT_ID?.value,
+    () => undefined,
+  );
+  return resolved === id;
 }
