@@ -17,11 +17,14 @@ const (
 	releaseTable      = "releases"
 	createReleaseStmt = `INSERT INTO releases (project_id, id, content_hash, pointers, metadata)` +
 		` VALUES (@p1, @p2, @p3, @p4, @p5) THEN RETURN created_at`
-	releaseQuery = `SELECT project_id, id, content_hash, pointers, metadata, created_at FROM releases`
+	releaseQuery      = `SELECT project_id, id, content_hash, pointers, metadata, created_at, revoked_at FROM releases`
+	revokeReleaseStmt = `UPDATE releases SET revoked_at = COALESCE(revoked_at, CURRENT_TIMESTAMP())` +
+		` WHERE project_id = @p1 AND id = @p2` +
+		` THEN RETURN project_id, id, content_hash, pointers, metadata, created_at, revoked_at`
 )
 
 var releaseColumns = []string{
-	"project_id", "id", "content_hash", "pointers", "metadata", "created_at",
+	"project_id", "id", "content_hash", "pointers", "metadata", "created_at", "revoked_at",
 }
 
 type releaseStatements struct{ statement }
@@ -161,12 +164,27 @@ func (rs releaseStatements) ListReleases(ctx context.Context, filter *database.L
 	return &database.ListResult[*domain.Release]{Items: items, NextCursor: nextCursor}, nil
 }
 
+// RevokeRelease implements [service.ReleaseStatements].
+func (rs releaseStatements) RevokeRelease(ctx context.Context, projectID, id string) (*domain.Release, error) {
+	stmt := buildStatement(revokeReleaseStmt, projectID, id).statement()
+	var entity *domain.Release
+	if err := rs.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
+		var err error
+		entity, err = collectOneRow(iter, rs.scanRelease)
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	return entity, nil
+}
+
 func (rs releaseStatements) scanRelease(row *spanner.Row) (*domain.Release, error) {
 	var (
 		scanned      release.Row
 		pointersJSON spanner.NullJSON
 		metadataJSON spanner.NullJSON
 		createdAt    time.Time
+		revokedAt    spanner.NullTime
 	)
 	if err := row.Columns(
 		&scanned.ProjectID,
@@ -175,6 +193,7 @@ func (rs releaseStatements) scanRelease(row *spanner.Row) (*domain.Release, erro
 		&pointersJSON,
 		&metadataJSON,
 		&createdAt,
+		&revokedAt,
 	); err != nil {
 		return nil, err
 	}
@@ -190,6 +209,9 @@ func (rs releaseStatements) scanRelease(row *spanner.Row) (*domain.Release, erro
 	scanned.Pointers = rawPointers
 	scanned.Metadata = rawMetadata
 	scanned.CreatedAt = createdAt
+	if revokedAt.Valid {
+		scanned.RevokedAt = &revokedAt.Time
+	}
 	return release.ToDomain(scanned)
 }
 
