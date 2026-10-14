@@ -69,10 +69,17 @@ export function matchesRoutes(pathname: string, routes: readonly string[]): bool
   });
 }
 
-/** Strips trailing slashes, keeping the root path `/` itself. */
+/**
+ * Strips trailing slashes, keeping the root path `/` itself. A linear scan, not
+ * `/\/+$/`: that regex backtracks quadratically on a path of many slashes, and
+ * the pathname is attacker-controlled on every request.
+ */
 function withoutTrailingSlash(path: string): string {
-  const trimmed = path.replace(/\/+$/, "");
-  return trimmed === "" ? "/" : trimmed;
+  let end = path.length;
+  while (end > 1 && path.charCodeAt(end - 1) === 0x2f) {
+    end--;
+  }
+  return path.slice(0, end);
 }
 
 // ─── Proxy credentials ───────────────────────────────────────────────────────

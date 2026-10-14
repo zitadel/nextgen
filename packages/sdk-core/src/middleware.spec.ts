@@ -120,6 +120,20 @@ describe("matchesRoutes", () => {
   ])("does not match %s against %j", (pathname, routes) => {
     expect(matchesRoutes(pathname, routes)).toBe(false);
   });
+
+  it("treats a path of only slashes as the root", () => {
+    expect(matchesRoutes("///", ["/"])).toBe(true);
+  });
+
+  // The pathname is attacker-controlled. A backtracking trailing-slash regex
+  // takes quadratic time on a long run of slashes; this must stay linear.
+  it("matches a pathname of many slashes in linear time", () => {
+    const pathname = `/${"/".repeat(200_000)}x`;
+    const started = performance.now();
+
+    expect(matchesRoutes(pathname, ["/profile"])).toBe(false);
+    expect(performance.now() - started).toBeLessThan(250);
+  });
 });
 
 describe("requiresProjectSecret", () => {
