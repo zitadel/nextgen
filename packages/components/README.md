@@ -355,7 +355,7 @@ and signs out through `revokeMySession`, like `<zitadel-logout>`.
 | `projectId` / `project-id` | `string` | Project id, for a page with no JavaScript config. Read only when neither `project` nor a global handle is set |
 | `proxyPath` / `proxy-path` | `string` | Same-origin API prefix that goes with `project-id`; defaults to `/__nextgen` |
 | `url` | `string` | Backend URL that goes with `project-id` (server-side use; the browser calls `proxy-path`) |
-| `postSignOutUrl` / `post-sign-out-url` | `string` | Navigate here after sign-out, and when the visitor has no session |
+| `postSignOutUrl` / `post-sign-out-url` | `string` | Navigate here after sign-out, and when the visitor has no session unless it is the card's own page |
 | `heading` | `string` | Card title; unset shows "Signed in as" |
 | `logoutLabel` / `logout-label` | `string` | Button label; unset shows "Sign out" |
 | `variant` | `'widget' \| 'page'` | As on `<zitadel-login>`: `widget` (default) is content-sized and transparent, `page` claims the viewport |
@@ -375,6 +375,13 @@ Events (both bubble and are composed):
   when one is set and otherwise renders nothing. Anything else is not "signed
   out": the card stays and shows the error. "No session" is decided as for
   `<zitadel-logout>` above.
+
+The card never redirects to the page it is on. When `post-sign-out-url`
+resolves to the current page (same origin, path and query; the fragment is
+ignored), a visit without a session renders nothing instead of navigating, so
+a page that shows the card and is also its sign-out target (`/account` with
+`post-sign-out-url="/account"`) does not reload itself forever. A sign-out on
+that page still navigates there, which reloads it once.
 
 The framework wrappers surface these as `onSignout` / `onSessionMissing`, except
 Vue and Angular, which emit `signout` / `sessionMissing`, and Qwik, which takes

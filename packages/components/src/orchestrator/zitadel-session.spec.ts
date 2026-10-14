@@ -97,12 +97,15 @@ function activate(button: Element): void {
   button.dispatchEvent(new CustomEvent("zl-submit", { bubbles: true, composed: true }));
 }
 
-/** Replaces `window.location` with a stub recording `assign()` calls. */
-function stubLocation(): { current: string } {
+/**
+ * Replaces `window.location` with a stub recording `assign()` calls, on
+ * `href` when given.
+ */
+function stubLocation(href = window.location.href): { current: string } {
   const record = { current: "" };
   Object.defineProperty(window, "location", {
     configurable: true,
-    value: { ...window.location, assign: (url: string) => (record.current = url) },
+    value: { ...window.location, href, assign: (url: string) => (record.current = url) },
     writable: true,
   });
   return record;
@@ -194,6 +197,34 @@ describe("<zitadel-session>", () => {
     );
     await flush(element);
     expect(loc.current).toBe("https://app.test/login");
+  });
+
+  it.each([
+    "/account?tab=me",
+    "https://app.test/account?tab=me",
+    "account?tab=me",
+    "/account?tab=me#top",
+  ])("renders nothing and stays when post-sign-out-url %j is the page it is on", async (url) => {
+    sessionAnswer = unauthorized;
+    const loc = stubLocation("https://app.test/account?tab=me");
+    const missing: Event[] = [];
+    host.addEventListener("zitadel-session-missing", (e) => missing.push(e));
+    const element = mount(`<zitadel-session post-sign-out-url="${url}"></zitadel-session>`);
+    await flush(element);
+    expect(missing).toHaveLength(1);
+    expect(loc.current).toBe("");
+    expect(element.shadowRoot?.querySelector(".title")).toBeNull();
+  });
+
+  it.each([
+    ["/account", "/account"],
+    ["https://other.test/account?tab=me", "https://other.test/account?tab=me"],
+  ])("navigates when post-sign-out-url %j is another page", async (url, expected) => {
+    sessionAnswer = unauthorized;
+    const loc = stubLocation("https://app.test/account?tab=me");
+    const element = mount(`<zitadel-session post-sign-out-url="${url}"></zitadel-session>`);
+    await flush(element);
+    expect(loc.current).toBe(expected);
   });
 
   it("neither announces nor navigates once removed before the answer arrives", async () => {
