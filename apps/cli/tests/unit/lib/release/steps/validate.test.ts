@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { validateStep } from "../../../../../src/lib/release/steps/validate";
 import type { StepContext } from "../../../../../src/lib/release/pipeline";
+import type { SuggestedCommand } from "../../../../../src/lib/suggestion";
 
 /** A valid user-schema the server would accept, so schema parsing passes. */
 const validSchema = {
@@ -49,6 +50,7 @@ function ctx(
     color: false,
     bundle,
     brandingSources,
+    suggest: (args) => args as SuggestedCommand,
   };
 }
 

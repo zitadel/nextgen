@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { StepContext } from "../../../../../src/lib/release/pipeline";
 import { diffStep } from "../../../../../src/lib/release/steps/diff";
+import type { SuggestedCommand } from "../../../../../src/lib/suggestion";
 
 type Live = { targets: { origin: string; expires_at: string | null }[]; sha?: string };
 
@@ -45,6 +46,7 @@ function ctx(live: Live[], json = false): StepContext {
     color: false,
     bundle: { schemas: [], flow_definitions: [], brandings: [] },
     brandingSources: [],
+    suggest: (args) => `${args} --env staging` as SuggestedCommand,
   };
 }
 

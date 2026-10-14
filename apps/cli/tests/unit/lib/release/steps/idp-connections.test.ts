@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { IDPS_DIR } from "../../../../../src/lib/idp";
 import type { StepContext } from "../../../../../src/lib/release/pipeline";
 import { idpConnectionsStep } from "../../../../../src/lib/release/steps/idp-connections";
+import type { SuggestedCommand } from "../../../../../src/lib/suggestion";
 
 /** A connection the server would accept: a `${{ NAME }}` client_secret. */
 const googleBody = (over: Record<string, unknown> = {}) => ({
@@ -50,6 +51,7 @@ function ctx(cwd: string, over: Partial<StepContext>, held: object = HELD): Step
     color: false,
     bundle: { schemas: [], flow_definitions: [], brandings: [] },
     brandingSources: [],
+    suggest: (args) => `${args} --env staging` as SuggestedCommand,
     ...rest,
   };
 }
@@ -119,6 +121,14 @@ describe("idp-connections step", () => {
 
     await expect(idpConnectionsStep.run(ctx(cwd, {}, {}))).rejects.toMatchObject({
       code: "E_CREDENTIAL_MISSING",
+    });
+  });
+
+  it("suggests publishing a missing variable in the environment the deploy addressed", async () => {
+    const cwd = await project({ "google.json": googleBody() });
+
+    await expect(idpConnectionsStep.run(ctx(cwd, {}, {}))).rejects.toMatchObject({
+      nextCommands: ["variables set GOOGLE_CLIENT_SECRET --project-level --secret --env staging"],
     });
   });
 

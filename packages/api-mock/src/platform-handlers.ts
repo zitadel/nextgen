@@ -1928,7 +1928,7 @@ export function setupPlatformHandlers() {
             "dep.invalid",
             "deployment: a deployment to preview URLs cannot be rolled back",
           ),
-          { status: 409 },
+          { status: 400 },
         );
       }
       const primaries = primaryOrigins(project);
@@ -1936,10 +1936,10 @@ export function setupPlatformHandlers() {
       if (removed) {
         return HttpResponse.json(
           errorBody(
-            "dep.invalid",
-            `deployment: ${removed.origin} is no longer a primary origin of the project`,
+            "proj.origin_not_allowed",
+            `project: ${removed.origin} is not a primary origin`,
           ),
-          { status: 409 },
+          { status: 403 },
         );
       }
       const release = store.releases.get(target.releaseId);

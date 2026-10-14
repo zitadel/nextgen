@@ -115,6 +115,29 @@ describe("deploy", () => {
         expect(await app.registeredIdps()).toEqual([]);
       });
 
+      it("refuses a connection whose secret variable the project does not hold", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.enableSso("google", {
+          clientId: "1234-abc.apps.googleusercontent.com",
+          secret: "the-client-secret",
+        });
+        await app.deleteVariable("GOOGLE_CLIENT_SECRET");
+
+        const result = await app.deploy();
+
+        expect(result).toFailWith("E_CREDENTIAL_MISSING");
+      });
+
+      it("refuses an --origin that is not an origin of the project", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+
+        const result = await app.deploy(["--origin", "https://elsewhere.example.com"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
       it("refuses an --origin a preview wildcard covers as a preview", async () => {
         const app = await aSetUpApp();
         await app.addOrigin("https://*-acme.vercel.app", "preview");

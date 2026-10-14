@@ -12,7 +12,7 @@ import { type CodeLanguage, type CodeLine, highlightCode } from "@/lib/highlight
  * The published CLI, invoked without installing it — the repo is in changesets
  * prerelease mode on the `alpha` dist-tag, which is the tag the design names.
  */
-const CLI_COMMAND = "npx @zitadel/cli@alpha apply";
+const CLI_COMMAND = "npx @zitadel/cli@alpha deploy";
 
 /**
  * `lineWidth: 0` disables YAML's line folding. Folding is legal and Shiki reads
@@ -100,7 +100,7 @@ export function DocumentViewer({ document, noun }: { document: unknown; noun: st
           of the full stop. Normal inline text wraps the same way and lets the
           punctuation hug the command. */}
       <p className="border-t border-border py-3 pr-3 pl-4 text-xs leading-4 text-muted-foreground">
-        Edit the {noun} locally, then apply your changes with{" "}
+        Edit the {noun} locally, then deploy your changes with{" "}
         <InlineCode className="text-[10px]">{CLI_COMMAND}</InlineCode>. Applying creates a new
         revision.
       </p>

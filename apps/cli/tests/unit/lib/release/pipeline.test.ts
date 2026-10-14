@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { runSteps, type Step, type StepContext } from "../../../../src/lib/release/pipeline";
+import type { SuggestedCommand } from "../../../../src/lib/suggestion";
 
 function ctx(overrides: Partial<StepContext>): StepContext {
   return {
@@ -14,6 +15,7 @@ function ctx(overrides: Partial<StepContext>): StepContext {
     color: false,
     bundle: { schemas: [], flow_definitions: [], brandings: [] },
     brandingSources: [],
+    suggest: (args) => `${args} --env staging` as SuggestedCommand,
     ...overrides,
   };
 }
