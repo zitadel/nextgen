@@ -52,21 +52,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      # The postgres lane (server:test-postgres) starts its databases through
-      # testcontainers, and every package of the lane waits while the first
-      # one pulls the image: 6-8 s on Depot's microVMs, 11-12 s on its EC2
-      # runners. Pull it now, in the background while the job installs, so
-      # the lane finds it there. The image name comes from the testdb package,
-      # so the two cannot drift; the output goes to a file, so the step
-      # returns at once.
-      - name: Pull the postgres lane's image
-        run: |
-          image="$(sed -n 's/^const containerImage = "\(.*\)"$/\1/p' internal/storage/testdb/postgres.go)"
-          if [ -z "$image" ]; then
-            echo "::warning::internal/storage/testdb/postgres.go has no containerImage constant; nothing to pull"
-            exit 0
-          fi
-          nohup docker pull --quiet "$image" </dev/null >"$RUNNER_TEMP/postgres-image-pull.log" 2>&1 &
+      # The postgres lane (server:test-postgres) gives every test package a
+      # database of its own. A testcontainer each, the packages waited for the
+      # image pull (6-12 s) and, on Depot's EC2 runners, for Docker's
+      # container create (see the step above). The script starts one server
+      # for all of them in the background while the job installs, and
+      # exports ZITADEL_TEST_POSTGRES_SERVER_URL, on which testdb.PostgresDSN
+      # creates each package's database. It says why it waits before creating
+      # the container.
+      - name: Start the postgres lane's server
+        run: .github/scripts/postgres-lane-server.sh start
 
       # Keyed on both modules' go.sum (tools/bench is a module of its own)
       # instead of setup-go's default, go.mod. ci-turbo.yml shared the go.mod
@@ -283,6 +278,15 @@ jobs:
       - name: Report Moon CI failures
         if: ${{ failure() && (steps.moon-ci.conclusion == 'failure' || steps.moon-e2e.conclusion == 'failure') }}
         run: node scripts/report-moon-failures.mjs
+
+      # The postgres lane's server starts in the background, out of sight: the
+      # script's output and the server's log, for a lane that could not reach
+      # it.
+      - name: Show the postgres lane's server log
+        if: ${{ failure() && steps.ci-mode.outputs.go_tests == 'true' }}
+        run: |
+          cat "$RUNNER_TEMP/postgres-lane.log" || true
+          docker logs --tail 100 postgres-lane || true
 
       - name: Validate version PR
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}

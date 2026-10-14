@@ -25,9 +25,14 @@ const containerImage = "public.ecr.aws/docker/library/postgres:18.3"
 
 const containerStartAttempts = 3
 
-// PostgresDSN returns a Postgres DSN and stop func. Prefer
-// ZITADEL_TEST_POSTGRES_URL; otherwise start a testcontainer.
+// PostgresDSN returns a Postgres DSN and stop func. Precedence: if
+// ZITADEL_TEST_POSTGRES_SERVER_URL is set it creates a new, empty database on
+// that server (the returned stop drops it); else if ZITADEL_TEST_POSTGRES_URL
+// is set it returns that DSN; otherwise it starts a testcontainer.
 func PostgresDSN(ctx context.Context) (string, func(), error) {
+	if serverURL := os.Getenv(serverURLEnv); serverURL != "" {
+		return createPostgresDatabase(ctx, serverURL)
+	}
 	if url := os.Getenv("ZITADEL_TEST_POSTGRES_URL"); url != "" {
 		return url, func() {}, nil
 	}

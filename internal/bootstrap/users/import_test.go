@@ -19,6 +19,12 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	os.Exit(runTests(m))
+}
+
+// runTests holds the deferred cleanup, which os.Exit would skip: without it the
+// test database outlives the run on a shared server.
+func runTests(m *testing.M) int {
 	ctx := context.Background()
 	pool, stop, err := dbtest.Postgres(ctx)
 	if err != nil {
@@ -28,7 +34,7 @@ func TestMain(m *testing.M) {
 	defer pool.Close(ctx)
 
 	testServiceDB = service.NewPool(pool)
-	os.Exit(m.Run())
+	return m.Run()
 }
 
 var testServiceDB *service.DB

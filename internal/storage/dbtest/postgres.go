@@ -10,9 +10,11 @@ import (
 )
 
 // Postgres returns a connected v2 pool for the Postgres integration tests.
-// If ZITADEL_TEST_POSTGRES_URL is set, it connects to that database (no Docker
-// required); otherwise it starts a Postgres testcontainer. The returned stop
-// function is always non-nil and safe to defer.
+// Bring-up precedence is owned by testdb.PostgresDSN: a database of its own on
+// the server ZITADEL_TEST_POSTGRES_SERVER_URL names, the database
+// ZITADEL_TEST_POSTGRES_URL names (no Docker required for either), or a
+// Postgres testcontainer. The returned stop function is always non-nil and
+// safe to defer.
 func Postgres(ctx context.Context) (Pool, func(), error) {
 	dsn, stop, err := testdb.PostgresDSN(ctx)
 	if err != nil {

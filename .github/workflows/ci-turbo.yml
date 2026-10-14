@@ -85,15 +85,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      # As in ci.yml: the postgres lane's image, pulled while the job installs.
-      - name: Pull the postgres lane's image
-        run: |
-          image="$(sed -n 's/^const containerImage = "\(.*\)"$/\1/p' internal/storage/testdb/postgres.go)"
-          if [ -z "$image" ]; then
-            echo "::warning::internal/storage/testdb/postgres.go has no containerImage constant; nothing to pull"
-            exit 0
-          fi
-          nohup docker pull --quiet "$image" </dev/null >"$RUNNER_TEMP/postgres-image-pull.log" 2>&1 &
+      # As in ci.yml: the postgres lane's server, started while the job
+      # installs; every test package gets a database of its own on it.
+      - name: Start the postgres lane's server
+        run: .github/scripts/postgres-lane-server.sh start
 
       # Not setup-go's cache: its key (Go version and go.mod) is ci.yml's
       # too, and the two jobs write GOCACHE in formats the other cannot read.
@@ -312,6 +307,14 @@ jobs:
       - name: Run console platform-project suite
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.suites_console == 'true' }}
         run: turbo run console-platform --filter=@zitadel/e2e
+
+      # As in ci.yml: the postgres lane's server log, for a lane that could not
+      # reach it.
+      - name: Show the postgres lane's server log
+        if: ${{ failure() && steps.ci-mode.outputs.go_tests == 'true' }}
+        run: |
+          cat "$RUNNER_TEMP/postgres-lane.log" || true
+          docker logs --tail 100 postgres-lane || true
 
       - name: Validate version PR
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}

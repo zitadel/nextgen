@@ -347,7 +347,7 @@ Docker-outside-of-Docker setup. Local zero-config runs use SQLite and need no
 Docker.
 
 ```sh
-# Postgres (testcontainer, or ZITADEL_TEST_POSTGRES_URL)
+# Postgres (testcontainers, ZITADEL_TEST_POSTGRES_URL or ZITADEL_TEST_POSTGRES_SERVER_URL)
 moon run server:test-postgres
 # or: go test -v -tags postgres_integration -timeout=10m ./...
 
@@ -361,6 +361,13 @@ testcontainers, set `ZITADEL_TEST_POSTGRES_URL` (Postgres DSN) or
 connect instead of starting a container, so `go test -tags … ./...` needs no
 Docker. Point them at a throwaway database — the suites run migrations that
 create the `zitadel_nextgen` schema.
+
+To give every Postgres test package a database of its own on one server you
+run, as CI does, set `ZITADEL_TEST_POSTGRES_SERVER_URL` instead: a
+`postgres://` URL of a role that may create databases, for example
+`postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable`. Each
+package creates an empty `itest_<package>_<random>` database there and drops it
+when it finishes; a package killed midway leaves its database behind.
 
 The Spanner emulator only supports one transaction at a time, so concurrent
 integration tests make it abort read-write transactions aggressively. That is
