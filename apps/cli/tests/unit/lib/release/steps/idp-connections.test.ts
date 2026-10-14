@@ -34,10 +34,14 @@ async function project(files: Record<string, unknown>): Promise<string> {
   return dir;
 }
 
-function ctx(cwd: string, over: Partial<StepContext>): StepContext {
+/** The variables the project holds unless a test says otherwise: the secret googleBody names. */
+const HELD = { GOOGLE_CLIENT_SECRET: { secret: true } };
+
+function ctx(cwd: string, over: Partial<StepContext>, held: object = HELD): StepContext {
+  const { client, ...rest } = over;
   return {
     cwd,
-    client: {} as never,
+    client: { getVariables: async () => held, ...(client as object | undefined) } as never,
     projectId: "proj_1",
     env: {},
     mode: "deploy",
@@ -46,7 +50,7 @@ function ctx(cwd: string, over: Partial<StepContext>): StepContext {
     color: false,
     bundle: { schemas: [], flow_definitions: [], brandings: [] },
     brandingSources: [],
-    ...over,
+    ...rest,
   };
 }
 
@@ -108,5 +112,52 @@ describe("idp-connections step", () => {
     await idpConnectionsStep.run(ctx(cwd, { client: { createIdp } as never }));
 
     expect(createIdp).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses a connection whose client_secret names a variable the project lacks", async () => {
+    const cwd = await project({ "google.json": googleBody() });
+
+    await expect(idpConnectionsStep.run(ctx(cwd, {}, {}))).rejects.toMatchObject({
+      code: "E_CREDENTIAL_MISSING",
+    });
+  });
+
+  it("refuses a client_secret held in a plain variable", async () => {
+    const cwd = await project({ "google.json": googleBody() });
+
+    await expect(
+      idpConnectionsStep.run(ctx(cwd, {}, { GOOGLE_CLIENT_SECRET: "plain" })),
+    ).rejects.toThrow(/which is not a secret/);
+  });
+
+  it("refuses a client_id held in a secret variable", async () => {
+    const cwd = await project({
+      "google.json": googleBody({
+        oidc: {
+          issuer: "https://accounts.google.com",
+          client_id: "${{ GOOGLE_CLIENT_ID }}",
+          client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+          scopes: ["openid"],
+        },
+      }),
+    });
+
+    await expect(
+      idpConnectionsStep.run(
+        ctx(
+          cwd,
+          {},
+          { GOOGLE_CLIENT_ID: { secret: true }, GOOGLE_CLIENT_SECRET: { secret: true } },
+        ),
+      ),
+    ).rejects.toThrow(/which is a secret/);
+  });
+
+  it("names the connection file in the refusal", async () => {
+    const cwd = await project({ "google-workspace.json": googleBody() });
+
+    await expect(idpConnectionsStep.run(ctx(cwd, {}, {}))).rejects.toThrow(
+      /\.zitadel\/idps\/google-workspace\.json/,
+    );
   });
 });

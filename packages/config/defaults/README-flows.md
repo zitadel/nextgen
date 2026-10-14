@@ -98,11 +98,10 @@ unscoped one serves the purpose.
 The flip side: a **new active flow definition without an `audience`, or a
 new revision of one, becomes the newest unscoped definition, i.e. the
 project default for the purposes it serves**, the moment it deploys.
-`zitadel deploy --dry-run` calls this out with a `# warning:` line on that create or revision
-so an experiment can't silently take over `/login`. If that isn't the
-intent, give the flow definition an `audience` before its first `deploy`
-and select it by `flowName`, or pin `flow-name` on the pages that should
-keep the current project default.
+So an experiment can't silently take over `/login`, give the flow
+definition an `audience` before its first `deploy` and select it by
+`flowName`, or pin `flow-name` on the pages that should keep the current
+project default.
 
 ## Presets
 

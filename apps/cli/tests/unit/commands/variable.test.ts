@@ -452,6 +452,21 @@ describe("variable set", () => {
     expect(res.exitCode).toBe(0);
   });
 
+  it("succeeds, warning, when the read back after the write fails", async () => {
+    const cwd = await makeProject();
+    server.use(
+      http.get("*/variables", () =>
+        HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+      ),
+    );
+
+    const res = await runCliForTest(["variable", "set", "GREETING", "hello", ...base(cwd)]);
+
+    expect((parseJson(res.stdout) as { warnings?: string[] }).warnings).toEqual([
+      expect.stringContaining("The value was stored"),
+    ]);
+  });
+
   it("says on a terminal what each slot holds after the write", async () => {
     // Real mock, so the read-back after the write is honest: a plain value
     // prints in the `all` slot, a secret prints its marker, and the untouched
