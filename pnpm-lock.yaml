@@ -1635,11 +1635,11 @@ importers:
         version: link:../sdk-core
     devDependencies:
       '@qwik.dev/core':
-        specifier: ^2.0.0-rc.3
-        version: 2.0.0-rc.3(@oxc-project/types@0.152.0)(esbuild@0.28.2)(prettier@3.8.3)(rolldown@1.2.12)(rollup@4.62.2)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(vitest@4.1.11)(webpack@5.106.2(@swc/core@1.15.8(@swc/helpers@0.5.18))(cssnano@8.0.5(postcss@8.5.28))(csso@5.0.5)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(uglify-js@3.19.3))
+        specifier: 2.0.0-rc.2
+        version: 2.0.0-rc.2(@oxc-project/types@0.152.0)(esbuild@0.28.2)(prettier@3.8.3)(rolldown@1.2.12)(rollup@4.62.2)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(vitest@4.1.11)(webpack@5.106.2(@swc/core@1.15.8(@swc/helpers@0.5.18))(cssnano@8.0.5(postcss@8.5.28))(csso@5.0.5)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(uglify-js@3.19.3))
       '@qwik.dev/router':
-        specifier: ^2.0.0-rc.3
-        version: 2.0.0-rc.3(@qwik.dev/core@2.0.0-rc.3(@oxc-project/types@0.152.0)(esbuild@0.28.2)(prettier@3.8.3)(rolldown@1.2.12)(rollup@4.62.2)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(vitest@4.1.11)(webpack@5.106.2(@swc/core@1.15.8(@swc/helpers@0.5.18))(cssnano@8.0.5(postcss@8.5.28))(csso@5.0.5)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(uglify-js@3.19.3)))(rollup@4.62.2)(supports-color@8.1.1)(typescript@6.0.3)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))
+        specifier: 2.0.0-rc.2
+        version: 2.0.0-rc.2(@qwik.dev/core@2.0.0-rc.2(@oxc-project/types@0.152.0)(esbuild@0.28.2)(prettier@3.8.3)(rolldown@1.2.12)(rollup@4.62.2)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(vitest@4.1.11)(webpack@5.106.2(@swc/core@1.15.8(@swc/helpers@0.5.18))(cssnano@8.0.5(postcss@8.5.28))(csso@5.0.5)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(uglify-js@3.19.3)))(rollup@4.62.2)(supports-color@8.1.1)(typescript@6.0.3)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))
       '@types/node':
         specifier: ^24.19.1
         version: 24.19.1
@@ -5781,8 +5781,8 @@ packages:
       vitest:
         optional: true
 
-  '@qwik.dev/core@2.0.0-rc.3':
-    resolution: {integrity: sha512-s87/I5hyQAPXzLg1ihKwoGzA5931uIYdqBzwR6tKUCixrH2fijLrLQSZgAQk1Z0wA5Cw4KsfHMNX8tzx/tNSkg==}
+  '@qwik.dev/core@2.0.0-rc.2':
+    resolution: {integrity: sha512-yYCSObNzz6spYauuGqwUrURNlqlnCKzVPW9FTx6arkGAf9NcsHfTYWc/lel8GeVajiYSgXrJ14MZL6grdEvH2A==}
     engines: {node: ^20.3.0 || >=21.0.0}
     hasBin: true
     peerDependencies:
@@ -5799,11 +5799,11 @@ packages:
     resolution: {integrity: sha512-PKZedb4+/Goi5KS7HCiJXZO9g3prbmI7lTi+yhy0GBPHUFlmRWVCXhllGrgRBHbvuPxfLTOAfZ5d/sG2QufTXQ==}
     engines: {node: ^20.3.0 || >=21.0.0}
 
-  '@qwik.dev/router@2.0.0-rc.3':
-    resolution: {integrity: sha512-mVwtspzYrm0+FhO6JMiyICuvz7hGgRayZz31j5jy+tBIf9N+61NffGaez2MwV1SNr3TKXukLLob211zGhk6qAQ==}
+  '@qwik.dev/router@2.0.0-rc.2':
+    resolution: {integrity: sha512-abPGzOfMLiIU62etIlBJMHlTfxRf4DoDlIAGtDkbu4Ym0CyFFNFuuna8uJU6k6BoAp99pLZMT28yIyAS13wtlg==}
     engines: {node: ^18.17.0 || ^20.3.0 || >=21.0.0}
     peerDependencies:
-      '@qwik.dev/core': 2.0.0-rc.3
+      '@qwik.dev/core': 2.0.0-rc.2
       vite: '>=8 <9'
 
   '@radix-ui/number@1.1.2':
@@ -20745,7 +20745,7 @@ snapshots:
       - unloader
       - webpack
 
-  '@qwik.dev/core@2.0.0-rc.3(@oxc-project/types@0.152.0)(esbuild@0.28.2)(prettier@3.8.3)(rolldown@1.2.12)(rollup@4.62.2)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(vitest@4.1.11)(webpack@5.106.2(@swc/core@1.15.8(@swc/helpers@0.5.18))(cssnano@8.0.5(postcss@8.5.28))(csso@5.0.5)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(uglify-js@3.19.3))':
+  '@qwik.dev/core@2.0.0-rc.2(@oxc-project/types@0.152.0)(esbuild@0.28.2)(prettier@3.8.3)(rolldown@1.2.12)(rollup@4.62.2)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(vitest@4.1.11)(webpack@5.106.2(@swc/core@1.15.8(@swc/helpers@0.5.18))(cssnano@8.0.5(postcss@8.5.28))(csso@5.0.5)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(uglify-js@3.19.3))':
     dependencies:
       '@emnapi/core': 1.11.3
       '@emnapi/runtime': 1.11.3
@@ -20776,12 +20776,12 @@ snapshots:
 
   '@qwik.dev/optimizer@2.1.0-beta.9': {}
 
-  '@qwik.dev/router@2.0.0-rc.3(@qwik.dev/core@2.0.0-rc.3(@oxc-project/types@0.152.0)(esbuild@0.28.2)(prettier@3.8.3)(rolldown@1.2.12)(rollup@4.62.2)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(vitest@4.1.11)(webpack@5.106.2(@swc/core@1.15.8(@swc/helpers@0.5.18))(cssnano@8.0.5(postcss@8.5.28))(csso@5.0.5)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(uglify-js@3.19.3)))(rollup@4.62.2)(supports-color@8.1.1)(typescript@6.0.3)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))':
+  '@qwik.dev/router@2.0.0-rc.2(@qwik.dev/core@2.0.0-rc.2(@oxc-project/types@0.152.0)(esbuild@0.28.2)(prettier@3.8.3)(rolldown@1.2.12)(rollup@4.62.2)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(vitest@4.1.11)(webpack@5.106.2(@swc/core@1.15.8(@swc/helpers@0.5.18))(cssnano@8.0.5(postcss@8.5.28))(csso@5.0.5)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(uglify-js@3.19.3)))(rollup@4.62.2)(supports-color@8.1.1)(typescript@6.0.3)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))':
     dependencies:
       '@azure/functions': 3.5.1
       '@mdx-js/mdx': 3.1.1(supports-color@8.1.1)
       '@netlify/edge-functions': 3.0.8
-      '@qwik.dev/core': 2.0.0-rc.3(@oxc-project/types@0.152.0)(esbuild@0.28.2)(prettier@3.8.3)(rolldown@1.2.12)(rollup@4.62.2)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(vitest@4.1.11)(webpack@5.106.2(@swc/core@1.15.8(@swc/helpers@0.5.18))(cssnano@8.0.5(postcss@8.5.28))(csso@5.0.5)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(uglify-js@3.19.3))
+      '@qwik.dev/core': 2.0.0-rc.2(@oxc-project/types@0.152.0)(esbuild@0.28.2)(prettier@3.8.3)(rolldown@1.2.12)(rollup@4.62.2)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(vitest@4.1.11)(webpack@5.106.2(@swc/core@1.15.8(@swc/helpers@0.5.18))(cssnano@8.0.5(postcss@8.5.28))(csso@5.0.5)(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.28)(uglify-js@3.19.3))
       '@types/mdx': 2.0.14
       estree-util-value-to-estree: 3.5.0
       github-slugger: 2.0.0
