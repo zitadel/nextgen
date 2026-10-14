@@ -15,7 +15,11 @@ import (
 const (
 	createReleaseStmt = `INSERT INTO zitadel_nextgen.releases (project_id, id, content_hash, pointers, metadata)` +
 		` VALUES ($1, $2, $3, $4, $5) RETURNING created_at`
-	releaseQuery = `SELECT project_id, id, content_hash, pointers, metadata, created_at FROM zitadel_nextgen.releases`
+	releaseQuery = `SELECT project_id, id, content_hash, pointers, metadata, created_at, revoked_at FROM zitadel_nextgen.releases`
+	// COALESCE keeps the first stamp.
+	revokeReleaseStmt = `UPDATE zitadel_nextgen.releases SET revoked_at = COALESCE(revoked_at, now())` +
+		` WHERE project_id = $1 AND id = $2` +
+		` RETURNING project_id, id, content_hash, pointers, metadata, created_at, revoked_at`
 )
 
 type releaseStatements struct{ statement }
@@ -138,6 +142,19 @@ func (rs releaseStatements) ListReleases(ctx context.Context, filter *database.L
 	return &database.ListResult[*domain.Release]{Items: items, NextCursor: nextCursor}, nil
 }
 
+// RevokeRelease implements [service.ReleaseStatements].
+func (rs releaseStatements) RevokeRelease(ctx context.Context, projectID, id string) (*domain.Release, error) {
+	rows, err := rs.client.Query(ctx, revokeReleaseStmt, projectID, id)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	entity, err := pgx.CollectExactlyOneRow(rows, scanRelease)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return entity, nil
+}
+
 func scanRelease(row pgx.CollectableRow) (*domain.Release, error) {
 	var scanned release.Row
 	if err := row.Scan(
@@ -147,6 +164,7 @@ func scanRelease(row pgx.CollectableRow) (*domain.Release, error) {
 		&scanned.Pointers,
 		&scanned.Metadata,
 		&scanned.CreatedAt,
+		&scanned.RevokedAt,
 	); err != nil {
 		return nil, err
 	}
