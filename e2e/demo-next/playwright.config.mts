@@ -21,6 +21,7 @@ const workspaceRoot = resolve(import.meta.dirname, "../..");
 export default defineConfig({
   ...e2eTimeouts,
   testDir: "./src",
+  outputDir: "test-results/mock",
   use: {
     ...e2eActionTimeouts,
     baseURL: "http://localhost:3002",

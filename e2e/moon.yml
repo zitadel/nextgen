@@ -267,7 +267,7 @@ tasks:
   # still selects this lane (the fresh-app matrix scaffolds an app per SDK) —
   # the affected-selection edge the old ci-mode gating provided by hand.
   journey-local:
-    command: "env -u CI -u GITHUB_ACTIONS corepack pnpm run e2e-local -- --ci --matrix full --runtime binary"
+    command: "env -u CI -u GITHUB_ACTIONS corepack pnpm run e2e-local -- --ci --runtime binary"
     inputs:
       - "journey/**/*"
       - "package.json"

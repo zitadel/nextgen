@@ -255,13 +255,15 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Upload console e2e diagnostics
+      # Every lane's results; the handshake (project secret) sits beside them in
+      # .zitadel-testing/ and stays out.
+      - name: Upload e2e diagnostics
         if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
-          name: console-e2e-diagnostics-turbo
+          name: e2e-diagnostics-turbo
           path: |
-            e2e/console/test-results
-            e2e/console/playwright-report
+            e2e/*/test-results
+            e2e/*/playwright-report
           if-no-files-found: ignore
           retention-days: 7

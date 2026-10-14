@@ -120,6 +120,21 @@ jobs:
           version="$(node -p "require('./apps/server/package.json').version")"
           echo "JOURNEY_TARBALLS_DIR=$PWD/dist/release/${version}/npm" >> "$GITHUB_ENV"
 
+      # Verdaccio proxies every public framework package the journey scaffolds
+      # pull from npmjs; persisting its storage turns a dozen cold npm installs
+      # into warm ones. The key is per-run so each save adds newly seen
+      # packages and restore-keys pulls the most recent prior store. The journey
+      # always republishes the @zitadel packages fresh (local-registry.mjs), so
+      # a stale store is still valid.
+      - name: Cache journey registry packages
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/journey-verdaccio-storage
+          key: journey-verdaccio-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            journey-verdaccio-${{ runner.os }}-
+
       # The e2e suites run here too: `e2e:all` depends on every lane (console
       # smoke/real/embedded/platform, demo mock/real, the CLI journey matrix, the
       # kit's real-instance suite), which depend on server:build / cli:build, so
@@ -133,13 +148,23 @@ jobs:
         # with --include-relations also runs the tasks of every project that
         # depends on a changed one, so an api change re-tests its consumers.
         run: moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph e2e:all --downstream deep --include-relations
+        env:
+          # The journey's options, as ci-turbo.yml passes them: the work dir the
+          # diagnostics upload below reads, ci-mode's framework scope (`single`
+          # unless an SDK, the CLI or the journey moved), and the Verdaccio
+          # storage the cache step above restores.
+          JOURNEY_WORK_DIR: ${{ runner.temp }}/ci-journey
+          JOURNEY_MATRIX: ${{ steps.ci-mode.outputs.journey_matrix }}
+          JOURNEY_REGISTRY_STORAGE: ${{ runner.temp }}/journey-verdaccio-storage
 
       - name: Report Moon CI failures
         if: ${{ failure() && steps.moon-ci.conclusion == 'failure' }}
         run: node scripts/report-moon-failures.mjs
 
-      # Go integration lanes stay hand-orchestrated (not folded into this change):
-      # they are not `test` tasks, so `:test` above does not select them.
+      # The Go database lanes depend on the console and login UI builds their
+      # binary embeds, so `moon ci` above also runs them whenever one of those
+      # builds is affected, and these steps then run them a second time.
+      # Folding them into the graph step (and dropping these) is a follow-up.
       - name: Run Go integration tests (postgres)
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
         run: moon run server:test-postgres
@@ -174,14 +199,16 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-      # The handshake is deliberately excluded: it carries the project secret.
-      - name: Upload console e2e diagnostics
+      # Every lane's results, each in its config folder's test-results/ and
+      # playwright-report/. The handshake is deliberately excluded: it carries
+      # the project secret and sits beside them in .zitadel-testing/.
+      - name: Upload e2e diagnostics
         if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
-          name: console-e2e-diagnostics
+          name: e2e-diagnostics
           path: |
-            e2e/console/test-results
-            e2e/console/playwright-report
+            e2e/*/test-results
+            e2e/*/playwright-report
           if-no-files-found: ignore
           retention-days: 7

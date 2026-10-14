@@ -16,6 +16,7 @@ const workspaceRoot = resolve(import.meta.dirname, "../..");
 export default defineConfig({
   ...e2eTimeouts,
   testDir: "./src",
+  outputDir: "test-results/smoke",
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     ...e2eActionTimeouts,

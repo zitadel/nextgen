@@ -24,6 +24,7 @@ const appOrigin = process.env.REAL_APP_ORIGIN ?? "http://localhost:3002";
 export default defineConfig({
   ...e2eTimeouts,
   testDir: "./src-real",
+  outputDir: "test-results/real",
   fullyParallel: true,
   workers: 2,
   use: {
