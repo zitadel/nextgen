@@ -64,6 +64,22 @@ export function resolveServerCommand(env: NodeJS.ProcessEnv = process.env): {
   };
 }
 
+/**
+ * The server version `start` runs from this CLI: the bundled `@zitadel/server`,
+ * or what `ZITADEL_SERVER_BINARY_VERSION` names for an override. It is what a
+ * running binary runtime's `server_version` is compared with, because a server
+ * another CLI release started serves that release's API. `undefined` when the
+ * package cannot be read: a comparison has nothing to go on then, and `start`
+ * reports the broken install itself when it tries to run the server.
+ */
+export function bundledServerVersion(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  try {
+    return resolveServerCommand(env).serverVersion;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function startBinaryRuntime(spec: BinaryRunSpec): Promise<BinaryRuntimeMetadata> {
   const command = resolveServerCommand();
   const env = spec.env ?? EMPTY_ENV;

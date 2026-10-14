@@ -443,6 +443,43 @@ describe("local runtime commands", () => {
     expect(dockerCalls.some((args) => args[0] === "run")).toBe(false);
   });
 
+  it("start restarts a server another CLI release started instead of reusing it", async () => {
+    // After an upgrade the folder may still run the previous release's server.
+    // Its API is that release's, and setup against it fails halfway.
+    const cwd = await tempProject("zitadel-start-binary-release-");
+    const fake = await fakeServerBinary();
+    const port = await freePort();
+
+    const older = await runCliForTest(["start", "--cwd", cwd, "--json", "--port", String(port)], {
+      ZITADEL_SERVER_BINARY: fake.binPath,
+      ZITADEL_SERVER_BINARY_VERSION: "1.0.0-alpha.1",
+    });
+    expect(older.exitCode).toBe(0);
+    const olderPid = (parseJson(older.stdout) as { data: { runtime: { pid: number } } }).data
+      .runtime.pid;
+    binaryPids.push(olderPid);
+
+    const newer = await runCliForTest(["start", "--cwd", cwd, "--port", String(port)], {
+      ZITADEL_SERVER_BINARY: fake.binPath,
+      ZITADEL_SERVER_BINARY_VERSION: "1.0.0-alpha.2",
+    });
+
+    expect(newer.exitCode).toBe(0);
+    expect(newer.stdout).toContain(
+      "Restarting the local Zitadel server on 1.0.0-alpha.2: it ran 1.0.0-alpha.1.",
+    );
+    expect(newer.stdout).not.toContain("already running");
+    const runtime = await readRuntimeMetadata(cwd);
+    expect(runtime).toMatchObject({ backend: "binary", server_version: "1.0.0-alpha.2" });
+    const newerPid = runtime?.backend === "binary" ? runtime.pid : 0;
+    binaryPids.push(newerPid);
+    expect(newerPid).not.toBe(olderPid);
+    expect(() => process.kill(olderPid, 0)).toThrow();
+
+    const stop = await runCliForTest(["stop", "--cwd", cwd, "--json"]);
+    expect(stop.exitCode).toBe(0);
+  });
+
   it("start --json defaults to the npm binary runtime and writes metadata", async () => {
     const cwd = await tempProject("zitadel-start-binary-");
     const fake = await fakeServerBinary();
