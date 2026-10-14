@@ -161,6 +161,21 @@ describe("createNextgenOnRequest (Qwik City)", () => {
     expect(h.redirected?.url).toContain("next=%2Fadmin");
   });
 
+  // Qwik Router defaults to `trailingSlash: true`, so `/profile/` is the
+  // canonical URL and must not slip past `protectedRoutes: ["/profile"]`.
+  it("protected route requested with a trailing slash redirects to login", async () => {
+    const handler = createNextgenOnRequest({
+      url: "http://localhost:4000",
+      protectedRoutes: ["/profile"],
+      loginPath: "/login",
+    });
+    const h = makeHarness("http://localhost:3000/profile/");
+
+    await run(handler, h.ev);
+
+    expect(h.redirected?.url).toContain("/login");
+  });
+
   it("protected route with a valid cookie token sets sharedMap to authenticated", async () => {
     const kid = nextKid();
     const token = makeJwt(
@@ -328,10 +343,9 @@ describe("createNextgenOnRequest (Qwik City)", () => {
       expect(captured?.get("content-type")).toBe("application/json");
     });
 
-    it("sends the upstream response with Set-Cookie forwarded and location stripped", async () => {
+    it("sends the upstream response with Set-Cookie forwarded", async () => {
       const upstreamHeaders = new Headers();
       upstreamHeaders.append("set-cookie", "__nextgen_session=abc; HttpOnly");
-      upstreamHeaders.set("location", "http://internal:4000/cb");
       vi.stubGlobal(
         "fetch",
         vi.fn().mockResolvedValue(new Response("{}", { status: 200, headers: upstreamHeaders })),
@@ -342,10 +356,28 @@ describe("createNextgenOnRequest (Qwik City)", () => {
 
       await run(handler, h.ev);
       expect(h.sent?.headers.get("set-cookie")).toContain("__nextgen_session=abc");
-      expect(h.sent?.headers.get("location")).toBeNull();
     });
 
-    it("attaches the project secret as the bearer", async () => {
+    // The IdP callback answers 303 back to the page sign-in started on: a
+    // top-level navigation, so a dropped Location strands the browser.
+    it.each([
+      ["/profile?signed=1", "http://localhost:3000/profile?signed=1"],
+      ["http://localhost:3000/profile", "http://localhost:3000/profile"],
+      ["http://internal:4000/profile", "http://localhost:3000/profile"],
+    ])("forwards an upstream Location %s onto this app as %s", async (location, expected) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(new Response(null, { status: 303, headers: { location } })),
+      );
+
+      const handler = createNextgenOnRequest({ url: "http://localhost:4000" });
+      const h = makeHarness("http://localhost:3000/__nextgen/idp/callback?code=x");
+
+      await run(handler, h.ev);
+      expect(h.sent?.headers.get("location")).toBe(expected);
+    });
+
+    function captureUpstreamHeaders(): () => Headers | undefined {
       let captured: Headers | undefined;
       vi.stubGlobal(
         "fetch",
@@ -354,15 +386,57 @@ describe("createNextgenOnRequest (Qwik City)", () => {
           return Promise.resolve(new Response("{}", { status: 200 }));
         }),
       );
+      return () => captured;
+    }
+
+    it("attaches the project secret to the handoff exchange", async () => {
+      const captured = captureUpstreamHeaders();
 
       const handler = createNextgenOnRequest({
         url: "http://localhost:4000",
         projectSecret: "sk-1",
       });
-      const h = makeHarness("http://localhost:3000/__nextgen/v1/flow");
+      const h = makeHarness("http://localhost:3000/__nextgen/sessions/exchange", {
+        method: "POST",
+      });
 
       await run(handler, h.ev);
-      expect(captured?.get("authorization")).toBe("Bearer sk-1");
+      expect(captured()?.get("authorization")).toBe("Bearer sk-1");
+    });
+
+    // ADR 036: on any other operation the secret would make the public proxy
+    // an open relay carrying project authority.
+    it.each([
+      ["GET", "/__nextgen/v1/flow"],
+      ["POST", "/__nextgen/v1/flow"],
+      ["GET", "/__nextgen/sessions/exchange"],
+    ])("withholds the project secret from %s %s", async (method, path) => {
+      const captured = captureUpstreamHeaders();
+
+      const handler = createNextgenOnRequest({
+        url: "http://localhost:4000",
+        projectSecret: "sk-1",
+      });
+      const h = makeHarness(`http://localhost:3000${path}`, { method });
+
+      await run(handler, h.ev);
+      expect(captured()?.has("authorization")).toBe(false);
+    });
+
+    it("keeps a caller-supplied credential on the handoff exchange", async () => {
+      const captured = captureUpstreamHeaders();
+
+      const handler = createNextgenOnRequest({
+        url: "http://localhost:4000",
+        projectSecret: "sk-1",
+      });
+      const h = makeHarness("http://localhost:3000/__nextgen/sessions/exchange", {
+        method: "POST",
+        authorization: "Bearer pk-caller",
+      });
+
+      await run(handler, h.ev);
+      expect(captured()?.get("authorization")).toBe("Bearer pk-caller");
     });
 
     it("appends the client IP to the X-Forwarded-For chain", async () => {

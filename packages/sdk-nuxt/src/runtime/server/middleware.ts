@@ -7,6 +7,7 @@ import {
   INTERNAL_HEADERS,
   filterResponseHeaders,
   matchesRoutes,
+  requiresProjectSecret,
 } from "@zitadel/sdk-core/middleware";
 import {
   defineEventHandler,
@@ -234,10 +235,6 @@ async function proxyRequest(
   }
 
   return response.body;
-}
-
-function requiresProjectSecret(method: string, pathname: string): boolean {
-  return method.toUpperCase() === "POST" && pathname === "/sessions/exchange";
 }
 
 const DECODER = new TextDecoder();

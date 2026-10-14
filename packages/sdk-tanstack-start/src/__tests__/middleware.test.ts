@@ -247,10 +247,9 @@ describe("handleNextgenRequest", () => {
       expect(captured?.get("content-type")).toBe("application/json");
     });
 
-    it("forwards upstream Set-Cookie and strips location", async () => {
+    it("forwards upstream Set-Cookie", async () => {
       const upstreamHeaders = new Headers();
       upstreamHeaders.append("set-cookie", "__nextgen_session=abc; HttpOnly");
-      upstreamHeaders.set("location", "http://internal:4000/cb");
       vi.stubGlobal(
         "fetch",
         vi.fn().mockResolvedValue(new Response("{}", { status: 200, headers: upstreamHeaders })),
@@ -263,10 +262,30 @@ describe("handleNextgenRequest", () => {
 
       if (decision.type !== "proxy") throw new Error("expected proxy");
       expect(decision.response.headers.get("set-cookie")).toContain("__nextgen_session=abc");
-      expect(decision.response.headers.get("location")).toBeNull();
     });
 
-    it("attaches the project secret as the bearer and appends x-real-ip to XFF", async () => {
+    // The IdP callback answers 303 back to the page sign-in started on: a
+    // top-level navigation, so a dropped Location strands the browser.
+    it.each([
+      ["/profile?signed=1", "http://localhost:3000/profile?signed=1"],
+      ["http://localhost:3000/profile", "http://localhost:3000/profile"],
+      ["http://internal:4000/profile", "http://localhost:3000/profile"],
+    ])("forwards an upstream Location %s onto this app as %s", async (location, expected) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(new Response(null, { status: 303, headers: { location } })),
+      );
+
+      const decision = await handleNextgenRequest(
+        makeRequest("http://localhost:3000/__nextgen/idp/callback?code=x"),
+        { url: "http://localhost:4000" },
+      );
+
+      if (decision.type !== "proxy") throw new Error("expected proxy");
+      expect(decision.response.headers.get("location")).toBe(expected);
+    });
+
+    function captureUpstreamHeaders(): () => Headers | undefined {
       let captured: Headers | undefined;
       vi.stubGlobal(
         "fetch",
@@ -275,18 +294,62 @@ describe("handleNextgenRequest", () => {
           return Promise.resolve(new Response("{}", { status: 200 }));
         }),
       );
+      return () => captured;
+    }
+
+    it("attaches the project secret to the handoff exchange", async () => {
+      const captured = captureUpstreamHeaders();
+
+      await handleNextgenRequest(
+        makeRequest("http://localhost:3000/__nextgen/sessions/exchange", { method: "POST" }),
+        { url: "http://localhost:4000", projectSecret: "sk-1" },
+      );
+
+      expect(captured()?.get("authorization")).toBe("Bearer sk-1");
+    });
+
+    // ADR 036: on any other operation the secret would make the public proxy
+    // an open relay carrying project authority.
+    it.each([
+      ["GET", "/__nextgen/v1/flow"],
+      ["POST", "/__nextgen/v1/flow"],
+      ["GET", "/__nextgen/sessions/exchange"],
+    ])("withholds the project secret from %s %s", async (method, path) => {
+      const captured = captureUpstreamHeaders();
+
+      await handleNextgenRequest(makeRequest(`http://localhost:3000${path}`, { method }), {
+        url: "http://localhost:4000",
+        projectSecret: "sk-1",
+      });
+
+      expect(captured()?.has("authorization")).toBe(false);
+    });
+
+    it("keeps a caller-supplied credential on the handoff exchange", async () => {
+      const captured = captureUpstreamHeaders();
+
+      await handleNextgenRequest(
+        makeRequest("http://localhost:3000/__nextgen/sessions/exchange", {
+          method: "POST",
+          authorization: "Bearer pk-caller",
+        }),
+        { url: "http://localhost:4000", projectSecret: "sk-1" },
+      );
+
+      expect(captured()?.get("authorization")).toBe("Bearer pk-caller");
+    });
+
+    it("appends x-real-ip to the X-Forwarded-For chain", async () => {
+      const captured = captureUpstreamHeaders();
 
       await handleNextgenRequest(
         makeRequest("http://localhost:3000/__nextgen/v1/flow", {
           headers: { "x-forwarded-for": "10.0.0.1", "x-real-ip": "10.0.0.2" },
         }),
-        { url: "http://localhost:4000", projectSecret: "sk-1" },
+        { url: "http://localhost:4000" },
       );
 
-      expect(captured?.get("authorization")).toBe("Bearer sk-1");
-      const xff = captured?.get("x-forwarded-for") ?? "";
-      expect(xff).toContain("10.0.0.1");
-      expect(xff).toContain("10.0.0.2");
+      expect(captured()?.get("x-forwarded-for")).toBe("10.0.0.1, 10.0.0.2");
     });
 
     it("does not proxy a path that only shares the prefix without a separator", async () => {

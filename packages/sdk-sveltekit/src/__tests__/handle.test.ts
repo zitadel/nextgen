@@ -430,38 +430,76 @@ describe("createNextgenHandle", () => {
       expect(res.headers.get("set-cookie")).toBe("__nextgen_session=abc; HttpOnly; SameSite=Lax");
     });
 
-    it("strips the location header from the upstream response", async () => {
-      const upstreamHeaders = new Headers();
-      upstreamHeaders.set("content-type", "application/json");
-      upstreamHeaders.set("location", "http://internal-auth.corp:4000/callback");
+    // The IdP callback answers 303 back to the page sign-in started on: a
+    // top-level navigation, so a dropped Location strands the browser.
+    it.each([
+      ["/profile?signed=1", "http://localhost:3000/profile?signed=1"],
+      ["http://localhost:3000/profile", "http://localhost:3000/profile"],
+      ["http://internal-auth.corp:4000/profile", "http://localhost:3000/profile"],
+    ])("forwards an upstream Location %s onto this app as %s", async (location, expected) => {
       vi.stubGlobal(
         "fetch",
-        vi.fn().mockResolvedValue(new Response("{}", { status: 302, headers: upstreamHeaders })),
+        vi.fn().mockResolvedValue(new Response(null, { status: 303, headers: { location } })),
       );
 
       const handle = createNextgenHandle({ url: "http://localhost:4000" });
-      const { event, resolve } = makeEvent("http://localhost:3000/__nextgen/v1/flow");
+      const { event, resolve } = makeEvent("http://localhost:3000/__nextgen/idp/callback?code=x");
 
       const res = await run(handle, event, resolve);
-      expect(res.headers.get("location")).toBeNull();
-      expect(res.headers.get("content-type")).toBe("application/json");
+      expect(res.headers.get("location")).toBe(expected);
     });
 
-    it("attaches the project secret as the bearer when none is present", async () => {
-      let capturedHeaders: Headers | undefined;
+    function captureUpstreamHeaders(): () => Headers | undefined {
+      let captured: Headers | undefined;
       vi.stubGlobal(
         "fetch",
         vi.fn().mockImplementation((_url: string, init: RequestInit) => {
-          capturedHeaders = init.headers as Headers;
+          captured = init.headers as Headers;
           return Promise.resolve(new Response("{}", { status: 200 }));
         }),
       );
+      return () => captured;
+    }
+
+    it("attaches the project secret to the handoff exchange", async () => {
+      const captured = captureUpstreamHeaders();
 
       const handle = createNextgenHandle({ url: "http://localhost:4000", projectSecret: "sk-123" });
-      const { event, resolve } = makeEvent("http://localhost:3000/__nextgen/v1/flow");
+      const { event, resolve } = makeEvent("http://localhost:3000/__nextgen/sessions/exchange", {
+        method: "POST",
+      });
 
       await run(handle, event, resolve);
-      expect(capturedHeaders?.get("authorization")).toBe("Bearer sk-123");
+      expect(captured()?.get("authorization")).toBe("Bearer sk-123");
+    });
+
+    // ADR 036: on any other operation the secret would make the public proxy
+    // an open relay carrying project authority.
+    it.each([
+      ["GET", "/__nextgen/v1/flow"],
+      ["POST", "/__nextgen/v1/flow"],
+      ["GET", "/__nextgen/sessions/exchange"],
+    ])("withholds the project secret from %s %s", async (method, path) => {
+      const captured = captureUpstreamHeaders();
+
+      const handle = createNextgenHandle({ url: "http://localhost:4000", projectSecret: "sk-123" });
+      const { event, resolve } = makeEvent(`http://localhost:3000${path}`, { method });
+
+      await run(handle, event, resolve);
+      expect(captured()?.has("authorization")).toBe(false);
+    });
+
+    it("keeps a caller-supplied credential on the handoff exchange", async () => {
+      const captured = captureUpstreamHeaders();
+
+      const handle = createNextgenHandle({ url: "http://localhost:4000", projectSecret: "sk-123" });
+      const { event, resolve } = makeEvent("http://localhost:3000/__nextgen/sessions/exchange", {
+        method: "POST",
+        authorization: "Bearer pk-caller",
+      });
+
+      await run(handle, event, resolve);
+      expect(captured()?.get("authorization")).toBe("Bearer pk-caller");
     });
 
     it("does not proxy a path that only shares the prefix without a separator", async () => {

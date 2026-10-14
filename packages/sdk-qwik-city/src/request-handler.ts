@@ -5,6 +5,7 @@ import {
   INTERNAL_HEADERS,
   filterResponseHeaders,
   matchesRoutes,
+  requiresProjectSecret,
 } from "@zitadel/sdk-core/middleware";
 
 import { verifyJwt, base64UrlDecode } from "./lib/jwt";
@@ -102,8 +103,9 @@ function buildUpstreamHeaders(ev: QwikRequestEvent): Headers {
 
 /**
  * Forwards a `/__nextgen/*` request to the upstream auth backend and returns the
- * upstream response verbatim, including `Set-Cookie` headers. Hop-by-hop and
- * `location` headers are stripped in both directions.
+ * upstream response verbatim, including `Set-Cookie` headers. Hop-by-hop
+ * headers are stripped in both directions, and a `location` is kept only as a
+ * redirect onto this app.
  */
 async function proxyResponse(
   ev: QwikRequestEvent,
@@ -121,9 +123,14 @@ async function proxyResponse(
 
   const upstreamHeaders = buildUpstreamHeaders(ev);
 
-  // Attach the project service-key as the bearer on every proxied request. The
-  // secret is read server-side and never reaches the browser.
-  if (!upstreamHeaders.has("authorization") && projectSecret) {
+  // ADR 036: attach the project secret only to the handoff exchange — on every
+  // operation it would make this public boundary an open relay with project
+  // authority. A caller-supplied credential is preserved.
+  if (
+    requiresProjectSecret(method, suffix) &&
+    !upstreamHeaders.has("authorization") &&
+    projectSecret
+  ) {
     upstreamHeaders.set("authorization", `Bearer ${projectSecret}`);
   }
 
@@ -135,7 +142,9 @@ async function proxyResponse(
     signal: AbortSignal.timeout(proxyTimeoutMs),
   });
 
-  const responseHeaders = filterResponseHeaders(upstream.headers);
+  // The app's own request URL: the origin a proxied redirect may name, and the
+  // base a relative one resolves against (the IdP callback's 303 needs it).
+  const responseHeaders = filterResponseHeaders(upstream.headers, ev.url.toString());
   const setCookies = upstream.headers.getSetCookie?.() ?? [];
   for (const cookie of setCookies) {
     responseHeaders.append("set-cookie", cookie);

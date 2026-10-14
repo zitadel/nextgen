@@ -49,10 +49,14 @@
     "solid-js": ">=1.6"
   },
   "devDependencies": {
+    "@solidjs/router": "^1.0.0",
+    "@solidjs/start": "^2.0.6",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "solid-js": "^1.9.12",
     "tsup": "catalog:",
     "typescript": "catalog:",
+    "vite": "catalog:",
     "vitest": "catalog:"
   }
 }

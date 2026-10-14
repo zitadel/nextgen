@@ -5,6 +5,7 @@ import {
   INTERNAL_HEADERS,
   filterResponseHeaders,
   matchesRoutes,
+  requiresProjectSecret,
 } from "@zitadel/sdk-core/middleware";
 
 import { verifyJwt, base64UrlDecode } from "./lib/jwt";
@@ -84,7 +85,14 @@ async function proxyRequest(
 
   const upstreamHeaders = buildUpstreamHeaders(request, url, clientAddress);
 
-  if (!upstreamHeaders.has("authorization") && projectSecret) {
+  // ADR 036: attach the project secret only to the handoff exchange — on every
+  // operation it would make this public boundary an open relay with project
+  // authority. A caller-supplied credential is preserved.
+  if (
+    requiresProjectSecret(method, suffix) &&
+    !upstreamHeaders.has("authorization") &&
+    projectSecret
+  ) {
     upstreamHeaders.set("authorization", `Bearer ${projectSecret}`);
   }
 
@@ -96,7 +104,9 @@ async function proxyRequest(
     signal: AbortSignal.timeout(proxyTimeoutMs),
   });
 
-  const responseHeaders = filterResponseHeaders(upstream.headers);
+  // The app's own request URL: the origin a proxied redirect may name, and the
+  // base a relative one resolves against (the IdP callback's 303 needs it).
+  const responseHeaders = filterResponseHeaders(upstream.headers, url.toString());
   const setCookies = upstream.headers.getSetCookie?.() ?? [];
   for (const cookie of setCookies) {
     responseHeaders.append("set-cookie", cookie);

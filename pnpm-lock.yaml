@@ -1584,7 +1584,7 @@ importers:
     devDependencies:
       '@solidjs/testing-library':
         specifier: ^0.8.10
-        version: 0.8.10(solid-js@1.9.12)
+        version: 0.8.10(@solidjs/router@1.0.0(solid-js@1.9.12))(solid-js@1.9.12)
       '@testing-library/jest-dom':
         specifier: ^6.0.0
         version: 6.9.1
@@ -1624,31 +1624,37 @@ importers:
 
   packages/sdk-solid-start:
     dependencies:
-      '@solidjs/start':
-        specifier: ^1.0.0 || ^2.0.0-0
-        version: 2.0.6(@testing-library/jest-dom@6.9.1)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.0))
       '@zitadel/api':
         specifier: workspace:*
         version: link:../api
       '@zitadel/sdk-core':
         specifier: workspace:*
         version: link:../sdk-core
-      solid-js:
-        specifier: '>=1.6'
-        version: 1.9.12
     devDependencies:
+      '@solidjs/router':
+        specifier: ^1.0.0
+        version: 1.0.0(solid-js@1.9.17)
+      '@solidjs/start':
+        specifier: ^2.0.6
+        version: 2.0.6(@solidjs/router@1.0.0(solid-js@1.9.17))(@testing-library/jest-dom@6.9.1)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.0))
       '@types/node':
         specifier: ^24.19.1
         version: 24.19.1
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.11(@vitest/browser@4.1.11)(vitest@4.1.11)
+      solid-js:
+        specifier: ^1.9.12
+        version: 1.9.17
       tsup:
         specifier: 'catalog:'
         version: 8.5.1(@microsoft/api-extractor@7.58.9(@types/node@24.19.1))(@swc/core@1.15.8(@swc/helpers@0.5.18))(jiti@2.7.0)(postcss@8.5.28)(tsx@4.21.0)(typescript@6.0.3)(yaml@2.9.0)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vite:
+        specifier: 'catalog:'
+        version: 8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.0)
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.19.1)(@vitest/browser-playwright@4.1.11)(@vitest/coverage-v8@4.1.11)(happy-dom@20.14.5)(jsdom@29.0.2(@noble/hashes@1.8.0))(msw@2.14.6(@types/node@24.19.1)(typescript@6.0.3))(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.0))
@@ -7002,6 +7008,11 @@ packages:
     resolution: {integrity: sha512-zdIWBGpR9zGx1p1bzIPqF5Gs+Ks/BH8R6fWhmUa/dcK1L2rUC8BAcZJzNRYBQv74kScf1TSOs0EY//Vd/I0V8g==}
     peerDependencies:
       solid-js: '>=1.8.4'
+
+  '@solidjs/router@1.0.0':
+    resolution: {integrity: sha512-cCSk1hvgCowiMa9bzzYWHiLu1U4E22+DfJe6/rOwAyECKrxc3jrd5QnoW3sDDJtW+e077cz/M67bPl3DqOBw1Q==}
+    peerDependencies:
+      solid-js: ^1.8.6
 
   '@solidjs/start@2.0.6':
     resolution: {integrity: sha512-XoJG1lj2LxrXpDxN9RrakppgsV1WAYWyMYZcPHPwT3Jb1eE69mnAgU8esIDIL6raNmoiiDqBc7Muj4Mv38iv6w==}
@@ -21750,7 +21761,16 @@ snapshots:
     dependencies:
       solid-js: 1.9.17
 
-  '@solidjs/start@2.0.6(@testing-library/jest-dom@6.9.1)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.0))':
+  '@solidjs/router@1.0.0(solid-js@1.9.12)':
+    dependencies:
+      solid-js: 1.9.12
+    optional: true
+
+  '@solidjs/router@1.0.0(solid-js@1.9.17)':
+    dependencies:
+      solid-js: 1.9.17
+
+  '@solidjs/start@2.0.6(@solidjs/router@1.0.0(solid-js@1.9.17))(@testing-library/jest-dom@6.9.1)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.0))':
     dependencies:
       '@babel/core': 7.29.7
       '@babel/traverse': 7.29.7
@@ -21778,16 +21798,20 @@ snapshots:
       terracotta: 1.3.1(solid-js@1.9.17)
       vite: 8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.0)
       vite-plugin-solid: 2.11.14(@testing-library/jest-dom@6.9.1)(solid-js@1.9.17)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.0))
+    optionalDependencies:
+      '@solidjs/router': 1.0.0(solid-js@1.9.17)
     transitivePeerDependencies:
       - '@testing-library/jest-dom'
       - crossws
       - ocache
       - supports-color
 
-  '@solidjs/testing-library@0.8.10(solid-js@1.9.12)':
+  '@solidjs/testing-library@0.8.10(@solidjs/router@1.0.0(solid-js@1.9.12))(solid-js@1.9.12)':
     dependencies:
       '@testing-library/dom': 10.4.1
       solid-js: 1.9.12
+    optionalDependencies:
+      '@solidjs/router': 1.0.0(solid-js@1.9.12)
 
   '@speed-highlight/core@1.2.15': {}
 

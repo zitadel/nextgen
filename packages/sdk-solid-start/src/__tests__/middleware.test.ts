@@ -8,7 +8,8 @@
  */
 
 import { generateKeyPairSync, createSign } from "node:crypto";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { createMiddleware } from "@solidjs/start/middleware";
+import { describe, it, expect, expectTypeOf, vi, beforeEach } from "vitest";
 
 import type { SolidFetchEvent } from "../middleware";
 
@@ -285,10 +286,9 @@ describe("createNextgenMiddleware (SolidStart)", () => {
       expect(captured?.get("content-type")).toBe("application/json");
     });
 
-    it("forwards upstream Set-Cookie and strips location", async () => {
+    it("forwards upstream Set-Cookie", async () => {
       const upstreamHeaders = new Headers();
       upstreamHeaders.append("set-cookie", "__nextgen_session=abc; HttpOnly");
-      upstreamHeaders.set("location", "http://internal:4000/cb");
       vi.stubGlobal(
         "fetch",
         vi.fn().mockResolvedValue(new Response("{}", { status: 200, headers: upstreamHeaders })),
@@ -298,10 +298,30 @@ describe("createNextgenMiddleware (SolidStart)", () => {
       const res = await onRequest(mw, makeEvent("http://localhost:3000/__nextgen/v1/flow"));
 
       expect(res?.headers.get("set-cookie")).toContain("__nextgen_session=abc");
-      expect(res?.headers.get("location")).toBeNull();
     });
 
-    it("attaches the project secret as the bearer", async () => {
+    // The IdP callback answers 303 back to the page sign-in started on: a
+    // top-level navigation, so a dropped Location strands the browser.
+    it.each([
+      ["/profile?signed=1", "http://localhost:3000/profile?signed=1"],
+      ["http://localhost:3000/profile", "http://localhost:3000/profile"],
+      ["http://internal:4000/profile", "http://localhost:3000/profile"],
+    ])("forwards an upstream Location %s onto this app as %s", async (location, expected) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(new Response(null, { status: 303, headers: { location } })),
+      );
+
+      const mw = createNextgenMiddleware({ url: "http://localhost:4000" });
+      const res = await onRequest(
+        mw,
+        makeEvent("http://localhost:3000/__nextgen/idp/callback?code=x"),
+      );
+
+      expect(res?.headers.get("location")).toBe(expected);
+    });
+
+    function captureUpstreamHeaders(): () => Headers | undefined {
       let captured: Headers | undefined;
       vi.stubGlobal(
         "fetch",
@@ -310,10 +330,49 @@ describe("createNextgenMiddleware (SolidStart)", () => {
           return Promise.resolve(new Response("{}", { status: 200 }));
         }),
       );
+      return () => captured;
+    }
+
+    it("attaches the project secret to the handoff exchange", async () => {
+      const captured = captureUpstreamHeaders();
 
       const mw = createNextgenMiddleware({ url: "http://localhost:4000", projectSecret: "sk-1" });
-      await onRequest(mw, makeEvent("http://localhost:3000/__nextgen/v1/flow"));
-      expect(captured?.get("authorization")).toBe("Bearer sk-1");
+      await onRequest(
+        mw,
+        makeEvent("http://localhost:3000/__nextgen/sessions/exchange", { method: "POST" }),
+      );
+
+      expect(captured()?.get("authorization")).toBe("Bearer sk-1");
+    });
+
+    // ADR 036: on any other operation the secret would make the public proxy
+    // an open relay carrying project authority.
+    it.each([
+      ["GET", "/__nextgen/v1/flow"],
+      ["POST", "/__nextgen/v1/flow"],
+      ["GET", "/__nextgen/sessions/exchange"],
+    ])("withholds the project secret from %s %s", async (method, path) => {
+      const captured = captureUpstreamHeaders();
+
+      const mw = createNextgenMiddleware({ url: "http://localhost:4000", projectSecret: "sk-1" });
+      await onRequest(mw, makeEvent(`http://localhost:3000${path}`, { method }));
+
+      expect(captured()?.has("authorization")).toBe(false);
+    });
+
+    it("keeps a caller-supplied credential on the handoff exchange", async () => {
+      const captured = captureUpstreamHeaders();
+
+      const mw = createNextgenMiddleware({ url: "http://localhost:4000", projectSecret: "sk-1" });
+      await onRequest(
+        mw,
+        makeEvent("http://localhost:3000/__nextgen/sessions/exchange", {
+          method: "POST",
+          authorization: "Bearer pk-caller",
+        }),
+      );
+
+      expect(captured()?.get("authorization")).toBe("Bearer pk-caller");
     });
 
     it("appends the client address to the X-Forwarded-For chain", async () => {
@@ -376,6 +435,17 @@ describe("createNextgenMiddleware (SolidStart)", () => {
       const res = await onRequest(mw, event);
       expect(res).toBeUndefined();
       expect(event.locals.nextgenAuth).toBeUndefined();
+    });
+  });
+
+  // The generated src/middleware.ts passes this config straight to SolidStart
+  // 2's createMiddleware; a mismatch fails the scaffolded app's typecheck.
+  // Checked by `tsc -p tsconfig.spec.json`.
+  describe("SolidStart 2 compatibility", () => {
+    it("is accepted by createMiddleware", () => {
+      expectTypeOf(createNextgenMiddleware({ url: "http://localhost:4000" })).toExtend<
+        Parameters<typeof createMiddleware>[0]
+      >();
     });
   });
 });
