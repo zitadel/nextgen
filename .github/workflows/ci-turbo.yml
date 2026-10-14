@@ -46,6 +46,10 @@ jobs:
       id-token: write
     env:
       DO_NOT_TRACK: "1"
+      # Playwright forces FORCE_COLOR=1 on its workers and web servers, and Node
+      # warns on every process that also sees NO_COLOR. Blank it so only the
+      # test output is left in the log.
+      NO_COLOR: ""
       TURBO_TELEMETRY_DISABLED: "1"
       # The contributor scripts (run-cli, local-registry, check) build through
       # turbo instead of moon; scripts/ci-mode.mjs asks turbo's graph.
@@ -146,7 +150,7 @@ jobs:
 
       - name: Cache Playwright browsers
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.browsers == 'true' }}
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
@@ -195,7 +199,7 @@ jobs:
 
       - name: Cache journey registry packages
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ runner.temp }}/journey-verdaccio-storage
           key: journey-verdaccio-${{ runner.os }}-${{ github.run_id }}
@@ -214,23 +218,30 @@ jobs:
           JOURNEY_WORK_DIR: ${{ runner.temp }}/ci-journey
         run: |
           version="$(node -p "require('./apps/server/package.json').version")"
-          JOURNEY_TARBALLS_DIR="dist/release/${version}/npm" turbo run e2e-local --filter=@zitadel/cli-journey-e2e
+          JOURNEY_TARBALLS_DIR="dist/release/${version}/npm" turbo run e2e-local --filter=@zitadel/e2e
 
       - name: Run @zitadel/testing real-instance suites
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.suites_testing_demo == 'true' }}
-        run: turbo run test:integration e2e-real --filter=@zitadel/testing --filter=@zitadel/demo-next-e2e
+        run: turbo run test:integration demo-next-real --filter=@zitadel/testing --filter=@zitadel/e2e
+
+      # The lanes that need no backend: the console's preview smoke and the demos
+      # against api-mock (moon runs them inside e2e:all). After the step above:
+      # both demo-next lanes serve the demo on :3002.
+      - name: Run mock-backed e2e lanes
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.suites_mock == 'true' }}
+        run: turbo run console-smoke demo-next-mock demo-nuxt-mock --filter=@zitadel/e2e
 
       - name: Run console real-instance suite
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.suites_console == 'true' }}
-        run: turbo run e2e-real --filter=@zitadel/console-e2e
+        run: turbo run console-real --filter=@zitadel/e2e
 
       - name: Run console embedded-surface suite
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.suites_console == 'true' }}
-        run: turbo run e2e-embedded --filter=@zitadel/console-e2e
+        run: turbo run console-embedded --filter=@zitadel/e2e
 
       - name: Run console platform-project suite
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.suites_console == 'true' }}
-        run: turbo run e2e-platform --filter=@zitadel/console-e2e
+        run: turbo run console-platform --filter=@zitadel/e2e
 
       - name: Validate version PR
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
@@ -244,24 +255,26 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
         run: |
           version="$(node -p "require('./apps/server/package.json').version")"
-          node apps/cli-journey-e2e/scripts/verify-tarballs.mjs "dist/release/${version}/npm"
+          node e2e/journey/scripts/verify-tarballs.mjs "dist/release/${version}/npm"
 
       - name: Upload journey diagnostics
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: journey-diagnostics-turbo
           path: ${{ runner.temp }}/ci-journey/diagnostics
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Upload console e2e diagnostics
+      # Every lane's results; the handshake (project secret) sits beside them in
+      # .zitadel-testing/ and stays out.
+      - name: Upload e2e diagnostics
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: console-e2e-diagnostics-turbo
+          name: e2e-diagnostics-turbo
           path: |
-            apps/console-e2e/test-results
-            apps/console-e2e/playwright-report
+            e2e/*/test-results
+            e2e/*/playwright-report
           if-no-files-found: ignore
           retention-days: 7

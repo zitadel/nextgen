@@ -650,24 +650,6 @@ importers:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.19.1)(@vitest/browser-playwright@4.1.11)(@vitest/coverage-v8@4.1.11)(happy-dom@20.14.5)(jsdom@29.0.2(@noble/hashes@1.8.0))(msw@2.14.6(@types/node@24.19.1)(typescript@6.0.3))(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))
 
-  apps/cli-journey-e2e:
-    devDependencies:
-      '@playwright/test':
-        specifier: 'catalog:'
-        version: 1.60.0
-      '@types/node':
-        specifier: ^24.19.1
-        version: 24.19.1
-      '@zitadel/testing':
-        specifier: workspace:*
-        version: link:../../packages/testing
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.3
-      vitest:
-        specifier: 'catalog:'
-        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.19.1)(@vitest/browser-playwright@4.1.11)(@vitest/coverage-v8@4.1.11)(happy-dom@20.14.5)(jsdom@29.0.2(@noble/hashes@1.8.0))(msw@2.14.6(@types/node@24.19.1)(typescript@6.0.3))(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))
-
   apps/cli-skill-e2e:
     devDependencies:
       '@types/node':
@@ -810,21 +792,6 @@ importers:
         specifier: 'catalog:'
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.19.1)(@vitest/browser-playwright@4.1.11)(@vitest/coverage-v8@4.1.11)(happy-dom@20.14.5)(jsdom@29.0.2(@noble/hashes@1.8.0))(msw@2.14.6(@types/node@24.19.1)(typescript@6.0.3))(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.0))
 
-  apps/console-e2e:
-    devDependencies:
-      '@playwright/test':
-        specifier: 'catalog:'
-        version: 1.60.0
-      '@types/node':
-        specifier: ^24.19.1
-        version: 24.19.1
-      '@zitadel/testing':
-        specifier: workspace:*
-        version: link:../../packages/testing
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.3
-
   apps/demo-next:
     dependencies:
       '@zitadel/api':
@@ -862,24 +829,6 @@ importers:
         specifier: 'catalog:'
         version: 6.0.3
 
-  apps/demo-next-e2e:
-    devDependencies:
-      '@playwright/test':
-        specifier: 'catalog:'
-        version: 1.60.0
-      '@types/node':
-        specifier: ^24.19.1
-        version: 24.19.1
-      '@zitadel/api-mock':
-        specifier: workspace:*
-        version: link:../../packages/api-mock
-      '@zitadel/testing':
-        specifier: workspace:*
-        version: link:../../packages/testing
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.3
-
   apps/demo-nuxt:
     dependencies:
       '@zitadel/api':
@@ -910,24 +859,6 @@ importers:
       vue-tsc:
         specifier: 'catalog:'
         version: 3.2.8(typescript@6.0.3)
-
-  apps/demo-nuxt-e2e:
-    devDependencies:
-      '@playwright/test':
-        specifier: 'catalog:'
-        version: 1.60.0
-      '@types/node':
-        specifier: ^24.19.1
-        version: 24.19.1
-      '@zitadel/api-mock':
-        specifier: workspace:*
-        version: link:../../packages/api-mock
-      '@zitadel/sdk-nuxt':
-        specifier: workspace:*
-        version: link:../../packages/sdk-nuxt
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.3
 
   apps/docs:
     dependencies:
@@ -1207,6 +1138,30 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+
+  e2e:
+    devDependencies:
+      '@playwright/test':
+        specifier: 'catalog:'
+        version: 1.60.0
+      '@types/node':
+        specifier: ^24.19.1
+        version: 24.19.1
+      '@zitadel/api-mock':
+        specifier: workspace:*
+        version: link:../packages/api-mock
+      '@zitadel/sdk-nuxt':
+        specifier: workspace:*
+        version: link:../packages/sdk-nuxt
+      '@zitadel/testing':
+        specifier: workspace:*
+        version: link:../packages/testing
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.19.1)(@vitest/browser-playwright@4.1.11)(@vitest/coverage-v8@4.1.11)(happy-dom@20.14.5)(jsdom@29.0.2(@noble/hashes@1.8.0))(msw@2.14.6(@types/node@24.19.1)(typescript@6.0.3))(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))
 
   packages/api:
     dependencies:
