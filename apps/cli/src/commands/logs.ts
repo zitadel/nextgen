@@ -6,7 +6,6 @@ import { containerLogs, followContainerLogs } from "../lib/local-server/docker";
 import { DEFAULT_LOCAL_SERVER_URL, readRuntimeMetadata } from "../lib/local-server/runtime";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { resolveCwd } from "../lib/paths";
-import { unscopedCommand } from "../lib/suggestion";
 
 export default class Logs extends BaseCommand {
   static override description = "Show local Zitadel server logs.";
@@ -29,7 +28,7 @@ export default class Logs extends BaseCommand {
     if (!runtime) {
       throw new ZitadelError("E_VALIDATION", "Local Zitadel runtime has not been started", {
         hint: "Run `zitadel start` first.",
-        nextCommands: [unscopedCommand("start", this.meta.cliVersion)],
+        nextCommands: [this.suggestUnscoped("start")],
       });
     }
 
