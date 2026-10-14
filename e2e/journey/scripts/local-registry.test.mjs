@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { afterEach, test } from "vitest";
@@ -187,6 +187,45 @@ test("uses prebuilt tarballs without rebuilding release packages", async () => {
   assert.equal(
     await readFile(join(paths.tarballsDir, "zitadel-cli-0.1.0-alpha.5.tgz"), "utf8"),
     "@zitadel/cli\n",
+  );
+});
+
+test("keeps a reused store's proxied packages and trusts their metadata for an hour", async () => {
+  const repoRoot = await fixtureRepo();
+  const workDir = await mkdtemp(join(tmpdir(), "zitadel-local-registry-"));
+  const prebuiltTarballsDir = await mkdtemp(join(tmpdir(), "zitadel-prebuilt-tarballs-"));
+  tempDirs.push(workDir, prebuiltTarballsDir);
+  await fixtureTarballs(prebuiltTarballsDir);
+  const paths = localRegistryPaths(workDir);
+  // A store restored from CI's cache: a package an earlier run proxied from
+  // npmjs, and the @zitadel packages it published.
+  await mkdir(join(paths.storagePath, "next"), { recursive: true });
+  await writeFile(join(paths.storagePath, "next", "package.json"), "{}\n");
+  await mkdir(join(paths.storagePath, "@zitadel", "cli"), { recursive: true });
+  await writeFile(join(paths.storagePath, "@zitadel", "cli", "package.json"), "{}\n");
+
+  await prepareLocalRegistry({
+    env: { PATH: "/bin" },
+    paths,
+    prebuiltTarballsDir,
+    registryPort: 51_234,
+    registryUrl: "http://127.0.0.1:51234",
+    repoRoot,
+    resetStorage: false,
+    run: async () => undefined,
+    startLocalRegistry: async () => ({ exitCode: null, logFile: paths.registryLogPath }),
+    waitForHttp: async () => undefined,
+    workDir,
+  });
+
+  assert.equal(await readFile(join(paths.storagePath, "next", "package.json"), "utf8"), "{}\n");
+  await assert.rejects(stat(join(paths.storagePath, "@zitadel")), { code: "ENOENT" });
+  // With Verdaccio's default maxage (2m), every restored packument would go
+  // back to npmjs before it is served.
+  const verdaccioConfig = await readFile(paths.verdaccioConfigPath, "utf8");
+  assert.ok(
+    verdaccioConfig.includes("  npmjs:\n    url: https://registry.npmjs.org/\n    maxage: 1h\n"),
+    verdaccioConfig,
   );
 });
 

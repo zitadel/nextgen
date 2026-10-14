@@ -266,17 +266,21 @@ dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
   browser projects pull in their own Chromium through a moon `install-browsers`
   dep on their `:test` task.
 - `moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph` —
-  builds, lint, typecheck and unit tests.
-- `moon run server:test-postgres`, then `moon run server:test-sqlite` — Go
-  integration lanes. They depend on the UI builds their binary embeds, so
-  `moon ci` also runs them when one of those builds is affected; on such runs
-  they run twice until a follow-up folds them into the graph step.
+  builds, lint, typecheck and unit tests, and the Go database lanes
+  (`server:test-postgres`, `server:test-sqlite`) whenever moon finds them
+  affected, as dependents of the UI builds their binary embeds.
+- `moon run server:test-postgres`, then `moon run server:test-sqlite` — only
+  the lanes the graph did not run, which `scripts/ci-mode.mjs` reads from its
+  report: a run forced full for a workflow-only edit, which no lane lists as
+  input, leaves them out of the graph.
 - `moon run release:snapshot -- --skip-container` — a non-publishing release
   snapshot, built outside any moon graph and handed to the journey via
   `JOURNEY_TARBALLS_DIR`, whenever the journey can run. The journey must not
   pack inside the e2e step (a nested moon graph is forbidden), so in GitHub
   Actions it refuses to run without the snapshot. The journey's Verdaccio
-  storage comes back from the Actions cache.
+  storage comes back from the Actions cache, and goes back only when the
+  journey fetched new tarballs into it or refreshed packuments a later run can
+  still use.
 - `moon exec e2e:all --ignore-ci-checks` — the e2e suite, in a step of its own
   so its browsers and dev servers do not compete with the unit suites. Its
   lanes are `runInCI: "skip"`, which keeps them out of the `moon ci` graph.

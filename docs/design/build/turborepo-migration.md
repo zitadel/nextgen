@@ -222,12 +222,13 @@ task: turbo sets `TURBO_HASH` for every task. Under moon, which has its own
 ### `retryCount: 3` (4 uses)
 
 `task-guard --retries 3` in the same four browser-test `test` scripts. The
-flake it exists for is a cold-start race, so the retry re-runs the whole suite
-(warm), which Vitest's own per-test `retry` would not do — a failed module
-import fails the file. Moon is unchanged: its `test` task runs each package's
-`test:all` script, which calls Vitest directly, so moon keeps its own
-`retryCount: 3` and `mutex` and no suite retries under both. The `test:all`
-scripts go with moon at the cutover.
+flake it exists for is a module import that Chromium aborts when a container
+changes the host's addresses (#1490, now prevented in CI; the retry stays as a
+safety net), so the retry re-runs the whole suite, which Vitest's own per-test
+`retry` would not do — a failed module import fails the file. Moon is
+unchanged: its `test` task runs each package's `test:all` script, which calls
+Vitest directly, so moon keeps its own `retryCount: 3` and `mutex` and no suite
+retries under both. The `test:all` scripts go with moon at the cutover.
 
 ### `runInCI` (72 uses)
 
@@ -419,9 +420,9 @@ Two workable setups; the prototype's draft uses the first.
 |---|---|---|
 | Setup | a repository variable `TURBO_TEAM=zitadel`, `id-token: write` on the job, `vercel/setup-turborepo-remote-cache-action@v1.1.0` before the first `turbo` (with `policy:` set to the policy's ID only if more than one of the team's Turborepo policies matches the token: Vercel then refuses the exchange), `TURBO_API=https://vercel.com` on Depot runners (they inject Depot's `TURBO_API`), and a **Turborepo CLI OIDC policy** in the Vercel team settings (Build and Deployment → OIDC Policies for CLI Access → Turborepo CLI Policies, not a VCR policy; select GitHub, repository `zitadel/nextgen`; optionally restrict to a workflow or branch) | nothing on Depot runners: `TURBO_API`, `TURBO_TOKEN`, `TURBO_TEAM` are injected |
 | Shared with | the cloud deployments (same team cache): a build CI did is a hit on Vercel and the reverse | CI only |
-| Cost | free on the Pro plan; 1 TB/month upload; artifacts expire after 7 days | part of the Depot plan (as moon's cache today) |
+| Cost | free, within a fair-use limit of 1 TB/month of uploads on Pro; artifacts expire after 7 days | part of the Depot plan (as moon's cache today) |
 | Forks | no token, local cache only | same |
-| Write policy | `TURBO_CACHE=local:rw,remote:rw` on pushes to main (which run the gate alone), `local:rw,remote:r` on pull requests and the merge queue; on Vercel, every build reads and writes, Vercel's default, production and previews in separate entries (see "Who may write to the cache") | same flags |
+| Write policy | `TURBO_CACHE=local:rw,remote:rw` on every run: pull requests, the merge queue and pushes to main (which run the gate alone), as moon's runs write Depot's cache; on Vercel, every build reads and writes, Vercel's default, production and previews in separate entries (see "Who may write to the cache") | same flags |
 
 Recommendation: Vercel's, for the one shared cache and because the cloud
 deployments use it already. Set up on 2026-10-12: the variable
@@ -458,12 +459,15 @@ sets them up:
   (Vercel's docs describe no read-only policy; forks get no token).
   Restricting the policy to main would take the remote cache away from
   pull requests without narrowing who can write: anyone who can push a
-  branch can write through that branch's Vercel preview build. So pull requests
-  read (`remote:r`, their own choice). Main creates the cache: a push to
-  main runs the gate and writes, pull requests and the merge queue read.
-  Without `VERCEL_TARGET_ENV`, CI's entries are apart from the Vercel
-  builds'. A poisoned artifact could still make a pull-request or
-  merge-queue run pass for code that fails; the signatures below close that.
+  branch can write through that branch's Vercel preview build. So every run
+  reads and writes (decision 8), as moon's CI runs do with Depot's cache: a
+  pull request's later pushes restore what its earlier ones built, and the
+  merge queue writes the results of the commit that lands on main. A
+  read-only flag (`remote:r`) is the pull request's own choice, so it only
+  ever kept honest branches out. Without `VERCEL_TARGET_ENV`, CI's entries
+  are apart from the Vercel builds'. A poisoned artifact could still make a
+  pull-request or merge-queue run pass for code that fails; the signatures
+  below close that.
 - **Later, to let only main's results reach production:** turbo's
   artifact signatures (`remoteCache.signature: true` with
   `TURBO_REMOTE_CACHE_SIGNATURE_KEY`). Production and trusted CI get the
@@ -594,5 +598,14 @@ the release graph.
    `api-mock`.
 7. **Dual run as proposed:** two to four weeks, exit after two consecutive
    weeks without a divergence that was turbo's fault.
-8. **Main creates the cache** (2026-10-13). `ci-turbo` writes the remote
-   cache only on pushes to main; pull requests and the merge queue read it.
+8. **Every CI run writes the cache** (2026-10-14, replacing "Main creates
+   the cache"). `ci-turbo` reads and writes the remote cache on pull
+   requests, the merge queue and pushes to main, as moon's runs write
+   Depot's. While only main wrote, a pull request restored main's results
+   but never its own earlier pushes' (pull requests averaged almost five CI
+   runs each). Replayed over the 143 green pull-request runs of 2026-10-14,
+   the gate restores 57 of its 119 tasks at the median instead of none. The
+   price is the upload: about 93 MB a run, some 0.5 TB a month at the
+   current number of pull-request runs, against the 1 TB fair-use limit of
+   Vercel's cache on Pro. The read-only flag kept honest branches out of the
+   cache and no one else (see "Who may write to the cache").
