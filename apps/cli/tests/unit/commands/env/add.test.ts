@@ -104,6 +104,28 @@ describe("env add", () => {
       }
     });
 
+    it("offers no origin add without an app URL to add", async () => {
+      const cwd = await makeProject("next");
+
+      const { envelope } = await add(cwd);
+
+      expect(suggested(envelope).some((command) => command.includes("origin add"))).toBe(false);
+    });
+
+    it("offers no origin add when the file holds no project secret to run it with", async () => {
+      const cwd = await makeProject("next");
+
+      const { envelope } = await add(
+        cwd,
+        "--project",
+        "proj_existing",
+        "--app-url",
+        "https://app.acme.com",
+      );
+
+      expect(suggested(envelope).some((command) => command.includes("origin add"))).toBe(false);
+    });
+
     it("restricts the project to the app's origin first", async () => {
       const cwd = await makeProject("next");
 

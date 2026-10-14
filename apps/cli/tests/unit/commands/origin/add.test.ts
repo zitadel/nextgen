@@ -125,6 +125,10 @@ describe("origin add", () => {
 
   it("keeps the active --env in the suggested next command", async () => {
     const cwd = await anAppDir();
+    await writeFile(
+      join(cwd, ".env.production.local"),
+      "ZITADEL_PROJECT_ID=proj_unit\nZITADEL_PROJECT_SECRET=sk_unit\n",
+    );
 
     const { envelope } = await add(
       cwd,

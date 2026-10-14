@@ -821,7 +821,12 @@ function normalizeOrigin(raw: string): string | null {
     return null;
   }
   const hostname = host.replace(/:\d+$/, "");
+  // A port is digits only: what is left of the host may hold a colon only as
+  // an IPv6 literal in brackets, so `host:*` or `host:abc` is refused rather
+  // than stored with a "port" the shared-host check would never see past.
+  const ipv6 = hostname.startsWith("[") && hostname.endsWith("]");
   if (
+    (!ipv6 && hostname.includes(":")) ||
     hostname === "" ||
     hostname.startsWith(".") ||
     hostname.endsWith(".") ||
