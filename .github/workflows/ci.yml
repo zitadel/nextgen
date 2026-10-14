@@ -39,10 +39,19 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Keyed on both modules' go.sum (tools/bench is a module of its own)
+      # instead of setup-go's default, go.mod. ci-turbo.yml shared the go.mod
+      # key until it got a cache of its own, and its entry there for Go 1.26.8
+      # holds Go's own cache files. On Depot this job builds through GOCACHEPROG
+      # (`depot gocache`, which keeps depot-* files in GOCACHE), so it cannot
+      # use them.
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
+          cache-dependency-path: |
+            go.sum
+            tools/bench/go.sum
 
       - uses: pnpm/action-setup@v5
         with:
