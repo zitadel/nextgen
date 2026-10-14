@@ -26,11 +26,43 @@ import {
 import * as React from "react";
 
 export { businessLocales } from "@zitadel/sdk-react";
+// Every type `@zitadel/sdk-react` exports. A TanStack Start app installs only
+// this package, so under a strict package manager it cannot import
+// `@zitadel/sdk-react` to type a widget callback.
+//
+// The list is explicit because tsup's declaration bundler rewrites
+// `export type * from` into a plain `export *`, which would declare
+// sdk-react's runtime exports (`configureZitadel`, ...) on this entry without
+// shipping them. react.test.tsx fails when this list and sdk-react's drift.
 export type {
+  CreateFlowBodyPurpose,
+  ZITADEL_LOGIN_EVENT_HANDLERS,
+  ZITADEL_LOGIN_EVENTS,
+  ZITADEL_LOGOUT_EVENT_HANDLERS,
+  ZITADEL_LOGOUT_EVENTS,
+  ZITADEL_SESSION_EVENT_HANDLERS,
+  ZITADEL_SESSION_EVENTS,
+  ZitadelConfig,
+  ZitadelFlowCompleteDetail,
+  ZitadelFlowErrorDetail,
+  ZitadelFlowInputDetail,
+  ZitadelFlowRedirectDetail,
+  ZitadelFlowStepDetail,
+  ZitadelLoginConfig,
+  ZitadelLoginEventMap,
+  ZitadelLoginHandlers,
   ZitadelLoginProps,
   ZitadelLoginReactProps,
+  ZitadelLogoutConfig,
+  ZitadelLogoutEventMap,
+  ZitadelLogoutHandlers,
   ZitadelLogoutProps,
+  ZitadelProject,
+  ZitadelSessionConfig,
+  ZitadelSessionEventMap,
+  ZitadelSessionHandlers,
   ZitadelSessionProps,
+  ZitadelSignoutDetail,
 } from "@zitadel/sdk-react";
 
 const subscribeNever = () => () => {};
