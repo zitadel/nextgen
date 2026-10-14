@@ -103,7 +103,7 @@ test("prepares the customer local setup journey in the app root", async () => {
     );
     assert.ok(calls.every((call) => call.env.ZITADEL_LOCAL_IMAGE === image));
     assert.ok(calls.every((call) => call.env.npm_config_cache === join(workDir, ".npm-cache")));
-    assert.ok(calls.every((call) => call.env.npm_config_tmp === join(workDir, ".npm-tmp")));
+    assert.ok(calls.every((call) => call.env.TMPDIR === join(workDir, ".npm-tmp")));
     assert.ok(JSON.parse(await readFile(join(workDir, "doctor.json"), "utf8")));
     assert.ok(JSON.parse(await readFile(join(workDir, "start.json"), "utf8")));
     assert.ok(JSON.parse(await readFile(join(workDir, "setup.json"), "utf8")));
