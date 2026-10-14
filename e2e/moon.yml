@@ -164,12 +164,13 @@ tasks:
       cache: false
       runInCI: "skip"
 
-  # The hosted cloud's console on a deployment, which CONSOLE_DEPLOYMENT_URL names
+  # The hosted cloud's console on a deployment, which CLOUD_URL names
   # (VERCEL_AUTOMATION_BYPASS_SECRET opens its protection): how vercel.json routes
   # the console's paths, and the console signed out, down to the login widget's
-  # first step. Nothing to build or boot, no credential; the deployment-checks
-  # workflow runs it for every deployment. Not a dependency of `all`: the config
-  # refuses to run without CONSOLE_DEPLOYMENT_URL.
+  # first step. Nothing to build or boot, no credential; the root's
+  # `pnpm check:cloud` runs it beside every other deployment suite, and the
+  # deployment-checks workflow runs it for every deployment. Not a dependency of
+  # `all`: the config refuses to run without CLOUD_URL.
   console-deployment:
     command: "corepack pnpm exec playwright test --config console/playwright.deployment.config.mts"
     inputs:

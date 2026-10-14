@@ -186,7 +186,7 @@ as they were.
 | docs | `generate` (inputs openapi + redocly) | `#generate` | same inputs and outputs |
 | docs | `build` (`next build`, mergeArgs replace) | `#build` | existing script (`pnpm run generate && next build`): bundles once more than moon; the Vercel docs service runs the script without a runner |
 | docs | `dev`, `start` | same | existing |
-| docs | `e2e` (dep build), `e2e-deployment` (inline `DOCS_BASE_URL` check) | same | **new** scripts; the deployment lane's check is in the script |
+| docs | `e2e` (dep build), `e2e-deployment` (its own Playwright config, which requires `CLOUD_URL`) | same | **new** scripts; the root's `check:cloud` runs `e2e-deployment` with the e2e package's `console-deployment` |
 | console | `build` env inputs `$CONSOLE_VERCEL_INSIGHTS`, `$CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE` | `#build` `env` | both listed: strict mode would otherwise hide them from vite.config.ts. Neither is `VITE_`-prefixed: Vite inference would hash a prefixed one into every Vite package of the cloud's console build (as `VITE_CONSOLE_VERCEL_INSIGHTS`, it had `components` built twice per deployment) |
 | login-ui | `build`, `build-release` (outputs staticui) | same | **new** `build-release`: `vite build` |
 | login-ui | `dev`, `preview` | same | existing |
@@ -376,10 +376,12 @@ token.
   `generate` / `test` → `turbo run sync:export --filter=@zitadel/design-tokens`
   etc. Its filtered install (`--filter @zitadel/design-tokens...`) keeps the
   root devDependencies, so `node_modules/.bin/turbo` is present.
-- **deployment-checks.yml** (and the production variant): `env -u CI -u
-  GITHUB_ACTIONS moon run docs:e2e-deployment` → `turbo run e2e-deployment
-  --filter=@zitadel/docs`; the step summary's "Reproduce" line changes with
-  it.
+- **deployment-checks.yml** (and the production variant, which calls it):
+  done ahead of the cutover (decision 10). Each job runs its suite's turbo
+  task (`turbo run e2e-deployment --filter=@zitadel/docs`, `turbo run
+  console-deployment --filter=@zitadel/e2e`), the tasks the root's
+  `pnpm check:cloud` runs by hand, and the step summary's "Reproduce" line
+  names that command.
 - **Vercel:** the repo-root `vercel.json` and `apps/cloud/build.sh` already
   build with turbo (pilot). `apps/console/vercel.json` belongs to the paused
   legacy `nextgen` project and still says `moon run console:build`; it is
@@ -627,3 +629,12 @@ the release graph.
    the parity period is there to explain. That period is paused: the two
    weeks of decision 7 count from when `pull_request` and `merge_group`
    are back in the workflow.
+10. **The deployment checks run turbo ahead of the cutover** (2026-10-14).
+    People run them by hand to see whether the cloud works, so the root's
+    `pnpm check:cloud` runs every deployment suite against the deployment
+    `CLOUD_URL` names, and deployment-checks.yml runs the same tasks, one
+    job each. `moon run` stops the other suites at the first failure (with
+    the docs' suite failing, it ended the console's after 7 ms); turbo's
+    `--continue` reports every suite. The suites build and cache nothing,
+    so the runner changes nothing else there: moon took about 1.5 s of a
+    one-minute job.

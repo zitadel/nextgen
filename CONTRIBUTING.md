@@ -426,12 +426,25 @@ moon run e2e:demo-nuxt-mock
 ### Docs site suite
 
 The docs site's contract suite runs against a URL: the local build by default
-(Playwright serves it on port 3003), or a deployment of the hosted cloud named
-by `DOCS_BASE_URL` (see [the cloud runbook](docs/runbooks/cloud.md#deployment-checks)):
+(Playwright serves it on port 3003), or a deployment of the hosted cloud, below:
 
 ```sh
 corepack pnpm --filter @zitadel/docs exec playwright install chromium
 moon run docs:e2e
+```
+
+### Cloud deployment checks
+
+`pnpm check:cloud` runs every deployment suite, today the docs' and the
+console's, against the deployment of the hosted cloud that `CLOUD_URL` names:
+the checks CI runs for every deployment, and it reports every suite even when
+one fails. The production domain needs nothing else; any other deployment URL
+needs `VERCEL_AUTOMATION_BYPASS_SECRET`
+(see [the cloud runbook](docs/runbooks/cloud.md#checking-a-deployment-by-hand)):
+
+```sh
+corepack pnpm --filter @zitadel/e2e exec playwright install chromium
+CLOUD_URL=https://preview.zitadel.com pnpm check:cloud
 ```
 
 ### Fresh-app journey

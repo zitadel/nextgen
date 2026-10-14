@@ -126,6 +126,7 @@ packages calls Vitest without the guard, so no suite retries under both.
 | what would run | `turbo run build --dry` |
 | affected tasks, task-level | `turbo query '{ affectedTasks(base: "origin/main", tasks: ["test"]) { items { name package { name } } } }'` |
 | a run summary for the failure report | `--summarize` → `.turbo/runs/<id>.json`, `node scripts/report-turbo-failures.mjs` |
+| check a deployment of the cloud | `CLOUD_URL=<url> pnpm check:cloud`: every deployment suite, `--continue` ([runbook](../../runbooks/cloud.md#checking-a-deployment-by-hand)) |
 
 Arguments after `--` reach only the named task, but turbo puts them into the
 cache key of every task in the run

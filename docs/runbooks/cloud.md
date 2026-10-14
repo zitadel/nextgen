@@ -222,9 +222,9 @@ Every deployment is tested once Vercel built it, on its own URL
 (`cloud-<hash>-zitadel.vercel.app`, never a production alias):
 [`deployment-checks.yml`](../../.github/workflows/deployment-checks.yml) runs each
 service's contract suite against the deployment, today the docs'
-(`moon run docs:e2e-deployment`, [`apps/docs/AGENTS.md`](../../apps/docs/AGENTS.md))
-and the console's (`moon run e2e:console-deployment`,
-[`e2e/console/README.md`](../../e2e/console/README.md)). The console's
+([`apps/docs/AGENTS.md`](../../apps/docs/AGENTS.md)) and the console's
+([`e2e/console/README.md`](../../e2e/console/README.md)), as the turbo tasks
+`pnpm check:cloud` runs [by hand](#checking-a-deployment-by-hand). The console's
 signs nobody in: it checks how `vercel.json` routes the console's paths and
 that the signed-out console comes up, down to the login widget's first step,
 which needs the server and its database behind it.
@@ -272,14 +272,12 @@ What starts it, and where the result lands, depends on the environment:
   `docs-deployment-screenshots` or `console-deployment-screenshots` artifact.
   A flaky production run is run
   again from that run's page: it reports on the same commit again.
-- By hand, against any deployment:
-  `DOCS_BASE_URL=https://cloud-….vercel.app VERCEL_AUTOMATION_BYPASS_SECRET=… moon run docs:e2e-deployment`
-  and `CONSOLE_DEPLOYMENT_URL=https://cloud-….vercel.app VERCEL_AUTOMATION_BYPASS_SECRET=… moon run e2e:console-deployment`,
-  or `gh workflow run deployment-checks.yml --ref <branch> -f url=https://cloud-….vercel.app`
-  for a run without a new deployment; it reports `docs (dispatch)` and
-  `console (dispatch)`, never production's statuses. A change to `deployment-checks.yml` needs no
-  dispatch: a `deployment_status` run uses the file as it is on the deployed
-  commit, so the branch's own preview checks it.
+- `gh workflow run deployment-checks.yml --ref <branch> -f url=https://cloud-….vercel.app`
+  runs the workflow without a new deployment; it reports `docs (dispatch)`
+  and `console (dispatch)`, never production's statuses. A change to
+  `deployment-checks.yml` needs no dispatch: a `deployment_status` run uses
+  the file as it is on the deployed commit, so the branch's own preview
+  checks it.
 - **Holding production back on it:** in the project's Build & Deployment
   settings, Deployment Checks, add the GitHub checks `docs (Production)` and
   `console (Production)` and let them block. Vercel then assigns the
@@ -289,6 +287,27 @@ What starts it, and where the result lands, depends on the environment:
   only shows on the commit while the deployment already serves. A check
   added there has to come from `production-checks.yml`: one that starts on
   `deployment_status` waits for the very domains it holds back.
+
+### Checking a deployment by hand
+
+`pnpm check:cloud` runs every deployment suite from a checkout against the
+deployment `CLOUD_URL` names: the turbo tasks the workflow runs, side by side,
+and on past a suite that fails, so one run says what works and what does not.
+The production domain is public; any other URL of the project, a preview's or
+a deployment's own, needs the bypass secret:
+
+```sh
+corepack pnpm --filter @zitadel/e2e exec playwright install chromium   # once
+CLOUD_URL=https://preview.zitadel.com pnpm check:cloud
+
+export VERCEL_AUTOMATION_BYPASS_SECRET="$(npx -y vercel@63.1.2 api "/v9/projects/cloud?teamId=team_IDtOs36TGPOejsKm40wr1p3C" | jq -r '.protectionBypass | keys[0]')"
+CLOUD_URL=https://cloud-….vercel.app pnpm check:cloud
+```
+
+`--filter=@zitadel/docs` or `--filter=@zitadel/e2e` runs one suite; that is
+the command a red check's summary names. A new suite is a turbo task that
+`check:cloud` lists, a job in `deployment-checks.yml` and a status in
+`production-checks.yml`'s `SUITES`.
 
 ## Rotating the master key
 
