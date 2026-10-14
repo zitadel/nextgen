@@ -2,7 +2,7 @@
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { forwardedArgs, isDirectRun, run, runCapture } from "./dev-process.mjs";
+import { forwardedArgs, isDirectRun, mapWithConcurrency, run, runCapture } from "./dev-process.mjs";
 import { upsertProductGithubRelease } from "./release-github.mjs";
 import {
   findPrereleaseOnlyPackages,
@@ -66,10 +66,19 @@ async function commandSnapshot(options) {
 
   await run("go", ["mod", "download"], { cwd: repoRoot });
   await buildServerBinaries({ repoRoot, outDir, version: release.version, gitInfo: info });
-  await stageServerNpmBinaries({ repoRoot, outDir, version: release.version });
-  await createArchives({ repoRoot, outDir, version: release.version });
-  await packPublicPackages({ repoRoot, outDir, version: release.version });
-  await prepareDockerContext({ repoRoot, outDir, version: release.version });
+  // Three independent lanes over the built binaries, run side by side: each
+  // writes only its own output (the platform packages' bin/ and then npm/,
+  // archives/, docker-context/). A failing lane lets the others finish before
+  // its error is rethrown.
+  const lanes = [
+    async () => {
+      await stageServerNpmBinaries({ repoRoot, outDir, version: release.version });
+      await packPublicPackages({ repoRoot, outDir, version: release.version });
+    },
+    () => createArchives({ repoRoot, outDir, version: release.version }),
+    () => prepareDockerContext({ repoRoot, outDir, version: release.version }),
+  ];
+  await mapWithConcurrency(lanes, lanes.length, (lane) => lane());
   await writeReleaseMetadata({ repoRoot, outDir, release, gitInfo: info });
 
   if (!options.skipContainer) {
