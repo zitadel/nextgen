@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 import { expect, test } from "@playwright/test";
 import { identity, registerWithPassword } from "@zitadel/testing/playwright";
 
-import { ERROR_STATE_TITLE, NEUTRAL_MESSAGE } from "../../console/support/copy";
+import { ERROR_BOUNDARY_TITLE, NEUTRAL_MESSAGE } from "../../console/support/copy";
 import { requiredEnv } from "./support";
 
 /**
@@ -151,10 +151,11 @@ test("the setup admin can add and remove a project admin, and the colleague sees
 
     // The colleague loses the project with the grant: the page's loader fails,
     // so the route's error boundary replaces the screen it rendered before.
-    // Any of the error states' titles: which status the read answers with does
-    // not decide whether the boundary is found.
+    // Any of the boundary's titles, so which status the read answers with does
+    // not decide whether it is found; never the not-found state, which only a
+    // path no route matches renders.
     await colleaguePage.reload();
-    await expect(colleaguePage.getByText(ERROR_STATE_TITLE)).toBeVisible();
+    await expect(colleaguePage.getByText(ERROR_BOUNDARY_TITLE)).toBeVisible();
   } finally {
     await colleagueContext.close();
   }

@@ -15,13 +15,23 @@ export const NEUTRAL_MESSAGE =
   "If the user exists in our system, they have been granted access to your project.";
 
 /**
- * The title of any of the console's error states
- * (`apps/console/src/components/boundaries.tsx`): "Not authorized" for a 403,
- * "Request failed (<status>)" for any other refusal, "Console API not
- * authorized" for a session the server did not accept, the generic "Something
- * went wrong", and "Not found". One pattern for every lane: a state left off
- * it — "Console API not authorized" once was — lets a refused request pass as
- * a loaded screen.
+ * The titles the error boundary gives a route whose loader failed
+ * (`describeBoundaryError` in `apps/console/src/components/boundaries.tsx`):
+ * "Not authorized" for a 403, "Request failed (<status>)" for any other
+ * refusal, and the generic "Something went wrong". For asserting that a read
+ * was refused: the not-found state is left out on purpose, because the router
+ * renders it only for a path no route matches, and a broken route must not
+ * pass for refused access.
+ */
+export const ERROR_BOUNDARY_TITLE =
+  /^(?:Not authorized|Request failed \(\d+\)|Something went wrong)$/;
+
+/**
+ * The title of any of the console's error states: the boundary's three above,
+ * "Console API not authorized" for a session the server did not accept, and
+ * "Not found". For asserting that no error state rendered at all: a state left
+ * off it — "Console API not authorized" once was — lets a refused request pass
+ * as a loaded screen.
  */
 export const ERROR_STATE_TITLE =
-  /^(?:Request failed \(\d+\)|Not authorized|Console API not authorized|Something went wrong|Not found)$/;
+  /^(?:Not authorized|Request failed \(\d+\)|Something went wrong|Console API not authorized|Not found)$/;
