@@ -1272,6 +1272,14 @@ function upsertRelease(
   return HttpResponse.json(releaseResponse(record), { status: 201 });
 }
 
+/**
+ * The project's default preview lifetime, applied when a preview deployment
+ * omits `ttl`. A real project configures this; the mock stands in one value
+ * for every project, matching the spec's "omitted, the project's default
+ * applies" (create-deployment-request.yaml).
+ */
+const DEFAULT_PREVIEW_TTL = "7d";
+
 export function setupPlatformHandlers() {
   return [
     http.post("*/projects", async ({ request }) => {
@@ -1763,7 +1771,7 @@ export function setupPlatformHandlers() {
         }
       }
 
-      const expiresAt = sawPreview && ttl ? ttlToExpiry(ttl) : null;
+      const expiresAt = sawPreview ? ttlToExpiry(ttl ?? DEFAULT_PREVIEW_TTL) : null;
       const id = `dep_${shortId()}`;
       const record: DeploymentRecord = {
         id,
