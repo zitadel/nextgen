@@ -122,6 +122,7 @@ Repo tooling:
 | Run normal local checks            | `moon ci :lint :typecheck :build :test`  |
 | Mirror CI locally                  | `moon run workspace:check -- --full`     |
 | Rerun one failed task              | `moon run <project>:<task>`              |
+| Check a deployment of the cloud    | `CLOUD_URL=<url> pnpm check:cloud`       |
 
 ### I am adding Zitadel to my app
 
@@ -265,7 +266,8 @@ upward**. When deciding where a new test belongs:
    The docs site's suite is the one that lives beside its app,
    `apps/docs/tests/`: written against a URL, it runs on the local build
    (`docs:e2e`) and on every deployment of the hosted cloud
-   (`docs:e2e-deployment`, see
+   (`docs:e2e-deployment`; `pnpm check:cloud` runs it beside the console's
+   deployment suite, see
    [docs/runbooks/cloud.md](docs/runbooks/cloud.md#deployment-checks)).
 
 The consumer journey suite is the exception to the checked-in demo ownership
