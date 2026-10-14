@@ -1,29 +1,25 @@
-import { defineConfig, devices } from "@playwright/test";
-import { resolve } from "node:path";
-import { e2eActionTimeouts, e2eTimeouts, e2eTrace } from "../playwright.shared";
-
-const workspaceRoot = resolve(import.meta.dirname, "../..");
-
-/**
- * Read environment variables from file.
- * https://github.com/motdotla/dotenv
- */
-// require('dotenv').config();
+import { defineConfig } from "@playwright/test";
+import {
+  chromiumProjects,
+  e2eActionTimeouts,
+  e2eTimeouts,
+  e2eTrace,
+  workspaceRoot,
+} from "../playwright.shared";
 
 /**
- * See https://playwright.dev/docs/test-configuration.
+ * Embedded shell smoke: the built console under its production embed base,
+ * served by `vite preview` with no backend (see `src/console-shell.spec.ts`).
  */
 export default defineConfig({
   ...e2eTimeouts,
   testDir: "./src",
   outputDir: "test-results/smoke",
-  /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     ...e2eActionTimeouts,
     baseURL: "http://localhost:4173",
     trace: e2eTrace,
   },
-  /* Run your local dev server before starting the tests */
   webServer: {
     // Preview only — the console dist is already built by the `console:build`
     // moon dependency. Building again here would rewrite the dist that the
@@ -33,10 +29,5 @@ export default defineConfig({
     reuseExistingServer: true,
     cwd: workspaceRoot,
   },
-  projects: [
-    {
-      name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
-    },
-  ],
+  projects: chromiumProjects,
 });

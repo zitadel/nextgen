@@ -2,7 +2,7 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { connectZitadel } from "../../src/index";
+import { connectZitadel, identity } from "../../src/index";
 import type { InstanceHandle } from "../../src/types";
 
 const BASE = "http://zitadel-testing.invalid";
@@ -133,6 +133,12 @@ describe("seed vocabulary", () => {
     expect(one.email).not.toBe(two.email);
     expect(one.password).not.toBe(two.password);
     // onUnhandledRequest: "error" would fail this test if anything was called.
+  });
+
+  it("identity() is an export of its own, for suites without an instance", () => {
+    const who = identity();
+    expect(who.email).toMatch(/^e2e-[0-9a-f]{8}@example\.com$/);
+    expect(identity().email).not.toBe(who.email);
   });
 
   it("seedUsers applies the per-index template and keeps unique defaults", async () => {
