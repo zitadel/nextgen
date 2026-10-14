@@ -45,14 +45,17 @@
     "@zitadel/sdk-core": "workspace:*"
   },
   "peerDependencies": {
-    "@builder.io/qwik": "^1.5.0",
-    "@builder.io/qwik-city": "^1.5.0"
+    "@qwik.dev/core": "^2.0.0-beta.45",
+    "@qwik.dev/router": "^2.0.0-beta.45"
   },
   "devDependencies": {
+    "@qwik.dev/core": "^2.0.0-rc.3",
+    "@qwik.dev/router": "^2.0.0-rc.3",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "tsup": "catalog:",
     "typescript": "catalog:",
+    "vite": "catalog:",
     "vitest": "catalog:"
   }
 }

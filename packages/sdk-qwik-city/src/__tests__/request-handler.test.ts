@@ -9,7 +9,8 @@
  */
 
 import { generateKeyPairSync, createSign } from "node:crypto";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { RequestEvent, RequestHandler } from "@qwik.dev/router";
+import { describe, it, expect, expectTypeOf, vi, beforeEach } from "vitest";
 
 import type { QwikRequestEvent } from "../request-handler";
 
@@ -410,6 +411,21 @@ describe("createNextgenOnRequest (Qwik City)", () => {
       await run(handler, h.ev);
       expect(h.redirected).toBeUndefined();
       expect(h.ev.sharedMap.has("nextgenAuth")).toBe(false);
+    });
+  });
+
+  // The generated `plugin@nextgen.ts` exports the handler as Qwik Router's
+  // `onRequest`, so Qwik's real `RequestEvent` must satisfy the structural
+  // `QwikRequestEvent` the handler reads. Checked by `tsc -p tsconfig.spec.json`.
+  describe("Qwik Router 2 compatibility", () => {
+    it("accepts Qwik Router's RequestEvent as a QwikRequestEvent", () => {
+      expectTypeOf<RequestEvent>().toExtend<QwikRequestEvent>();
+    });
+
+    it("is assignable as a Qwik Router onRequest handler", () => {
+      expectTypeOf(
+        createNextgenOnRequest({ url: "http://localhost:4000" }),
+      ).toExtend<RequestHandler>();
     });
   });
 });

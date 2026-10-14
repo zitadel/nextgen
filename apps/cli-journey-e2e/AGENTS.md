@@ -36,8 +36,9 @@ ADR 044) — both shapes run the same CLI path and browser journeys.
   temporary Verdaccio registry, not from public npm.
 - CI must run `npx @zitadel/cli@alpha doctor --runtime binary`,
   `start --runtime binary`, and
-  `setup --framework <next|nuxt|react|vue|angular|solid|svelte|qwik> --server local`
-  from the fresh app directory with `--non-interactive --json`.
+  `setup --framework <id> --server local` from the fresh app directory with
+  `--non-interactive --json`, for every id in `frameworkIds`
+  (`scripts/frameworks.mjs`) — the SPA families and the meta-frameworks alike.
 - Docker fallback coverage must opt in with `--runtime docker --image <tag>`.
 - Pack and upload only the public packages — `PUBLIC_RELEASE_PACKAGES` in
   `scripts/release-manifest.mjs` is the authoritative list, and

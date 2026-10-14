@@ -31,7 +31,7 @@ describe("QwikCityScaffolder", () => {
 
     const [command, args, opts] = mockSpawn.mock.calls[0] ?? [];
     expect(command).toBe("npx");
-    expect(args).toEqual(["-y", "create-qwik@latest", "empty", "."]);
+    expect(args).toEqual(["-y", "create-qwik@2.0.0-rc.3", "empty", ".", "--installDeps=false"]);
     expect(opts).toMatchObject({ cwd: "/tmp/proj" });
     expect(mockRm).toHaveBeenCalledWith(join("/tmp/proj", "src/routes/index.tsx"), {
       force: true,

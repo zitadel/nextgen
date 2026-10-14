@@ -18,13 +18,12 @@ const PROCESS_ENV: Record<string, string | undefined> =
   typeof process !== "undefined" && process.env ? process.env : {};
 
 /**
- * The slice of Qwik City's `RequestEventCommon` this handler reads. Qwik City
- * (and Qwik 1.x, which peers Vite `>=5 <8`) is not a dependency of this package
- * — typing the handful of fields we touch keeps the package on the workspace's
- * Vite 8 toolchain while staying installable in a Qwik City app, the same way
- * `sdk-nuxt` shims Nuxt's `#imports`. The shape is structurally compatible with
- * the real `RequestEventCommon`, so the returned handler drops straight into
- * `export const onRequest = createNextgenOnRequest(...)`.
+ * The slice of Qwik Router's `RequestEvent` this handler reads. `@qwik.dev/router`
+ * is a peer, not a runtime dependency: typing only the handful of fields we
+ * touch keeps the built output free of a Qwik import, the same way `sdk-nuxt`
+ * shims Nuxt's `#imports`. The shape is structurally compatible with the real
+ * `RequestEvent` (a type-level test asserts it), so the returned handler drops
+ * straight into `export const onRequest = createNextgenOnRequest(...)`.
  */
 export interface QwikCookieValue {
   readonly value: string;
@@ -299,12 +298,14 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
  * import { createNextgenOnRequest } from "@zitadel/sdk-qwik-city/server";
  *
  * export const onRequest = createNextgenOnRequest({
- *   url: import.meta.env.ZITADEL_URL,
- *   projectSecret: process.env.ZITADEL_PROJECT_SECRET,
  *   protectedRoutes: ["/admin*", "/dashboard*"],
  *   loginPath: "/login",
  * });
  * ```
+ *
+ * `url` and `projectSecret` default to `ZITADEL_URL` / `ZITADEL_PROJECT_SECRET`,
+ * read per request from `ev.env` (where Vite loads `.env.local`), then
+ * `process.env`.
  *
  * @param options - Configuration. `projectSecret` is the project service-key
  *   forwarded as the bearer on proxied requests.

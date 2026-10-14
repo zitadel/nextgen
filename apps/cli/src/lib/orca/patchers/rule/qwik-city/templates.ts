@@ -29,7 +29,7 @@ export const onRequest = createNextgenOnRequest({
 /** `src/routes/index.tsx` — the landing chooser linking to login/register/profile. */
 export function indexPageTemplate(): string {
   return `${MANAGED_MARKER}
-import { component$ } from "@builder.io/qwik";
+import { component$ } from "@qwik.dev/core";
 
 export default component$(() => (
   <main style="position:fixed;inset:0;padding:48px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:#0f0f11;color-scheme:dark;color:#f4f4f6;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.5;letter-spacing:normal;text-align:center">
@@ -55,7 +55,7 @@ export default component$(() => (
  */
 function authPage(purpose: "login" | "register"): string {
   return `${MANAGED_MARKER}
-import { component$ } from "@builder.io/qwik";
+import { component$ } from "@qwik.dev/core";
 import { ZitadelLogin, configureZitadel } from "@zitadel/sdk-qwik";
 
 const project = configureZitadel({
@@ -84,7 +84,7 @@ export function registerPageTemplate(): string {
 /** `src/routes/profile/index.tsx` — the signed-in view with the logout widget. */
 export function profilePageTemplate(): string {
   return `${MANAGED_MARKER}
-import { component$ } from "@builder.io/qwik";
+import { component$ } from "@qwik.dev/core";
 import { ZitadelLogout, configureZitadel } from "@zitadel/sdk-qwik";
 
 const project = configureZitadel({

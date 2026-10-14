@@ -52,6 +52,29 @@ describe("QwikCityPatcher.plan", () => {
     expect(writeContents(plan, "src/routes/login/index.tsx")).toContain("ZitadelLogin");
   });
 
+  // The pages render the Qwik 2 @zitadel/sdk-qwik widgets, so they must be on
+  // Qwik 2 too; a Qwik 1 (@builder.io/qwik) import would not resolve in the app.
+  it.each([
+    "src/routes/index.tsx",
+    "src/routes/login/index.tsx",
+    "src/routes/register/index.tsx",
+    "src/routes/profile/index.tsx",
+  ])("imports %s's component$ from Qwik 2's @qwik.dev/core", (path) => {
+    expect(writeContents(new QwikCityPatcher().plan(ctx()), path)).toContain(
+      'import { component$ } from "@qwik.dev/core";',
+    );
+  });
+
+  it.each([
+    "src/routes/plugin@nextgen.ts",
+    "src/routes/index.tsx",
+    "src/routes/login/index.tsx",
+    "src/routes/register/index.tsx",
+    "src/routes/profile/index.tsx",
+  ])("references no Qwik 1 @builder.io package in %s", (path) => {
+    expect(writeContents(new QwikCityPatcher().plan(ctx()), path)).not.toContain("@builder.io");
+  });
+
   it("seeds the public project id and no other config edit", () => {
     const plan = new QwikCityPatcher().plan(ctx());
     const envOp = plan.ops.find(
@@ -74,7 +97,7 @@ describe("QwikCityPatcher.plan", () => {
     const deps = new QwikCityPatcher()
       .plan(ctx())
       .ops.filter((op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep");
-    // Qwik City's vite config forces /qwik/i-named packages into devDependencies.
+    // Qwik bundles devDependencies into the server build; ecosystem packages go there.
     expect(deps).toContainEqual(
       expect.objectContaining({ name: "@zitadel/sdk-qwik-city", version: "alpha", dev: true }),
     );

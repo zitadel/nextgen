@@ -8,10 +8,13 @@ import { QwikCityDetector } from "../../../../../src/lib/orca/detectors/qwik-cit
 
 const dirs: string[] = [];
 
-async function project(deps: Record<string, string>): Promise<string> {
+async function project(
+  deps: Record<string, string>,
+  field: "dependencies" | "devDependencies" = "dependencies",
+): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "qwik-city-detect-"));
   dirs.push(cwd);
-  await writeFile(join(cwd, "package.json"), JSON.stringify({ dependencies: deps }));
+  await writeFile(join(cwd, "package.json"), JSON.stringify({ [field]: deps }));
   return cwd;
 }
 
@@ -22,21 +25,40 @@ afterEach(async () => {
 });
 
 describe("QwikCityDetector", () => {
-  it("recognises a Qwik City app by @builder.io/qwik + @builder.io/qwik-city", async () => {
+  it("recognises a Qwik City app by @qwik.dev/core + @qwik.dev/router", async () => {
     const facts = await new QwikCityDetector().detect(
       await project({
-        "@builder.io/qwik": "^1",
-        "@builder.io/qwik-city": "^1",
-        vite: "^7",
+        "@qwik.dev/core": "^2.0.0-rc.3",
+        "@qwik.dev/router": "^2.0.0-rc.3",
+        vite: "^8",
       }),
     );
     expect(facts?.id).toBe("qwik-city");
     expect(facts?.appDir).toBe("src");
   });
 
-  it("returns null for a bare Qwik SPA (no @builder.io/qwik-city)", async () => {
+  // create-qwik's empty starter declares Qwik as devDependencies.
+  it("recognises Qwik City declared as devDependencies, as create-qwik emits it", async () => {
+    const facts = await new QwikCityDetector().detect(
+      await project(
+        { "@qwik.dev/core": "^2.0.0-rc.3", "@qwik.dev/router": "^2.0.0-rc.3", vite: "8.2.1" },
+        "devDependencies",
+      ),
+    );
+    expect(facts?.id).toBe("qwik-city");
+  });
+
+  it("returns null for a bare Qwik SPA (no @qwik.dev/router)", async () => {
     expect(
-      await new QwikCityDetector().detect(await project({ "@builder.io/qwik": "^1", vite: "^5" })),
+      await new QwikCityDetector().detect(await project({ "@qwik.dev/core": "^2", vite: "^8" })),
+    ).toBeNull();
+  });
+
+  it("does not match a Qwik 1 City app, whose widgets need an incompatible SDK", async () => {
+    expect(
+      await new QwikCityDetector().detect(
+        await project({ "@builder.io/qwik": "^1", "@builder.io/qwik-city": "^1", vite: "^7" }),
+      ),
     ).toBeNull();
   });
 

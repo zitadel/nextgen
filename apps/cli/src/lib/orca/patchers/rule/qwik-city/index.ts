@@ -51,20 +51,20 @@ export class QwikCityPatcher extends AbstractRulePatcher {
         entries: { PUBLIC_ZITADEL_PROJECT_ID: ctx.project.id },
       },
       {
-        // Qwik City's generated `vite.config.ts` rejects any `dependencies`
-        // entry whose name matches `/qwik/i` (`errorOnDuplicatesPkgDeps`),
-        // forcing Qwik-ecosystem packages into `devDependencies` where Qwik
-        // bundles them into the server build. `@zitadel/sdk-qwik-city` matches,
-        // so it must be a devDependency or the app fails to build.
+        // Qwik's convention: `devDependencies` are bundled into the server
+        // build, `dependencies` stay external (the starter's `vite.config.ts`
+        // documents this). Ecosystem packages like this one belong in
+        // `devDependencies`. That config also throws when one package is
+        // listed in both sections, so the writer moves an existing
+        // `dependencies` entry rather than duplicating it.
         kind: "add-dep",
         name: SDK_DEPENDENCY,
         version: npmDistTagForCliVersion(ctx.cliVersion),
         dev: true,
       },
       {
-        // The component library is also a Qwik-ecosystem package whose name
-        // matches `/qwik/i`, so `errorOnDuplicatesPkgDeps` likewise forces it
-        // into `devDependencies` where Qwik bundles it into the build.
+        // The component library is a Qwik-ecosystem package too, so it is
+        // bundled the same way.
         kind: "add-dep",
         name: COMPONENT_DEPENDENCY,
         version: npmDistTagForCliVersion(ctx.cliVersion),

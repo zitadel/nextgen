@@ -2,10 +2,11 @@
 
 Qwik City request handler and helpers for Nextgen Auth.
 
-> **Vite version note.** Qwik 1.x peers Vite `>=5 <8` (its optimizer relies on
-> Rollup's `ModuleInfo`, which Vite 8's Rolldown bundler does not yet expose), so
-> a Qwik City **app** runs on Vite 7. This SDK itself is bundler-agnostic — it
-> ships plain TypeScript and adds no Vite constraint of its own.
+> **Qwik 2 required.** This SDK peers Qwik 2 — `@qwik.dev/core` and
+> `@qwik.dev/router` (Qwik City's package was renamed from `@builder.io/qwik-city`
+> in Qwik 2), which run on Vite 8. A Qwik 1 app (`@builder.io/qwik`) is not
+> supported: the login widget comes from `@zitadel/sdk-qwik`, which requires
+> Qwik 2. Migrate the app to `@qwik.dev/*` first.
 
 ## Installation
 
@@ -23,12 +24,15 @@ Add a root plugin, e.g. `src/routes/plugin@nextgen.ts`:
 import { createNextgenOnRequest } from '@zitadel/sdk-qwik-city/server';
 
 export const onRequest = createNextgenOnRequest({
-  url: process.env.ZITADEL_URL,
-  projectSecret: process.env.ZITADEL_PROJECT_SECRET,
   protectedRoutes: ['/admin', '/dashboard*'],
   loginPath: '/login',
 });
 ```
+
+`url` and `projectSecret` default to `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET`,
+read per request from Qwik City's `requestEvent.env` — which is where Vite loads
+`.env` / `.env.local`, not `process.env` — falling back to `process.env`. Pass
+them explicitly only to override that.
 
 The handler runs on every request and does three things in one pass:
 
@@ -48,7 +52,7 @@ export const onRequest = [createNextgenOnRequest({ /* … */ }), myOnRequest];
 ### 2. Reading auth in a loader, action, or endpoint
 
 ```ts
-import { routeLoader$ } from '@builder.io/qwik-city';
+import { routeLoader$ } from '@qwik.dev/router';
 import { getAuth } from '@zitadel/sdk-qwik-city/server';
 
 export const useUser = routeLoader$((ev) => {
@@ -69,7 +73,7 @@ pnpm add -D @zitadel/sdk-qwik
 ```
 
 ```tsx
-import { component$ } from '@builder.io/qwik';
+import { component$ } from '@qwik.dev/core';
 import { ZitadelLogin, configureZitadel } from '@zitadel/sdk-qwik';
 
 const project = configureZitadel({ projectId: 'demo', proxyPath: '/__nextgen' });

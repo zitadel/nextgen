@@ -7,8 +7,9 @@ demo apps. Instead, it builds the current workspace packages, publishes packed
 tarballs to a temporary registry, creates empty app directories outside the
 repo, runs the customer local CLI flow through `npx`, starts the generated apps,
 and verifies that real users can register, log out, and log in again across
-all eight frameworks: Next, Nuxt, React, Vue, Angular, Solid, Svelte, and
-Qwik (`scripts/frameworks.mjs` is the authoritative list).
+every supported framework: the SPA families (React, Vue, Angular, Solid,
+Svelte, Qwik) and the meta-frameworks (Next, Nuxt, SvelteKit, TanStack Start,
+SolidStart, Qwik City). `scripts/frameworks.mjs` is the authoritative list.
 
 ## Local runner
 
@@ -45,8 +46,9 @@ moon run workspace:journey -- --concurrency 2
 moon run workspace:journey -- --tarballs-dir dist/release/<version>/npm
 ```
 
-- `--framework <id>` runs one framework (`next`, `nuxt`, `react`, `vue`,
-  `angular`, `solid`, `svelte`, or `qwik`) instead of the full matrix.
+- `--framework <id>` runs one framework (any id in `frameworkIds` in
+  `scripts/frameworks.mjs`, e.g. `next`, `sveltekit`, `qwik-city`) instead of
+  the full matrix.
 - `--suite frameworks|testkit` selects the lane: `frameworks` (default) runs
   the scaffold journey matrix; `testkit` runs the `@zitadel/testing` consumer
   lane.
