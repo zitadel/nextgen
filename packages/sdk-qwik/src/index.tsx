@@ -166,36 +166,100 @@ function eventDetail<T>(event: Event): T {
   return (event as CustomEvent<T>).detail;
 }
 
+type Handler = QRL<(detail: never) => void> | undefined;
+
 /**
- * Wires the widget's native `zitadel-*` listeners once every handler QRL has
- * loaded. A QRL is async until resolved, and the widget navigates synchronously
- * right after emitting `zitadel-signout`, `zitadel-flow-redirect` or a
- * redirecting `zitadel-flow-complete` — so an unresolved handler would only
- * start after the page is already leaving. A resolved QRL runs synchronously
- * when called, like the other SDKs' callbacks. The cleanup is registered before
- * the await so a re-run or unmount during loading never attaches stale
- * listeners.
+ * Calls a handler QRL with the event's detail. A resolved QRL runs
+ * synchronously, like the other SDKs' callbacks: the widget navigates right
+ * after emitting `zitadel-signout`, `zitadel-flow-redirect` or a redirecting
+ * `zitadel-flow-complete`, so a handler that only started later would run after
+ * the page is already leaving. One still loading runs once it has loaded: late,
+ * but never dropped.
  */
-async function listen(
+function forward(handler: Handler, event: Event): void {
+  if (!handler) {
+    return;
+  }
+  const detail = eventDetail<never>(event);
+  const run = handler.resolved;
+  if (run) {
+    run(detail);
+    return;
+  }
+  void handler.resolve().then((loaded) => loaded(detail));
+}
+
+/** Starts loading the handler QRLs now, so each is usually resolved before its event fires. */
+function preload(handlers: readonly Handler[]): void {
+  for (const handler of handlers) {
+    void handler?.resolve().catch(() => undefined);
+  }
+}
+
+/** The latest props each wired element forwards to, so a re-render never re-attaches. */
+const wiredProps = new WeakMap<Element, object>();
+
+/**
+ * Attaches the native `zitadel-*` listeners, once per element and
+ * synchronously. The widget starts its flow as soon as it upgrades, so a
+ * listener attached only after the handler chunks load would miss the first
+ * `zitadel-flow-step`, or a startup `zitadel-flow-error`. Each listener reads
+ * the props current at dispatch time, so a re-render that swaps a handler needs
+ * no re-attach. Called from the `ref` binder (client renders) and from the
+ * visible task (resumed server markup, where the `ref` binder ran on the server
+ * against a placeholder rather than the element).
+ */
+function wire<P extends object>(
   el: Element,
-  listeners: Record<string, (event: Event) => void>,
-  cleanup: (fn: () => void) => void,
-  handlers: readonly (QRL | undefined)[],
-): Promise<void> {
-  let disposed = false;
-  cleanup(() => {
-    disposed = true;
-    for (const [name, listener] of Object.entries(listeners)) {
-      el.removeEventListener(name, listener);
-    }
-  });
-  await Promise.all(handlers.map((handler) => handler?.resolve()));
-  if (disposed) {
+  props: P,
+  listeners: Readonly<Record<string, (props: P, event: Event) => void>>,
+): void {
+  if (typeof (el as Partial<Element>).addEventListener !== "function") {
+    return;
+  }
+  const wired = wiredProps.has(el);
+  wiredProps.set(el, props);
+  if (wired) {
     return;
   }
   for (const [name, listener] of Object.entries(listeners)) {
-    el.addEventListener(name, listener);
+    el.addEventListener(name, (event) => listener(wiredProps.get(el) as P, event));
   }
+}
+
+const LOGIN_LISTENERS = {
+  "zitadel-flow-step": (props: ZitadelLoginProps, event: Event): void =>
+    forward(props.onFlowStep$, event),
+  "zitadel-flow-input": (props: ZitadelLoginProps, event: Event): void =>
+    forward(props.onFlowInput$, event),
+  "zitadel-flow-complete": (props: ZitadelLoginProps, event: Event): void =>
+    forward(props.onFlowComplete$, event),
+  "zitadel-flow-redirect": (props: ZitadelLoginProps, event: Event): void =>
+    forward(props.onFlowRedirect$, event),
+  "zitadel-flow-error": (props: ZitadelLoginProps, event: Event): void =>
+    forward(props.onFlowError$, event),
+};
+
+type SignedInProps = ZitadelLogoutProps | ZitadelSessionProps;
+
+const SESSION_LISTENERS = {
+  "zitadel-signout": (props: SignedInProps, event: Event): void => forward(props.onSignout$, event),
+  "zitadel-session-missing": (props: SignedInProps, event: Event): void =>
+    forward(props.onSessionMissing$, event),
+};
+
+function loginHandlers(props: ZitadelLoginProps): Handler[] {
+  return [
+    props.onFlowStep$,
+    props.onFlowInput$,
+    props.onFlowComplete$,
+    props.onFlowRedirect$,
+    props.onFlowError$,
+  ];
+}
+
+function sessionHandlers(props: SignedInProps): Handler[] {
+  return [props.onSignout$, props.onSessionMissing$];
 }
 
 /**
@@ -231,17 +295,21 @@ export type ZitadelLoginProps = ZitadelLoginConfig &
  * Qwik component wrapping the `<zitadel-login>` web component. Binds the
  * {@link ZitadelProject} handle (or the discrete project id / proxy path) and
  * the surface config as DOM properties — Qwik's JSX cannot set these on a custom
- * element (see {@link setProp}). The `ref` callback applies them synchronously at
- * mount, before the widget's first render; the `useVisibleTask$` tracks the props
- * and re-applies them when any changes (so the widget stays reactive), and wires
- * the native listeners that forward the widget's `zitadel-*` events, which Qwik's
+ * element (see {@link setProp}). On a client render the `ref` callback applies
+ * them as soon as the element exists; under SSR the `ref` binder only ran on the
+ * server, so the widget boots from its attributes and may start its flow before
+ * the resumed visible task applies the properties. The element compares the
+ * project it resolves, not the channel it came through, so the same project
+ * arriving as attributes and then as a handle does not start a second flow. The
+ * `useVisibleTask$` tracks the props and re-applies them when any changes, and
+ * the native listeners forward the widget's `zitadel-*` events, which Qwik's
  * declarative `useOn` does not catch.
  */
 export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
   const host = useSignal<ZitadelLoginElement>();
   // biome-ignore lint/correctness/noQwikUseVisibleTask: wrapping a web component needs an imperative mount task to set DOM properties and wire native listeners Qwik's declarative APIs cannot express.
   useVisibleTask$(
-    async ({ track, cleanup }) => {
+    ({ track }) => {
       const el = track(() => host.value);
       if (!el) {
         return;
@@ -249,22 +317,8 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
       // Re-run whenever any prop changes, then re-apply the config reactively.
       track(() => ({ ...props }));
       bindLoginConfig(el, props);
-      const listeners = {
-        "zitadel-flow-step": (event: Event): void => void props.onFlowStep$?.(eventDetail(event)),
-        "zitadel-flow-input": (event: Event): void => void props.onFlowInput$?.(eventDetail(event)),
-        "zitadel-flow-complete": (event: Event): void =>
-          void props.onFlowComplete$?.(eventDetail(event)),
-        "zitadel-flow-redirect": (event: Event): void =>
-          void props.onFlowRedirect$?.(eventDetail(event)),
-        "zitadel-flow-error": (event: Event): void => void props.onFlowError$?.(eventDetail(event)),
-      };
-      await listen(el, listeners, cleanup, [
-        props.onFlowStep$,
-        props.onFlowInput$,
-        props.onFlowComplete$,
-        props.onFlowRedirect$,
-        props.onFlowError$,
-      ]);
+      wire(el, props, LOGIN_LISTENERS);
+      preload(loginHandlers(props));
     },
     { strategy: "document-ready" },
   );
@@ -276,6 +330,7 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
           props.ref.value = el;
         }
         bindLoginConfig(el, props);
+        wire(el, props, LOGIN_LISTENERS);
       }}
       {...loginAttrs(props)}
     >
@@ -306,23 +361,22 @@ export type ZitadelLogoutProps = ZitadelLogoutConfig &
  * {@link ZitadelProject} handle (or the discrete project id / proxy path) and
  * surface config as DOM properties (see {@link setProp}) — applied at mount in
  * the `ref` callback and re-applied reactively by the `useVisibleTask$` — and
- * forwards the widget's `zitadel-signout` event as an optional callback.
+ * forwards the widget's `zitadel-signout` and `zitadel-session-missing` events
+ * as optional callbacks.
  */
 export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
   const host = useSignal<ZitadelLogoutElement>();
   // biome-ignore lint/correctness/noQwikUseVisibleTask: wrapping a web component needs an imperative mount task to set DOM properties and wire native listeners Qwik's declarative APIs cannot express.
   useVisibleTask$(
-    async ({ track, cleanup }) => {
+    ({ track }) => {
       const el = track(() => host.value);
       if (!el) {
         return;
       }
       track(() => ({ ...props }));
       bindLogoutConfig(el, props);
-      const listeners = {
-        "zitadel-signout": (event: Event): void => void props.onSignout$?.(eventDetail(event)),
-      };
-      await listen(el, listeners, cleanup, [props.onSignout$]);
+      wire(el, props, SESSION_LISTENERS);
+      preload(sessionHandlers(props));
     },
     { strategy: "document-ready" },
   );
@@ -334,6 +388,7 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
           props.ref.value = el;
         }
         bindLogoutConfig(el, props);
+        wire(el, props, SESSION_LISTENERS);
       }}
       {...logoutAttrs(props)}
     >
@@ -364,23 +419,21 @@ export type ZitadelSessionProps = ZitadelSessionConfig &
  * the discrete project id / proxy path) and surface config as DOM properties
  * (see {@link setProp}) — applied at mount in the `ref` callback and re-applied
  * reactively by the `useVisibleTask$` — and forwards the widget's
- * `zitadel-signout` event as an optional callback.
+ * `zitadel-signout` and `zitadel-session-missing` events as optional callbacks.
  */
 export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
   const host = useSignal<ZitadelSessionElement>();
   // biome-ignore lint/correctness/noQwikUseVisibleTask: wrapping a web component needs an imperative mount task to set DOM properties and wire native listeners Qwik's declarative APIs cannot express.
   useVisibleTask$(
-    async ({ track, cleanup }) => {
+    ({ track }) => {
       const el = track(() => host.value);
       if (!el) {
         return;
       }
       track(() => ({ ...props }));
       bindSessionConfig(el, props);
-      const listeners = {
-        "zitadel-signout": (event: Event): void => void props.onSignout$?.(eventDetail(event)),
-      };
-      await listen(el, listeners, cleanup, [props.onSignout$]);
+      wire(el, props, SESSION_LISTENERS);
+      preload(sessionHandlers(props));
     },
     { strategy: "document-ready" },
   );
@@ -392,6 +445,7 @@ export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
           props.ref.value = el;
         }
         bindSessionConfig(el, props);
+        wire(el, props, SESSION_LISTENERS);
       }}
       {...sessionAttrs(props)}
     >

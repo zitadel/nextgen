@@ -35,7 +35,7 @@ for the form-association / accessibility decisions baked into every input atom.
 ## Install
 
 ```sh
-corepack pnpm add @zitadel/components
+corepack pnpm add @zitadel/components@alpha
 ```
 
 `lit`, `liquidjs`, `dompurify`, and `lucide` are runtime dependencies and are intentionally
@@ -269,6 +269,10 @@ renders the bundled `default.liquid`. Tracked as a follow-up.
 | `purpose` | `'login' \| 'register' \| 'reset_password' \| string` | Which flow purpose to drive |
 | `flowName` / `flow-name` | `string` | Run the flow definition with this `name` instead of the project default |
 | `project` | `ZitadelProject` | SDK handle from `configureZitadel()`. Object property (not an attribute). When unset, the element falls back to the global handle from `getZitadelConfig()` |
+| `projectId` / `project-id` | `string` | Project id, for a page with no JavaScript config. Read only when neither `project` nor a global handle is set |
+| `proxyPath` / `proxy-path` | `string` | Same-origin API prefix that goes with `project-id`; defaults to `/__nextgen` |
+| `url` | `string` | Backend URL that goes with `project-id` (server-side use; the browser calls `proxy-path`) |
+| `suppressHeader` / `suppress-header` | `boolean` | Visually hide the step heading (kept for assistive technology), for a host that renders its own |
 | `lang` | `string` | BCP 47 tag (e.g. `"de"`, `"en-US"`). Resolves to a built-in dictionary; falls back to `<html lang>` / `navigator.language` |
 | `locales` | `Record<string, Locale>` | Custom locale dictionaries keyed by language code; spread over the built-in dictionary so partial overrides work |
 | `postSignInUrl` / `post-sign-in-url` | `string` | After `complete: "show"`, exchange the `handoff_token` for a session cookie and navigate here |
@@ -306,10 +310,65 @@ the SDK handle, and clears the session. Uses the same token adoption as
 | Property | Type | Notes |
 | --- | --- | --- |
 | `project` | `ZitadelProject` | SDK handle from `configureZitadel()`. Object property; falls back to the global handle from `getZitadelConfig()` |
+| `projectId` / `project-id` | `string` | Project id, for a page with no JavaScript config. Read only when neither `project` nor a global handle is set |
+| `proxyPath` / `proxy-path` | `string` | Same-origin API prefix that goes with `project-id`; defaults to `/__nextgen` |
+| `url` | `string` | Backend URL that goes with `project-id` (server-side use; the browser calls `proxy-path`) |
 | `postSignOutUrl` / `post-sign-out-url` | `string` | Navigate here after sign-out |
+| `theme` | `'light' \| 'dark' \| 'auto'` | Colour mode. Unset follows the visitor's preference (`auto`) |
 
 Supports a light-DOM `<template>` slot for a fully custom menu; default UI is
-the avatar trigger + dropdown.
+the avatar trigger + dropdown. In the template, `{{display}}`, `{{identifier}}`
+and `{{initial}}` are filled with the signed-in identity, and any element with
+`data-action="logout"` signs out. A framework that compiles `{{…}}` itself
+needs an escape: Vue `v-pre`, Angular `ngNonBindable`, Svelte `{'{{display}}'}`,
+JSX (React, Solid, Qwik) a string literal `{"{{display}}"}`.
+
+Events (both bubble and are composed):
+
+- `zitadel-signout` (detail `{ display, identifier }`, the identity just signed
+  out) after a sign-out. A sign-out answered 401 or 404 counts: the session is
+  already gone. The element then navigates to `post-sign-out-url`, or, without
+  one, renders nothing.
+- `zitadel-session-missing` (detail `{}`) when `GET /sessions/me` answers 401
+  or 404, or names no user. The element renders nothing (no avatar, no
+  projected template) and stays on the page: the menu sits in an app's own
+  chrome. A network error or a 5xx is not "signed out": the control stays and
+  the menu shows the error.
+
+### `<zitadel-session>`
+
+The signed-in card: "Signed in as {identity}" with a **Sign out** button, built
+from the same atoms as `<zitadel-login>`. Reads the identity from `getMySession`
+and signs out through `revokeMySession`, like `<zitadel-logout>`.
+
+| Property | Type | Notes |
+| --- | --- | --- |
+| `project` | `ZitadelProject` | SDK handle from `configureZitadel()`. Object property; falls back to the global handle from `getZitadelConfig()` |
+| `projectId` / `project-id` | `string` | Project id, for a page with no JavaScript config. Read only when neither `project` nor a global handle is set |
+| `proxyPath` / `proxy-path` | `string` | Same-origin API prefix that goes with `project-id`; defaults to `/__nextgen` |
+| `url` | `string` | Backend URL that goes with `project-id` (server-side use; the browser calls `proxy-path`) |
+| `postSignOutUrl` / `post-sign-out-url` | `string` | Navigate here after sign-out, and when the visitor has no session |
+| `heading` | `string` | Card title; unset shows "Signed in as" |
+| `logoutLabel` / `logout-label` | `string` | Button label; unset shows "Sign out" |
+| `variant` | `'widget' \| 'page'` | As on `<zitadel-login>`: `widget` (default) is content-sized and transparent, `page` claims the viewport |
+| `theme` | `'light' \| 'dark' \| 'auto'` | Colour mode; unset resolves from the variant (`dark` for `page`, `auto` for `widget`) |
+| `suppressHeader` / `suppress-header` | `boolean` | Visually hide the heading (kept for assistive technology) |
+
+Events (both bubble and are composed):
+
+- `zitadel-signout` (detail `{ display, identifier }`, the identity just signed
+  out) after a sign-out. A sign-out answered 401 or 404 counts: the session is
+  already gone. The card then navigates to `post-sign-out-url`, or, without
+  one, renders nothing.
+- `zitadel-session-missing` (detail `{}`) when `GET /sessions/me` answers 401
+  or 404, or names no user, so a page reached without a session never shows
+  "Signed in as" for nobody. The card navigates to `post-sign-out-url` when one
+  is set and otherwise renders nothing. A network error or a 5xx is not
+  "signed out": the card stays and shows the error.
+
+The framework wrappers surface these as `onSignout` / `onSessionMissing`, except
+Vue and Angular, which emit `signout` / `sessionMissing`, and Qwik, which takes
+`onSignout$` / `onSessionMissing$`.
 
 ### `<zl-field>`
 

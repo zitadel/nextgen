@@ -84,6 +84,32 @@ export const load = (event) => {
 };
 ```
 
+`protectedRoutes` guards full page loads (a direct visit or a reload): the hook
+redirects before anything renders. Client-side navigation, such as following a
+link to `/profile`, does not request the page from the server, so the hook does
+not run. There the `ZitadelSession` card is the guard: when it finds no session
+it navigates to its `postSignOutUrl`, so a signed-out visitor still ends at
+`/login`.
+
+To keep a page from rendering at all without a session, guard it on the server
+with a load like the one above in its `+page.server.ts`. SvelteKit fetches that
+load's data from the server on client-side navigation too, so the redirect runs
+before the page renders either way:
+
+```ts
+// src/routes/profile/+page.server.ts
+import { redirect } from '@sveltejs/kit';
+import { getAuth } from '@zitadel/sdk-sveltekit/server';
+import type { PageServerLoad } from './$types';
+
+export const load: PageServerLoad = (event) => {
+  if (!getAuth(event).isAuthenticated) throw redirect(303, '/login');
+};
+```
+
+A universal `+page.ts` load does not work for this: it runs in the browser on
+client-side navigation, where the hook's `locals` are not available.
+
 ### 4. Render the login widget
 
 Install the Svelte component library and render its `ZitadelLogin` component.

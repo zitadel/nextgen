@@ -3,7 +3,7 @@
   import '@zitadel/components';
   import type { ZitadelLogout as ZitadelLogoutElement } from '@zitadel/components';
 
-  import type { ZitadelLogoutProps, ZitadelSignoutDetail } from './types';
+  import type { ZitadelLogoutProps, ZitadelSessionMissingDetail, ZitadelSignoutDetail } from './types';
 
   let {
     project,
@@ -12,6 +12,7 @@
     postSignOutUrl,
     theme,
     onSignout,
+    onSessionMissing,
     children,
   }: ZitadelLogoutProps & { children?: Snippet } = $props();
 
@@ -33,9 +34,13 @@
     }
     const signout = (event: Event): void =>
       onSignout?.((event as CustomEvent<ZitadelSignoutDetail>).detail);
+    const sessionMissing = (event: Event): void =>
+      onSessionMissing?.((event as CustomEvent<ZitadelSessionMissingDetail>).detail);
     node.addEventListener('zitadel-signout', signout);
+    node.addEventListener('zitadel-session-missing', sessionMissing);
     return () => {
       node.removeEventListener('zitadel-signout', signout);
+      node.removeEventListener('zitadel-session-missing', sessionMissing);
     };
   });
 </script>

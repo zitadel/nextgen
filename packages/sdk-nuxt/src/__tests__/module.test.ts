@@ -76,6 +76,13 @@ describe("@zitadel/sdk-nuxt module", () => {
     expect(vue.compilerOptions.isCustomElement("my-widget")).toBe(false);
   });
 
+  // `components/ZitadelHeader.vue` written in kebab case in a template.
+  it("leaves an app's own zitadel-prefixed component to Vue", async () => {
+    const { vue } = await installNuxt();
+
+    expect(vue.compilerOptions.isCustomElement("zitadel-header")).toBe(false);
+  });
+
   it("keeps the app's own isCustomElement predicate", async () => {
     const { vue } = await installNuxt({
       vue: { compilerOptions: { isCustomElement: (tag) => tag.startsWith("ion-") } },

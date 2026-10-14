@@ -4,7 +4,8 @@ import type {
   ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
 
-import { $, component$, createSignal, render, type Signal } from "@qwik.dev/core";
+import { $, component$, createSignal, render, type QRL, type Signal } from "@qwik.dev/core";
+import { qrl } from "@qwik.dev/core/internal";
 import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
@@ -84,10 +85,8 @@ async function dispatchUntilForwarded(
 }
 
 /**
- * Resolves once `el` has a listener for `eventName`. The visible task attaches
- * its listeners only after the handler QRLs have loaded, so waiting for the
- * attachment (rather than dispatching until something arrives) lets a test
- * check what the *first* event does.
+ * Resolves once `el` has a listener for `eventName`, so a test can check what
+ * the *first* event does rather than dispatching until something arrives.
  */
 async function listenerAttached(
   el: Element,
@@ -352,7 +351,14 @@ describe("ZitadelLogout", () => {
 describe("ZitadelSession", () => {
   it("emits its config as attributes, which survive SSR resume", async () => {
     const host = await renderWidget(
-      <ZitadelSession project={project} postSignOutUrl="/login" heading="Hi" logoutLabel="Leave" />,
+      // The mock API has no session, so the card leaves for this URL once it
+      // loads; a fragment keeps the test page where it is.
+      <ZitadelSession
+        project={project}
+        postSignOutUrl="#signed-out"
+        heading="Hi"
+        logoutLabel="Leave"
+      />,
     );
 
     expect(
@@ -366,7 +372,7 @@ describe("ZitadelSession", () => {
     ).toEqual({
       "project-id": "proj-test",
       "proxy-path": "/__nextgen",
-      "post-sign-out-url": "/login",
+      "post-sign-out-url": "#signed-out",
       heading: "Hi",
       "logout-label": "Leave",
     });
@@ -441,20 +447,22 @@ describe.each([
     ([event, handler]) => ["zitadel-session", event, handler] as const,
   ),
 ])("<%s> %s", (tag, eventName, handlerProp) => {
-  it("runs its callback before dispatchEvent returns, so it beats the widget's navigation", async () => {
+  it("runs its loaded callback before dispatchEvent returns, so it beats the widget's navigation", async () => {
     const spy = vi.spyOn(HTMLElement.prototype, "addEventListener");
     try {
       const received: Record<string, unknown>[] = [];
-      const handler = {
-        [`${handlerProp}$`]: $((detail: Record<string, unknown>) => {
-          received.push(detail);
-        }),
-      };
+      const callback = $((detail: Record<string, unknown>) => {
+        received.push(detail);
+      });
+      const handler = { [`${handlerProp}$`]: callback };
       const host = await renderWidget(
         <Toggled on={createSignal(true)} tag={tag} set={{ project, ...handler }} cleared={{}} />,
       );
       const el = host.querySelector(tag)!;
       await listenerAttached(el, eventName, spy);
+      // The visible task starts loading every handler; once loaded, the
+      // listener calls it synchronously.
+      await expect.poll(() => callback.resolved).toBeTruthy();
       const detail = { probe: eventName };
       el.dispatchEvent(new CustomEvent(eventName, { detail }));
       expect(received).toContain(detail);
@@ -517,6 +525,109 @@ describe.each([
       expect(received).toContain(detail);
     } finally {
       document.removeEventListener("ssr-forwarded", record);
+    }
+  });
+});
+
+/** Records every `eventName` the page sees, from before any widget mounts. */
+function recordEvents(eventName: string): { details: unknown[]; stop: () => void } {
+  const details: unknown[] = [];
+  const record = (event: Event): void => {
+    details.push((event as CustomEvent).detail);
+  };
+  document.addEventListener(eventName, record, true);
+  return { details, stop: () => document.removeEventListener(eventName, record, true) };
+}
+
+/** Counts the `POST …/flow` requests (flow starts) the page sends from now on. */
+function countFlowStarts(): () => number {
+  const original = globalThis.fetch;
+  let starts = 0;
+  vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = input instanceof Request ? input.url : String(input);
+    const method = init?.method ?? (input instanceof Request ? input.method : "GET");
+    if (method === "POST" && /\/flow$/.test(url)) {
+      starts += 1;
+    }
+    return original(input, init);
+  });
+  return () => starts;
+}
+
+/** Long enough for a restart the wrapper's late binding would trigger to have gone out. */
+const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 500));
+
+describe("<zitadel-login> flow starts", () => {
+  it("starts one flow on a client render with a project handle", async () => {
+    const steps = recordEvents("zitadel-flow-step");
+    try {
+      const starts = countFlowStarts();
+      await renderWidget(<ZitadelLogin project={project} purpose="register" />);
+      await expect.poll(() => steps.details.length).toBeGreaterThan(0);
+      await settle();
+      expect(starts()).toBe(1);
+    } finally {
+      steps.stop();
+    }
+  });
+
+  it("starts one flow when server markup with a project handle resumes", async () => {
+    const steps = recordEvents("zitadel-flow-step");
+    try {
+      const starts = countFlowStarts();
+      const host = await resumeServerRendered("zitadel-login");
+      const el = host.querySelector("zitadel-login") as unknown as Record<string, unknown>;
+      await expect.poll(() => el.project).toBeTruthy();
+      await expect.poll(() => steps.details.length).toBeGreaterThan(0);
+      await settle();
+      expect(starts()).toBe(1);
+    } finally {
+      steps.stop();
+    }
+  });
+});
+
+/**
+ * A handler QRL whose chunk takes `ms` to load, as a lazily fetched segment does
+ * on a slow network.
+ */
+function slowHandler<D>(ms: number, received: unknown[]): QRL<(detail: D) => void> {
+  const record = (detail: D): void => {
+    received.push(detail);
+  };
+  return qrl(
+    () =>
+      new Promise<{ record: typeof record }>((resolve) =>
+        setTimeout(() => resolve({ record }), ms),
+      ),
+    "record",
+  );
+}
+
+describe("<zitadel-login> handlers that are still loading", () => {
+  it("receive the first zitadel-flow-step", async () => {
+    const steps = recordEvents("zitadel-flow-step");
+    try {
+      const received: unknown[] = [];
+      await renderWidget(
+        <ZitadelLogin project={project} onFlowStep$={slowHandler(400, received)} />,
+      );
+      await expect.poll(() => steps.details.length).toBeGreaterThan(0);
+      await expect.poll(() => received[0]).toBe(steps.details[0]);
+    } finally {
+      steps.stop();
+    }
+  });
+
+  it("receive a zitadel-flow-error the widget emits on startup", async () => {
+    const errors = recordEvents("zitadel-flow-error");
+    try {
+      const received: unknown[] = [];
+      await renderWidget(<ZitadelLogin onFlowError$={slowHandler(400, received)} />);
+      await expect.poll(() => errors.details.length).toBeGreaterThan(0);
+      await expect.poll(() => received[0]).toBe(errors.details[0]);
+    } finally {
+      errors.stop();
     }
   });
 });

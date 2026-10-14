@@ -27,11 +27,11 @@ JSX you drop into your routes.
 
 ## Install
 
-`solid-js >= 1.6` is a peer dependency, and the published types need
+`solid-js` `^1.8.0` is a peer dependency, and the published types need
 TypeScript >= 5.0.
 
 ```sh
-npm install @zitadel/sdk-solid
+npm install @zitadel/sdk-solid@alpha
 ```
 
 ## Integrate
@@ -63,9 +63,10 @@ import { ZitadelLogout, ZitadelSession } from '@zitadel/sdk-solid';
 
 `purpose` selects the flow (`"login"`, etc.); `postSignInUrl` /
 `postSignOutUrl` are where the widget navigates after the flow completes.
-Flow events are surfaced as optional callbacks — `onFlowStep`,
-`onFlowInput`, `onFlowComplete`, and `onFlowError` — when you need to react
-to the flow yourself.
+Widget events are surfaced as optional `on…` callbacks (for example
+`onFlowComplete` on the login, `onSignout` on logout and the session card)
+when you need to react to them yourself; the README and the types list them
+all.
 
 **Same-origin proxy.** The widgets call `${proxyPath}/…` same-origin
 (default `/__nextgen`). For local development the CLI dev proxy covers this;
@@ -99,5 +100,5 @@ Exported surface (discover-first, confirm against the types above):
   development only.
 - **TypeScript < 5.0 won't type-check.** The published `.d.ts` re-exports
   with `export type *`, introduced in TS 5.0.
-- **`solid-js` is a peer dependency** (`>= 1.6`) — install it in the host
+- **`solid-js` is a peer dependency** (`^1.8.0`) — install it in the host
   app; the package does not bundle it.

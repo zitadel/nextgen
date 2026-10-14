@@ -40,13 +40,18 @@ const DEFAULT_LOGOUT_LABEL = "Sign out";
  *   authenticates it. The card shows `name`, then `email`, then the
  *   always-present `user_id`. NOTE: the current server response includes only
  *   the `user_id`, so the card displays the raw id until the backend returns a
- *   human-readable `name`/`email` on `/sessions/me`. A failed or
- *   unauthenticated request renders the card without an identity line rather
- *   than throwing.
+ *   human-readable `name`/`email` on `/sessions/me`.
+ * - **No session.** When that request answers 401 or 404 (or names no user)
+ *   the visitor is signed out: the element fires `zitadel-session-missing`,
+ *   then navigates to `post-sign-out-url` when one is set and otherwise
+ *   renders nothing. A network error or a 5xx is not "signed out": the card
+ *   stays and shows the error.
  * - **Sign out** calls the typed `revokeMySession` operation
  *   (`DELETE /sessions/me`); the server clears the session cookie. On success
- *   the element fires `zitadel-signout` (detail `{ display, identifier }`, matching the
- *   shared SPA contract) and optionally navigates to `post-sign-out-url`.
+ *   (a 401 or 404 counts, the session is already gone) the element fires
+ *   `zitadel-signout` (detail `{ display, identifier }`, matching the shared
+ *   SPA contract), then navigates to `post-sign-out-url`, or without one
+ *   renders nothing.
  *
  * A "Continue" action is intentionally omitted for now: the post-sign-in
  * destination contract is still being decided. Consumers redirect after
@@ -126,9 +131,18 @@ export class ZitadelSession extends ZitadelSurface {
   }
   #logoutLabel = DEFAULT_LOGOUT_LABEL;
 
-  private readonly session = new SessionController(this, () =>
-    resolveApi(this.project, this.projectAttrs, "<zitadel-session>"),
+  private readonly session = new SessionController(
+    this,
+    () => resolveApi(this.project, this.projectAttrs, "<zitadel-session>"),
+    { onSessionMissing: () => this.leave() },
   );
+
+  /** Navigates to `postSignOutUrl` when one is set; reports whether it did. */
+  private leave(): boolean {
+    if (!this.postSignOutUrl || typeof window === "undefined") return false;
+    window.location.assign(this.postSignOutUrl);
+    return true;
+  }
 
   override willUpdate(): void {
     // No tenant branding payload on this surface (yet) — the theme resolves
@@ -138,15 +152,12 @@ export class ZitadelSession extends ZitadelSurface {
 
   /**
    * Signs out, then navigates to `postSignOutUrl`, or, without one, stays and
-   * drops the identity so the card no longer names a signed-out user. A
-   * failure stays put.
+   * drops the identity, which leaves the card empty: there is nobody left to
+   * name or sign out. A failure stays put.
    */
   private async doLogout(): Promise<void> {
     if (!(await this.session.signOut())) return;
-    if (this.postSignOutUrl && typeof window !== "undefined") {
-      window.location.assign(this.postSignOutUrl);
-      return;
-    }
+    if (this.leave()) return;
     this.session.clearIdentity();
   }
 
@@ -156,6 +167,9 @@ export class ZitadelSession extends ZitadelSurface {
   }
 
   override render() {
+    // No session (none at load, or signed out in place): a "Signed in as"
+    // card with a Sign out button would describe nobody.
+    if (this.session.state === "signed-out") return nothing;
     // Static template, so widget polarity is a plain binding — unlike
     // `<zitadel-login>`, whose `zl-page-shell` lives in unsafeHTML-parsed
     // markup and needs the imperative re-stamp loop.

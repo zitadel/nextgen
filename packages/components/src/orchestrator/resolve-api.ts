@@ -56,6 +56,20 @@ function projectFromAttrs({ projectId, proxyPath, url }: ProjectAttrs): ZitadelP
 }
 
 /**
+ * The project an element would talk to, or `undefined` when nothing configures
+ * one. Precedence, highest first: the element's `project` property, the global
+ * `configureZitadel()` handle, then the attributes. Exported so a caller can
+ * compare what it resolves to rather than which channel supplied it: the same
+ * project arriving as attributes first and as a handle later is the same config.
+ */
+export function resolveProject(
+  project: ZitadelProject | undefined,
+  attrs: ProjectAttrs,
+): ZitadelProject | undefined {
+  return project ?? getZitadelConfig() ?? projectFromAttrs(attrs);
+}
+
+/**
  * Resolves the effective SDK project handle and its typed API client for an
  * orchestrator element. Precedence, highest first:
  *
@@ -82,7 +96,7 @@ export function resolveApi(
   attrs: ProjectAttrs,
   element: string,
 ): { project: ZitadelProject; api: ZitadelApi } {
-  const cfg = project ?? getZitadelConfig() ?? projectFromAttrs(attrs);
+  const cfg = resolveProject(project, attrs);
   if (!cfg) {
     throw new Error(
       `${element} requires a configured project: set the \`project-id\` attribute, ` +

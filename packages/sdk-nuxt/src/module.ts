@@ -15,6 +15,13 @@ import type { NextgenMiddlewareOptions } from "./runtime/types";
 const DEFAULT_URL = "http://localhost:8080";
 const DEFAULT_PROXY_PATH = "/__nextgen";
 
+/** The custom elements `@zitadel/components` defines, and only those. */
+const WIDGET_TAGS: ReadonlySet<string> = new Set([
+  "zitadel-login",
+  "zitadel-logout",
+  "zitadel-session",
+]);
+
 /**
  * Parses `.env.local` in the project root. Quoted values keep their contents
  * verbatim; unquoted values stop at an inline ` #` comment (a bare `#`
@@ -103,16 +110,18 @@ const nextgenModule: NuxtModule<NextgenMiddlewareOptions> =
       // runtime.
       publicConfig.zitadelProjectId ||= setting("NUXT_PUBLIC_ZITADEL_PROJECT_ID") ?? "";
 
-      // The `<zitadel-*>` tags are Lit custom elements, not Vue components:
-      // without this, Vue tries to resolve them and warns "Failed to resolve
-      // component" for every widget in a template. An app's own predicate is
-      // kept and still consulted.
+      // The widget tags are Lit custom elements, not Vue components: without
+      // this, Vue tries to resolve them and warns "Failed to resolve
+      // component" for every widget in a template. Only the exact tags, not a
+      // `zitadel-` prefix: an app's own `components/ZitadelHeader.vue` used as
+      // `<zitadel-header>` must still resolve to its component. An app's own
+      // predicate is kept and still consulted.
       nuxt.options.vue ??= {} as typeof nuxt.options.vue;
       nuxt.options.vue.compilerOptions ??= {};
       const compilerOptions = nuxt.options.vue.compilerOptions;
       const appPredicate = compilerOptions.isCustomElement;
       compilerOptions.isCustomElement = (tag: string) =>
-        tag.startsWith("zitadel-") || appPredicate?.(tag) === true;
+        WIDGET_TAGS.has(tag) || appPredicate?.(tag) === true;
 
       addPlugin(resolve("./runtime/plugin"));
       addServerHandler({

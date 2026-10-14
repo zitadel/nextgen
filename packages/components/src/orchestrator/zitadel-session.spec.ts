@@ -144,11 +144,89 @@ describe("<zitadel-session>", () => {
     expect(shadowQuery<HTMLElement>(element, ".identity").textContent?.trim()).toBe("user_01ABC");
   });
 
-  it("omits the identity line when the session request is unauthenticated", async () => {
-    sessionStatus = 401;
+  it.each([401, 404])("renders nothing when the session request answers %i", async (status) => {
+    sessionStatus = status;
     const element = mount();
     await flush(element);
-    expect(element.shadowRoot?.querySelector(".identity")).toBeNull();
+    expect(element.shadowRoot?.querySelector(".title")).toBeNull();
+    expect(element.shadowRoot?.querySelector('[data-testid="zitadel-session-logout"]')).toBeNull();
+  });
+
+  it("fires zitadel-session-missing, not zitadel-signout, when there is no session", async () => {
+    sessionStatus = 401;
+    const missing: CustomEvent[] = [];
+    const signouts: Event[] = [];
+    host.addEventListener("zitadel-session-missing", (e) => missing.push(e as CustomEvent));
+    host.addEventListener("zitadel-signout", (e) => signouts.push(e));
+    const element = mount();
+    await flush(element);
+    expect(missing).toHaveLength(1);
+    expect(missing[0]?.bubbles && missing[0]?.composed).toBe(true);
+    expect(signouts).toHaveLength(0);
+  });
+
+  it("navigates to post-sign-out-url when there is no session", async () => {
+    sessionStatus = 404;
+    const loc = stubLocation();
+    const element = mount(
+      '<zitadel-session post-sign-out-url="https://app.test/login"></zitadel-session>',
+    );
+    await flush(element);
+    expect(loc.current).toBe("https://app.test/login");
+  });
+
+  it("neither announces nor navigates once removed before the answer arrives", async () => {
+    let answer: () => void = () => undefined;
+    server.use(
+      http.get(`${API_BASE}/sessions/me`, async () => {
+        await new Promise<void>((resolve) => {
+          answer = resolve;
+        });
+        return new HttpResponse(null, { status: 401 });
+      }),
+    );
+    const loc = stubLocation();
+    const missing: Event[] = [];
+    const element = mount(
+      '<zitadel-session post-sign-out-url="https://app.test/login"></zitadel-session>',
+    );
+    element.addEventListener("zitadel-session-missing", (e) => missing.push(e));
+    await flush(element);
+
+    element.remove();
+    answer();
+    await flush(element);
+
+    expect(missing).toHaveLength(0);
+    expect(loc.current).toBe("");
+  });
+
+  it.each([500, 503])(
+    "keeps the card and reports a %i from the session request",
+    async (status) => {
+      sessionStatus = status;
+      const loc = stubLocation();
+      const missing: Event[] = [];
+      host.addEventListener("zitadel-session-missing", (e) => missing.push(e));
+      const element = mount(
+        '<zitadel-session post-sign-out-url="https://app.test/login"></zitadel-session>',
+      );
+      await flush(element);
+      expect(shadowQuery<HTMLElement>(element, ".title").textContent?.trim()).toBe("Signed in as");
+      expect(shadowQuery<HTMLElement>(element, ".error").textContent).toContain(String(status));
+      expect(missing).toHaveLength(0);
+      expect(loc.current).toBe("");
+    },
+  );
+
+  it("keeps the card and reports a network error from the session request", async () => {
+    server.use(http.get(`${API_BASE}/sessions/me`, () => HttpResponse.error()));
+    const element = mount();
+    await flush(element);
+    expect(shadowQuery<HTMLElement>(element, ".title").textContent?.trim()).toBe("Signed in as");
+    expect(shadowQuery<HTMLElement>(element, ".error").textContent?.trim().length).toBeGreaterThan(
+      0,
+    );
   });
 
   it("suppress-header visually hides the heading but keeps it accessible", async () => {
@@ -240,6 +318,26 @@ describe("<zitadel-session>", () => {
       configureZitadel({ proxyPath: API_BASE, projectId: "test" });
     }
   });
+
+  it.each([401, 404])(
+    "treats a %i from the sign-out request as signed out and navigates",
+    async (status) => {
+      const loc = stubLocation();
+      const element = mount();
+      element.postSignOutUrl = "https://app.test/login";
+      await flush(element);
+      server.use(http.delete(`${API_BASE}/sessions/me`, () => new HttpResponse(null, { status })));
+      const events: CustomEvent[] = [];
+      element.addEventListener("zitadel-signout", (e) => events.push(e as CustomEvent));
+
+      activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
+      await new Promise((resolve) => setTimeout(resolve, 32));
+
+      expect(events).toHaveLength(1);
+      expect(loc.current).toBe("https://app.test/login");
+      expect(element.shadowRoot?.querySelector(".error")).toBeNull();
+    },
+  );
 
   it("surfaces a network error inline without redirecting", async () => {
     const loc = stubLocation();
@@ -366,14 +464,37 @@ describe("<zitadel-session> identity lifecycle", () => {
     return host.querySelector("zitadel-session") as ZitadelSession;
   }
 
-  it("drops the identity after signing out without a post-sign-out-url", async () => {
+  it("renders nothing after signing out without a post-sign-out-url", async () => {
     const element = mount();
     await flush(element);
 
     activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
     await flush(element);
 
+    expect(element.shadowRoot?.querySelector(".title")).toBeNull();
+    expect(element.shadowRoot?.querySelector('[data-testid="zitadel-session-logout"]')).toBeNull();
+  });
+
+  it("ignores an identity response that arrives after signing out", async () => {
+    let answer: () => void = () => undefined;
+    server.use(
+      http.get(`${API_BASE}/sessions/me`, async () => {
+        await new Promise<void>((resolve) => {
+          answer = resolve;
+        });
+        return HttpResponse.json(sessionBody("alice@acme.com", "user_test"));
+      }),
+    );
+    const element = mount();
+    await element.updateComplete;
+
+    activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
+    await flush(element);
+    answer();
+    await flush(element);
+
     expect(element.shadowRoot?.querySelector(".identity")).toBeNull();
+    expect(element.shadowRoot?.querySelector(".title")).toBeNull();
   });
 
   it("still reports the signed-out identity in zitadel-signout", async () => {

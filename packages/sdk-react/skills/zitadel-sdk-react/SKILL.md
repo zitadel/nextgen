@@ -26,7 +26,7 @@ scaffolding would overwrite or not fit it.
 ## Install
 
 ```sh
-npm install @zitadel/sdk-react
+npm install @zitadel/sdk-react@alpha
 ```
 
 Peer dependencies (you almost certainly already have them): `react >=18` and

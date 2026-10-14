@@ -8,15 +8,17 @@ type Capture = (command: string, args: string[]) => Promise<{ stdout: string }>;
 
 type LocalPackage = { name: string; version: string; license: string };
 
+type PublishBlockers = { unpublished: LocalPackage[]; prereleaseOnly: LocalPackage[] };
+
 type ReleaseDistTagsModule = {
-  findPrereleaseOnlyPackages: (
+  findPublishBlockers: (
     packages: LocalPackage[],
-    tag: string,
+    tag: string | undefined,
     options: { capture: Capture },
-  ) => Promise<LocalPackage[]>;
+  ) => Promise<PublishBlockers>;
   isPrereleaseOnly: (versions: string[], tag: string) => boolean;
   prereleaseIdentifier: (version: string) => string | undefined;
-  prereleaseOnlyMessage: (packages: LocalPackage[], tag: string) => string;
+  publishBlockersMessage: (blockers: PublishBlockers, tag: string | undefined) => string;
   readLocalPackages: (root: string, dirs: string[]) => Promise<LocalPackage[]>;
   readPrereleaseTag: (root: string) => Promise<string | undefined>;
   readPublishedVersions: (name: string, options: { capture: Capture }) => Promise<string[]>;
@@ -70,7 +72,7 @@ describe("release dist-tags preflight", () => {
     expect(distTags.isPrereleaseOnly(["0.0.0-oidc-bootstrap.0", "1.0.0-alpha.25"], "alpha")).toBe(
       false,
     );
-    // Never published: the first publish already goes to the prerelease tag.
+    // Never published is its own blocker, not this one.
     expect(distTags.isPrereleaseOnly([], "alpha")).toBe(false);
   });
 
@@ -82,19 +84,50 @@ describe("release dist-tags preflight", () => {
       "@zitadel/sdk-qwik": "1.0.0-alpha.25",
     });
 
-    const stuck = await distTags.findPrereleaseOnlyPackages(
+    const blockers = await distTags.findPublishBlockers(
       [
         localPackage("@zitadel/sdk-react"),
         localPackage("@zitadel/sdk-solid"),
         localPackage("@zitadel/server"),
         localPackage("@zitadel/sdk-qwik"),
-        localPackage("@zitadel/not-yet-published"),
       ],
       "alpha",
       { capture },
     );
 
-    expect(stuck.map((pkg) => pkg.name)).toEqual(["@zitadel/sdk-solid", "@zitadel/sdk-qwik"]);
+    expect(blockers.prereleaseOnly.map((pkg) => pkg.name)).toEqual([
+      "@zitadel/sdk-solid",
+      "@zitadel/sdk-qwik",
+    ]);
+    expect(blockers.unpublished).toEqual([]);
+  });
+
+  it.each([
+    ["in pre mode", "alpha"],
+    ["outside pre mode", undefined],
+  ])("finds the packages that were never published %s", async (_mode, tag) => {
+    // Trusted publishing cannot create a package, so its first publish fails.
+    const capture = npmView({ "@zitadel/sdk-react": ["0.0.0", "1.0.0-alpha.25"] });
+
+    const blockers = await distTags.findPublishBlockers(
+      [localPackage("@zitadel/sdk-react"), localPackage("@zitadel/sdk-sveltekit")],
+      tag,
+      { capture },
+    );
+
+    expect(blockers.unpublished.map((pkg) => pkg.name)).toEqual(["@zitadel/sdk-sveltekit"]);
+  });
+
+  it("checks prerelease-only packages only in pre mode", async () => {
+    const capture = npmView({ "@zitadel/sdk-solid": ["0.1.0-alpha.11", "1.0.0-alpha.25"] });
+
+    const blockers = await distTags.findPublishBlockers(
+      [localPackage("@zitadel/sdk-solid", "1.0.0")],
+      undefined,
+      { capture },
+    );
+
+    expect(blockers).toEqual({ unpublished: [], prereleaseOnly: [] });
   });
 
   it("skips a package whose local version is already published", async () => {
@@ -102,13 +135,13 @@ describe("release dist-tags preflight", () => {
     // release must not stop here.
     const capture = npmView({ "@zitadel/sdk-solid": ["0.1.0-alpha.11", "1.0.0-alpha.25"] });
 
-    const stuck = await distTags.findPrereleaseOnlyPackages(
+    const blockers = await distTags.findPublishBlockers(
       [localPackage("@zitadel/sdk-solid", "1.0.0-alpha.25")],
       "alpha",
       { capture },
     );
 
-    expect(stuck).toEqual([]);
+    expect(blockers).toEqual({ unpublished: [], prereleaseOnly: [] });
   });
 
   it("rethrows registry failures other than a missing package", async () => {
@@ -124,18 +157,36 @@ describe("release dist-tags preflight", () => {
   });
 
   it("names the packages and gives a bootstrap command with each one's license", () => {
-    const message = distTags.prereleaseOnlyMessage(
-      [
-        localPackage("@zitadel/sdk-solid"),
-        localPackage("@zitadel/server", "1.0.0-alpha.26", "AGPL-3.0-only"),
-      ],
+    const message = distTags.publishBlockersMessage(
+      {
+        unpublished: [],
+        prereleaseOnly: [
+          localPackage("@zitadel/sdk-solid"),
+          localPackage("@zitadel/server", "1.0.0-alpha.26", "AGPL-3.0-only"),
+        ],
+      },
       "alpha",
     );
 
     expect(message).toContain("@zitadel/sdk-solid, @zitadel/server only have `alpha`");
     expect(message.match(/npm publish --access public --tag bootstrap/g)).toHaveLength(2);
-    expect(message).toContain('"@zitadel/sdk-solid" "MIT" "@zitadel/sdk-solid"');
-    expect(message).toContain('"@zitadel/server" "AGPL-3.0-only" "@zitadel/server"');
+    expect(message).toContain('"@zitadel/sdk-solid" "MIT" "@zitadel/sdk-solid@alpha"');
+    expect(message).toContain('"@zitadel/server" "AGPL-3.0-only" "@zitadel/server@alpha"');
+    expect(message).not.toContain("Trusted Publishing");
+  });
+
+  it("tells the maintainer to bootstrap and add a trusted publisher for a never-published package", () => {
+    const message = distTags.publishBlockersMessage(
+      { unpublished: [localPackage("@zitadel/sdk-sveltekit")], prereleaseOnly: [] },
+      "alpha",
+    );
+
+    expect(message).toContain("@zitadel/sdk-sveltekit has never been published to npm");
+    expect(message).toContain('"@zitadel/sdk-sveltekit" "MIT" "@zitadel/sdk-sveltekit@alpha"');
+    expect(message).toContain(
+      "add a trusted publisher for @zitadel/sdk-sveltekit on npmjs.com (package Settings → Trusted Publishing: GitHub Actions, repository zitadel/nextgen, workflow release-publish.yml)",
+    );
+    expect(message).toContain(".changeset/README.md");
   });
 
   it("reads each package's name, version, and license", async () => {

@@ -27,7 +27,9 @@ The signed-in session card is `<ZitadelSession {project} />` (exported as `Zitad
 
 The widget's events are also surfaced as optional callbacks: `ZitadelLogin`
 takes `onFlowStep`, `onFlowInput`, `onFlowComplete`, `onFlowRedirect` and
-`onFlowError`; `ZitadelLogout` and `ZitadelSession` take `onSignout`. Each
+`onFlowError`; `ZitadelLogout` and `ZitadelSession` take `onSignout` and
+`onSessionMissing` (the visitor has no session: the widget renders nothing,
+and the session card goes to its `postSignOutUrl` when one is set). Each
 receives the event detail. An unset or cleared prop leaves the widget on its
 default (for example the "Signed in as" heading).
 
@@ -35,12 +37,21 @@ Children go into the element's light DOM, so `ZitadelLogout` accepts a
 `<template>` for a custom sign-out control (`{{display}}`, `{{identifier}}`
 and `{{initial}}` are filled in, and an element with `data-action="logout"`
 signs out), and `ZitadelLogin` accepts content for its
-`slot="attribution-trailing"` slot.
+`slot="attribution-trailing"` slot. Svelte reads `{{display}}` as an
+expression, so write each placeholder as a string expression:
+
+```svelte
+<ZitadelLogout {project}>
+  <template>
+    <button data-action="logout">Sign out {'{{display}}'}</button>
+  </template>
+</ZitadelLogout>
+```
 
 The components are browser-only: the package ships client-compiled Svelte, so
 rendering them on the server fails. Under SvelteKit, mount them client-side
-(for example behind `onMount` or a `browser` check), as the
-[`@zitadel/sdk-sveltekit`](../sdk-sveltekit/README.md) README shows.
+behind `onMount`, as the [`@zitadel/sdk-sveltekit`](../sdk-sveltekit/README.md)
+README shows.
 
 ## Proxying to the backend (deployment)
 
