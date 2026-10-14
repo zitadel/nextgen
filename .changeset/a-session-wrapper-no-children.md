@@ -1,10 +1,10 @@
 ---
-"@zitadel/sdk-react": minor
-"@zitadel/sdk-vue": minor
-"@zitadel/sdk-angular": minor
-"@zitadel/sdk-svelte": minor
-"@zitadel/sdk-solid": minor
-"@zitadel/sdk-qwik": minor
+"@zitadel/sdk-react": major
+"@zitadel/sdk-vue": major
+"@zitadel/sdk-angular": major
+"@zitadel/sdk-svelte": major
+"@zitadel/sdk-solid": major
+"@zitadel/sdk-qwik": major
 ---
 
 `ZitadelSession` no longer accepts children, slot content or projected content. `<zitadel-session>`
