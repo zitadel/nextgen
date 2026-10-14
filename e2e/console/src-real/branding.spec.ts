@@ -14,7 +14,7 @@ import { expectNoErrorBoundary, signIn } from "./support";
  */
 
 test("previews the project's own login beside the settings", async ({ page, zitadel, seed }) => {
-  await signIn(page, zitadel.handle, await seed.user());
+  await signIn(page, zitadel, await seed.user());
 
   await page.goto("/branding");
 
@@ -35,7 +35,7 @@ test("is reached from the sidebar, nested under the flows it brands", async ({
   zitadel,
   seed,
 }) => {
-  await signIn(page, zitadel.handle, await seed.user());
+  await signIn(page, zitadel, await seed.user());
 
   // The sidebar lists a project's screens once one is selected; `/` selects
   // this lane's pinned project and lands on its first screen.
@@ -68,7 +68,7 @@ test("shows the branding in use without a control to change it", async ({
   zitadel,
   seed,
 }) => {
-  await signIn(page, zitadel.handle, await seed.user());
+  await signIn(page, zitadel, await seed.user());
 
   await page.goto("/branding");
   await expect(page.locator("zitadel-login").getByRole("textbox", { name: "Email" })).toBeVisible();
@@ -93,7 +93,7 @@ test("shows the served step in each state without submitting it", async ({
   zitadel,
   seed,
 }) => {
-  await signIn(page, zitadel.handle, await seed.user());
+  await signIn(page, zitadel, await seed.user());
 
   await page.goto("/branding");
   const preview = page.locator("zitadel-login");

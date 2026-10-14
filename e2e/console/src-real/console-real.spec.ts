@@ -19,7 +19,7 @@ test("shows the bootstrapped project in the list and detail views", async ({
   // so the operator needs a grant on the project before it shows up — being
   // able to sign in to it is not access to it.
   const operator = await seed.user();
-  await signIn(page, zitadel.handle, operator);
+  await signIn(page, zitadel, operator);
 
   // The pill reads the same query, with the session cookie alone.
   await expect(page.getByRole("button", { name: "Switch project" })).not.toHaveText("No projects");
@@ -46,7 +46,7 @@ test("shows the bootstrapped project in the list and detail views", async ({
 
 test("shows a seeded user in the list and detail views", async ({ page, zitadel, seed }) => {
   const user = await seed.user();
-  await signIn(page, zitadel.handle, user);
+  await signIn(page, zitadel, user);
 
   await page.goto("/users");
   await expect(page.getByRole("heading", { name: "Users", exact: true })).toBeVisible();
@@ -70,7 +70,7 @@ test("keeps the project credential out of browser requests and resources", async
   // Sign in first (Console ADR 0003): the resource pages sit behind the auth
   // guard, and the login exchange itself must not leak the project secret
   // either — the listener below starts before any navigation under test.
-  await signIn(page, zitadel.handle, await seed.user());
+  await signIn(page, zitadel, await seed.user());
 
   const inspectedResponses: Array<Promise<string | undefined>> = [];
   page.on("response", (response) => {
@@ -116,7 +116,7 @@ test("shows the status the API stamped on a seeded user", async ({ page, zitadel
   // returning recently. Asserted against a real instance rather than a stub so
   // the column is proven against the shape the server actually sends.
   const user = await seed.user();
-  await signIn(page, zitadel.handle, user);
+  await signIn(page, zitadel, user);
 
   await page.goto("/users");
   const row = page.getByRole("row").filter({ hasText: user.email });
@@ -138,7 +138,7 @@ test("gives a colleague admin access to the project, and takes it away", async (
   // project to open it — a seeded user can sign in but holds no grant.
   const operator = await seed.user();
   const colleague = await seed.user();
-  await signIn(page, zitadel.handle, operator);
+  await signIn(page, zitadel, operator);
 
   await page.goto(`/projects/${zitadel.handle.projectId}`);
   await expect(page.getByRole("region", { name: "Admins" })).toBeVisible();
@@ -178,8 +178,8 @@ test("answers the same way for an address that belongs to nobody", async ({
   // instance because it is the server that decides to say nothing, and a stub
   // would be asserting the stub.
   const operator = await seed.user();
-  const unknown = `nobody-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
-  await signIn(page, zitadel.handle, operator);
+  const unknown = seed.identity().email;
+  await signIn(page, zitadel, operator);
 
   await page.goto(`/projects/${zitadel.handle.projectId}`);
   await page.getByRole("button", { name: "Add admin", exact: true }).click();

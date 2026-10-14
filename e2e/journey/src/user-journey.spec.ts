@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { SESSION_COOKIE_NAME } from "@zitadel/testing";
 import {
   clickFlowAction,
   enableVirtualPasskey,
@@ -174,14 +175,14 @@ async function expectSessionCookie(page: Page): Promise<void> {
       async () =>
         Boolean(
           (await page.context().cookies()).find(
-            (cookie) => cookie.name === "__nextgen_session" && cookie.value,
+            (cookie) => cookie.name === SESSION_COOKIE_NAME && cookie.value,
           ),
         ),
       { timeout: 10_000 },
     )
     .toBe(true);
   const sessionCookie = (await page.context().cookies()).find(
-    (cookie) => cookie.name === "__nextgen_session",
+    (cookie) => cookie.name === SESSION_COOKIE_NAME,
   );
   expect(sessionCookie?.httpOnly).toBe(true);
 }
@@ -211,7 +212,7 @@ async function expectSessionCleared(page: Page): Promise<void> {
   await expect
     .poll(
       async () =>
-        (await page.context().cookies()).some((cookie) => cookie.name === "__nextgen_session"),
+        (await page.context().cookies()).some((cookie) => cookie.name === SESSION_COOKIE_NAME),
       { timeout: 5000 },
     )
     .toBe(false);

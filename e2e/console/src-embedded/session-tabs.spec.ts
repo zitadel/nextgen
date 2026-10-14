@@ -1,5 +1,5 @@
 import type { Page, Response } from "@playwright/test";
-import { expect, test } from "@zitadel/testing/playwright";
+import { expect, loginWithPassword, test } from "@zitadel/testing/playwright";
 
 import { grantProjectAdmin } from "../src-real/support";
 
@@ -23,10 +23,7 @@ import { grantProjectAdmin } from "../src-real/support";
 type Person = { email: string; password: string };
 
 async function signIn(page: Page, person: Person): Promise<void> {
-  await page.getByLabel("Email").fill(person.email);
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByLabel("Password").fill(person.password);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await loginWithPassword(page, person);
   await page.waitForURL((url) => !url.pathname.endsWith("/login"));
   await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
 }
@@ -79,7 +76,7 @@ test("a write after the same person signed in again in another tab goes through"
   zitadel,
 }) => {
   const operator = await seed.user();
-  await grantProjectAdmin(zitadel.handle, operator.id);
+  await grantProjectAdmin(zitadel, operator.id);
 
   await page.goto("/ui/console/");
   await signIn(page, operator);
@@ -109,7 +106,7 @@ test("a write after someone else signed in in another tab reloads instead of wri
   zitadel,
 }) => {
   const operator = await seed.user();
-  await grantProjectAdmin(zitadel.handle, operator.id);
+  await grantProjectAdmin(zitadel, operator.id);
   const colleague = await seed.user();
 
   await page.goto("/ui/console/");

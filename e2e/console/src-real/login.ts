@@ -1,10 +1,11 @@
 import type { Page } from "@playwright/test";
+import { loginWithPassword } from "@zitadel/testing/playwright";
 
 /**
- * Completes the console's login screen (Console ADR 0003) as `user`: the
- * default-login flow's identifier step ("Email" + "Continue"), then the
- * password step ("Password" + "Sign in"). The widget exchanges the handoff for
- * the `__nextgen_session` cookie and performs a full-document navigation away
+ * Completes the console's login screen (Console ADR 0003) as `user`, through
+ * the kit's `loginWithPassword`: the default-login flow's identifier step,
+ * then its password step. The widget exchanges the handoff for the
+ * `__nextgen_session` cookie and performs a full-document navigation away
  * from /login.
  *
  * Only the login, not the grant `signIn` in `support.ts` writes first, and
@@ -20,10 +21,8 @@ export async function completeLogin(
   loginUrl = "/login",
 ): Promise<void> {
   await page.goto(loginUrl);
-  await page.getByLabel("Email").fill(user.email);
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByLabel("Password").fill(user.password);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  // The kit returns right after the last click, without waiting for anything.
+  await loginWithPassword(page, user);
   await page.waitForURL((url) => !url.pathname.endsWith("/login"));
 
   // The URL leaving /login is not the end of signing in. The widget's terminal

@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { expect } from "@zitadel/testing/playwright";
+import { type ConnectedZitadel, expect } from "@zitadel/testing/playwright";
 
 import { completeLogin } from "./login";
 
@@ -11,22 +11,19 @@ import { completeLogin } from "./login";
  * mean the suites were signing in differently while looking identical.
  */
 
-/** The instance handle fields the helpers here need. */
-type ProjectHandle = { baseUrl: string; projectId: string; projectSecret: string };
-
 /**
  * Grants a seeded user admin on the instance's project, then signs in with it
  * through the console's login screen (`completeLogin` in `login.ts`).
  */
 export async function signIn(
   page: Page,
-  handle: ProjectHandle,
+  zitadel: ConnectedZitadel,
   user: { id: string; email: string; password: string },
 ): Promise<void> {
   // The console authenticates with the session cookie alone (#1300): what a
   // person sees is what their grants allow, so every signed-in test user is
   // made an admin of the instance's project first.
-  await grantProjectAdmin(handle, user.id);
+  await grantProjectAdmin(zitadel, user.id);
   await completeLogin(page, user);
 }
 
@@ -38,11 +35,13 @@ export async function signIn(
  * #1237) — so without this the project pill and the Projects screen are
  * honestly empty. The grant is the same one a project's admins section creates.
  */
-export async function grantProjectAdmin(handle: ProjectHandle, userId: string): Promise<void> {
-  await postWithProjectSecret(handle, "/grants", {
-    user: { user_id: userId },
-    relation: "admin",
-  });
+export async function grantProjectAdmin(zitadel: ConnectedZitadel, userId: string): Promise<void> {
+  await withErrorBody(
+    zitadel.api.createGrant(
+      { user: { user_id: userId }, relation: "admin" },
+      { project_id: zitadel.handle.projectId },
+    ),
+  );
 }
 
 /**
@@ -52,45 +51,44 @@ export async function grantProjectAdmin(handle: ProjectHandle, userId: string): 
  * parallel test reuses the connection instead of failing on it.
  */
 export async function createIdpConnection(
-  handle: ProjectHandle,
+  zitadel: ConnectedZitadel,
   idp: { slug: string; display_name: string; template?: string },
 ): Promise<{ id: string }> {
-  return postWithProjectSecret(handle, "/idps", {
-    idp: {
-      ...idp,
-      protocol: "oidc",
-      oidc: {
-        issuer: "https://accounts.google.com",
-        client_id: "${{ E2E_CLIENT_ID }}",
-        client_secret: "${{ E2E_CLIENT_SECRET }}",
-        scopes: ["openid", "profile", "email"],
+  return withErrorBody(
+    zitadel.api.createIdp(
+      {
+        idp: {
+          ...idp,
+          protocol: "oidc",
+          oidc: {
+            issuer: "https://accounts.google.com",
+            client_id: "${{ E2E_CLIENT_ID }}",
+            client_secret: "${{ E2E_CLIENT_SECRET }}",
+            scopes: ["openid", "profile", "email"],
+          },
+        },
       },
-    },
-  }) as Promise<{ id: string }>;
+      { project_id: zitadel.handle.projectId },
+    ),
+  );
 }
 
 /**
- * `POST <path>?project_id=…` with the boot-captured project secret, from the
- * test process — the browser must not see it (see the credential-leak spec).
+ * Awaits a call on the connection's typed client (`zitadel.api`, which holds
+ * the boot-captured project secret in the test process — the browser must not
+ * see it, see the credential-leak spec) and keeps the server's answer in a
+ * failure. The client's `ApiError` message is only "POST … returned 409"; the
+ * body, which says why, is a property the test report does not print.
  */
-async function postWithProjectSecret(
-  handle: ProjectHandle,
-  path: string,
-  body: unknown,
-): Promise<unknown> {
-  const query = new URLSearchParams({ project_id: handle.projectId });
-  const response = await fetch(`${handle.baseUrl}${path}?${query.toString()}`, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${handle.projectSecret}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-  if (!response.ok) {
-    throw new Error(`POST ${path} answered ${response.status}: ${await response.text()}`);
+export async function withErrorBody<T>(call: Promise<T>): Promise<T> {
+  try {
+    return await call;
+  } catch (error) {
+    if (error instanceof Error && "body" in error) {
+      throw new Error(`${error.message}: ${JSON.stringify(error.body)}`, { cause: error });
+    }
+    throw error;
   }
-  return response.json();
 }
 
 /**

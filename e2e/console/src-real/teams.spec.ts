@@ -19,7 +19,7 @@ function teamName(prefix: string): string {
 }
 
 test("creates a team through the drawer and lists it", async ({ page, zitadel, seed }) => {
-  await signIn(page, zitadel.handle, await seed.user());
+  await signIn(page, zitadel, await seed.user());
   const name = teamName("acme");
 
   await page.goto("/teams");
@@ -40,7 +40,7 @@ test("creates a team through the drawer and lists it", async ({ page, zitadel, s
 });
 
 test("opens a team from the list and renames it", async ({ page, zitadel, seed }) => {
-  await signIn(page, zitadel.handle, await seed.user());
+  await signIn(page, zitadel, await seed.user());
   const name = teamName("rename");
   const renamed = `${name}-renamed`;
 
@@ -67,7 +67,7 @@ test("opens a team from the list and renames it", async ({ page, zitadel, seed }
 });
 
 test("shows the status the API stamped on a team", async ({ page, zitadel, seed }) => {
-  await signIn(page, zitadel.handle, await seed.user());
+  await signIn(page, zitadel, await seed.user());
   const name = teamName("status");
 
   await page.goto("/teams");

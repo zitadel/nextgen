@@ -1,3 +1,4 @@
+import { SESSION_COOKIE_NAME } from "@zitadel/testing";
 import { expect, loginWithPassword, test } from "@zitadel/testing/playwright";
 
 /**
@@ -13,7 +14,7 @@ test("a seeded user signs in with their password", async ({ page, seed }) => {
 
   await page.waitForURL(/\/profile(?:[/?#]|$)/, { timeout: 30_000 });
   const session = (await page.context().cookies()).find(
-    (cookie) => cookie.name === "__nextgen_session",
+    (cookie) => cookie.name === SESSION_COOKIE_NAME,
   );
   expect(session).toBeDefined();
   expect(session?.httpOnly).toBe(true);

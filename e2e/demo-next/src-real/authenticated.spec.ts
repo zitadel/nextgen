@@ -1,3 +1,4 @@
+import { SESSION_COOKIE_NAME } from "@zitadel/testing";
 import { expect, test } from "@zitadel/testing/playwright";
 
 /**
@@ -23,7 +24,7 @@ test("an authenticatedPage starts on a protected route without visiting login", 
   // /sessions/me authenticates via the session cookie (the SDK middleware's
   // own headless pattern), so send the token the way a cookie would carry it.
   const me = await fetch(`${zitadel.handle.baseUrl}/sessions/me`, {
-    headers: { cookie: `__nextgen_session=${session.sessionToken}` },
+    headers: { cookie: `${SESSION_COOKIE_NAME}=${session.sessionToken}` },
   });
   expect(me.status).toBe(200);
   expect(((await me.json()) as { user_id?: string }).user_id).toBe(user.id);

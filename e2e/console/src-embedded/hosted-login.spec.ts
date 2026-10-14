@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { expect, test } from "@zitadel/testing/playwright";
+import { expect, loginWithPassword, test } from "@zitadel/testing/playwright";
 
 /**
  * The hosted sign-in shell the binary serves at `/ui/login/`
@@ -86,11 +86,7 @@ test("signs into the deployment's project with no query parameter", async ({ pag
 
   const completion = flowCompletion(page);
 
-  await page.getByLabel("Email").fill(user.email);
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await expect(page.getByLabel("Password")).toBeVisible();
-  await page.getByLabel("Password").fill(user.password);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await loginWithPassword(page, user);
 
   // A real user authenticated against the deployment's real project: the
   // handoff token is what a host would exchange for a session.

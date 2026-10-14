@@ -12,7 +12,7 @@ import { expectNoErrorBoundary, signIn } from "./support";
 
 test("shows the signed-in person's email, read-only", async ({ page, zitadel, seed }) => {
   const user = await seed.user();
-  await signIn(page, zitadel.handle, user);
+  await signIn(page, zitadel, user);
 
   await page.goto("/settings");
 
