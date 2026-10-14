@@ -46,9 +46,7 @@ describe("SolidStartPatcher.plan", () => {
     expect(writeContents(plan, "src/middleware.ts")).toContain(
       'import { createMiddleware } from "@solidjs/start/middleware"',
     );
-    expect(writeContents(plan, "src/middleware.ts")).toContain(
-      "export default createMiddleware(",
-    );
+    expect(writeContents(plan, "src/middleware.ts")).toContain("export default createMiddleware(");
 
     expect(writeContents(plan, "src/routes/index.tsx")).toContain(MANAGED_MARKER);
     expect(writeContents(plan, "src/routes/login.tsx")).toContain('purpose="login"');
