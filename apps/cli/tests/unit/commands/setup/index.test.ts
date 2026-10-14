@@ -219,7 +219,9 @@ describe("setup command pre-flight", () => {
     expect(json.hint).toContain("Run start to restart it");
     expect(json.next_commands).toEqual([
       expectedPublicCliCommand("start"),
-      expectedPublicCliCommand("setup --framework next --non-interactive --server local"),
+      expectedPublicCliCommand(
+        `setup --framework next --non-interactive --server local --cwd ${cwd}`,
+      ),
     ]);
     expect(json.details).toMatchObject({ server_url: serverUrl, server_version: "0.0.1" });
     // Nothing scaffolded and no project files: only the runtime `start` left.
@@ -274,8 +276,10 @@ describe("setup command pre-flight", () => {
     expect(json.code).toBe("E_LOCAL_SERVER_NOT_RUNNING");
     expect(json.hint).toContain("Start local Zitadel first");
     expect(json.next_commands).toEqual([
-      expectedPublicCliCommand("start"),
-      expectedPublicCliCommand("setup --framework next --non-interactive --server local"),
+      expectedPublicCliCommand(`start --cwd ${cwd}`),
+      expectedPublicCliCommand(
+        `setup --framework next --non-interactive --server local --cwd ${cwd}`,
+      ),
     ]);
   });
 
@@ -316,10 +320,8 @@ describe("setup command pre-flight", () => {
   });
 
   // Recovery commands configure the project setup was pointed at, not the
-  // shell's own directory, and they carry no `--cwd` -- a path can hold spaces
-  // and metacharacters, and nothing escapes a suggested command for a shell.
-  // So the guidance names the directory instead.
-  it("names the project directory when it is not the shell's own", async () => {
+  // shell's own directory, so each carries `--cwd`, quoted for a shell.
+  it("points every recovery command at the project directory", async () => {
     const cwd = await makeTempDir();
     await writeFile(join(cwd, "package.json"), JSON.stringify({ dependencies: { next: "^15" } }));
     await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:9"));
@@ -335,11 +337,10 @@ describe("setup command pre-flight", () => {
       "--json",
     ]);
 
-    const json = parseJson(res.stdout) as { hint?: string; next_commands?: string[] };
-    expect(json.hint).toContain(cwd);
-    // Named in prose, never as an argument a shell would split.
+    const json = parseJson(res.stdout) as { next_commands?: string[] };
+    expect(json.next_commands?.length).toBeGreaterThan(0);
     for (const command of json.next_commands ?? []) {
-      expect(command).not.toContain("--cwd");
+      expect(command).toContain(`--cwd ${cwd}`);
     }
   });
 
@@ -481,9 +482,9 @@ describe("setup command pre-flight", () => {
       "--framework next --dev-port 3000 --non-interactive --server local",
     );
     expect(json.next_commands).toEqual([
-      expectedPublicCliCommand("start"),
+      expectedPublicCliCommand(`start --cwd ${cwd}`),
       expectedPublicCliCommand(
-        "setup --framework next --dev-port 3000 --non-interactive --server local",
+        `setup --framework next --dev-port 3000 --non-interactive --server local --cwd ${cwd}`,
       ),
     ]);
   });
@@ -522,9 +523,9 @@ describe("setup command pre-flight", () => {
     // sign-in preset, not silently fall back to the default.
     expect(json.hint).toContain("--preset passkey-first");
     expect(json.next_commands).toEqual([
-      expectedPublicCliCommand("start"),
+      expectedPublicCliCommand(`start --cwd ${cwd}`),
       expectedPublicCliCommand(
-        "setup --framework next --preset passkey-first --dev-port 3000 --non-interactive --server local",
+        `setup --framework next --preset passkey-first --dev-port 3000 --non-interactive --server local --cwd ${cwd}`,
       ),
     ]);
   });
