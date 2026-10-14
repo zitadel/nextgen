@@ -57,11 +57,15 @@ export type {
   ZitadelLogoutEventMap,
   ZitadelLogoutHandlers,
   ZitadelLogoutProps,
+  ZitadelLogoutReactProps,
   ZitadelProject,
   ZitadelSessionConfig,
+  ZitadelSessionErrorDetail,
   ZitadelSessionEventMap,
   ZitadelSessionHandlers,
+  ZitadelSessionMissingDetail,
   ZitadelSessionProps,
+  ZitadelSessionReactProps,
   ZitadelSignoutDetail,
 } from "@zitadel/sdk-react";
 
