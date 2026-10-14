@@ -235,7 +235,6 @@ jobs:
         run: >-
           node e2e/journey/scripts/registry-cache.mjs compare
           "$RUNNER_TEMP/journey-verdaccio-storage" "$RUNNER_TEMP/journey-verdaccio-restored.txt"
-          "$RUNNER_TEMP/ci-journey/verdaccio/config.yaml"
 
       - name: Save journey registry packages
         if: ${{ steps.journey-registry-changes.outputs.save == 'true' }}

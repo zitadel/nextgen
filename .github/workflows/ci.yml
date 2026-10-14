@@ -201,8 +201,8 @@ jobs:
           JOURNEY_REGISTRY_STORAGE: ${{ runner.temp }}/journey-verdaccio-storage
 
       # Saves the store only when the journey changed what a later run gets from
-      # it: new npmjs tarballs, or packuments it refreshed when the journey's
-      # Verdaccio config keeps them for longer than the 2-minute default
+      # it: new npmjs tarballs, or packuments it refreshed when local-registry.mjs
+      # keeps them for longer than Verdaccio's 2-minute default
       # (registry-cache.mjs says why). An unchanged store would upload the same
       # ~700 MB again, about 8 s of every run. Only after green e2e suites, as
       # the cache action's post step did.
@@ -212,7 +212,6 @@ jobs:
         run: >-
           node e2e/journey/scripts/registry-cache.mjs compare
           "$RUNNER_TEMP/journey-verdaccio-storage" "$RUNNER_TEMP/journey-verdaccio-restored.txt"
-          "$RUNNER_TEMP/ci-journey/verdaccio/config.yaml"
 
       - name: Save journey registry packages
         if: ${{ steps.journey-registry-changes.outputs.save == 'true' }}

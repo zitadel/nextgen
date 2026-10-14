@@ -3,6 +3,9 @@ import { readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 
 import { isDirectRun } from "../../../scripts/dev-process.mjs";
+// A namespace import, so a local-registry.mjs that sets no UPLINK_MAXAGE reads
+// as undefined instead of failing to link.
+import * as localRegistry from "./local-registry.mjs";
 
 // CI keeps the journey's Verdaccio store (JOURNEY_REGISTRY_STORAGE) in the
 // Actions cache, and each save takes about 8 s. A save pays off only when the
@@ -13,13 +16,15 @@ import { isDirectRun } from "../../../scripts/dev-process.mjs";
 //   npmjs, and asks npmjs again once it is the uplink's `maxage` old. Runs
 //   restore a store minutes after it was saved, so under the 2-minute default
 //   a refresh never lasts that long, and every run refreshes what it uses
-//   anyway. A longer maxage in local-registry.mjs makes refreshes worth saving.
+//   anyway. A longer UPLINK_MAXAGE in local-registry.mjs makes refreshes worth
+//   saving. It is read from that module rather than from the Verdaccio config
+//   it writes, because a green journey deletes its work dir, config included.
 // The @zitadel packages never count: local-registry.mjs republishes them on
 // every run. CI lists the tarballs after the restore; after the journey,
 // `compare` checks for new tarballs and for packuments written since that list.
 //
 //   node registry-cache.mjs list <storage> <list-file>
-//   node registry-cache.mjs compare <storage> <list-file> [<verdaccio-config>]
+//   node registry-cache.mjs compare <storage> <list-file>
 //
 // `compare` writes `save=true|false` to $GITHUB_OUTPUT.
 
@@ -90,23 +95,28 @@ export async function packumentsWrittenSince(storage, since) {
 }
 
 /**
- * The `maxage` local-registry.mjs gives the npmjs uplink, in ms, from the
- * Verdaccio config it wrote; Verdaccio's 2-minute default without one.
+ * A Verdaccio interval (`1h`, `90s`, `1h 30m`, or a number of seconds) in ms,
+ * read the way Verdaccio reads `maxage`; undefined when it cannot be read.
  */
-export function uplinkMaxageMs(config) {
-  const value = /^\s+maxage:\s*["']?([^"'\n]*?)["']?\s*$/m.exec(config ?? "")?.[1];
-  if (!value) {
-    return DEFAULT_MAXAGE_MS;
+export function parseInterval(interval) {
+  if (typeof interval === "number") {
+    return interval * 1000;
   }
+  const parts = typeof interval === "string" ? interval.trim().split(/\s+/) : [""];
   let total = 0;
-  for (const part of value.split(/\s+/)) {
+  for (const part of parts) {
     const match = /^(\d+(?:\.\d+)?)(ms|s|m|h|d|w|M|y|)$/.exec(part);
     if (!match) {
-      return DEFAULT_MAXAGE_MS;
+      return undefined;
     }
     total += Number(match[1]) * INTERVAL_UNITS[match[2]];
   }
   return total;
+}
+
+/** The uplink's maxage in ms: `interval`, or Verdaccio's default without one. */
+export function maxageMs(interval) {
+  return parseInterval(interval) ?? DEFAULT_MAXAGE_MS;
 }
 
 /** The tarballs in `current` that `restored` lacks. */
@@ -132,39 +142,35 @@ export async function readTarballList(listFile) {
   }
 }
 
-async function readOptional(path) {
-  if (!path) {
-    return "";
-  }
-  try {
-    return await readFile(path, "utf8");
-  } catch (error) {
-    if (error?.code === "ENOENT") {
-      return "";
-    }
-    throw error;
-  }
+/**
+ * What the journey changed in the store since `list` wrote `listFile`, and
+ * whether that is worth a save. `maxage` is the npmjs uplink's, as a Verdaccio
+ * interval (local-registry.mjs's UPLINK_MAXAGE).
+ */
+export async function compareStore({ storage, listFile, maxage }) {
+  const current = await listTarballs(storage);
+  const { tarballs: restored, listedAt } = await readTarballList(listFile);
+  const added = newTarballs(restored, current);
+  const refreshed = await packumentsWrittenSince(storage, listedAt);
+  const maxageInMs = maxageMs(maxage);
+  const refreshesLast = maxageInMs > DEFAULT_MAXAGE_MS;
+  const save = added.length > 0 || (refreshesLast && refreshed.length > 0);
+  return { restored, current, added, refreshed, maxageInMs, refreshesLast, save };
 }
 
 async function main(argv = process.argv.slice(2), env = process.env) {
-  const [command, storage, listFile, configFile] = argv;
+  const [command, storage, listFile] = argv;
   if (!["list", "compare"].includes(command) || !storage || !listFile) {
-    throw new Error(
-      "usage: node registry-cache.mjs <list|compare> <storage> <list-file> [<verdaccio-config>]",
-    );
+    throw new Error("usage: node registry-cache.mjs <list|compare> <storage> <list-file>");
   }
-  const current = await listTarballs(storage);
   if (command === "list") {
+    const current = await listTarballs(storage);
     await writeFile(listFile, current.map((path) => `${path}\n`).join(""));
     console.log(`journey registry: ${current.length} tarballs restored`);
     return;
   }
-  const { tarballs: restored, listedAt } = await readTarballList(listFile);
-  const added = newTarballs(restored, current);
-  const refreshed = await packumentsWrittenSince(storage, listedAt);
-  const maxage = uplinkMaxageMs(await readOptional(configFile));
-  const refreshesLast = maxage > DEFAULT_MAXAGE_MS;
-  const save = added.length > 0 || (refreshesLast && refreshed.length > 0);
+  const { restored, current, added, refreshed, maxageInMs, refreshesLast, save } =
+    await compareStore({ storage, listFile, maxage: localRegistry.UPLINK_MAXAGE });
   console.log(
     `journey registry: ${restored.length} tarballs restored, ${current.length} now, ${added.length} new`,
   );
@@ -175,7 +181,7 @@ async function main(argv = process.argv.slice(2), env = process.env) {
     console.log(`  … and ${added.length - LOGGED_NEW_TARBALLS} more`);
   }
   console.log(
-    `journey registry: ${refreshed.length} packuments refreshed; with an uplink maxage of ${maxage / 1000} s they ${refreshesLast ? "count" : "do not count"}`,
+    `journey registry: ${refreshed.length} packuments refreshed; with an uplink maxage of ${maxageInMs / 1000} s they ${refreshesLast ? "count" : "do not count"}`,
   );
   console.log(`journey registry: ${save ? "saving" : "not saving"} the store`);
   if (env.GITHUB_OUTPUT) {

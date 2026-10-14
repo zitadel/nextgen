@@ -6,26 +6,19 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, test } from "vitest";
 
+import * as localRegistry from "./local-registry.mjs";
 import {
   DEFAULT_MAXAGE_MS,
+  compareStore,
   listTarballs,
+  maxageMs,
   newTarballs,
   packumentsWrittenSince,
+  parseInterval,
   readTarballList,
-  uplinkMaxageMs,
 } from "./registry-cache.mjs";
 
 const script = join(dirname(fileURLToPath(import.meta.url)), "registry-cache.mjs");
-
-// The npmjs uplink as local-registry.mjs writes it, with and without a maxage.
-const configWith = (maxage) => `storage: /tmp/storage
-uplinks:
-  npmjs:
-    url: https://registry.npmjs.org/
-${maxage ? `    maxage: ${maxage}\n` : ""}packages:
-  '**':
-    proxy: npmjs
-`;
 
 let root;
 let storage;
@@ -66,6 +59,14 @@ async function listRestored() {
   assert.equal(run("list", storage, list).status, 0);
   await age(list);
   return list;
+}
+
+// A restored store with one package whose packument predates the restore.
+async function restoredReact() {
+  await put("react/package.json", '{"_uplinks":{"npmjs":{"fetched":1}}}');
+  await put("react/react-19.0.0.tgz");
+  await age(join(storage, "react/package.json"), 120);
+  return listRestored();
 }
 
 test("lists the npmjs tarballs, sorted, without the republished @zitadel scope", async () => {
@@ -124,67 +125,69 @@ test("packuments written since a time are the refreshed and the new ones", async
   ]);
 });
 
-test("reads the npmjs uplink's maxage the way Verdaccio does", () => {
-  assert.equal(uplinkMaxageMs(configWith("1h")), 3_600_000);
-  assert.equal(uplinkMaxageMs(configWith("30m")), 1_800_000);
-  assert.equal(uplinkMaxageMs(configWith('"90s"')), 90_000);
-  assert.equal(uplinkMaxageMs(configWith("90")), 90_000);
-  assert.equal(uplinkMaxageMs(configWith("1h 30m")), 5_400_000);
-  // Verdaccio's default: no maxage, no config, or one this parser cannot read.
-  assert.equal(uplinkMaxageMs(configWith("")), DEFAULT_MAXAGE_MS);
-  assert.equal(uplinkMaxageMs(""), DEFAULT_MAXAGE_MS);
-  assert.equal(uplinkMaxageMs(configWith("soon")), DEFAULT_MAXAGE_MS);
+test("reads maxage intervals the way Verdaccio does", () => {
+  assert.equal(parseInterval("1h"), 3_600_000);
+  assert.equal(parseInterval("30m"), 1_800_000);
+  assert.equal(parseInterval("90s"), 90_000);
+  assert.equal(parseInterval("90"), 90_000);
+  assert.equal(parseInterval(90), 90_000);
+  assert.equal(parseInterval("1h 30m"), 5_400_000);
+  assert.equal(parseInterval("soon"), undefined);
+  // Without a readable one, Verdaccio's default applies.
+  assert.equal(maxageMs(undefined), DEFAULT_MAXAGE_MS);
+  assert.equal(maxageMs(""), DEFAULT_MAXAGE_MS);
+  assert.equal(maxageMs("soon"), DEFAULT_MAXAGE_MS);
 });
 
-test("rewritten metadata and republished @zitadel packages do not save under the default maxage", async () => {
-  await put("react/package.json", '{"_uplinks":{"npmjs":{"fetched":1}}}');
-  await put("react/react-19.0.0.tgz");
-  await put("@zitadel/cli/cli-1.0.0-alpha.24.tgz");
-  await age(join(storage, "react/package.json"), 120);
-  const list = await listRestored();
+test.skipIf(localRegistry.UPLINK_MAXAGE === undefined)(
+  "local-registry.mjs's UPLINK_MAXAGE is an interval this reads",
+  () => {
+    assert.notEqual(parseInterval(localRegistry.UPLINK_MAXAGE), undefined);
+  },
+);
 
-  // What a journey that fetched nothing leaves behind under the 2-minute
-  // default: every packument it used revalidated.
+test("refreshed packuments do not count under the default maxage", async () => {
+  const listFile = await restoredReact();
+  // Under the 2-minute default every packument a journey uses revalidates.
   await put("react/package.json", '{"_uplinks":{"npmjs":{"fetched":2}}}');
-  await rm(join(storage, "@zitadel"), { recursive: true });
-  await put("@zitadel/cli/cli-1.0.0-alpha.25.tgz");
-  const config = join(root, "config.yaml");
-  await writeFile(config, configWith(""));
 
-  const compared = run("compare", storage, list, config);
-  assert.equal(compared.status, 0, compared.stderr);
-  assert.match(compared.stdout, /1 tarballs restored, 1 now, 0 new/);
-  assert.match(
-    compared.stdout,
-    /1 packuments refreshed; with an uplink maxage of 120 s they do not count/,
-  );
-  assert.equal(await readFile(compared.output, "utf8"), "save=false\n");
+  const result = await compareStore({ storage, listFile, maxage: undefined });
+  assert.deepEqual(result.added, []);
+  assert.deepEqual(result.refreshed, ["react/package.json"]);
+  assert.equal(result.maxageInMs, DEFAULT_MAXAGE_MS);
+  assert.equal(result.save, false);
 });
 
 test("refreshed packuments save when the maxage outlasts the gap between runs", async () => {
-  await put("react/package.json", '{"_uplinks":{"npmjs":{"fetched":1}}}');
-  await put("react/react-19.0.0.tgz");
-  await age(join(storage, "react/package.json"), 120);
-  const list = await listRestored();
-  const config = join(root, "config.yaml");
-  await writeFile(config, configWith("1h"));
+  const listFile = await restoredReact();
 
   // Within the hour Verdaccio rewrites nothing.
-  const unchanged = run("compare", storage, list, config);
-  assert.equal(unchanged.status, 0, unchanged.stderr);
-  assert.match(unchanged.stdout, /0 packuments refreshed/);
-  assert.equal(await readFile(unchanged.output, "utf8"), "save=false\n");
+  const unchanged = await compareStore({ storage, listFile, maxage: "1h" });
+  assert.deepEqual(unchanged.refreshed, []);
+  assert.equal(unchanged.save, false);
 
   // Past the hour it revalidates and rewrites what the journey asked for.
   await put("react/package.json", '{"_uplinks":{"npmjs":{"fetched":2}}}');
-  await rm(unchanged.output);
-  const refreshed = run("compare", storage, list, config);
-  assert.equal(refreshed.status, 0, refreshed.stderr);
-  assert.match(
-    refreshed.stdout,
-    /1 packuments refreshed; with an uplink maxage of 3600 s they count/,
-  );
-  assert.equal(await readFile(refreshed.output, "utf8"), "save=true\n");
+  const refreshed = await compareStore({ storage, listFile, maxage: "1h" });
+  assert.deepEqual(refreshed.refreshed, ["react/package.json"]);
+  assert.equal(refreshed.refreshesLast, true);
+  assert.equal(refreshed.save, true);
+});
+
+test("a journey that changed nothing a later run uses does not save", async () => {
+  await put("@zitadel/cli/cli-1.0.0-alpha.24.tgz");
+  const list = await restoredReact();
+  // What every run does: republish @zitadel, which Verdaccio records.
+  await rm(join(storage, "@zitadel"), { recursive: true });
+  await put("@zitadel/cli/package.json", "{}");
+  await put("@zitadel/cli/cli-1.0.0-alpha.25.tgz");
+  await put(".verdaccio-db.json", '{"list":["@zitadel/cli"]}');
+
+  const compared = run("compare", storage, list);
+  assert.equal(compared.status, 0, compared.stderr);
+  assert.match(compared.stdout, /1 tarballs restored, 1 now, 0 new/);
+  assert.match(compared.stdout, /0 packuments refreshed/);
+  assert.equal(await readFile(compared.output, "utf8"), "save=false\n");
 });
 
 test("a fetched tarball is new", async () => {
