@@ -71,6 +71,7 @@ export {
   setupMockHandlers,
 };
 export type { MockSsoProvider } from "./sso-providers.js";
+export { serverCanonicalFlow } from "./server-canonical-flow.js";
 
 /**
  * The password step's field name — the schema pointer the real server emits.

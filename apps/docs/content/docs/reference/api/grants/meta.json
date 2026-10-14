@@ -1,0 +1,4 @@
+{
+  "title": "Grants",
+  "pages": ["createGrant", "queryGrants", "getGrant", "deleteGrant", "..."]
+}

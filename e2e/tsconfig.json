@@ -1,0 +1,36 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "noEmit": true,
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "playwright.shared.ts",
+    "console/playwright*.config.mts",
+    "console/scripts/**/*.mts",
+    "console/src/**/*.ts",
+    "console/src-embedded/**/*.ts",
+    "console/src-platform/**/*.ts",
+    "console/src-real/**/*.ts",
+    "console/src-deployment/**/*.ts",
+    "demo-next/playwright*.config.mts",
+    "demo-next/src/**/*.ts",
+    "demo-next/src-real/**/*.ts",
+    "demo-nuxt/playwright*.config.mts",
+    "demo-nuxt/src/**/*.ts",
+    "journey/playwright*.config.mts",
+    "journey/vitest.config.ts",
+    "journey/scripts/**/*.mjs",
+    "journey/src/**/*.ts",
+    "journey/fixtures/testkit/**/*.mts",
+    "journey/fixtures/testkit/**/*.ts"
+  ]
+}

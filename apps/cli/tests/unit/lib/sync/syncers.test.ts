@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 
@@ -86,6 +86,7 @@ describe("SchemaSyncer", () => {
     expect(() =>
       schema.validate({
         kind: "user-schema",
+        objectType: "human-user",
         metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
         "x-auth-methods": { password: { enabled: true } },
         properties: { email: { type: "string" } },
@@ -519,7 +520,7 @@ describe("BrandingSyncer", () => {
     ).toThrow(ZitadelError);
   });
 
-  it("validate throws E_VALIDATION on font_url (read-only in v1)", async () => {
+  it("validate throws E_VALIDATION on a top-level font_url (it belongs under typography)", async () => {
     const cwd = await makeBrandingProject();
     const [, , , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
 
@@ -926,6 +927,314 @@ describe("IdpConnectionSyncer", () => {
     });
 
     expect(await idp.update("idp_1", renamed)).toMatchObject({ id: "idp_2" });
+  });
+
+  describe("preflight", () => {
+    const file = ".zitadel/idps/google.json";
+    const idpSyncer = (): ReturnType<typeof makeSyncers>[1] =>
+      makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" })[1];
+    const failure = (run: Promise<unknown> | undefined) => run?.catch((err: unknown) => err);
+
+    /** The variables the project holds: a name ending in _SECRET is a secret, any other is plain. */
+    const holding = (names: string[]) =>
+      server.use(
+        http.get(`${BASE}/variables`, () =>
+          HttpResponse.json(
+            Object.fromEntries(
+              names.map((name) => [name, name.endsWith("_SECRET") ? { secret: true } : "a-value"]),
+            ),
+          ),
+        ),
+      );
+
+    /** What the platform answers when asked for the connection with this slug. */
+    const storing = (definition: object | undefined) =>
+      server.use(
+        http.post(`${BASE}/idps/query`, () =>
+          HttpResponse.json({
+            idps:
+              definition === undefined
+                ? []
+                : [
+                    {
+                      id: "idp_1",
+                      revision_id: "idprev_1",
+                      slug: (definition as { slug: string }).slug,
+                      created_at: "2026-01-01T00:00:00.000Z",
+                      updated_at: "2026-01-01T00:00:00.000Z",
+                      definition,
+                    },
+                  ],
+            next_page_token: null,
+          }),
+        ),
+      );
+
+    describe("the variables a connection names", () => {
+      it("reports a client_secret variable the project does not hold, naming it and the file", async () => {
+        holding(["GOOGLE_CLIENT_ID"]);
+
+        const error = await failure(idpSyncer().preflight?.(file, connection, connection));
+
+        expect(error).toMatchObject({ code: "E_CREDENTIAL_MISSING" });
+        expect((error as ZitadelError).message).toContain("GOOGLE_CLIENT_SECRET");
+        expect((error as ZitadelError).message).toContain(file);
+      });
+
+      it("reports a client_id variable the project does not hold", async () => {
+        holding(["GOOGLE_CLIENT_SECRET"]);
+        const named = {
+          ...connection,
+          oidc: { ...connection.oidc, client_id: "${{ GOOGLE_CLIENT_ID }}" },
+        };
+
+        const error = await failure(idpSyncer().preflight?.(file, named, named));
+
+        expect(error).toMatchObject({ code: "E_CREDENTIAL_MISSING" });
+        expect((error as ZitadelError).message).toContain("GOOGLE_CLIENT_ID");
+      });
+
+      it("tells the developer to publish the secret as a secret, at the project level", async () => {
+        holding([]);
+
+        const error = await failure(idpSyncer().preflight?.(file, connection, connection));
+
+        expect((error as ZitadelError).hint).toContain(
+          "variables set GOOGLE_CLIENT_SECRET --project-level --secret",
+        );
+      });
+
+      it("tells the developer to publish the client id as a plain variable", async () => {
+        holding(["GOOGLE_CLIENT_SECRET"]);
+        const named = {
+          ...connection,
+          oidc: { ...connection.oidc, client_id: "${{ GOOGLE_CLIENT_ID }}" },
+        };
+
+        const error = await failure(idpSyncer().preflight?.(file, named, named));
+
+        expect((error as ZitadelError).hint).not.toContain("--secret");
+      });
+
+      it("accepts a secret client_secret and a plain client_id", async () => {
+        holding(["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]);
+        const named = {
+          ...connection,
+          oidc: { ...connection.oidc, client_id: "${{ GOOGLE_CLIENT_ID }}" },
+        };
+
+        await expect(idpSyncer().preflight?.(file, named, named)).resolves.toBeUndefined();
+      });
+
+      it("refuses a client_secret that is not a secret variable", async () => {
+        holding(["GOOGLE_CLIENT_SECRET_PLAIN"]);
+        const plain = {
+          ...connection,
+          oidc: { ...connection.oidc, client_secret: "${{ GOOGLE_CLIENT_SECRET_PLAIN }}" },
+        };
+
+        const error = await failure(idpSyncer().preflight?.(file, plain, plain));
+
+        expect(error).toMatchObject({ code: "E_VALIDATION" });
+        expect((error as ZitadelError).hint).toContain("--secret");
+      });
+
+      it("refuses a client_id that is a secret variable", async () => {
+        holding(["GOOGLE_ID_SECRET", "GOOGLE_CLIENT_SECRET"]);
+        const secretId = {
+          ...connection,
+          oidc: { ...connection.oidc, client_id: "${{ GOOGLE_ID_SECRET }}" },
+        };
+
+        const error = await failure(idpSyncer().preflight?.(file, secretId, secretId));
+
+        expect(error).toMatchObject({ code: "E_VALIDATION" });
+        expect((error as ZitadelError).message).toContain("GOOGLE_ID_SECRET");
+      });
+
+      it("refuses one variable named by both fields", async () => {
+        holding(["GOOGLE_CLIENT_SECRET"]);
+        const both = {
+          ...connection,
+          oidc: { ...connection.oidc, client_id: "${{ GOOGLE_CLIENT_SECRET }}" },
+        };
+
+        const error = await failure(idpSyncer().preflight?.(file, both, both));
+
+        expect((error as ZitadelError).message).toContain("both name the variable");
+      });
+
+      it("stops when the project's variables cannot be read", async () => {
+        server.use(http.get(`${BASE}/variables`, () => HttpResponse.error()));
+
+        const error = await failure(idpSyncer().preflight?.(file, connection, connection));
+
+        expect(error).toBeInstanceOf(Error);
+      });
+    });
+
+    describe("what identifies a connection", () => {
+      const stored = { ...connection, subject_claim: "sub" };
+
+      it.each([
+        ["slug", { ...stored, slug: "google2" }],
+        ["oidc.issuer", { ...stored, oidc: { ...stored.oidc, issuer: "https://other.test" } }],
+        ["subject_claim", { ...stored, subject_claim: "email" }],
+        ["protocol", { ...stored, protocol: "oauth2" }],
+      ])("refuses an edit of %s before anything is sent", async (field, edited) => {
+        holding(["GOOGLE_CLIENT_SECRET"]);
+
+        const error = await failure(idpSyncer().preflight?.(file, edited, stored));
+
+        expect(error).toMatchObject({ code: "E_VALIDATION" });
+        expect((error as ZitadelError).message).toContain(field);
+      });
+
+      it("names the file in the refusal", async () => {
+        const error = await failure(
+          idpSyncer().preflight?.(file, { ...stored, slug: "google2" }, stored),
+        );
+
+        expect((error as ZitadelError).message).toContain(file);
+      });
+
+      describe("an OAuth2 connection", () => {
+        const oauth2 = {
+          slug: "acme",
+          protocol: "oauth2",
+          subject_claim: "id",
+          oauth2: {
+            authorization_endpoint: "https://acme.test/authorize",
+            token_endpoint: "https://acme.test/token",
+            userinfo_endpoint: "https://acme.test/me",
+            client_id: "id",
+            client_secret: "${{ ACME_CLIENT_SECRET }}",
+          },
+        };
+
+        it.each([
+          ["oauth2.token_endpoint", { token_endpoint: "https://other.test/token" }],
+          ["oauth2.userinfo_endpoint", { userinfo_endpoint: "https://other.test/me" }],
+        ])("refuses an edit of %s", async (field, over) => {
+          const error = await failure(
+            idpSyncer().preflight?.(
+              file,
+              { ...oauth2, oauth2: { ...oauth2.oauth2, ...over } },
+              oauth2,
+            ),
+          );
+
+          expect((error as ZitadelError).message).toContain(field);
+        });
+      });
+
+      describe("an OIDC subject claim the file leaves out", () => {
+        const { subject_claim: _left, ...without } = stored;
+
+        beforeEach(() => holding(["GOOGLE_CLIENT_SECRET"]));
+
+        it("is the same connection as one that says sub", async () => {
+          await expect(idpSyncer().preflight?.(file, without, stored)).resolves.toBeUndefined();
+        });
+
+        it("is refused when a stored custom claim is removed", async () => {
+          const error = await failure(
+            idpSyncer().preflight?.(file, without, { ...stored, subject_claim: "oid" }),
+          );
+
+          expect((error as ZitadelError).message).toContain("subject_claim");
+        });
+
+        it("is refused when a custom claim is added to a stored connection without one", async () => {
+          const error = await failure(
+            idpSyncer().preflight?.(file, { ...without, subject_claim: "oid" }, without),
+          );
+
+          expect((error as ZitadelError).message).toContain("subject_claim");
+        });
+      });
+
+      it("allows an edit of a field that does not identify the connection", async () => {
+        holding(["GOOGLE_CLIENT_SECRET"]);
+
+        await expect(
+          idpSyncer().preflight?.(file, { ...stored, display_name: "Workspace" }, stored),
+        ).resolves.toBeUndefined();
+      });
+    });
+
+    describe("a file the platform does not track yet", () => {
+      const next = { ...connection, subject_claim: "sub" };
+
+      beforeEach(() => holding(["GOOGLE_CLIENT_SECRET"]));
+
+      it("answers nothing when no connection holds its slug", async () => {
+        storing(undefined);
+
+        await expect(idpSyncer().preflight?.(file, next, null)).resolves.toBeUndefined();
+      });
+
+      it("answers with the id of the connection that already holds its slug", async () => {
+        storing(next);
+
+        await expect(idpSyncer().preflight?.(file, next, null)).resolves.toMatchObject({
+          id: "idp_1",
+        });
+      });
+
+      it("answers with the stored connection as well, for a plan to compare against", async () => {
+        storing(next);
+
+        await expect(idpSyncer().preflight?.(file, next, null)).resolves.toMatchObject({
+          definition: expect.objectContaining({ slug: "google" }),
+        });
+      });
+
+      it("judges it against that connection, so a moved file cannot change the issuer", async () => {
+        storing(next);
+        const moved = { ...next, oidc: { ...next.oidc, issuer: "https://other.test" } };
+
+        const error = await failure(
+          idpSyncer().preflight?.(".zitadel/idps/moved.json", moved, null),
+        );
+
+        expect((error as ZitadelError).message).toContain("oidc.issuer");
+      });
+
+      it("stops when the platform cannot be asked", async () => {
+        server.use(http.post(`${BASE}/idps/query`, () => HttpResponse.error()));
+
+        const error = await failure(idpSyncer().preflight?.(file, next, null));
+
+        expect(error).toBeInstanceOf(Error);
+      });
+
+      it("does not ask for a file the platform already tracks", async () => {
+        await expect(idpSyncer().preflight?.(file, next, next)).resolves.toBeUndefined();
+      });
+    });
+  });
+
+  it("names a stored connection by its slug, to match a removed file to what it kept", () => {
+    const [, idp] = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
+
+    expect(idp.identityOf?.({ slug: "acme" })).toBe("acme");
+  });
+
+  it("declares deletion unsupported, so a removed file is reported and not sent", () => {
+    const [, idp] = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: {},
+      cwd: "/tmp/zitadel-sync-test",
+    });
+
+    expect(idp.deletion).toBe("unsupported");
   });
 
   it("refuses to delete, because what happens to linked users is undesigned", async () => {

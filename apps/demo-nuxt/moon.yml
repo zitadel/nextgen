@@ -9,7 +9,7 @@ dependsOn:
 
 workspace:
   inheritedTasks:
-    # A demo app with no unit tests; demo-nuxt-e2e covers it.
+    # A demo app with no unit tests; the e2e project's demo-nuxt lane covers it.
     exclude:
       - "test"
 

@@ -76,7 +76,7 @@ that ships zero Lit runtime.
 > **Update (2026-06):** Lit ↔ React parity and the orchestrator showcase
 > moved to the unified Storybook (`apps/storybook`), where stories run as
 > real-browser tests via `@storybook/addon-vitest` (in CI). The original
-> `apps/console-e2e/visual-parity.spec.ts` matrix sweep was retired with the
+> `e2e/console/visual-parity.spec.ts` matrix sweep was retired with the
 > playgrounds.
 
 ### 3. Console embeds the Lit orchestrator via a tiny `createElement` wrapper

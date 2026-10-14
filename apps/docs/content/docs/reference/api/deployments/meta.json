@@ -1,0 +1,10 @@
+{
+  "title": "Deployments",
+  "pages": [
+    "createDeployment",
+    "listDeployments",
+    "getDeploymentById",
+    "rollbackDeployment",
+    "..."
+  ]
+}

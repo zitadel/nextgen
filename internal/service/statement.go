@@ -473,6 +473,11 @@ type UserStatements interface {
 
 type UserPasswordStatements interface {
 	Statements
+	// SetUserPassword adds pw as the user's current password and sets pw.ID
+	// when it is empty; the password it replaces becomes history. Concurrent
+	// sets of one user all succeed and take effect one after the other, so
+	// the one that lands last is current. An unknown user returns
+	// *database.ForeignKeyError.
 	SetUserPassword(ctx context.Context, pw *domain.SetUserPassword) error
 	GetUserPassword(ctx context.Context, filter database.Filter[domain.UserPasswordField]) (*domain.UserPassword, error)
 	ListUserPasswords(ctx context.Context, filter *database.ListOptions[domain.UserPasswordField]) (*database.ListResult[*domain.UserPassword], error)

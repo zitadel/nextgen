@@ -1,6 +1,6 @@
 /**
  * Reserved auth-method credential prefix of flow field names. Mirrors
- * `AUTH_METHOD_PREFIX` in `@zitadel/config` (`src/validate.ts`), which
+ * `AUTH_METHOD_PREFIX` in `@zitadel/config` (`src/validation/flow.ts`), which
  * owns the wire dialect; components has no dependency on that package,
  * so the literal is repeated here.
  */
