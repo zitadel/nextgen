@@ -2,7 +2,7 @@
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { forwardedArgs, isDirectRun, mapWithConcurrency, run, runCapture } from "./dev-process.mjs";
+import { forwardedArgs, isDirectRun, run, runCapture } from "./dev-process.mjs";
 import { upsertProductGithubRelease } from "./release-github.mjs";
 import {
   findPrereleaseOnlyPackages,
@@ -68,17 +68,20 @@ async function commandSnapshot(options) {
   await buildServerBinaries({ repoRoot, outDir, version: release.version, gitInfo: info });
   // Three independent lanes over the built binaries, run side by side: each
   // writes only its own output (the platform packages' bin/ and then npm/,
-  // archives/, docker-context/). A failing lane lets the others finish before
-  // its error is rethrown.
-  const lanes = [
-    async () => {
+  // archives/, docker-context/). Every lane settles before the first failure
+  // is rethrown, so a failing lane never leaves another's processes running.
+  const lanes = await Promise.allSettled([
+    (async () => {
       await stageServerNpmBinaries({ repoRoot, outDir, version: release.version });
       await packPublicPackages({ repoRoot, outDir, version: release.version });
-    },
-    () => createArchives({ repoRoot, outDir, version: release.version }),
-    () => prepareDockerContext({ repoRoot, outDir, version: release.version }),
-  ];
-  await mapWithConcurrency(lanes, lanes.length, (lane) => lane());
+    })(),
+    createArchives({ repoRoot, outDir, version: release.version }),
+    prepareDockerContext({ repoRoot, outDir, version: release.version }),
+  ]);
+  const failedLane = lanes.find((lane) => lane.status === "rejected");
+  if (failedLane) {
+    throw failedLane.reason;
+  }
   await writeReleaseMetadata({ repoRoot, outDir, release, gitInfo: info });
 
   if (!options.skipContainer) {
