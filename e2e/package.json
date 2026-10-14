@@ -26,6 +26,7 @@
     "@zitadel/api-mock": "workspace:*",
     "@zitadel/sdk-nuxt": "workspace:*",
     "@zitadel/testing": "workspace:*",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }
