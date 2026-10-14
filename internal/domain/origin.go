@@ -62,10 +62,9 @@ func NormalizeOrigins(origins []Origin) []Origin {
 }
 
 // ValidateOriginsWriteRules applies the structural write rules for create:
-// primary must be exact, kinds must be primary|preview, one kind per pattern,
-// and unbounded shared-host wildcards (https://*.vercel.app and peers) are
-// rejected. Shared-host allow-regexes beyond this baseline live on the service
-// OriginValidator once instance config is available.
+// primary must be exact, kinds must be primary|preview, and one kind per
+// pattern. The same pattern with the same kind is idempotent (like AddOrigin);
+// the same pattern with a different kind is origin.kind_conflict.
 func ValidateOriginsWriteRules(origins []Origin) error {
 	seen := make(map[string]OriginKind, len(origins))
 	for _, o := range origins {
@@ -77,11 +76,30 @@ func ValidateOriginsWriteRules(origins []Origin) error {
 			if prev != o.Kind {
 				return ErrOriginKindConflict()
 			}
-			return ErrOriginInvalid()
+			continue
 		}
 		seen[pattern] = o.Kind
 	}
 	return nil
+}
+
+// CompactOrigins keeps the first occurrence of each pattern. Call after
+// ValidateOriginsWriteRules so kind conflicts are detected before collapse.
+func CompactOrigins(origins []Origin) []Origin {
+	if len(origins) == 0 {
+		return origins
+	}
+	seen := make(map[string]struct{}, len(origins))
+	out := make([]Origin, 0, len(origins))
+	for _, o := range origins {
+		pattern := strings.TrimSpace(o.Pattern)
+		if _, ok := seen[pattern]; ok {
+			continue
+		}
+		seen[pattern] = struct{}{}
+		out = append(out, o)
+	}
+	return out
 }
 
 func validateOriginWriteRule(o Origin) error {
@@ -125,9 +143,6 @@ func validateOriginWriteRule(o Origin) error {
 		if o.Kind != OriginKindPreview {
 			return ErrOriginInvalid()
 		}
-		if isUnboundedSharedHostWildcard(host) {
-			return ErrOriginUnbounded()
-		}
 		return nil
 	}
 
@@ -135,16 +150,4 @@ func validateOriginWriteRule(o Origin) error {
 		return ErrOriginInvalid()
 	}
 	return nil
-}
-
-// isUnboundedSharedHostWildcard reports hosts like "*.vercel.app" where the
-// sole label is "*" on a known shared parent. Tenant-unique labels
-// ("*-acme.vercel.app") pass.
-func isUnboundedSharedHostWildcard(host string) bool {
-	for _, shared := range []string{"vercel.app", "netlify.app", "pages.dev", "workers.dev"} {
-		if host == "*."+shared {
-			return true
-		}
-	}
-	return false
 }

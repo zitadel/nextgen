@@ -174,13 +174,16 @@ describe("NextPatcher.plan", () => {
     expect(writeContents(plan, ".zitadel/flows/default.json")).toBeUndefined();
   });
 
-  it("writes preview issuer_pattern as the raw origins, not a doubled scheme", () => {
+  it("writes preview issuer_pattern from preview origins only, not a doubled scheme", () => {
     const base = ctxFor("app");
     const ctx = {
       ...base,
       project: {
         ...base.project,
-        origins: [{ pattern: "https://nextgen.dev.mrida.ng", kind: "preview" as const }],
+        origins: [
+          { pattern: "https://app.example.com", kind: "primary" as const },
+          { pattern: "https://nextgen.dev.mrida.ng", kind: "preview" as const },
+        ],
       },
     };
     const zitadelJson = JSON.parse(
