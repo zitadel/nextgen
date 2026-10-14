@@ -90,6 +90,11 @@ export default defineEventHandler((event) => {
 });
 ```
 
+Never return `getAuth(event)` itself from a route the browser calls: it carries
+the session token, which Zitadel sets as an HttpOnly cookie so no script can
+read it. Return `getClientAuth(event)` instead, the same state without the
+token.
+
 ### Login page
 
 Register the shared components in a client-only plugin

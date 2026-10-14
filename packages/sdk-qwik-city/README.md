@@ -72,6 +72,12 @@ export const useUser = routeLoader$((ev) => {
 });
 ```
 
+`getAuth(ev)` carries the raw session token (`session.token`), which Zitadel
+sets as an HttpOnly cookie so no script can read it. Never return it from a
+`routeLoader$` or `server$`: Qwik serialises the result into the page. To hand
+the whole auth state to the page, return `getClientAuth(ev)`, the same state
+without the token.
+
 `protectedRoutes` guards full page loads (a direct visit or a reload): the
 handler redirects before anything renders. Do not rely on it for client-side
 `<Link>` navigation, which does not load the page from the server. There the
@@ -91,7 +97,11 @@ import { getAuth } from '@zitadel/sdk-qwik-city/server';
 
 export const useSession = routeLoader$((ev) => {
   const auth = getAuth(ev);
-  if (!auth.isAuthenticated) throw ev.redirect(302, '/login');
+  if (!auth.isAuthenticated) {
+    // Zitadel could not be asked: an outage, not a sign-out.
+    if (auth.reason === 'unavailable') throw ev.error(503, 'Try again shortly');
+    throw ev.redirect(302, '/login');
+  }
   return { userId: auth.session.userId };
 });
 
@@ -160,4 +170,4 @@ work-email copy for a business audience.
 | `proxyTimeoutMs`    | `number`             | `5000`                       | Timeout in ms for upstream proxy requests. A request exceeding it is answered `504`; an unreachable backend `502`, both with a `{ code, message }` body |
 | `audience`          | `string \| string[]` | not validated                | Expected `aud` claim value(s)                                       |
 
-Only Zitadel's own answer that the session is gone, a `401` with the code `auth.unauthorized` or a `404` with `sess.not_found`, clears the session cookie. If the Zitadel server times out, is unreachable, answers `5xx`, or something in front of it (a gateway, a wrong `url`) answers a `401`/`404` page of its own, the cookie is kept: public pages render signed out with `getAuth()` reporting `reason: "unavailable"`, and a protected route is answered `503` with `retry-after`. Guard your own loaders the same way (see above). After such a failure the SDK logs it once and does not ask Zitadel again for a few seconds, so a hanging server does not slow every request.
+Only Zitadel's own answer that the session is gone, a `401` with the code `auth.unauthorized` or a `404` with `sess.not_found`, clears the session cookie. If the Zitadel server times out, is unreachable, answers `5xx`, or something in front of it (a gateway, a wrong `url`) answers a `401`/`404` page of its own, the cookie is kept: public pages render signed out with `getAuth()` reporting `reason: "unavailable"`, and a protected route is answered `503` with `retry-after`. Guard your own loaders the same way (see above). When Zitadel cannot be reached (a network error, a timeout, or a `502`, `503` or `504`), the SDK logs it once and does not ask again for 15 seconds, and while one check has gone a second without an answer, other requests do not wait for it, so a hanging server does not slow every request. Any other failure holds for that request only. A session cookie that cannot be a Zitadel token (characters a token never has, or far too long) is treated as signed out without asking Zitadel.

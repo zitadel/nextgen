@@ -13,7 +13,7 @@ pnpm add @zitadel/sdk-next
 | Import                         | Runs in                          | Provides                                         |
 | ------------------------------ | -------------------------------- | ------------------------------------------------ |
 | `@zitadel/sdk-next/middleware` | Edge middleware                  | `nextgenMiddleware`, `createProxy`               |
-| `@zitadel/sdk-next/server`     | Server Components, Route Handlers | `auth()`, `NextgenProvider`                      |
+| `@zitadel/sdk-next/server`     | Server Components, Route Handlers | `auth()`, `getClientAuth()`, `NextgenProvider`   |
 | `@zitadel/sdk-next/react`      | Client Components                | `useAuth()`, `AuthContextProvider`               |
 | `@zitadel/sdk-next/session`    | Client Components                | `getSession()`                                   |
 | `@zitadel/sdk-next/client`     | Client boundary                  | Web-component registration, `configureZitadel()` |
@@ -91,7 +91,17 @@ follow:
 
 `session.token` is the raw session token, available server-side for calling
 upstream APIs. Never forward it into client components yourself —
-`NextgenProvider` strips it for you (next section).
+`NextgenProvider` strips it for you (next section). Never return `auth()`'s
+result from a server action either, since Next.js sends that to the browser:
+return `getClientAuth()` (from `@zitadel/sdk-next/server`), the same state
+without the token.
+
+A client can send the `x-nextgen-auth-state` header the middleware uses to
+report a session it could not check. On routes the `matcher` covers, the
+middleware always overwrites it; on a route outside it, a client sending
+`unavailable` makes `auth()` report `reason: "unavailable"` for that request
+only. It cannot sign anyone in, but cover every route that calls `auth()` with
+the `matcher` to rule it out.
 
 ### 3. Reading auth in a Client Component
 
