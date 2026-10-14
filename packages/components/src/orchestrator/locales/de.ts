@@ -206,6 +206,7 @@ export const de: Locale = {
   "error.sso_user_not_found": "Für diese Anmeldung gibt es noch kein Konto.",
   "error.outcome_unhandled":
     "Dieser Schritt konnte nicht fortgesetzt werden. Bitte versuche es erneut.",
+  "error.sign_in_first": "Bitte melde dich zuerst bei deinem Konto an.",
 
   // --- Feld- / Formularfehler ---
   "error.email_required": "Bitte gib eine E-Mail-Adresse ein",

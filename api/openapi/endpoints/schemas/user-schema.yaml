@@ -9,6 +9,7 @@ description: |
 required:
   - metaSchema
   - kind
+  - objectType
   - x-auth-methods
 additionalProperties: true
 properties:
@@ -21,6 +22,8 @@ properties:
     maxLength: 256
     description: |
       The type of user this schema describes. This is a customer chosen name.
+      Every revision of a schema shares its `objectType`, and flow
+      definitions name the schema they operate on by it.
     example: human-user
   kind:
     type: string

@@ -1,6 +1,7 @@
 packages:
   - "apps/*"
   - "packages/*"
+  - "e2e"
   # The release and benchmark projects (tools/release, tools/bench) carry no
   # code the workspace installs; they are packages so the task runner can
   # address their tasks (see turbo.json).
@@ -35,7 +36,6 @@ catalog:
   "@tailwindcss/vite": ^4.2.4
   "@tanstack/devtools-vite": ^0.6.0
   "@tanstack/react-devtools": ^0.10.2
-  "@tanstack/react-query": ^5.100.6
   "@tanstack/react-router": ^1.168.23
   "@tanstack/react-router-devtools": ^1.166.13
   "@tanstack/router-plugin": ^1.167.22
@@ -82,8 +82,9 @@ catalog:
   next: ^16.2.11
   nuxt: ^4.5.1
   oclif: ^4.17.46
-  orval: ^8.37.0
+  orval: ^8.42.0
   playwright: ^1.60.0
+  publint: ^0.3.25
   radix-ui: ^1.6.4
   react: ^19.2.8
   react-dom: ^19.2.8
@@ -132,3 +133,6 @@ supportedArchitectures:
     - current
     - x64
     - arm64
+
+# Fail the install on an unmet or conflicting peer dependency instead of warning.
+strictPeerDependencies: true

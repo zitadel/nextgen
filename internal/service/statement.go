@@ -33,6 +33,7 @@ type AllStatements interface {
 	IDPConnectionStatements
 	IDPIdentityLinkStatements
 	DeploymentStatements
+	PreviewStatements
 	TeamStatements
 	TeamMembershipStatements
 	TokenStatements
@@ -45,6 +46,7 @@ type AllStatements interface {
 	UserRecoveryCodesStatements
 	BrandingStatements
 	VariableStatements
+	VariableSetStatements
 	ClaimStatements
 	ResourceScopeStatements
 	AuthzAssignmentStatements
@@ -149,6 +151,9 @@ type ReleaseStatements interface {
 	// absent from the result, not an error.
 	GetReleasesByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Release, error)
 	ListReleases(ctx context.Context, filter *database.ListOptions[domain.ReleaseField]) (*database.ListResult[*domain.Release], error)
+	// RevokeRelease stamps revoked_at once; revoking again returns the first
+	// stamp.
+	RevokeRelease(ctx context.Context, projectID, id string) (*domain.Release, error)
 }
 
 // IDPConnectionStatements persists identity provider connections and their
@@ -214,23 +219,41 @@ type IDPIdentityLinkStatements interface {
 
 type DeploymentStatements interface {
 	Statements
-	// CreateDeployment inserts the deployment and points the environment's
-	// current_deployment_id at it, atomically. A non-nil
-	// expectedCurrentDeploymentID makes the swap conditional: when the
-	// environment's current deployment is not exactly that one, nothing is
-	// written and domain.ErrDeploymentConflict reports what actually runs.
-	// An environment that does not exist is a NoRowFoundError.
-	//
-	// Idempotent on the running release: when the environment's current
-	// deployment already points at entity's release, nothing is written,
-	// entity is overwritten with that existing record, and created is false.
-	CreateDeployment(ctx context.Context, entity *domain.Deployment, expectedCurrentDeploymentID *string) (created bool, err error)
+	// GetNewestPerOrigin returns, for each of origins that has one, the newest
+	// deployment to it.
+	GetNewestPerOrigin(ctx context.Context, projectID string, origins []string) ([]domain.OriginDeployment, error)
+	// CreateDeployment writes the deployment with every origin, under an
+	// optimistic lock: read is what GetNewestPerOrigin returned for its origins,
+	// and when another deploy wrote to one of them since, nothing is written
+	// and it fails with a UniqueError. The caller re-reads and retries.
+	CreateDeployment(ctx context.Context, entity *domain.Deployment, read []domain.OriginDeployment) error
 	GetDeploymentByID(ctx context.Context, projectID, id string) (*domain.Deployment, error)
-	// GetDeploymentsByIDs reads the named deployments in one round trip, for
-	// hydrating current_deployment on environment reads. Unknown ids are
-	// simply absent from the result, not an error.
+	// GetDeploymentsByIDs skips unknown ids.
 	GetDeploymentsByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Deployment, error)
+	// ListDeployments lists deployments with every origin they named.
 	ListDeployments(ctx context.Context, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error)
+	// ListLiveDeployments lists, with deployment.LiveListOptions, the
+	// deployments some origin serves at now, each narrowed to those origins.
+	ListLiveDeployments(ctx context.Context, now time.Time, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error)
+	// GetLiveDeployment is the deployment origin serves at now, narrowed to the
+	// origins it still serves; a NoRowFoundError when it serves nothing,
+	// including after its preview expired.
+	GetLiveDeployment(ctx context.Context, projectID, origin string, now time.Time) (*domain.Deployment, error)
+}
+
+type PreviewStatements interface {
+	Statements
+	// UpsertPreviews creates the previews of origins or renews their expiry,
+	// keeping created_at.
+	UpsertPreviews(ctx context.Context, projectID string, origins []string, expiresAt, createdAt time.Time) error
+	GetPreview(ctx context.Context, projectID, origin string) (*domain.Preview, error)
+	// ListPreviews takes preview.LiveListOptions or preview.ExpiredListOptions.
+	ListPreviews(ctx context.Context, filter *database.ListOptions[domain.PreviewField]) (*database.ListResult[*domain.Preview], error)
+	// DeletePreview is idempotent.
+	DeletePreview(ctx context.Context, projectID, origin string) (deleted bool, err error)
+	// DeleteExpiredPreview deletes only if the preview expired by now, so a
+	// racing renewal survives the sweep.
+	DeleteExpiredPreview(ctx context.Context, projectID, origin string, now time.Time) (deleted bool, err error)
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
@@ -451,6 +474,11 @@ type UserStatements interface {
 
 type UserPasswordStatements interface {
 	Statements
+	// SetUserPassword adds pw as the user's current password and sets pw.ID
+	// when it is empty; the password it replaces becomes history. Concurrent
+	// sets of one user all succeed and take effect one after the other, so
+	// the one that lands last is current. An unknown user returns
+	// *database.ForeignKeyError.
 	SetUserPassword(ctx context.Context, pw *domain.SetUserPassword) error
 	GetUserPassword(ctx context.Context, filter database.Filter[domain.UserPasswordField]) (*domain.UserPassword, error)
 	ListUserPasswords(ctx context.Context, filter *database.ListOptions[domain.UserPasswordField]) (*database.ListResult[*domain.UserPassword], error)
@@ -517,26 +545,63 @@ type BrandingStatements interface {
 
 type VariableStatements interface {
 	Statements
-	// GetVariables returns the variables owner entered, for the given names (all
-	// names when none are given), ordered by name. Every owner column is matched
-	// exactly, so a name owner has not entered is absent even when another owner
-	// of the same project holds it -- nothing is inherited. This is the only
-	// place the owner predicate is enforced, so a caller never sees a variable
-	// entered elsewhere.
+	// GetVariables returns the variables owner entered for kind, for the given
+	// names (all names when none are given), ordered by name. The owner column
+	// and the kind are matched exactly, so a name owner has not entered for
+	// that kind is absent even when another owner of the same project holds
+	// it, or the same owner holds it for the other kind -- nothing is
+	// inherited and nothing falls back from primary to preview. This is the
+	// only place the owner predicate is enforced, so a caller never sees a
+	// variable entered elsewhere.
 	//
-	// The primary key is the name plus the owner, so at most one variable comes
-	// back per name and the caller has nothing to choose between.
-	GetVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error)
-	// SetVariable writes variable under its own name and owner, replacing the
-	// value and IsSecret flag of an existing variable with the same name and
-	// owner. A project that is missing or names no existing project is
+	// The primary key is the name plus the owner and kind, so at most one
+	// variable comes back per name and the caller has nothing to choose
+	// between.
+	GetVariables(ctx context.Context, owner domain.VariableOwner, kind domain.DeploymentOriginKind, names ...string) ([]*domain.Variable, error)
+	// SetVariable writes variable under its own name, owner and kind,
+	// replacing the value and IsSecret flag of an existing variable with the
+	// same name, owner and kind. A value that applies to both kinds is two
+	// calls. A project that is missing or names no existing project is
 	// rejected by the table.
 	SetVariable(ctx context.Context, variable *domain.Variable) error
-	// DeleteVariable removes the variable owner entered under name. Removing one
-	// that is not there returns NoRowFoundError; it never deletes a variable
-	// with a different owner, since the owner column must match exactly, so
-	// one owner cannot remove what another entered.
-	DeleteVariable(ctx context.Context, owner domain.VariableOwner, name string) error
+	// DeleteVariable removes the variable owner entered under name for kind.
+	// Removing one that is not there returns NoRowFoundError; it never
+	// deletes a variable with a different owner or kind, since both must
+	// match exactly, so one owner cannot remove what another entered and
+	// removing the primary value leaves the preview one.
+	DeleteVariable(ctx context.Context, owner domain.VariableOwner, kind domain.DeploymentOriginKind, name string) error
+}
+
+// VariableSetStatements freezes the variables a deployment is created with
+// and reads them back (ADR 069). A set is content-addressed: identical values
+// in one project are stored once, however many deployments use them.
+type VariableSetStatements interface {
+	Statements
+	// FreezeDeploymentVariables copies the variables of projectID for the
+	// deployment's origin kind into an immutable set and links deploymentID
+	// to it, in one transaction. The kind is the deployment's own, read from
+	// its row inside that transaction, never a caller's choice. It reads the
+	// rows of that kind only: a preview deployment freezes the preview values
+	// and nothing else, so a name entered for primary alone is absent from
+	// it, and a value that applies to both kinds is in both freezes because
+	// it was entered twice. A project with no variables freezes the empty
+	// set, which is stored and linked like any other.
+	//
+	// The set is inserted only when its hash is new to the project, so a
+	// deployment whose values did not change writes no set row and shares
+	// the one that exists. The link is one row per deployment: freezing the
+	// same deployment twice returns UniqueError, and a deployment that does
+	// not exist in projectID -- including one of another project -- returns
+	// NoRowFoundError, since there is no row to read the kind from.
+	//
+	// Secrets are copied as the ciphertext stored, never decrypted. The set
+	// returned is what a later GetDeploymentVariables reads back.
+	FreezeDeploymentVariables(ctx context.Context, projectID, deploymentID string) (*domain.VariableSet, error)
+	// GetDeploymentVariables returns the set deploymentID was frozen with,
+	// as it was then, whatever the project's variables have become since. A
+	// deployment that was never frozen -- or does not exist, or belongs to
+	// another project -- returns NoRowFoundError.
+	GetDeploymentVariables(ctx context.Context, projectID, deploymentID string) (*domain.VariableSet, error)
 }
 
 type ClaimStatements interface {

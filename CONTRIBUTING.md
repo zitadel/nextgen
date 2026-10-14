@@ -261,35 +261,44 @@ dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
 
 **Full mode** (normal PRs) runs, in order:
 
-- `moon run server:check-generate` — Go generated-file drift check.
-- Playwright Chromium install for the `:test` graph, the e2e suites and the
-  journeys. The `components`/`api-mock` browser projects run in CI as part of
-  their `:test` task (via `test:all`), each pulling in Chromium through a moon
-  `install-browsers` dep.
-- `moon ci :lint :typecheck :build :test :check-adrs`.
-- `moon run server:test`, then `moon run server:test-postgres` and
-  `moon run server:test-sqlite`.
+- `moon run server:check-generate-pruned` — Go generated-file drift check.
+- Playwright Chromium install for the e2e lanes. The `components`/`api-mock`
+  browser projects pull in their own Chromium through a moon `install-browsers`
+  dep on their `:test` task.
+- `moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph` —
+  builds, lint, typecheck and unit tests.
+- `moon run server:test-postgres`, then `moon run server:test-sqlite` — Go
+  integration lanes. They depend on the UI builds their binary embeds, so
+  `moon ci` also runs them when one of those builds is affected; on such runs
+  they run twice until a follow-up folds them into the graph step.
 - `moon run release:snapshot -- --skip-container` — a non-publishing release
-  snapshot.
-- All consumer journey variants in one process (`cli-journey-e2e:e2e-local
-  --ci`): the fresh-app framework matrix, the passkey-first preset, the
-  pre-existing-app posture, and the test-kit consumer suite — run concurrently
-  with the npm binary runtime against the snapshot's packed tarballs.
-- The real-instance suites: `testing:test-integration` with
-  `demo-next-e2e:e2e-real`, then `console-e2e:e2e-real`.
+  snapshot, built outside any moon graph and handed to the journey via
+  `JOURNEY_TARBALLS_DIR`, whenever the journey can run. The journey must not
+  pack inside the e2e step (a nested moon graph is forbidden), so in GitHub
+  Actions it refuses to run without the snapshot. The journey's Verdaccio
+  storage comes back from the Actions cache.
+- `moon exec e2e:all --ignore-ci-checks` — the e2e suite, in a step of its own
+  so its browsers and dev servers do not compete with the unit suites. Its
+  lanes are `runInCI: "skip"`, which keeps them out of the `moon ci` graph.
+  `e2e:all` runs every e2e lane as its dependencies: console, demo, the journey
+  (with ci-mode's framework matrix), and `testing:test-integration`.
 
-Within full mode, the steps after the `moon ci` graph are additionally gated
-by moon's affected task selection (`moon query tasks --affected --downstream
-deep`, computed in `scripts/ci-mode.mjs`): a lane is skipped when the diff
-provably cannot reach its
-tasks — a docs-only PR runs almost nothing, a frontend-only PR skips the Go
-suites, a console-only PR runs the e2e suites but no journeys. The journeys run
-together in the one `--ci` step, gated on whether any journey surface is
-affected (the map lives as task-space constants in `scripts/ci-mode.mjs`);
-the fresh-app framework matrix still collapses to a single framework unless an
-SDK, the CLI, or the journey project itself moved. The
-snapshot runs iff any journey does — the tarball handoff between them is a
-filesystem contract moon cannot see. The gates fail open: known repo-wide
+Within full mode the `moon ci` graph selects only the tasks the diff affects
+(`--downstream deep --include-relations`): a lane is skipped when the diff
+provably cannot reach it — a docs-only PR runs almost nothing, a frontend-only
+PR skips the Go suites. The e2e lanes run, all together, whenever one of them
+is affected (its folder, a demo app it serves, or something it depends on: the
+server, CLI, console, SDKs, api-mock or testing kit), so most code PRs run
+them.
+`scripts/ci-mode.mjs` picks the mode (full vs version-only) and the gates for
+the steps outside the graph: the Go suites, the e2e step (on when moon finds
+`e2e:all` affected), the release snapshot (on when a journey trigger moved or
+the e2e step runs) and the journey's framework matrix, which collapses to Next
+unless an SDK, the CLI, the test kit or the journey's own files moved. It asks
+moon as a local run would: in CI, moon leaves `runInCI: "skip"` tasks such as
+the lanes out of its affected set when only their own files changed.
+ci-turbo.yml uses the same gates for its per-lane steps. The gates fail
+open: known repo-wide
 files no moon task claims (workflow definitions, `scripts/`, moon config,
 root manifests and compiler/release inputs such as `tsconfig.base.json`), an
 empty diff, or a failed query all force the
@@ -307,12 +316,10 @@ demand, and is not a required check. To run it against a branch, use
 
 CI consumes the workflow's packed npm tarballs, not public Zitadel packages.
 Changesets PR comments are informational release-intent feedback, not a
-blocking gate. Workflow artifacts (the release snapshot whenever a journey
-lane runs — a run whose journeys are gated off, such as a docs-only or
-console-only PR, uploads no snapshot — and journey diagnostics on failure)
-expire after 7 days. The demo end-to-end suites and
-the Docker-fallback journey do not run in CI; they stay opt-in local checks
-(see below).
+blocking gate. The release snapshot the journeys install from stays on the
+runner; a failed run uploads the journey's diagnostics and every e2e lane's
+results, which expire after 7 days. The Docker-fallback journey does not run in
+CI; it stays an opt-in local check (see below).
 
 ## Running integration and end-to-end tests
 
@@ -405,9 +412,9 @@ These tests start real servers and require a browser install, so they are opt-in
 locally. The demo suites exercise the checked-in framework demos:
 
 ```sh
-corepack pnpm --filter @zitadel/demo-next-e2e exec playwright install
-moon run demo-next-e2e:e2e
-moon run demo-nuxt-e2e:e2e
+corepack pnpm --filter @zitadel/e2e exec playwright install
+moon run e2e:demo-next-mock
+moon run e2e:demo-nuxt-mock
 ```
 
 ### Docs site suite
@@ -426,17 +433,17 @@ moon run docs:e2e
 The journey test creates one fresh app directory per selected framework outside
 the repo, runs the full CLI setup flow against local workspace packages, starts
 each generated app, and runs Playwright to verify the result. By default it runs
-the full framework matrix; use `moon run workspace:journey -- --framework next`
+the full framework matrix; use `moon run e2e:journey -- --framework next`
 for a single Next.js run:
 
 ```sh
-moon run workspace:journey
+moon run e2e:journey
 ```
 
 To exercise the Docker fallback path, provide a local backend image tag:
 
 ```sh
-moon run workspace:journey -- --runtime docker --image nextgen:local
+moon run e2e:journey -- --runtime docker --image nextgen:local
 ```
 
 Use `--keep` to preserve the temporary work directory after success. On failure
@@ -565,3 +572,16 @@ sections:
 - `Release notes / changeset` — changeset status for user-visible package
   changes.
 - `Notes` — reviewer context, follow-ups, risks, or `None`.
+
+### Merging
+
+`main` takes pull requests through GitHub's merge queue, squashed. Click
+**Merge when ready** (or run `gh pr merge --auto`): once `full-pr` is green
+on the pull request, the queue picks it up, runs `full-pr` again on it
+combined with the latest `main` and the pull requests queued ahead of it, and
+merges it when that run passes too. A failing run takes it out of the queue;
+fix the branch and queue it again.
+
+A branch does not have to be up to date with `main` to merge. Merge `main`
+into it only to resolve a conflict or to pick up a change you need: every
+push runs `full-pr` and rebuilds the branch's cloud preview.

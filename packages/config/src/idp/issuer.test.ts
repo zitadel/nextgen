@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { GoogleProvider } from "./google.js";
-import { isSupportedIssuer } from "./issuer.js";
+import { isLoopbackIssuer, isSupportedIssuer } from "./issuer.js";
 
 describe("the issuer contract", () => {
   it("accepts the vendor's own issuer", () => {
@@ -36,4 +36,20 @@ describe("the issuer contract", () => {
   it("ignores surrounding whitespace, which a paste brings along", () => {
     expect(isSupportedIssuer("  https://accounts.google.com  ")).toBe(true);
   });
+});
+
+describe("isLoopbackIssuer", () => {
+  it.each(["http://localhost:9100", "http://127.0.0.1:9100", "https://localhost/realm"])(
+    "takes %s to be on this machine",
+    (issuer) => {
+      expect(isLoopbackIssuer(issuer)).toBe(true);
+    },
+  );
+
+  it.each(["https://accounts.google.com", "http://localhost.example.com", "not a url"])(
+    "does not take %s to be on this machine",
+    (issuer) => {
+      expect(isLoopbackIssuer(issuer)).toBe(false);
+    },
+  );
 });

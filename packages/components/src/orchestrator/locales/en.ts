@@ -215,6 +215,7 @@ export const en: Record<string, string> = {
   "error.user_not_found": "We couldn't find an account with these details.",
   "error.sso_user_not_found": "There is no account for this sign-in yet.",
   "error.outcome_unhandled": "This step could not continue. Please try again.",
+  "error.sign_in_first": "Please sign in to your account first.",
 
   // --- Field / form errors ---
   "error.email_required": "Please enter an email address",

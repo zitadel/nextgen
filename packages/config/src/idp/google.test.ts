@@ -6,6 +6,7 @@ import Ajv2020 from "ajv/dist/2020";
 import { describe, expect, it } from "vitest";
 
 import { GoogleProvider } from "./google.js";
+import { issuer, slug } from "./test-support.js";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const validateConnection = new Ajv2020({ strict: false, validateFormats: false }).compile(
@@ -93,7 +94,7 @@ describe("the scaffolded connection", () => {
   it("writes the provider's own slug unless one is given", () => {
     expect(connection().slug).toBe("google");
 
-    const second = connection({ slug: "google_work" });
+    const second = connection({ slug: slug("google_work") });
     expect(second.slug).toBe("google_work");
     // The credentials follow the slug: a second connection for the same
     // provider has its own OAuth application, and sharing one variable with
@@ -120,7 +121,7 @@ describe("endpoints", () => {
     // unless id_token mapping is on. A subset is rejected as
     // `idp.endpoints_partial`, so the stand-in serves its own discovery
     // document, as the vendor's does.
-    const oidc = oidcOf(connection({ endpoints: { issuer: "http://localhost:9100" } }));
+    const oidc = oidcOf(connection({ endpoints: { issuer: issuer("http://localhost:9100") } }));
 
     expect(oidc.issuer).toBe("http://localhost:9100");
     expect(oidc).not.toHaveProperty("authorization_endpoint");
@@ -131,7 +132,7 @@ describe("endpoints", () => {
 
   it("falls back to the vendor when the issuer is absent or empty", () => {
     expect(oidcOf(connection({ endpoints: {} })).issuer).toBe(google.issuer);
-    expect(oidcOf(connection({ endpoints: { issuer: "" } })).issuer).toBe(google.issuer);
+    expect(oidcOf(connection({ endpoints: { issuer: issuer("") } })).issuer).toBe(google.issuer);
   });
 });
 

@@ -64,7 +64,7 @@
       "import": "./dist/normalize.mjs"
     },
     "./validate": {
-      "@zitadel/source": "./src/validate.ts",
+      "@zitadel/source": "./src/validation/index.ts",
       "types": "./dist/validate.d.mts",
       "import": "./dist/validate.mjs"
     },
@@ -88,15 +88,16 @@
   },
   "scripts": {
     "sync-schemas": "node ../../scripts/task-guard.mjs --mutex generated-sources -- node scripts/sync-meta-schemas.mjs",
-    "prebuild": "pnpm run sync-schemas",
+    "prebuild": "node --run sync-schemas",
     "build": "tsdown",
-    "pretypecheck": "pnpm run sync-schemas",
+    "pretypecheck": "node --run sync-schemas",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
-    "pretest": "pnpm run sync-schemas",
+    "pretest": "node --run sync-schemas",
     "test": "vitest run",
     "test:all": "pnpm run test",
     "lint": "biome check .",
-    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build"
+    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build",
+    "prepack": "publint --strict"
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",

@@ -34,7 +34,7 @@ export const baseTest = {
   passWithNoTests: false,
   // Discover both suffixes under src/, so a package can't silently drop a whole
   // suite by matching only one of *.spec / *.test. Packages whose tests live
-  // outside src/ (cli → tests/, workspace/cli-journey-e2e → scripts/) or that
+  // outside src/ (cli → tests/, e2e → journey/scripts/) or that
   // split into sub-projects override `include` in their own config.
   include: ["src/**/*.{test,spec}.{ts,tsx}"],
   // No shared globalSetup: the only setup work is package-specific (config syncs

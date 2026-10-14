@@ -9,7 +9,6 @@
     "cli": "node scripts/run-cli.mjs",
     "server": "node scripts/run-server.mjs",
     "docs": "moon run docs:dev",
-    "journey": "node scripts/run-journey.mjs",
     "check": "node scripts/check.mjs",
     "test": "node scripts/assert-file.mjs scripts/ci-mode.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts && vitest run scripts/ci-mode.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts",
     "test:all": "pnpm run test",
@@ -32,6 +31,7 @@
     "@redocly/openapi-core": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "publint": "catalog:",
     "sharp": "catalog:",
     "tsx": "catalog:",
     "turbo": "catalog:",
@@ -46,6 +46,14 @@
     "onlyBuiltDependencies": [
       "esbuild",
       "sharp"
+    ],
+    "ignoredBuiltDependencies": [
+      "@parcel/watcher",
+      "@swc/core",
+      "lmdb",
+      "msgpackr-extract",
+      "msw",
+      "vue-demi"
     ],
     "overrides": {
       "@types/react": "^19.2.14",
