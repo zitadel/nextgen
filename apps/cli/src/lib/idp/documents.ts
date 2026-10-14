@@ -87,7 +87,7 @@ function providerOutcomes(terminal: string): Record<string, string> {
  * terminal is the `complete` property, which both shipped flows carry. A flow
  * whose terminal is called something else was valid before this edit, and
  * writing `done` into the generated routes would point them at a step that
- * does not exist: `validateFlowDefinition` rejects that on the next `plan`
+ * does not exist: `validateFlowDefinition` rejects that on the next `deploy`
  * ("transition ... targets unknown step"), so enabling a provider would break
  * a flow that worked.
  *
@@ -356,7 +356,7 @@ function ssoConflictStep(
  * Whether a step is still what this generator would write for it.
  *
  * Compared key-sorted at every depth: the CLI writes its managed files with a
- * stable serialiser, so a step that has been through `setup` or any `apply`
+ * stable serialiser, so a step that has been through `setup`
  * has its keys in a different order from the object built here while being
  * the same step. Comparing the raw JSON would report the generator's own
  * output as hand-edited.
@@ -368,7 +368,7 @@ function matches(step: Step, expected: Step): boolean {
 /**
  * A step without what the platform leaves out when it answers.
  *
- * `apply` writes the canonical definition back into the file, and the server
+ * `setup` writes the canonical definition into the file, and the server
  * omits an action's `primary: false` (a default), an empty `fields` list, and
  * an empty `gates` map, so the step in the file is not byte for byte what this
  * generator wrote though it is the same step. Reading it as hand-edited would

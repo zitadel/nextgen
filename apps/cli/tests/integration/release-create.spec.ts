@@ -46,6 +46,18 @@ describe("release create", () => {
         expect(app.envelopeOf<{ count: number }>(listed).data.count).toBe(0);
       });
 
+      it("registers a new sign-in provider the release names", async () => {
+        const app = await aSetUpApp();
+        await app.enableSso("google", {
+          clientId: "1234-abc.apps.googleusercontent.com",
+          secret: "the-client-secret",
+        });
+
+        await createRelease(app);
+
+        expect((await app.registeredIdps()).map((idp) => idp.slug)).toEqual(["google"]);
+      });
+
       it("creates no release on a dry run", async () => {
         const app = await aSetUpApp();
 

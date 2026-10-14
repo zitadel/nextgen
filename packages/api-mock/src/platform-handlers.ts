@@ -1008,7 +1008,12 @@ function normalizeOrigin(raw: string): string | null {
     return null;
   }
   const hostname = host.replace(/:\d+$/, "");
+  // A port is digits only: what is left of the host may hold a colon only as
+  // an IPv6 literal in brackets, so `host:*` or `host:abc` is refused rather
+  // than stored with a "port" the shared-host check would never see past.
+  const ipv6 = hostname.startsWith("[") && hostname.endsWith("]");
   if (
+    (!ipv6 && hostname.includes(":")) ||
     hostname === "" ||
     hostname.startsWith(".") ||
     hostname.endsWith(".") ||
@@ -1287,19 +1292,22 @@ function previewIsLive(preview: PreviewRecord | undefined): preview is PreviewRe
   return preview !== undefined && new Date(preview.expiresAt).getTime() > Date.now();
 }
 
-/** The newest deployment to an origin, treating an expired preview as gone. */
+/**
+ * The newest deployment to an origin, treating a preview that is gone as gone.
+ * A preview's liveness is its preview row, not the expiry frozen onto the
+ * deployment: `preview rm` deletes the row and a renewal moves its expiry, and
+ * every endpoint has to agree on which previews are live.
+ */
 function newestDeploymentForOrigin(
   projectId: string,
   origin: string,
 ): DeploymentRecord | undefined {
-  const now = Date.now();
+  const previewLive = previewIsLive(store.previews.get(previewKey(projectId, origin)));
   return [...store.deployments.values()]
     .filter((deployment) => deployment.projectId === projectId)
     .filter((deployment) =>
       deployment.targets.some(
-        (target) =>
-          target.origin === origin &&
-          (target.expiresAt === null || new Date(target.expiresAt).getTime() > now),
+        (target) => target.origin === origin && (target.expiresAt === null || previewLive),
       ),
     )
     .sort((a, b) => b.seq - a.seq)[0];
@@ -1878,9 +1886,9 @@ export function setupPlatformHandlers() {
       const frozen = freezeVariables(project.id, sawPreview);
 
       // A preview deploy always renews its targets' previews — writing a new one
-      // or extending the live one's expiry from this deploy's ttl — before the
-      // idempotency short-circuit below, so re-deploying unchanged content keeps
-      // the preview URL alive rather than letting it expire on its old clock.
+      // or extending the live one's expiry from this deploy's ttl — so
+      // re-deploying unchanged content keeps the preview URL alive rather than
+      // letting it expire on its old clock.
       if (sawPreview && expiresAt !== null) {
         for (const origin of targets) {
           const key = previewKey(project.id, origin);
@@ -1903,15 +1911,19 @@ export function setupPlatformHandlers() {
       // Idempotent on what is served: a new deployment is skipped only when
       // every target already runs this release *and* the same frozen variable
       // snapshot. A later variable write changes the snapshot, so the same
-      // release deploys afresh rather than being deduped away.
-      const alreadyServed = targets.every((origin) => {
-        const newest = newestDeploymentForOrigin(project.id, origin);
-        return (
-          newest !== undefined &&
-          newest.releaseId === release.id &&
-          sameVariableSnapshot(newest.frozenVariables, frozen)
-        );
-      });
+      // release deploys afresh rather than being deduped away. A deployment to
+      // preview URLs is never skipped: it always writes a new deployment, which
+      // is what renews the preview's time-to-live, and answers `201`.
+      const alreadyServed =
+        !sawPreview &&
+        targets.every((origin) => {
+          const newest = newestDeploymentForOrigin(project.id, origin);
+          return (
+            newest !== undefined &&
+            newest.releaseId === release.id &&
+            sameVariableSnapshot(newest.frozenVariables, frozen)
+          );
+        });
       if (targets.length > 0 && alreadyServed) {
         const newest = [...store.deployments.values()]
           .filter(
@@ -1923,18 +1935,7 @@ export function setupPlatformHandlers() {
           )
           .sort((a, b) => b.seq - a.seq)[0];
         if (newest) {
-          // The deployment record is immutable history, so its stored target
-          // rows keep the expiry they were written with; the renewed expiry is
-          // reported from the preview row instead, so the 200 reflects the clock
-          // the preview now runs on without mutating the historical deployment.
-          const rows = newest.targets.map((row) =>
-            row.expiresAt !== null && targets.includes(row.origin)
-              ? { origin: row.origin, expiresAt }
-              : row,
-          );
-          // The renewed-expiry `rows` are reported, so the idempotent 200
-          // reflects the clock the preview now runs on.
-          return HttpResponse.json(deploymentResponse(newest, rows), { status: 200 });
+          return HttpResponse.json(deploymentResponse(newest), { status: 200 });
         }
       }
 
@@ -1955,11 +1956,6 @@ export function setupPlatformHandlers() {
         frozenVariables: frozen,
       };
       store.deployments.set(id, record);
-
-      // The preview rows were already renewed above, before the idempotency
-      // short-circuit, so a preview deploy renews them whether or not it reaches
-      // this new-deployment path.
-
       return HttpResponse.json(deploymentResponse(record), { status: 201 });
     }),
 
@@ -2174,6 +2170,29 @@ export function setupPlatformHandlers() {
       }
 
       const origins = target.targets.map((row) => row.origin);
+      // The optimistic guard: the deployment the caller believes is the newest
+      // one to any of the targets. A mismatch is a deploy that raced in.
+      const rollbackData = body.data as Record<string, unknown>;
+      const expectedRollbackId =
+        typeof rollbackData.expected_deployment_id === "string"
+          ? rollbackData.expected_deployment_id
+          : undefined;
+      if (expectedRollbackId !== undefined) {
+        const newestToTargets = origins
+          .map((origin) => newestDeploymentForOrigin(project.id, origin))
+          .filter((deployment): deployment is DeploymentRecord => deployment !== undefined)
+          .sort((a, b) => b.seq - a.seq)[0];
+        if (newestToTargets && newestToTargets.id !== expectedRollbackId) {
+          return HttpResponse.json(
+            errorBody(
+              "dep.conflict",
+              "deployment: the newest deployment to the targets does not match expected_deployment_id",
+              { deployment: deploymentResponse(newestToTargets) },
+            ),
+            { status: 409 },
+          );
+        }
+      }
       // A rollback re-applies the deployment being reverted to, so what it
       // restores is that deployment's own frozen snapshot — not the project's
       // current `all` bucket, which may have drifted since. Idempotent only
@@ -2871,7 +2890,7 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(out.data);
     }),
 
-    // One variable by name, which `variables get` and `variables delete`
+    // One variable by name, which `variable get` and `variable rm`
     // address directly. A variable belongs to the owner that entered it, so a
     // name another owner of the same project holds answers `var.not_found`
     // and leaves that owner's value standing.

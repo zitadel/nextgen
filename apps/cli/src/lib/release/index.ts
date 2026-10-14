@@ -6,8 +6,6 @@
 export { buildBundle, type BuiltBundle, type ConfigurationBundle } from "./bundle";
 export {
   createReleaseFromBundle,
-  findReleaseByContentHash,
-  getRelease,
   revokeRelease,
   type Release,
   type ReleaseSource,

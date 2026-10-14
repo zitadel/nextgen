@@ -1,10 +1,5 @@
 import type { ZitadelClient } from "@zitadel/api/client";
-import type {
-  BuildRelease201,
-  BuildReleaseBody,
-  GetReleaseById200,
-  ListReleases200ReleasesItem,
-} from "@zitadel/api/generated/model";
+import type { BuildRelease201, BuildReleaseBody } from "@zitadel/api/generated/model";
 
 import type { ConfigurationBundle } from "./bundle";
 
@@ -53,26 +48,4 @@ export async function revokeRelease(
   releaseId: string,
 ): Promise<Release> {
   return client.revokeRelease(releaseId, { project_id: projectId });
-}
-
-/** The release a digest names, or undefined when the project carries none. */
-export async function findReleaseByContentHash(
-  client: ZitadelClient,
-  projectId: string,
-  contentHash: string,
-): Promise<ListReleases200ReleasesItem | undefined> {
-  const { releases } = await client.listReleases({
-    project_id: projectId,
-    content_hash: contentHash,
-  });
-  return releases[0];
-}
-
-/** Read one release by its `rel_` id. */
-export async function getRelease(
-  client: ZitadelClient,
-  projectId: string,
-  releaseId: string,
-): Promise<GetReleaseById200> {
-  return client.getReleaseById(releaseId, { project_id: projectId });
 }

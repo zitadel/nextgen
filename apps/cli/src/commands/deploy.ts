@@ -92,6 +92,8 @@ export default class Deploy extends EnvironmentCommand {
     // `https://*.preview.acme.com`) is still a preview and must be refused here,
     // not slip through as a primary target.
     const origin = flags.origin;
+    // The origins this deploy lands on, for the optimistic guard below.
+    let landing: string[] = origin === undefined ? [] : [origin];
     if (origin !== undefined) {
       const origins = (await client.getProject(projectId)).origins ?? [];
       const isPrimary = origins.some(
@@ -120,7 +122,8 @@ export default class Deploy extends EnvironmentCommand {
       // run writes nothing and never reaches the deploy, so it is exempt: it
       // still validates and previews a project that has no primary origin yet.
       const origins = (await client.getProject(projectId)).origins ?? [];
-      if (!origins.some((entry) => entry.kind === "primary")) {
+      landing = origins.filter((entry) => entry.kind === "primary").map((entry) => entry.pattern);
+      if (landing.length === 0) {
         throw new ZitadelError("E_VALIDATION", "The project has no primary origin to deploy to", {
           hint: `Add one with \`zitadel origin add <url> --kind primary${this.environmentSelector()}\`, then deploy.`,
           nextCommands: [this.suggest("origin list")],
@@ -176,11 +179,25 @@ export default class Deploy extends EnvironmentCommand {
       gitDirty,
     });
 
-    // What the targets serve right now, newest first. Its id guards the create
-    // against another deploy that raced in since we inspected: the server
-    // refuses with 409 rather than overwriting that deploy unseen (#538).
+    // What the targets serve right now. The guard id must be the newest
+    // deployment for every target the create resolves, so it is sent only
+    // when all of them agree on one: after a `deploy --origin` the primary
+    // origins serve different deployments, and any single id would be
+    // refused on every run. A live preview is never a primary's deployment,
+    // so the list is read per origin rather than taking the newest overall.
+    // When they agree, the id guards the create against another deploy that
+    // raced in since we inspected: the server refuses with 409 rather than
+    // overwriting that deploy unseen (#538).
     const liveQuery = { project_id: projectId, live: true, ...(origin ? { origin } : {}) };
-    const observed = (await client.listDeployments(liveQuery)).deployments[0]?.id;
+    const live = (await client.listDeployments(liveQuery)).deployments;
+    const newest = new Set(
+      landing.map(
+        (target) =>
+          live.find((deployment) => deployment.targets.some((entry) => entry.origin === target))
+            ?.id,
+      ),
+    );
+    const observed = newest.size === 1 ? [...newest][0] : undefined;
     const targets = origin ? [origin] : ["primary"];
     let deployment: Awaited<ReturnType<typeof createDeployment>>;
     try {
@@ -201,6 +218,19 @@ export default class Deploy extends EnvironmentCommand {
       // deployment, so the caller re-runs against current state (#538).
       if (!(error instanceof ApiError) || error.status !== 409) {
         throw error;
+      }
+      // Building dedupes on content, revoked releases included, so a tree
+      // that matches a revoked release builds back to it and cannot deploy.
+      // That is not a race: re-running would fail the same way.
+      if (errorCode(error) === "rel.revoked") {
+        throw new ZitadelError(
+          "E_CONFLICT",
+          `This content was already released as ${release.id}, which is revoked`,
+          {
+            hint: "A revoked release can never be served again. Change the configuration so it builds a new release, then deploy.",
+            details: { release_id: release.id, content_hash: release.content_hash },
+          },
+        );
       }
       const current = (await client.listDeployments(liveQuery)).deployments[0];
       throw new ZitadelError(
@@ -233,4 +263,14 @@ export default class Deploy extends EnvironmentCommand {
       ].join("\n"),
     });
   }
+}
+
+/** The `code` of an API error body, when it carries one. */
+function errorCode(error: ApiError): string | undefined {
+  const body = error.body;
+  return typeof body === "object" &&
+    body !== null &&
+    typeof (body as { code?: unknown }).code === "string"
+    ? (body as { code: string }).code
+    : undefined;
 }

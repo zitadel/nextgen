@@ -25,15 +25,6 @@ type Normalizer = {
  */
 
 /**
- * Legacy content hash: order-sensitive and normalization-blind. Kept only so
- * state entries written by older CLI versions still match; new hashes come from
- * {@link hashForState}.
- */
-export function hashResourceContent(data: object): string {
-  return createHash("sha256").update(JSON.stringify(data)).digest("hex");
-}
-
-/**
  * The content hash stored in `.zitadel/state.json`: key-order-insensitive (via
  * `stableStringify`) and computed on the syncer's normalized form, so
  * reordering keys or spelling out a meta-schema default does not read as an

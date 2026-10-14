@@ -5,6 +5,7 @@ import {
   buildBundle,
   createReleaseFromBundle,
   headSha,
+  idpConnectionsStep,
   runSteps,
   type StepContext,
   validateStep,
@@ -56,7 +57,10 @@ export default class ReleaseCreate extends EnvironmentCommand {
       bundle,
       brandingSources,
     };
-    await runSteps([validateStep], ctx);
+    // The IdP connections sync before the build, as `deploy` does: a release
+    // names its connections by slug, and the server refuses to build one
+    // that names a slug the project does not hold yet.
+    await runSteps([validateStep, idpConnectionsStep], ctx);
 
     // `release create` carries the same no-mutation promise every command does
     // under `--dry-run`: validate the bundle the same way, then stop before the

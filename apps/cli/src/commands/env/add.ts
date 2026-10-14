@@ -256,7 +256,11 @@ export default class EnvAdd extends BaseCommand {
       pretty: [
         `Wrote ${file} with ${Object.keys(values).join(", ")}`,
         "",
-        `Allow this project's origin: zitadel origin add ${issuer ?? "<your-app-url>"} --kind primary --env ${name}`,
+        // Quoted like the machine command, and only offered when it can run:
+        // without the project secret in the file it would fail to authenticate.
+        writtenKeys.has("ZITADEL_PROJECT_SECRET")
+          ? `Allow this project's origin: zitadel origin add ${issuer === undefined ? "<your-app-url>" : shellArg(issuer)} --kind primary --env ${name}`
+          : `Allow this project's origin once ZITADEL_PROJECT_SECRET is in ${file}: zitadel origin add <your-app-url> --kind primary --env ${name}`,
         `Check what resolves: zitadel env --env ${name}`,
         "",
         "The deployed app never reads that file. Set these where it is built and run.",

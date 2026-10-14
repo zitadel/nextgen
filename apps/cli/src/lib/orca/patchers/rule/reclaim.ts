@@ -15,7 +15,7 @@ import type { FileOp, ScaffoldPlan } from "./file-writer/types";
  * the transform returning the source unchanged), so replaying one restores a
  * removed managed block without clobbering the user's own edits. Deliberately
  * excludes the unmarked `.zitadel/` resource writes and `zitadel.json` — those
- * are user-editable and synced by `apply`, so `--fix` must not clobber them.
+ * are user-editable and published by `deploy`, so `--fix` must not clobber them.
  *
  * Pure: filters a freshly-allocated list; the input plan is not mutated.
  */

@@ -158,6 +158,27 @@ describe("validate step", () => {
     ).rejects.toMatchObject({ code: "E_VALIDATION" });
   });
 
+  it("rejects a login template that leaves out the mandatory gates", async () => {
+    const descriptor = { layout: "centered", liquid_template: "<zl-page-shell></zl-page-shell>" };
+    const bundle = { schemas: [], flow_definitions: [], brandings: [descriptor] };
+
+    await expect(validateStep.run(ctx(bundle, { brandingSources: [descriptor] }))).rejects.toThrow(
+      /mandatory-gates/,
+    );
+  });
+
+  it("rejects a login template that carries a script tag", async () => {
+    const descriptor = {
+      layout: "centered",
+      liquid_template: "<script>alert(1)</script>{% mandatory_gates %}",
+    };
+    const bundle = { schemas: [], flow_definitions: [], brandings: [descriptor] };
+
+    await expect(validateStep.run(ctx(bundle, { brandingSources: [descriptor] }))).rejects.toThrow(
+      /no-script-tag/,
+    );
+  });
+
   it("rejects a branding $file reference that cannot be read", async () => {
     dir = await mkdtemp(join(tmpdir(), "zitadel-validate-"));
     await mkdir(join(dir, ".zitadel", "branding"), { recursive: true });
