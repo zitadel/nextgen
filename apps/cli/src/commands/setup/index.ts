@@ -1542,7 +1542,7 @@ async function assertLocalServerVersion(
         `halfway. Run start to restart it on ${expected}; its data stays. ${where}` +
         "Then rerun setup.",
       nextCommands: [
-        unscopedCommand("start", cliVersion),
+        unscopedCommand(`start --cwd ${shellArg(nearest.dir)}`, cliVersion),
         unscopedCommand(`setup ${setupRetryFlags(retry)}`, cliVersion),
       ],
       details: {

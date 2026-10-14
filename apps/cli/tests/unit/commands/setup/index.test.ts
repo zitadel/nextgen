@@ -218,7 +218,7 @@ describe("setup command pre-flight", () => {
     );
     expect(json.hint).toContain("Run start to restart it");
     expect(json.next_commands).toEqual([
-      expectedPublicCliCommand("start"),
+      expectedPublicCliCommand(`start --cwd ${cwd}`),
       expectedPublicCliCommand(
         `setup --framework next --non-interactive --server local --cwd ${cwd}`,
       ),

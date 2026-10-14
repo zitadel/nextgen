@@ -8,7 +8,11 @@ import type { StepContext } from "../../../../../src/lib/release/pipeline";
 import { diffStep } from "../../../../../src/lib/release/steps/diff";
 import type { SuggestedCommand } from "../../../../../src/lib/suggestion";
 
-type Live = { targets: { origin: string; expires_at: string | null }[]; sha?: string };
+type Live = {
+  targets: { origin: string; expires_at: string | null }[];
+  sha?: string;
+  release?: string;
+};
 
 let cwd: string;
 let written: string[];
@@ -34,6 +38,7 @@ function ctx(live: Live[], json = false): StepContext {
       listDeployments: async () => ({
         deployments: live.map((deployment) => ({
           targets: deployment.targets,
+          release_id: deployment.release ?? "rel_1",
           release: { metadata: { git_sha: deployment.sha } },
         })),
       }),
@@ -75,6 +80,21 @@ describe("diffStep", () => {
     );
 
     expect(written.join("")).toContain("0123456789ab");
+  });
+
+  it("says so when the primary origins serve different releases", async () => {
+    await diffStep.run(
+      ctx([
+        { targets: [PRIMARY], sha: "0123456789abcdef", release: "rel_2" },
+        {
+          targets: [{ origin: "https://www.acme.com", expires_at: null }],
+          sha: "fedcba9876543210",
+          release: "rel_1",
+        },
+      ]),
+    );
+
+    expect(written.join("")).toContain("The primary origins serve 2 different releases");
   });
 
   it("writes nothing to stdout under --json", async () => {

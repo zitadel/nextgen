@@ -1878,6 +1878,27 @@ describe("api-mock releases and deployments", () => {
     expect(deployed.status).toBe(201);
   });
 
+  test("gives a preview deployment without a ttl the project's default expiry", async () => {
+    const project = await newProject("deploy-preview-default-ttl");
+    await fetch(`${BASE}/projects/${project.id}/origins`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+      body: JSON.stringify({ pattern: "https://*-acme.vercel.app", kind: "preview" }),
+    });
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+
+    const deployed = (await (
+      await createDeployment(project.id, project.secret, {
+        release_id: release.id,
+        targets: ["https://x-acme.vercel.app"],
+      })
+    ).json()) as { targets: { expires_at: string | null }[] };
+
+    expect(deployed.targets[0]?.expires_at).not.toBeNull();
+  });
+
   test("refuses a rollback to an origin that is no longer primary with 403", async () => {
     const project = await newProject("deploy-rollback-removed");
     await addPrimary(project.id, project.secret, "https://app.acme.com");
