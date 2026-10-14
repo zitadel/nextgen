@@ -127,6 +127,7 @@ component attributes against the installed version rather than assuming.
   Use the `.client.ts` plugin and wrap the elements in `<ClientOnly>`.
 - **Keep `proxyPath` at `/__nextgen` for external sign-in.** The module moves
   the server proxy and the widgets together, but a provider returns the browser
-  to `/__nextgen/idp/callback`, which is proxied only under the default prefix.
+  to `/__nextgen/idp/{slug}/callback`, which is proxied only under the default
+  prefix.
 - **`useAuth()` never carries the JWT.** It is omitted so the token is not
   serialized into the SSR payload; use `getAuth(event)` server-side for it.

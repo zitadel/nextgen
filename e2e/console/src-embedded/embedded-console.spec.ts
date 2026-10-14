@@ -1,6 +1,8 @@
 import { expect, test } from "@zitadel/testing/playwright";
 
-import { grantProjectAdmin } from "../src-real/support";
+import { withErrorBody } from "../support/api";
+import { openAddTeam, uniqueName } from "../support/screens";
+import { EMBEDDED_LOGIN_URL, signIn } from "../support/sign-in";
 
 /**
  * The console as the Go binary serves it (Console ADR 0002 §4).
@@ -73,30 +75,21 @@ test("manages the project with the session cookie alone", async ({ page, seed, z
   // a granted operator's session cookie is what authorizes a management read
   // and a management write. The grant is written from the test process.
   const operator = await seed.user();
-  await grantProjectAdmin(zitadel.handle, operator.id);
   const colleague = await seed.user();
-
-  await page.goto("/ui/console/");
-  await page.getByLabel("Email").fill(operator.email);
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByLabel("Password").fill(operator.password);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.waitForURL((url) => !url.pathname.endsWith("/login"));
-  await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
+  await signIn(page, zitadel, operator, EMBEDDED_LOGIN_URL);
 
   await page.goto("/ui/console/users");
   await expect(page.getByRole("link", { name: colleague.email, exact: true })).toBeVisible();
 
-  const name = `Embedded ${Date.now().toString(36)}`;
+  const name = uniqueName("Embedded");
   await page.goto("/ui/console/teams?status=active");
-  await page.getByRole("button", { name: "Add", exact: true }).click();
-  const drawer = page.getByRole("dialog", { name: "Add team" });
-  await drawer.getByLabel("Team name").fill(name);
+  const addTeam = await openAddTeam(page);
+  await addTeam.name.fill(name);
   const created = page.waitForResponse(
     (response) =>
       new URL(response.url()).pathname === "/teams" && response.request().method() === "POST",
   );
-  await drawer.getByRole("button", { name: "Add team", exact: true }).click();
+  await addTeam.submit.click();
   expect((await created).status()).toBe(201);
   await expect(page.getByRole("link", { name, exact: true })).toBeVisible();
 });
@@ -111,40 +104,24 @@ test("shows each user's team on the Users screen with the session cookie", async
   // project. Proven through the console, not only the API: without it the
   // Users screen falls back to the unexpanded read and drops its Team column,
   // while every Go test stays green.
-  const { baseUrl, projectId, projectSecret, schemaId } = zitadel.handle;
-  const post = async (path: string, body: unknown) => {
-    const response = await fetch(`${baseUrl}${path}`, {
-      method: "POST",
-      headers: { authorization: `Bearer ${projectSecret}`, "content-type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const text = await response.text();
-    expect(response.ok, text).toBe(true);
-    return JSON.parse(text) as { id: string };
-  };
-
-  const operator = await seed.user();
-  await grantProjectAdmin(zitadel.handle, operator.id);
-  const team = await post(`/teams?project_id=${projectId}`, {
-    name: `Support ${Date.now().toString(36)}`,
-  });
-  const member = `member-${Date.now().toString(36)}@example.com`;
-  await post(`/users?project_id=${projectId}&team_id=${team.id}`, {
-    schema: schemaId,
-    attributes: { email: member },
-  });
-
-  await page.goto("/ui/console/");
-  await page.getByLabel("Email").fill(operator.email);
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByLabel("Password").fill(operator.password);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.waitForURL((url) => !url.pathname.endsWith("/login"));
+  const { projectId, schemaId } = zitadel.handle;
+  const team = await withErrorBody(
+    zitadel.api.createTeam({ name: uniqueName("Support") }, { project_id: projectId }),
+  );
+  // Created straight into the team: the membership the Team column shows.
+  const member = seed.identity().email;
+  await withErrorBody(
+    zitadel.api.createUser(
+      { schema: schemaId, attributes: { email: member } },
+      { project_id: projectId, team_id: team.id },
+    ),
+  );
+  await signIn(page, zitadel, await seed.user(), EMBEDDED_LOGIN_URL);
 
   await page.goto("/ui/console/users");
   await expect(page.getByRole("columnheader", { name: "Team" })).toBeVisible();
   const row = page.getByRole("row").filter({ hasText: member });
-  await expect(row.getByText(/^Support /)).toBeVisible();
+  await expect(row.getByText(team.name, { exact: true })).toBeVisible();
 });
 
 test("targets the origin root, never an /api prefix", async ({ page }) => {

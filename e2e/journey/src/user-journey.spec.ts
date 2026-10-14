@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import {
   clickFlowAction,
@@ -7,10 +5,12 @@ import {
   fillFlowField,
   flowAction,
   flowField,
+  identity,
   loginWithPasskey,
   loginWithPassword,
   registerWithPasskey,
   registerWithPassword,
+  SESSION_COOKIE_NAME,
   type ProfileEntry,
 } from "@zitadel/testing/playwright";
 
@@ -44,15 +44,13 @@ if (preset === "password-first") {
   test(`password-only registration, logout, and password login work in a fresh ${framework} app`, async ({
     page,
   }) => {
-    const email = uniqueEmail("password");
-    const password = "Correct-Horse-42!";
+    const { email, password } = identity();
 
     if (expectsProtectedRouteRedirect) {
       await expectProtectedRouteToRedirect(page);
     }
     await gotoLogin(page);
     await registerWithPassword(page, { email, password, profile: registrationProfile });
-    await skipPasskeyUpsellIfVisible(page);
     await expectSignedIn(page);
     await expectSessionCookie(page);
 
@@ -66,8 +64,7 @@ if (preset === "password-first") {
   test(`in-card sign-up and sign-in navigation switches purpose in a fresh ${framework} app`, async ({
     page,
   }) => {
-    const email = uniqueEmail("navswitch");
-    const password = "Correct-Horse-43!";
+    const { email, password } = identity();
 
     await gotoLogin(page);
 
@@ -99,7 +96,6 @@ if (preset === "password-first") {
     await clickFlowAction(page, "submit");
     await fillFlowField(page, "password", password, { label: /password/i });
     await clickFlowAction(page, "submit");
-    await skipPasskeyUpsellIfVisible(page);
     await expectSignedIn(page);
     await expectSessionCookie(page);
   });
@@ -110,7 +106,7 @@ if (preset === "passkey-first" && process.env.JOURNEY_ENABLE_PASSKEY !== "0") {
     page,
   }) => {
     const authenticator = await enableVirtualPasskey(page);
-    const email = uniqueEmail("passkey-first");
+    const { email } = identity();
 
     await gotoLogin(page);
     // Entry step renders the primary passkey action exactly once (a stale
@@ -169,24 +165,6 @@ async function gotoLogin(page: Page): Promise<void> {
   });
 }
 
-async function skipPasskeyUpsellIfVisible(page: Page): Promise<void> {
-  const skip = page.getByRole("button", { name: /skip for now/i });
-  const nextState = await Promise.race([
-    skip.waitFor({ state: "visible", timeout: 30_000 }).then(() => "passkey-upsell" as const),
-    signedInLocator(page)
-      .first()
-      .waitFor({ state: "visible", timeout: 30_000 })
-      .then(() => "signed-in" as const),
-  ]).catch(() => {
-    throw new Error(
-      `Timed out waiting for signed-in surface or passkey upsell; current URL: ${page.url()}`,
-    );
-  });
-  if (nextState === "passkey-upsell") {
-    await skip.click();
-  }
-}
-
 async function expectSignedIn(page: Page): Promise<void> {
   await expect(page).toHaveURL(profileUrl, { timeout: 30_000 });
   await expect(signedInLocator(page).first()).toBeVisible({ timeout: 30_000 });
@@ -198,14 +176,14 @@ async function expectSessionCookie(page: Page): Promise<void> {
       async () =>
         Boolean(
           (await page.context().cookies()).find(
-            (cookie) => cookie.name === "__nextgen_session" && cookie.value,
+            (cookie) => cookie.name === SESSION_COOKIE_NAME && cookie.value,
           ),
         ),
       { timeout: 10_000 },
     )
     .toBe(true);
   const sessionCookie = (await page.context().cookies()).find(
-    (cookie) => cookie.name === "__nextgen_session",
+    (cookie) => cookie.name === SESSION_COOKIE_NAME,
   );
   expect(sessionCookie?.httpOnly).toBe(true);
 }
@@ -235,7 +213,7 @@ async function expectSessionCleared(page: Page): Promise<void> {
   await expect
     .poll(
       async () =>
-        (await page.context().cookies()).some((cookie) => cookie.name === "__nextgen_session"),
+        (await page.context().cookies()).some((cookie) => cookie.name === SESSION_COOKIE_NAME),
       { timeout: 5000 },
     )
     .toBe(false);
@@ -267,10 +245,4 @@ function logoutLocator(page: Page) {
     .or(page.locator('zl-button[action="logout"], [data-action="logout"]'))
     .or(page.getByRole("button", { name: /logout|sign out/i }))
     .or(page.getByRole("link", { name: /logout|sign out/i }));
-}
-
-function uniqueEmail(prefix: string): string {
-  // crypto-backed, not Math.random(): these identifiers flow into the kit's
-  // credential-shaped ceremony inputs, where CodeQL flags insecure randomness.
-  return `${prefix}-${Date.now()}-${randomUUID().slice(0, 8)}@example.test`;
 }
