@@ -147,10 +147,15 @@ turbo's cache defaults to the main checkout's `.turbo/cache`; set
 `TURBO_CACHE_DIR` to keep worktrees apart. Telemetry is off in CI and on
 Vercel (`TURBO_TELEMETRY_DISABLED=1`); set it locally too.
 
-On Vercel, `apps/cloud/turbo-build.sh` runs the hosted cloud's builds with
-the cache as Vercel sets it up: every build reads and writes the team's
-remote cache, production and previews in separate entries, and keeps no
-local cache. Writing takes the team's token, which a fork's pull request
-never gets unapproved. The docs and the website do not build through turbo:
-with Skew Protection on, a Next.js build's cache key includes the
-deployment's ID, so no build could reuse another's.
+On Vercel, the hosted cloud's services build with the plain `turbo run build`
+Vercel itself uses (repo-root `vercel.json`; the server's login UI in
+`apps/cloud/build.sh`). Two project variables, `TURBO_TELEMETRY_DISABLED`
+and `TURBO_PLATFORM_ENV_DISABLED`, turn off telemetry and turbo's warning
+about each project variable `turbo.json` does not pass
+([runbook](../../runbooks/cloud.md)). The cache works as Vercel sets it up:
+every build reads and writes the team's remote cache, production and
+previews in separate entries, and keeps no local cache. Writing takes the
+team's token, which a fork's pull request never gets unapproved. The docs
+and the website do not build through turbo: with Skew Protection on, a
+Next.js build's cache key includes the deployment's ID, so no build could
+reuse another's.

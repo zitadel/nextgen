@@ -51,7 +51,7 @@
     "TMPDIR",
     "LC_ALL",
     // Vercel keeps corepack enabled for a turbo build only when this is
-    // listed here (it checks the file); the scripts run `corepack pnpm`.
+    // listed here (it checks the file); the cloud's builds run its `pnpm`.
     "COREPACK_HOME"
   ],
   // The root files moon's .moon/tasks/*.yml list as implicitInputs: a change

@@ -593,8 +593,8 @@ the release graph.
    production and preview, reads and writes the team's remote cache, and
    turbo's default `VERCEL_TARGET_ENV` hash keeps production's entries
    apart from the previews'. Writing takes the team's token, which forks do
-   not get (see "Who may write to the cache"). `apps/cloud/turbo-build.sh`
-   sets no cache policy of its own.
+   not get (see "Who may write to the cache"). The cloud's builds set no
+   cache policy of their own.
 4. **The Go tasks' scripts stay in `apps/server/package.json`** (published,
    inert).
 5. **Release builds keep rewriting `dist/` in place**, ordered by the edge
