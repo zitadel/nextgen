@@ -6,6 +6,7 @@ import {
   filterResponseHeaders,
   matchesRoutes,
   requiresProjectSecret,
+  validateOpaqueSessionToken,
 } from "@zitadel/sdk-core/middleware";
 
 import { verifyJwt, base64UrlDecode } from "./lib/jwt";
@@ -26,7 +27,15 @@ const PROCESS_ENV: Record<string, string | undefined> =
 export type NextgenRequestDecision =
   | { readonly type: "proxy"; readonly response: Response }
   | { readonly type: "redirect"; readonly response: Response }
-  | { readonly type: "continue"; readonly auth: AuthResult };
+  | {
+      readonly type: "continue";
+      readonly auth: AuthResult;
+      /**
+       * `Set-Cookie` values the response to this request must carry — the
+       * clearing of dead session cookies. Empty or absent when there are none.
+       */
+      readonly setCookies?: readonly string[];
+    };
 
 /** Options accepted by {@link handleNextgenRequest} and the middleware factory. */
 export type NextgenRequestOptions = NextgenMiddlewareOptions & {
@@ -128,25 +137,6 @@ function isJwtShaped(token: string): boolean {
     return typeof header?.alg === "string" && !("enc" in header);
   } catch {
     return false;
-  }
-}
-
-async function validateOpaqueSessionToken(
-  token: string,
-  issuerUrl: string,
-  timeoutMs: number,
-): Promise<{ userId?: string } | null> {
-  try {
-    const res = await fetch(`${issuerUrl}/sessions/me`, {
-      method: "GET",
-      headers: { cookie: `__nextgen_session=${token}` },
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    if (!res.ok) return null;
-    const body = (await res.json()) as { user_id?: string };
-    return { userId: body.user_id };
-  } catch {
-    return null;
   }
 }
 
@@ -263,38 +253,51 @@ export async function handleNextgenRequest(
     };
   }
 
+  let liveAnonymousSession = false;
   if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
-    const opaqueResult = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
-    if (opaqueResult) {
+    const opaque = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
+    // A session without a user is anonymous: its sign-in has not verified a
+    // factor yet. It is not signed in, but it is live — keep its cookie.
+    if (opaque?.userId) {
       return {
         type: "continue",
         auth: {
           isAuthenticated: true,
           session: {
-            userId: opaqueResult.userId ?? "unknown",
-            identifier: null,
-            identifierProperty: null,
-            display: null,
+            userId: opaque.userId,
+            identifier: opaque.identifier,
+            identifierProperty: opaque.identifierProperty,
+            display: opaque.display,
             token: cookieToken,
           },
         },
       };
     }
+    liveAnonymousSession = opaque !== null;
   }
+
+  // Dead credentials are cleared on every unauthenticated response so the
+  // browser stops replaying them (each replay costs a backend session check);
+  // a live anonymous session's cookie stays, since its sign-in may complete.
+  const setCookies = liveAnonymousSession
+    ? []
+    : [...cookies.keys()].filter((name) => name.startsWith("__nextgen")).map(clearCookie);
 
   if (matchesRoutes(pathname, protectedRoutes)) {
     const loginUrl = new URL(loginPath, url2);
     loginUrl.searchParams.set("next", pathname);
     const headers = new Headers({ location: loginUrl.toString() });
-    for (const name of cookies.keys()) {
-      if (name.startsWith("__nextgen")) {
-        headers.append("set-cookie", clearCookie(name));
-      }
+    for (const cookie of setCookies) {
+      headers.append("set-cookie", cookie);
     }
     return { type: "redirect", response: new Response(null, { status: 302, headers }) };
   }
 
-  return { type: "continue", auth: { isAuthenticated: false, session: null } };
+  return {
+    type: "continue",
+    auth: { isAuthenticated: false, session: null },
+    ...(setCookies.length > 0 ? { setCookies } : {}),
+  };
 }
 
 /**
@@ -352,7 +355,15 @@ export function createNextgenRequestMiddleware(
 
     if (decision.type === "continue") {
       const result = await next({ context: { [CONTEXT_KEY]: decision.auth } });
-      return result.response;
+      if (!decision.setCookies?.length) {
+        return result.response;
+      }
+      // A downstream response's headers may be immutable; copy before adding.
+      const response = new Response(result.response.body, result.response);
+      for (const cookie of decision.setCookies) {
+        response.headers.append("set-cookie", cookie);
+      }
+      return response;
     }
     return decision.response;
   };

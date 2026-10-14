@@ -6,6 +6,7 @@ import {
   filterResponseHeaders,
   matchesRoutes,
   requiresProjectSecret,
+  validateOpaqueSessionToken,
 } from "@zitadel/sdk-core/middleware";
 
 import { verifyJwt, base64UrlDecode } from "./lib/jwt";
@@ -173,29 +174,6 @@ function isJwtShaped(token: string): boolean {
   }
 }
 
-/**
- * Validates an opaque (non-JWT) session token via the backend's `/sessions/me`
- * endpoint. Returns the response JSON on HTTP 200, `null` otherwise.
- */
-async function validateOpaqueSessionToken(
-  token: string,
-  issuerUrl: string,
-  timeoutMs: number,
-): Promise<{ userId?: string } | null> {
-  try {
-    const res = await fetch(`${issuerUrl}/sessions/me`, {
-      method: "GET",
-      headers: { cookie: `__nextgen_session=${token}` },
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    if (!res.ok) return null;
-    const body = (await res.json()) as { user_id?: string };
-    return { userId: body.user_id };
-  } catch {
-    return null;
-  }
-}
-
 /** Key under which the auth result is stored on `ev.sharedMap`. */
 const SHARED_MAP_KEY = "nextgenAuth";
 
@@ -263,21 +241,25 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
     return;
   }
 
+  let liveAnonymousSession = false;
   if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
-    const opaqueResult = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
-    if (opaqueResult) {
+    const opaque = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
+    // A session without a user is anonymous: its sign-in has not verified a
+    // factor yet. It is not signed in, but it is live — keep its cookie.
+    if (opaque?.userId) {
       ev.sharedMap.set(SHARED_MAP_KEY, {
         isAuthenticated: true,
         session: {
-          userId: opaqueResult.userId ?? "unknown",
-          identifier: null,
-          identifierProperty: null,
-          display: null,
+          userId: opaque.userId,
+          identifier: opaque.identifier,
+          identifierProperty: opaque.identifierProperty,
+          display: opaque.display,
           token: cookieToken,
         },
       } satisfies AuthResult);
       return;
     }
+    liveAnonymousSession = opaque !== null;
   }
 
   ev.sharedMap.set(SHARED_MAP_KEY, {
@@ -285,12 +267,19 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
     session: null,
   } satisfies AuthResult);
 
-  if (matchesRoutes(pathname, protectedRoutes)) {
+  // Dead credentials are cleared on every unauthenticated response so the
+  // browser stops replaying them (each replay costs a backend session check);
+  // a live anonymous session's cookie stays, since its sign-in may complete.
+  // Qwik applies the deletion to whichever response goes out.
+  if (!liveAnonymousSession) {
     for (const name of Object.keys(ev.cookie.getAll())) {
       if (name.startsWith("__nextgen")) {
         ev.cookie.delete(name, { path: "/" });
       }
     }
+  }
+
+  if (matchesRoutes(pathname, protectedRoutes)) {
     const loginUrl = new URL(loginPath, ev.url);
     loginUrl.searchParams.set("next", pathname);
     throw ev.redirect(302, `${loginUrl.pathname}${loginUrl.search}`);

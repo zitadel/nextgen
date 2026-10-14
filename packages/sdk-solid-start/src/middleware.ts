@@ -6,6 +6,7 @@ import {
   filterResponseHeaders,
   matchesRoutes,
   requiresProjectSecret,
+  validateOpaqueSessionToken,
 } from "@zitadel/sdk-core/middleware";
 
 import { verifyJwt, base64UrlDecode } from "./lib/jwt";
@@ -31,6 +32,11 @@ export interface SolidFetchEvent {
   readonly locals: Record<string, unknown> & { nextgenAuth?: AuthResult };
   /** Direct client address, when the platform adapter resolves one. */
   readonly clientAddress?: string;
+  /**
+   * The response stub SolidStart merges into the response it eventually sends;
+   * a middleware that continues sets headers (here, clearing cookies) on it.
+   */
+  readonly response?: { readonly headers: Headers };
 }
 
 /**
@@ -166,29 +172,6 @@ function isJwtShaped(token: string): boolean {
   }
 }
 
-/**
- * Validates an opaque (non-JWT) session token via the backend's `/sessions/me`
- * endpoint. Returns the response JSON on HTTP 200, `null` otherwise.
- */
-async function validateOpaqueSessionToken(
-  token: string,
-  issuerUrl: string,
-  timeoutMs: number,
-): Promise<{ userId?: string } | null> {
-  try {
-    const res = await fetch(`${issuerUrl}/sessions/me`, {
-      method: "GET",
-      headers: { cookie: `__nextgen_session=${token}` },
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    if (!res.ok) return null;
-    const body = (await res.json()) as { user_id?: string };
-    return { userId: body.user_id };
-  } catch {
-    return null;
-  }
-}
-
 /** A `Set-Cookie` value that clears `name` on the root path. */
 function clearCookie(name: string): string {
   return `${name}=; Path=/; Max-Age=0`;
@@ -270,38 +253,51 @@ async function handleAuth(
     return;
   }
 
+  let liveAnonymousSession = false;
   if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
-    const opaqueResult = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
-    if (opaqueResult) {
+    const opaque = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
+    // A session without a user is anonymous: its sign-in has not verified a
+    // factor yet. It is not signed in, but it is live — keep its cookie.
+    if (opaque?.userId) {
       event.locals.nextgenAuth = {
         isAuthenticated: true,
         session: {
-          userId: opaqueResult.userId ?? "unknown",
-          identifier: null,
-          identifierProperty: null,
-          display: null,
+          userId: opaque.userId,
+          identifier: opaque.identifier,
+          identifierProperty: opaque.identifierProperty,
+          display: opaque.display,
           token: cookieToken,
         },
       };
       return;
     }
+    liveAnonymousSession = opaque !== null;
   }
 
   event.locals.nextgenAuth = { isAuthenticated: false, session: null };
+
+  // Dead credentials are cleared on every unauthenticated response so the
+  // browser stops replaying them (each replay costs a backend session check);
+  // a live anonymous session's cookie stays, since its sign-in may complete.
+  const staleCookies = liveAnonymousSession
+    ? []
+    : [...cookies.keys()].filter((name) => name.startsWith("__nextgen"));
 
   if (matchesRoutes(pathname, protectedRoutes)) {
     const loginUrl = new URL(loginPath, url2);
     loginUrl.searchParams.set("next", pathname);
     const headers = new Headers({ location: loginUrl.toString() });
-    for (const name of cookies.keys()) {
-      if (name.startsWith("__nextgen")) {
-        headers.append("set-cookie", clearCookie(name));
-      }
+    for (const name of staleCookies) {
+      headers.append("set-cookie", clearCookie(name));
     }
     return new Response(null, { status: 302, headers });
   }
 
-  // Unprotected route with no session: continue the SolidStart pipeline.
+  // Unprotected route: continue the SolidStart pipeline, which merges the
+  // response stub's headers into the response it sends.
+  for (const name of staleCookies) {
+    event.response?.headers.append("set-cookie", clearCookie(name));
+  }
   return undefined;
 }
 

@@ -13,6 +13,13 @@ import { generateKeyPairSync, createSign } from "node:crypto";
 import { describe, it, expect, expectTypeOf, vi, beforeEach } from "vitest";
 
 import { createNextgenHandle } from "../handle";
+import { clearJwksCache } from "@zitadel/sdk-core/jwt";
+
+// The JWKS cache is module-level and per issuer: start every case from a cold
+// cache, so each one fetches the keys its own mock publishes.
+beforeEach(() => {
+  clearJwksCache();
+});
 
 function base64url(buf: Buffer): string {
   return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -603,5 +610,72 @@ function ts(offsetSeconds: number): number {
 describe("SvelteKit Handle compatibility", () => {
   it("is assignable to SvelteKit's Handle", () => {
     expectTypeOf(createNextgenHandle({ url: "http://localhost:4000" })).toExtend<Handle>();
+  });
+});
+
+// The backend issues opaque session tokens; the hook asks /sessions/me about them.
+describe("opaque session cookie", () => {
+  const COOKIE = "__nextgen_session=opaque-session-token";
+
+  function sessionsMe(response: Response): void {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => response),
+    );
+  }
+
+  function protectedHandle() {
+    return createNextgenHandle({
+      url: "http://localhost:4000",
+      protectedRoutes: ["/admin"],
+      loginPath: "/login",
+    });
+  }
+
+  it("signs in a live session that names a user, with the user's details", async () => {
+    sessionsMe(
+      Response.json({
+        user_id: "u1",
+        user: { identifier: "ada@example.com", identifier_property: "email", display: "Ada" },
+      }),
+    );
+    const { event, resolve } = makeEvent("http://localhost:3000/admin", { cookie: COOKIE });
+
+    await run(protectedHandle(), event, resolve);
+
+    expect(event.locals.nextgenAuth).toMatchObject({
+      isAuthenticated: true,
+      session: { userId: "u1", identifier: "ada@example.com", display: "Ada" },
+    });
+  });
+
+  // CreateSession sets the cookie before any factor is verified: an abandoned
+  // sign-in must not open protected routes.
+  it("redirects an anonymous session on a protected route to login", async () => {
+    sessionsMe(Response.json({}));
+    const { event, resolve } = makeEvent("http://localhost:3000/admin", { cookie: COOKIE });
+
+    const res = await run(protectedHandle(), event, resolve);
+
+    expect(res.status).toBe(302);
+  });
+
+  it("keeps an anonymous session's cookie, since its sign-in may still complete", async () => {
+    sessionsMe(Response.json({}));
+    const { event, resolve } = makeEvent("http://localhost:3000/admin", { cookie: COOKIE });
+
+    const res = await run(protectedHandle(), event, resolve);
+
+    expect(res.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("clears a dead session cookie on a public page", async () => {
+    sessionsMe(new Response(null, { status: 401 }));
+    const { event, resolve } = makeEvent("http://localhost:3000/", { cookie: COOKIE });
+    const deleteCookie = vi.spyOn(event.cookies, "delete");
+
+    await run(protectedHandle(), event, resolve);
+
+    expect(deleteCookie).toHaveBeenCalledWith("__nextgen_session", { path: "/" });
   });
 });

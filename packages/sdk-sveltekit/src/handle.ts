@@ -7,6 +7,7 @@ import {
   filterResponseHeaders,
   matchesRoutes,
   requiresProjectSecret,
+  validateOpaqueSessionToken,
 } from "@zitadel/sdk-core/middleware";
 
 import { verifyJwt, base64UrlDecode } from "./lib/jwt";
@@ -192,46 +193,6 @@ function isJwtShaped(token: string): boolean {
 }
 
 /**
- * Validates an opaque (non-JWT) session token by calling the backend's
- * `/sessions/me` endpoint. Returns the response JSON when the backend
- * confirms the session is live (HTTP 200), `null` otherwise.
- *
- * This is the fallback path for backends that issue encrypted opaque tokens
- * rather than self-contained JWTs.
- */
-async function validateOpaqueSessionToken(
-  token: string,
-  issuerUrl: string,
-  timeoutMs: number,
-): Promise<{
-  userId?: string;
-  identifier: string | null;
-  identifierProperty: string | null;
-  display: string | null;
-} | null> {
-  try {
-    const res = await fetch(`${issuerUrl}/sessions/me`, {
-      method: "GET",
-      headers: { cookie: `__nextgen_session=${token}` },
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    if (!res.ok) return null;
-    const body = (await res.json()) as {
-      user_id?: string;
-      user?: { identifier?: string; identifier_property?: string; display?: string };
-    };
-    return {
-      userId: body.user_id,
-      identifier: body.user?.identifier ?? null,
-      identifierProperty: body.user?.identifier_property ?? null,
-      display: body.user?.display ?? null,
-    };
-  } catch {
-    return null;
-  }
-}
-
-/**
  * Options passed internally to {@link handleAuth} after destructuring the
  * public-facing {@link NextgenMiddlewareOptions}.
  */
@@ -334,29 +295,37 @@ async function handleAuth(
   // Only fall back to /sessions/me validation when the token is definitively
   // not a JWT (non-JSON segments). A token with a valid JWT structure that
   // failed verification (bad sig, wrong typ/alg) must be rejected.
+  let liveAnonymousSession = false;
   if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
-    const opaqueResult = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
-    if (opaqueResult) {
+    const opaque = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
+    // A session without a user is anonymous: its sign-in has not verified a
+    // factor yet. It is not signed in, but it is live — keep its cookie.
+    if (opaque?.userId) {
       event.locals.nextgenAuth = {
         isAuthenticated: true,
         session: {
-          userId: opaqueResult.userId ?? "unknown",
-          identifier: opaqueResult.identifier,
-          identifierProperty: opaqueResult.identifierProperty,
-          display: opaqueResult.display,
+          userId: opaque.userId,
+          identifier: opaque.identifier,
+          identifierProperty: opaque.identifierProperty,
+          display: opaque.display,
           token: cookieToken,
         },
       };
       return resolve(event);
     }
+    liveAnonymousSession = opaque !== null;
   }
 
   event.locals.nextgenAuth = { isAuthenticated: false, session: null };
 
-  const staleCookies = event.cookies
-    .getAll()
-    .filter((c) => c.name.startsWith("__nextgen"))
-    .map((c) => c.name);
+  // Dead credentials are cleared so the browser stops replaying them; a live
+  // anonymous session's cookie stays, since its sign-in may still complete.
+  const staleCookies = liveAnonymousSession
+    ? []
+    : event.cookies
+        .getAll()
+        .filter((c) => c.name.startsWith("__nextgen"))
+        .map((c) => c.name);
 
   if (matchesRoutes(pathname, protectedRoutes)) {
     const loginUrl = new URL(loginPath, event.url);
