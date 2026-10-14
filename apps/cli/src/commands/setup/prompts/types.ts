@@ -93,8 +93,13 @@ export type SetupAnswers = {
 /** Read-only facts a prompt may need. */
 export type PromptContext = {
   /**
-   * How a prompt asks its question: the command's `input`, so every question
-   * the wizard asks behaves like every other question the CLI asks.
+   * How a prompt asks its question: `input`, so every question the wizard
+   * asks behaves like every other question the CLI asks.
+   *
+   * Deliberately not the command's `this.input`. That one answers a `confirm`
+   * when the command's `--force` is given, and setup's `--force` means "overwrite
+   * files", so with it a prompt such as "Detected next. Proceed?" would be
+   * answered yes without asking. This one never is.
    */
   readonly input: Asker;
   readonly framework: FrameworkFacts;

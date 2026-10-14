@@ -134,6 +134,15 @@ describe("FrameworkConfirmPrompt", () => {
     });
   });
 
+  it("says it stopped because the framework was declined, not that anything was cancelled", async () => {
+    vi.mocked(confirm).mockResolvedValueOnce(false);
+
+    await expect(new FrameworkConfirmPrompt().ask(baseAnswers(), ctx)).rejects.toMatchObject({
+      message: "Setup stopped — the detected framework was declined",
+      hint: "Re-run with --framework next when ready.",
+    });
+  });
+
   it("throws E_VALIDATION on Ctrl-C", async () => {
     vi.mocked(confirm).mockResolvedValueOnce(Symbol("cancel") as never);
     vi.mocked(isCancel).mockReturnValueOnce(true);
@@ -686,6 +695,59 @@ describe("askCustomSettings", () => {
 
     expect(await askCustomSettings(given, ask)).toEqual(given);
     expect(text).not.toHaveBeenCalled();
+  });
+
+  const EVERYTHING = {
+    slug: "acme-sso",
+    displayName: "Acme SSO",
+    issuer: "https://sso.acme.example",
+    scopes: "openid",
+  };
+  const QUESTIONS = {
+    slug: "Name for this connection",
+    displayName: "Name shown on the sign-in button",
+    issuer: "Issuer URL of the provider",
+    scopes: "Scopes to request",
+  };
+
+  it.each([
+    [["slug"], ["displayName", "issuer", "scopes"]],
+    [
+      ["displayName", "scopes"],
+      ["slug", "issuer"],
+    ],
+    [["slug", "displayName", "issuer"], ["scopes"]],
+    [[], ["slug", "displayName", "issuer", "scopes"]],
+  ] as const)("given %j asks only for %j, in that order", async (givenKeys, askedKeys) => {
+    const given = Object.fromEntries(givenKeys.map((key) => [key, EVERYTHING[key]]));
+    vi.mocked(text).mockImplementation(
+      (async ({ message }: { message: string }) =>
+        Object.values(EVERYTHING)[
+          Object.values(QUESTIONS).findIndex((question) => message.startsWith(question))
+        ]) as never,
+    );
+
+    await askCustomSettings(given, ask);
+
+    expect(vi.mocked(text).mock.calls.map(([options]) => options.message)).toEqual(
+      askedKeys.map((key) => expect.stringContaining(QUESTIONS[key])),
+    );
+  });
+
+  it.each([
+    ["slug", "Not A Slug"],
+    ["issuer", "not a url"],
+  ] as const)("refuses a given %s that does not parse, without asking", async (key, value) => {
+    await expect(askCustomSettings({ ...EVERYTHING, [key]: value }, ask)).rejects.toMatchObject({
+      code: "E_VALIDATION",
+    });
+    expect(text).not.toHaveBeenCalled();
+  });
+
+  it("returns the scopes that were given as one string", async () => {
+    const values = await askCustomSettings({ ...EVERYTHING, scopes: "openid  email" }, ask);
+
+    expect(values.scopes).toBe("openid email");
   });
 
   it("asks only for the settings that were left out", async () => {

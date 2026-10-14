@@ -94,14 +94,18 @@ describe("resources", () => {
         );
       });
 
-      it("refuses to delete without --force when no one can be asked", async () => {
+      it.each([
+        ["users", "delete", "user_1"],
+        ["teams", "deactivate", "team_1"],
+        ["sessions", "revoke", "sess_1"],
+      ])("refuses %s %s without --force when no one can be asked", async (topic, verb, id) => {
         const app = await aSetUpApp();
 
-        const result = await app.run(["users", "delete", "user_1", "--json"]);
+        const result = await app.run([topic, verb, id, "--json"]);
 
         expect(result).toFailWith("E_VALIDATION");
         expect(result).toHintAt("--force");
-        expect(result).toSuggest("users delete user_1 --force");
+        expect(result).toSuggest(`${topic} ${verb} ${id} --force`);
       });
 
       it("says what can be done to each topic", async () => {

@@ -145,7 +145,6 @@ export default class BrandingEject extends BaseCommand {
     return this.input({
       kind: "select",
       name: "design",
-      flag: "--design",
       message: "Which design do you want to start from?",
       initialValue: DEFAULT_BRANDING_DESIGN as string,
       options: BRANDING_DESIGNS.map((design) => ({

@@ -11,23 +11,27 @@ type Choice<V> = { value: V; label: string; hint?: string };
 /** What every question says about itself, whatever it asks for. */
 type Common = {
   /**
-   * What is being asked for, as a lowercase noun phrase ("client id"). It
-   * completes the error a run with no way to answer gets: "No client id
-   * supplied". For a `confirm` it is the action instead ("delete the
-   * variable"), which completes "Cannot delete the variable without --force".
+   * What is being asked for, as a lowercase noun phrase ("client id"). It is
+   * required because any question can meet a run with nobody to ask, and the
+   * refusal names it: "No client id supplied". For a `confirm` it is the
+   * action instead ("delete the variable"), which completes "Cannot delete the
+   * variable without --force". A question that is only ever asked in a
+   * terminal never shows it.
    */
   name: string;
   /** The question as the prompt shows it. */
   message: string;
   /**
-   * The flag that carries this value (`--client-id`), when there is one. It
-   * is what the error tells a scripted caller to pass. A value that is never a
-   * flag, such as a secret, leaves it out.
+   * The flag that carries this value (`--client-id`), when there is one. The
+   * refusal tells a scripted caller to pass it. Leave it out for a question a
+   * script cannot answer with a flag. It is ignored for a `secret`, which is
+   * never a flag.
    */
   flag?: string;
   /**
-   * The command to run again with the missing input, for an agent to run. It
-   * becomes the error's `nextCommands`.
+   * The command to run again with the missing input, written for an agent to
+   * run. It becomes the refusal's `nextCommands`, and for a value it is also
+   * quoted in the hint as an example.
    */
   retry?: string;
 };
@@ -47,9 +51,11 @@ type TextQuestion = Common & {
   /** Whether piped stdin may answer, for a value a script supplies. */
   stdin?: boolean;
   /**
-   * Whether having no answer is acceptable. The question then never prompts
-   * and never throws: it returns `undefined` when nothing was given or piped
-   * in, which is for a value a rerun may replace but does not need.
+   * Whether having no answer is acceptable, for a value a rerun may replace
+   * but does not need. The question then never prompts and never refuses for
+   * want of a value: it returns `undefined` when nothing was given and
+   * nothing, or only an empty pipe, was piped in. A pipe that has content that
+   * does not parse is still an `E_VALIDATION` error, like any other source.
    */
   optional?: boolean;
   initialValue?: string;
@@ -59,15 +65,12 @@ type TextQuestion = Common & {
 type SelectQuestion = Common & {
   kind: "select";
   options: Choice<unknown>[];
-  given?: unknown;
   initialValue?: unknown;
 };
 
 type MultiselectQuestion = Common & {
   kind: "multiselect";
   options: Choice<unknown>[];
-  given?: unknown[];
-  initialValues?: unknown[];
   /** Whether at least one option must be ticked. */
   required?: boolean;
 };
@@ -119,11 +122,12 @@ export type Asker = <Q extends Question>(question: Q) => Promise<Answer<Q>>;
  * 1. **`given`**, the value the command line already carried (a flag).
  * 2. **Piped stdin**, only when the question sets `stdin` and stdin is not a
  *    terminal. A terminal on stdin means nothing was piped, and reading it
- *    would block forever, so it is never read.
+ *    would block forever, so it is never read. An empty pipe that does not
+ *    parse is a script that piped nothing, and counts as no pipe.
  * 3. **A prompt**, only when the session is `interactive`.
  * 4. **Otherwise an `E_VALIDATION` error**: "No <name> supplied", with a hint
- *    built from the question's `flag` and whether stdin is accepted, and the
- *    question's `retry` command as `nextCommands`.
+ *    built from the question's `flag`, whether stdin is accepted and, as an
+ *    example, its `retry`; and `retry` as `nextCommands` for an agent to run.
  *
  * What comes back follows the `kind`:
  *
@@ -132,12 +136,15 @@ export type Asker = <Q extends Question>(question: Q) => Promise<Answer<Q>>;
  *   one rule, and the caller never parses again. In the prompt it is the
  *   validator that refuses an answer as it is typed. A value from a flag or a
  *   pipe that does not parse is an `E_VALIDATION` error saying why. `secret`
- *   masks what is typed; the value is never echoed or put in an error.
+ *   masks what is typed, is never a flag, and is never echoed or put in an
+ *   error. With `optional`, the answer may be `undefined` (see its docs).
  * - `select` returns the chosen option's `value`.
  * - `multiselect` returns the chosen options' `value`s.
- * - `confirm` returns a boolean. `force` answers it as yes, so the command's
- *   `--force` skips the question. With no one to ask and no `force`, it throws
- *   an `E_VALIDATION` error saying `--force` is required.
+ * - `confirm` returns a boolean. The session's `force` (the command's
+ *   `--force`) answers it yes without asking. With no one to ask and no
+ *   `force`, it throws an `E_VALIDATION` error saying `--force` is required.
+ *   A command whose `--force` means something else must not hand out a
+ *   session with `force` set.
  *
  * Cancelling a prompt (Ctrl-C) throws `E_VALIDATION` "Cancelled by user"
  * instead of returning a sentinel, so a command never carries on with a
@@ -160,7 +167,7 @@ export type Asker = <Q extends Question>(question: Q) => Promise<Answer<Q>>;
 export async function input<Q extends Question>(question: Q, session: Session): Promise<Answer<Q>> {
   const q: Question = question;
   const stdin = session.stdin ?? process.stdin;
-  const fail = (message: string, hint?: string): ZitadelError =>
+  const refusal = (message: string, hint?: string): ZitadelError =>
     new ZitadelError("E_VALIDATION", message, {
       ...(hint === undefined ? {} : { hint }),
       ...(q.retry === undefined ? {} : { nextCommands: [q.retry] }),
@@ -169,99 +176,117 @@ export async function input<Q extends Question>(question: Q, session: Session): 
     cancel("Cancelled.");
     return new ZitadelError("E_VALIDATION", "Cancelled by user");
   };
-  const unsupplied = (acceptsStdin: boolean): ZitadelError => {
+  const unsupplied = (): ZitadelError => {
+    const isText = q.kind === "text" || q.kind === "secret";
+    // A secret is never a flag, whatever the question says, because that would
+    // put it in shell history, a process listing and CI logs.
+    const secret = q.kind === "secret";
     const ways = [
-      ...(q.flag === undefined ? [] : [`pass ${q.flag}`]),
-      ...(acceptsStdin ? ["pipe it in on stdin"] : []),
+      ...(q.flag === undefined || secret ? [] : [`pass ${q.flag}`]),
+      ...(isText && q.stdin === true ? ["pipe it in on stdin"] : []),
     ];
-    const secret =
-      q.kind === "secret" && q.flag === undefined
-        ? " It is never a flag: that would put it in shell history, a process listing and CI logs."
-        : "";
-    const hint =
-      ways.length === 0
-        ? undefined
-        : `${ways.join(", or ").replace(/^./, (first) => first.toUpperCase())}.${secret}`;
-    return fail(`No ${q.name} supplied`, hint);
+    const hint = [
+      ...(ways.length === 0
+        ? []
+        : [`${ways.join(", or ").replace(/^./, (c) => c.toUpperCase())}.`]),
+      ...(secret
+        ? ["It is never a flag: that would put it in shell history, a process listing and CI logs."]
+        : []),
+      ...(isText && q.retry !== undefined ? [`For example: ${q.retry}`] : []),
+    ].join(" ");
+    return refusal(`No ${q.name} supplied`, hint === "" ? undefined : hint);
   };
 
-  if (q.kind === "confirm") {
-    if (session.force) {
-      return true as Answer<Q>;
+  const answer = async (): Promise<unknown> => {
+    if (q.kind === "confirm") {
+      if (session.force) {
+        return true;
+      }
+      if (!session.interactive) {
+        throw refusal(
+          `Cannot ${q.name} without --force in non-interactive mode`,
+          `Pass --force to ${q.name}.`,
+        );
+      }
+      const confirmed = await confirm({
+        message: q.message,
+        initialValue: q.initialValue ?? false,
+      });
+      if (isCancel(confirmed)) {
+        throw cancelled();
+      }
+      return confirmed;
     }
-    if (!session.interactive) {
-      throw fail(
-        `Cannot ${q.name} without --force in non-interactive mode`,
-        `Pass --force to ${q.name}.`,
-      );
-    }
-    const answer = await confirm({ message: q.message, initialValue: q.initialValue ?? false });
-    if (isCancel(answer)) {
-      throw cancelled();
-    }
-    return answer as Answer<Q>;
-  }
 
-  if (q.kind === "select" || q.kind === "multiselect") {
+    if (q.kind === "select" || q.kind === "multiselect") {
+      if (!session.interactive) {
+        throw unsupplied();
+      }
+      const chosen =
+        q.kind === "select"
+          ? await select({
+              message: q.message,
+              options: q.options,
+              initialValue: q.initialValue,
+            })
+          : await multiselect({
+              message: q.message,
+              options: q.options,
+              required: q.required,
+            });
+      if (isCancel(chosen)) {
+        throw cancelled();
+      }
+      return chosen;
+    }
+
+    const accept = (raw: string): unknown => {
+      const parsed = q.parse(raw);
+      if (!parsed.ok) {
+        throw refusal(parsed.problem);
+      }
+      return parsed.value;
+    };
     if (q.given !== undefined) {
-      return q.given as Answer<Q>;
+      return accept(q.given);
+    }
+    if (q.stdin === true && !stdin.isTTY) {
+      const piped = await readStdin(stdin);
+      const parsed = q.parse(piped);
+      if (parsed.ok) {
+        return parsed.value;
+      }
+      if (piped.trim() !== "") {
+        throw refusal(parsed.problem);
+      }
+    }
+    if (q.optional === true) {
+      return undefined;
     }
     if (!session.interactive) {
-      throw unsupplied(false);
+      throw unsupplied();
     }
-    const answer =
-      q.kind === "select"
-        ? await select(q as unknown as Parameters<typeof select>[0])
-        : await multiselect(q as unknown as Parameters<typeof multiselect>[0]);
-    if (isCancel(answer)) {
+    const validate = (value: string | undefined): string | undefined => {
+      const parsed = q.parse(value ?? "");
+      return parsed.ok ? undefined : parsed.problem;
+    };
+    const typed =
+      q.kind === "secret"
+        ? await password({ message: q.message, validate })
+        : await text({
+            message: q.message,
+            validate,
+            initialValue: q.initialValue,
+            placeholder: q.placeholder,
+          });
+    if (isCancel(typed)) {
       throw cancelled();
     }
-    return answer as Answer<Q>;
-  }
+    return accept(String(typed ?? ""));
+  };
 
-  const accept = (raw: string): unknown => {
-    const parsed = q.parse(raw);
-    if (!parsed.ok) {
-      throw fail(parsed.problem);
-    }
-    return parsed.value;
-  };
-  if (q.given !== undefined) {
-    return accept(q.given) as Answer<Q>;
-  }
-  if (q.stdin === true && !stdin.isTTY) {
-    // An empty pipe that does not parse is a script that piped nothing, which
-    // is the same as no pipe: it falls through to the prompt or the error.
-    const piped = await readStdin(stdin);
-    const parsed = q.parse(piped);
-    if (parsed.ok) {
-      return parsed.value as Answer<Q>;
-    }
-    if (piped.trim() !== "") {
-      throw fail(parsed.problem);
-    }
-  }
-  if (q.optional === true) {
-    return undefined as Answer<Q>;
-  }
-  if (!session.interactive) {
-    throw unsupplied(q.stdin === true);
-  }
-  const validate = (value: string | undefined): string | undefined => {
-    const parsed = q.parse(value ?? "");
-    return parsed.ok ? undefined : parsed.problem;
-  };
-  const answer =
-    q.kind === "secret"
-      ? await password({ message: q.message, validate })
-      : await text({
-          message: q.message,
-          validate,
-          initialValue: q.initialValue,
-          placeholder: q.placeholder,
-        });
-  if (isCancel(answer)) {
-    throw cancelled();
-  }
-  return accept(String(answer ?? "")) as Answer<Q>;
+  // The one cast: `Answer<Q>` is computed from the question's type, which the
+  // branches above cannot see, so each branch returns `unknown` and this is
+  // where the kind-to-type mapping the question's type promises is trusted.
+  return (await answer()) as Answer<Q>;
 }

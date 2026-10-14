@@ -1,4 +1,4 @@
-import { readdir, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 import { Readable } from "node:stream";
 
@@ -17,21 +17,13 @@ vi.mock("@clack/prompts", () => ({
 import { cancel, confirm, isCancel, multiselect, password, select, text } from "@clack/prompts";
 import { type Parsed, parseClientId } from "@zitadel/config/idp";
 
+import type { ZitadelError } from "../../../src/lib/errors";
+
+import { clackInputImports } from "../../helpers/clack-imports";
+import { sourceFiles } from "../../helpers/source-files";
 import { input } from "../../../src/lib/input";
 
 const SRC = join(import.meta.dirname, "../../../src");
-
-async function sourceFiles(dir: string): Promise<string[]> {
-  const entries = await readdir(dir, { withFileTypes: true });
-  const nested = await Promise.all(
-    entries.map((entry) =>
-      entry.isDirectory()
-        ? sourceFiles(join(dir, entry.name))
-        : Promise.resolve(entry.name.endsWith(".ts") ? [join(dir, entry.name)] : []),
-    ),
-  );
-  return nested.flat();
-}
 
 /** A stdin that is a pipe carrying `content`. */
 function piped(content: string): NodeJS.ReadableStream & { isTTY?: boolean } {
@@ -191,6 +183,14 @@ describe("input", () => {
       expect(validate?.("x")).toBeUndefined();
     });
 
+    it("shows the placeholder in the prompt", async () => {
+      vi.mocked(text).mockResolvedValueOnce("x" as never);
+
+      await input({ ...typed(), placeholder: "3000" }, ask);
+
+      expect(vi.mocked(text).mock.calls[0]?.[0]).toMatchObject({ placeholder: "3000" });
+    });
+
     it("starts the prompt from the initial value", async () => {
       vi.mocked(text).mockResolvedValueOnce("x" as never);
 
@@ -219,12 +219,29 @@ describe("input", () => {
           name: "client secret",
           message: "Secret",
           stdin: true,
+          retry: "zitadel x",
           parse: (): Parsed<string> => ({ ok: false, problem: "Too short." }),
         },
         { ...scripted, stdin: piped("hunter2") },
-      ).catch((caught: Error) => caught);
+      ).catch((caught: ZitadelError) => caught);
 
-      expect(JSON.stringify(error)).not.toContain("hunter2");
+      const { message, hint, details, nextCommands } = error as ZitadelError;
+      expect(JSON.stringify({ message, hint, details, nextCommands })).not.toContain("hunter2");
+    });
+
+    it("is refused with a reminder that it is never a flag", async () => {
+      const error = await input(
+        { ...typed("client secret"), kind: "secret", stdin: true },
+        { ...scripted, stdin: keyboard() },
+      ).catch((caught: ZitadelError) => caught);
+
+      expect((error as ZitadelError).hint).toContain("It is never a flag");
+    });
+
+    it("is not offered a flag, even when the question names one", async () => {
+      await expect(
+        input({ ...typed("client secret"), kind: "secret", flag: "--secret" }, scripted),
+      ).rejects.toMatchObject({ hint: expect.not.stringContaining("--secret") });
     });
   });
 
@@ -262,6 +279,23 @@ describe("input", () => {
       ).rejects.toMatchObject({ nextCommands: ["zitadel sso enable --client-id <id>"] });
     });
 
+    it("quotes the command to run again in the hint as an example", async () => {
+      await expect(
+        input({ ...typed(), retry: "zitadel sso enable --client-id <id>" }, scripted),
+      ).rejects.toMatchObject({
+        hint: "For example: zitadel sso enable --client-id <id>",
+      });
+    });
+
+    it.each([
+      ["a select", { kind: "select" as const, options: [{ value: "a", label: "A" }] }],
+      ["a multiselect", { kind: "multiselect" as const, options: [{ value: "a", label: "A" }] }],
+    ])("offers the command to run again for %s too", async (_kind, extra) => {
+      await expect(
+        input({ name: "x", message: "X", retry: "zitadel x --y", ...extra }, scripted),
+      ).rejects.toMatchObject({ nextCommands: ["zitadel x --y"] });
+    });
+
     it.each([
       ["a select", { kind: "select" as const, options: [{ value: "a", label: "A" }] }],
       ["a multiselect", { kind: "multiselect" as const, options: [{ value: "a", label: "A" }] }],
@@ -296,6 +330,15 @@ describe("input", () => {
       expect(await input(optional, { ...scripted, stdin: piped("\n") })).toBeUndefined();
     });
 
+    it("is refused when what was piped in does not parse", async () => {
+      await expect(
+        input(
+          { ...optional, parse: (): Parsed<string> => ({ ok: false, problem: "Not that." }) },
+          { ...scripted, stdin: piped("abc") },
+        ),
+      ).rejects.toMatchObject({ code: "E_VALIDATION", message: "Not that." });
+    });
+
     it("is never prompted for", async () => {
       await input(optional, { ...ask, stdin: keyboard() });
 
@@ -315,10 +358,22 @@ describe("input", () => {
       expect(await input({ kind: "select", name: "x", message: "X", options }, ask)).toBe("b");
     });
 
-    it("returns the given value without asking", async () => {
-      expect(
-        await input({ kind: "select", name: "x", message: "X", options, given: "a" }, scripted),
-      ).toBe("a");
+    it("starts on the initial value", async () => {
+      vi.mocked(select).mockResolvedValueOnce("a" as never);
+
+      await input({ kind: "select", name: "x", message: "X", options, initialValue: "b" }, ask);
+
+      expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({
+        message: "X",
+        options,
+        initialValue: "b",
+      });
+    });
+
+    it("is never asked when nobody is there", async () => {
+      await expect(
+        input({ kind: "select", name: "x", message: "X", options }, scripted),
+      ).rejects.toMatchObject({ message: "No x supplied" });
       expect(select).not.toHaveBeenCalled();
     });
   });
@@ -349,14 +404,12 @@ describe("input", () => {
       ).toEqual([]);
     });
 
-    it("returns the given values without asking", async () => {
-      expect(
-        await input(
-          { kind: "multiselect", name: "x", message: "X", options, given: ["a"] },
-          scripted,
-        ),
-      ).toEqual(["a"]);
-      expect(multiselect).not.toHaveBeenCalled();
+    it.each([true, false])("passes required=%s on to the prompt", async (required) => {
+      vi.mocked(multiselect).mockResolvedValueOnce([] as never);
+
+      await input({ kind: "multiselect", name: "x", message: "X", options, required }, ask);
+
+      expect(vi.mocked(multiselect).mock.calls[0]?.[0]).toMatchObject({ message: "X", required });
     });
   });
 
@@ -399,7 +452,7 @@ describe("input", () => {
   });
 
   describe("cancelling", () => {
-    it.each([
+    const prompts: Array<[string, () => unknown, Parameters<typeof input>[0]]> = [
       ["a text prompt", () => vi.mocked(text), typed()],
       ["a secret prompt", () => vi.mocked(password), { ...typed(), kind: "secret" as const }],
       [
@@ -422,9 +475,11 @@ describe("input", () => {
         () => vi.mocked(confirm),
         { kind: "confirm" as const, name: "x", message: "X" },
       ],
-    ])("throws E_VALIDATION from %s", async (_kind, prompt, question) => {
+    ];
+
+    it.each(prompts)("throws E_VALIDATION from %s", async (_kind, prompt, question) => {
       vi.mocked(isCancel).mockReturnValue(true);
-      prompt().mockResolvedValueOnce(Symbol("cancel") as never);
+      (prompt() as ReturnType<typeof vi.fn>).mockResolvedValueOnce(Symbol("cancel"));
 
       await expect(input(question, ask)).rejects.toMatchObject({
         code: "E_VALIDATION",
@@ -432,11 +487,11 @@ describe("input", () => {
       });
     });
 
-    it("says so on the terminal", async () => {
+    it.each(prompts)("says so on the terminal from %s", async (_kind, prompt, question) => {
       vi.mocked(isCancel).mockReturnValue(true);
-      vi.mocked(text).mockResolvedValueOnce(Symbol("cancel") as never);
+      (prompt() as ReturnType<typeof vi.fn>).mockResolvedValueOnce(Symbol("cancel"));
 
-      await input(typed(), ask).catch(() => undefined);
+      await input(question, ask).catch(() => undefined);
 
       expect(cancel).toHaveBeenCalledWith("Cancelled.");
     });
@@ -449,27 +504,45 @@ describe("the source tree", () => {
   it("imports clack's input prompts in lib/input.ts only", async () => {
     const importers: string[] = [];
     for (const file of await sourceFiles(SRC)) {
-      const source = await readFile(file, "utf8");
-      const imported = [...source.matchAll(/import\s*\{([^}]*)\}\s*from\s*"@clack\/prompts"/g)]
-        .flatMap((match) => (match[1] ?? "").split(","))
-        .map(
-          (name) =>
-            name
-              .trim()
-              .replace(/^type\s+/, "")
-              .split(/\s+as\s+/)[0],
-        )
-        .filter((name) =>
-          ["text", "password", "select", "multiselect", "confirm", "isCancel", "cancel"].includes(
-            name ?? "",
-          ),
-        );
-      if (imported.length > 0) {
+      if (clackInputImports(await readFile(file, "utf8")).length > 0) {
         // Compared with forward slashes, so the test also passes on Windows.
         importers.push(relative(SRC, file).split(sep).join("/"));
       }
     }
 
     expect(importers).toEqual(["lib/input.ts"]);
+  });
+});
+
+describe("the boundary scan", () => {
+  it.each([
+    ["a named import", 'import { text } from "@clack/prompts";', ["text"]],
+    ["a single-quoted import", "import { select } from '@clack/prompts';", ["select"]],
+    [
+      "a multi-line import",
+      'import {\n  intro,\n  confirm,\n} from "@clack/prompts";',
+      ["confirm"],
+    ],
+    ["a renamed import", 'import { password as ask } from "@clack/prompts";', ["password"]],
+    ["a type-prefixed name", 'import { type isCancel } from "@clack/prompts";', ["isCancel"]],
+    ["a type-only import", 'import type { text } from "@clack/prompts";', ["text"]],
+    ["a re-export", 'export { multiselect } from "@clack/prompts";', ["multiselect"]],
+    ["a namespace import", 'import * as clack from "@clack/prompts";', ["*"]],
+    ["a default import", 'import clack from "@clack/prompts";', ["*"]],
+    ["a default and named import", 'import clack, { spinner } from "@clack/prompts";', ["*"]],
+    ["an export-star", 'export * from "@clack/prompts";', ["*"]],
+    ["a dynamic import", 'const clack = await import("@clack/prompts");', ["*"]],
+    ["a require", "const clack = require('@clack/prompts');", ["*"]],
+    ["a name nobody listed", 'import { autocomplete } from "@clack/prompts";', ["autocomplete"]],
+  ])("catches %s", (_form, source, expected) => {
+    expect(clackInputImports(source)).toEqual(expected);
+  });
+
+  it.each(["spinner", "note", "intro", "outro", "log"])("allows %s, which is output", (name) => {
+    expect(clackInputImports(`import { ${name} } from "@clack/prompts";`)).toEqual([]);
+  });
+
+  it("ignores another package", () => {
+    expect(clackInputImports('import { text } from "@clack/core";')).toEqual([]);
   });
 });

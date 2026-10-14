@@ -27,7 +27,6 @@ export class UseCasePrompt implements SetupPrompt {
     const useCase = await ctx.input({
       kind: "select",
       name: "use case",
-      flag: "--use-case",
       message: "Who will sign in to your app? Collected fields stay editable after setup.",
       initialValue: answers.useCase,
       options: SETUP_USE_CASES.map((useCase) => ({

@@ -22,7 +22,7 @@ export class FrameworkConfirmPrompt implements SetupPrompt {
     if (ack === false) {
       throw new ZitadelError(
         "E_UNSUPPORTED_PROJECT_SHAPE",
-        "Setup cancelled — framework declined",
+        "Setup stopped — the detected framework was declined",
         { hint: `Re-run with --framework ${ctx.framework.id} when ready.` },
       );
     }

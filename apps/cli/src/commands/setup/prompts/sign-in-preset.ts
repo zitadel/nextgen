@@ -20,7 +20,6 @@ export class SignInPresetPrompt implements SetupPrompt {
     const preset = await ctx.input({
       kind: "select",
       name: "sign-in preset",
-      flag: "--preset",
       message: "How should users sign in?",
       initialValue: answers.preset,
       options: SETUP_PRESETS.map((preset) => ({ value: preset, label: labels[preset] })),

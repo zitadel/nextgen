@@ -7,10 +7,14 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
+vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
+
 vi.mock("../../../src/commands/setup/prompts", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   askCustomSettings: vi.fn(),
 }));
+
+import { confirm } from "@clack/prompts";
 
 import { customExample, SETUP_FLAG_NAMES } from "../../../src/lib/idp";
 import {
@@ -22,7 +26,9 @@ import {
 import { askCustomSettings } from "../../../src/commands/setup/prompts";
 import type { Asker } from "../../../src/lib/input";
 import { writeRuntimeMetadata } from "../../../src/lib/local-server/runtime";
+import Setup from "../../../src/commands/setup";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { asTerminal } from "../../helpers/terminal";
 
 const tempDirs: string[] = [];
 const server = setupServer(...setupPlatformHandlers());
@@ -895,7 +901,7 @@ describe("a custom provider named with --sso", () => {
       scopes: "openid",
     });
 
-    const draft = await ssoFromFlags(partial, false, false, ask);
+    const draft = await ssoFromFlags(partial, false, false, ask, "0.0.0-test");
 
     expect(draft?.selection).toMatchObject({ kind: "custom", connection: { displayName: "Acme" } });
   });
@@ -909,7 +915,7 @@ describe("a custom provider named with --sso", () => {
       scopes: "openid",
     });
 
-    await ssoFromFlags(partial, false, false, ask);
+    await ssoFromFlags(partial, false, false, ask, "0.0.0-test");
 
     expect(askCustomSettings).toHaveBeenCalledWith(
       expect.objectContaining({ slug: "acme-sso" }),
@@ -920,7 +926,7 @@ describe("a custom provider named with --sso", () => {
   it("is not asked about when nobody is there to answer", async () => {
     vi.mocked(askCustomSettings).mockClear();
 
-    await expect(ssoFromFlags(partial, true, false, ask)).rejects.toMatchObject({
+    await expect(ssoFromFlags(partial, true, false, ask, "0.0.0-test")).rejects.toMatchObject({
       code: "E_VALIDATION",
     });
     expect(askCustomSettings).not.toHaveBeenCalled();
@@ -975,5 +981,33 @@ describe("setup with a custom provider described in part", () => {
     const res = await setup(cwd, ["--sso", "custom", "--sso-slug", "Acme"]);
 
     expect(parseJson(res.stdout)).toMatchObject({ message: expect.stringContaining("--sso-slug") });
+  });
+});
+
+describe("setup asked on a terminal", () => {
+  // The built CLI bundles its own prompts, so a prompt can only be answered
+  // by running the command from source, where `input` is the one module asked.
+  const settingUp = (cwd: string, ...extra: string[]) =>
+    asTerminal(() => Setup.run(["--cwd", cwd, "--server", "https://api.zitadel.cloud", ...extra]));
+
+  it("still asks whether to proceed with the detected framework when --force is given", async () => {
+    // --force permits overwriting files here. It must never answer a question.
+    const cwd = await makeNextProject();
+    vi.mocked(confirm).mockResolvedValueOnce(false as never);
+
+    await settingUp(cwd, "--force").catch(() => undefined);
+
+    expect(confirm).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Detected next. Proceed?" }),
+    );
+  });
+
+  it("stops without writing anything when the framework is declined", async () => {
+    const cwd = await makeNextProject();
+    vi.mocked(confirm).mockResolvedValueOnce(false as never);
+
+    await expect(settingUp(cwd)).rejects.toThrow();
+
+    await expect(readFile(join(cwd, "zitadel.json"), "utf8")).rejects.toThrow();
   });
 });

@@ -1,7 +1,5 @@
 import { Flags } from "@oclif/core";
 
-import type { Parsed } from "@zitadel/config/idp";
-
 import { CommandGroups, type JsonEnvelope, nonBlankArg, OwnerCommand } from "../../lib/oclif";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { ZitadelError } from "../../lib/errors";
@@ -89,16 +87,7 @@ export default class VariablesSet extends OwnerCommand {
       message: `Value for ${name}`,
       stdin: true,
       retry: pipeHint(name, flags.secret, type, cliVersion),
-      parse: (raw): Parsed<string | number | boolean> => {
-        try {
-          return { ok: true, value: parseVariableValue(raw, type) };
-        } catch (error) {
-          if (error instanceof ZitadelError) {
-            return { ok: false, problem: [error.message, error.hint].filter(Boolean).join(" ") };
-          }
-          throw error;
-        }
-      },
+      parse: (raw) => parseVariableValue(raw, type),
     });
 
     await client.updateVariables({ [name]: { value, secret: flags.secret } }, scope);

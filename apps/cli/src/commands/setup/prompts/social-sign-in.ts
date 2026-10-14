@@ -37,53 +37,48 @@ import type { PromptContext, SetupAnswers, SetupPrompt, SsoDraft } from "./types
 
 /**
  * The settings of a custom connection, asking only for the ones not already
- * given — the way `--preset` skips its own question and no other. A value that
- * was given is returned as it came, for the caller to check against the flag
- * that carried it. Each answer is checked against the contract the server
- * enforces on apply, so a name or issuer it would refuse is refused where it
- * was typed.
+ * given — the way `--preset` skips its own question and no other. A given
+ * value goes through the same parser as a typed one, so every setting comes
+ * back checked against the contract the server enforces on apply, and a name
+ * or issuer it would refuse is refused. The command line's own mistakes are
+ * named under their flag before this runs (`checkGivenCustomFlags`), so a
+ * given value that gets here has already passed.
  */
 export async function askCustomSettings(
   given: CustomFlagValues,
   ask: Asker,
 ): Promise<Required<CustomFlagValues>> {
-  return {
-    slug:
-      given.slug ??
-      (await ask({
-        kind: "text",
-        name: "connection name",
-        message: "Name for this connection (used in your configuration, e.g. acme-sso)",
-        parse: (value) => parseConnectionSlug(value, RESERVED_SLUGS),
-      })),
-    displayName:
-      given.displayName ??
-      (await ask({
-        kind: "text",
-        name: "display name",
-        message: "Name shown on the sign-in button (e.g. Acme SSO)",
-        parse: parseDisplayName,
-      })),
-    issuer:
-      given.issuer ??
-      (await ask({
-        kind: "text",
-        name: "issuer",
-        message: "Issuer URL of the provider",
-        parse: parseIssuer,
-      })),
-    scopes:
-      given.scopes ??
-      (
-        await ask({
-          kind: "text",
-          name: "scopes",
-          message: "Scopes to request",
-          parse: parseScopes,
-          initialValue: DEFAULT_SCOPES.join(" "),
-        })
-      ).join(" "),
-  };
+  const slug = await ask({
+    kind: "text",
+    name: "connection name",
+    message: "Name for this connection (used in your configuration, e.g. acme-sso)",
+    parse: (value) => parseConnectionSlug(value, RESERVED_SLUGS),
+    given: given.slug,
+  });
+  const displayName = await ask({
+    kind: "text",
+    name: "display name",
+    message: "Name shown on the sign-in button (e.g. Acme SSO)",
+    parse: parseDisplayName,
+    given: given.displayName,
+  });
+  const issuer = await ask({
+    kind: "text",
+    name: "issuer",
+    message: "Issuer URL of the provider",
+    parse: parseIssuer,
+    given: given.issuer,
+  });
+  const scopes = await ask({
+    kind: "text",
+    name: "scopes",
+    message: "Scopes to request",
+    parse: parseScopes,
+    given: given.scopes,
+    initialValue: DEFAULT_SCOPES.join(" "),
+  });
+  // The settings carry the scopes as the one string a flag does.
+  return { slug, displayName, issuer, scopes: scopes.join(" ") };
 }
 
 /**
@@ -146,22 +141,20 @@ export class SocialSignInPrompt implements SetupPrompt {
             })));
       this.announce(entry, answers.devPort, endpoints?.issuer);
 
-      const clientId =
-        flagged?.credentials.clientId ??
-        (await ctx.input({
-          kind: "text",
-          name: "client id",
-          message: `Client ID (${entry.displayName})`,
-          parse: parseClientId,
-        }));
-      const secret =
-        flagged?.credentials.secret ??
-        (await ctx.input({
-          kind: "secret",
-          name: "client secret",
-          message: `Client secret (published to the project as ${credentialVariables(providerOf(selection).slug).clientSecret})`,
-          parse: parseClientSecret,
-        }));
+      const clientId = await ctx.input({
+        kind: "text",
+        name: "client id",
+        message: `Client ID (${entry.displayName})`,
+        parse: parseClientId,
+        given: flagged?.credentials.clientId,
+      });
+      const secret = await ctx.input({
+        kind: "secret",
+        name: "client secret",
+        message: `Client secret (published to the project as ${credentialVariables(providerOf(selection).slug).clientSecret})`,
+        parse: parseClientSecret,
+        given: flagged?.credentials.secret,
+      });
       collected.push({ selection, credentials: { clientId, secret }, endpoints });
     }
     return { ...answers, sso: collected };

@@ -277,10 +277,19 @@ export default class Setup extends BaseCommand {
     // inconsistent set of --sso flags is a mistake in the command line, and
     // reporting it after a project has been created would leave the developer
     // to clean up.
-    // The wizard only runs interactively, and its `--force` permits overwriting
-    // files, so it must not answer the wizard's own questions.
-    const ask: Asker = (question) => input(question, { interactive: true, force: false });
-    const ssoFromCommandLine = await ssoFromFlags(flags, nonInteractive, dryRun, this.input);
+    // Not `this.input`: that one answers a confirm when `--force` is given, and
+    // here `--force` permits overwriting files, so it must never answer a
+    // question. Interactive only when a person is there, which is also the only
+    // time the wizard runs.
+    const wizardInput: Asker = (question) =>
+      input(question, { interactive: !nonInteractive, force: false });
+    const ssoFromCommandLine = await ssoFromFlags(
+      flags,
+      nonInteractive,
+      dryRun,
+      wizardInput,
+      this.config.version,
+    );
 
     const orca = createOrca();
 
@@ -312,7 +321,7 @@ export default class Setup extends BaseCommand {
             retry: retryOptionsFromFlags(flags),
             serverFlag: this.meta.serverFlag,
             cliVersion: this.config.version,
-            ask,
+            ask: wizardInput,
           }),
           force,
         );
@@ -368,7 +377,7 @@ export default class Setup extends BaseCommand {
     if (!nonInteractive && !dryRun) {
       intro("Zitadel setup");
       const promptCtx = {
-        input: ask,
+        input: wizardInput,
         framework,
         cwd,
         frameworkChosen: scaffoldedFramework || flags.framework !== undefined,
@@ -1039,6 +1048,7 @@ export async function ssoFromFlags(
   nonInteractive: boolean,
   dryRun: boolean,
   ask: Asker,
+  cliVersion: string,
 ): Promise<SsoDraft | undefined> {
   const customValues = customFlagValues(flags, SETUP_FLAG_KEYS);
   if (flags.sso === undefined) {
@@ -1107,6 +1117,9 @@ export async function ssoFromFlags(
     message: "Client secret",
     parse: parseClientSecret,
     stdin: true,
+    // A concrete rerun for an agent, never carrying the value: the secret is
+    // piped from the caller's own environment.
+    retry: `printf '%s' "$CLIENT_SECRET" | ${publicCliCommand(`setup --sso ${flags.sso} --sso-client-id <id> ...`, cliVersion)}`,
   });
   return { selection, credentials: { clientId: clientId.value, secret } };
 }

@@ -25,12 +25,19 @@ Scope pointers first — this file's own body covers **telemetry only**:
   envelope's `warnings`, and `emit` prints a result's `warnings` after its
   `pretty` text. A unit test fails on any other `consola.warn` call.
 - Input goes through one function, `input` in `src/lib/input.ts` — a command
-  calls it as `this.input(...)`. It takes the value from the flag, else piped
-  stdin, else a prompt, else throws one uniform `E_VALIDATION`, and runs the
-  question's `parse` on whichever source answered. Never import clack's
-  `text`, `password`, `select`, `multiselect`, `confirm`, `isCancel` or `cancel`
-  anywhere else, and never hand-write the flag-or-stdin-or-prompt rule: a unit
-  test fails on the import.
+  calls it as `this.input(...)`. It takes the value from `given` (the flag),
+  else piped stdin (`stdin: true`), else a prompt, else throws one uniform
+  `E_VALIDATION` ("No <name> supplied", with a hint from `flag`, `stdin` and
+  `retry`), and runs the question's `parse` on whichever source answered.
+  `retry` is the command an agent can run once the input is to hand: it becomes
+  the error's `nextCommands`. `optional` returns `undefined` instead of
+  prompting or refusing when nothing was given or piped (a bad non-empty pipe
+  still fails). A `confirm` is answered by the command's `--force`, and
+  refuses without it when no one can be asked, so a command whose `--force`
+  means something else (`setup`) must use its own asker with `force: false`.
+  Never import clack's `text`, `password`, `select`, `multiselect`, `confirm`,
+  `isCancel` or `cancel` anywhere else, and never hand-write the
+  flag-or-stdin-or-prompt rule: a unit test fails on the import.
 - The flag surface deliberately tracks the [WebCLI spec](https://webcli.com/) so
   an agent can drive the CLI from conventions it already knows. That is the
   rationale; the canonical flag list, output-channel rules and the two

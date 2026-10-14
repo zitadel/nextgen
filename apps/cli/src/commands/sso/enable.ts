@@ -142,6 +142,12 @@ export default class SsoEnable extends BaseCommand {
       customExample(ENABLE_FLAG_NAMES),
     );
     const entry = providerOf(selection);
+    // What an agent can run once the missing credential is to hand. Only for a
+    // catalog provider: a custom connection needs its settings repeated too.
+    const retryFor = (clientId: string, pipe = ""): string | undefined =>
+      selection.kind === "catalog"
+        ? `${pipe}${publicCliCommand(`sso enable --provider ${provider} --client-id ${clientId}`, this.meta.cliVersion)}`
+        : undefined;
     const loopback = loopbackIssuerWarning(selection);
     if (loopback !== undefined) {
       reportWarning(loopback);
@@ -312,6 +318,7 @@ export default class SsoEnable extends BaseCommand {
         flag: "--client-id",
         parse: parseClientId,
         given: flags["client-id"],
+        retry: retryFor("<client-id>"),
       });
       // Required, like the client id. The connection document references the
       // secret as `${{ NAME }}` and the engine resolves that from the project's
@@ -324,6 +331,7 @@ export default class SsoEnable extends BaseCommand {
         message: `Client secret (published to the project as ${scaffolded.clientSecret})`,
         parse: parseClientSecret,
         stdin: true,
+        retry: retryFor(clientId, `printf '%s' "$CLIENT_SECRET" | `),
       });
 
       const publish = this.publisher(secretFile);
