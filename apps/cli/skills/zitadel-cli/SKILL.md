@@ -243,7 +243,15 @@ where it detects a framework. What `start` leaves in a directory —
 empty, so the golden path runs `setup` right after `start` in the same
 directory. Any other non-empty directory stops setup with a hint to pass
 `--force`. Pass it only for a directory whose contents may be replaced: files
-the new app also has, such as `package.json`, are overwritten.
+the new app also has, such as `package.json`, are overwritten. Without a
+terminal `setup` cannot ask which framework to scaffold, so pass `--framework`;
+the error lists the choices in `details.frameworks`.
+
+`start` reuses a server already running in the directory only when it is the
+release this CLI ships; one an earlier release started is restarted, and its
+data stays. `setup --server local` refuses a binary-runtime server another
+release started with `E_CONFLICT` before it creates anything: that server's API
+is its own release's. Its `next_commands` run `start`, then `setup` again.
 
 In an existing app, `--framework` has to name the framework setup detects
 there; another one stops setup with `E_CONFLICT` instead of offering
