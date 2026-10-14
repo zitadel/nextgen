@@ -35,6 +35,16 @@ export const diffStep: Step = {
       return;
     }
 
+    // Without `--origin` the deploy lands on every primary origin, and they
+    // need not serve the same release: the diff is against the newest one, so
+    // it is said aloud that another origin moves from something else.
+    const releases = new Set(deployments.filter(servesPrimary).map((entry) => entry.release_id));
+    if (ctx.origin === undefined && releases.size > 1) {
+      note(
+        `The primary origins serve ${releases.size} different releases; the diff below is against the newest, ${sha.slice(0, 12)}.`,
+      );
+    }
+
     const diff = await diffConfigAgainst(ctx.cwd, sha, ctx.color);
     if (diff === null) {
       note(`No diff available: ${sha.slice(0, 12)} is not in this repository's history.`);

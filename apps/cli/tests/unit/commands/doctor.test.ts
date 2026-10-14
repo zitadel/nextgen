@@ -204,16 +204,40 @@ describe("doctor command", () => {
     );
   });
 
-  it("does not pin the claim to a .env.development.local that names another project", async () => {
+  it("suggests the claim on the project's own server, not the one doctor was pointed at", async () => {
+    const cwd = await makeHealthyProject();
+    await writeDetachedSecret(cwd);
+    const fake = await fakeDocker();
+
+    const res = await runCliForTest(
+      [
+        "doctor",
+        "--cwd",
+        cwd,
+        "--json",
+        "--port",
+        String(await freePort()),
+        "--server",
+        "https://self.example",
+      ],
+      { PATH: `${fake.binDir}:${process.env.PATH ?? ""}`, DOCKER_LOG: fake.logPath },
+    );
+
+    const data = (parseJson(res.stdout) as { data: { next_commands?: string[] } }).data;
+    expect(data.next_commands).toContain(
+      expectedPublicCliCommand(`claim --server https://api.zitadel.cloud --cwd ${cwd}`),
+    );
+  });
+
+  it("suggests no claim when .env.development.local names another project", async () => {
     const cwd = await makeHealthyProject();
     await writeDetachedSecret(cwd);
     await writeFile(join(cwd, ".env.development.local"), "ZITADEL_PROJECT_ID=someone-else\n");
 
     const res = await doctor(cwd);
 
-    expect(
-      (parseJson(res.stdout) as { data: { next_commands?: string[] } }).data.next_commands,
-    ).toContain(expectedPublicCliCommand(`claim --server https://api.zitadel.cloud --cwd ${cwd}`));
+    const data = (parseJson(res.stdout) as { data: { next_commands?: string[] } }).data;
+    expect((data.next_commands ?? []).some((command) => command.includes(" claim"))).toBe(false);
   });
 
   it("pins the claim it suggests to setup's file when there is one", async () => {
