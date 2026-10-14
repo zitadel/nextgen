@@ -100,6 +100,12 @@ export default class VariableSet extends EnvironmentCommand {
     const scope = variableScope(projectId, flags.preview);
 
     if (dryRun) {
+      // A value given on the command line is checked as the real run checks
+      // it, so a preview never reports a write the run would refuse.
+      const given = args.value === undefined ? undefined : parseVariableValue(args.value, type);
+      if (given !== undefined && !given.ok) {
+        throw new ZitadelError("E_VALIDATION", given.problem);
+      }
       // The resource commands' dry-run contract, plus what this write would
       // store. Never the value: it may be a credential.
       const preview = dryRunResult("set", "variable", name);

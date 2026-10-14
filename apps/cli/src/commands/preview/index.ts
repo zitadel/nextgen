@@ -8,6 +8,7 @@ import {
   createDeployment,
   createReleaseFromBundle,
   headSha,
+  idpConnectionsStep,
   runSteps,
   type StepContext,
   validateStep,
@@ -17,14 +18,16 @@ import { detectPreviewUrls } from "../../lib/preview";
 import { parseTtl } from "../../lib/ttl";
 import { ZitadelError } from "../../lib/errors";
 import { reportWarning } from "../../lib/warnings";
+import { ciProvider } from "../../lib/telemetry/dimensions/ci-provider";
+import { envEnabled } from "../../lib/telemetry/dimensions/env-flag";
 
 /**
  * `zitadel preview` — publish `.zitadel/` to a pull-request build's preview URLs.
  *
  * It is `deploy`'s counterpart for a preview environment: it assembles the same
- * release bundle, but runs only the validation step — a pull-request build must
- * never touch the live identity-provider connections the deploy step syncs —
- * and deploys to the preview URLs with a time-to-live rather than to the
+ * release bundle and validates it as `deploy` does, identity-provider
+ * connections included, but never writes them — a pull-request build must not
+ * touch the live connections a merged deploy syncs — and deploys to the preview URLs with a time-to-live rather than to the
  * primary origins. The URLs come from `--origin` or, failing that, from the
  * hosting platform's own build variables (Vercel, Netlify).
  *
@@ -181,9 +184,10 @@ export default class Preview extends PreviewCommand {
       suggest: (args) => this.suggest(args),
     };
 
-    // Validation only: the IdP sync step is deploy-only, so a pull-request build
-    // never reconfigures the connections a merged deploy owns.
-    await runSteps([validateStep], ctx);
+    // The IdP step validates the connection files and stops short of syncing
+    // them in a preview, so a pull-request build never reconfigures the
+    // connections a merged deploy owns.
+    await runSteps([validateStep, idpConnectionsStep], ctx);
 
     // A dry run validates and resolves the targets but writes nothing — no
     // release, no deployment, no preview registration — so a pull-request build
@@ -254,7 +258,16 @@ async function primaryOrigins(client: ZitadelClient, projectId: string): Promise
   }
 }
 
-/** Whether this runs in a CI build: the variable every major CI sets, or Cloudflare Pages' own. */
+/**
+ * Whether this runs in a CI build: the providers the CLI already recognises
+ * (`CI`, or a provider's own marker such as Jenkins' `JENKINS_URL`), plus the
+ * builds that set neither: Cloudflare Pages, Azure Pipelines and AWS CodeBuild.
+ */
 function runsInCi(env: NodeJS.ProcessEnv): boolean {
-  return (env.CI !== undefined && env.CI !== "" && env.CI !== "false") || env.CF_PAGES === "1";
+  return (
+    ciProvider.value(env) !== undefined ||
+    env.CF_PAGES === "1" ||
+    envEnabled(env.TF_BUILD) ||
+    env.CODEBUILD_BUILD_ID !== undefined
+  );
 }

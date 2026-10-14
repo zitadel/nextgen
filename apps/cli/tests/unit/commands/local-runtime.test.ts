@@ -855,7 +855,7 @@ describe("local runtime commands", () => {
       data: { next_commands?: string[] };
     };
     expect(envelope.status).toBe("ok");
-    expect(envelope.data.next_commands).toEqual([expectedPublicCliCommand("stop")]);
+    expect(envelope.data.next_commands).toEqual([expectedPublicCliCommand(`stop --cwd ${cwd}`)]);
   });
 
   it("stop --all reports only discovered CLI-managed runtime candidates", async () => {

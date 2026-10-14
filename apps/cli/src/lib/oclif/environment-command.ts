@@ -130,9 +130,11 @@ export abstract class EnvironmentCommand extends BaseCommand {
     // On a terminal a missing value is prompted for and persisted to
     // `.env.<name>.local` (#1313); non-interactively each still throws, naming
     // the sources consulted, so a scripted run stays deterministic.
+    // A dry run writes nothing, and an answer is persisted to a file, so it
+    // never asks: a missing value fails it exactly as a scripted run.
     const ask = {
       cwd: this.meta.cwd,
-      interactive: !this.meta.nonInteractive && options.prompt !== false,
+      interactive: !this.meta.nonInteractive && !this.meta.dryRun && options.prompt !== false,
     };
     const server = await requireValueInteractive(environment, "ZITADEL_URL", ask);
     const projectId = await requireValueInteractive(environment, "ZITADEL_PROJECT_ID", ask);

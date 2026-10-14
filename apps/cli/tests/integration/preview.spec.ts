@@ -156,6 +156,33 @@ describe("preview", () => {
         expect(result).toBeSkipped();
       });
 
+      it.each([
+        ["Jenkins", { JENKINS_URL: "https://ci.example" }],
+        ["Azure Pipelines", { TF_BUILD: "True" }],
+        ["AWS CodeBuild", { CODEBUILD_BUILD_ID: "build:1" }],
+      ])("skips a %s build that names no environment", async (_, env) => {
+        const app = await anAppAdmittingPreviews();
+
+        const result = await app.run(["preview", "--origin", PREVIEW_URL, "--json"], env);
+
+        expect(result).toBeSkipped();
+      });
+
+      it("refuses a connection file holding a literal client secret", async () => {
+        const app = await anAppAdmittingPreviews();
+        await app.enableSso("google", {
+          clientId: "1234-abc.apps.googleusercontent.com",
+          secret: "the-client-secret",
+        });
+        await app.editConnection("google", (connection) => {
+          connection.oidc.client_secret = "a-literal-secret";
+        });
+
+        const result = await app.run(["preview", "--origin", PREVIEW_URL, "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
       it("says how to deploy from a CI build that names no environment", async () => {
         const app = await anAppAdmittingPreviews();
 

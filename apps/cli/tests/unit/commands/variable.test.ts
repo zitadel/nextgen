@@ -629,6 +629,23 @@ describe("variable set", () => {
     expect(json.data).not.toHaveProperty("environment");
   });
 
+  it("refuses a given value its --as cannot parse under --dry-run, as the real run does", async () => {
+    const cwd = await makeProject();
+
+    const res = await runCliForTest([
+      "variable",
+      "set",
+      "SESSION_TTL",
+      "abc",
+      "--as",
+      "number",
+      "--dry-run",
+      ...base(cwd),
+    ]);
+
+    expect((parseJson(res.stdout) as { code: string }).code).toBe("E_VALIDATION");
+  });
+
   it("previews the write on the project under --dry-run", async () => {
     const cwd = await makeProject();
 

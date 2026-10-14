@@ -76,6 +76,13 @@ The CLI requires Node.js 24+.
   `zitadel.json` names no server. `zitadel env` shows what resolved and where
   each value came from; `zitadel env add <name>` binds another environment to a
   project.
+- **Origins.** `zitadel origin add <url> --kind primary|preview`, `origin list`
+  and `origin rm <url>` manage the URLs a project serves: a `primary` origin is
+  where `deploy` publishes, a `preview` pattern (it may hold a `*`) is where
+  pull-request builds run. They need the project secret, not the preview token.
+  An empty list admits every origin, so removing the last one opens the project
+  up; `origin rm` asks first and needs `--force` when non-interactive. Removing
+  a preview pattern leaves its live previews served until they expire.
 - **Telemetry.** The CLI sends anonymous usage telemetry by default, and
   agent-driven runs are exactly the ones worth learning from — leave it on.
   Don't add `--no-telemetry` to commands. An opt-out exists for users who need

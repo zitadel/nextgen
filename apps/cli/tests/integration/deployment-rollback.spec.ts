@@ -197,6 +197,58 @@ describe("deployment rollback", () => {
         );
       });
 
+      it("undoes the latest deploy to the --origin it names", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin("https://a.example.com");
+        await app.addPrimaryOrigin("https://b.example.com");
+        const everywhere = await app.deployData();
+        await app.editUserSchema((schema) => {
+          schema.properties.one = { type: "string" };
+        });
+        await app.deployData(["--origin", "https://a.example.com"]);
+
+        const result = await app.run([
+          "deployment",
+          "rollback",
+          "--origin",
+          "https://a.example.com",
+          "--force",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf<{ release_id: string }>(result).data.release_id).toBe(
+          everywhere.release_id,
+        );
+      });
+
+      it("refuses an --origin rollback that would also move an origin deployed since", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin("https://a.example.com");
+        await app.addPrimaryOrigin("https://b.example.com");
+        await app.deployData();
+        await app.editUserSchema((schema) => {
+          schema.properties.one = { type: "string" };
+        });
+        await app.deployData(["--origin", "https://b.example.com"]);
+        await app.editUserSchema((schema) => {
+          schema.properties.two = { type: "string" };
+        });
+        await app.deployData(["--origin", "https://a.example.com"]);
+
+        const result = await app.run([
+          "deployment",
+          "rollback",
+          "--origin",
+          "https://a.example.com",
+          "--force",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
       it("re-applies a named deployment after another origin moved on", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin("https://a.example.com");

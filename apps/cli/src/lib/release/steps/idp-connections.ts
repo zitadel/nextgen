@@ -1,6 +1,7 @@
 import { join } from "node:path";
 
 import type { CreateIdpBodyIdp } from "@zitadel/api/generated/model";
+import { ApiError } from "@zitadel/api/runtime/fetch";
 import { consola } from "consola";
 
 import { isVariableReference, referencedVariable } from "@zitadel/config/idp";
@@ -22,11 +23,13 @@ import type { Step, StepContext } from "../pipeline";
  */
 export const idpConnectionsStep: Step = {
   name: "idp-connections",
-  runsFor: ["deploy"],
+  runsFor: ["deploy", "preview"],
   // Not marked `writes`: a dry run must still run this step to validate and
   // preview the connection files. The write itself (`POST /idps`) is guarded on
   // `ctx.dryRun` below rather than the whole step being skipped, so a dry run
-  // reports what it would sync without a bad file slipping past validation.
+  // reports what it would sync without a bad file slipping past validation. A
+  // preview validates the same way and never writes: a pull-request build must
+  // not reconfigure the connections a merged deploy owns.
   async run(ctx: StepContext): Promise<void> {
     const entries = await readJsonDirEntries(join(ctx.cwd, IDPS_DIR));
     const connections = entries.map((entry) => entry.body);
@@ -43,9 +46,14 @@ export const idpConnectionsStep: Step = {
     // deploy publishes a sign-in button that fails at the provider.
     if (connections.length > 0) {
       const held = await heldVariables(ctx);
-      for (const entry of entries) {
-        checkCredentialVariables(entry.body, `${IDPS_DIR}/${entry.name}`, held, ctx.suggest);
+      if (held !== undefined) {
+        for (const entry of entries) {
+          checkCredentialVariables(entry.body, `${IDPS_DIR}/${entry.name}`, held, ctx.suggest);
+        }
       }
+    }
+    if (ctx.mode === "preview") {
+      return;
     }
     for (const connection of connections) {
       if (ctx.dryRun) {
@@ -111,9 +119,24 @@ function valueAt(data: object, path: ReadonlyArray<PropertyKey>): unknown {
   return current;
 }
 
-/** The project's variables, by name, and whether each is a secret. */
-async function heldVariables(ctx: StepContext): Promise<Map<string, boolean>> {
-  const held = await ctx.client.getVariables({ project_id: ctx.projectId });
+/**
+ * The project's variables, by name, and whether each is a secret. A preview's
+ * token may not read them, which leaves the check to the deploy that merges it.
+ */
+async function heldVariables(ctx: StepContext): Promise<Map<string, boolean> | undefined> {
+  let held: Awaited<ReturnType<StepContext["client"]["getVariables"]>>;
+  try {
+    held = await ctx.client.getVariables({ project_id: ctx.projectId });
+  } catch (error) {
+    if (
+      ctx.mode === "preview" &&
+      error instanceof ApiError &&
+      (error.status === 401 || error.status === 403)
+    ) {
+      return undefined;
+    }
+    throw error;
+  }
   // A secret reads back as `{ secret: true }`, a plain value as the value.
   return new Map(Object.entries(held).map(([name, value]) => [name, typeof value === "object"]));
 }

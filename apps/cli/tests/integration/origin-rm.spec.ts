@@ -82,6 +82,15 @@ describe("origin rm", () => {
         expect(result).toSay("admits every origin");
       });
 
+      it("suggests adding an origin back after removing the last one", async () => {
+        const app = await aSetUpApp();
+        await app.addOrigin("https://app.acme.com", "primary");
+
+        const result = await app.removeOrigin("https://app.acme.com");
+
+        expect(result).toSuggest("origin add <url> --kind primary");
+      });
+
       it("does not warn while other origins remain", async () => {
         const app = await aSetUpApp();
         await app.addOrigin("https://app.acme.com", "primary");

@@ -213,7 +213,9 @@ describe("status command", () => {
       };
     };
     expect(json.status).toBe("ok");
-    expect(json.data.next_commands).toContain(expectedPublicCliCommand("setup --force"));
+    expect(json.data.next_commands).toContain(
+      expectedPublicCliCommand(`setup --force --cwd ${cwd}`),
+    );
     expect(json.data.project.project_id).toBe("orphan");
     expect(json.data.project.lifecycle).toBe("orphaned-config");
   });
@@ -242,6 +244,28 @@ describe("status command", () => {
     expect(json.data.project.project_id).toBe("proj-prod");
   });
 
+  it("reports a named environment that binds no project as not configured", async () => {
+    const cwd = await makeProject();
+
+    await writeFile(
+      join(cwd, "zitadel.json"),
+      JSON.stringify({ project: "proj-local", server: "https://api.zitadel.cloud" }),
+    );
+
+    const res = await runCliForTest(["status", "--cwd", cwd, "--json", "--env", "production"]);
+
+    const json = parseJson(res.stdout) as {
+      data: { project: { lifecycle: string; environment?: string }; next_commands: string[] };
+    };
+    expect(json.data.project).toMatchObject({
+      lifecycle: "not-configured",
+      environment: "production",
+    });
+    expect(json.data.next_commands).toContain(
+      expectedPublicCliCommand(`env add production --cwd ${cwd}`),
+    );
+  });
+
   it("reports not-configured when zitadel.json is missing entirely", async () => {
     const cwd = await makeProject();
 
@@ -261,8 +285,10 @@ describe("status command", () => {
     expect(json.data.server.lifecycle).toBe("missing");
     expect(json.data.project.lifecycle).toBe("not-configured");
     expect(json.data.next_actions.join("\n")).toContain("From your app directory");
-    expect(json.data.next_commands).toContain(expectedPublicCliCommand("start"));
-    expect(json.data.next_commands).toContain(expectedPublicCliCommand("setup --server local"));
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand(`start --cwd ${cwd}`));
+    expect(json.data.next_commands).toContain(
+      expectedPublicCliCommand(`setup --server local --cwd ${cwd}`),
+    );
   });
 
   it("normalizes relative --cwd before reading runtime metadata", async () => {

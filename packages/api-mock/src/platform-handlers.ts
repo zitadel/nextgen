@@ -1785,7 +1785,10 @@ export function setupPlatformHandlers() {
       const release = hasReleaseId
         ? store.releases.get(data.release_id as string)
         : [...store.releases.values()].find(
+            // In this project: another project built from the same scaffold
+            // holds a release with the very same digest.
             (candidate) =>
+              candidate.projectId === project.id &&
               `${RELEASE_CONTENT_HASH_PREFIX}${candidate.contentHash}` === data.content_hash,
           );
       if (!release || release.projectId !== project.id) {

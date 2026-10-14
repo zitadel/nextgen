@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { ApiError } from "@zitadel/api/runtime/fetch";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { IDPS_DIR } from "../../../../../src/lib/idp";
@@ -89,6 +90,34 @@ describe("idp-connections step", () => {
       idpConnectionsStep.run(ctx(cwd, { dryRun: true, client: { createIdp } as never })),
     ).rejects.toThrow();
     expect(createIdp).not.toHaveBeenCalled();
+  });
+
+  it("writes no idp in a preview", async () => {
+    const cwd = await project({ "google.json": googleBody() });
+    const createIdp = vi.fn();
+
+    await idpConnectionsStep.run(ctx(cwd, { mode: "preview", client: { createIdp } as never }));
+
+    expect(createIdp).not.toHaveBeenCalled();
+  });
+
+  it("refuses a connection a preview names with a variable the project lacks", async () => {
+    const cwd = await project({ "google.json": googleBody() });
+
+    await expect(idpConnectionsStep.run(ctx(cwd, { mode: "preview" }, {}))).rejects.toMatchObject({
+      code: "E_CREDENTIAL_MISSING",
+    });
+  });
+
+  it("leaves the variable check to the deploy when a preview's token may not read them", async () => {
+    const cwd = await project({ "google.json": googleBody() });
+    const getVariables = vi
+      .fn()
+      .mockRejectedValue(new ApiError(403, "https://api.example/variables", {}, "Forbidden"));
+
+    await expect(
+      idpConnectionsStep.run(ctx(cwd, { mode: "preview", client: { getVariables } as never })),
+    ).resolves.toBeUndefined();
   });
 
   it("creates no connection when a later file is malformed", async () => {
