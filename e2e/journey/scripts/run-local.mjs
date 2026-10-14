@@ -8,15 +8,15 @@ import { spawn } from "node:child_process";
 
 import { frameworkForId, frameworkIds } from "./frameworks.mjs";
 import { remoteHostEnv, startHttpsEdge } from "./https-edge.mjs";
-import { canListen, createJourneyPortAllocator } from "./ports.mjs";
+import { errorMessage, packageName, parsePort } from "./lib.mjs";
 import {
   localRegistryPaths,
   npmEnvironment,
-  packageName,
   prepareLocalRegistry,
   stopLocalRegistry,
   waitForHttp,
 } from "./local-registry.mjs";
+import { canListen, createJourneyPortAllocator } from "./ports.mjs";
 import {
   assertPrebuiltTarballsOnGitHub,
   journeyArgsFromEnv,
@@ -601,17 +601,9 @@ async function runWithConcurrency(items, limit, worker) {
 async function resolvePort(envName) {
   const value = process.env[envName];
   if (value) {
-    return validatePortValue(value, envName);
+    return parsePort(value, envName);
   }
   return reserveJourneyPort(usedPorts);
-}
-
-function validatePortValue(value, name) {
-  const port = Number(value);
-  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
-    throw new Error(`${name} must be a TCP port, got ${value}`);
-  }
-  return port;
 }
 
 async function ensurePlaywrightBrowsers() {
@@ -987,10 +979,6 @@ function npxEnv(context) {
 
 function log(message) {
   console.log(`[journey-local] ${message}`);
-}
-
-function errorMessage(error) {
-  return error instanceof Error ? error.message : String(error);
 }
 
 function isErrno(error, code) {

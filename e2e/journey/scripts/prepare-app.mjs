@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 
 import { appPortFromUrl, frameworkForId } from "./frameworks.mjs";
+import { errorMessage, packageName, parsePort } from "./lib.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const defaultRepoRoot = resolve(here, "../../..");
@@ -42,8 +43,7 @@ export async function prepareApp(options = {}) {
   };
   const runCaptureFn = options.runCapture ?? runCapture;
   const packageNameFn =
-    options.packageName ??
-    ((relativePath) => packageName(relativePath, { readFile: fs.readFile, repoRoot }));
+    options.packageName ?? ((relativePath) => packageName(repoRoot, relativePath, fs.readFile));
   const cliPackage = env.JOURNEY_CLI_PACKAGE ?? (await packageNameFn("apps/cli"));
   const sdkPackage =
     env.JOURNEY_SDK_PACKAGE ??
@@ -451,16 +451,6 @@ async function readOptionalFile(path, readFileFn) {
   }
 }
 
-async function packageName(relativePath, options) {
-  const pkg = JSON.parse(
-    await options.readFile(join(options.repoRoot, relativePath, "package.json"), "utf8"),
-  );
-  if (typeof pkg.name !== "string" || pkg.name.length === 0) {
-    throw new Error(`${relativePath}/package.json has no name`);
-  }
-  return pkg.name;
-}
-
 function npmEnvironment(env, registryUrl, outputDir) {
   const next = { ...env };
   for (const key of Object.keys(next)) {
@@ -481,12 +471,7 @@ function npmEnvironment(env, registryUrl, outputDir) {
 }
 
 function optionalPort(value, name) {
-  if (!value) return undefined;
-  const port = Number(value);
-  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
-    throw new Error(`${name} must be a TCP port, got ${value}`);
-  }
-  return port;
+  return value ? parsePort(value, name) : undefined;
 }
 
 function withPort(args, port) {
@@ -548,8 +533,4 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     console.error(errorMessage(error));
     process.exit(1);
   }
-}
-
-function errorMessage(error) {
-  return error instanceof Error ? error.message : String(error);
 }
