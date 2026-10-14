@@ -1,6 +1,7 @@
 import { expect, test } from "@zitadel/testing/playwright";
 
-import { expectNoErrorBoundary, signIn } from "./support";
+import { expectNoErrorBoundary } from "../support/screens";
+import { signIn } from "../support/sign-in";
 
 /**
  * The project rename, against a real instance.
@@ -18,7 +19,7 @@ import { expectNoErrorBoundary, signIn } from "./support";
 test.describe.configure({ mode: "serial" });
 
 test("renames the project and the change survives a reload", async ({ page, zitadel, seed }) => {
-  await signIn(page, zitadel.handle, await seed.user());
+  await signIn(page, zitadel, await seed.user());
 
   await page.goto(`/projects/${zitadel.handle.projectId}`);
   const heading = page.getByRole("heading").first();

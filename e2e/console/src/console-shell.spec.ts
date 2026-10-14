@@ -19,22 +19,9 @@
  * running a backend-less preview, and a lane that set it could no longer see
  * the error state at all.)
  */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
-const RUNTIME_URL = "**/console/runtime.json";
-
-/** What a reachable server with no project yet answers (ADR 0004 §3, state 2). */
-const AWAITING_SETUP = { mode: "standalone" };
-
-async function serveRuntime(page: Page, document: object): Promise<void> {
-  await page.route(RUNTIME_URL, (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(document),
-    }),
-  );
-}
+import { AWAITING_SETUP, breakRuntime, dropRuntime, serveRuntime } from "../support/runtime";
 
 test("unauthenticated console redirects to login under the embed base", async ({ page }) => {
   // The console build is served under `/ui/console/` (it embeds in the Go
@@ -64,15 +51,10 @@ test("deep links survive the auth guard via ?next=", async ({ page }) => {
 test("an erroring runtime endpoint renders a retryable connectivity error", async ({ page }) => {
   // The failure this replaces: a 500 used to render "No project yet", sending
   // an operator to `zitadel setup` for a server outage (Console ADR 0004 §3).
-  let broken = true;
-  await page.route(RUNTIME_URL, (route) =>
-    broken
-      ? route.fulfill({ status: 500, contentType: "application/json", body: `{"error":"boom"}` })
-      : route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify(AWAITING_SETUP),
-        }),
+  const recover = await breakRuntime(
+    page,
+    { status: 500, contentType: "application/json", body: `{"error":"boom"}` },
+    AWAITING_SETUP,
   );
 
   await page.goto("/ui/console/");
@@ -84,14 +66,14 @@ test("an erroring runtime endpoint renders a retryable connectivity error", asyn
 
   // Retry is a real second attempt, not a reload hint: recovering the server
   // hands the operator the console on one click.
-  broken = false;
+  recover();
   await page.getByRole("button", { name: "Try again" }).click();
   await expect(page.getByRole("heading", { name: "No project yet" })).toBeVisible();
   expect(new URL(page.url()).pathname).toBe("/ui/console/login");
 });
 
 test("an unreachable runtime endpoint renders the same connectivity error", async ({ page }) => {
-  await page.route(RUNTIME_URL, (route) => route.abort("failed"));
+  await dropRuntime(page);
 
   await page.goto("/ui/console/");
   await expect(page.getByRole("heading", { name: "Server unavailable" })).toBeVisible();

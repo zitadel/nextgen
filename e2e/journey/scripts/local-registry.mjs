@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 
 import { PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
 import { runnerCommand } from "../../../scripts/task-runner.mjs";
+import { packageName, parsePort } from "./lib.mjs";
 
 export const packageDirs = [...PUBLIC_PACKAGE_DIRS];
 
@@ -226,14 +227,6 @@ export function npmEnvironment(env, registryUrl, npmrcPath) {
   };
 }
 
-export async function packageName(repoRoot, relativePath) {
-  const manifest = JSON.parse(await readFile(join(repoRoot, relativePath, "package.json"), "utf8"));
-  if (typeof manifest.name !== "string" || manifest.name.length === 0) {
-    throw new Error(`${relativePath}/package.json has no name`);
-  }
-  return manifest.name;
-}
-
 export async function packageVersion(repoRoot, relativePath) {
   const manifest = JSON.parse(await readFile(join(repoRoot, relativePath, "package.json"), "utf8"));
   if (typeof manifest.version !== "string" || manifest.version.length === 0) {
@@ -245,11 +238,7 @@ export async function packageVersion(repoRoot, relativePath) {
 export function localRegistryPort(repoRoot, env = process.env) {
   const explicit = env.ZITADEL_CLI_LOCAL_REGISTRY_PORT;
   if (explicit) {
-    const port = Number(explicit);
-    if (!Number.isInteger(port) || port <= 0 || port > 65_535) {
-      throw new Error(`ZITADEL_CLI_LOCAL_REGISTRY_PORT must be a TCP port, got ${explicit}`);
-    }
-    return port;
+    return parsePort(explicit, "ZITADEL_CLI_LOCAL_REGISTRY_PORT");
   }
   const hash = createHash("sha256").update(repoRoot).digest("hex").slice(0, 8);
   return 54_873 + (Number.parseInt(hash, 16) % 10_000);
