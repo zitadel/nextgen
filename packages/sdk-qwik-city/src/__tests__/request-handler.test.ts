@@ -14,7 +14,7 @@ import { describe, it, expect, expectTypeOf, vi, afterEach, beforeEach } from "v
 
 import type { QwikRequestEvent } from "../request-handler";
 
-import { createNextgenOnRequest, getAuth } from "../request-handler";
+import { createNextgenOnRequest, getAuth, getClientAuth } from "../request-handler";
 import { clearJwksCache } from "@zitadel/sdk-core/jwt";
 import { clearSessionCheckBackoff } from "@zitadel/sdk-core/middleware";
 import { DEAD, OUTAGES, PROXY_FAILURES } from "./outages";
@@ -329,25 +329,20 @@ describe("createNextgenOnRequest (Qwik City)", () => {
 
   describe("loginPath validation", () => {
     // A visitor without a session would be redirected from /login to /login forever.
-    it("throws at setup when protectedRoutes match the loginPath", () => {
-      expect(() =>
-        createNextgenOnRequest({
-          url: "http://localhost:4000",
-          loginPath: "/login",
-          protectedRoutes: ["/*"],
-        }),
-      ).toThrow(/is matched by protectedRoutes/);
-    });
+    // Exported from a nested layout, the handler never sees the login page, and
+    // it cannot tell: protectedRoutes may then match the login path safely.
+    it("serves requests when protectedRoutes match the loginPath, without warning", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      const handler = createNextgenOnRequest({
+        url: "http://localhost:4000",
+        loginPath: "/login",
+        protectedRoutes: ["/*"],
+      });
+      const h = makeHarness("http://localhost:3000/app/settings");
 
-    it("accepts a loginPath that ignoredRoutes exempt from protectedRoutes", () => {
-      expect(() =>
-        createNextgenOnRequest({
-          url: "http://localhost:4000",
-          loginPath: "/login",
-          protectedRoutes: ["/*"],
-          ignoredRoutes: ["/login"],
-        }),
-      ).not.toThrow();
+      await run(handler, h.ev);
+
+      expect([h.redirected?.status, warn.mock.calls]).toEqual([302, []]);
     });
 
     it("throws on an absolute loginPath", () => {
@@ -567,6 +562,7 @@ describe("opaque session cookie", () => {
   it("signs in a live session that names a user, with the user's details", async () => {
     sessionsMe(
       Response.json({
+        session_id: "s1",
         user_id: "u1",
         user: { identifier: "ada@example.com", identifier_property: "email", display: "Ada" },
       }),
@@ -584,7 +580,7 @@ describe("opaque session cookie", () => {
   // CreateSession sets the cookie before any factor is verified: an abandoned
   // sign-in must not open protected routes.
   it("redirects an anonymous session on a protected route to login", async () => {
-    sessionsMe(Response.json({}));
+    sessionsMe(Response.json({ session_id: "s1" }));
     const h = makeHarness("http://localhost:3000/admin", { cookie: COOKIE });
 
     await run(protectedHandler(), h.ev);
@@ -593,7 +589,7 @@ describe("opaque session cookie", () => {
   });
 
   it("keeps an anonymous session's cookie, since its sign-in may still complete", async () => {
-    sessionsMe(Response.json({}));
+    sessionsMe(Response.json({ session_id: "s1" }));
     const h = makeHarness("http://localhost:3000/admin", { cookie: COOKIE });
 
     await run(protectedHandler(), h.ev);
@@ -642,6 +638,101 @@ describe("opaque session cookie", () => {
 
     expect([h.sent?.status, h.redirected, h.deleted]).toEqual([503, undefined, []]);
   });
+
+  // A cookie the backend cannot have minted must not reach it, or read as an outage.
+  it("clears a malformed session cookie on a protected route without asking the backend", async () => {
+    const backend = vi.fn(async () => Response.json({ session_id: "s1", user_id: "u1" }));
+    vi.stubGlobal("fetch", backend);
+    const h = makeHarness("http://localhost:3000/admin", { cookie: "__nextgen_session=x%0Ay" });
+
+    await run(protectedHandler(), h.ev);
+
+    expect([h.redirected?.status, h.deleted, backend.mock.calls]).toEqual([
+      302,
+      ["__nextgen_session"],
+      [],
+    ]);
+  });
+
+  it("keeps signing in a live session after a malformed cookie and a 500", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: RequestInit) =>
+        new Headers(init.headers).get("cookie") === COOKIE
+          ? Response.json({ session_id: "s1", user_id: "u1" })
+          : new Response(null, { status: 500 }),
+      ),
+    );
+    for (const cookie of ["__nextgen_session=x%0Ay", "__nextgen_session=poison"]) {
+      await run(protectedHandler(), makeHarness("http://localhost:3000/admin", { cookie }).ev);
+    }
+    const h = makeHarness("http://localhost:3000/admin", { cookie: COOKIE });
+
+    await run(protectedHandler(), h.ev);
+
+    expect(getAuth(h.ev)).toMatchObject({ isAuthenticated: true });
+  });
+});
+
+// A JWKS that cannot be fetched on a cold cache says nothing about a JWT.
+describe("JWT session during a JWKS outage", () => {
+  function jwtCookie(): string {
+    const token = makeJwt({ sub: "u1", iss: "http://localhost:4000", exp: ts(3600) }, nextKid());
+    return `__nextgen_session=${token}`;
+  }
+
+  function protectedHandler() {
+    return createNextgenOnRequest({ url: "http://localhost:4000", protectedRoutes: ["/admin"] });
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(new TypeError("fetch failed"))),
+    );
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+  });
+
+  it("answers a protected route 503 and keeps the cookie", async () => {
+    const h = makeHarness("http://localhost:3000/admin", { cookie: jwtCookie() });
+
+    await run(protectedHandler(), h.ev);
+
+    expect([h.sent?.status, h.redirected, h.deleted]).toEqual([503, undefined, []]);
+  });
+
+  it("continues a public route as unavailable, keeping the cookie", async () => {
+    const h = makeHarness("http://localhost:3000/", { cookie: jwtCookie() });
+
+    await run(protectedHandler(), h.ev);
+
+    expect([h.sent, h.deleted, getAuth(h.ev)]).toEqual([
+      undefined,
+      [],
+      { isAuthenticated: false, session: null, reason: "unavailable" },
+    ]);
+  });
+});
+
+describe("getClientAuth", () => {
+  it("drops the session token from the server-side auth", () => {
+    const h = makeHarness("http://localhost:3000/");
+    h.ev.sharedMap.set("nextgenAuth", {
+      isAuthenticated: true,
+      session: {
+        userId: "u1",
+        identifier: null,
+        identifierProperty: null,
+        display: "Ada",
+        token: "t",
+      },
+    });
+
+    expect(getClientAuth(h.ev)).toEqual({
+      isAuthenticated: true,
+      session: { userId: "u1", identifier: null, identifierProperty: null, display: "Ada" },
+    });
+  });
 });
 
 describe("proxy upstream failure", () => {
@@ -677,7 +768,7 @@ describe("configuration from ev.env", () => {
   const EXCHANGE = "http://localhost:3000/__nextgen/sessions/exchange";
 
   function upstream(): ReturnType<typeof vi.fn> {
-    const fetchMock = vi.fn(async () => Response.json({}));
+    const fetchMock = vi.fn(async () => Response.json({ session_id: "s1" }));
     vi.stubGlobal("fetch", fetchMock);
     return fetchMock;
   }

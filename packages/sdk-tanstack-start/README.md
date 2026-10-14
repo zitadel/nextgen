@@ -60,14 +60,20 @@ Server functions receive the request middleware's context, so read auth there
 with `getAuth(context)`. A route's own `beforeLoad` context does **not** carry
 it — and on client-side navigation `beforeLoad` runs in the browser, where no
 request middleware ran at all. Guard a route by calling a server function from
-`beforeLoad`; the call goes to the server on every navigation:
+`beforeLoad`; the call goes to the server on every navigation.
+
+`getAuth(context)` carries the raw session token (`session.token`), which
+Zitadel sets as an HttpOnly cookie so no script can read it. Use it on the
+server only, and never return it from a server function: TanStack sends the
+return value to the browser. Return `getClientAuth(context)` instead, the same
+state without the token:
 
 ```ts
 import { createServerFn } from '@tanstack/react-start';
 import { createFileRoute, redirect } from '@tanstack/react-router';
-import { getAuth } from '@zitadel/sdk-tanstack-start/server';
+import { getClientAuth } from '@zitadel/sdk-tanstack-start/server';
 
-const fetchAuth = createServerFn().handler(({ context }) => getAuth(context));
+const fetchAuth = createServerFn().handler(({ context }) => getClientAuth(context));
 
 export const Route = createFileRoute('/admin')({
   beforeLoad: async () => {
@@ -142,4 +148,4 @@ for a business audience.
 | `proxyTimeoutMs`    | `number`             | `5000`                       | Timeout in ms for upstream proxy requests. A request exceeding it is answered `504`; an unreachable backend `502`, both with a `{ code, message }` body |
 | `audience`          | `string \| string[]` | not validated                | Expected `aud` claim value(s)                                       |
 
-Only Zitadel's own answer that the session is gone, a `401` with the code `auth.unauthorized` or a `404` with `sess.not_found`, clears the session cookie. If the Zitadel server times out, is unreachable, answers `5xx`, or something in front of it (a gateway, a wrong `url`) answers a `401`/`404` page of its own, the cookie is kept: public pages render signed out with `getAuth()` reporting `reason: "unavailable"`, and a protected route is answered `503` with `retry-after`. Guard your own loaders the same way (see above). After such a failure the SDK logs it once and does not ask Zitadel again for a few seconds, so a hanging server does not slow every request. `handleNextgenRequest` reports that case as `{ type: "unavailable" }`.
+Only Zitadel's own answer that the session is gone, a `401` with the code `auth.unauthorized` or a `404` with `sess.not_found`, clears the session cookie. If the Zitadel server times out, is unreachable, answers `5xx`, or something in front of it (a gateway, a wrong `url`) answers a `401`/`404` page of its own, the cookie is kept: public pages render signed out with `getAuth()` reporting `reason: "unavailable"`, and a protected route is answered `503` with `retry-after`. Guard your own loaders the same way (see above). When Zitadel cannot be reached (a network error, a timeout, or a `502`, `503` or `504`), the SDK logs it once and does not ask again for 15 seconds, and while one check has gone a second without an answer, other requests do not wait for it, so a hanging server does not slow every request. Any other failure holds for that request only. A session cookie that cannot be a Zitadel token (characters a token never has, or far too long) is treated as signed out without asking Zitadel. `handleNextgenRequest` reports that case as `{ type: "unavailable" }`.

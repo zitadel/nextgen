@@ -14,3 +14,5 @@ not be checked, `getAuth()` (and `auth()` in sdk-next, `useAuth()` in sdk-nuxt) 
 retryable error there instead of redirecting to the login page, for example
 `if (auth.reason === "unavailable") error(503)` before the redirect. The `UnauthReason` type is
 exported from every server SDK.
+The route-guard examples in the SvelteKit, SolidStart and Qwik City READMEs now do this too, instead
+of sending a signed-in visitor to the login page during an outage.

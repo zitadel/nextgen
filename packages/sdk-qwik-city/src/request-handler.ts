@@ -1,4 +1,8 @@
-import type { AuthResult, NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
+import type {
+  AuthResult,
+  ClientAuthResult,
+  NextgenMiddlewareOptions,
+} from "@zitadel/sdk-core/middleware";
 
 import {
   HOP_BY_HOP,
@@ -10,10 +14,11 @@ import {
   proxyFailureResponse,
   requiresProjectSecret,
   sessionUnavailableResponse,
+  toClientAuth,
   validateOpaqueSessionToken,
 } from "@zitadel/sdk-core/middleware";
 
-import { isJwtShaped, verifyJwt } from "./lib/jwt";
+import { checkJwt, isJwtShaped } from "./lib/jwt";
 
 /**
  * `process` is undefined in some edge/serverless runtimes; read env defensively
@@ -215,8 +220,8 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
   // Bearer token takes explicit precedence over the session cookie.
   const token = bearerToken ?? cookieToken;
 
-  const payload = token
-    ? await verifyJwt(token, {
+  const jwt = token
+    ? await checkJwt(token, {
         issuerUrl: url,
         allowedAlgorithms,
         clockSkewMs,
@@ -225,6 +230,7 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
         jwksTimeoutMs,
       })
     : null;
+  const payload = jwt?.status === "valid" ? jwt.payload : null;
 
   if (payload && token && payload.sub) {
     ev.sharedMap.set(SHARED_MAP_KEY, {
@@ -240,6 +246,9 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
     return;
   }
 
+  // A JWT whose keys cannot be fetched (the JWKS is down and nothing is
+  // cached) may well be good: an outage, not a sign-out.
+  let unavailable = jwt?.status === "unavailable";
   let keepCookies = false;
   if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
     const check = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
@@ -259,19 +268,20 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
     // A session without a user is anonymous: its sign-in has not verified a
     // factor yet. It is not signed in, but it is live — keep its cookie.
     keepCookies = check.status === "live";
-    if (check.status === "unknown") {
-      // The backend could not be asked. The session may be live, so its cookie
-      // survives the outage; a protected route is retryable, not a sign-in.
-      ev.sharedMap.set(SHARED_MAP_KEY, {
-        isAuthenticated: false,
-        session: null,
-        reason: "unavailable",
-      } satisfies AuthResult);
-      if (matchesRoutes(pathname, protectedRoutes)) {
-        ev.send(sessionUnavailableResponse());
-      }
-      return;
+    unavailable ||= check.status === "unknown";
+  }
+  if (unavailable) {
+    // The backend could not be asked. The session may be live, so its cookie
+    // survives the outage; a protected route is retryable, not a sign-in.
+    ev.sharedMap.set(SHARED_MAP_KEY, {
+      isAuthenticated: false,
+      session: null,
+      reason: "unavailable",
+    } satisfies AuthResult);
+    if (matchesRoutes(pathname, protectedRoutes)) {
+      ev.send(sessionUnavailableResponse());
     }
+    return;
   }
 
   ev.sharedMap.set(SHARED_MAP_KEY, {
@@ -341,7 +351,9 @@ export function createNextgenOnRequest(
   } = options;
 
   // Guard against open-redirect: loginPath must be a path on this app.
-  assertLoginPath(loginPath, { protectedRoutes, ignoredRoutes });
+  assertLoginPath(loginPath);
+  // No check of loginPath against protectedRoutes: exported from a nested
+  // layout, this handler never sees the login page, and it cannot tell.
 
   return async (ev: QwikRequestEvent): Promise<void> => {
     const { pathname } = ev.url;
@@ -410,4 +422,18 @@ export function getAuth(ev: { sharedMap: Map<string, unknown> }): AuthResult {
       session: null,
     }
   );
+}
+
+/**
+ * The auth state of {@link getAuth} without the session token: safe to return
+ * from a `routeLoader$` or `server$`, whose results Qwik serialises into the
+ * page. The backend sets the token as an HttpOnly cookie; returning
+ * {@link getAuth}'s result would hand it to any script on the page.
+ *
+ * @param ev - The current Qwik City request event.
+ * @returns The current {@link ClientAuthResult}, with `reason` when the
+ *   session could not be checked.
+ */
+export function getClientAuth(ev: { sharedMap: Map<string, unknown> }): ClientAuthResult {
+  return toClientAuth(getAuth(ev));
 }

@@ -47,16 +47,46 @@ Opaque (non-JWT) session tokens are validated against the backend's
 `GET /sessions/me` instead, bounded by `opaqueTokenTimeoutMs`. Only the
 backend's own answer that the session is gone, a `401` with the code
 `auth.unauthorized` or a `404` with `sess.not_found`, means the session is dead
-and its cookie is cleared. Anything else (a network error, a timeout, a `5xx`,
-an unreadable body, or a `401`/`404` page from a gateway in front of the
-backend) leaves the outcome unknown: every SDK keeps the cookie, treats the
-request as signed out for now with `reason: "unavailable"` on its auth result,
-and answers a protected route with a retryable `503` instead of the login
-redirect. An unknown outcome is logged once and the backend is not asked again
-for `SESSION_CHECK_BACKOFF_MS` (5 seconds), so a hanging backend does not cost
-every request the full timeout. A JWKS refresh that fails (including a `5xx`)
-keeps verifying against the keys already cached, is logged once, and is not
-retried for `JWKS_FAILURE_BACKOFF_MS` (5 seconds).
+and its cookie is cleared. A token that cannot be one the backend minted
+(anything but base64url characters and dots, or longer than
+`MAX_SESSION_TOKEN_LENGTH`) is dead too, without asking the backend
+(`isWellFormedSessionToken`). Anything else (a network error, a timeout, a
+`5xx`, an unreadable body, a `200` that is not the session JSON with its
+`session_id`, or a `401`/`404` page from a gateway in front of the backend)
+leaves the outcome unknown: every SDK keeps the cookie, treats the request as
+signed out for now with `reason: "unavailable"` on its auth result, and answers
+a protected route with a retryable `503` instead of the login redirect.
+
+Only a failure to reach the backend (a network error, a timeout, or a `502`,
+`503` or `504`) starts a backoff: it is logged once, and the backend is not
+asked again for `SESSION_CHECK_BACKOFF_MS` (15 seconds, longer than the
+default timeout). While one check has gone unanswered for
+`SESSION_CHECK_STALL_MS` (1 second), other checks against the same backend
+answer unknown at once instead of each waiting out the timeout. So a hanging
+backend costs at most the requests of its first second, not every request.
+Any other unknown answer (a `500`, say) may come from the request's own token,
+so it holds for that request only; it is logged at most once per
+`SESSION_CHECK_BACKOFF_MS`.
+
+A JWT whose keys cannot be had (the JWKS endpoint fails and no keys are
+cached) is unknown in the same way: `checkJwt` answers `unavailable`, and every
+SDK keeps the cookie and answers a protected route `503`. A JWKS refresh that
+fails with keys cached keeps verifying against them; either way the failure is
+logged once and the JWKS is not fetched again for `JWKS_FAILURE_BACKOFF_MS`
+(5 seconds).
+
+The backoff, the stall tracking and the JWKS cache are module state, so they
+are per process or isolate: each serverless instance, edge isolate or worker
+keeps its own, and an instance that serves one request at a time gains only
+across the requests it serves in sequence. In Next.js the edge middleware and
+the Node `auth()` load separate copies of this package, each with its own
+backoff and JWKS cache, so `auth()` can report `unavailable` for a request the
+middleware just saw live.
+
+Anything a server hands to the browser (load data, a server function's result,
+an SSR payload) must not carry the session token, which the backend sets as an
+HttpOnly cookie. `toClientAuth(auth)` turns an `AuthResult` into the
+`ClientAuthResult` without it; each server SDK wraps it as `getClientAuth`.
 
 A proxied `/__nextgen/*` call the backend does not answer comes back as a `502`
 (unreachable) or `504` (`proxyTimeoutMs` elapsed) with an `{ code, message }`

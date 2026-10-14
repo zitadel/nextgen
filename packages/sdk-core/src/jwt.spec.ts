@@ -5,12 +5,14 @@ import {
   JWKS_FAILURE_BACKOFF_MS,
   JWKS_MIN_REFRESH_MS,
   JWKS_TTL_MS,
+  checkJwt,
   verifyJwt,
   type VerifyJwtOptions,
 } from "./jwt.js";
 
 const rsa = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const ec = generateKeyPairSync("ec", { namedCurve: "P-256" });
+const other = generateKeyPairSync("rsa", { modulusLength: 2048 });
 
 function b64url(buf: Buffer): string {
   return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -246,6 +248,58 @@ describe("verifyJwt JWKS refresh backoff", () => {
       ).toMatchObject({ sub: "u1" });
     }
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("checkJwt", () => {
+  it("answers valid with the payload of a good token", async () => {
+    const issuer = freshIssuer();
+    serveJwks(() => [jwk(rsa.publicKey, { kid: "k1", alg: "RS256" })]);
+
+    expect(await checkJwt(sign(issuer, "k1", "RS256", rsa.privateKey), opts(issuer))).toMatchObject(
+      { status: "valid", payload: { sub: "u1" } },
+    );
+  });
+
+  // A JWKS outage on a cold cache says nothing about the token: not a sign-out.
+  it.each([
+    ["a 503", () => Promise.resolve(new Response(null, { status: 503 }))],
+    ["a network error", () => Promise.reject(new TypeError("fetch failed"))],
+    ["a timeout", () => Promise.reject(new DOMException("timed out", "TimeoutError"))],
+  ])("answers unavailable when the JWKS fails with %s and nothing is cached", async (_l, fail) => {
+    const issuer = freshIssuer();
+    vi.stubGlobal("fetch", vi.fn(fail));
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    expect(await checkJwt(sign(issuer, "k1", "RS256", rsa.privateKey), opts(issuer))).toEqual({
+      status: "unavailable",
+    });
+  });
+
+  it("answers unavailable during the JWKS backoff while nothing is cached", async () => {
+    const issuer = freshIssuer();
+    const fetchMock = vi.fn(() => Promise.reject(new TypeError("fetch failed")));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const token = sign(issuer, "k1", "RS256", rsa.privateKey);
+    await checkJwt(token, opts(issuer));
+
+    expect(await checkJwt(token, opts(issuer))).toEqual({ status: "unavailable" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [
+      "a kid the issuer does not publish",
+      (iss: string) => sign(iss, "other", "RS256", rsa.privateKey),
+    ],
+    ["a signature by another key", (iss: string) => sign(iss, "k1", "RS256", other.privateKey)],
+    ["a token that is not a JWT", () => "not.a.jwt"],
+  ])("answers invalid for %s", async (_label, token) => {
+    const issuer = freshIssuer();
+    serveJwks(() => [jwk(rsa.publicKey, { kid: "k1", alg: "RS256" })]);
+
+    expect(await checkJwt(token(issuer), opts(issuer))).toEqual({ status: "invalid" });
   });
 });
 

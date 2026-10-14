@@ -76,14 +76,14 @@ The TanStack Start SDK is a global request middleware that proxies and verifies 
     }));
     ```
 
-    `protectedRoutes` only guards document requests. A client-side `<Link>` never reaches the request middleware, so guard the route itself in `beforeLoad` by calling a server function. A route's own `beforeLoad` context does not carry the session; a server function's does.
+    `protectedRoutes` only guards document requests. A client-side `<Link>` never reaches the request middleware, so guard the route itself in `beforeLoad` by calling a server function. A route's own `beforeLoad` context does not carry the session; a server function's does. Return `getClientAuth(context)` from it, not `getAuth(context)`: a server function's return value reaches the browser, and `getAuth` carries the HttpOnly session token.
 
     ```tsx
     import { createFileRoute, redirect } from "@tanstack/react-router";
     import { createServerFn } from "@tanstack/react-start";
-    import { getAuth } from "@zitadel/sdk-tanstack-start/server";
+    import { getClientAuth } from "@zitadel/sdk-tanstack-start/server";
 
-    const fetchAuth = createServerFn().handler(({ context }) => getAuth(context));
+    const fetchAuth = createServerFn().handler(({ context }) => getClientAuth(context));
 
     export const Route = createFileRoute("/profile")({
       beforeLoad: async () => {

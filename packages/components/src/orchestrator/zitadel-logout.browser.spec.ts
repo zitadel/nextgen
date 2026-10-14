@@ -148,8 +148,11 @@ describe("<zitadel-logout> without a session (chromium)", () => {
     host = document.createElement("div");
     document.body.appendChild(host);
     originalFetch = globalThis.fetch;
-    globalThis.fetch = vi.fn(
-      async () => new Response(null, { status: 401 }),
+    globalThis.fetch = vi.fn(async () =>
+      Response.json(
+        { code: "auth.unauthorized", message: "Missing or invalid session token." },
+        { status: 401 },
+      ),
     ) as unknown as typeof fetch;
   });
 

@@ -7,8 +7,15 @@
 export {
   JWKS_TTL_MS,
   base64UrlDecode,
+  checkJwt,
   decodeJwt,
   isJwtShaped,
   verifyJwt,
 } from "@zitadel/sdk-core/jwt";
-export type { JwtPayload, JwtHeader, DecodedJwt, VerifyJwtOptions } from "@zitadel/sdk-core/jwt";
+export type {
+  JwtPayload,
+  JwtHeader,
+  DecodedJwt,
+  VerifyJwtOptions,
+  JwtCheck,
+} from "@zitadel/sdk-core/jwt";

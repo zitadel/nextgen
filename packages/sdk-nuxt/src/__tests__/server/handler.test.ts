@@ -101,7 +101,9 @@ describe("module server handler", () => {
   });
 
   it("sends the project secret the module stored on the handoff exchange", async () => {
-    const upstream = vi.fn(async (_url: string, _init: RequestInit) => Response.json({}));
+    const upstream = vi.fn(async (_url: string, _init: RequestInit) =>
+      Response.json({ session_id: "s1" }),
+    );
     vi.stubGlobal("fetch", upstream);
     const handle = await moduleHandler({ url: "http://zitadel.test", projectSecret: "sk_module" });
 

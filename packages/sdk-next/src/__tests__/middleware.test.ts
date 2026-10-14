@@ -832,7 +832,7 @@ describe("opaque session cookie", () => {
   });
 
   it("tunnels a live session that names a user to server components", async () => {
-    sessionsMe(Response.json({ user_id: "u1" }));
+    sessionsMe(Response.json({ session_id: "s1", user_id: "u1" }));
 
     const res = await nextgenMiddleware(
       makeRequest("http://localhost:3000/admin", COOKIE),
@@ -957,6 +957,88 @@ describe("opaque session cookie", () => {
       [],
     ]);
   });
+
+  // Next percent-decodes cookies: `x%0Ay` reaches the middleware as a newline,
+  // which fetch refuses to send. It must not read as an outage.
+  it("clears a malformed session cookie on a protected route without asking the backend", async () => {
+    const backend = vi.fn(async () => Response.json({ session_id: "s1", user_id: "u1" }));
+    vi.stubGlobal("fetch", backend);
+
+    const res = await nextgenMiddleware(
+      makeRequest("http://localhost:3000/admin", "__nextgen_session=x%0Ay"),
+      OPTIONS,
+    );
+
+    expect([res.status, cleared(res), backend.mock.calls]).toEqual([
+      302,
+      ["__nextgen_session"],
+      [],
+    ]);
+  });
+
+  it("keeps signing in a live session after a malformed cookie and a 500", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: RequestInit) =>
+        new Headers(init.headers).get("cookie") === COOKIE
+          ? Response.json({ session_id: "s1", user_id: "u1" })
+          : new Response(null, { status: 500 }),
+      ),
+    );
+    for (const cookie of ["__nextgen_session=x%0Ay", "__nextgen_session=poison"]) {
+      await nextgenMiddleware(makeRequest("http://localhost:3000/admin", cookie), OPTIONS);
+    }
+
+    const res = await nextgenMiddleware(
+      makeRequest("http://localhost:3000/admin", COOKIE),
+      OPTIONS,
+    );
+
+    expect([res.status, tunnelled(res)]).toEqual([200, "opaque-session-token"]);
+  });
+});
+
+// A JWKS that cannot be fetched on a cold cache says nothing about a JWT.
+describe("JWT session during a JWKS outage", () => {
+  const OPTIONS = { url: "http://localhost:4000", protectedRoutes: ["/admin"] };
+
+  function jwtCookie(): string {
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    return `__nextgen_session=${makeJwt({ sub: "u1", iss: OPTIONS.url, exp }, nextKid())}`;
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(new TypeError("fetch failed"))),
+    );
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("answers a protected route 503 and keeps the cookie", async () => {
+    const res = await nextgenMiddleware(
+      makeRequest("http://localhost:3000/admin", jwtCookie()),
+      OPTIONS,
+    );
+
+    expect([res.status, res.headers.getSetCookie()]).toEqual([503, []]);
+  });
+
+  it("tells auth() the session is unavailable on a public route, keeping the cookie", async () => {
+    const res = await nextgenMiddleware(
+      makeRequest("http://localhost:3000/", jwtCookie()),
+      OPTIONS,
+    );
+
+    expect([
+      res.headers.get("x-middleware-request-x-nextgen-auth-state"),
+      res.headers.getSetCookie(),
+    ]).toEqual(["unavailable", []]);
+  });
 });
 
 describe("proxy upstream failure", () => {
@@ -988,7 +1070,9 @@ describe("project secret sources", () => {
     ["nothing", undefined, undefined, null],
   ])("sends the exchange bearer from %s", async (_l, option, env, expected) => {
     vi.stubEnv("ZITADEL_PROJECT_SECRET", env);
-    const upstream = vi.fn(async (_url: string, _init: RequestInit) => Response.json({}));
+    const upstream = vi.fn(async (_url: string, _init: RequestInit) =>
+      Response.json({ session_id: "s1" }),
+    );
     vi.stubGlobal("fetch", upstream);
 
     await nextgenMiddleware(
@@ -1000,7 +1084,9 @@ describe("project secret sources", () => {
   });
 
   it("passes the project secret through createProxy", async () => {
-    const upstream = vi.fn(async (_url: string, _init: RequestInit) => Response.json({}));
+    const upstream = vi.fn(async (_url: string, _init: RequestInit) =>
+      Response.json({ session_id: "s1" }),
+    );
     vi.stubGlobal("fetch", upstream);
     const proxy = createProxy(
       { projectId: "p1", url: "http://localhost:4000", proxyPath: "/__nextgen" } as Parameters<
@@ -1035,15 +1121,33 @@ describe("createProxy", () => {
     },
   );
 
-  // A visitor without a session would be redirected from /login to /login forever.
-  it("throws at setup when protectedRoutes match the loginPath", () => {
-    expect(() =>
-      createProxy(
-        { url: "http://localhost:4000", proxyPath: "/__nextgen" } as Parameters<
-          typeof createProxy
-        >[0],
-        { loginPath: "/login", protectedRoutes: ["/*"] },
-      ),
-    ).toThrow(/is matched by protectedRoutes/);
+  // protectedRoutes may match the login page when the `matcher` keeps the
+  // middleware off it, which the SDK cannot see: such a setup must keep working.
+  it("serves a matched route when protectedRoutes also match the loginPath", async () => {
+    const proxy = createProxy(
+      { url: "http://localhost:4000", proxyPath: "/__nextgen" } as Parameters<
+        typeof createProxy
+      >[0],
+      { loginPath: "/login", protectedRoutes: ["/*"] },
+    );
+
+    const res = await proxy(makeRequest("http://localhost:3000/profile"));
+
+    expect([res.status, vi.mocked(console.warn).mock.calls]).toEqual([302, []]);
+  });
+});
+
+describe("nextgenMiddleware with protectedRoutes matching the loginPath", () => {
+  it("answers every request instead of throwing, and does not warn", async () => {
+    const options = { url: "http://localhost:4000", loginPath: "/login", protectedRoutes: ["/*"] };
+
+    const statuses = [];
+    for (let i = 0; i < 3; i++) {
+      statuses.push(
+        (await nextgenMiddleware(makeRequest("http://localhost:3000/a"), options)).status,
+      );
+    }
+
+    expect([statuses, vi.mocked(console.warn).mock.calls]).toEqual([[302, 302, 302], []]);
   });
 });

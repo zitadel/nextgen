@@ -90,6 +90,11 @@ export default defineEventHandler((event) => {
 });
 ```
 
+Never return `getAuth(event)` itself from a route the browser calls: it carries
+the session token, which Zitadel sets as an HttpOnly cookie so no script can
+read it. Return `getClientAuth(event)` instead, the same state without the
+token.
+
 ### Login page
 
 Register the shared components in a client-only plugin
@@ -125,6 +130,37 @@ const project = useZitadelProject();
   </main>
 </template>
 ```
+
+### Session widgets
+
+`<zitadel-session>` (the signed-in card for a profile page) and
+`<zitadel-logout>` (the avatar menu) are bound the same way. Nuxt templates use
+the raw elements, so listen to their events directly: `@zitadel-signout` after
+a sign-out, and `@zitadel-session-missing` when the widget finds no session as
+it loads. Without a session both widgets render nothing, and the card also goes
+to its `post-sign-out-url` when one is set, unless that URL is the page the
+card is on:
+
+```vue
+<script setup lang="ts">
+const project = useZitadelProject();
+const onSessionMissing = () => console.info("no session");
+</script>
+
+<template>
+  <ClientOnly>
+    <zitadel-session
+      :project="project"
+      post-sign-out-url="/login"
+      @zitadel-session-missing="onSessionMissing"
+    />
+  </ClientOnly>
+</template>
+```
+
+A failure that is not the backend saying "no session" (a gateway's error
+page, a 5xx, a network error) keeps the widget and shows the error. See the
+`@zitadel/components` README for the full rule.
 
 ## Surface 2 — direct middleware (hand-rolled)
 

@@ -1,1 +1,1 @@
-export { createNextgenMiddleware, getAuth } from "./runtime/server/middleware";
+export { createNextgenMiddleware, getAuth, getClientAuth } from "./runtime/server/middleware";

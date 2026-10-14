@@ -326,14 +326,22 @@ JSX (React, Solid, Qwik) a string literal `{"{{display}}"}`.
 Events (both bubble and are composed):
 
 - `zitadel-signout` (detail `{ display, identifier }`, the identity just signed
-  out) after a sign-out. A sign-out answered 401 or 404 counts: the session is
-  already gone. The element then navigates to `post-sign-out-url`, or, without
-  one, renders nothing.
-- `zitadel-session-missing` (detail `{}`) when `GET /sessions/me` answers 401
-  or 404, or names no user. The element renders nothing (no avatar, no
+  out) after a sign-out. A sign-out the backend answers with "no session"
+  counts: the session is already gone. The element then navigates to
+  `post-sign-out-url`, or, without one, renders nothing. Any other failure
+  shows the error in the menu, fires nothing and stays put.
+- `zitadel-session-missing` (detail `{}`) when the backend answers that there
+  is no session, or names no user. The element renders nothing (no avatar, no
   projected template) and stays on the page: the menu sits in an app's own
-  chrome. A network error or a 5xx is not "signed out": the control stays and
-  the menu shows the error.
+  chrome. Anything else is not "signed out": the control stays and the menu
+  shows the error.
+
+"No session" means the backend's own answer: `401` with the
+`auth.unauthorized` code or `404` with `sess.not_found`. A gateway, WAF or
+ingress answers 401 and 404 too, without that code, and an SPA host may answer
+a 200 with its `index.html`; those, a network error, a 403, a 429 and a 5xx all
+leave the session as it is and show the error, the same way the server SDKs
+answer 503 instead of sending a signed-in user to the login page.
 
 ### `<zitadel-session>`
 
@@ -347,7 +355,7 @@ and signs out through `revokeMySession`, like `<zitadel-logout>`.
 | `projectId` / `project-id` | `string` | Project id, for a page with no JavaScript config. Read only when neither `project` nor a global handle is set |
 | `proxyPath` / `proxy-path` | `string` | Same-origin API prefix that goes with `project-id`; defaults to `/__nextgen` |
 | `url` | `string` | Backend URL that goes with `project-id` (server-side use; the browser calls `proxy-path`) |
-| `postSignOutUrl` / `post-sign-out-url` | `string` | Navigate here after sign-out, and when the visitor has no session |
+| `postSignOutUrl` / `post-sign-out-url` | `string` | Navigate here after sign-out, and when the visitor has no session unless it is the card's own page |
 | `heading` | `string` | Card title; unset shows "Signed in as" |
 | `logoutLabel` / `logout-label` | `string` | Button label; unset shows "Sign out" |
 | `variant` | `'widget' \| 'page'` | As on `<zitadel-login>`: `widget` (default) is content-sized and transparent, `page` claims the viewport |
@@ -357,14 +365,23 @@ and signs out through `revokeMySession`, like `<zitadel-logout>`.
 Events (both bubble and are composed):
 
 - `zitadel-signout` (detail `{ display, identifier }`, the identity just signed
-  out) after a sign-out. A sign-out answered 401 or 404 counts: the session is
-  already gone. The card then navigates to `post-sign-out-url`, or, without
-  one, renders nothing.
-- `zitadel-session-missing` (detail `{}`) when `GET /sessions/me` answers 401
-  or 404, or names no user, so a page reached without a session never shows
-  "Signed in as" for nobody. The card navigates to `post-sign-out-url` when one
-  is set and otherwise renders nothing. A network error or a 5xx is not
-  "signed out": the card stays and shows the error.
+  out) after a sign-out. A sign-out the backend answers with "no session"
+  counts: the session is already gone. The card then navigates to
+  `post-sign-out-url`, or, without one, renders nothing. Any other failure
+  shows the error, fires nothing and stays put.
+- `zitadel-session-missing` (detail `{}`) when the backend answers that there
+  is no session, or names no user, so a page reached without a session never
+  shows "Signed in as" for nobody. The card navigates to `post-sign-out-url`
+  when one is set and otherwise renders nothing. Anything else is not "signed
+  out": the card stays and shows the error. "No session" is decided as for
+  `<zitadel-logout>` above.
+
+The card never redirects to the page it is on. When `post-sign-out-url`
+resolves to the current page (same origin, path and query; the fragment is
+ignored), a visit without a session renders nothing instead of navigating, so
+a page that shows the card and is also its sign-out target (`/account` with
+`post-sign-out-url="/account"`) does not reload itself forever. A sign-out on
+that page still navigates there, which reloads it once.
 
 The framework wrappers surface these as `onSignout` / `onSessionMissing`, except
 Vue and Angular, which emit `signout` / `sessionMissing`, and Qwik, which takes

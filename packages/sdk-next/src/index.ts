@@ -8,7 +8,7 @@
 export * from "./types.js";
 export { nextgenMiddleware, createProxy } from "./middleware.js";
 export type { ProxyOptions, ProxyHandler } from "./middleware.js";
-export { auth } from "./auth.js";
+export { auth, getClientAuth } from "./auth.js";
 export type { AuthOptions } from "./auth.js";
 export { NextgenProvider } from "./provider.js";
 export { AuthContextProvider, useAuthContext } from "./context.js";
