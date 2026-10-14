@@ -1,6 +1,6 @@
 # CLI Journey E2E Instructions
 
-These instructions apply to `apps/cli-journey-e2e/**`. Defer to the root
+These instructions apply to `e2e/journey/**`. Defer to the root
 `AGENTS.md` for repository-wide rules.
 
 ## Purpose
@@ -65,7 +65,7 @@ ADR 044) — both shapes run the same CLI path and browser journeys.
   bootable via `npm run dev`, and carrying a distinctive shell and homepage the
   specs assert survive setup. Only route-based frameworks (Next, Nuxt) belong
   here — the SPA families keep the page posture.
-- The testkit suite (`--suite testkit`, moon task `e2e-testkit`) is the
+- The testkit suite (`moon run e2e:journey -- --suite testkit`) is the
   customer-configuration proof for `@zitadel/testing`: it scaffolds one next
   app, installs the kit from the journey registry, copies the checked-in
   consumer suite from `fixtures/testkit/`, and runs it inside the app. It must

@@ -21,7 +21,7 @@ import { e2eActionTimeouts, e2eTimeouts } from "../playwright.shared";
 const appDir = import.meta.dirname;
 const workspaceRoot = join(appDir, "../..");
 // A fixed pin, same reasoning as the embedded lane. Neighbors: 8093
-// console-e2e e2e-real, 8094 console dev-real, 8095 console-e2e e2e-embedded.
+// e2e:console-real, 8094 console dev-real, 8095 e2e:console-embedded.
 const zitadelPort = Number(process.env.PLATFORM_ZITADEL_PORT ?? 8097);
 const origin = `http://localhost:${zitadelPort}`;
 

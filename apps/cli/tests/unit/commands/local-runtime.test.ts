@@ -568,8 +568,8 @@ describe("local runtime commands", () => {
   });
 
   // The platform project and the local admin travel together: a harness that
-  // wants a bare single-project instance opts out of both (apps/console-e2e's
-  // real and embedded lanes do). The project's env files reach the server over
+  // wants a bare single-project instance opts out of both (the e2e project's
+  // console real and embedded lanes do). The project's env files reach the server over
   // the shell and the user file forces the bootstrap on, so an opt-out in
   // `.env.local` must be read by the CLI too. And the server refuses to
   // bootstrap the platform project while pinned to another one, so a pin means

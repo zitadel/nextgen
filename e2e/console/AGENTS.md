@@ -1,4 +1,4 @@
-# Agent Instructions — `apps/console-e2e`
+# Agent Instructions — `e2e/console`
 
 Playwright project for the console's five runtime boundaries. Defer to root
 [`AGENTS.md`](../../AGENTS.md) for repo-wide rules; lane descriptions and the
@@ -6,26 +6,26 @@ secret-handling caveat live in [`README.md`](README.md).
 
 ## The five lanes
 
-- `moon run console-e2e:e2e` — **embedded shell smoke**: Vite-preview of the
+- `moon run e2e:console-smoke` — **embedded shell smoke**: Vite-preview of the
   built console under its production embed base `/ui/console/`. No live API.
-- `moon run console-e2e:e2e-real` — **real-instance resource coverage**: one
+- `moon run e2e:console-real` — **real-instance resource coverage**: one
   ephemeral real instance via `@zitadel/testing`
   ([`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md)), console
   served by the Vite dev server through its (credential-free) API proxy; each
   test's user is granted access through the API and signs in with its
   session cookie (`src-real/support.ts`). Playwright workers share the
   instance and seed a fresh user per test.
-- `moon run console-e2e:e2e-embedded` — **embedded production-path coverage**:
+- `moon run e2e:console-embedded` — **embedded production-path coverage**:
   the built Go binary serves the console, hosted login, and API from one
   origin, with no Vite proxy. This is the only lane that proves the API base
   and Go mux agree on the request path customers receive.
-- `moon run console-e2e:e2e-platform` — **platform-project coverage**: the
+- `moon run e2e:console-platform` — **platform-project coverage**: the
   same binary with the platform project bootstrapped (the server default). An
   operator signs up through the console, is granted the harness project by
   email, and uses the screens on the session cookie alone. The console selects
   that project on its own (the operator's only grant, as `?project=`), so the
   screens run in a project other than the one the console signs into.
-- `moon run console-e2e:e2e-deployment` — **hosted-cloud deployment
+- `moon run e2e:console-deployment` — **hosted-cloud deployment
   coverage**: no server of its own; it checks a deployment that
   `CONSOLE_DEPLOYMENT_URL` names, where the console is a Vercel service at
   `/console/` beside the server. It pins the routing (`/console/runtime.json`
@@ -57,7 +57,8 @@ the shell smoke stays local-only. The `@zitadel/testing` interaction is document
   and `PLATFORM_ZITADEL_PORT: 8097` are fixed pins deliberately outside the
   deferred-bind blocks — the full doctrine (why config-time ports cannot live
   in the dynamically scanned reservation domains, and the neighbor map) is in
-  [`moon.yml`](moon.yml) and `apps/cli-journey-e2e/scripts/ports.mjs`. Do not
+  the lane configs (`playwright.*.config.mts`) and
+  [`../journey/scripts/ports.mjs`](../journey/scripts/ports.mjs). Do not
   move any of these lanes onto a scanned block, and sweep orphans with
   `moon run workspace:cli -- stop --all`.
 - **Secrets**: the `.zitadel-testing/` handshake contains the project secret —

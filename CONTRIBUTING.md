@@ -267,23 +267,30 @@ dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
   dep on their `:test` task.
 - `moon run release:snapshot -- --skip-container` — a non-publishing release
   snapshot, built here (outside the main graph) and handed to the journey via
-  `JOURNEY_TARBALLS_DIR`; the journey must not pack inside `moon ci` (a nested
-  moon graph is forbidden).
-- `moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph`. The
-  `:test` target runs the whole `e2e` project through its `test` task: every
-  console, demo, journey, and `testing:test-integration` lane, as dependencies.
+  `JOURNEY_TARBALLS_DIR`, whenever the journey can run. The journey must not
+  pack inside `moon ci` (a nested moon graph is forbidden), so in GitHub
+  Actions it refuses to run without the snapshot. The journey's Verdaccio
+  storage comes back from the Actions cache.
+- `moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph e2e:all`.
+  `e2e:all` runs every e2e lane as its dependencies: console, demo, the journey
+  (with ci-mode's framework matrix), and `testing:test-integration`.
 - `moon run server:test-postgres`, then `moon run server:test-sqlite` — Go
-  integration lanes (not `test` tasks, so `:test` does not select them).
+  integration lanes. They depend on the UI builds their binary embeds, so
+  `moon ci` also runs them when one of those builds is affected; on such runs
+  they run twice until a follow-up folds them into the graph step.
 
 Within full mode the `moon ci` graph selects only the tasks the diff affects
 (`--downstream deep --include-relations`): a lane is skipped when the diff
 provably cannot reach it — a docs-only PR runs almost nothing, a frontend-only
-PR skips the Go suites. The e2e lanes run whenever the `e2e` project — which
-depends on the console, demos, CLI, SDKs, api-mock and testing kit — is
-affected, so most code PRs run them; the journey's fresh-app matrix always runs
-all frameworks (the single-framework collapse was dropped with the
-consolidation). `scripts/ci-mode.mjs` now only picks the mode (full vs
-version-only) and the `go_tests` gate. The gates fail open: known repo-wide
+PR skips the Go suites. The e2e lanes run, all together, whenever one of them
+is affected (its folder, or something it depends on: the server, CLI, console,
+SDKs, api-mock or testing kit), so most code PRs run them.
+`scripts/ci-mode.mjs` picks the mode (full vs version-only) and the gates for
+the steps outside the graph: the Go suites, the release snapshot (on when a
+journey trigger moved or `e2e:all` is affected) and the journey's framework
+matrix, which collapses to Next unless an SDK, the CLI, the test kit or the
+journey's own files moved. ci-turbo.yml uses the same gates for its per-lane steps. The gates fail
+open: known repo-wide
 files no moon task claims (workflow definitions, `scripts/`, moon config,
 root manifests and compiler/release inputs such as `tsconfig.base.json`), an
 empty diff, or a failed query all force the
@@ -302,10 +309,9 @@ demand, and is not a required check. To run it against a branch, use
 CI consumes the workflow's packed npm tarballs, not public Zitadel packages.
 Changesets PR comments are informational release-intent feedback, not a
 blocking gate. The release snapshot the journeys install from stays on the
-runner; a failed run uploads journey and console e2e diagnostics, which
-expire after 7 days. The demo end-to-end suites and
-the Docker-fallback journey do not run in CI; they stay opt-in local checks
-(see below).
+runner; a failed run uploads the journey's diagnostics and every e2e lane's
+results, which expire after 7 days. The Docker-fallback journey does not run in
+CI; it stays an opt-in local check (see below).
 
 ## Running integration and end-to-end tests
 

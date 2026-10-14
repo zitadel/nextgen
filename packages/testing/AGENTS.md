@@ -16,11 +16,11 @@ drives the `<zitadel-login>` widget through whole auth ceremonies
 
 In-repo consumers, which double as the dogfood proof:
 
-- `apps/demo-next-e2e` (`e2e-real`) — flagship Playwright consumer.
-- `apps/console-e2e` (`e2e-real`) and `console:dev-real` — kit as suite
+- `e2e/demo-next` (`e2e:demo-next-real`) — flagship Playwright consumer.
+- `e2e/console` (`e2e:console-real`) and `console:dev-real` — kit as suite
   bootstrapper and as dev-loop seeder.
-- `apps/cli-journey-e2e` — the product journey imports kit helpers as a
-  workspace dep; the `e2e-testkit` lane installs the kit **from the local
+- `e2e/journey` — the product journey imports kit helpers as a
+  workspace dep; its testkit variant installs the kit **from the local
   registry** exactly as a customer would. Breaking the customer install
   path shows up there, not in unit tests.
 
@@ -160,9 +160,10 @@ a `testing:build` task dep.
 - Dogfood: `moon run e2e:demo-next-real`, `moon run e2e:console-real`,
   `moon run e2e:journey-local` (runs the testkit variant among others).
 
-The real-instance lanes are `runInCI: true` and run as dependencies of the
-`e2e` project's `test` task, so `moon ci :test` executes them through the DAG
-(`.github/workflows/ci.yml`). Run one locally with `moon run e2e:<lane>`.
+The real-instance lanes are `runInCI: true` dependencies of `e2e:all`, which
+the `moon ci` call in `.github/workflows/ci.yml` names, so CI runs them through
+the DAG; `:test` alone stays unit tests. Run one locally with
+`moon run e2e:<lane>`, or all of them with `moon run e2e:all`.
 
 Serialize moon invocations — two concurrent graphs produce spurious
 failures. Orphaned runtimes from aborted e2e runs squat fixed ports;

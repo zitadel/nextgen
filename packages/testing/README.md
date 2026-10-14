@@ -14,7 +14,7 @@ the real login journey immediately.
 
 The repo previously had two extremes: the demo e2e suites run against
 `@zitadel/api-mock` (fast, but fake — no user store, no real crypto), and
-`cli-journey-e2e` runs the real packaged product but creates users by clicking
+the CLI journey (`e2e/journey`) runs the real packaged product but creates users by clicking
 through the registration UI, serialized per suite. This kit fills the middle:
 **real server, programmatic seeding, parallel-safe per-test users.**
 
@@ -342,8 +342,8 @@ Zitadel" when the app under test and Playwright share one machine. The layers
 on top, in intended order:
 
 1. **Registration fixtures.** Landed: `zitadel.identity()` plus the
-   demo-next-e2e registration spec driving the real registration UI and
-   verifying the created user through the API. `cli-journey-e2e` keeps the
+   demo-next real-lane registration spec driving the real registration UI and
+   verifying the created user through the API. The CLI journey keeps the
    packaged-product registration coverage.
 2. **Email/OTP capture.** `zitadel.email.waitForCode(address)` for
    verification flows. Blocked on a server-side story (dev SMTP sink or

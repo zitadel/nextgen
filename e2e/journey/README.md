@@ -1,4 +1,4 @@
-# @zitadel/cli-journey-e2e
+# CLI journey (`e2e/journey`)
 
 Fresh-app Playwright coverage for the customer local setup journey.
 

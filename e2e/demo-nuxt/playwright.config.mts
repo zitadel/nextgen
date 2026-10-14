@@ -11,14 +11,14 @@ const workspaceRoot = resolve(import.meta.dirname, "../..");
  *                    → api-mock TCP server → __nextgen_session cookie
  *                    → /admin (server-rendered, authenticated)
  *
- * The Vue / Nitro story is structurally similar to demo-next-e2e but the
+ * The Vue / Nitro story is structurally similar to the demo-next lanes but the
  * proxy and route-protection layers come from `@zitadel/sdk-nuxt`'s Nitro
  * middleware rather than `@zitadel/sdk-next`'s edge middleware.
  * Running the same scenario on both demos is the only way to catch a
  * regression in one SDK without the other.
  *
  * Component / orchestrator behaviour is covered by `packages/components`'s
- * Vitest suite — do not duplicate it here. See `apps/demo-nuxt-e2e/AGENTS.md`.
+ * Vitest suite — do not duplicate it here. See `e2e/demo-nuxt/AGENTS.md`.
  */
 export default defineConfig({
   ...e2eTimeouts,
@@ -34,7 +34,7 @@ export default defineConfig({
   // processes outside Moon's task graph; Playwright owns their lifecycle.
   //
   // The api-mock listens on PORT 8081 here so this project can run in
-  // parallel with `apps/demo-next-e2e/` (which uses the default 8080).
+  // parallel with `e2e/demo-next/` (which uses the default 8080).
   // Both api-mock (`bin/start.ts` reads PORT) and
   // the SDKs (ZITADEL_URL) already accept the override; no
   // application code changes.

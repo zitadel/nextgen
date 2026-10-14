@@ -6,8 +6,8 @@
  * Runs against a console you already have up, so it shows your working tree:
  *
  *   moon run console:dev-real                                   # terminal 1
- *   corepack pnpm --filter @zitadel/console-e2e exec tsx \
- *     scripts/screenshot-grid.mts                                # terminal 2
+ *   corepack pnpm --filter @zitadel/e2e exec tsx \
+ *     console/scripts/screenshot-grid.mts                        # terminal 2
  *
  * Then open `test-output/screenshots/index.html`. Detail screens are captured
  * on the first row of their list, so what they show is whatever the instance

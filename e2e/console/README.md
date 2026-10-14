@@ -1,4 +1,4 @@
-# @zitadel/console-e2e
+# Console lanes (`e2e/console`)
 
 Playwright coverage for the console's runtime boundaries. Each lane serves the
 console differently, and the differences are the point — pick by which boundary
@@ -15,7 +15,7 @@ you need proven.
 ## Embedded shell smoke
 
 ```sh
-moon run console-e2e:e2e
+moon run e2e:console-smoke
 ```
 
 Builds the console, serves it with Vite preview, and verifies that the SPA mounts
@@ -34,7 +34,7 @@ previewing without a backend, and setting it here would hide the error state.
 ## Real-instance resource coverage
 
 ```sh
-moon run console-e2e:e2e-real
+moon run e2e:console-real
 ```
 
 Boots one ephemeral Zitadel instance through `@zitadel/testing`, starts the
@@ -59,7 +59,7 @@ first-created project, the harness one. Nothing pins it on the client.
 ## Embedded-surface coverage
 
 ```sh
-moon run console-e2e:e2e-embedded
+moon run e2e:console-embedded
 ```
 
 Boots the **built Go binary** and nothing else. It serves the console at
@@ -85,7 +85,7 @@ test that needs one grants its user access through the API first.
 ## Platform-project coverage
 
 ```sh
-moon run console-e2e:e2e-platform
+moon run e2e:console-platform
 ```
 
 Boots the built Go binary with the platform project bootstrapped: the
@@ -101,7 +101,7 @@ its seeded users into the harness project.
 
 ```sh
 CONSOLE_DEPLOYMENT_URL=https://cloud-….vercel.app VERCEL_AUTOMATION_BYPASS_SECRET=… \
-  moon run console-e2e:e2e-deployment
+  moon run e2e:console-deployment
 ```
 
 Boots nothing: it checks a deployment of the hosted cloud, which serves the

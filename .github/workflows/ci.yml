@@ -151,7 +151,8 @@ jobs:
         env:
           # The journey's options, as ci-turbo.yml passes them: the work dir the
           # diagnostics upload below reads, ci-mode's framework scope (`single`
-          # unless an SDK, the CLI or the journey moved), and the Verdaccio
+          # unless an SDK, the CLI, the test kit or the journey's own files
+          # moved), and the Verdaccio
           # storage the cache step above restores.
           JOURNEY_WORK_DIR: ${{ runner.temp }}/ci-journey
           JOURNEY_MATRIX: ${{ steps.ci-mode.outputs.journey_matrix }}

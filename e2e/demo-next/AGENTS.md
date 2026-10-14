@@ -1,4 +1,4 @@
-# Agent Instructions — `apps/demo-next-e2e/`
+# Agent Instructions — `e2e/demo-next/`
 
 Playwright project that exercises `apps/demo-next/` end-to-end. It has two
 suites: the **mock lane** (`e2e`, against the standalone `@zitadel/api-mock`
@@ -9,7 +9,7 @@ instance through `@zitadel/testing` (`ZITADEL_SERVER_BINARY`,
 password sign-in, and authenticated navigation against real storage. It does
 not cover passkeys: the lane seeds the shipped `password-first` default flow,
 which offers no passkey action, and the real-server passkey round trip is
-covered by `cli-journey-e2e`'s `passkey-first` preset lane. This project is the flagship Playwright consumer of the test kit —
+covered by the journey's (`e2e/journey`) `passkey-first` preset lane. This project is the flagship Playwright consumer of the test kit —
 see [`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md). The
 real lane runs in CI through an explicit `full-pr` step even though its moon
 task carries `runInCI: false`. Defer to root
@@ -45,8 +45,8 @@ this project.
 
 ```sh
 corepack pnpm exec playwright install        # one-time, browsers
-moon run demo-next-e2e:e2e                   # mock lane
-moon run demo-next-e2e:e2e-real              # real-instance lane (@zitadel/testing)
+moon run e2e:demo-next-mock                  # mock lane
+moon run e2e:demo-next-real                  # real-instance lane (@zitadel/testing)
 ```
 
 Moon rebuilds `@zitadel/components` first through task dependencies, then
@@ -58,7 +58,7 @@ direct `pnpm --filter` commands.
 - One terminal assertion per behaviour. Most checks should use
   Playwright web-first locators (`getByRole`, `getByLabel`) rather than
   raw selectors so shadow DOM is pierced consistently.
-- Mirror the spec in `apps/demo-nuxt-e2e/` if and only if the property
+- Mirror the spec in `e2e/demo-nuxt/` if and only if the property
   depends on framework-specific middleware. Component-level behaviour
   goes in Vitest.
 - Specs are paired (one spec per behaviour, identifiable filename) so

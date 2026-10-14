@@ -1,4 +1,4 @@
-# Agent Instructions — `apps/demo-nuxt-e2e/`
+# Agent Instructions — `e2e/demo-nuxt/`
 
 Playwright project that exercises `apps/demo-nuxt/` end-to-end against
 the standalone `@zitadel/api-mock` TCP server. Defer to root
@@ -16,7 +16,7 @@ This project covers the boundary that Vitest cannot reach:
 - The Nitro auth middleware accepting that cookie on the next request
   and bouncing unauthenticated traffic back to `/login`.
 
-It is the Nuxt-side mirror of `apps/demo-next-e2e/`. Both projects must
+It is the Nuxt-side mirror of `e2e/demo-next/`. Both lanes must
 exist because the proxy and route-protection layers are different
 implementations on each framework — a regression in one SDK does not
 necessarily surface in the other.
@@ -40,7 +40,7 @@ belong in this project.
 
 ```sh
 corepack pnpm exec playwright install        # one-time, browsers
-moon run demo-nuxt-e2e:e2e
+moon run e2e:demo-nuxt-mock
 ```
 
 Moon rebuilds `@zitadel/components` first through task dependencies, then
@@ -48,8 +48,8 @@ Playwright boots `api-mock` (`:8081`) and `demo-nuxt` (`:3001`) through
 direct `pnpm --filter` commands.
 
 The api-mock listens on `:8081` here (not the default `:8080` used by
-`apps/demo-next-e2e/`) so this project can run in parallel with it under
-`moon run demo-next-e2e:e2e demo-nuxt-e2e:e2e` without `EADDRINUSE`. The `PORT` override is
+`e2e/demo-next/`) so the two mock lanes can run side by side (turbo runs them
+in one step) without `EADDRINUSE`. The `PORT` override is
 plumbed through via Playwright's `webServer.env` and matched by the
 `ZITADEL_URL` passed to the Nuxt dev server. Both knobs are
 existing env contracts — no application code changes.
@@ -59,7 +59,7 @@ Cold-start for Nuxt + Vite optimiser is noticeably slower than Next; the
 
 ## When Adding A Spec
 
-- Mirror specs across `demo-next-e2e` and `demo-nuxt-e2e` only when the
+- Mirror specs across `e2e/demo-next` and `e2e/demo-nuxt` only when the
   property genuinely depends on framework-specific behaviour. Most
   orchestrator behaviour belongs in Vitest, not duplicated here.
 - Use Playwright web-first locators (`getByRole`, `getByLabel`) so

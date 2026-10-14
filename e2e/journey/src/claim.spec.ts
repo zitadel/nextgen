@@ -39,7 +39,7 @@ type JourneyMetadata = {
 /**
  * Labels and copy owned by the console, retyped rather than imported: this
  * project does not compile console source, and the real-instance lane
- * (`apps/console-e2e/src-real/console-real.spec.ts`) mirrors them the same way.
+ * (`e2e/console/src-real/console-real.spec.ts`) mirrors them the same way.
  */
 const NEUTRAL_MESSAGE =
   "If the user exists in our system, they have been granted access to your project.";
@@ -130,7 +130,7 @@ test("the setup admin can add and remove a project admin, and the colleague sees
     await page.goto(consoleLink.data?.sign_in_url ?? "");
     await expect(page).not.toHaveURL(/\/login/, { timeout: 60_000 });
 
-    // Locators copied from `apps/console-e2e/src-real/console-real.spec.ts`,
+    // Locators copied from `e2e/console/src-real/console-real.spec.ts`,
     // which proves the same screen against an API-created project.
     await page.goto(projectUrl);
     await expect(page.getByRole("region", { name: "Admins" })).toBeVisible();

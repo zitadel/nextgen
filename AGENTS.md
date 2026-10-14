@@ -72,7 +72,8 @@ Development and test surfaces (`apps/`):
   assembled product). Subfolders `console/`, `demo-next/`, `demo-nuxt/` and
   `journey/` hold the lanes; the journey covers the fresh consumer path (CLI
   setup plus real registration/login, installing local package tarballs through
-  a temporary registry). `moon ci :test` runs the whole suite.
+  a temporary registry). CI runs the whole suite through `e2e:all`; `:test`
+  stays unit tests.
 - `apps/mock-zitadel/` — thin deployment wrapper that serves
   `packages/api-mock` as a live per-PR preview endpoint.
 - `apps/cloud/` — deployment wrapper of the hosted cloud: `main` on Vercel
@@ -182,13 +183,13 @@ scripts so server processes are signaled and cleaned up directly.
 startup, then runs `go run .`. Direct `go run .` callers must build the embedded
 UI surfaces themselves or disable both embedded UI surfaces.
 
-Checked-in end-to-end tests now run as part of the default
-`moon ci :lint :typecheck :build :test`: the root `e2e` project's `test` task
-depends on every lane (console real/embedded/platform, demo mock/real, the CLI
-journey matrix, and the kit's real-instance suite), so a normal `:test` launches
-the full system suite — it boots real servers and needs browsers installed. The
-lanes are `runInCI: true` dependencies of `e2e:test`, not separate workflow
-steps; the canonical details are in
+Checked-in end-to-end tests run in CI inside the same graph as the builds: the
+root `e2e` project's `all` task depends on every lane (console
+smoke/real/embedded/platform, demo mock/real, the CLI journey matrix, and the
+kit's real-instance suite), and ci.yml's `moon ci` call names `e2e:all`. A
+plain `:test` (and `pnpm run check`) stays unit tests; `moon run e2e:all` runs
+the whole suite locally, which boots real servers and needs browsers
+installed. The canonical details are in
 [packages/testing/AGENTS.md](packages/testing/AGENTS.md). (More in
 [CONTRIBUTING.md](CONTRIBUTING.md#running-integration-and-end-to-end-tests)):
 

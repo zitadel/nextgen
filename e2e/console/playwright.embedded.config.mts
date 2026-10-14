@@ -28,10 +28,10 @@ const appDir = import.meta.dirname;
 const workspaceRoot = join(appDir, "../..");
 // A fixed pin, deliberately outside the deferred-bind blocks (22000-23999
 // journey runner / 24000-31999 embedded-pg — doctrine in
-// apps/cli-journey-e2e/scripts/ports.mjs): withZitadel() needs the port while
+// e2e/journey/scripts/ports.mjs): withZitadel() needs the port while
 // the Playwright config is evaluated, and those blocks are dynamically
-// scanned reservation domains. Neighbors: 8092 demo-next-e2e e2e-real,
-// 8093 console-e2e e2e-real, 8094 console dev-real.
+// scanned reservation domains. Neighbors: 8092 e2e:demo-next-real,
+// 8093 e2e:console-real, 8094 console dev-real.
 const zitadelPort = Number(process.env.EMBEDDED_ZITADEL_PORT ?? 8095);
 const origin = `http://localhost:${zitadelPort}`;
 
