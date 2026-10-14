@@ -1754,10 +1754,12 @@ export function setupPlatformHandlers() {
 
       // Idempotent on what is served: when every target already runs this
       // release, the newest deployment to the targets is returned unchanged.
+      // Never for preview URLs: the contract has a preview deploy always write
+      // a new deployment (201), which is how its expiry is renewed.
       const alreadyServed = targets.every(
         (origin) => newestDeploymentForOrigin(project.id, origin)?.releaseId === release.id,
       );
-      if (targets.length > 0 && alreadyServed) {
+      if (targets.length > 0 && alreadyServed && !sawPreview) {
         const newest = [...store.deployments.values()]
           .filter(
             (deployment) =>
