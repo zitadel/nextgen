@@ -136,7 +136,7 @@ describe("origin rm", () => {
     expect(envelope.next_commands?.[0]).toContain("--env production");
   });
 
-  it("suggests adding an origin back in the environment the last one was removed from", async () => {
+  it("names the environment the last origin was removed from in how to add one back", async () => {
     const cwd = await anAppDir();
     await writeFile(
       join(cwd, ".env.production.local"),
@@ -150,9 +150,9 @@ describe("origin rm", () => {
 
     const result = await remove(cwd, ["--env", "production", "--force"]);
 
-    expect(
-      (parseJson(result.stdout) as { data: { next_commands?: string[] } }).data.next_commands,
-    ).toEqual([expect.stringMatching(/origin add <url> --kind primary --env production/)]);
+    expect((parseJson(result.stdout) as { warnings?: string[] }).warnings).toEqual([
+      expect.stringContaining("origin add <url> --kind primary --env production"),
+    ]);
   });
 
   it("quotes a wildcard pattern in the suggested retry, so the shell cannot expand it", async () => {

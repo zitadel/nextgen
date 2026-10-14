@@ -249,6 +249,40 @@ describe("deployment rollback", () => {
         expect(result).toFailWith("E_VALIDATION");
       });
 
+      it("guards a bare rollback with the deployment it undoes", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.deployData();
+        await app.editUserSchema((schema) => {
+          schema.properties.one = { type: "string" };
+        });
+        const undone = await app.deployData();
+        const rollbacks = platform.capturesRollbacks();
+
+        await app.run(["deployment", "rollback", "--force", "--non-interactive", "--json"]);
+
+        expect(rollbacks.last?.expected_deployment_id).toBe(undone.deployment_id);
+      });
+
+      it("refuses re-applying a deployment to an origin since removed as a validation error", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin("https://a.example.com");
+        await app.addPrimaryOrigin("https://b.example.com");
+        const first = await app.deployData();
+        await app.removeOrigin("https://b.example.com");
+
+        const result = await app.run([
+          "deployment",
+          "rollback",
+          first.deployment_id ?? "",
+          "--force",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
       it("re-applies a named deployment after another origin moved on", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin("https://a.example.com");
