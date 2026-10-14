@@ -3,6 +3,7 @@
   import type { ZitadelLogout as ZitadelLogoutElement } from '@zitadel/components';
 
   import type { ZitadelLogoutProps, ZitadelSignoutDetail } from './types';
+  import { assignGiven } from './given';
 
   let {
     project,
@@ -24,6 +25,14 @@
     return el;
   }
 
+  // Props the element has defaults for are assigned only when given; a
+  // binding would assign `undefined` and overwrite the default.
+  $effect(() => {
+    if (el) {
+      assignGiven(el, { theme });
+    }
+  });
+
   $effect(() => {
     const node = el;
     if (!node) {
@@ -44,5 +53,4 @@
   project-id={projectId}
   proxy-path={proxyPath}
   post-sign-out-url={postSignOutUrl}
-  {theme}
 ></zitadel-logout>
