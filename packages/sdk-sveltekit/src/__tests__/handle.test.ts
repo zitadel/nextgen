@@ -13,7 +13,7 @@ import type { Handle } from "@sveltejs/kit/hooks";
 import { generateKeyPairSync, createSign } from "node:crypto";
 import { describe, it, expect, expectTypeOf, vi, beforeEach, afterEach } from "vitest";
 
-import { createNextgenHandle } from "../handle";
+import { createNextgenHandle, getClientAuth } from "../handle";
 import { clearJwksCache } from "@zitadel/sdk-core/jwt";
 import { clearSessionCheckBackoff } from "@zitadel/sdk-core/middleware";
 import { DEAD, OUTAGES, PROXY_FAILURES } from "./outages";
@@ -389,25 +389,31 @@ describe("createNextgenHandle", () => {
 
   describe("loginPath validation", () => {
     // A visitor without a session would be redirected from /login to /login forever.
-    it("throws at setup when protectedRoutes match the loginPath", () => {
-      expect(() =>
-        createNextgenHandle({
-          url: "http://localhost:4000",
-          loginPath: "/login",
-          protectedRoutes: ["/*"],
-        }),
-      ).toThrow(/is matched by protectedRoutes/);
+    it("warns at setup when protectedRoutes match the loginPath", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+      createNextgenHandle({
+        url: "http://localhost:4000",
+        loginPath: "/sveltekit-login",
+        protectedRoutes: ["/*"],
+      });
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('loginPath "/sveltekit-login" is matched by protectedRoutes'),
+      );
     });
 
-    it("accepts a loginPath that ignoredRoutes exempt from protectedRoutes", () => {
-      expect(() =>
-        createNextgenHandle({
-          url: "http://localhost:4000",
-          loginPath: "/login",
-          protectedRoutes: ["/*"],
-          ignoredRoutes: ["/login"],
-        }),
-      ).not.toThrow();
+    it("does not warn when ignoredRoutes exempt the loginPath from protectedRoutes", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+      createNextgenHandle({
+        url: "http://localhost:4000",
+        loginPath: "/login",
+        protectedRoutes: ["/*"],
+        ignoredRoutes: ["/login"],
+      });
+
+      expect(warn).not.toHaveBeenCalled();
     });
 
     it("throws synchronously when loginPath is an absolute URL", () => {
@@ -667,6 +673,7 @@ describe("opaque session cookie", () => {
   it("signs in a live session that names a user, with the user's details", async () => {
     sessionsMe(
       Response.json({
+        session_id: "s1",
         user_id: "u1",
         user: { identifier: "ada@example.com", identifier_property: "email", display: "Ada" },
       }),
@@ -684,7 +691,7 @@ describe("opaque session cookie", () => {
   // CreateSession sets the cookie before any factor is verified: an abandoned
   // sign-in must not open protected routes.
   it("redirects an anonymous session on a protected route to login", async () => {
-    sessionsMe(Response.json({}));
+    sessionsMe(Response.json({ session_id: "s1" }));
     const { event, resolve } = makeEvent("http://localhost:3000/admin", { cookie: COOKIE });
 
     const res = await run(protectedHandle(), event, resolve);
@@ -693,7 +700,7 @@ describe("opaque session cookie", () => {
   });
 
   it("keeps an anonymous session's cookie, since its sign-in may still complete", async () => {
-    sessionsMe(Response.json({}));
+    sessionsMe(Response.json({ session_id: "s1" }));
     const { event, resolve } = makeEvent("http://localhost:3000/admin", { cookie: COOKIE });
 
     const res = await run(protectedHandle(), event, resolve);
@@ -749,6 +756,105 @@ describe("opaque session cookie", () => {
       response.headers.get("location"),
       response.headers.getSetCookie(),
     ]).toEqual([503, null, []]);
+  });
+
+  // SvelteKit percent-decodes cookies: `x%0Ay` reaches the hook as a newline,
+  // which must neither reach the backend nor read as an outage.
+  it("clears a malformed session cookie on a protected route without asking the backend", async () => {
+    const fetchMock = vi.fn(async () => Response.json({ session_id: "s1", user_id: "u1" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { event, resolve } = makeEvent("http://localhost:3000/admin", { cookie: COOKIE });
+    event.cookies.set("__nextgen_session", "x\ny", { path: "/" });
+
+    const response = await run(protectedHandle(), event, resolve);
+
+    expect([response.status, response.headers.getSetCookie(), fetchMock.mock.calls]).toEqual([
+      302,
+      ["__nextgen_session=; Path=/; Max-Age=0"],
+      [],
+    ]);
+  });
+
+  it("keeps signing in a live session after a malformed cookie and a 500", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: RequestInit) =>
+        new Headers(init.headers).get("cookie") === COOKIE
+          ? Response.json({ session_id: "s1", user_id: "u1" })
+          : new Response(null, { status: 500 }),
+      ),
+    );
+    for (const value of ["x\ny", "poison"]) {
+      const attacker = makeEvent("http://localhost:3000/admin", { cookie: COOKIE });
+      attacker.event.cookies.set("__nextgen_session", value, { path: "/" });
+      await run(protectedHandle(), attacker.event, attacker.resolve);
+    }
+    const { event, resolve } = makeEvent("http://localhost:3000/admin", { cookie: COOKIE });
+
+    await run(protectedHandle(), event, resolve);
+
+    expect(event.locals.nextgenAuth).toMatchObject({ isAuthenticated: true });
+  });
+});
+
+// A JWKS that cannot be fetched on a cold cache says nothing about a JWT.
+describe("JWT session during a JWKS outage", () => {
+  function jwtCookie(): string {
+    const token = makeJwt({ sub: "u1", iss: "http://localhost:4000", exp: ts(3600) }, nextKid());
+    return `__nextgen_session=${token}`;
+  }
+
+  function protectedHandle() {
+    return createNextgenHandle({ url: "http://localhost:4000", protectedRoutes: ["/admin"] });
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(new TypeError("fetch failed"))),
+    );
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+  });
+
+  it("answers a protected route 503 and keeps the cookie", async () => {
+    const { event, resolve } = makeEvent("http://localhost:3000/admin", { cookie: jwtCookie() });
+
+    const response = await run(protectedHandle(), event, resolve);
+
+    expect([response.status, response.headers.getSetCookie()]).toEqual([503, []]);
+  });
+
+  it("renders a public route as unavailable, keeping the cookie", async () => {
+    const { event, resolve } = makeEvent("http://localhost:3000/", { cookie: jwtCookie() });
+    const deleteCookie = vi.spyOn(event.cookies, "delete");
+
+    await run(protectedHandle(), event, resolve);
+
+    expect([deleteCookie.mock.calls, event.locals.nextgenAuth]).toEqual([
+      [],
+      { isAuthenticated: false, session: null, reason: "unavailable" },
+    ]);
+  });
+});
+
+describe("getClientAuth", () => {
+  it("drops the session token, which load data would carry to the browser", () => {
+    const { event } = makeEvent("http://localhost:3000/");
+    event.locals.nextgenAuth = {
+      isAuthenticated: true,
+      session: {
+        userId: "u1",
+        identifier: null,
+        identifierProperty: null,
+        display: "Ada",
+        token: "t",
+      },
+    };
+
+    expect(getClientAuth(event)).toEqual({
+      isAuthenticated: true,
+      session: { userId: "u1", identifier: null, identifierProperty: null, display: "Ada" },
+    });
   });
 });
 

@@ -49,6 +49,13 @@ export const OUTAGES: ReadonlyArray<readonly [string, () => Promise<Response>]> 
   ["an unreadable body", () => Promise.resolve(new Response("<html>", { status: 200 }))],
   ["a 401-gateway-html page", () => gatewayPage(401)],
   ["a 404-gateway-html page", () => gatewayPage(404)],
+  // Only the session JSON, which always names its `session_id`, is a session.
+  ["a 200 with an empty body", () => Promise.resolve(new Response(null, { status: 200 }))],
+  ["a 200 with an empty JSON object", () => Promise.resolve(Response.json({}))],
+  [
+    "a 200 with JSON that is not a session",
+    () => Promise.resolve(Response.json({ user_id: "u1", status: "ok" })),
+  ],
 ];
 
 /** Proxied calls the backend does not answer, and the status each one gets. */

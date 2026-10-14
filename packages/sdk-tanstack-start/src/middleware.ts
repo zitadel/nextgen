@@ -1,4 +1,8 @@
-import type { AuthResult, NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
+import type {
+  AuthResult,
+  ClientAuthResult,
+  NextgenMiddlewareOptions,
+} from "@zitadel/sdk-core/middleware";
 
 import {
   HOP_BY_HOP,
@@ -12,9 +16,11 @@ import {
   requiresProjectSecret,
   sessionUnavailableResponse,
   validateOpaqueSessionToken,
+  toClientAuth,
+  warnIfLoginPathProtected,
 } from "@zitadel/sdk-core/middleware";
 
-import { isJwtShaped, verifyJwt } from "./lib/jwt";
+import { checkJwt, isJwtShaped } from "./lib/jwt";
 
 /**
  * `process` is undefined in some edge/serverless runtimes; read env defensively
@@ -192,7 +198,7 @@ export async function handleNextgenRequest(
   // Guard against open-redirect: loginPath must be a path on this app.
   // createNextgenRequestMiddleware checks it once at setup; a direct call
   // checks it here.
-  assertLoginPath(loginPath, { protectedRoutes, ignoredRoutes });
+  assertLoginPath(loginPath);
 
   const url2 = new URL(request.url);
   const { pathname } = url2;
@@ -224,8 +230,8 @@ export async function handleNextgenRequest(
   // Bearer token takes explicit precedence over the session cookie.
   const token = bearerToken ?? cookieToken;
 
-  const payload = token
-    ? await verifyJwt(token, {
+  const jwt = token
+    ? await checkJwt(token, {
         issuerUrl: url,
         allowedAlgorithms,
         clockSkewMs,
@@ -234,6 +240,7 @@ export async function handleNextgenRequest(
         jwksTimeoutMs,
       })
     : null;
+  const payload = jwt?.status === "valid" ? jwt.payload : null;
 
   if (payload && token && payload.sub) {
     return {
@@ -251,6 +258,9 @@ export async function handleNextgenRequest(
     };
   }
 
+  // A JWT whose keys cannot be fetched (the JWKS is down and nothing is
+  // cached) may well be good: an outage, not a sign-out.
+  let unavailable = jwt?.status === "unavailable";
   let keepCookies = false;
   if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
     const check = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
@@ -272,16 +282,17 @@ export async function handleNextgenRequest(
     // A session without a user is anonymous: its sign-in has not verified a
     // factor yet. It is not signed in, but it is live — keep its cookie.
     keepCookies = check.status === "live";
-    if (check.status === "unknown") {
-      // The backend could not be asked. The session may be live, so its cookie
-      // survives the outage; a protected route is retryable, not a sign-in.
-      return matchesRoutes(pathname, protectedRoutes)
-        ? { type: "unavailable", response: sessionUnavailableResponse() }
-        : {
-            type: "continue",
-            auth: { isAuthenticated: false, session: null, reason: "unavailable" },
-          };
-    }
+    unavailable ||= check.status === "unknown";
+  }
+  if (unavailable) {
+    // The backend could not be asked. The session may be live, so its cookie
+    // survives the outage; a protected route is retryable, not a sign-in.
+    return matchesRoutes(pathname, protectedRoutes)
+      ? { type: "unavailable", response: sessionUnavailableResponse() }
+      : {
+          type: "continue",
+          auth: { isAuthenticated: false, session: null, reason: "unavailable" },
+        };
   }
 
   // Dead credentials are cleared on every unauthenticated response so the
@@ -359,7 +370,9 @@ export function createNextgenRequestMiddleware(
   options: NextgenRequestOptions = {},
 ): (ctx: RequestMiddlewareContext) => Promise<Response> {
   // Fail at setup, not with a 500 on every request.
-  assertLoginPath(options.loginPath ?? "/login", options);
+  const loginPath = options.loginPath ?? "/login";
+  assertLoginPath(loginPath);
+  warnIfLoginPathProtected(loginPath, options);
   return async ({ request, next }: RequestMiddlewareContext): Promise<Response> => {
     const clientAddress = options.clientAddress ?? request.headers.get("x-real-ip") ?? undefined;
     const decision = await handleNextgenRequest(request, { ...options, clientAddress });
@@ -388,9 +401,46 @@ export function createNextgenRequestMiddleware(
  * navigation `beforeLoad` runs in the browser) — call a server function from
  * `beforeLoad` instead.
  *
+ * The result carries the raw session token (`session.token`), which the
+ * backend sets as an HttpOnly cookie. Use it on the server only, and never
+ * return it from a server function: TanStack serialises the return value to the
+ * browser, where any script could read and replay the session. Return
+ * {@link getClientAuth} instead.
+ *
  * @param context - The router/middleware context.
  * @returns The current {@link AuthResult}.
  */
 export function getAuth(context: { readonly nextgenAuth?: AuthResult } | undefined): AuthResult {
   return context?.nextgenAuth ?? { isAuthenticated: false, session: null };
+}
+
+/**
+ * The auth state of {@link getAuth} without the session token: safe to return
+ * from a server function, which TanStack serialises to the browser. Use it for
+ * a `beforeLoad` guard:
+ *
+ * ```ts
+ * const requireSession = createServerFn().handler(({ context }) => getClientAuth(context));
+ *
+ * export const Route = createFileRoute("/profile")({
+ *   beforeLoad: async () => {
+ *     const auth = await requireSession();
+ *     if (!auth.isAuthenticated) {
+ *       // Zitadel could not be asked: an outage, not a sign-out.
+ *       if (auth.reason === "unavailable") throw new Error("Try again shortly");
+ *       throw redirect({ to: "/login" });
+ *     }
+ *     return { session: auth.session };
+ *   },
+ * });
+ * ```
+ *
+ * @param context - The router/middleware context.
+ * @returns The current {@link ClientAuthResult}, with `reason` when the session
+ *   could not be checked.
+ */
+export function getClientAuth(
+  context: { readonly nextgenAuth?: AuthResult } | undefined,
+): ClientAuthResult {
+  return toClientAuth(getAuth(context));
 }

@@ -1,4 +1,8 @@
-import type { AuthResult, NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
+import type {
+  AuthResult,
+  ClientAuthResult,
+  NextgenMiddlewareOptions,
+} from "@zitadel/sdk-core/middleware";
 import type { EventHandler, H3Event } from "h3";
 
 import { useRuntimeConfig } from "#imports";
@@ -11,7 +15,9 @@ import {
   proxyFailureResponse,
   requiresProjectSecret,
   sessionUnavailableResponse,
+  toClientAuth,
   validateOpaqueSessionToken,
+  warnIfLoginPathProtected,
 } from "@zitadel/sdk-core/middleware";
 import {
   defineEventHandler,
@@ -24,7 +30,7 @@ import {
   readRawBody,
 } from "h3";
 
-import { isJwtShaped, verifyJwt } from "../lib/jwt";
+import { checkJwt, isJwtShaped } from "../lib/jwt";
 
 declare module "h3" {
   interface H3EventContext {
@@ -126,7 +132,8 @@ export function createNextgenMiddleware(
   } = options;
 
   // Guard against open-redirect: loginPath must be a path on this app.
-  assertLoginPath(loginPath, { protectedRoutes, ignoredRoutes });
+  assertLoginPath(loginPath);
+  warnIfLoginPathProtected(loginPath, { protectedRoutes, ignoredRoutes });
 
   return defineEventHandler(async (event: H3Event) => {
     const urlObj = getRequestURL(event);
@@ -337,8 +344,8 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<Res
   // cookies; when both are present the caller clearly intended the Bearer token.
   const token = bearerToken ?? cookieToken;
 
-  const payload = token
-    ? await verifyJwt(token, {
+  const jwt = token
+    ? await checkJwt(token, {
         issuerUrl: url,
         allowedAlgorithms,
         clockSkewMs,
@@ -347,6 +354,7 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<Res
         jwksTimeoutMs,
       })
     : null;
+  const payload = jwt?.status === "valid" ? jwt.payload : null;
 
   if (payload && token && payload.sub) {
     event.context.nextgenAuth = {
@@ -367,6 +375,9 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<Res
   // not a JWT (non-JSON segments). A token with a valid JWT structure that
   // failed verification (bad sig, wrong typ/alg) must be rejected — never
   // accepted by a backend call that doesn't re-check the JWT claims.
+  // A JWT whose keys cannot be fetched (the JWKS is down and nothing is
+  // cached) may well be good: an outage, not a sign-out.
+  let unavailable = jwt?.status === "unavailable";
   let keepCookies = false;
   if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
     const check = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
@@ -388,15 +399,16 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<Res
     // inventing a placeholder identity that no route handler can resolve, but
     // keep its cookie: an in-progress login flow may still complete it.
     keepCookies = check.status === "live";
-    if (check.status === "unknown") {
-      // The backend could not be asked. The session may be live, so its cookie
-      // survives the outage; a protected route is retryable, not a sign-in.
-      event.context.nextgenAuth = { isAuthenticated: false, session: null, reason: "unavailable" };
-      if (matchesRoutes(pathname, protectedRoutes)) {
-        return sessionUnavailableResponse();
-      }
-      return undefined;
+    unavailable ||= check.status === "unknown";
+  }
+  if (unavailable) {
+    // The backend could not be asked. The session may be live, so its cookie
+    // survives the outage; a protected route is retryable, not a sign-in.
+    event.context.nextgenAuth = { isAuthenticated: false, session: null, reason: "unavailable" };
+    if (matchesRoutes(pathname, protectedRoutes)) {
+      return sessionUnavailableResponse();
     }
+    return undefined;
   }
 
   event.context.nextgenAuth = { isAuthenticated: false, session: null };
@@ -443,4 +455,19 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<Res
  */
 export function getAuth(event: H3Event): AuthResult {
   return event.context.nextgenAuth ?? { isAuthenticated: false, session: null };
+}
+
+/**
+ * The auth state of {@link getAuth} without the session token: safe to return
+ * from a server route or API handler the browser calls. The backend sets the
+ * token as an HttpOnly cookie; returning {@link getAuth}'s result would hand it
+ * to any script on the page. (`useAuth()` already reads this shape in
+ * components.)
+ *
+ * @param event - The current H3 event.
+ * @returns The current {@link ClientAuthResult}, with `reason` when the
+ *   session could not be checked.
+ */
+export function getClientAuth(event: H3Event): ClientAuthResult {
+  return toClientAuth(getAuth(event));
 }

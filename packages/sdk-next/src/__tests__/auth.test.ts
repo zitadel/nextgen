@@ -309,7 +309,7 @@ describe("auth()", () => {
   // A UI renders `display ?? identifier`: an empty display must read as absent.
   it("reads an empty display or identifier from the backend as null", async () => {
     routeFetch(nextKid(), () =>
-      jsonResponse({ user_id: "user-1", user: { identifier: "", display: "" } }),
+      jsonResponse({ session_id: "s1", user_id: "user-1", user: { identifier: "", display: "" } }),
     );
     mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
 
@@ -398,5 +398,55 @@ describe("auth()", () => {
 
     expect(result.isAuthenticated).toBe(true);
     expect(fetchMock).toHaveBeenCalledWith(`${ISSUER}/sessions/me`, expect.anything());
+  });
+
+  // This runtime has its own JWKS cache: a cold one during a JWKS outage says
+  // nothing about the token.
+  it("reports a JWT as unavailable when the JWKS cannot be fetched and nothing is cached", async () => {
+    fetchMock.mockImplementation(() => Promise.reject(new TypeError("fetch failed")));
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mockHeadersMap.set(
+      "x-nextgen-auth-token",
+      makeSignedJwt({ sub: "user-1", iss: ISSUER, exp: ts(3600) }, nextKid()),
+    );
+
+    const auth = await importAuth();
+
+    expect(await auth({ url: ISSUER })).toEqual({
+      isAuthenticated: false,
+      session: null,
+      reason: "unavailable",
+    });
+  });
+});
+
+describe("getClientAuth()", () => {
+  it("returns the signed-in state without the session token", async () => {
+    const kid = nextKid();
+    routeFetch(kid, () => jsonResponse({}, 404));
+    mockHeadersMap.set(
+      "x-nextgen-auth-token",
+      makeSignedJwt({ sub: "user-1", email: "a@b.c", iss: ISSUER, exp: ts(3600) }, kid),
+    );
+
+    const { getClientAuth } = await import("../auth.js");
+
+    expect(await getClientAuth({ url: ISSUER })).toEqual({
+      isAuthenticated: true,
+      session: { userId: "user-1", identifier: "a@b.c", identifierProperty: null, display: null },
+    });
+  });
+
+  it("keeps the reason a session could not be checked", async () => {
+    mockHeadersMap.set("x-nextgen-auth-token", "");
+    mockHeadersMap.set("x-nextgen-auth-state", "unavailable");
+
+    const { getClientAuth } = await import("../auth.js");
+
+    expect(await getClientAuth({ url: ISSUER })).toEqual({
+      isAuthenticated: false,
+      session: null,
+      reason: "unavailable",
+    });
   });
 });

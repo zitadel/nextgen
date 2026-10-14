@@ -1,4 +1,8 @@
-import type { AuthResult, NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
+import type {
+  AuthResult,
+  ClientAuthResult,
+  NextgenMiddlewareOptions,
+} from "@zitadel/sdk-core/middleware";
 
 import {
   HOP_BY_HOP,
@@ -11,10 +15,12 @@ import {
   proxyFailureResponse,
   requiresProjectSecret,
   sessionUnavailableResponse,
+  toClientAuth,
   validateOpaqueSessionToken,
+  warnIfLoginPathProtected,
 } from "@zitadel/sdk-core/middleware";
 
-import { isJwtShaped, verifyJwt } from "./lib/jwt";
+import { checkJwt, isJwtShaped } from "./lib/jwt";
 
 /**
  * `process` is undefined in some edge/serverless runtimes; read env defensively
@@ -203,8 +209,8 @@ async function handleAuth(
   // Bearer token takes explicit precedence over the session cookie.
   const token = bearerToken ?? cookieToken;
 
-  const payload = token
-    ? await verifyJwt(token, {
+  const jwt = token
+    ? await checkJwt(token, {
         issuerUrl: url,
         allowedAlgorithms,
         clockSkewMs,
@@ -213,6 +219,7 @@ async function handleAuth(
         jwksTimeoutMs,
       })
     : null;
+  const payload = jwt?.status === "valid" ? jwt.payload : null;
 
   if (payload && token && payload.sub) {
     event.locals.nextgenAuth = {
@@ -228,6 +235,9 @@ async function handleAuth(
     return;
   }
 
+  // A JWT whose keys cannot be fetched (the JWKS is down and nothing is
+  // cached) may well be good: an outage, not a sign-out.
+  let unavailable = jwt?.status === "unavailable";
   let keepCookies = false;
   if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
     const check = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
@@ -247,12 +257,13 @@ async function handleAuth(
     // A session without a user is anonymous: its sign-in has not verified a
     // factor yet. It is not signed in, but it is live — keep its cookie.
     keepCookies = check.status === "live";
-    if (check.status === "unknown") {
-      // The backend could not be asked. The session may be live, so its cookie
-      // survives the outage; a protected route is retryable, not a sign-in.
-      event.locals.nextgenAuth = { isAuthenticated: false, session: null, reason: "unavailable" };
-      return matchesRoutes(pathname, protectedRoutes) ? sessionUnavailableResponse() : undefined;
-    }
+    unavailable ||= check.status === "unknown";
+  }
+  if (unavailable) {
+    // The backend could not be asked. The session may be live, so its cookie
+    // survives the outage; a protected route is retryable, not a sign-in.
+    event.locals.nextgenAuth = { isAuthenticated: false, session: null, reason: "unavailable" };
+    return matchesRoutes(pathname, protectedRoutes) ? sessionUnavailableResponse() : undefined;
   }
 
   event.locals.nextgenAuth = { isAuthenticated: false, session: null };
@@ -334,7 +345,8 @@ export function createNextgenMiddleware(
   } = options;
 
   // Guard against open-redirect: loginPath must be a path on this app.
-  assertLoginPath(loginPath, { protectedRoutes, ignoredRoutes });
+  assertLoginPath(loginPath);
+  warnIfLoginPathProtected(loginPath, { protectedRoutes, ignoredRoutes });
 
   const onRequest = async (event: SolidFetchEvent): Promise<Response | undefined> => {
     const url2 = new URL(event.request.url);
@@ -386,4 +398,18 @@ export function createNextgenMiddleware(
  */
 export function getAuth(event: SolidFetchEvent): AuthResult {
   return event.locals.nextgenAuth ?? { isAuthenticated: false, session: null };
+}
+
+/**
+ * The auth state of {@link getAuth} without the session token: safe to return
+ * from a `query` or server function, whose result SolidStart serialises to the
+ * browser. The backend sets the token as an HttpOnly cookie; returning
+ * {@link getAuth}'s result would hand it to any script on the page.
+ *
+ * @param event - The current SolidStart request event.
+ * @returns The current {@link ClientAuthResult}, with `reason` when the
+ *   session could not be checked.
+ */
+export function getClientAuth(event: SolidFetchEvent): ClientAuthResult {
+  return toClientAuth(getAuth(event));
 }

@@ -1,12 +1,17 @@
 import "server-only";
 
-import { validateOpaqueSessionToken } from "@zitadel/sdk-core/middleware";
+import { toClientAuth, validateOpaqueSessionToken } from "@zitadel/sdk-core/middleware";
 import { headers } from "next/headers";
 import { cache } from "react";
 
-import type { AuthResult, ClientSession, NextgenMiddlewareOptions } from "./types.js";
+import type {
+  AuthResult,
+  ClientAuthResult,
+  ClientSession,
+  NextgenMiddlewareOptions,
+} from "./types.js";
 
-import { isJwtShaped, verifyJwt } from "./lib/jwt.js";
+import { checkJwt, isJwtShaped } from "./lib/jwt.js";
 
 /**
  * Options for {@link auth}.
@@ -85,10 +90,19 @@ const validateOpaqueSession = cache(
  *   `identifier`, `display`). The lookup is deduplicated per render pass via
  *   React `cache()`.
  *
- * The header alone is never proof of anything: on routes the middleware
- * `matcher` does not cover, the middleware cannot neutralise a forged
- * client-supplied header, so `auth()` re-verifies every value it reads.
- * A header value that fails verification is treated as signed out.
+ * The token header alone is never proof of a session: on routes the
+ * middleware `matcher` does not cover, the middleware cannot neutralise a
+ * forged client-supplied header, so `auth()` re-verifies every token it reads.
+ * A token that fails verification is treated as signed out.
+ *
+ * The state header (`x-nextgen-auth-state`), by which the middleware reports a
+ * session it could not check, is trusted only on routes the middleware covers,
+ * where it always overwrites it. On a route outside the `matcher`, a client can
+ * send `x-nextgen-auth-state: unavailable` itself and `auth()` then reports
+ * `reason: "unavailable"` for that request. That can only make the sender's own
+ * request look like an outage (a `503` from your guard, without the
+ * middleware's warning in the log); it never signs anyone in. Cover every route
+ * that calls `auth()` with the `matcher` to rule it out.
  *
  * **Matcher precondition (read this):** the middleware only tunnels the
  * session token on routes covered by its `matcher`. On uncovered routes the
@@ -154,7 +168,7 @@ export async function auth(options: AuthOptions = {}): Promise<AuthResult> {
   } = options;
 
   if (isJwtShaped(token)) {
-    const payload = await verifyJwt(token, {
+    const jwt = await checkJwt(token, {
       issuerUrl: url,
       allowedAlgorithms,
       clockSkewMs,
@@ -162,6 +176,12 @@ export async function auth(options: AuthOptions = {}): Promise<AuthResult> {
       allowedTokenTypes,
       jwksTimeoutMs,
     });
+    if (jwt.status === "unavailable") {
+      // This runtime cannot fetch the JWKS and has no keys cached: the token
+      // may well be good, so this is an outage, not a sign-out.
+      return { isAuthenticated: false, session: null, reason: "unavailable" };
+    }
+    const payload = jwt.status === "valid" ? jwt.payload : null;
 
     if (payload?.sub) {
       return {
@@ -200,4 +220,27 @@ export async function auth(options: AuthOptions = {}): Promise<AuthResult> {
   }
 
   return { isAuthenticated: false, session: null };
+}
+
+/**
+ * The auth state of {@link auth} without the session token: safe to return
+ * from a server action or to pass as a prop to a client component, both of
+ * which Next.js serialises to the browser. The backend sets the token as an
+ * HttpOnly cookie, and returning it would hand it to any script on the page.
+ *
+ * ```ts
+ * "use server";
+ * import { getClientAuth } from "@zitadel/sdk-next/server";
+ *
+ * export async function whoAmI() {
+ *   return getClientAuth();
+ * }
+ * ```
+ *
+ * @param options - Optional verification settings; see {@link AuthOptions}.
+ * @returns The current {@link ClientAuthResult}, with `reason` when the session
+ *   could not be checked.
+ */
+export async function getClientAuth(options: AuthOptions = {}): Promise<ClientAuthResult> {
+  return toClientAuth(await auth(options));
 }

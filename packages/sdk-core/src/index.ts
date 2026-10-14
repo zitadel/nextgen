@@ -14,6 +14,11 @@ export {
   INTERNAL_HEADERS,
   matchesRoutes,
   assertLoginPath,
+  warnIfLoginPathProtected,
+  toClientAuth,
+  isWellFormedSessionToken,
+  MAX_SESSION_TOKEN_LENGTH,
+  SESSION_CHECK_STALL_MS,
   filterResponseHeaders,
   requiresProjectSecret,
   validateOpaqueSessionToken,
@@ -27,6 +32,7 @@ export {
 export type { OpaqueSession, OpaqueSessionCheck, LoginPathRoutes } from "./middleware.js";
 export {
   verifyJwt,
+  checkJwt,
   decodeJwt,
   isJwtShaped,
   base64UrlDecode,
@@ -35,7 +41,7 @@ export {
   JWKS_FAILURE_BACKOFF_MS,
   clearJwksCache,
 } from "./jwt.js";
-export type { JwtPayload, JwtHeader, DecodedJwt, VerifyJwtOptions } from "./jwt.js";
+export type { JwtPayload, JwtHeader, DecodedJwt, VerifyJwtOptions, JwtCheck } from "./jwt.js";
 
 export type ZitadelEnvironment = "development" | "preview" | "production";
 

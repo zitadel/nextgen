@@ -6,6 +6,6 @@
  * import { auth, NextgenProvider } from "@zitadel/sdk-next/server";
  * ```
  */
-export { auth } from "./auth.js";
+export { auth, getClientAuth } from "./auth.js";
 export type { AuthOptions } from "./auth.js";
 export { NextgenProvider } from "./provider.js";

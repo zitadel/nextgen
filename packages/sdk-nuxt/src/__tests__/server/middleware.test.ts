@@ -2,7 +2,7 @@ import { createApp, toWebHandler, getRequestHeader } from "h3";
 import { generateKeyPairSync, createSign } from "node:crypto";
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 
-import { createNextgenMiddleware } from "../../runtime/server/middleware";
+import { createNextgenMiddleware, getClientAuth } from "../../runtime/server/middleware";
 import { setRuntimeConfig } from "../stubs/nuxt-imports";
 import { clearJwksCache } from "@zitadel/sdk-core/jwt";
 import { clearSessionCheckBackoff } from "@zitadel/sdk-core/middleware";
@@ -559,7 +559,7 @@ describe("createNextgenMiddleware (H3)", () => {
   });
 
   it("opaque session token with a user id authenticates as that user", async () => {
-    vi.stubGlobal("fetch", mockSessionsMe({ user_id: "user-opaque" }));
+    vi.stubGlobal("fetch", mockSessionsMe({ session_id: "s1", user_id: "user-opaque" }));
 
     const app = createApp();
     app.use(
@@ -596,7 +596,7 @@ describe("createNextgenMiddleware (H3)", () => {
     // hand route handlers a placeholder identity matching no real user — but
     // the session is live, so clearing its cookie would orphan the login flow
     // that is still completing it.
-    vi.stubGlobal("fetch", mockSessionsMe({}));
+    vi.stubGlobal("fetch", mockSessionsMe({ session_id: "s1" }));
 
     const app = createApp();
     app.use(
@@ -827,25 +827,31 @@ describe("createNextgenMiddleware (H3)", () => {
 
   describe("loginPath validation (P-3)", () => {
     // A visitor without a session would be redirected from /login to /login forever.
-    it("throws at setup when protectedRoutes match the loginPath", () => {
-      expect(() =>
-        createNextgenMiddleware({
-          url: "http://localhost:4000",
-          loginPath: "/login",
-          protectedRoutes: ["/*"],
-        }),
-      ).toThrow(/is matched by protectedRoutes/);
+    it("warns at setup when protectedRoutes match the loginPath", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+      createNextgenMiddleware({
+        url: "http://localhost:4000",
+        loginPath: "/nuxt-login",
+        protectedRoutes: ["/*"],
+      });
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('loginPath "/nuxt-login" is matched by protectedRoutes'),
+      );
     });
 
-    it("accepts a loginPath that ignoredRoutes exempt from protectedRoutes", () => {
-      expect(() =>
-        createNextgenMiddleware({
-          url: "http://localhost:4000",
-          loginPath: "/login",
-          protectedRoutes: ["/*"],
-          ignoredRoutes: ["/login"],
-        }),
-      ).not.toThrow();
+    it("does not warn when ignoredRoutes exempt the loginPath from protectedRoutes", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+      createNextgenMiddleware({
+        url: "http://localhost:4000",
+        loginPath: "/login",
+        protectedRoutes: ["/*"],
+        ignoredRoutes: ["/login"],
+      });
+
+      expect(warn).not.toHaveBeenCalled();
     });
 
     it("throws synchronously when loginPath is an absolute URL", () => {
@@ -1136,7 +1142,9 @@ describe("opaque session cookie: backend answers", () => {
   it("reads an empty display or identifier from the backend as null", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => Response.json({ user_id: "u1", user: { identifier: "", display: "" } })),
+      vi.fn(async () =>
+        Response.json({ session_id: "s1", user_id: "u1", user: { identifier: "", display: "" } }),
+      ),
     );
     const { handle, seen } = app();
 
@@ -1195,6 +1203,112 @@ describe("opaque session cookie: backend answers", () => {
       response.headers.getSetCookie(),
     ]).toEqual([503, null, []]);
   });
+
+  // h3 percent-decodes cookies: `x%0Ay` reaches the middleware as a newline,
+  // which fetch refuses to send. It must not read as an outage.
+  it("clears a malformed session cookie on a protected route without asking the backend", async () => {
+    const backend = vi.fn(async () => Response.json({ session_id: "s1", user_id: "u1" }));
+    vi.stubGlobal("fetch", backend);
+
+    const response = await app().handle(
+      makeWebRequest("http://localhost:3000/admin", "__nextgen_session=x%0Ay"),
+    );
+
+    expect([response.status, response.headers.getSetCookie(), backend.mock.calls]).toEqual([
+      302,
+      [expect.stringMatching(/^__nextgen_session=;.*Max-Age=0/)],
+      [],
+    ]);
+  });
+
+  it("keeps signing in a live session after a malformed cookie and a 500", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: RequestInit) =>
+        new Headers(init.headers).get("cookie") === COOKIE
+          ? Response.json({ session_id: "s1", user_id: "u1" })
+          : new Response(null, { status: 500 }),
+      ),
+    );
+    const { handle, seen } = app();
+    for (const cookie of ["__nextgen_session=x%0Ay", "__nextgen_session=poison"]) {
+      await handle(makeWebRequest("http://localhost:3000/", cookie));
+    }
+
+    await handle(makeWebRequest("http://localhost:3000/", COOKIE));
+
+    expect(seen.at(-1)).toMatchObject({ isAuthenticated: true });
+  });
+});
+
+// A JWKS that cannot be fetched on a cold cache says nothing about a JWT.
+describe("JWT session during a JWKS outage", () => {
+  function jwtCookie(): string {
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const token = makeJwt({ sub: "u1", iss: "http://localhost:4000", exp }, nextKid());
+    return `__nextgen_session=${token}`;
+  }
+
+  function app(): { handle: ReturnType<typeof toWebHandler>; seen: unknown[] } {
+    const seen: unknown[] = [];
+    const h3 = createApp();
+    h3.use(createNextgenMiddleware({ url: "http://localhost:4000", protectedRoutes: ["/admin"] }));
+    h3.use("/", (event) => {
+      seen.push(event.context.nextgenAuth);
+      return { ok: true };
+    });
+    return { handle: toWebHandler(h3), seen };
+  }
+
+  beforeEach(() => {
+    setRuntimeConfig({ nextgen: {} });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(new TypeError("fetch failed"))),
+    );
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+  });
+
+  it("answers a protected route 503 and keeps the cookie", async () => {
+    const response = await app().handle(makeWebRequest("http://localhost:3000/admin", jwtCookie()));
+
+    expect([response.status, response.headers.getSetCookie()]).toEqual([503, []]);
+  });
+
+  it("renders a public route as unavailable, keeping the cookie", async () => {
+    const { handle, seen } = app();
+
+    const response = await handle(makeWebRequest("http://localhost:3000/", jwtCookie()));
+
+    expect([response.headers.getSetCookie(), seen]).toEqual([
+      [],
+      [{ isAuthenticated: false, session: null, reason: "unavailable" }],
+    ]);
+  });
+});
+
+describe("getClientAuth", () => {
+  it("drops the session token from the server-side auth", () => {
+    const event = {
+      context: {
+        nextgenAuth: {
+          isAuthenticated: true,
+          session: {
+            userId: "u1",
+            identifier: null,
+            identifierProperty: null,
+            display: "Ada",
+            token: "secret",
+          },
+        },
+      },
+    } as unknown as Parameters<typeof getClientAuth>[0];
+
+    expect(getClientAuth(event)).toEqual({
+      isAuthenticated: true,
+      session: { userId: "u1", identifier: null, identifierProperty: null, display: "Ada" },
+    });
+  });
 });
 
 describe("proxy upstream failure", () => {
@@ -1238,7 +1352,9 @@ describe("project secret sources", () => {
     setRuntimeConfig({ nextgen });
     if (env !== undefined) vi.stubEnv("ZITADEL_PROJECT_SECRET", env);
     else vi.stubEnv("ZITADEL_PROJECT_SECRET", undefined);
-    const upstream = vi.fn(async (_url: string, _init: RequestInit) => Response.json({}));
+    const upstream = vi.fn(async (_url: string, _init: RequestInit) =>
+      Response.json({ session_id: "s1" }),
+    );
     vi.stubGlobal("fetch", upstream);
     const h3 = createApp();
     h3.use(createNextgenMiddleware({ url: "http://localhost:4000", projectSecret: option }));

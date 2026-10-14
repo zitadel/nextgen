@@ -96,8 +96,11 @@
  * keys already cached, is logged once, and is not retried for
  * {@link JWKS_FAILURE_BACKOFF_MS}.
  *
- * > **Note (serverless):** the cache is module-level. In serverless environments
- * > each cold start gets a fresh cache; warm instances share it across requests.
+ * > **Note (serverless):** the cache and the failure backoff are module-level,
+ * > so they are per process or isolate. In serverless environments each cold
+ * > start gets a fresh cache; warm instances share it across requests. Next.js
+ * > runs its edge middleware and its Node `auth()` in separate module copies,
+ * > each with a cache of its own.
  *
  * ---
  *
@@ -254,8 +257,9 @@ export interface VerifyJwtOptions {
 
   /**
    * Timeout in milliseconds for JWKS endpoint requests.
-   * Requests that do not complete within this window are aborted and the
-   * token is rejected (function returns `null`).
+   * Requests that do not complete within this window are aborted. With no
+   * keys cached, the token cannot be checked ({@link checkJwt} answers
+   * `unavailable`, {@link verifyJwt} `null`).
    * @default 5000
    */
   readonly jwksTimeoutMs?: number;
@@ -536,8 +540,10 @@ function findKey(entry: JwksCacheEntry, kid: string | undefined): Jwk | undefine
  * The JWKS document is cached for {@link JWKS_TTL_MS}. A `kid` the cached
  * document lacks refreshes it — a rotated key — but no sooner than
  * {@link JWKS_MIN_REFRESH_MS} after the last fetch, so tokens with made-up
- * `kid` values are answered from the cache. Returns `null` when no key fits:
- * the endpoint failed, no key has that `kid`, or the key cannot verify `alg`.
+ * `kid` values are answered from the cache. Returns `"no-key"` when no key
+ * fits (no key has that `kid`, or the key cannot verify `alg`), and
+ * `"unavailable"` when there are no keys to look in at all: the endpoint failed
+ * (or is in its {@link JWKS_FAILURE_BACKOFF_MS}) and nothing is cached.
  *
  * @param jwksUri - Full URL of the JWKS endpoint.
  * @param kid     - The `kid` header value from the JWT, or `undefined`.
@@ -548,14 +554,16 @@ async function resolveJwk(
   kid: string | undefined,
   alg: string,
   timeoutMs: number,
-): Promise<CryptoKey | null> {
+): Promise<CryptoKey | "no-key" | "unavailable"> {
   const now = Date.now();
   let entry = jwksCache.get(jwksUri);
   if (!entry || now - entry.fetchedAt >= JWKS_TTL_MS) {
     entry = (await refreshJwks(jwksUri, timeoutMs)) ?? entry;
   }
   if (!entry) {
-    return null;
+    // A cold cache and a JWKS that cannot be fetched: nothing says whether the
+    // token is good or bad.
+    return "unavailable";
   }
 
   let jwk = findKey(entry, kid);
@@ -567,12 +575,12 @@ async function resolveJwk(
     }
   }
   if (!jwk) {
-    return null;
+    return "no-key";
   }
 
   const params = importParams(jwk, alg);
   if (!params) {
-    return null;
+    return "no-key";
   }
   const importedKey = `${kid ?? "__default__"}:${alg}`;
   const cached = entry.imported.get(importedKey);
@@ -587,15 +595,36 @@ async function resolveJwk(
 // ─── Verification ─────────────────────────────────────────────────────────────
 
 /**
- * Verifies a compact-serialised JWT and returns its validated payload.
+ * The outcome of {@link checkJwt}.
+ *
+ * - `valid`: the token verified; `payload` holds its claims.
+ * - `invalid`: the token is not a good one: malformed, wrongly signed, for
+ *   another issuer or audience, expired, or naming a key the issuer does not
+ *   publish. Treat it like no token at all.
+ * - `unavailable`: the token could not be checked, because the issuer's JWKS
+ *   cannot be fetched and no keys are cached (a cold start during a JWKS
+ *   outage). The token may well be good: keep its cookie and answer a protected
+ *   route with a retryable `503` rather than a sign-in.
+ */
+export type JwtCheck =
+  | { readonly status: "valid"; readonly payload: JwtPayload }
+  | { readonly status: "invalid" }
+  | { readonly status: "unavailable" };
+
+const INVALID: JwtCheck = { status: "invalid" };
+
+/**
+ * Verifies a compact-serialised JWT, telling a bad token apart from one that
+ * could not be checked.
  *
  * ## Verification steps (in order)
  *
- * 1. Split the token — returns `null` immediately when fewer than three
+ * 1. Split the token: `invalid` immediately when fewer than three
  *    dot-separated segments are present.
  * 2. Reject if `alg` is not in {@link VerifyJwtOptions.allowedAlgorithms} (when set).
  * 3. Reject if `typ` is not in {@link VerifyJwtOptions.allowedTokenTypes} (when non-empty).
- * 4. Fetch (or retrieve from cache) the matching public key from the JWKS endpoint.
+ * 4. Fetch (or retrieve from cache) the matching public key from the JWKS
+ *    endpoint: `unavailable` when the endpoint fails and nothing is cached.
  * 5. Verify the cryptographic signature over `header.payload`.
  * 6. Reject if `iss` is absent or does not equal {@link VerifyJwtOptions.issuerUrl}.
  * 7. Reject if {@link VerifyJwtOptions.audience} is set and `aud` does not contain it.
@@ -603,14 +632,13 @@ async function resolveJwk(
  * 9. Reject if `nbf` is in the future (plus clock-skew tolerance).
  * 10. Reject if `iat` is in the future (plus clock-skew tolerance).
  *
- * Returns `null` on any failure rather than throwing, so callers can treat a
- * bad token identically to a missing one without try/catch at the call site.
+ * Never throws.
  *
  * @param token - The raw compact-serialised JWT string.
  * @param opts  - Verification options; see {@link VerifyJwtOptions}.
- * @returns The verified {@link JwtPayload}, or `null` if verification fails.
+ * @returns A {@link JwtCheck}.
  */
-export async function verifyJwt(token: string, opts: VerifyJwtOptions): Promise<JwtPayload | null> {
+export async function checkJwt(token: string, opts: VerifyJwtOptions): Promise<JwtCheck> {
   try {
     const {
       issuerUrl,
@@ -623,7 +651,7 @@ export async function verifyJwt(token: string, opts: VerifyJwtOptions): Promise<
 
     const segments = splitToken(token);
     if (!segments) {
-      return null;
+      return INVALID;
     }
     const [rawHeader, rawPayload, rawSig] = segments;
 
@@ -634,30 +662,33 @@ export async function verifyJwt(token: string, opts: VerifyJwtOptions): Promise<
     // is structurally invalid — we reject it rather than guessing an algorithm.
     const alg = header.alg;
     if (!alg) {
-      return null;
+      return INVALID;
     }
     // Unconditionally reject the 'none' algorithm regardless of the allowlist.
     // 'none' means the token is unsigned; accepting it would allow anyone to
     // forge arbitrary claims without a key. The comparison is case-insensitive
     // so that "None", "NONE", or any other casing variant is also rejected.
     if (alg.toLowerCase() === "none") {
-      return null;
+      return INVALID;
     }
     if (allowedAlgorithms?.length && !allowedAlgorithms.includes(alg)) {
-      return null;
+      return INVALID;
     }
 
     if (allowedTokenTypes.length > 0) {
       const typ = header.typ ?? "";
       if (!allowedTokenTypes.some((t) => t.toLowerCase() === typ.toLowerCase())) {
-        return null;
+        return INVALID;
       }
     }
 
     const kid = header.kid;
     const cryptoKey = await resolveJwk(`${issuerUrl}/auth/keys`, kid, alg, jwksTimeoutMs);
-    if (!cryptoKey) {
-      return null;
+    if (cryptoKey === "unavailable") {
+      return { status: "unavailable" };
+    }
+    if (cryptoKey === "no-key") {
+      return INVALID;
     }
 
     const valid = await crypto.subtle.verify(
@@ -667,7 +698,7 @@ export async function verifyJwt(token: string, opts: VerifyJwtOptions): Promise<
       ENCODER.encode(`${rawHeader}.${rawPayload}`),
     );
     if (!valid) {
-      return null;
+      return INVALID;
     }
 
     // Strict equality is intentional: the issuer URL must match exactly as
@@ -675,40 +706,59 @@ export async function verifyJwt(token: string, opts: VerifyJwtOptions): Promise<
     // surrounding whitespace — any difference is either a misconfiguration or
     // a token issued by a different server and must be rejected.
     if (payload.iss !== issuerUrl) {
-      return null;
+      return INVALID;
     }
 
     if (audience !== undefined) {
       const audList = payload.aud !== undefined ? [payload.aud].flat() : [];
       const expectedList = [audience].flat();
       if (!expectedList.some((a) => audList.includes(a))) {
-        return null;
+        return INVALID;
       }
     }
 
     const now = Date.now();
     if (payload.exp === undefined || payload.exp * 1000 < now - clockSkewMs) {
-      return null;
+      return INVALID;
     }
     if (payload.nbf !== undefined && payload.nbf * 1000 > now + clockSkewMs) {
-      return null;
+      return INVALID;
     }
     if (payload.iat !== undefined && payload.iat * 1000 > now + clockSkewMs) {
-      return null;
+      return INVALID;
     }
 
-    return payload;
+    return { status: "valid", payload };
   } catch (err) {
     // SyntaxError from JSON.parse means the token segments are not JSON —
-    // this is an opaque (non-JWT) token. Return null silently; the middleware
-    // will fall back to opaque token validation via the backend.
+    // this is an opaque (non-JWT) token. Answer invalid silently; the
+    // middleware will fall back to opaque token validation via the backend.
     if (err instanceof SyntaxError) {
-      return null;
+      return INVALID;
     }
-    // Any other unexpected error (network failure, malformed JWKS, Web Crypto
-    // exception) is worth logging so operators can distinguish infrastructure
-    // failures from genuine bad tokens.
+    // Any other unexpected error (malformed JWKS, Web Crypto exception) is
+    // worth logging so operators can distinguish infrastructure failures from
+    // genuine bad tokens.
     console.error("[nextgen] verifyJwt unexpected error:", err);
-    return null;
+    return INVALID;
   }
+}
+
+/**
+ * Verifies a compact-serialised JWT and returns its validated payload: the
+ * steps of {@link checkJwt}, collapsed to the payload or `null`.
+ *
+ * Returns `null` on any failure rather than throwing, so callers can treat a
+ * bad token identically to a missing one without try/catch at the call site.
+ * That includes a token that could not be checked because the JWKS is
+ * unreachable and nothing is cached; use {@link checkJwt} to tell that case
+ * apart, so an outage does not sign anyone out.
+ *
+ * @param token - The raw compact-serialised JWT string.
+ * @param opts  - Verification options; see {@link VerifyJwtOptions}.
+ * @returns The verified {@link JwtPayload}, or `null` if verification fails.
+ */
+export async function verifyJwt(token: string, opts: VerifyJwtOptions): Promise<JwtPayload | null> {
+  const check = await checkJwt(token, opts);
+  return check.status === "valid" ? check.payload : null;
 }

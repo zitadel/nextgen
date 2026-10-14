@@ -2,17 +2,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DEAD, OUTAGES } from "./__tests__/outages.js";
 import {
+  MAX_SESSION_TOKEN_LENGTH,
   SESSION_CHECK_BACKOFF_MS,
+  SESSION_CHECK_STALL_MS,
   assertLoginPath,
   clearCookie,
   clearSessionCheckBackoff,
   filterResponseHeaders,
+  isWellFormedSessionToken,
   matchesRoutes,
   parseCookieHeader,
   proxyFailureResponse,
   requiresProjectSecret,
   sessionUnavailableResponse,
+  toClientAuth,
   validateOpaqueSessionToken,
+  warnIfLoginPathProtected,
 } from "./middleware.js";
 
 // An unknown session check is logged and starts a backoff; neither may leak
@@ -199,6 +204,7 @@ describe("validateOpaqueSessionToken", () => {
   it("returns the signed-in user of a live session", async () => {
     backend(
       Response.json({
+        session_id: "s1",
         user_id: "u1",
         user: { identifier: "a@b.c", identifier_property: "email", display: "Ada" },
       }),
@@ -216,7 +222,7 @@ describe("validateOpaqueSessionToken", () => {
   });
 
   it("asks the backend for the session the cookie names", async () => {
-    const fetchMock = backend(Response.json({ user_id: "u1" }));
+    const fetchMock = backend(Response.json({ session_id: "s1", user_id: "u1" }));
 
     await validateOpaqueSessionToken("tok", "http://auth.test", 1000);
 
@@ -229,17 +235,19 @@ describe("validateOpaqueSessionToken", () => {
   });
 
   // CreateSession sets the cookie before any factor is verified.
-  it.each([[{}], [{ user_id: "" }], [{ user_id: 42 }], [{ user_id: null }]])(
-    "reports a live session without a user (%j) as anonymous",
-    async (body) => {
-      backend(Response.json(body));
+  it.each([
+    [{ session_id: "s1" }],
+    [{ session_id: "s1", user_id: "" }],
+    [{ session_id: "s1", user_id: 42 }],
+    [{ session_id: "s1", user_id: null }],
+  ])("reports a live session without a user (%j) as anonymous", async (body) => {
+    backend(Response.json(body));
 
-      expect(await validateOpaqueSessionToken("tok", "http://auth.test", 1000)).toMatchObject({
-        status: "live",
-        session: { userId: null },
-      });
-    },
-  );
+    expect(await validateOpaqueSessionToken("tok", "http://auth.test", 1000)).toMatchObject({
+      status: "live",
+      session: { userId: null },
+    });
+  });
 
   // A UI renders `display ?? identifier`; an empty string would show no name.
   it.each([
@@ -248,7 +256,7 @@ describe("validateOpaqueSessionToken", () => {
     ["a non-string display", { display: 7 }, { display: null }],
     ["an empty identifier property", { identifier_property: "" }, { identifierProperty: null }],
   ])("reads %s as null", async (_label, user, expected) => {
-    backend(Response.json({ user_id: "u1", user }));
+    backend(Response.json({ session_id: "s1", user_id: "u1", user }));
 
     expect(await validateOpaqueSessionToken("tok", "http://auth.test", 1000)).toMatchObject({
       status: "live",
@@ -328,7 +336,7 @@ describe("validateOpaqueSessionToken backoff", () => {
   it("asks the backend again once the backoff has passed", async () => {
     const fetchMock = outage();
     await validateOpaqueSessionToken("tok", "http://auth.test", 1000);
-    fetchMock.mockImplementation(async () => Response.json({ user_id: "u1" }));
+    fetchMock.mockImplementation(async () => Response.json({ session_id: "s1", user_id: "u1" }));
     vi.advanceTimersByTime(SESSION_CHECK_BACKOFF_MS);
 
     expect(await validateOpaqueSessionToken("tok", "http://auth.test", 1000)).toMatchObject({
@@ -363,6 +371,270 @@ describe("validateOpaqueSessionToken backoff", () => {
     await validateOpaqueSessionToken("tok", "http://auth.test", 1000);
 
     expect(console.warn).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["a network error", () => Promise.reject(new TypeError("fetch failed"))],
+    ["a timeout", () => Promise.reject(new DOMException("timed out", "TimeoutError"))],
+    ["a 502", () => Promise.resolve(new Response(null, { status: 502 }))],
+    ["a 503", () => Promise.resolve(new Response(null, { status: 503 }))],
+    ["a 504", () => Promise.resolve(new Response(null, { status: 504 }))],
+  ])("backs off after %s, which says the backend is unreachable", async (_label, answer) => {
+    const fetchMock = vi.fn(answer);
+    vi.stubGlobal("fetch", fetchMock);
+    await validateOpaqueSessionToken("tok", "http://auth.test", 1000);
+
+    await validateOpaqueSessionToken("tok", "http://auth.test", 1000);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  // These answers may come from the request's own token; one request must not
+  // make the backend look down for everyone else.
+  it.each([
+    ["a 500", () => new Response(null, { status: 500 })],
+    ["a 429", () => new Response(null, { status: 429 })],
+    ["a 403", () => new Response(null, { status: 403 })],
+    ["a 401 without the code", () => new Response(null, { status: 401 })],
+    ["an unreadable body", () => new Response("<html>", { status: 200 })],
+    ["a 200 that is not a session", () => Response.json({ user_id: "u1" })],
+  ])("does not back off after %s", async (_label, answer) => {
+    const fetchMock = vi.fn(async () => answer());
+    vi.stubGlobal("fetch", fetchMock);
+    await validateOpaqueSessionToken("tok", "http://auth.test", 1000);
+
+    await validateOpaqueSessionToken("tok", "http://auth.test", 1000);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps validating a live session after a 500 caused by another request", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: RequestInit) =>
+        new Headers(init.headers).get("cookie") === "__nextgen_session=good"
+          ? Response.json({ session_id: "s1", user_id: "u1" })
+          : new Response(null, { status: 500 }),
+      ),
+    );
+    await validateOpaqueSessionToken("poison", "http://auth.test", 1000);
+
+    expect(await validateOpaqueSessionToken("good", "http://auth.test", 1000)).toMatchObject({
+      status: "live",
+    });
+  });
+
+  it("logs an answer that starts no backoff once per window", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(null, { status: 500 })),
+    );
+    for (let i = 0; i < 5; i++) {
+      await validateOpaqueSessionToken("tok", "http://auth.test", 1000);
+    }
+    vi.advanceTimersByTime(SESSION_CHECK_BACKOFF_MS);
+    await validateOpaqueSessionToken("tok", "http://auth.test", 1000);
+
+    expect(console.warn).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not back off when the request cannot be built", async () => {
+    const fetchMock = vi.fn(async () => Response.json({ session_id: "s1", user_id: "u1" }));
+    vi.stubGlobal("fetch", fetchMock);
+    await validateOpaqueSessionToken("tok", "not a url", 1000);
+
+    await validateOpaqueSessionToken("tok", "not a url", 1000);
+
+    expect([fetchMock.mock.calls.length, vi.mocked(console.warn).mock.calls.length]).toEqual([
+      0, 1,
+    ]);
+  });
+
+  it("outlasts the default session-check timeout", () => {
+    expect(SESSION_CHECK_BACKOFF_MS).toBeGreaterThan(5_000);
+  });
+});
+
+describe("validateOpaqueSessionToken with a malformed token", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  // A percent-decoded `%0A` in the cookie reaches the SDK as a newline, which
+  // fetch refuses to send. It must not read as a backend outage.
+  it.each([
+    ["a newline", "x\ny"],
+    ["a carriage return", "x\ry"],
+    ["a NUL", "x\u0000y"],
+    ["a space", "x y"],
+    ["a tab", "x\ty"],
+    ["a non-ASCII character", "xéy"],
+    ["a percent sign", "x%0Ay"],
+    ["a semicolon", "x;other=1"],
+    ["an empty token", ""],
+    ["an over-long token", "a".repeat(MAX_SESSION_TOKEN_LENGTH + 1)],
+  ])("reports a token with %s dead without asking the backend", async (_label, token) => {
+    const fetchMock = vi.fn(async () => Response.json({ session_id: "s1", user_id: "u1" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect([
+      await validateOpaqueSessionToken(token, "http://auth.test", 1000),
+      fetchMock.mock.calls,
+    ]).toEqual([{ status: "dead" }, []]);
+  });
+
+  it("keeps validating a live session after a malformed one", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ session_id: "s1", user_id: "u1" })),
+    );
+    await validateOpaqueSessionToken("x\ny", "http://auth.test", 1000);
+
+    expect(await validateOpaqueSessionToken("good", "http://auth.test", 1000)).toMatchObject({
+      status: "live",
+    });
+  });
+});
+
+describe("toClientAuth", () => {
+  it("drops the session token, which must never reach the browser", () => {
+    expect(
+      toClientAuth({
+        isAuthenticated: true,
+        session: {
+          userId: "u1",
+          identifier: "ada@example.com",
+          identifierProperty: "email",
+          display: "Ada",
+          token: "secret",
+        },
+      }),
+    ).toEqual({
+      isAuthenticated: true,
+      session: {
+        userId: "u1",
+        identifier: "ada@example.com",
+        identifierProperty: "email",
+        display: "Ada",
+      },
+    });
+  });
+
+  it.each([
+    [{ isAuthenticated: false as const, session: null }],
+    [{ isAuthenticated: false as const, session: null, reason: "unavailable" as const }],
+  ])("keeps the signed-out state %j as it is", (auth) => {
+    expect(toClientAuth(auth)).toEqual(auth);
+  });
+});
+
+describe("isWellFormedSessionToken", () => {
+  it.each([
+    "eyJhbGciOiJBMjU2R0NNS1ciLCJlbmMiOiJBMjU2R0NNIn0.a-b_c.d.e.f",
+    "tok",
+    "a".repeat(MAX_SESSION_TOKEN_LENGTH),
+  ])("accepts %s", (token) => {
+    expect(isWellFormedSessionToken(token)).toBe(true);
+  });
+
+  it.each(["", "x\ny", "x y", "xéy", "a=b", "a".repeat(MAX_SESSION_TOKEN_LENGTH + 1)])(
+    "rejects %j",
+    (token) => {
+      expect(isWellFormedSessionToken(token)).toBe(false);
+    },
+  );
+});
+
+describe("validateOpaqueSessionToken under a hanging backend", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  /** A backend that answers no check until the test times one out. */
+  function hanging() {
+    const pending: Array<(error: unknown) => void> = [];
+    const fetchMock = vi.fn(
+      () =>
+        new Promise<Response>((_resolve, reject) => {
+          pending.push(reject);
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const timeOutAll = async () => {
+      for (const reject of pending.splice(0)) {
+        reject(new DOMException("timed out", "TimeoutError"));
+      }
+      // Only Date is faked: a real macrotask lets every rejection settle.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    };
+    return { fetchMock, timeOutAll };
+  }
+
+  it("answers other checks at once while one has been unanswered past the stall threshold", async () => {
+    const { fetchMock, timeOutAll } = hanging();
+    const first = validateOpaqueSessionToken("tok", "http://auth.test", 5000);
+    vi.advanceTimersByTime(SESSION_CHECK_STALL_MS);
+
+    const others = await Promise.all(
+      Array.from({ length: 20 }, () => validateOpaqueSessionToken("tok", "http://auth.test", 5000)),
+    );
+
+    expect([fetchMock.mock.calls.length, new Set(others.map((o) => o.status))]).toEqual([
+      1,
+      new Set(["unknown"]),
+    ]);
+    await timeOutAll();
+    await first;
+  });
+
+  it("still sends checks that arrive before the stall threshold", async () => {
+    const { fetchMock, timeOutAll } = hanging();
+    const checks = [validateOpaqueSessionToken("tok", "http://auth.test", 5000)];
+    vi.advanceTimersByTime(SESSION_CHECK_STALL_MS - 1);
+    checks.push(validateOpaqueSessionToken("tok", "http://auth.test", 5000));
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await timeOutAll();
+    await Promise.all(checks);
+  });
+
+  it("logs a timed-out probe once, however many checks were waiting on it", async () => {
+    const { timeOutAll } = hanging();
+    const checks = Array.from({ length: 5 }, () =>
+      validateOpaqueSessionToken("tok", "http://auth.test", 5000),
+    );
+    vi.advanceTimersByTime(5000);
+    await timeOutAll();
+    await Promise.all(checks);
+
+    expect(console.warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends the backend one probe per backoff window under steady load", async () => {
+    const { fetchMock, timeOutAll } = hanging();
+    const checks: Promise<unknown>[] = [];
+    // One request every 250ms for 20s against a backend that never answers;
+    // every probe times out after 5s.
+    for (let t = 0; t < 20_000; t += 250) {
+      checks.push(validateOpaqueSessionToken("tok", "http://auth.test", 5000));
+      vi.advanceTimersByTime(250);
+      if ((t + 250) % 5000 === 0) {
+        await timeOutAll();
+      }
+    }
+    await timeOutAll();
+    await Promise.all(checks);
+
+    // Only the 4 checks of the first second are sent; from then on the stalled
+    // probe, and after its 5s timeout the 15s backoff, answer the rest at once.
+    expect([fetchMock.mock.calls.length, vi.mocked(console.warn).mock.calls.length]).toEqual([
+      4, 1,
+    ]);
   });
 });
 
@@ -419,24 +691,38 @@ describe("assertLoginPath", () => {
   it.each(["https://evil.com/phish", "//evil.com", "login", ""])("rejects %j", (loginPath) => {
     expect(() => assertLoginPath(loginPath)).toThrow(/loginPath must be a relative path/);
   });
+});
 
-  // A visitor without a session would be redirected from /login to /login forever.
+describe("warnIfLoginPathProtected", () => {
+  // A visitor without a session would be redirected from /login to /login
+  // forever, if the middleware runs there; the framework may keep it away.
   it.each([
     ["/login", ["/*"]],
     ["/login", ["/login"]],
     ["/login/", ["/login"]],
     ["/login?x=1", ["/login"]],
-  ])("rejects %s when protectedRoutes %j match it", (loginPath, protectedRoutes) => {
-    expect(() => assertLoginPath(loginPath, { protectedRoutes })).toThrow(
-      /is matched by protectedRoutes/,
+  ])("warns about %s when protectedRoutes %j match it", (loginPath, protectedRoutes) => {
+    expect(() => warnIfLoginPathProtected(loginPath, { protectedRoutes })).not.toThrow();
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining(`loginPath "${loginPath}" is matched by protectedRoutes`),
     );
+  });
+
+  it("warns once per configuration", () => {
+    for (let i = 0; i < 3; i++) {
+      warnIfLoginPathProtected("/sign-in", { protectedRoutes: ["/sign*"] });
+    }
+
+    expect(console.warn).toHaveBeenCalledTimes(1);
   });
 
   it.each([
     ["/login", { protectedRoutes: ["/profile", "/admin*"] }],
     ["/login", { protectedRoutes: ["/*"], ignoredRoutes: ["/login"] }],
     ["/login", { protectedRoutes: ["/*"], ignoredRoutes: ["/log*"] }],
-  ])("accepts %s with routes %j", (loginPath, routes) => {
-    expect(() => assertLoginPath(loginPath, routes)).not.toThrow();
+  ])("stays quiet about %s with routes %j", (loginPath, routes) => {
+    warnIfLoginPathProtected(loginPath, routes);
+
+    expect(console.warn).not.toHaveBeenCalled();
   });
 });

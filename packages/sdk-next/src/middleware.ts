@@ -15,7 +15,7 @@ import {
 } from "@zitadel/sdk-core/middleware";
 import { NextResponse } from "next/server";
 
-import { verifyJwt, isJwtShaped } from "./lib/jwt.js";
+import { checkJwt, isJwtShaped } from "./lib/jwt.js";
 
 /**
  * Clones the incoming request headers, injects `extra` key/value pairs,
@@ -105,7 +105,9 @@ export async function nextgenMiddleware(
   } = options;
 
   // Guard against open-redirect: loginPath must be a path on this app.
-  assertLoginPath(loginPath, { protectedRoutes, ignoredRoutes });
+  assertLoginPath(loginPath);
+  // No check of loginPath against protectedRoutes: a `matcher` may keep this
+  // middleware off the login page, which it cannot see.
 
   const { pathname } = new URL(req.url);
 
@@ -313,8 +315,8 @@ async function handleAuth(
   // cookies; when both are present the caller clearly intended the Bearer token.
   const token = bearerToken ?? cookieToken;
 
-  const payload = token
-    ? await verifyJwt(token, {
+  const jwt = token
+    ? await checkJwt(token, {
         issuerUrl: url,
         allowedAlgorithms,
         clockSkewMs,
@@ -323,6 +325,7 @@ async function handleAuth(
         jwksTimeoutMs,
       })
     : null;
+  const payload = jwt?.status === "valid" ? jwt.payload : null;
 
   if (payload && token && payload.sub) {
     const tunnelled = tunnelHeaders(req, { "x-nextgen-auth-token": token });
@@ -334,6 +337,9 @@ async function handleAuth(
   // not a JWT (non-JSON segments). A token with a valid JWT structure that
   // failed verification (bad sig, wrong typ/alg) must be rejected — never
   // accepted by a backend call that doesn't re-check the JWT claims.
+  // A JWT whose keys cannot be fetched (the JWKS is down and nothing is
+  // cached) may well be good: an outage, not a sign-out.
+  let unavailable = jwt?.status === "unavailable";
   let keepCookies = false;
   if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
     const check = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
@@ -347,19 +353,20 @@ async function handleAuth(
       return NextResponse.next({ request: { headers: tunnelled } });
     }
     keepCookies = check.status === "live";
-    if (check.status === "unknown") {
-      // The backend could not be asked. The session may be live, so its cookie
-      // survives the outage; a protected route is retryable, not a sign-in.
-      if (matchesRoutes(pathname, protectedRoutes)) {
-        return sessionUnavailableResponse();
-      }
-      // auth() reports `reason: "unavailable"` without asking the backend again.
-      const tunnelled = tunnelHeaders(req, {
-        "x-nextgen-auth-token": "",
-        "x-nextgen-auth-state": "unavailable",
-      });
-      return NextResponse.next({ request: { headers: tunnelled } });
+    unavailable ||= check.status === "unknown";
+  }
+  if (unavailable) {
+    // The backend could not be asked. The session may be live, so its cookie
+    // survives the outage; a protected route is retryable, not a sign-in.
+    if (matchesRoutes(pathname, protectedRoutes)) {
+      return sessionUnavailableResponse();
     }
+    // auth() reports `reason: "unavailable"` without asking the backend again.
+    const tunnelled = tunnelHeaders(req, {
+      "x-nextgen-auth-token": "",
+      "x-nextgen-auth-state": "unavailable",
+    });
+    return NextResponse.next({ request: { headers: tunnelled } });
   }
 
   const tunnelled = tunnelHeaders(req, { "x-nextgen-auth-token": "" });
@@ -438,7 +445,7 @@ export type ProxyHandler = (req: NextRequest) => Promise<NextResponse | Response
  */
 export function createProxy(config: ZitadelProject, options: ProxyOptions = {}): ProxyHandler {
   // Fail at setup, not with a 500 on every request.
-  assertLoginPath(options.loginPath ?? "/login", options);
+  assertLoginPath(options.loginPath ?? "/login");
   const mergedOptions: NextgenMiddlewareOptions & { projectSecret?: string } = {
     ...options,
     proxyPath: config.proxyPath,

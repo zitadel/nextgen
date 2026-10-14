@@ -10,7 +10,12 @@
 import { generateKeyPairSync, createSign } from "node:crypto";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-import { handleNextgenRequest, createNextgenRequestMiddleware, getAuth } from "../middleware";
+import {
+  handleNextgenRequest,
+  createNextgenRequestMiddleware,
+  getAuth,
+  getClientAuth,
+} from "../middleware";
 import { clearJwksCache } from "@zitadel/sdk-core/jwt";
 import { clearSessionCheckBackoff } from "@zitadel/sdk-core/middleware";
 import { DEAD, OUTAGES, PROXY_FAILURES } from "./outages";
@@ -392,25 +397,41 @@ describe("handleNextgenRequest", () => {
 
 describe("createNextgenRequestMiddleware", () => {
   // A visitor without a session would be redirected from /login to /login forever.
-  it("throws at setup when protectedRoutes match the loginPath", () => {
-    expect(() =>
-      createNextgenRequestMiddleware({
-        url: "http://localhost:4000",
-        loginPath: "/login",
-        protectedRoutes: ["/*"],
-      }),
-    ).toThrow(/is matched by protectedRoutes/);
+  it("warns at setup when protectedRoutes match the loginPath", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    createNextgenRequestMiddleware({
+      url: "http://localhost:4000",
+      loginPath: "/tanstack-login",
+      protectedRoutes: ["/*"],
+    });
+
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining('loginPath "/tanstack-login" is matched by protectedRoutes'),
+    );
   });
 
-  it("accepts a loginPath that ignoredRoutes exempt from protectedRoutes", () => {
-    expect(() =>
-      createNextgenRequestMiddleware({
-        url: "http://localhost:4000",
-        loginPath: "/login",
-        protectedRoutes: ["/*"],
-        ignoredRoutes: ["/login"],
-      }),
-    ).not.toThrow();
+  it("does not check the routes of a direct call per request", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    await handleNextgenRequest(makeRequest("http://localhost:3000/"), {
+      url: "http://localhost:4000",
+      loginPath: "/tanstack-direct-login",
+      protectedRoutes: ["/*"],
+      ignoredRoutes: ["/"],
+    });
+
+    expect(console.warn).not.toHaveBeenCalled();
+  });
+
+  it("does not warn when ignoredRoutes exempt the loginPath from protectedRoutes", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    createNextgenRequestMiddleware({
+      url: "http://localhost:4000",
+      loginPath: "/login",
+      protectedRoutes: ["/*"],
+      ignoredRoutes: ["/login"],
+    });
+
+    expect(console.warn).not.toHaveBeenCalled();
   });
 
   // A bad loginPath must fail once at setup, not answer every request with a 500.
@@ -490,6 +511,7 @@ describe("opaque session cookie", () => {
   it("signs in a live session that names a user, with the user's details", async () => {
     sessionsMe(
       Response.json({
+        session_id: "s1",
         user_id: "u1",
         user: { identifier: "ada@example.com", identifier_property: "email", display: "Ada" },
       }),
@@ -512,7 +534,7 @@ describe("opaque session cookie", () => {
   // CreateSession sets the cookie before any factor is verified: an abandoned
   // sign-in must not open protected routes.
   it("redirects an anonymous session on a protected route to login", async () => {
-    sessionsMe(Response.json({}));
+    sessionsMe(Response.json({ session_id: "s1" }));
 
     const decision = await handleNextgenRequest(
       makeRequest("http://localhost:3000/admin", { cookie: COOKIE }),
@@ -523,7 +545,7 @@ describe("opaque session cookie", () => {
   });
 
   it("keeps an anonymous session's cookie, since its sign-in may still complete", async () => {
-    sessionsMe(Response.json({}));
+    sessionsMe(Response.json({ session_id: "s1" }));
 
     const decision = await handleNextgenRequest(
       makeRequest("http://localhost:3000/admin", { cookie: COOKIE }),
@@ -596,6 +618,133 @@ describe("opaque session cookie", () => {
       res.headers.getSetCookie(),
       next.mock.calls,
     ]).toEqual([503, null, [], []]);
+  });
+
+  // A cookie the backend cannot have minted must not reach it, or read as an outage.
+  it("clears a malformed session cookie on a protected route without asking the backend", async () => {
+    const fetchMock = vi.fn(async () => Response.json({ session_id: "s1", user_id: "u1" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const decision = await handleNextgenRequest(
+      makeRequest("http://localhost:3000/admin", { cookie: "__nextgen_session=x%0Ay" }),
+      OPTIONS,
+    );
+
+    if (decision.type === "continue") throw new Error("expected a response");
+    expect([decision.type, decision.response.headers.getSetCookie(), fetchMock.mock.calls]).toEqual(
+      ["redirect", ["__nextgen_session=; Path=/; Max-Age=0"], []],
+    );
+  });
+
+  it("keeps signing in a live session after a malformed cookie and a 500", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: RequestInit) =>
+        new Headers(init.headers).get("cookie") === COOKIE
+          ? Response.json({ session_id: "s1", user_id: "u1" })
+          : new Response(null, { status: 500 }),
+      ),
+    );
+    for (const cookie of ["__nextgen_session=x%0Ay", "__nextgen_session=poison"]) {
+      await handleNextgenRequest(makeRequest("http://localhost:3000/admin", { cookie }), OPTIONS);
+    }
+
+    const decision = await handleNextgenRequest(
+      makeRequest("http://localhost:3000/admin", { cookie: COOKIE }),
+      OPTIONS,
+    );
+
+    expect(decision).toMatchObject({ type: "continue", auth: { isAuthenticated: true } });
+  });
+});
+
+// A JWKS that cannot be fetched on a cold cache says nothing about a JWT.
+describe("JWT session during a JWKS outage", () => {
+  const OPTIONS = { url: "http://localhost:4000", protectedRoutes: ["/admin"] };
+
+  function jwtCookie(): string {
+    return `__nextgen_session=${makeJwt({ sub: "u1", iss: OPTIONS.url, exp: ts(3600) }, nextKid())}`;
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(new TypeError("fetch failed"))),
+    );
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+  });
+
+  it("answers a protected route 503 and keeps the cookie", async () => {
+    const decision = await handleNextgenRequest(
+      makeRequest("http://localhost:3000/admin", { cookie: jwtCookie() }),
+      OPTIONS,
+    );
+
+    if (decision.type === "continue") throw new Error("expected a response");
+    expect([
+      decision.type,
+      decision.response.status,
+      decision.response.headers.getSetCookie(),
+    ]).toEqual(["unavailable", 503, []]);
+  });
+
+  it("continues a public route as unavailable", async () => {
+    const decision = await handleNextgenRequest(
+      makeRequest("http://localhost:3000/", { cookie: jwtCookie() }),
+      OPTIONS,
+    );
+
+    expect(decision).toEqual({
+      type: "continue",
+      auth: { isAuthenticated: false, session: null, reason: "unavailable" },
+    });
+  });
+});
+
+describe("getClientAuth", () => {
+  it("drops the session token, which must never reach the browser", () => {
+    const context = {
+      nextgenAuth: {
+        isAuthenticated: true as const,
+        session: {
+          userId: "u1",
+          identifier: "ada@example.com",
+          identifierProperty: "email",
+          display: "Ada",
+          token: "secret-token",
+        },
+      },
+    };
+
+    expect(getClientAuth(context)).toEqual({
+      isAuthenticated: true,
+      session: {
+        userId: "u1",
+        identifier: "ada@example.com",
+        identifierProperty: "email",
+        display: "Ada",
+      },
+    });
+  });
+
+  it("keeps the reason a session could not be checked", () => {
+    const context = {
+      nextgenAuth: {
+        isAuthenticated: false as const,
+        session: null,
+        reason: "unavailable" as const,
+      },
+    };
+
+    expect(getClientAuth(context)).toEqual({
+      isAuthenticated: false,
+      session: null,
+      reason: "unavailable",
+    });
+  });
+
+  it.each([[undefined], [{}]])("reads a missing session from %j as signed out", (context) => {
+    expect(getClientAuth(context)).toEqual({ isAuthenticated: false, session: null });
   });
 });
 
