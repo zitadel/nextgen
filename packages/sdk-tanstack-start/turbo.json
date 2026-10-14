@@ -3,13 +3,13 @@
   "extends": ["//"],
   "tasks": {
     "typecheck": {
-      "dependsOn": ["@zitadel/components#build", "@zitadel/sdk-core#build", "@zitadel/sdk-react#build"]
+      "dependsOn": ["@zitadel/sdk-react#build"]
     },
     "build": {
-      "dependsOn": ["@zitadel/components#build", "@zitadel/sdk-core#build", "@zitadel/sdk-react#build"]
+      "dependsOn": ["@zitadel/sdk-react#build"]
     },
     "build-release": {
-      "dependsOn": ["@zitadel/components#build-release", "@zitadel/sdk-core#build-release", "@zitadel/sdk-react#build-release", "@zitadel/sdk-qwik-city#build-release"]
+      "dependsOn": ["@zitadel/sdk-react#build-release", "@zitadel/sdk-qwik-city#build-release"]
     },
     "test": {
       "dependsOn": ["build"]
@@ -17,7 +17,7 @@
     // tsup's declaration pass resolves the workspace packages, which need
     // api's generated client and the built dependencies.
     "dev": {
-      "dependsOn": ["@zitadel/components#build", "@zitadel/sdk-core#build", "@zitadel/sdk-react#build"]
+      "dependsOn": ["@zitadel/sdk-react#build"]
     }
   }
 }

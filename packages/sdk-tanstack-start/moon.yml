@@ -11,14 +11,10 @@ dependsOn:
 tasks:
   typecheck:
     deps:
-      - "components:build"
-      - "sdk-core:build"
       - "sdk-react:build"
 
   build:
     deps:
-      - "components:build"
-      - "sdk-core:build"
       - "sdk-react:build"
     options:
       mutex: "sdk-tanstack-start-dist"
@@ -28,8 +24,6 @@ tasks:
       node ../../scripts/release-clean.mjs local-dist
       corepack pnpm run build
     deps:
-      - "components:build-release"
-      - "sdk-core:build-release"
       - "sdk-react:build-release"
     outputs:
       - "dist/**/*"
@@ -53,8 +47,6 @@ tasks:
   dev:
     command: "corepack pnpm run dev"
     deps:
-      - "components:build"
-      - "sdk-core:build"
       - "sdk-react:build"
     options:
       persistent: true
