@@ -111,6 +111,18 @@ describe("FrameworkConfirmPrompt", () => {
     );
   });
 
+  it("does not ask when the developer already chose the framework", async () => {
+    // Picked from the scaffold list a moment earlier, or passed --framework:
+    // detection only read their own answer back.
+    const out = await new FrameworkConfirmPrompt().ask(baseAnswers(), {
+      ...ctx,
+      frameworkChosen: true,
+    });
+
+    expect(out).toEqual(baseAnswers());
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
   it("throws E_UNSUPPORTED_PROJECT_SHAPE when the user declines", async () => {
     vi.mocked(confirm).mockResolvedValueOnce(false);
 
