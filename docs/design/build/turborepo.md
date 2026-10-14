@@ -43,15 +43,15 @@ hosted cloud's builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
   remove.
 - A task cannot depend on a persistent task (`dev`, `start`, `preview`,
   `//#server`).
-- The release builds run in a fixed order because each cleans and rewrites
-  the `dist/` that dev builds and tests of the same graph read (moon ran them
-  serially). The chain, each link naming its predecessor in its own
-  `turbo.json`: `cli` (after `cli#test`) → `api` → `config` → `components` →
-  `sdk-core` → `sdk-next` → `sdk-nuxt` → `sdk-react` → `sdk-vue` →
-  `sdk-angular` → `sdk-solid` → `sdk-svelte` → `sdk-qwik` → `testing`; the
-  console and login UI release builds wait for
-  `@zitadel/release#build-public-packages`. Keep a new public package in that
-  chain and in `release-manifest.mjs`.
+- Each release build cleans and rewrites the `dist/` that dev builds and
+  tests of the same graph read, so the release builds start after
+  `cli#test` (`api#build-release` depends on it, and every other release
+  build reaches `api`'s through its package edges). From there they run in
+  parallel on the same package edges as their dev builds: a release build
+  depends on the release build of every package its dev build depends on.
+  The console and login UI release builds wait for
+  `@zitadel/release#build-public-packages`. Give a new public package those
+  edges and add it to `release-manifest.mjs`.
 
 ## Inputs and outputs
 

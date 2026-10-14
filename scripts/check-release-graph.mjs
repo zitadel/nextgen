@@ -22,6 +22,20 @@ const BUILD_MUTEX_REQUIREMENTS = new Map([
 ]);
 const RELEASE_ENTRYPOINT_TARGETS = ["release:pack", "release:snapshot", "release:publish"];
 
+// The public package release builds run in parallel wherever their
+// dependencies allow, and each one cleans and rewrites its package's dist in
+// place. Two checks below keep that safe:
+//
+// - Each release build depends on the release build of every package its
+//   normal build depends on. The normal builds run in parallel in `moon ci` on
+//   those edges, so with them no release build reads a dist another release
+//   build is rewriting.
+// - In every entry point's run, everything else scheduled before packaging
+//   (the normal builds and tests, generators, cli:test; server:test in
+//   snapshot) finishes before the first release build starts, so no normal
+//   task reads or rewrites a dist while it is being cleaned. Tasks after the
+//   aggregate run after every release build.
+
 export async function main(args = forwardedArgs()) {
   if (args.includes("--help")) {
     console.log("usage: node scripts/check-release-graph.mjs");
@@ -45,12 +59,14 @@ export async function main(args = forwardedArgs()) {
     );
   }
 
+  const normalBuildDeps = await readNormalBuildDeps();
   for (const target of PUBLIC_PACKAGE_BUILD_TARGETS) {
     assertTask(publicTasks, target);
     assertTaskOption(publicTasks, target, "runInCI", false);
     assertReleaseBuildCleans(publicTasks, target);
     assertBuildMutex(publicTasks, target);
     assertSelfBuildNotInReleaseGraph(publicTasks, target);
+    assertMirrorsNormalBuildEdges(publicTasks, target, normalBuildDeps);
 
     if (!aggregateDeps.has(target)) {
       throw new Error(`${PUBLIC_AGGREGATE_TARGET} is missing manifest build target ${target}`);
@@ -89,13 +105,16 @@ export async function main(args = forwardedArgs()) {
         throw new Error(`${target} must depend on ${uiTarget}`);
       }
     }
+
+    assertReleaseBuildsStartAfterOtherWork(await readActionGraph(target), target);
   }
 
   console.log(
     "release graph ok: public package release builds clean and rebuild dist " +
-      "without self-build readers, and " +
+      "without self-build readers, mirror their normal builds' package edges, " +
+      "and start after the other work of each entry point; " +
       `${RELEASE_UI_BUILD_REQUIREMENTS.size} release UI ` +
-      "builds depend on the package release chain they consume",
+      "builds depend on the package release builds they consume",
   );
 }
 
@@ -127,6 +146,68 @@ async function readTask(target) {
         result.stdout.slice(0, 1000),
     );
   }
+}
+
+// Every project's normal `build` task and its deps, by target. The query
+// matches task ids by prefix, so pick `build` itself.
+async function readNormalBuildDeps() {
+  const result = await runCapture("moon", ["query", "tasks", "--id", "build"], {
+    cwd: repoRoot,
+  });
+
+  let tasksByProject;
+  try {
+    ({ tasks: tasksByProject } = JSON.parse(result.stdout));
+  } catch (error) {
+    throw new Error(
+      `failed to parse moon build tasks: ${formatError(error)}\n${result.stdout.slice(0, 1000)}`,
+    );
+  }
+
+  const deps = new Map();
+  for (const tasks of Object.values(tasksByProject ?? {})) {
+    if (tasks.build) {
+      deps.set(
+        tasks.build.target,
+        (tasks.build.deps ?? []).map((dep) => dep.target),
+      );
+    }
+  }
+  return deps;
+}
+
+// The action graph `moon run <target>` executes: the task deps plus the
+// ordering edges moon adds for `runDepsInParallel: false`, which the task
+// graph does not show. Returns each run-task action's target and the targets
+// it waits for directly.
+async function readActionGraph(target) {
+  const result = await runCapture("moon", ["action-graph", target, "--json"], {
+    cwd: repoRoot,
+  });
+
+  let graph;
+  try {
+    graph = JSON.parse(result.stdout);
+  } catch (error) {
+    throw new Error(
+      `failed to parse moon action graph for ${target}: ${formatError(error)}\n` +
+        result.stdout.slice(0, 1000),
+    );
+  }
+
+  const targetOf = new Map();
+  for (const [index, node] of Object.entries(graph.data ?? {})) {
+    if (node.action === "run-task") {
+      targetOf.set(Number(index), node.params.target);
+    }
+  }
+  const waitsFor = new Map([...targetOf.values()].map((runTarget) => [runTarget, new Set()]));
+  for (const [from, to] of graph.graph?.edges ?? []) {
+    if (targetOf.has(from) && targetOf.has(to)) {
+      waitsFor.get(targetOf.get(from)).add(targetOf.get(to));
+    }
+  }
+  return waitsFor;
 }
 
 function indexTasks(graph) {
@@ -193,6 +274,79 @@ function assertReleaseBuildCleans(tasks, target) {
   if (!script.includes("release-clean.mjs local-dist")) {
     throw new Error(`${target} must clean local dist inside build-release`);
   }
+}
+
+// A normal build's dep on another package's build means it reads that
+// package's dist, so the release build must wait for the release build that
+// rewrites it (or for the normal build, for a package without one).
+function assertMirrorsNormalBuildEdges(tasks, target, normalBuildDeps) {
+  const buildTarget = normalBuildTargetFor(target);
+  if (!normalBuildDeps.has(buildTarget)) {
+    throw new Error(`moon build tasks are missing ${buildTarget}`);
+  }
+  for (const dep of normalBuildDeps.get(buildTarget)) {
+    const [project, task] = dep.split(":");
+    if (task !== "build" || dep === buildTarget) {
+      continue;
+    }
+    const releaseDep = `${project}:build-release`;
+    const expected = PUBLIC_PACKAGE_BUILD_TARGETS.includes(releaseDep) ? releaseDep : dep;
+    if (!reaches(tasks, target, expected)) {
+      throw new Error(
+        `${target} must depend on ${expected}: ${buildTarget} depends on ${dep}, ` +
+          "and release builds run in parallel, so without the edge it can read " +
+          "a dist that is being rewritten.",
+      );
+    }
+  }
+}
+
+function assertReleaseBuildsStartAfterOtherWork(waitsFor, entryPoint) {
+  for (const target of [PUBLIC_AGGREGATE_TARGET, ...PUBLIC_PACKAGE_BUILD_TARGETS]) {
+    if (!waitsFor.has(target)) {
+      throw new Error(`moon action graph for ${entryPoint} is missing ${target}`);
+    }
+  }
+  const afterRelease = new Set(
+    [...waitsFor.keys()].filter((target) => reachesIn(waitsFor, target, PUBLIC_AGGREGATE_TARGET)),
+  );
+
+  for (const releaseBuild of PUBLIC_PACKAGE_BUILD_TARGETS) {
+    const before = reachableFrom(waitsFor, releaseBuild);
+    for (const other of waitsFor.keys()) {
+      if (
+        PUBLIC_PACKAGE_BUILD_TARGETS.includes(other) ||
+        afterRelease.has(other) ||
+        other.startsWith("release:") ||
+        before.has(other)
+      ) {
+        continue;
+      }
+      throw new Error(
+        `${releaseBuild} can run beside ${other} in ${entryPoint}; release builds ` +
+          "rewrite package dist directories in place, so the other work of the " +
+          "run must finish before the first one starts.",
+      );
+    }
+  }
+}
+
+function reachableFrom(waitsFor, start) {
+  const seen = new Set();
+  const pending = [...(waitsFor.get(start) ?? [])];
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (seen.has(current)) {
+      continue;
+    }
+    seen.add(current);
+    pending.push(...(waitsFor.get(current) ?? []));
+  }
+  return seen;
+}
+
+function reachesIn(waitsFor, start, target) {
+  return start === target || reachableFrom(waitsFor, start).has(target);
 }
 
 function directDeps(tasks, target) {
