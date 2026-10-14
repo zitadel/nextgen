@@ -665,11 +665,21 @@ describe("setup command", () => {
     const res = await setup(cwd);
 
     expect(res.exitCode).toBe(3);
-    const json = parseJson(res.stdout) as { status: string; code: string; hint: string };
+    const json = parseJson(res.stdout) as {
+      status: string;
+      code: string;
+      hint: string;
+      next_commands?: string[];
+      details?: { frameworks?: string[] };
+    };
     expect(json.status).toBe("error");
     expect(json.code).toBe("E_FRAMEWORK_NOT_DETECTED");
-    expect(json.hint).toContain("Run without --json/--non-interactive");
-    expect(json.hint).not.toContain("next");
+    // Every choice, not a prompt the caller cannot see. And no rerun: the
+    // suggested command pins `--server local`, which this run did not ask for.
+    expect(json.hint).toContain("only in a terminal");
+    expect(json.hint).toContain("next, nuxt");
+    expect(json.details?.frameworks).toContain("next");
+    expect(json.next_commands ?? []).toEqual([]);
   });
 
   it("reproduces a non-default --use-case in the retry guidance when project creation fails", async () => {

@@ -1,11 +1,13 @@
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import { buildSummary } from "../../../../src/commands/setup/index";
+import { bundledServerVersion } from "../../../../src/lib/local-server/binary";
 import {
   localContainerName,
   localRuntimePaths,
@@ -104,6 +106,84 @@ describe("setup command pre-flight", () => {
     // so a non-interactive run only lacks the framework to scaffold.
     expect(json.hint).toContain("--framework");
     expect(json.hint).not.toContain("--force");
+  });
+
+  it("names every framework and the rerun when there is nobody to ask", async () => {
+    // What a coding agent meets when it runs the quickstart's `setup --server
+    // local` as written: no terminal, so no prompt, and no flag saying so.
+    const cwd = await makeTempDir();
+    const serverUrl = await startHealthServer();
+    await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
+
+    const res = await runCliForTest(["setup", "--cwd", cwd, "--server", "local"]);
+
+    expect(res.exitCode).toBe(3);
+    expect(res.stderr).toContain("only in a terminal");
+    expect(res.stderr).not.toContain("Run without --json/--non-interactive");
+    for (const framework of ["next", "nuxt", "react", "vue", "angular"]) {
+      expect(res.stderr).toContain(framework);
+    }
+    expect(res.stderr).toContain(expectedPublicCliCommand("setup --framework next --server local"));
+  });
+
+  it("refuses a local server another CLI release started, before writing anything", async () => {
+    const cwd = await makeTempDir();
+    const serverUrl = await startHealthServer();
+    await writeRuntimeMetadata(cwd, binaryRuntimeFor(cwd, serverUrl, "0.0.1"));
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--framework",
+      "next",
+      "--server",
+      "local",
+      "--non-interactive",
+      "--json",
+    ]);
+
+    expect(res.exitCode).toBe(5);
+    const json = parseJson(res.stdout) as {
+      code: string;
+      message: string;
+      hint?: string;
+      next_commands?: string[];
+      details?: Record<string, unknown>;
+    };
+    expect(json.code).toBe("E_CONFLICT");
+    expect(json.message).toBe(
+      `The local Zitadel server runs 0.0.1, but this CLI ships ${String(bundledServerVersion())}`,
+    );
+    expect(json.hint).toContain("Run start to restart it");
+    expect(json.next_commands).toEqual([
+      expectedPublicCliCommand("start"),
+      expectedPublicCliCommand("setup --framework next --non-interactive --server local"),
+    ]);
+    expect(json.details).toMatchObject({ server_url: serverUrl, server_version: "0.0.1" });
+    // Nothing scaffolded and no project files: only the runtime `start` left.
+    expect(await readdir(cwd)).toEqual([".zitadel"]);
+  });
+
+  it("goes on against a local server of this CLI's own version", async () => {
+    const cwd = await makeTempDir();
+    const serverUrl = await startHealthServer();
+    const version = bundledServerVersion();
+    expect(version).toBeDefined();
+    await writeRuntimeMetadata(cwd, binaryRuntimeFor(cwd, serverUrl, String(version)));
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--server",
+      "local",
+      "--non-interactive",
+      "--json",
+    ]);
+
+    // Past the version check: what stops it now is the missing --framework.
+    expect(parseJson(res.stdout)).toMatchObject({ code: "E_FRAMEWORK_NOT_DETECTED" });
   });
 
   it("keeps the framework in local-runtime-missing setup guidance", async () => {
@@ -644,6 +724,42 @@ describe("setup --renderer surface", () => {
   });
 });
 
+describe("setup summary", () => {
+  type SummaryInput = Parameters<typeof buildSummary>[0];
+  const input: Omit<SummaryInput, "scaffoldedFramework" | "scaffoldedBesideFiles"> = {
+    projectFacts: { framework: "next", typescript: true, packageManager: "npm" },
+    writtenRel: [],
+    depsAdded: [],
+    project: { id: "proj_test" } as SummaryInput["project"],
+    server: "http://localhost:8080",
+    issuer: "http://localhost:3000",
+    sso: [],
+  };
+  const scaffoldRow = (over: Pick<SummaryInput, "scaffoldedFramework" | "scaffoldedBesideFiles">) =>
+    buildSummary({ ...input, ...over })
+      .find((section) => section.title === "Detected")
+      ?.rows.find((row) => row.label === "Scaffold");
+
+  it("calls a scaffold a new project, without claiming the directory was empty", () => {
+    // The directory `start` ran in still holds its runtime and .gitignore.
+    expect(scaffoldRow({ scaffoldedFramework: true, scaffoldedBesideFiles: false })?.value).toBe(
+      "new project",
+    );
+  });
+
+  it("says when --force scaffolded over files the directory already held", () => {
+    expect(scaffoldRow({ scaffoldedFramework: true, scaffoldedBesideFiles: true })?.value).toBe(
+      "new project over existing files (--force)",
+    );
+  });
+
+  it("has no scaffold row for an app that already existed", () => {
+    expect(
+      scaffoldRow({ scaffoldedFramework: false, scaffoldedBesideFiles: false }),
+    ).toBeUndefined();
+  });
+});
+
 async function startHealthServer(): Promise<string> {
   const server = createServer((req, res) => {
     if (req.url === "/healthz") {
@@ -751,5 +867,23 @@ function runtimeFor(cwd: string, serverUrl: string): RuntimeMetadata {
     data_dir: localRuntimePaths(cwd).dataDir,
     created_at: "2026-06-09T00:00:00.000Z",
     cli_version: "0.0.0-test",
+  };
+}
+
+/** A binary runtime as `start` records it, running `serverVersion`. */
+function binaryRuntimeFor(cwd: string, serverUrl: string, serverVersion: string): RuntimeMetadata {
+  return {
+    schema_version: 1,
+    backend: "binary",
+    pid: process.pid,
+    command: process.execPath,
+    log_path: localRuntimePaths(cwd).logFile,
+    server_package: "@zitadel/server",
+    server_version: serverVersion,
+    port: Number(new URL(serverUrl).port),
+    server_url: serverUrl,
+    data_dir: localRuntimePaths(cwd).dataDir,
+    created_at: "2026-06-09T00:00:00.000Z",
+    cli_version: serverVersion,
   };
 }

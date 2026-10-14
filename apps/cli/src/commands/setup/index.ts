@@ -14,6 +14,7 @@ import {
 } from "@zitadel/config/defaults";
 import { credentialVariables, idpProvider, IDP_PROVIDERS } from "@zitadel/config/idp";
 import { consola } from "consola";
+import semver from "semver";
 
 import { createZitadelClient } from "../../lib/api-client";
 import { isDevelopmentBuild } from "../../lib/build-channel";
@@ -42,7 +43,8 @@ import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from ".
 import { serverKind } from "../../lib/oclif/server-kind";
 import { findLocalAdminFor } from "../../lib/local-server/admin-credential";
 import { claimProjectAsAdmin } from "../../lib/local-server/claim-as-admin";
-import { readPlatformRuntime } from "../../lib/local-server/runtime";
+import { bundledServerVersion } from "../../lib/local-server/binary";
+import { readNearestRuntimeMetadata, readPlatformRuntime } from "../../lib/local-server/runtime";
 import { readZitadelSecret, writeZitadelSecret } from "../../lib/project";
 import {
   createOrca,
@@ -199,6 +201,14 @@ export default class Setup extends BaseCommand {
         hint: "Move the secret aside or restore zitadel.json before running setup.",
       });
     }
+    // Before anything is detected, created or written: a server another CLI
+    // release left running fails setup halfway, after the project exists.
+    await assertLocalServerVersion(
+      cwd,
+      this.meta.source,
+      retryOptionsFromFlags(flags),
+      this.config.version,
+    );
 
     // Resolved before anything is detected, created or written: an
     // inconsistent set of --sso flags is a mistake in the command line, and
@@ -211,6 +221,9 @@ export default class Setup extends BaseCommand {
     consola.start(`Detecting framework in ${shortPath(cwd)}`);
     let framework: FrameworkFacts;
     let scaffoldedFramework = false;
+    // Whether `--force` scaffolded beside entries the directory already held,
+    // other than the local runtime `start` leaves, which counts as empty.
+    let scaffoldedBesideFiles = false;
     try {
       framework = await orca.detect(cwd, flags.framework);
       consola.success(
@@ -229,10 +242,15 @@ export default class Setup extends BaseCommand {
         );
         framework = await orca.scaffold(
           cwd,
-          await resolveScaffoldFramework(flags.framework, nonInteractive, orca),
+          await resolveScaffoldFramework(flags.framework, nonInteractive, orca, {
+            retry: retryOptionsFromFlags(flags),
+            serverFlag: this.meta.serverFlag,
+            cliVersion: this.config.version,
+          }),
           force,
         );
         scaffoldedFramework = true;
+        scaffoldedBesideFiles = !target.scaffoldable;
         consola.success(`Scaffolded ${framework.id} skeleton`);
       } else {
         throw error;
@@ -285,6 +303,7 @@ export default class Setup extends BaseCommand {
       const promptCtx = {
         framework,
         cwd,
+        frameworkChosen: scaffoldedFramework || flags.framework !== undefined,
         serverFlag: this.meta.serverFlag,
         devPortFromFlag: flags["dev-port"] !== undefined,
         presetFromFlag: flags.preset !== undefined,
@@ -660,6 +679,7 @@ export default class Setup extends BaseCommand {
         server: answers.server,
         issuer,
         scaffoldedFramework,
+        scaffoldedBesideFiles,
         sso: answers.sso,
       });
       // Frame the report in a consola box so it reads as a distinct
@@ -798,13 +818,34 @@ async function resolveScaffoldFramework(
   framework: string | undefined,
   nonInteractive: boolean,
   orca: Orca,
+  guidance: { retry: SetupRetryOptions; serverFlag?: string; cliVersion: string },
 ): Promise<string> {
   if (framework) {
     return framework;
   }
   if (nonInteractive) {
+    // Most often a coding agent or CI: no terminal, and no flag saying so. So
+    // the error names every choice instead of pointing at a prompt it can't
+    // see, and for a local server hands over the exact rerun. Only then:
+    // `setupRetryFlags` pins `--server local`.
+    const choices = orca.availableFrameworks().map((choice) => choice.id);
+    const suggested = choices.includes("next") ? "next" : choices[0];
     throw new ZitadelError("E_FRAMEWORK_NOT_DETECTED", "Empty directory — pass --framework", {
-      hint: "Run without --json/--non-interactive to choose from a prompt, or pass --framework for scripted setup.",
+      hint: (
+        "Setup asks which framework to scaffold only in a terminal. Without one, or with " +
+        `--json or --non-interactive, pass --framework with one of: ${choices.join(", ")}. ` +
+        runFromHint(guidance.retry)
+      ).trimEnd(),
+      nextCommands:
+        guidance.serverFlag === "local" && suggested
+          ? [
+              publicCliCommand(
+                `setup ${setupRetryFlags({ ...guidance.retry, framework: suggested })}`,
+                guidance.cliVersion,
+              ),
+            ]
+          : [],
+      details: { frameworks: choices },
     });
   }
   return new PickFrameworkPrompt().ask(orca.availableFrameworks());
@@ -1149,6 +1190,64 @@ function defaultProjectName(cwd: string, framework: string): string {
   return fromDirectory.length > 0 ? fromDirectory : `zitadel-${framework}-app`;
 }
 
+/**
+ * Refuses a local server that another CLI release started. `start` restarts
+ * such a server, but one left running stays that release's until `start` runs
+ * again, and its API is that release's: setup would create the project, then
+ * fail uploading the default schema and flow, and `--force` would not help.
+ *
+ * Only a binary runtime records the version it runs, and only release versions
+ * are compared: an override records `override`, which says nothing about its
+ * API. An unreadable `runtime.json` is doctor's to report, not setup's.
+ */
+async function assertLocalServerVersion(
+  cwd: string,
+  server: string,
+  retry: SetupRetryOptions,
+  cliVersion: string,
+): Promise<void> {
+  let nearest: Awaited<ReturnType<typeof readNearestRuntimeMetadata>>;
+  try {
+    nearest = await readNearestRuntimeMetadata(cwd);
+  } catch {
+    return;
+  }
+  const runtime = nearest?.runtime;
+  if (!nearest || runtime?.backend !== "binary" || runtime.server_url !== server) {
+    return;
+  }
+  const expected = bundledServerVersion();
+  if (
+    expected === undefined ||
+    !semver.valid(expected) ||
+    !semver.valid(runtime.server_version) ||
+    runtime.server_version === expected
+  ) {
+    return;
+  }
+  const where =
+    nearest.dir === cwd ? "" : `Run start in ${nearest.dir}, where the server was started. `;
+  throw new ZitadelError(
+    "E_CONFLICT",
+    `The local Zitadel server runs ${runtime.server_version}, but this CLI ships ${expected}`,
+    {
+      hint:
+        "A server another CLI release started serves that release's API, so setup would stop " +
+        `halfway. Run start to restart it on ${expected}; its data stays. ${where}` +
+        `Then rerun setup. ${runFromHint(retry)}`.trimEnd(),
+      nextCommands: [
+        publicCliCommand("start", cliVersion),
+        publicCliCommand(`setup ${setupRetryFlags(retry)}`, cliVersion),
+      ],
+      details: {
+        server_url: runtime.server_url,
+        server_version: runtime.server_version,
+        cli_server_version: expected,
+      },
+    },
+  );
+}
+
 function localSetupHint(error: unknown, retry: SetupRetryOptions, cliVersion: string): unknown {
   const normalized = toZitadelError(error);
   if (normalized.code !== "E_LOCAL_SERVER_NOT_RUNNING") {
@@ -1252,8 +1351,11 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
   "package.json": { subject: "package.json with the SDK dependency" },
 };
 
-/** Builds the section list driving {@link renderSummary} for the setup command. */
-function buildSummary(opts: {
+/**
+ * Builds the section list driving {@link renderSummary} for the setup command.
+ * Exported so its wording is unit-tested.
+ */
+export function buildSummary(opts: {
   projectFacts: Awaited<ReturnType<typeof detectProjectFacts>>;
   writtenRel: string[];
   depsAdded: ReadonlyArray<string>;
@@ -1261,6 +1363,7 @@ function buildSummary(opts: {
   server: string;
   issuer: string;
   scaffoldedFramework: boolean;
+  scaffoldedBesideFiles: boolean;
   sso: readonly SsoAnswer[];
 }): Section[] {
   const { projectFacts, writtenRel, depsAdded, project, server, issuer, scaffoldedFramework, sso } =
@@ -1269,7 +1372,12 @@ function buildSummary(opts: {
 
   const detected: Row[] = [{ label: "Framework", value: formatFrameworkLine(projectFacts) }];
   if (scaffoldedFramework) {
-    detected.push({ label: "Scaffold", value: "fresh project (no existing files)" });
+    detected.push({
+      label: "Scaffold",
+      value: opts.scaffoldedBesideFiles
+        ? "new project over existing files (--force)"
+        : "new project",
+    });
   }
 
   const installedRows: Row[] = [];
