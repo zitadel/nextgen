@@ -82,8 +82,10 @@ for (const method of ["error", "warn"] as const) {
 vi.mock("./router", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./router")>();
   const { createMemoryHistory } = await import("@tanstack/react-router");
-  const routes = actual.createAppRouter({ history: createMemoryHistory() });
-  await Promise.all(Object.values(routes.routesById).map((route) => routes.loadRouteChunk(route)));
+  const preloadRouter = actual.createAppRouter({ history: createMemoryHistory() });
+  await Promise.all(
+    Object.values(preloadRouter.routesById).map((route) => preloadRouter.loadRouteChunk(route)),
+  );
   return {
     ...actual,
     createAppRouter: (...args: Parameters<typeof actual.createAppRouter>) => {
