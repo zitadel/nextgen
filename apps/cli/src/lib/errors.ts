@@ -118,8 +118,14 @@ export function toZitadelError(error: unknown): ZitadelError {
     // A 409 is the platform refusing because of the state it holds — a
     // release still served, a deploy that raced in, a revoked release — not
     // because the request was malformed, so it is a conflict.
-    const code: ZitadelErrorCode =
-      error.status === 401 || error.status === 403
+    // A 403 naming an origin the project does not hold is a refused target,
+    // not a bad credential: re-authenticating would never fix it.
+    const originRefused =
+      error.status === 403 &&
+      (error.body as { code?: unknown } | undefined)?.code === "proj.origin_not_allowed";
+    const code: ZitadelErrorCode = originRefused
+      ? "E_VALIDATION"
+      : error.status === 401 || error.status === 403
         ? "E_AUTH"
         : error.status === 409
           ? "E_CONFLICT"

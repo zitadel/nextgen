@@ -1,3 +1,5 @@
+import { join } from "node:path";
+import { existsSync } from "node:fs";
 import { Flags } from "@oclif/core";
 import consola from "consola";
 
@@ -141,14 +143,22 @@ export default class Doctor extends BaseCommand {
       envName: typeof flags.env === "string" ? flags.env : undefined,
       server: typeof flags.server === "string" ? flags.server : undefined,
     });
-    // The claim check reads the local `.zitadel/secret`, which is the default
-    // environment's project, so the claim it suggests keeps only `--cwd` and
-    // `--server` (where doctor checked it): this run's `--env` or `--env-file`
-    // would claim a different project.
+    // The claim check reads the local `.zitadel/secret`, which is setup's
+    // project, so the claim it suggests is pinned to the file setup wrote for
+    // it, as setup's own claim suggestion is: this run's `--env`, or a
+    // production project exported in the shell, would claim a different one.
+    // `--env-file` outranks the process environment; without that file only
+    // `--cwd` and `--server` (where doctor checked it) are carried.
     const warningAdvice = advisoryForWarnings(
       warnings,
       this.meta.cliVersion,
-      environmentSelectorSuffix({ cwd: cwdFlag, server: serverFlag }),
+      environmentSelectorSuffix({
+        cwd: cwdFlag,
+        server: serverFlag,
+        ...(existsSync(join(cwd, ".env.development.local"))
+          ? { envFile: ".env.development.local" }
+          : {}),
+      }),
     );
     this.recordTelemetry({
       runtime: runtimeBackend,

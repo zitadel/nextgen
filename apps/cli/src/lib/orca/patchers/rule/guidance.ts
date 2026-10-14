@@ -102,7 +102,7 @@ The golden path:
 4. Preview, then publish:
    - \`${deployDryRun}\`
    - \`${deploy}\`
-   - Agents: run both non-interactively with \`--non-interactive --json\`; the publish also needs \`-m "<why this release changes>"\`, because a non-interactive \`deploy\` requires a message (\`--dry-run\` is exempt). \`deploy --dry-run\` validates flow invariants with the server's own rules and shows the diff **before** anything uploads — fix what it reports and re-run.
+   - Agents: run both with \`--non-interactive\`; the publish also needs \`-m "<why this release changes>"\`, because a non-interactive \`deploy\` requires a message (\`--dry-run\` is exempt). \`deploy --dry-run\` validates flow invariants with the server's own rules and prints the diff **before** anything uploads — fix what it reports and re-run. Leave \`--json\` off the dry run to see that diff: its envelope carries only what would be published.
 
 ${presentationParagraph}${jsxTypesNote}
 
