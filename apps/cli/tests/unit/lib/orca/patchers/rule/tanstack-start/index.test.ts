@@ -90,7 +90,7 @@ describe("TanStackStartPatcher.plan", () => {
     const profile = writeContents(new TanStackStartPatcher().plan(ctx()), "src/routes/profile.tsx");
 
     expect(profile).toContain(
-      "const fetchAuth = createServerFn().handler(({ context }) => getAuth(context));",
+      "const fetchAuth = createServerFn().handler(({ context }) => getClientAuth(context));",
     );
   });
 
