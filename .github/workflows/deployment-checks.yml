@@ -135,7 +135,7 @@ jobs:
         run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
 
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
@@ -260,7 +260,7 @@ jobs:
         run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
 
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}

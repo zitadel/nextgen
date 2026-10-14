@@ -150,7 +150,7 @@ jobs:
 
       - name: Cache Playwright browsers
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.browsers == 'true' }}
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
@@ -199,7 +199,7 @@ jobs:
 
       - name: Cache journey registry packages
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ runner.temp }}/journey-verdaccio-storage
           key: journey-verdaccio-${{ runner.os }}-${{ github.run_id }}
