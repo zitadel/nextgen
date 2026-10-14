@@ -1,10 +1,8 @@
 import { Flags } from "@oclif/core";
-import { cancel, confirm, isCancel } from "@clack/prompts";
 
 import { CommandGroups, type JsonEnvelope, nonBlankArg, PreviewCommand } from "../../lib/oclif";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { deletedData } from "../../lib/oclif/envelope";
-import { ZitadelError } from "../../lib/errors";
 import { publicCliCommand } from "../../lib/public-cli";
 import { shellArg } from "../../lib/shell";
 
@@ -37,7 +35,7 @@ export default class PreviewRm extends PreviewCommand {
   async run(): Promise<JsonEnvelope> {
     const { args, flags } = await this.parse(PreviewRm);
     await this.toMeta(flags);
-    const { nonInteractive, dryRun, force, cliVersion } = this.meta;
+    const { dryRun, cliVersion } = this.meta;
     const url = args.url;
 
     // A dry run makes no request, so it answers before the connection — the
@@ -48,29 +46,17 @@ export default class PreviewRm extends PreviewCommand {
       return this.emit({ ...preview, pretty: `${preview.pretty} from the project` });
     }
 
-    if (!force) {
-      if (nonInteractive) {
-        const retry = publicCliCommand(
-          `preview rm ${shellArg(url)} --force${this.environmentSelector()}`,
-          cliVersion,
-        );
-        throw new ZitadelError(
-          "E_VALIDATION",
-          "Removing a preview requires --force in non-interactive mode",
-          {
-            hint: `Pass --force to remove ${url} from the project.`,
-            nextCommands: [retry],
-          },
-        );
-      }
-      const answer = await confirm({
-        message: `Remove ${url} from the project?`,
-        initialValue: false,
-      });
-      if (isCancel(answer) || !answer) {
-        cancel("Remove cancelled.");
-        return this.emit({ status: "skipped", reason: "remove-cancelled" });
-      }
+    const confirmed = await this.input({
+      kind: "confirm",
+      name: `remove ${url} from the project`,
+      message: `Remove ${url} from the project?`,
+      retry: publicCliCommand(
+        `preview rm ${shellArg(url)} --force${this.environmentSelector()}`,
+        cliVersion,
+      ),
+    });
+    if (!confirmed) {
+      return this.emit({ status: "skipped", reason: "remove-cancelled" });
     }
 
     const { client, projectId } = await this.connect();
