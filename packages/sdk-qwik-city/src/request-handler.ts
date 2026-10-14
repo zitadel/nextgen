@@ -265,6 +265,7 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
       ev.sharedMap.set(SHARED_MAP_KEY, {
         isAuthenticated: false,
         session: null,
+        reason: "unavailable",
       } satisfies AuthResult);
       if (matchesRoutes(pathname, protectedRoutes)) {
         ev.send(sessionUnavailableResponse());
@@ -340,7 +341,7 @@ export function createNextgenOnRequest(
   } = options;
 
   // Guard against open-redirect: loginPath must be a path on this app.
-  assertLoginPath(loginPath);
+  assertLoginPath(loginPath, { protectedRoutes, ignoredRoutes });
 
   return async (ev: QwikRequestEvent): Promise<void> => {
     const { pathname } = ev.url;
@@ -390,7 +391,11 @@ export function createNextgenOnRequest(
  *
  * export const useUser = routeLoader$((ev) => {
  *   const auth = getAuth(ev);
- *   if (!auth.isAuthenticated) throw ev.redirect(302, "/login");
+ *   if (!auth.isAuthenticated) {
+ *     // Zitadel could not be asked: an outage, not a sign-out.
+ *     if (auth.reason === "unavailable") throw ev.error(503, "Try again shortly");
+ *     throw ev.redirect(302, "/login");
+ *   }
  *   return auth.session.userId;
  * });
  * ```

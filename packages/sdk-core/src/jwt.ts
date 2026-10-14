@@ -92,6 +92,10 @@
  * after the last fetch. The `kid` header is attacker-controlled, so a per-`kid`
  * cache would let any request with a made-up `kid` cost a JWKS fetch.
  *
+ * A refresh that fails (a `5xx`, a timeout, a refused connection) keeps the
+ * keys already cached, is logged once, and is not retried for
+ * {@link JWKS_FAILURE_BACKOFF_MS}.
+ *
  * > **Note (serverless):** the cache is module-level. In serverless environments
  * > each cold start gets a fresh cache; warm instances share it across requests.
  *
@@ -118,6 +122,13 @@ export const JWKS_TTL_MS = 5 * 60 * 1_000;
  * `kid` values cannot turn every request into a JWKS fetch.
  */
 export const JWKS_MIN_REFRESH_MS = 30 * 1_000;
+
+/**
+ * How long after a failed JWKS refresh (a 5xx, a timeout, a refused
+ * connection) the endpoint is left alone: verification uses the keys already
+ * cached, without fetching again or logging again, until this has passed.
+ */
+export const JWKS_FAILURE_BACKOFF_MS = 5_000;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -263,13 +274,18 @@ const jwksCache = new Map<string, JwksCacheEntry>();
 /** In-flight JWKS fetches by URI, so concurrent misses share one request. */
 const jwksInFlight = new Map<string, Promise<JwksCacheEntry | null>>();
 
+/** When each JWKS URI last failed to refresh (see {@link JWKS_FAILURE_BACKOFF_MS}). */
+const jwksFailedAt = new Map<string, number>();
+
 /**
- * Forgets every cached JWKS document, so the next verification fetches the key
- * set anew. Use it to drop a compromised key at once instead of waiting out
- * {@link JWKS_TTL_MS}, and in tests that publish different keys per case.
+ * Forgets every cached JWKS document and every failed refresh, so the next
+ * verification fetches the key set anew. Use it to drop a compromised key at
+ * once instead of waiting out {@link JWKS_TTL_MS}, and in tests that publish
+ * different keys per case.
  */
 export function clearJwksCache(): void {
   jwksCache.clear();
+  jwksFailedAt.clear();
 }
 
 const DECODER = new TextDecoder();
@@ -457,15 +473,34 @@ function refreshJwks(jwksUri: string, timeoutMs: number): Promise<JwksCacheEntry
   if (pending) {
     return pending;
   }
+  const failedAt = jwksFailedAt.get(jwksUri);
+  if (failedAt !== undefined && Date.now() - failedAt < JWKS_FAILURE_BACKOFF_MS) {
+    return Promise.resolve(null);
+  }
+  // A failed refresh — a 5xx, a timeout, a refused connection, an unreadable
+  // body — falls back to the keys already cached, rather than rejecting every
+  // token until the endpoint answers again. It is logged once and not retried
+  // for JWKS_FAILURE_BACKOFF_MS, so an outage neither costs every request the
+  // JWKS timeout nor floods the log, and operators can still tell an
+  // infrastructure failure from a bad token.
+  const failed = (why: string): null => {
+    jwksFailedAt.set(jwksUri, Date.now());
+    console.error(
+      `[nextgen] could not refresh the JWKS at ${jwksUri}: ${why}. Tokens are verified ` +
+        `against the keys already cached, and the JWKS is not fetched again for ` +
+        `${JWKS_FAILURE_BACKOFF_MS}ms.`,
+    );
+    return null;
+  };
   const request = (async () => {
     try {
       const res = await fetch(jwksUri, { signal: AbortSignal.timeout(timeoutMs) });
       if (!res.ok) {
-        return null;
+        return failed(`HTTP ${res.status}`);
       }
       const json = (await res.json()) as { keys?: unknown };
       if (!Array.isArray(json.keys)) {
-        return null;
+        return failed("the response has no key set");
       }
       const entry: JwksCacheEntry = {
         keys: json.keys as Jwk[],
@@ -473,15 +508,14 @@ function refreshJwks(jwksUri: string, timeoutMs: number): Promise<JwksCacheEntry
         imported: new Map(),
       };
       jwksCache.set(jwksUri, entry);
+      jwksFailedAt.delete(jwksUri);
       return entry;
     } catch (err) {
-      // A timeout, a refused connection or an unreadable body is a failed
-      // refresh like a 5xx: the caller falls back to the keys it already has,
-      // rather than rejecting every token until the endpoint answers again.
-      // Still logged, so operators can tell an infrastructure failure from a
-      // bad token.
-      console.error("[nextgen] verifyJwt unexpected error:", err);
-      return null;
+      return failed(
+        (err as { name?: unknown } | null)?.name === "TimeoutError"
+          ? `no answer within ${timeoutMs}ms`
+          : String(err),
+      );
     } finally {
       jwksInFlight.delete(jwksUri);
     }

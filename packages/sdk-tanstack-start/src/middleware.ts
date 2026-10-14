@@ -192,7 +192,7 @@ export async function handleNextgenRequest(
   // Guard against open-redirect: loginPath must be a path on this app.
   // createNextgenRequestMiddleware checks it once at setup; a direct call
   // checks it here.
-  assertLoginPath(loginPath);
+  assertLoginPath(loginPath, { protectedRoutes, ignoredRoutes });
 
   const url2 = new URL(request.url);
   const { pathname } = url2;
@@ -277,7 +277,10 @@ export async function handleNextgenRequest(
       // survives the outage; a protected route is retryable, not a sign-in.
       return matchesRoutes(pathname, protectedRoutes)
         ? { type: "unavailable", response: sessionUnavailableResponse() }
-        : { type: "continue", auth: { isAuthenticated: false, session: null } };
+        : {
+            type: "continue",
+            auth: { isAuthenticated: false, session: null, reason: "unavailable" },
+          };
     }
   }
 
@@ -356,7 +359,7 @@ export function createNextgenRequestMiddleware(
   options: NextgenRequestOptions = {},
 ): (ctx: RequestMiddlewareContext) => Promise<Response> {
   // Fail at setup, not with a 500 on every request.
-  assertLoginPath(options.loginPath ?? "/login");
+  assertLoginPath(options.loginPath ?? "/login", options);
   return async ({ request, next }: RequestMiddlewareContext): Promise<Response> => {
     const clientAddress = options.clientAddress ?? request.headers.get("x-real-ip") ?? undefined;
     const decision = await handleNextgenRequest(request, { ...options, clientAddress });

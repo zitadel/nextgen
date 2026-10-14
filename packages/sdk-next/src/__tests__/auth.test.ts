@@ -110,13 +110,49 @@ beforeEach(() => {
   vi.resetModules();
 });
 
-afterEach(() => {
+afterEach(async () => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
+  const { clearSessionCheckBackoff } = await import("@zitadel/sdk-core/middleware");
+  clearSessionCheckBackoff();
 });
 
 describe("auth()", () => {
+  it("reports an unavailable session when the middleware could not check it", async () => {
+    mockHeadersMap.set("x-nextgen-auth-token", "");
+    mockHeadersMap.set("x-nextgen-auth-state", "unavailable");
+
+    const auth = await importAuth();
+
+    expect(await auth({ url: ISSUER })).toEqual({
+      isAuthenticated: false,
+      session: null,
+      reason: "unavailable",
+    });
+  });
+
+  it("does not report a session as unavailable without the middleware saying so", async () => {
+    mockHeadersMap.set("x-nextgen-auth-token", "");
+
+    const auth = await importAuth();
+
+    expect(await auth({ url: ISSUER })).toEqual({ isAuthenticated: false, session: null });
+  });
+
+  it("reports a gateway's HTML 401 as unavailable, not signed out", async () => {
+    routeFetch(nextKid(), () => new Response("<html>401</html>", { status: 401 }));
+    mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
+
+    const auth = await importAuth();
+
+    expect(await auth({ url: ISSUER })).toEqual({
+      isAuthenticated: false,
+      session: null,
+      reason: "unavailable",
+    });
+  });
+
   it("returns unauthenticated when the x-nextgen-auth-token header is absent", async () => {
     const auth = await importAuth();
     expect(await auth({ url: ISSUER })).toEqual({ isAuthenticated: false, session: null });
@@ -217,7 +253,9 @@ describe("auth()", () => {
   // ── Opaque path: backend validation, not blind trust ─────────────────
 
   it("rejects a random opaque header value the backend does not know", async () => {
-    routeFetch(nextKid(), () => jsonResponse({ error: "unauthenticated" }, 401));
+    routeFetch(nextKid(), () =>
+      jsonResponse({ code: "auth.unauthorized", message: "unauthenticated" }, 401),
+    );
     mockHeadersMap.set("x-nextgen-auth-token", "attacker-supplied-junk");
 
     const auth = await importAuth();
@@ -296,8 +334,14 @@ describe("auth()", () => {
     mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
 
     const auth = await importAuth();
-    expect(await auth({ url: ISSUER })).toEqual({ isAuthenticated: false, session: null });
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("could not validate"));
+    expect(await auth({ url: ISSUER })).toEqual({
+      isAuthenticated: false,
+      session: null,
+      reason: "unavailable",
+    });
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining("could not check the session"),
+    );
   });
 
   it("fails closed and warns when the backend is unreachable", async () => {
@@ -305,8 +349,14 @@ describe("auth()", () => {
     mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
 
     const auth = await importAuth();
-    expect(await auth({ url: ISSUER })).toEqual({ isAuthenticated: false, session: null });
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("could not validate"));
+    expect(await auth({ url: ISSUER })).toEqual({
+      isAuthenticated: false,
+      session: null,
+      reason: "unavailable",
+    });
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining("could not check the session"),
+    );
   });
 
   it("aborts opaque validation after opaqueTokenTimeoutMs and fails closed", async () => {
@@ -325,8 +375,10 @@ describe("auth()", () => {
     const auth = await importAuth();
     const result = await auth({ url: ISSUER, opaqueTokenTimeoutMs: 5 });
 
-    expect(result).toEqual({ isAuthenticated: false, session: null });
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("could not validate"));
+    expect(result).toEqual({ isAuthenticated: false, session: null, reason: "unavailable" });
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining("could not check the session"),
+    );
   });
 
   it("falls back to the ZITADEL_URL environment variable for the backend URL", async () => {

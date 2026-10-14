@@ -8,16 +8,24 @@
  */
 
 import { generateKeyPairSync, createSign } from "node:crypto";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { handleNextgenRequest, createNextgenRequestMiddleware, getAuth } from "../middleware";
 import { clearJwksCache } from "@zitadel/sdk-core/jwt";
+import { clearSessionCheckBackoff } from "@zitadel/sdk-core/middleware";
 import { DEAD, OUTAGES, PROXY_FAILURES } from "./outages";
 
-// The JWKS cache is module-level and per issuer: start every case from a cold
-// cache, so each one fetches the keys its own mock publishes.
+// The JWKS cache and the session-check backoff are module-level and per
+// issuer: start every case cold, so each one asks its own mock, and keep the
+// expected outage warnings out of the output.
 beforeEach(() => {
   clearJwksCache();
+  clearSessionCheckBackoff();
+  vi.spyOn(console, "warn").mockImplementation(() => undefined);
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 function base64url(buf: Buffer): string {
@@ -383,6 +391,28 @@ describe("handleNextgenRequest", () => {
 });
 
 describe("createNextgenRequestMiddleware", () => {
+  // A visitor without a session would be redirected from /login to /login forever.
+  it("throws at setup when protectedRoutes match the loginPath", () => {
+    expect(() =>
+      createNextgenRequestMiddleware({
+        url: "http://localhost:4000",
+        loginPath: "/login",
+        protectedRoutes: ["/*"],
+      }),
+    ).toThrow(/is matched by protectedRoutes/);
+  });
+
+  it("accepts a loginPath that ignoredRoutes exempt from protectedRoutes", () => {
+    expect(() =>
+      createNextgenRequestMiddleware({
+        url: "http://localhost:4000",
+        loginPath: "/login",
+        protectedRoutes: ["/*"],
+        ignoredRoutes: ["/login"],
+      }),
+    ).not.toThrow();
+  });
+
   // A bad loginPath must fail once at setup, not answer every request with a 500.
   it.each(["https://evil.test/x", "//evil.test"])(
     "throws at setup on loginPath %s",
@@ -505,7 +535,7 @@ describe("opaque session cookie", () => {
   });
 
   it("clears a dead session cookie on a public page", async () => {
-    sessionsMe(new Response(null, { status: 401 }));
+    sessionsMe(Response.json({ code: "auth.unauthorized", message: "gone" }, { status: 401 }));
     const mw = createNextgenRequestMiddleware(OPTIONS);
     const next = vi.fn().mockResolvedValue({ response: new Response("page", { status: 200 }) });
 
@@ -545,7 +575,9 @@ describe("opaque session cookie", () => {
     expect([res.status, res.headers.getSetCookie(), next.mock.calls[0]?.[0]]).toEqual([
       200,
       [],
-      { context: { nextgenAuth: { isAuthenticated: false, session: null } } },
+      {
+        context: { nextgenAuth: { isAuthenticated: false, session: null, reason: "unavailable" } },
+      },
     ]);
   });
 

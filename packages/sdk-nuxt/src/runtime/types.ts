@@ -8,6 +8,7 @@ export type {
   NextgenSession,
   AuthState,
   UnauthState,
+  UnauthReason,
   AuthResult,
   NextgenMiddlewareOptions,
   // Client-safe auth shapes (token intentionally absent — it must not be

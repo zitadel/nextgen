@@ -4,12 +4,20 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { createProxy, nextgenMiddleware } from "../middleware";
 import { clearJwksCache } from "@zitadel/sdk-core/jwt";
+import { clearSessionCheckBackoff } from "@zitadel/sdk-core/middleware";
 import { DEAD, OUTAGES, PROXY_FAILURES } from "./outages";
 
-// The JWKS cache is module-level and per issuer: start every case from a cold
-// cache, so each one fetches the keys its own mock publishes.
+// The JWKS cache and the session-check backoff are module-level and per
+// issuer: start every case cold, so each one asks its own mock, and keep the
+// expected outage warnings out of the output.
 beforeEach(() => {
   clearJwksCache();
+  clearSessionCheckBackoff();
+  vi.spyOn(console, "warn").mockImplementation(() => undefined);
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", {
@@ -870,7 +878,7 @@ describe("opaque session cookie", () => {
   });
 
   it("clears a dead session cookie on a public page", async () => {
-    sessionsMe(new Response(null, { status: 401 }));
+    sessionsMe(DEAD[0]?.[1]() ?? new Response());
 
     const res = await nextgenMiddleware(makeRequest("http://localhost:3000/", COOKIE), OPTIONS);
 
@@ -895,6 +903,44 @@ describe("opaque session cookie", () => {
     const res = await nextgenMiddleware(makeRequest("http://localhost:3000/", COOKIE), OPTIONS);
 
     expect([res.status, tunnelled(res), res.headers.getSetCookie()]).toEqual([200, "", []]);
+  });
+
+  it.each(OUTAGES)("tells auth() the session is unavailable for %s", async (_l, fail) => {
+    vi.stubGlobal("fetch", vi.fn(fail));
+
+    const res = await nextgenMiddleware(makeRequest("http://localhost:3000/", COOKIE), OPTIONS);
+
+    expect(res.headers.get("x-middleware-request-x-nextgen-auth-state")).toBe("unavailable");
+  });
+
+  it("does not report a dead session as unavailable", async () => {
+    sessionsMe(DEAD[0]?.[1]() ?? new Response());
+
+    const res = await nextgenMiddleware(makeRequest("http://localhost:3000/", COOKIE), OPTIONS);
+
+    expect(res.headers.get("x-middleware-request-x-nextgen-auth-state")).toBe("");
+  });
+
+  it("overwrites a client-sent auth state on a request without a session", async () => {
+    const res = await nextgenMiddleware(
+      new NextRequest("http://localhost:3000/", {
+        headers: { "x-nextgen-auth-state": "unavailable" },
+      }),
+      OPTIONS,
+    );
+
+    expect(res.headers.get("x-middleware-request-x-nextgen-auth-state")).toBe("");
+  });
+
+  it("asks the backend once for several requests during an outage", async () => {
+    const backend = vi.fn((): Promise<Response> => Promise.reject(new TypeError("fetch failed")));
+    vi.stubGlobal("fetch", backend);
+
+    for (let i = 0; i < 3; i++) {
+      await nextgenMiddleware(makeRequest("http://localhost:3000/", COOKIE), OPTIONS);
+    }
+
+    expect(backend).toHaveBeenCalledTimes(1);
   });
 
   it.each(OUTAGES)("answers a protected route 503 for %s", async (_l, fail) => {
@@ -988,4 +1034,16 @@ describe("createProxy", () => {
       ).toThrow(/loginPath must be a relative path/);
     },
   );
+
+  // A visitor without a session would be redirected from /login to /login forever.
+  it("throws at setup when protectedRoutes match the loginPath", () => {
+    expect(() =>
+      createProxy(
+        { url: "http://localhost:4000", proxyPath: "/__nextgen" } as Parameters<
+          typeof createProxy
+        >[0],
+        { loginPath: "/login", protectedRoutes: ["/*"] },
+      ),
+    ).toThrow(/is matched by protectedRoutes/);
+  });
 });

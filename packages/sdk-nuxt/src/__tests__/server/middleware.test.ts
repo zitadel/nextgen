@@ -5,12 +5,20 @@ import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { createNextgenMiddleware } from "../../runtime/server/middleware";
 import { setRuntimeConfig } from "../stubs/nuxt-imports";
 import { clearJwksCache } from "@zitadel/sdk-core/jwt";
+import { clearSessionCheckBackoff } from "@zitadel/sdk-core/middleware";
 import { DEAD, OUTAGES, PROXY_FAILURES } from "./outages";
 
-// The JWKS cache is module-level and per issuer: start every case from a cold
-// cache, so each one fetches the keys its own mock publishes.
+// The JWKS cache and the session-check backoff are module-level and per
+// issuer: start every case cold, so each one asks its own mock, and keep the
+// expected outage warnings out of the output.
 beforeEach(() => {
   clearJwksCache();
+  clearSessionCheckBackoff();
+  vi.spyOn(console, "warn").mockImplementation(() => undefined);
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 function base64url(buf: Buffer): string {
@@ -616,7 +624,7 @@ describe("createNextgenMiddleware (H3)", () => {
   it("dead opaque session token is cleared from the browser", async () => {
     // The backend no longer knows the session (revoked or expired), so the
     // sweep must clear the cookie to stop the browser from replaying it.
-    vi.stubGlobal("fetch", mockSessionsMe({}, 401));
+    vi.stubGlobal("fetch", mockSessionsMe({ code: "auth.unauthorized", message: "gone" }, 401));
 
     const app = createApp();
     app.use(
@@ -818,6 +826,28 @@ describe("createNextgenMiddleware (H3)", () => {
   });
 
   describe("loginPath validation (P-3)", () => {
+    // A visitor without a session would be redirected from /login to /login forever.
+    it("throws at setup when protectedRoutes match the loginPath", () => {
+      expect(() =>
+        createNextgenMiddleware({
+          url: "http://localhost:4000",
+          loginPath: "/login",
+          protectedRoutes: ["/*"],
+        }),
+      ).toThrow(/is matched by protectedRoutes/);
+    });
+
+    it("accepts a loginPath that ignoredRoutes exempt from protectedRoutes", () => {
+      expect(() =>
+        createNextgenMiddleware({
+          url: "http://localhost:4000",
+          loginPath: "/login",
+          protectedRoutes: ["/*"],
+          ignoredRoutes: ["/login"],
+        }),
+      ).not.toThrow();
+    });
+
     it("throws synchronously when loginPath is an absolute URL", () => {
       expect(() =>
         createNextgenMiddleware({
@@ -1150,7 +1180,7 @@ describe("opaque session cookie: backend answers", () => {
     expect([response.status, response.headers.getSetCookie(), seen]).toEqual([
       200,
       [],
-      [{ isAuthenticated: false, session: null }],
+      [{ isAuthenticated: false, session: null, reason: "unavailable" }],
     ]);
   });
 

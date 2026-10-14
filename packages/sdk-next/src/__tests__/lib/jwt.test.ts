@@ -270,7 +270,9 @@ describe("verifyJwt", () => {
 
       expect(result).toBeNull();
       expect(spy).toHaveBeenCalledOnce();
-      expect(spy).toHaveBeenCalledWith("[nextgen] verifyJwt unexpected error:", networkError);
+      expect(spy).toHaveBeenCalledWith(
+        expect.stringContaining("could not refresh the JWKS at http://localhost:4000/auth/keys"),
+      );
     });
 
     it("uses the default 5-second timeout when jwksTimeoutMs is not set", async () => {

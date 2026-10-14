@@ -1,7 +1,13 @@
 import { createSign, generateKeyPairSync, type KeyObject } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { JWKS_MIN_REFRESH_MS, JWKS_TTL_MS, verifyJwt, type VerifyJwtOptions } from "./jwt.js";
+import {
+  JWKS_FAILURE_BACKOFF_MS,
+  JWKS_MIN_REFRESH_MS,
+  JWKS_TTL_MS,
+  verifyJwt,
+  type VerifyJwtOptions,
+} from "./jwt.js";
 
 const rsa = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const ec = generateKeyPairSync("ec", { namedCurve: "P-256" });
@@ -158,7 +164,88 @@ describe("verifyJwt JWKS caching", () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     expect(await verifyJwt(sign(issuer, "k1", "RS256", rsa.privateKey), opts(issuer))).toBeNull();
-    expect(consoleError).toHaveBeenCalledWith("[nextgen] verifyJwt unexpected error:", failure);
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining(`could not refresh the JWKS at ${issuer}/auth/keys`),
+    );
+  });
+});
+
+describe("verifyJwt JWKS refresh backoff", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** A JWKS endpoint that fails every fetch with `failure`, counting them. */
+  function failingJwks(failure: () => Promise<Response>) {
+    const fetchMock = vi.fn(failure);
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  it.each([
+    ["a 503", () => Promise.resolve(new Response(null, { status: 503 }))],
+    ["a network error", () => Promise.reject(new TypeError("fetch failed"))],
+    ["a timeout", () => Promise.reject(new DOMException("timed out", "TimeoutError"))],
+  ])("logs a failed refresh with %s once per backoff window", async (_label, failure) => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const issuer = freshIssuer();
+    failingJwks(failure);
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const token = sign(issuer, "k1", "RS256", rsa.privateKey);
+
+    for (let i = 0; i < 5; i++) {
+      await verifyJwt(token, opts(issuer));
+    }
+
+    expect(consoleError).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not fetch the JWKS again within the backoff after a failed refresh", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const issuer = freshIssuer();
+    const fetchMock = failingJwks(() => Promise.reject(new TypeError("fetch failed")));
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const token = sign(issuer, "k1", "RS256", rsa.privateKey);
+    await verifyJwt(token, opts(issuer));
+
+    vi.advanceTimersByTime(JWKS_FAILURE_BACKOFF_MS - 1);
+    await verifyJwt(token, opts(issuer));
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("fetches the JWKS again once the backoff has passed", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const issuer = freshIssuer();
+    const fetchMock = failingJwks(() => Promise.reject(new TypeError("fetch failed")));
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const token = sign(issuer, "k1", "RS256", rsa.privateKey);
+    await verifyJwt(token, opts(issuer));
+    fetchMock.mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ keys: [jwk(rsa.publicKey, { kid: "k1", alg: "RS256" })] })),
+    );
+
+    vi.advanceTimersByTime(JWKS_FAILURE_BACKOFF_MS);
+
+    expect(await verifyJwt(token, opts(issuer))).toMatchObject({ sub: "u1" });
+  });
+
+  it("keeps verifying against the cached keys without refetching during the backoff", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const issuer = freshIssuer();
+    const fetchMock = serveJwks(() => [jwk(rsa.publicKey, { kid: "k1", alg: "RS256" })]);
+    await verifyJwt(sign(issuer, "k1", "RS256", rsa.privateKey), opts(issuer));
+    vi.advanceTimersByTime(JWKS_TTL_MS);
+    fetchMock.mockImplementation(() => Promise.reject(new TypeError("fetch failed")));
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    for (let i = 0; i < 3; i++) {
+      expect(
+        await verifyJwt(sign(issuer, "k1", "RS256", rsa.privateKey), opts(issuer)),
+      ).toMatchObject({ sub: "u1" });
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
 

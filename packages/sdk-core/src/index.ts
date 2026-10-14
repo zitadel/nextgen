@@ -2,6 +2,7 @@ export type {
   NextgenSession,
   AuthState,
   UnauthState,
+  UnauthReason,
   AuthResult,
   NextgenMiddlewareOptions,
   ClientSession,
@@ -16,12 +17,14 @@ export {
   filterResponseHeaders,
   requiresProjectSecret,
   validateOpaqueSessionToken,
+  SESSION_CHECK_BACKOFF_MS,
+  clearSessionCheckBackoff,
   parseCookieHeader,
   clearCookie,
   sessionUnavailableResponse,
   proxyFailureResponse,
 } from "./middleware.js";
-export type { OpaqueSession, OpaqueSessionCheck } from "./middleware.js";
+export type { OpaqueSession, OpaqueSessionCheck, LoginPathRoutes } from "./middleware.js";
 export {
   verifyJwt,
   decodeJwt,
@@ -29,6 +32,7 @@ export {
   base64UrlDecode,
   JWKS_TTL_MS,
   JWKS_MIN_REFRESH_MS,
+  JWKS_FAILURE_BACKOFF_MS,
   clearJwksCache,
 } from "./jwt.js";
 export type { JwtPayload, JwtHeader, DecodedJwt, VerifyJwtOptions } from "./jwt.js";
