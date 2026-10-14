@@ -14,15 +14,25 @@ const WIDGET_WRAP = "position:fixed;inset:0;overflow:auto;background:#0f0f11;col
  * unauthenticated requests away from protected routes. `url` and `projectSecret`
  * default from `process.env` (seeded in `.env.local`), so only the route policy
  * is spelled out here. The managed marker sits in a JS comment.
+ *
+ * SolidStart 2 imports this module's default export and registers it as an
+ * array of h3 middleware (`middleware.map(...)`). The config object is wrapped
+ * in SolidStart's own `createMiddleware`, which turns `{ onRequest }` into that
+ * array — exporting the bare config would leave SolidStart with nothing to run,
+ * so `/__nextgen/*` would 404. The SDK stays framework-agnostic; the wrap lives
+ * here in the generated app.
  */
 export function middlewareTemplate(): string {
   return `${MANAGED_MARKER}
+import { createMiddleware } from "@solidjs/start/middleware";
 import { createNextgenMiddleware } from "@zitadel/sdk-solid-start/server";
 
-export default createNextgenMiddleware({
-  protectedRoutes: ["/profile"],
-  loginPath: "/login",
-});
+export default createMiddleware(
+  createNextgenMiddleware({
+    protectedRoutes: ["/profile"],
+    loginPath: "/login",
+  }),
+);
 `;
 }
 

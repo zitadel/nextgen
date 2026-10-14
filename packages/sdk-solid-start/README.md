@@ -17,15 +17,23 @@ Create `src/middleware.ts` and register it via the `solidStart()` plugin in
 
 ```ts
 // src/middleware.ts
+import { createMiddleware } from '@solidjs/start/middleware';
 import { createNextgenMiddleware } from '@zitadel/sdk-solid-start/server';
 
-export default createNextgenMiddleware({
-  url: process.env.ZITADEL_URL,
-  projectSecret: process.env.ZITADEL_PROJECT_SECRET,
-  protectedRoutes: ['/admin', '/dashboard*'],
-  loginPath: '/login',
-});
+export default createMiddleware(
+  createNextgenMiddleware({
+    url: process.env.ZITADEL_URL,
+    projectSecret: process.env.ZITADEL_PROJECT_SECRET,
+    protectedRoutes: ['/admin', '/dashboard*'],
+    loginPath: '/login',
+  }),
+);
 ```
+
+SolidStart 2 registers this module's default export as an array of h3
+middleware, so the config must be wrapped in SolidStart's `createMiddleware`.
+Exporting the bare `createNextgenMiddleware(...)` object registers nothing and
+`/__nextgen/*` 404s.
 
 ```ts
 // vite.config.ts

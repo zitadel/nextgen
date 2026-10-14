@@ -300,21 +300,29 @@ async function handleAuth(
  * Creates a SolidStart middleware config that handles proxying, JWT
  * verification, and route protection in a single `onRequest` pass.
  *
- * Reference it from `app.config.ts` via `middleware`, then in that file:
+ * Reference it from the `middleware` option (the `solidStart()` plugin in
+ * `vite.config.ts`, or `app.config.ts` on older setups), then in that file wrap
+ * the config in SolidStart's own `createMiddleware`:
  *
  * ```ts
+ * import { createMiddleware } from "@solidjs/start/middleware";
  * import { createNextgenMiddleware } from "@zitadel/sdk-solid-start/server";
  *
- * export default createNextgenMiddleware({
- *   url: process.env.ZITADEL_URL,
- *   projectSecret: process.env.ZITADEL_PROJECT_SECRET,
- *   protectedRoutes: ["/admin*", "/dashboard*"],
- *   loginPath: "/login",
- * });
+ * export default createMiddleware(
+ *   createNextgenMiddleware({
+ *     url: process.env.ZITADEL_URL,
+ *     projectSecret: process.env.ZITADEL_PROJECT_SECRET,
+ *     protectedRoutes: ["/admin*", "/dashboard*"],
+ *     loginPath: "/login",
+ *   }),
+ * );
  * ```
  *
- * To compose with your own handlers, spread `createNextgenMiddleware(...).onRequest`
- * into your own `createMiddleware({ onRequest: [...] })`.
+ * SolidStart 2 registers the middleware module's default export as an array of
+ * h3 middleware, and `createMiddleware` turns the `{ onRequest }` config into
+ * that array. Exporting the bare config registers nothing, so `/__nextgen/*`
+ * would 404. To compose with your own handlers, pass them in the same call:
+ * `createMiddleware({ onRequest: [...createNextgenMiddleware(...).onRequest, mine] })`.
  *
  * @param options - Middleware configuration. `projectSecret` is the project
  *   service-key forwarded as the bearer on proxied requests.

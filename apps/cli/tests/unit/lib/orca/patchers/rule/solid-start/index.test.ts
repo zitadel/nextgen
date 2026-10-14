@@ -40,6 +40,15 @@ describe("SolidStartPatcher.plan", () => {
     expect(writeContents(plan, "src/middleware.ts")).toContain(MANAGED_MARKER);
     expect(writeContents(plan, "src/middleware.ts")).toContain("@zitadel/sdk-solid-start/server");
     expect(writeContents(plan, "src/middleware.ts")).toContain("createNextgenMiddleware");
+    // SolidStart 2 registers the default export as an array of h3 middleware, so
+    // the config object must be wrapped in SolidStart's createMiddleware — a bare
+    // createNextgenMiddleware(...) export registers nothing and /__nextgen/* 404s.
+    expect(writeContents(plan, "src/middleware.ts")).toContain(
+      'import { createMiddleware } from "@solidjs/start/middleware"',
+    );
+    expect(writeContents(plan, "src/middleware.ts")).toContain(
+      "export default createMiddleware(",
+    );
 
     expect(writeContents(plan, "src/routes/index.tsx")).toContain(MANAGED_MARKER);
     expect(writeContents(plan, "src/routes/login.tsx")).toContain('purpose="login"');
