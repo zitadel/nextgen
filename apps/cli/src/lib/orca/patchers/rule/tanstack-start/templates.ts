@@ -121,18 +121,38 @@ export function registerRouteTemplate(): string {
   return authRoute("register");
 }
 
-/** `src/routes/profile.tsx` — the signed-in view with the logout widget. */
+/**
+ * `src/routes/profile.tsx` — the signed-in view with the logout widget.
+ *
+ * `protectedRoutes` in `src/start.ts` only guards document requests: a
+ * client-side `<Link to="/profile">` never reaches the request middleware. So
+ * the route also guards itself in `beforeLoad` by calling a server function —
+ * the call always goes to the server, where the request middleware has put the
+ * session on the server function's context (a route's own `beforeLoad` context
+ * does not carry it).
+ */
 export function profileRouteTemplate(): string {
   return `${MANAGED_MARKER}
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createServerFn } from "@tanstack/react-start";
 import { ZitadelLogout } from "@zitadel/sdk-tanstack-start/react";
 import { configureZitadel } from "@zitadel/sdk-tanstack-start/client";
+import { getAuth } from "@zitadel/sdk-tanstack-start/server";
 
 const projectId = import.meta.env.VITE_ZITADEL_PROJECT_ID ?? "";
 
 const project = configureZitadel({ projectId, proxyPath: "${PROXY_PATH}" });
 
+// Runs on the server on every navigation, client-side ones included.
+const fetchAuth = createServerFn().handler(({ context }) => getAuth(context));
+
 export const Route = createFileRoute("/profile")({
+  beforeLoad: async () => {
+    const auth = await fetchAuth();
+    if (!auth.isAuthenticated) {
+      throw redirect({ to: "/login" });
+    }
+  },
   component: ProfilePage,
 });
 

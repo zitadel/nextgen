@@ -402,6 +402,11 @@ describe("createNextgenRequestMiddleware", () => {
     expect(res).toBe(downstream);
   });
 
+  // A server function called where no request middleware ran has no context.
+  it.each([[undefined], [{}]])("reads a missing session from %j as signed out", (context) => {
+    expect(getAuth(context)).toEqual({ isAuthenticated: false, session: null });
+  });
+
   it("returns the redirect response without calling next on a protected miss", async () => {
     const mw = createNextgenRequestMiddleware({
       url: "http://localhost:4000",

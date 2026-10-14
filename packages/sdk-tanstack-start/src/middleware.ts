@@ -369,6 +369,6 @@ export function createNextgenRequestMiddleware(
  * @param context - The router/middleware context.
  * @returns The current {@link AuthResult}.
  */
-export function getAuth(context: { readonly nextgenAuth?: AuthResult }): AuthResult {
-  return context.nextgenAuth ?? { isAuthenticated: false, session: null };
+export function getAuth(context: { readonly nextgenAuth?: AuthResult } | undefined): AuthResult {
+  return context?.nextgenAuth ?? { isAuthenticated: false, session: null };
 }

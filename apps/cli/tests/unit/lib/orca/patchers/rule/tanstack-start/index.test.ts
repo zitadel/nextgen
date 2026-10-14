@@ -59,6 +59,32 @@ describe("TanStackStartPatcher.plan", () => {
     expect(writeContents(plan, "src/routes/login.tsx")).toContain("#0f0f11");
   });
 
+  // CSRF must run before auth, so a cross-site server-function call is
+  // rejected before any session work.
+  it("orders the CSRF middleware ahead of auth", () => {
+    expect(writeContents(new TanStackStartPatcher().plan(ctx()), "src/start.ts")).toContain(
+      "requestMiddleware: [csrfMiddleware, authMiddleware]",
+    );
+  });
+
+  // protectedRoutes only sees document requests; a client-side <Link> never
+  // reaches the request middleware, so the route guards itself.
+  it("guards the profile route in beforeLoad through a server function", () => {
+    const profile = writeContents(new TanStackStartPatcher().plan(ctx()), "src/routes/profile.tsx");
+
+    expect(profile).toContain(
+      "const fetchAuth = createServerFn().handler(({ context }) => getAuth(context));",
+    );
+  });
+
+  it("redirects a signed-out profile visit to login from beforeLoad", () => {
+    const profile = writeContents(new TanStackStartPatcher().plan(ctx()), "src/routes/profile.tsx");
+
+    expect(profile).toMatch(
+      /beforeLoad: async \(\) => \{\s+const auth = await fetchAuth\(\);\s+if \(!auth\.isAuthenticated\) \{\s+throw redirect\(\{ to: "\/login" \}\);/,
+    );
+  });
+
   it("seeds the public project id and no other config edit", () => {
     const plan = new TanStackStartPatcher().plan(ctx());
     const envOp = plan.ops.find(
