@@ -5,7 +5,7 @@ Nuxt module, Nitro middleware, and helpers for Nextgen Auth.
 ## Installation
 
 ```bash
-pnpm add @zitadel/sdk-nuxt
+pnpm add @zitadel/sdk-nuxt@alpha
 ```
 
 There are two ways to wire the SDK. **The module is what `zitadel setup`
@@ -95,7 +95,7 @@ Under strict package managers (pnpm, Yarn PnP) `@zitadel/components` is not
 resolvable as a transitive dependency, so declare it in your app first:
 
 ```bash
-pnpm add @zitadel/components
+pnpm add @zitadel/components@alpha
 ```
 
 ```ts
