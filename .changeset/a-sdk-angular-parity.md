@@ -1,5 +1,5 @@
 ---
-"@zitadel/sdk-angular": patch
+"@zitadel/sdk-angular": minor
 ---
 
 `configureZitadel`, `getApi` and `getZitadelConfig` now come from `@zitadel/api/config`, like the

@@ -1,5 +1,5 @@
 ---
-"@zitadel/sdk-svelte": patch
+"@zitadel/sdk-svelte": minor
 ---
 
 Clearing a prop now restores the widget's default instead of keeping the previous value, and the
