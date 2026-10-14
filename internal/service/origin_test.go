@@ -54,15 +54,15 @@ func TestProjectService_AddOrigin(t *testing.T) {
 		assert.Nil(t, got)
 	})
 
-	t.Run("rejects unbounded shared host", func(t *testing.T) {
+	t.Run("accepts shared-host preview wildcard as written", func(t *testing.T) {
 		t.Parallel()
-		svc, _, _, _, _, _, _, _, _, _ := createMockedProjectService(t)
-		got, err := svc.AddOrigin(context.Background(), project.ID, domain.Origin{
-			Pattern: "https://*.vercel.app",
-			Kind:    domain.OriginKindPreview,
-		})
-		require.ErrorIs(t, err, domain.ErrOriginUnbounded())
-		assert.Nil(t, got)
+		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+		wildcard := domain.Origin{Pattern: "https://*.vercel.app", Kind: domain.OriginKindPreview}
+		statements.EXPECT().InsertOrigin(gomock.Any(), project.ID, wildcard).Return(true, nil)
+
+		got, err := svc.AddOrigin(context.Background(), project.ID, wildcard)
+		require.NoError(t, err)
+		assert.Equal(t, &wildcard, got)
 	})
 
 	t.Run("rejects primary wildcard", func(t *testing.T) {
@@ -137,8 +137,8 @@ func TestProjectService_Create_RejectsInvalidOrigins(t *testing.T) {
 	t.Parallel()
 	svc, _, _, _, _, _, _, _, _, _ := createMockedProjectService(t)
 	got, err := svc.Create(context.Background(), "test", []domain.Origin{
-		{Pattern: "https://*.vercel.app", Kind: domain.OriginKindPreview},
+		{Pattern: "https://*.example.com", Kind: domain.OriginKindPrimary},
 	}, false)
-	require.ErrorIs(t, err, domain.ErrOriginUnbounded())
+	require.ErrorIs(t, err, domain.ErrOriginPrimaryNotExact())
 	assert.Nil(t, got)
 }

@@ -23,7 +23,6 @@ type AddOriginErrorResponse struct {
 	OriginNotFound         OriginNotFound
 	OriginPermissionDenied OriginPermissionDenied
 	OriginPrimaryNotExact  OriginPrimaryNotExact
-	OriginUnbounded        OriginUnbounded
 	ProjMissingID          ProjMissingID
 	ProjNotFound           ProjNotFound
 	ReqInvalid             ReqInvalid
@@ -42,7 +41,6 @@ const (
 	OriginNotFoundAddOriginErrorResponse         AddOriginErrorResponseType = "origin.not_found"
 	OriginPermissionDeniedAddOriginErrorResponse AddOriginErrorResponseType = "origin.permission_denied"
 	OriginPrimaryNotExactAddOriginErrorResponse  AddOriginErrorResponseType = "origin.primary_not_exact"
-	OriginUnboundedAddOriginErrorResponse        AddOriginErrorResponseType = "origin.unbounded"
 	ProjMissingIDAddOriginErrorResponse          AddOriginErrorResponseType = "proj.missing_id"
 	ProjNotFoundAddOriginErrorResponse           AddOriginErrorResponseType = "proj.not_found"
 	ReqInvalidAddOriginErrorResponse             AddOriginErrorResponseType = "req.invalid"
@@ -84,11 +82,6 @@ func (s AddOriginErrorResponse) IsOriginPermissionDenied() bool {
 // IsOriginPrimaryNotExact reports whether AddOriginErrorResponse is OriginPrimaryNotExact.
 func (s AddOriginErrorResponse) IsOriginPrimaryNotExact() bool {
 	return s.Type == OriginPrimaryNotExactAddOriginErrorResponse
-}
-
-// IsOriginUnbounded reports whether AddOriginErrorResponse is OriginUnbounded.
-func (s AddOriginErrorResponse) IsOriginUnbounded() bool {
-	return s.Type == OriginUnboundedAddOriginErrorResponse
 }
 
 // IsProjMissingID reports whether AddOriginErrorResponse is ProjMissingID.
@@ -271,27 +264,6 @@ func (s AddOriginErrorResponse) GetOriginPrimaryNotExact() (v OriginPrimaryNotEx
 func NewOriginPrimaryNotExactAddOriginErrorResponse(v OriginPrimaryNotExact) AddOriginErrorResponse {
 	var s AddOriginErrorResponse
 	s.SetOriginPrimaryNotExact(v)
-	return s
-}
-
-// SetOriginUnbounded sets AddOriginErrorResponse to OriginUnbounded.
-func (s *AddOriginErrorResponse) SetOriginUnbounded(v OriginUnbounded) {
-	s.Type = OriginUnboundedAddOriginErrorResponse
-	s.OriginUnbounded = v
-}
-
-// GetOriginUnbounded returns OriginUnbounded and true boolean if AddOriginErrorResponse is OriginUnbounded.
-func (s AddOriginErrorResponse) GetOriginUnbounded() (v OriginUnbounded, ok bool) {
-	if !s.IsOriginUnbounded() {
-		return v, false
-	}
-	return s.OriginUnbounded, true
-}
-
-// NewOriginUnboundedAddOriginErrorResponse returns new AddOriginErrorResponse from OriginUnbounded.
-func NewOriginUnboundedAddOriginErrorResponse(v OriginUnbounded) AddOriginErrorResponse {
-	var s AddOriginErrorResponse
-	s.SetOriginUnbounded(v)
 	return s
 }
 
@@ -13365,7 +13337,6 @@ type CreateProjectErrorResponse struct {
 	OriginInvalid         OriginInvalid
 	OriginKindConflict    OriginKindConflict
 	OriginPrimaryNotExact OriginPrimaryNotExact
-	OriginUnbounded       OriginUnbounded
 	ProjNameInvalid       ProjNameInvalid
 	ReqInvalid            ReqInvalid
 	EncKeyUnknownAlg      EncKeyUnknownAlg
@@ -13388,7 +13359,6 @@ const (
 	OriginInvalidCreateProjectErrorResponse         CreateProjectErrorResponseType = "origin.invalid"
 	OriginKindConflictCreateProjectErrorResponse    CreateProjectErrorResponseType = "origin.kind_conflict"
 	OriginPrimaryNotExactCreateProjectErrorResponse CreateProjectErrorResponseType = "origin.primary_not_exact"
-	OriginUnboundedCreateProjectErrorResponse       CreateProjectErrorResponseType = "origin.unbounded"
 	ProjNameInvalidCreateProjectErrorResponse       CreateProjectErrorResponseType = "proj.name_invalid"
 	ReqInvalidCreateProjectErrorResponse            CreateProjectErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgCreateProjectErrorResponse      CreateProjectErrorResponseType = "enc_key.unknown_alg"
@@ -13448,11 +13418,6 @@ func (s CreateProjectErrorResponse) IsOriginKindConflict() bool {
 // IsOriginPrimaryNotExact reports whether CreateProjectErrorResponse is OriginPrimaryNotExact.
 func (s CreateProjectErrorResponse) IsOriginPrimaryNotExact() bool {
 	return s.Type == OriginPrimaryNotExactCreateProjectErrorResponse
-}
-
-// IsOriginUnbounded reports whether CreateProjectErrorResponse is OriginUnbounded.
-func (s CreateProjectErrorResponse) IsOriginUnbounded() bool {
-	return s.Type == OriginUnboundedCreateProjectErrorResponse
 }
 
 // IsProjNameInvalid reports whether CreateProjectErrorResponse is ProjNameInvalid.
@@ -13703,27 +13668,6 @@ func (s CreateProjectErrorResponse) GetOriginPrimaryNotExact() (v OriginPrimaryN
 func NewOriginPrimaryNotExactCreateProjectErrorResponse(v OriginPrimaryNotExact) CreateProjectErrorResponse {
 	var s CreateProjectErrorResponse
 	s.SetOriginPrimaryNotExact(v)
-	return s
-}
-
-// SetOriginUnbounded sets CreateProjectErrorResponse to OriginUnbounded.
-func (s *CreateProjectErrorResponse) SetOriginUnbounded(v OriginUnbounded) {
-	s.Type = OriginUnboundedCreateProjectErrorResponse
-	s.OriginUnbounded = v
-}
-
-// GetOriginUnbounded returns OriginUnbounded and true boolean if CreateProjectErrorResponse is OriginUnbounded.
-func (s CreateProjectErrorResponse) GetOriginUnbounded() (v OriginUnbounded, ok bool) {
-	if !s.IsOriginUnbounded() {
-		return v, false
-	}
-	return s.OriginUnbounded, true
-}
-
-// NewOriginUnboundedCreateProjectErrorResponse returns new CreateProjectErrorResponse from OriginUnbounded.
-func NewOriginUnboundedCreateProjectErrorResponse(v OriginUnbounded) CreateProjectErrorResponse {
-	var s CreateProjectErrorResponse
-	s.SetOriginUnbounded(v)
 	return s
 }
 
@@ -46802,52 +46746,6 @@ func (o OptOriginRemovedEventDelegationType) Or(d OriginRemovedEventDelegationTy
 	return d
 }
 
-// NewOptOriginUnboundedDetails returns new OptOriginUnboundedDetails with value set to v.
-func NewOptOriginUnboundedDetails(v OriginUnboundedDetails) OptOriginUnboundedDetails {
-	return OptOriginUnboundedDetails{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptOriginUnboundedDetails is optional OriginUnboundedDetails.
-type OptOriginUnboundedDetails struct {
-	Value OriginUnboundedDetails
-	Set   bool
-}
-
-// IsSet returns true if OptOriginUnboundedDetails was set.
-func (o OptOriginUnboundedDetails) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptOriginUnboundedDetails) Reset() {
-	var v OriginUnboundedDetails
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptOriginUnboundedDetails) SetTo(v OriginUnboundedDetails) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptOriginUnboundedDetails) Get() (v OriginUnboundedDetails, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptOriginUnboundedDetails) Or(d OriginUnboundedDetails) OriginUnboundedDetails {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptPageToken returns new OptPageToken with value set to v.
 func NewOptPageToken(v PageToken) OptPageToken {
 	return OptPageToken{
@@ -52533,59 +52431,6 @@ func (s *OriginRemovedEventDelegationType) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
-}
-
-// Merged schema.
-// Ref: #
-type OriginUnbounded struct {
-	// Merged property.
-	Code string `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Additional error-specific context.
-	Details OptOriginUnboundedDetails `json:"details"`
-}
-
-// GetCode returns the value of Code.
-func (s *OriginUnbounded) GetCode() string {
-	return s.Code
-}
-
-// GetMessage returns the value of Message.
-func (s *OriginUnbounded) GetMessage() string {
-	return s.Message
-}
-
-// GetDetails returns the value of Details.
-func (s *OriginUnbounded) GetDetails() OptOriginUnboundedDetails {
-	return s.Details
-}
-
-// SetCode sets the value of Code.
-func (s *OriginUnbounded) SetCode(val string) {
-	s.Code = val
-}
-
-// SetMessage sets the value of Message.
-func (s *OriginUnbounded) SetMessage(val string) {
-	s.Message = val
-}
-
-// SetDetails sets the value of Details.
-func (s *OriginUnbounded) SetDetails(val OptOriginUnboundedDetails) {
-	s.Details = val
-}
-
-// Additional error-specific context.
-type OriginUnboundedDetails map[string]jx.Raw
-
-func (s *OriginUnboundedDetails) init() OriginUnboundedDetails {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
 }
 
 type PageToken string

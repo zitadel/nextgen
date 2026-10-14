@@ -52,9 +52,9 @@ type OriginValidator struct {
 	SharedHosts map[string]*regexp.Regexp
 }
 
-// ValidateAll validates every origin; the first failure wins. Duplicate
-// patterns are rejected so create matches add (same pattern / different kind
-// → kind_conflict; same pattern twice → invalid).
+// ValidateAll validates every origin; the first failure wins. Same pattern /
+// different kind → kind_conflict. Same pattern / same kind is idempotent
+// (matches AddOrigin); callers should CompactOrigins after ValidateAll.
 func (v OriginValidator) ValidateAll(origins []Origin) error {
 	seen := make(map[string]OriginKind, len(origins))
 	for _, o := range origins {
@@ -66,7 +66,7 @@ func (v OriginValidator) ValidateAll(origins []Origin) error {
 			if prev != o.Kind {
 				return ErrOriginKindConflict()
 			}
-			return ErrOriginInvalid()
+			continue
 		}
 		seen[pattern] = o.Kind
 	}
@@ -117,10 +117,6 @@ func (v OriginValidator) Validate(o Origin) error {
 		if o.Kind != OriginKindPreview {
 			return ErrOriginInvalid()
 		}
-		// A single * always sits inside one DNS label (dots split labels).
-		if v.isUnboundedSharedHost(host) {
-			return ErrOriginUnbounded()
-		}
 		return nil
 	}
 
@@ -128,24 +124,4 @@ func (v OriginValidator) Validate(o Origin) error {
 		return ErrOriginInvalid()
 	}
 	return nil
-}
-
-func (v OriginValidator) isUnboundedSharedHost(host string) bool {
-	shared := matchSharedHost(host, v.SharedHosts)
-	if shared == "" {
-		return false
-	}
-	return !v.SharedHosts[shared].MatchString(host)
-}
-
-func matchSharedHost(host string, sharedHosts map[string]*regexp.Regexp) string {
-	best := ""
-	for shared := range sharedHosts {
-		if host == shared || strings.HasSuffix(host, "."+shared) {
-			if len(shared) > len(best) {
-				best = shared
-			}
-		}
-	}
-	return best
 }

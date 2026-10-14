@@ -73,3 +73,22 @@ func NormalizeOrigins(origins []Origin) []Origin {
 	}
 	return out
 }
+
+// CompactOrigins keeps the first occurrence of each pattern. Call after
+// OriginValidator.ValidateAll so kind conflicts are detected before collapse.
+func CompactOrigins(origins []Origin) []Origin {
+	if len(origins) == 0 {
+		return origins
+	}
+	seen := make(map[string]struct{}, len(origins))
+	out := make([]Origin, 0, len(origins))
+	for _, o := range origins {
+		pattern := strings.TrimSpace(o.Pattern)
+		if _, ok := seen[pattern]; ok {
+			continue
+		}
+		seen[pattern] = struct{}{}
+		out = append(out, o)
+	}
+	return out
+}

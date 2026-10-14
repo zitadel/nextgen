@@ -12,7 +12,6 @@ content:
         - $ref: '../../../../components/schemas/errors/origin-not_found.yaml'
         - $ref: '../../../../components/schemas/errors/origin-permission_denied.yaml'
         - $ref: '../../../../components/schemas/errors/origin-primary_not_exact.yaml'
-        - $ref: '../../../../components/schemas/errors/origin-unbounded.yaml'
         - $ref: '../../../../components/schemas/errors/proj-missing_id.yaml'
         - $ref: '../../../../components/schemas/errors/proj-not_found.yaml'
         - $ref: '../../../../components/schemas/errors/req-invalid.yaml'
@@ -27,7 +26,6 @@ content:
           origin.not_found: '../../../../components/schemas/errors/origin-not_found.yaml'
           origin.permission_denied: '../../../../components/schemas/errors/origin-permission_denied.yaml'
           origin.primary_not_exact: '../../../../components/schemas/errors/origin-primary_not_exact.yaml'
-          origin.unbounded: '../../../../components/schemas/errors/origin-unbounded.yaml'
           proj.missing_id: '../../../../components/schemas/errors/proj-missing_id.yaml'
           proj.not_found: '../../../../components/schemas/errors/proj-not_found.yaml'
           req.invalid: '../../../../components/schemas/errors/req-invalid.yaml'
@@ -72,11 +70,6 @@ content:
         value:
           code: origin.primary_not_exact
           message: 'a primary origin is an exact URL, no wildcard'
-      origin.unbounded:
-        summary: origin.unbounded
-        value:
-          code: origin.unbounded
-          message: 'origin: a wildcard on a shared host needs a literal label of your own beside the host'
       proj.missing_id:
         summary: proj.missing_id
         value:

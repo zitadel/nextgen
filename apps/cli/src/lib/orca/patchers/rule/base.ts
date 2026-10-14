@@ -336,12 +336,14 @@ async function readTextIfExists(path: string): Promise<string | undefined> {
 /** Builds the `zitadel.json` body persisted at the project root. */
 function projectConfig(ctx: PatchContext): Record<string, unknown> {
   const environments: Record<string, unknown> = { development: { issuer: ctx.issuer } };
-  const originPatterns = ctx.project.origins.map((origin) => origin.pattern);
-  if (originPatterns.length > 0) {
-    // Origins are already full origins (scheme://host[:port]); don't
+  const previewPatterns = ctx.project.origins
+    .filter((origin) => origin.kind === "preview")
+    .map((origin) => origin.pattern);
+  if (previewPatterns.length > 0) {
+    // Preview patterns are already full origins (scheme://host[:port]); don't
     // prepend a scheme or it doubles up (https://http://localhost:3000).
     environments.preview = {
-      issuer_pattern: [...originPatterns],
+      issuer_pattern: [...previewPatterns],
     };
   }
   return {

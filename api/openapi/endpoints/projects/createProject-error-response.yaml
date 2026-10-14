@@ -15,7 +15,6 @@ content:
         - $ref: '../../components/schemas/errors/origin-invalid.yaml'
         - $ref: '../../components/schemas/errors/origin-kind_conflict.yaml'
         - $ref: '../../components/schemas/errors/origin-primary_not_exact.yaml'
-        - $ref: '../../components/schemas/errors/origin-unbounded.yaml'
         - $ref: '../../components/schemas/errors/proj-name_invalid.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
@@ -34,7 +33,6 @@ content:
           origin.invalid: '../../components/schemas/errors/origin-invalid.yaml'
           origin.kind_conflict: '../../components/schemas/errors/origin-kind_conflict.yaml'
           origin.primary_not_exact: '../../components/schemas/errors/origin-primary_not_exact.yaml'
-          origin.unbounded: '../../components/schemas/errors/origin-unbounded.yaml'
           proj.name_invalid: '../../components/schemas/errors/proj-name_invalid.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
           enc_key.unknown_alg: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
@@ -95,11 +93,6 @@ content:
         value:
           code: origin.primary_not_exact
           message: 'a primary origin is an exact URL, no wildcard'
-      origin.unbounded:
-        summary: origin.unbounded
-        value:
-          code: origin.unbounded
-          message: 'origin: a wildcard on a shared host needs a literal label of your own beside the host'
       proj.name_invalid:
         summary: proj.name_invalid
         value:

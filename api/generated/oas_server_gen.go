@@ -11,10 +11,9 @@ type Handler interface {
 	// AddOrigin implements addOrigin operation.
 	//
 	// Adds one `{pattern, kind}` to the project's origins. A primary pattern
-	// must be an exact URL (no wildcard). A preview wildcard on a shared host
-	// must keep a literal tenant-unique label. A host the server has no rule
-	// for is accepted as written. Adding a pattern that already exists with the
-	// same kind is idempotent and answers 201 with the stored origin.
+	// must be an exact URL (no wildcard). Preview patterns may include a single
+	// DNS-label wildcard. Adding a pattern that already exists with the same
+	// kind is idempotent and answers 201 with the stored origin.
 	//
 	// POST /projects/{project_id}/origins
 	AddOrigin(ctx context.Context, req *ProjectOrigin, params AddOriginParams) (AddOriginRes, error)

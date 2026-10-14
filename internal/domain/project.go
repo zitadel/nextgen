@@ -86,7 +86,7 @@ func NewProject(name string, origins []Origin) (*Project, error) {
 
 	return &Project{
 		Name:    name,
-		Origins: normalized,
+		Origins: CompactOrigins(normalized),
 	}, nil
 }
 

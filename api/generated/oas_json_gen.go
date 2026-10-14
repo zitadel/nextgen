@@ -152,22 +152,6 @@ func (s AddOriginErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case OriginUnboundedAddOriginErrorResponse:
-		e.FieldStart("code")
-		e.Str("origin.unbounded")
-		{
-			s := s.OriginUnbounded
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
 	case ProjMissingIDAddOriginErrorResponse:
 		e.FieldStart("code")
 		e.Str("proj.missing_id")
@@ -266,9 +250,6 @@ func (s *AddOriginErrorResponse) Decode(d *jx.Decoder) error {
 				case "origin.primary_not_exact":
 					s.Type = OriginPrimaryNotExactAddOriginErrorResponse
 					found = true
-				case "origin.unbounded":
-					s.Type = OriginUnboundedAddOriginErrorResponse
-					found = true
 				case "proj.missing_id":
 					s.Type = ProjMissingIDAddOriginErrorResponse
 					found = true
@@ -322,10 +303,6 @@ func (s *AddOriginErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case OriginPrimaryNotExactAddOriginErrorResponse:
 		if err := s.OriginPrimaryNotExact.Decode(d); err != nil {
-			return err
-		}
-	case OriginUnboundedAddOriginErrorResponse:
-		if err := s.OriginUnbounded.Decode(d); err != nil {
 			return err
 		}
 	case ProjMissingIDAddOriginErrorResponse:
@@ -21451,22 +21428,6 @@ func (s CreateProjectErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case OriginUnboundedCreateProjectErrorResponse:
-		e.FieldStart("code")
-		e.Str("origin.unbounded")
-		{
-			s := s.OriginUnbounded
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
 	case ProjNameInvalidCreateProjectErrorResponse:
 		e.FieldStart("code")
 		e.Str("proj.name_invalid")
@@ -21590,9 +21551,6 @@ func (s *CreateProjectErrorResponse) Decode(d *jx.Decoder) error {
 				case "origin.primary_not_exact":
 					s.Type = OriginPrimaryNotExactCreateProjectErrorResponse
 					found = true
-				case "origin.unbounded":
-					s.Type = OriginUnboundedCreateProjectErrorResponse
-					found = true
 				case "proj.name_invalid":
 					s.Type = ProjNameInvalidCreateProjectErrorResponse
 					found = true
@@ -21661,10 +21619,6 @@ func (s *CreateProjectErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case OriginPrimaryNotExactCreateProjectErrorResponse:
 		if err := s.OriginPrimaryNotExact.Decode(d); err != nil {
-			return err
-		}
-	case OriginUnboundedCreateProjectErrorResponse:
-		if err := s.OriginUnbounded.Decode(d); err != nil {
 			return err
 		}
 	case ProjNameInvalidCreateProjectErrorResponse:
@@ -70750,40 +70704,6 @@ func (s *OptOriginRemovedEventDelegationType) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes OriginUnboundedDetails as json.
-func (o OptOriginUnboundedDetails) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	o.Value.Encode(e)
-}
-
-// Decode decodes OriginUnboundedDetails from json.
-func (o *OptOriginUnboundedDetails) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptOriginUnboundedDetails to nil")
-	}
-	o.Set = true
-	o.Value = make(OriginUnboundedDetails)
-	if err := o.Value.Decode(d); err != nil {
-		return err
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptOriginUnboundedDetails) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptOriginUnboundedDetails) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode encodes PasskeyChallengePayloadPublicKeyUserVerification as json.
 func (o OptPasskeyChallengePayloadPublicKeyUserVerification) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -76306,194 +76226,6 @@ func (s OriginRemovedEventDelegationType) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OriginRemovedEventDelegationType) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s *OriginUnbounded) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields encodes fields.
-func (s *OriginUnbounded) encodeFields(e *jx.Encoder) {
-	{
-		e.FieldStart("code")
-		e.Str("origin.unbounded")
-	}
-	{
-		e.FieldStart("message")
-		e.Str(s.Message)
-	}
-	{
-		if s.Details.Set {
-			e.FieldStart("details")
-			s.Details.Encode(e)
-		}
-	}
-}
-
-var jsonFieldsNameOfOriginUnbounded = [3]string{
-	0: "code",
-	1: "message",
-	2: "details",
-}
-
-// Decode decodes OriginUnbounded from json.
-func (s *OriginUnbounded) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode OriginUnbounded to nil")
-	}
-	var requiredBitSet [1]uint8
-
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "code":
-			requiredBitSet[0] |= 1 << 0
-			if err := func() error {
-				v, err := d.Str()
-				s.Code = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"code\"")
-			}
-		case "message":
-			requiredBitSet[0] |= 1 << 1
-			if err := func() error {
-				v, err := d.Str()
-				s.Message = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"message\"")
-			}
-		case "details":
-			if err := func() error {
-				s.Details.Reset()
-				if err := s.Details.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"details\"")
-			}
-		default:
-			return d.Skip()
-		}
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode OriginUnbounded")
-	}
-	// Validate required fields.
-	var failures []validate.FieldError
-	for i, mask := range [1]uint8{
-		0b00000011,
-	} {
-		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
-			// Mask only required fields and check equality to mask using XOR.
-			//
-			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
-			// Bits of fields which would be set are actually bits of missed fields.
-			missed := bits.OnesCount8(result)
-			for bitN := 0; bitN < missed; bitN++ {
-				bitIdx := bits.TrailingZeros8(result)
-				fieldIdx := i*8 + bitIdx
-				var name string
-				if fieldIdx < len(jsonFieldsNameOfOriginUnbounded) {
-					name = jsonFieldsNameOfOriginUnbounded[fieldIdx]
-				} else {
-					name = strconv.Itoa(fieldIdx)
-				}
-				failures = append(failures, validate.FieldError{
-					Name:  name,
-					Error: validate.ErrFieldRequired,
-				})
-				// Reset bit.
-				result &^= 1 << bitIdx
-			}
-		}
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *OriginUnbounded) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OriginUnbounded) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s OriginUnboundedDetails) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields implements json.Marshaler.
-func (s OriginUnboundedDetails) encodeFields(e *jx.Encoder) {
-	for k, elem := range s {
-		e.FieldStart(k)
-
-		if len(elem) != 0 {
-			e.Raw(elem)
-		}
-	}
-}
-
-// Decode decodes OriginUnboundedDetails from json.
-func (s *OriginUnboundedDetails) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode OriginUnboundedDetails to nil")
-	}
-	m := s.init()
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		var elem jx.Raw
-		if err := func() error {
-			v, err := d.RawAppend(nil)
-			elem = jx.Raw(v)
-			if err != nil {
-				return err
-			}
-			return nil
-		}(); err != nil {
-			return errors.Wrapf(err, "decode field %q", k)
-		}
-		m[string(k)] = elem
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode OriginUnboundedDetails")
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OriginUnboundedDetails) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OriginUnboundedDetails) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
