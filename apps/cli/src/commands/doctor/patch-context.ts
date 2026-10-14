@@ -54,9 +54,18 @@ export async function loadPatchContext(
 }
 
 async function resolveIssuer(cwd: string, facts: FrameworkFacts): Promise<string> {
-  const { values } = await resolveEnvironment({ cwd, env: process.env });
-  if (values.ZITADEL_ISSUER) {
-    return values.ZITADEL_ISSUER.value;
+  // The issuer setup recorded for the development project, from its files
+  // alone: the repair writes it into `.env.local` and `.env.development.local`,
+  // so a production issuer exported in the shell, or a `ZITADEL_ENV` naming
+  // another environment, must never stand in for it. A file the resolver
+  // cannot read leaves the issuer to the fallbacks below rather than failing
+  // the repair.
+  const issuer = await resolveEnvironment({ cwd, env: {} }).then(
+    ({ values }) => values.ZITADEL_ISSUER?.value,
+    () => undefined,
+  );
+  if (issuer !== undefined) {
+    return issuer;
   }
   const scaffold = await readScaffoldManifest(cwd);
   if (typeof scaffold?.dev_port === "number") {

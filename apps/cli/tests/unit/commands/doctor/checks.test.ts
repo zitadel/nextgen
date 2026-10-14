@@ -2,7 +2,7 @@ import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/pr
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   ClaimCheck,
@@ -1153,6 +1153,19 @@ describe("loadPatchContext", () => {
     expect(ctx.scaffoldedFramework).toBe(true);
     // The issuer in the env file still wins over the manifest port.
     expect(ctx.issuer).toBe("http://localhost:3000");
+  });
+
+  it("takes the issuer from the project's files, never the shell's environment", async () => {
+    const cwd = await makeProject();
+    vi.stubEnv("ZITADEL_ENV", "production");
+    vi.stubEnv("ZITADEL_ISSUER", "https://auth.example.com");
+    try {
+      expect((await loadPatchContext(cwd, createOrca(), "0.1.0-alpha.0")).issuer).toBe(
+        "http://localhost:3000",
+      );
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("falls back to the manifest dev_port for the issuer", async () => {

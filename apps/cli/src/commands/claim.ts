@@ -105,7 +105,14 @@ export default class Claim extends EnvironmentCommand {
     // same project (and credential) `connect()` authenticates — so a
     // `--env`/`--env-file` claim targets that environment's project, never the
     // fallback `.zitadel/secret`.
-    const projectId = requireValue(this.environment, "ZITADEL_PROJECT_ID");
+    // On a terminal a missing project id is asked for by `connect()`, as every
+    // other project command does. A dry run writes nothing, a prompted answer's
+    // file included, so it still fails naming the sources it consulted.
+    const prompted =
+      this.environment.values.ZITADEL_PROJECT_ID === undefined && !dryRun && !nonInteractive
+        ? await this.connect()
+        : undefined;
+    const projectId = prompted?.projectId ?? requireValue(this.environment, "ZITADEL_PROJECT_ID");
     // `.zitadel/secret` is only the place a completed claim is recorded, and
     // only when it is this very project's record. An env file can supply a
     // different project, so the legacy secret is neither required nor touched
@@ -149,7 +156,7 @@ export default class Claim extends EnvironmentCommand {
       });
     }
 
-    const { client } = await this.connect();
+    const { client } = prompted ?? (await this.connect());
 
     let challenge: Awaited<ReturnType<typeof client.initClaim>>;
     try {
