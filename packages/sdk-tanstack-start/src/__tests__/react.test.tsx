@@ -1,10 +1,25 @@
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { configureZitadel } from "@zitadel/api/config";
 import * as sdkReact from "@zitadel/sdk-react";
 import { act, createElement, createRef, type ElementType } from "react";
 import { createRoot, hydrateRoot, type Root } from "react-dom/client";
 import { renderToString } from "react-dom/server";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import ts from "typescript";
+import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 
+import type {
+  ZitadelFlowCompleteDetail,
+  ZitadelFlowErrorDetail,
+  ZitadelFlowInputDetail,
+  ZitadelFlowRedirectDetail,
+  ZitadelFlowStepDetail,
+  ZitadelLoginProps,
+  ZitadelLoginReactProps,
+  ZitadelLogoutProps,
+  ZitadelSessionProps,
+  ZitadelSignoutDetail,
+} from "../react";
 import * as tanstackReact from "../react";
 import { ZitadelLogin, ZitadelLogout, ZitadelSession } from "../react";
 
@@ -54,6 +69,34 @@ function flowPurposes(): string[] {
   return fetchCalls
     .filter((call) => new URL(call.url, "http://localhost").pathname === "/__nextgen/flow")
     .map((call) => (JSON.parse(call.body) as { purpose?: string }).purpose ?? "");
+}
+
+/**
+ * The names a package entry exports for types only: everything its published
+ * declarations export, minus what its JavaScript exports at runtime.
+ */
+function typeOnlyExports(specifier: string, runtime: object): string[] {
+  const options: ts.CompilerOptions = {
+    module: ts.ModuleKind.ESNext,
+    moduleResolution: ts.ModuleResolutionKind.Bundler,
+    jsx: ts.JsxEmit.ReactJSX,
+    skipLibCheck: true,
+    noEmit: true,
+  };
+  const from = join(dirname(fileURLToPath(import.meta.url)), "..", "index.ts");
+  const resolved = ts.resolveModuleName(specifier, from, options, ts.sys).resolvedModule;
+  if (!resolved) throw new Error(`cannot resolve ${specifier}`);
+  const program = ts.createProgram([resolved.resolvedFileName], options);
+  const source = program.getSourceFile(resolved.resolvedFileName);
+  const entry = source && program.getTypeChecker().getSymbolAtLocation(source);
+  if (!entry) throw new Error(`${specifier} has no module symbol`);
+  const values = new Set(Object.keys(runtime));
+  return program
+    .getTypeChecker()
+    .getExportsOfModule(entry)
+    .map((symbol) => symbol.name)
+    .filter((name) => !values.has(name))
+    .sort();
 }
 
 const register = () =>
@@ -134,5 +177,24 @@ describe("@zitadel/sdk-tanstack-start/react", () => {
 
   it("re-exports @zitadel/sdk-react's business copy overlay", () => {
     expect(tanstackReact.businessLocales).toBe(sdkReact.businessLocales);
+  });
+
+  it("exports every type @zitadel/sdk-react exports", () => {
+    expect(typeOnlyExports("@zitadel/sdk-tanstack-start/react", tanstackReact)).toEqual(
+      typeOnlyExports("@zitadel/sdk-react", sdkReact),
+    );
+  }, 30_000);
+
+  it("exports the widget event details and props as @zitadel/sdk-react's", () => {
+    expectTypeOf<ZitadelFlowStepDetail>().toEqualTypeOf<sdkReact.ZitadelFlowStepDetail>();
+    expectTypeOf<ZitadelFlowInputDetail>().toEqualTypeOf<sdkReact.ZitadelFlowInputDetail>();
+    expectTypeOf<ZitadelFlowCompleteDetail>().toEqualTypeOf<sdkReact.ZitadelFlowCompleteDetail>();
+    expectTypeOf<ZitadelFlowRedirectDetail>().toEqualTypeOf<sdkReact.ZitadelFlowRedirectDetail>();
+    expectTypeOf<ZitadelFlowErrorDetail>().toEqualTypeOf<sdkReact.ZitadelFlowErrorDetail>();
+    expectTypeOf<ZitadelSignoutDetail>().toEqualTypeOf<sdkReact.ZitadelSignoutDetail>();
+    expectTypeOf<ZitadelLoginProps>().toEqualTypeOf<sdkReact.ZitadelLoginProps>();
+    expectTypeOf<ZitadelLoginReactProps>().toEqualTypeOf<sdkReact.ZitadelLoginReactProps>();
+    expectTypeOf<ZitadelLogoutProps>().toEqualTypeOf<sdkReact.ZitadelLogoutProps>();
+    expectTypeOf<ZitadelSessionProps>().toEqualTypeOf<sdkReact.ZitadelSessionProps>();
   });
 });
