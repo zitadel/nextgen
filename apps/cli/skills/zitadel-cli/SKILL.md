@@ -73,7 +73,7 @@ The CLI requires Node.js 24+.
   (`VERCEL_ENV`, or Netlify's `CONTEXT` inside a Netlify build), else
   `development`. A missing value fails with `E_VALIDATION` naming the variable
   and the files it looked in; there is no cloud default outside `setup`, and
-  `zitadel.json` names no server. `zitadel env` shows what resolved and where
+  the server is never read from `zitadel.json`. `zitadel env` shows what resolved and where
   each value came from; `zitadel env add <name>` binds another environment to a
   project.
 - **Origins.** `zitadel origin add <url> --kind primary|preview`, `origin list`
