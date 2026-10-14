@@ -34,7 +34,8 @@
     "test": "vitest run",
     "test:all": "pnpm run test",
     "lint": "biome check .",
-    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build"
+    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build",
+    "prepack": "publint --strict"
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",

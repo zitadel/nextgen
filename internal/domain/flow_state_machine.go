@@ -77,6 +77,13 @@ const (
 	// FlowStepErrorOutcomeUnhandled reports an unwired outcome with no
 	// key of its own.
 	FlowStepErrorOutcomeUnhandled = "error.outcome_unhandled"
+	// FlowStepErrorSignInFirst reports a password submitted on a sign-in
+	// step that has no user to check it against, such as a conflict step
+	// reached without binding the colliding user. The password is
+	// discarded; the user has to sign in from the start. The key avoids the
+	// `error.<field>_<rule>` shape so it cannot read as a field's validation
+	// error.
+	FlowStepErrorSignInFirst = "error.sign_in_first"
 )
 
 // unwiredOutcomeErrors maps an implicit outcome the current step does not
@@ -1781,6 +1788,15 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved Fl
 		case FlowFieldChallengePassword:
 			if state.CurrentPurpose != FlowDefinitionPurposeLogin {
 				continue
+			}
+			// A sign-in password is checked, not stored: [mergeCollected]
+			// has already banked it, so it is dropped here rather than
+			// carried into whatever the flow resolves next. The only
+			// on_success a login step can run is create_user, which would
+			// store it on a new account rather than the one it verified.
+			state.CollectedData.AuthMethods.Password = ""
+			if state.CollectedData.UserID == "" {
+				return flowDispatchResult{StepError: new(FlowStepErrorSignInFirst)}, nil
 			}
 			err := r.authAttempts.SubmitPassword(ctx, FlowSubmitPasswordInput{
 				ProjectID: state.ProjectID,
