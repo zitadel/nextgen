@@ -266,6 +266,14 @@ describe("eject asked on a terminal", () => {
     expect(await exists(join(cwd, "app/login/page.tsx"))).toBe(true);
   });
 
+  it("does not ask on a dry run, which removes nothing", async () => {
+    const cwd = await makeManagedProject();
+
+    await asTerminal(() => Eject.run(["--cwd", cwd, "--dry-run"]));
+
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
   it("fails, removing nothing, on Ctrl-C", async () => {
     const cwd = await makeManagedProject();
     vi.mocked(isCancel).mockReturnValue(true);

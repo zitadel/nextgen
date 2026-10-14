@@ -103,12 +103,15 @@ export default class Eject extends BaseCommand {
     await this.toMeta(flags);
     const { cwd, dryRun } = this.meta;
 
-    const confirmed = await this.input({
-      kind: "confirm",
-      name: "remove the managed files and local state",
-      message: "Remove the managed files and local Zitadel state?",
-      retry: publicCliCommand("eject --force", this.meta.cliVersion),
-    });
+    // A dry run removes nothing, so it has nothing to confirm (as in `reset`).
+    const confirmed =
+      dryRun ||
+      (await this.input({
+        kind: "confirm",
+        name: "remove the managed files and local state",
+        message: "Remove the managed files and local Zitadel state?",
+        retry: publicCliCommand("eject --force", this.meta.cliVersion),
+      }));
     if (!confirmed) {
       return this.emit({ status: "skipped", reason: "eject-cancelled" });
     }
