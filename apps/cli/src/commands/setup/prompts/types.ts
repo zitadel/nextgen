@@ -68,6 +68,13 @@ export type PromptContext = {
    */
   readonly cwd: string;
   /**
+   * Whether the developer already named the framework: picked it to scaffold
+   * an empty directory, or passed `--framework`. Then
+   * {@link import("./framework-confirm").FrameworkConfirmPrompt} has nothing
+   * left to confirm and skips itself.
+   */
+  readonly frameworkChosen?: boolean;
+  /**
    * The raw `--server` flag value as the user passed it, or `undefined`
    * when not provided. Prompts use this to skip themselves when the flag
    * already pinned the answer (the docstring on `SetupPrompt` says
