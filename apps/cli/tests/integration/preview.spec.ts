@@ -135,6 +135,23 @@ describe("preview", () => {
         expect(app.envelopeOf<Listed>(listed).data.items).toEqual([]);
       });
 
+      it("deploys a URL given twice once", async () => {
+        const app = await anAppAdmittingPreviews();
+
+        const result = await app.run([
+          "preview",
+          "--origin",
+          `${PREVIEW_URL}/`,
+          "--origin",
+          PREVIEW_URL,
+          "--json",
+        ]);
+
+        expect(
+          app.envelopeOf<Published>(result).data.previews.map((preview) => preview.url),
+        ).toEqual([PREVIEW_URL]);
+      });
+
       it("treats a trailing slash on --origin as the same preview URL", async () => {
         const app = await anAppAdmittingPreviews();
 
@@ -158,6 +175,7 @@ describe("preview", () => {
 
       it.each([
         ["Jenkins", { JENKINS_URL: "https://ci.example" }],
+        ["Cloudflare Pages", { CF_PAGES: "1" }],
         ["Azure Pipelines", { TF_BUILD: "True" }],
         ["AWS CodeBuild", { CODEBUILD_BUILD_ID: "build:1" }],
       ])("skips a %s build that names no environment", async (_, env) => {

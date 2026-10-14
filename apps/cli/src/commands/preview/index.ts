@@ -74,8 +74,9 @@ export default class Preview extends PreviewCommand {
     // an explicit origin only selects which targets to preview, it never
     // authorizes a preview deploy into an environment that must not take writes.
     // An origin has no path, so a trailing slash is the same URL: dropped
-    // here as detection drops it, so one preview is one spelling.
-    const requested = (flags.origin ?? []).map((url) => url.replace(/\/+$/, ""));
+    // here as detection drops it, so one preview is one spelling — and a URL
+    // given twice is sent once, as the request's unique targets require.
+    const requested = [...new Set((flags.origin ?? []).map((url) => url.replace(/\/+$/, "")))];
     // `primary` is the deployment keyword for every primary origin. A preview
     // build carries the preview credential and must never be able to reach
     // production with it, so the keyword is refused outright.
@@ -268,6 +269,6 @@ function runsInCi(env: NodeJS.ProcessEnv): boolean {
     ciProvider.value(env) !== undefined ||
     env.CF_PAGES === "1" ||
     envEnabled(env.TF_BUILD) ||
-    env.CODEBUILD_BUILD_ID !== undefined
+    envEnabled(env.CODEBUILD_BUILD_ID)
   );
 }

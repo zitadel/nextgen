@@ -1799,6 +1799,13 @@ export function setupPlatformHandlers() {
       }
 
       const requested = data.targets as string[];
+      // The contract's targets are unique items: a repeated one is a malformed
+      // request, not something to fold quietly.
+      if (new Set(requested).size !== requested.length) {
+        return HttpResponse.json(errorBody("dep.invalid", "deployment: targets must be unique"), {
+          status: 400,
+        });
+      }
       const primaries = primaryOrigins(project);
       const resolved = new Set<string>();
       let sawPreview = false;
