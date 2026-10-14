@@ -238,13 +238,20 @@ export default class EnvAdd extends BaseCommand {
         platform,
         // The new environment, by name: this run's own selection is not it.
         ...nextCommandsData([
-          projectCommand("env", environmentSelectorSuffix({ envName: name }), this.meta.cliVersion),
+          projectCommand(
+            "env",
+            environmentSelectorSuffix({
+              envName: name,
+              ...(typeof flags.cwd === "string" ? { cwd: flags.cwd } : {}),
+            }),
+            this.meta.cliVersion,
+          ),
         ]),
       },
       pretty: [
         `Wrote ${file} with ${Object.keys(values).join(", ")}`,
         "",
-        `Check what resolves: zitadel env --env ${name}`,
+        `Check what resolves: zitadel env --env ${shellArg(name)}${typeof flags.cwd === "string" ? ` --cwd ${shellArg(flags.cwd)}` : ""}`,
         "",
         "The deployed app never reads that file. Set these where it is built and run.",
         "",

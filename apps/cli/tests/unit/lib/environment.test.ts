@@ -403,10 +403,10 @@ describe("requireValue", () => {
     const production = await resolve({ envName: "production" });
 
     expect(() => requireValue(development, "ZITADEL_URL")).toThrow(
-      expect.objectContaining({ nextCommands: ["zitadel setup"] }),
+      expect.objectContaining({ nextCommands: [`zitadel setup --cwd ${dir}`] }),
     );
     expect(() => requireValue(production, "ZITADEL_URL")).toThrow(
-      expect.objectContaining({ nextCommands: ["zitadel env add production"] }),
+      expect.objectContaining({ nextCommands: [`zitadel env add production --cwd ${dir}`] }),
     );
   });
 
@@ -450,6 +450,14 @@ describe("requireValue", () => {
 
     expect(() => requireValue(environment, "ZITADEL_PROJECT_SECRET")).toThrow(
       expect.objectContaining({ nextCommands: undefined }),
+    );
+  });
+
+  it("runs the env add it suggests in the directory this run addressed", async () => {
+    const environment = await resolve({ envName: "staging" });
+
+    expect(() => requireValue(environment, "ZITADEL_PROJECT_ID")).toThrow(
+      expect.objectContaining({ nextCommands: [`zitadel env add staging --cwd ${dir}`] }),
     );
   });
 
