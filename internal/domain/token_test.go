@@ -81,7 +81,12 @@ var storedKeyHeaderRefusals = []struct {
 	{"over-long kid", `{"alg":"A256GCMKW","enc":"A256GCM","kid":"enc_key_` + strings.Repeat("A", 4096) + `"}`},
 	{"unknown kid format", `{"alg":"A256GCMKW","enc":"A256GCM","kid":"key-1"}`},
 	{"kid of another resource", `{"alg":"A256GCMKW","enc":"A256GCM","kid":"sig_key_01JAAAAAAAAAAAAAAAAAAAAAAA"}`},
-	{"lowercase ulid kid", `{"alg":"A256GCMKW","enc":"A256GCM","kid":"enc_key_01jaaaaaaaaaaaaaaaaaaaaaaa"}`},
+	{"newline in kid", `{"alg":"A256GCMKW","enc":"A256GCM","kid":"enc_key_01JAAAAAAAAAAAAAAAAAAAAAAA\n"}`},
+	{"tab in kid", `{"alg":"A256GCMKW","enc":"A256GCM","kid":"enc_key_01JAAAAA\tAAAAAAAAAAAAAAAAA"}`},
+	{"delete control in kid", `{"alg":"A256GCMKW","enc":"A256GCM","kid":"enc_key_01JAAAAA\u007fAAAAAAAAAAAAAAAAA"}`},
+	{"non-ascii kid", `{"alg":"A256GCMKW","enc":"A256GCM","kid":"enc_key_01JAAAAA\u00e9AAAAAAAAAAAAAAAAA"}`},
+	{"kid one past the length bound", `{"alg":"A256GCMKW","enc":"A256GCM","kid":"enc_key_` + strings.Repeat("A", 65) + `"}`},
+	{"prefix only kid", `{"alg":"A256GCMKW","enc":"A256GCM","kid":"enc_key_"}`},
 	{"missing kid", `{"alg":"A256GCMKW","enc":"A256GCM"}`},
 	{"unsupported enc", `{"alg":"A256GCMKW","enc":"A128CBC-HS256","kid":"enc_key_01JAAAAAAAAAAAAAAAAAAAAAAA"}`},
 	{"missing enc", `{"alg":"A256GCMKW","kid":"enc_key_01JAAAAAAAAAAAAAAAAAAAAAAA"}`},
@@ -95,8 +100,10 @@ func TestDecodeStoredKeyJWEHeader(t *testing.T) {
 	for _, kid := range []string{
 		"enc_key_01JAAAAAAAAAAAAAAAAAAAAAAA",
 		"enc_key_3f1c2d4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f",
+		"enc_key_01jaaaaaaaaaaaaaaaaaaaaaaa",
+		"enc_key_k7_Zq-9" + strings.Repeat("x", 57),
 	} {
-		t.Run("accepts minted kid "+kid, func(t *testing.T) {
+		t.Run("accepts opaque kid "+kid, func(t *testing.T) {
 			t.Parallel()
 			header, err := domain.DecodeStoredKeyJWEHeader(jweWithHeader(`{"alg":"A256GCMKW","enc":"A256GCM","kid":"` + kid + `"}`))
 			require.NoError(t, err)
