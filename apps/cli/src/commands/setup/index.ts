@@ -1005,7 +1005,9 @@ const CREDENTIAL_ENV_FILES = [".env.local", ".env.development.local"] as const;
  * rethrown, because reading it as "absent" would make the rollback delete a
  * pre-existing file it should have restored.
  */
-async function readCredentialEnvFiles(cwd: string): Promise<Map<string, Buffer | undefined>> {
+export async function readCredentialEnvFiles(
+  cwd: string,
+): Promise<Map<string, Buffer | undefined>> {
   const before = new Map<string, Buffer | undefined>();
   for (const file of CREDENTIAL_ENV_FILES) {
     try {
@@ -1033,7 +1035,7 @@ async function readCredentialEnvFiles(cwd: string): Promise<Map<string, Buffer |
  * this runs while setup is already failing, and the real error carries the
  * remedy the developer needs.
  */
-async function restoreCredentialEnvFiles(
+export async function restoreCredentialEnvFiles(
   cwd: string,
   before: ReadonlyMap<string, Buffer | undefined>,
 ): Promise<void> {

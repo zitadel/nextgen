@@ -6,7 +6,12 @@ import { dirname, join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { buildSummary } from "../../../../src/commands/setup/index";
+import {
+  buildSummary,
+  readCredentialEnvFiles,
+  restoreCredentialEnvFiles,
+} from "../../../../src/commands/setup/index";
+import { takeReportedWarnings } from "../../../../src/lib/warnings";
 import { bundledServerVersion } from "../../../../src/lib/local-server/binary";
 import {
   localContainerName,
@@ -764,6 +769,45 @@ describe("setup that fails after it created the project", () => {
 
     expect(res.exitCode).toBe(3);
     expect(existsSync(join(cwd, ".env.local"))).toBe(false);
+  });
+});
+
+describe("the credential env files a failed setup rolls back", () => {
+  it("puts back one that existed and removes one setup created", async () => {
+    const cwd = await makeTempDir();
+    await writeFile(join(cwd, ".env.local"), "KEEP=1\n");
+    const before = await readCredentialEnvFiles(cwd);
+    await writeFile(join(cwd, ".env.local"), "KEEP=1\nZITADEL_PROJECT_ID=abandoned\n");
+    await writeFile(join(cwd, ".env.development.local"), "ZITADEL_PROJECT_ID=abandoned\n");
+
+    await restoreCredentialEnvFiles(cwd, before);
+
+    expect(await readFile(join(cwd, ".env.local"), "utf8")).toBe("KEEP=1\n");
+    expect(existsSync(join(cwd, ".env.development.local"))).toBe(false);
+  });
+
+  it("does not read a file it cannot open as one that is absent", async () => {
+    const cwd = await makeTempDir();
+    // A directory where the file should be reads as EISDIR, not ENOENT: treating
+    // it as absent would let the rollback delete something it should restore.
+    await mkdir(join(cwd, ".env.development.local"));
+
+    await expect(readCredentialEnvFiles(cwd)).rejects.toMatchObject({ code: "EISDIR" });
+  });
+
+  it("reports a file it cannot restore as a warning instead of throwing", async () => {
+    const cwd = await makeTempDir();
+    // Writing a file over a directory fails, as an unrestorable file would.
+    await mkdir(join(cwd, ".env.local"));
+    takeReportedWarnings();
+
+    await expect(
+      restoreCredentialEnvFiles(cwd, new Map([[".env.local", Buffer.from("KEEP=1\n")]])),
+    ).resolves.toBeUndefined();
+
+    expect(takeReportedWarnings()).toEqual([
+      expect.stringContaining("Could not restore .env.local"),
+    ]);
   });
 });
 
