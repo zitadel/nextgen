@@ -27,6 +27,8 @@ export async function prepareApp(options = {}) {
   const runtime = localRuntime(env.JOURNEY_RUNTIME);
   const preset = options.preset ?? env.JOURNEY_PRESET ?? "";
   const preexistingApp = options.preexistingApp ?? env.JOURNEY_PREEXISTING_APP === "1";
+  // `local`, or the remote lane's https edge in front of the same local runtime.
+  const setupServer = options.setupServer ?? (env.JOURNEY_SETUP_SERVER || "local");
   const fs = {
     appendFile: options.appendFile ?? appendFile,
     cp: options.cp ?? cp,
@@ -99,7 +101,7 @@ export async function prepareApp(options = {}) {
         "--framework",
         framework.id,
         "--server",
-        "local",
+        setupServer,
         "--dev-port",
         String(appPort),
         // A fresh app dir holds only what `start` just left there, which setup

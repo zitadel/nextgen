@@ -1,8 +1,9 @@
 {
-  "title": "Flow Definitions",
+  "title": "Flow definitions",
   "pages": [
     "listFlowDefinitions",
     "createFlowDefinition",
-    "getFlowDefinition"
+    "getFlowDefinition",
+    "..."
   ]
 }

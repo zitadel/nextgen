@@ -19,17 +19,17 @@ The Vue SDK wraps the shared web components with Vue 3-friendly bindings.
 <Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
   <Tab>
     ```sh
-    pnpm add @zitadel/sdk-vue
+    pnpm add @zitadel/sdk-vue@alpha
     ```
   </Tab>
   <Tab>
     ```sh
-    npm install @zitadel/sdk-vue
+    npm install @zitadel/sdk-vue@alpha
     ```
   </Tab>
   <Tab>
     ```sh
-    yarn add @zitadel/sdk-vue
+    yarn add @zitadel/sdk-vue@alpha
     ```
   </Tab>
 </Tabs>
@@ -47,6 +47,8 @@ The Vue SDK wraps the shared web components with Vue 3-friendly bindings.
       <File name=".env.example" />
       <File name="package.json" />
     </Files>
+
+    In an existing app, the CLI edits the `vite.config.*` you already have. Every setup also writes `zitadel.json` and the `.zitadel/` folder, adds its entries to `.gitignore`, and adds managed sections to `AGENTS.md` and `README.md`.
   </Tab>
   <Tab>
     Configure Zitadel once, then render the components:
@@ -73,8 +75,8 @@ The Vue SDK wraps the shared web components with Vue 3-friendly bindings.
 
 <Steps>
   <Step>The Vue components call the same shared Zitadel web components as the other SPA SDKs.</Step>
-  <Step>The generated Vite proxy forwards `/__nextgen/*` to the backend during local development.</Step>
-  <Step>Production needs an equivalent proxy for same-origin auth API calls.</Step>
+  <Step>The generated Vite proxy forwards `/__nextgen/*` to the backend during local development and adds the project secret to the session exchange, and to no other call.</Step>
+  <Step>In production, you supply the same-origin proxy yourself. The generated app sends no credential, so that proxy must add the project secret to the session exchange, and to no other call. A plain rewrite cannot do that (see [SDK proxy](/docs/concepts/sdk-proxy#spas-in-production)).</Step>
 </Steps>
 
 ## Verify
@@ -86,6 +88,6 @@ The Vue SDK wraps the shared web components with Vue 3-friendly bindings.
 
 ## See also
 
-- [SDK proxy](/docs/concepts/sdk-proxy) — why SPAs need a same-origin `/__nextgen/*` proxy and how to run one in production.
+- [SDK proxy](/docs/concepts/sdk-proxy) — why SPAs need a same-origin `/__nextgen/*` proxy and what it must do in production.
 - [Components](/docs/sdks/components) — the shared web components these wrappers render.
 - [`@zitadel/sdk-vue` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-vue) and the [CLI Vue patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/vue).
