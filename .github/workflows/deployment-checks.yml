@@ -16,7 +16,7 @@ name: deployment-checks
 # Each job runs a service's contract suite against the deployment's URL: the
 # docs' the way the service runs it locally, but against the deployment
 # instead of a local server (`docs:e2e-deployment`); the console's, which has
-# no local counterpart, signed out (`console-e2e:e2e-deployment`). What is
+# no local counterpart, signed out (`e2e:console-deployment`). What is
 # checked is the artifact Vercel built, routed by the repo-root vercel.json,
 # behind Vercel's protection.
 #
@@ -98,6 +98,10 @@ jobs:
       # See ci.yml.
       MOON_SUMMARY: detailed
       DO_NOT_TRACK: "1"
+      # Playwright forces FORCE_COLOR=1 on its workers and web servers, and Node
+      # warns on every process that also sees NO_COLOR. Blank it so only the
+      # test output is left in the log.
+      NO_COLOR: ""
     steps:
       - name: Name the deployment in the run's summary
         env:
@@ -131,7 +135,7 @@ jobs:
         run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
 
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
@@ -168,7 +172,7 @@ jobs:
       # (docs/runbooks/cloud.md, "Deployment checks").
       - name: Upload the screenshots
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: docs-deployment-screenshots
           path: apps/docs/test-results/**/*.png
@@ -196,6 +200,10 @@ jobs:
       VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
       MOON_SUMMARY: detailed
       DO_NOT_TRACK: "1"
+      # Playwright forces FORCE_COLOR=1 on its workers and web servers, and Node
+      # warns on every process that also sees NO_COLOR. Blank it so only the
+      # test output is left in the log.
+      NO_COLOR: ""
     steps:
       - name: Name the deployment in the run's summary
         env:
@@ -204,13 +212,37 @@ jobs:
         run: |
           {
             echo "- Deployment: $CONSOLE_DEPLOYMENT_URL ($ENVIRONMENT, commit ${COMMIT:0:8})"
-            echo "- Reproduce: \`CONSOLE_DEPLOYMENT_URL=$CONSOLE_DEPLOYMENT_URL VERCEL_AUTOMATION_BYPASS_SECRET=… moon run console-e2e:e2e-deployment\`"
+            echo "- Reproduce: \`CONSOLE_DEPLOYMENT_URL=$CONSOLE_DEPLOYMENT_URL VERCEL_AUTOMATION_BYPASS_SECRET=… moon run e2e:console-deployment\`"
             echo "- On a failure the annotations name the contract and the requests that failed; a failed browser test's screenshots are the \`console-deployment-screenshots\` artifact."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/checkout@v6
         with:
           ref: ${{ inputs.sha || github.event.deployment.sha || github.ref }}
+
+      # On production this workflow comes from main's head but the code from
+      # the deployed commit, which can predate the move of the e2e suites into
+      # e2e/ (a deployment still building when that merged, or a rollback).
+      # Run the suite the checked-out commit has.
+      - name: Find the console suite in this commit
+        id: suite
+        run: |
+          if [ -f e2e/console/playwright.deployment.config.mts ]; then
+            {
+              echo "target=e2e:console-deployment"
+              echo "package=@zitadel/e2e"
+              echo "results=e2e/console/test-results"
+            } >> "$GITHUB_OUTPUT"
+          elif [ -f apps/console-e2e/playwright.deployment.config.mts ]; then
+            {
+              echo "target=console-e2e:e2e-deployment"
+              echo "package=@zitadel/console-e2e"
+              echo "results=apps/console-e2e/test-results"
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::This commit has no console deployment suite."
+            exit 1
+          fi
 
       - uses: pnpm/action-setup@v5
         with:
@@ -228,13 +260,15 @@ jobs:
         run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
 
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install Playwright Chromium
-        run: corepack pnpm --filter @zitadel/console-e2e exec playwright install chromium
+        env:
+          SUITE_PACKAGE: ${{ steps.suite.outputs.package }}
+        run: corepack pnpm --filter "$SUITE_PACKAGE" exec playwright install chromium
 
       - name: Check the bypass secret is set
         run: |
@@ -244,17 +278,21 @@ jobs:
           }
 
       - name: Run the console suite against the deployment
-        run: env -u CI -u GITHUB_ACTIONS moon run console-e2e:e2e-deployment
+        env:
+          SUITE_TARGET: ${{ steps.suite.outputs.target }}
+        run: env -u CI -u GITHUB_ACTIONS moon run "$SUITE_TARGET"
 
       - name: Record the pass
         id: passed
         run: echo "result=success" >> "$GITHUB_OUTPUT"
 
+      # Not when the suite lookup failed: an empty results path would turn the
+      # glob into /**/*.png, every PNG on the runner.
       - name: Upload the screenshots
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        if: ${{ failure() && steps.suite.outputs.results != '' }}
+        uses: actions/upload-artifact@v7
         with:
           name: console-deployment-screenshots
-          path: apps/console-e2e/test-results/**/*.png
+          path: ${{ steps.suite.outputs.results }}/**/*.png
           if-no-files-found: ignore
           retention-days: 7

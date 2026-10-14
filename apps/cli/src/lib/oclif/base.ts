@@ -7,6 +7,7 @@ import consola from "consola";
 
 import { toZitadelError, type ZitadelError } from "../errors";
 import { listenForInterrupt, stopListeningForInterrupt } from "../interrupt";
+import { type Asker, input as askInput } from "../input";
 import { isObject } from "../json";
 import { resolveCwd } from "../paths";
 import { normalizePublicCliCommand, normalizePublicCliCommands } from "../public-cli";
@@ -141,6 +142,16 @@ export abstract class BaseCommand extends Command {
     const telemetryFlag = this.argv.includes("--no-telemetry") ? false : undefined;
     installUserAgent(buildUserAgent(processUserAgentFacts(this.config.version, telemetryFlag)));
   }
+
+  /**
+   * Asks for a value, a choice or a confirmation: the one way a command takes
+   * input. It is {@link askInput} with this invocation's interactivity
+   * (`--non-interactive`, `--json`, no terminal) and `--force` filled in, so a
+   * command states only the question. See {@link askInput} for the order the
+   * answer is looked for in and what is thrown when there is none.
+   */
+  protected readonly input: Asker = (question) =>
+    askInput(question, { interactive: !this.meta.nonInteractive, force: this.meta.force });
 
   /**
    * Merge command-specific dimensions into {@link telemetryProps} immutably: a

@@ -1,5 +1,4 @@
 import { Flags } from "@oclif/core";
-import { cancel, isCancel, password, text } from "@clack/prompts";
 
 import { CommandGroups, type JsonEnvelope, nonBlankArg, OwnerCommand } from "../../lib/oclif";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
@@ -7,7 +6,6 @@ import { ZitadelError } from "../../lib/errors";
 import {
   assertVariableName,
   parseVariableValue,
-  readStdin,
   VARIABLE_TYPES,
   type VariableType,
 } from "../../lib/variables";
@@ -51,7 +49,7 @@ export default class VariablesSet extends OwnerCommand {
   async run(): Promise<JsonEnvelope> {
     const { args, flags } = await this.parse(VariablesSet);
     await this.toMeta(flags);
-    const { nonInteractive, dryRun, cliVersion } = this.meta;
+    const { dryRun, cliVersion } = this.meta;
     const name = args.name;
     const type = flags.as as VariableType;
 
@@ -79,32 +77,18 @@ export default class VariablesSet extends OwnerCommand {
       });
     }
 
-    // A value never comes from a flag, so a scripted run has to pipe one in. A
-    // terminal on stdin means nothing was piped: fail rather than block on a
-    // read that would never end.
-    if (nonInteractive && process.stdin.isTTY) {
-      const retry = pipeHint(name, flags.secret, type, cliVersion);
-      throw new ZitadelError("E_VALIDATION", `No value supplied for ${name}.`, {
-        hint: `Pipe the value in: ${retry}`,
-        nextCommands: [retry],
-      });
-    }
+    // A value never comes from a flag, so a scripted run has to pipe one in.
     // The prompt is masked when the value is to be stored as a secret, so it
-    // does not stay on screen or in a scrollback buffer.
-    const answer = nonInteractive
-      ? await readStdin(process.stdin)
-      : flags.secret
-        ? await password({ message: `Value for ${name}` })
-        : await text({ message: `Value for ${name}` });
-    if (isCancel(answer)) {
-      cancel("Set cancelled.");
-      throw new ZitadelError("E_VALIDATION", "Set cancelled by user");
-    }
-    // An empty submission reads as `undefined` from the prompt and has to
-    // become `""`, not the string "undefined". An empty string is a value the
-    // scalar schema accepts; only an absent input is an error, which the stdin
-    // guard above and the cancel signal cover.
-    const value = parseVariableValue(String(answer ?? ""), type);
+    // does not stay on screen or in a scrollback buffer. An empty string is a
+    // value the scalar schema accepts; only an absent input is an error.
+    const value = await this.input({
+      kind: flags.secret ? "secret" : "text",
+      name: `value for ${name}`,
+      message: `Value for ${name}`,
+      stdin: true,
+      retry: pipeHint(name, flags.secret, type, cliVersion),
+      parse: (raw) => parseVariableValue(raw, type),
+    });
 
     await client.updateVariables({ [name]: { value, secret: flags.secret } }, scope);
     this.recordTelemetry({ is_secret: flags.secret });

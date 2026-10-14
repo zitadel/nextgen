@@ -72,6 +72,30 @@ describe("variables delete", () => {
       });
     });
 
+    describe("without --force when no one can be asked", () => {
+      it("is refused", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+        const result = await app.run(["variables", "delete", "FOO", "--project-level", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toHintAt("--force");
+        expect(result).toSuggest("variables delete FOO --project-level --force");
+      });
+
+      it("removes nothing", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+        await app.run(["variables", "delete", "FOO", "--project-level", "--json"]);
+
+        expect(await app.projectVariables()).toEqual(
+          expect.arrayContaining([expect.objectContaining({ name: "FOO" })]),
+        );
+      });
+    });
+
     it("removes nothing on a dry run", async () => {
       const app = await aSetUpApp();
       expect(await app.setVariable("FOO", "bar")).toSucceed();

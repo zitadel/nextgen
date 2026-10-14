@@ -1,8 +1,5 @@
-import { select } from "@clack/prompts";
-
 import { SETUP_PRESETS, type SetupPreset } from "@zitadel/config/defaults";
 
-import { bail } from "./cancel";
 import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
 
 /**
@@ -20,12 +17,13 @@ export class SignInPresetPrompt implements SetupPrompt {
       "password-first": "Password first — email + password",
       "passkey-first": "Passkey first — one-tap passkey up front, email + password fallback",
     };
-    const value = await select({
+    const preset = await ctx.input({
+      kind: "select",
+      name: "sign-in preset",
       message: "How should users sign in?",
       initialValue: answers.preset,
       options: SETUP_PRESETS.map((preset) => ({ value: preset, label: labels[preset] })),
     });
-    bail(value);
-    return { ...answers, preset: value as SetupPreset };
+    return { ...answers, preset };
   }
 }

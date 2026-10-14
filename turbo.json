@@ -117,23 +117,7 @@
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
-    "e2e-real": {
-      "cache": false,
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
-    },
-    "e2e-embedded": {
-      "cache": false,
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
-    },
-    "e2e-platform": {
-      "cache": false,
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
-    },
     "e2e-local": {
-      "cache": false,
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
-    },
-    "e2e-testkit": {
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
@@ -176,6 +160,9 @@
         "packages/*/package.json",
         "apps/*/tsconfig*.json",
         "packages/*/tsconfig*.json",
+        "e2e/moon.yml",
+        "e2e/package.json",
+        "e2e/tsconfig*.json",
         "vitest.config.ts"
       ]
     },
@@ -200,8 +187,10 @@
         "apps/*/moon.yml",
         "packages/*/moon.yml",
         "tools/*/moon.yml",
+        "e2e/moon.yml",
         "apps/*/package.json",
-        "packages/*/package.json"
+        "packages/*/package.json",
+        "e2e/package.json"
       ]
     },
     "//#check-adrs": {
@@ -231,11 +220,6 @@
         "scripts/task-runner.mjs"
       ],
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "GOFLAGS"]
-    },
-    "//#journey": {
-      "cache": false,
-      "inputs": ["scripts/run-journey.mjs", "scripts/dev-process.mjs"],
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "PLAYWRIGHT_*", "DOCKER_*"]
     },
     // The local runtime image: the server cross-compiled for linux with both
     // UI dists embedded. Needs Docker, so it stays out of CI.
