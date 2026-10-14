@@ -43,6 +43,16 @@ describe("reset", () => {
 
   describe("against a valid server", () => {
     describe("--json", () => {
+      it("refuses to delete without --force when no one can be asked", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["reset", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toHintAt("--force");
+        expect(result).toSuggest("reset --force");
+      });
+
       it("succeeds when there is no local runtime to delete", async () => {
         const app = await aSetUpApp();
 

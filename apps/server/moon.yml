@@ -218,6 +218,11 @@ tasks:
       - "10m"
       - "./..."
     deps:
+      # check-generate rewrites api/generated while it runs. These suites
+      # compile that package and api/internal/erroranalysis type-loads it, so a
+      # lane run beside it reads half-written files. vet, lint and build wait
+      # for it the same way.
+      - "check-generate"
       # Order UI builds before go test so //go:embed all:dist has files.
       - "console:build"
       - "login-ui:build"
@@ -230,8 +235,8 @@ tasks:
       cache: false
       # Invoked explicitly by the CI "Run Go integration tests (postgres)" step.
       # runInCI must be true, otherwise moon hides the task from `moon run` in CI
-      # ("No tasks found"). It is not pulled into `moon ci :...:test` because that
-      # selects the `test` task by name, not `test-postgres`.
+      # ("No tasks found"). `moon ci --downstream deep` also runs it when it is
+      # affected, as a dependent of the UI builds.
       runInCI: true
 
   test-spanner:
@@ -274,6 +279,8 @@ tasks:
       - "1"
       - "./..."
     deps:
+      # check-generate rewrites api/generated; see test-postgres.
+      - "check-generate"
       # Order UI builds before go test so //go:embed all:dist has files.
       - "console:build"
       - "login-ui:build"
@@ -293,11 +300,13 @@ tasks:
       # before go's cache mattered. Observed on #934, where moon replayed the
       # emulator task's result for a real-instance run.
       cache: false
-      # Invoked by .github/workflows/spanner.yml (not by ci.yml).
-      # runInCI must be true, otherwise moon hides the task from `moon run` in CI
-      # ("No tasks found"). It is not pulled into `moon ci :...:test` because that
-      # selects the `test` task by name, not `test-spanner`.
-      runInCI: true
+      # Runs in .github/workflows/spanner.yml, never in ci.yml. "skip" keeps
+      # `moon ci` from pulling it in: --downstream deep selects it as a
+      # dependent of the UI builds whenever the server or a UI changes, and
+      # its ~3.5 minutes then held up the whole PR graph. In CI, `moon run`
+      # refuses a skipped task ("No tasks found"); spanner.yml runs it with
+      # `moon exec --ignore-ci-checks`. Local `moon run` is unaffected.
+      runInCI: "skip"
 
   test-sqlite:
     # -count=1 disables go's test-result cache; see test-postgres above. SQLite
@@ -315,6 +324,8 @@ tasks:
       - "5m"
       - "./..."
     deps:
+      # check-generate rewrites api/generated; see test-postgres.
+      - "check-generate"
       # Order UI builds before go test so //go:embed all:dist has files.
       - "console:build"
       - "login-ui:build"
@@ -327,8 +338,8 @@ tasks:
       cache: false
       # Invoked explicitly by the CI "Run Go integration tests (sqlite)" step.
       # runInCI must be true, otherwise moon hides the task from `moon run` in CI
-      # ("No tasks found"). It is not pulled into `moon ci :...:test` because that
-      # selects the `test` task by name, not `test-sqlite`.
+      # ("No tasks found"). `moon ci --downstream deep` also runs it when it is
+      # affected, as a dependent of the UI builds.
       runInCI: true
 
   build:

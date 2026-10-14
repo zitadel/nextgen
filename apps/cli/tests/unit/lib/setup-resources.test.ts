@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import type { ZitadelClient } from "@zitadel/api/client";
 import { DEFAULT_FLOW_CONFIG_PATH, DEFAULT_SCHEMA_CONFIG_PATH } from "@zitadel/config/defaults";
@@ -9,8 +9,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
 
-import { materializeSetupResources } from "../../../src/lib/setup-resources";
+import {
+  assertNoSetupResourceConflicts,
+  materializeSetupResources,
+} from "../../../src/lib/setup-resources";
 import { IDPS_DIR } from "../../../src/lib/idp";
+import { acmeSelection, googleSelection } from "../../helpers/idp-values";
 import { FLOWS_DIR } from "../../../src/lib/flows";
 import { SCHEMAS_DIR } from "../../../src/lib/user-schema";
 import { hashForState } from "../../../src/lib/sync";
@@ -62,7 +66,7 @@ describe("materializeSetupResources", () => {
     });
   });
 
-  it("reuses the server-returned schema id as user_schema on the flow", async () => {
+  it("names the schema by its objectType on the flow", async () => {
     const client = {
       createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
       createFlowDefinition: vi
@@ -85,7 +89,7 @@ describe("materializeSetupResources", () => {
     const flowFile = JSON.parse(await readFile(join(cwd, DEFAULT_FLOW_CONFIG_PATH), "utf8")) as {
       user_schema: string;
     };
-    expect(flowFile.user_schema).toBe("sch_01KWHF");
+    expect(flowFile.user_schema).toBe("human-user");
   });
 
   it("reconciles the schema file with the server's stored body and seeds its hash", async () => {
@@ -348,7 +352,7 @@ describe("materializeSetupResources with a social provider", () => {
   }
 
   // A list now: setup enables any number of providers in one run.
-  const google = [{ provider: "google", clientId: "1234-abc.apps.googleusercontent.com" }];
+  const google = [{ selection: googleSelection }];
 
   it("writes the connection and records the id the platform assigned", async () => {
     const client = recordingClient();
@@ -493,6 +497,128 @@ describe("materializeSetupResources with a social provider", () => {
     expect(kept.mine).toBe(true);
   });
 
+  it("does not read the connection files when no provider was chosen", async () => {
+    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await writeFile(join(cwd, IDPS_DIR, "draft.json"), "{not json");
+
+    await expect(
+      materializeSetupResources({
+        cwd,
+        cliVersion: TEST_CLI_VERSION,
+        client: recordingClient(),
+        projectId: "project_123",
+        force: false,
+      }),
+    ).resolves.toBeDefined();
+  });
+
+  it("names setup's own slug flag when it refuses a connection to another issuer", async () => {
+    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await writeFile(
+      join(cwd, IDPS_DIR, "acme.json"),
+      JSON.stringify({ slug: "acme", oidc: { issuer: "https://sso.other.example" } }),
+    );
+
+    const error = await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: recordingClient(),
+      projectId: "project_123",
+      force: false,
+      sso: [{ selection: acmeSelection }],
+    }).catch((err: unknown) => err);
+
+    expect((error as { hint?: string }).hint).toContain("--sso-slug");
+  });
+
+  it("suggests enabling the provider that was chosen, not always Google", async () => {
+    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await writeFile(
+      join(cwd, IDPS_DIR, "acme.json"),
+      JSON.stringify({ slug: "acme", oidc: { issuer: "https://sso.acme.example" } }),
+    );
+
+    const error = await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: recordingClient(),
+      projectId: "project_123",
+      force: false,
+      sso: [{ selection: acmeSelection }],
+    }).catch((err: unknown) => err);
+
+    expect((error as { nextCommands?: string[] }).nextCommands?.[0]).toContain(
+      "--provider custom --slug acme",
+    );
+  });
+
+  it("refuses a connection another file already holds the slug of, before creating anything", async () => {
+    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await writeFile(
+      join(cwd, IDPS_DIR, "elsewhere.json"),
+      JSON.stringify({ slug: "google", template: "google" }),
+    );
+
+    await expect(
+      materializeSetupResources({
+        cwd,
+        cliVersion: TEST_CLI_VERSION,
+        client: recordingClient(),
+        projectId: "project_123",
+        force: false,
+        sso: google,
+      }),
+    ).rejects.toMatchObject({ code: "E_CONFLICT" });
+  });
+
+  it("refuses a custom connection whose variables another file would share", async () => {
+    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await writeFile(
+      join(cwd, IDPS_DIR, "other.json"),
+      JSON.stringify({
+        slug: "other",
+        oidc: {
+          issuer: "https://other.example",
+          client_id: "${{ ACME_CLIENT_ID }}",
+          client_secret: "${{ OTHER_CLIENT_SECRET }}",
+        },
+      }),
+    );
+
+    await expect(
+      materializeSetupResources({
+        cwd,
+        cliVersion: TEST_CLI_VERSION,
+        client: recordingClient(),
+        projectId: "project_123",
+        force: false,
+        sso: [{ selection: acmeSelection }],
+      }),
+    ).rejects.toMatchObject({ code: "E_CONFLICT" });
+  });
+
+  // Setup does not remove a connection file it wrote, so a schema refused
+  // after the connection exists would leave a file the retry refuses on.
+  it("refuses an existing default schema before it creates the connection", async () => {
+    const client = recordingClient();
+    await mkdir(join(cwd, SCHEMAS_DIR), { recursive: true });
+    await writeFile(join(cwd, DEFAULT_SCHEMA_CONFIG_PATH), "{}\n");
+
+    await expect(
+      materializeSetupResources({
+        cwd,
+        cliVersion: TEST_CLI_VERSION,
+        client,
+        projectId: "project_123",
+        force: false,
+        sso: google,
+      }),
+    ).rejects.toMatchObject({ code: "E_CONFLICT" });
+
+    expect(client.createIdp).not.toHaveBeenCalled();
+    expect(existsSync(join(cwd, IDPS_DIR, "google.json"))).toBe(false);
+  });
+
   it("creates the connection before the flow that names it", async () => {
     const client = recordingClient();
 
@@ -556,13 +682,7 @@ describe("materializeSetupResources with a social provider", () => {
   });
 });
 
-/**
- * Cardinality greater than one, which the catalog cannot supply today: it
- * registers Google alone (`packages/config/src/idp/index.ts`). Mocking the
- * lookup is the alternative to a production seam that exists only for tests —
- * the loops under test take whatever `idpProvider` returns, so two distinct
- * fakes exercise them exactly as two real providers would.
- */
+/** Several providers at once: Google from the catalog, and a custom connection beside it. */
 describe("materializeSetupResources with several providers", () => {
   let cwd: string;
 
@@ -573,39 +693,13 @@ describe("materializeSetupResources with several providers", () => {
       join(cwd, ".zitadel/state.json"),
       JSON.stringify({ framework: "next", resources: {} }),
     );
-    vi.resetModules();
   });
 
   afterEach(async () => {
-    vi.doUnmock("@zitadel/config/idp");
-    vi.resetModules();
     await rm(cwd, { recursive: true, force: true });
   });
 
   it("creates a connection per provider and names every slug", async () => {
-    const actual =
-      await vi.importActual<typeof import("@zitadel/config/idp")>("@zitadel/config/idp");
-    const google = actual.idpProvider("google");
-    // Two providers differing only in slug and display name: enough for the
-    // loops, and the connection body stays a real one the contract accepts.
-    vi.doMock("@zitadel/config/idp", () => ({
-      ...actual,
-      IDP_PROVIDERS: ["google", "acme"],
-      idpProvider: (slug: string) => ({
-        ...google,
-        slug,
-        displayName: slug === "acme" ? "Acme SSO" : "Google",
-        connection: (input: Parameters<typeof google.connection>[0]) => ({
-          ...(google.connection(input) as Record<string, unknown>),
-          slug,
-          display_name: slug === "acme" ? "Acme SSO" : "Google",
-        }),
-      }),
-    }));
-
-    const { materializeSetupResources: materialize } = await import(
-      "../../../src/lib/setup-resources"
-    );
     const client = {
       createIdp: vi.fn().mockImplementation(async (body: { idp: { slug?: string } }) => ({
         // A distinct id per connection, so a first-only bug cannot hide behind
@@ -623,16 +717,13 @@ describe("materializeSetupResources with several providers", () => {
         })),
     } as unknown as ZitadelClient;
 
-    await materialize({
+    await materializeSetupResources({
       cwd,
       cliVersion: TEST_CLI_VERSION,
       client,
       projectId: "project_123",
       force: false,
-      sso: [
-        { provider: "google", clientId: "google-client-id" },
-        { provider: "acme", clientId: "acme-client-id" },
-      ],
+      sso: [{ selection: googleSelection }, { selection: acmeSelection }],
     });
 
     // One create and one file each, not just the first.
@@ -651,5 +742,70 @@ describe("materializeSetupResources with several providers", () => {
     };
     const identifier = flow.steps.find((step) => step.name === "identifier");
     expect(identifier?.sso_providers).toEqual(["google", "acme"]);
+  });
+});
+
+/**
+ * Setup runs this before it creates the project: a conflict found once the
+ * project exists leaves the project behind, and the rerun's `.env.local`
+ * keeps its id and secret.
+ */
+describe("assertNoSetupResourceConflicts", () => {
+  it.each([DEFAULT_SCHEMA_CONFIG_PATH, DEFAULT_FLOW_CONFIG_PATH])(
+    "refuses an existing %s without --force",
+    async (path) => {
+      await mkdir(join(cwd, dirname(path)), { recursive: true });
+      await writeFile(join(cwd, path), "{}\n");
+
+      await expect(assertNoSetupResourceConflicts({ cwd, force: false })).rejects.toMatchObject({
+        code: "E_CONFLICT",
+        message: `${path} already exists`,
+        hint: expect.stringContaining("--force"),
+      });
+    },
+  );
+
+  it("lets --force replace the default schema and flow", async () => {
+    for (const path of [DEFAULT_SCHEMA_CONFIG_PATH, DEFAULT_FLOW_CONFIG_PATH]) {
+      await mkdir(join(cwd, dirname(path)), { recursive: true });
+      await writeFile(join(cwd, path), "{}\n");
+    }
+
+    await expect(assertNoSetupResourceConflicts({ cwd, force: true })).resolves.toBe(undefined);
+  });
+
+  it("refuses an existing connection for a chosen provider, even with --force", async () => {
+    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await writeFile(
+      join(cwd, IDPS_DIR, "google.json"),
+      JSON.stringify({ slug: "google", template: "google" }),
+    );
+
+    await expect(
+      assertNoSetupResourceConflicts({ cwd, force: true, sso: [{ selection: googleSelection }] }),
+    ).rejects.toMatchObject({
+      code: "E_CONFLICT",
+      message: `${IDPS_DIR}/google.json already exists`,
+      hint: expect.stringContaining("never replaces or removes one"),
+    });
+  });
+
+  it("refuses a chosen provider whose slug another connection file holds, before the project exists", async () => {
+    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await writeFile(
+      join(cwd, IDPS_DIR, "elsewhere.json"),
+      JSON.stringify({ slug: "google", template: "google" }),
+    );
+
+    await expect(
+      assertNoSetupResourceConflicts({ cwd, force: true, sso: [{ selection: googleSelection }] }),
+    ).rejects.toMatchObject({ code: "E_CONFLICT" });
+  });
+
+  it("ignores a connection for a provider nobody chose", async () => {
+    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await writeFile(join(cwd, IDPS_DIR, "google.json"), JSON.stringify({ slug: "google" }));
+
+    await expect(assertNoSetupResourceConflicts({ cwd, force: false })).resolves.toBe(undefined);
   });
 });

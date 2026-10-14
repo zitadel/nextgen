@@ -45,7 +45,7 @@ import {
   ListFlowDefinitionsResponse,
   QueryIdpsResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 
 import { signHandoffToken } from "./crypto.js";
 import {
@@ -184,6 +184,46 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(body.code).toBe("sess.project_id_missing");
   });
 
+  // The server cannot tell a replayed token from one it never issued (it
+  // deletes the attempt on exchange), so it refuses both, and an expired one,
+  // with the same 400 (internal/api/integration_test/session_exchange_test.go).
+  describe("POST /sessions/exchange refuses a handoff token it will not exchange", () => {
+    const exchange = (handoffToken: string) =>
+      fetch(`${BASE}/sessions/exchange?project_id=proj_refused`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ handoff_token: handoffToken }),
+      });
+    const expectRefused = async (res: Response) => {
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as Record<string, unknown>;
+      expect(body.code).toBe("sess.invalid_handoff_token");
+    };
+
+    test("a replay of an exchanged token", async () => {
+      const handoff = await signHandoffToken({ sub: "proj_refused", iss: BASE });
+      expect((await exchange(handoff)).status).toBe(200);
+      await expectRefused(await exchange(handoff));
+    });
+
+    test("a token it never issued", async () => {
+      await expectRefused(await exchange("handoff_never_issued"));
+    });
+
+    test("an expired token", async () => {
+      // Signed two minutes ago, so its 60-second lifetime is over.
+      vi.useFakeTimers({ toFake: ["Date"] });
+      let handoff: string;
+      try {
+        vi.setSystemTime(Date.now() - 120_000);
+        handoff = await signHandoffToken({ sub: "proj_refused", iss: BASE });
+      } finally {
+        vi.useRealTimers();
+      }
+      await expectRefused(await exchange(handoff));
+    });
+  });
+
   test("DELETE /sessions/me revokes an active session and clears the cookie", async () => {
     const handoff = await signHandoffToken({ sub: "proj_revoke", iss: BASE });
     const exchange = await fetch(`${BASE}/sessions/exchange?project_id=proj_revoke`, {
@@ -318,6 +358,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       body: JSON.stringify({
         kind: "user-schema",
         metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+        objectType: "conformance",
         // Mirrors the server's designation rule (ADR 058 §1): password
         // requires a designated project-unique identifier.
         "x-identifier": "email",
@@ -338,6 +379,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       body: JSON.stringify({
         kind: "user-schema",
         metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+        objectType: "conformance",
         // Mirrors the server's designation rule (ADR 058 §1): password
         // requires a designated project-unique identifier.
         "x-identifier": "email",
@@ -369,6 +411,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const doc = {
       kind: "user-schema",
       metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+      objectType: "conformance",
       "x-auth-methods": { password: { enabled: true } },
       title: "CustomTitle",
       "x-custom-extension": { keep: true },
@@ -505,6 +548,33 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     // POST 201 and GET 200 share the `flow-definition-response`
     // envelope per the spec, so the GET response zod schema validates both.
     expect(() => GetFlowDefinitionResponse.parse(body)).not.toThrow();
+  });
+
+  test("POST /flow_definitions stores a schema id as the objectType it names", async () => {
+    const schema = await fetch(`${BASE}/schemas?project_id=proj_conformance_handle`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "user-schema",
+        metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+        objectType: "conformance-handle",
+        "x-auth-methods": { passkey: { enabled: true } },
+        properties: { email: { type: "string", format: "email", "x-unique": "project" } },
+      }),
+    });
+    const { id } = (await schema.json()) as { id: string };
+
+    const res = await fetch(`${BASE}/flow_definitions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        project_id: "proj_conformance_handle",
+        flow_definition: { ...validFlowDefinitionBody(), user_schema: id },
+      }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { flow_definition: { user_schema: string } };
+    expect(body.flow_definition.user_schema).toBe("conformance-handle");
   });
 
   test("POST /flow_definitions rejects an invalid definition with the server's flowdef.invalid envelope", async () => {

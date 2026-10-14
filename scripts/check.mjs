@@ -118,14 +118,14 @@ async function phaseNodeE2e() {
   await run("corepack", [
     "pnpm",
     "--filter",
-    "@zitadel/demo-next-e2e",
+    "@zitadel/e2e",
     "exec",
     "playwright",
     "install",
     "chromium",
   ]);
-  await runTargets("demo-next-e2e:e2e");
-  await runTargets("demo-nuxt-e2e:e2e");
+  await runTargets("e2e:demo-next-mock");
+  await runTargets("e2e:demo-nuxt-mock");
 }
 
 async function phasePack() {
@@ -142,5 +142,5 @@ async function phaseRelease() {
 }
 
 async function phaseJourney() {
-  await run(process.execPath, ["scripts/run-journey.mjs"]);
+  await runTargets("e2e:journey");
 }

@@ -7,11 +7,22 @@
   --color-background: #0f0f11;
   --color-foreground: #f4f4f6;
   --color-text-primary: #f4f4f6;
+  --color-text-secondary: #bfbfcf;
+  --color-text-muted: #82829c;
+  --color-border-primary: #252528;
+  --color-surface-black-secondary: #252528;
   --color-accent-strong: #bd2514;
 
-  /* layout.tsx sets --font-arimo and --font-apk-futural on <html>. */
+  /* layout.tsx sets --font-arimo, --font-apk-futural and --font-azeret-mono
+     on <html>. */
   --font-sans: var(--font-arimo), Arial, Helvetica, sans-serif;
   --font-heading: var(--font-apk-futural), Arial, Helvetica, sans-serif;
+  --font-mono: var(--font-azeret-mono), ui-monospace, monospace;
+}
+
+/* How the stage and the commands under it move in. */
+:root {
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* The centerpiece (page.tsx): the website's hero animation, its own light
@@ -21,13 +32,13 @@
   .stage {
     --tilt-x: 0;
     --tilt-y: 0;
-    --ease: cubic-bezier(0.22, 1, 0.36, 1);
     display: flex;
     flex-direction: column;
     align-items: center;
-    /* As wide as the column, 44rem, and the height beside the logo and the
-       caption allow. */
-    width: min(100%, 44rem, calc((100dvh - 13rem) * 550 / 448));
+    /* As wide as the column, 44rem, and the height beside the logo, the
+       caption and the commands allow, but never so small that the animation
+       is lost: a phone held sideways scrolls instead. */
+    width: min(100%, 44rem, max(18rem, calc((100dvh - 19rem) * 550 / 448)));
   }
 
   /* Over the animation's dark top, a little nearer than it, like the caption. */
@@ -84,6 +95,9 @@
     line-height: 1.1;
     letter-spacing: -0.025em;
     text-align: center;
+    /* One line even while its letters gather (caption-in), so nothing below
+       it moves. */
+    white-space: nowrap;
     background: linear-gradient(
       180deg,
       var(--color-foreground) 35%,
@@ -102,6 +116,11 @@
 
     .stage-caption {
       animation: caption-in 2s var(--ease) 0.2s both;
+    }
+
+    /* The commands under the caption (page.tsx), once the words are in. */
+    .teaser {
+      animation: teaser-in 1.2s var(--ease) 1s both;
     }
   }
 
@@ -145,6 +164,13 @@
   from {
     opacity: 0;
     letter-spacing: 0.4em;
+  }
+}
+
+@keyframes teaser-in {
+  from {
+    opacity: 0;
+    translate: 0 0.75rem;
   }
 }
 

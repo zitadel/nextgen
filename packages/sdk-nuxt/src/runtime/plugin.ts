@@ -43,7 +43,7 @@ export default defineNuxtPlugin(() => {
   const url =
     (runtimeConfig.nextgen?.url as string | undefined) ??
     (runtimeConfig.nextgen?.issuerUrl as string | undefined) ??
-    "http://localhost:4000";
+    "http://localhost:8080";
 
   if (proxyPath && projectId) {
     configureZitadel({ proxyPath, projectId, url });

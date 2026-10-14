@@ -254,8 +254,8 @@ step routing stay consistent.
 
 The full sign-in handover (terminal step → session exchange → real
 `Set-Cookie` on the demo origin → full-page navigation to a protected
-route) is covered end-to-end in `apps/demo-next-e2e/` and
-`apps/demo-nuxt-e2e/`, not here. The terminal `handoff_token` is exchanged
+route) is covered end-to-end in `e2e/demo-next/` and
+`e2e/demo-nuxt/`, not here. The terminal `handoff_token` is exchanged
 through the generated `exchangeSession` wrapper in `api-client.ts` (which
 hits the SDK proxy path); there is no `session-exchange-path` attribute. Unit
 coverage lives in `zitadel-login.spec.ts`. When a

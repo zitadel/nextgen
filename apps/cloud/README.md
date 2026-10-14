@@ -12,14 +12,18 @@ deployment as five [services](https://vercel.com/docs/services):
 | Service | Root | What it is | Paths |
 |---|---|---|---|
 | `server` | `.` | the Go server on Vercel's Go preset, login UI embedded, console off | everything else, including `/console/runtime.json` |
-| `console` | `apps/console` | the console SPA, built with Vercel Web Analytics and Speed Insights | `/ui/console/*` |
+| `console` | `apps/console` | the console SPA, built for `/console/` with Vercel Web Analytics and Speed Insights | `/console/*` |
 | `storybook` | `apps/storybook` | the component workbench, a static build | `/storybook/*` |
 | `docs` | `apps/docs` | the docs site, Fumadocs on Next.js, with Vercel Web Analytics and Speed Insights | `/docs`, `/docs/*` |
 | `website` | `apps/website` | the coming-soon page, on Next.js, with Vercel Web Analytics and Speed Insights | `/`, `/_next/*`, `/favicon.ico`, `/favicons/*` |
 
-The console is served at the path the server would serve it from, on the same
-origin, so the session cookie, CSRF and the server's console links work
-unchanged. Everything the docs serve, their scripts and their search, lives
+The console is served on the same origin, so the session cookie and CSRF work
+unchanged, but at `/console/` rather than a self-hosted server's
+`/ui/console/`: its build takes the path from `CONSOLE_BASE_PATH`, and the
+launcher points the server's console links (claim, dashboard) there. The
+server's `/console/runtime.json` keeps its own rewrite, ahead of the
+console's, and old `/ui/console/*` links redirect to `/console/*` (307, query
+kept). Everything the docs serve, their scripts and their search, lives
 under `/docs` ([`apps/docs/AGENTS.md`](../docs/AGENTS.md)). The website's
 scripts, styles and fonts load from `/_next/`; a page of its own beyond `/`
 needs a rewrite of its own. Its favicons are the host's: the console, the
