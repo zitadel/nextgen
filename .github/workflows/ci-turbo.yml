@@ -197,14 +197,21 @@ jobs:
           RELEASE_SKIP_CONTAINER: "1"
         run: turbo run snapshot --filter=@zitadel/release
 
-      - name: Cache journey registry packages
+      - name: Restore journey registry packages
+        id: journey-registry
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: ${{ runner.temp }}/journey-verdaccio-storage
-          key: journey-verdaccio-${{ runner.os }}-${{ github.run_id }}
+          key: journey-verdaccio-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
             journey-verdaccio-${{ runner.os }}-
+
+      - name: List restored journey registry packages
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
+        run: >-
+          node e2e/journey/scripts/registry-cache.mjs list
+          "$RUNNER_TEMP/journey-verdaccio-storage" "$RUNNER_TEMP/journey-verdaccio-restored.txt"
 
       # The runner's options as JOURNEY_* variables (see the top): ci.yml's
       # `--ci --matrix … --runtime binary --work-dir … --tarballs-dir …`.
@@ -219,6 +226,22 @@ jobs:
         run: |
           version="$(node -p "require('./apps/server/package.json').version")"
           JOURNEY_TARBALLS_DIR="dist/release/${version}/npm" turbo run e2e-local --filter=@zitadel/e2e
+
+      # Right after the journey; ci.yml's journey is part of its e2e step, so
+      # the save there waits for every lane.
+      - name: Look for new journey registry packages
+        id: journey-registry-new
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
+        run: >-
+          node e2e/journey/scripts/registry-cache.mjs compare
+          "$RUNNER_TEMP/journey-verdaccio-storage" "$RUNNER_TEMP/journey-verdaccio-restored.txt"
+
+      - name: Save journey registry packages
+        if: ${{ steps.journey-registry-new.outputs.count > 0 }}
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ runner.temp }}/journey-verdaccio-storage
+          key: ${{ steps.journey-registry.outputs.cache-primary-key }}
 
       - name: Run @zitadel/testing real-instance suites
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.suites_testing_demo == 'true' }}
