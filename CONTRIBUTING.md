@@ -278,7 +278,9 @@ dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
   `JOURNEY_TARBALLS_DIR`, whenever the journey can run. The journey must not
   pack inside the e2e step (a nested moon graph is forbidden), so in GitHub
   Actions it refuses to run without the snapshot. The journey's Verdaccio
-  storage comes back from the Actions cache.
+  storage comes back from the Actions cache, and goes back only when the
+  journey fetched new tarballs into it or refreshed packuments a later run can
+  still use.
 - `moon exec e2e:all --ignore-ci-checks` — the e2e suite, in a step of its own
   so its browsers and dev servers do not compete with the unit suites. Its
   lanes are `runInCI: "skip"`, which keeps them out of the `moon ci` graph.

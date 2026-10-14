@@ -161,18 +161,28 @@ jobs:
 
       # Verdaccio proxies every public framework package the journey scaffolds
       # pull from npmjs; persisting its storage turns a dozen cold npm installs
-      # into warm ones. The key is per-run so each save adds newly seen
-      # packages and restore-keys pulls the most recent prior store. The journey
-      # always republishes the @zitadel packages fresh (local-registry.mjs), so
-      # a stale store is still valid.
-      - name: Cache journey registry packages
+      # into warm ones. restore-keys pulls the newest saved store (on Depot
+      # runners from any branch: Depot's cache has no branch scopes); the key is
+      # per attempt, so a re-run starts from the newest store too, not from its
+      # first attempt's. The journey always republishes the @zitadel packages
+      # fresh (local-registry.mjs), so a stale store is still valid. The steps
+      # after the e2e suites save it again only when the journey fetched new
+      # tarballs into it.
+      - name: Restore journey registry packages
+        id: journey-registry
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: ${{ runner.temp }}/journey-verdaccio-storage
-          key: journey-verdaccio-${{ runner.os }}-${{ github.run_id }}
+          key: journey-verdaccio-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
             journey-verdaccio-${{ runner.os }}-
+
+      - name: List restored journey registry packages
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
+        run: >-
+          node e2e/journey/scripts/registry-cache.mjs list
+          "$RUNNER_TEMP/journey-verdaccio-storage" "$RUNNER_TEMP/journey-verdaccio-restored.txt"
 
       # The e2e suite, after the graph rather than inside it: run alongside the
       # unit suites, its browsers and dev servers slowed both sides into
@@ -197,10 +207,30 @@ jobs:
           # The journey's options, as ci-turbo.yml passes them: the work dir the
           # diagnostics upload below reads, ci-mode's framework scope (`single`
           # unless an SDK, the CLI, the test kit or the journey's own files
-          # moved), and the Verdaccio storage the cache step above restores.
+          # moved), and the Verdaccio storage the restore step above fills.
           JOURNEY_WORK_DIR: ${{ runner.temp }}/ci-journey
           JOURNEY_MATRIX: ${{ steps.ci-mode.outputs.journey_matrix }}
           JOURNEY_REGISTRY_STORAGE: ${{ runner.temp }}/journey-verdaccio-storage
+
+      # Saves the store only when the journey changed what a later run gets from
+      # it: new npmjs tarballs, or packuments it refreshed when local-registry.mjs
+      # keeps them for longer than Verdaccio's 2-minute default
+      # (registry-cache.mjs says why). An unchanged store would upload the same
+      # ~700 MB again, about 8 s of every run. Only after green e2e suites, as
+      # the cache action's post step did.
+      - name: Look for journey registry changes
+        id: journey-registry-changes
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
+        run: >-
+          node e2e/journey/scripts/registry-cache.mjs compare
+          "$RUNNER_TEMP/journey-verdaccio-storage" "$RUNNER_TEMP/journey-verdaccio-restored.txt"
+
+      - name: Save journey registry packages
+        if: ${{ steps.journey-registry-changes.outputs.save == 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ runner.temp }}/journey-verdaccio-storage
+          key: ${{ steps.journey-registry.outputs.cache-primary-key }}
 
       # Reads moon's newest run report, so it names the failures of whichever
       # moon step failed.
