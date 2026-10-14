@@ -2471,6 +2471,19 @@ describe("<zitadel-login> config that arrives after upgrade", () => {
     expect(createFlows()[1]).toEqual({ purpose: "register", project_id: "demo-project" });
   });
 
+  // The restart runs from `updated`; changing reactive state there schedules
+  // a second update (Lit's change-in-update), which updateComplete reports as
+  // `false`.
+  it("restarts without scheduling an update from inside an update", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const element = await mount(host);
+
+    element.purpose = "register";
+
+    expect(await element.updateComplete).toBe(true);
+  });
+
   it("keeps the visitor's flow when config changes after they submit", async () => {
     const host = document.createElement("div");
     document.body.appendChild(host);

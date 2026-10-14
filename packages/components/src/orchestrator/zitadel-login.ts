@@ -773,10 +773,13 @@ export class ZitadelLogin extends ZitadelSurface {
       this.restartPending = true;
       return;
     }
-    this.formValues = {};
-    // Deferred like the first start: called from `updated`, where setting
-    // `loading` synchronously would schedule a change-in-update.
-    queueMicrotask(() => void this.startFlow());
+    // Deferred like the first start: this runs from `updated`, where changing
+    // reactive state (`formValues`, then `loading`) would schedule a
+    // change-in-update.
+    queueMicrotask(() => {
+      this.formValues = {};
+      void this.startFlow();
+    });
   }
 
   private async startFlow(): Promise<void> {
