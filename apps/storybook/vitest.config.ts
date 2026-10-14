@@ -6,7 +6,11 @@ import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 
 import { baseTest } from "../../vitest.shared.mjs";
-import { optimizeDepsExclude, optimizeDepsInclude } from "./.storybook/optimize-deps.ts";
+import {
+  apiClientInclude,
+  optimizeDepsExclude,
+  optimizeDepsInclude,
+} from "./.storybook/optimize-deps.ts";
 
 const dir = dirname(fileURLToPath(import.meta.url));
 
@@ -48,7 +52,7 @@ export default defineConfig({
         ],
         optimizeDeps: {
           exclude: optimizeDepsExclude,
-          include: optimizeDepsInclude,
+          include: [...optimizeDepsInclude, ...apiClientInclude],
           // Forbid on-the-fly discovery: optimize ONLY the `include` list up
           // front and never re-optimize mid-run. The browser suite's recurring
           // cold-CI failure ("Failed to fetch dynamically imported module …
@@ -58,6 +62,10 @@ export default defineConfig({
           // happen: a missing dep fails deterministically (and reproducibly on
           // a cold local cache) instead of flaking under CI timing.
           noDiscovery: true,
+          // Re-bundle on every start, as a cold CI run does: the pre-bundled API
+          // client is workspace source, which Vite's cache key does not cover
+          // (see `apiClientInclude`). Bundling takes under a second.
+          force: true,
         },
         test: {
           name: "storybook",
