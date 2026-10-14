@@ -55535,10 +55535,9 @@ type ProjectID string
 // from the URLs it matches. A `preview` pattern only bounds which URLs a
 // preview deploy may register; it may include at most one `*` inside a single
 // host label (`*` matches one or more characters, none of them a dot). A
-// literal beats a wildcard. Unbounded shared-host wildcards (for example
-// `https://*.vercel.app`) are rejected on write. An empty list means every
-// origin is admitted until the first pattern is added. Loopback origins are
-// admitted without a pattern.
+// literal beats a wildcard. Unknown hosts are accepted as written. An empty
+// list means every origin is admitted until the first pattern is added.
+// Loopback origins are admitted without a pattern.
 // Ref: #
 type ProjectOrigin struct {
 	Pattern string            `json:"pattern"`
