@@ -158,7 +158,11 @@ export default class Doctor extends BaseCommand {
     // advice says so instead. The server is the project's own, from
     // `zitadel.json` where the claim check read it, not this run's `--server`.
     const projectId = await secretProjectId(cwd);
-    const projectServer = hasConfig ? readProjectServer(await readZitadelConfig(cwd)) : serverFlag;
+    // A `zitadel.json` that does not parse is the config check's to report,
+    // not a reason for doctor itself to fail before it reports anything.
+    const projectServer = hasConfig
+      ? await readZitadelConfig(cwd).then(readProjectServer, () => serverFlag)
+      : serverFlag;
     // A bare claim resolves as this shell does, so it is offered unpinned only
     // when that resolution lands on the very project the check read.
     const bareResolves =
@@ -366,7 +370,7 @@ export function advisoryForWarnings(
     // authoritatively.
     if (local === undefined) {
       nextActions.push(
-        "Claim this project with `zitadel claim` once .env.development.local sets ZITADEL_PROJECT_ID to the project in .zitadel/secret; until then claim would resolve a different project.",
+        "Claim this project with `zitadel claim` once .env.development.local sets ZITADEL_PROJECT_ID and ZITADEL_PROJECT_SECRET to the project in .zitadel/secret; until then claim would resolve a different project.",
       );
     } else {
       nextActions.push(
@@ -793,10 +797,12 @@ async function namesProject(
     return false;
   }
   // Read through the resolver, as `claim --env-file` would read it; the
-  // process environment is left out, so only the file answers.
-  const resolved = await resolveEnvironment({ cwd: dirname(path), env: {}, envFile: path }).then(
-    (environment) => environment.values.ZITADEL_PROJECT_ID?.value,
-    () => undefined,
+  // process environment is left out, so only the file answers. The file must
+  // carry the credential too: for one it lacks, a pinned claim would take
+  // whatever secret the shell exports and send it along for this project.
+  return resolveEnvironment({ cwd: dirname(path), env: {}, envFile: path }).then(
+    ({ values }) =>
+      values.ZITADEL_PROJECT_ID?.value === id && values.ZITADEL_PROJECT_SECRET !== undefined,
+    () => false,
   );
-  return resolved === id;
 }
