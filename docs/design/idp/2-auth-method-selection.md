@@ -284,7 +284,7 @@ the Go mirror of the new error-grade rules is tracked in area 1's
 - [ADR 020](../../adrs/020-credentials-out-of-user-schema.md) (`x-auth-methods`
   as policy input)
 - `api/openapi/endpoints/schemas/auth-methods.json`, `auth-method.json`
-- `packages/config/src/validate.ts` (`validateFlowDefinition`,
+- `packages/config/src/validation/` (`validateFlowDefinition`,
   `RESERVED_OUTCOMES`, `PURPOSE_FLIP_TARGETS`; internal `authMethodEnabled`,
   `resolveFieldChallenge`, `AUTH_METHOD_PREFIX`)
 - `packages/config/defaults/default-login.json` (step shapes)

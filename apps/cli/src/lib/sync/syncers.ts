@@ -10,7 +10,7 @@ import { consola } from "consola";
 
 import type { ZitadelClient } from "@zitadel/api/client";
 import { DEFAULT_FLOW_SCHEMA_URI } from "@zitadel/config/defaults";
-import { isVariableReference } from "@zitadel/config/idp";
+import { isVariableReference, referencedVariable } from "@zitadel/config/idp";
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
 import {
   brandingConfigSchema,
@@ -107,6 +107,41 @@ function assertEnvRefs(data: object, env: EnvLookup): void {
   }
 }
 
+type Endpoints = {
+  issuer?: string;
+  token_endpoint?: string;
+  userinfo_endpoint?: string;
+  client_id?: string;
+  client_secret?: string;
+};
+
+type ConnectionBody = {
+  slug?: string;
+  protocol?: string;
+  subject_claim?: string;
+  oidc?: Endpoints;
+  oauth2?: Endpoints;
+};
+
+/** The fields that make a connection the one its linked users came through. */
+const IDENTITY_FIELDS = [
+  { name: "slug", read: (body: ConnectionBody) => body.slug },
+  { name: "protocol", read: (body: ConnectionBody) => body.protocol },
+  { name: "oidc.issuer", read: (body: ConnectionBody) => body.oidc?.issuer },
+  { name: "oauth2.token_endpoint", read: (body: ConnectionBody) => body.oauth2?.token_endpoint },
+  {
+    name: "oauth2.userinfo_endpoint",
+    read: (body: ConnectionBody) => body.oauth2?.userinfo_endpoint,
+  },
+  {
+    name: "subject_claim",
+    // The engine reads an absent OIDC subject claim as `sub`, so a file that
+    // leaves it out and one that says `sub` are the same connection.
+    read: (body: ConnectionBody) =>
+      body.subject_claim ?? (body.protocol === "oauth2" ? undefined : "sub"),
+  },
+] as const;
+
 /**
  * Syncs `.zitadel/idps/*.json`, one identity provider connection per file.
  *
@@ -116,8 +151,8 @@ function assertEnvRefs(data: object, env: EnvLookup): void {
  * be re-pinned.
  *
  * Deletion is not supported yet (#1013): what should happen to users already
- * linked to a connection is undesigned, so a removed file is reported and no
- * deletion is sent.
+ * linked to a connection is undesigned, so a removed file is reported by plan
+ * and apply and no deletion is sent.
  *
  * `fetch` reads the stored connection so an update plans with a field-level
  * diff, as every other resource does. It refuses a body whose `client_secret`
@@ -131,9 +166,11 @@ class IdpConnectionSyncer implements ResourceSyncer {
   readonly directory = IDPS_DIR;
   readonly mutable = true;
   readonly revisioned = false;
+  readonly deletion = "unsupported";
 
   private readonly client: ZitadelClient;
   private readonly projectId: string;
+  private variables: Promise<ReadonlyMap<string, boolean>> | undefined;
 
   constructor(client: ZitadelClient, projectId: string) {
     this.client = client;
@@ -169,7 +206,7 @@ class IdpConnectionSyncer implements ResourceSyncer {
         : "Connection file is not a valid identity provider connection",
       {
         hint: literalSecret
-          ? 'Use "client_secret": "${{ NAME }}" and publish the value with `variables set NAME --secret`.'
+          ? 'Use "client_secret": "${{ NAME }}" and publish the value with `variables set NAME --project-level --secret`.'
           : undefined,
         details: { issues: result.error.issues },
       },
@@ -231,14 +268,146 @@ class IdpConnectionSyncer implements ResourceSyncer {
     return definition;
   }
 
+  /** Never reached: `deletion` is unsupported, so the loop reports a removed file and sends nothing. */
   async delete(_id: string): Promise<void> {
     throw new ZitadelError(
       "E_NOT_IMPLEMENTED",
       "Deleting an identity provider connection is not supported yet",
-      {
-        hint: "Restore the file, or remove the connection on the platform once deletion is designed (#1013).",
-      },
+      { hint: "Restore the file (#1013)." },
     );
+  }
+
+  identityOf(stored: object): string | undefined {
+    return (stored as ConnectionBody).slug;
+  }
+
+  /**
+   * What the files alone cannot say. An edit may not change what the
+   * connection is: its `slug`, `issuer` or `subject_claim` would re-key the
+   * users already linked to it, so it is refused naming the field. And a
+   * `client_secret` naming a variable the project does not hold would
+   * publish a connection that cannot sign anyone in.
+   */
+  async preflight(
+    path: string,
+    data: object,
+    old: object | null,
+  ): Promise<{ id: string; definition: object } | undefined> {
+    const next = data as ConnectionBody;
+    // A file the platform does not track yet may still name a connection it
+    // holds, such as one moved here from a removed file, so the stored copy is
+    // looked up by slug and judged the same way.
+    const found = old === null ? await this.findBySlug(next.slug) : undefined;
+    const previous = old ?? found?.definition ?? null;
+    if (previous !== null) {
+      const stored = previous as ConnectionBody;
+      const changed = IDENTITY_FIELDS.filter(
+        ({ read }) =>
+          read(stored) !== undefined && read(next) !== undefined && read(stored) !== read(next),
+      );
+      if (changed.length > 0) {
+        throw new ZitadelError(
+          "E_VALIDATION",
+          `${path}: ${changed.map(({ name }) => name).join(", ")} of the connection ${JSON.stringify(stored.slug)} cannot be edited`,
+          {
+            hint:
+              "These fields identify the connection and the users linked through it. " +
+              "Restore the stored value, or add a new connection file with its own slug.",
+            details: {
+              fields: changed.map(({ name, read }) => ({
+                name,
+                stored: read(stored),
+                local: read(next),
+              })),
+            },
+          },
+        );
+      }
+    }
+
+    await this.checkVariables(path, next);
+    return found;
+  }
+
+  /** The stored connection with this slug, which a create would revise. */
+  private async findBySlug(
+    slug: string | undefined,
+  ): Promise<{ id: string; definition: object } | undefined> {
+    if (slug === undefined) {
+      return undefined;
+    }
+    const { idps } = await this.client.queryIdps(
+      { filter: [{ field: "slug", operation: "equals", value: slug }], limit: 1 },
+      { project_id: this.projectId },
+    );
+    const [match] = idps;
+    return match === undefined ? undefined : { id: match.id, definition: match.definition };
+  }
+
+  /**
+   * What the engine needs from the variables a connection names: they exist,
+   * the client id is a plain one it can put in the authorize URL, and the
+   * client secret is a secret one. A variable that cannot be read stops the
+   * run, like a stored copy that cannot be.
+   */
+  private async checkVariables(path: string, next: ConnectionBody): Promise<void> {
+    const block = next.oidc ?? next.oauth2;
+    const named = [
+      { field: "client_id", secret: false, name: referencedVariable(block?.client_id ?? "") },
+      {
+        field: "client_secret",
+        secret: true,
+        name: referencedVariable(block?.client_secret ?? ""),
+      },
+    ].flatMap((credential) =>
+      credential.name === undefined ? [] : [{ ...credential, name: credential.name }],
+    );
+    if (named.length === 0) {
+      return;
+    }
+    this.variables ??= this.client
+      .getVariables({ project_id: this.projectId })
+      .then(
+        (held) =>
+          new Map(Object.entries(held).map(([name, value]) => [name, typeof value === "object"])),
+      );
+    const held = await this.variables;
+    const [id, secret] = named;
+    if (id !== undefined && secret !== undefined && id.name === secret.name) {
+      throw new ZitadelError(
+        "E_VALIDATION",
+        `${path}: client_id and client_secret both name the variable ${id.name}`,
+        {
+          hint: "Give each its own variable: a plain one for the client id, a secret one for the client secret.",
+          details: { variable: id.name, file: path },
+        },
+      );
+    }
+    for (const { field, secret: wantsSecret, name } of named) {
+      const isSecret = held.get(name);
+      if (isSecret === undefined) {
+        throw new ZitadelError(
+          "E_CREDENTIAL_MISSING",
+          `${path}: ${field} names the variable ${name}, which the project does not have`,
+          {
+            hint: `Publish it with \`variables set ${name} --project-level${wantsSecret ? " --secret" : ""}\`, then re-run.`,
+            details: { variable: name, field, file: path },
+          },
+        );
+      }
+      if (isSecret !== wantsSecret) {
+        throw new ZitadelError(
+          "E_VALIDATION",
+          `${path}: ${field} names the variable ${name}, which is ${isSecret ? "a secret" : "not a secret"}`,
+          {
+            hint: wantsSecret
+              ? `The client secret must be a secret variable: publish it with \`variables set ${name} --project-level --secret\`.`
+              : `The client id must be a plain variable the engine can read back: publish it with \`variables set ${name} --project-level\`, without --secret.`,
+            details: { variable: name, field, file: path, secret: isSecret },
+          },
+        );
+      }
+    }
   }
 }
 

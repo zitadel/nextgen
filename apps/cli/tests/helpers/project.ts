@@ -100,6 +100,17 @@ export interface UserSchemaDocument {
   "x-auth-methods"?: Record<string, { enabled: boolean; providers?: string[] }>;
 }
 
+/** A connection file as committed, which the developer owns and edits. */
+export interface ConnectionDocument {
+  slug: string;
+  protocol?: string;
+  display_name?: string;
+  subject_claim?: string;
+  oidc: { issuer: string; client_id?: string; client_secret?: string };
+  claim_mapping?: Record<string, string>;
+  verified_claims?: Record<string, string>;
+}
+
 /** The login flow as committed, which the developer owns and edits. */
 export interface FlowDocument {
   purposes: Record<string, string>;
@@ -523,6 +534,48 @@ export class ScaffoldedApp {
       }
       edit(step);
     });
+  }
+
+  /** Edits a committed connection file, as the developer owning it would. */
+  editConnection(slug: string, edit: (connection: ConnectionDocument) => void): Promise<void> {
+    return this.editDocument(`.zitadel/idps/${slug}.json`, edit);
+  }
+
+  /** Adds a second connection file that claims the same slug as an existing one. */
+  async copyConnection(slug: string, name: string): Promise<void> {
+    await this.writeProjectFile(
+      `.zitadel/idps/${name}.json`,
+      await this.readProjectFile(`.zitadel/idps/${slug}.json`),
+    );
+  }
+
+  /** The project-relative path of a connection's file, as a command reports it. */
+  connectionFile(slug: string): string {
+    return `.zitadel/idps/${slug}.json`;
+  }
+
+  /** Adds a connection no schema lists, so removing it breaks nothing else. */
+  async addUnlistedConnection(slug: string): Promise<void> {
+    const prefix = slug.toUpperCase().replaceAll("-", "_");
+    await this.copyConnection("google", slug);
+    await this.editConnection(slug, (connection) => {
+      connection.slug = slug;
+      connection.oidc.client_id = `\${{ ${prefix}_CLIENT_ID }}`;
+      connection.oidc.client_secret = `\${{ ${prefix}_CLIENT_SECRET }}`;
+    });
+    await this.setVariable(`${prefix}_CLIENT_ID`, "a-client-id");
+    await this.setVariable(`${prefix}_CLIENT_SECRET`, "a-client-secret", { secret: true });
+  }
+
+  /** Removes a committed connection file, as the developer owning it would. */
+  removeConnection(slug: string): Promise<void> {
+    return this.deleteProjectFile(`.zitadel/idps/${slug}.json`);
+  }
+
+  /** Renames a committed connection file without touching its contents. */
+  async renameConnection(slug: string, name: string): Promise<void> {
+    await this.copyConnection(slug, name);
+    await this.removeConnection(slug);
   }
 
   /** Edits the committed login flow, as the developer owning it would. */
