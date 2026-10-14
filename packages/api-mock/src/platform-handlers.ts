@@ -1850,8 +1850,8 @@ export function setupPlatformHandlers() {
       // create-deployment-request.yaml, so a caller (the CLI included) need not
       // pin a lifetime of its own. A primary-only deployment keeps none.
       const ttl = sawPreview ? (requestedTtl ?? DEFAULT_PREVIEW_TTL) : undefined;
-      // Resolved up here because a preview deploy renews its targets' previews
-      // from this ttl whether or not a new deployment is written below.
+      // Resolved up here: the preview rows are renewed from this ttl before the
+      // new deployment, which carries the same expiry, is written below.
       const expiresAt = sawPreview && ttl ? ttlToExpiry(ttl) : null;
 
       const targets = [...resolved].sort();
