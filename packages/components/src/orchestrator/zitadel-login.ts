@@ -423,8 +423,10 @@ export class ZitadelLogin extends ZitadelSurface {
   /**
    * Resolves the effective locale dictionary. The built-in dictionary for the
    * resolved language is used as the base; entries from the `locales` map (if
-   * set) are spread on top so partial overrides work without importing and
-   * spreading the full base dictionary.
+   * set) are merged on top by {@link mergeLocale}, so partial overrides work
+   * without importing the full base dictionary. The merge also drops a
+   * built-in `<step>.description.sso` when the integrator rewrote that step's
+   * description without one, so their text is what the `t` fallback shows.
    *
    * Priority: explicit `lang` attr → `navigator.language` (user preference)
    * → `document.documentElement.lang` (page default) → English fallback.
