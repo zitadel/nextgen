@@ -21,10 +21,11 @@ import { TEST_PROJECT_ID } from "./project-scope.fixture";
  */
 
 /**
- * The one read every `_authed` screen makes for its chrome rather than for the
+ * The reads every `_authed` screen makes for its chrome rather than for the
  * screen under test: the context switcher and the `_authed` guard both list the
  * person's projects, and the default lists the fixture's project so the
- * selection most specs open under is a listed one. A spec about the switcher or
+ * selection most specs open under is a listed one. The sidebar footer reads the
+ * person's team roster for the account it names (`lib/account.ts`). A spec about the switcher or
  * the guard overrides it with `server.use(...)`.
  *
  * `GET /projects/{id}` is deliberately not defaulted: the switcher reads it only
@@ -37,6 +38,38 @@ const shellHandlers = [
   http.get("*/api/users/me/projects", () =>
     HttpResponse.json({ projects: [{ id: TEST_PROJECT_ID, name: "Test project" }] }),
   ),
+  http.post("*/api/users/query", async ({ request }) => {
+    // Only the footer's own read. A screen's user list is the spec's to mock,
+    // and falls through to an unhandled error.
+    if (!(await isAccountRead(request))) return undefined;
+    return HttpResponse.json({
+      users: [
+        {
+          id: "user_test",
+          teams: [
+            {
+              id: "team_account",
+              name: "Test account",
+              membership_status: "active",
+              created_at: "2026-01-01T00:00:00Z",
+              updated_at: "2026-01-01T00:00:00Z",
+            },
+          ],
+        },
+      ],
+    });
+  }),
 ];
 
 export const server = setupServer(...shellHandlers);
+
+/**
+ * Whether a `POST /users/query` is the sidebar footer's account read — the
+ * signed-in person by id (`lib/account.ts`) — rather than the screen's. A spec
+ * that counts or records user queries returns early on it, so the default
+ * handler answers and the screen's requests are all it sees.
+ */
+export async function isAccountRead(request: Request): Promise<boolean> {
+  const body = (await request.clone().json()) as { filter?: { field: string }[] };
+  return body.filter?.some((filter) => filter.field === "id") ?? false;
+}

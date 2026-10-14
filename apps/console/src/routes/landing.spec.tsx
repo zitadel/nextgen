@@ -1,5 +1,5 @@
 import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
@@ -206,9 +206,10 @@ describe("landing routes", () => {
 
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/settings/profile"));
     expect(await screen.findByRole("heading", { name: "Profile" })).toBeInTheDocument();
-    // No screen claims WORKSPACE, so the heading is absent and no Admins row
-    // survives from when that screen lived here.
-    expect(screen.queryByRole("navigation", { name: "WORKSPACE" })).not.toBeInTheDocument();
+    // WORKSPACE carries the account and nothing else: no Admins row survives
+    // from when that screen lived here.
+    const workspace = screen.getByRole("navigation", { name: "WORKSPACE" });
+    expect(within(workspace).getByRole("link", { name: "Account" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Admins/ })).not.toBeInTheDocument();
   });
 });

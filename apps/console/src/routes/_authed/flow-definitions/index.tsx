@@ -14,7 +14,6 @@ import {
   ResourceHeadCell,
   ResourceHeaderRow,
   ResourceMenuHead,
-  ResourcePage,
   ResourceRow,
   ResourceTitle,
   RowMenu,
@@ -33,6 +32,7 @@ import {
 } from "@/lib/flow-definition";
 import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { schemaDisplayName } from "@/lib/schema";
+import { Page } from "@/components/layout";
 
 export const Route = createFileRoute("/_authed/flow-definitions/")({
   // Order 5: Users sits at 3, Authentication at 4.
@@ -82,7 +82,7 @@ function LoginFlowsScreen() {
   const { flows } = Route.useLoaderData();
 
   return (
-    <ResourcePage>
+    <Page>
       <ResourceTitle>Login flows</ResourceTitle>
 
       <div className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP}`}>
@@ -110,7 +110,7 @@ function LoginFlowsScreen() {
           </TableBody>
         </Table>
       </div>
-    </ResourcePage>
+    </Page>
   );
 }
 

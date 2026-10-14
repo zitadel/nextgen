@@ -25,8 +25,8 @@ Every console surface (cards, tables, panels, dialogs, drawers, alerts, tab stri
 ### D17 · Every directory is a resource table — 2026-10-07 · [standing]
 User schemas and Login flows draw the same data table as Users, Teams and Projects: a name column with the resource icon, the resource's own columns, a date, and the row menu. The stacked card rows broke on narrow widths. Supersedes D7 and the schema half of D0a. The schema id leaves the list row for the detail header card, which matches Login flows (refines D10).
 
-### D16 · Profile shows the account email only, read-only — 2026-09-30 · [standing]
-Claiming asks for nothing but an email address, and the email cannot be changed, so Settings → Profile is one disabled field with no Save. Name fields are not pulled in from the schema.
+### D16 · Profile shows the account email read-only, plus an optional name — 2026-09-30, amended 2026-10-14 · [standing]
+Claiming asks for nothing but an email address, and the email cannot be changed, so the email is a disabled field. Amended: the platform project's user schema gains an optional `name` designated as `x-display`, so the people operating Zitadel (the cloud admin, the local `zitadel start` admin) can name themselves; Profile offers that one field, with Save, when the person's schema designates it. No other schema fields are pulled in.
 
 ### D15 · Create uses a right-side drawer — 2026-07-31 · [standing]
 Adding a resource (e.g. a user) opens a drawer from the right — the shadcn/ui default interaction pattern. Fields relevant to the current context (e.g. team) are preselected.

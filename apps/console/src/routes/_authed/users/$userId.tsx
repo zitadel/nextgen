@@ -5,13 +5,7 @@ import { useId } from "react";
 import { api } from "@/api/zitadel";
 import { DeleteUserDialog } from "@/components/delete-user-dialog";
 import { MetaRule, MetaValue } from "@/components/detail-meta";
-import {
-  DETAIL_BODY,
-  DETAIL_CARD,
-  DetailHeader,
-  DetailPage,
-  ICON_PLATE,
-} from "@/components/detail-page";
+import { DETAIL_BODY, DETAIL_CARD, DetailHeader, ICON_PLATE } from "@/components/detail-page";
 import { StatusBadge } from "@/components/status-badge";
 import { EYEBROW } from "@/components/typography";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +20,7 @@ import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { displayValue, field } from "@/lib/record";
 import { type UserSchema, schemaDisplayName, schemaFields } from "@/lib/schema";
 import { userAttributes, userIdentity, userIdentitySecondary, userMetadata } from "@/lib/user";
+import { Page } from "@/components/layout";
 
 /**
  * User detail — the overview and authentication tabs.
@@ -98,7 +93,7 @@ function UserDetail() {
   const schemaName = schema ? schemaDisplayName(schema, "Unknown") : "Unknown";
 
   return (
-    <DetailPage>
+    <Page>
       {/* `User`, the sidebar's glyph for Users, as each detail title carries its
           section's. */}
       <DetailHeader
@@ -201,7 +196,7 @@ function UserDetail() {
           </Card>
         </TabsContent>
       </Tabs>
-    </DetailPage>
+    </Page>
   );
 }
 

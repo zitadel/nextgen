@@ -6,7 +6,7 @@ import { api } from "@/api/zitadel";
 import { MetaCard, MetaRule, MetaValue } from "@/components/detail-meta";
 import { DetailPanel, PanelTitle } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
-import { DETAIL_PANEL_PAGE } from "@/components/layout";
+import { Page } from "@/components/layout";
 import { SchemaFieldsPanel } from "@/components/schema-fields-panel";
 import { Badge } from "@/components/ui/badge";
 import { InlineCode } from "@/components/ui/inline-code";
@@ -36,7 +36,7 @@ function SchemaDetail() {
   const methods = schemaAuthMethods(schema);
 
   return (
-    <div className={DETAIL_PANEL_PAGE}>
+    <Page inset="panel">
       <DetailPanel>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <PanelTitle icon={Users} title={name} />
@@ -122,7 +122,7 @@ function SchemaDetail() {
           </TabsContent>
         </Tabs>
       </DetailPanel>
-    </div>
+    </Page>
   );
 }
 

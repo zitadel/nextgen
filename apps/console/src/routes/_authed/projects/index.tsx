@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Box, Boxes } from "lucide-react";
+import { Boxes } from "lucide-react";
 
 import { api } from "@/api/zitadel";
 import { validateNextSearch } from "@/auth/session";
@@ -17,7 +17,6 @@ import {
   ResourceHeadCell,
   ResourceHeaderRow,
   ResourceMenuHead,
-  ResourcePage,
   ResourceRow,
   ResourceTitle,
   RowMenu,
@@ -27,6 +26,7 @@ import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table"
 import { useLoadMore } from "@/hooks/use-load-more";
 import { formatDate } from "@/lib/date";
 import { useProjectScope, useSelectProjectTarget } from "@/lib/project-scope";
+import { Page } from "@/components/layout";
 
 /**
  * Projects overview — every project the person can act on.
@@ -85,7 +85,7 @@ function ProjectsScreen() {
   const projects = [...loaded.projects, ...paging.extra];
 
   return (
-    <ResourcePage>
+    <Page>
       <ResourceTitle>Projects</ResourceTitle>
       {/* Until a project is selected the sidebar lists only this screen, so the
           page says why and what to do about it. */}
@@ -125,7 +125,7 @@ function ProjectsScreen() {
                 >
                   <TableCell className={`${RESOURCE_CELL} truncate`}>
                     <Link {...selectTarget(project.id)} className={RESOURCE_ROW_LINK}>
-                      <Box aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
+                      <Boxes aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
                       {project.name}
                     </Link>
                   </TableCell>
@@ -143,7 +143,7 @@ function ProjectsScreen() {
       </div>
 
       <LoadMore paging={paging} />
-    </ResourcePage>
+    </Page>
   );
 }
 

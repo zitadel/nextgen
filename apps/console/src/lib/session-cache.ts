@@ -19,6 +19,14 @@ export function clearSessionCaches(): void {
   for (const cache of caches) cache.clear();
 }
 
+/**
+ * Registers a cache that keys its own answers — one `sessionCached` cannot,
+ * since it takes no arguments — so it is dropped with the rest.
+ */
+export function registerSessionCache(cache: { clear(): void }): void {
+  caches.add(cache);
+}
+
 /** A read shared by its callers for `ttlMs`. */
 export function sessionCached<T>(load: () => Promise<T>, ttlMs: number): () => Promise<T> {
   let entry: { at: number; value: Promise<T> } | undefined;

@@ -7,7 +7,7 @@ import { scopedPath } from "@/test/project-scope.fixture";
 // Safe as a static import where `@/auth/session` is not: the fixture's only
 // dependency on it is a type, which the transform erases.
 import { makeTestSession } from "@/test/session.fixture";
-import { server } from "@/test/msw";
+import { isAccountRead, server } from "@/test/msw";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -282,7 +282,8 @@ describe("project admins", () => {
     stubCreateGrant();
     let userQueries = 0;
     server.use(
-      http.post(USERS_QUERY_URL, () => {
+      http.post(USERS_QUERY_URL, async ({ request }) => {
+        if (await isAccountRead(request)) return undefined;
         userQueries += 1;
         return HttpResponse.json({ users: [] });
       }),

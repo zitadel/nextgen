@@ -12,7 +12,7 @@ import { TableCell, TableHead, TableRow } from "@/components/ui/table";
 import type { LoadMoreState } from "@/hooks/use-load-more";
 import { cn } from "@/lib/utils";
 
-import { PAGE_TITLE } from "./typography";
+import { PAGE_TITLE, PAGE_TITLE_ROW } from "./typography";
 
 /**
  * Shared geometry for the console's resource list screens (Users, Teams,
@@ -22,10 +22,9 @@ import { PAGE_TITLE } from "./typography";
  *
  * | Region        | Value                                              |
  * | ------------- | -------------------------------------------------- |
- * | Page gutter   | 16px — the table's own inset                        |
- * | Page top      | 20px at `lg`, 16px below — the page-header block    |
+ * | Page          | `Page` (`layout.tsx`) — 16px gutter, 20px top at `lg` |
  * | Header gutter | 24px at `lg` — the page gutter plus 8px; 16px below  |
- * | Title row     | 24px, or 36px with the Add button beside the title  |
+ * | Title row     | 36px with or without the Add button (`PAGE_TITLE_ROW`) |
  * | Table top     | 20px under the title row at `lg`, 16px below        |
  * | Table head    | 56px tall, 24px leading / 16px trailing inset       |
  * | Table cell    | 56px tall, 24px inset, 8px block padding            |
@@ -36,14 +35,6 @@ import { PAGE_TITLE } from "./typography";
  * thirds, and the Users table is schema-driven and scrolls horizontally, so it
  * has no fixed grid to share.
  */
-
-/** Page gutters. `ResourcePage` adds the page-header block's top padding. */
-export const RESOURCE_PAGE = "px-4 pb-8";
-
-/** Page wrapper for a list screen: 20px under the navbar at `lg`, 16px below. */
-export function ResourcePage({ children }: { children: ReactNode }) {
-  return <div className={cn(RESOURCE_PAGE, "pt-4 lg:pt-5")}>{children}</div>;
-}
 
 /**
  * Title row. The page header block insets 24px at `lg` (the page gutter plus
@@ -66,12 +57,12 @@ export const RESOURCE_TITLE = PAGE_TITLE;
 
 /**
  * The title row of a list screen: the heading with, where the screen has one,
- * its primary action beside it at every width (D19). 24px tall on its own,
- * 36px with the button.
+ * its primary action beside it at every width (D19). 36px tall with or without
+ * the button (`PAGE_TITLE_ROW`).
  */
 export function ResourceTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (
-    <div className={cn(RESOURCE_HEADER, "flex min-h-6 items-center justify-between gap-3")}>
+    <div className={cn(RESOURCE_HEADER, PAGE_TITLE_ROW)}>
       <h1 className={RESOURCE_TITLE}>{children}</h1>
       {action}
     </div>
