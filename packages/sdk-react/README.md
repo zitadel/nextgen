@@ -36,8 +36,10 @@ as `ZitadelSession`).
 
 `ZitadelLogin` takes the callbacks `onFlowStep`, `onFlowInput`, `onFlowComplete`,
 `onFlowRedirect` and `onFlowError`; `ZitadelLogout` and `ZitadelSession` take
-`onSignout` and `onSessionMissing` (the visitor has no session: the widget renders nothing, and the session card
-goes to its `postSignOutUrl` when one is set). Each receives the event detail. An unset or cleared prop leaves
+`onSignout`, `onSessionMissing` (the visitor has no session: the widget renders nothing, and the session card
+goes to its `postSignOutUrl` when one is set) and `onSessionError` (loading the session or signing out failed
+some other way, such as a 5xx or a network error; the detail has `phase`, `message` and, when a response came
+back, `status` and `code`). Each receives the event detail. An unset or cleared prop leaves
 the widget on its default (for example the "Signed in as" heading).
 
 Children go into the element's light DOM, so `ZitadelLogout` accepts a

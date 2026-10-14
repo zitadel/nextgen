@@ -335,6 +335,13 @@ Events (both bubble and are composed):
   projected template) and stays on the page: the menu sits in an app's own
   chrome. Anything else is not "signed out": the control stays and the menu
   shows the error.
+- `zitadel-session-error` (detail `{ status?, code?, message, phase }`) when
+  loading the identity (`phase: "load"`) or signing out (`phase: "signout"`)
+  fails with anything other than the backend's no-session answer: a 5xx, a
+  network error, a gateway's page, a body that is not a session. `message` is
+  the text the element shows; `status` is set when a response came back and
+  `code` when it carried the backend's error code. Use it to tell an outage
+  from a visitor without a session, or to end your own "signing out" state.
 
 "No session" means the backend's own answer: `401` with the
 `auth.unauthorized` code or `404` with `sess.not_found`. A gateway, WAF or
@@ -375,6 +382,9 @@ Events (both bubble and are composed):
   when one is set and otherwise renders nothing. Anything else is not "signed
   out": the card stays and shows the error. "No session" is decided as for
   `<zitadel-logout>` above.
+- `zitadel-session-error` (detail `{ status?, code?, message, phase }`) for any
+  other failure of the identity request or the sign-out, as on
+  `<zitadel-logout>`.
 
 The card never redirects to the page it is on. When `post-sign-out-url`
 resolves to the current page (same origin, path with or without a trailing
@@ -391,9 +401,10 @@ target sends the visitor straight back, for example `post-sign-out-url="/"`
 where `/` redirects to the card's page, the second visit renders nothing and
 only fires `zitadel-session-missing`.
 
-The framework wrappers surface these as `onSignout` / `onSessionMissing`, except
-Vue and Angular, which emit `signout` / `sessionMissing`, and Qwik, which takes
-`onSignout$` / `onSessionMissing$`.
+The framework wrappers surface these as `onSignout` / `onSessionMissing` /
+`onSessionError`, except Vue and Angular, which emit `signout` /
+`sessionMissing` / `sessionError`, and Qwik, which takes `onSignout$` /
+`onSessionMissing$` / `onSessionError$`.
 
 ### `<zl-field>`
 

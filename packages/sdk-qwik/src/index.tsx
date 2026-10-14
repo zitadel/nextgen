@@ -246,6 +246,8 @@ const SESSION_LISTENERS = {
   "zitadel-signout": (props: SignedInProps, event: Event): void => forward(props.onSignout$, event),
   "zitadel-session-missing": (props: SignedInProps, event: Event): void =>
     forward(props.onSessionMissing$, event),
+  "zitadel-session-error": (props: SignedInProps, event: Event): void =>
+    forward(props.onSessionError$, event),
 };
 
 function loginHandlers(props: ZitadelLoginProps): Handler[] {
@@ -259,7 +261,7 @@ function loginHandlers(props: ZitadelLoginProps): Handler[] {
 }
 
 function sessionHandlers(props: SignedInProps): Handler[] {
-  return [props.onSignout$, props.onSessionMissing$];
+  return [props.onSignout$, props.onSessionMissing$, props.onSessionError$];
 }
 
 /**
@@ -361,8 +363,8 @@ export type ZitadelLogoutProps = ZitadelLogoutConfig &
  * {@link ZitadelProject} handle (or the discrete project id / proxy path) and
  * surface config as DOM properties (see {@link setProp}) — applied at mount in
  * the `ref` callback and re-applied reactively by the `useVisibleTask$` — and
- * forwards the widget's `zitadel-signout` and `zitadel-session-missing` events
- * as optional callbacks.
+ * forwards the widget's `zitadel-signout`, `zitadel-session-missing` and
+ * `zitadel-session-error` events as optional callbacks.
  */
 export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
   const host = useSignal<ZitadelLogoutElement>();
@@ -419,7 +421,8 @@ export type ZitadelSessionProps = ZitadelSessionConfig &
  * the discrete project id / proxy path) and surface config as DOM properties
  * (see {@link setProp}) — applied at mount in the `ref` callback and re-applied
  * reactively by the `useVisibleTask$` — and forwards the widget's
- * `zitadel-signout` and `zitadel-session-missing` events as optional callbacks.
+ * `zitadel-signout`, `zitadel-session-missing` and `zitadel-session-error` events
+ * as optional callbacks.
  */
 export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
   const host = useSignal<ZitadelSessionElement>();

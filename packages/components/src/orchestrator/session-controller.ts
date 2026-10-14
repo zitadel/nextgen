@@ -62,6 +62,30 @@ function isSessionBody(body: unknown): body is SessionIdentity {
   return typeof id === "string" && id !== "";
 }
 
+/**
+ * Payload of `zitadel-session-error`: which request failed (`load` for the
+ * identity, `signout` for the revoke), the message the widget shows, and, when
+ * a response came back, its status and the backend's error code.
+ */
+export interface SessionErrorDetail {
+  readonly status?: number;
+  readonly code?: string;
+  readonly message: string;
+  readonly phase: "load" | "signout";
+}
+
+function sessionErrorDetail(
+  error: unknown,
+  message: string,
+  phase: SessionErrorDetail["phase"],
+): SessionErrorDetail {
+  if (!(error instanceof ApiError)) return { message, phase };
+  const code = apiErrorCode(error);
+  return code === undefined
+    ? { status: error.status, message, phase }
+    : { status: error.status, code, message, phase };
+}
+
 export interface SessionControllerOptions {
   /** Runs after the identity is fetched, fails to load, or is cleared. */
   readonly onIdentityChanged?: () => void;
@@ -78,7 +102,9 @@ export interface SessionControllerOptions {
  * whenever that project changes), and `DELETE /sessions/me` that fires
  * `zitadel-signout` on success. A visitor without a session gets
  * `zitadel-session-missing` instead, so the host can stop offering a sign-out
- * to nobody.
+ * to nobody. Any other failure of either request (a 5xx, a network error, a
+ * gateway's page, a 200 that is not a session) fires `zitadel-session-error`,
+ * so the app can tell an outage from a visitor without a session.
  */
 export class SessionController implements ReactiveController {
   display = "";
@@ -173,7 +199,8 @@ export class SessionController implements ReactiveController {
    * backend answering that there is no session (see {@link isNoSession}) means
    * it is already gone, which is what signing out asks for, so it succeeds the
    * same way. Any other failure, a gateway's 401 or 404 included, revoked
-   * nothing: it sets `errorMessage` and resolves `false`.
+   * nothing: it sets `errorMessage`, fires `zitadel-session-error` and
+   * resolves `false`.
    */
   async signOut(onRevoked?: () => void): Promise<boolean> {
     this.loading = true;
@@ -188,6 +215,11 @@ export class SessionController implements ReactiveController {
         this.errorMessage = message || "Sign-out failed. Please try again.";
         this.loading = false;
         this.host.requestUpdate();
+        emit(
+          this.host,
+          "zitadel-session-error",
+          sessionErrorDetail(error, this.errorMessage, "signout"),
+        );
         return false;
       }
     }
@@ -226,6 +258,7 @@ export class SessionController implements ReactiveController {
 
   private async loadIdentity(api: Api, seq: number): Promise<void> {
     let missing: boolean;
+    let failure: SessionErrorDetail | undefined;
     try {
       const session: unknown = await getSession(api);
       if (seq !== this.loadSeq) return;
@@ -247,10 +280,14 @@ export class SessionController implements ReactiveController {
         // An outage, not an answer: keep the surface and say what went wrong.
         const message = error instanceof Error ? error.message : "";
         this.errorMessage = message || "Could not load the session. Please try again.";
+        failure = sessionErrorDetail(error, this.errorMessage, "load");
       }
     }
     this.host.requestUpdate();
     this.options.onIdentityChanged?.();
+    // A host removed while the request was in flight reports nothing: it no
+    // longer speaks for the page.
+    if (failure && this.host.isConnected) emit(this.host, "zitadel-session-error", failure);
     if (!missing) return;
     if (!this.host.isConnected) {
       // A host removed while the request was in flight no longer speaks for
