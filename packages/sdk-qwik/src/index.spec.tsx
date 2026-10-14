@@ -18,6 +18,16 @@ import { businessLocales, ZitadelLogin, ZitadelLogout, ZitadelSession } from "./
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 
+/**
+ * Under SSR (Qwik Router) Qwik resumes the server markup instead of re-running
+ * the `ref` binder, so the widget boots from its attributes alone. These are the
+ * attributes the server must emit; the client render emits the same ones.
+ */
+function attributesOf(host: HTMLElement, tag: string, names: readonly string[]) {
+  const el = host.querySelector(tag);
+  return Object.fromEntries(names.map((name) => [name, el?.getAttribute(name) ?? null]));
+}
+
 const macrotask = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
 /**
@@ -66,6 +76,50 @@ async function dispatchUntilForwarded(
 }
 
 describe("ZitadelLogin", () => {
+  it("emits its config as attributes, which survive SSR resume", async () => {
+    const host = await renderWidget(
+      <ZitadelLogin
+        project={{ ...project, url: "http://auth.test" }}
+        purpose="register"
+        postSignInUrl="/profile"
+        flowName="signup"
+        suppressHeader
+        suppressPasswordToggle
+      />,
+    );
+
+    expect(
+      attributesOf(host, "zitadel-login", [
+        "project-id",
+        "proxy-path",
+        "url",
+        "purpose",
+        "post-sign-in-url",
+        "flow-name",
+        "suppress-header",
+        "suppress-password-toggle",
+      ]),
+    ).toEqual({
+      "project-id": "proj-test",
+      "proxy-path": "/__nextgen",
+      url: "http://auth.test",
+      purpose: "register",
+      "post-sign-in-url": "/profile",
+      "flow-name": "signup",
+      "suppress-header": "",
+      "suppress-password-toggle": "",
+    });
+  });
+
+  it("emits the discrete project id and proxy path as attributes", async () => {
+    const host = await renderWidget(<ZitadelLogin projectId="proj-test" proxyPath="/__nextgen" />);
+
+    expect(attributesOf(host, "zitadel-login", ["project-id", "proxy-path", "purpose"])).toEqual({
+      "project-id": "proj-test",
+      "proxy-path": "/__nextgen",
+      purpose: "login",
+    });
+  });
   it("binds the project handle as a property", async () => {
     const host = await renderWidget(<ZitadelLogin project={project} purpose="login" />);
     const el = host.querySelector<ZitadelLoginElement>("zitadel-login");
@@ -122,6 +176,17 @@ describe("ZitadelLogin", () => {
 });
 
 describe("ZitadelLogout", () => {
+  it("emits its config as attributes, which survive SSR resume", async () => {
+    const host = await renderWidget(<ZitadelLogout project={project} postSignOutUrl="/login" />);
+
+    expect(
+      attributesOf(host, "zitadel-logout", ["project-id", "proxy-path", "post-sign-out-url"]),
+    ).toEqual({
+      "project-id": "proj-test",
+      "proxy-path": "/__nextgen",
+      "post-sign-out-url": "/login",
+    });
+  });
   it("binds the project handle as a property", async () => {
     const host = await renderWidget(<ZitadelLogout project={project} />);
     const el = host.querySelector<ZitadelLogoutElement>("zitadel-logout");
@@ -170,6 +235,27 @@ describe("ZitadelLogout", () => {
 });
 
 describe("ZitadelSession", () => {
+  it("emits its config as attributes, which survive SSR resume", async () => {
+    const host = await renderWidget(
+      <ZitadelSession project={project} postSignOutUrl="/login" heading="Hi" logoutLabel="Leave" />,
+    );
+
+    expect(
+      attributesOf(host, "zitadel-session", [
+        "project-id",
+        "proxy-path",
+        "post-sign-out-url",
+        "heading",
+        "logout-label",
+      ]),
+    ).toEqual({
+      "project-id": "proj-test",
+      "proxy-path": "/__nextgen",
+      "post-sign-out-url": "/login",
+      heading: "Hi",
+      "logout-label": "Leave",
+    });
+  });
   it("binds the project handle as a property", async () => {
     const host = await renderWidget(<ZitadelSession project={project} />);
     const el = host.querySelector<ZitadelSessionElement>("zitadel-session");
