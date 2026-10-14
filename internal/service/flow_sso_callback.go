@@ -104,18 +104,22 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 		return c.fail(ctx, projectID, check, fmt.Errorf("%w: the callback path names connection %q, the state pins %q", errSSOCallbackMixUp, in.ConnectionSlug, pending.ProviderSlug), refusedEventType(in))
 	}
 
-	var conn *idp.Connection
-	if in.Issuer != "" {
-		pinned, err := c.pinnedConnection(ctx, projectID, pending)
-		if err != nil {
-			return c.fail(ctx, projectID, check, err, refusedEventType(in))
-		}
-		if in.Issuer != pinned.OIDC.Issuer {
-			return c.fail(ctx, projectID, check, fmt.Errorf("%w: the callback's iss %q is not the issuer %q of connection %q", errSSOCallbackMixUp, in.Issuer, pinned.OIDC.Issuer, pending.ProviderSlug), refusedEventType(in))
-		}
-		conn = &pinned
+	var conn idp.Connection
+	var connErr error
+	if in.Issuer != "" || (in.Error == "" && in.Code != "") {
+		conn, connErr = c.pinnedConnection(ctx, projectID, pending)
+	}
+	if in.Issuer != "" && connErr == nil && in.Issuer != conn.OIDC.Issuer {
+		return c.fail(ctx, projectID, check, fmt.Errorf("%w: the callback's iss %q is not the issuer %q of connection %q", errSSOCallbackMixUp, in.Issuer, conn.OIDC.Issuer, pending.ProviderSlug), refusedEventType(in))
 	}
 	if in.Error != "" {
+		if connErr != nil {
+			getLoggingContext(ctx, "flow").Warn("sso callback could not check the iss of a provider error",
+				slog.String("project_id", projectID),
+				slog.String("slug", pending.ProviderSlug),
+				slog.Any("error", connErr),
+			)
+		}
 		// access_denied is the person saying no and gets its own key. Every
 		// other code is the provider failing.
 		key := domain.FlowStepErrorSSOFailed
@@ -138,6 +142,9 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 		return c.fail(ctx, projectID, check, errors.New("the callback carried neither a code nor an error"), domain.EventTypeAuthSSOAuthorizationFailed)
 	}
 
+	if connErr != nil {
+		return c.fail(ctx, projectID, check, connErr, domain.EventTypeAuthSSOExchangeFailed)
+	}
 	identity, err := c.exchange(ctx, projectID, in.Code, pending, conn)
 	if err != nil {
 		return c.fail(ctx, projectID, check, err, domain.EventTypeAuthSSOExchangeFailed)
@@ -167,17 +174,7 @@ func (c *FlowSSOCallback) pinnedConnection(ctx context.Context, projectID string
 	return idp.ParseConnection(connection.RevisionID, connection.Document)
 }
 
-func (c *FlowSSOCallback) exchange(ctx context.Context, projectID, code string, pending *domain.SSOStatePayload, pinned *idp.Connection) (idp.ExternalIdentity, error) {
-	var conn idp.Connection
-	if pinned != nil {
-		conn = *pinned
-	} else {
-		loaded, err := c.pinnedConnection(ctx, projectID, pending)
-		if err != nil {
-			return idp.ExternalIdentity{}, err
-		}
-		conn = loaded
-	}
+func (c *FlowSSOCallback) exchange(ctx context.Context, projectID, code string, pending *domain.SSOStatePayload, conn idp.Connection) (idp.ExternalIdentity, error) {
 	if err := resolveSSOClientID(ctx, c.variables, projectID, &conn); err != nil {
 		return idp.ExternalIdentity{}, err
 	}

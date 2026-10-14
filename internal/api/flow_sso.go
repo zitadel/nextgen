@@ -9,8 +9,9 @@ import (
 )
 
 const idpCallbackProxyPrefix = "/__nextgen"
+const idpCallbackUpstreamPrefix = "/idp"
 
-const IDPCallbackUpstreamPattern = "/idp/{" + idpCallbackSlugWildcard + "}/callback"
+const IDPCallbackUpstreamPattern = idpCallbackUpstreamPrefix + "/{" + idpCallbackSlugWildcard + "}/callback"
 const IDPCallbackPattern = idpCallbackProxyPrefix + IDPCallbackUpstreamPattern
 
 const idpCallbackSlugWildcard = "slug"
@@ -20,11 +21,11 @@ func IDPCallbackPath(slug string) string {
 }
 
 func IDPCallbackUpstreamPath(slug string) string {
-	return "/idp/" + url.PathEscape(slug) + "/callback"
+	return idpCallbackUpstreamPrefix + "/" + url.PathEscape(slug) + "/callback"
 }
 
 func IDPCallbackPathPrefixes() []string {
-	return []string{idpCallbackProxyPrefix + "/idp", "/idp"}
+	return []string{idpCallbackProxyPrefix + idpCallbackUpstreamPrefix, idpCallbackUpstreamPrefix}
 }
 
 // ssoBindingCookieName is the browser-binding cookie's name. The `__Host-`

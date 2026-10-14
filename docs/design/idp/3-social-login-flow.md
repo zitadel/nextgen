@@ -59,6 +59,15 @@ connection's issuer is refused the same way, before the exchange. `iss` alone
 was not enough: few providers send it, and an absent value cannot be refused
 without breaking those that do not.
 
+The `iss` support is partial, deliberately. RFC 9207 §2.4 also refuses a
+response without `iss` from a provider whose discovery document advertises
+`authorization_response_iss_parameter_supported`, as Google's does; the
+callback does not, because the per-connection path already defends against
+the mix-up, and the check is defense in depth for later. An error response
+whose connection revision cannot be read leaves its `iss` unchecked too: it
+exchanges no code, so the person's answer is shown rather than a failure of
+the server.
+
 The shared route that preceded these, `/__nextgen/idp/callback` (and
 `/idp/callback`), is not served: a provider still registered with it gets no
 sign-in until the connection's own URI is registered.

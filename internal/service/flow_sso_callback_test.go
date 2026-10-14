@@ -160,13 +160,24 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 			wantEvent:  domain.EventTypeAuthSSOAuthorizationFailed,
 		},
 		{
-			name: "a revision that cannot be read for the iss check stores the failed key",
+			// No token request follows an error response, so the unchecked
+			// iss costs nothing, and the person's answer is kept.
+			name: "a provider error whose revision cannot be read for the iss check is read as usual",
 			in:   service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Error: "access_denied", Issuer: "https://accounts.example.test"},
 			connections: func(m *servicemocks.MockIDPConnectionService) {
 				m.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").Return(nil, domain.ErrIDPConnectionNotFound())
 			},
-			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOCancelled},
 			wantEvent:  domain.EventTypeAuthSSOAuthorizationFailed,
+		},
+		{
+			name: "a code whose revision cannot be read for the iss check stores the failed key",
+			in:   service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code", Issuer: "https://accounts.example.test"},
+			connections: func(m *servicemocks.MockIDPConnectionService) {
+				m.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").Return(nil, domain.ErrIDPConnectionNotFound())
+			},
+			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
+			wantEvent:  domain.EventTypeAuthSSOExchangeFailed,
 		},
 		{
 			name: "a vanished revision stores the failed key",
