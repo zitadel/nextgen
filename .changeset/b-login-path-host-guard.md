@@ -10,5 +10,6 @@
 
 The `loginPath` check now also refuses paths a browser reads as another site: one with a backslash
 (`/\evil.example`), a tab, newline or other whitespace or control character, or the same written
-percent-encoded (`/%5Cevil.example`). Such a path made the protected-route redirect leave your app.
+percent-encoded (`/%5Cevil.example`), and one whose `..` segments resolve to a path starting with
+`//` (`/x/../..//evil.example`). Such a path made the protected-route redirect leave your app.
 A `loginPath` like that now fails when the middleware is set up, as an absolute URL already did.

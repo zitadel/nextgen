@@ -114,6 +114,14 @@ describe("filterResponseHeaders", () => {
     expect(rewritten === null ? null : new URL(rewritten).origin).toBe(APP);
   });
 
+  // A framework that relativises a same-host redirect by cutting the origin
+  // off would otherwise send a protocol-relative `//evil.example/...`.
+  it.each(OFF_ORIGIN_LOCATIONS)("keeps %s on this app once the origin is cut off", (location) => {
+    const rewritten = filterResponseHeaders(upstream({ location }), CALLBACK).get("location");
+
+    expect(rewritten === null ? "/" : new URL(rewritten).pathname).not.toMatch(/^\/\//);
+  });
+
   it("drops a redirect when the caller names no request URL", () => {
     expect(filterResponseHeaders(upstream({ location: `${APP}/login` })).has("location")).toBe(
       false,
@@ -866,6 +874,9 @@ describe("assertLoginPath", () => {
     "/%5Cevil.example/login",
     "/%2F/evil.example/login",
     "/%09/evil.example/login",
+    "/x/../..//evil.example/login",
+    "/.%2E//evil.example/login",
+    "/%2E/.//evil.example/login",
     "/%E0%A4%A",
   ])("rejects %j", (loginPath) => {
     expect(() => assertLoginPath(loginPath)).toThrow(/loginPath must be a relative path/);

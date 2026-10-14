@@ -1,3 +1,10 @@
+// Next's middleware adapter reads `globalThis.AsyncLocalStorage` when its
+// modules load, as the edge runtime provides it; set it before any import.
+await vi.hoisted(async () => {
+  const { AsyncLocalStorage } = await import("node:async_hooks");
+  (globalThis as { AsyncLocalStorage?: unknown }).AsyncLocalStorage ??= AsyncLocalStorage;
+});
+
 import { NextRequest } from "next/server";
 import { generateKeyPairSync, createSign } from "node:crypto";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -80,6 +87,32 @@ function nextKid(): string {
 function mockJwks(kid: string): ReturnType<typeof vi.fn> {
   const jwks = { keys: [{ ...publicKeyJwk, kid, alg: "RS256", use: "sig" }] };
   return vi.fn().mockResolvedValue(new Response(JSON.stringify(jwks), { status: 200 }));
+}
+
+/**
+ * Runs `handler` the way production does: through Next's own middleware
+ * `adapter()`, which post-processes the response (it relativises a same-host
+ * `Location`, for one).
+ */
+async function throughNextAdapter(
+  url: string,
+  handler: (req: NextRequest) => Promise<Response>,
+): Promise<Response> {
+  const { adapter } = (await import("next/dist/server/web/adapter.js")) as unknown as {
+    adapter: (params: unknown) => Promise<{ response: Response }>;
+  };
+  const result = await adapter({
+    handler,
+    page: "/middleware",
+    request: {
+      headers: {},
+      method: "GET",
+      url,
+      nextConfig: {},
+      signal: new AbortController().signal,
+    },
+  });
+  return result.response;
 }
 
 describe("nextgenMiddleware", () => {
@@ -619,6 +652,27 @@ describe("nextgenMiddleware", () => {
     });
   });
 
+  // Next's own adapter wraps middleware in production and rewrites a same-host
+  // Location to the path alone, so a path starting with `//` would reach the
+  // browser as protocol-relative.
+  describe("proxy: redirects through Next's middleware adapter", () => {
+    it.each(OFF_ORIGIN_LOCATIONS)("keeps %s on this app", async (location) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(null, { status: 303, headers: { location } })),
+      );
+
+      const res = await throughNextAdapter(
+        "https://app.test/__nextgen/idp/google/callback",
+        (req) => nextgenMiddleware(req, { url: "http://localhost:4000" }),
+      );
+
+      expect(new URL(res.headers.get("location") ?? "", "https://app.test/__nextgen/").origin).toBe(
+        "https://app.test",
+      );
+    });
+  });
+
   describe("tunnel: client header injection prevention (P-1)", () => {
     it("does not preserve client-injected x-middleware-override-headers", async () => {
       const req = new NextRequest("http://localhost:3000/", {
@@ -660,6 +714,23 @@ describe("nextgenMiddleware", () => {
         }),
       ).rejects.toThrow(/loginPath must be a relative path/i);
     });
+
+    // A dot-segment path that resolves to `//evil.example` would leave the app
+    // once Next's adapter cuts the origin off the redirect.
+    it.each(["/x/../..//evil.example/login", "/.%2E//evil.example/login"])(
+      "refuses loginPath %j before a redirect goes out through Next's adapter",
+      async (loginPath) => {
+        await expect(
+          throughNextAdapter("https://app.test/dashboard", (req) =>
+            nextgenMiddleware(req, {
+              url: "http://localhost:4000",
+              protectedRoutes: ["/dashboard"],
+              loginPath,
+            }),
+          ),
+        ).rejects.toThrow(/loginPath must be a relative path/i);
+      },
+    );
 
     it("accepts a relative loginPath and redirects correctly", async () => {
       const req = makeRequest("http://localhost:3000/admin");

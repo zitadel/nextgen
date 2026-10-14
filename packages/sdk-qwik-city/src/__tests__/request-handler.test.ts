@@ -358,7 +358,9 @@ describe("createNextgenOnRequest (Qwik City)", () => {
       ).toThrow(/loginPath must be a relative path/i);
     });
 
-    it.each(["/\\evil.test/x", "/\t/evil.test/x"])(
+    // The last two resolve to `//evil.test/x`, and the redirect is sent as
+    // `pathname + search`, which a browser reads as protocol-relative.
+    it.each(["/\\evil.test/x", "/\t/evil.test/x", "/x/../..//evil.test/x", "/.%2E//evil.test/x"])(
       "throws on loginPath %j, which a URL parser reads as another host",
       (loginPath) => {
         expect(() => createNextgenOnRequest({ url: "http://localhost:4000", loginPath })).toThrow(

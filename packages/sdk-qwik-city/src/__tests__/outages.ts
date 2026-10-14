@@ -56,6 +56,7 @@ export const OFF_ORIGIN_LOCATIONS: readonly string[] = [
   "https://app.test//evil.example/login?flow=f1",
   "/.//evil.example/login?flow=f1",
   "https://app.test/\\evil.example/login?flow=f1",
+  "https://app.test/\\\\evil.example/login?flow=f1",
 ];
 
 /** `/sessions/me` answers that mean the session is dead. */

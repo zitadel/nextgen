@@ -103,14 +103,18 @@ const LOGIN_PATH_PROBE = "http://login-path.invalid";
  * backslash, whitespace or control character (WHATWG URL parsing reads `/\`
  * as `//` and drops tabs and newlines, so `/\evil.example` and
  * `/<TAB>/evil.example` both name another host), and resolves to the origin it
- * was resolved against.
+ * was resolved against with a pathname that does not start with `//` either
+ * (`/x/../..//evil.example` and `/.%2E//evil.example` resolve to
+ * `//evil.example`, which a redirect sent as a path, or relativised by the
+ * framework, would read as another host).
  */
 function isAppPath(path: string): boolean {
   if (!path.startsWith("/") || path.startsWith("//") || /[\\\s\p{Cc}]/u.test(path)) {
     return false;
   }
   try {
-    return new URL(path, LOGIN_PATH_PROBE).origin === LOGIN_PATH_PROBE;
+    const resolved = new URL(path, LOGIN_PATH_PROBE);
+    return resolved.origin === LOGIN_PATH_PROBE && !resolved.pathname.startsWith("//");
   } catch {
     return false;
   }
@@ -122,8 +126,9 @@ function isAppPath(path: string): boolean {
  * whitespace or a control character, or resolve to another origin. An
  * absolute URL (`https://evil.com/phish`), a protocol-relative one
  * (`//evil.com`) or one a URL parser reads as such (`/\evil.com`,
- * `/<TAB>/evil.com`, `/%5Cevil.com`) would turn the protected-route redirect
- * into an open redirect.
+ * `/<TAB>/evil.com`, `/%5Cevil.com`, or `/x/../..//evil.com`, whose
+ * dot segments resolve to `//evil.com`) would turn the protected-route
+ * redirect into an open redirect.
  *
  * @param loginPath - The configured login path.
  */
@@ -292,6 +297,12 @@ export async function redactExchangeBody(
  * `/.//evil.example`, `https://a/\evil.example`) would read as
  * protocol-relative and take its host from the path. The result must keep the
  * app's origin, or there is nothing to forward.
+ *
+ * Leading slashes are collapsed to one as well, after the parser has turned
+ * `\` into `/` and resolved dot segments: a framework may relativise a
+ * same-host redirect by cutting the origin off (Next's middleware adapter
+ * sends `url.slice(origin.length)`), and `https://app.test//evil.example/x`
+ * then reaches the browser as the protocol-relative `//evil.example/x`.
  */
 function ontoThisApp(location: string, selfUrl: string | undefined): string | undefined {
   if (selfUrl === undefined || selfUrl === "") {
@@ -301,10 +312,12 @@ function ontoThisApp(location: string, selfUrl: string | undefined): string | un
     const base = new URL(selfUrl);
     const target = new URL(location, base);
     const out = new URL(base.href);
-    out.pathname = target.pathname;
+    out.pathname = target.pathname.replace(/^\/{2,}/, "/");
     out.search = target.search;
     out.hash = target.hash;
-    return out.origin === base.origin ? out.toString() : undefined;
+    return out.origin === base.origin && !out.pathname.startsWith("//")
+      ? out.toString()
+      : undefined;
   } catch {
     return undefined;
   }
