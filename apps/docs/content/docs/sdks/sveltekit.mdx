@@ -72,7 +72,7 @@ The SvelteKit SDK is a `handle` hook that proxies and verifies sessions on the s
     });
     ```
 
-    Render the widget on the client only. It registers custom elements, which cannot run during server rendering, and `onMount` never runs there:
+    Render the widget on the client only. Its config (`project` and the rest) is set as element properties, which server-rendered markup cannot carry; `onMount` never runs during server rendering, so the widget is created in the browser with its config already in place:
 
     ```svelte
     <script lang="ts">

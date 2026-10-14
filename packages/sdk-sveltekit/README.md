@@ -107,7 +107,9 @@ pnpm add @zitadel/sdk-svelte
 {/if}
 ```
 
-The widget mounts on the client only. `onMount` never runs during SSR, and works
+The widget mounts on the client only: its config is set as element properties,
+which server-rendered markup cannot carry, so it is created in the browser with
+its config in place. `onMount` never runs during SSR, and works
 on SvelteKit 2 and 3 alike (`$app/environment` is deprecated in SvelteKit 3).
 
 ## Middleware options
