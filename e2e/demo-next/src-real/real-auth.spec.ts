@@ -1,6 +1,11 @@
 import type { Page } from "@playwright/test";
-import { SESSION_COOKIE_NAME } from "@zitadel/testing";
-import { expect, loginWithPassword, test, type SeededUser } from "@zitadel/testing/playwright";
+import {
+  expect,
+  loginWithPassword,
+  SESSION_COOKIE_NAME,
+  test,
+  type SeededUser,
+} from "@zitadel/testing/playwright";
 
 async function expectAuthenticatedAs(page: Page, user: SeededUser): Promise<void> {
   await expect(page.getByRole("heading", { name: "Admin" })).toBeVisible();

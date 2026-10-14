@@ -1,5 +1,4 @@
-import { SESSION_COOKIE_NAME } from "@zitadel/testing";
-import { expect, loginWithPassword, test } from "@zitadel/testing/playwright";
+import { expect, loginWithPassword, SESSION_COOKIE_NAME, test } from "@zitadel/testing/playwright";
 
 /**
  * The kit's central promise in a scaffolded app: seed a user through the API,

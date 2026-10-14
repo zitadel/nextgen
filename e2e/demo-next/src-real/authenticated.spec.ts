@@ -1,5 +1,4 @@
-import { SESSION_COOKIE_NAME } from "@zitadel/testing";
-import { expect, test } from "@zitadel/testing/playwright";
+import { expect, SESSION_COOKIE_NAME, test } from "@zitadel/testing/playwright";
 
 /**
  * The session-mint promise: tests start past login. The fixture seeds a user,

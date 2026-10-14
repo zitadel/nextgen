@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 
 import { expect, test } from "@playwright/test";
-import { registerWithPassword } from "@zitadel/testing/playwright";
+import { identity, registerWithPassword } from "@zitadel/testing/playwright";
 
 /**
  * The local ownership journey. `zitadel start` boots the server with the
@@ -109,7 +109,7 @@ test("the setup admin can add and remove a project admin, and the colleague sees
     project_id: string;
   };
   const projectUrl = `${serverOrigin}/ui/console/projects/${secret.project_id}`;
-  const email = `colleague-${Date.now()}@example.com`;
+  const { email, password } = identity();
 
   // The colleague signs up at the console's own sign-in screen, in their own
   // context. That screen signs in to the platform project, which is the only
@@ -120,7 +120,7 @@ test("the setup admin can add and remove a project admin, and the colleague sees
   try {
     const colleaguePage = await colleagueContext.newPage();
     await colleaguePage.goto(`${serverOrigin}/ui/console/login`);
-    await registerWithPassword(colleaguePage, { email, password: "Colleague-pass-123!" });
+    await registerWithPassword(colleaguePage, { email, password });
     await expect(colleaguePage).not.toHaveURL(/\/login/, { timeout: 60_000 });
 
     // The admin signs in through a fresh one-time link, as above.

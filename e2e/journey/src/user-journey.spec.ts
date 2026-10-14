@@ -1,17 +1,16 @@
-import { randomUUID } from "node:crypto";
-
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { SESSION_COOKIE_NAME } from "@zitadel/testing";
 import {
   clickFlowAction,
   enableVirtualPasskey,
   fillFlowField,
   flowAction,
   flowField,
+  identity,
   loginWithPasskey,
   loginWithPassword,
   registerWithPasskey,
   registerWithPassword,
+  SESSION_COOKIE_NAME,
   type ProfileEntry,
 } from "@zitadel/testing/playwright";
 
@@ -41,8 +40,7 @@ if (preset === "password-first") {
   test(`password-only registration, logout, and password login work in a fresh ${framework} app`, async ({
     page,
   }) => {
-    const email = uniqueEmail("password");
-    const password = "Correct-Horse-42!";
+    const { email, password } = identity();
 
     if (expectsProtectedRouteRedirect) {
       await expectProtectedRouteToRedirect(page);
@@ -62,8 +60,7 @@ if (preset === "password-first") {
   test(`in-card sign-up and sign-in navigation switches purpose in a fresh ${framework} app`, async ({
     page,
   }) => {
-    const email = uniqueEmail("navswitch");
-    const password = "Correct-Horse-43!";
+    const { email, password } = identity();
 
     await gotoLogin(page);
 
@@ -105,7 +102,7 @@ if (preset === "passkey-first" && process.env.JOURNEY_ENABLE_PASSKEY !== "0") {
     page,
   }) => {
     const authenticator = await enableVirtualPasskey(page);
-    const email = uniqueEmail("passkey-first");
+    const { email } = identity();
 
     await gotoLogin(page);
     // Entry step renders the primary passkey action exactly once (a stale
@@ -244,10 +241,4 @@ function logoutLocator(page: Page) {
     .or(page.locator('zl-button[action="logout"], [data-action="logout"]'))
     .or(page.getByRole("button", { name: /logout|sign out/i }))
     .or(page.getByRole("link", { name: /logout|sign out/i }));
-}
-
-function uniqueEmail(prefix: string): string {
-  // crypto-backed, not Math.random(): these identifiers flow into the kit's
-  // credential-shaped ceremony inputs, where CodeQL flags insecure randomness.
-  return `${prefix}-${Date.now()}-${randomUUID().slice(0, 8)}@example.test`;
 }
