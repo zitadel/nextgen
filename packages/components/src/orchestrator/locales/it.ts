@@ -99,6 +99,7 @@ export const it: Locale = {
   // --- Alias dei nomi step per il flusso login predefinito ---
   "password.title": "Accedi",
   "password.description": "Inserisci la tua password",
+  "password.description.sso": "Inserisci la tua password o continua con il tuo provider di accesso",
   "password.field.password": "Password",
   "password.action.signin": "Accedi",
   "password.action.passkey": "Accedi con passkey",

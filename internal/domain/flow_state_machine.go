@@ -2390,9 +2390,16 @@ func (r *FlowStateMachineRuntime) buildStep(ctx context.Context, state *FlowStat
 		})
 	}
 	applyAutocomplete(resolved.Fields, state.CurrentPurpose)
+	// A step that offers providers reaches users who have no password, and the
+	// text cannot depend on the user without revealing how the account signs in.
+	// It gets its own key; a client without that key falls back to the plain one.
+	descriptionKey := step.Name + ".description"
+	if len(providers) > 0 {
+		descriptionKey += ".sso"
+	}
 	return &FlowStep{
 		Name:         step.Name,
-		Texts:        FlowStepTexts{TitleKey: step.Name + ".title", DescriptionKey: step.Name + ".description"},
+		Texts:        FlowStepTexts{TitleKey: step.Name + ".title", DescriptionKey: descriptionKey},
 		Error:        errorKey,
 		Complete:     complete,
 		RedirectURL:  redirectURL,

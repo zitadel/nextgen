@@ -94,6 +94,38 @@ describe("LiquidJS engine", () => {
     expect(result).toBe("custom.action.back");
   });
 
+  it("the | t filter falls back from a step's SSO description to its plain one", () => {
+    // The engine asks for `<step>.description.sso` once the step offers providers
+    // (flow_state_machine.go buildStep); only some steps need their own wording.
+    const engine = createLiquidEngine({ locale: { ...locale, "identifier.description": "Email" } });
+    const result = engine.parseAndRenderSync("{{ key | t }}", {
+      key: "identifier.description.sso",
+    });
+    expect(result).toBe("Email");
+  });
+
+  it("a step's own SSO description wins over its plain one", () => {
+    const engine = createLiquidEngine({
+      locale: {
+        ...locale,
+        "password.description": "Password",
+        "password.description.sso": "Password or provider",
+      },
+    });
+    const result = engine.parseAndRenderSync("{{ key | t }}", { key: "password.description.sso" });
+    expect(result).toBe("Password or provider");
+  });
+
+  it("an SSO description with no plain one still falls through to the raw key", () => {
+    const engine = createLiquidEngine({ locale });
+    const result = engine.parseAndRenderSync("{{ key | t }}", { key: "custom.description.sso" });
+    expect(result).toBe("custom.description.sso");
+  });
+
+  it("the builtin password step names the provider in its SSO description", () => {
+    expect(fullLocale["password.description.sso"]).toContain("provider");
+  });
+
   it("the builtin locales ship the generic action.back", () => {
     expect(fullLocale["action.back"]).toBe("Back");
   });

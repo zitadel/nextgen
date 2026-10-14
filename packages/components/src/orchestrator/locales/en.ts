@@ -102,6 +102,7 @@ export const en: Record<string, string> = {
   // --- Step-name aliases used by the default login flow ---
   "password.title": "Sign in",
   "password.description": "Enter your password",
+  "password.description.sso": "Enter your password or continue with your sign-in provider",
   "password.field.password": "Password",
   "password.action.signin": "Sign in",
   "password.action.passkey": "Sign in with a passkey",

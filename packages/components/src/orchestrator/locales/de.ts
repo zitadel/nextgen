@@ -100,6 +100,7 @@ export const de: Locale = {
   // --- Step-Name-Aliase für den Standard-Login-Flow ---
   "password.title": "Anmelden",
   "password.description": "Gib dein Passwort ein",
+  "password.description.sso": "Gib dein Passwort ein oder fahre mit deinem Anmeldeanbieter fort",
   "password.field.password": "Passwort",
   "password.action.signin": "Anmelden",
   "password.action.passkey": "Mit Passkey anmelden",

@@ -49,5 +49,11 @@ export function withSsoProviders(base: CreateFlow201): CreateFlow201 {
   if (overlay.length === 0 || !PROVIDER_STEPS.has(base.step.name)) {
     return base;
   }
-  return { ...base, step: { ...base.step, sso_providers: [...overlay] } };
+  // The engine asks for `<step>.description.sso` once a step offers providers.
+  const description = base.step.texts?.description_key;
+  const texts =
+    description === undefined || description === null
+      ? base.step.texts
+      : { ...base.step.texts, description_key: `${description}.sso` };
+  return { ...base, step: { ...base.step, texts, sso_providers: [...overlay] } };
 }
