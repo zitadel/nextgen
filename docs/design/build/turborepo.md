@@ -25,9 +25,12 @@ hosted cloud's builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
   (`tools/bench`) and `@zitadel/release` (`tools/release`); their scripts
   `cd` to the directory the command needs.
 - Task names are script names: `dev:real`, `test:integration` and
-  `sync:export` keep their colons; the e2e lanes are `e2e`, `e2e-real`,
-  `e2e-embedded`, `e2e-platform`, `e2e-local`, `e2e-testkit` and the docs'
-  `e2e-deployment`.
+  `sync:export` keep their colons. The e2e lanes are `@zitadel/e2e`'s
+  `console-smoke`, `console-real`, `console-embedded`, `console-platform`,
+  `console-deployment`, `demo-next-mock`, `demo-next-real`, `demo-nuxt-mock`,
+  `journey`, `journey-local` and `e2e-local` (the journey runner with its
+  options from `JOURNEY_*`), plus the docs' `e2e` and `e2e-deployment`. Unlike
+  moon there is no `all` aggregate: ci-turbo.yml runs the lanes as gated steps.
 
 ## Dependencies
 
@@ -101,9 +104,10 @@ The lock is a directory in the OS temp dir keyed by the repository root, so
 checkouts do not block each other and a dead holder is reclaimed. The guard
 acts only when turbo runs the task (turbo sets `TURBO_HASH` for every task);
 under moon and when run by hand it runs the command once, unchanged. Names in
-use: `browser-tests` (one real-Chromium Vite server at a time, #1490) and
+use: `browser-tests` (one real-Chromium Vite server at a time, #1490),
 `generated-sources` (the generation tasks and the tasks that read what they
-rewrite).
+rewrite) and `demo-next-app` (the two demo-next e2e lanes, which both serve the
+demo on :3002; moon's `e2e-serial` covers them and the other server lanes).
 
 Moon keeps its own `mutex` and `retryCount` until the cutover. Its `test`
 task runs each package's `test:all` script, which in the four browser-test
@@ -127,7 +131,7 @@ by design): the task's dependencies miss the cache and rebuild. A script that
 CI or another script runs through turbo therefore takes its options from the
 environment, listed in the task's `passThroughEnv`: `RELEASE_SKIP_CONTAINER=1`
 for the release snapshot, `JOURNEY_CI=1`, `JOURNEY_MATRIX`, … for the journey
-runner (`apps/cli-journey-e2e/README.md`).
+runner (`e2e/journey/README.md`).
 
 Do not select the gate with `--affected` or `--filter=…[ref]`: both follow
 `package.json` edges only and would skip the server's tests on a console

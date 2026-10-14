@@ -1,6 +1,7 @@
 packages:
   - "apps/*"
   - "packages/*"
+  - "e2e"
   # The release and benchmark projects (tools/release, tools/bench) carry no
   # code the workspace installs; they are packages so the task runner can
   # address their tasks (see turbo.json).

@@ -14,7 +14,7 @@ Scope pointers first — this file's own body covers **telemetry only**:
   [ADR 046](../../docs/adrs/046-claim-lifecycle-v2.md) (`src/commands/claim.ts`,
   `src/lib/claim-state.ts`, `src/commands/doctor/checks/claim.ts`).
 - The journey e2e contract is
-  [`apps/cli-journey-e2e/AGENTS.md`](../cli-journey-e2e/AGENTS.md).
+  [`e2e/journey/AGENTS.md`](../../e2e/journey/AGENTS.md).
 - The test contract — the unit/spec split and one spec per command — is
   [`tests/AGENTS.md`](tests/AGENTS.md). Read it before adding or moving any
   test.
