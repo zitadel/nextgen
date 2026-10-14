@@ -272,8 +272,9 @@ func (UnimplementedHandler) CreateProject(ctx context.Context, req *CreateProjec
 // resource is always pinned under the identity it declares.
 // Every handle a pinned resource references, such as a flow definition's
 // `user_schema` naming a schema by `objectType`, or a flow step's
-// `sso_providers` naming IDP connections by `slug`, must be pinned by the
-// same release. A handle the release does not pin refuses the request with
+// `sso_providers` and a schema's `x-auth-methods.sso.providers` naming IDP
+// connections by `slug`, must be referenced by the same release. A handle the release does not pin
+// refuses the request with
 // `rel.unresolved_reference`. The message names the pointer and the handle
 // that did not resolve, for example
 // `flow_definition default-login: user_schema human-user not found`,

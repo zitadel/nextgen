@@ -83,6 +83,9 @@ func expectHandleReads(statements *servicemocks.MockAllStatements) {
 		GetFlowDefinitionByID(gomock.Any(), "proj_1", "flowdef_1").
 		Return(loginFlow(), nil).AnyTimes()
 	statements.EXPECT().
+		GetIDPConnectionRevision(gomock.Any(), "proj_1", "idprev_1").
+		Return(&domain.IDPConnection{ProjectID: "proj_1", ID: "idp_1", Slug: "google", RevisionID: "idprev_1"}, nil).AnyTimes()
+	statements.EXPECT().
 		GetBrandingByID(gomock.Any(), "proj_1", "brnd_1").
 		Return(&domain.Branding{ProjectID: "proj_1", ID: "brnd_1"}, nil).AnyTimes()
 }
@@ -300,6 +303,40 @@ func TestReleaseServiceCreateRejectsMissingUserSchema(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, domain.ErrReleaseUnresolvedReference().Code, domErr.Code)
 	assert.Equal(t, "flow_definition default-login: user_schema human-user not found", domErr.Message)
+}
+
+// An IDP connection is referenced by its revision and recorded under its slug.
+func TestReleaseServiceCreateReferencesIDPConnection(t *testing.T) {
+	svc, statements := newMockedReleaseService(t)
+	expectHandleReads(statements)
+	statements.EXPECT().
+		GetReleaseByContentHash(gomock.Any(), "proj_1", gomock.Any()).
+		Return(nil, new(database.NoRowFoundError))
+	statements.EXPECT().CreateRelease(gomock.Any(), gomock.Any()).Return(nil)
+
+	result, err := svc.Create(t.Context(), service.CreateReleaseInput{
+		ProjectID: "proj_1",
+		Pointers: []service.CreateReleasePointer{
+			{Kind: domain.ReleasePointerKindIDP, RevisionID: "idprev_1"},
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []domain.ReleasePointer{
+		{Kind: domain.ReleasePointerKindIDP, Handle: "google", RevisionID: "idprev_1"},
+	}, result.Release.Pointers)
+}
+
+func TestReleaseServiceCreateRejectsUnknownIDPRevision(t *testing.T) {
+	svc, statements := newMockedReleaseService(t)
+	statements.EXPECT().
+		GetIDPConnectionRevision(gomock.Any(), "proj_1", "idprev_gone").
+		Return(nil, new(database.NoRowFoundError))
+
+	_, err := svc.Create(t.Context(), service.CreateReleaseInput{
+		ProjectID: "proj_1",
+		Pointers:  []service.CreateReleasePointer{{Kind: domain.ReleasePointerKindIDP, RevisionID: "idprev_gone"}},
+	})
+	assert.ErrorIs(t, err, domain.ErrReleaseRevisionNotFound(nil))
 }
 
 // The flow is checked against the schema revision in the release, not the
