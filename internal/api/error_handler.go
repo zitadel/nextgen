@@ -178,8 +178,9 @@ func OgenErrorHandler(ctx context.Context, w http.ResponseWriter, _ *http.Reques
 
 	switch {
 	case isSecurityInternalError(err):
-		// The security handler could not decide (CSRF request state missing):
-		// a server fault, not a refused credential. The client gets the generic
+		// The security handler could not decide (CSRF request state missing, or
+		// the token store unreachable while introspecting the credential): a
+		// server fault, not a refused credential. The client gets the generic
 		// internal answer; the cause goes to the log, where a wiring mistake
 		// that makes every cookie request fail has to be findable.
 		slog.ErrorContext(ctx, "security handler could not reach a decision", "error", err)
