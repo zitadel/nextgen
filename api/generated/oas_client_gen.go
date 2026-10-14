@@ -252,8 +252,9 @@ type Invoker interface {
 	// `sso_providers` or a schema's `x-auth-methods.sso.providers`. A missing
 	// one answers `rel.unresolved_reference`, naming the resource and the
 	// handle, e.g. `flow_definition default-login: user_schema human-user not found`.
-	// - Every flow must fit the user schema revision in the release. A flow
-	// that does not answers `rel.invalid`, with the reason in `details`.
+	// - Every flow is validated as on save, against the user schema revision
+	// in the release. A flow that fails answers `rel.invalid`, with the
+	// reason in `details`.
 	// Idempotent on the set of revisions: the same revisions with a different
 	// `message` answer `200` with the existing release. A new release answers
 	// `201`. Creating a release does not deploy it.
@@ -2726,8 +2727,9 @@ func (c *Client) sendCreateProject(ctx context.Context, request *CreateProjectRe
 // `sso_providers` or a schema's `x-auth-methods.sso.providers`. A missing
 // one answers `rel.unresolved_reference`, naming the resource and the
 // handle, e.g. `flow_definition default-login: user_schema human-user not found`.
-// - Every flow must fit the user schema revision in the release. A flow
-// that does not answers `rel.invalid`, with the reason in `details`.
+// - Every flow is validated as on save, against the user schema revision
+// in the release. A flow that fails answers `rel.invalid`, with the
+// reason in `details`.
 // Idempotent on the set of revisions: the same revisions with a different
 // `message` answer `200` with the existing release. A new release answers
 // `201`. Creating a release does not deploy it.

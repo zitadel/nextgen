@@ -343,7 +343,7 @@ func TestCreateReleaseChecksFlowAgainstItsSchemaRevision(t *testing.T) {
 	require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, resp))
 	assert.Equal(t, http.StatusBadRequest, status)
 	assert.Equal(t, domain.ErrReleaseInvalid(nil, nil).Code, code)
-	assert.Contains(t, message, "flow_definition release-fit-flow: does not fit user_schema example-user")
+	assert.Contains(t, message, "flow_definition release-fit-flow: invalid")
 
 	resp = release(v1)
 	require.IsType(t, &api.CreateReleaseCreated{}, resp, "create release: %s", helpers.MustMarshal(t, resp))

@@ -38,29 +38,23 @@ func (c ReleaseContent) Pointers() []ReleasePointer {
 // Rules are called directly: the spec's error sets are inferred from static
 // calls only.
 func ValidateRelease(content ReleaseContent) error {
-	schemas := make(map[string]releaseSchema, len(content.Schemas))
+	documents := make(map[string]*jsonschema.Schema, len(content.Schemas))
 	for _, schema := range content.Schemas {
 		document, err := schema.Document()
 		if err != nil {
 			return ErrInternal(err).WithMessage("failed to unmarshal user schema")
 		}
-		schemas[*schema.ObjectType] = releaseSchema{JSONSchema: schema, document: document}
+		documents[*schema.ObjectType] = document
 	}
-	if err := validateReleaseReferencesClosed(content, schemas); err != nil {
+	if err := validateReleaseReferencesClosed(content, documents); err != nil {
 		return err
 	}
-	return validateReleaseFlowsFitSchemas(content, schemas)
-}
-
-// releaseSchema is a schema in the release with its parsed document.
-type releaseSchema struct {
-	*JSONSchema
-	document *jsonschema.Schema
+	return validateReleaseFlowDefinitions(content, documents)
 }
 
 // validateReleaseReferencesClosed requires every handle a revision names to
 // be in the release.
-func validateReleaseReferencesClosed(content ReleaseContent, schemas map[string]releaseSchema) error {
+func validateReleaseReferencesClosed(content ReleaseContent, documents map[string]*jsonschema.Schema) error {
 	type key struct {
 		kind   ReleasePointerKind
 		handle string
@@ -84,7 +78,7 @@ func validateReleaseReferencesClosed(content ReleaseContent, schemas map[string]
 	}
 	for _, schema := range content.Schemas {
 		objectType := *schema.ObjectType
-		authMethods, err := newSchemaReader(schemas[objectType].document).AuthMethods()
+		authMethods, err := newSchemaReader(documents[objectType]).AuthMethods()
 		if err != nil {
 			return ErrInternal(err).WithMessage("failed to read user schema auth methods")
 		}
@@ -101,13 +95,12 @@ func errReleaseUnresolved(kind ReleasePointerKind, handle, field, ref string) er
 	return ErrReleaseUnresolvedReference().WithMessage(fmt.Sprintf("%s %s: %s %s not found", kind, handle, field, ref))
 }
 
-// validateReleaseFlowsFitSchemas checks each flow against the schema revision
-// in the release, as a save checks it against the newest one. Runs after
+// validateReleaseFlowDefinitions validates each flow as a save does, against
+// the schema revision in the release instead of the newest one. Runs after
 // closure, so the schema is there.
-func validateReleaseFlowsFitSchemas(content ReleaseContent, schemas map[string]releaseSchema) error {
+func validateReleaseFlowDefinitions(content ReleaseContent, documents map[string]*jsonschema.Schema) error {
 	for _, flow := range content.FlowDefinitions {
-		schema := schemas[flow.UserSchema]
-		if _, err := ValidateFlowDefinition(schema.document, *flow); err != nil {
+		if _, err := ValidateFlowDefinition(documents[flow.UserSchema], *flow); err != nil {
 			reason, ok := errors.AsType[Error](err)
 			if !ok {
 				return ErrInternal(err).WithMessage("failed to validate flow definition")
@@ -116,8 +109,7 @@ func validateReleaseFlowsFitSchemas(content ReleaseContent, schemas map[string]r
 			if details == nil {
 				details = reason.Message
 			}
-			return ErrReleaseInvalid(details, err).WithMessage(fmt.Sprintf("%s %s: does not fit user_schema %s revision %s",
-				ReleasePointerKindFlowDefinition, flow.Name, flow.UserSchema, schema.URL))
+			return ErrReleaseInvalid(details, err).WithMessage(fmt.Sprintf("%s %s: invalid", ReleasePointerKindFlowDefinition, flow.Name))
 		}
 	}
 	return nil

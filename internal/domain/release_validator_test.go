@@ -144,7 +144,7 @@ func TestValidateReleaseFlowMustFitItsSchema(t *testing.T) {
 	domErr, ok := errors.AsType[domain.Error](err)
 	require.True(t, ok)
 	assert.Equal(t, domain.ErrReleaseInvalid(nil, nil).Code, domErr.Code)
-	assert.Equal(t, "flow_definition default-login: does not fit user_schema human-user revision sch_1", domErr.Message)
+	assert.Equal(t, "flow_definition default-login: invalid", domErr.Message)
 	assert.NotEmpty(t, domErr.Details, "the details carry the flow validator's reason")
 	assert.ErrorIs(t, err, domain.ErrFlowDefinitionInvalid(nil, nil))
 }
