@@ -222,12 +222,13 @@ task: turbo sets `TURBO_HASH` for every task. Under moon, which has its own
 ### `retryCount: 3` (4 uses)
 
 `task-guard --retries 3` in the same four browser-test `test` scripts. The
-flake it exists for is a cold-start race, so the retry re-runs the whole suite
-(warm), which Vitest's own per-test `retry` would not do — a failed module
-import fails the file. Moon is unchanged: its `test` task runs each package's
-`test:all` script, which calls Vitest directly, so moon keeps its own
-`retryCount: 3` and `mutex` and no suite retries under both. The `test:all`
-scripts go with moon at the cutover.
+flake it exists for is a module import Chromium aborts when a container changes
+the host's addresses (#1490, now prevented in CI; the retry stays as a safety
+net), so the retry re-runs the whole suite, which Vitest's own per-test `retry`
+would not do — a failed module import fails the file. Moon is unchanged: its
+`test` task runs each package's `test:all` script, which calls Vitest directly,
+so moon keeps its own `retryCount: 3` and `mutex` and no suite retries under
+both. The `test:all` scripts go with moon at the cutover.
 
 ### `runInCI` (72 uses)
 

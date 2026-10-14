@@ -15,8 +15,8 @@
  * The lock is a directory under the OS temp dir, keyed by the repository
  * root, so two checkouts never block each other. The holder's pid is written
  * into it; a lock whose holder is gone is reclaimed. Retries re-run the whole
- * command while the lock is held, which is what a cold-start flake needs: the
- * first attempt warms a cache, the retry runs warm (#1490).
+ * command while the lock is held: a module import the browser loses fails the
+ * whole file, which a per-test retry would not run again (#1490).
  */
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";

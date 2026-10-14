@@ -161,7 +161,11 @@ jobs:
 
       - name: Keep Docker's interface churn away from Chromium
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        run: sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
+        run: |
+          sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
+          if [ -d /proc/sys/net/ipv6/conf/docker0 ]; then
+            sudo sysctl -w net.ipv6.conf.docker0.disable_ipv6=1
+          fi
 
       # The gate. No `--affected`: turbo's package-level selection would miss
       # the artifact edges (a console change must re-run the server's tests,

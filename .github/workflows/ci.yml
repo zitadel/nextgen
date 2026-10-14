@@ -105,13 +105,20 @@ jobs:
 
       - name: Keep Docker's interface churn away from Chromium
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        # Every container the Go integration suites start or stop adds or removes
-        # a host veth interface. With IPv6 on, the kernel gives it a link-local
-        # address, and Chromium aborts every in-flight request when the host's
-        # addresses change (ERR_NETWORK_CHANGED), failing whichever browser-mode
-        # suite is loading at that moment. Disable IPv6 on newly created
-        # interfaces only; loopback and the runner's NIC keep it. (#1490)
-        run: sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
+        # Chromium aborts every in-flight request when the host gains or loses
+        # an IP address (ERR_NETWORK_CHANGED), failing whichever browser-mode
+        # suite is loading a module at that moment. The containers the Go
+        # integration suites start add addresses in two ways: with IPv6 on, the
+        # kernel gives each container's host veth interface a link-local
+        # address, and the job's first container brings up the docker0 bridge,
+        # which then gets one too. Disable IPv6 on interfaces created from here
+        # on and on docker0, which already exists; loopback and the runner's
+        # NIC keep it. (#1490)
+        run: |
+          sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
+          if [ -d /proc/sys/net/ipv6/conf/docker0 ]; then
+            sudo sysctl -w net.ipv6.conf.docker0.disable_ipv6=1
+          fi
 
       # Builds, lint, typecheck and unit tests. `:test` is unit tests here as in
       # a local `pnpm run check`; the e2e suite runs in its own step below.

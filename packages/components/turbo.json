@@ -20,7 +20,7 @@
     },
     // standalone-artifact.spec.ts reads dist/standalone.mjs, so the dev build
     // runs first. The script serialises the browser suites across packages
-    // (`browser-tests` lock) and retries the cold-start flake (#1490).
+    // (`browser-tests` lock) and retries a failed suite (#1490).
     "test": {
       "dependsOn": ["install-browsers", "@zitadel/api-mock#build", "build"]
     }
