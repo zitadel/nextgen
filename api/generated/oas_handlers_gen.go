@@ -15920,8 +15920,10 @@ func (s *Server) handleUpdateTeamRequest(args [1]string, argsEscaped bool, w htt
 // Enters, replaces and removes the project's variables for the requested
 // kind. Names not in the body are untouched. Existing deployments keep the
 // values they froze.
-// Without `kind`, a plain value is written for both kinds and a secret for
-// `primary` only. `null` removes the name from both.
+// Without `kind`, a plain value is written for both kinds. A secret is
+// written for `primary` only and removes the name's `preview` value, so a
+// preview never keeps a plaintext copy; set a preview secret with
+// `kind=preview`. `null` removes the name from both.
 // A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
 // stores the value encrypted under the project's active `secret` key, after
 // which it can be referenced but not read back. `null` removes the name

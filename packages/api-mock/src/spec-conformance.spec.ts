@@ -1464,13 +1464,18 @@ describe("api-mock idp and variable contract details", () => {
     expect(await (await fetch(url())).json()).toEqual({ SHARED: { primary: "prod" } });
   });
 
-  test("writes a secret naming no kind for primary only", async () => {
+  test("writes a secret naming no kind for primary only, removing the preview value", async () => {
     const projectId = await newProject("vars-secret-kind");
     const url = `${BASE}/variables?project_id=${projectId}`;
     await fetch(url, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ TOKEN: { value: "s3cr3t", secret: true }, HOST: "example.com" }),
+      body: JSON.stringify({ TOKEN: "plain", HOST: "example.com" }),
+    });
+    await fetch(url, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ TOKEN: { value: "s3cr3t", secret: true } }),
     });
 
     expect(await (await fetch(url)).json()).toEqual({

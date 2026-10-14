@@ -1469,7 +1469,7 @@ export function setupPlatformHandlers() {
       };
       // RFC 7386: a name present is written, `null` removes it, and a name
       // absent is left alone. Without a kind, a plain value is written for
-      // both kinds and a secret for primary only.
+      // both kinds, and a secret for primary only, removing the preview value.
       for (const [name, value] of Object.entries(body.data as Record<string, unknown>)) {
         if (value === null) {
           for (const kind of kinds) {
@@ -1477,10 +1477,12 @@ export function setupPlatformHandlers() {
           }
         } else if (typeof value === "object") {
           const input = value as { value: string | number | boolean; secret: boolean };
-          const targets: VariableKind[] =
-            input.secret && query.data.kind === undefined ? ["primary"] : kinds;
-          for (const kind of targets) {
+          const kindless = input.secret && query.data.kind === undefined;
+          for (const kind of kindless ? (["primary"] as const) : kinds) {
             owned(kind).set(name, { value: input.value, secret: input.secret });
+          }
+          if (kindless) {
+            owned("preview").delete(name);
           }
         } else {
           for (const kind of kinds) {
