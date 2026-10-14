@@ -2,6 +2,7 @@ import { Flags } from "@oclif/core";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
 import { createDeployment } from "../../lib/release";
+import { nextCommandsData } from "../../lib/oclif/envelope";
 
 /**
  * `zitadel deployment create --release <id>` — make an existing release live.
@@ -59,7 +60,7 @@ export default class DeploymentCreate extends EnvironmentCommand {
         deployment_id: deployment.id,
         release_id: deployment.release_id,
         origins,
-        next_commands: [`zitadel deployment list${this.environmentSelector()}`],
+        ...nextCommandsData([this.suggest("deployment list")]),
       },
       pretty: [
         `Deployed ${deployment.release_id} to ${origins.length} origin${origins.length === 1 ? "" : "s"}`,

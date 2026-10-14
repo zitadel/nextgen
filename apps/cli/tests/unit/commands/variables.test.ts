@@ -554,6 +554,9 @@ describe("variables set", () => {
       expect(retry).toContain("--project-level");
       expect(retry).toContain("--secret");
       expect(json.hint).toContain("--project-level");
+      // The server this run was pointed at, before the redirection: without
+      // it the piped secret would land in the default project's store.
+      expect(retry).toContain(`--server ${SERVER} < value.txt`);
     } finally {
       if (original) {
         Object.defineProperty(process, "stdin", original);
@@ -951,6 +954,24 @@ describe("variables delete asked on a terminal", () => {
 });
 
 describe("variables delete", () => {
+  it("keeps the run's server in the suggested --force retry", async () => {
+    const cwd = await makeProject();
+
+    const res = await runCliForTest([
+      "variables",
+      "delete",
+      "SUPPORT_EMAIL",
+      "--project-level",
+      "--non-interactive",
+      ...base(cwd),
+    ]);
+
+    const json = parseJson(res.stdout) as { next_commands?: string[] };
+    expect(json.next_commands?.[0]).toContain(
+      `variables delete SUPPORT_EMAIL --project-level --force --server ${SERVER}`,
+    );
+  });
+
   it("deletes the name at the project level", async () => {
     const cwd = await makeProject();
     let path = "";

@@ -10,6 +10,7 @@ import {
   validateStep,
   worktreeIsDirty,
 } from "../../lib/release";
+import { nextCommandsData } from "../../lib/oclif/envelope";
 
 /**
  * `zitadel release create` — build a release from `.zitadel/` and post it,
@@ -80,9 +81,7 @@ export default class ReleaseCreate extends EnvironmentCommand {
         release_id: release.id,
         content_hash: release.content_hash,
         resources: resourceCount,
-        next_commands: [
-          `zitadel deployment create --release ${release.id}${this.environmentSelector()}`,
-        ],
+        ...nextCommandsData([this.suggest(`deployment create --release ${release.id}`)]),
       },
       pretty: `Created ${release.id} (${release.content_hash})`,
     });

@@ -11,7 +11,7 @@ import {
   type PackageCommand,
   type PackageManager,
 } from "../../lib/package-manager";
-import { publicCliCommand } from "../../lib/public-cli";
+import { shellCommand, type SuggestedCommand, unscopedCommand } from "../../lib/suggestion";
 
 type InstallReason = "dry-run" | "skip-install" | "no-dependency-changes";
 
@@ -35,7 +35,7 @@ export type SetupInstallOutcome = {
   boxActions: BoxAction[];
   /** Complete journey for the JSON envelope — agents consume all of it. */
   nextActions: string[];
-  nextCommands: string[];
+  nextCommands: SuggestedCommand[];
 };
 
 export type SetupInstallInput = {
@@ -121,8 +121,8 @@ function outcome(input: {
   issuer: string;
   includeInstallCommand: boolean;
 }): SetupInstallOutcome {
-  const planCommand = publicCliCommand("deploy --dry-run", input.cliVersion);
-  const statusCommand = publicCliCommand("status", input.cliVersion);
+  const planCommand = unscopedCommand("deploy --dry-run", input.cliVersion);
+  const statusCommand = unscopedCommand("status", input.cliVersion);
   const verifyActions = [
     ...(input.includeInstallCommand ? [`Install dependencies: ${input.install.command}`] : []),
     `Start your project: ${input.devCommand} (then open ${input.issuer}/login)`,
@@ -150,8 +150,8 @@ function outcome(input: {
     boxActions,
     nextActions: [...verifyActions, ...customizeAndPublishActions(input.cliVersion)],
     nextCommands: input.includeInstallCommand
-      ? [input.install.command, input.devCommand, planCommand]
-      : [input.devCommand, planCommand],
+      ? [shellCommand(input.install.command), shellCommand(input.devCommand), planCommand]
+      : [shellCommand(input.devCommand), planCommand],
   };
 }
 
@@ -163,7 +163,7 @@ function installFailed(
 ): ZitadelError {
   return new ZitadelError("E_VALIDATION", `Dependency install failed: ${installCommand.display}`, {
     hint: `Run ${installCommand.display} in ${cwd}, then start the app with ${devCommand.display}.`,
-    nextCommands: [installCommand.display],
+    nextCommands: [shellCommand(installCommand.display)],
     details: { command: installCommand.display, cwd, original: errorShape(error) },
   });
 }

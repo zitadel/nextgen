@@ -12,6 +12,7 @@ import { isObject } from "../json";
 import { resolveCwd } from "../paths";
 import { normalizePublicCliCommand, normalizePublicCliCommands } from "../public-cli";
 import { resolveServer } from "../server";
+import { type SuggestedCommand, unscopedCommand } from "../suggestion";
 import { type Properties, Telemetry, type TelemetryDeps } from "../telemetry";
 import { buildUserAgent, installUserAgent, processUserAgentFacts } from "../user-agent";
 import { takeReportedWarnings } from "../warnings";
@@ -152,6 +153,17 @@ export abstract class BaseCommand extends Command {
    */
   protected readonly input: Asker = (question) =>
     askInput(question, { interactive: !this.meta.nonInteractive, force: this.meta.force });
+
+  /**
+   * A `zitadel` command that does not target a project, in the public `npx`
+   * form: `setup`, `start`, `doctor`, the local runtime. A command that talks
+   * to a project suggests through `EnvironmentCommand.suggest` instead, which
+   * keeps the run's environment selector; reaching for this one is the
+   * deliberate opt-out.
+   */
+  protected suggestUnscoped(args: string): SuggestedCommand {
+    return unscopedCommand(args, this.meta.cliVersion);
+  }
 
   /**
    * Merge command-specific dimensions into {@link telemetryProps} immutably: a

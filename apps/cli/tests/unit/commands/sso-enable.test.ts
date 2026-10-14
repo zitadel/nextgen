@@ -554,6 +554,19 @@ describe("sso enable secret handling", () => {
     expect(json.hint).toContain("stdin");
     await expect(readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")).rejects.toThrow();
   });
+
+  it("keeps the run's server in the retry it suggests for a missing client id", async () => {
+    // Following a retry without it would publish the credentials to whichever
+    // project the default environment resolves to.
+    const cwd = await makeProject();
+
+    const result = await enable(cwd, "--server", "https://api.zitadel.cloud");
+
+    const json = parseJson(result.stdout) as { next_commands?: string[] };
+    expect(json.next_commands?.[0]).toContain(
+      "sso enable --provider google --client-id <client-id> --server https://api.zitadel.cloud",
+    );
+  });
 });
 
 describe("sso enable with a connection already on disk", () => {

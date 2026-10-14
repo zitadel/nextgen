@@ -9,7 +9,7 @@ import {
   VARIABLE_TYPES,
   type VariableType,
 } from "../../lib/variables";
-import { publicCliCommand } from "../../lib/public-cli";
+import { inShell } from "../../lib/suggestion";
 
 /**
  * The `variables set` topic command — enter or replace one variable at the
@@ -49,7 +49,7 @@ export default class VariablesSet extends OwnerCommand {
   async run(): Promise<JsonEnvelope> {
     const { args, flags } = await this.parse(VariablesSet);
     await this.toMeta(flags);
-    const { dryRun, cliVersion } = this.meta;
+    const { dryRun } = this.meta;
     const name = args.name;
     const type = flags.as as VariableType;
 
@@ -86,7 +86,7 @@ export default class VariablesSet extends OwnerCommand {
       name: `value for ${name}`,
       message: `Value for ${name}`,
       stdin: true,
-      retry: pipeHint(name, flags.secret, type, cliVersion),
+      retry: inShell(this.suggest(pipeArgs(name, flags.secret, type)), { after: " < value.txt" }),
       parse: (raw) => parseVariableValue(raw, type),
     });
 
@@ -108,8 +108,8 @@ export default class VariablesSet extends OwnerCommand {
  * Dropping any of them would hand back a command that writes a credential as a
  * readable value, or stores a number as a string.
  */
-function pipeHint(name: string, secret: boolean, type: VariableType, cliVersion: string): string {
-  const args = [
+function pipeArgs(name: string, secret: boolean, type: VariableType): string {
+  return [
     "variables",
     "set",
     name,
@@ -117,5 +117,4 @@ function pipeHint(name: string, secret: boolean, type: VariableType, cliVersion:
     ...(secret ? ["--secret"] : []),
     ...(type === "string" ? [] : ["--as", type]),
   ].join(" ");
-  return `${publicCliCommand(args, cliVersion)} < value.txt`;
 }

@@ -14,6 +14,7 @@ import {
   type ContainerIdentity,
   type RuntimeMetadata,
 } from "./runtime";
+import { unscopedCommand } from "../suggestion";
 
 export type DockerResult = {
   status: number;
@@ -288,7 +289,7 @@ function dockerError(action: string, args: string[], cause: unknown): ZitadelErr
       : { command: ["docker", ...args], cause };
   return new ZitadelError("E_VALIDATION", `${action} failed`, {
     hint: "Check that Docker is installed, running, and reachable from this shell.",
-    nextCommands: ["zitadel doctor"],
+    nextCommands: [unscopedCommand("doctor")],
     details,
   });
 }

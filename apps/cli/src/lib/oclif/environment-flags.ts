@@ -1,5 +1,6 @@
 import { shellArg } from "../shell";
 import { nonBlankString } from "./flags";
+import { asEnvironmentSelector, type EnvironmentSelector } from "../suggestion";
 
 /**
  * The flags that choose the environment a command runs against, spread into
@@ -39,7 +40,7 @@ export function environmentSelectorSuffix(input: {
   envFile?: string;
   envName?: string;
   server?: string;
-}): string {
+}): EnvironmentSelector {
   const parts: string[] = [];
   if (input.envFile !== undefined) {
     parts.push(`--env-file ${shellArg(input.envFile)}`);
@@ -49,5 +50,5 @@ export function environmentSelectorSuffix(input: {
   if (input.server !== undefined) {
     parts.push(`--server ${shellArg(input.server)}`);
   }
-  return parts.length === 0 ? "" : ` ${parts.join(" ")}`;
+  return asEnvironmentSelector(parts.length === 0 ? "" : ` ${parts.join(" ")}`);
 }

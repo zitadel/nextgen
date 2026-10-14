@@ -2,7 +2,6 @@ import { Flags } from "@oclif/core";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
 import { revokeRelease } from "../../lib/release";
-import { publicCliCommand } from "../../lib/public-cli";
 
 /**
  * `zitadel release revoke <release_id>` — mark a release so its content is
@@ -32,7 +31,7 @@ export default class ReleaseRevoke extends EnvironmentCommand {
   async run(): Promise<JsonEnvelope> {
     const { args, flags } = await this.parse(ReleaseRevoke);
     await this.toMeta(flags);
-    const { dryRun, cliVersion } = this.meta;
+    const { dryRun } = this.meta;
     const releaseId = args.release_id;
 
     // A dry run makes no request, so it answers before the connection and
@@ -50,10 +49,7 @@ export default class ReleaseRevoke extends EnvironmentCommand {
       kind: "confirm",
       name: `revoke ${releaseId}`,
       message: `Revoke ${releaseId}? Its content can never be served again.`,
-      retry: publicCliCommand(
-        `release revoke ${releaseId} --force${this.environmentSelector()}`,
-        cliVersion,
-      ),
+      retry: this.suggest(`release revoke ${releaseId} --force`),
     });
     if (!confirmed) {
       return this.emit({ status: "skipped", reason: "revoke-cancelled" });
