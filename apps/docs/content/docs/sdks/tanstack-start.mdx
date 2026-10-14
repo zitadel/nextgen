@@ -89,6 +89,8 @@ The TanStack Start SDK is a global request middleware that proxies and verifies 
       beforeLoad: async () => {
         const auth = await fetchAuth();
         if (!auth.isAuthenticated) {
+          // Zitadel could not be asked: an outage, not a sign-out.
+          if (auth.reason === "unavailable") throw new Error("Try again shortly");
           throw redirect({ to: "/login" });
         }
       },

@@ -3,7 +3,9 @@
 > **Status:** Proposed
 > **Date:** 2026-07-17
 > **Amended:** 2026-08-03 — credential exposure contracts; server-originated
-> me-ops; SSR session validation at the render layer
+> me-ops; SSR session validation at the render layer. 2026-10-08 — one
+> publishable key per project; allow-all is the absence of a pattern.
+> 2026-10-14 — an unanswered session check is not a sign-out
 >
 > **Proposed amendment — [ADR 053 §5](053-cross-project-principals.md#5-first-party-human-sessions-may-call-the-operator-plane):**
 > if ADR 053 is accepted, the operator plane no longer always authenticates
@@ -307,16 +309,33 @@ sdk-core's `validateOpaqueSessionToken`:
 
 - **Live**: a `2xx` with a readable body. A session that names no user is
   live but anonymous: not signed in, and its cookie stays.
-- **Dead**: `401` or `404`, the only answers that say the token names no
-  session. The SDK clears the `__nextgen*` cookies and a protected route
-  redirects to the login page.
-- **Unknown**: a network error, a timeout (`opaqueTokenTimeoutMs`), a `5xx` or
-  any other answer. The request is treated as signed out, the cookies stay, and
-  a protected route answers a retryable `503` instead of the login redirect.
-  Clearing the cookie here would sign every user out whenever the backend
-  restarts or slows down.
+- **Dead**: the backend's own error envelope saying the token names no
+  session — `401` with `code: "auth.unauthorized"` or `404` with
+  `code: "sess.not_found"`. These are the only answers that sign out: the SDK
+  clears the `__nextgen*` cookies and a protected route redirects to the login
+  page. A `401` or `404` without that code (a gateway's HTML page, a wrong base
+  URL, a WAF) is not the backend speaking and counts as unknown, the same rule
+  the client `getSession()` already applies.
+- **Unknown**: a network error, a timeout (`opaqueTokenTimeoutMs`), a `5xx`, an
+  unreadable body, an unrecognised `401`/`404`, or any other answer. The
+  request is treated as signed out with `reason: "unavailable"` on the auth
+  result, so an app's own guard can answer a retryable error instead of
+  redirecting; the cookies stay; and a protected route answers a retryable
+  `503` instead of the login redirect. Clearing the cookie here would sign
+  every user out whenever the backend restarts or slows down. After an unknown
+  outcome the SDK logs it once and answers unknown without asking that backend
+  again for a few seconds (`SESSION_CHECK_BACKOFF_MS`), so a hanging backend
+  does not cost every request the full timeout.
+
+The guarantee is therefore exactly as strong as the backend's answers: the SDK
+signs a user out only when the backend reports the session dead. A backend that
+reports an internal failure as `401 auth.unauthorized` (for example, a session
+check whose token-record read fails while the database is down) still signs
+users out; making the backend answer such failures as `5xx` is a separate
+server fix, not part of this amendment.
 
 The same rule covers the proxy and the JWKS: a proxied call the backend does
 not answer is a `502` (unreachable) or `504` (`proxyTimeoutMs`) with an
-`{ code, message }` body, and a failed JWKS refresh keeps verifying against the
-keys already cached.
+`{ code, message }` body, and a failed JWKS refresh (a `5xx` included) keeps
+verifying against the keys already cached, is logged once, and is not retried
+for `JWKS_FAILURE_BACKOFF_MS`.

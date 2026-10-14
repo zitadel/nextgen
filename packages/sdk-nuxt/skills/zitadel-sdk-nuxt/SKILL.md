@@ -94,7 +94,11 @@ import { getAuth } from '@zitadel/sdk-nuxt/server';
 
 export default defineEventHandler((event) => {
   const auth = getAuth(event);
-  if (!auth.isAuthenticated) throw createError({ statusCode: 401 });
+  if (!auth.isAuthenticated) {
+    // Zitadel could not be asked: an outage, not a sign-out.
+    if (auth.reason === 'unavailable') throw createError({ statusCode: 503 });
+    throw createError({ statusCode: 401 });
+  }
   return { userId: auth.session.userId };
 });
 ```

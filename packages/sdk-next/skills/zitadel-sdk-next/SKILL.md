@@ -121,7 +121,8 @@ Confirm names against those before writing code.
 
 - **Never import the package root from a `"use client"` module.** The root
   re-exports the server-only `auth()`; pulling it into a client graph fails the
-  build. Client code imports from `/react` or `/session` only.
+  build. Client code imports from `/react`, `/session` or `/client` (for
+  `configureZitadel()`) only.
 - **`NextgenProvider` is server-only** and must not be re-exported through a
   `"use client"` `providers.tsx` wrapper — that would leak the unstripped token
   into the RSC flight payload. To seed from client state, use
@@ -133,7 +134,9 @@ Confirm names against those before writing code.
   unmatched public page always looks signed out — use `getSession()` there.
 - **A rejected `getSession()` means *unknown*, not signed out** (broken proxy /
   network / 5xx). Render a neutral or error state, never the signed-out CTA.
-- **Config handles:** `ZITADEL_URL` (backend, server-side) and
-  `NEXT_PUBLIC_ZITADEL_PROJECT_ID` (passed to `configureZitadel`). If the
+- **Config handles:** `ZITADEL_URL` (backend, server-side),
+  `ZITADEL_PROJECT_SECRET` (server-only, sent on the sign-in handoff; without
+  it sign-in cannot finish) and `NEXT_PUBLIC_ZITADEL_PROJECT_ID` (passed to
+  `configureZitadel`). If the
   middleware runs with custom verification options, pass the same ones to
   `auth()` so both layers accept the same tokens.

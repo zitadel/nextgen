@@ -66,7 +66,11 @@ const fetchAuth = createServerFn().handler(({ context }) => getAuth(context));
 export const Route = createFileRoute('/admin')({
   beforeLoad: async () => {
     const auth = await fetchAuth();
-    if (!auth.isAuthenticated) throw redirect({ to: '/login' });
+    if (!auth.isAuthenticated) {
+      // Zitadel could not be asked: an outage, not a sign-out.
+      if (auth.reason === 'unavailable') throw new Error('Try again shortly');
+      throw redirect({ to: '/login' });
+    }
     return { userId: auth.session.userId };
   },
 });
@@ -120,7 +124,7 @@ for a business audience.
 | `proxyPath`         | `string`             | `"/__nextgen"`               | Path prefix proxied to the auth backend                              |
 | `protectedRoutes`   | `string[]`           | `[]`                         | Paths requiring a valid session. Trailing `*` matches sub-paths      |
 | `ignoredRoutes`     | `string[]`           | `[]`                         | Paths skipped entirely — no JWT check. Trailing `*` matches sub-paths |
-| `loginPath`         | `string`             | `"/login"`                   | Where to redirect unauthenticated users                              |
+| `loginPath`         | `string`             | `"/login"`                   | Where to redirect unauthenticated users. Setup fails if `protectedRoutes` matches it and `ignoredRoutes` does not                              |
 | `allowedAlgorithms` | `string[]`           | `["RS256", "ES256"]`         | JWT `alg` values to accept                                           |
 | `allowedTokenTypes` | `string[]`           | `["JWT", "at+JWT"]`          | Accepted `typ` header values (case-insensitive)                     |
 | `clockSkewMs`       | `number`             | `5000`                       | Clock skew tolerance in ms for `exp`, `nbf`, `iat`                  |
@@ -128,4 +132,4 @@ for a business audience.
 | `proxyTimeoutMs`    | `number`             | `5000`                       | Timeout in ms for upstream proxy requests. A request exceeding it is answered `504`; an unreachable backend `502`, both with a `{ code, message }` body |
 | `audience`          | `string \| string[]` | not validated                | Expected `aud` claim value(s)                                       |
 
-Only a `401` or `404` from the session check clears the session cookie. If the Zitadel server times out, is unreachable or answers `5xx`, the cookie is kept: public pages render signed out and a protected route is answered `503` with `retry-after`, so an outage never signs users out. `handleNextgenRequest` reports that case as `{ type: "unavailable" }`.
+Only Zitadel's own answer that the session is gone, a `401` with the code `auth.unauthorized` or a `404` with `sess.not_found`, clears the session cookie. If the Zitadel server times out, is unreachable, answers `5xx`, or something in front of it (a gateway, a wrong `url`) answers a `401`/`404` page of its own, the cookie is kept: public pages render signed out with `getAuth()` reporting `reason: "unavailable"`, and a protected route is answered `503` with `retry-after`. Guard your own loaders the same way (see above). After such a failure the SDK logs it once and does not ask Zitadel again for a few seconds, so a hanging server does not slow every request. `handleNextgenRequest` reports that case as `{ type: "unavailable" }`.
