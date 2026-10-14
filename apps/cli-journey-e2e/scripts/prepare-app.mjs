@@ -27,6 +27,8 @@ export async function prepareApp(options = {}) {
   const runtime = localRuntime(env.JOURNEY_RUNTIME);
   const preset = options.preset ?? env.JOURNEY_PRESET ?? "";
   const preexistingApp = options.preexistingApp ?? env.JOURNEY_PREEXISTING_APP === "1";
+  // `local`, or the remote lane's https edge in front of the same local runtime.
+  const setupServer = options.setupServer ?? (env.JOURNEY_SETUP_SERVER || "local");
   const fs = {
     appendFile: options.appendFile ?? appendFile,
     cp: options.cp ?? cp,
@@ -99,12 +101,14 @@ export async function prepareApp(options = {}) {
         "--framework",
         framework.id,
         "--server",
-        "local",
+        setupServer,
         "--dev-port",
         String(appPort),
-        // `start` ran first and left `.zitadel/local` in the app dir, so the
-        // directory is no longer empty; --force scaffolds (or patches) into it.
-        "--force",
+        // A fresh app dir holds only what `start` just left there, which setup
+        // scaffolds beside as the quickstart does: no --force. The pre-existing
+        // lane keeps the --force it has always passed; there setup patches a
+        // detected app.
+        ...(preexistingApp ? ["--force"] : []),
         ...(preset ? ["--preset", preset] : []),
       ],
       writeFile: fs.writeFile,

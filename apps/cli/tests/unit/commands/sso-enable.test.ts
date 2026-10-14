@@ -645,6 +645,31 @@ describe("sso enable with a connection already on disk", () => {
     expect(result.exitCode).not.toBe(0);
     expect((parseJson(result.stdout) as { code: string }).code).toBe("E_NOT_FOUND");
   });
+
+  it("finds the flow naming the schema by its objectType", async () => {
+    const cwd = await makeProject();
+    const schemaPath = join(cwd, ".zitadel/schemas/default-human-user.json");
+    const flowPath = join(cwd, ".zitadel/flows/default-human-user-login.json");
+    const schema = JSON.parse(await readFile(schemaPath, "utf8")) as Record<string, unknown>;
+    const flow = JSON.parse(await readFile(flowPath, "utf8")) as Record<string, unknown>;
+    await writeFile(
+      schemaPath,
+      JSON.stringify(
+        { ...schema, $id: "https://a.example/default-human-user.json", objectType: "human-user" },
+        null,
+        2,
+      ),
+    );
+    await writeFile(flowPath, JSON.stringify({ ...flow, user_schema: "human-user" }, null, 2));
+
+    const result = await enable(cwd, "--client-id", "abc");
+
+    expect(result.exitCode).toBe(0);
+    expect(JSON.parse(await readFile(flowPath, "utf8"))).not.toEqual({
+      ...flow,
+      user_schema: "human-user",
+    });
+  });
 });
 
 describe("sso enable preflight", () => {

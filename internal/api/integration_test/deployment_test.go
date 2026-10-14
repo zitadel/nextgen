@@ -16,7 +16,8 @@ import (
 
 // TestDeploymentsNotImplemented pins the deployment operations to 501 until
 // the deployment service deploys to targets. Each request goes through the
-// real server, so the access check still runs first.
+// real server, so the new shapes decode and the access check still runs
+// first.
 func TestDeploymentsNotImplemented(t *testing.T) {
 	t.Parallel()
 
@@ -34,13 +35,37 @@ func TestDeploymentsNotImplemented(t *testing.T) {
 		assert.Equal(t, domain.ErrNotImplemented().Code, code)
 	}
 
-	t.Run("create", func(t *testing.T) {
+	t.Run("create by release id", func(t *testing.T) {
 		resp, err := fixture.client.CreateDeployment(t.Context(),
 			&api.CreateDeploymentRequest{
-				Environment: "prod",
-				ReleaseID:   releaseID,
+				ReleaseID: api.NewOptReleaseID(releaseID),
+				Targets:   api.DeploymentTargetsRequest{"primary"},
 			},
 			api.CreateDeploymentParams{ProjectID: project})
+		require.NoError(t, err)
+		expectNotImplemented(t, resp)
+	})
+
+	t.Run("create by content hash", func(t *testing.T) {
+		resp, err := fixture.client.CreateDeployment(t.Context(),
+			&api.CreateDeploymentRequest{
+				ContentHash: api.NewOptReleaseContentHash(created.(*api.CreateReleaseCreated).ContentHash),
+				Targets:     api.DeploymentTargetsRequest{"https://app.acme.com"},
+			},
+			api.CreateDeploymentParams{ProjectID: project})
+		require.NoError(t, err)
+		expectNotImplemented(t, resp)
+	})
+
+	t.Run("rollback", func(t *testing.T) {
+		resp, err := fixture.client.RollbackDeployment(t.Context(),
+			api.NewOptRollbackDeploymentRequest(api.RollbackDeploymentRequest{
+				Message: api.NewOptString("phone_number broke sign-up"),
+			}),
+			api.RollbackDeploymentParams{
+				ProjectID:    project,
+				DeploymentID: "dep_01KX4SB9C8E1F0N9WD3P2E4YM5",
+			})
 		require.NoError(t, err)
 		expectNotImplemented(t, resp)
 	})
@@ -54,10 +79,38 @@ func TestDeploymentsNotImplemented(t *testing.T) {
 		expectNotImplemented(t, resp)
 	})
 
-	t.Run("list", func(t *testing.T) {
+	t.Run("list the live view of one origin", func(t *testing.T) {
 		resp, err := fixture.client.ListDeployments(t.Context(), api.ListDeploymentsParams{
 			ProjectID: project,
+			Origin:    api.NewOptOrigin("https://app.acme.com"),
+			Live:      api.NewOptBool(true),
 		})
+		require.NoError(t, err)
+		expectNotImplemented(t, resp)
+	})
+
+	t.Run("create to preview URLs", func(t *testing.T) {
+		resp, err := fixture.client.CreateDeployment(t.Context(),
+			&api.CreateDeploymentRequest{
+				ReleaseID: api.NewOptReleaseID(releaseID),
+				Targets:   api.DeploymentTargetsRequest{"https://acme-git-sso-acmeinc.vercel.app"},
+				TTL:       api.NewOptPreviewTTL("168h"),
+			},
+			api.CreateDeploymentParams{ProjectID: project})
+		require.NoError(t, err)
+		expectNotImplemented(t, resp)
+	})
+
+	t.Run("list previews", func(t *testing.T) {
+		resp, err := fixture.client.ListPreviews(t.Context(), api.ListPreviewsParams{ProjectID: project})
+		require.NoError(t, err)
+		expectNotImplemented(t, resp)
+	})
+
+	t.Run("remove a preview", func(t *testing.T) {
+		resp, err := fixture.client.RemovePreview(t.Context(),
+			&api.RemovePreviewRequest{Origin: "https://acme-git-sso-acmeinc.vercel.app"},
+			api.RemovePreviewParams{ProjectID: project})
 		require.NoError(t, err)
 		expectNotImplemented(t, resp)
 	})
@@ -84,8 +137,8 @@ func TestDeploymentsCheckAccessBeforeNotImplemented(t *testing.T) {
 	t.Run("create in another project", func(t *testing.T) {
 		resp, err := theirs.client.CreateDeployment(t.Context(),
 			&api.CreateDeploymentRequest{
-				Environment: "prod",
-				ReleaseID:   "rel_01KX5N7C9D2E7F0N9WD3P2E4YM6",
+				ReleaseID: api.NewOptReleaseID("rel_01KX5N7C9D2E7F0N9WD3P2E4YM6"),
+				Targets:   api.DeploymentTargetsRequest{"primary"},
 			},
 			api.CreateDeploymentParams{ProjectID: project})
 		require.NoError(t, err)

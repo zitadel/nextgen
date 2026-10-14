@@ -42,6 +42,7 @@ func TestCreateSchema(t *testing.T) {
                   "title": "password with identifier",
                   "$schema": "https://json-schema.org/draft/2020-12/schema",
                   "$id": "https://example.com/schemas/pw-with-identifier.json",
+                  "objectType": "pw-with-identifier",
                   "metaSchema": "%s/user-schema.json",
                   "kind": "user-schema",
                   "type": "object",
@@ -95,6 +96,7 @@ func TestCreateSchema(t *testing.T) {
 				"metaSchema": "https://json-schema.org/draft/2020-12/schema",
 				"$id":        "https://example.com/my-invalid-schema.json",
 				"kind":       "does not exist",
+				"objectType": "invalid-kind",
 				"title":      "an invalid user schema",
 				"x-auth-methods": map[string]any{
 					"passkey": map[string]any{
@@ -130,6 +132,7 @@ func TestCreateSchema(t *testing.T) {
                   "title": "without id",
                   "$schema": "https://json-schema.org/draft/2020-12/schema",
                   "$id": "duplicate-id",
+                  "objectType": "duplicate-id",
                   "metaSchema": "%s/user-schema.json",
                   "kind": "user-schema",
                   "type": "object",
@@ -176,6 +179,7 @@ func TestCreateSchema(t *testing.T) {
                   "title": "password without identifier",
                   "$schema": "https://json-schema.org/draft/2020-12/schema",
                   "$id": "https://example.com/schemas/pw-no-identifier.json",
+                  "objectType": "pw-no-identifier",
                   "metaSchema": "%s/user-schema.json",
                   "kind": "user-schema",
                   "type": "object",
@@ -378,7 +382,7 @@ func TestSchemaRevisions(t *testing.T) {
 				for _, item := range list {
 					doc, ok := item.Schema.GetUserSchema()
 					if assert.True(t, ok, "list row should carry the user-schema document") {
-						assert.Equal(t, tc.objectType, doc.ObjectType.Value)
+						assert.Equal(t, tc.objectType, doc.ObjectType)
 					}
 					assert.False(t, item.Metadata.CreatedAt.IsZero())
 				}

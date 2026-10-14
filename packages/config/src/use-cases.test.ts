@@ -32,7 +32,7 @@ describe.each([...SETUP_USE_CASES])("use case %s", (useCase) => {
 
   it.each([...SETUP_PRESETS])("renders a valid schema+flow with preset %s", (preset) => {
     const schema = getDefaultHumanUserSchema({ preset, useCase });
-    const flow = getDefaultLoginFlow({ preset, useCase, userSchemaUrl: "sch_TEST" });
+    const flow = getDefaultLoginFlow({ preset, useCase });
 
     expect(schemaConfigSchema.safeParse(schema).success).toBe(true);
     expect(flowConfigSchema.safeParse(flow).success).toBe(true);

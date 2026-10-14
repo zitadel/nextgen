@@ -7,9 +7,9 @@ npx @zitadel/cli@alpha start
 npx @zitadel/cli@alpha setup --server local
 ```
 
-During the public alpha, bare `npx @zitadel/cli` resolves to the same tested
-alpha CLI. Use `@alpha` or an exact `0.1.0-alpha.N` selector in bug reports and
-automation when reproducibility matters.
+Always pass `@alpha`: bare `npx @zitadel/cli` resolves npm's `latest` tag, which
+still points at an early `0.0.0` build. Use an exact `1.0.0-alpha.N` selector in
+bug reports and automation when reproducibility matters.
 
 > **Beta.** This is the **next-generation Zitadel**, a ground-up rewrite of the platform. It is distinct from the established Zitadel at [github.com/zitadel/zitadel](https://github.com/zitadel/zitadel). APIs and CLI flags will change.
 
@@ -69,9 +69,9 @@ For a reproducible tester report, use the exact alpha train from the GitHub
 Release:
 
 ```sh
-npx @zitadel/cli@0.1.0-alpha.N doctor
-npx @zitadel/cli@0.1.0-alpha.N start
-npx @zitadel/cli@0.1.0-alpha.N setup --server local
+npx @zitadel/cli@1.0.0-alpha.N doctor
+npx @zitadel/cli@1.0.0-alpha.N start
+npx @zitadel/cli@1.0.0-alpha.N setup --server local
 ```
 
 The default project flow supports password registration/login, passkey
@@ -2629,9 +2629,7 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
-      --as=<option>      [default: string] Store the value as this JSON type. A
-                         reference to the whole field resolves to that type, so
-                         a number stays a number.
+      --as=<option>      [default: string] Store the value as this JSON type.
                          <options: string|number|boolean>
       --[no-]color       Colorize human output. Disable with --no-color;
                          NO_COLOR and FORCE_COLOR are honored too.

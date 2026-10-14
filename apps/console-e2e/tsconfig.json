@@ -15,6 +15,7 @@
   "include": [
     "playwright*.config.mts",
     "scripts/**/*.mts",
+    "src-deployment/**/*.ts",
     "src-embedded/**/*.ts",
     "src-platform/**/*.ts",
     "src-real/**/*.ts",

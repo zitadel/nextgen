@@ -32,9 +32,9 @@ to install first:
 npx @zitadel/cli@alpha <command> --non-interactive --json
 ```
 
-During the public alpha, bare `npx @zitadel/cli` is promoted to the same tested
-alpha CLI so discovery works for first-time users. Prefer `@alpha`, or an exact
-`0.1.0-alpha.N` selector in agent scripts and bug reports, for reproducibility.
+Always pass `@alpha`: bare `npx @zitadel/cli` resolves npm's `latest` tag,
+which still points at an early `0.0.0` build. Use an exact `1.0.0-alpha.N`
+selector in agent scripts and bug reports for reproducibility.
 The CLI requires Node.js 24+.
 
 ## Using the CLI
@@ -114,8 +114,9 @@ once — every resource, its verbs, each verb's `create_fields` / `update_fields
 (flag name, kind, `required`, any closed value set), its `filter_fields` /
 `sort_fields`, and the `delete_outcome` a destructive verb returns — so prefer it
 over reading `<resource> --help` one at a time. A `list` verb's envelope carries
-`data.count`, so a "how many …?" question is one `list --json` call: read the
-count, do not page and tally.
+`data.count`, the number of items it returned. A list returns one page unless
+you pass `--all`, so a "how many …?" question is one `list --all --json` call:
+read the count, do not page and tally.
 
 ## Reading the envelope
 
@@ -124,10 +125,13 @@ Each invocation prints one JSON object:
 - `status`: `ok` | `skipped` | `error`.
 - `cli_version`, `command`, `source`: always present.
 - On success: `data` with the command-specific payload.
-- On a no-op: `reason` (e.g. `no-framework-detected`, `orphaned-config`).
+- On a no-op: `reason` (e.g. `already-initialized`, `already-claimed`,
+  `nothing-to-eject`).
 - On failure: `code` (e.g. `E_VALIDATION`, `E_NETWORK`, `E_NOT_FOUND`,
-  `E_CONFLICT`) and `message`.
-- `next_commands`: the suggested follow-ups. Prefer these over free-text hints.
+  `E_CONFLICT`) and `message`, usually with a `hint`, and `details` when there
+  is structured context.
+- `next_commands`: the suggested follow-ups, inside `data` on success and at
+  the top level on a no-op or failure. Prefer these over free-text hints.
 - `warnings`: things that went wrong without stopping the command, such as a
   value that was not published. Always present on success (often empty), and
   present on a no-op or failure when there are any. Read them before you report
@@ -220,22 +224,33 @@ framework, sign-in preset, and profile-field options):
 ```sh
 npx @zitadel/cli@alpha doctor --non-interactive --json
 npx @zitadel/cli@alpha start --non-interactive --json
-npx @zitadel/cli@alpha setup --framework next --server local --force --non-interactive --json
+npx @zitadel/cli@alpha setup --framework next --server local --non-interactive --json
 npx @zitadel/cli@alpha doctor --non-interactive --json
 npx @zitadel/cli@alpha plan --non-interactive --json
 npx @zitadel/cli@alpha apply --non-interactive --json
 ```
 
 `setup` scaffolds into an empty directory, or patches an existing app project
-where it detects a framework. It stops on any other non-empty directory and
-asks for `--force` — which the golden path passes because `start` has already
-written `.zitadel/local` into the directory. If you run `setup` before `start`,
-in a truly empty directory, `--force` is not needed.
+where it detects a framework. What `start` leaves in a directory —
+`.zitadel/local/` and the `.gitignore` line that ignores it — still counts as
+empty, so the golden path runs `setup` right after `start` in the same
+directory. Any other non-empty directory stops setup with a hint to pass
+`--force`. Pass it only for a directory whose contents may be replaced: files
+the new app also has, such as `package.json`, are overwritten.
+
+In an existing app, `--framework` has to name the framework setup detects
+there; another one stops setup with `E_CONFLICT` instead of offering
+`--force`. Setup reports its conflicts with the app before it creates a
+project, and the error's `hint` says whether `--force` resolves one: it
+replaces a file at a path setup writes, but not the app's root component or
+request boundary at another path.
 
 The app may also live in a subdirectory of the one `start` ran in: `setup`,
 `console` and `--server local` read `.zitadel/local/` from the working
 directory or the nearest parent that has it (up to the home directory), so
-`mkdir my-app && cd my-app` after `start` works without `--force`. On a local
+`mkdir my-app && cd my-app` after `start` works too. `stop`, `reset`, `logs`,
+`status` and `doctor` read only the working directory's `.zitadel/local/`, so
+run them where `start` ran. On a local
 server that hosts the platform project, `setup` attaches the project to the
 local admin's team and ends `data.next_commands` with `console`; when it finds
 no local admin for that server on the way up, it says so in the envelope's

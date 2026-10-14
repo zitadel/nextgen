@@ -522,11 +522,7 @@ export default class SsoEnable extends BaseCommand {
   }
 }
 
-/**
- * Whether a flow runs against this schema. Flows name it by the URL the
- * schema publishes, so the schema's own `$id` is the reliable link; a Project
- * with one schema and one flow matches on that alone.
- */
+/** Whether a flow runs against this schema: by `objectType`, or by a revision id or URL in older files. */
 function flowUsesSchema(
   flow: Record<string, unknown>,
   schema: SchemaFile,
@@ -535,6 +531,10 @@ function flowUsesSchema(
   const used = flow.user_schema;
   if (typeof used !== "string") {
     return false;
+  }
+  const objectType = schema.body.objectType;
+  if (typeof objectType === "string" && used === objectType) {
+    return true;
   }
   // Once a Project has been applied, the flow names the schema by the id the
   // platform assigned, which `.zitadel/state.json` records against the schema

@@ -89,16 +89,12 @@ describe("applySsoToFlow", () => {
   it("produces the flow the design documents", () => {
     const { document } = applySsoToFlow(shippedFlow(), "google", bothMethods);
 
-    // Two differences that are not this generator's doing: the reference
-    // carries a $schema pointer the shipped flow does not, and it leaves
-    // user_schema as the `${USER_SCHEMA_URL}` placeholder the templates
-    // render at scaffold time.
+    // The reference carries a $schema pointer the shipped flow does not,
+    // which is not this generator's doing.
     const expected = { ...reference };
     const actual = { ...(document as Record<string, unknown>) };
-    for (const key of ["$schema", "user_schema"]) {
-      delete expected[key];
-      delete actual[key];
-    }
+    delete expected.$schema;
+    delete actual.$schema;
     expect(actual).toEqual(expected);
   });
 

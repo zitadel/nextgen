@@ -307,9 +307,8 @@ demand, and is not a required check. To run it against a branch, use
 
 CI consumes the workflow's packed npm tarballs, not public Zitadel packages.
 Changesets PR comments are informational release-intent feedback, not a
-blocking gate. Workflow artifacts (the release snapshot whenever a journey
-lane runs — a run whose journeys are gated off, such as a docs-only or
-console-only PR, uploads no snapshot — and journey diagnostics on failure)
+blocking gate. The release snapshot the journeys install from stays on the
+runner; a failed run uploads journey and console e2e diagnostics, which
 expire after 7 days. The demo end-to-end suites and
 the Docker-fallback journey do not run in CI; they stay opt-in local checks
 (see below).
@@ -565,3 +564,16 @@ sections:
 - `Release notes / changeset` — changeset status for user-visible package
   changes.
 - `Notes` — reviewer context, follow-ups, risks, or `None`.
+
+### Merging
+
+`main` takes pull requests through GitHub's merge queue, squashed. Click
+**Merge when ready** (or run `gh pr merge --auto`): once `full-pr` is green
+on the pull request, the queue picks it up, runs `full-pr` again on it
+combined with the latest `main` and the pull requests queued ahead of it, and
+merges it when that run passes too. A failing run takes it out of the queue;
+fix the branch and queue it again.
+
+A branch does not have to be up to date with `main` to merge. Merge `main`
+into it only to resolve a conflict or to pick up a change you need: every
+push runs `full-pr` and rebuilds the branch's cloud preview.
