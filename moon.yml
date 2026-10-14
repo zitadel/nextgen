@@ -78,6 +78,24 @@ tasks:
       cache: false
       runInCI: false
 
+  # The inherited Biome check (.moon/tasks/javascript.yml) runs on the whole
+  # repository from here, so it also covers the files no other project owns
+  # (scripts/, apps/cli-skill-e2e). A root-level project gets no default
+  # inputs, and without this list `moon ci :lint` never selects the task. The
+  # glob is every file type Biome checks here (biome.json, already an implicit
+  # input, leaves out JSON, CSS, HTML, SVG, Vue and Svelte), as in turbo.json's
+  # `//#lint`. Moon globs a root-level project's inputs on disk, past
+  # .gitignore, so the negations keep the ignored trees that hold JS out of the
+  # hash: installed packages, build output that other tasks rewrite while this
+  # one hashes (a file gone mid-hash fails the task), and the agent worktrees
+  # under .claude/ in a main checkout.
+  lint:
+    inputs:
+      - "**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}"
+      - "!**/node_modules/**"
+      - "!**/{dist,.next,.nuxt,.output}/**"
+      - "!.claude/**"
+
   # Matched by the `:test` target in the ci workflow's `moon ci` call, so the
   # affected-gate and release-body logic never become test files nothing
   # executes.

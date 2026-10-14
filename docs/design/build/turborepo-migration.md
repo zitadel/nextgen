@@ -121,7 +121,9 @@ round — a root-project task without explicit inputs has no inputs in moon, so
 the root lint is never selected by affectedness and the root `scripts/*.mjs`
 are linted only where a package task happens to reach them. Both are worth a
 look in a real CI log. The turbo configuration gives `//#lint` the files Biome
-checks as inputs instead of copying the gap.
+checks as inputs instead of copying the gap. Moon's `workspace:lint` now lists
+the same files: the gap let #1594's formatting errors in `apps/cli-skill-e2e`,
+which no moon project owns, pass `ci / full-pr`.
 
 The port's affected sets were also compared with today's moon on two real
 commits (a console-only and a Go-only change): the lane gates and the journey

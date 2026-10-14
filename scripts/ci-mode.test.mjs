@@ -15,9 +15,10 @@ import {
 } from "./ci-mode.mjs";
 
 // Affected sets below are real `moon query tasks --affected --downstream deep`
-// results (moon 2.6.1, 2026-10-14, after the e2e projects merged into `e2e`)
-// for one representative touched file per change class. Tests that pass an
-// inline list use a hand-made slice exercising one trigger path instead.
+// results (moon 2.6.1, 2026-10-14, after the e2e projects merged into `e2e`
+// and the root lint got its inputs) for one representative touched file per
+// change class. Tests that pass an inline list use a hand-made slice
+// exercising one trigger path instead.
 
 const GO_CLASS = [
   "bench:build",
@@ -53,6 +54,7 @@ const JOURNEY_CLASS = [
   "e2e:lint",
   "e2e:test",
   "e2e:typecheck",
+  "workspace:lint",
 ];
 const CONSOLE_CLASS = [
   "console:build",
@@ -82,6 +84,7 @@ const CONSOLE_CLASS = [
   "server:vet",
   "testing:test-integration",
   "workspace:build-local-image",
+  "workspace:lint",
   "workspace:smoke-container",
 ];
 const SDK_VUE_CLASS = [
@@ -96,6 +99,7 @@ const SDK_VUE_CLASS = [
   "sdk-vue:lint",
   "sdk-vue:test",
   "sdk-vue:typecheck",
+  "workspace:lint",
 ];
 const LOGIN_UI_CLASS = [
   "e2e:all",
@@ -122,6 +126,7 @@ const LOGIN_UI_CLASS = [
   "server:vet",
   "testing:test-integration",
   "workspace:build-local-image",
+  "workspace:lint",
   "workspace:smoke-container",
 ];
 const TESTING_KIT_CLASS = [
@@ -143,8 +148,9 @@ const TESTING_KIT_CLASS = [
   "testing:test",
   "testing:test-integration",
   "testing:typecheck",
+  "workspace:lint",
 ];
-// Components feeds every SDK, both UIs, the CLI and every e2e lane: 96 tasks,
+// Components feeds every SDK, both UIs, the CLI and every e2e lane: 97 tasks,
 // correctly close to "everything".
 const COMPONENTS_CLASS = [
   "cli:build",
@@ -242,6 +248,7 @@ const COMPONENTS_CLASS = [
   "storybook:typecheck",
   "testing:test-integration",
   "workspace:build-local-image",
+  "workspace:lint",
   "workspace:smoke-container",
 ];
 // An api-mock change reaches the suite only through the mock lanes, so no
@@ -284,6 +291,7 @@ const API_MOCK_CLASS = [
   "storybook:dev",
   "storybook:test",
   "storybook:typecheck",
+  "workspace:lint",
 ];
 // A console spec edit: the console lanes' own inputs, not the journey's.
 const CONSOLE_SPEC_CLASS = [
@@ -296,6 +304,7 @@ const CONSOLE_SPEC_CLASS = [
   "e2e:lint",
   "e2e:test",
   "e2e:typecheck",
+  "workspace:lint",
 ];
 // A demo app edit: the demo lanes list the app they serve as an input.
 const DEMO_NEXT_CLASS = [
@@ -307,6 +316,7 @@ const DEMO_NEXT_CLASS = [
   "e2e:all",
   "e2e:demo-next-mock",
   "e2e:demo-next-real",
+  "workspace:lint",
 ];
 
 function allTrue(gates) {
@@ -597,6 +607,20 @@ test("an empty affected set for unallowlisted files fails open (tsconfig.base.js
   for (const file of ["tsconfig.base.json", "LICENSE", "README.md", "VISION.md"]) {
     const { gates } = resolveGates({ mode: "full", files: [file], targets: [] });
     assert.ok(allTrue(gates), `${file} must force a full run on an empty set`);
+  }
+});
+
+test("an affected set holding only the root lint fails open like an empty one", () => {
+  // Probed on moon 2.6.1: a file outside every moon project selects
+  // workspace:lint, whose inputs are every JS/TS file, and nothing else.
+  for (const file of ["apps/cli-skill-e2e/scripts/drive.mjs", "apps/cloud/admin-document.mjs"]) {
+    const { gates, reason } = resolveGates({
+      mode: "full",
+      files: [file],
+      targets: ["workspace:lint"],
+    });
+    assert.equal(reason, "empty affected set for files outside the inert allowlist", file);
+    assert.ok(allTrue(gates), file);
   }
 });
 

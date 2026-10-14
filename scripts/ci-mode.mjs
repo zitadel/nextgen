@@ -26,10 +26,10 @@ import { moonTargetOf, taskRunner } from "./task-runner.mjs";
 // The gates fail open: known repo-wide files no task claims (workflow
 // definitions, scripts/, moon config, root manifests and compiler/release
 // inputs) force a full run, an empty diff forces a full run, a failing or
-// unparsable query forces a full run, and an empty affected set forces a
-// full run unless every changed
-// file is on the explicit inert allowlist — unclaimed files are not assumed
-// inert. A gate may only ever skip work that provably cannot be affected.
+// unparsable query forces a full run, and an empty affected set (the root lint
+// alone counts as empty) forces a full run unless every changed file is on the
+// explicit inert allowlist — unclaimed files are not assumed inert. A gate may
+// only ever skip work that provably cannot be affected.
 //
 // A second entry point runs after ci.yml's graph step (`moon ci`):
 // `--ran-in-graph <output>=<target>...` reads that step's report and sets each
@@ -71,6 +71,12 @@ function isInertWhenUnclaimed(file) {
     INERT_UNCLAIMED_FILES.has(file)
   );
 }
+
+// The root lint runs Biome over the whole repository, so its inputs are every
+// JS/TS file (moon.yml, and turbo.json's `//#lint`), including files no other
+// task reads, such as apps/cli-skill-e2e. That claim says the file is linted,
+// not that nothing else reads it, so it does not stand in for a claim above.
+const ROOT_LINT_TARGET = "workspace:lint";
 
 // Workflow steps run fixed targets, so gates are membership checks on the
 // affected set.
@@ -180,7 +186,7 @@ export function resolveGates({ mode, files, targets }) {
   const forced =
     forceFullReason(files) ??
     (targets === null ? "affected query failed" : null) ??
-    (targets.length === 0 && !files.every(isInertWhenUnclaimed)
+    (targets.every((target) => target === ROOT_LINT_TARGET) && !files.every(isInertWhenUnclaimed)
       ? "empty affected set for files outside the inert allowlist"
       : null);
   if (forced) {

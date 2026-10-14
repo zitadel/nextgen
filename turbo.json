@@ -129,10 +129,17 @@
     // scripts marks them affected (scripts/ci-mode.mjs).
     //
     // The root lint checks the whole repository, so its inputs are every file
-    // Biome checks (moon's workspace:lint has no inputs and is never selected
-    // by affectedness, which is a gap rather than a behaviour to copy).
+    // Biome checks, as moon.yml lists them for workspace:lint. The glob does
+    // not stop at .gitignore here, so the negations keep the installed
+    // packages, build output and agent worktrees out of the hash.
     "//#lint": {
-      "inputs": ["**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}", "biome.json"]
+      "inputs": [
+        "**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}",
+        "!**/node_modules/**",
+        "!**/{dist,.next,.nuxt,.output}/**",
+        "!.claude/**",
+        "biome.json"
+      ]
     },
     "//#test": {
       "inputs": [

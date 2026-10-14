@@ -75,8 +75,13 @@ The exceptions name only what lies outside the project folder:
 - The Go projects (`server`, `bench`) keep their file groups, because their
   code lives at the repo root, not in their folders. Anything compiled in
   through `//go:embed` or read by a test belongs in them.
-- The root `workspace` project's `test` and `check-*` tasks list their files,
-  because its folder is the whole repo.
+- The root `workspace` project's `test`, `lint` and `check-*` tasks list their
+  files, because its folder is the whole repo: moon gives a root-level project
+  no default inputs, so `moon ci` never selects a task there without a list.
+  `lint` runs Biome on the whole repo and lists every file type Biome checks,
+  so it also covers the files no other project owns. Moon globs this project's
+  inputs on disk, past `.gitignore`, so a glob this wide negates the ignored
+  trees that hold matching files (`node_modules`, build output, `.claude/`).
 
 ## Dependencies between projects
 
