@@ -301,40 +301,6 @@ export class ScaffoldedApp {
     );
   }
 
-  /** The deprecated `sso enable` alias, for the spec that covers it. */
-  enableSsoDeprecated(provider: string, credentials: Credentials): Promise<CliResult> {
-    return this.pipingSecret(credentials.secret, () =>
-      this.cli([
-        "sso",
-        "enable",
-        "--non-interactive",
-        "--json",
-        "--provider",
-        provider,
-        "--client-id",
-        credentials.clientId,
-      ]),
-    );
-  }
-
-  /**
-   * The deprecated `sso enable` alias without `--json`, for what the developer
-   * reads.
-   */
-  enableSsoDeprecatedRendered(provider: string, credentials: Credentials): Promise<CliResult> {
-    return this.pipingStdin(credentials.secret, () =>
-      this.cli([
-        "sso",
-        "enable",
-        "--non-interactive",
-        "--provider",
-        provider,
-        "--client-id",
-        credentials.clientId,
-      ]),
-    );
-  }
-
   /** `auth-method password|passkey enable`. */
   enableMethod(method: "password" | "passkey", extraArgs: string[] = []): Promise<CliResult> {
     return this.cli(["auth-method", method, "enable", "--non-interactive", "--json", ...extraArgs]);

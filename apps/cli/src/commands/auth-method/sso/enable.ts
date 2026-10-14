@@ -74,7 +74,7 @@ import { reportWarning } from "../../../lib/warnings";
 
 /**
  * The `auth-method sso enable` command (ADR 069) — add a provider to a
- * Project's sign-in methods. `sso enable` is its deprecated alias.
+ * Project's sign-in methods. It replaces the former `sso enable`.
  *
  * One direct journey: the developer is told what to register with the
  * provider, gives back the credentials, and the Project's configuration is

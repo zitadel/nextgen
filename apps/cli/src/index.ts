@@ -18,7 +18,6 @@ import Reset from "./commands/reset";
 import { RESOURCE_COMMANDS } from "./commands/resources";
 import ResourcesList from "./commands/resources-list";
 import Setup from "./commands/setup/index";
-import SsoEnable from "./commands/sso/enable";
 import Start from "./commands/start";
 import Status from "./commands/status";
 import Stop from "./commands/stop";
@@ -57,7 +56,6 @@ export const COMMANDS: Record<string, typeof Command> = {
   "auth-method:sso:enable": AuthMethodSsoEnable,
   "auth-method:sso:disable": AuthMethodSsoDisable,
   "branding:eject": BrandingEject,
-  "sso:enable": SsoEnable,
   "variables:list": VariablesList,
   "variables:get": VariablesGet,
   "variables:set": VariablesSet,

@@ -215,7 +215,7 @@ describe("applySsoToFlow", () => {
   });
 
   it("leaves out the sign-in escape on a flow that does not serve login", () => {
-    // `sso enable` edits every flow bound to the schema, and a register-only
+    // `auth-method sso enable` edits every flow bound to the schema, and a register-only
     // flow has nowhere to send someone who wants to sign in — the validator
     // rejects a transition that re-purposes to a purpose the flow lacks.
     const registerOnly = {
@@ -882,7 +882,7 @@ describe("removeSsoFromSchema", () => {
 });
 
 describe("removeSsoFromFlow", () => {
-  /** The shipped flow after `sso enable` added these providers. */
+  /** The shipped flow after `auth-method sso enable` added these providers. */
   function enabled(...slugs: string[]): Record<string, unknown> {
     let flow: object = shippedFlow();
     for (const name of slugs) {

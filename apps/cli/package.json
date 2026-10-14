@@ -72,9 +72,6 @@
       "branding": {
         "description": "Work with login branding revisions."
       },
-      "sso": {
-        "description": "Deprecated: use auth-method sso."
-      },
       "auth-method": {
         "description": "Turn sign-in methods on or off for a user schema."
       },

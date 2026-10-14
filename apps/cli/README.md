@@ -170,7 +170,6 @@ which ships in this package.
 * [`zitadel sessions list`](#zitadel-sessions-list)
 * [`zitadel sessions revoke ID`](#zitadel-sessions-revoke-id)
 * [`zitadel setup`](#zitadel-setup)
-* [`zitadel sso enable`](#zitadel-sso-enable)
 * [`zitadel start`](#zitadel-start)
 * [`zitadel status`](#zitadel-status)
 * [`zitadel stop`](#zitadel-stop)
@@ -2086,56 +2085,6 @@ EXAMPLES
   $ zitadel setup --framework next
 
   $ zitadel setup --framework react --dev-port 3000
-```
-
-## `zitadel sso enable`
-
-Deprecated alias of auth-method sso enable.
-
-```
-USAGE
-  $ zitadel sso enable [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--schema <value>]
-    [--provider google|custom] [--slug <value>] [--display-name <value>]
-    [--issuer <value>] [--scopes <value>] [--client-id <value>]
-
-FLAGS
-  -c, --cwd=<value>           Project directory to operate on.
-  -n, --non-interactive       Disable prompts. Required when scripting or
-                              running as an agent.
-  -s, --server=<value>        Override the resolved server URL.
-  -v, --verbose               Verbose logging.
-      --client-id=<value>     Client id of the application registered with the
-                              provider.
-      --[no-]color            Colorize human output. Disable with --no-color;
-                              NO_COLOR and FORCE_COLOR are honored too.
-      --debug                 Debug logging.
-      --display-name=<value>  Name shown on the custom connection's sign-in
-                              button.
-      --dry-run               Preview without mutating files or the platform.
-      --issuer=<value>        Issuer URL of the custom provider. Its endpoints
-                              are found by OIDC discovery.
-      --provider=<option>     Identity provider to enable, or "custom" for any
-                              other OpenID Connect provider.
-                              <options: google|custom>
-      --schema=<value>        User schema to change. Required when the Project
-                              has more than one.
-      --scopes=<value>        Scopes the custom connection requests, separated
-                              by spaces or commas. Must include openid. Default:
-                              openid profile email.
-      --slug=<value>          Name of the custom connection. Schemas and flows
-                              refer to it by this.
-      --[no-]telemetry        Send anonymous usage analytics. Disable with
-                              --no-telemetry.
-
-GLOBAL FLAGS
-  --json  Format output as json.
-
-DESCRIPTION
-  Deprecated alias of auth-method sso enable.
-
-EXAMPLES
-  $ zitadel auth-method sso enable --provider google
 ```
 
 ## `zitadel start`
