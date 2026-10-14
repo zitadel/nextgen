@@ -45,10 +45,10 @@
     "test:all": "pnpm run test"
   },
   "dependencies": {
-    "@lit/react": "^1.0.8",
     "@zitadel/api": "workspace:*",
     "@zitadel/components": "workspace:*",
-    "@zitadel/sdk-core": "workspace:*"
+    "@zitadel/sdk-core": "workspace:*",
+    "@zitadel/sdk-react": "workspace:*"
   },
   "peerDependencies": {
     "@tanstack/react-start": ">=1",

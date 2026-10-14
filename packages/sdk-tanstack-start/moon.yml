@@ -6,17 +6,20 @@ dependsOn:
   - "api"
   - "components"
   - "sdk-core"
+  - "sdk-react"
 
 tasks:
   typecheck:
     deps:
       - "components:build"
       - "sdk-core:build"
+      - "sdk-react:build"
 
   build:
     deps:
       - "components:build"
       - "sdk-core:build"
+      - "sdk-react:build"
     options:
       mutex: "sdk-tanstack-start-dist"
 
@@ -27,6 +30,7 @@ tasks:
     deps:
       - "components:build-release"
       - "sdk-core:build-release"
+      - "sdk-react:build-release"
     outputs:
       - "dist/**/*"
     options:
@@ -51,6 +55,7 @@ tasks:
     deps:
       - "components:build"
       - "sdk-core:build"
+      - "sdk-react:build"
     options:
       persistent: true
       runInCI: false

@@ -9,6 +9,6 @@
  * without reaching into `@zitadel/api/config`. Import it inside a client-only
  * boundary before the components mount.
  */
-export { ZitadelLogin, ZitadelLogout } from "@zitadel/components";
+export { ZitadelLogin, ZitadelLogout, ZitadelSession } from "@zitadel/components";
 export { configureZitadel, getApi, getZitadelConfig } from "@zitadel/api/config";
 export type { ZitadelConfig, ZitadelProject } from "@zitadel/api/config";
