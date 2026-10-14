@@ -129,11 +129,7 @@ async function heldVariables(ctx: StepContext): Promise<Map<string, boolean> | u
   try {
     held = await ctx.client.getVariables({ project_id: ctx.projectId });
   } catch (error) {
-    if (
-      ctx.mode === "preview" &&
-      error instanceof ApiError &&
-      (error.status === 401 || error.status === 403)
-    ) {
+    if (ctx.mode === "preview" && error instanceof ApiError && error.status === 403) {
       return undefined;
     }
     throw error;

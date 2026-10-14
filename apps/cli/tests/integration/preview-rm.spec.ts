@@ -12,7 +12,7 @@ const PREVIEW_URL = "https://x-acme.vercel.app";
 async function anAppWithAPreview() {
   const app = await aSetUpApp();
   await app.addOrigin(PREVIEW_PATTERN, "preview");
-  await app.run(["preview", "--origin", PREVIEW_URL, "--json"]);
+  await app.previewData(PREVIEW_URL);
   return app;
 }
 

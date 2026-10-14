@@ -14,14 +14,14 @@ type Listed = { items: { origin: string }[]; count: number; next_page_token: str
 async function anAppWithAPreview() {
   const app = await aSetUpApp();
   await app.addOrigin(PREVIEW_PATTERN, "preview");
-  await app.run(["preview", "--origin", PREVIEW_URL, "--json"]);
+  await app.previewData(PREVIEW_URL);
   return app;
 }
 
 /** Arranges a project with two live previews. */
 async function anAppWithTwoPreviews() {
   const app = await anAppWithAPreview();
-  await app.run(["preview", "--origin", "https://y-acme.vercel.app", "--json"]);
+  await app.previewData("https://y-acme.vercel.app");
   return app;
 }
 
