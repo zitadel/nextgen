@@ -5,9 +5,12 @@ import { join } from "node:path";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 import {
+  ANGULAR_CLI_ENGINES_TIMEOUT_MS,
   ANGULAR_CLI_NODE_FALLBACK,
   AngularScaffolder,
+  angularNodeSupport,
 } from "../../../../../src/lib/orca/scaffolders/angular";
+import { takeReportedWarnings } from "../../../../../src/lib/warnings";
 
 vi.mock("node:child_process", () => ({ spawnSync: vi.fn() }));
 vi.mock("node:fs/promises", () => ({ rm: vi.fn() }));
@@ -37,6 +40,33 @@ beforeEach(() => {
   mockSpawn.mockReset();
   mockRm.mockReset();
   mockRm.mockResolvedValue(undefined);
+  takeReportedWarnings();
+});
+
+/** A spawn npm's lookup never finished: killed at the timeout, with no exit status. */
+function timedOut(): ReturnType<typeof spawnSync> {
+  return {
+    ...spawnResult(0),
+    status: null,
+    signal: "SIGTERM",
+    error: Object.assign(new Error("spawnSync npm ETIMEDOUT"), { code: "ETIMEDOUT" }),
+  };
+}
+
+describe("angularNodeSupport", () => {
+  it.each([
+    ["22.22.3", "supported"],
+    ["22.21.0", "refused"],
+    ["23.11.0", "warned"],
+    ["24.12.0", "refused"],
+    ["24.15.0", "supported"],
+    ["25.2.0", "warned"],
+    ["26.0.0", "supported"],
+    ["27.0.0", "refused"],
+    ["21.7.0", "refused"],
+  ])("decides Node %s is %s, as the Angular CLI does", (node, support) => {
+    expect(angularNodeSupport(node, ANGULAR_CLI_NODE_FALLBACK)).toBe(support);
+  });
 });
 
 describe("AngularScaffolder", () => {
@@ -95,6 +125,51 @@ describe("AngularScaffolder", () => {
     );
   });
 
+  it.each(["23.11.0", "25.2.0"])(
+    "runs ng new on Node %s, which the Angular CLI only warns about",
+    async (node) => {
+      angularPublishes(ANGULAR_CLI_NODE_FALLBACK);
+
+      await new AngularScaffolder(node).scaffold("/tmp/proj", "angular");
+
+      expect(ngNewCalls()).toHaveLength(1);
+    },
+  );
+
+  it("warns on a Node the Angular CLI only warns about", async () => {
+    angularPublishes(ANGULAR_CLI_NODE_FALLBACK);
+
+    await new AngularScaffolder("25.2.0").scaffold("/tmp/proj", "angular");
+
+    expect(takeReportedWarnings()).toEqual([
+      "The Angular CLI supports Node ^22.22.3 || ^24.15.0 || >=26.0.0; it runs on Node v25.2.0 with a warning, as odd-numbered Node versions never reach LTS",
+    ]);
+  });
+
+  it("warns about nothing on a Node the Angular CLI supports", async () => {
+    angularPublishes(ANGULAR_CLI_NODE_FALLBACK);
+
+    await new AngularScaffolder(SUPPORTED_NODE).scaffold("/tmp/proj", "angular");
+
+    expect(takeReportedWarnings()).toEqual([]);
+  });
+
+  it("refuses a Node major above every one the Angular CLI lists", async () => {
+    angularPublishes(ANGULAR_CLI_NODE_FALLBACK);
+
+    await expect(new AngularScaffolder("27.0.0").scaffold("/tmp/proj", "angular")).rejects.toThrow(
+      "this is Node v27.0.0",
+    );
+  });
+
+  it("bounds the npm lookup with a timeout", async () => {
+    angularPublishes(ANGULAR_CLI_NODE_FALLBACK);
+
+    await new AngularScaffolder(SUPPORTED_NODE).scaffold("/tmp/proj", "angular");
+
+    expect(mockSpawn.mock.calls[0]?.[2]).toMatchObject({ timeout: ANGULAR_CLI_ENGINES_TIMEOUT_MS });
+  });
+
   it("applies the range npm publishes over the built-in one", async () => {
     angularPublishes(">=28.0.0");
 
@@ -106,6 +181,7 @@ describe("AngularScaffolder", () => {
   it.each([
     ["npm fails", spawnResult(1)],
     ["npm answers with no range", spawnResult(0, "\n")],
+    ["npm times out", timedOut()],
   ])("falls back to the built-in range when %s", async (_case, npmResult) => {
     mockSpawn.mockImplementation((command) => (command === "npm" ? npmResult : spawnResult(0)));
 
