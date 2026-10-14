@@ -45,7 +45,7 @@ Brand assets live in `branding.json` and must be hosted `https://` URLs. While y
 }
 ```
 
-Each design decides which images it shows: `centered` shows the logo, `minimal` shows none, and neither shows `hero_url`. A URL the design doesn't use is stored but not shown, and `plan` still checks it.
+Each design decides which images it shows: `centered` shows the logo, `minimal` shows none, and neither shows `hero_url`. A URL the design doesn't use is stored but not shown, and `deploy` still checks it.
 
 `typography.font_family` sets the typeface for body and headings; include a generic family as a fallback. `typography.font_url` is a stylesheet that loads the face. It needs a `font_family`, must be `https://`, and is loaded only when the login runs as `variant="page"`. Setup generates page-variant sign-in pages only when it creates the Next.js or Nuxt app itself, in an empty directory. In a Next.js or Nuxt app that already exists, even a new one, and in every SPA template, the login runs as a widget, so load the font from your own page there.
 

@@ -576,33 +576,18 @@ function variableOwner(
 }
 
 /**
- * A non-fatal condition a deployment reports back in its response. The only one
- * today: a preview deployment that froze an `all` secret because the name has
- * no preview override, so the preview URL serves the production credential —
- * allowed, but worth flagging (ADR 062 §7, #1617).
+ * The project's variables as a deployment freezes them. A primary deployment
+ * runs the `all` values alone; a preview deployment prefers each name's
+ * `preview` override and falls back to the `all` value where none exists. The
+ * result is a flat map — one value per name — so a deployment never has to
+ * choose at read time.
  */
-type DeploymentWarning = { code: string; message: string; variable: string };
-
-/**
- * The project's variables as a deployment freezes them, and any warnings the
- * freeze raised. A primary deployment runs the `all` values alone; a preview
- * deployment prefers each name's `preview` override and falls back to the `all`
- * value where none exists. The result is a flat map — one value per name — so a
- * deployment never has to choose at read time.
- *
- * A preview fallback to an `all` secret is flagged: there is no preview-only
- * override, so the preview URL would serve the production secret, which the
- * operator should know even though it is not refused.
- */
-function freezeVariables(
-  projectId: string,
-  preview: boolean,
-): { frozen: Map<string, VariableRecord>; warnings: DeploymentWarning[] } {
+function freezeVariables(projectId: string, preview: boolean): Map<string, VariableRecord> {
   const all =
     store.variables.get(variableOwner(projectId, undefined, "all")) ??
     new Map<string, VariableRecord>();
   if (!preview) {
-    return { frozen: new Map(all), warnings: [] };
+    return new Map(all);
   }
   const overrides =
     store.variables.get(variableOwner(projectId, undefined, "preview")) ??
@@ -611,20 +596,7 @@ function freezeVariables(
   for (const [name, held] of overrides) {
     frozen.set(name, held);
   }
-  const warnings: DeploymentWarning[] = [];
-  for (const [name, held] of all) {
-    if (held.secret && !overrides.has(name)) {
-      warnings.push({
-        code: "variable.missing_preview_secret",
-        message: `preview deployment falls back to the all secret ${name}; set a preview override to avoid serving the production secret`,
-        variable: name,
-      });
-    }
-  }
-  // Sorted by name so the warning list is stable between runs, like the rest of
-  // the mock's collection output.
-  warnings.sort((a, b) => a.variable.localeCompare(b.variable));
-  return { frozen, warnings };
+  return frozen;
 }
 
 /**
@@ -1003,7 +975,12 @@ function normalizeOrigin(raw: string): string | null {
     return null;
   }
   const hostname = host.replace(/:\d+$/, "");
+  // A port is digits only: what is left of the host may hold a colon only as
+  // an IPv6 literal in brackets, so `host:*` or `host:abc` is refused rather
+  // than stored with a "port" the shared-host check would never see past.
+  const ipv6 = hostname.startsWith("[") && hostname.endsWith("]");
   if (
+    (!ipv6 && hostname.includes(":")) ||
     hostname === "" ||
     hostname.startsWith(".") ||
     hostname.endsWith(".") ||
@@ -1844,20 +1821,24 @@ export function setupPlatformHandlers() {
       // The snapshot this deployment would freeze, resolved now. It decides
       // idempotency alongside the release: a variable-only change leaves the
       // release untouched but must still create a new deployment.
-      const { frozen, warnings } = freezeVariables(project.id, sawPreview);
+      const frozen = freezeVariables(project.id, sawPreview);
 
       // Idempotent on what is served: a new deployment is skipped only when
       // every target already runs this release *and* the same frozen variable
       // snapshot. A later variable write changes the snapshot, so the same
-      // release deploys afresh rather than being deduped away.
-      const alreadyServed = targets.every((origin) => {
-        const newest = newestDeploymentForOrigin(project.id, origin);
-        return (
-          newest !== undefined &&
-          newest.releaseId === release.id &&
-          sameVariableSnapshot(newest.frozenVariables, frozen)
-        );
-      });
+      // release deploys afresh rather than being deduped away. A deployment to
+      // preview URLs is never skipped: it always writes a new deployment, which
+      // is what renews the preview's time-to-live, and answers `201`.
+      const alreadyServed =
+        !sawPreview &&
+        targets.every((origin) => {
+          const newest = newestDeploymentForOrigin(project.id, origin);
+          return (
+            newest !== undefined &&
+            newest.releaseId === release.id &&
+            sameVariableSnapshot(newest.frozenVariables, frozen)
+          );
+        });
       if (targets.length > 0 && alreadyServed) {
         const newest = [...store.deployments.values()]
           .filter(
@@ -1869,16 +1850,7 @@ export function setupPlatformHandlers() {
           )
           .sort((a, b) => b.seq - a.seq)[0];
         if (newest) {
-          // The create-deployment response wraps the deployment with the
-          // non-blocking `warnings` it raised. Re-deploying an unchanged preview
-          // that still falls back to an `all` secret keeps raising
-          // `variable.missing_preview_secret`, so the idempotent 200 carries the
-          // renewed warnings rather than dropping them — the preview consumer
-          // surfaces the safety warning on every retry, not only the first.
-          const base = deploymentResponse(newest);
-          return HttpResponse.json(warnings.length > 0 ? { ...base, warnings } : base, {
-            status: 200,
-          });
+          return HttpResponse.json(deploymentResponse(newest), { status: 200 });
         }
       }
 
@@ -1899,13 +1871,7 @@ export function setupPlatformHandlers() {
         frozenVariables: frozen,
       };
       store.deployments.set(id, record);
-      // Warnings ride the create response (a preview falling back to an `all`
-      // secret), surfaced only when there are any so the common case stays the
-      // bare deployment shape.
-      const response = deploymentResponse(record);
-      return HttpResponse.json(warnings.length > 0 ? { ...response, warnings } : response, {
-        status: 201,
-      });
+      return HttpResponse.json(deploymentResponse(record), { status: 201 });
     }),
 
     http.get("*/deployments", ({ request }) => {
@@ -2103,6 +2069,29 @@ export function setupPlatformHandlers() {
       }
 
       const origins = target.targets.map((row) => row.origin);
+      // The optimistic guard: the deployment the caller believes is the newest
+      // one to any of the targets. A mismatch is a deploy that raced in.
+      const rollbackData = body.data as Record<string, unknown>;
+      const expectedRollbackId =
+        typeof rollbackData.expected_deployment_id === "string"
+          ? rollbackData.expected_deployment_id
+          : undefined;
+      if (expectedRollbackId !== undefined) {
+        const newestToTargets = origins
+          .map((origin) => newestDeploymentForOrigin(project.id, origin))
+          .filter((deployment): deployment is DeploymentRecord => deployment !== undefined)
+          .sort((a, b) => b.seq - a.seq)[0];
+        if (newestToTargets && newestToTargets.id !== expectedRollbackId) {
+          return HttpResponse.json(
+            errorBody(
+              "dep.conflict",
+              "deployment: the newest deployment to the targets does not match expected_deployment_id",
+              { deployment: deploymentResponse(newestToTargets) },
+            ),
+            { status: 409 },
+          );
+        }
+      }
       // A rollback re-applies the deployment being reverted to, so what it
       // restores is that deployment's own frozen snapshot — not the project's
       // current `all` bucket, which may have drifted since. Idempotent only
@@ -2720,7 +2709,7 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(out.data);
     }),
 
-    // One variable by name, which `variables get` and `variables delete`
+    // One variable by name, which `variable get` and `variable rm`
     // address directly. A variable belongs to the owner that entered it, so a
     // name another owner of the same project holds answers `var.not_found`
     // and leaves that owner's value standing.

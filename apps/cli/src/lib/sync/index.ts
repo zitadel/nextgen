@@ -6,4 +6,4 @@
  * helpers that `setup-resources.ts` uses to materialise a project's files —
  * setup, not deploy, is what writes `.zitadel/`.
  */
-export { hashForState, hashResourceContent, writeBackResource } from "./writeback";
+export { hashForState, writeBackResource } from "./writeback";

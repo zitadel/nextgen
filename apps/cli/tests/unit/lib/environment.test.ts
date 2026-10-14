@@ -80,6 +80,13 @@ describe("resolveEnvironment", () => {
       expect(environment.name).toEqual({ value: "production", source: "ZITADEL_ENV" });
     });
 
+    it("ignores a CONTEXT that no Netlify build set", async () => {
+      expect((await resolve({ env: { CONTEXT: "staging" } })).name).toEqual({
+        value: "development",
+        source: "default",
+      });
+    });
+
     it("reads VERCEL_ENV", async () => {
       expect((await resolve({ env: { VERCEL_ENV: "production" } })).name).toEqual({
         value: "production",
@@ -93,7 +100,7 @@ describe("resolveEnvironment", () => {
       ["dev", "development"],
       ["production", "production"],
     ])("reads CONTEXT=%s as %s", async (context, name) => {
-      expect((await resolve({ env: { CONTEXT: context } })).name).toEqual({
+      expect((await resolve({ env: { CONTEXT: context, NETLIFY: "true" } })).name).toEqual({
         value: name,
         source: "CONTEXT",
       });
@@ -172,6 +179,40 @@ describe("resolveEnvironment", () => {
       const environment = await resolve({ envName: "test" });
 
       expect(environment.values.ZITADEL_PROJECT_ID?.source).toBe(".env.test");
+    });
+
+    it("never takes another environment's project from .env.local", async () => {
+      await write(".env.local", { ZITADEL_PROJECT_ID: "proj_development" });
+
+      const environment = await resolve({ envName: "production" });
+
+      expect(environment.values.ZITADEL_PROJECT_ID).toBeUndefined();
+    });
+
+    it("never takes another environment's credential from .zitadel/secret", async () => {
+      await writeSecret();
+
+      const environment = await resolve({ envName: "production" });
+
+      expect(environment.values.ZITADEL_PROJECT_SECRET).toBeUndefined();
+    });
+
+    it("never fills an --env-file's gaps from .env.local", async () => {
+      await write("ci.env", { ZITADEL_PROJECT_ID: "proj_ci" });
+      await write(".env.local", { ZITADEL_URL: "https://dev.example" });
+
+      const environment = await resolve({ envFile: "ci.env" });
+
+      expect(environment.values.ZITADEL_URL).toBeUndefined();
+    });
+
+    it("never fills an --env-file's gaps from .zitadel/secret", async () => {
+      await write("ci.env", { ZITADEL_PROJECT_ID: "proj_ci" });
+      await writeSecret();
+
+      const environment = await resolve({ envFile: "ci.env" });
+
+      expect(environment.values.ZITADEL_PROJECT_SECRET).toBeUndefined();
     });
 
     it("falls back to .zitadel/secret for the project and its credentials", async () => {
@@ -326,10 +367,8 @@ describe("requireValue", () => {
     for (const source of [
       "process environment",
       ".env.production.local",
-      ".env.local",
       ".env.production",
       ".env",
-      ".zitadel/secret",
     ]) {
       expect(hint).toContain(source);
     }
@@ -344,6 +383,26 @@ describe("requireValue", () => {
     );
     expect(() => requireValue(production, "ZITADEL_URL")).toThrow(
       expect.objectContaining({ nextCommands: ["zitadel env add production"] }),
+    );
+  });
+
+  it("points an --env-file run at that file", async () => {
+    await write("ci.env", { ZITADEL_URL: "https://ci.example" });
+    const environment = await resolve({ envFile: "ci.env" });
+
+    expect(() => requireValue(environment, "ZITADEL_PROJECT_ID")).toThrow(
+      expect.objectContaining({
+        hint: expect.stringContaining("Set ZITADEL_PROJECT_ID in ci.env"),
+      }),
+    );
+  });
+
+  it("never sends an --env-file run to setup, which would create a new project", async () => {
+    await write("ci.env", { ZITADEL_URL: "https://ci.example" });
+    const environment = await resolve({ envFile: "ci.env" });
+
+    expect(() => requireValue(environment, "ZITADEL_PROJECT_ID")).toThrow(
+      expect.objectContaining({ nextCommands: undefined }),
     );
   });
 
@@ -378,6 +437,19 @@ describe("requireValueInteractive", () => {
     expect(await readFile(join(dir, ".env.production.local"), "utf8")).toContain(
       "ZITADEL_PROJECT_ID=proj_prompted",
     );
+  });
+
+  it("keeps a value typed for an --env-file run out of .env.<name>.local", async () => {
+    promptAnswer.value = "sk_typed";
+    await write("ci.env", { ZITADEL_PROJECT_ID: "proj_ci" });
+    const environment = await resolve({ envFile: "ci.env" });
+
+    await requireValueInteractive(environment, "ZITADEL_PROJECT_SECRET", {
+      cwd: dir,
+      interactive: true,
+    });
+
+    await expect(readFile(join(dir, ".env.development.local"), "utf8")).rejects.toThrow();
   });
 });
 

@@ -1649,6 +1649,17 @@ describe("api-mock project origins", () => {
     expect(((await res.json()) as { code: string }).code).toBe("origin.invalid");
   });
 
+  test.each(["https://*.vercel.app:*", "https://app.acme.com:abc"])(
+    "rejects %s, whose port is not digits, with origin.invalid",
+    async (pattern) => {
+      const project = await newProject("origins-bad-port");
+
+      const res = await addOrigin(project.id, project.projectSecret, { pattern, kind: "preview" });
+
+      expect(((await res.json()) as { code: string }).code).toBe("origin.invalid");
+    },
+  );
+
   test("removes a pattern and stops listing it", async () => {
     const project = await newProject("origins-remove");
     await addOrigin(project.id, project.projectSecret, {
@@ -1815,6 +1826,39 @@ describe("api-mock releases and deployments", () => {
     });
     expect(unknown.status).toBe(403);
     expect(((await unknown.json()) as { code: string }).code).toBe("proj.origin_not_allowed");
+  });
+
+  test("refuses a rollback whose expected deployment is no longer the newest", async () => {
+    const project = await newProject("deploy-rollback-guard");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const first = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const firstDeploy = (await (
+      await createDeployment(project.id, project.secret, {
+        release_id: first.id,
+        targets: ["primary"],
+      })
+    ).json()) as { id: string };
+    const second = (await (await createRelease(project.id, project.secret, rel2)).json()) as {
+      id: string;
+    };
+    await createDeployment(project.id, project.secret, {
+      release_id: second.id,
+      targets: ["primary"],
+    });
+
+    const rollback = await fetch(
+      `${BASE}/deployments/${firstDeploy.id}/rollback?project_id=${project.id}`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({ expected_deployment_id: firstDeploy.id }),
+      },
+    );
+
+    expect(rollback.status).toBe(409);
+    expect(((await rollback.json()) as { code: string }).code).toBe("dep.conflict");
   });
 
   test("rolls back to an earlier deployment, reversing the live release", async () => {
@@ -2004,10 +2048,37 @@ describe("api-mock releases and deployments", () => {
     expect(frozen).toEqual({ API_URL: "https://api.v1.acme.com" });
   });
 
-  test("warns when a preview deployment falls back to an all secret", async () => {
-    // A preview URL serving the production secret is allowed but flagged: there
-    // is no preview override for that name, so the deployment reports it.
-    const project = await newProject("deploy-preview-warn");
+  test("writes a new preview deployment on every create, renewing it", async () => {
+    // The contract: a deployment to preview URLs never answers 200; each create
+    // writes a new deployment, and that record is the renewal of its TTL.
+    const project = await newProject("deploy-preview-renew");
+    await fetch(`${BASE}/projects/${project.id}/origins`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+      body: JSON.stringify({ pattern: "https://*-acme.vercel.app", kind: "preview" }),
+    });
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const request = {
+      release_id: release.id,
+      targets: ["https://pr-1-acme.vercel.app"],
+      ttl: "24h",
+    };
+
+    const first = await createDeployment(project.id, project.secret, request);
+    const retry = await createDeployment(project.id, project.secret, request);
+
+    expect([first.status, retry.status]).toEqual([201, 201]);
+    const ids = [
+      ((await first.json()) as { id: string }).id,
+      ((await retry.json()) as { id: string }).id,
+    ];
+    expect(ids[0]).not.toBe(ids[1]);
+  });
+
+  test("carries no warnings field the contract does not define", async () => {
+    const project = await newProject("deploy-preview-no-warnings");
     await fetch(`${BASE}/projects/${project.id}/origins`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
@@ -2018,52 +2089,13 @@ describe("api-mock releases and deployments", () => {
       id: string;
     };
 
-    const warned = await createDeployment(project.id, project.secret, {
+    const created = await createDeployment(project.id, project.secret, {
       release_id: release.id,
       targets: ["https://pr-1-acme.vercel.app"],
       ttl: "24h",
     });
-    expect(warned.status).toBe(201);
-    const body = (await warned.json()) as {
-      warnings?: { code: string; variable: string; message: string }[];
-    };
-    expect(body.warnings).toHaveLength(1);
-    expect(body.warnings?.[0]).toMatchObject({
-      code: "variable.missing_preview_secret",
-      variable: "API_TOKEN",
-    });
-    expect(typeof body.warnings?.[0]?.message).toBe("string");
 
-    // Re-deploying the same preview target with unchanged config is idempotent
-    // (200), but the fallback to the production secret is still in effect, so
-    // the warning rides the retry response too rather than being dropped.
-    const retry = await createDeployment(project.id, project.secret, {
-      release_id: release.id,
-      targets: ["https://pr-1-acme.vercel.app"],
-      ttl: "24h",
-    });
-    expect(retry.status).toBe(200);
-    const retryBody = (await retry.json()) as {
-      warnings?: { code: string; variable: string }[];
-    };
-    expect(retryBody.warnings).toHaveLength(1);
-    expect(retryBody.warnings?.[0]).toMatchObject({
-      code: "variable.missing_preview_secret",
-      variable: "API_TOKEN",
-    });
-
-    // A preview override for the same name silences the warning: the preview no
-    // longer serves the production secret.
-    await setVars(project.id, "&applies_to=preview", {
-      API_TOKEN: { value: "preview-secret", secret: true },
-    });
-    const quiet = await createDeployment(project.id, project.secret, {
-      release_id: release.id,
-      targets: ["https://pr-2-acme.vercel.app"],
-      ttl: "24h",
-    });
-    expect(quiet.status).toBe(201);
-    expect((await quiet.json()) as { warnings?: unknown }).not.toHaveProperty("warnings");
+    expect((await created.json()) as object).not.toHaveProperty("warnings");
   });
 
   test("answers dep.not_found for a deployment's variables under the wrong project", async () => {
