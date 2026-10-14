@@ -32,7 +32,7 @@ import type { ResolvedTheme } from "./theme-controller.js";
 import type { Branding } from "./branding.js";
 import { stampExportparts } from "./exportparts.js";
 import { createLiquidEngine, localiseFlowErrorKeys, parseSsoError } from "./liquid.js";
-import { en, builtinLocales, type Locale } from "./locales/index.js";
+import { en, builtinLocales, mergeLocale, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
 import { resolveApi } from "./resolve-api.js";
 import { createSanitiser } from "./sanitiser.js";
@@ -439,13 +439,7 @@ export class ZitadelLogin extends ZitadelSurface {
     const custom = this.locales?.[primary];
     if (!custom) return builtin;
 
-    // Entries are Partial — merge key-by-key and skip explicit `undefined`
-    // values, which a plain spread would let shadow the built-in copy.
-    const merged: Locale = { ...builtin };
-    for (const [key, value] of Object.entries(custom)) {
-      if (value !== undefined) merged[key] = value;
-    }
-    return merged;
+    return mergeLocale(builtin, custom);
   }
 
   override willUpdate(changed: PropertyValues<this>): void {

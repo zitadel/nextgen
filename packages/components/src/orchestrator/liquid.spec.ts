@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createLiquidEngine, localiseFlowErrorKeys, parseSsoError } from "./liquid.js";
 import { en as fullLocale } from "./locales/en.js";
+import { builtinLocales } from "./locales/index.js";
 import { mandatoryGatesMarkerComment } from "./mandatory-gates.js";
 import { TEMPLATE_NAMES } from "./template-names.js";
 
@@ -51,7 +52,9 @@ describe("LiquidJS engine", () => {
   it("warns once per missing key, and never for fallback-served or empty keys", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     try {
-      const engine = createLiquidEngine({ locale: { ...locale, "action.back": "Back" } });
+      const engine = createLiquidEngine({
+        locale: { ...locale, "action.back": "Back", "identifier.description": "Email" },
+      });
       // Raw-key miss: warns on first render only.
       engine.parseAndRenderSync("{{ key | t }}", { key: "unknown.key" });
       engine.parseAndRenderSync("{{ key | t }}", { key: "unknown.key" });
@@ -62,6 +65,7 @@ describe("LiquidJS engine", () => {
       // Served by the injected-key and field-label fallbacks: no warning.
       engine.parseAndRenderSync("{{ key | t }}", { key: "custom-step.action.back" });
       engine.parseAndRenderSync("{{ key | t }}", { key: "register.field.givenName" });
+      engine.parseAndRenderSync("{{ key | t }}", { key: "identifier.description.sso" });
       // Undefined text_key stringifies to "": no warning.
       engine.parseAndRenderSync("{{ key | t }}", { key: undefined });
       expect(warn).toHaveBeenCalledTimes(1);
@@ -122,9 +126,12 @@ describe("LiquidJS engine", () => {
     expect(result).toBe("custom.description.sso");
   });
 
-  it("the builtin password step names the provider in its SSO description", () => {
-    expect(fullLocale["password.description.sso"]).toContain("provider");
-  });
+  it.each(Object.entries(builtinLocales))(
+    "the builtin %s password step has its own wording when it offers providers",
+    (_lang, dictionary) => {
+      expect(dictionary["password.description.sso"]).not.toBe(dictionary["password.description"]);
+    },
+  );
 
   it("the builtin locales ship the generic action.back", () => {
     expect(fullLocale["action.back"]).toBe("Back");

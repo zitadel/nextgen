@@ -35,6 +35,14 @@ describe("withSsoProviders", () => {
     expect(step.texts?.description_key).toBe("password.description");
   });
 
+  it("leaves an empty description alone", () => {
+    applySsoProviders([google]);
+
+    const step = withSsoProviders(flowAt("password", "")).step;
+
+    expect(step.texts?.description_key).toBe("");
+  });
+
   it("leaves a step that has no description alone", () => {
     applySsoProviders([google]);
 
