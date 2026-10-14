@@ -15,6 +15,7 @@ import { describe, it, expect, expectTypeOf, vi, beforeEach } from "vitest";
 
 import { createNextgenHandle } from "../handle";
 import { clearJwksCache } from "@zitadel/sdk-core/jwt";
+import { DEAD, OUTAGES, PROXY_FAILURES } from "./outages";
 
 // The JWKS cache is module-level and per issuer: start every case from a cold
 // cache, so each one fetches the keys its own mock publishes.
@@ -678,5 +679,60 @@ describe("opaque session cookie", () => {
     await run(protectedHandle(), event, resolve);
 
     expect(deleteCookie).toHaveBeenCalledWith("__nextgen_session", { path: "/" });
+  });
+
+  it.each(DEAD)("clears the cookie and redirects on a protected route for %s", async (_l, res) => {
+    sessionsMe(res());
+    const { event, resolve } = makeEvent("http://localhost:3000/admin", { cookie: COOKIE });
+
+    const response = await run(protectedHandle(), event, resolve);
+
+    expect([response.status, response.headers.getSetCookie()]).toEqual([
+      302,
+      ["__nextgen_session=; Path=/; Max-Age=0"],
+    ]);
+  });
+
+  // A backend outage is not a sign-out: the cookie must survive it.
+  it.each(OUTAGES)("keeps the cookie on a public page for %s", async (_l, fail) => {
+    vi.stubGlobal("fetch", vi.fn(fail));
+    const { event, resolve } = makeEvent("http://localhost:3000/", { cookie: COOKIE });
+    const deleteCookie = vi.spyOn(event.cookies, "delete");
+
+    const response = await run(protectedHandle(), event, resolve);
+
+    expect([response.status, deleteCookie.mock.calls, event.locals.nextgenAuth]).toEqual([
+      200,
+      [],
+      { isAuthenticated: false, session: null },
+    ]);
+  });
+
+  it.each(OUTAGES)("answers a protected route 503 for %s", async (_l, fail) => {
+    vi.stubGlobal("fetch", vi.fn(fail));
+    const { event, resolve } = makeEvent("http://localhost:3000/admin", { cookie: COOKIE });
+
+    const response = await run(protectedHandle(), event, resolve);
+
+    expect([
+      response.status,
+      response.headers.get("location"),
+      response.headers.getSetCookie(),
+    ]).toEqual([503, null, []]);
+  });
+});
+
+describe("proxy upstream failure", () => {
+  it.each(PROXY_FAILURES)("answers %s with %i", async (_l, status, code, fail) => {
+    vi.stubGlobal("fetch", vi.fn(fail));
+    const handle = createNextgenHandle({ url: "http://localhost:4000" });
+    const { event, resolve } = makeEvent("http://localhost:3000/__nextgen/v1/flow");
+
+    const response = await run(handle, event, resolve);
+
+    expect([response.status, await response.json()]).toEqual([
+      status,
+      { code, message: expect.any(String) },
+    ]);
   });
 });

@@ -474,6 +474,14 @@ function refreshJwks(jwksUri: string, timeoutMs: number): Promise<JwksCacheEntry
       };
       jwksCache.set(jwksUri, entry);
       return entry;
+    } catch (err) {
+      // A timeout, a refused connection or an unreadable body is a failed
+      // refresh like a 5xx: the caller falls back to the keys it already has,
+      // rather than rejecting every token until the endpoint answers again.
+      // Still logged, so operators can tell an infrastructure failure from a
+      // bad token.
+      console.error("[nextgen] verifyJwt unexpected error:", err);
+      return null;
     } finally {
       jwksInFlight.delete(jwksUri);
     }

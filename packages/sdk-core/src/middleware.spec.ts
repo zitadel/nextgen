@@ -1,9 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  assertLoginPath,
+  clearCookie,
   filterResponseHeaders,
   matchesRoutes,
+  parseCookieHeader,
+  proxyFailureResponse,
   requiresProjectSecret,
+  sessionUnavailableResponse,
   validateOpaqueSessionToken,
 } from "./middleware.js";
 
@@ -186,10 +191,13 @@ describe("validateOpaqueSessionToken", () => {
     );
 
     expect(await validateOpaqueSessionToken("tok", "http://auth.test", 1000)).toEqual({
-      userId: "u1",
-      identifier: "a@b.c",
-      identifierProperty: "email",
-      display: "Ada",
+      status: "live",
+      session: {
+        userId: "u1",
+        identifier: "a@b.c",
+        identifierProperty: "email",
+        display: "Ada",
+      },
     });
   });
 
@@ -200,30 +208,120 @@ describe("validateOpaqueSessionToken", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       "http://auth.test/sessions/me",
-      expect.objectContaining({ headers: { cookie: "__nextgen_session=tok" } }),
+      expect.objectContaining({
+        headers: expect.objectContaining({ cookie: "__nextgen_session=tok" }),
+      }),
     );
   });
 
   // CreateSession sets the cookie before any factor is verified.
-  it.each([[{}], [{ user_id: "" }]])(
+  it.each([[{}], [{ user_id: "" }], [{ user_id: 42 }], [{ user_id: null }]])(
     "reports a live session without a user (%j) as anonymous",
     async (body) => {
       backend(Response.json(body));
 
       expect(await validateOpaqueSessionToken("tok", "http://auth.test", 1000)).toMatchObject({
-        userId: null,
+        status: "live",
+        session: { userId: null },
       });
     },
   );
 
+  // A UI renders `display ?? identifier`; an empty string would show no name.
+  it.each([
+    ["an empty display", { display: "" }, { display: null }],
+    ["an empty identifier", { identifier: "" }, { identifier: null }],
+    ["a non-string display", { display: 7 }, { display: null }],
+    ["an empty identifier property", { identifier_property: "" }, { identifierProperty: null }],
+  ])("reads %s as null", async (_label, user, expected) => {
+    backend(Response.json({ user_id: "u1", user }));
+
+    expect(await validateOpaqueSessionToken("tok", "http://auth.test", 1000)).toMatchObject({
+      status: "live",
+      session: expected,
+    });
+  });
+
   it.each([
     ["a 401", new Response(null, { status: 401 })],
     ["a 404", new Response(null, { status: 404 })],
-    ["an unreadable body", new Response("not json", { status: 200 })],
-    ["a network error", new Error("ECONNREFUSED")],
-  ])("reports no live session for %s", async (_label, response) => {
+  ])("reports the session dead for %s", async (_label, response) => {
     backend(response);
 
-    expect(await validateOpaqueSessionToken("tok", "http://auth.test", 1000)).toBeNull();
+    expect(await validateOpaqueSessionToken("tok", "http://auth.test", 1000)).toEqual({
+      status: "dead",
+    });
+  });
+
+  // An outage is not a sign-out: only the backend saying so is.
+  it.each([
+    ["a network error", new TypeError("fetch failed")],
+    ["a timeout", new DOMException("timed out", "TimeoutError")],
+    ["a 500", new Response(null, { status: 500 })],
+    ["a 502", new Response(null, { status: 502 })],
+    ["a 503", new Response(null, { status: 503 })],
+    ["a 429", new Response(null, { status: 429 })],
+    ["an unreadable body", new Response("not json", { status: 200 })],
+  ])("reports the session unknown for %s", async (_label, response) => {
+    backend(response);
+
+    expect(await validateOpaqueSessionToken("tok", "http://auth.test", 1000)).toEqual({
+      status: "unknown",
+    });
+  });
+});
+
+describe("parseCookieHeader", () => {
+  it.each([
+    [null, {}],
+    ["", {}],
+    ["a=1", { a: "1" }],
+    ["a=1; b=2", { a: "1", b: "2" }],
+    [" a = 1 ;b=x=y", { a: "1", b: "x=y" }],
+    ["novalue; a=1", { a: "1" }],
+    ["=orphan; a=1", { a: "1" }],
+    ["a=1; a=2", { a: "2" }],
+  ])("parses %j", (header, expected) => {
+    expect(Object.fromEntries(parseCookieHeader(header))).toEqual(expected);
+  });
+});
+
+describe("clearCookie", () => {
+  it("expires the cookie on the root path", () => {
+    expect(clearCookie("__nextgen_session")).toBe("__nextgen_session=; Path=/; Max-Age=0");
+  });
+});
+
+describe("sessionUnavailableResponse", () => {
+  it("is a retryable 503 that sets no cookie and is never cached", () => {
+    const res = sessionUnavailableResponse();
+
+    expect(res.status).toBe(503);
+    expect(res.headers.get("set-cookie")).toBeNull();
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(res.headers.get("retry-after")).toBe("5");
+  });
+});
+
+describe("proxyFailureResponse", () => {
+  it.each([
+    ["a timeout", new DOMException("timed out", "TimeoutError"), 504, "proxy.upstream_timeout"],
+    ["a network error", new TypeError("fetch failed"), 502, "proxy.upstream_unreachable"],
+    ["a non-error rejection", "boom", 502, "proxy.upstream_unreachable"],
+  ])("answers %s with %i and the error envelope", async (_label, error, status, code) => {
+    const res = proxyFailureResponse(error);
+
+    expect(res.status).toBe(status);
+    expect(await res.json()).toMatchObject({ code, message: expect.any(String) });
+  });
+});
+
+describe("assertLoginPath", () => {
+  it.each(["/login", "/auth/sign-in?x=1", "/"])("accepts %s", (loginPath) => {
+    expect(() => assertLoginPath(loginPath)).not.toThrow();
+  });
+
+  it.each(["https://evil.com/phish", "//evil.com", "login", ""])("rejects %j", (loginPath) => {
+    expect(() => assertLoginPath(loginPath)).toThrow(/loginPath must be a relative path/);
   });
 });

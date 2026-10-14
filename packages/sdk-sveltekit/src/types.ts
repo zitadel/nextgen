@@ -10,37 +10,11 @@ export type {
   UnauthState,
   AuthResult,
   NextgenMiddlewareOptions,
+  // Client-safe auth shapes (token intentionally absent — the raw session token
+  // must not be serialised into an SSR payload where client-side scripts could
+  // read it; use getAuth server-side when it is needed). Defined in sdk-core so
+  // every SDK hands the client the identical shape.
+  ClientSession,
+  ClientAuthState,
+  ClientAuthResult,
 } from "@zitadel/sdk-core/middleware";
-
-import type { UnauthState } from "@zitadel/sdk-core/middleware";
-
-// ─── SvelteKit-specific client-safe types ────────────────────────────────────
-
-/**
- * The client-safe session a load function may forward to the browser via the
- * page `data`. Identical to {@link NextgenSession} but omits `token` — the raw
- * JWT must not be serialised into the SSR payload where client-side scripts
- * could read it.
- */
-export type ClientSession = {
-  /** The user's unique identifier (`sub` claim). */
-  userId: string;
-  /**
-   * The user schema's designated identifier value (the login identifier, e.g.
-   * an email address or username), or `null` when unresolved.
-   */
-  identifier: string | null;
-  /** The schema property `identifier` came from (e.g. `"email"`), or `null`. */
-  identifierProperty: string | null;
-  /** The user's display name rendering, or `null` when the schema designates none. */
-  display: string | null;
-};
-
-/** Client-safe auth state when the user is signed in. */
-export type ClientAuthState = { isAuthenticated: true; session: ClientSession };
-
-/**
- * Union of all possible client-safe auth states. Token is intentionally absent
- * — use {@link getAuth} server-side when the raw JWT is needed.
- */
-export type ClientAuthResult = ClientAuthState | UnauthState;

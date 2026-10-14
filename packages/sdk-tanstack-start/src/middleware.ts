@@ -3,13 +3,18 @@ import type { AuthResult, NextgenMiddlewareOptions } from "@zitadel/sdk-core/mid
 import {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
+  assertLoginPath,
+  clearCookie,
   filterResponseHeaders,
   matchesRoutes,
+  parseCookieHeader,
+  proxyFailureResponse,
   requiresProjectSecret,
+  sessionUnavailableResponse,
   validateOpaqueSessionToken,
 } from "@zitadel/sdk-core/middleware";
 
-import { verifyJwt, base64UrlDecode } from "./lib/jwt";
+import { isJwtShaped, verifyJwt } from "./lib/jwt";
 
 /**
  * `process` is undefined in some edge/serverless runtimes; read env defensively
@@ -21,12 +26,14 @@ const PROCESS_ENV: Record<string, string | undefined> =
 
 /**
  * The decision produced by {@link handleNextgenRequest}: either a ready-to-send
- * `Response` (proxy or login redirect) or an instruction to continue the request
- * with the resolved {@link AuthResult} attached to the router context.
+ * `Response` (proxy, login redirect, or a `503` for a protected route whose
+ * session the backend could not check) or an instruction to continue the
+ * request with the resolved {@link AuthResult} attached to the router context.
  */
 export type NextgenRequestDecision =
   | { readonly type: "proxy"; readonly response: Response }
   | { readonly type: "redirect"; readonly response: Response }
+  | { readonly type: "unavailable"; readonly response: Response }
   | {
       readonly type: "continue";
       readonly auth: AuthResult;
@@ -105,13 +112,20 @@ async function proxyRequest(
     upstreamHeaders.set("authorization", `Bearer ${projectSecret}`);
   }
 
-  const upstream = await fetch(target, {
-    method,
-    headers: upstreamHeaders,
-    body,
-    redirect: "manual",
-    signal: AbortSignal.timeout(proxyTimeoutMs),
-  });
+  let upstream: Response;
+  try {
+    upstream = await fetch(target, {
+      method,
+      headers: upstreamHeaders,
+      body,
+      redirect: "manual",
+      signal: AbortSignal.timeout(proxyTimeoutMs),
+    });
+  } catch (error) {
+    // The backend is down or too slow: a 502/504 in the API's error envelope,
+    // not the framework's HTML 500 page.
+    return proxyFailureResponse(error);
+  }
 
   // The app's own request URL: the origin a proxied redirect may name, and the
   // base a relative one resolves against (the IdP callback's 303 needs it).
@@ -127,34 +141,19 @@ async function proxyRequest(
   });
 }
 
-const DECODER = new TextDecoder();
-
-function isJwtShaped(token: string): boolean {
-  const parts = token.split(".");
-  if (parts.length < 3 || !parts[0]) return false;
+/**
+ * Removes any client-supplied `x-nextgen-auth-token` from the inbound request,
+ * so server code reading raw headers cannot observe an attacker-controlled
+ * value; `getAuth(context)` is canonical. A `Request`'s headers may be
+ * immutable, so the delete is guarded.
+ */
+function stripAuthTokenHeader(request: Request): void {
   try {
-    const header = JSON.parse(DECODER.decode(base64UrlDecode(parts[0]))) as Record<string, unknown>;
-    return typeof header?.alg === "string" && !("enc" in header);
+    request.headers.delete("x-nextgen-auth-token");
   } catch {
-    return false;
+    // Immutable headers — nothing to strip beyond what the proxy path already
+    // drops via INTERNAL_HEADERS before forwarding upstream.
   }
-}
-
-function parseCookieHeader(header: string | null): Map<string, string> {
-  const jar = new Map<string, string>();
-  if (!header) return jar;
-  for (const part of header.split(";")) {
-    const idx = part.indexOf("=");
-    if (idx === -1) continue;
-    const name = part.slice(0, idx).trim();
-    const value = part.slice(idx + 1).trim();
-    if (name) jar.set(name, value);
-  }
-  return jar;
-}
-
-function clearCookie(name: string): string {
-  return `${name}=; Path=/; Max-Age=0`;
 }
 
 /**
@@ -190,19 +189,16 @@ export async function handleNextgenRequest(
     clientAddress,
   } = options;
 
-  // Guard against open-redirect: loginPath must be a relative path.
-  if (!loginPath.startsWith("/") || loginPath.startsWith("//")) {
-    throw new Error(
-      `[nextgen] loginPath must be a relative path starting with a single "/". ` +
-        `Received: "${loginPath}". Using an absolute or protocol-relative URL ` +
-        `would allow open-redirect attacks.`,
-    );
-  }
+  // Guard against open-redirect: loginPath must be a path on this app.
+  // createNextgenRequestMiddleware checks it once at setup; a direct call
+  // checks it here.
+  assertLoginPath(loginPath);
 
   const url2 = new URL(request.url);
   const { pathname } = url2;
 
   if (matchesRoutes(pathname, ignoredRoutes)) {
+    stripAuthTokenHeader(request);
     return { type: "continue", auth: { isAuthenticated: false, session: null } };
   }
 
@@ -218,6 +214,8 @@ export async function handleNextgenRequest(
     );
     return { type: "proxy", response };
   }
+
+  stripAuthTokenHeader(request);
 
   const cookies = parseCookieHeader(request.headers.get("cookie"));
   const authHeader = request.headers.get("authorization");
@@ -253,33 +251,40 @@ export async function handleNextgenRequest(
     };
   }
 
-  let liveAnonymousSession = false;
+  let keepCookies = false;
   if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
-    const opaque = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
-    // A session without a user is anonymous: its sign-in has not verified a
-    // factor yet. It is not signed in, but it is live — keep its cookie.
-    if (opaque?.userId) {
+    const check = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
+    if (check.status === "live" && check.session.userId) {
       return {
         type: "continue",
         auth: {
           isAuthenticated: true,
           session: {
-            userId: opaque.userId,
-            identifier: opaque.identifier,
-            identifierProperty: opaque.identifierProperty,
-            display: opaque.display,
+            userId: check.session.userId,
+            identifier: check.session.identifier,
+            identifierProperty: check.session.identifierProperty,
+            display: check.session.display,
             token: cookieToken,
           },
         },
       };
     }
-    liveAnonymousSession = opaque !== null;
+    // A session without a user is anonymous: its sign-in has not verified a
+    // factor yet. It is not signed in, but it is live — keep its cookie.
+    keepCookies = check.status === "live";
+    if (check.status === "unknown") {
+      // The backend could not be asked. The session may be live, so its cookie
+      // survives the outage; a protected route is retryable, not a sign-in.
+      return matchesRoutes(pathname, protectedRoutes)
+        ? { type: "unavailable", response: sessionUnavailableResponse() }
+        : { type: "continue", auth: { isAuthenticated: false, session: null } };
+    }
   }
 
   // Dead credentials are cleared on every unauthenticated response so the
   // browser stops replaying them (each replay costs a backend session check);
   // a live anonymous session's cookie stays, since its sign-in may complete.
-  const setCookies = liveAnonymousSession
+  const setCookies = keepCookies
     ? []
     : [...cookies.keys()].filter((name) => name.startsWith("__nextgen")).map(clearCookie);
 
@@ -341,7 +346,8 @@ const CONTEXT_KEY = "nextgenAuth";
  *
  * On an authenticated request it calls `next({ context: { nextgenAuth } })` so
  * loaders and server functions can read the session via {@link getAuth}. On a
- * proxy or protected-route miss it returns the `Response` directly.
+ * proxy, a protected-route miss, or a protected route whose session the backend
+ * could not check (`503`), it returns the `Response` directly.
  *
  * @param options - Configuration; see {@link NextgenRequestOptions}.
  * @returns A request-middleware server handler.
@@ -349,6 +355,8 @@ const CONTEXT_KEY = "nextgenAuth";
 export function createNextgenRequestMiddleware(
   options: NextgenRequestOptions = {},
 ): (ctx: RequestMiddlewareContext) => Promise<Response> {
+  // Fail at setup, not with a 500 on every request.
+  assertLoginPath(options.loginPath ?? "/login");
   return async ({ request, next }: RequestMiddlewareContext): Promise<Response> => {
     const clientAddress = options.clientAddress ?? request.headers.get("x-real-ip") ?? undefined;
     const decision = await handleNextgenRequest(request, { ...options, clientAddress });

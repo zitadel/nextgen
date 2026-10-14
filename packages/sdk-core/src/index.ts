@@ -4,16 +4,24 @@ export type {
   UnauthState,
   AuthResult,
   NextgenMiddlewareOptions,
+  ClientSession,
+  ClientAuthState,
+  ClientAuthResult,
 } from "./middleware.js";
 export {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
   matchesRoutes,
+  assertLoginPath,
   filterResponseHeaders,
   requiresProjectSecret,
   validateOpaqueSessionToken,
+  parseCookieHeader,
+  clearCookie,
+  sessionUnavailableResponse,
+  proxyFailureResponse,
 } from "./middleware.js";
-export type { OpaqueSession } from "./middleware.js";
+export type { OpaqueSession, OpaqueSessionCheck } from "./middleware.js";
 export {
   verifyJwt,
   decodeJwt,

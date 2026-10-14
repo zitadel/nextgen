@@ -31,7 +31,8 @@ export type GetSessionOptions = {
  * `configureZitadel()` to have run.
  *
  * - `200` with an authenticated user → `{ isAuthenticated: true, session }`
- *   with the client-safe identity (`userId`, `email`, `name` — no token).
+ *   with the client-safe identity (`userId`, `identifier`, `identifierProperty`,
+ *   `display` — no token).
  * - `200` for an anonymous session, `401` with `auth.unauthorized`, or `404`
  *   with `sess.not_found` → signed out.
  * - Any other response throws — including a framework's HTML 404 page from

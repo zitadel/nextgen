@@ -126,6 +126,40 @@ describe("verifyJwt JWKS caching", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+
+  // An expired cache whose refresh fails keeps verifying against the keys it
+  // holds: a JWKS outage must not reject every bearer until the endpoint is back.
+  it.each([
+    ["a 503", () => Promise.resolve(new Response(null, { status: 503 }))],
+    ["a network error", () => Promise.reject(new TypeError("fetch failed"))],
+    ["a timeout", () => Promise.reject(new DOMException("timed out", "TimeoutError"))],
+    ["an unreadable body", () => Promise.resolve(new Response("<html>", { status: 200 }))],
+  ])("keeps the cached keys when a refresh after the TTL fails with %s", async (_label, fail) => {
+    const issuer = freshIssuer();
+    const fetchMock = serveJwks(() => [jwk(ec.publicKey, { kid: "k1", alg: "ES256" })]);
+    const start = Date.now();
+    await verifyJwt(sign(issuer, "k1", "ES256", ec.privateKey), opts(issuer));
+    vi.spyOn(Date, "now").mockReturnValue(start + JWKS_TTL_MS + 1_000);
+    fetchMock.mockImplementation(fail);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    expect(await verifyJwt(sign(issuer, "k1", "ES256", ec.privateKey), opts(issuer))).toMatchObject(
+      { sub: "u1" },
+    );
+  });
+
+  it("rejects the token and logs when the first JWKS fetch fails and nothing is cached", async () => {
+    const issuer = freshIssuer();
+    const failure = new TypeError("fetch failed");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(failure)),
+    );
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    expect(await verifyJwt(sign(issuer, "k1", "RS256", rsa.privateKey), opts(issuer))).toBeNull();
+    expect(consoleError).toHaveBeenCalledWith("[nextgen] verifyJwt unexpected error:", failure);
+  });
 });
 
 describe("verifyJwt key selection", () => {

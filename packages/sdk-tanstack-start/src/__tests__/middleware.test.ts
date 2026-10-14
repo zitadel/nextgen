@@ -12,6 +12,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import { handleNextgenRequest, createNextgenRequestMiddleware, getAuth } from "../middleware";
 import { clearJwksCache } from "@zitadel/sdk-core/jwt";
+import { DEAD, OUTAGES, PROXY_FAILURES } from "./outages";
 
 // The JWKS cache is module-level and per issuer: start every case from a cold
 // cache, so each one fetches the keys its own mock publishes.
@@ -382,6 +383,16 @@ describe("handleNextgenRequest", () => {
 });
 
 describe("createNextgenRequestMiddleware", () => {
+  // A bad loginPath must fail once at setup, not answer every request with a 500.
+  it.each(["https://evil.test/x", "//evil.test"])(
+    "throws at setup on loginPath %s",
+    (loginPath) => {
+      expect(() => createNextgenRequestMiddleware({ loginPath })).toThrow(
+        /loginPath must be a relative path/,
+      );
+    },
+  );
+
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -504,5 +515,80 @@ describe("opaque session cookie", () => {
     });
 
     expect(res.headers.get("set-cookie")).toContain("__nextgen_session=;");
+  });
+
+  it.each(DEAD)("clears the cookie and redirects on a protected route for %s", async (_l, res) => {
+    sessionsMe(res());
+
+    const decision = await handleNextgenRequest(
+      makeRequest("http://localhost:3000/admin", { cookie: COOKIE }),
+      OPTIONS,
+    );
+
+    if (decision.type === "continue") throw new Error("expected a response");
+    expect([decision.type, decision.response.headers.getSetCookie()]).toEqual([
+      "redirect",
+      ["__nextgen_session=; Path=/; Max-Age=0"],
+    ]);
+  });
+
+  // A backend outage is not a sign-out: the cookie must survive it.
+  it.each(OUTAGES)("keeps the cookie on a public page for %s", async (_l, fail) => {
+    vi.stubGlobal("fetch", vi.fn(fail));
+    const next = vi.fn().mockResolvedValue({ response: new Response("page", { status: 200 }) });
+
+    const res = await createNextgenRequestMiddleware(OPTIONS)({
+      request: makeRequest("http://localhost:3000/", { cookie: COOKIE }),
+      next,
+    });
+
+    expect([res.status, res.headers.getSetCookie(), next.mock.calls[0]?.[0]]).toEqual([
+      200,
+      [],
+      { context: { nextgenAuth: { isAuthenticated: false, session: null } } },
+    ]);
+  });
+
+  it.each(OUTAGES)("answers a protected route 503 for %s", async (_l, fail) => {
+    vi.stubGlobal("fetch", vi.fn(fail));
+    const next = vi.fn();
+
+    const res = await createNextgenRequestMiddleware(OPTIONS)({
+      request: makeRequest("http://localhost:3000/admin", { cookie: COOKIE }),
+      next,
+    });
+
+    expect([
+      res.status,
+      res.headers.get("location"),
+      res.headers.getSetCookie(),
+      next.mock.calls,
+    ]).toEqual([503, null, [], []]);
+  });
+});
+
+describe("proxy upstream failure", () => {
+  it.each(PROXY_FAILURES)("answers %s with %i", async (_l, status, code, fail) => {
+    vi.stubGlobal("fetch", vi.fn(fail));
+
+    const res = await createNextgenRequestMiddleware({ url: "http://localhost:4000" })({
+      request: makeRequest("http://localhost:3000/__nextgen/v1/flow"),
+      next: vi.fn(),
+    });
+
+    expect([res.status, await res.json()]).toEqual([status, { code, message: expect.any(String) }]);
+  });
+});
+
+describe("inbound x-nextgen-auth-token", () => {
+  it.each([
+    ["a public route", "http://localhost:3000/"],
+    ["an ignored route", "http://localhost:3000/health"],
+  ])("is stripped on %s", async (_l, url) => {
+    const request = makeRequest(url, { headers: { "x-nextgen-auth-token": "forged" } });
+
+    await handleNextgenRequest(request, { ignoredRoutes: ["/health"] });
+
+    expect(request.headers.has("x-nextgen-auth-token")).toBe(false);
   });
 });

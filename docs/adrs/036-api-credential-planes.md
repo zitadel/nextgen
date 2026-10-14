@@ -297,3 +297,26 @@ no environments ([ADR 068](068-project-is-the-data-boundary.md)), so:
   decide is withdrawn.
 
 Design: [origins](https://github.com/zitadel/nextgen/pull/1427) in the spike behind #1389.
+
+## Amendment (2026-10-14): an unanswered session check is not a sign-out
+
+The server-originated `getMySession` read above has three outcomes, not two,
+and every server SDK (`sdk-next`, `sdk-nuxt`, `sdk-sveltekit`,
+`sdk-solid-start`, `sdk-qwik-city`, `sdk-tanstack-start`) handles them through
+sdk-core's `validateOpaqueSessionToken`:
+
+- **Live**: a `2xx` with a readable body. A session that names no user is
+  live but anonymous: not signed in, and its cookie stays.
+- **Dead**: `401` or `404`, the only answers that say the token names no
+  session. The SDK clears the `__nextgen*` cookies and a protected route
+  redirects to the login page.
+- **Unknown**: a network error, a timeout (`opaqueTokenTimeoutMs`), a `5xx` or
+  any other answer. The request is treated as signed out, the cookies stay, and
+  a protected route answers a retryable `503` instead of the login redirect.
+  Clearing the cookie here would sign every user out whenever the backend
+  restarts or slows down.
+
+The same rule covers the proxy and the JWKS: a proxied call the backend does
+not answer is a `502` (unreachable) or `504` (`proxyTimeoutMs`) with an
+`{ code, message }` body, and a failed JWKS refresh keeps verifying against the
+keys already cached.

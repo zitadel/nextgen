@@ -10,12 +10,13 @@
 
 import { generateKeyPairSync, createSign } from "node:crypto";
 import type { RequestEvent, RequestHandler } from "@qwik.dev/router";
-import { describe, it, expect, expectTypeOf, vi, beforeEach } from "vitest";
+import { describe, it, expect, expectTypeOf, vi, afterEach, beforeEach } from "vitest";
 
 import type { QwikRequestEvent } from "../request-handler";
 
 import { createNextgenOnRequest, getAuth } from "../request-handler";
 import { clearJwksCache } from "@zitadel/sdk-core/jwt";
+import { DEAD, OUTAGES, PROXY_FAILURES } from "./outages";
 
 // The JWKS cache is module-level and per issuer: start every case from a cold
 // cache, so each one fetches the keys its own mock publishes.
@@ -60,6 +61,8 @@ interface MakeEventOptions {
   readonly method?: string;
   readonly headers?: Record<string, string>;
   readonly clientIp?: string;
+  /** What Qwik's `ev.env` holds — where Vite loads `.env.local`. */
+  readonly env?: Record<string, string>;
 }
 
 class RedirectMarker {
@@ -113,6 +116,7 @@ function makeHarness(url: string, opts: MakeEventOptions = {}): Harness {
       harness.redirected = { status, url: u };
       return new RedirectMarker(status, u);
     },
+    ...(opts.env ? { env: { get: (key: string) => opts.env?.[key] } } : {}),
   };
   (harness as { ev: QwikRequestEvent }).ev = ev;
   return harness;
@@ -574,5 +578,125 @@ describe("opaque session cookie", () => {
     await run(protectedHandler(), h.ev);
 
     expect(h.deleted).toEqual(["__nextgen_session"]);
+  });
+
+  it.each(DEAD)("clears the cookie and redirects on a protected route for %s", async (_l, res) => {
+    sessionsMe(res());
+    const h = makeHarness("http://localhost:3000/admin", { cookie: COOKIE });
+
+    await run(protectedHandler(), h.ev);
+
+    expect([h.redirected?.status, h.deleted]).toEqual([302, ["__nextgen_session"]]);
+  });
+
+  // A backend outage is not a sign-out: the cookie must survive it.
+  it.each(OUTAGES)("keeps the cookie on a public page for %s", async (_l, fail) => {
+    vi.stubGlobal("fetch", vi.fn(fail));
+    const h = makeHarness("http://localhost:3000/", { cookie: COOKIE });
+
+    await run(protectedHandler(), h.ev);
+
+    expect([h.sent, h.redirected, h.deleted, getAuth(h.ev)]).toEqual([
+      undefined,
+      undefined,
+      [],
+      { isAuthenticated: false, session: null },
+    ]);
+  });
+
+  it.each(OUTAGES)("answers a protected route 503 for %s", async (_l, fail) => {
+    vi.stubGlobal("fetch", vi.fn(fail));
+    const h = makeHarness("http://localhost:3000/admin", { cookie: COOKIE });
+
+    await run(protectedHandler(), h.ev);
+
+    expect([h.sent?.status, h.redirected, h.deleted]).toEqual([503, undefined, []]);
+  });
+});
+
+describe("proxy upstream failure", () => {
+  it.each(PROXY_FAILURES)("answers %s with %i", async (_l, status, code, fail) => {
+    vi.stubGlobal("fetch", vi.fn(fail));
+    const h = makeHarness("http://localhost:3000/__nextgen/v1/flow");
+
+    await run(createNextgenOnRequest({ url: "http://localhost:4000" }), h.ev);
+
+    expect([h.sent?.status, await h.sent?.json()]).toEqual([
+      status,
+      { code, message: expect.any(String) },
+    ]);
+  });
+});
+
+describe("inbound x-nextgen-auth-token", () => {
+  it.each([
+    ["a public route", "http://localhost:3000/"],
+    ["an ignored route", "http://localhost:3000/health"],
+  ])("is stripped on %s", async (_l, url) => {
+    const h = makeHarness(url, { headers: { "x-nextgen-auth-token": "forged" } });
+
+    await run(createNextgenOnRequest({ ignoredRoutes: ["/health"] }), h.ev);
+
+    expect(h.ev.request.headers.has("x-nextgen-auth-token")).toBe(false);
+  });
+});
+
+// Vite loads `.env.local` into Qwik's `ev.env`, not `process.env`, so the
+// handler resolves its settings per request: option > ev.env > process.env.
+describe("configuration from ev.env", () => {
+  const EXCHANGE = "http://localhost:3000/__nextgen/sessions/exchange";
+
+  function upstream(): ReturnType<typeof vi.fn> {
+    const fetchMock = vi.fn(async () => Response.json({}));
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  function sentTo(fetchMock: ReturnType<typeof vi.fn>): [string, string | null] {
+    const [target, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    return [target, new Headers(init.headers).get("authorization")];
+  }
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it.each([
+    [
+      "env only",
+      {},
+      { ZITADEL_URL: "http://env.test", ZITADEL_PROJECT_SECRET: "sk_env" },
+      {},
+      ["http://env.test/sessions/exchange", "Bearer sk_env"],
+    ],
+    [
+      "an option over env",
+      { url: "http://option.test", projectSecret: "sk_option" },
+      { ZITADEL_URL: "http://env.test", ZITADEL_PROJECT_SECRET: "sk_env" },
+      {},
+      ["http://option.test/sessions/exchange", "Bearer sk_option"],
+    ],
+    [
+      "env over process.env",
+      {},
+      { ZITADEL_URL: "http://env.test", ZITADEL_PROJECT_SECRET: "sk_env" },
+      { ZITADEL_URL: "http://process.test", ZITADEL_PROJECT_SECRET: "sk_process" },
+      ["http://env.test/sessions/exchange", "Bearer sk_env"],
+    ],
+    [
+      "process.env without env",
+      {},
+      {},
+      { ZITADEL_URL: "http://process.test", ZITADEL_PROJECT_SECRET: "sk_process" },
+      ["http://process.test/sessions/exchange", "Bearer sk_process"],
+    ],
+  ])("resolves the backend and secret from %s", async (_l, options, env, processEnv, expected) => {
+    for (const [key, value] of Object.entries(processEnv)) vi.stubEnv(key, value);
+    const fetchMock = upstream();
+    const h = makeHarness(EXCHANGE, { method: "POST", env });
+
+    await run(createNextgenOnRequest(options), h.ev);
+
+    expect(sentTo(fetchMock)).toEqual(expected);
   });
 });

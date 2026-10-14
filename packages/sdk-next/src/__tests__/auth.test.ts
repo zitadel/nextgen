@@ -268,6 +268,19 @@ describe("auth()", () => {
     });
   });
 
+  // A UI renders `display ?? identifier`: an empty display must read as absent.
+  it("reads an empty display or identifier from the backend as null", async () => {
+    routeFetch(nextKid(), () =>
+      jsonResponse({ user_id: "user-1", user: { identifier: "", display: "" } }),
+    );
+    mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
+
+    const auth = await importAuth();
+    expect(await auth({ url: ISSUER })).toMatchObject({
+      session: { identifier: null, display: null },
+    });
+  });
+
   it("treats an anonymous session (no user_id) as signed out", async () => {
     routeFetch(nextKid(), () =>
       jsonResponse({ session_id: "sess-2", project_id: "proj-1", state: "active" }),
@@ -284,7 +297,7 @@ describe("auth()", () => {
 
     const auth = await importAuth();
     expect(await auth({ url: ISSUER })).toEqual({ isAuthenticated: false, session: null });
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("HTTP 500"));
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("could not validate"));
   });
 
   it("fails closed and warns when the backend is unreachable", async () => {
@@ -293,7 +306,7 @@ describe("auth()", () => {
 
     const auth = await importAuth();
     expect(await auth({ url: ISSUER })).toEqual({ isAuthenticated: false, session: null });
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("could not reach"));
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("could not validate"));
   });
 
   it("aborts opaque validation after opaqueTokenTimeoutMs and fails closed", async () => {
@@ -313,7 +326,7 @@ describe("auth()", () => {
     const result = await auth({ url: ISSUER, opaqueTokenTimeoutMs: 5 });
 
     expect(result).toEqual({ isAuthenticated: false, session: null });
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("could not reach"));
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("could not validate"));
   });
 
   it("falls back to the ZITADEL_URL environment variable for the backend URL", async () => {

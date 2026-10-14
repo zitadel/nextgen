@@ -146,8 +146,10 @@ work-email copy for a business audience.
 | `allowedTokenTypes` | `string[]`           | `["JWT", "at+JWT"]`  | Accepted `typ` header values (case-insensitive). Set to `[]` to disable this check             |
 | `clockSkewMs`       | `number`             | `5000`               | Clock skew tolerance in ms for `exp`, `nbf`, `iat`                                              |
 | `jwksTimeoutMs`     | `number`             | `5000`               | Timeout in ms for JWKS endpoint requests                                                        |
-| `proxyTimeoutMs`    | `number`             | `5000`               | Timeout in ms for upstream proxy requests                                                       |
+| `proxyTimeoutMs`    | `number`             | `5000`               | Timeout in ms for upstream proxy requests. A request exceeding it is answered `504`; an unreachable backend `502`, both with a `{ code, message }` body |
 | `audience`          | `string \| string[]` | not validated        | Expected `aud` claim value(s). When omitted, audience is not checked                           |
+
+Only a `401` or `404` from the session check clears the session cookie. If the Zitadel server times out, is unreachable or answers `5xx`, the cookie is kept: public pages render signed out and a protected route is answered `503` with `retry-after`, so an outage never signs users out.
 
 ## How JWT verification works
 

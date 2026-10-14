@@ -5,9 +5,13 @@ import type { NextRequest } from "next/server";
 import {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
+  assertLoginPath,
   filterResponseHeaders,
   matchesRoutes,
+  proxyFailureResponse,
   requiresProjectSecret,
+  sessionUnavailableResponse,
+  validateOpaqueSessionToken,
 } from "@zitadel/sdk-core/middleware";
 import { NextResponse } from "next/server";
 
@@ -68,12 +72,14 @@ function tunnelHeaders(req: NextRequest, extra: Readonly<Record<string, string>>
  * ```
  *
  * @param req     - The incoming Next.js edge request.
- * @param options - Middleware configuration options.
+ * @param options - Middleware configuration options. `projectSecret` is the
+ *   project service-key, sent as the bearer on the `POST /sessions/exchange`
+ *   handoff only; it defaults to `ZITADEL_PROJECT_SECRET`.
  * @returns A `NextResponse` or `Response` to continue, redirect, or proxy.
  */
 export async function nextgenMiddleware(
   req: NextRequest,
-  options: NextgenMiddlewareOptions = {},
+  options: NextgenMiddlewareOptions & { projectSecret?: string } = {},
 ): Promise<NextResponse | Response> {
   const {
     url = process.env.ZITADEL_URL ?? "http://localhost:8080",
@@ -88,18 +94,11 @@ export async function nextgenMiddleware(
     jwksTimeoutMs,
     proxyTimeoutMs = 5000,
     opaqueTokenTimeoutMs = 5000,
+    projectSecret = process.env.ZITADEL_PROJECT_SECRET,
   } = options;
 
-  // Guard against open-redirect: loginPath must be a relative path. An absolute
-  // URL (e.g. "https://evil.com/phish") or a protocol-relative URL
-  // (e.g. "//evil.com") would redirect the browser to an external host.
-  if (!loginPath.startsWith("/") || loginPath.startsWith("//")) {
-    throw new Error(
-      `[nextgen] loginPath must be a relative path starting with a single "/". ` +
-        `Received: "${loginPath}". Using an absolute or protocol-relative URL ` +
-        `would allow open-redirect attacks.`,
-    );
-  }
+  // Guard against open-redirect: loginPath must be a path on this app.
+  assertLoginPath(loginPath);
 
   const { pathname } = new URL(req.url);
 
@@ -112,7 +111,7 @@ export async function nextgenMiddleware(
   }
 
   if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-    return proxyRequest(req, url, proxyPath, proxyTimeoutMs);
+    return proxyRequest(req, url, proxyPath, projectSecret, proxyTimeoutMs);
   }
 
   return handleAuth(req, {
@@ -130,31 +129,6 @@ export async function nextgenMiddleware(
 }
 
 /**
- * Validates an opaque (non-JWT) session token by calling the backend's
- * `/sessions/me` endpoint. Returns `true` when the backend confirms the
- * session is live (HTTP 200), `false` otherwise.
- *
- * This is the fallback path for backends that issue encrypted opaque tokens
- * rather than self-contained JWTs.
- */
-async function validateOpaqueSessionToken(
-  token: string,
-  issuerUrl: string,
-  timeoutMs: number,
-): Promise<boolean> {
-  try {
-    const res = await fetch(`${issuerUrl}/sessions/me`, {
-      method: "GET",
-      headers: { cookie: `__nextgen_session=${token}` },
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Forwards a `/__nextgen/*` request to the upstream auth backend and streams
  * the response back verbatim, stripping hop-by-hop headers in both directions.
  *
@@ -168,12 +142,14 @@ async function validateOpaqueSessionToken(
  * @param req        - The incoming edge request.
  * @param authUrl    - Base URL of the auth backend.
  * @param proxyPath  - The path prefix being proxied (e.g. `"/__nextgen"`).
- * @returns The proxied upstream `Response`.
+ * @param projectSecret - The exchange bearer, if configured.
+ * @returns The proxied upstream `Response`, or a 502/504 when it did not answer.
  */
 async function proxyRequest(
   req: NextRequest,
   authUrl: string,
   proxyPath: string,
+  projectSecret: string | undefined,
   proxyTimeoutMs: number,
 ): Promise<Response> {
   const url = new URL(req.url);
@@ -213,11 +189,12 @@ async function proxyRequest(
   // turns this public request boundary into an operator-capable open relay.
   // Preserve an explicit caller credential so the exchange can use the future
   // publishable-key plane without being overwritten.
-  if (requiresProjectSecret(req.method, suffix) && !upstreamHeaders.has("authorization")) {
-    const secret = process.env.ZITADEL_PROJECT_SECRET;
-    if (secret) {
-      upstreamHeaders.set("authorization", `Bearer ${secret}`);
-    }
+  if (
+    requiresProjectSecret(req.method, suffix) &&
+    !upstreamHeaders.has("authorization") &&
+    projectSecret
+  ) {
+    upstreamHeaders.set("authorization", `Bearer ${projectSecret}`);
   }
 
   // Read body eagerly so undici receives a concrete buffer rather than a
@@ -225,13 +202,20 @@ async function proxyRequest(
   // extraction.
   const bodyBuffer = hasBody ? await req.arrayBuffer() : undefined;
 
-  const upstream = await fetch(target, {
-    method: req.method,
-    headers: upstreamHeaders,
-    body: bodyBuffer,
-    redirect: "manual",
-    signal: AbortSignal.timeout(proxyTimeoutMs),
-  });
+  let upstream: Response;
+  try {
+    upstream = await fetch(target, {
+      method: req.method,
+      headers: upstreamHeaders,
+      body: bodyBuffer,
+      redirect: "manual",
+      signal: AbortSignal.timeout(proxyTimeoutMs),
+    });
+  } catch (error) {
+    // The backend is down or too slow: a 502/504 in the API's error envelope,
+    // not Next's HTML 500 page.
+    return proxyFailureResponse(error);
+  }
 
   // The app's own request URL: the origin a proxied redirect may name, and
   // the base a relative one resolves against.
@@ -289,13 +273,18 @@ interface AuthHandlerOptions {
 /**
  * Verifies the session token and tunnels the result to server components via
  * a request header. Redirects to the login page when the token is absent or
- * invalid on a protected route.
+ * invalid on a protected route. Stale `__nextgen*` cookies are cleared when the
+ * backend says the token is dead; when the backend cannot be asked, they stay
+ * and a protected route answers `503`.
  *
  * @param req  - The incoming edge request.
  * @param opts - Auth handler options.
- * @returns A `NextResponse` to continue or redirect.
+ * @returns A `NextResponse` to continue or redirect, or the `503` `Response`.
  */
-async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<NextResponse> {
+async function handleAuth(
+  req: NextRequest,
+  opts: AuthHandlerOptions,
+): Promise<NextResponse | Response> {
   const {
     url,
     protectedRoutes,
@@ -338,20 +327,35 @@ async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<N
   // not a JWT (non-JSON segments). A token with a valid JWT structure that
   // failed verification (bad sig, wrong typ/alg) must be rejected — never
   // accepted by a backend call that doesn't re-check the JWT claims.
+  let keepCookies = false;
   if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
-    const isValid = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
-    if (isValid) {
+    const check = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
+    // Only a session that names a user is signed in. A live anonymous session
+    // (its sign-in has not verified a factor yet) must not open a protected
+    // route, but it keeps its cookie, since that sign-in may still complete.
+    if (check.status === "live" && check.session.userId) {
       const tunnelled = tunnelHeaders(req, {
         "x-nextgen-auth-token": cookieToken,
       });
       return NextResponse.next({ request: { headers: tunnelled } });
     }
+    keepCookies = check.status === "live";
+    if (check.status === "unknown") {
+      // The backend could not be asked. The session may be live, so its cookie
+      // survives the outage; a protected route is retryable, not a sign-in.
+      if (matchesRoutes(pathname, protectedRoutes)) {
+        return sessionUnavailableResponse();
+      }
+      const tunnelled = tunnelHeaders(req, { "x-nextgen-auth-token": "" });
+      return NextResponse.next({ request: { headers: tunnelled } });
+    }
   }
 
   const tunnelled = tunnelHeaders(req, { "x-nextgen-auth-token": "" });
-  const staleNextgenCookies = req.cookies
-    .getAll()
-    .filter((c: { name: string }) => c.name.startsWith("__nextgen"));
+  // Dead credentials are cleared so the browser stops replaying them.
+  const staleNextgenCookies = keepCookies
+    ? []
+    : req.cookies.getAll().filter((c: { name: string }) => c.name.startsWith("__nextgen"));
 
   if (matchesRoutes(pathname, protectedRoutes)) {
     const loginUrl = new URL(loginPath, req.url);
@@ -373,12 +377,16 @@ async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<N
 /**
  * Options for {@link createProxy} that are separate from the shared
  * {@link ZitadelConfig}. These configure route protection, login
- * redirects, and JWT verification behaviour.
+ * redirects, and JWT verification behaviour, plus the `projectSecret` sent as
+ * the bearer on the `POST /sessions/exchange` handoff only (default:
+ * `ZITADEL_PROJECT_SECRET`).
  *
  * `proxyPath` and `url` are omitted because they come from the
  * {@link ZitadelConfig} passed as the first argument.
  */
-export type ProxyOptions = Omit<NextgenMiddlewareOptions, "proxyPath" | "url">;
+export type ProxyOptions = Omit<NextgenMiddlewareOptions, "proxyPath" | "url"> & {
+  projectSecret?: string;
+};
 
 /**
  * A pre-configured middleware handler returned by {@link createProxy}.
@@ -418,7 +426,9 @@ export type ProxyHandler = (req: NextRequest) => Promise<NextResponse | Response
  * @returns A middleware handler function.
  */
 export function createProxy(config: ZitadelProject, options: ProxyOptions = {}): ProxyHandler {
-  const mergedOptions: NextgenMiddlewareOptions = {
+  // Fail at setup, not with a 500 on every request.
+  assertLoginPath(options.loginPath ?? "/login");
+  const mergedOptions: NextgenMiddlewareOptions & { projectSecret?: string } = {
     ...options,
     proxyPath: config.proxyPath,
     url: config.url,

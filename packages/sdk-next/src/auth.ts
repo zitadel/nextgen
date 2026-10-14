@@ -1,7 +1,6 @@
 import "server-only";
 
-import type { GetMySession200 } from "@zitadel/api/generated/model";
-
+import { validateOpaqueSessionToken } from "@zitadel/sdk-core/middleware";
 import { headers } from "next/headers";
 import { cache } from "react";
 
@@ -31,62 +30,43 @@ export type AuthOptions = Pick<
 
 /**
  * Validates an opaque (non-JWT) session token against the backend's
- * `GET /sessions/me` and returns the client-safe identity, or `null` when the
+ * `GET /sessions/me` (sdk-core's {@link validateOpaqueSessionToken}, shared by
+ * every server SDK) and returns the client-safe identity, or `null` when the
  * backend does not confirm a signed-in user.
  *
  * Wrapped in React's `cache()` so that many components calling `auth()` in
  * the same render pass share a single backend round-trip. Arguments are
  * primitives on purpose — `cache()` memoises by argument identity.
  *
- * Fail-closed: network errors, timeouts, and unexpected statuses all resolve
- * to `null` (signed out). Unexpected failures are logged so a broken proxy or
- * unreachable backend is distinguishable from a genuinely missing session.
+ * Fail-closed: a dead session (401/404) and an anonymous one (no user yet) are
+ * signed out. So is a backend that cannot answer — a network error, a timeout
+ * or a 5xx — which is also logged, so a broken proxy or unreachable backend is
+ * distinguishable from a genuinely missing session. `auth()` never clears the
+ * cookie, so the session survives the outage.
  */
 const validateOpaqueSession = cache(
   async (token: string, issuerUrl: string, timeoutMs: number): Promise<ClientSession | null> => {
-    try {
-      const res = await fetch(`${issuerUrl}/sessions/me`, {
-        method: "GET",
-        headers: { accept: "application/json", cookie: `__nextgen_session=${token}` },
-        signal: AbortSignal.timeout(timeoutMs),
-      });
-
-      // 401 = no/invalid session token, 404 = session gone (revoked/expired):
-      // both are the server's definitive "not signed in".
-      if (res.status === 401 || res.status === 404) {
-        return null;
-      }
-
-      if (!res.ok) {
-        console.warn(
-          `[nextgen] auth(): session validation failed with HTTP ${res.status} from ` +
-            `${issuerUrl}/sessions/me — treating as signed out. If this persists, the ` +
-            `backend URL is likely misconfigured (ZITADEL_URL or the \`url\` option).`,
-        );
-        return null;
-      }
-
-      const session = (await res.json()) as GetMySession200;
-
-      // An anonymous session (no verified user factor yet) has no user_id —
-      // for server-rendered UI that is "not signed in".
-      if (!session.user_id) {
-        return null;
-      }
-
-      return {
-        userId: session.user_id,
-        identifier: session.user?.identifier ?? null,
-        identifierProperty: session.user?.identifier_property ?? null,
-        display: session.user?.display ?? null,
-      };
-    } catch {
+    const check = await validateOpaqueSessionToken(token, issuerUrl, timeoutMs);
+    if (check.status === "unknown") {
       console.warn(
-        `[nextgen] auth(): could not reach ${issuerUrl}/sessions/me to validate the ` +
-          `session token — treating as signed out.`,
+        `[nextgen] auth(): could not validate the session token at ${issuerUrl}/sessions/me ` +
+          `(the backend is unreachable, too slow or failing) — treating as signed out. If ` +
+          `this persists, the backend URL is likely misconfigured (ZITADEL_URL or the ` +
+          `\`url\` option).`,
       );
       return null;
     }
+    // An anonymous session (no verified user factor yet) has no user id —
+    // for server-rendered UI that is "not signed in".
+    if (check.status === "dead" || !check.session.userId) {
+      return null;
+    }
+    return {
+      userId: check.session.userId,
+      identifier: check.session.identifier,
+      identifierProperty: check.session.identifierProperty,
+      display: check.session.display,
+    };
   },
 );
 
@@ -103,8 +83,8 @@ const validateOpaqueSession = cache(
  *   not add a backend round-trip after the first call.
  * - **Opaque encrypted tokens** are validated against the backend's
  *   `GET /sessions/me`, which also supplies the user's identity (`userId`,
- *   `email`, `name`). The lookup is deduplicated per render pass via React
- *   `cache()`.
+ *   `identifier`, `display`). The lookup is deduplicated per render pass via
+ *   React `cache()`.
  *
  * The header alone is never proof of anything: on routes the middleware
  * `matcher` does not cover, the middleware cannot neutralise a forged

@@ -5,9 +5,13 @@ import { useRuntimeConfig } from "#imports";
 import {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
+  assertLoginPath,
   filterResponseHeaders,
   matchesRoutes,
+  proxyFailureResponse,
   requiresProjectSecret,
+  sessionUnavailableResponse,
+  validateOpaqueSessionToken,
 } from "@zitadel/sdk-core/middleware";
 import {
   defineEventHandler,
@@ -20,7 +24,7 @@ import {
   readRawBody,
 } from "h3";
 
-import { verifyJwt, base64UrlDecode } from "../lib/jwt";
+import { isJwtShaped, verifyJwt } from "../lib/jwt";
 
 declare module "h3" {
   interface H3EventContext {
@@ -90,15 +94,21 @@ function buildUpstreamHeaders(event: H3Event): Headers {
  *
  * export default createNextgenMiddleware({
  *   url: process.env.ZITADEL_URL,
+ *   projectSecret: process.env.ZITADEL_PROJECT_SECRET,
  *   protectedRoutes: ["/admin*", "/dashboard*"],
  *   loginPath: "/login",
  * });
  * ```
  *
- * @param options - Middleware configuration options.
+ * @param options - Middleware configuration options. `projectSecret` is the
+ *   project service-key, sent as the bearer on the `POST /sessions/exchange`
+ *   handoff only; it defaults to `runtimeConfig.nextgen.projectSecret` (set by
+ *   the module), then `ZITADEL_PROJECT_SECRET`.
  * @returns An H3 event handler suitable for use as a global server middleware.
  */
-export function createNextgenMiddleware(options: NextgenMiddlewareOptions = {}): EventHandler {
+export function createNextgenMiddleware(
+  options: NextgenMiddlewareOptions & { projectSecret?: string } = {},
+): EventHandler {
   const {
     url = process.env.ZITADEL_URL ?? "http://localhost:8080",
     proxyPath = "/__nextgen",
@@ -112,18 +122,11 @@ export function createNextgenMiddleware(options: NextgenMiddlewareOptions = {}):
     jwksTimeoutMs,
     proxyTimeoutMs = 5000,
     opaqueTokenTimeoutMs = 5000,
+    projectSecret,
   } = options;
 
-  // Guard against open-redirect: loginPath must be a relative path. An absolute
-  // URL (e.g. "https://evil.com/phish") or a protocol-relative URL
-  // (e.g. "//evil.com") would redirect the browser to an external host.
-  if (!loginPath.startsWith("/") || loginPath.startsWith("//")) {
-    throw new Error(
-      `[nextgen] loginPath must be a relative path starting with a single "/". ` +
-        `Received: "${loginPath}". Using an absolute or protocol-relative URL ` +
-        `would allow open-redirect attacks.`,
-    );
-  }
+  // Guard against open-redirect: loginPath must be a path on this app.
+  assertLoginPath(loginPath);
 
   return defineEventHandler(async (event: H3Event) => {
     const urlObj = getRequestURL(event);
@@ -140,7 +143,7 @@ export function createNextgenMiddleware(options: NextgenMiddlewareOptions = {}):
     }
 
     if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-      return proxyRequest(event, url, proxyPath, urlObj, proxyTimeoutMs);
+      return proxyRequest(event, url, proxyPath, urlObj, projectSecret, proxyTimeoutMs);
     }
 
     return handleAuth(event, {
@@ -167,15 +170,18 @@ export function createNextgenMiddleware(options: NextgenMiddlewareOptions = {}):
  * @param authUrl    - Base URL of the auth backend.
  * @param proxyPath  - The path prefix being proxied (e.g. `"/__nextgen"`).
  * @param url        - The parsed request URL.
- * @returns The upstream response body stream.
+ * @param projectSecret - The exchange bearer from the options, if any.
+ * @returns The upstream response body stream, or a 502/504 `Response` when the
+ *   upstream did not answer.
  */
 async function proxyRequest(
   event: H3Event,
   authUrl: string,
   proxyPath: string,
   url: URL,
+  projectSecret: string | undefined,
   proxyTimeoutMs: number,
-): Promise<ReadableStream<Uint8Array> | null> {
+): Promise<ReadableStream<Uint8Array> | Response | null> {
   const suffix = url.pathname.slice(proxyPath.length);
   const target = `${authUrl}${suffix}${url.search}`;
 
@@ -191,20 +197,26 @@ async function proxyRequest(
   // operator-capable relay, and preserve an explicit caller credential for
   // the future publishable-key exchange path.
   if (requiresProjectSecret(method, suffix) && !upstreamHeaders.has("authorization")) {
-    const config = useRuntimeConfig();
-    const projectSecret = (config.nextgen as { projectSecret?: string } | undefined)?.projectSecret;
-    if (projectSecret) {
-      upstreamHeaders.set("authorization", `Bearer ${projectSecret}`);
+    const secret = projectSecret || runtimeProjectSecret() || process.env.ZITADEL_PROJECT_SECRET;
+    if (secret) {
+      upstreamHeaders.set("authorization", `Bearer ${secret}`);
     }
   }
 
-  const upstream = await fetch(target, {
-    method,
-    headers: upstreamHeaders,
-    body,
-    redirect: "manual",
-    signal: AbortSignal.timeout(proxyTimeoutMs),
-  });
+  let upstream: Response;
+  try {
+    upstream = await fetch(target, {
+      method,
+      headers: upstreamHeaders,
+      body,
+      redirect: "manual",
+      signal: AbortSignal.timeout(proxyTimeoutMs),
+    });
+  } catch (error) {
+    // The backend is down or too slow: a 502/504 in the API's error envelope,
+    // not h3's HTML 500 page. h3 sends a returned web `Response` as is.
+    return proxyFailureResponse(error);
+  }
 
   // Build a web-standard Response with filtered headers. This is the
   // canonical representation — we write it to event.node.res at the end.
@@ -237,72 +249,16 @@ async function proxyRequest(
   return response.body;
 }
 
-const DECODER = new TextDecoder();
-
 /**
- * Returns `true` when `token` looks structurally like a signed JWT (JWS) —
- * NOT an encrypted token (JWE).
- *
- * JWS compact: 3 dot-separated segments; header has `alg` but NOT `enc`.
- * JWE compact: 5 dot-separated segments; header has BOTH `alg` and `enc`.
- *
- * Our backend issues JWE tokens (AES-256-GCM via go-jose `A256GCMKW/A256GCM`),
- * whose compact form is `header.encrypted_key.iv.ciphertext.tag`. The header
- * decodes to JSON with `"alg":"A256GCMKW","enc":"A256GCM"`. Checking for the
- * absence of `enc` correctly identifies signed JWTs without false-positives on
- * JWE tokens.
- *
- * This is a structural check only — not a security check.
+ * The exchange bearer the module stored in `runtimeConfig.nextgen` (from
+ * `ZITADEL_PROJECT_SECRET` at build time, or `NUXT_NEXTGEN_PROJECT_SECRET` at
+ * runtime). Read per request so a runtime override applies.
  */
-function isJwtShaped(token: string): boolean {
-  const parts = token.split(".");
-  if (parts.length < 3 || !parts[0]) return false;
-  try {
-    const header = JSON.parse(DECODER.decode(base64UrlDecode(parts[0]))) as Record<string, unknown>;
-    return typeof header?.alg === "string" && !("enc" in header);
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Validates an opaque (non-JWT) session token by calling the backend's
- * `/sessions/me` endpoint. Returns the response JSON when the backend
- * confirms the session is live (HTTP 200), `null` otherwise.
- *
- * This is the fallback path for backends that issue encrypted opaque tokens
- * rather than self-contained JWTs.
- */
-async function validateOpaqueSessionToken(
-  token: string,
-  issuerUrl: string,
-  timeoutMs: number,
-): Promise<{
-  userId?: string;
-  identifier: string | null;
-  identifierProperty: string | null;
-  display: string | null;
-} | null> {
-  try {
-    const res = await fetch(`${issuerUrl}/sessions/me`, {
-      method: "GET",
-      headers: { cookie: `__nextgen_session=${token}` },
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    if (!res.ok) return null;
-    const body = (await res.json()) as {
-      user_id?: string;
-      user?: { identifier?: string; identifier_property?: string; display?: string };
-    };
-    return {
-      userId: body.user_id,
-      identifier: body.user?.identifier ?? null,
-      identifierProperty: body.user?.identifier_property ?? null,
-      display: body.user?.display ?? null,
-    };
-  } catch {
-    return null;
-  }
+function runtimeProjectSecret(): string | undefined {
+  const nextgen = useRuntimeConfig().nextgen as { projectSecret?: unknown } | undefined;
+  return typeof nextgen?.projectSecret === "string" && nextgen.projectSecret !== ""
+    ? nextgen.projectSecret
+    : undefined;
 }
 
 /**
@@ -341,13 +297,15 @@ interface AuthHandlerOptions {
 
 /**
  * Verifies the session token and writes the auth result to `event.context`.
- * Deletes all `__nextgen*` cookies when the token is present but invalid.
- * Redirects to the login page on protected routes with no valid session.
+ * Deletes all `__nextgen*` cookies when the backend says the token is dead;
+ * when the backend cannot be asked, they stay and a protected route answers
+ * `503`. Redirects to the login page on protected routes with no valid session.
  *
  * @param event - The current H3 event.
  * @param opts  - Auth handler options.
+ * @returns A `Response` that ends the request (the `503`), else nothing.
  */
-async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<void> {
+async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<Response | undefined> {
   const {
     url,
     protectedRoutes,
@@ -401,7 +359,7 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<voi
         token,
       },
     };
-    return;
+    return undefined;
   }
 
   // The backend issues opaque encrypted session tokens rather than JWTs.
@@ -409,34 +367,42 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<voi
   // not a JWT (non-JSON segments). A token with a valid JWT structure that
   // failed verification (bad sig, wrong typ/alg) must be rejected — never
   // accepted by a backend call that doesn't re-check the JWT claims.
-  let liveAnonymousSession = false;
+  let keepCookies = false;
   if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
-    const opaqueResult = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
-    // A session without a user id is an anonymous session — the flow has not
-    // verified a user factor yet. Treat it as unauthenticated rather than
-    // inventing a placeholder identity that no route handler can resolve.
-    if (opaqueResult?.userId) {
+    const check = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
+    if (check.status === "live" && check.session.userId) {
       event.context.nextgenAuth = {
         isAuthenticated: true,
         session: {
-          userId: opaqueResult.userId,
-          identifier: opaqueResult.identifier,
-          identifierProperty: opaqueResult.identifierProperty,
-          display: opaqueResult.display,
+          userId: check.session.userId,
+          identifier: check.session.identifier,
+          identifierProperty: check.session.identifierProperty,
+          display: check.session.display,
           token: cookieToken,
         },
       };
-      return;
+      return undefined;
     }
-    liveAnonymousSession = opaqueResult !== null;
+    // A session without a user id is an anonymous session — the flow has not
+    // verified a user factor yet. Treat it as unauthenticated rather than
+    // inventing a placeholder identity that no route handler can resolve, but
+    // keep its cookie: an in-progress login flow may still complete it.
+    keepCookies = check.status === "live";
+    if (check.status === "unknown") {
+      // The backend could not be asked. The session may be live, so its cookie
+      // survives the outage; a protected route is retryable, not a sign-in.
+      event.context.nextgenAuth = { isAuthenticated: false, session: null };
+      if (matchesRoutes(pathname, protectedRoutes)) {
+        return sessionUnavailableResponse();
+      }
+      return undefined;
+    }
   }
 
   event.context.nextgenAuth = { isAuthenticated: false, session: null };
 
-  // Clearing cookies stops the browser from replaying dead credentials. A
-  // live anonymous session is not dead — the backend confirmed it above, and
-  // an in-progress login flow may still complete it — so its cookie stays.
-  if (!liveAnonymousSession) {
+  // Clearing cookies stops the browser from replaying dead credentials.
+  if (!keepCookies) {
     for (const name of Object.keys(parseCookies(event))) {
       if (name.startsWith("__nextgen")) {
         deleteCookie(event, name);
@@ -448,8 +414,9 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<voi
     const loginUrl = new URL(loginPath, getRequestURL(event));
     loginUrl.searchParams.set("next", pathname);
     await sendRedirect(event, loginUrl.toString(), 302);
-    return;
+    return undefined;
   }
+  return undefined;
 }
 
 /**

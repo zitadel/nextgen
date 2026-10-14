@@ -1,8 +1,9 @@
 /**
  * Shared constants and utility functions for the SDK middleware proxy layer.
  *
- * These are consumed by both `sdk-next` and `sdk-nuxt` to avoid duplicating
- * pure, framework-agnostic logic.
+ * These are consumed by every server SDK (`sdk-next`, `sdk-nuxt`,
+ * `sdk-sveltekit`, `sdk-solid-start`, `sdk-qwik-city`, `sdk-tanstack-start`)
+ * so the framework-agnostic logic and its failure semantics stay identical.
  */
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -80,6 +81,25 @@ function withoutTrailingSlash(path: string): string {
     end--;
   }
   return path.slice(0, end);
+}
+
+/**
+ * Throws unless `loginPath` is a path on this app: it must start with a single
+ * `/`. An absolute URL (`https://evil.com/phish`) or a protocol-relative one
+ * (`//evil.com`) would turn the protected-route redirect into an open redirect.
+ * Every SDK calls this once, when its middleware is created, so a bad value
+ * fails at startup instead of on every request.
+ *
+ * @param loginPath - The configured login path.
+ */
+export function assertLoginPath(loginPath: string): void {
+  if (!loginPath.startsWith("/") || loginPath.startsWith("//")) {
+    throw new Error(
+      `[nextgen] loginPath must be a relative path starting with a single "/". ` +
+        `Received: "${loginPath}". Using an absolute or protocol-relative URL ` +
+        `would allow open-redirect attacks.`,
+    );
+  }
 }
 
 // ─── Proxy credentials ───────────────────────────────────────────────────────
@@ -333,20 +353,54 @@ export type NextgenMiddlewareOptions = {
 
   /**
    * Timeout in milliseconds for upstream proxy requests.
-   * Requests that do not complete within this window are aborted with a
-   * network error. Defaults to 5 000 ms.
+   * Requests that do not complete within this window are aborted and answered
+   * with a `504`; an upstream that cannot be reached at all is a `502`.
    * @default 5000
    */
   proxyTimeoutMs?: number;
 
   /**
    * Timeout in milliseconds for opaque (non-JWT) session token validation
-   * via the backend's `GET /sessions/me` endpoint. Tokens that cannot be
-   * validated within this window are treated as invalid.
+   * via the backend's `GET /sessions/me` endpoint. Tokens the backend has not
+   * answered within this window leave the request signed out for now but keep
+   * their cookie — a slow backend is not a dead session — and a protected
+   * route answers `503` instead of redirecting to the login page.
    * @default 5000
    */
   opaqueTokenTimeoutMs?: number;
 };
+
+// ─── Cookies ─────────────────────────────────────────────────────────────────
+
+/**
+ * Parses a `Cookie` request header into a name→value map, for runtimes that
+ * hand the middleware a bare Web `Request` without a cookie API.
+ *
+ * @param header - The raw `Cookie` header, or `null` when absent.
+ * @returns The cookies by name; a name sent twice keeps its last value.
+ */
+export function parseCookieHeader(header: string | null): Map<string, string> {
+  const jar = new Map<string, string>();
+  if (!header) return jar;
+  for (const part of header.split(";")) {
+    const idx = part.indexOf("=");
+    if (idx === -1) continue;
+    const name = part.slice(0, idx).trim();
+    const value = part.slice(idx + 1).trim();
+    if (name) jar.set(name, value);
+  }
+  return jar;
+}
+
+/**
+ * A `Set-Cookie` value that clears `name` on the root path, where the backend
+ * sets the `__nextgen*` cookies.
+ *
+ * @param name - The cookie to clear.
+ */
+export function clearCookie(name: string): string {
+  return `${name}=; Path=/; Max-Age=0`;
+}
 
 // ─── Opaque session tokens ───────────────────────────────────────────────────
 
@@ -367,43 +421,114 @@ export interface OpaqueSession {
 }
 
 /**
+ * The outcome of asking the backend about an opaque session token.
+ *
+ * - `live`: the backend holds the session. Its `userId` is `null` when it is
+ *   anonymous (see {@link OpaqueSession}).
+ * - `dead`: the backend answered that the token names no session — `401` for
+ *   an invalid, expired or revoked token, `404` for a session that is gone.
+ *   Only this outcome justifies clearing the cookie.
+ * - `unknown`: the backend could not say — a network error, a timeout, a `5xx`
+ *   or any other unexpected answer. The session may well be live, so callers
+ *   keep the cookie and treat the request as not signed in for now; a
+ *   protected route answers {@link sessionUnavailableResponse} instead of
+ *   sending a signed-in user to the login page. Clearing the cookie here would
+ *   sign every user out whenever the backend restarts.
+ */
+export type OpaqueSessionCheck =
+  | { readonly status: "live"; readonly session: OpaqueSession }
+  | { readonly status: "dead" }
+  | { readonly status: "unknown" };
+
+/**
  * Validates an opaque session token by asking the backend
  * (`GET {issuerUrl}/sessions/me`) whether the session is live.
+ *
+ * Identity fields are normalised: anything other than a non-empty string
+ * (an empty `display`, a numeric `user_id`) reads as `null`, so a UI rendering
+ * `display ?? identifier` never shows an empty name.
  *
  * @param token     - The opaque session token from the `__nextgen_session` cookie.
  * @param issuerUrl - Base URL of the auth backend.
  * @param timeoutMs - How long to wait for the backend before giving up.
- * @returns The live session — with a `null` `userId` when it is anonymous — or
- *   `null` when the backend does not hold a live session for the token (any
- *   non-2xx answer, a timeout, a network error, or an unreadable body).
+ * @returns An {@link OpaqueSessionCheck}: `live` with the session, `dead` only
+ *   when the backend answered `401` or `404`, else `unknown`.
  */
 export async function validateOpaqueSessionToken(
   token: string,
   issuerUrl: string,
   timeoutMs: number,
-): Promise<OpaqueSession | null> {
+): Promise<OpaqueSessionCheck> {
   try {
     const res = await fetch(`${issuerUrl}/sessions/me`, {
       method: "GET",
-      headers: { cookie: `__nextgen_session=${token}` },
+      headers: { accept: "application/json", cookie: `__nextgen_session=${token}` },
       signal: AbortSignal.timeout(timeoutMs),
     });
+    if (res.status === 401 || res.status === 404) {
+      return { status: "dead" };
+    }
     if (!res.ok) {
-      return null;
+      return { status: "unknown" };
     }
     const body = (await res.json()) as {
       user_id?: unknown;
       user?: { identifier?: unknown; identifier_property?: unknown; display?: unknown };
-    };
+    } | null;
     const text = (value: unknown): string | null =>
       typeof value === "string" && value !== "" ? value : null;
     return {
-      userId: text(body.user_id),
-      identifier: text(body.user?.identifier),
-      identifierProperty: text(body.user?.identifier_property),
-      display: text(body.user?.display),
+      status: "live",
+      session: {
+        userId: text(body?.user_id),
+        identifier: text(body?.user?.identifier),
+        identifierProperty: text(body?.user?.identifier_property),
+        display: text(body?.user?.display),
+      },
     };
   } catch {
-    return null;
+    // A network error, a timeout or an unreadable body: the backend did not
+    // say the session is dead.
+    return { status: "unknown" };
   }
+}
+
+// ─── Failure responses ───────────────────────────────────────────────────────
+
+/**
+ * The answer to a protected route whose session could not be checked because
+ * the backend is unreachable, slow or failing ({@link OpaqueSessionCheck}
+ * `unknown`). A `503` the browser can retry, carrying no `Set-Cookie`: the
+ * session cookie survives the outage, and a reload signs the user straight
+ * back in once the backend answers again. Redirecting to the login page
+ * instead would show a signed-in user a sign-in form.
+ */
+export function sessionUnavailableResponse(): Response {
+  return new Response("The sign-in service is unavailable. Try again shortly.", {
+    status: 503,
+    headers: {
+      "content-type": "text/plain; charset=utf-8",
+      "cache-control": "no-store",
+      "retry-after": "5",
+    },
+  });
+}
+
+/**
+ * The answer to a proxied `/__nextgen/*` call the backend did not answer: `504`
+ * when the upstream timed out (`proxyTimeoutMs`), `502` for any other failure
+ * (connection refused, DNS, reset). The body uses the backend's error envelope
+ * (`{ code, message }`), so the widgets read it like any other API error
+ * instead of a framework's HTML error page.
+ *
+ * @param error - What the upstream `fetch` rejected with.
+ */
+export function proxyFailureResponse(error: unknown): Response {
+  const timedOut = (error as { name?: unknown } | null)?.name === "TimeoutError";
+  return Response.json(
+    timedOut
+      ? { code: "proxy.upstream_timeout", message: "The sign-in service did not answer in time." }
+      : { code: "proxy.upstream_unreachable", message: "The sign-in service is unreachable." },
+    { status: timedOut ? 504 : 502, headers: { "cache-control": "no-store" } },
+  );
 }

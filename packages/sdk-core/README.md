@@ -14,7 +14,7 @@ building your own middleware or need the types without a framework wrapper.
 | `@zitadel/sdk-core` | The middleware, JWT, and runtime-resolution exports in one namespace. The `/types` widget contract is **not** re-exported from the root — import it from `@zitadel/sdk-core/types` |
 | `@zitadel/sdk-core/types` | The SPA widget contract (`ZitadelFlowStepDetail` and the other widget event/config/handler/props types the SPA SDKs re-export) |
 | `@zitadel/sdk-core/jwt` | `verifyJwt`, `decodeJwt`, `isJwtShaped`, `JWKS_TTL_MS` |
-| `@zitadel/sdk-core/middleware` | The middleware layer: `NextgenSession`, `AuthResult`, `NextgenMiddlewareOptions`, route matching (`matchesRoutes`), response-header filtering (`filterResponseHeaders`, `HOP_BY_HOP`) |
+| `@zitadel/sdk-core/middleware` | The middleware layer: `NextgenSession`, `AuthResult`, the client-safe `ClientSession` / `ClientAuthResult`, `NextgenMiddlewareOptions`, route matching (`matchesRoutes`), response-header filtering (`filterResponseHeaders`, `HOP_BY_HOP`), opaque session checks (`validateOpaqueSessionToken`) and the outage responses (`sessionUnavailableResponse`, `proxyFailureResponse`) |
 
 It also exports `resolveZitadelRuntime` / `resolveZitadelRuntimeEnv` and
 `ZitadelRuntimeError` for resolving the runtime environment
@@ -42,7 +42,17 @@ middleware runs (`verifyJwt`):
 9. `nbf` and `iat` are validated with `clockSkewMs` tolerance when present.
 
 Opaque (non-JWT) session tokens are validated against the backend's
-`GET /sessions/me` instead, bounded by `opaqueTokenTimeoutMs`.
+`GET /sessions/me` instead, bounded by `opaqueTokenTimeoutMs`. Only a `401` or
+`404` from the backend means the session is dead and its cookie is cleared. A
+network error, a timeout or a `5xx` leaves the outcome unknown: every SDK keeps
+the cookie, treats the request as signed out for now, and answers a protected
+route with a retryable `503` instead of the login redirect, so a backend
+restart signs nobody out. A JWKS refresh that fails the same way keeps
+verifying against the keys already cached.
+
+A proxied `/__nextgen/*` call the backend does not answer comes back as a `502`
+(unreachable) or `504` (`proxyTimeoutMs` elapsed) with an `{ code, message }`
+body, the same in every SDK.
 
 Framework-specific steps (header tunnelling, `auth()` re-verification) are
 documented in each framework SDK's README on top of this pipeline.

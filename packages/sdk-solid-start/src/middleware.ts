@@ -3,13 +3,18 @@ import type { AuthResult, NextgenMiddlewareOptions } from "@zitadel/sdk-core/mid
 import {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
+  assertLoginPath,
+  clearCookie,
   filterResponseHeaders,
   matchesRoutes,
+  parseCookieHeader,
+  proxyFailureResponse,
   requiresProjectSecret,
+  sessionUnavailableResponse,
   validateOpaqueSessionToken,
 } from "@zitadel/sdk-core/middleware";
 
-import { verifyJwt, base64UrlDecode } from "./lib/jwt";
+import { isJwtShaped, verifyJwt } from "./lib/jwt";
 
 /**
  * `process` is undefined in some edge/serverless runtimes; read env defensively
@@ -48,22 +53,6 @@ export interface SolidFetchEvent {
  */
 export interface SolidMiddlewareConfig {
   readonly onRequest: Array<(event: SolidFetchEvent) => Promise<Response | undefined>>;
-}
-
-/**
- * Parses a `Cookie` request header into a name→value map.
- */
-function parseCookieHeader(header: string | null): Map<string, string> {
-  const jar = new Map<string, string>();
-  if (!header) return jar;
-  for (const part of header.split(";")) {
-    const idx = part.indexOf("=");
-    if (idx === -1) continue;
-    const name = part.slice(0, idx).trim();
-    const value = part.slice(idx + 1).trim();
-    if (name) jar.set(name, value);
-  }
-  return jar;
 }
 
 /**
@@ -133,13 +122,20 @@ async function proxyRequest(
     upstreamHeaders.set("authorization", `Bearer ${projectSecret}`);
   }
 
-  const upstream = await fetch(target, {
-    method,
-    headers: upstreamHeaders,
-    body,
-    redirect: "manual",
-    signal: AbortSignal.timeout(proxyTimeoutMs),
-  });
+  let upstream: Response;
+  try {
+    upstream = await fetch(target, {
+      method,
+      headers: upstreamHeaders,
+      body,
+      redirect: "manual",
+      signal: AbortSignal.timeout(proxyTimeoutMs),
+    });
+  } catch (error) {
+    // The backend is down or too slow: a 502/504 in the API's error envelope,
+    // not the framework's HTML 500 page.
+    return proxyFailureResponse(error);
+  }
 
   // The app's own request URL: the origin a proxied redirect may name, and the
   // base a relative one resolves against (the IdP callback's 303 needs it).
@@ -153,28 +149,6 @@ async function proxyRequest(
     status: upstream.status,
     headers: responseHeaders,
   });
-}
-
-const DECODER = new TextDecoder();
-
-/**
- * Returns `true` when `token` looks structurally like a signed JWT (JWS) — NOT
- * an encrypted token (JWE). A structural check only, not a security check.
- */
-function isJwtShaped(token: string): boolean {
-  const parts = token.split(".");
-  if (parts.length < 3 || !parts[0]) return false;
-  try {
-    const header = JSON.parse(DECODER.decode(base64UrlDecode(parts[0]))) as Record<string, unknown>;
-    return typeof header?.alg === "string" && !("enc" in header);
-  } catch {
-    return false;
-  }
-}
-
-/** A `Set-Cookie` value that clears `name` on the root path. */
-function clearCookie(name: string): string {
-  return `${name}=; Path=/; Max-Age=0`;
 }
 
 interface AuthHandlerOptions {
@@ -192,8 +166,9 @@ interface AuthHandlerOptions {
 /**
  * Verifies the session token, writes the auth result to `event.locals`, and
  * returns a redirect `Response` on a protected route with no valid session
- * (otherwise `undefined` to continue). Stale `__nextgen*` cookies are cleared on
- * the redirect when the token is present but invalid.
+ * (otherwise `undefined` to continue). Stale `__nextgen*` cookies are cleared
+ * when the backend says the token is dead; when the backend cannot be asked,
+ * they stay and a protected route answers `503`.
  */
 async function handleAuth(
   event: SolidFetchEvent,
@@ -253,25 +228,31 @@ async function handleAuth(
     return;
   }
 
-  let liveAnonymousSession = false;
+  let keepCookies = false;
   if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
-    const opaque = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
-    // A session without a user is anonymous: its sign-in has not verified a
-    // factor yet. It is not signed in, but it is live — keep its cookie.
-    if (opaque?.userId) {
+    const check = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
+    if (check.status === "live" && check.session.userId) {
       event.locals.nextgenAuth = {
         isAuthenticated: true,
         session: {
-          userId: opaque.userId,
-          identifier: opaque.identifier,
-          identifierProperty: opaque.identifierProperty,
-          display: opaque.display,
+          userId: check.session.userId,
+          identifier: check.session.identifier,
+          identifierProperty: check.session.identifierProperty,
+          display: check.session.display,
           token: cookieToken,
         },
       };
       return;
     }
-    liveAnonymousSession = opaque !== null;
+    // A session without a user is anonymous: its sign-in has not verified a
+    // factor yet. It is not signed in, but it is live — keep its cookie.
+    keepCookies = check.status === "live";
+    if (check.status === "unknown") {
+      // The backend could not be asked. The session may be live, so its cookie
+      // survives the outage; a protected route is retryable, not a sign-in.
+      event.locals.nextgenAuth = { isAuthenticated: false, session: null };
+      return matchesRoutes(pathname, protectedRoutes) ? sessionUnavailableResponse() : undefined;
+    }
   }
 
   event.locals.nextgenAuth = { isAuthenticated: false, session: null };
@@ -279,7 +260,7 @@ async function handleAuth(
   // Dead credentials are cleared on every unauthenticated response so the
   // browser stops replaying them (each replay costs a backend session check);
   // a live anonymous session's cookie stays, since its sign-in may complete.
-  const staleCookies = liveAnonymousSession
+  const staleCookies = keepCookies
     ? []
     : [...cookies.keys()].filter((name) => name.startsWith("__nextgen"));
 
@@ -352,14 +333,8 @@ export function createNextgenMiddleware(
     projectSecret = PROCESS_ENV.ZITADEL_PROJECT_SECRET,
   } = options;
 
-  // Guard against open-redirect: loginPath must be a relative path.
-  if (!loginPath.startsWith("/") || loginPath.startsWith("//")) {
-    throw new Error(
-      `[nextgen] loginPath must be a relative path starting with a single "/". ` +
-        `Received: "${loginPath}". Using an absolute or protocol-relative URL ` +
-        `would allow open-redirect attacks.`,
-    );
-  }
+  // Guard against open-redirect: loginPath must be a path on this app.
+  assertLoginPath(loginPath);
 
   const onRequest = async (event: SolidFetchEvent): Promise<Response | undefined> => {
     const url2 = new URL(event.request.url);

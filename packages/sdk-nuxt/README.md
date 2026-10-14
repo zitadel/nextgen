@@ -160,8 +160,9 @@ Both surfaces take these options: the module under `nextgen` in
 | `allowedTokenTypes` | `string[]`           | `["JWT", "at+JWT"]`      | Accepted `typ` header values (case-insensitive). Set to `[]` to disable this check                                         |
 | `clockSkewMs`       | `number`             | `5000`                   | Clock skew tolerance in ms for `exp`, `nbf`, `iat`                                                                         |
 | `jwksTimeoutMs`     | `number`             | `5000`                   | Timeout in ms for JWKS endpoint requests. Token is rejected if the fetch exceeds this window                               |
-| `opaqueTokenTimeoutMs` | `number`          | `5000`                   | Timeout in ms for opaque (non-JWT) session validation via `GET /sessions/me`                                               |
-| `proxyTimeoutMs`    | `number`             | `5000`                   | Timeout in ms for upstream proxy requests; requests exceeding it abort with a network error                                |
+| `opaqueTokenTimeoutMs` | `number`          | `5000`                   | Timeout in ms for opaque (non-JWT) session validation via `GET /sessions/me`. Only a `401`/`404` clears the cookie; a timeout, network error or `5xx` keeps it and answers a protected route `503` |
+| `proxyTimeoutMs`    | `number`             | `5000`                   | Timeout in ms for upstream proxy requests. A request exceeding it is answered `504`; an unreachable backend `502`, both with a `{ code, message }` body |
+| `projectSecret`     | `string`             | `runtimeConfig.nextgen.projectSecret`, else `ZITADEL_PROJECT_SECRET` env | Project secret, sent as the bearer on the `POST /sessions/exchange` handoff only (server-only). Middleware argument only: the module reads `ZITADEL_PROJECT_SECRET` itself (see the table above), never from `nuxt.config.ts` |
 | `audience`          | `string \| string[]` | not validated            | Expected `aud` claim value(s). When omitted, audience is not checked                                                       |
 
 ## How JWT verification works

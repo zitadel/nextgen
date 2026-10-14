@@ -11,31 +11,11 @@ export type {
   UnauthState,
   AuthResult,
   NextgenMiddlewareOptions,
+  // Client-safe auth shapes (token intentionally absent — the raw session token
+  // must not be serialised into an SSR payload where client-side scripts could
+  // read it; use getAuth server-side when it is needed). Defined in sdk-core so
+  // every SDK hands the client the identical shape.
+  ClientSession,
+  ClientAuthState,
+  ClientAuthResult,
 } from "@zitadel/sdk-core/middleware";
-
-import type { UnauthState } from "@zitadel/sdk-core/middleware";
-
-// ─── Client-safe types ────────────────────────────────────────────────────────
-
-/**
- * The client-safe session that may be forwarded to the browser. Identical to
- * {@link NextgenSession} but omits `token` — the raw JWT must not be serialised
- * into the SSR payload where client-side scripts could read it.
- */
-export type ClientSession = {
-  /** The user's unique identifier (`sub` claim). */
-  userId: string;
-  /** The user's email address, or `null` if not present in the token. */
-  email: string | null;
-  /** The user's display name, or `null` if not present in the token. */
-  name: string | null;
-};
-
-/** Client-safe auth state when the user is signed in. */
-export type ClientAuthState = { isAuthenticated: true; session: ClientSession };
-
-/**
- * Union of all possible client-safe auth states. Token is intentionally absent
- * — use {@link getAuth} server-side when the raw JWT is needed.
- */
-export type ClientAuthResult = ClientAuthState | UnauthState;

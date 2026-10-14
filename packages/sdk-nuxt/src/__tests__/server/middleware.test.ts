@@ -1,10 +1,11 @@
 import { createApp, toWebHandler, getRequestHeader } from "h3";
 import { generateKeyPairSync, createSign } from "node:crypto";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 
 import { createNextgenMiddleware } from "../../runtime/server/middleware";
 import { setRuntimeConfig } from "../stubs/nuxt-imports";
 import { clearJwksCache } from "@zitadel/sdk-core/jwt";
+import { DEAD, OUTAGES, PROXY_FAILURES } from "./outages";
 
 // The JWKS cache is module-level and per issuer: start every case from a cold
 // cache, so each one fetches the keys its own mock publishes.
@@ -1071,5 +1072,156 @@ describe("createNextgenMiddleware (H3)", () => {
 
       expect(capturedToken).toBeUndefined();
     });
+  });
+});
+
+// The backend issues opaque session tokens; the middleware asks /sessions/me.
+describe("opaque session cookie: backend answers", () => {
+  const COOKIE = "__nextgen_session=opaque-session-token";
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    setRuntimeConfig({ nextgen: {} });
+  });
+
+  /** The middleware in front of a page that records the auth it saw. */
+  function app(): { handle: ReturnType<typeof toWebHandler>; seen: unknown[] } {
+    const seen: unknown[] = [];
+    const h3 = createApp();
+    h3.use(
+      createNextgenMiddleware({
+        url: "http://localhost:4000",
+        protectedRoutes: ["/admin"],
+        loginPath: "/login",
+      }),
+    );
+    h3.use("/", (event) => {
+      seen.push(event.context.nextgenAuth);
+      return { ok: true };
+    });
+    return { handle: toWebHandler(h3), seen };
+  }
+
+  // A UI renders `display ?? identifier`: an empty display must read as absent.
+  it("reads an empty display or identifier from the backend as null", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ user_id: "u1", user: { identifier: "", display: "" } })),
+    );
+    const { handle, seen } = app();
+
+    await handle(makeWebRequest("http://localhost:3000/", COOKIE));
+
+    expect(seen).toEqual([
+      {
+        isAuthenticated: true,
+        session: {
+          userId: "u1",
+          identifier: null,
+          identifierProperty: null,
+          display: null,
+          token: "opaque-session-token",
+        },
+      },
+    ]);
+  });
+
+  it.each(DEAD)("clears the cookie and redirects on a protected route for %s", async (_l, res) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => res()),
+    );
+
+    const response = await app().handle(makeWebRequest("http://localhost:3000/admin", COOKIE));
+
+    expect([response.status, response.headers.getSetCookie()]).toEqual([
+      302,
+      [expect.stringMatching(/^__nextgen_session=;.*Max-Age=0/)],
+    ]);
+  });
+
+  // A backend outage is not a sign-out: the cookie must survive it.
+  it.each(OUTAGES)("keeps the cookie on a public page for %s", async (_l, fail) => {
+    vi.stubGlobal("fetch", vi.fn(fail));
+    const { handle, seen } = app();
+
+    const response = await handle(makeWebRequest("http://localhost:3000/", COOKIE));
+
+    expect([response.status, response.headers.getSetCookie(), seen]).toEqual([
+      200,
+      [],
+      [{ isAuthenticated: false, session: null }],
+    ]);
+  });
+
+  it.each(OUTAGES)("answers a protected route 503 for %s", async (_l, fail) => {
+    vi.stubGlobal("fetch", vi.fn(fail));
+
+    const response = await app().handle(makeWebRequest("http://localhost:3000/admin", COOKIE));
+
+    expect([
+      response.status,
+      response.headers.get("location"),
+      response.headers.getSetCookie(),
+    ]).toEqual([503, null, []]);
+  });
+});
+
+describe("proxy upstream failure", () => {
+  it.each(PROXY_FAILURES)("answers %s with %i", async (_l, status, code, fail) => {
+    vi.stubGlobal("fetch", vi.fn(fail));
+    const h3 = createApp();
+    h3.use(createNextgenMiddleware({ url: "http://localhost:4000" }));
+
+    const response = await toWebHandler(h3)(
+      makeWebRequest("http://localhost:3000/__nextgen/v1/flow"),
+    );
+
+    expect([response.status, await response.json()]).toEqual([
+      status,
+      { code, message: expect.any(String) },
+    ]);
+  });
+});
+
+// A hand-rolled middleware (outside the module) must be able to send the
+// exchange bearer: option, then the module's runtimeConfig, then the env.
+describe("project secret sources", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    setRuntimeConfig({ nextgen: {} });
+  });
+
+  it.each([
+    ["the option", "sk_option", { projectSecret: "sk_runtime" }, "sk_env", "Bearer sk_option"],
+    ["runtimeConfig", undefined, { projectSecret: "sk_runtime" }, "sk_env", "Bearer sk_runtime"],
+    ["ZITADEL_PROJECT_SECRET", undefined, {}, "sk_env", "Bearer sk_env"],
+    [
+      "ZITADEL_PROJECT_SECRET over an empty runtimeConfig",
+      undefined,
+      { projectSecret: "" },
+      "sk_env",
+      "Bearer sk_env",
+    ],
+    ["nothing", undefined, {}, undefined, null],
+  ])("sends the exchange bearer from %s", async (_l, option, nextgen, env, expected) => {
+    setRuntimeConfig({ nextgen });
+    if (env !== undefined) vi.stubEnv("ZITADEL_PROJECT_SECRET", env);
+    else vi.stubEnv("ZITADEL_PROJECT_SECRET", undefined);
+    const upstream = vi.fn(async (_url: string, _init: RequestInit) => Response.json({}));
+    vi.stubGlobal("fetch", upstream);
+    const h3 = createApp();
+    h3.use(createNextgenMiddleware({ url: "http://localhost:4000", projectSecret: option }));
+
+    await toWebHandler(h3)(
+      makeWebRequest(
+        "http://localhost:3000/__nextgen/sessions/exchange",
+        undefined,
+        undefined,
+        "POST",
+      ),
+    );
+
+    expect(new Headers(upstream.mock.calls[0]?.[1].headers).get("authorization")).toBe(expected);
   });
 });
