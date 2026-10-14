@@ -25,7 +25,7 @@ type Person = { email: string; password: string };
 async function signIn(page: Page, person: Person): Promise<void> {
   await page.getByLabel("Email").fill(person.email);
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByLabel("Password").fill(person.password);
+  await page.getByRole("textbox", { name: "Password" }).fill(person.password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.waitForURL((url) => !url.pathname.endsWith("/login"));
   await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();

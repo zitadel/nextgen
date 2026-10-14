@@ -88,8 +88,8 @@ test("signs into the deployment's project with no query parameter", async ({ pag
 
   await page.getByLabel("Email").fill(user.email);
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await expect(page.getByLabel("Password")).toBeVisible();
-  await page.getByLabel("Password").fill(user.password);
+  await expect(page.getByRole("textbox", { name: "Password" })).toBeVisible();
+  await page.getByRole("textbox", { name: "Password" }).fill(user.password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
 
   // A real user authenticated against the deployment's real project: the

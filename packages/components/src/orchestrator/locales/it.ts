@@ -151,8 +151,7 @@ export const it: Locale = {
   "submit.continue": "Continua",
   "submit.signin": "Accedi",
   "action.forgot_password": "Password dimenticata?",
-  "action.show_password": "Mostra",
-  "action.hide_password": "Nascondi",
+  "action.show_password": "Mostra password",
   "action.cancel": "Annulla",
   // Fallback generico per la chiave `<step>.action.back` iniettata dal motore
   // (vedi INJECTED_KEY_FALLBACKS in liquid.ts).

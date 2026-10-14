@@ -9,7 +9,7 @@ async function loginWithPassword(page: Page, user: SeededUser): Promise<void> {
   await page.goto("/login");
   await page.getByLabel(/email/i).fill(user.email);
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByLabel(/password/i).fill(user.password);
+  await page.getByRole("textbox", { name: /password/i }).fill(user.password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.waitForURL("**/admin", { timeout: 20_000 });
 }

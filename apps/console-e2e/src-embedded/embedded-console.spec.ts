@@ -34,8 +34,8 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   await page.getByLabel("Email").fill(user.email);
   await page.getByRole("button", { name: "Continue", exact: true }).click();
 
-  await expect(page.getByLabel("Password")).toBeVisible();
-  await page.getByLabel("Password").fill(user.password);
+  await expect(page.getByRole("textbox", { name: "Password" })).toBeVisible();
+  await page.getByRole("textbox", { name: "Password" }).fill(user.password);
   // Registered before the terminal click, because the call fires as soon as
   // the console boots on the other side of the navigation.
   const myProjects = page.waitForResponse(
@@ -79,7 +79,7 @@ test("manages the project with the session cookie alone", async ({ page, seed, z
   await page.goto("/ui/console/");
   await page.getByLabel("Email").fill(operator.email);
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByLabel("Password").fill(operator.password);
+  await page.getByRole("textbox", { name: "Password" }).fill(operator.password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.waitForURL((url) => !url.pathname.endsWith("/login"));
   await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
@@ -137,7 +137,7 @@ test("shows each user's team on the Users screen with the session cookie", async
   await page.goto("/ui/console/");
   await page.getByLabel("Email").fill(operator.email);
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByLabel("Password").fill(operator.password);
+  await page.getByRole("textbox", { name: "Password" }).fill(operator.password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.waitForURL((url) => !url.pathname.endsWith("/login"));
 

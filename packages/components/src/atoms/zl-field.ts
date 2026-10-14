@@ -87,13 +87,11 @@ export class ZlField extends FormAtom {
    */
   @property({ attribute: false }) accessor passwordToggle = false;
   /**
-   * The toggle's accessible name. Deliberately without "password": label
-   * lookups (`getByLabel("Password")`, agents reading the accessibility tree)
-   * match by substring, and a "Show password" button would make the field
-   * ambiguous. The button points at the field's label for that context.
+   * The toggle's accessible name. It stays the same in both states and
+   * `aria-pressed` carries the state, as the APG toggle-button pattern asks:
+   * a name that flips alongside `aria-pressed` would read "Hide, pressed".
    */
-  @property({ attribute: false }) accessor showPasswordLabel = "Show";
-  @property({ attribute: false }) accessor hidePasswordLabel = "Hide";
+  @property({ attribute: false }) accessor passwordToggleLabel = "Show password";
   @property({ type: Boolean }) accessor required = false;
   @property({ type: Boolean, reflect: true, attribute: "readonly" }) accessor readOnly = false;
   @property({ type: Boolean, reflect: true }) accessor invalid = false;
@@ -223,7 +221,7 @@ export class ZlField extends FormAtom {
         !this.isDisabled &&
         (!this.readOnly || this.invalid || showError || showSuccess));
     const trailing = toggleShown
-      ? this.renderPasswordToggle(this.label ? labelId : undefined)
+      ? this.renderPasswordToggle()
       : showDefaultTrailing
         ? this.renderTrailingIcon()
         : null;
@@ -349,19 +347,17 @@ export class ZlField extends FormAtom {
     `;
   }
 
-  private renderPasswordToggle(labelId: string | undefined) {
-    const label = this.revealed ? this.hidePasswordLabel : this.showPasswordLabel;
+  private renderPasswordToggle() {
     return html`
       <span class="zr-field__trailing zr-field__trailing--toggle" part="trailing-icon">
         <button
           type="button"
           class="zr-field__trailing-action zr-focus-ring"
           part="trailing-action password-toggle"
-          aria-label=${label}
+          aria-label=${this.passwordToggleLabel}
           aria-pressed=${this.revealed ? "true" : "false"}
           aria-controls=${this.inputId}
-          aria-describedby=${ifDefined(labelId)}
-          title=${label}
+          title=${this.passwordToggleLabel}
           @mousedown=${this.keepInputFocus}
           @click=${this.handlePasswordToggle}
         >

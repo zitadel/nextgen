@@ -22,7 +22,7 @@ export async function completeLogin(
   await page.goto(loginUrl);
   await page.getByLabel("Email").fill(user.email);
   await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByLabel("Password").fill(user.password);
+  await page.getByRole("textbox", { name: "Password" }).fill(user.password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.waitForURL((url) => !url.pathname.endsWith("/login"));
 
