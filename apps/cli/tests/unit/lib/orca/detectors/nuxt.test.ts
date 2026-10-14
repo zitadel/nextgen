@@ -32,12 +32,37 @@ describe("NuxtDetector", () => {
     expect(facts?.appDir).toBe("app");
   });
 
-  it("reports appDir '.' for a root-layout project (Nuxt 3)", async () => {
+  it("reports appDir '.' for a root-layout project", async () => {
     const facts = await new NuxtDetector().detect(await project({ appDir: false }));
     expect(facts?.appDir).toBe(".");
   });
 
   it("returns null without a nuxt dependency", async () => {
     expect(await new NuxtDetector().detect(await project({ nuxt: false }))).toBeNull();
+  });
+});
+
+describe("NuxtDetector version floor", () => {
+  async function nuxtApp(nuxt: string): Promise<string> {
+    const cwd = await mkdtemp(join(tmpdir(), "nuxt-detect-"));
+    dirs.push(cwd);
+    await writeFile(join(cwd, "package.json"), JSON.stringify({ dependencies: { nuxt } }));
+    return cwd;
+  }
+
+  it("refuses a Nuxt 3 app, which cannot install @zitadel/sdk-nuxt", async () => {
+    await expect(new NuxtDetector().detect(await nuxtApp("^3.21.0"))).rejects.toMatchObject({
+      code: "E_UNSUPPORTED_PROJECT_SHAPE",
+    });
+  });
+
+  it("names the floor in the refusal", async () => {
+    await expect(new NuxtDetector().detect(await nuxtApp("^3.21.0"))).rejects.toThrow(
+      'Nuxt "^3.21.0" is below the supported floor — the CLI integrates Nuxt 4 and newer',
+    );
+  });
+
+  it.each(["^4.0.0", ">=3", "latest"])("accepts nuxt %s", async (version) => {
+    expect(await new NuxtDetector().detect(await nuxtApp(version))).not.toBeNull();
   });
 });

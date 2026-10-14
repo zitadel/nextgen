@@ -14,6 +14,18 @@ export function npmSelectorForCliVersion(cliVersion: string): string {
   return npmDistTagForCliVersion(normalized);
 }
 
+/**
+ * The version a scaffold writes for the `@zitadel/*` packages it adds: the
+ * CLI's own exact version on an alpha train, else its dist-tag (`latest` for a
+ * stable CLI). The packages publish as one lockstep train, so the exact pin
+ * keeps the app on the SDK that matches the files this CLI wrote, instead of
+ * floating to whatever the tag points at later, and lets doctor's
+ * `dependency-version` check compare it against the CLI.
+ */
+export function sdkVersionForCli(cliVersion: string): string {
+  return npmSelectorForCliVersion(cliVersion);
+}
+
 export function publicCliCommand(args: string, cliVersion: string): string {
   const prefix = `npx ${CLI_PACKAGE_NAME}@${npmSelectorForCliVersion(cliVersion)}`;
   return args.length > 0 ? `${prefix} ${args}` : prefix;

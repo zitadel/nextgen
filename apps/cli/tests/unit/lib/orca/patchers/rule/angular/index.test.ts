@@ -98,6 +98,23 @@ describe("AngularPatcher.plan", () => {
     expect(writeContents(consumer, "src/app/app.ts")).not.toContain("businessLocales");
   });
 
+  it("reads the current path without touching window, so the root renders under SSR", () => {
+    const app = writeContents(new AngularPatcher().plan(ctx()), "src/app/app.ts");
+    expect(app).toContain("protected readonly path = inject(PlatformLocation).pathname;");
+  });
+
+  it("redirects the bare root to /login in the browser only", () => {
+    const app = writeContents(new AngularPatcher().plan(ctx()), "src/app/app.ts");
+    expect(app).toContain(
+      'if (this.path === "/" && isPlatformBrowser(this.platformId)) {\n      window.location.replace("/login");',
+    );
+  });
+
+  it("uses window nowhere but the browser-only redirect", () => {
+    const app = writeContents(new AngularPatcher().plan(ctx()), "src/app/app.ts") ?? "";
+    expect(app.match(/window\./g)).toEqual(["window."]);
+  });
+
   it("writes the managed root component, template, and proxy config", () => {
     const plan = new AngularPatcher().plan(ctx());
     expect(writeContents(plan, "src/app/app.ts")).toContain(MANAGED_MARKER);
@@ -216,11 +233,11 @@ function setBearer(proxyReq) {
     expect(() => packageJsonEdit()(undefined)).toThrowError(/package\.json is required/);
   });
 
-  it("adds the SDK dependency at the CLI's prerelease tag", () => {
+  it("pins the SDK dependency at the CLI's exact version", () => {
     const dep = new AngularPatcher()
       .plan(ctx())
       .ops.find((op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep");
-    expect(dep).toMatchObject({ name: "@zitadel/sdk-angular", version: "alpha" });
+    expect(dep).toMatchObject({ name: "@zitadel/sdk-angular", version: "0.1.0-alpha.0" });
   });
 });
 

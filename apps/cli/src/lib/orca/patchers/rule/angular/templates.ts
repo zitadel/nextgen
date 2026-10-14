@@ -43,7 +43,8 @@ export function appComponentTemplate(ctx: PatchContext): string {
   protected readonly locales = businessLocales;`
     : "";
   return `${MANAGED_MARKER}
-import { Component, OnInit } from "@angular/core";
+import { isPlatformBrowser, PlatformLocation } from "@angular/common";
+import { Component, inject, OnInit, PLATFORM_ID } from "@angular/core";
 import {${importNames}} from "@zitadel/sdk-angular";
 
 @Component({
@@ -53,14 +54,17 @@ import {${importNames}} from "@zitadel/sdk-angular";
   templateUrl: "./app.html",
 })
 export class App implements OnInit {
+  private readonly platformId = inject(PLATFORM_ID);
   protected readonly project = configureZitadel({
     projectId: ${JSON.stringify(ctx.project.id)},
     proxyPath: "${PROXY_PATH}",
   });
-  protected readonly path = window.location.pathname;${localesProperty}
+  // PlatformLocation reads the browser's URL, or the request's when the app
+  // is server-rendered with @angular/ssr, which has no window object.
+  protected readonly path = inject(PlatformLocation).pathname;${localesProperty}
 
   ngOnInit(): void {
-    if (this.path === "/") {
+    if (this.path === "/" && isPlatformBrowser(this.platformId)) {
       window.location.replace("/login");
     }
   }

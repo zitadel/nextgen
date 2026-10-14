@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
+  assertDependencyFloor,
+  dependencySpecProvablyBelow,
   dependencySpecProvablyBelowMajor,
   dependencyVersionMajor,
   hasDependency,
@@ -115,5 +117,43 @@ describe("dependencySpecProvablyBelowMajor", () => {
     expect(
       dependencySpecProvablyBelowMajor({ devDependencies: { next: "^14.0.0" } }, "next", 15),
     ).toBe("^14.0.0");
+  });
+});
+
+describe("dependencySpecProvablyBelow", () => {
+  function spec(value: string): PackageJson {
+    return { dependencies: { "solid-js": value } };
+  }
+
+  it("rejects ranges that can only resolve below a minor floor", () => {
+    for (const value of ["~1.7.0", "1.7.12", ">=1.6 <1.8"]) {
+      expect(dependencySpecProvablyBelow(spec(value), "solid-js", "1.8")).toBe(value);
+    }
+  });
+
+  it("passes ranges that reach the minor floor", () => {
+    for (const value of ["^1.7.0", "^1", "^1.8.0", "1.8.0-beta.1", ">=1.6"]) {
+      expect(dependencySpecProvablyBelow(spec(value), "solid-js", "1.8")).toBeUndefined();
+    }
+  });
+});
+
+describe("assertDependencyFloor", () => {
+  const floor = { dependency: "nuxt", minimum: "4", product: "Nuxt", hint: "Upgrade." };
+
+  it("refuses a provably older app with E_UNSUPPORTED_PROJECT_SHAPE", () => {
+    expect(() => assertDependencyFloor({ dependencies: { nuxt: "^3.21.0" } }, floor)).toThrow(
+      expect.objectContaining({ code: "E_UNSUPPORTED_PROJECT_SHAPE", hint: "Upgrade." }),
+    );
+  });
+
+  it("names the spec and the floor", () => {
+    expect(() => assertDependencyFloor({ dependencies: { nuxt: "^3.21.0" } }, floor)).toThrow(
+      'Nuxt "^3.21.0" is below the supported floor — the CLI integrates Nuxt 4 and newer',
+    );
+  });
+
+  it("passes a spec that may resolve to a supported version", () => {
+    expect(() => assertDependencyFloor({ dependencies: { nuxt: "latest" } }, floor)).not.toThrow();
   });
 });

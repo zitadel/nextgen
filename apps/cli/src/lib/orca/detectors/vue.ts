@@ -1,4 +1,4 @@
-import { hasDependency, readPackageJson } from "./package-json";
+import { assertDependencyFloor, hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
 import type { Detector, FrameworkFacts } from "./types";
 
@@ -20,6 +20,15 @@ export class VueDetector implements Detector {
     ) {
       return null;
     }
+
+    // @zitadel/sdk-vue peers Vue 3; a Vue 2 app fails the install with a
+    // peer-dependency conflict, after setup has already written its files.
+    assertDependencyFloor(pkg, {
+      dependency: "vue",
+      minimum: "3",
+      product: "Vue",
+      hint: "Upgrade the app to Vue 3 and rerun.",
+    });
 
     const devPort = await detectDevPort(cwd, pkg);
     return { id: "vue", appDir: "src", devPort, url: issuerFromPort(devPort) };

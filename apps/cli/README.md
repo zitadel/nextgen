@@ -17,7 +17,7 @@ bug reports and automation when reproducibility matters.
 
 - Node from the supported range in `package.json#engines` (currently ≥ 24)
 - Docker only when using the optional Docker runtime backend
-- An app in one of the eight supported frameworks, or an empty directory
+- An app in one of the twelve supported frameworks, or an empty directory
   where setup can scaffold one
 
 ## Quickstart

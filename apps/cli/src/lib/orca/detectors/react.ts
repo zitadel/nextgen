@@ -1,6 +1,5 @@
-import { ZitadelError } from "../../errors";
 import {
-  dependencySpecProvablyBelowMajor,
+  assertDependencyFloor,
   dependencyVersionMajor,
   hasDependency,
   readPackageJson,
@@ -37,14 +36,12 @@ export class ReactDetector implements Detector {
     // target React 18+. Enforced here so setup and doctor share one loud
     // gate; only a spec that provably cannot resolve to 18+ is rejected —
     // protocol specs and dist-tags pass.
-    const belowFloor = dependencySpecProvablyBelowMajor(pkg, "react", 18);
-    if (belowFloor !== undefined) {
-      throw new ZitadelError(
-        "E_UNSUPPORTED_PROJECT_SHAPE",
-        `React "${belowFloor}" is below the supported floor — the CLI integrates React 18 and newer`,
-        { hint: "Upgrade the app to React 18+ and rerun." },
-      );
-    }
+    assertDependencyFloor(pkg, {
+      dependency: "react",
+      minimum: "18",
+      product: "React",
+      hint: "Upgrade the app to React 18+ and rerun.",
+    });
 
     const devPort = await detectDevPort(cwd, pkg);
     const versionMajor = dependencyVersionMajor(pkg, "react");

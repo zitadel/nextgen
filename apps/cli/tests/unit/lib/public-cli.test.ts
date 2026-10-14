@@ -7,6 +7,7 @@ import {
   npmDistTagForCliVersion,
   npmSelectorForCliVersion,
   publicCliCommand,
+  sdkVersionForCli,
 } from "../../../src/lib/public-cli";
 
 describe("public CLI command formatting", () => {
@@ -14,6 +15,15 @@ describe("public CLI command formatting", () => {
     expect(npmDistTagForCliVersion("0.1.0-alpha.1")).toBe("alpha");
     expect(npmSelectorForCliVersion("0.1.0-alpha.1")).toBe("0.1.0-alpha.1");
     expect(publicCliCommand("start", "0.1.0-alpha.1")).toBe("npx @zitadel/cli@0.1.0-alpha.1 start");
+  });
+
+  it("pins scaffolded SDKs at the CLI's exact alpha version", () => {
+    expect(sdkVersionForCli("1.0.0-alpha.25")).toBe("1.0.0-alpha.25");
+  });
+
+  it("scaffolds SDKs from the dist-tag for stable and non-alpha CLIs", () => {
+    expect(sdkVersionForCli("1.0.0")).toBe("latest");
+    expect(sdkVersionForCli("1.0.0-beta.2")).toBe("beta");
   });
 
   it("uses latest for stable versions", () => {
