@@ -189,3 +189,6 @@ minimumReleaseAgeExclude:
 # pnpm 12 offers to link the agent skills dependencies ship; we use none.
 skills:
   dirs: []
+
+# Fail the install on an unmet or conflicting peer dependency instead of warning.
+strictPeerDependencies: true
