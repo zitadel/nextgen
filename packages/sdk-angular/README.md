@@ -32,6 +32,49 @@ export class LoginPage {
 
 The signed-in session card is `<zitadel-auth-session>` (exported as `ZitadelSessionComponent`).
 
+### Configuration
+
+`configureZitadel`, `getApi`, `getZitadelConfig` and the `ZitadelConfig` / `ZitadelProject`
+types are re-exported from `@zitadel/api/config`, the same module every Zitadel SPA SDK uses.
+`configureZitadel(...)` returns the project handle and also records it as the app-wide
+config, so a component rendered without `[project]` falls back to it. It accepts an optional
+`publishableKey`, which `getApi(project)` sends as the bearer on direct API calls.
+
+### Inputs and outputs
+
+Each component's inputs mirror the shared `ZitadelLoginConfig` / `ZitadelLogoutConfig` /
+`ZitadelSessionConfig` types. An input you leave unset, or clear back to `undefined`, keeps
+the widget's own default (e.g. `purpose` is `"login"`).
+
+| Component                | Outputs (each emits the event detail)                                |
+| ------------------------ | -------------------------------------------------------------------- |
+| `<zitadel-auth-login>`   | `flowStep`, `flowInput`, `flowComplete`, `flowRedirect`, `flowError` |
+| `<zitadel-auth-logout>`  | `signout`                                                            |
+| `<zitadel-auth-session>` | `signout`                                                            |
+
+```html
+<zitadel-auth-login [project]="project" (flowComplete)="onComplete($event)"
+  (flowError)="onError($event)" />
+```
+
+### Projected content
+
+Content placed inside a component is projected into the underlying element (for example
+`<zitadel-auth-login>`'s `attribution-trailing` slot). A `<template>`
+inside `<zitadel-auth-logout>` replaces the avatar menu with your own markup: `{{display}}`,
+`{{identifier}}` and `{{initial}}` are filled in, and any element with `data-action="logout"`
+signs the user out. Mark the `<template>` `ngNonBindable` so Angular leaves the
+`{{…}}` placeholders for the element to fill:
+
+```html
+<zitadel-auth-logout [project]="project" postSignOutUrl="/login">
+  <template ngNonBindable>
+    <span>{{display}}</span>
+    <button data-action="logout">Sign out</button>
+  </template>
+</zitadel-auth-logout>
+```
+
 > The wrapper uses the selector `zitadel-auth-login` (not `zitadel-login`) because
 > the latter is the underlying custom element the component renders internally.
 

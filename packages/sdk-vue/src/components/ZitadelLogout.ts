@@ -29,26 +29,33 @@ export default defineComponent({
     theme: { type: String as PropType<"light" | "dark" | "auto">, default: undefined },
   },
   emits: ["signout"],
-  setup(props, { emit, expose }) {
+  setup(props, { emit, expose, slots }) {
     // Template ref to the rendered Lit element. Exposed so a consumer's
     // component `ref` (which resolves to this instance) can reach the DOM node.
     const element = ref<ZitadelLogoutElement | null>(null);
     expose({ element });
 
     return () =>
-      h("zitadel-logout", {
-        ref: element,
-        // Hand the Lit element the raw SDK handle, not Vue's reactive proxy:
-        // the widget does identity checks on it (and `render` from test-utils
-        // would otherwise pass a wrapped clone).
-        project: toRaw(props.project),
-        projectId: props.projectId,
-        proxyPath: props.proxyPath,
-        "post-sign-out-url": props.postSignOutUrl,
-        theme: props.theme,
-        onZitadelSignout: (event: CustomEvent<ZitadelSignoutDetail>) => {
-          emit("signout", event.detail);
+      h(
+        "zitadel-logout",
+        {
+          ref: element,
+          // Hand the Lit element the raw SDK handle, not Vue's reactive proxy:
+          // the widget does identity checks on it (and `render` from test-utils
+          // would otherwise pass a wrapped clone).
+          project: toRaw(props.project),
+          projectId: props.projectId,
+          proxyPath: props.proxyPath,
+          "post-sign-out-url": props.postSignOutUrl,
+          theme: props.theme,
+          onZitadelSignout: (event: CustomEvent<ZitadelSignoutDetail>) => {
+            emit("signout", event.detail);
+          },
         },
-      });
+        // Slot content goes into the element's light DOM: the `<template>`
+        // `<zitadel-logout>` clones for a custom control, or login's
+        // `attribution-trailing` slot.
+        slots.default?.(),
+      );
   },
 });

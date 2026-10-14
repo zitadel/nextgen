@@ -25,8 +25,35 @@ export default function LoginPage() {
 
 The signed-in session card is `<ZitadelSession project={project} />` (exported as `ZitadelSession`).
 
-The widget's flow events are also surfaced as optional callbacks:
-`onFlowStep`, `onFlowInput`, `onFlowComplete`, and `onFlowError`.
+The widgets' events are also surfaced as optional callbacks:
+
+- `ZitadelLogin`: `onFlowStep`, `onFlowInput`, `onFlowComplete`, `onFlowRedirect`, and
+  `onFlowError`.
+- `ZitadelLogout` and `ZitadelSession`: `onSignout`.
+
+Leaving a prop unset, or setting it back to `undefined`, keeps the element's own default (for
+example the session card's "Signed in as" heading).
+
+Children are rendered into the element. Give `ZitadelLogout` a `<template>` child to replace its
+avatar menu with your own markup, filled with `{{display}}`, `{{identifier}}` and `{{initial}}`,
+where any `data-action="logout"` element signs out. Content with `slot="attribution-trailing"`
+inside `ZitadelLogin` is shown next to its attribution.
+
+```tsx
+<ZitadelLogout project={project}>
+  <template>
+    <button type="button" data-action="logout">{'Sign out {{display}}'}</button>
+  </template>
+</ZitadelLogout>
+```
+
+## Server rendering
+
+The package ships a `solid` export condition with uncompiled JSX, so `vite-plugin-solid` compiles
+it for each environment (server and hydrating client). Importing it in a SolidStart route is
+safe during SSR. The `project` handle, `locales`, `lang` and `suppressHeader` are set only as
+properties, so they are not in the server markup; the client sets them while hydrating. The other
+props are rendered as attributes, and the element reads them when it upgrades.
 
 ## Proxying to the backend (deployment)
 

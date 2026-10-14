@@ -1,5 +1,5 @@
 import { LitElement, html, nothing } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { property } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { unsafeSVG } from "lit/directives/unsafe-svg.js";
 
@@ -22,6 +22,7 @@ import {
   X,
 } from "lucide";
 
+import { defineOnce } from "../internal/define-once.js";
 import type { AtomManifest } from "../manifest.js";
 import { surfaceStyles } from "../styles/index.js";
 
@@ -59,7 +60,7 @@ import { surfaceStyles } from "../styles/index.js";
  * which prevents the icon's name from leaking into the parent's
  * accessible name (e.g. avoids "Loading Loading" on a loading button).
  */
-@customElement("zl-icon")
+@defineOnce("zl-icon")
 export class ZlIcon extends LitElement {
   /* No baseHostStyles — would force white on :host; icons inherit context color. */
   static override styles = surfaceStyles(iconStyles);

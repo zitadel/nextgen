@@ -29,26 +29,33 @@ export default defineComponent({
     suppressHeader: { type: Boolean, default: undefined },
   },
   emits: ["signout"],
-  setup(props, { emit, expose }) {
+  setup(props, { emit, expose, slots }) {
     const element = ref<ZitadelSessionElement | null>(null);
     expose({ element });
 
     return () =>
-      h("zitadel-session", {
-        ref: element,
-        // Hand the Lit element the raw SDK handle, not Vue's reactive proxy.
-        project: toRaw(props.project),
-        projectId: props.projectId,
-        proxyPath: props.proxyPath,
-        "post-sign-out-url": props.postSignOutUrl,
-        heading: props.heading,
-        "logout-label": props.logoutLabel,
-        variant: props.variant,
-        theme: props.theme,
-        suppressHeader: props.suppressHeader,
-        onZitadelSignout: (event: CustomEvent<ZitadelSignoutDetail>) => {
-          emit("signout", event.detail);
+      h(
+        "zitadel-session",
+        {
+          ref: element,
+          // Hand the Lit element the raw SDK handle, not Vue's reactive proxy.
+          project: toRaw(props.project),
+          projectId: props.projectId,
+          proxyPath: props.proxyPath,
+          "post-sign-out-url": props.postSignOutUrl,
+          heading: props.heading,
+          "logout-label": props.logoutLabel,
+          variant: props.variant,
+          theme: props.theme,
+          suppressHeader: props.suppressHeader,
+          onZitadelSignout: (event: CustomEvent<ZitadelSignoutDetail>) => {
+            emit("signout", event.detail);
+          },
         },
-      });
+        // Slot content goes into the element's light DOM: the `<template>`
+        // `<zitadel-logout>` clones for a custom control, or login's
+        // `attribution-trailing` slot.
+        slots.default?.(),
+      );
   },
 });

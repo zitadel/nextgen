@@ -70,7 +70,7 @@ The Solid SDK is the SPA wrapper for the shared Zitadel login and logout widgets
     }
     ```
 
-    The widget's flow events surface as optional callbacks: `onFlowStep`, `onFlowInput`, `onFlowComplete`, and `onFlowError`.
+    `ZitadelLogin` takes the callbacks `onFlowStep`, `onFlowInput`, `onFlowComplete`, `onFlowRedirect` and `onFlowError`; `ZitadelLogout` and `ZitadelSession` take `onSignout`. Each receives the event detail. `ZitadelSession` is the signed-in card (`<ZitadelSession project={project} />`). An unset or cleared prop leaves the widget on its default, for example the "Signed in as" heading. Children go into the element's light DOM, so `ZitadelLogout` accepts a `<template>` for a custom sign-out control and `ZitadelLogin` accepts `slot="attribution-trailing"` content.
   </Tab>
 </Tabs>
 

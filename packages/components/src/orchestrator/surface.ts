@@ -2,6 +2,7 @@ import { LitElement } from "lit";
 import { property } from "lit/decorators.js";
 import type { ZitadelProject } from "@zitadel/api/config";
 
+import { orDefault } from "../internal/or-default.js";
 import type { Branding } from "./branding.js";
 import { applyBaseTokens, applyBrandingTokens } from "./branding-to-tokens.js";
 import { applyDefaultFont, applyFontUrl } from "./font-loader.js";
@@ -73,7 +74,14 @@ export class ZitadelSurface extends ZitadelConfigured {
    * viewport, paints the surface background, and ships the brand font.
    * Fine-grained height override in both modes: `--zl-page-min-height`.
    */
-  @property({ type: String, reflect: true }) accessor variant: "widget" | "page" = "widget";
+  @property({ type: String, reflect: true })
+  get variant(): "widget" | "page" {
+    return this.#variant;
+  }
+  set variant(value: "widget" | "page" | null | undefined | "") {
+    this.#variant = orDefault(value, "widget");
+  }
+  #variant: "widget" | "page" = "widget";
 
   /**
    * Colour mode: `light`, `dark`, or `auto` (follow `prefers-color-scheme`).
@@ -84,7 +92,14 @@ export class ZitadelSurface extends ZitadelConfigured {
    * dark card onto a light page. Set it explicitly when your app's surface
    * is fixed: `<zitadel-login theme="light">`.
    */
-  @property({ type: String }) accessor theme: "" | ThemeMode = "";
+  @property({ type: String })
+  get theme(): "" | ThemeMode {
+    return this.#theme;
+  }
+  set theme(value: ThemeMode | null | undefined | "") {
+    this.#theme = orDefault(value, "");
+  }
+  #theme: "" | ThemeMode = "";
 
   /**
    * Visually hide the surface's own heading block (the step title and
@@ -96,7 +111,14 @@ export class ZitadelSurface extends ZitadelConfigured {
    * attribute, like `variant`.
    */
   @property({ type: Boolean, reflect: true, attribute: "suppress-header" })
-  accessor suppressHeader = false;
+  get suppressHeader(): boolean {
+    return this.#suppressHeader;
+  }
+  set suppressHeader(value: boolean | null | undefined) {
+    // Only a real `true` suppresses: an unset or cleared binding is the default.
+    this.#suppressHeader = value === true;
+  }
+  #suppressHeader = false;
 
   protected readonly themeController = new ThemeController(this);
 

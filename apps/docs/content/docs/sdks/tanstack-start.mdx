@@ -94,6 +94,25 @@ The TanStack Start SDK is a global request middleware that proxies and verifies 
       },
     });
     ```
+
+    Render the widgets from `@zitadel/sdk-tanstack-start/react`. They mount client-only: on the server and during hydration they render nothing, so no flow starts before the app hydrates with its config. The `/react` entry also exports `businessLocales` and the Login, Logout and Session prop types; `@zitadel/sdk-tanstack-start/client` exports only `configureZitadel`, `getApi` and `getZitadelConfig`, with no element classes.
+
+    ```tsx
+    import { createFileRoute } from "@tanstack/react-router";
+    import { configureZitadel } from "@zitadel/sdk-tanstack-start/client";
+    import { ZitadelSession } from "@zitadel/sdk-tanstack-start/react";
+
+    const project = configureZitadel({
+      projectId: import.meta.env.VITE_ZITADEL_PROJECT_ID,
+      proxyPath: "/__nextgen",
+    });
+
+    export const Route = createFileRoute("/profile")({
+      component: () => <ZitadelSession project={project} postSignOutUrl="/login" />,
+    });
+    ```
+
+    `ZitadelLogin` takes the callbacks `onFlowStep`, `onFlowInput`, `onFlowComplete`, `onFlowRedirect` and `onFlowError`; `ZitadelLogout` and `ZitadelSession` take `onSignout`. Each receives the event detail. The signed-in card for a profile page is `ZitadelSession`, as above.
   </Tab>
 </Tabs>
 

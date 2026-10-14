@@ -1,11 +1,13 @@
 import { css, html, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { property, state } from "lit/decorators.js";
 
 import { applyBaseTokens, applyBrandingTokens } from "./branding-to-tokens.js";
 import { resolveApi } from "./resolve-api.js";
 import { SessionController } from "./session-controller.js";
 import { ZitadelConfigured, stampTheme } from "./surface.js";
 import { ThemeController, type ThemeMode } from "./theme-controller.js";
+import { defineOnce } from "../internal/define-once.js";
+import { orDefault } from "../internal/or-default.js";
 import { baseHostStyles, focusVisibleStyles, t } from "../styles/index.js";
 
 import "../atoms/zl-icon.js";
@@ -40,7 +42,7 @@ import "../atoms/zl-icon.js";
  * Default styles consume the `--zl-*` design tokens so tenant branding
  * applies automatically.
  */
-@customElement("zitadel-logout")
+@defineOnce("zitadel-logout")
 export class ZitadelLogout extends ZitadelConfigured {
   static override styles = [
     baseHostStyles,
@@ -179,12 +181,19 @@ export class ZitadelLogout extends ZitadelConfigured {
    * rather than forcing the dark login surface. Set it explicitly when the
    * surrounding app surface is fixed: `<zitadel-logout theme="dark">`.
    */
-  @property({ type: String }) accessor theme: "" | ThemeMode = "";
+  @property({ type: String })
+  get theme(): "" | ThemeMode {
+    return this.#theme;
+  }
+  set theme(value: ThemeMode | null | undefined | "") {
+    this.#theme = orDefault(value, "");
+  }
+  #theme: "" | ThemeMode = "";
 
   @state() private accessor open = false;
 
-  // Set once in `connectedCallback` based on whether a `<template>` child is
-  // present. Not reactive — switching modes mid-life would require re-running
+  // Set once, on connect or before the first render, based on whether a
+  // `<template>` child is present. Not reactive — switching modes mid-life would require re-running
   // light-DOM mutation, which we don't support.
   private templateMode = false;
 
@@ -197,24 +206,17 @@ export class ZitadelLogout extends ZitadelConfigured {
 
   private readonly themeController = new ThemeController(this);
 
-  // Re-projects once identity settles so template-mode markup shows it.
+  // Re-projects whenever identity changes so template-mode markup shows it.
   private readonly session = new SessionController(
     this,
-    () => resolveApi(this.project, this.projectAttrs, "<zitadel-logout>").api,
+    () => resolveApi(this.project, this.projectAttrs, "<zitadel-logout>"),
     () => this.projectTemplate(),
   );
 
   override connectedCallback(): void {
     super.connectedCallback();
 
-    const tmpl = this.querySelector("template");
-    if (tmpl instanceof HTMLTemplateElement) {
-      this.templateMode = true;
-      this.pendingTemplate = tmpl;
-      // Project immediately so the logout control renders even before (or
-      // without) a resolvable config; it is re-projected once identity loads.
-      this.projectTemplate();
-    }
+    this.adoptTemplate();
 
     document.addEventListener("click", this.handleDocumentClick);
     document.addEventListener("keydown", this.handleDocumentKeydown);
@@ -226,7 +228,26 @@ export class ZitadelLogout extends ZitadelConfigured {
     document.removeEventListener("keydown", this.handleDocumentKeydown);
   }
 
+  /**
+   * Switches to template mode when a `<template>` child is present. Checked on
+   * connect and again before the first render: some frameworks (Qwik's client
+   * renderer) insert the host first and append its children in the same task,
+   * so the template only shows up after `connectedCallback`.
+   */
+  private adoptTemplate(): void {
+    if (this.templateMode) return;
+    const tmpl = this.querySelector("template");
+    if (tmpl instanceof HTMLTemplateElement) {
+      this.templateMode = true;
+      this.pendingTemplate = tmpl;
+      // Project immediately so the logout control renders even before (or
+      // without) a resolvable config; it is re-projected once identity loads.
+      this.projectTemplate();
+    }
+  }
+
   override willUpdate(): void {
+    if (!this.hasUpdated) this.adoptTemplate();
     // No branding payload reaches this element (yet); the empty overrides
     // call keeps the token pipeline identical to the other orchestrator
     // surfaces so a future branding input only has to change the argument.
@@ -258,7 +279,7 @@ export class ZitadelLogout extends ZitadelConfigured {
   private projectTemplate(): void {
     if (!this.templateMode || !this.pendingTemplate) return;
 
-    const clone = this.pendingTemplate.content.cloneNode(true) as DocumentFragment;
+    const clone = templateMarkup(this.pendingTemplate);
     fillTemplateTokens(clone, this.session.display, this.session.identifier, this.initial);
 
     const container = document.createElement("span");
@@ -302,7 +323,11 @@ export class ZitadelLogout extends ZitadelConfigured {
     if (!(await this.session.signOut(closeMenu))) return;
     if (this.postSignOutUrl && typeof window !== "undefined") {
       window.location.href = this.postSignOutUrl;
+      return;
     }
+    // Staying on the page: the avatar (or the projected template) must stop
+    // showing the user whose session was just revoked.
+    this.session.clearIdentity();
   }
 
   private handleSignOutClick(event: Event): void {
@@ -312,10 +337,10 @@ export class ZitadelLogout extends ZitadelConfigured {
 
   override render() {
     if (this.templateMode) {
-      // Rendering happens into the light DOM via `projectTemplate`. The
-      // shadow root stays empty so the projected markup is the only thing
-      // the user sees.
-      return nothing;
+      // The markup lives in the light DOM (see `projectTemplate`), and light
+      // children of a shadow host only render when assigned to a slot, so
+      // the shadow root is just the slot that shows them.
+      return html`<slot></slot>`;
     }
 
     return html`
@@ -389,6 +414,20 @@ export class ZitadelLogout extends ZitadelConfigured {
       }
     `;
   }
+}
+
+/**
+ * A copy of the template's markup. Parsed HTML puts it in `content`, but a
+ * framework that builds the `<template>` with DOM calls (React, Solid, …)
+ * appends the children to the element itself, where `content` never sees them.
+ */
+function templateMarkup(template: HTMLTemplateElement): DocumentFragment {
+  if (template.content.childNodes.length > 0 || template.childNodes.length === 0) {
+    return template.content.cloneNode(true) as DocumentFragment;
+  }
+  const fragment = document.createDocumentFragment();
+  for (const node of template.childNodes) fragment.appendChild(node.cloneNode(true));
+  return fragment;
 }
 
 /**

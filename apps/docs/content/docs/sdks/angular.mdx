@@ -21,6 +21,8 @@ The Angular SDK exposes standalone components that wrap the shared Zitadel auth 
     ```sh
     pnpm add @zitadel/sdk-angular@alpha
     ```
+
+    `configureZitadel` is the shared one from `@zitadel/api/config`, re-exported here with `getApi` and `getZitadelConfig`, so the components also pick up its global handle when no `[project]` is bound. `<zitadel-auth-login>` emits `flowStep`, `flowInput`, `flowComplete`, `flowRedirect` and `flowError`; `<zitadel-auth-logout>` and `<zitadel-auth-session>` (the signed-in card) emit `signout`. Each payload is the event detail. An unset or cleared input leaves the widget on its default. Projected content goes into the element's light DOM, so `<zitadel-auth-logout>` accepts a `<template>` for a custom sign-out control.
   </Tab>
   <Tab>
     ```sh

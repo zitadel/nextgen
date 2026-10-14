@@ -1,8 +1,9 @@
 import { LitElement, html, nothing } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { property } from "lit/decorators.js";
 
 import ssoStyles from "./zl-sso-providers.css?inline";
 
+import { defineOnce } from "../internal/define-once.js";
 import { emit } from "../internal/emit.js";
 import { parseJsonAttribute } from "../internal/json-attribute.js";
 import type { AtomManifest } from "../manifest.js";
@@ -58,7 +59,7 @@ const NAME_PLACEHOLDER = "{name}";
  * the step is submitting. Any "pending" flag kept here would be thrown away
  * on that same frame, so the disabled attribute is the whole mechanism.
  */
-@customElement("zl-sso-providers")
+@defineOnce("zl-sso-providers")
 export class ZlSsoProviders extends LitElement {
   static override styles = [baseHostStyles, ...surfaceStyles(ssoStyles)];
 

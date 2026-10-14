@@ -34,6 +34,20 @@ export function ProfilePage() {
 The signed-in session card is `<ZitadelSession project={project} />` (exported
 as `ZitadelSession`).
 
+`ZitadelLogin` takes the callbacks `onFlowStep`, `onFlowInput`, `onFlowComplete`,
+`onFlowRedirect` and `onFlowError`; `ZitadelLogout` and `ZitadelSession` take
+`onSignout`. Each receives the event detail. An unset or cleared prop leaves
+the widget on its default (for example the "Signed in as" heading).
+
+Children go into the element's light DOM, so `ZitadelLogout` accepts a
+`<template>` for a custom sign-out control (`{{display}}`, `{{identifier}}`
+and `{{initial}}` are filled in, and an element with `data-action="logout"`
+signs out), and `ZitadelLogin` accepts content for its
+`slot="attribution-trailing"` slot.
+
+The package is marked `"use client"`, so a Next.js App Router server component
+can render the widgets directly.
+
 ## Proxying to the backend (deployment)
 
 The widgets call `${proxyPath}/…` same-origin (default `/__nextgen`). In

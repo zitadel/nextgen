@@ -1,9 +1,9 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import '@zitadel/components';
   import type { ZitadelLogout as ZitadelLogoutElement } from '@zitadel/components';
 
   import type { ZitadelLogoutProps, ZitadelSignoutDetail } from './types';
-  import { assignGiven } from './given';
 
   let {
     project,
@@ -12,7 +12,8 @@
     postSignOutUrl,
     theme,
     onSignout,
-  }: ZitadelLogoutProps = $props();
+    children,
+  }: ZitadelLogoutProps & { children?: Snippet } = $props();
 
   let el: ZitadelLogoutElement | undefined = $state();
 
@@ -24,14 +25,6 @@
   export function getElement(): ZitadelLogoutElement | undefined {
     return el;
   }
-
-  // Props the element has defaults for are assigned only when given; a
-  // binding would assign `undefined` and overwrite the default.
-  $effect(() => {
-    if (el) {
-      assignGiven(el, { theme });
-    }
-  });
 
   $effect(() => {
     const node = el;
@@ -53,4 +46,8 @@
   project-id={projectId}
   proxy-path={proxyPath}
   post-sign-out-url={postSignOutUrl}
-></zitadel-logout>
+  {theme}
+>
+  <!-- A `<template>` child becomes the element's custom sign-out control. -->
+  {@render children?.()}
+</zitadel-logout>

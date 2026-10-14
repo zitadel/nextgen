@@ -3,14 +3,14 @@ name: zitadel-sdk-qwik
 description: >-
   Integrate Zitadel authentication into a Qwik app with `@zitadel/sdk-qwik`.
   Use when the user wants to add login, logout, or a signed-in session card to
-  an existing or custom client-side Qwik SPA — wiring the `ZitadelLogin`,
+  an existing or custom Qwik app (client-side or Qwik City) — wiring the `ZitadelLogin`,
   `ZitadelLogout`, or `ZitadelSession` components and `configureZitadel`.
 ---
 
 # @zitadel/sdk-qwik
 
 Qwik components that wrap the Zitadel auth UI web components (`<zitadel-login>`,
-`<zitadel-logout>`, `<zitadel-session>`) for client-side SPAs (Vite, etc.). The
+`<zitadel-logout>`, `<zitadel-session>`) for Qwik apps, client-side or under Qwik City SSR. The
 package exports the components, the `configureZitadel` handle factory, and the
 shared SPA config/handler types.
 
@@ -55,10 +55,8 @@ export default component$(() => {
 - `<ZitadelSession project={project} />` renders the signed-in session card.
 - Instead of the `project` handle you may pass the discrete `projectId` /
   `proxyPath` props; the widget uses whichever is present.
-- Flow events are surfaced as optional QRL callbacks on the components:
-  `onFlowStep$`, `onFlowInput$`, `onFlowComplete$`, `onFlowError$`.
-- The SDK binds `project` (and `projectId` / `proxyPath`) to the element as DOM
-  *properties*, matching the other framework SDKs.
+- Widget events are surfaced as optional `on…$` QRL callbacks on the components;
+  the README and the prop types list which component has which.
 
 ## Read these, don't guess
 
@@ -87,7 +85,9 @@ Confirm the current surface before wiring — do not rely on memory:
 - **Local dev without the proxy.** You can point `proxyPath` straight at the
   backend cross-origin, e.g. `proxyPath: 'http://localhost:8080'` (the
   `zitadel start` local runtime default port).
-- **Properties, not attributes.** Config is applied imperatively as DOM
-  properties because Qwik 2 binds custom-element JSX props as lower-cased
-  attributes only — which is why the SDK wrapper exists rather than using the
-  web components directly.
+- **Attributes and properties.** Qwik 2 binds custom-element JSX props as
+  attributes only, so the wrapper renders the attribute-backed config as
+  attributes (which survive Qwik City SSR) and sets every prop, including the
+  property-only `project` handle and `locales`, as a DOM property once mounted
+  or resumed — which is why the SDK wrapper exists rather than using the web
+  components directly.

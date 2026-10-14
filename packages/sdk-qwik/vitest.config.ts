@@ -1,3 +1,5 @@
+import { Worker } from "node:worker_threads";
+
 import { qwikVite } from "@qwik.dev/core/optimizer";
 import { playwright } from "@vitest/browser-playwright";
 import { apiMockPublicDir } from "@zitadel/api-mock/public-dir";
@@ -30,6 +32,23 @@ export default defineConfig({
       provider: playwright(),
       headless: true,
       instances: [{ browser: "chromium" }],
+      commands: {
+        // Server-renders a fixture so a spec can resume it in the browser (see
+        // scripts/render-ssr.ts); the browser lane cannot run Qwik's SSR itself.
+        async renderSsr(_ctx, name: string) {
+          const worker = new Worker(new URL("./scripts/render-ssr.ts", import.meta.url), {
+            workerData: { name },
+          });
+          try {
+            return await new Promise<string>((resolve, reject) => {
+              worker.once("message", resolve);
+              worker.once("error", reject);
+            });
+          } finally {
+            await worker.terminate();
+          }
+        },
+      },
     },
   },
 });

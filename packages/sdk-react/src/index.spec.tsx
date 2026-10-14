@@ -5,6 +5,9 @@ import type {
   ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { render } from "@testing-library/react";
 import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import {
@@ -17,9 +20,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { businessLocales, ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
 
-// A representative project handle. The element still starts its flow before
-// @lit/react binds this prop (see vitest.config.ts), so the expected mount-time
-// rejection is ignored package-wide; these are light binding/event assertions.
+// A representative project handle. `@lit/react` binds it in a layout effect,
+// before the element's first update starts the flow.
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 
 describe("ZitadelLogin", () => {
@@ -159,5 +161,112 @@ describe("ZitadelSession", () => {
 describe("businessLocales", () => {
   it("re-exports the business copy overlay from @zitadel/components", () => {
     expect(businessLocales).toBe(componentsBusinessLocales);
+  });
+});
+
+// The element's own defaults, which every wrapper must leave in place when a
+// prop is unset and restore when a prop is cleared.
+const LOGIN_DEFAULTS = {
+  purpose: "login",
+  variant: "widget",
+  theme: "",
+  lang: "",
+  suppressHeader: false,
+} as const;
+const LOGIN_VALUES = {
+  purpose: "register",
+  variant: "page",
+  theme: "light",
+  lang: "de",
+  suppressHeader: true,
+} as const;
+const SESSION_DEFAULTS = {
+  heading: "Signed in as",
+  logoutLabel: "Sign out",
+  variant: "widget",
+  theme: "",
+  suppressHeader: false,
+} as const;
+const SESSION_VALUES = {
+  heading: "Welcome",
+  logoutLabel: "Leave",
+  variant: "page",
+  theme: "dark",
+  suppressHeader: true,
+} as const;
+
+describe.each([
+  ["ZitadelLogin", "zitadel-login", ZitadelLogin, LOGIN_DEFAULTS, LOGIN_VALUES],
+  ["ZitadelSession", "zitadel-session", ZitadelSession, SESSION_DEFAULTS, SESSION_VALUES],
+  ["ZitadelLogout", "zitadel-logout", ZitadelLogout, { theme: "" }, { theme: "dark" }],
+] as const)("%s element defaults", (_name, tag, Component, defaults, values) => {
+  const Wrapper = Component as React.ComponentType<Record<string, unknown>>;
+  const prop = (el: Element, key: string) => (el as unknown as Record<string, unknown>)[key];
+
+  it.each(Object.entries(defaults))("keeps %s at its default when unset", (key, fallback) => {
+    const { container } = render(<Wrapper project={project} />);
+    expect(prop(container.querySelector(tag)!, key)).toBe(fallback);
+  });
+
+  it.each(Object.entries(defaults))(
+    "keeps %s at its default when passed undefined",
+    (key, fallback) => {
+      const { container } = render(<Wrapper project={project} {...{ [key]: undefined }} />);
+      expect(prop(container.querySelector(tag)!, key)).toBe(fallback);
+    },
+  );
+
+  it.each(Object.entries(defaults))("restores %s to its default when cleared", (key, fallback) => {
+    const given = (values as Record<string, unknown>)[key];
+    const { container, rerender } = render(<Wrapper project={project} {...{ [key]: given }} />);
+    expect(prop(container.querySelector(tag)!, key)).toBe(given);
+
+    rerender(<Wrapper project={project} />);
+
+    expect(prop(container.querySelector(tag)!, key)).toBe(fallback);
+  });
+});
+
+describe.each([
+  ["ZitadelLogout", "zitadel-logout", ZitadelLogout],
+  ["ZitadelSession", "zitadel-session", ZitadelSession],
+  ["ZitadelLogin", "zitadel-login", ZitadelLogin],
+] as const)("%s children", (_name, tag, Component) => {
+  const Wrapper = Component as React.ComponentType<Record<string, unknown>>;
+
+  it("renders children into the element's light DOM", () => {
+    const { container } = render(
+      <Wrapper project={project}>
+        <span slot="attribution-trailing">extra</span>
+      </Wrapper>,
+    );
+    expect(container.querySelector(`${tag} > span[slot="attribution-trailing"]`)).not.toBeNull();
+  });
+});
+
+describe("ZitadelLogout template children", () => {
+  it("projects a <template> child as the sign-out control", async () => {
+    const { container } = render(
+      <ZitadelLogout project={project}>
+        <template>
+          <button type="button" data-action="logout">
+            Bye
+          </button>
+        </template>
+      </ZitadelLogout>,
+    );
+    const el = container.querySelector<ZitadelLogoutElement>("zitadel-logout")!;
+    await el.updateComplete;
+    expect(el.querySelector("span [data-action='logout']")?.textContent).toBe("Bye");
+  });
+});
+
+describe("published build", () => {
+  // Next's App Router renders server components with the `react-server`
+  // build of React, which has no `useRef`/`useLayoutEffect`; the directive
+  // makes the bundle a client boundary instead of a crash.
+  it("keeps the use client directive at the top of dist/index.js", () => {
+    const bundle = readFileSync(join(process.cwd(), "dist/index.js"), "utf8");
+    expect(bundle.trimStart().startsWith('"use client"')).toBe(true);
   });
 });

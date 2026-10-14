@@ -189,3 +189,88 @@ describe("businessLocales", () => {
     expect(businessLocales).toBe(componentsBusinessLocales);
   });
 });
+
+// The element's own defaults, which the wrappers must leave in place when a
+// prop is unset and restore when a prop is cleared.
+const LOGIN_DEFAULTS = {
+  purpose: "login",
+  variant: "widget",
+  theme: "",
+  lang: "",
+  suppressHeader: false,
+} as const;
+const LOGIN_VALUES = {
+  purpose: "register",
+  variant: "page",
+  theme: "light",
+  lang: "de",
+  suppressHeader: true,
+} as const;
+const SESSION_DEFAULTS = {
+  heading: "Signed in as",
+  logoutLabel: "Sign out",
+  variant: "widget",
+  theme: "",
+  suppressHeader: false,
+} as const;
+const SESSION_VALUES = {
+  heading: "Welcome",
+  logoutLabel: "Leave",
+  variant: "page",
+  theme: "dark",
+  suppressHeader: true,
+} as const;
+
+describe.each([
+  ["ZitadelLogin", "zitadel-login", ZitadelLogin, LOGIN_DEFAULTS, LOGIN_VALUES],
+  ["ZitadelSession", "zitadel-session", ZitadelSession, SESSION_DEFAULTS, SESSION_VALUES],
+  ["ZitadelLogout", "zitadel-logout", ZitadelLogout, { theme: "" }, { theme: "dark" }],
+] as const)("%s element defaults", (_name, tag, component, defaults, values) => {
+  const prop = (el: Element, key: string) => (el as unknown as Record<string, unknown>)[key];
+
+  it.each(Object.entries(defaults))("keeps %s at its default when unset", (key, fallback) => {
+    const { container } = render(component, { props: { project } });
+    expect(prop(container.querySelector(tag)!, key)).toBe(fallback);
+  });
+
+  it.each(Object.entries(defaults))(
+    "restores %s to its default when cleared",
+    async (key, fallback) => {
+      const given = (values as Record<string, unknown>)[key];
+      const { container, rerender } = render(component, { props: { project, [key]: given } });
+      expect(prop(container.querySelector(tag)!, key)).toBe(given);
+
+      await rerender({ project, [key]: undefined });
+
+      expect(prop(container.querySelector(tag)!, key)).toBe(fallback);
+    },
+  );
+});
+
+describe.each([
+  ["ZitadelLogout", "zitadel-logout", ZitadelLogout],
+  ["ZitadelSession", "zitadel-session", ZitadelSession],
+  ["ZitadelLogin", "zitadel-login", ZitadelLogin],
+] as const)("%s slot content", (_name, tag, component) => {
+  it("renders the default slot into the element's light DOM", () => {
+    const { container } = render(component, {
+      props: { project },
+      slots: { default: () => h("span", { slot: "attribution-trailing" }, "extra") },
+    });
+    expect(container.querySelector(`${tag} > span[slot="attribution-trailing"]`)).not.toBeNull();
+  });
+});
+
+describe("ZitadelLogout template slot", () => {
+  it("projects a <template> child as the sign-out control", async () => {
+    const { container } = render(ZitadelLogout, {
+      props: { project },
+      slots: {
+        default: () => h("template", [h("button", { "data-action": "logout" }, "Bye")]),
+      },
+    });
+    const el = container.querySelector<ZitadelLogoutElement>("zitadel-logout")!;
+    await el.updateComplete;
+    expect(el.querySelector("span [data-action='logout']")?.textContent).toBe("Bye");
+  });
+});

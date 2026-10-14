@@ -7,18 +7,22 @@ import type {
   SubmitFlowStepBodyChallengeResponse,
   SubmitFlowStepBodyFields,
 } from "@zitadel/api/generated/model";
+import { getZitadelConfig } from "@zitadel/api/config";
 import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
 import { zitadelTrustmarkInnerHtml } from "../internal/attribution-markup.js";
 import type { Liquid, Template } from "liquidjs";
 import { css, html, LitElement, nothing, type PropertyValues } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { property, state } from "lit/decorators.js";
 
 import "../atoms/index.js";
 import type { ZlFieldInputDetail, ZlSubmitDetail } from "../atoms/index.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 
+import { onConfigChange } from "../internal/config-change.js";
+import { defineOnce } from "../internal/define-once.js";
 import { emit } from "../internal/emit.js";
 import { escapeHtml } from "../internal/escape-html.js";
+import { orDefault } from "../internal/or-default.js";
 import {
   exchangeSession,
   getCurrentStep,
@@ -162,7 +166,7 @@ function apiErrorCode(error: unknown): string {
     : "";
 }
 
-@customElement("zitadel-login")
+@defineOnce("zitadel-login")
 export class ZitadelLogin extends ZitadelSurface {
   static override shadowRootOptions: ShadowRootInit = {
     ...LitElement.shadowRootOptions,
@@ -185,7 +189,19 @@ export class ZitadelLogin extends ZitadelSurface {
   // variant-specific behavior on top of the shared surface polarity: `page`
   // focuses the first field on load, `widget` never steals focus.
 
-  @property({ type: String }) accessor purpose: CreateFlowBodyPurpose = "login";
+  /**
+   * What the flow is for (`login`, `register`, …). Unset, `null` or `""` mean
+   * `login`: the server requires a purpose, so a framework clearing the prop
+   * must not start a flow without one.
+   */
+  @property({ type: String })
+  get purpose(): CreateFlowBodyPurpose {
+    return this.#purpose;
+  }
+  set purpose(value: CreateFlowBodyPurpose | null | undefined | "") {
+    this.#purpose = orDefault(value, "login");
+  }
+  #purpose: CreateFlowBodyPurpose = "login";
 
   /**
    * Name of the flow definition to run, matching the `name` in its flow
@@ -264,7 +280,14 @@ export class ZitadelLogin extends ZitadelSurface {
    * to a built-in locale dictionary. Falls back to auto-detection from
    * `document.documentElement.lang` or `navigator.language` when empty.
    */
-  @property({ type: String }) override accessor lang = "";
+  @property({ type: String })
+  override get lang(): string {
+    return this.#lang;
+  }
+  override set lang(value: string | null | undefined) {
+    this.#lang = orDefault(value, "");
+  }
+  #lang = "";
 
   /**
    * Custom locale dictionaries keyed by language code. Entries may be
@@ -393,11 +416,18 @@ export class ZitadelLogin extends ZitadelSurface {
     return root;
   }
 
+  /** Unsubscribes from late `configureZitadel()` calls; set while connected. */
+  private unsubscribeConfig: (() => void) | undefined;
+
   override connectedCallback(): void {
     super.connectedCallback();
     if (typeof window !== "undefined") {
       window.addEventListener("popstate", this.handlePopState);
     }
+    // A global config that arrives after the first start changes no property,
+    // so `updated` never sees it; without this the "requires a configured
+    // project" error would stay until some unrelated prop changed.
+    this.unsubscribeConfig = onConfigChange(() => this.restartForLateConfig());
   }
 
   override disconnectedCallback(): void {
@@ -405,6 +435,8 @@ export class ZitadelLogin extends ZitadelSurface {
     if (typeof window !== "undefined") {
       window.removeEventListener("popstate", this.handlePopState);
     }
+    this.unsubscribeConfig?.();
+    this.unsubscribeConfig = undefined;
   }
 
   /**
@@ -746,18 +778,24 @@ export class ZitadelLogin extends ZitadelSurface {
   private restartPending = false;
 
   private flowConfigKey(): string {
-    const handle = this.project;
-    return JSON.stringify([
-      handle?.projectId,
-      handle?.proxyPath,
-      handle?.url,
-      handle?.publishableKey,
-      this.projectId,
-      this.proxyPath,
-      this.url,
-      this.purpose,
-      this.flowName,
-    ]);
+    // The handle `resolveApi` would pick over the attributes, so a late
+    // `configureZitadel()` counts as a config change too.
+    const handle = this.project ?? getZitadelConfig();
+    // Every unset spelling (`undefined`, `null`, `""`) is the same config, so
+    // a framework re-binding an empty prop does not restart an untouched flow.
+    return JSON.stringify(
+      [
+        handle?.projectId,
+        handle?.proxyPath,
+        handle?.url,
+        handle?.publishableKey,
+        this.projectId,
+        this.proxyPath,
+        this.url,
+        this.purpose,
+        this.flowName,
+      ].map((value) => value || ""),
+    );
   }
 
   /**

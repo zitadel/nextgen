@@ -91,6 +91,9 @@ The SvelteKit SDK is a `handle` hook that proxies and verifies sessions on the s
       <ZitadelLogin {project} purpose="login" postSignInUrl="/profile" />
     {/if}
     ```
+
+    `ZitadelLogin` takes the callbacks `onFlowStep`, `onFlowInput`, `onFlowComplete`, `onFlowRedirect` and `onFlowError`; `ZitadelLogout` and `ZitadelSession` take `onSignout`. Each receives the event detail. The signed-in card for a profile page is `<ZitadelSession {project} postSignOutUrl="/login" />`, mounted the same way.
+
   </Tab>
 </Tabs>
 

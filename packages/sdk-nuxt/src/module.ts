@@ -103,6 +103,17 @@ const nextgenModule: NuxtModule<NextgenMiddlewareOptions> =
       // runtime.
       publicConfig.zitadelProjectId ||= setting("NUXT_PUBLIC_ZITADEL_PROJECT_ID") ?? "";
 
+      // The `<zitadel-*>` tags are Lit custom elements, not Vue components:
+      // without this, Vue tries to resolve them and warns "Failed to resolve
+      // component" for every widget in a template. An app's own predicate is
+      // kept and still consulted.
+      nuxt.options.vue ??= {} as typeof nuxt.options.vue;
+      nuxt.options.vue.compilerOptions ??= {};
+      const compilerOptions = nuxt.options.vue.compilerOptions;
+      const appPredicate = compilerOptions.isCustomElement;
+      compilerOptions.isCustomElement = (tag: string) =>
+        tag.startsWith("zitadel-") || appPredicate?.(tag) === true;
+
       addPlugin(resolve("./runtime/plugin"));
       addServerHandler({
         middleware: true,

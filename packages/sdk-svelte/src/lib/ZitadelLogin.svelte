@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import '@zitadel/components';
   import type { ZitadelLogin as ZitadelLoginElement } from '@zitadel/components';
 
@@ -10,13 +11,12 @@
     ZitadelFlowStepDetail,
     ZitadelLoginProps,
   } from './types';
-  import { assignGiven } from './given';
 
   let {
     project,
     projectId,
     proxyPath,
-    purpose = 'login',
+    purpose,
     flowName,
     postSignInUrl,
     locales,
@@ -29,7 +29,8 @@
     onFlowComplete,
     onFlowRedirect,
     onFlowError,
-  }: ZitadelLoginProps = $props();
+    children,
+  }: ZitadelLoginProps & { children?: Snippet } = $props();
 
   let el: ZitadelLoginElement | undefined = $state();
 
@@ -41,14 +42,6 @@
   export function getElement(): ZitadelLoginElement | undefined {
     return el;
   }
-
-  // Props the element has defaults for are assigned only when given; a
-  // binding would assign `undefined` and overwrite the default.
-  $effect(() => {
-    if (el) {
-      assignGiven(el, { lang, variant, theme, suppressHeader });
-    }
-  });
 
   $effect(() => {
     const node = el;
@@ -89,4 +82,11 @@
   proxy-path={proxyPath}
   post-sign-in-url={postSignInUrl}
   flow-name={flowName}
-></zitadel-login>
+  {lang}
+  {variant}
+  {theme}
+  {suppressHeader}
+>
+  <!-- Light-DOM content, e.g. the `attribution-trailing` slot. -->
+  {@render children?.()}
+</zitadel-login>

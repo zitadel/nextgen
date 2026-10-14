@@ -25,8 +25,22 @@ TypeScript ≥ 5.0 — the published type definitions re-export with `export typ
 
 The signed-in session card is `<ZitadelSession {project} />` (exported as `ZitadelSession`).
 
-The widget's flow events are also surfaced as optional callbacks:
-`onFlowStep`, `onFlowInput`, `onFlowComplete`, and `onFlowError`.
+The widget's events are also surfaced as optional callbacks: `ZitadelLogin`
+takes `onFlowStep`, `onFlowInput`, `onFlowComplete`, `onFlowRedirect` and
+`onFlowError`; `ZitadelLogout` and `ZitadelSession` take `onSignout`. Each
+receives the event detail. An unset or cleared prop leaves the widget on its
+default (for example the "Signed in as" heading).
+
+Children go into the element's light DOM, so `ZitadelLogout` accepts a
+`<template>` for a custom sign-out control (`{{display}}`, `{{identifier}}`
+and `{{initial}}` are filled in, and an element with `data-action="logout"`
+signs out), and `ZitadelLogin` accepts content for its
+`slot="attribution-trailing"` slot.
+
+The components are browser-only: the package ships client-compiled Svelte, so
+rendering them on the server fails. Under SvelteKit, mount them client-side
+(for example behind `onMount` or a `browser` check), as the
+[`@zitadel/sdk-sveltekit`](../sdk-sveltekit/README.md) README shows.
 
 ## Proxying to the backend (deployment)
 

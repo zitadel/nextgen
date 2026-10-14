@@ -1,9 +1,10 @@
 import { LitElement, html, nothing } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { property } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 
 import buttonStyles from "./zl-button.css?inline";
 
+import { defineOnce } from "../internal/define-once.js";
 import { emit } from "../internal/emit.js";
 import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";
@@ -32,7 +33,7 @@ import "./zl-icon.js";
  * `delegatesFocus` ensures Tab lands on it and `<zl-field>`'s
  * Enter-to-submit pipe still fires the host form.
  */
-@customElement("zl-button")
+@defineOnce("zl-button")
 export class ZlButton extends LitElement {
   static formAssociated = true;
 

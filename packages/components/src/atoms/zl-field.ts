@@ -1,12 +1,13 @@
 import type { CreateFlow201StepFieldsItemType } from "@zitadel/api/generated/model";
 import { html, nothing, type PropertyValues } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
+import { property, query, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { ifDefined } from "lit/directives/if-defined.js";
 import { live } from "lit/directives/live.js";
 
 import fieldStyles from "./zl-field.css?inline";
 
+import { defineOnce } from "../internal/define-once.js";
 import { emit } from "../internal/emit.js";
 import { FormAtom } from "../internal/form-atom.js";
 import { hookName } from "../internal/hook-name.js";
@@ -47,7 +48,7 @@ export type ZlFieldInputDetail = { name: string; value: string };
  *
  * Form participation: `<zl-field>` is a form-associated custom element.
  */
-@customElement("zl-field")
+@defineOnce("zl-field")
 export class ZlField extends FormAtom {
   static override styles = [baseHostStyles, ...surfaceStyles(sharedStyles, fieldStyles)];
 

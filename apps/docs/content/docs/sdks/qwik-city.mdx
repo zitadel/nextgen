@@ -82,6 +82,9 @@ Install both packages as dev dependencies. Qwik bundles `devDependencies` into t
       <ZitadelLogin project={project} purpose="login" postSignInUrl="/profile" />
     ));
     ```
+
+    `ZitadelLogin` takes the callbacks `onFlowStep$`, `onFlowInput$`, `onFlowComplete$`, `onFlowRedirect$` and `onFlowError$`; `ZitadelLogout` and `ZitadelSession` take `onSignout$`. Each QRL receives the event detail. The signed-in card for a profile page is `<ZitadelSession project={project} postSignOutUrl="/login" />`.
+
   </Tab>
 </Tabs>
 

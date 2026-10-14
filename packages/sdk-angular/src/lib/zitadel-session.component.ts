@@ -1,6 +1,7 @@
 import type { ElementRef } from "@angular/core";
+import type { ZitadelProject } from "@zitadel/api/config";
 import type { ZitadelSession as ZitadelSessionElement } from "@zitadel/components";
-import type { ZitadelSignoutDetail } from "@zitadel/sdk-core/types";
+import type { ZitadelSignoutDetail, ZitadelSessionConfig } from "@zitadel/sdk-core/types";
 
 import {
   Component,
@@ -10,8 +11,6 @@ import {
   Output,
   ViewChild,
 } from "@angular/core";
-
-import type { ZitadelProject } from "./config";
 
 import "@zitadel/components";
 
@@ -34,18 +33,18 @@ import "@zitadel/components";
   template: `<zitadel-session
     #el
     [project]="project"
-    [projectId]="projectId"
-    [proxyPath]="proxyPath"
+    [attr.project-id]="projectId"
+    [attr.proxy-path]="proxyPath"
     [attr.post-sign-out-url]="postSignOutUrl"
     [attr.heading]="heading"
     [attr.logout-label]="logoutLabel"
-    [attr.variant]="variant ?? null"
-    [attr.theme]="theme ?? null"
+    [attr.variant]="variant"
+    [attr.theme]="theme"
     [suppressHeader]="suppressHeader"
     (zitadel-signout)="onSignout($event)"
-  ></zitadel-session>`,
+  ><ng-content /></zitadel-session>`,
 })
-export class ZitadelSessionComponent {
+export class ZitadelSessionComponent implements ZitadelSessionConfig {
   @Input() project?: ZitadelProject;
   @Input() projectId?: string;
   @Input() proxyPath?: string;

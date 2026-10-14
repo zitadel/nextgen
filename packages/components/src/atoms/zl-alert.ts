@@ -1,8 +1,9 @@
 import { LitElement, html } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { property } from "lit/decorators.js";
 
 import alertStyles from "./zl-alert.css?inline";
 
+import { defineOnce } from "../internal/define-once.js";
 import { emit } from "../internal/emit.js";
 import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, sharedStyles, surfaceStyles } from "../styles/index.js";
@@ -21,7 +22,7 @@ import type { IconName } from "./zl-icon.js";
  * orchestrator surfaces flow-level errors through `errors` in the Liquid
  * context.
  */
-@customElement("zl-alert")
+@defineOnce("zl-alert")
 export class ZlAlert extends LitElement {
   static override styles = [baseHostStyles, ...surfaceStyles(sharedStyles, alertStyles)];
 

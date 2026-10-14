@@ -1,12 +1,17 @@
 import { css, html, nothing } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { property } from "lit/decorators.js";
 
 import { resolveApi } from "./resolve-api.js";
 import { SessionController } from "./session-controller.js";
 import { ZitadelSurface } from "./surface.js";
+import { defineOnce } from "../internal/define-once.js";
+import { orDefault } from "../internal/or-default.js";
 import { baseHostStyles, t } from "../styles/index.js";
 
 import "../atoms/index.js";
+
+const DEFAULT_HEADING = "Signed in as";
+const DEFAULT_LOGOUT_LABEL = "Sign out";
 
 /**
  * `<zitadel-session>` — the "signed in" card.
@@ -47,7 +52,7 @@ import "../atoms/index.js";
  * destination contract is still being decided. Consumers redirect after
  * sign-in via the `<zitadel-login>` `post-sign-in-url`.
  */
-@customElement("zitadel-session")
+@defineOnce("zitadel-session")
 export class ZitadelSession extends ZitadelSurface {
   static override styles = [
     baseHostStyles,
@@ -101,15 +106,28 @@ export class ZitadelSession extends ZitadelSurface {
   /** URL to navigate to after a successful sign-out. */
   @property({ type: String, attribute: "post-sign-out-url" }) accessor postSignOutUrl = "";
 
-  /** Heading text. Defaults to the English label. */
-  @property({ type: String }) accessor heading = "Signed in as";
+  /** Heading text. Unset, `null` or `""` show the English default. */
+  @property({ type: String })
+  get heading(): string {
+    return this.#heading;
+  }
+  set heading(value: string | null | undefined) {
+    this.#heading = orDefault(value, DEFAULT_HEADING);
+  }
+  #heading = DEFAULT_HEADING;
 
-  /** Sign-out action label. */
-  @property({ type: String, attribute: "logout-label" }) accessor logoutLabel = "Sign out";
+  /** Sign-out action label. Unset, `null` or `""` show the English default. */
+  @property({ type: String, attribute: "logout-label" })
+  get logoutLabel(): string {
+    return this.#logoutLabel;
+  }
+  set logoutLabel(value: string | null | undefined) {
+    this.#logoutLabel = orDefault(value, DEFAULT_LOGOUT_LABEL);
+  }
+  #logoutLabel = DEFAULT_LOGOUT_LABEL;
 
-  private readonly session = new SessionController(
-    this,
-    () => resolveApi(this.project, this.projectAttrs, "<zitadel-session>").api,
+  private readonly session = new SessionController(this, () =>
+    resolveApi(this.project, this.projectAttrs, "<zitadel-session>"),
   );
 
   override willUpdate(): void {
@@ -118,12 +136,18 @@ export class ZitadelSession extends ZitadelSurface {
     this.applySurfaceTheme(undefined);
   }
 
-  /** Signs out, then optionally navigates to `postSignOutUrl`; a failure stays put. */
+  /**
+   * Signs out, then navigates to `postSignOutUrl`, or, without one, stays and
+   * drops the identity so the card no longer names a signed-out user. A
+   * failure stays put.
+   */
   private async doLogout(): Promise<void> {
     if (!(await this.session.signOut())) return;
     if (this.postSignOutUrl && typeof window !== "undefined") {
       window.location.assign(this.postSignOutUrl);
+      return;
     }
+    this.session.clearIdentity();
   }
 
   private handleLogout(event: Event): void {

@@ -27,6 +27,18 @@ const project = configureZitadel({
 
 The signed-in session card is `<ZitadelSession :project="project" />` (exported as `ZitadelSession`).
 
+`ZitadelLogin` emits `flowStep`, `flowInput`, `flowComplete`, `flowRedirect` and
+`flowError` (listen with `@flow-step` and so on); `ZitadelLogout` and
+`ZitadelSession` emit `signout`. Each payload is the event detail. An unset or
+cleared prop leaves the widget on its default (for example the "Signed in as"
+heading).
+
+The default slot goes into the element's light DOM, so `ZitadelLogout` accepts a
+`<template>` for a custom sign-out control (`{{display}}`, `{{identifier}}` and
+`{{initial}}` are filled in, and an element with `data-action="logout"` signs
+out), and `ZitadelLogin` accepts content for its `slot="attribution-trailing"`
+slot.
+
 ## Proxying to the backend (deployment)
 
 The widgets call `${proxyPath}/…` same-origin (default `/__nextgen`). In

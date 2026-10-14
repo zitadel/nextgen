@@ -1,11 +1,12 @@
 import { html, nothing, type PropertyValues } from "lit";
-import { customElement, property, query } from "lit/decorators.js";
+import { property, query } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { ifDefined } from "lit/directives/if-defined.js";
 import { live } from "lit/directives/live.js";
 
 import checkboxStyles from "./zl-checkbox.css?inline";
 
+import { defineOnce } from "../internal/define-once.js";
 import { emit } from "../internal/emit.js";
 import { FormAtom } from "../internal/form-atom.js";
 import { nextUid } from "../internal/unique-id.js";
@@ -27,7 +28,7 @@ export type ZlCheckboxChangeDetail = { name: string; checked: boolean; value: st
  * Form participation: `<zl-checkbox>` is a form-associated custom element, so
  * it submits its `value` only when checked, exactly like a native checkbox.
  */
-@customElement("zl-checkbox")
+@defineOnce("zl-checkbox")
 export class ZlCheckbox extends FormAtom {
   static override styles = [baseHostStyles, ...surfaceStyles(sharedStyles, checkboxStyles)];
 

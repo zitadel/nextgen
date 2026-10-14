@@ -315,3 +315,102 @@ describe("<zitadel-logout>", () => {
     expect(errorBar.textContent?.trim().length).toBeGreaterThan(0);
   });
 });
+
+describe("<zitadel-logout> after signing out in place", () => {
+  let host: HTMLDivElement;
+
+  beforeAll(() => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    host.innerHTML = "";
+  });
+
+  it("drops the identity from the avatar without a post-sign-out-url", async () => {
+    currentName = "Alice Liddell";
+    host.innerHTML = "<zitadel-logout></zitadel-logout>";
+    const element = host.querySelector("zitadel-logout") as ZitadelLogout;
+    await flush(element);
+    shadowQuery<HTMLButtonElement>(element, ".trigger").click();
+    await element.updateComplete;
+
+    shadowQuery<HTMLButtonElement>(element, ".signout-btn").click();
+    await flush(element);
+
+    expect(shadowQuery<HTMLButtonElement>(element, ".trigger").textContent?.trim()).toBe("?");
+  });
+
+  it("re-projects the template without the identity", async () => {
+    currentName = "Bob Builder";
+    host.innerHTML = `
+      <zitadel-logout>
+        <template><button data-action="logout">Bye {{display}} [{{initial}}]</button></template>
+      </zitadel-logout>
+    `;
+    const element = host.querySelector("zitadel-logout") as ZitadelLogout;
+    await flush(element);
+
+    (element.querySelector("button[data-action='logout']") as HTMLButtonElement).click();
+    await flush(element);
+
+    expect(element.querySelector("button[data-action='logout']")?.textContent).toBe("Bye  [?]");
+  });
+});
+
+describe("<zitadel-logout> defaults for unset props", () => {
+  it.each([undefined, null, ""])("reads theme assigned %j as unset", (value) => {
+    const element = document.createElement("zitadel-logout") as ZitadelLogout;
+    (element as unknown as Record<string, unknown>).theme = value;
+    expect(element.theme).toBe("");
+  });
+
+  it("restores theme to unset when the attribute is removed", () => {
+    const element = document.createElement("zitadel-logout") as ZitadelLogout;
+    element.setAttribute("theme", "dark");
+    element.removeAttribute("theme");
+    expect(element.theme).toBe("");
+  });
+});
+
+describe("<zitadel-logout> template built with DOM calls", () => {
+  it("projects a template whose children were appended to the element, not its content", async () => {
+    currentName = "Dana";
+    const element = document.createElement("zitadel-logout") as ZitadelLogout;
+    const template = document.createElement("template");
+    const button = document.createElement("button");
+    button.dataset.action = "logout";
+    button.textContent = "Bye {{display}}";
+    template.appendChild(button);
+    element.appendChild(template);
+    document.body.appendChild(element);
+    try {
+      await flush(element);
+      const projected = element.querySelector(
+        "span button[data-action='logout']",
+      ) as HTMLButtonElement | null;
+      expect(projected?.textContent).toBe("Bye Dana");
+    } finally {
+      element.remove();
+    }
+  });
+});
+
+describe("<zitadel-logout> template appended after connect", () => {
+  it("still projects a template child that arrives in the same task as the connect", async () => {
+    currentName = "Erin";
+    const element = document.createElement("zitadel-logout") as ZitadelLogout;
+    document.body.appendChild(element);
+    const template = document.createElement("template");
+    template.innerHTML = '<button data-action="logout">Bye {{display}}</button>';
+    element.appendChild(template);
+    try {
+      await flush(element);
+      expect(element.querySelector("span [data-action='logout']")?.textContent).toBe("Bye Erin");
+      expect(element.shadowRoot?.querySelector(".trigger")).toBeNull();
+    } finally {
+      element.remove();
+    }
+  });
+});

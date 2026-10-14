@@ -101,5 +101,18 @@ export async function getSession(api: ZitadelApi): Promise<SessionIdentity> {
  * server deletes the session and clears the cookie via `Set-Cookie: Max-Age=0`.
  */
 export async function revokeSession(api: ZitadelApi): Promise<void> {
-  await api.revokeMySession(apiRequestInit);
+  await api.revokeMySession(revokeRequestInit);
 }
+
+/**
+ * The revoke carries no body, so a browser sends it without a content type.
+ * Framework CSRF guards treat a body-less write like a cross-site form post
+ * and refuse it unless `Origin` matches exactly: Qwik Router answers 403
+ * before the SDK's proxy runs, behind any TLS-terminating proxy whose origin
+ * the app was not told. A JSON content type is what every other widget call
+ * already sends, and the server ignores it on a request without a body.
+ */
+const revokeRequestInit: RequestInit = {
+  ...apiRequestInit,
+  headers: { "content-type": "application/json" },
+};

@@ -41,10 +41,9 @@ export default defineComponent({
     project: { type: Object as PropType<ZitadelProject>, default: undefined },
     projectId: { type: String, default: undefined },
     proxyPath: { type: String, default: undefined },
-    purpose: {
-      type: String as PropType<CreateFlowBodyPurpose>,
-      default: "login",
-    },
+    // No default here: unset reaches the element as `undefined`, which it
+    // reads as "login", so clearing the prop behaves the same as never setting it.
+    purpose: { type: String as PropType<CreateFlowBodyPurpose>, default: undefined },
     postSignInUrl: { type: String, default: undefined },
     locales: {
       type: Object as PropType<Record<string, Partial<Record<string, string>>>>,
@@ -57,46 +56,53 @@ export default defineComponent({
     suppressHeader: { type: Boolean, default: undefined },
   },
   emits: ["flowStep", "flowInput", "flowComplete", "flowRedirect", "flowError"],
-  setup(props, { emit, expose }) {
+  setup(props, { emit, expose, slots }) {
     // Template ref to the rendered Lit element. Exposed so a consumer's
     // component `ref` (which resolves to this instance) can reach the DOM node.
     const element = ref<ZitadelLoginElement | null>(null);
     expose({ element });
 
     return () =>
-      h("zitadel-login", {
-        ref: element,
-        // Hand the Lit element the raw SDK handle, not Vue's reactive proxy:
-        // the widget does identity checks on it (and `render` from test-utils
-        // would otherwise pass a wrapped clone).
-        project: toRaw(props.project),
-        projectId: props.projectId,
-        proxyPath: props.proxyPath,
-        purpose: props.purpose,
-        "post-sign-in-url": props.postSignInUrl,
-        // Same raw-unwrap rationale as `project`: hand the widget the plain
-        // dictionaries, not Vue's reactive proxy.
-        locales: props.locales === undefined ? undefined : toRaw(props.locales),
-        lang: props.lang,
-        "flow-name": props.flowName,
-        variant: props.variant,
-        theme: props.theme,
-        suppressHeader: props.suppressHeader,
-        onZitadelFlowStep: (event: CustomEvent<ZitadelFlowStepDetail>) => {
-          emit("flowStep", event.detail);
+      h(
+        "zitadel-login",
+        {
+          ref: element,
+          // Hand the Lit element the raw SDK handle, not Vue's reactive proxy:
+          // the widget does identity checks on it (and `render` from test-utils
+          // would otherwise pass a wrapped clone).
+          project: toRaw(props.project),
+          projectId: props.projectId,
+          proxyPath: props.proxyPath,
+          purpose: props.purpose,
+          "post-sign-in-url": props.postSignInUrl,
+          // Same raw-unwrap rationale as `project`: hand the widget the plain
+          // dictionaries, not Vue's reactive proxy.
+          locales: props.locales === undefined ? undefined : toRaw(props.locales),
+          lang: props.lang,
+          "flow-name": props.flowName,
+          variant: props.variant,
+          theme: props.theme,
+          suppressHeader: props.suppressHeader,
+          onZitadelFlowStep: (event: CustomEvent<ZitadelFlowStepDetail>) => {
+            emit("flowStep", event.detail);
+          },
+          onZitadelFlowInput: (event: CustomEvent<ZitadelFlowInputDetail>) => {
+            emit("flowInput", event.detail);
+          },
+          onZitadelFlowComplete: (event: CustomEvent<ZitadelFlowCompleteDetail>) => {
+            emit("flowComplete", event.detail);
+          },
+          onZitadelFlowRedirect: (event: CustomEvent<ZitadelFlowRedirectDetail>) => {
+            emit("flowRedirect", event.detail);
+          },
+          onZitadelFlowError: (event: CustomEvent<ZitadelFlowErrorDetail>) => {
+            emit("flowError", event.detail);
+          },
         },
-        onZitadelFlowInput: (event: CustomEvent<ZitadelFlowInputDetail>) => {
-          emit("flowInput", event.detail);
-        },
-        onZitadelFlowComplete: (event: CustomEvent<ZitadelFlowCompleteDetail>) => {
-          emit("flowComplete", event.detail);
-        },
-        onZitadelFlowRedirect: (event: CustomEvent<ZitadelFlowRedirectDetail>) => {
-          emit("flowRedirect", event.detail);
-        },
-        onZitadelFlowError: (event: CustomEvent<ZitadelFlowErrorDetail>) => {
-          emit("flowError", event.detail);
-        },
-      });
+        // Slot content goes into the element's light DOM: the `<template>`
+        // `<zitadel-logout>` clones for a custom control, or login's
+        // `attribution-trailing` slot.
+        slots.default?.(),
+      );
   },
 });

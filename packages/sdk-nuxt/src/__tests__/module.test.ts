@@ -40,18 +40,51 @@ async function install(
     nextgen?: Record<string, unknown>;
     publicRuntimeConfig?: Record<string, unknown>;
     envLocal?: string;
+    vue?: { compilerOptions?: { isCustomElement?: (tag: string) => boolean } };
   } = {},
 ): Promise<ModuleRuntimeConfig> {
+  return (await installNuxt(app)).runtimeConfig;
+}
+
+/** Installs the module and returns the Nuxt options it changed. */
+async function installNuxt(app: Parameters<typeof install>[0] = {}): Promise<{
+  runtimeConfig: ModuleRuntimeConfig;
+  vue: { compilerOptions: { isCustomElement: (tag: string) => boolean } };
+}> {
   if (app.envLocal !== undefined) {
     writeFileSync(join(rootDir, ".env.local"), app.envLocal);
   }
   const runtimeConfig = { public: { ...app.publicRuntimeConfig } };
-  const nuxt = { options: { rootDir, nextgen: app.nextgen ?? {}, runtimeConfig } };
+  const nuxt = { options: { rootDir, nextgen: app.nextgen ?? {}, runtimeConfig, vue: app.vue } };
   await nextgenModule({}, nuxt as unknown as Nuxt);
-  return runtimeConfig as unknown as ModuleRuntimeConfig;
+  return nuxt.options as unknown as Awaited<ReturnType<typeof installNuxt>>;
 }
 
 describe("@zitadel/sdk-nuxt module", () => {
+  it.each(["zitadel-login", "zitadel-logout", "zitadel-session"])(
+    "tells Vue that <%s> is a custom element",
+    async (tag) => {
+      const { vue } = await installNuxt();
+
+      expect(vue.compilerOptions.isCustomElement(tag)).toBe(true);
+    },
+  );
+
+  it("leaves other tags to Vue's component resolution", async () => {
+    const { vue } = await installNuxt();
+
+    expect(vue.compilerOptions.isCustomElement("my-widget")).toBe(false);
+  });
+
+  it("keeps the app's own isCustomElement predicate", async () => {
+    const { vue } = await installNuxt({
+      vue: { compilerOptions: { isCustomElement: (tag) => tag.startsWith("ion-") } },
+    });
+
+    expect(vue.compilerOptions.isCustomElement("ion-button")).toBe(true);
+    expect(vue.compilerOptions.isCustomElement("zitadel-login")).toBe(true);
+  });
+
   it("hands a custom proxyPath to the server middleware and to the widgets", async () => {
     const runtime = await install({ nextgen: { proxyPath: "/auth" } });
 

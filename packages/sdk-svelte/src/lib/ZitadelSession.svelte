@@ -1,9 +1,9 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import '@zitadel/components';
   import type { ZitadelSession as ZitadelSessionElement } from '@zitadel/components';
 
   import type { ZitadelSessionProps, ZitadelSignoutDetail } from './types';
-  import { assignGiven } from './given';
 
   let {
     project,
@@ -16,7 +16,8 @@
     theme,
     suppressHeader,
     onSignout,
-  }: ZitadelSessionProps = $props();
+    children,
+  }: ZitadelSessionProps & { children?: Snippet } = $props();
 
   let el: ZitadelSessionElement | undefined = $state();
 
@@ -28,14 +29,6 @@
   export function getElement(): ZitadelSessionElement | undefined {
     return el;
   }
-
-  // Props the element has defaults for are assigned only when given; a
-  // binding would assign `undefined` and overwrite the default.
-  $effect(() => {
-    if (el) {
-      assignGiven(el, { heading, variant, theme, suppressHeader });
-    }
-  });
 
   $effect(() => {
     const node = el;
@@ -57,5 +50,12 @@
   project-id={projectId}
   proxy-path={proxyPath}
   post-sign-out-url={postSignOutUrl}
+  {heading}
   logout-label={logoutLabel}
-></zitadel-session>
+  {variant}
+  {theme}
+  {suppressHeader}
+>
+  <!-- Light-DOM content for the element (see README). -->
+  {@render children?.()}
+</zitadel-session>

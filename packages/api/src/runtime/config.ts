@@ -92,6 +92,14 @@ const apiCache = new WeakMap<ZitadelProject, ZitadelApi>();
  * original. This prevents accidental overwrites while remaining safe
  * for HMR and framework double-mounts.
  */
+/**
+ * Event dispatched on `globalThis` when {@link configureZitadel} stores a new
+ * project handle. The handle lives in a plain slot, not a reactive store, so a
+ * widget that started before the app configured (in an effect that ran after
+ * mount) listens for this to try again.
+ */
+export const CONFIG_CHANGE_EVENT = "zitadel-config-change";
+
 export function configureZitadel(config: ZitadelConfig): ZitadelProject {
   const resolvedProxyPath = config.proxyPath ?? "/__nextgen";
   const existing = readSlot();
@@ -122,6 +130,9 @@ export function configureZitadel(config: ZitadelConfig): ZitadelProject {
   });
   writeSlot(project);
   setProxyPath(resolvedProxyPath);
+  if (typeof globalThis.dispatchEvent === "function") {
+    globalThis.dispatchEvent(new Event(CONFIG_CHANGE_EVENT));
+  }
   return project;
 }
 

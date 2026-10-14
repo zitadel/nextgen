@@ -1,6 +1,7 @@
 import { html, LitElement, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { property, state } from "lit/decorators.js";
 
+import { defineOnce } from "../internal/define-once.js";
 import { bufferToBase64Url, base64UrlToBuffer } from "../internal/base64url.js";
 import { emit } from "../internal/emit.js";
 import { parseJsonAttribute } from "../internal/json-attribute.js";
@@ -95,7 +96,7 @@ const TIMEOUT_GRACE_MS = 1000;
  *
  * Spec: ADR 011 — Passkey Action Contract
  */
-@customElement("zl-passkey")
+@defineOnce("zl-passkey")
 export class ZlPasskey extends LitElement {
   /**
    * Which WebAuthn ceremony to perform.

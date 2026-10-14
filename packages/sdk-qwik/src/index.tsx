@@ -13,7 +13,14 @@ import type {
 } from "@zitadel/sdk-core/types";
 
 import "@zitadel/components";
-import { component$, useSignal, useVisibleTask$, type QRL, type Signal } from "@qwik.dev/core";
+import {
+  component$,
+  Slot,
+  useSignal,
+  useVisibleTask$,
+  type QRL,
+  type Signal,
+} from "@qwik.dev/core";
 import {
   configureZitadel,
   getApi,
@@ -31,9 +38,10 @@ export * from "./types";
 export { businessLocales } from "@zitadel/components";
 
 /**
- * Assigns a widget config value as a DOM *property*, skipping `undefined` so the
- * element keeps its own accessor default (e.g. the session card's "Signed in
- * as" heading).
+ * Assigns a widget config value as a DOM *property*, `undefined` included: the
+ * widgets treat `undefined` as "use the default", so a prop the parent clears
+ * resets the element (e.g. the session card's "Signed in as" heading), and a
+ * property-only member (`project`, `locales`) is dropped rather than kept stale.
  *
  * Qwik 2 binds custom-element JSX props as *attributes* only — its client
  * renderer has no property-setting path for elements — and the widgets expose
@@ -48,22 +56,23 @@ function setProp<E extends Element, K extends keyof E>(
   key: K,
   value: E[K] | undefined,
 ): void {
-  if (value !== undefined) {
-    el[key] = value;
-  }
+  el[key] = value as E[K];
 }
 
 /**
  * The attribute-backed config, emitted declaratively in the JSX. Under SSR
- * (Qwik Router) the widget arrives as server-rendered markup and Qwik *resumes*
- * it rather than re-rendering, so the `ref` binder never runs and the
- * `useVisibleTask$` re-binds only after the widget has upgraded and rendered
- * "requires a configured project" (and booted a `login` flow on a register
- * page). Attributes are serialised into the SSR'd HTML, so the widget reads them
- * the instant it upgrades. Qwik renders lower-case kebab-case attributes
- * verbatim; `undefined` omits one, and a boolean attribute is present-or-absent.
- * The property binders still run on the client, so property-only config (the
- * full `project` handle, `locales`) is applied on top.
+ * (Qwik Router) the widget arrives as server-rendered markup that Qwik
+ * *resumes* rather than re-renders. The `ref` binder does run on the server,
+ * but there it receives a `DomRef` placeholder, not the element: it stores that
+ * ref in the host signal (which serialises), and on resume the
+ * `useVisibleTask$` reads the real element from it and applies the properties
+ * and listeners. That happens only after the widget has upgraded, so the
+ * attributes are what it boots from: they are serialised into the SSR'd HTML
+ * and read the instant it upgrades (otherwise it would render "requires a
+ * configured project", or boot a `login` flow on a register page). Qwik renders
+ * lower-case kebab-case attributes verbatim; `undefined` omits one, and a
+ * boolean attribute is present-or-absent. Property-only config (the full
+ * `project` handle, `locales`) is applied on top by the visible task.
  */
 type Attrs = Record<string, string | undefined>;
 
@@ -86,7 +95,7 @@ function flag(value: boolean | undefined): string | undefined {
 function loginAttrs(props: ZitadelLoginProps): Attrs {
   return {
     ...projectAttrs(props),
-    purpose: props.purpose ?? "login",
+    purpose: props.purpose,
     "flow-name": props.flowName,
     "post-sign-in-url": props.postSignInUrl,
     variant: props.variant,
@@ -121,7 +130,7 @@ function bindLoginConfig(el: ZitadelLoginElement, props: ZitadelLoginProps): voi
   setProp(el, "project", props.project);
   setProp(el, "projectId", props.projectId);
   setProp(el, "proxyPath", props.proxyPath);
-  setProp(el, "purpose", props.purpose ?? "login");
+  setProp(el, "purpose", props.purpose);
   setProp(el, "flowName", props.flowName);
   setProp(el, "postSignInUrl", props.postSignInUrl);
   setProp(el, "variant", props.variant);
@@ -155,6 +164,38 @@ function bindSessionConfig(el: ZitadelSessionElement, props: ZitadelSessionProps
 
 function eventDetail<T>(event: Event): T {
   return (event as CustomEvent<T>).detail;
+}
+
+/**
+ * Wires the widget's native `zitadel-*` listeners once every handler QRL has
+ * loaded. A QRL is async until resolved, and the widget navigates synchronously
+ * right after emitting `zitadel-signout`, `zitadel-flow-redirect` or a
+ * redirecting `zitadel-flow-complete` — so an unresolved handler would only
+ * start after the page is already leaving. A resolved QRL runs synchronously
+ * when called, like the other SDKs' callbacks. The cleanup is registered before
+ * the await so a re-run or unmount during loading never attaches stale
+ * listeners.
+ */
+async function listen(
+  el: Element,
+  listeners: Record<string, (event: Event) => void>,
+  cleanup: (fn: () => void) => void,
+  handlers: readonly (QRL | undefined)[],
+): Promise<void> {
+  let disposed = false;
+  cleanup(() => {
+    disposed = true;
+    for (const [name, listener] of Object.entries(listeners)) {
+      el.removeEventListener(name, listener);
+    }
+  });
+  await Promise.all(handlers.map((handler) => handler?.resolve()));
+  if (disposed) {
+    return;
+  }
+  for (const [name, listener] of Object.entries(listeners)) {
+    el.addEventListener(name, listener);
+  }
 }
 
 /**
@@ -200,7 +241,7 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
   const host = useSignal<ZitadelLoginElement>();
   // biome-ignore lint/correctness/noQwikUseVisibleTask: wrapping a web component needs an imperative mount task to set DOM properties and wire native listeners Qwik's declarative APIs cannot express.
   useVisibleTask$(
-    ({ track, cleanup }) => {
+    async ({ track, cleanup }) => {
       const el = track(() => host.value);
       if (!el) {
         return;
@@ -208,23 +249,22 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
       // Re-run whenever any prop changes, then re-apply the config reactively.
       track(() => ({ ...props }));
       bindLoginConfig(el, props);
-      const onStep = (event: Event): void => void props.onFlowStep$?.(eventDetail(event));
-      const onInput = (event: Event): void => void props.onFlowInput$?.(eventDetail(event));
-      const onComplete = (event: Event): void => void props.onFlowComplete$?.(eventDetail(event));
-      const onRedirect = (event: Event): void => void props.onFlowRedirect$?.(eventDetail(event));
-      const onError = (event: Event): void => void props.onFlowError$?.(eventDetail(event));
-      el.addEventListener("zitadel-flow-step", onStep);
-      el.addEventListener("zitadel-flow-input", onInput);
-      el.addEventListener("zitadel-flow-complete", onComplete);
-      el.addEventListener("zitadel-flow-redirect", onRedirect);
-      el.addEventListener("zitadel-flow-error", onError);
-      cleanup(() => {
-        el.removeEventListener("zitadel-flow-step", onStep);
-        el.removeEventListener("zitadel-flow-input", onInput);
-        el.removeEventListener("zitadel-flow-complete", onComplete);
-        el.removeEventListener("zitadel-flow-redirect", onRedirect);
-        el.removeEventListener("zitadel-flow-error", onError);
-      });
+      const listeners = {
+        "zitadel-flow-step": (event: Event): void => void props.onFlowStep$?.(eventDetail(event)),
+        "zitadel-flow-input": (event: Event): void => void props.onFlowInput$?.(eventDetail(event)),
+        "zitadel-flow-complete": (event: Event): void =>
+          void props.onFlowComplete$?.(eventDetail(event)),
+        "zitadel-flow-redirect": (event: Event): void =>
+          void props.onFlowRedirect$?.(eventDetail(event)),
+        "zitadel-flow-error": (event: Event): void => void props.onFlowError$?.(eventDetail(event)),
+      };
+      await listen(el, listeners, cleanup, [
+        props.onFlowStep$,
+        props.onFlowInput$,
+        props.onFlowComplete$,
+        props.onFlowRedirect$,
+        props.onFlowError$,
+      ]);
     },
     { strategy: "document-ready" },
   );
@@ -238,7 +278,9 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
         bindLoginConfig(el, props);
       }}
       {...loginAttrs(props)}
-    />
+    >
+      <Slot />
+    </zitadel-login>
   );
 });
 
@@ -270,18 +312,17 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
   const host = useSignal<ZitadelLogoutElement>();
   // biome-ignore lint/correctness/noQwikUseVisibleTask: wrapping a web component needs an imperative mount task to set DOM properties and wire native listeners Qwik's declarative APIs cannot express.
   useVisibleTask$(
-    ({ track, cleanup }) => {
+    async ({ track, cleanup }) => {
       const el = track(() => host.value);
       if (!el) {
         return;
       }
       track(() => ({ ...props }));
       bindLogoutConfig(el, props);
-      const onSignout = (event: Event): void => void props.onSignout$?.(eventDetail(event));
-      el.addEventListener("zitadel-signout", onSignout);
-      cleanup(() => {
-        el.removeEventListener("zitadel-signout", onSignout);
-      });
+      const listeners = {
+        "zitadel-signout": (event: Event): void => void props.onSignout$?.(eventDetail(event)),
+      };
+      await listen(el, listeners, cleanup, [props.onSignout$]);
     },
     { strategy: "document-ready" },
   );
@@ -295,7 +336,9 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
         bindLogoutConfig(el, props);
       }}
       {...logoutAttrs(props)}
-    />
+    >
+      <Slot />
+    </zitadel-logout>
   );
 });
 
@@ -327,18 +370,17 @@ export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
   const host = useSignal<ZitadelSessionElement>();
   // biome-ignore lint/correctness/noQwikUseVisibleTask: wrapping a web component needs an imperative mount task to set DOM properties and wire native listeners Qwik's declarative APIs cannot express.
   useVisibleTask$(
-    ({ track, cleanup }) => {
+    async ({ track, cleanup }) => {
       const el = track(() => host.value);
       if (!el) {
         return;
       }
       track(() => ({ ...props }));
       bindSessionConfig(el, props);
-      const onSignout = (event: Event): void => void props.onSignout$?.(eventDetail(event));
-      el.addEventListener("zitadel-signout", onSignout);
-      cleanup(() => {
-        el.removeEventListener("zitadel-signout", onSignout);
-      });
+      const listeners = {
+        "zitadel-signout": (event: Event): void => void props.onSignout$?.(eventDetail(event)),
+      };
+      await listen(el, listeners, cleanup, [props.onSignout$]);
     },
     { strategy: "document-ready" },
   );
@@ -352,6 +394,8 @@ export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
         bindSessionConfig(el, props);
       }}
       {...sessionAttrs(props)}
-    />
+    >
+      <Slot />
+    </zitadel-session>
   );
 });

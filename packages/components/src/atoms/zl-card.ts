@@ -1,8 +1,9 @@
 import { LitElement, html } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { property } from "lit/decorators.js";
 
 import cardStyles from "./zl-card.css?inline";
 
+import { defineOnce } from "../internal/define-once.js";
 import { lightDomSlotFilled } from "../internal/slot-filled.js";
 import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";
@@ -28,7 +29,7 @@ import { baseHostStyles, surfaceStyles } from "../styles/index.js";
  *               tighter gaps (12px) from the orchestrator's layout chrome,
  *               because the card only sees a flat slot.
  */
-@customElement("zl-card")
+@defineOnce("zl-card")
 export class ZlCard extends LitElement {
   static override styles = [baseHostStyles, ...surfaceStyles(cardStyles)];
 

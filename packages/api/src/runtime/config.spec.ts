@@ -1,7 +1,13 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { getProxyPath } from "./base-url";
-import { configureZitadel, getApi, getZitadelConfig, _resetConfigForTesting } from "./config";
+import {
+  CONFIG_CHANGE_EVENT,
+  configureZitadel,
+  getApi,
+  getZitadelConfig,
+  _resetConfigForTesting,
+} from "./config";
 
 afterEach(() => {
   _resetConfigForTesting();
@@ -9,6 +15,21 @@ afterEach(() => {
 });
 
 describe("configureZitadel", () => {
+  test("announces a newly stored project on globalThis", () => {
+    const target = new EventTarget();
+    vi.stubGlobal("dispatchEvent", target.dispatchEvent.bind(target));
+    const listener = vi.fn();
+    target.addEventListener(CONFIG_CHANGE_EVENT, listener);
+    vi.spyOn(console, "warn").mockImplementation(vi.fn());
+
+    configureZitadel({ proxyPath: "/__nextgen", projectId: "proj_1" });
+    configureZitadel({ proxyPath: "/__nextgen", projectId: "proj_1" });
+    configureZitadel({ proxyPath: "/other", projectId: "proj_2" });
+    vi.unstubAllGlobals();
+
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
   test("sets config and syncs proxyPath", () => {
     const project = configureZitadel({ proxyPath: "/__nextgen", projectId: "proj_1" });
 

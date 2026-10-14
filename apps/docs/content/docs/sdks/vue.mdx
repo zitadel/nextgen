@@ -21,6 +21,8 @@ The Vue SDK wraps the shared web components with Vue 3-friendly bindings.
     ```sh
     pnpm add @zitadel/sdk-vue@alpha
     ```
+
+    `ZitadelLogin` emits `flowStep`, `flowInput`, `flowComplete`, `flowRedirect` and `flowError`; `ZitadelLogout` and `ZitadelSession` emit `signout`. Each payload is the event detail. `ZitadelSession` is the signed-in card (`<ZitadelSession :project="project" />`). An unset or cleared prop leaves the widget on its default, for example the "Signed in as" heading. The default slot goes into the element's light DOM, so `ZitadelLogout` accepts a `<template>` for a custom sign-out control and `ZitadelLogin` accepts `slot="attribution-trailing"` content.
   </Tab>
   <Tab>
     ```sh

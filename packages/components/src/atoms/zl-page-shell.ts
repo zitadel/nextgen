@@ -1,8 +1,8 @@
 import { LitElement, html } from "lit";
-import { customElement } from "lit/decorators.js";
 
 import pageShellStyles from "./zl-page-shell.css?inline";
 
+import { defineOnce } from "../internal/define-once.js";
 import { lightDomSlotFilled } from "../internal/slot-filled.js";
 import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";
@@ -30,7 +30,7 @@ import { baseHostStyles, surfaceStyles } from "../styles/index.js";
  * embedding app owns spacing around the card. Only the region gap
  * survives, because it separates real content (card → attribution pill).
  */
-@customElement("zl-page-shell")
+@defineOnce("zl-page-shell")
 export class ZlPageShell extends LitElement {
   static override styles = [baseHostStyles, ...surfaceStyles(pageShellStyles)];
 

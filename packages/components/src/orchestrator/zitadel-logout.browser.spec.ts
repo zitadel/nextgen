@@ -108,3 +108,34 @@ describe("<zitadel-logout> open/close (chromium)", () => {
     expect(init.credentials).toBe("include");
   });
 });
+
+describe("<zitadel-logout> template mode (chromium)", () => {
+  let host: HTMLDivElement;
+
+  beforeEach(() => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    host.remove();
+  });
+
+  it("renders the projected template where the user can see and click it", async () => {
+    host.innerHTML = `
+      <zitadel-logout>
+        <template><button data-action="logout">Sign out</button></template>
+      </zitadel-logout>
+    `;
+    const element = host.querySelector("zitadel-logout") as ZitadelLogout;
+    await element.updateComplete;
+    const button = await waitFor(() =>
+      element.querySelector<HTMLButtonElement>("button[data-action='logout']"),
+    );
+
+    const rect = button.getBoundingClientRect();
+    expect(button.checkVisibility()).toBe(true);
+    expect(rect.width).toBeGreaterThan(0);
+    expect(rect.height).toBeGreaterThan(0);
+  });
+});

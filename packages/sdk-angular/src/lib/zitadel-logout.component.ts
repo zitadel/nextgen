@@ -1,6 +1,7 @@
 import type { ElementRef } from "@angular/core";
+import type { ZitadelProject } from "@zitadel/api/config";
 import type { ZitadelLogout as ZitadelLogoutElement } from "@zitadel/components";
-import type { ZitadelSignoutDetail } from "@zitadel/sdk-core/types";
+import type { ZitadelSignoutDetail, ZitadelLogoutConfig } from "@zitadel/sdk-core/types";
 
 import {
   Component,
@@ -11,8 +12,6 @@ import {
   ViewChild,
 } from "@angular/core";
 
-import type { ZitadelProject } from "./config";
-
 import "@zitadel/components";
 
 /**
@@ -21,6 +20,10 @@ import "@zitadel/components";
  * `zitadel-signout` event is re-emitted with its detail as the `signout`
  * output. The underlying `<zitadel-logout>` custom element is exposed via the
  * {@link element} getter (the Angular analogue of React's `forwardRef`).
+ *
+ * Content placed inside the wrapper is projected into the element, so a
+ * `<template>` child switches it to template mode (the consumer's own markup,
+ * with a `data-action="logout"` trigger, instead of the avatar menu).
  *
  * ```html
  * <zitadel-auth-logout [project]="project" postSignOutUrl="/login"
@@ -34,14 +37,14 @@ import "@zitadel/components";
   template: `<zitadel-logout
     #el
     [project]="project"
-    [projectId]="projectId"
-    [proxyPath]="proxyPath"
+    [attr.project-id]="projectId"
+    [attr.proxy-path]="proxyPath"
     [attr.post-sign-out-url]="postSignOutUrl"
-    [attr.theme]="theme ?? null"
+    [attr.theme]="theme"
     (zitadel-signout)="onSignout($event)"
-  ></zitadel-logout>`,
+  ><ng-content /></zitadel-logout>`,
 })
-export class ZitadelLogoutComponent {
+export class ZitadelLogoutComponent implements ZitadelLogoutConfig {
   @Input() project?: ZitadelProject;
   @Input() projectId?: string;
   @Input() proxyPath?: string;
