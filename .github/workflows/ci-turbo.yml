@@ -259,7 +259,7 @@ jobs:
 
       - name: Upload journey diagnostics
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: journey-diagnostics-turbo
           path: ${{ runner.temp }}/ci-journey/diagnostics
@@ -270,7 +270,7 @@ jobs:
       # .zitadel-testing/ and stays out.
       - name: Upload e2e diagnostics
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-diagnostics-turbo
           path: |
