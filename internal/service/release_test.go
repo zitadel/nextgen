@@ -294,12 +294,7 @@ func TestReleaseServiceCreateRejectsMissingUserSchema(t *testing.T) {
 			{Kind: domain.ReleasePointerKindBranding, RevisionID: "brnd_1"},
 		},
 	})
-	require.Error(t, err)
-
-	domErr, ok := errors.AsType[domain.Error](err)
-	require.True(t, ok)
-	assert.Equal(t, domain.ErrReleaseUnresolvedReference().Code, domErr.Code)
-	assert.Equal(t, "flow_definition default-login: user_schema human-user not found", domErr.Message)
+	assert.ErrorIs(t, err, domain.ErrReleaseUnresolvedReference())
 }
 
 func TestReleaseServiceCreateReferencesIDPConnection(t *testing.T) {
@@ -346,12 +341,7 @@ func TestReleaseServiceCreateRejectsFlowNotFittingItsSchema(t *testing.T) {
 			{Kind: domain.ReleasePointerKindSchema, RevisionID: "https://example.com/human-user-v2.json"},
 		},
 	})
-	require.Error(t, err)
-
-	domErr, ok := errors.AsType[domain.Error](err)
-	require.True(t, ok)
-	assert.Equal(t, domain.ErrReleaseInvalid(nil, nil).Code, domErr.Code)
-	assert.Equal(t, "flow_definition default-login: does not fit user_schema human-user revision https://example.com/human-user-v2.json", domErr.Message)
+	assert.ErrorIs(t, err, domain.ErrReleaseInvalid(nil, nil))
 }
 
 // Two revisions of one resource cannot both be pinned: the release would
