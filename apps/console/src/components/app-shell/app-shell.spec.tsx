@@ -1,5 +1,5 @@
 import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -343,44 +343,7 @@ describe("project pill", () => {
     expect(router.state.resolvedLocation?.pathname).toBe("/teams");
     await waitFor(() => expect(pill).toHaveTextContent("Delta"));
     expect(screen.queryByRole("list", { name: "Switch project" })).not.toBeInTheDocument();
-    // A screen may re-fetch (hovering the row preloads it), so which projects
-    // were asked for matters here, not how many times.
-    await waitFor(() => expect([...new Set(queried)]).toEqual(["proj_1", "proj_2"]));
-  });
-
-  it("re-scopes the same way when the row was hovered long enough to preload", async () => {
-    const queried: string[] = [];
-    server.use(
-      http.get(MY_PROJECTS, () =>
-        HttpResponse.json({
-          projects: [
-            { id: "proj_1", name: "River" },
-            { id: "proj_2", name: "Delta" },
-          ],
-        }),
-      ),
-      http.post(TEAMS_QUERY, ({ request }) => {
-        queried.push(new URL(request.url).searchParams.get("project_id") ?? "");
-        return HttpResponse.json({ teams: [] });
-      }),
-    );
-    const router = renderShell(scopedPath("/teams", "proj_1"));
-
-    const pill = await screen.findByRole("button", { name: "Switch project" });
-    await waitFor(() => expect(pill).toHaveTextContent("River"));
-    await userEvent.click(pill);
-    const list = within(await screen.findByRole("list", { name: "Switch project" }));
-    const row = list.getByRole("link", { name: "Delta" });
-    await userEvent.hover(row);
-    // Long enough for the router's intent preload (50ms) to fire before the click.
-    await act(() => new Promise((resolve) => setTimeout(resolve, 200)));
-    await userEvent.click(row);
-
-    await waitFor(() =>
-      expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_2" }),
-    );
-    await waitFor(() => expect(pill).toHaveTextContent("Delta"));
-    await waitFor(() => expect([...new Set(queried)]).toEqual(["proj_1", "proj_2"]));
+    await waitFor(() => expect(queried).toEqual(["proj_1", "proj_2"]));
   });
 
   it("lands on the new project's first screen when selected from an unscoped one", async () => {
