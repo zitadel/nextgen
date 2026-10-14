@@ -51,6 +51,7 @@ export async function prepareApp(options = {}) {
   await fs.rm(appDir, { recursive: true, force: true });
   await fs.mkdir(appDir, { recursive: true });
   await fs.mkdir(outputDir, { recursive: true });
+  await fs.mkdir(npmEnv.TMPDIR, { recursive: true });
 
   if (preexistingApp) {
     // The pre-existing-app lane (ADR 044): seed a minimal host app before any
@@ -471,8 +472,10 @@ function npmEnvironment(env, registryUrl, outputDir) {
     npm_config_fund: "false",
     npm_config_prefer_online: "true",
     npm_config_registry: registryUrl,
-    npm_config_tmp: join(outputDir, ".npm-tmp"),
     npm_config_yes: "true",
+    // npm has no `tmp` setting any more and warns about npm_config_tmp; it
+    // takes its scratch directory from TMPDIR.
+    TMPDIR: join(outputDir, ".npm-tmp"),
   };
 }
 
