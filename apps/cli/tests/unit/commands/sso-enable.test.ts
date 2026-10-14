@@ -119,6 +119,22 @@ function enable(cwd: string, ...extra: string[]) {
   );
 }
 
+/** The same, rendered for a terminal, which is where the warnings are said. */
+function enableRendered(cwd: string, ...extra: string[]) {
+  return withStdin("piped-secret", () =>
+    runCliForTest([
+      "sso",
+      "enable",
+      "--cwd",
+      cwd,
+      "--provider",
+      "google",
+      "--non-interactive",
+      ...extra,
+    ]),
+  );
+}
+
 afterEach(async () => {
   while (tempDirs.length > 0) {
     const dir = tempDirs.pop();
@@ -153,6 +169,59 @@ describe("sso enable", () => {
     expect(written.claim_mapping).toEqual({ email: "email" });
   });
 
+  describe("a password step edited by hand", () => {
+    async function aProjectWithAnEditedPasswordStep(): Promise<string> {
+      const cwd = await makeProject();
+      const path = join(cwd, ".zitadel/flows/default-human-user-login.json");
+      const flow = JSON.parse(await readFile(path, "utf8")) as {
+        steps: Array<Record<string, unknown>>;
+      };
+      flow.steps.splice(flow.steps.length - 1, 0, {
+        name: "password",
+        fields: ["x-auth-methods#password"],
+        actions: [{ name: "submit", kind: "submit", primary: true, text_key: "my.own.copy" }],
+        transitions: { submit: { target: "done" } },
+      });
+      await writeFile(path, `${JSON.stringify(flow)}\n`);
+      return cwd;
+    }
+
+    it("is told to add the connection's slug, not its display name", async () => {
+      const cwd = await aProjectWithAnEditedPasswordStep();
+
+      const result = await enableRendered(
+        cwd,
+        "--client-id",
+        "1234-abc.apps.googleusercontent.com",
+      );
+
+      expect(result.stderr).toContain("Add google to its sso_providers");
+    });
+
+    it("is told where each provider outcome should go", async () => {
+      const cwd = await aProjectWithAnEditedPasswordStep();
+
+      const result = await enableRendered(
+        cwd,
+        "--client-id",
+        "1234-abc.apps.googleusercontent.com",
+      );
+
+      expect(result.stderr).toContain("user_already_exists to sso-conflict");
+    });
+
+    it("is left alone, and said so once, by step name", async () => {
+      const cwd = await aProjectWithAnEditedPasswordStep();
+
+      const result = await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
+
+      const payload = parseJson(result.stdout) as { data: { untouched: string[] } };
+      expect(payload.data.untouched).toEqual([
+        ".zitadel/flows/default-human-user-login.json steps.password",
+      ]);
+    });
+  });
+
   it("reuses the connection on a second run and writes nothing new", async () => {
     const cwd = await makeProject();
     await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
@@ -162,6 +231,40 @@ describe("sso enable", () => {
     const payload = parseJson(result.stdout) as { data: { connection: { action: string } } };
     expect(payload.data.connection.action).toBe("reuse");
     expect(await readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")).toBe(before);
+  });
+
+  it("warns when the schema defines nothing the provider maps, so the connection has no mapping", async () => {
+    const cwd = await makeProject({
+      "default-human-user": {
+        properties: { staffNumber: { type: "string" } },
+        "x-auth-methods": { password: { enabled: true }, passkey: { enabled: true } },
+      },
+    });
+
+    const result = await withStdin("piped-secret", () =>
+      runCliForTest([
+        "sso",
+        "enable",
+        "--cwd",
+        cwd,
+        "--json",
+        "--non-interactive",
+        "--provider",
+        "custom",
+        "--slug",
+        "acme-sso",
+        "--display-name",
+        "Acme SSO",
+        "--issuer",
+        "https://sso.acme.example",
+        "--client-id",
+        "acme-client-id",
+      ]),
+    );
+
+    expect(result.exitCode).toBe(0);
+    const payload = parseJson(result.stdout) as { warnings?: string[] };
+    expect(payload.warnings?.join("\n")).toContain("has no claim_mapping");
   });
 
   it("publishes a changed client id on reuse rather than ignoring it", async () => {

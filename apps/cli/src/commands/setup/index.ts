@@ -12,8 +12,19 @@ import {
   type SetupPreset,
   type SetupUseCase,
 } from "@zitadel/config/defaults";
-import { credentialVariables, idpProvider, IDP_PROVIDERS } from "@zitadel/config/idp";
+import {
+  credentialVariables,
+  CUSTOM_PROVIDER,
+  IDP_PROVIDERS,
+  parseClientId,
+  parseClientSecret,
+  type ProviderSelection,
+  providerOf,
+  selectionName,
+  type ConnectionSlug,
+} from "@zitadel/config/idp";
 import { consola } from "consola";
+import semver from "semver";
 
 import { createZitadelClient } from "../../lib/api-client";
 import { isDevelopmentBuild } from "../../lib/build-channel";
@@ -26,13 +37,24 @@ import {
   claimState,
   claimWindowDeadline,
 } from "../../lib/claim-state";
-import { toZitadelError, ZitadelError } from "../../lib/errors";
+import { isErrno, toZitadelError, ZitadelError } from "../../lib/errors";
 import {
+  customFlagText,
+  checkGivenCustomFlags,
+  customExample,
+  customFlagValues,
+  flagText,
+  ENABLE_FLAG_NAMES,
+  givenCustomFlags,
+  loopbackIssuerWarning,
   publishClientId,
   type PublishState,
+  selectionFromFlags,
   reportClientIdOutcome,
   reportSecretOutcome,
   republishCommands,
+  SETUP_FLAG_KEYS,
+  SETUP_FLAG_NAMES,
   storeClientSecret,
   type SecretOutcome,
   type SecretPublisher,
@@ -42,7 +64,8 @@ import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from ".
 import { serverKind } from "../../lib/oclif/server-kind";
 import { findLocalAdminFor } from "../../lib/local-server/admin-credential";
 import { claimProjectAsAdmin } from "../../lib/local-server/claim-as-admin";
-import { readPlatformRuntime } from "../../lib/local-server/runtime";
+import { bundledServerVersion } from "../../lib/local-server/binary";
+import { readNearestRuntimeMetadata, readPlatformRuntime } from "../../lib/local-server/runtime";
 import { readZitadelSecret, writeZitadelSecret } from "../../lib/project";
 import {
   createOrca,
@@ -63,11 +86,19 @@ import { derivePosture } from "../../lib/orca/patchers/posture";
 import { writeScaffoldManifest } from "../../lib/scaffold-manifest";
 import { readStdin } from "../../lib/variables";
 import {
+  assertNoSetupResourceConflicts,
   materializeSetupResources,
   type MaterializeSetupResourcesResult,
 } from "../../lib/setup-resources";
 import { installDependenciesForSetup } from "./install";
-import { PickFrameworkPrompt, SETUP_PROMPTS, type SetupAnswers, type SsoAnswer } from "./prompts";
+import {
+  askCustomSettings,
+  PickFrameworkPrompt,
+  SETUP_PROMPTS,
+  type SetupAnswers,
+  type SsoDraft,
+  completeSso,
+} from "./prompts";
 import {
   detectProjectFacts,
   fileNameOf,
@@ -170,13 +201,27 @@ export default class Setup extends BaseCommand {
     // hidden so scripts and agents still passing it get a targeted error
     // pointing at `branding eject` instead of oclif's unknown-flag error.
     design: nonBlankString({ hidden: true }),
-    sso: Flags.string({
+    [SETUP_FLAG_KEYS.provider]: Flags.string({
       description:
         "Social sign-in provider to enable while scaffolding, e.g. google. Skips the wizard's provider question; needs --sso-client-id, and the OAuth application must already be registered with the provider. Pipe the client secret in on stdin; never pass it as a flag.",
-      options: [...IDP_PROVIDERS],
+      options: [...IDP_PROVIDERS, CUSTOM_PROVIDER],
     }),
     "sso-client-id": nonBlankString({
       description: "Client id of the OAuth application registered with the --sso provider.",
+    }),
+    [SETUP_FLAG_KEYS.slug]: nonBlankString({
+      description: "With --sso custom: the name of the connection. Schemas and flows refer to it.",
+    }),
+    [SETUP_FLAG_KEYS.displayName]: nonBlankString({
+      description: "With --sso custom: the name shown on the sign-in button.",
+    }),
+    [SETUP_FLAG_KEYS.issuer]: nonBlankString({
+      description:
+        "With --sso custom: the provider's issuer URL. Its endpoints come from OIDC discovery.",
+    }),
+    [SETUP_FLAG_KEYS.scopes]: nonBlankString({
+      description:
+        "With --sso custom: the scopes to request, separated by spaces or commas. Must include openid. Default: openid profile email.",
     }),
   };
 
@@ -195,6 +240,26 @@ export default class Setup extends BaseCommand {
     if (flags.design !== undefined) {
       throw setupDesignRemovedError(this.config.version);
     }
+    // The command line's own mistakes come before anything that can fail for
+    // another reason, so a slug the server would refuse is named even when the
+    // server is down. A custom connection whose settings the wizard will ask for
+    // is checked once they are all there.
+    const customValues = customFlagValues(flags, SETUP_FLAG_KEYS);
+    const settingsGiven =
+      customValues.slug !== undefined &&
+      customValues.displayName !== undefined &&
+      customValues.issuer !== undefined;
+    // A run with no terminal, or asked for JSON, has nobody to ask for what is
+    // missing, so it is held to the full description.
+    const scripted = Boolean(
+      flags["non-interactive"] || this.jsonEnabled() || !process.stdin.isTTY,
+    );
+    if (flags.sso === CUSTOM_PROVIDER) {
+      checkGivenCustomFlags(customValues, SETUP_FLAG_NAMES);
+    }
+    if (flags.sso !== undefined && (flags.sso !== CUSTOM_PROVIDER || settingsGiven || scripted)) {
+      selectionFromFlags(flags.sso, customValues, SETUP_FLAG_NAMES, SSO_CUSTOM_EXAMPLE);
+    }
     try {
       await this.toMeta(flags);
     } catch (error) {
@@ -210,6 +275,14 @@ export default class Setup extends BaseCommand {
         hint: "Move the secret aside or restore zitadel.json before running setup.",
       });
     }
+    // Before anything is detected, created or written: a server another CLI
+    // release left running fails setup halfway, after the project exists.
+    await assertLocalServerVersion(
+      cwd,
+      this.meta.source,
+      retryOptionsFromFlags(flags),
+      this.config.version,
+    );
 
     // Resolved before anything is detected, created or written: an
     // inconsistent set of --sso flags is a mistake in the command line, and
@@ -222,6 +295,9 @@ export default class Setup extends BaseCommand {
     consola.start(`Detecting framework in ${shortPath(cwd)}`);
     let framework: FrameworkFacts;
     let scaffoldedFramework = false;
+    // Whether `--force` scaffolded beside entries the directory already held,
+    // other than the local runtime `start` leaves, which counts as empty.
+    let scaffoldedBesideFiles = false;
     try {
       framework = await orca.detect(cwd, flags.framework);
       consola.success(
@@ -240,10 +316,15 @@ export default class Setup extends BaseCommand {
         );
         framework = await orca.scaffold(
           cwd,
-          await resolveScaffoldFramework(flags.framework, nonInteractive, orca),
+          await resolveScaffoldFramework(flags.framework, nonInteractive, orca, {
+            retry: retryOptionsFromFlags(flags),
+            serverFlag: this.meta.serverFlag,
+            cliVersion: this.config.version,
+          }),
           force,
         );
         scaffoldedFramework = true;
+        scaffoldedBesideFiles = !target.scaffoldable;
         consola.success(`Scaffolded ${framework.id} skeleton`);
       } else {
         throw error;
@@ -296,6 +377,7 @@ export default class Setup extends BaseCommand {
       const promptCtx = {
         framework,
         cwd,
+        frameworkChosen: scaffoldedFramework || flags.framework !== undefined,
         serverFlag: this.meta.serverFlag,
         devPortFromFlag: flags["dev-port"] !== undefined,
         presetFromFlag: flags.preset !== undefined,
@@ -323,7 +405,9 @@ export default class Setup extends BaseCommand {
         answers.sso.length === 0
           ? "none"
           : answers.sso.length === 1
-            ? (answers.sso[0]?.provider ?? "none")
+            ? answers.sso[0]
+              ? selectionName(answers.sso[0].selection)
+              : "none"
             : "multiple",
     });
 
@@ -333,6 +417,42 @@ export default class Setup extends BaseCommand {
     // `framework.devPort`, and it must agree with the issuer and the registered
     // origin (both derived from `answers.devPort`).
     framework = { ...framework, devPort: answers.devPort, url: issuer };
+
+    // Fresh scaffolds keep the widgets' full-page chrome; a pre-existing
+    // route-based app gets embeddable cards inside its own layout (ADR 044).
+    const posture = derivePosture(framework.id, scaffoldedFramework);
+    const patchContext = (project: CreateProject201): PatchContext => ({
+      framework,
+      rendererId: flags.renderer ?? "react",
+      project,
+      issuer,
+      server: answers.server,
+      cliVersion: this.meta.cliVersion,
+      scaffoldedFramework,
+      posture,
+      preset: answers.preset,
+      useCase: answers.useCase,
+    });
+    const patcher = orca.patcherFor(framework.id);
+    if (!dryRun) {
+      // Patch as a dry run first, against a placeholder project: a file setup
+      // would refuse to overwrite (E_CONFLICT), such as an existing app's own
+      // root component, stops setup here, before it creates a project and
+      // writes `zitadel.json`. Without this, the conflict surfaced after both,
+      // and every rerun skipped the directory as already set up.
+      await patcher.patch(patchContext(dryRunProject(issuer)), { cwd, dryRun: true, force });
+    }
+    // The same for the schema, flow and connection files, which setup writes
+    // only once the project exists: a conflict on one of those left the
+    // project behind, and the rerun's `.env.local` kept pointing at it.
+    // Read-only, so a dry run reports them too.
+    await assertNoSetupResourceConflicts({
+      cwd,
+      force,
+      preset: answers.preset,
+      useCase: answers.useCase,
+      sso: answers.sso,
+    });
 
     // `POST /projects` is unauthenticated. CLI-managed projects opt out of
     // server fallback defaults, then setup uploads the local default schema and
@@ -360,56 +480,33 @@ export default class Setup extends BaseCommand {
             preset: answers.preset,
             useCase: answers.useCase,
             devPort: answers.devPort,
-            sso: answers.sso.map((answer) => ({
-              provider: answer.provider,
-              clientId: answer.clientId,
-            })),
+            sso: answers.sso.map((answer) => answer.selection),
           },
         );
     consola.success(`Created project ${project.id}`);
     this.recordTelemetry({ step: "project_created" });
 
-    // Fresh scaffolds keep the widgets' full-page chrome; a pre-existing
-    // route-based app gets embeddable cards inside its own layout (ADR 044).
-    const posture = derivePosture(framework.id, scaffoldedFramework);
-    const ctx: PatchContext = {
-      framework,
-      rendererId: flags.renderer ?? "react",
-      project,
-      issuer,
-      server: answers.server,
-      cliVersion: this.meta.cliVersion,
-      scaffoldedFramework,
-      posture,
-      preset: answers.preset,
-      useCase: answers.useCase,
-    };
-    // The patcher is about to merge this project's id and secrets into the
-    // credential env files. Snapshot each (its content, or null when absent) so
-    // a materialize failure below can restore it: `merge-env` only adds missing
-    // keys, so a leftover file would otherwise keep the abandoned project's
-    // `ZITADEL_PROJECT_ID` and a rerun would target it.
-    const credentialEnvFiles = [".env.local", ".env.development.local"];
-    const envSnapshots = new Map<string, string | null>(
-      await Promise.all(
-        credentialEnvFiles.map(async (file): Promise<[string, string | null]> => {
-          try {
-            // The content to restore, or null only when the file is absent (so a
-            // rollback removes a file setup created). A different read error must
-            // not be read as "absent" — that would delete a pre-existing file the
-            // rollback should have restored — so it is rethrown.
-            return [file, await readFile(join(cwd, file), "utf8")];
-          } catch (error) {
-            if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-              return [file, null];
-            }
-            throw error;
-          }
-        }),
-      ),
-    );
+    const ctx = patchContext(project);
+    // The credential env files as they are before the patch merges this
+    // project's id and secrets into them, so a failure below can put them back:
+    // the merge only adds missing keys, so a leftover file would keep the
+    // abandoned project's `ZITADEL_PROJECT_ID` and a rerun would target it.
+    const envFilesBefore = await readCredentialEnvFiles(cwd);
     consola.start(`Patching project files${dryRun ? " (dry run)" : ""}`);
-    const result = await orca.patcherFor(framework.id).patch(ctx, { cwd, dryRun, force });
+    let result: Awaited<ReturnType<typeof patcher.patch>>;
+    try {
+      result = await patcher.patch(ctx, { cwd, dryRun, force });
+    } catch (error) {
+      // The dry run above already ruled out conflicts, so this is an I/O
+      // failure partway through. Remove the setup markers and put the
+      // credential env files back, as a failed resource upload does below, so a
+      // rerun starts over.
+      if (!dryRun) {
+        await removeSetupMarkers(cwd);
+        await restoreCredentialEnvFiles(cwd, envFilesBefore);
+      }
+      throw error;
+    }
     for (const file of result.filesWritten) {
       const sentence = describeWrittenFile(relativeDisplay(cwd, file), dryRun);
       if (sentence) consola.info(sentence);
@@ -441,29 +538,12 @@ export default class Setup extends BaseCommand {
       // Remove both so a rerun starts a fresh setup instead of being skipped
       // forever with no default schema or login flow anywhere. The
       // half-provisioned project has no usable resources, so its credentials
-      // are not worth keeping.
-      // Only these two, and never a connection file: those are tenant-owned,
-      // and setup neither writes over nor removes one.
-      await rm(join(cwd, "zitadel.json"), { force: true });
-      await rm(join(cwd, ".zitadel/secret"), { force: true });
-      // The patcher also merged this project's id and secrets into the
-      // credential env files. Restore each to its pre-patch state — its prior
-      // content, or removed when setup created it — so a rerun starts from
-      // clean credentials rather than inheriting the abandoned project's. A
-      // failure here must not replace the real `error` below (its remedy is the
-      // useful one), so restore is best-effort.
-      try {
-        for (const [file, before] of envSnapshots) {
-          const target = join(cwd, file);
-          if (before === null) {
-            await rm(target, { force: true });
-          } else {
-            await writeFile(target, before);
-          }
-        }
-      } catch {
-        // Keep the original failure as the thrown cause.
-      }
+      // are not worth keeping, and the credential env files, where the patch
+      // merged them, go back to what they held before.
+      // Only these, and never a connection file: those are tenant-owned, and
+      // setup neither writes over nor removes one.
+      await removeSetupMarkers(cwd);
+      await restoreCredentialEnvFiles(cwd, envFilesBefore);
       const cause = toZitadelError(error);
       throw new ZitadelError(cause.code, `Default resource setup failed: ${cause.message}`, {
         // The cause knows its own remedy when it has one -- a file setup
@@ -506,25 +586,33 @@ export default class Setup extends BaseCommand {
     // separately, because one provider's publish can land while another's does
     // not, and telling the developer "the secret did not reach the project"
     // without saying whose would leave them guessing.
-    const ssoOutcomes = new Map<string, { clientId: PublishState; secret: SecretOutcome }>();
+    const ssoOutcomes = new Map<
+      ConnectionSlug,
+      { clientId: PublishState; secret: SecretOutcome }
+    >();
     if (answers.sso.length > 0 && !dryRun) {
       const publish = ssoCredentialPublisher(answers.server, project);
-      for (const answer of answers.sso) {
-        const idVariable = credentialVariables(answer.provider).clientId;
-        const variable = credentialVariables(answer.provider).clientSecret;
+      // Only here do both credentials have to exist, and the type says so.
+      for (const answer of completeSso(answers.sso)) {
+        const slug = providerOf(answer.selection).slug;
+        const { clientId: idVariable, clientSecret: variable } = credentialVariables(slug);
         const clientId = await publishClientId({
           name: idVariable,
-          value: answer.clientId,
+          value: answer.credentials.clientId,
           publish,
         });
-        const secret = await storeClientSecret({ name: variable, value: answer.secret, publish });
-        ssoOutcomes.set(answer.provider, { clientId, secret });
+        const secret = await storeClientSecret({
+          name: variable,
+          value: answer.credentials.secret,
+          publish,
+        });
+        ssoOutcomes.set(slug, { clientId, secret });
         if (answer.endpoints?.issuer !== undefined) {
           // Said out loud: a connection pointing somewhere other than the
           // vendor is not what the developer will want in the end, and nothing
           // else in the summary would show it.
           reportWarning(
-            `${idpProvider(answer.provider).displayName} points at ` +
+            `${providerOf(answer.selection).displayName} points at ` +
               `${answer.endpoints.issuer}, not the provider`,
           );
         }
@@ -692,6 +780,7 @@ export default class Setup extends BaseCommand {
         server: answers.server,
         issuer,
         scaffoldedFramework,
+        scaffoldedBesideFiles,
         sso: answers.sso,
       });
       // Frame the report in a consola box so it reads as a distinct
@@ -749,16 +838,15 @@ export default class Setup extends BaseCommand {
         // when none was. An agent reading this needs to know which provider a
         // deferred publish belongs to, so the outcomes stay per entry.
         sso: answers.sso.map((answer) => {
-          const outcome = ssoOutcomes.get(answer.provider);
+          const slug = providerOf(answer.selection).slug;
+          const outcome = ssoOutcomes.get(slug);
           return {
-            provider: answer.provider,
-            client_id: answer.clientId,
-            connection: `.zitadel/idps/${answer.provider}.json`,
+            provider: selectionName(answer.selection),
+            slug,
+            client_id: answer.credentials.clientId ?? null,
+            connection: `.zitadel/idps/${slug}.json`,
             client_id_variable: outcome
-              ? {
-                  variable: credentialVariables(answer.provider).clientId,
-                  published: outcome.clientId,
-                }
+              ? { variable: credentialVariables(slug).clientId, published: outcome.clientId }
               : null,
             secret: outcome
               ? { variable: outcome.secret.name, published: outcome.secret.published }
@@ -779,10 +867,11 @@ export default class Setup extends BaseCommand {
         next_commands: [
           ...republishCommands(
             answers.sso.flatMap((answer) => {
-              const outcome = ssoOutcomes.get(answer.provider);
+              const slug = providerOf(answer.selection).slug;
+              const outcome = ssoOutcomes.get(slug);
               return [
                 {
-                  name: credentialVariables(answer.provider).clientId,
+                  name: credentialVariables(slug).clientId,
                   secret: false,
                   published: outcome?.clientId,
                 },
@@ -831,13 +920,34 @@ async function resolveScaffoldFramework(
   framework: string | undefined,
   nonInteractive: boolean,
   orca: Orca,
+  guidance: { retry: SetupRetryOptions; serverFlag?: string; cliVersion: string },
 ): Promise<string> {
   if (framework) {
     return framework;
   }
   if (nonInteractive) {
+    // Most often a coding agent or CI: no terminal, and no flag saying so. So
+    // the error names every choice instead of pointing at a prompt it can't
+    // see, and for a local server hands over the exact rerun. Only then:
+    // `setupRetryFlags` pins `--server local`.
+    const choices = orca.availableFrameworks().map((choice) => choice.id);
+    const suggested = choices.includes("next") ? "next" : choices[0];
     throw new ZitadelError("E_FRAMEWORK_NOT_DETECTED", "Empty directory — pass --framework", {
-      hint: "Run without --json/--non-interactive to choose from a prompt, or pass --framework for scripted setup.",
+      hint: (
+        "Setup asks which framework to scaffold only in a terminal. Without one, or with " +
+        `--json or --non-interactive, pass --framework with one of: ${choices.join(", ")}. ` +
+        runFromHint(guidance.retry)
+      ).trimEnd(),
+      nextCommands:
+        guidance.serverFlag === "local" && suggested
+          ? [
+              publicCliCommand(
+                `setup ${setupRetryFlags({ ...guidance.retry, framework: suggested })}`,
+                guidance.cliVersion,
+              ),
+            ]
+          : [],
+      details: { frameworks: choices },
     });
   }
   return new PickFrameworkPrompt().ask(orca.availableFrameworks());
@@ -858,6 +968,15 @@ export async function localServerHostsPlatform(server: string, timeoutMs = 1500)
   return Boolean(await readPlatformRuntime(server, timeoutMs));
 }
 
+/**
+ * Removes `zitadel.json` (the marker the already-initialized guard skips on)
+ * and `.zitadel/secret`, so a setup that failed after writing them can be rerun.
+ */
+async function removeSetupMarkers(cwd: string): Promise<void> {
+  await rm(join(cwd, "zitadel.json"), { force: true });
+  await rm(join(cwd, ".zitadel/secret"), { force: true });
+}
+
 /** A deterministic stand-in project for `--dry-run`, so no remote call is made. */
 function dryRunProject(issuer: string): CreateProject201 {
   return {
@@ -868,6 +987,73 @@ function dryRunProject(issuer: string): CreateProject201 {
     preview_origins: [issuer],
     created_at: "2026-04-21T14:03:11.000Z",
   };
+}
+
+/** What a command line describing a custom connection looks like, for an error to show. */
+const SSO_CUSTOM_EXAMPLE = customExample(SETUP_FLAG_NAMES);
+
+/**
+ * The env files the patch merges a project's id and secrets into: `.env.local`
+ * for the app, and `.env.development.local`, which the recovery commands pin
+ * with `--env-file` and which therefore decides which project they target.
+ */
+const CREDENTIAL_ENV_FILES = [".env.local", ".env.development.local"] as const;
+
+/**
+ * What each credential env file holds, or `undefined` for a file that is not
+ * there. Only a missing file counts as absent: any other read error is
+ * rethrown, because reading it as "absent" would make the rollback delete a
+ * pre-existing file it should have restored.
+ */
+export async function readCredentialEnvFiles(
+  cwd: string,
+): Promise<Map<string, Buffer | undefined>> {
+  const before = new Map<string, Buffer | undefined>();
+  for (const file of CREDENTIAL_ENV_FILES) {
+    try {
+      before.set(file, await readFile(join(cwd, file)));
+    } catch (error) {
+      if (!isErrno(error, "ENOENT")) {
+        throw error;
+      }
+      before.set(file, undefined);
+    }
+  }
+  return before;
+}
+
+/**
+ * Puts the credential env files back to what {@link readCredentialEnvFiles}
+ * read before the patch, and removes one setup created. The patch merged the
+ * failed setup's project id and secrets into them, and a merge only adds the
+ * keys a file is missing, `--force` or not: left in place, they would survive
+ * the rerun, and the app would talk to an abandoned project with no schema or
+ * login flow. `.env.example` needs nothing: it gets the same empty values on
+ * every run.
+ *
+ * A file that cannot be restored is reported as a warning rather than thrown:
+ * this runs while setup is already failing, and the real error carries the
+ * remedy the developer needs.
+ */
+export async function restoreCredentialEnvFiles(
+  cwd: string,
+  before: ReadonlyMap<string, Buffer | undefined>,
+): Promise<void> {
+  for (const [file, content] of before) {
+    const path = join(cwd, file);
+    try {
+      if (content === undefined) {
+        await rm(path, { force: true });
+      } else {
+        await writeFile(path, content);
+      }
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      reportWarning(
+        `Could not restore ${file} after the failed setup (${reason}); it may still name the abandoned project.`,
+      );
+    }
+  }
 }
 
 /**
@@ -885,59 +1071,89 @@ function dryRunProject(issuer: string): CreateProject201 {
  * on stdin means nothing was piped, and reading it would block forever, so
  * that case is treated as "not supplied".
  */
-async function ssoFromFlags(
+export async function ssoFromFlags(
   flags: {
     sso?: string;
     "sso-client-id"?: string;
+    "sso-slug"?: string;
+    "sso-display-name"?: string;
+    "sso-issuer"?: string;
+    "sso-scopes"?: string;
   },
   nonInteractive: boolean,
   dryRun: boolean,
-): Promise<SsoAnswer | undefined> {
+): Promise<SsoDraft | undefined> {
+  const customValues = customFlagValues(flags, SETUP_FLAG_KEYS);
   if (flags.sso === undefined) {
     if (flags["sso-client-id"] !== undefined) {
       throw new ZitadelError("E_VALIDATION", "--sso-client-id needs --sso", {
         hint: "Name the provider with --sso, e.g. --sso google.",
       });
     }
+    const given = givenCustomFlags(customValues, SETUP_FLAG_NAMES);
+    if (given.length > 0) {
+      throw new ZitadelError("E_VALIDATION", `${given.join(", ")} needs --sso ${CUSTOM_PROVIDER}`, {
+        hint: `Name the provider with --sso ${CUSTOM_PROVIDER}.`,
+      });
+    }
     return undefined;
   }
-  const clientId = flags["sso-client-id"]?.trim();
-  if (clientId === undefined || clientId === "") {
+  // Described before the credentials are asked for, and before a Project is
+  // created: a name or issuer the server would refuse is a mistake in the
+  // command line.
+  // An interactive run asks for the custom settings it was not given, the way
+  // it asks for a client id: `--sso` skips the question it answers and no other.
+  const selection = selectionFromFlags(
+    flags.sso,
+    flags.sso === CUSTOM_PROVIDER && !nonInteractive
+      ? await askCustomSettings(customValues)
+      : customValues,
+    SETUP_FLAG_NAMES,
+    SSO_CUSTOM_EXAMPLE,
+  );
+  const loopback = loopbackIssuerWarning(selection);
+  if (loopback !== undefined) {
+    reportWarning(loopback);
+  }
+  const clientId =
+    flags["sso-client-id"] === undefined ? undefined : parseClientId(flags["sso-client-id"]);
+  if (clientId === undefined || !clientId.ok) {
     // Interactively the wizard asks for it — `--sso` skips the question it
     // answers and no other, the way `--preset` does. Only a scripted run has
     // nobody to ask.
     if (!nonInteractive) {
-      return { provider: flags.sso, clientId: "", secret: "" };
+      return { selection, credentials: {} };
     }
+    const entry = providerOf(selection);
     throw new ZitadelError("E_VALIDATION", `--sso ${flags.sso} needs --sso-client-id`, {
-      hint: `Register an OAuth application at ${idpProvider(flags.sso).consoleUrl} and pass its client id.`,
+      hint:
+        entry.consoleUrl === undefined
+          ? `Register a client at ${entry.issuer} and pass its client id.`
+          : `Register an OAuth application at ${entry.consoleUrl} and pass its client id.`,
     });
   }
-  if (!nonInteractive) {
+  if (!nonInteractive || dryRun) {
     // The wizard asks for the secret, the way it asks for a client id that
-    // `--sso-client-id` did not answer.
-    return { provider: flags.sso, clientId, secret: "" };
+    // `--sso-client-id` did not answer. A preview publishes nothing and
+    // materialises nothing, so demanding a real credential to see what setup
+    // would do is a toll for no reason -- and `sso enable --dry-run` returns
+    // before asking for one at all.
+    return { selection, credentials: { clientId: clientId.value } };
   }
-  if (dryRun) {
-    // A preview publishes nothing and materialises nothing, so demanding a
-    // real credential to see what setup would do is a toll for no reason --
-    // and `sso enable --dry-run` returns before asking for one at all.
-    return { provider: flags.sso, clientId, secret: "" };
-  }
-  const piped = process.stdin.isTTY ? "" : (await readStdin(process.stdin)).trim();
-  if (piped === "") {
-    // Required, not optional: scaffolding the connection without it writes a
-    // sign-in button that fails at the provider with `invalid_client`, long
-    // after setup reports success. It is never a flag — that would put it in
-    // shell history, a process listing and CI logs.
+  // Required, not optional: scaffolding the connection without it writes a
+  // sign-in button that fails at the provider with `invalid_client`, long
+  // after setup reports success. It is never a flag — that would put it in
+  // shell history, a process listing and CI logs.
+  const secret = parseClientSecret(process.stdin.isTTY ? "" : await readStdin(process.stdin));
+  if (!secret.ok) {
     throw new ZitadelError("E_VALIDATION", `--sso ${flags.sso} needs the client secret on stdin`, {
       // The client id is the developer's own, already on their command line,
       // so the example names the flag rather than echoing the value back into
       // a line they may paste somewhere else.
-      hint: `Pipe it in, e.g. \`printf '%s' "$GOOGLE_CLIENT_SECRET" | zitadel setup --sso ${flags.sso} --sso-client-id <id> ...\`.`,
+      hint: `Pipe it in, e.g. \`printf '%s' "$CLIENT_SECRET" | zitadel setup --sso ${flags.sso} --sso-client-id <id> ...\`.`,
     });
   }
-  return { provider: flags.sso, clientId, secret: piped };
+  return { selection, credentials: { clientId: clientId.value, secret: secret.value } };
 }
 
 /**
@@ -945,7 +1161,7 @@ async function ssoFromFlags(
  * Suggested retries are followed verbatim (especially by agents), so dropping
  * a flag here silently changes what the retry scaffolds.
  */
-type SetupRetryOptions = {
+export type SetupRetryOptions = {
   /**
    * The directory setup was pointed at, when it was not the shell's own.
    * Named in the guidance rather than passed as `--cwd` in the command text:
@@ -962,6 +1178,12 @@ type SetupRetryOptions = {
   devPort?: number;
   nonInteractive?: boolean;
   /**
+   * The `--sso` flags as typed, when they could not be resolved to a provider
+   * yet: a custom connection described in part, which the wizard completes.
+   * Dropping them would send the developer back without what they typed.
+   */
+  ssoTyped?: string;
+  /**
    * The social provider and its client id. The secret is deliberately absent:
    * a retry asks for it again, or takes it on stdin, because putting a
    * credential in suggested command text is exactly what piping the secret
@@ -969,7 +1191,7 @@ type SetupRetryOptions = {
    * goes to the project's variables, which is where the engine resolves the
    * connection's `${{ NAME }}` from.
    */
-  sso?: readonly { provider: string; clientId: string }[];
+  sso?: readonly ProviderSelection[];
 };
 
 /**
@@ -977,7 +1199,7 @@ type SetupRetryOptions = {
  * ending in `--server local`. Flags whose resolved value equals the default
  * are omitted — the retry reproduces the same outcome without them.
  */
-function setupRetryFlags(opts: SetupRetryOptions): string {
+export function setupRetryFlags(opts: SetupRetryOptions): string {
   const parts: string[] = [];
   if (opts.framework) {
     parts.push(`--framework ${opts.framework}`);
@@ -1001,11 +1223,19 @@ function setupRetryFlags(opts: SetupRetryOptions): string {
   // `--sso` makes the rerun skip the multi-select, so a provider left out here
   // could not be reselected.
   const [firstSso] = opts.sso ?? [];
+  if (firstSso === undefined && opts.ssoTyped !== undefined) {
+    parts.push(opts.ssoTyped);
+  }
   if (firstSso) {
     // Provider only. `--sso-client-id` would interpolate a value the wizard
     // accepted on emptiness alone into a command run verbatim, and nothing
     // here escapes it for a shell. The rerun asks for the id.
-    parts.push(`--sso ${firstSso.provider}`);
+    parts.push(`--sso ${selectionName(firstSso)}`);
+    // A custom connection is nothing without its description, and none of it is
+    // a credential, so unlike the client id it travels in the command.
+    if (firstSso.kind === "custom") {
+      parts.push(customFlagText(firstSso.connection, SETUP_FLAG_NAMES));
+    }
   }
   // `--non-interactive` is dropped when a provider is being configured: that
   // combination reads the client secret from stdin, and a command handed over
@@ -1013,19 +1243,23 @@ function setupRetryFlags(opts: SetupRetryOptions): string {
   // fails the moment it is run. Interactively the rerun asks for the secret,
   // which is the one way a plain command can obtain it -- putting it in the
   // command text is never an option.
-  if (opts.nonInteractive && firstSso === undefined) {
+  if (opts.nonInteractive && firstSso === undefined && opts.ssoTyped === undefined) {
     parts.push("--non-interactive");
   }
   parts.push("--server local");
   return parts.join(" ");
 }
 
+/** Whether `--sso` names a provider this CLI offers. */
+const isKnownSsoName = (name: string): boolean =>
+  name === CUSTOM_PROVIDER || (IDP_PROVIDERS as readonly string[]).includes(name);
+
 /**
  * Retry options straight from parsed flags, for failures before the wizard
  * resolves answers. `--non-interactive` is echoed only when explicitly passed
  * — TTY/JSON-inferred non-interactivity re-infers itself on the retry.
  */
-function retryOptionsFromFlags(flags: {
+export function retryOptionsFromFlags(flags: {
   cwd?: string;
   framework?: string;
   preset?: string;
@@ -1035,8 +1269,44 @@ function retryOptionsFromFlags(flags: {
   "non-interactive"?: boolean;
   sso?: string;
   "sso-client-id"?: string;
+  "sso-slug"?: string;
+  "sso-display-name"?: string;
+  "sso-issuer"?: string;
+  "sso-scopes"?: string;
 }): SetupRetryOptions {
+  // The provider survives on its own. A suggested retry carries `--sso`
+  // without `--sso-client-id` -- the id is never put in command text -- so
+  // requiring both here would drop the provider from the next suggestion if
+  // that retry failed again before the wizard ran, and the developer would be
+  // told to set up without the provider they asked for. An empty id means "ask
+  // for it", which is what the wizard does with it.
+  //
+  // A custom connection is restated as typed, minus the credentials. One the
+  // checks refuse is left out: it was refused, and a retry carrying it would be
+  // refused again.
+  let selection: ProviderSelection | undefined;
+  if (flags.sso !== undefined) {
+    try {
+      selection = selectionFromFlags(
+        flags.sso,
+        customFlagValues(flags, SETUP_FLAG_KEYS),
+        SETUP_FLAG_NAMES,
+        "",
+      );
+    } catch {
+      selection = undefined;
+    }
+  }
+  // What was typed for a provider this run knows, kept when it cannot become a
+  // selection yet, so a retry reproduces it.
+  const typed =
+    selection === undefined && flags.sso !== undefined && isKnownSsoName(flags.sso)
+      ? [`--sso ${flags.sso}`, flagText(customFlagValues(flags, SETUP_FLAG_KEYS), SETUP_FLAG_NAMES)]
+          .filter((part) => part !== "")
+          .join(" ")
+      : undefined;
   return {
+    ssoTyped: typed,
     framework: flags.framework,
     preset: flags.preset as SetupPreset | undefined,
     useCase: flags["use-case"] as SetupUseCase | undefined,
@@ -1050,10 +1320,7 @@ function retryOptionsFromFlags(flags: {
     // that retry failed again before the wizard ran, and the developer would
     // be told to set up without the provider they asked for. An empty id
     // means "ask for it", which is what the wizard does with it.
-    sso:
-      flags.sso !== undefined
-        ? [{ provider: flags.sso, clientId: flags["sso-client-id"] ?? "" }]
-        : undefined,
+    sso: selection === undefined ? undefined : [selection],
   };
 }
 
@@ -1105,7 +1372,7 @@ function ssoRecovery(
   }
   return {
     hint:
-      `The rerun configures ${chosen[0]?.provider ?? ""} only; add the rest with the sso enable ` +
+      `The rerun configures ${chosen[0] ? providerOf(chosen[0]).slug : ""} only; add the rest with the sso enable ` +
       "commands below, which ask for each client id. ",
     // The client id is not interpolated into the command. These strings are
     // run verbatim, especially by agents, and nothing escapes them for a
@@ -1128,9 +1395,13 @@ function ssoRecovery(
     // the production token to the local server. `--env-file` outranks the
     // process environment (unlike `--env`), so it is the one that forces the
     // generated development credential the local project actually expects.
-    commands: remaining.map((provider) =>
+    commands: remaining.map((selection) =>
       publicCliCommand(
-        `sso enable --provider ${provider.provider} --server local --env-file .env.development.local`,
+        `sso enable --provider ${selectionName(selection)}${
+          selection.kind === "custom"
+            ? ` ${customFlagText(selection.connection, ENABLE_FLAG_NAMES)}`
+            : ""
+        } --server local --env-file .env.development.local`,
         cliVersion,
       ),
     ),
@@ -1181,6 +1452,64 @@ async function createProjectWithLocalHint(
 function defaultProjectName(cwd: string, framework: string): string {
   const fromDirectory = basename(cwd).trim();
   return fromDirectory.length > 0 ? fromDirectory : `zitadel-${framework}-app`;
+}
+
+/**
+ * Refuses a local server that another CLI release started. `start` restarts
+ * such a server, but one left running stays that release's until `start` runs
+ * again, and its API is that release's: setup would create the project, then
+ * fail uploading the default schema and flow, and `--force` would not help.
+ *
+ * Only a binary runtime records the version it runs, and only release versions
+ * are compared: an override records `override`, which says nothing about its
+ * API. An unreadable `runtime.json` is doctor's to report, not setup's.
+ */
+async function assertLocalServerVersion(
+  cwd: string,
+  server: string,
+  retry: SetupRetryOptions,
+  cliVersion: string,
+): Promise<void> {
+  let nearest: Awaited<ReturnType<typeof readNearestRuntimeMetadata>>;
+  try {
+    nearest = await readNearestRuntimeMetadata(cwd);
+  } catch {
+    return;
+  }
+  const runtime = nearest?.runtime;
+  if (!nearest || runtime?.backend !== "binary" || runtime.server_url !== server) {
+    return;
+  }
+  const expected = bundledServerVersion();
+  if (
+    expected === undefined ||
+    !semver.valid(expected) ||
+    !semver.valid(runtime.server_version) ||
+    runtime.server_version === expected
+  ) {
+    return;
+  }
+  const where =
+    nearest.dir === cwd ? "" : `Run start in ${nearest.dir}, where the server was started. `;
+  throw new ZitadelError(
+    "E_CONFLICT",
+    `The local Zitadel server runs ${runtime.server_version}, but this CLI ships ${expected}`,
+    {
+      hint:
+        "A server another CLI release started serves that release's API, so setup would stop " +
+        `halfway. Run start to restart it on ${expected}; its data stays. ${where}` +
+        `Then rerun setup. ${runFromHint(retry)}`.trimEnd(),
+      nextCommands: [
+        publicCliCommand("start", cliVersion),
+        publicCliCommand(`setup ${setupRetryFlags(retry)}`, cliVersion),
+      ],
+      details: {
+        server_url: runtime.server_url,
+        server_version: runtime.server_version,
+        cli_server_version: expected,
+      },
+    },
+  );
 }
 
 function localSetupHint(error: unknown, retry: SetupRetryOptions, cliVersion: string): unknown {
@@ -1287,8 +1616,11 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
   "package.json": { subject: "package.json with the SDK dependency" },
 };
 
-/** Builds the section list driving {@link renderSummary} for the setup command. */
-function buildSummary(opts: {
+/**
+ * Builds the section list driving {@link renderSummary} for the setup command.
+ * Exported so its wording is unit-tested.
+ */
+export function buildSummary(opts: {
   projectFacts: Awaited<ReturnType<typeof detectProjectFacts>>;
   writtenRel: string[];
   depsAdded: ReadonlyArray<string>;
@@ -1296,7 +1628,8 @@ function buildSummary(opts: {
   server: string;
   issuer: string;
   scaffoldedFramework: boolean;
-  sso: readonly SsoAnswer[];
+  scaffoldedBesideFiles: boolean;
+  sso: readonly SsoDraft[];
 }): Section[] {
   const { projectFacts, writtenRel, depsAdded, project, server, issuer, scaffoldedFramework, sso } =
     opts;
@@ -1304,7 +1637,12 @@ function buildSummary(opts: {
 
   const detected: Row[] = [{ label: "Framework", value: formatFrameworkLine(projectFacts) }];
   if (scaffoldedFramework) {
-    detected.push({ label: "Scaffold", value: "fresh project (no existing files)" });
+    detected.push({
+      label: "Scaffold",
+      value: opts.scaffoldedBesideFiles
+        ? "new project over existing files (--force)"
+        : "new project",
+    });
   }
 
   const installedRows: Row[] = [];
@@ -1368,8 +1706,8 @@ function buildSummary(opts: {
   for (const answer of sso) {
     customizeRows.push({
       label: "Social sign-in",
-      value: idpProvider(answer.provider).displayName,
-      secondary: stylePath(`.zitadel/idps/${answer.provider}.json`),
+      value: providerOf(answer.selection).displayName,
+      secondary: stylePath(`.zitadel/idps/${providerOf(answer.selection).slug}.json`),
     });
   }
 

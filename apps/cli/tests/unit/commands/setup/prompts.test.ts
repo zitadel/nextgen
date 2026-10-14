@@ -32,11 +32,20 @@ vi.mock("../../../../src/lib/local-server/runtime", async (importOriginal) => ({
 }));
 
 import { confirm, isCancel, multiselect, note, password, select, text } from "@clack/prompts";
-import { IDP_PROVIDERS } from "@zitadel/config/idp";
+import { IDP_PROVIDERS, type ProviderSelection } from "@zitadel/config/idp";
 
+import {
+  acmeSelection,
+  clientId,
+  clientSecret,
+  googleSelection,
+} from "../../../helpers/idp-values";
+
+import { takeReportedWarnings } from "../../../../src/lib/warnings";
 import { detectHealthyLocalServer } from "../../../../src/lib/local-server/runtime";
 
 import {
+  askCustomSettings,
   DevPortPrompt,
   FrameworkConfirmPrompt,
   PickFrameworkPrompt,
@@ -100,6 +109,18 @@ describe("FrameworkConfirmPrompt", () => {
     expect(confirm).toHaveBeenCalledWith(
       expect.objectContaining({ message: expect.stringContaining("next") }),
     );
+  });
+
+  it("does not ask when the developer already chose the framework", async () => {
+    // Picked from the scaffold list a moment earlier, or passed --framework:
+    // detection only read their own answer back.
+    const out = await new FrameworkConfirmPrompt().ask(baseAnswers(), {
+      ...ctx,
+      frameworkChosen: true,
+    });
+
+    expect(out).toEqual(baseAnswers());
+    expect(confirm).not.toHaveBeenCalled();
   });
 
   it("throws E_UNSUPPORTED_PROJECT_SHAPE when the user declines", async () => {
@@ -324,7 +345,7 @@ describe("SocialSignInPrompt", () => {
     expect(password).not.toHaveBeenCalled();
   });
 
-  it("offers every catalog provider, with no option meaning none", async () => {
+  it("offers every catalog provider and a custom one, with no option meaning none", async () => {
     vi.mocked(multiselect).mockResolvedValueOnce([] as never);
 
     await new SocialSignInPrompt().ask(baseAnswers(), ctx);
@@ -332,7 +353,7 @@ describe("SocialSignInPrompt", () => {
     const options = vi.mocked(multiselect).mock.calls[0]?.[0]?.options ?? [];
     // No declining option: an empty selection is the decline, which is what
     // `required: false` on the multiselect allows.
-    expect(options.map((option) => option.value)).toEqual([...IDP_PROVIDERS]);
+    expect(options.map((option) => option.value)).toEqual([...IDP_PROVIDERS, "custom"]);
   });
 
   it("captures the credentials and shows the redirect URI to register", async () => {
@@ -344,9 +365,12 @@ describe("SocialSignInPrompt", () => {
 
     expect(answers.sso).toEqual([
       {
-        provider: "google",
-        clientId: "1234-abc.apps.googleusercontent.com",
-        secret: "s3cret",
+        selection: googleSelection,
+        credentials: {
+          clientId: "1234-abc.apps.googleusercontent.com",
+          secret: "s3cret",
+        },
+        endpoints: undefined,
       },
     ]);
     // The URI has to be exact — the vendor matches it literally — and the
@@ -354,6 +378,183 @@ describe("SocialSignInPrompt", () => {
     expect(vi.mocked(note).mock.calls[0]?.[0]).toContain(
       "http://localhost:4321/__nextgen/idp/callback",
     );
+  });
+
+  describe("a custom provider", () => {
+    /** The four questions describing the connection, then the client id. */
+    function describeAcme(overrides: { slug?: string; scopes?: string } = {}): void {
+      vi.mocked(text)
+        .mockResolvedValueOnce((overrides.slug ?? " acme-sso ") as never)
+        .mockResolvedValueOnce(" Acme SSO " as never)
+        .mockResolvedValueOnce(" https://sso.acme.example " as never)
+        .mockResolvedValueOnce((overrides.scopes ?? "openid profile email groups") as never)
+        .mockResolvedValueOnce("acme-client-id" as never);
+    }
+
+    it("is offered beside the catalog, saying what it will ask for", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce([] as never);
+
+      await new SocialSignInPrompt().ask(baseAnswers(), ctx);
+
+      const options = vi.mocked(multiselect).mock.calls[0]?.[0]?.options ?? [];
+      expect(options.at(-1)).toMatchObject({
+        value: "custom",
+        label: "Continue with another OpenID Connect provider",
+      });
+    });
+
+    it("asks what the connection is, then for its credentials", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce(["custom"] as never);
+      describeAcme();
+      vi.mocked(password).mockResolvedValueOnce("acme-secret" as never);
+
+      const answers = await new SocialSignInPrompt().ask(baseAnswers(), ctx);
+
+      expect(answers.sso).toEqual([
+        {
+          selection: {
+            kind: "custom",
+            connection: {
+              slug: "acme-sso",
+              displayName: "Acme SSO",
+              issuer: "https://sso.acme.example",
+              scopes: ["openid", "profile", "email", "groups"],
+            },
+          },
+          credentials: { clientId: "acme-client-id", secret: "acme-secret" },
+          endpoints: undefined,
+        },
+      ]);
+    });
+
+    it("warns about an issuer on this machine that was typed in, naming the allow list", async () => {
+      takeReportedWarnings();
+      vi.mocked(multiselect).mockResolvedValueOnce(["custom"] as never);
+      vi.mocked(text)
+        .mockResolvedValueOnce("acme-sso" as never)
+        .mockResolvedValueOnce("Acme SSO" as never)
+        .mockResolvedValueOnce("http://localhost:9100" as never)
+        .mockResolvedValueOnce("openid" as never)
+        .mockResolvedValueOnce("acme-client-id" as never);
+      vi.mocked(password).mockResolvedValueOnce("acme-secret" as never);
+
+      await new SocialSignInPrompt().ask(baseAnswers(), ctx);
+
+      expect(takeReportedWarnings().join(" ")).toContain("NEXTGEN_HTTPCLIENT_ALLOW_LIST");
+    });
+
+    it("says nothing about an issuer elsewhere", async () => {
+      takeReportedWarnings();
+      vi.mocked(multiselect).mockResolvedValueOnce(["custom"] as never);
+      describeAcme();
+      vi.mocked(password).mockResolvedValueOnce("acme-secret" as never);
+
+      await new SocialSignInPrompt().ask(baseAnswers(), ctx);
+
+      expect(takeReportedWarnings()).toEqual([]);
+    });
+
+    it("names the secret's variable after the connection, not after 'custom'", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce(["custom"] as never);
+      describeAcme();
+      vi.mocked(password).mockResolvedValueOnce("acme-secret" as never);
+
+      await new SocialSignInPrompt().ask(baseAnswers(), ctx);
+
+      expect(vi.mocked(password).mock.calls.at(-1)?.[0]).toMatchObject({
+        message: expect.stringContaining("ACME_SSO_CLIENT_SECRET"),
+      });
+    });
+
+    it("shows the redirect URI to register at the developer's own provider", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce(["custom"] as never);
+      describeAcme();
+      vi.mocked(password).mockResolvedValueOnce("acme-secret" as never);
+
+      await new SocialSignInPrompt().ask(baseAnswers({ devPort: 4321 }), ctx);
+
+      const [shown, title] = vi.mocked(note).mock.calls[0] ?? [];
+      expect(shown).toContain("http://localhost:4321/__nextgen/idp/callback");
+      expect(shown).toContain("https://sso.acme.example");
+      expect(shown).not.toContain("undefined");
+      expect(title).toBe("Acme SSO sign-in");
+    });
+
+    it("never asks where the provider lives, even on a development build", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce(["custom"] as never);
+      describeAcme();
+      vi.mocked(password).mockResolvedValueOnce("acme-secret" as never);
+
+      const answers = await new SocialSignInPrompt().ask(baseAnswers(), {
+        ...ctx,
+        developmentBuild: true,
+      });
+
+      // Slug, display name, issuer, scopes and client id, and nothing more.
+      expect(vi.mocked(text)).toHaveBeenCalledTimes(5);
+      expect(answers.sso[0]?.endpoints).toBeUndefined();
+    });
+
+    it("checks each answer against what the server would refuse", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce(["custom"] as never);
+      describeAcme();
+      vi.mocked(password).mockResolvedValueOnce("acme-secret" as never);
+
+      await new SocialSignInPrompt().ask(baseAnswers(), ctx);
+
+      const validate = (call: number): ((value: string) => string | undefined) => {
+        const options = vi.mocked(text).mock.calls[call]?.[0] as
+          | { validate?: (value: string) => string | undefined }
+          | undefined;
+        return options?.validate ?? (() => "no validator");
+      };
+      expect(validate(0)("Acme")).toBeTruthy();
+      expect(validate(0)("google")).toContain("built-in provider");
+      expect(validate(0)("acme-sso")).toBeUndefined();
+      expect(validate(1)("  ")).toBeTruthy();
+      expect(validate(2)("http://sso.acme.example")).toBeTruthy();
+      expect(validate(2)("https://sso.acme.example")).toBeUndefined();
+      expect(validate(3)("profile email")).toContain("openid");
+      expect(validate(3)("openid email")).toBeUndefined();
+    });
+
+    it("will not take an empty client id or client secret, so the connection cannot be left without one", async () => {
+      vi.mocked(multiselect).mockResolvedValueOnce(["custom"] as never);
+      describeAcme();
+      vi.mocked(password).mockResolvedValueOnce("acme-secret" as never);
+
+      await new SocialSignInPrompt().ask(baseAnswers(), ctx);
+
+      type Validate = (value: string) => string | undefined;
+      const validatorOf = (call: unknown[] | undefined): Validate => {
+        const [options] = call ?? [];
+        return (options as { validate: Validate }).validate;
+      };
+      const clientIdValidate = validatorOf(vi.mocked(text).mock.calls[4]);
+      const secretValidate = validatorOf(vi.mocked(password).mock.calls.at(-1));
+      for (const validate of [clientIdValidate, secretValidate]) {
+        expect(validate("")).toBeTruthy();
+        expect(validate("   ")).toBeTruthy();
+        expect(validate("something")).toBeUndefined();
+      }
+    });
+
+    it("uses the description from --sso-* flags rather than asking again", async () => {
+      vi.mocked(text).mockResolvedValueOnce("acme-client-id" as never);
+      vi.mocked(password).mockResolvedValueOnce("acme-secret" as never);
+      const selection = {
+        ...acmeSelection,
+        connection: { ...acmeSelection.connection, scopes: ["openid"] },
+      } as ProviderSelection;
+
+      const answers = await new SocialSignInPrompt().ask(
+        baseAnswers({ sso: [{ selection, credentials: {} }] }),
+        { ...ctx, ssoFromFlag: true },
+      );
+
+      expect(vi.mocked(text)).toHaveBeenCalledTimes(1);
+      expect(answers.sso[0]?.selection).toEqual(selection);
+    });
   });
 
   it("asks where the provider lives on a development build", async () => {
@@ -414,17 +615,17 @@ describe("SocialSignInPrompt", () => {
   });
 
   it("does not ask which provider when --sso named one", async () => {
-    vi.mocked(password).mockResolvedValueOnce("" as never);
+    vi.mocked(password).mockResolvedValueOnce("a-secret" as never);
     const seeded = baseAnswers({
-      sso: [{ provider: "google", clientId: "from-the-flag", secret: "" }],
+      sso: [{ selection: googleSelection, credentials: { clientId: clientId("from-the-flag") } }],
     });
 
     const answers = await new SocialSignInPrompt().ask(seeded, { ...ctx, ssoFromFlag: true });
 
     expect(select).not.toHaveBeenCalled();
     expect(text).not.toHaveBeenCalled();
-    expect(answers.sso[0]?.provider).toBe("google");
-    expect(answers.sso[0]?.clientId).toBe("from-the-flag");
+    expect(answers.sso[0]?.selection).toEqual(googleSelection);
+    expect(answers.sso[0]?.credentials.clientId).toBe("from-the-flag");
   });
 
   it("still asks for the secret a flagged run could not supply", async () => {
@@ -432,24 +633,29 @@ describe("SocialSignInPrompt", () => {
     // interactive run with --sso arrives here without one.
     vi.mocked(password).mockResolvedValueOnce("typed-after-the-flag" as never);
     const seeded = baseAnswers({
-      sso: [{ provider: "google", clientId: "from-the-flag", secret: "" }],
+      sso: [{ selection: googleSelection, credentials: { clientId: clientId("from-the-flag") } }],
     });
 
     const answers = await new SocialSignInPrompt().ask(seeded, { ...ctx, ssoFromFlag: true });
 
     expect(password).toHaveBeenCalledOnce();
-    expect(answers.sso[0]?.secret).toBe("typed-after-the-flag");
+    expect(answers.sso[0]?.credentials.secret).toBe("typed-after-the-flag");
   });
 
   it("keeps a secret that was already piped in rather than asking again", async () => {
     const seeded = baseAnswers({
-      sso: [{ provider: "google", clientId: "from-the-flag", secret: "piped" }],
+      sso: [
+        {
+          selection: googleSelection,
+          credentials: { clientId: clientId("from-the-flag"), secret: clientSecret("piped") },
+        },
+      ],
     });
 
     const answers = await new SocialSignInPrompt().ask(seeded, { ...ctx, ssoFromFlag: true });
 
     expect(password).not.toHaveBeenCalled();
-    expect(answers.sso[0]?.secret).toBe("piped");
+    expect(answers.sso[0]?.credentials.secret).toBe("piped");
   });
 
   it("throws E_VALIDATION on Ctrl-C at the provider question", async () => {
@@ -458,6 +664,42 @@ describe("SocialSignInPrompt", () => {
 
     await expect(new SocialSignInPrompt().ask(baseAnswers(), ctx)).rejects.toMatchObject({
       code: "E_VALIDATION",
+    });
+  });
+});
+
+describe("askCustomSettings", () => {
+  beforeEach(() => {
+    vi.mocked(text).mockReset();
+  });
+
+  it("asks for nothing when every setting was given", async () => {
+    const given = {
+      slug: "acme-sso",
+      displayName: "Acme SSO",
+      issuer: "https://sso.acme.example",
+      scopes: "openid",
+    };
+
+    expect(await askCustomSettings(given)).toEqual(given);
+    expect(text).not.toHaveBeenCalled();
+  });
+
+  it("asks only for the settings that were left out", async () => {
+    vi.mocked(text).mockResolvedValueOnce("Acme SSO" as never);
+    vi.mocked(text).mockResolvedValueOnce("openid groups" as never);
+
+    const values = await askCustomSettings({
+      slug: "acme-sso",
+      issuer: "https://sso.acme.example",
+    });
+
+    expect(vi.mocked(text)).toHaveBeenCalledTimes(2);
+    expect(values).toEqual({
+      slug: "acme-sso",
+      displayName: "Acme SSO",
+      issuer: "https://sso.acme.example",
+      scopes: "openid groups",
     });
   });
 });

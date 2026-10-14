@@ -64,7 +64,7 @@
       "import": "./dist/normalize.mjs"
     },
     "./validate": {
-      "@zitadel/source": "./src/validate.ts",
+      "@zitadel/source": "./src/validation/index.ts",
       "types": "./dist/validate.d.mts",
       "import": "./dist/validate.mjs"
     },

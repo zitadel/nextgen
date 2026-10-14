@@ -3,6 +3,9 @@ import { join } from "node:path";
 
 import { ZitadelError } from "./errors";
 
+/** One `*.json` file read by {@link readJsonDirEntries}: its file name and parsed body. */
+export type JsonDirEntry = { name: string; body: Record<string, unknown> };
+
 /**
  * Read every `*.json` file under `absDir` and return each body as a plain
  * object. Files are read in lexical filename order so the result is
@@ -18,6 +21,14 @@ import { ZitadelError } from "./errors";
  * @param absDir - Absolute path to the directory to scan.
  */
 export async function readJsonDir(absDir: string): Promise<ReadonlyArray<Record<string, unknown>>> {
+  return (await readJsonDirEntries(absDir)).map((entry) => entry.body);
+}
+
+/**
+ * {@link readJsonDir}, keeping each body's file name — for callers that report
+ * a problem against the file it came from.
+ */
+export async function readJsonDirEntries(absDir: string): Promise<ReadonlyArray<JsonDirEntry>> {
   let entries: string[];
   try {
     entries = await readdir(absDir);
@@ -27,7 +38,7 @@ export async function readJsonDir(absDir: string): Promise<ReadonlyArray<Record<
     }
     throw error;
   }
-  const result: Record<string, unknown>[] = [];
+  const result: JsonDirEntry[] = [];
   for (const entry of entries.filter((name) => name.endsWith(".json")).sort()) {
     const abs = join(absDir, entry);
     let raw: unknown;
@@ -39,7 +50,7 @@ export async function readJsonDir(absDir: string): Promise<ReadonlyArray<Record<
     if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
       throw new ZitadelError("E_VALIDATION", `${entry} must contain a JSON object at the root`);
     }
-    result.push(raw as Record<string, unknown>);
+    result.push({ name: entry, body: raw as Record<string, unknown> });
   }
   return result;
 }

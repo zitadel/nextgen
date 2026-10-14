@@ -1,10 +1,10 @@
 # Agent Instructions — `apps/console-e2e`
 
-Playwright project for the console's four runtime boundaries. Defer to root
+Playwright project for the console's five runtime boundaries. Defer to root
 [`AGENTS.md`](../../AGENTS.md) for repo-wide rules; lane descriptions and the
 secret-handling caveat live in [`README.md`](README.md).
 
-## The four lanes
+## The five lanes
 
 - `moon run console-e2e:e2e` — **embedded shell smoke**: Vite-preview of the
   built console under its production embed base `/ui/console/`. No live API.
@@ -25,6 +25,14 @@ secret-handling caveat live in [`README.md`](README.md).
   email, and uses the screens on the session cookie alone. The console selects
   that project on its own (the operator's only grant, as `?project=`), so the
   screens run in a project other than the one the console signs into.
+- `moon run console-e2e:e2e-deployment` — **hosted-cloud deployment
+  coverage**: no server of its own; it checks a deployment that
+  `CONSOLE_DEPLOYMENT_URL` names, where the console is a Vercel service at
+  `/console/` beside the server. It pins the routing (`/console/runtime.json`
+  to the server, the old `/ui/console` links redirected) and the signed-out
+  sign-in screen down to the login widget's first step. It holds no
+  credential but `VERCEL_AUTOMATION_BYPASS_SECRET`, so it records no traces
+  and writes no HTML report.
 
 Console screens act on the selected project (`?project=`, see
 [`apps/console/AGENTS.md`](../console/AGENTS.md)). The guard only ever selects
@@ -36,10 +44,11 @@ the instance's `/console/runtime.json` in every lane; no lane pins it. A spec
 that navigates by URL either lets the guard fill it in or names it, and asserts
 it survives navigation where that is the point.
 
-All four tasks carry `runInCI: false` — that only keeps them out of moon's
+All five tasks carry `runInCI: false` — that only keeps them out of moon's
 automatic selection. The `full-pr` job explicitly runs `e2e-real`,
-`e2e-embedded` and `e2e-platform` in separate, sequential workflow steps; the
-shell smoke stays local-only. The `@zitadel/testing` interaction is documented in
+`e2e-embedded` and `e2e-platform` in separate, sequential workflow steps;
+`deployment-checks.yml` runs `e2e-deployment` against every cloud deployment;
+the shell smoke stays local-only. The `@zitadel/testing` interaction is documented in
 [`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md).
 
 ## Hard rules
@@ -55,7 +64,8 @@ shell smoke stays local-only. The `@zitadel/testing` interaction is documented i
   gitignored, never uploaded as a CI artifact. Failure artifacts are limited
   to Playwright results and the HTML report.
 - **Test placement**: this project covers only console runtime boundaries
-  (embed base, dev proxy, live resource data, binary-served production path).
+  (embed base, dev proxy, live resource data, binary-served production path,
+  the hosted cloud's routing).
   Screen behavior belongs in `apps/console` Vitest specs
   (`src/routes/**/*.spec.tsx`); component behavior in the component packages —
   same layering rule as root `AGENTS.md` Testing Layers.

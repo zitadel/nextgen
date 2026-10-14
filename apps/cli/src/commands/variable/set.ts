@@ -64,8 +64,7 @@ export default class VariableSet extends EnvironmentCommand {
     as: Flags.string({
       options: [...VARIABLE_TYPES],
       default: "string",
-      description:
-        "Store the value as this JSON type. A reference to the whole field resolves to that type, so a number stays a number.",
+      description: "Store the value as this JSON type.",
     }),
     preview: Flags.boolean({
       default: false,

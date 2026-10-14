@@ -23,6 +23,14 @@
     },
     "e2e-platform": {
       "dependsOn": ["@zitadel/testing#build", "@zitadel/cli#build", "@zitadel/server#build"]
+    },
+    // The hosted cloud's console on a deployment, which CONSOLE_DEPLOYMENT_URL
+    // names (VERCEL_AUTOMATION_BYPASS_SECRET opens its protection);
+    // .github/workflows/deployment-checks.yml runs it for every deployment.
+    // The Playwright config refuses to run without CONSOLE_DEPLOYMENT_URL.
+    "e2e-deployment": {
+      "cache": false,
+      "passThroughEnv": ["CONSOLE_DEPLOYMENT_URL", "VERCEL_AUTOMATION_BYPASS_SECRET", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "GITHUB_*"]
     }
   }
 }

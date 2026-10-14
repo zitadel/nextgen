@@ -27,6 +27,13 @@ import type {
 import { reclaimableOps, withoutExistingTargets } from "./reclaim";
 
 /**
+ * Closes every {@link AbstractRulePatcher.preflight} refusal. `--force` is the
+ * obvious next try after an `E_CONFLICT`, and it changes nothing there.
+ */
+export const PREFLIGHT_FORCE_NOTE =
+  "--force can't fix this: it only replaces files at the paths setup writes.";
+
+/**
  * Base for rule-based (deterministic, template-driven) patchers, as opposed to
  * a future LLM-driven family. It applies the integration by building a
  * file-operation plan and running the file-writer — that strategy stays
@@ -51,8 +58,20 @@ export abstract class AbstractRulePatcher implements Patcher {
 
   /** Apply the full plan (base `.zitadel/` files + framework routes). */
   async patch(ctx: PatchContext, opts: PatchExecOptions): Promise<PatchResult> {
+    await this.preflight(ctx, opts.cwd);
     return scaffold(this.plan(ctx), opts);
   }
+
+  /**
+   * Refuses, with `E_CONFLICT`, a project the plan would leave broken without
+   * conflicting on any path it writes: the file-writer only stops on a file
+   * at exactly a path in the plan, and some of the app's own files break the
+   * integration from another path. Setup's dry-run patch runs this before it
+   * creates a project. `force` does not skip it: forcing replaces files at the
+   * plan's paths, and these files sit elsewhere. `repair` does not run it —
+   * `doctor` reports what it finds instead. Defaults to nothing to check.
+   */
+  protected async preflight(_ctx: PatchContext, _cwd: string): Promise<void> {}
 
   /**
    * Re-apply only the reclaimable subset — env files, gitignore, the SDK

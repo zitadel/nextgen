@@ -138,6 +138,7 @@
     "oclif": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
+    "vite": "catalog:",
     "vitest": "catalog:"
   }
 }

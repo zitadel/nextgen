@@ -88,7 +88,6 @@
     "vitest": "catalog:"
   },
   "peerDependencies": {
-    "@tanstack/react-query": "catalog:",
     "msw": "catalog:",
     "@faker-js/faker": "catalog:"
   },
