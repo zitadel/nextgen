@@ -9,7 +9,7 @@
       "dependsOn": ["@zitadel/sdk-react#build"]
     },
     "build-release": {
-      "dependsOn": ["@zitadel/sdk-react#build-release", "@zitadel/sdk-qwik-city#build-release"]
+      "dependsOn": ["@zitadel/sdk-react#build-release"]
     },
     "test": {
       "dependsOn": ["build"]

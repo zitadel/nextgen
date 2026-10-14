@@ -266,11 +266,13 @@ dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
   browser projects pull in their own Chromium through a moon `install-browsers`
   dep on their `:test` task.
 - `moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph` —
-  builds, lint, typecheck and unit tests.
-- `moon run server:test-postgres`, then `moon run server:test-sqlite` — Go
-  integration lanes. They depend on the UI builds their binary embeds, so
-  `moon ci` also runs them when one of those builds is affected; on such runs
-  they run twice until a follow-up folds them into the graph step.
+  builds, lint, typecheck and unit tests, and the Go database lanes
+  (`server:test-postgres`, `server:test-sqlite`) whenever moon finds them
+  affected, as dependents of the UI builds their binary embeds.
+- `moon run server:test-postgres`, then `moon run server:test-sqlite` — only
+  the lanes the graph did not run, which `scripts/ci-mode.mjs` reads from its
+  report: a run forced full for a workflow-only edit, which no lane lists as
+  input, leaves them out of the graph.
 - `moon run release:snapshot -- --skip-container` — a non-publishing release
   snapshot, built outside any moon graph and handed to the journey via
   `JOURNEY_TARBALLS_DIR`, whenever the journey can run. The journey must not
