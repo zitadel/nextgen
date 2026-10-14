@@ -390,7 +390,7 @@ describe("setup command", () => {
     };
     expect(json.data.next_actions.join("\n")).toContain("temporary and its data may be lost");
     expect(json.data.next_commands.at(-1)).toMatch(
-      /^npx @zitadel\/cli@\S+ claim --env-file \.env\.development\.local$/,
+      /^npx @zitadel\/cli@\S+ claim --env-file \.env\.development\.local --cwd \S+$/,
     );
   });
 
@@ -418,7 +418,7 @@ describe("setup command", () => {
     };
     expect(json.data.next_actions.join("\n")).toContain("temporary and its data may be lost");
     expect(json.data.next_commands.at(-1)).toMatch(
-      /^npx @zitadel\/cli@\S+ claim --env-file \.env\.development\.local$/,
+      /^npx @zitadel\/cli@\S+ claim --env-file \.env\.development\.local --cwd \S+$/,
     );
   });
 
@@ -612,7 +612,7 @@ describe("setup command", () => {
     };
     expect(secret.team_id).toBeUndefined();
     expect(json.data.next_commands.at(-1)).toMatch(
-      /^npx @zitadel\/cli@\S+ claim --env-file \.env\.development\.local$/,
+      /^npx @zitadel\/cli@\S+ claim --env-file \.env\.development\.local --cwd \S+$/,
     );
   });
 

@@ -295,6 +295,9 @@ export abstract class AbstractRulePatcher implements Patcher {
         kind: "merge-env",
         path: ".env.development.local",
         mode: 0o600,
+        // The CLI's own file: a value a prompt saved here before setup ran
+        // must give way to the project setup just created.
+        overwrite: true,
         entries: {
           ZITADEL_URL: ctx.server,
           ZITADEL_PROJECT_ID: ctx.project.id,

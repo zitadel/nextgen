@@ -100,7 +100,7 @@ async function applyOp(
       await mergeEnv(
         abs(opts.cwd, op.path),
         op.entries,
-        { comment: op.comment ?? [], mode: op.mode },
+        { comment: op.comment ?? [], mode: op.mode, overwrite: op.overwrite === true },
         opts.dryRun,
         result,
       );
@@ -288,19 +288,45 @@ async function appendText(
 async function mergeEnv(
   path: string,
   entries: Readonly<Record<string, string>>,
-  { comment, mode }: { comment: ReadonlyArray<string>; mode?: number },
+  {
+    comment,
+    mode,
+    overwrite,
+  }: { comment: ReadonlyArray<string>; mode?: number; overwrite: boolean },
   dryRun: boolean,
   result: ScaffoldAccumulator,
 ): Promise<void> {
   const raw = await readIfExists(path);
-  const existing = raw ?? "";
+  const keyOf = (line: string) => line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)=/)?.[1];
+  // With `overwrite`, a line holding one of the entries is rewritten in place
+  // with this run's value; otherwise the file's own value stands.
+  const replaced = overwrite
+    ? (raw ?? "")
+        .split("\n")
+        .map((line) => {
+          const key = keyOf(line);
+          return key !== undefined && key in entries ? `${key}=${entries[key]}` : line;
+        })
+        .join("\n")
+    : raw;
+  const existing = replaced ?? "";
   const present = new Set(
     existing
       .split(/\r?\n/g)
-      .map((line) => line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)=/)?.[1])
+      .map(keyOf)
       .filter((value): value is string => Boolean(value)),
   );
   const additions = Object.entries(entries).filter(([key]) => !present.has(key));
+  if (additions.length === 0 && replaced !== raw) {
+    if (!dryRun) {
+      await writeFile(path, existing, { mode });
+      if (mode !== undefined) {
+        await enforceMode(path, mode);
+      }
+    }
+    record(result, path, "file", "update");
+    return;
+  }
   if (additions.length === 0) {
     // Nothing to add, but a secret-bearing target (`mode` set) must still have
     // its permissions re-asserted: `writeFile`'s mode applied only when the
