@@ -68,6 +68,35 @@ export const useUser = routeLoader$((ev) => {
 });
 ```
 
+`protectedRoutes` guards full page loads (a direct visit or a reload): the
+handler redirects before anything renders. Do not rely on it for client-side
+`<Link>` navigation, which does not load the page from the server. There the
+`ZitadelSession` card is the guard: when it finds no session it navigates to its
+`postSignOutUrl`, so a signed-out visitor still ends at `/login`.
+
+To keep a route from rendering at all without a session, export a loader like
+the one above from the route itself. Qwik City runs a route's `routeLoader$` on
+the server for a `<Link>` navigation too, so its redirect sends the visitor to
+`/login` before the route renders:
+
+```tsx
+// src/routes/profile/index.tsx
+import { component$ } from '@qwik.dev/core';
+import { routeLoader$ } from '@qwik.dev/router';
+import { getAuth } from '@zitadel/sdk-qwik-city/server';
+
+export const useSession = routeLoader$((ev) => {
+  const auth = getAuth(ev);
+  if (!auth.isAuthenticated) throw ev.redirect(302, '/login');
+  return { userId: auth.session.userId };
+});
+
+export default component$(() => {
+  const session = useSession();
+  return <p>Signed in as {session.value.userId}</p>;
+});
+```
+
 ### 3. Render the login widget
 
 Install the Qwik component library and render its `ZitadelLogin` component.

@@ -1,5 +1,5 @@
 ---
-"@zitadel/sdk-tanstack-start": patch
+"@zitadel/sdk-tanstack-start": major
 ---
 
 The `/react` widgets now mount on the client only. On the server and during hydration they render
@@ -12,3 +12,7 @@ so a register page started an extra sign-in flow, or briefly showed a missing-pr
 `configureZitadel`, `getApi` and `getZitadelConfig`, like the other meta-framework SDKs, so an
 auto-import of `ZitadelLogin` can no longer pick the custom element class instead of the React
 component.
+
+If you imported `ZitadelLogin`, `ZitadelLogout` or `ZitadelSession` from `/client`, render the
+components from `@zitadel/sdk-tanstack-start/react` instead, or import the element classes from
+`@zitadel/components`.

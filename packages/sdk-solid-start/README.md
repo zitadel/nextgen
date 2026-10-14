@@ -85,6 +85,41 @@ export function requireUser() {
 }
 ```
 
+`protectedRoutes` guards full page loads (a direct visit or a reload): the
+middleware redirects before anything renders. Client-side navigation, such as
+following an `<A>` link to `/profile`, does not request the page from the
+server, so the middleware does not run. There the `ZitadelSession` card is the
+guard: when it finds no session it navigates to its `postSignOutUrl`, so a
+signed-out visitor still ends at `/login`.
+
+To keep a route from rendering at all without a session, check the session in a
+server query and preload it. The query runs on the server on client-side
+navigation too, and its `redirect` sends the visitor to `/login` before the
+route renders:
+
+```tsx
+// src/routes/profile.tsx
+import { createAsync, query, redirect, type RouteDefinition } from '@solidjs/router';
+import { getRequestEvent } from 'solid-js/web';
+import { getAuth } from '@zitadel/sdk-solid-start/server';
+
+const requireSession = query(async () => {
+  'use server';
+  const auth = getAuth(getRequestEvent()!);
+  if (!auth.isAuthenticated) throw redirect('/login');
+  return auth.session.userId;
+}, 'session');
+
+export const route = {
+  preload: () => requireSession(),
+} satisfies RouteDefinition;
+
+export default function Profile() {
+  const userId = createAsync(() => requireSession(), { deferStream: true });
+  return <p>Signed in as {userId()}</p>;
+}
+```
+
 ### 3. Render the login widget
 
 Install the Solid component library and render its `ZitadelLogin` component.
