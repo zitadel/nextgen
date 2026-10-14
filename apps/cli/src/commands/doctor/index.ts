@@ -19,12 +19,13 @@ import {
   checkLocalServerHealth,
   defaultLocalServerImageForCliVersion,
   localServerUrl,
-  readRuntimeMetadata,
+  readNearestRuntimeMetadata,
   type RuntimeBackend,
   type RuntimeMetadata,
 } from "../../lib/local-server/runtime";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { createOrca } from "../../lib/orca";
+import { resolveCwd } from "../../lib/paths";
 import { hasZitadelConfig } from "../../lib/project";
 import { listenersForPort } from "../../lib/prober/ports";
 import { publicCliCommand } from "../../lib/public-cli";
@@ -60,7 +61,9 @@ export default class Doctor extends BaseCommand {
   static override flags = {
     fix: Flags.boolean({ description: "Repair missing files and stale managed wiring." }),
     image: nonBlankString({ description: "Container image to check." }),
-    port: Flags.integer({ description: "Local HTTP port.", default: DEFAULT_LOCAL_SERVER_PORT }),
+    port: Flags.integer({
+      description: `Local HTTP port. Defaults to the port of the local server this directory uses, else ${String(DEFAULT_LOCAL_SERVER_PORT)}.`,
+    }),
     runtime: Flags.string({
       description: "Local runtime backend.",
       options: ["binary", "docker"],
@@ -69,10 +72,18 @@ export default class Doctor extends BaseCommand {
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Doctor);
-    const port = flags.port ?? DEFAULT_LOCAL_SERVER_PORT;
+    // The local server this directory uses: the one `zitadel start` ran here,
+    // or in the nearest parent — an app created inside the directory `start`
+    // ran in uses that server, as setup and `console` do. Checking only this
+    // directory reported the app's own server as "another" runtime and probed
+    // the default port instead of the server's.
+    const nearest = await readNearestRuntimeMetadata(
+      resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined),
+    );
+    const existingRuntime = nearest?.runtime;
+    const port = flags.port ?? existingRuntime?.port ?? DEFAULT_LOCAL_SERVER_PORT;
     await this.toMeta(flags, { resolveServer: false, source: localServerUrl(port) });
     const { cwd, dryRun } = this.meta;
-    const existingRuntime = await readRuntimeMetadata(cwd);
     const runtimeBackend = resolveRuntimeBackend({
       runtime: flags.runtime,
       image: flags.image,
@@ -83,7 +94,13 @@ export default class Doctor extends BaseCommand {
       flags.image ??
       this.meta.env.ZITADEL_LOCAL_IMAGE ??
       defaultLocalServerImageForCliVersion(this.meta.cliVersion);
-    const runtimeChecks = await runLocalRuntimeChecks(cwd, runtimeBackend, image, port);
+    const runtimeChecks = await runLocalRuntimeChecks(
+      nearest?.dir ?? cwd,
+      existingRuntime,
+      runtimeBackend,
+      image,
+      port,
+    );
     const hasConfig = await hasZitadelConfig(cwd);
     const ctx: CheckContext = { cwd, orca: createOrca(), cliVersion: this.meta.cliVersion, dryRun };
 
@@ -304,13 +321,18 @@ function advisoryForWarnings(
   return { nextActions: unique(nextActions), nextCommands: unique(nextCommands) };
 }
 
+/**
+ * The local runtime checks, against the server in `runtimeDir` (the
+ * directory holding its `.zitadel/local` state, or the current directory when
+ * no server was started yet).
+ */
 async function runLocalRuntimeChecks(
-  cwd: string,
+  runtimeDir: string,
+  runtime: RuntimeMetadata | undefined,
   runtimeBackend: RuntimeBackend,
   image: string,
   port: number,
 ): Promise<CheckOutcome[]> {
-  const runtime = await readRuntimeMetadata(cwd);
   const managedRuntimeCheck = await checkManagedRuntimeProcesses(runtime);
   if (runtimeBackend === "binary") {
     return [
@@ -322,7 +344,7 @@ async function runLocalRuntimeChecks(
         "state-dir",
         "Local state directory is writable",
         async () => {
-          const probe = await assertLocalStateWritable(cwd);
+          const probe = await assertLocalStateWritable(runtimeDir);
           return probe.checkedPath === probe.targetPath
             ? `${probe.targetPath} is writable`
             : `${probe.targetPath} can be created (${probe.checkedPath} is writable)`;
@@ -385,7 +407,7 @@ async function runLocalRuntimeChecks(
       "state-dir",
       "Local state directory is writable",
       async () => {
-        const probe = await assertLocalStateWritable(cwd);
+        const probe = await assertLocalStateWritable(runtimeDir);
         return probe.checkedPath === probe.targetPath
           ? `${probe.targetPath} is writable`
           : `${probe.targetPath} can be created (${probe.checkedPath} is writable)`;
