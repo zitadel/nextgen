@@ -2,7 +2,7 @@ import { join } from "node:path";
 
 import { defineConfig, devices } from "@playwright/test";
 import { withZitadel } from "@zitadel/testing/playwright";
-import { e2eActionTimeouts, e2eTimeouts } from "../playwright.shared";
+import { e2eActionTimeouts, e2eTimeouts, e2eTrace } from "../playwright.shared";
 
 /**
  * The embedded console against a deployment with the platform project
@@ -36,7 +36,7 @@ export default defineConfig({
   use: {
     ...e2eActionTimeouts,
     baseURL: origin,
-    trace: "on-first-retry",
+    trace: e2eTrace,
   },
   // Sign-up plus a walk over every screen: readiness, not latency, is under
   // test, so give the visibility assertions the embedded lane's headroom.

@@ -2,7 +2,7 @@ import { join } from "node:path";
 
 import { defineConfig, devices } from "@playwright/test";
 import { withZitadel, type AppEnvTemplate } from "@zitadel/testing/playwright";
-import { e2eActionTimeouts, e2eTimeouts } from "../playwright.shared";
+import { e2eActionTimeouts, e2eTimeouts, e2eTrace } from "../playwright.shared";
 
 /**
  * Real-instance console coverage:
@@ -42,7 +42,7 @@ export default defineConfig({
   use: {
     ...e2eActionTimeouts,
     baseURL: consoleOrigin,
-    trace: "on-first-retry",
+    trace: e2eTrace,
   },
   ...withZitadel({
     configDir: appDir,

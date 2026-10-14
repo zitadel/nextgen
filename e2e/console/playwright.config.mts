@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 import { resolve } from "node:path";
-import { e2eActionTimeouts, e2eTimeouts } from "../playwright.shared";
+import { e2eActionTimeouts, e2eTimeouts, e2eTrace } from "../playwright.shared";
 
 const workspaceRoot = resolve(import.meta.dirname, "../..");
 
@@ -21,8 +21,7 @@ export default defineConfig({
   use: {
     ...e2eActionTimeouts,
     baseURL: "http://localhost:4173",
-    /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
-    trace: "on-first-retry",
+    trace: e2eTrace,
   },
   /* Run your local dev server before starting the tests */
   webServer: {

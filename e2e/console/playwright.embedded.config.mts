@@ -2,7 +2,7 @@ import { join } from "node:path";
 
 import { defineConfig, devices } from "@playwright/test";
 import { withZitadel } from "@zitadel/testing/playwright";
-import { e2eActionTimeouts, e2eTimeouts } from "../playwright.shared";
+import { e2eActionTimeouts, e2eTimeouts, e2eTrace } from "../playwright.shared";
 
 /**
  * The embedded surfaces, served the way a customer gets them.
@@ -46,7 +46,7 @@ export default defineConfig({
   use: {
     ...e2eActionTimeouts,
     baseURL: origin,
-    trace: "on-first-retry",
+    trace: e2eTrace,
   },
   // Two workers cold-start Chromium and cold-load the console SPA
   // concurrently on a shared CI runner; the first visibility assertions sat
