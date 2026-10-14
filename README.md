@@ -46,7 +46,7 @@ The CLI is the agent-facing surface today: every command supports
 [apps/cli/skills/zitadel-cli/SKILL.md](apps/cli/skills/zitadel-cli/SKILL.md) is the canonical contract for agents
 integrating Zitadel into an app; [AGENTS.md](AGENTS.md) is for agents
 contributing to this repository. The documentation site publishes LLM-friendly
-text at `/llms.txt`, `/llms-full.txt`, and page-level `.md` URLs.
+text at `/docs/llms.txt`, `/docs/llms-full.txt`, and page-level `.md` URLs.
 
 Install the skill into any skills-compatible agent (Claude Code, Cursor,
 Copilot, Codex, and more) straight from this repo:
@@ -158,16 +158,18 @@ Details: [docs/quick-start/index.md](docs/quick-start/index.md). To build from s
 
 ## Documentation site
 
-The Fumapress/Fumadocs documentation skeleton lives in `apps/docs`.
+The documentation site lives in `apps/docs`: Fumadocs on Next.js, served
+under `/docs`.
 
 ```sh
 moon run docs:dev
 moon run docs:build
 ```
 
-The docs app bundles the OpenAPI source into a generated reference, exposes
-static search, and publishes LLM-friendly text at `/llms.txt`,
-`/llms-full.txt`, page-level `.md` URLs, and `/mcp`.
+The docs app bundles the OpenAPI source into a generated reference, has
+search, and publishes LLM-friendly text at `/docs/llms.txt`,
+`/docs/llms-full.txt` and page-level `.md` URLs, and an MCP server at
+`/docs/api/mcp`.
 
 ## Current status
 

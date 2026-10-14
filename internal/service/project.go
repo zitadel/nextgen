@@ -170,10 +170,6 @@ func (s *projectService) create(ctx context.Context, project *domain.Project, se
 			return err
 		}
 
-		if err := seedDefaultEnvironments(ctx, tx.Statements(), project.ID); err != nil {
-			return err
-		}
-
 		if !seedDefaults {
 			return emitProjectCreated(ctx, tx.Statements(), project)
 		}
@@ -225,11 +221,7 @@ func (s *projectService) createDefaultUserSchemas(ctx context.Context, stmts All
 }
 
 func (s *projectService) createDefaultLoginFlowDefinitions(ctx context.Context, stmts AllStatements, projectID string, userSchema *jsonschema.Schema) error {
-	flowDefs, err := flow_definitions.DefaultLoginFlowDefinitions(
-		s.serverURL,
-		projectID,
-		schemas.DefaultHumanUserSchemaURL(s.serverURL),
-	)
+	flowDefs, err := flow_definitions.DefaultLoginFlowDefinitions(s.serverURL, projectID)
 	if err != nil {
 		return domain.ErrInternal(err).WithMessage("failed to retrieve default flow definition")
 	}

@@ -18,10 +18,6 @@ type FlowDefinitionService interface {
 	List(ctx context.Context, req ListFlowDefinitionsRequest) (*ListFlowDefinitionsResponse, error)
 }
 
-type SchemaGetter interface {
-	GetSchema(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error)
-}
-
 type BuiltinSchemaProvider interface {
 	GetBuiltinSchema(uri string) (*jsonschema.Schema, error)
 	LatestSchemaURI(kind domain.KnownSchemaKind) (string, error)
@@ -43,14 +39,12 @@ type FlowDefinitionRequest struct {
 
 type flowDefinitionService struct {
 	v2Pool                 *DB
-	schemaGetter           SchemaGetter
 	builtinSchemaProvider  BuiltinSchemaProvider
 	validateFlowDefinition flowDefinitionValidatorFunc
 }
 
 func NewFlowDefinitionService(
 	v2Pool *DB,
-	schemaGetter SchemaGetter,
 	schemaProvider BuiltinSchemaProvider,
 	flowDefinitionValidatorFn flowDefinitionValidatorFunc,
 ) FlowDefinitionService {
@@ -59,7 +53,6 @@ func NewFlowDefinitionService(
 	}
 	return &flowDefinitionService{
 		v2Pool:                 v2Pool,
-		schemaGetter:           schemaGetter,
 		builtinSchemaProvider:  schemaProvider,
 		validateFlowDefinition: flowDefinitionValidatorFn,
 	}
@@ -74,12 +67,19 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionR
 	if err != nil {
 		return nil, domain.ErrFlowDefinitionInvalid(fmt.Sprintf("invalid status: %q", req.Status), err)
 	}
+	userSchema, err := resolveUserSchema(ctx, fd.v2Pool.Statements(), req.ProjectID, req.UserSchema)
+	if err != nil {
+		if errors.Is(err, domain.ErrJSONSchemaNotFound()) {
+			return nil, domain.ErrFlowDefinitionInvalid(fmt.Sprintf("user schema %q not found", req.UserSchema), err)
+		}
+		return nil, domain.ErrSchemaFetchFailed("failed to fetch user schema", err)
+	}
 	flowDefinition, err := domain.NewFlowDefinition(
 		"",
 		req.ProjectID,
 		req.Name,
 		req.SchemaVersion,
-		req.UserSchema,
+		*userSchema.ObjectType,
 		purposes,
 		req.Audience,
 		req.Steps,
@@ -89,7 +89,7 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionR
 		return nil, err
 	}
 
-	err = fd.Validate(ctx, flowDefinition)
+	err = fd.validate(ctx, flowDefinition, userSchema)
 	if err != nil {
 		return nil, err
 	}
@@ -119,17 +119,9 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionR
 	return flowDefinition, nil
 }
 
-func (fd *flowDefinitionService) Validate(ctx context.Context, flowDefinition *domain.FlowDefinition) error {
-	sch, err := fd.schemaGetter.GetSchema(ctx, flowDefinition.ProjectID, "", flowDefinition.UserSchema)
-	if err != nil {
-		if errors.Is(err, domain.ErrJSONSchemaNotFound()) {
-			return domain.ErrFlowDefinitionInvalid(fmt.Sprintf("user schema %q not found", flowDefinition.UserSchema), err)
-		}
-		return domain.ErrSchemaFetchFailed("failed to fetch user schema", err)
-	}
-
+func (fd *flowDefinitionService) validate(ctx context.Context, flowDefinition *domain.FlowDefinition, sch *domain.JSONSchema) error {
 	var userSchema *jsonschema.Schema
-	err = json.Unmarshal(sch.Schema, &userSchema)
+	err := json.Unmarshal(sch.Schema, &userSchema)
 	if err != nil {
 		return domain.ErrSchemaFetchFailed("failed to unmarshal user schema", err)
 	}

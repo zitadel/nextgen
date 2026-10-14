@@ -14,7 +14,7 @@ Scope pointers first — this file's own body covers **telemetry only**:
   [ADR 046](../../docs/adrs/046-claim-lifecycle-v2.md) (`src/commands/claim.ts`,
   `src/lib/claim-state.ts`, `src/commands/doctor/checks/claim.ts`).
 - The journey e2e contract is
-  [`apps/cli-journey-e2e/AGENTS.md`](../cli-journey-e2e/AGENTS.md).
+  [`e2e/journey/AGENTS.md`](../../e2e/journey/AGENTS.md).
 - The test contract — the unit/spec split and one spec per command — is
   [`tests/AGENTS.md`](tests/AGENTS.md). Read it before adding or moving any
   test.
@@ -24,6 +24,20 @@ Scope pointers first — this file's own body covers **telemetry only**:
   `reportWarning` shows it in the terminal at once and adds it to the JSON
   envelope's `warnings`, and `emit` prints a result's `warnings` after its
   `pretty` text. A unit test fails on any other `consola.warn` call.
+- Input goes through one function, `input` in `src/lib/input.ts` — a command
+  calls it as `this.input(...)`. It takes the value from `given` (the flag),
+  else piped stdin (`stdin: true`), else a prompt, else throws one uniform
+  `E_VALIDATION` ("No <name> supplied", with a hint from `flag`, `stdin` and
+  `retry`), and runs the question's `parse` on whichever source answered.
+  `retry` is the command an agent can run once the input is to hand: it becomes
+  the error's `nextCommands`. `optional` returns `undefined` instead of
+  prompting or refusing when nothing was given or piped (a bad non-empty pipe
+  still fails). A `confirm` is answered by the command's `--force`, and
+  refuses without it when no one can be asked, so a command whose `--force`
+  means something else (`setup`) must use its own asker with `force: false`.
+  Never import clack's `text`, `password`, `select`, `multiselect`, `confirm`,
+  `isCancel` or `cancel` anywhere else, and never hand-write the
+  flag-or-stdin-or-prompt rule: a unit test fails on the import.
 - The flag surface deliberately tracks the [WebCLI spec](https://webcli.com/) so
   an agent can drive the CLI from conventions it already knows. That is the
   rationale; the canonical flag list, output-channel rules and the two
@@ -186,7 +200,7 @@ Commands add dimensions via `this.recordTelemetry({ … })` (merged immutably on
 each lifecycle event emitted *after* recording — typically `completed`/`failed`,
 since `started` fires before the command body runs):
 
-- **setup** — `framework`, `renderer`, `package_manager`, `scaffolded_skeleton`, `skip_install`, `dev_port_explicit`, `preset`, `use_case`, `sso` (an `IDP_PROVIDERS` slug, `none`, or `multiple` when setup enabled several), `design` (a `BRANDING_DESIGNS` value or `built-in`), `files_written_count`, `step` (`framework_resolved` → `project_created` → `files_patched` → `dependencies_installed`).
+- **setup** — `framework`, `renderer`, `package_manager`, `scaffolded_skeleton`, `skip_install`, `dev_port_explicit`, `preset`, `use_case`, `sso` (an `IDP_PROVIDERS` slug, `custom` for a developer-described connection — never its free-text slug —, `none`, or `multiple` when setup enabled several), `design` (a `BRANDING_DESIGNS` value or `built-in`), `files_written_count`, `step` (`framework_resolved` → `project_created` → `files_patched` → `dependencies_installed`).
 - **plan / apply** — `creates`, `updates`, `deletes`, `revisions`, `total` (diff *counts* only).
 - **doctor** — `runtime`, `checks_total`, `checks_failed`, `checks_warn`, `failed_checks` (failing check **names**, never messages).
 - **start** — `runtime` (`binary` / `docker`).

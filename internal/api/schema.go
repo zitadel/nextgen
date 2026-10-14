@@ -81,9 +81,13 @@ func (h *Handler) ListSchemas(ctx context.Context, params api.ListSchemasParams)
 		kind = &parsed
 	}
 
+	var objectTypes []string
+	if objectType, ok := params.ObjectType.Get(); ok {
+		objectTypes = []string{objectType}
+	}
 	schemas, err := h.schemaService.ListSchemas(ctx, service.ListSchemasInput{
 		ProjectID:                   string(params.ProjectID),
-		ObjectType:                  params.ObjectType.Value,
+		ObjectTypes:                 objectTypes,
 		Kind:                        kind,
 		LatestRevisionPerObjectType: params.Revisions.Value == api.ListSchemasRevisionsLatest,
 		PageToken:                   string(params.PageToken.Value),

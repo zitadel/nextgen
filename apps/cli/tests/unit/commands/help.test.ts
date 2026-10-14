@@ -44,8 +44,6 @@ Configuration commands
   auth-method sso enable:       Add an identity provider to a user schema
   branding get:                 Get one branding revision by id
   branding list:                List branding
-  environments get:             Get one environment by id
-  environments list:            List environments
   flow-definitions get:         Get one flow definition by id
   flow-definitions list:        List flow-definitions
   releases get:                 Get one release by id

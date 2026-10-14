@@ -19,9 +19,10 @@ export async function flowsForSchema(cwd: string, schema: SchemaFile): Promise<F
 }
 
 /**
- * Whether a flow runs against this schema. Flows name it by the URL the
- * schema publishes, so the schema's own `$id` is the reliable link; a Project
- * with one schema and one flow matches on that alone.
+ * Whether a flow runs against this schema. A flow names its schema by the
+ * schema's `objectType`, the handle the platform resolves `user_schema` by;
+ * older files name it by the id the platform assigned or by the URL setup
+ * wrote, which the schema's own `$id` states.
  */
 function flowUsesSchema(
   flow: Record<string, unknown>,
@@ -31,6 +32,12 @@ function flowUsesSchema(
   const used = flow.user_schema;
   if (typeof used !== "string") {
     return false;
+  }
+  // The same order `plan` and `apply` resolve a flow's schema in
+  // (`pinnedSchemaPath` in lib/sync/sso-validation.ts): `objectType` first.
+  const objectType = schema.body.objectType;
+  if (typeof objectType === "string" && used === objectType) {
+    return true;
   }
   // Once a Project has been applied, the flow names the schema by the id the
   // platform assigned, which `.zitadel/state.json` records against the schema

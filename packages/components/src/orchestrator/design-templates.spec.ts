@@ -144,6 +144,24 @@ describe("branding design catalog", () => {
     });
   }
 
+  // A verified unique provider claim renders read-only, so the user cannot
+  // type a value the server refuses on submit.
+  it.each([...BRANDING_DESIGNS])("%s renders a read_only field read-only", (design) => {
+    const engine = createLiquidEngine({ locale });
+    const rendered = engine.parseAndRenderSync(templateFor(design), {
+      ...context,
+      fields: [
+        { ...step.fields[0], value: "alice@example.com", read_only: true },
+        { name: "given_name", type: "text", text_key: "identifier.field.email" },
+      ],
+    });
+    const fields = createSanitiser()(rendered).match(/<zl-field\b[^>]*>/g) ?? [];
+
+    expect(fields).toHaveLength(2);
+    expect(fields.find((f) => f.includes('name="email"'))).toMatch(/\sreadonly[\s>=]/);
+    expect(fields.find((f) => f.includes('name="given_name"'))).not.toMatch(/\sreadonly[\s>=]/);
+  });
+
   describe.each([...BRANDING_DESIGNS])("%s with identity providers", (design) => {
     /** The step as the engine renders it once a connection is enabled. */
     const withProviders = {

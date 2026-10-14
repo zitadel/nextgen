@@ -1,15 +1,20 @@
 {
   "extends": "./tsconfig.spec.json",
+  // Next reads this file and expects its generated route types listed here.
   "include": [
-    "press.config.tsx",
-    "source.config.ts",
-    "waku.config.ts",
+    "next-env.d.ts",
+    "proxy.ts",
     "*.config.mts",
     "*.config.ts",
     "scripts/**/*.ts",
-    "src/**/*.ts",
-    "src/**/*.tsx",
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "lib/**/*.ts",
+    "lib/**/*.tsx",
     "tests/**/*.ts",
-    "tests/**/*.tsx"
+    "tests/**/*.tsx",
+    ".next/types/**/*.ts"
   ]
 }

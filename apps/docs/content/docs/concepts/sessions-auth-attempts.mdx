@@ -7,4 +7,4 @@ An auth attempt is an ephemeral state machine for one authentication journey. It
 
 A session is the durable post-auth container. It carries the verified user and factors after an auth attempt succeeds.
 
-The generated OpenAPI reference exposes these resources as endpoint groups. The SDK middleware uses session cookies and JWT verification to protect routes and expose auth state to framework code.
+The generated OpenAPI reference exposes these resources as endpoint groups. The SDK middleware reads the session cookie and validates its token to protect routes and expose auth state to framework code (see [SDK proxy](/docs/concepts/sdk-proxy)).

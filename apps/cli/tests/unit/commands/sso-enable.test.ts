@@ -41,6 +41,34 @@ describe("sso enable (deprecated alias)", () => {
     await expect(access(join(cwd, ".zitadel/idps/google.json"))).resolves.toBeUndefined();
   });
 
+  it("takes a custom connection's flags, as auth-method sso enable does", async () => {
+    const cwd = await setUpProject();
+
+    const result = await withStdin("piped-secret", () =>
+      runCliForTest([
+        "sso",
+        "enable",
+        "--cwd",
+        cwd,
+        "--provider",
+        "custom",
+        "--slug",
+        "acme-sso",
+        "--display-name",
+        "Acme SSO",
+        "--issuer",
+        "https://sso.acme.example",
+        "--client-id",
+        "acme-client-id",
+        "--json",
+        "--non-interactive",
+      ]),
+    );
+
+    expect(result.exitCode).toBe(0);
+    await expect(access(join(cwd, ".zitadel/idps/acme-sso.json"))).resolves.toBeUndefined();
+  });
+
   it("names the command to use instead", async () => {
     const cwd = await setUpProject();
 

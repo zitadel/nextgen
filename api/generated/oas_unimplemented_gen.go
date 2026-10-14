@@ -26,6 +26,40 @@ func (UnimplementedHandler) BeginUserPasskeyRegistration(ctx context.Context, re
 	return r, ht.ErrNotImplemented
 }
 
+// BuildRelease implements buildRelease operation.
+//
+// Builds a release from the resources of `.zitadel/` as authored on disk,
+// grouped by kind, in one transaction: a failure anywhere leaves no
+// revision and no release. The caller records nothing.
+// If the project already holds a release with the same content, the same
+// `content_hash`, the request answers `200` with that release and
+// allocates nothing, however long ago it was built. Otherwise every resource is compared against the
+// project's newest revision of the same handle: unchanged content reuses
+// that revision, changed content allocates a new one, and the request
+// answers `201` with the new release. Metadata is excluded from the
+// comparison, so the same content under a different `message` is the same
+// release.
+// A structurally malformed request is refused while decoding with
+// `req.invalid`, naming the offending fields. A well-formed bundle is then
+// checked resource by resource, as each kind's create endpoint checks it,
+// and every failure is reported at once: the request answers `400` with
+// `rel.invalid`, and `details.resources` lists each resource that failed.
+// A handle that resolves neither in the bundle nor in the project answers
+// `rel.unresolved_reference`, naming the pointer and the handle.
+// Building writes revisions, so besides `release.write` it needs the write
+// scope of every kind the bundle carries a resource of: `schema.write`,
+// `flow_definition.write`, `branding.write` and `idp.write`, as the
+// per-kind create endpoints do. A missing scope answers `403` with `rel.permission_denied`,
+// naming the kind. An empty kind needs no scope.
+// Building a release does not deploy it. A release is not tied to an
+// origin, and the same release can later be deployed to any number of
+// origins unchanged.
+//
+// POST /releases/build
+func (UnimplementedHandler) BuildRelease(ctx context.Context, req *BuildReleaseRequest, params BuildReleaseParams) (r BuildReleaseRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // CompleteClaim implements completeClaim operation.
 //
 // Called by the browser after the developer authenticates on the claim page.
@@ -68,25 +102,48 @@ func (UnimplementedHandler) CreateBranding(ctx context.Context, req *Branding, p
 
 // CreateDeployment implements createDeployment operation.
 //
-// Makes a release live on an environment by recording a deployment. The two
-// happen atomically: when the call returns, the environment runs the named
-// release and the record exists; on any failure the environment keeps
-// running what it ran and no record is written.
-// Deploying, promoting and rolling back are all this call — `reason` says
-// which. None of them assembles a release: the release must already exist,
-// and rolling back means deploying a release the environment ran earlier,
-// chosen from its deployment history.
-// Idempotent on the running release: deploying the release the environment
-// already runs changes nothing and answers `200` with the deployment that
-// made it live, so a re-run of `zitadel deploy` on unchanged content is a
-// no-op end to end — matching `POST /releases`, which resolves the same
-// content to the same release first. Anything else writes a new record,
-// including the same release returning after something else ran in between:
-// the log is append-only, and each row is one act of making a release live.
-// `expected_current_deployment_id` guards against racing another deploy:
-// when present, the swap only happens if the environment's current
-// deployment still is the one named, and a mismatch answers `409` with the
-// actual `current_deployment_id` and `current_release_id` in the details.
+// Makes a release live on a set of targets by recording a deployment. The
+// two happen atomically: when the call returns, every target serves the
+// named release and the record exists; on any failure every target keeps
+// serving what it served and no record is written.
+// The release is named by exactly one of `release_id` or `content_hash`
+// (both or neither answers `400` with `dep.invalid`), and must already
+// exist in the project: deploying never assembles a release. An
+// unknown release id or digest answers `404` with `rel.not_found`, and a
+// revoked release answers `409` with `rel.revoked`.
+// `targets` lists `primary`, which expands to every primary origin of the
+// project, and exact origins. An origin that is neither a primary origin
+// of the project nor matches one of its preview patterns answers `403`
+// with `proj.origin_not_allowed`, and `primary` on a project with no
+// primary origin answers `400` with `dep.invalid`. The deployment records
+// the resolved origins, sorted, never the keyword.
+// A deployment to preview URLs creates the preview for each of them, or
+// renews it when it exists, in the same transaction, with the expiry set
+// from `ttl`; each target in the response carries that expiry. It always
+// writes a new deployment, answering `201`, even when the URLs already
+// serve the release: that record is the renewal. Primary origins and
+// preview URLs cannot be mixed in one deployment: that answers `400` with
+// `dep.invalid`.
+// A deployment freezes the variable values the project stores for its
+// kind: primary origins use the primary values, preview URLs the preview
+// values, with no fallback from one to the other. A release that
+// references a variable with no value for that kind answers `400` with
+// `dep.variables_missing`, naming the kind and every missing variable, and
+// nothing is written.
+// A deployment to primary origins is idempotent on what is served: when
+// every resolved target already serves the release with the same frozen
+// variable values, nothing changes and the call answers `200` with the
+// newest deployment to those targets, so a re-run of `zitadel deploy` on
+// unchanged content is a no-op end to end. The same release with a
+// changed variable value is a new deployment.
+// Anything else writes a new record covering all of the resolved targets,
+// including the same release returning after something else was served in
+// between: the log is append-only, and each record is one act of making a
+// release live.
+// `expected_deployment_id` guards against racing another deploy: when
+// present, the write only happens if the newest deployment to any of the
+// resolved targets still is the one named, and a mismatch answers `409`
+// with `dep.conflict`, carrying the actual newest deployment.
 //
 // POST /deployments
 func (UnimplementedHandler) CreateDeployment(ctx context.Context, req *CreateDeploymentRequest, params CreateDeploymentParams) (r CreateDeploymentRes, _ error) {
@@ -206,18 +263,29 @@ func (UnimplementedHandler) CreateProject(ctx context.Context, req *CreateProjec
 
 // CreateRelease implements createRelease operation.
 //
-// Bundles a release from revisions that already exist, supplied as
-// `(kind, revision_id)` pairs. No new revisions are allocated — use the
-// per-kind create endpoints for that, then pin the ids here.
-// Every referenced `revision_id` must exist in the project. Each one's handle
-// is read from the revision itself and recorded on the release, so a resource
-// is always pinned under the identity it declares.
-// Creating a release does not deploy it. A release is environment-agnostic
-// and the same release can later be deployed to any number of environments
-// unchanged.
-// Idempotent on the pinned set: metadata is excluded from the comparison, so
-// re-submitting the same revisions with a different `message` returns the
-// release that already pins them rather than creating a second one.
+// Assembles a release from revisions that already exist, supplied as
+// `(kind, revision_id)` pairs. No new revisions are allocated: to build a
+// release from the files on disk, use `POST /releases/build`, which
+// allocates them.
+// Every referenced `revision_id` must exist in the project. Each one's
+// handle is read from the revision itself and recorded on the release, so a
+// resource is always pinned under the identity it declares.
+// Every handle a pinned resource references, such as a flow definition's
+// `user_schema` naming a schema by `objectType`, or a flow step's
+// `sso_providers` naming IDP connections by `slug`, must be pinned by the
+// same release. A handle the release does not pin refuses the request with
+// `rel.unresolved_reference`. The message names the pointer and the handle
+// that did not resolve, for example
+// `flow_definition default-login: user_schema human-user not found`,
+// because a release pins many and the code alone does not say which one
+// failed.
+// Idempotent on the pinned set: metadata is excluded from the comparison,
+// so re-submitting the same revisions with a different `message` answers
+// `200` with the release that already pins them rather than creating a
+// second one. A release the project did not hold before answers `201`.
+// Creating a release does not deploy it. A release is not tied to an
+// origin, and the same release can later be deployed to any number of
+// origins unchanged.
 //
 // POST /releases
 func (UnimplementedHandler) CreateRelease(ctx context.Context, req *CreateReleaseRequest, params CreateReleaseParams) (r CreateReleaseRes, _ error) {
@@ -327,10 +395,8 @@ func (UnimplementedHandler) DeleteUserByID(ctx context.Context, params DeleteUse
 
 // DeleteVariable implements deleteVariable operation.
 //
-// Removes the variable this owner entered under this name.
-// A variable is deletable only by the owner that entered it. Deleting a name
-// another owner of the same project holds answers `var.not_found` and leaves
-// that owner's value standing.
+// Removes the project's variable under this name. Deleting a name the
+// project does not hold answers `var.not_found`.
 //
 // DELETE /variables/{variable_name}
 func (UnimplementedHandler) DeleteVariable(ctx context.Context, params DeleteVariableParams) (r DeleteVariableRes, _ error) {
@@ -435,17 +501,6 @@ func (UnimplementedHandler) GetClaimWindow(ctx context.Context, params GetClaimW
 //
 // GET /deployments/{deployment_id}
 func (UnimplementedHandler) GetDeploymentById(ctx context.Context, params GetDeploymentByIdParams) (r GetDeploymentByIdRes, _ error) {
-	return r, ht.ErrNotImplemented
-}
-
-// GetEnvironmentByName implements getEnvironmentByName operation.
-//
-// Reads one environment of the project by its name.
-// The lookup is scoped to the project in `project_id`: a name that exists in
-// another project answers `env.not_found` exactly as an unused name does.
-//
-// GET /environments/{name}
-func (UnimplementedHandler) GetEnvironmentByName(ctx context.Context, params GetEnvironmentByNameParams) (r GetEnvironmentByNameRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -600,8 +655,10 @@ func (UnimplementedHandler) GetReady(ctx context.Context) (r GetReadyRes, _ erro
 
 // GetReleaseById implements getReleaseById operation.
 //
-// Reads one release: its metadata and the `(kind, handle, revision_id)`
-// tuples it pins.
+// Reads one release: its digest, its metadata, whether it was revoked, and
+// the `(kind, handle, revision_id)` tuples it pins.
+// The path takes the `rel_` id only. To find a release from its digest,
+// list with the `content_hash` filter and read the matched entry's `id`.
 // Does not embed resource content. Resolve each `revision_id` through the
 // per-kind read endpoints when the bytes are needed.
 // The lookup is scoped to the project in `project_id`: a release id belonging
@@ -664,12 +721,9 @@ func (UnimplementedHandler) GetUserByID(ctx context.Context, params GetUserByIDP
 
 // GetVariable implements getVariable operation.
 //
-// Reads one variable by name from the owner this request addresses — one
-// environment of the project with `environment_name`, the project level
-// itself without it.
-// A name that owner has not entered answers `var.not_found`, even when
-// another owner of the same project holds it: nothing is inherited. A secret
-// is found but not disclosed: the response is `{"secret": true}`.
+// Reads one of the project's variables by name. A name the project has not
+// entered answers `var.not_found`. A secret is found but not disclosed: the
+// response is `{"secret": true}`.
 //
 // GET /variables/{variable_name}
 func (UnimplementedHandler) GetVariable(ctx context.Context, params GetVariableParams) (r GetVariableRes, _ error) {
@@ -678,12 +732,7 @@ func (UnimplementedHandler) GetVariable(ctx context.Context, params GetVariableP
 
 // GetVariables implements getVariables operation.
 //
-// Returns the variables entered at the owner this request addresses, keyed by
-// name — one environment of the project with `environment_name`, the project
-// level itself without it.
-// Owners are separate, not a ladder: an environment does not inherit the
-// project's variables and the project does not see its environments'. Reading
-// everything a project holds therefore means reading each owner in turn.
+// Returns the project's variables, keyed by name.
 // Secret values are not returned. A secret appears as `{"secret": true}`,
 // which says a value is held without disclosing it.
 //
@@ -734,10 +783,18 @@ func (UnimplementedHandler) ListBranding(ctx context.Context, params ListBrandin
 // ListDeployments implements listDeployments operation.
 //
 // Lists deployments newest first: what ran where, and when.
-// With `environment_name`, the list is that environment's history and its
-// first row is the environment's current deployment. Without it, the list
-// interleaves every environment of the project — a project-wide audit view
-// in which the first row is only the most recent deployment anywhere.
+// By default the list is the history: every deployment of the project, each
+// with every target it made the release live on. With `origin`, it is the
+// history of that origin alone, and its first row is the deployment the
+// origin serves.
+// With `live=true`, the list is what is served now: the newest deployment
+// to each target, each carrying only the targets it still serves. A
+// preview URL is served only while its preview is live, and its
+// `expires_at` is the expiry its newest deployment set, which is the
+// preview's current one. A deployment every target of which has since
+// been replaced, or whose previews have all expired or been removed, does
+// not appear. Combined with `origin`, the live view is the one deployment
+// that origin serves, or empty.
 // `expand: ["release"]` embeds the release each deployment made live, so a
 // history renders with each entry's content without resolving `release_id`
 // one by one. Expanding requires `release.read` and does not affect the
@@ -745,15 +802,6 @@ func (UnimplementedHandler) ListBranding(ctx context.Context, params ListBrandin
 //
 // GET /deployments
 func (UnimplementedHandler) ListDeployments(ctx context.Context, params ListDeploymentsParams) (r ListDeploymentsRes, _ error) {
-	return r, ht.ErrNotImplemented
-}
-
-// ListEnvironments implements listEnvironments operation.
-//
-// Lists the project's environments ordered by name.
-//
-// GET /environments
-func (UnimplementedHandler) ListEnvironments(ctx context.Context, params ListEnvironmentsParams) (r ListEnvironmentsRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -810,11 +858,28 @@ func (UnimplementedHandler) ListMyProjects(ctx context.Context, params ListMyPro
 	return r, ht.ErrNotImplemented
 }
 
+// ListPreviews implements listPreviews operation.
+//
+// Lists the project's live previews, newest first by `created_at`. An
+// expired or removed preview is not listed; what was deployed to it stays
+// in `GET /deployments`.
+//
+// GET /projects/{project_id}/previews
+func (UnimplementedHandler) ListPreviews(ctx context.Context, params ListPreviewsParams) (r ListPreviewsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListReleases implements listReleases operation.
 //
 // Lists the project's releases, newest first.
-// Entries carry metadata only — the pinned set is omitted. Read one release
-// with `GET /releases/{release_id}` to get its pointers.
+// Entries carry the digest, the metadata and `revoked_at` — the pinned set
+// is omitted.
+// Read one release with `GET /releases/{release_id}` to get its pointers.
+// `content_hash` looks a release up by its content, as the CLI does when a
+// person types the digest a transcript printed. The project holds at most
+// one release per digest, so the filtered list has one entry or none, and
+// an unknown digest is an empty list rather than an error. Paths take the
+// `rel_` id only; the matched entry's `id` is what to use there.
 //
 // GET /releases
 func (UnimplementedHandler) ListReleases(ctx context.Context, params ListReleasesParams) (r ListReleasesRes, _ error) {
@@ -962,6 +1027,21 @@ func (UnimplementedHandler) QueryUsers(ctx context.Context, req *QueryUsersReque
 	return r, ht.ErrNotImplemented
 }
 
+// RemovePreview implements removePreview operation.
+//
+// Ends a preview before it expires: the URL stops being served at once.
+// The deployments to it stay in the history.
+// Idempotent: a URL with no live preview, including one that has already
+// expired or was removed before, answers `204` too, so a cleanup that
+// races the expiry still succeeds.
+// The URL travels in the body rather than the path because an origin
+// contains `/`.
+//
+// POST /projects/{project_id}/previews/remove
+func (UnimplementedHandler) RemovePreview(ctx context.Context, req *RemovePreviewRequest, params RemovePreviewParams) (r RemovePreviewRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // RevokeMySession implements revokeMySession operation.
 //
 // Logs out by permanently deleting the session.
@@ -972,6 +1052,30 @@ func (UnimplementedHandler) QueryUsers(ctx context.Context, req *QueryUsersReque
 //
 // DELETE /sessions/me
 func (UnimplementedHandler) RevokeMySession(ctx context.Context) (r RevokeMySessionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// RevokeRelease implements revokeRelease operation.
+//
+// Marks the release revoked, so that its content is never served again.
+// From then on the release cannot be deployed and is refused on every path
+// that would serve it, including to a build that pins its digest, with
+// `rel.revoked`.
+// A release that any origin still serves cannot be revoked. An origin
+// serves the release of the newest deployment to it, so the call answers
+// `409` with `rel.in_use`, naming each such origin and that deployment.
+// Deploy another release there or roll back first, then revoke. Revoking
+// therefore never takes an origin down. Deployments that named the release
+// earlier stay in the history.
+// Idempotent: revoking a release that is already revoked answers `200`
+// with the release unchanged, `revoked_at` still naming the first
+// revocation. There is no un-revoke; build a new release instead.
+// Takes no body. The lookup is scoped to the project in `project_id`, so a
+// release id of another project answers not found exactly as an unknown id
+// does.
+//
+// POST /releases/{release_id}/revoke
+func (UnimplementedHandler) RevokeRelease(ctx context.Context, params RevokeReleaseParams) (r RevokeReleaseRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -987,6 +1091,37 @@ func (UnimplementedHandler) RevokeMySession(ctx context.Context) (r RevokeMySess
 //
 // DELETE /sessions/{session_id}
 func (UnimplementedHandler) RevokeSession(ctx context.Context, params RevokeSessionParams) (r RevokeSessionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// RollbackDeployment implements rollbackDeployment operation.
+//
+// Re-deploys the deployment named in the path: a new deployment with the
+// same `release_id` and the same `targets`, `reason: rollback`, and
+// `rollback_to` in its metadata naming the deployment it re-applied. The
+// variable values that deployment resolved are re-applied with it, so the
+// targets serve exactly what they served then. The history is append-only,
+// so the deployments in between stay in it.
+// Only a deployment to primary origins can be rolled back. One whose
+// targets were preview URLs answers `400` with `dep.invalid`; deploy to
+// the preview again instead. Every target must still be a primary origin
+// of the project, as `POST /deployments` requires of an exact origin:
+// when one is not, the request answers `403` with
+// `proj.origin_not_allowed` naming it, and nothing changes. There is no
+// narrowing to some of the targets: to roll back one origin, deploy the
+// earlier release to it with `POST /deployments`.
+// When every target already serves the deployment's release, nothing
+// changes and the call answers `200` with the newest deployment to the
+// targets.
+// The release must not be revoked: a revoked one answers `409` with
+// `rel.revoked`. An unknown deployment id, or one of another project,
+// answers `404` with `dep.not_found`.
+// A rollback never answers `dep.variables_missing`: the release and the
+// frozen values it re-applies passed that check together when the named
+// deployment was made.
+//
+// POST /deployments/{deployment_id}/rollback
+func (UnimplementedHandler) RollbackDeployment(ctx context.Context, req OptRollbackDeploymentRequest, params RollbackDeploymentParams) (r RollbackDeploymentRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -1056,20 +1191,16 @@ func (UnimplementedHandler) UpdateTeam(ctx context.Context, req *UpdateTeamReque
 
 // UpdateVariables implements updateVariables operation.
 //
-// Enters, replaces and removes variables at the owner this request
-// addresses.
-// Every name in the body is applied at exactly that owner — the project, or
-// the environment named by `environment_name` — and reaches no other. Names
-// not in the body are untouched.
+// Enters, replaces and removes the project's variables. Names not in the
+// body are untouched.
 // A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
 // stores the value encrypted under the project's active `secret` key, after
-// which it can be referenced but not read back. `null` removes the name from
-// this owner (RFC 7386), which is how several variables are removed in one
-// request; removing a name this owner does not hold is a no-op rather than an
-// error.
+// which it can be referenced but not read back. `null` removes the name
+// (RFC 7386), which is how several variables are removed in one request;
+// removing a name the project does not hold is a no-op rather than an error.
 // The body is applied whole or not at all, so a rejected request leaves the
-// owner exactly as it was. Writing the same name and owner twice replaces the
-// value rather than duplicating it, which makes a retry safe.
+// project's variables exactly as they were. Writing the same name twice
+// replaces the value rather than duplicating it, which makes a retry safe.
 //
 // PATCH /variables
 func (UnimplementedHandler) UpdateVariables(ctx context.Context, req UpdateVariablesRequest, params UpdateVariablesParams) (r UpdateVariablesRes, _ error) {

@@ -29,6 +29,23 @@ function enable(cwd: string, ...extra: string[]) {
   );
 }
 
+/** The same, rendered for a terminal, which is where the warnings are said. */
+function enableRendered(cwd: string, ...extra: string[]) {
+  return withStdin("piped-secret", () =>
+    runCliForTest([
+      "auth-method",
+      "sso",
+      "enable",
+      "--cwd",
+      cwd,
+      "--provider",
+      "google",
+      "--non-interactive",
+      ...extra,
+    ]),
+  );
+}
+
 describe("auth-method sso enable", () => {
   it("writes the connection and reports what changed", async () => {
     const cwd = await setUpProject();
@@ -52,6 +69,108 @@ describe("auth-method sso enable", () => {
     expect(written.oidc.client_secret).toBe("${{ GOOGLE_CLIENT_SECRET }}");
     // The default schema defines only email, so the name claims are dropped.
     expect(written.claim_mapping).toEqual({ email: "email" });
+  });
+
+  describe("a password step edited by hand", () => {
+    async function aProjectWithAnEditedPasswordStep(): Promise<string> {
+      const cwd = await setUpProject();
+      const path = join(cwd, ".zitadel/flows/default-human-user-login.json");
+      const flow = JSON.parse(await readFile(path, "utf8")) as {
+        steps: Array<Record<string, unknown>>;
+      };
+      // Reached from the identifier step, or the flow would not validate.
+      const identifier = flow.steps.find((step) => step.name === "identifier");
+      if (identifier !== undefined) {
+        identifier.transitions = {
+          ...(identifier.transitions as object),
+          submit: { target: "password" },
+        };
+      }
+      flow.steps.splice(flow.steps.length - 1, 0, {
+        name: "password",
+        fields: ["x-auth-methods#password"],
+        actions: [{ name: "submit", kind: "submit", primary: true, text_key: "my.own.copy" }],
+        transitions: { submit: { target: "done" } },
+      });
+      await writeFile(path, `${JSON.stringify(flow)}\n`);
+      return cwd;
+    }
+
+    it("is told to add the connection's slug, not its display name", async () => {
+      const cwd = await aProjectWithAnEditedPasswordStep();
+
+      const result = await enableRendered(
+        cwd,
+        "--client-id",
+        "1234-abc.apps.googleusercontent.com",
+      );
+
+      expect(result.stderr).toContain("Add google to its sso_providers");
+    });
+
+    it("is told where each provider outcome should go", async () => {
+      const cwd = await aProjectWithAnEditedPasswordStep();
+
+      const result = await enableRendered(
+        cwd,
+        "--client-id",
+        "1234-abc.apps.googleusercontent.com",
+      );
+
+      expect(result.stderr).toContain("user_already_exists to sso-conflict");
+    });
+
+    it("is left alone, and said so once, by step name", async () => {
+      const cwd = await aProjectWithAnEditedPasswordStep();
+
+      const result = await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
+
+      const payload = parseJson(result.stdout) as { data: { untouched: string[] } };
+      expect(payload.data.untouched).toEqual([
+        ".zitadel/flows/default-human-user-login.json steps.password",
+      ]);
+    });
+  });
+
+  it("warns when the schema defines nothing the provider maps, so the connection has no mapping", async () => {
+    const cwd = await setUpProject({
+      "default-human-user": {
+        ...defaultSchema,
+        properties: { staffNumber: { type: "string" } },
+      },
+    });
+    // The flow collects what the schema defines, so it validates as it is.
+    const flowPath = join(cwd, ".zitadel/flows/default-human-user-login.json");
+    await writeFile(
+      flowPath,
+      (await readFile(flowPath, "utf8")).replaceAll('"email"', '"staffNumber"'),
+    );
+
+    const result = await withStdin("piped-secret", () =>
+      runCliForTest([
+        "auth-method",
+        "sso",
+        "enable",
+        "--cwd",
+        cwd,
+        "--json",
+        "--non-interactive",
+        "--provider",
+        "custom",
+        "--slug",
+        "acme-sso",
+        "--display-name",
+        "Acme SSO",
+        "--issuer",
+        "https://sso.acme.example",
+        "--client-id",
+        "acme-client-id",
+      ]),
+    );
+
+    expect(result.exitCode).toBe(0);
+    const payload = parseJson(result.stdout) as { warnings?: string[] };
+    expect(payload.warnings?.join("\n")).toContain("has no claim_mapping");
   });
 
   it("reuses the connection on a second run and writes nothing new", async () => {
@@ -451,6 +570,31 @@ describe("auth-method sso enable with a connection already on disk", () => {
 
     expect(result.exitCode).not.toBe(0);
     expect((parseJson(result.stdout) as { code: string }).code).not.toBe("E_NOT_FOUND");
+  });
+
+  it("finds the flow naming the schema by its objectType", async () => {
+    const cwd = await setUpProject();
+    const schemaPath = join(cwd, ".zitadel/schemas/default-human-user.json");
+    const flowPath = join(cwd, ".zitadel/flows/default-human-user-login.json");
+    const schema = JSON.parse(await readFile(schemaPath, "utf8")) as Record<string, unknown>;
+    const flow = JSON.parse(await readFile(flowPath, "utf8")) as Record<string, unknown>;
+    await writeFile(
+      schemaPath,
+      JSON.stringify(
+        { ...schema, $id: "https://a.example/default-human-user.json", objectType: "human-user" },
+        null,
+        2,
+      ),
+    );
+    await writeFile(flowPath, JSON.stringify({ ...flow, user_schema: "human-user" }, null, 2));
+
+    const result = await enable(cwd, "--client-id", "abc");
+
+    expect(result.exitCode).toBe(0);
+    expect(JSON.parse(await readFile(flowPath, "utf8"))).not.toEqual({
+      ...flow,
+      user_schema: "human-user",
+    });
   });
 
   it("does not match a flow naming a different schema with the same file name", async () => {

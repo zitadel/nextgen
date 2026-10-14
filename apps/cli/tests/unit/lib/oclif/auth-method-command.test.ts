@@ -1,6 +1,9 @@
-import { confirm, isCancel } from "@clack/prompts";
-import { Config } from "@oclif/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@clack/prompts", async () => (await import("../../../helpers/clack")).clackDouble());
+
+import { cancel, confirm, isCancel } from "@clack/prompts";
+import { Config } from "@oclif/core";
 
 import AuthMethodPasskeyDisable from "../../../../src/commands/auth-method/passkey/disable";
 import AuthMethodSsoDisable from "../../../../src/commands/auth-method/sso/disable";
@@ -9,19 +12,9 @@ import { cliPackageRoot } from "../../../helpers/oclif-build";
 
 // The terminal paths of the auth-method base class: the confirmation that
 // guards the last way to sign in, and the runs that never prompt. The command
-// tests run --non-interactive against the built CLI, where a prompt cannot be
-// answered; this file runs the command classes in-process, so it can mock the
-// prompt (a module-level vi.mock, which is why it is a file of its own).
-vi.mock("@clack/prompts", async (importOriginal) => {
-  const original = await importOriginal<typeof import("@clack/prompts")>();
-  return {
-    ...original,
-    confirm: vi.fn(),
-    cancel: vi.fn(),
-    // Real by default; a test answering with Ctrl-C makes it say so once.
-    isCancel: vi.fn(original.isCancel),
-  };
-});
+// tests run --non-interactive against the built CLI, which bundles its own
+// prompts, so a prompt can only be answered by running the command classes
+// from source, where `input` is the one module that asks.
 
 // Restored exactly as found, so a stream that had no own `isTTY` gets none
 // back.
@@ -48,10 +41,10 @@ afterEach(async () => {
   restore(process.stdout, tty.stdout);
   restore(process.stdin, tty.stdin);
   vi.mocked(confirm).mockReset();
-  // Back to the real check, so a one-off answer a failing test left unused
+  vi.mocked(cancel).mockReset();
+  // Back to "not cancelled", so a one-off answer a failing test left unused
   // cannot leak into the next test.
-  const original = await vi.importActual<typeof import("@clack/prompts")>("@clack/prompts");
-  vi.mocked(isCancel).mockReset().mockImplementation(original.isCancel);
+  vi.mocked(isCancel).mockReset().mockReturnValue(false);
   vi.restoreAllMocks();
 });
 
@@ -106,7 +99,7 @@ async function disablePasskey(cwd: string, ...extra: string[]) {
 describe("auth-method passkey disable confirmation", () => {
   it("asks before removing the last way to sign in", async () => {
     const cwd = await passkeyOnlyProject();
-    vi.mocked(confirm).mockResolvedValue(false);
+    vi.mocked(confirm).mockResolvedValue(false as never);
 
     await disablePasskey(cwd);
 
@@ -115,7 +108,7 @@ describe("auth-method passkey disable confirmation", () => {
 
   it("ends as skipped and writes nothing when declined", async () => {
     const cwd = await passkeyOnlyProject();
-    vi.mocked(confirm).mockResolvedValue(false);
+    vi.mocked(confirm).mockResolvedValue(false as never);
 
     const envelope = await disablePasskey(cwd);
 
@@ -125,7 +118,7 @@ describe("auth-method passkey disable confirmation", () => {
 
   it("disables the method and warns when confirmed", async () => {
     const cwd = await passkeyOnlyProject();
-    vi.mocked(confirm).mockResolvedValue(true);
+    vi.mocked(confirm).mockResolvedValue(true as never);
 
     const envelope = await disablePasskey(cwd);
 
@@ -140,14 +133,23 @@ describe("auth-method passkey disable confirmation", () => {
 });
 
 describe("auth-method passkey disable cancelled with Ctrl-C", () => {
-  it("ends as skipped and writes nothing", async () => {
+  it("fails, as every cancelled prompt does", async () => {
     const cwd = await passkeyOnlyProject();
-    vi.mocked(confirm).mockResolvedValue(Symbol("cancel"));
+    vi.mocked(confirm).mockResolvedValue(Symbol("cancel") as never);
     vi.mocked(isCancel).mockReturnValueOnce(true);
 
-    const envelope = await disablePasskey(cwd);
+    await expect(disablePasskey(cwd)).rejects.toThrow();
 
-    expect(envelope).toMatchObject({ status: "skipped", reason: "disable-cancelled" });
+    expect(cancel).toHaveBeenCalledWith("Cancelled.");
+  });
+
+  it("writes nothing", async () => {
+    const cwd = await passkeyOnlyProject();
+    vi.mocked(confirm).mockResolvedValue(Symbol("cancel") as never);
+    vi.mocked(isCancel).mockReturnValueOnce(true);
+
+    await disablePasskey(cwd).catch(() => undefined);
+
     expect(await methodOf(cwd, "passkey")).toEqual({ enabled: true });
   });
 });
@@ -174,7 +176,7 @@ async function disableGoogle(cwd: string) {
 describe("auth-method sso disable confirmation", () => {
   it("asks before removing the last way to sign in", async () => {
     const cwd = await googleOnlyProject();
-    vi.mocked(confirm).mockResolvedValue(false);
+    vi.mocked(confirm).mockResolvedValue(false as never);
 
     await disableGoogle(cwd);
 
@@ -187,7 +189,7 @@ describe("auth-method sso disable confirmation", () => {
 
   it("ends as skipped and writes nothing when declined", async () => {
     const cwd = await googleOnlyProject();
-    vi.mocked(confirm).mockResolvedValue(false);
+    vi.mocked(confirm).mockResolvedValue(false as never);
 
     const envelope = await disableGoogle(cwd);
 
@@ -197,7 +199,7 @@ describe("auth-method sso disable confirmation", () => {
 
   it("removes the provider and warns when confirmed", async () => {
     const cwd = await googleOnlyProject();
-    vi.mocked(confirm).mockResolvedValue(true);
+    vi.mocked(confirm).mockResolvedValue(true as never);
 
     const envelope = await disableGoogle(cwd);
 

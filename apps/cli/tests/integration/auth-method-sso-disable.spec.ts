@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp, type ScaffoldedApp } from "../helpers/project";
+import { aSetUpApp, type CustomConnection, type ScaffoldedApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 
@@ -10,6 +10,21 @@ const CREDENTIALS = {
   clientId: "1234-abc.apps.googleusercontent.com",
   secret: "the-client-secret",
 };
+
+const ACME: CustomConnection = {
+  slug: "acme-sso",
+  displayName: "Acme SSO",
+  issuer: "https://sso.acme.example",
+};
+const ACME_CREDENTIALS = { clientId: "acme-client-id", secret: "acme-client-secret" };
+
+/** A set-up project serving a custom connection, published. */
+async function anAppServingAcme(): Promise<ScaffoldedApp> {
+  const app = await aSetUpApp();
+  expect(await app.enableCustomSso(ACME, ACME_CREDENTIALS)).toSucceed();
+  expect(await app.apply()).toSucceed();
+  return app;
+}
 
 /** A set-up project serving Google, published. */
 async function anAppServingGoogle(): Promise<ScaffoldedApp> {
@@ -86,6 +101,14 @@ describe("auth-method sso disable", () => {
           const registered = await app.registeredIdps();
 
           expect(registered.map((idp) => idp.slug)).toEqual([GOOGLE]);
+        });
+
+        it("removes a custom connection named by its slug", async () => {
+          const app = await anAppServingAcme();
+          expect(await app.disableSso(ACME.slug)).toSucceed();
+          expect(await app.apply()).toSucceed();
+
+          expect(await app.stepsOfferingSso()).toEqual([]);
         });
 
         it("leaves nothing to reconcile", async () => {

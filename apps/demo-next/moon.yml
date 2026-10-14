@@ -10,7 +10,7 @@ dependsOn:
 
 workspace:
   inheritedTasks:
-    # A demo app with no unit tests; demo-next-e2e covers it.
+    # A demo app with no unit tests; the e2e project's demo-next lanes cover it.
     exclude:
       - "test"
 

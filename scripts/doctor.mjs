@@ -119,7 +119,7 @@ async function checkPlaywright() {
 
   warn(
     `Playwright browsers missing: ${missing.join(", ")}`,
-    "Run: corepack pnpm --filter @zitadel/cli-journey-e2e exec playwright install chromium",
+    "Run: corepack pnpm --filter @zitadel/e2e exec playwright install chromium",
   );
 }
 

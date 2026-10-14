@@ -5,6 +5,13 @@ import { fileURLToPath } from "node:url";
 import { forwardedArgs, isDirectRun, run, runCapture } from "./dev-process.mjs";
 import { upsertProductGithubRelease } from "./release-github.mjs";
 import {
+  findPrereleaseOnlyPackages,
+  prereleaseOnlyMessage,
+  readLocalPackages,
+  readPrereleaseTag,
+} from "./release-dist-tags.mjs";
+import { PUBLIC_PACKAGE_DIRS } from "./release-manifest.mjs";
+import {
   detectReleaseAutomation,
   findUnrecordedPendingChangesets,
   readPrereleaseChangesetIds,
@@ -128,6 +135,7 @@ async function commandPublish(options) {
 
   await assertNoUnrecordedPendingChangesets();
   await assertMainBranch(options, { allowDryRunBypass: !options.recoverVersion });
+  await assertPrereleaseTagApplies();
 
   if (options.dryRun) {
     await commandSnapshot({ skipContainer: true });
@@ -162,6 +170,20 @@ async function commandPublish(options) {
   await upsertProductGithubRelease({ repoRoot, outDir, log: console.log });
 }
 
+// Fails before anything is published when `changeset publish` would put a
+// package on `latest` instead of the prerelease tag (see release-dist-tags.mjs).
+async function assertPrereleaseTagApplies() {
+  const tag = await readPrereleaseTag(repoRoot);
+  if (!tag) {
+    return;
+  }
+  const packages = await readLocalPackages(repoRoot, PUBLIC_PACKAGE_DIRS);
+  const stuck = await findPrereleaseOnlyPackages(packages, tag);
+  if (stuck.length > 0) {
+    throw new Error(prereleaseOnlyMessage(stuck, tag));
+  }
+}
+
 function assertRecoverVersion(release, recoverVersion) {
   if (release.version !== recoverVersion) {
     throw new Error(
@@ -176,8 +198,17 @@ async function commandVerify() {
   console.log(`release artifacts verified for ${release.version}`);
 }
 
-function parseOptions(args) {
-  const parsed = { dryRun: false, skipContainer: false, recoverVersion: "", base: "" };
+// RELEASE_SKIP_CONTAINER=1 is --skip-container for CI's turbo job, which
+// cannot pass it after `--`: turbo puts those arguments into the cache key of
+// every task in the run (vercel/turborepo#14770), so the whole release graph
+// would be rebuilt instead of restored.
+function parseOptions(args, env = process.env) {
+  const parsed = {
+    dryRun: false,
+    skipContainer: env.RELEASE_SKIP_CONTAINER === "1",
+    recoverVersion: "",
+    base: "",
+  };
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     switch (arg) {
@@ -253,7 +284,8 @@ function usage(error) {
 
 Options:
   --dry-run          Do not publish or mutate remote registries.
-  --skip-container   Build release files without building a local Docker image.
+  --skip-container   Build release files without building a local Docker image
+                     (or set RELEASE_SKIP_CONTAINER=1).
   --recover-version <v>
                      Publish recovery target version from release-publish.
   --base <ref>       Base ref for release publish detection.

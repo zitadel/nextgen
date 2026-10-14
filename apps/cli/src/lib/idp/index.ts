@@ -39,6 +39,23 @@ export {
   type SsoSkipped,
 } from "./documents";
 
+export {
+  customFlagText,
+  selectionFromFlags,
+  type CustomFlagNames,
+  checkGivenCustomFlags,
+  customExample,
+  customFlagValues,
+  ENABLE_FLAG_KEYS,
+  flagText,
+  SETUP_FLAG_KEYS,
+  loopbackIssuerWarning,
+  ENABLE_FLAG_NAMES,
+  givenCustomFlags,
+  SETUP_FLAG_NAMES,
+  type CustomFlagValues,
+} from "./custom";
+
 export { callbackUriFor } from "./callback";
 
 export { askConnectionEndpoints } from "./endpoints";

@@ -1,0 +1,27 @@
+{
+  "title": "API reference",
+  "pages": [
+    "---Runtime auth---",
+    "flows",
+    "authentication-attempts",
+    "sessions",
+    "---Configuration---",
+    "flow-definitions",
+    "schemas",
+    "branding",
+    "identity-providers",
+    "variables",
+    "releases",
+    "deployments",
+    "previews",
+    "---Management---",
+    "projects",
+    "teams",
+    "users",
+    "grants",
+    "events",
+    "---System---",
+    "system",
+    "..."
+  ]
+}

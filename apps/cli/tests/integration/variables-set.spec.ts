@@ -68,6 +68,34 @@ describe("variables set", () => {
       });
     });
 
+    describe("with no value piped in", () => {
+      it("is refused", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.setVariableWithNothingPiped("FOO");
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toExplain("No value for FOO supplied");
+        expect(result).toHintAt("Pipe it in on stdin.");
+      });
+
+      it("suggests the command that pipes it in", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.setVariableWithNothingPiped("TOKEN", { secret: true });
+
+        expect(result).toSuggest("variables set TOKEN --project-level --secret < value.txt");
+      });
+
+      it("enters nothing", async () => {
+        const app = await aSetUpApp();
+
+        await app.setVariableWithNothingPiped("FOO");
+
+        expect(await app.projectVariables()).toEqual([]);
+      });
+    });
+
     it("enters nothing on a dry run", async () => {
       const app = await aSetUpApp();
 

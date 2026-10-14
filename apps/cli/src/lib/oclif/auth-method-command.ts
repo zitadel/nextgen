@@ -1,7 +1,6 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { cancel, confirm, isCancel } from "@clack/prompts";
 import { consola } from "consola";
 
 import {
@@ -86,11 +85,12 @@ export abstract class AuthMethodCommand extends BaseCommand {
   /**
    * The last-method guard (ADR 069 §3). Returns `false` when the user declined
    * the prompt, which ends the run as skipped; refuses without `--force` when
-   * nobody can be asked.
+   * nobody can be asked. The question goes through `input`, which `--force`
+   * answers yes without asking.
    *
-   * A dry run passes, as it does `variables delete`'s guard: it changes
-   * nothing, so there is nothing to confirm, and {@link reportOutcome} still
-   * warns that the schema would have no way to sign in left.
+   * A dry run answers before the guard, as it does `variables delete`'s: it
+   * changes nothing, so there is nothing to confirm, and {@link reportOutcome}
+   * still warns that the schema would have no way to sign in left.
    *
    * @param input.disabling - What the prompt names as being disabled: the
    *   method, or the provider for `auth-method sso disable`.
@@ -105,26 +105,22 @@ export abstract class AuthMethodCommand extends BaseCommand {
     cwdArgs: string[];
   }): Promise<boolean> {
     const { dryRun, force, nonInteractive, cliVersion } = this.meta;
-    if (dryRun || force || !removesLastMethod(input.schema.body, input.after)) {
+    if (dryRun || !removesLastMethod(input.schema.body, input.after)) {
       return true;
     }
-    if (nonInteractive) {
-      refuseLastMethod({
-        schema: input.schema,
-        retryArgs: [...input.retryArgs, ...input.cwdArgs, "--force"],
-        cwdArgs: input.cwdArgs,
-        cliVersion,
-      });
+    const retryArgs = [...input.retryArgs, ...input.cwdArgs, "--force"];
+    if (nonInteractive && !force) {
+      // Refused here rather than by `input`, whose refusal names only the
+      // --force re-run: this one also lists the methods that could be enabled
+      // instead, as argument lists an agent can run whatever the quoting.
+      refuseLastMethod({ schema: input.schema, retryArgs, cwdArgs: input.cwdArgs, cliVersion });
     }
-    const answer = await confirm({
+    return this.input({
+      kind: "confirm",
+      name: `disable ${input.disabling}, the last way to sign in to ${input.schema.name}`,
       message: `Disable ${input.disabling} anyway? Nobody will be able to sign in to ${input.schema.name}.`,
-      initialValue: false,
+      retry: portableCommands([retryArgs], cliVersion)[0],
     });
-    if (isCancel(answer) || !answer) {
-      cancel("Disable cancelled.");
-      return false;
-    }
-    return true;
   }
 
   /**

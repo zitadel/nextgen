@@ -57,6 +57,7 @@ export async function makeProject({
 
 /** The scaffolded schema, cut to what `auth-method sso enable` reads. */
 export const defaultSchema = {
+  objectType: "human-user",
   properties: { email: { type: "string" } },
   "x-auth-methods": { password: { enabled: true }, passkey: { enabled: true } },
 };

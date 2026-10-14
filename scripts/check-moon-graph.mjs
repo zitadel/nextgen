@@ -21,17 +21,19 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 // requires build-public-packages to name each public package's build-release.
 const DUPLICATES_ALLOWED = new Set(["release:build-public-packages"]);
 
-// Edges on another project's build artifact, not on its code, so there is no
-// package.json entry to match.
+// Edges on what another project's tasks produce (a build artifact, generated
+// sources), not on its package, so there is no package.json entry to match.
 function artifactEdge(project, target) {
   if (project === "release") return true; // packages and publishes everything
   if (project === "server") return target === "console" || target === "login-ui"; // //go:embed of the UI dists
   if (project === "testing") return target === "server"; // integration tests boot the binary
+  if (project === "bench") return target === "server"; // vet compiles the Go the server's generation writes
   if (project === "console") return target === "cli"; // dev-real boots an instance through the built CLI
   if (project === "workspace") return target === "console" || target === "login-ui"; // the local image embeds the UI builds
-  // e2e suites run built apps and the server binary; demo-next's dev server
-  // loads the built sdk-next.
-  if (project.endsWith("-e2e")) return ["cli", "server", "console", "sdk-next"].includes(target);
+  // The e2e suite runs built apps and the server binary; demo-next's dev server
+  // loads the built sdk-next, demo-nuxt's the built sdk-nuxt.
+  if (project === "e2e" || project.endsWith("-e2e"))
+    return ["cli", "server", "console"].includes(target) || target.startsWith("sdk-");
   return false;
 }
 

@@ -27,6 +27,25 @@ async function projectWithFlows(flows: Record<string, string>, state?: string): 
 const names = (flows: { name: string }[]) => flows.map((flow) => flow.name);
 
 describe("flowsForSchema", () => {
+  it("matches flows by the schema's objectType", async () => {
+    const cwd = await projectWithFlows({ customers: "customer", staff: "employee" });
+
+    const flows = await flowsForSchema(
+      cwd,
+      schemaFile("customers", { objectType: "customer", $id: "https://a.test/customers.json" }),
+    );
+
+    expect(names(flows)).toEqual(["customers"]);
+  });
+
+  it("does not match another schema's objectType", async () => {
+    const cwd = await projectWithFlows({ staff: "employee" });
+
+    const flows = await flowsForSchema(cwd, schemaFile("customers", { objectType: "customer" }));
+
+    expect(flows).toEqual([]);
+  });
+
   it("matches flows by the schema's $id", async () => {
     const cwd = await projectWithFlows({
       customers: "https://a.test/customers.json",

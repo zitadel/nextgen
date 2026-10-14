@@ -32,9 +32,9 @@ to install first:
 npx @zitadel/cli@alpha <command> --non-interactive --json
 ```
 
-During the public alpha, bare `npx @zitadel/cli` is promoted to the same tested
-alpha CLI so discovery works for first-time users. Prefer `@alpha`, or an exact
-`0.1.0-alpha.N` selector in agent scripts and bug reports, for reproducibility.
+Always pass `@alpha`: bare `npx @zitadel/cli` resolves npm's `latest` tag,
+which still points at an early `0.0.0` build. Use an exact `1.0.0-alpha.N`
+selector in agent scripts and bug reports for reproducibility.
 The CLI requires Node.js 24+.
 
 ## Using the CLI
@@ -114,8 +114,9 @@ once — every resource, its verbs, each verb's `create_fields` / `update_fields
 (flag name, kind, `required`, any closed value set), its `filter_fields` /
 `sort_fields`, and the `delete_outcome` a destructive verb returns — so prefer it
 over reading `<resource> --help` one at a time. A `list` verb's envelope carries
-`data.count`, so a "how many …?" question is one `list --json` call: read the
-count, do not page and tally.
+`data.count`, the number of items it returned. A list returns one page unless
+you pass `--all`, so a "how many …?" question is one `list --all --json` call:
+read the count, do not page and tally.
 
 ## Reading the envelope
 
@@ -124,10 +125,13 @@ Each invocation prints one JSON object:
 - `status`: `ok` | `skipped` | `error`.
 - `cli_version`, `command`, `source`: always present.
 - On success: `data` with the command-specific payload.
-- On a no-op: `reason` (e.g. `no-framework-detected`, `orphaned-config`).
+- On a no-op: `reason` (e.g. `already-initialized`, `already-claimed`,
+  `nothing-to-eject`).
 - On failure: `code` (e.g. `E_VALIDATION`, `E_NETWORK`, `E_NOT_FOUND`,
-  `E_CONFLICT`) and `message`.
-- `next_commands`: the suggested follow-ups. Prefer these over free-text hints.
+  `E_CONFLICT`) and `message`, usually with a `hint`, and `details` when there
+  is structured context.
+- `next_commands`: the suggested follow-ups, inside `data` on success and at
+  the top level on a no-op or failure. Prefer these over free-text hints.
 - `warnings`: things that went wrong without stopping the command, such as a
   value that was not published. Always present on success (often empty), and
   present on a no-op or failure when there are any. Read them before you report
@@ -135,9 +139,13 @@ Each invocation prints one JSON object:
 - A `list` verb emits `data: { items, count, next_page_token }`; when a page
   remains, `data.next_commands` carries the exact command for the next page.
 - `plan` and `apply` emit `data.changes`: one row per touched resource
-  (`{kind, action, file, id?, previous_id?}`, action ∈ create/update/revision/
-  delete). Plan rows preview; apply rows report, with the resulting platform
-  ids. Use it to verify an edit did what you intended.
+  (`{kind, action, file, id?, previous_id?, moved_from?}`, action ∈ create/
+  update/revision/delete/move). A `move` is a file that took over a resource
+  from a removed one (`moved_from`). Plan rows preview; apply rows report, with
+  the resulting platform ids. Use it to verify an edit did what you intended.
+  `data.unsupported_deletions` counts removed files whose resource cannot be
+  deleted yet (they are kept, and are not part of `total`); on `apply` the files
+  are listed in `data.unsupported_deletion_files`.
 - A write verb's `--dry-run` reports what it would send without calling the
   platform, so you can preview a mutation before making it.
 
@@ -145,6 +153,9 @@ Common error codes point at their own fix in `next_commands`:
 
 - `E_VALIDATION`: the body or flags are wrong; `message` names what, and
   `details` often lists the missing or available values.
+- `E_CREDENTIAL_MISSING`: a connection's `client_id` or `client_secret` names a
+  project variable that does not exist; `details.variable` is the name. Publish it
+  with `variables set NAME --project-level` (add `--secret` for the secret), then retry.
 - `E_LOCAL_SERVER_NOT_RUNNING`: start the local runtime, then retry with
   `--server local`.
 - `E_NOT_FOUND`: an HTTP 404 — a missing resource, or a `--server` that is not a
@@ -181,7 +192,10 @@ the conversation: you clarify with the human, then drive the CLI headlessly.
 Ask about:
 
 - **Sign-in methods** — password (the usual default), passkeys, and single
-  sign-on. If they want SSO, which providers?
+  sign-on. If they want SSO, which providers? A provider the CLI does not list
+  by name is still possible: run `zitadel auth-method sso enable --help` to see
+  whether the installed CLI takes one, and which settings it needs, and ask for
+  those too.
 - **Profile fields** — the user schema starts with first name, last name, and
   the login identifier plus a password. Which additional fields do they want
   (for example phone, username, or a display name)?
@@ -220,22 +234,41 @@ framework, sign-in preset, and profile-field options):
 ```sh
 npx @zitadel/cli@alpha doctor --non-interactive --json
 npx @zitadel/cli@alpha start --non-interactive --json
-npx @zitadel/cli@alpha setup --framework next --server local --force --non-interactive --json
+npx @zitadel/cli@alpha setup --framework next --server local --non-interactive --json
 npx @zitadel/cli@alpha doctor --non-interactive --json
 npx @zitadel/cli@alpha plan --non-interactive --json
 npx @zitadel/cli@alpha apply --non-interactive --json
 ```
 
 `setup` scaffolds into an empty directory, or patches an existing app project
-where it detects a framework. It stops on any other non-empty directory and
-asks for `--force` — which the golden path passes because `start` has already
-written `.zitadel/local` into the directory. If you run `setup` before `start`,
-in a truly empty directory, `--force` is not needed.
+where it detects a framework. What `start` leaves in a directory —
+`.zitadel/local/` and the `.gitignore` line that ignores it — still counts as
+empty, so the golden path runs `setup` right after `start` in the same
+directory. Any other non-empty directory stops setup with a hint to pass
+`--force`. Pass it only for a directory whose contents may be replaced: files
+the new app also has, such as `package.json`, are overwritten. Without a
+terminal `setup` cannot ask which framework to scaffold, so pass `--framework`;
+the error lists the choices in `details.frameworks`.
+
+`start` reuses a server already running in the directory only when it is the
+release this CLI ships; one an earlier release started is restarted, and its
+data stays. `setup --server local` refuses a binary-runtime server another
+release started with `E_CONFLICT` before it creates anything: that server's API
+is its own release's. Its `next_commands` run `start`, then `setup` again.
+
+In an existing app, `--framework` has to name the framework setup detects
+there; another one stops setup with `E_CONFLICT` instead of offering
+`--force`. Setup reports its conflicts with the app before it creates a
+project, and the error's `hint` says whether `--force` resolves one: it
+replaces a file at a path setup writes, but not the app's root component or
+request boundary at another path.
 
 The app may also live in a subdirectory of the one `start` ran in: `setup`,
 `console` and `--server local` read `.zitadel/local/` from the working
 directory or the nearest parent that has it (up to the home directory), so
-`mkdir my-app && cd my-app` after `start` works without `--force`. On a local
+`mkdir my-app && cd my-app` after `start` works too. `stop`, `reset`, `logs`,
+`status` and `doctor` read only the working directory's `.zitadel/local/`, so
+run them where `start` ran. On a local
 server that hosts the platform project, `setup` attaches the project to the
 local admin's team and ends `data.next_commands` with `console`; when it finds
 no local admin for that server on the way up, it says so in the envelope's
@@ -255,8 +288,11 @@ than one:
 - `auth-method passkey enable` and `auth-method passkey disable`
 - `auth-method sso enable --provider google` adds a provider. It prompts for
   the client id and secret, or takes `--client-id` with the secret piped on
-  stdin when non-interactive. `auth-method sso disable --provider google`
-  removes it.
+  stdin when non-interactive. Any other OpenID Connect provider is
+  `--provider custom` with `--slug`, `--display-name`, `--issuer` and optionally
+  `--scopes` (default `openid profile email`).
+  `auth-method sso disable --provider google` removes a provider; a custom one
+  is named by its slug, as in `auth-method sso disable --provider acme-sso`.
 
 `sso enable` is a deprecated alias of `auth-method sso enable`; use the new
 command. The commands change only local files, apart from

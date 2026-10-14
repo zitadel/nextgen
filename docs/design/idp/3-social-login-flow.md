@@ -281,8 +281,8 @@ transitions route it:
 | Resolution State | Outcome Fired | Routing & Engine Behavior |
 | :--- | :--- | :--- |
 | **Known subject** | `sso_authenticated` | **Targets `done` (Authenticated).** Identity is pinned to `(connection, subject)`, not to claims, so profile edits cannot fork accounts. A sign-in does not update the stored user from fresh claims; that refresh is `is_auto_update`, deferred with its guards ([area 1](1-resource-model.md#deferred-and-cut-fields)). |
-| **Unknown subject** | `sso_user_not_found` | **Targets the data collection step** ([New Users: Prefill and Confirm](#new-users-prefill-and-confirm); `register-sso` in area 4's scaffold). Under `creation: disabled`, `sso_user_not_found` is not raised; the unknown subject is an error on the originating step ([Failures and Recovery](#failures-and-recovery)). |
-| **Unknown subject with unique-property collision** | `user_already_exists` | **Targets the conflict resolution step** ([Conflict Resolution Flow](#conflict-resolution-flow); `sso-conflict` in area 4's scaffold). The engine binds the attempt to the colliding account, and a correct password or passkey on that step signs that account in. |
+| **Unknown subject** | `sso_user_not_found` | **Targets the data collection step** ([New Users: Prefill and Confirm](#new-users-prefill-and-confirm); `register-sso` in area 4's scaffold), except on the `password` step under `creation: auto`, where the attempt is already bound to the identified user, so the engine restarts the flow instead of creating anyone. Under `creation: disabled`, `sso_user_not_found` is not raised; the unknown subject is an error on the originating step ([Failures and Recovery](#failures-and-recovery)). |
+| **Unknown subject with unique-property collision** | `user_already_exists` | **Targets the conflict resolution step** ([Conflict Resolution Flow](#conflict-resolution-flow); `sso-conflict` in area 4's scaffold), including from the `password` step, where the attempt is already bound to the identified user. The engine binds it to the colliding account either way, and a correct password or passkey on the conflict step signs that account in. |
 
 ### Creation Without Collection (`creation: auto`)
 
@@ -376,20 +376,46 @@ multiple identity providers.
   manually completed by the user.
 * **Optional Fields:** An omitted optional provider claim is silently skipped
   and does not block the step.
-* **User Edits:** Prefilled fields are editable.
+* **User Edits:** Prefilled fields are editable, except a unique value the
+  provider verified.
+  A submit that changes it is refused with
+  `error.sso_verified_unique_value_changed`: an edited, unregistered address
+  would otherwise get an account linked to the editor's provider subject.
+  The engine sets `read_only` on that field, so the login components render
+  it read-only on a text field.
+  A select field, or a template that ignores `read_only`, stays editable, and
+  the submit refusal still applies.
   `x-editable` was removed in
-  [#901](https://github.com/zitadel/nextgen/pull/901) and returns with the
-  collection-step implementation; until then editability is uniform.
-* **Verification Loss on Edit:** Editing a prefilled value immediately revokes
-  its verified status.
+  [#901](https://github.com/zitadel/nextgen/pull/901).
+* **Verification Loss on Edit:** Editing any other prefilled value revokes its
+  verified status.
   Because the provider only vouches for its own returned data, modified inputs
   must re-enter the standard verification pipeline (`x-verify`).
   This prevents users from replacing a verified prefilled email with an
   arbitrary address while retaining the verified flag.
 
-* **No Wire Change:** `api/openapi/components/flows/field.yaml` already defines
-  `value` for prefilled fields. After a successful callback the engine fills it
-  from mapped claims.
+* **Stored Attributes:** The user is created from what the steps collected,
+  with this submit's values, and each schema claim the step does not show.
+  A claim replaces a value an earlier step collected, so a typed identifier
+  cannot override the provider.
+  A hidden claim that fails its property's validation is dropped, because the
+  user cannot see it to fix it.
+* **Password:** A password field on the step is optional for the flow author.
+  When the step has one, the password is stored with the user, in the same
+  transaction as the user and the link, so the user can also sign in with it
+  later.
+  The provider is still the proof for this sign-in, so the session records no
+  password factor.
+* **Step Errors:** A required property that no field on the step supplies
+  gives `error.sso_user_cannot_be_created`; nothing on the step can fix it.
+  Values that fail the schema only together give `error.sso_user_invalid`.
+  A taken value whose owner the engine cannot look up gives
+  `error.user_already_exists`
+  ([Trigger Points](#trigger-points)).
+
+* **Wire:** `api/openapi/components/flows/field.yaml` defines `value` for
+  prefilled fields. After a successful callback the engine fills it from mapped
+  claims, and sets `read_only` on a field that shows a verified unique claim.
 
 ## The Resolved External Identity
 
@@ -466,12 +492,16 @@ and the flow must route both:
 
 1. **Callback Resolution:** Triggered when provider-supplied values collide with
    an existing user record.
-2. **Collection Step Submission:** Triggered when a user edits a prefilled field
-   into a conflicting value (matching standard registration submission
-   semantics).
+2. **Collection Step Submission:** Triggered when a submitted value collides
+   with an existing user record.
+   The engine binds that user, as at callback resolution.
+   A team-scoped value, an object or an array has no owner lookup, so its
+   collision shows `error.user_already_exists` on the step instead.
 
 Both the entry step and the collection step carry the `user_already_exists`
-transition.
+transition. The `password` step carries it too, pointing at itself: a user who
+typed their email is already identified, so a collision with that same account
+shows the step again, and any other collision restarts the flow.
 
 > **Enumeration Note:** The conflict step and the `user_already_exists` outcome
 > behind it confirm to the person completing the ceremony that an account with
@@ -520,7 +550,7 @@ and recovery route without exposing internal technical details to the end user.
 | Requirement | Owed By / Target |
 | :--- | :--- |
 | **Callback URI Surface:** Expose `{origin}/__nextgen/idp/callback` in the setup journey and per environment. | CLI Journey (Area 4) |
-| **Flow Scaffolding:** Scaffold `sso_providers` on the entry steps (both, in the shipped shared-entry default) and the conflict step with its login route. | CLI Journey (Area 4) |
+| **Flow Scaffolding:** Scaffold `sso_providers` on the entry steps (both, in the shipped shared-entry default), the password step and the conflict step with its login route. | CLI Journey (Area 4) |
 | **Callback Route:** Register route under the server HTTP surface; the scaffolded proxy matcher is already prefix-wide (`/__nextgen/:path*`), so no patcher work remains. | Server |
 | **Localization Keys:** Export conflict-step copy (the account-exists explanation plus its submit, passkey, and sign-in actions), error copy, and provider button labels as `text_key` entries. | Login UI / Locale Work |
 | **UI & Branding Assets:** Add conditional SSO blocks to all five branding `login.liquid` templates and `default.liquid`; add provider glyphs to `zl-icon`. | Branding Defaults / Components |

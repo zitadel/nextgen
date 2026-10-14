@@ -89,11 +89,10 @@ describe("add user sheet", () => {
 
     expect(await screen.findByRole("heading", { name: "Add user" })).toBeInTheDocument();
     // Single schema is preselected — there is no choice to make.
-    expect(await screen.findByRole("combobox", { name: "User Schema" })).toHaveTextContent(
-      "Business",
-    );
+    const picker = await screen.findByRole("combobox", { name: "User Schema" });
+    await waitFor(() => expect(picker).toHaveTextContent("Business"));
     for (const label of ["Email", "Given name", "Family name", "Company name"]) {
-      expect(screen.getByLabelText(label)).toBeInTheDocument();
+      expect(await screen.findByLabelText(label)).toBeInTheDocument();
     }
   });
 
@@ -134,7 +133,7 @@ describe("add user sheet", () => {
     // An optional property alone must not satisfy the gate. Asserted here rather
     // than end to end: this needs a schema with both required and optional
     // properties, and the seeded instance's schema requires everything it defines.
-    await userEvent.type(screen.getByLabelText("Given name"), "Maya");
+    await userEvent.type(await screen.findByLabelText("Given name"), "Maya");
     expect(submit).toBeDisabled();
 
     await userEvent.type(screen.getByLabelText("Email"), "maya.patel@acme.com");
@@ -153,7 +152,7 @@ describe("add user sheet", () => {
     await openSheet();
 
     await userEvent.type(await screen.findByLabelText("Email"), "maya.patel@acme.com");
-    await userEvent.type(screen.getByLabelText("Given name"), "Maya");
+    await userEvent.type(await screen.findByLabelText("Given name"), "Maya");
     await userEvent.click(screen.getByRole("button", { name: "Add user" }));
 
     await waitFor(() => expect(body).toBeDefined());
@@ -193,7 +192,7 @@ describe("add user sheet", () => {
 
     const picker = await screen.findByRole("combobox", { name: "User Schema" });
     // Two schemas across the pages, so nothing is preselected.
-    expect(picker).toHaveTextContent("Select schema");
+    await waitFor(() => expect(picker).toHaveTextContent("Select schema"));
 
     await userEvent.click(picker);
     expect(await screen.findByRole("option", { name: /Business/ })).toBeInTheDocument();
@@ -209,7 +208,7 @@ describe("add user sheet", () => {
 
     const picker = await screen.findByRole("combobox", { name: "User Schema" });
     // Two schemas, so nothing is preselected.
-    expect(picker).toHaveTextContent("Select schema");
+    await waitFor(() => expect(picker).toHaveTextContent("Select schema"));
 
     await userEvent.click(picker);
     await userEvent.click(await screen.findByRole("option", { name: /Business/ }));

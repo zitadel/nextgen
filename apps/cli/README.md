@@ -7,9 +7,9 @@ npx @zitadel/cli@alpha start
 npx @zitadel/cli@alpha setup --server local
 ```
 
-During the public alpha, bare `npx @zitadel/cli` resolves to the same tested
-alpha CLI. Use `@alpha` or an exact `0.1.0-alpha.N` selector in bug reports and
-automation when reproducibility matters.
+Always pass `@alpha`: bare `npx @zitadel/cli` resolves npm's `latest` tag, which
+still points at an early `0.0.0` build. Use an exact `1.0.0-alpha.N` selector in
+bug reports and automation when reproducibility matters.
 
 > **Beta.** This is the **next-generation Zitadel**, a ground-up rewrite of the platform. It is distinct from the established Zitadel at [github.com/zitadel/zitadel](https://github.com/zitadel/zitadel). APIs and CLI flags will change.
 
@@ -69,9 +69,9 @@ For a reproducible tester report, use the exact alpha train from the GitHub
 Release:
 
 ```sh
-npx @zitadel/cli@0.1.0-alpha.N doctor
-npx @zitadel/cli@0.1.0-alpha.N start
-npx @zitadel/cli@0.1.0-alpha.N setup --server local
+npx @zitadel/cli@1.0.0-alpha.N doctor
+npx @zitadel/cli@1.0.0-alpha.N start
+npx @zitadel/cli@1.0.0-alpha.N setup --server local
 ```
 
 The default project flow supports password registration/login, passkey
@@ -142,8 +142,6 @@ which ships in this package.
 * [`zitadel console`](#zitadel-console)
 * [`zitadel doctor`](#zitadel-doctor)
 * [`zitadel eject`](#zitadel-eject)
-* [`zitadel environments get NAME`](#zitadel-environments-get-name)
-* [`zitadel environments list`](#zitadel-environments-list)
 * [`zitadel events get ID`](#zitadel-events-get-id)
 * [`zitadel events list`](#zitadel-events-list)
 * [`zitadel flow-definitions get FLOW`](#zitadel-flow-definitions-get-flow)
@@ -419,26 +417,37 @@ Add an identity provider to a user schema.
 USAGE
   $ zitadel auth-method sso enable [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [--schema <value>]
-    [--provider google] [--client-id <value>]
+    [--provider google|custom] [--slug <value>] [--display-name <value>]
+    [--issuer <value>] [--scopes <value>] [--client-id <value>]
 
 FLAGS
-  -c, --cwd=<value>        Project directory to operate on.
-  -n, --non-interactive    Disable prompts. Required when scripting or running
-                           as an agent.
-  -s, --server=<value>     Override the resolved server URL.
-  -v, --verbose            Verbose logging.
-      --client-id=<value>  Client id of the application registered with the
-                           provider.
-      --[no-]color         Colorize human output. Disable with --no-color;
-                           NO_COLOR and FORCE_COLOR are honored too.
-      --debug              Debug logging.
-      --dry-run            Preview without mutating files or the platform.
-      --provider=<option>  Identity provider to enable.
-                           <options: google>
-      --schema=<value>     User schema to change. Required when the Project has
-                           more than one.
-      --[no-]telemetry     Send anonymous usage analytics. Disable with
-                           --no-telemetry.
+  -c, --cwd=<value>           Project directory to operate on.
+  -n, --non-interactive       Disable prompts. Required when scripting or
+                              running as an agent.
+  -s, --server=<value>        Override the resolved server URL.
+  -v, --verbose               Verbose logging.
+      --client-id=<value>     Client id of the application registered with the
+                              provider.
+      --[no-]color            Colorize human output. Disable with --no-color;
+                              NO_COLOR and FORCE_COLOR are honored too.
+      --debug                 Debug logging.
+      --display-name=<value>  Name shown on the custom connection's sign-in
+                              button.
+      --dry-run               Preview without mutating files or the platform.
+      --issuer=<value>        Issuer URL of the custom provider. Its endpoints
+                              are found by OIDC discovery.
+      --provider=<option>     Identity provider to enable, or "custom" for any
+                              other OpenID Connect provider.
+                              <options: google|custom>
+      --schema=<value>        User schema to change. Required when the Project
+                              has more than one.
+      --scopes=<value>        Scopes the custom connection requests, separated
+                              by spaces or commas. Must include openid. Default:
+                              openid profile email.
+      --slug=<value>          Name of the custom connection. Schemas and flows
+                              refer to it by this.
+      --[no-]telemetry        Send anonymous usage analytics. Disable with
+                              --no-telemetry.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -452,6 +461,10 @@ EXAMPLES
   $ zitadel auth-method sso enable --provider google --schema customers
 
   $ zitadel auth-method sso enable --provider google --client-id 1234-abc.apps.googleusercontent.com --non-interactive < secret.txt
+
+  $ zitadel auth-method sso enable --provider custom --slug acme-sso --display-name 'Acme SSO' --issuer https://sso.acme.example
+
+  $ zitadel auth-method sso enable --provider custom --slug acme-sso --display-name 'Acme SSO' --issuer https://sso.acme.example --scopes 'openid profile email groups' --client-id abc123 --non-interactive < secret.txt
 ```
 
 ## `zitadel autocomplete [SHELL]`
@@ -772,88 +785,6 @@ DESCRIPTION
 
 ALIASES
   $ zitadel uninstall
-```
-
-## `zitadel environments get NAME`
-
-Get one environment by id.
-
-```
-USAGE
-  $ zitadel environments get NAME [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--fields <value>]
-
-ARGUMENTS
-  NAME  environment name
-
-FLAGS
-  -c, --cwd=<value>      Project directory to operate on.
-  -n, --non-interactive  Disable prompts. Required when scripting or running as
-                         an agent.
-  -s, --server=<value>   Override the resolved server URL.
-  -v, --verbose          Verbose logging.
-      --[no-]color       Colorize human output. Disable with --no-color;
-                         NO_COLOR and FORCE_COLOR are honored too.
-      --debug            Debug logging.
-      --dry-run          Preview without mutating files or the platform.
-      --fields=<value>   Fields to show, comma-separated dot-paths. Defaults to
-                         the resource's own; `--json` is unaffected.
-      --[no-]telemetry   Send anonymous usage analytics. Disable with
-                         --no-telemetry.
-
-GLOBAL FLAGS
-  --json  Format output as json.
-
-DESCRIPTION
-  Get one environment by id.
-
-EXAMPLES
-  $ zitadel environments get <id>
-
-  $ zitadel environments get <id> --json
-```
-
-## `zitadel environments list`
-
-List environments.
-
-```
-USAGE
-  $ zitadel environments list [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--limit <value>] [-a |
-    --page-token <value>] [--fields <value>] [--plain]
-
-FLAGS
-  -a, --all                 Fetch every page instead of one.
-  -c, --cwd=<value>         Project directory to operate on.
-  -n, --non-interactive     Disable prompts. Required when scripting or running
-                            as an agent.
-  -s, --server=<value>      Override the resolved server URL.
-  -v, --verbose             Verbose logging.
-      --[no-]color          Colorize human output. Disable with --no-color;
-                            NO_COLOR and FORCE_COLOR are honored too.
-      --debug               Debug logging.
-      --dry-run             Preview without mutating files or the platform.
-      --fields=<value>      Columns to show, comma-separated dot-paths (e.g.
-                            id,attributes.email). Defaults to the resource's own
-                            columns; `--json` is unaffected.
-      --limit=<value>       Page size (server default 20, max 100).
-      --page-token=<value>  Continue from a previous page's next_page_token.
-      --plain               Tab-separated rows with no header, for piping.
-                            Implied when stdout is not a terminal.
-      --[no-]telemetry      Send anonymous usage analytics. Disable with
-                            --no-telemetry.
-
-GLOBAL FLAGS
-  --json  Format output as json.
-
-DESCRIPTION
-  List environments.
-
-EXAMPLES
-  $ zitadel environments list --json
-
-  $ zitadel environments list --all --json
 ```
 
 ## `zitadel events get ID`
@@ -2061,7 +1992,8 @@ USAGE
     next|nuxt|react|vue|solid|svelte|qwik|angular] [--renderer react]
     [--dev-port <value>] [--skip-install] [--preset
     password-first|passkey-first] [--use-case minimal|consumer|business] [--sso
-    google] [--sso-client-id <value>]
+    google|custom] [--sso-client-id <value>] [--sso-slug <value>]
+    [--sso-display-name <value>] [--sso-issuer <value>] [--sso-scopes <value>]
 
 FLAGS
   -c, --cwd=<value>
@@ -2116,10 +2048,25 @@ FLAGS
       wizard's provider question; needs --sso-client-id, and the OAuth application
       must already be registered with the provider. Pipe the client secret in on
       stdin; never pass it as a flag.
-      <options: google>
+      <options: google|custom>
 
   --sso-client-id=<value>
       Client id of the OAuth application registered with the --sso provider.
+
+  --sso-display-name=<value>
+      With --sso custom: the name shown on the sign-in button.
+
+  --sso-issuer=<value>
+      With --sso custom: the provider's issuer URL. Its endpoints come from OIDC
+      discovery.
+
+  --sso-scopes=<value>
+      With --sso custom: the scopes to request, separated by spaces or commas.
+      Must include openid. Default: openid profile email.
+
+  --sso-slug=<value>
+      With --sso custom: the name of the connection. Schemas and flows refer to
+      it.
 
   --[no-]telemetry
       Send anonymous usage analytics. Disable with --no-telemetry.
@@ -2149,26 +2096,37 @@ Deprecated alias of auth-method sso enable.
 USAGE
   $ zitadel sso enable [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [--schema <value>]
-    [--provider google] [--client-id <value>]
+    [--provider google|custom] [--slug <value>] [--display-name <value>]
+    [--issuer <value>] [--scopes <value>] [--client-id <value>]
 
 FLAGS
-  -c, --cwd=<value>        Project directory to operate on.
-  -n, --non-interactive    Disable prompts. Required when scripting or running
-                           as an agent.
-  -s, --server=<value>     Override the resolved server URL.
-  -v, --verbose            Verbose logging.
-      --client-id=<value>  Client id of the application registered with the
-                           provider.
-      --[no-]color         Colorize human output. Disable with --no-color;
-                           NO_COLOR and FORCE_COLOR are honored too.
-      --debug              Debug logging.
-      --dry-run            Preview without mutating files or the platform.
-      --provider=<option>  Identity provider to enable.
-                           <options: google>
-      --schema=<value>     User schema to change. Required when the Project has
-                           more than one.
-      --[no-]telemetry     Send anonymous usage analytics. Disable with
-                           --no-telemetry.
+  -c, --cwd=<value>           Project directory to operate on.
+  -n, --non-interactive       Disable prompts. Required when scripting or
+                              running as an agent.
+  -s, --server=<value>        Override the resolved server URL.
+  -v, --verbose               Verbose logging.
+      --client-id=<value>     Client id of the application registered with the
+                              provider.
+      --[no-]color            Colorize human output. Disable with --no-color;
+                              NO_COLOR and FORCE_COLOR are honored too.
+      --debug                 Debug logging.
+      --display-name=<value>  Name shown on the custom connection's sign-in
+                              button.
+      --dry-run               Preview without mutating files or the platform.
+      --issuer=<value>        Issuer URL of the custom provider. Its endpoints
+                              are found by OIDC discovery.
+      --provider=<option>     Identity provider to enable, or "custom" for any
+                              other OpenID Connect provider.
+                              <options: google|custom>
+      --schema=<value>        User schema to change. Required when the Project
+                              has more than one.
+      --scopes=<value>        Scopes the custom connection requests, separated
+                              by spaces or commas. Must include openid. Default:
+                              openid profile email.
+      --slug=<value>          Name of the custom connection. Schemas and flows
+                              refer to it by this.
+      --[no-]telemetry        Send anonymous usage analytics. Disable with
+                              --no-telemetry.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -2946,9 +2904,7 @@ FLAGS
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
-      --as=<option>      [default: string] Store the value as this JSON type. A
-                         reference to the whole field resolves to that type, so
-                         a number stays a number.
+      --as=<option>      [default: string] Store the value as this JSON type.
                          <options: string|number|boolean>
       --[no-]color       Colorize human output. Disable with --no-color;
                          NO_COLOR and FORCE_COLOR are honored too.
