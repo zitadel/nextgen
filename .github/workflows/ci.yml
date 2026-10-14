@@ -166,9 +166,9 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: ${{ runner.temp }}/journey-verdaccio-storage
-          key: journey-verdaccio-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+          key: journey-verdaccio-verify-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
-            journey-verdaccio-${{ runner.os }}-
+            journey-verdaccio-verify-${{ runner.os }}-
 
       - name: List restored journey registry packages
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
