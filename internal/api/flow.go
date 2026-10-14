@@ -174,9 +174,9 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	// the browser back to its callback route, and the page the browser then
 	// returns to must be on it. For a browser the origin header is not
 	// writable, so a page on one origin cannot aim the return at another.
-	// A non-browser client chooses both values, and until environments
-	// declare an issuer origin the guards that hold then are the provider's
-	// registered redirect URI and the Strict flow cookie.
+	// A non-browser client chooses both values, and until projects declare
+	// their origins the guards that hold then are the provider's registered
+	// redirect URI and the Strict flow cookie.
 	// Only the action selects the branch: a provider id on another action
 	// goes through to the engine, which refuses it as an invalid action.
 	if req.Action == domain.FlowActionSSO {
@@ -508,6 +508,9 @@ func toFlowField(f domain.FlowField) api.Field {
 	}
 	if f.Value != nil {
 		out.Value = jx.Raw(jsonQuoted(*f.Value))
+	}
+	if f.ReadOnly {
+		out.ReadOnly = api.NewOptBool(true)
 	}
 	if v := toFlowFieldValidation(f.Validation); v != nil {
 		out.Validation = api.NewOptFieldValidation(*v)

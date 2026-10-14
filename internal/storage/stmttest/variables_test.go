@@ -16,12 +16,11 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// variableFixture is a project, one of its environments, and a name, all
-// suffixed per test so cases never collide in a shared database.
+// variableFixture is a project and a name, both suffixed per test so cases
+// never collide in a shared database.
 type variableFixture struct {
-	name          string
-	projectID     string
-	environmentID string
+	name      string
+	projectID string
 }
 
 func newVariableFixture(t *testing.T, stmts service.AllStatements) variableFixture {
@@ -40,70 +39,15 @@ func newVariableFixture(t *testing.T, stmts service.AllStatements) variableFixtu
 	name := "login_appearance_" + strings.ReplaceAll(suffix, "-", "_")
 	require.Regexp(t, domain.NameRegex, name, "the fixture must use a referenceable name")
 
-	// environment_id is a real foreign key too, through the generated
-	// environment_ref column, so the environment has to exist before a variable
-	// can scope to it. The id is minted by the create, which is also the only
-	// way to get one an owner could legitimately hold.
-	environment := newTestEnvironment(t, stmts, projectID, "env-var-"+suffix)
-
 	return variableFixture{
-		name:          name,
-		projectID:     projectID,
-		environmentID: environment.ID,
+		name:      name,
+		projectID: projectID,
 	}
 }
 
-// newTestEnvironment creates one environment on the project and hands back the
-// stored record, whose id is what a variable scopes to.
-func newTestEnvironment(t *testing.T, stmts service.AllStatements, projectID, rawName string) *domain.Environment {
-	t.Helper()
-	environment := &domain.Environment{
-		ProjectID: projectID,
-		Name:      environmentNameFrom(t, rawName),
-	}
-	require.NoError(t, stmts.CreateEnvironment(t.Context(), environment))
-	require.NotEmpty(t, environment.ID, "the create has to mint the id a variable scopes to")
-	return environment
-}
-
-// environmentNameFrom bends a test suffix into the shape an environment name is
-// validated into: a lowercase DNS-style label of at most 63 characters. The
-// suffix carries the test name, so it holds underscores and easily runs past
-// the length limit; neither would get past the environments table. Collisions
-// do not matter -- the name is unique per project and every fixture builds its
-// own project.
-func environmentNameFrom(t *testing.T, raw string) string {
-	t.Helper()
-	label := strings.Map(func(r rune) rune {
-		switch {
-		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
-			return r
-		case r >= 'A' && r <= 'Z':
-			return r + ('a' - 'A')
-		default:
-			return '-'
-		}
-	}, raw)
-	if len(label) > domain.EnvironmentNameMaxLength {
-		label = label[:domain.EnvironmentNameMaxLength]
-	}
-	label = strings.Trim(label, "-")
-	require.Regexp(t, domain.EnvironmentNamePattern, label,
-		"the fixture must use a name the environment resource would accept")
-	return label
-}
-
-// projectOwner addresses the project level: the environment left unnamed, which
-// is stored as the empty string and is an address in its own right rather than
-// a wildcard.
+// projectOwner addresses the project the fixture created.
 func (f variableFixture) projectOwner() domain.VariableOwner {
 	return domain.VariableOwner{ProjectID: f.projectID}
-}
-
-// environmentOwner addresses one environment of the project, by the id the
-// table keys on rather than the name the wire carries.
-func (f variableFixture) environmentOwner() domain.VariableOwner {
-	return domain.VariableOwner{ProjectID: f.projectID, EnvironmentID: f.environmentID}
 }
 
 // set writes a variable at owner and registers its removal.
@@ -154,35 +98,18 @@ func TestVariablesRoundTrip(t *testing.T) {
 	})
 }
 
-// TestVariablesOwnersAreIndependent is the difference from the settings ladder
-// this table replaced. One name at two owners is two variables, and neither
-// read returns the other's: the project level does not reach into an
-// environment, and an environment does not inherit from the project.
+// TestVariablesOwnersAreIndependent checks that a read admits one project: a
+// name another project entered is not visible.
 func TestVariablesOwnersAreIndependent(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		f := newVariableFixture(t, d.stmts)
 
 		f.set(t, d.stmts, f.projectOwner(), "project", false)
-		f.set(t, d.stmts, f.environmentOwner(), "environment", false)
 
-		t.Run("the project level reads its own value", func(t *testing.T) {
+		t.Run("the project reads its own value", func(t *testing.T) {
 			got := f.get(t, d.stmts, f.projectOwner())
 			require.Len(t, got, 1, "a read admits one owner, so one name is one row")
 			assert.Equal(t, "project", got[0].Value)
-		})
-
-		t.Run("the environment reads its own value", func(t *testing.T) {
-			got := f.get(t, d.stmts, f.environmentOwner())
-			require.Len(t, got, 1)
-			assert.Equal(t, "environment", got[0].Value)
-		})
-
-		t.Run("an environment with nothing entered reads nothing", func(t *testing.T) {
-			// The project holds this name, but nothing is inherited: an
-			// environment sees only what was entered on it.
-			other := newTestEnvironment(t, d.stmts, f.projectID, "env-var-sibling-"+uniqueSuffix(t))
-			sibling := domain.VariableOwner{ProjectID: f.projectID, EnvironmentID: other.ID}
-			assert.Empty(t, f.get(t, d.stmts, sibling))
 		})
 
 		t.Run("another project sees nothing", func(t *testing.T) {
@@ -199,7 +126,7 @@ func TestVariablesNameFilter(t *testing.T) {
 		owner := f.projectOwner()
 		f.set(t, d.stmts, owner, "wanted", false)
 
-		other := variableFixture{name: f.name + "_other", projectID: f.projectID, environmentID: f.environmentID}
+		other := variableFixture{name: f.name + "_other", projectID: f.projectID}
 		other.set(t, d.stmts, owner, "unwanted", false)
 
 		byName, err := d.stmts.GetVariables(t.Context(), owner, f.name)
@@ -228,8 +155,8 @@ func TestVariablesDelete(t *testing.T) {
 		f.set(t, d.stmts, owner, "value", false)
 
 		// A different owner did not enter this variable, so it cannot remove
-		// it -- every owner column has to match.
-		err := d.stmts.DeleteVariable(t.Context(), f.environmentOwner(), f.name)
+		// it -- the owner column has to match.
+		err := d.stmts.DeleteVariable(t.Context(), domain.VariableOwner{ProjectID: f.projectID + "-other"}, f.name)
 		require.Error(t, err)
 		_, ok := errorsAsNoRowFound(err)
 		assert.True(t, ok, "deleting another owner's variable should report NoRowFoundError, got %v", err)
@@ -247,15 +174,14 @@ func TestVariablesDelete(t *testing.T) {
 }
 
 // TestVariablesOwnerWithoutProjectRejected guards the constraint that keeps a
-// variable from belonging to nothing. The environment may be left unnamed --
-// that addresses the project level -- but the project itself may not.
+// variable from belonging to nothing.
 func TestVariablesOwnerWithoutProjectRejected(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		f := newVariableFixture(t, d.stmts)
 
 		err := d.stmts.SetVariable(t.Context(), &domain.Variable{
 			Name:  f.name,
-			Owner: domain.VariableOwner{EnvironmentID: f.environmentID},
+			Owner: domain.VariableOwner{},
 			Value: "orphan",
 		})
 		require.Error(t, err)
@@ -277,53 +203,12 @@ func TestVariablesProjectForeignKey(t *testing.T) {
 		require.Error(t, err, "a variable cannot belong to a project that is not there")
 
 		f.set(t, d.stmts, f.projectOwner(), "project", false)
-		f.set(t, d.stmts, f.environmentOwner(), "environment", false)
 		require.Len(t, f.get(t, d.stmts, f.projectOwner()), 1)
 
 		_, err = d.stmts.DeleteProjectByID(t.Context(), f.projectID)
 		require.NoError(t, err)
 		assert.Empty(t, f.get(t, d.stmts, f.projectOwner()), "deleting the project takes its variables with it")
-		assert.Empty(t, f.get(t, d.stmts, f.environmentOwner()), "including the ones its environments entered")
 	})
-}
-
-// TestVariablesEnvironmentForeignKey covers the environment half of the owner
-// being a real reference (ADR 062). It is the case the empty string makes
-// awkward: ” is the project level, an address of its own that no environment
-// row answers to, so the constraint rides a generated column (NULLIF of
-// environment_id) that is NULL for exactly that address. Both halves of that
-// are asserted here -- the project level writes with no environment in sight,
-// and a scoped variable cannot name one that is not there.
-func TestVariablesEnvironmentForeignKey(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
-		f := newVariableFixture(t, d.stmts)
-
-		err := d.stmts.SetVariable(t.Context(), &domain.Variable{
-			Name:  f.name,
-			Owner: domain.VariableOwner{ProjectID: f.projectID, EnvironmentID: f.environmentID + "-missing"},
-			Value: "orphan",
-		})
-		require.Error(t, err, "a variable cannot scope to an environment that is not there")
-		_, isFK := errorsAsForeignKey(err)
-		assert.True(t, isFK, "the refusal has to be the reference failing, not some other write error: %v", err)
-
-		// The project level is the address the constraint must not reach: it
-		// names no environment, and there is none for it to name.
-		f.set(t, d.stmts, f.projectOwner(), "project", false)
-		require.Len(t, f.get(t, d.stmts, f.projectOwner()), 1,
-			"the project level writes without an environment to reference")
-
-		f.set(t, d.stmts, f.environmentOwner(), "environment", false)
-		require.Len(t, f.get(t, d.stmts, f.environmentOwner()), 1)
-	})
-}
-
-func errorsAsForeignKey(err error) (*database.ForeignKeyError, bool) {
-	var target *database.ForeignKeyError
-	if errors.As(err, &target) {
-		return target, true
-	}
-	return nil, false
 }
 
 func errorsAsNoRowFound(err error) (*database.NoRowFoundError, bool) {

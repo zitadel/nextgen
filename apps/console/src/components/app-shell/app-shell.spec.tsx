@@ -29,7 +29,14 @@ vi.mock("@/auth/session", async (importOriginal) => {
 // order the design puts them, then the project's own settings. `User schemas`
 // nests beneath `Users` rather than adding a second
 // top-level row.
-const NAV_ORDER = ["Projects", "Teams", "Users", "Login flows", "Project settings"];
+const NAV_ORDER = [
+  "Projects",
+  "Teams",
+  "Users",
+  "Authentication",
+  "Login flows",
+  "Project settings",
+];
 const NESTED_NAV = { parent: "Users", label: "User schemas" };
 const NESTED_BRANDING = { parent: "Login flows", label: "Branding" };
 // Absent for two different reasons, both deliberate:
@@ -128,7 +135,7 @@ describe("app shell navigation", () => {
       ),
     );
     const router = renderShell();
-    await waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
     const pill = await screen.findByRole("button", { name: "Switch project" });
     await waitFor(() => expect(pill).toHaveTextContent("Select a project"));
 
@@ -296,7 +303,7 @@ describe("project pill", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: "Switch project" }));
     const list = within(await screen.findByRole("list", { name: "Switch project" }));
-    const href = list.getByRole("link", { name: "River" }).getAttribute("href") ?? "";
+    const href = (await list.findByRole("link", { name: "River" })).getAttribute("href") ?? "";
     const target = new URL(href, "http://console.invalid");
     expect(target.pathname).toBe("/teams");
     expect(Object.fromEntries(target.searchParams)).toEqual({
@@ -330,8 +337,10 @@ describe("project pill", () => {
     const list = within(await screen.findByRole("list", { name: "Switch project" }));
     await userEvent.click(list.getByRole("link", { name: "Delta" }));
 
-    await waitFor(() => expect(router.state.location.search).toMatchObject({ project: "proj_2" }));
-    expect(router.state.location.pathname).toBe("/teams");
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_2" }),
+    );
+    expect(router.state.resolvedLocation?.pathname).toBe("/teams");
     await waitFor(() => expect(pill).toHaveTextContent("Delta"));
     expect(screen.queryByRole("list", { name: "Switch project" })).not.toBeInTheDocument();
     await waitFor(() => expect(queried).toEqual(["proj_1", "proj_2"]));
@@ -356,8 +365,8 @@ describe("project pill", () => {
     const list = within(await screen.findByRole("list", { name: "Switch project" }));
     await userEvent.click(list.getByRole("link", { name: "Delta" }));
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/teams"));
-    expect(router.state.location.search).toMatchObject({ project: "proj_2" });
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/teams"));
+    expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_2" });
   });
 
   it("links to the overview of every project beneath the list", async () => {
@@ -371,7 +380,7 @@ describe("project pill", () => {
     expect(all).toHaveAttribute("href", scopedPath("/projects", "proj_1"));
     await userEvent.click(all);
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
     expect(screen.queryByRole("list", { name: "Switch project" })).not.toBeInTheDocument();
   });
 

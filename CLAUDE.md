@@ -13,7 +13,7 @@ Start with:
 
 - [AGENTS.md](AGENTS.md)
 - [internal/storage/AGENTS.md](internal/storage/AGENTS.md)
-- [apps/cli-journey-e2e/AGENTS.md](apps/cli-journey-e2e/AGENTS.md)
+- [e2e/journey/AGENTS.md](e2e/journey/AGENTS.md)
 
 Minting a resource ID? Never write custom ULID/UUID helpers — the canonical
 minting contract lives in

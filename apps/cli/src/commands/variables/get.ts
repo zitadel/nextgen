@@ -6,10 +6,8 @@ import { assertVariableName, toVariableRow, variableCells } from "../../lib/vari
  * The `variables get` topic command — read one variable by name at the project
  * level.
  *
- * A name the project level has not entered answers `var.not_found`, even when
- * an environment of the same project holds it: nothing is inherited
- * (ADR 062 §4). A secret is found but not disclosed, so the answer says it is
- * held and nothing more.
+ * A name the project has not entered answers `var.not_found`. A secret is found
+ * but not disclosed, so the answer says it is held and nothing more.
  */
 export default class VariablesGet extends OwnerCommand {
   static override description = "Get one variable from the project.";

@@ -1,7 +1,5 @@
-import { cancel, confirm, isCancel } from "@clack/prompts";
 import { Flags } from "@oclif/core";
 
-import { ZitadelError } from "../../../errors";
 import { publicCliCommand } from "../../../public-cli";
 import type { CommandResult, GlobalOptions } from "../../types";
 import { article, capitalize, dryRunResult, idArg, idValue } from "../shared";
@@ -64,25 +62,14 @@ export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>> 
       return dryRunResult(verb, topic, id);
     }
 
-    if (!meta.force) {
-      if (meta.nonInteractive) {
-        throw new ZitadelError(
-          "E_VALIDATION",
-          `${capitalize(verb)} requires --force in non-interactive mode`,
-          {
-            hint: `Pass --force to ${verb} ${resource.singular} ${id}.`,
-            nextCommands: [publicCliCommand(`${topic} ${verb} ${id} --force`, meta.cliVersion)],
-          },
-        );
-      }
-      const answer = await confirm({
-        message: `${capitalize(verb)} ${resource.singular} ${id}?`,
-        initialValue: false,
-      });
-      if (isCancel(answer) || !answer) {
-        cancel(`${capitalize(verb)} cancelled.`);
-        return { status: "skipped", reason: `${verb}-cancelled` };
-      }
+    const confirmed = await this.input({
+      kind: "confirm",
+      name: `${verb} ${resource.singular} ${id}`,
+      message: `${capitalize(verb)} ${resource.singular} ${id}?`,
+      retry: publicCliCommand(`${topic} ${verb} ${id} --force`, meta.cliVersion),
+    });
+    if (!confirmed) {
+      return { status: "skipped", reason: `${verb}-cancelled` };
     }
     await spec.call(await this.connect(meta), id);
     return {

@@ -14,7 +14,7 @@
 ADR 0002 shipped the console with **no console-user authentication**: before
 sign-in the browser held no session, and the dev-only Vite proxy injected the
 project-secret bearer — explicitly labelled in
-[`vite.config.mts`](../../vite.config.mts) as _"a temporary pre-login
+[`vite.config.ts`](../../vite.config.ts) as _"a temporary pre-login
 workaround: once the console has a login, a proxy forwards the auth cookie as
 the bearer and the secret is dropped."_ This ADR designs that login.
 

@@ -1,4 +1,7 @@
-/** The deployment prefix from the Vite `base`: `/ui/console` when embedded, empty in dev. */
+/**
+ * The deployment prefix from the Vite `base`: `/ui/console` when embedded,
+ * `/console` in the hosted cloud, empty in dev.
+ */
 export function basePath(): string {
   return import.meta.env.BASE_URL.replace(/\/$/, "");
 }

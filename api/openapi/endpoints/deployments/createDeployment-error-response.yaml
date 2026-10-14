@@ -5,27 +5,21 @@ content:
     schema:
       oneOf:
         - $ref: '../../components/schemas/errors/auth-unauthorized.yaml'
-        - $ref: '../../components/schemas/errors/dep-conflict.yaml'
-        - $ref: '../../components/schemas/errors/dep-invalid.yaml'
         - $ref: '../../components/schemas/errors/dep-not_found.yaml'
         - $ref: '../../components/schemas/errors/dep-permission_denied.yaml'
-        - $ref: '../../components/schemas/errors/env-not_found.yaml'
         - $ref: '../../components/schemas/errors/env-project_not_found.yaml'
-        - $ref: '../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../components/schemas/errors/internal.yaml'
+        - $ref: '../../components/schemas/errors/not_implemented.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
       discriminator:
         propertyName: code
         mapping:
           auth.unauthorized: '../../components/schemas/errors/auth-unauthorized.yaml'
-          dep.conflict: '../../components/schemas/errors/dep-conflict.yaml'
-          dep.invalid: '../../components/schemas/errors/dep-invalid.yaml'
           dep.not_found: '../../components/schemas/errors/dep-not_found.yaml'
           dep.permission_denied: '../../components/schemas/errors/dep-permission_denied.yaml'
-          env.not_found: '../../components/schemas/errors/env-not_found.yaml'
           env.project_not_found: '../../components/schemas/errors/env-project_not_found.yaml'
-          evt.invalid: '../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../components/schemas/errors/internal.yaml'
+          not_implemented: '../../components/schemas/errors/not_implemented.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
     examples:
       auth.unauthorized:
@@ -33,16 +27,6 @@ content:
         value:
           code: auth.unauthorized
           message: 'The request lacks valid authentication credentials.'
-      dep.conflict:
-        summary: dep.conflict
-        value:
-          code: dep.conflict
-          message: 'deployment: the environment''s current deployment does not match expected_current_deployment_id'
-      dep.invalid:
-        summary: dep.invalid
-        value:
-          code: dep.invalid
-          message: 'deployment: invalid'
       dep.not_found:
         summary: dep.not_found
         value:
@@ -53,26 +37,21 @@ content:
         value:
           code: dep.permission_denied
           message: 'deployment: requires an operator-grade token bound to the project (project.write or a deployment.* scope)'
-      env.not_found:
-        summary: env.not_found
-        value:
-          code: env.not_found
-          message: 'environment not found'
       env.project_not_found:
         summary: env.project_not_found
         value:
           code: env.project_not_found
           message: 'project not found'
-      evt.invalid:
-        summary: evt.invalid
-        value:
-          code: evt.invalid
-          message: 'event: invalid'
       internal:
         summary: internal
         value:
           code: internal
           message: 'An unexpected error occurred.'
+      not_implemented:
+        summary: not_implemented
+        value:
+          code: not_implemented
+          message: 'This feature is not implemented yet.'
       req.invalid:
         summary: req.invalid
         value:

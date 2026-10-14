@@ -12,6 +12,9 @@
  * rewriting it would discard deliberate work.
  */
 
+import { getDefaultLoginFlow, SETUP_PRESETS } from "@zitadel/config/defaults";
+import type { ConnectionSlug } from "@zitadel/config/idp";
+
 import { ZitadelError } from "../errors";
 
 /**
@@ -64,6 +67,8 @@ function loginEntry(flow: Json): string | undefined {
 const REGISTER_SSO = "register-sso";
 /** Step shown when the provider's email already has an account. */
 const SSO_CONFLICT = "sso-conflict";
+/** The step that asks the identified user for a password. */
+const PASSWORD_STEP = "password";
 
 /** Outcomes the engine fires after a provider returns, and where they go. */
 function providerOutcomes(terminal: string): Record<string, string> {
@@ -106,6 +111,8 @@ type Step = Json & { name?: unknown };
 
 /** What a generator left alone, so the caller can say so. */
 export type SsoSkipped = {
+  /** The step that was left alone, e.g. `sso-conflict`. */
+  readonly step: string;
   /** File-relative description, e.g. `steps.sso-conflict`. */
   readonly region: string;
   readonly reason: "hand-edited";
@@ -212,7 +219,7 @@ function stepNamed(flow: Json, name: string): Step | undefined {
  * belongs to whoever set it, and a provider is added to the list rather than
  * replacing it, so enabling a second one later keeps the first.
  */
-export function applySsoToSchema(schema: object, slug: string): SsoResult<object> {
+export function applySsoToSchema(schema: object, slug: ConnectionSlug): SsoResult<object> {
   const document = clone(schema) as Json;
   const methods = isObject(document["x-auth-methods"]) ? { ...document["x-auth-methods"] } : {};
   const existing = isObject(methods.sso) ? methods.sso : undefined;
@@ -241,9 +248,9 @@ export function applySsoToSchema(schema: object, slug: string): SsoResult<object
  * property it defines, including ones the project deliberately does not ask
  * about.
  *
- * Credential fields are dropped. `create_user_with_sso` mints an account whose
- * proof is the provider, so a password box on this step would be asking for a
- * credential the mutation never stores.
+ * Credential fields are dropped. The provider is the proof for an account
+ * `create_user_with_sso` creates, so the scaffold asks for no password. An
+ * author who adds a password field gets it stored with the user.
  *
  * Falls back to the identifier-collecting step, and then to nothing, so a flow
  * shaped unlike the shipped one still produces a step that can collect the one
@@ -295,7 +302,7 @@ function registerSsoStep(fields: string[], terminal: string): Step {
  * without passwords is a dead end.
  */
 function ssoConflictStep(
-  slug: string,
+  slug: ConnectionSlug,
   methods: { password: boolean; passkey: boolean },
   loginStep: string | undefined,
   terminal: string,
@@ -355,11 +362,103 @@ function ssoConflictStep(
  * output as hand-edited.
  */
 function matches(step: Step, expected: Step): boolean {
-  return canonical(step) === canonical(expected);
+  return canonical(withoutServerDefaults(step)) === canonical(withoutServerDefaults(expected));
+}
+
+/**
+ * A step without what the platform leaves out when it answers.
+ *
+ * `apply` writes the canonical definition back into the file, and the server
+ * omits an action's `primary: false` (a default), an empty `fields` list, and
+ * an empty `gates` map, so the step in the file is not byte for byte what this
+ * generator wrote though it is the same step. Reading it as hand-edited would
+ * skip the step on the next provider.
+ */
+function withoutServerDefaults(step: Step): Step {
+  const copy: Step = { ...step };
+  for (const key of ["fields", "gates"]) {
+    const value = copy[key];
+    const empty = Array.isArray(value)
+      ? value.length === 0
+      : isObject(value) && Object.keys(value).length === 0;
+    if (empty) {
+      delete copy[key];
+    }
+  }
+  if (Array.isArray(copy.actions)) {
+    copy.actions = copy.actions.map((action) => {
+      if (!isObject(action) || action.primary !== false) {
+        return action;
+      }
+      const { primary: _default, ...rest } = action;
+      return rest;
+    });
+  }
+  return copy;
+}
+
+let shippedPasswordForms: string[] | undefined;
+
+/**
+ * The password steps the shipped flows carry, one per preset, in the form
+ * {@link withoutSsoRoutes} reduces any password step to. A step that reduces to
+ * one of these is the one `setup` wrote, however many providers it offers.
+ * The shipped steps carry no provider routes, so the terminal does not matter.
+ */
+function shippedPasswordSteps(): string[] {
+  shippedPasswordForms ??= SETUP_PRESETS.flatMap((preset) => {
+    const flow = getDefaultLoginFlow({ preset }) as unknown as Json;
+    const step = stepNamed(flow, PASSWORD_STEP);
+    return step === undefined ? [] : [canonical(withoutSsoRoutes(step, "done"))];
+  });
+  return shippedPasswordForms;
+}
+
+/**
+ * A password step without what offering providers adds to it: the provider
+ * list, and the routes this generator writes for what comes back from one.
+ *
+ * A route that goes somewhere else is the developer's and stays, which is what
+ * makes the step read as edited. The platform's own rewrite is not an edit
+ * ({@link withoutServerDefaults}).
+ */
+function withoutSsoRoutes(step: Step, terminal: string): Step {
+  const copy: Step = { ...withoutServerDefaults(step) };
+  delete copy.sso_providers;
+  if (isObject(copy.transitions)) {
+    const written = providerOutcomes(terminal);
+    copy.transitions = Object.fromEntries(
+      Object.entries(copy.transitions).filter(
+        ([outcome, route]) =>
+          !(
+            outcome in written &&
+            isObject(route) &&
+            route.target === written[outcome] &&
+            Object.keys(route).length === 1
+          ),
+      ),
+    );
+  }
+  return copy;
+}
+
+/**
+ * Whether a password step already lists the provider and carries the routes the
+ * generator writes, whatever else it has been edited to say.
+ */
+function offersAlready(step: Step, slug: string, terminal: string): boolean {
+  if (!Array.isArray(step.sso_providers) || !step.sso_providers.includes(slug)) {
+    return false;
+  }
+  const transitions = isObject(step.transitions) ? step.transitions : {};
+  return Object.entries(providerOutcomes(terminal)).every(([outcome, target]) => {
+    const route = transitions[outcome];
+    return isObject(route) && route.target === target;
+  });
 }
 
 /** The provider list a step should end up with: what it has, plus this slug. */
-function mergedProviders(step: Step, slug: string): unknown[] {
+function mergedProviders(step: Step, slug: ConnectionSlug): unknown[] {
   const providers = Array.isArray(step.sso_providers) ? [...(step.sso_providers as unknown[])] : [];
   return providers.includes(slug) ? providers : [...providers, slug];
 }
@@ -507,7 +606,7 @@ function refuseOutcomeActionCollision(document: Json): void {
  */
 export function applySsoToFlow(
   flow: object,
-  slug: string,
+  slug: ConnectionSlug,
   enabled: { password: boolean; passkey: boolean },
 ): SsoResult<object> {
   const document = clone(flow) as Json;
@@ -545,6 +644,53 @@ export function applySsoToFlow(
       changed = true;
     }
     step.transitions = transitions;
+  }
+
+  // The password step is where someone lands who typed their email rather than
+  // clicking a provider. A user who signed up with a provider has no password,
+  // so a step with only a password field is a dead end for them. It offers the
+  // providers too, unless it has been edited by hand: it is a step the
+  // developer is likely to have changed, and the editors only write into what
+  // they recognise.
+  const password = stepNamed(document, PASSWORD_STEP);
+  if (password !== undefined && !providerSteps(document).includes(PASSWORD_STEP)) {
+    if (offersAlready(password, slug, terminal)) {
+      // Edited by hand and already carrying the provider and its routes, which
+      // is what the warning asks for: there is nothing left to say.
+    } else if (!shippedPasswordSteps().includes(canonical(withoutSsoRoutes(password, terminal)))) {
+      skipped.push({
+        step: PASSWORD_STEP,
+        region: `steps.${PASSWORD_STEP}`,
+        reason: "hand-edited",
+      });
+    } else {
+      // Every provider the entry steps carry, not only the one named: a project
+      // enabled before the password step offered providers has several to catch up.
+      const offered = providerSteps(document).flatMap((name) => {
+        const entry = stepNamed(document, name);
+        return entry !== undefined && Array.isArray(entry.sso_providers)
+          ? (entry.sso_providers as unknown[])
+          : [];
+      });
+      for (const provider of new Set([...offered, slug])) {
+        if (typeof provider === "string" && addProvider(password, provider)) {
+          changed = true;
+        }
+      }
+      const transitions = isObject(password.transitions) ? { ...password.transitions } : {};
+      // The same routes as the entry steps. A collision here binds to the
+      // identified user either way, and the conflict step says why they are
+      // back and offers the other ways in; sending them to this step again
+      // would show an unchanged form and a Back that shows it twice.
+      for (const [outcome, target] of Object.entries(providerOutcomes(terminal))) {
+        const current = transitions[outcome];
+        if (!isObject(current) || current.target !== target) {
+          transitions[outcome] = { target };
+          changed = true;
+        }
+      }
+      password.transitions = transitions;
+    }
   }
 
   // The password registration step shares the outcome, so it has to route to
@@ -593,7 +739,7 @@ export function applySsoToFlow(
     // report promises it did not do.
     const candidate = merged === undefined ? existing : { ...existing, sso_providers: merged };
     if (!matches(candidate, expected)) {
-      skipped.push({ region: `steps.${name}`, reason: "hand-edited" });
+      skipped.push({ step: name, region: `steps.${name}`, reason: "hand-edited" });
     } else if (merged !== undefined && addProvider(existing, slug)) {
       changed = true;
     }

@@ -56,6 +56,7 @@ var operationRolesNextgenSession = map[string][]string{
 	GetBrandingByIdOperation:       []string{},
 	GetFlowDefinitionOperation:     []string{},
 	GetGrantOperation:              []string{},
+	GetIdpByIdOperation:            []string{},
 	GetMySessionOperation:          []string{},
 	GetMySessionCsrfTokenOperation: []string{},
 	GetMyUserOperation:             []string{},
@@ -72,6 +73,7 @@ var operationRolesNextgenSession = map[string][]string{
 	PatchMyUserOperation:           []string{},
 	PatchProjectOperation:          []string{},
 	QueryGrantsOperation:           []string{},
+	QueryIdpsOperation:             []string{},
 	QueryTeamsOperation:            []string{},
 	QueryUsersOperation:            []string{},
 	RevokeMySessionOperation:       []string{},
@@ -103,6 +105,9 @@ func GetRolesForNextgenSession(operation string) []string {
 var oauth2ScopesOAuth2 = map[string][]string{
 	BeginUserPasskeyRegistrationOperation: []string{
 		"user.write",
+	},
+	BuildReleaseOperation: []string{
+		"release.write",
 	},
 	CreateAuthAttemptOperation: []string{
 		"auth_attempt.write",
@@ -170,9 +175,6 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetDeploymentByIdOperation: []string{
 		"deployment.read",
 	},
-	GetEnvironmentByNameOperation: []string{
-		"environment.read",
-	},
 	GetEventOperation: []string{
 		"events.read",
 	},
@@ -224,9 +226,6 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	ListDeploymentsOperation: []string{
 		"deployment.read",
 	},
-	ListEnvironmentsOperation: []string{
-		"environment.read",
-	},
 	ListEventsOperation: []string{
 		"events.read",
 	},
@@ -235,6 +234,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	ListIdpRevisionsOperation: []string{
 		"idp.read",
+	},
+	ListPreviewsOperation: []string{
+		"deployment.read",
 	},
 	ListProjectAdminsOperation: []string{
 		"project.write",
@@ -276,8 +278,17 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	QueryUsersOperation: []string{
 		"user.read",
 	},
+	RemovePreviewOperation: []string{
+		"deployment.write",
+	},
+	RevokeReleaseOperation: []string{
+		"release.write",
+	},
 	RevokeSessionOperation: []string{
 		"session.delete",
+	},
+	RollbackDeploymentOperation: []string{
+		"deployment.write",
 	},
 	SetUserPasswordOperation: []string{
 		"user.write",
