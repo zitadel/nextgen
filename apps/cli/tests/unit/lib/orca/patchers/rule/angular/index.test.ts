@@ -7,13 +7,15 @@ import type {
 } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
 import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
+import { withFirstRedaction } from "../../../../../../helpers/legacy-proxy";
 import {
   EXCHANGE_BODY,
   REMOTE_HOST,
   SESSION_COOKIE,
+  SESSION_TOKEN,
   useRemoteServer,
 } from "../../../../../../helpers/remote-server";
-import { aProxyConfApp, type DevApp } from "../../../../../../helpers/vite";
+import { aProxyConfApp, type DevApp, deliveryOf, wireBodyOf } from "../../../../../../helpers/vite";
 
 function ctx(): PatchContext {
   return {
@@ -74,7 +76,7 @@ function unredactedProxyConf(): string {
   const current = proxyConfigEdit()(undefined);
   const unredacted = current
     .replace(
-      /\n\n\/\* zitadel:proxy:exchange-redaction \*\/[\s\S]*?(?=\n\nfunction stripPrefix)/,
+      /\n\nconst zlib = require\("node:zlib"\);\n\n\/\* zitadel:proxy:exchange-redaction:v2 \*\/[\s\S]*?(?=\n\nfunction stripPrefix)/,
       "",
     )
     .replace(
@@ -208,6 +210,22 @@ describe("AngularPatcher.plan", () => {
     const edit = proxyConfigEdit();
 
     expect(edit(unredactedProxyConf())).toBe(edit(undefined));
+  });
+
+  it("moves the redaction it wrote first onto the decoding one", () => {
+    const edit = proxyConfigEdit();
+
+    expect(edit(withFirstRedaction(edit(undefined)))).toBe(edit(undefined));
+  });
+
+  it("leaves a first redaction changed by hand alone", () => {
+    const edit = proxyConfigEdit();
+    const changed = withFirstRedaction(edit(undefined)).replace(
+      "// Not JSON: an error page, say.",
+      "// Not JSON: logged elsewhere.",
+    );
+
+    expect(edit(changed)).toBe(changed);
   });
 
   it("keeps a managed proxy whose response handling was already chosen by hand", () => {
@@ -399,7 +417,72 @@ describe("the generated proxy.conf.cjs, run by Vite against a remote https serve
 
     await fetch(`${origin}/__nextgen/sessions/exchange`, { method: "POST" });
 
-    expect(remote.requests.at(-1)?.headers["accept-encoding"]).toBeUndefined();
+    expect(remote.requests.at(-1)?.headers["accept-encoding"]).toBe("identity");
+  });
+
+  it.each(["gzip", "br"])(
+    "keeps the session token out of a %s-encoded exchange answer",
+    async (encoding) => {
+      const { origin } = await serve(proxyConfigEdit()(undefined));
+
+      const response = await fetch(`${origin}/__nextgen/sessions/exchange?encoding=${encoding}`, {
+        method: "POST",
+      });
+
+      expect(await response.json()).toEqual({ session: EXCHANGE_BODY.session });
+    },
+  );
+
+  it("answers 502 to an exchange answer it cannot decode", async () => {
+    const { origin } = await serve(proxyConfigEdit()(undefined));
+
+    const response = await fetch(`${origin}/__nextgen/sessions/exchange?encoding=garbled`, {
+      method: "POST",
+    });
+
+    expect(response.status).toBe(502);
+  });
+
+  it("never relays an exchange answer it cannot decode", async () => {
+    const { origin } = await serve(proxyConfigEdit()(undefined));
+
+    const body = await wireBodyOf(`${origin}/__nextgen/sessions/exchange?encoding=garbled`, "POST");
+
+    expect(body).not.toContain(SESSION_TOKEN);
+  });
+
+  it("ends the browser's exchange request when the server drops it", async () => {
+    const { origin } = await serve(proxyConfigEdit()(undefined));
+
+    const delivery = await deliveryOf(`${origin}/__nextgen/sessions/exchange?abort`, "POST");
+
+    expect(delivery).toBe("cut short");
+  });
+
+  it("ends the browser's other request when the server drops it", async () => {
+    const { origin } = await serve(proxyConfigEdit()(undefined));
+
+    const delivery = await deliveryOf(`${origin}/__nextgen/sessions/me?abort`);
+
+    expect(delivery).toBe("cut short");
+  });
+
+  it("relays every other call's encoded body as the server sent it", async () => {
+    const { origin } = await serve(proxyConfigEdit()(undefined));
+
+    const response = await fetch(`${origin}/__nextgen/sessions/me?encoding=gzip`);
+
+    expect(await response.json()).toEqual(EXCHANGE_BODY);
+  });
+
+  it("handed the browser the session token in a gzip answer with the redaction it wrote first", async () => {
+    const { origin } = await serve(withFirstRedaction(proxyConfigEdit()(undefined)));
+
+    const response = await fetch(`${origin}/__nextgen/sessions/exchange?encoding=gzip`, {
+      method: "POST",
+    });
+
+    expect(await response.json()).toEqual(EXCHANGE_BODY);
   });
 
   it("relays an exchange answer that is not JSON as it came", async () => {

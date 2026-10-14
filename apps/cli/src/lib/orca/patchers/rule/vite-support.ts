@@ -6,8 +6,10 @@ import { PROXY_PATH } from "./proxy";
 import {
   assertNoUnreviewedProjectSecretProxy,
   EXCHANGE_REDACTION_MARKER,
+  EXCHANGE_REDACTION_ZLIB,
   exchangeRedactionFunctions,
   PROXY_CREDENTIAL_POLICY_MARKER,
+  upgradeExchangeRedaction,
 } from "./proxy-credential-policy";
 import {
   ensureEditableObject,
@@ -198,6 +200,11 @@ function redactExchange(source: string): string {
 /** The imports that the injected proxy entry depends on. */
 const PROXY_IMPORTS = [{ from: "vite", imported: "loadEnv", local: "loadEnv" }] as const;
 
+/** The import the generated session-token redaction decodes with. */
+const REDACTION_IMPORTS = [
+  { from: "node:zlib", imported: "default", local: EXCHANGE_REDACTION_ZLIB },
+] as const;
+
 /**
  * Builds the pure `edit` transform the file-writer applies to the project's Vite
  * config (`vite.config.*`): a non-destructive magicast merge that adds the
@@ -207,7 +214,8 @@ const PROXY_IMPORTS = [{ from: "vite", imported: "loadEnv", local: "loadEnv" }] 
  * the issuer/origin requirement is about the port, not the bind host. Idempotent
  * — entries already present are left as-is, except the CLI's own earlier proxy
  * shapes, which are migrated in place: the unconditional bearer listener, the
- * host-keeping entry, and the entry without the session-token redaction. Throws `E_VALIDATION` when the file is absent or the
+ * host-keeping entry, the entry without the session-token redaction, and the
+ * redaction that relayed a compressed exchange answer unread. Throws `E_VALIDATION` when the file is absent or the
  * config object cannot be reached (function-built/exotic configs), with a hint
  * to add the block manually.
  */
@@ -229,7 +237,9 @@ export function viteProxyEdit(
       assertNoUnreviewedProjectSecretProxy(workingSource, label);
     }
     if (workingSource !== undefined) {
-      workingSource = redactExchange(forwardAppOrigin(workingSource));
+      workingSource = redactExchange(
+        forwardAppOrigin(upgradeExchangeRedaction(workingSource, exchangeRedactionFunctions)),
+      );
     }
 
     const mod = parseConfigModule(workingSource, label);
@@ -245,11 +255,14 @@ export function viteProxyEdit(
       changed = true;
     }
     const proxyConfig = ensureEditableObject(serverConfig, "proxy");
+    const redacting =
+      proxyConfig[PROXY_PATH] === undefined ||
+      workingSource?.includes(EXCHANGE_REDACTION_MARKER) === true;
     if (proxyConfig[PROXY_PATH] === undefined) {
       proxyConfig[PROXY_PATH] = builders.raw(proxyEntryCode(server));
       changed = true;
     }
-    for (const imp of PROXY_IMPORTS) {
+    for (const imp of redacting ? [...PROXY_IMPORTS, ...REDACTION_IMPORTS] : PROXY_IMPORTS) {
       if (!importIsPresent(mod, imp.local, imp.from)) {
         mod.imports.$add({ ...imp });
         changed = true;

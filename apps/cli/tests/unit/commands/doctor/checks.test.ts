@@ -25,6 +25,7 @@ import { proxyConfTemplate } from "../../../../src/lib/orca/patchers/rule/angula
 import { MANAGED_MARKER } from "../../../../src/lib/paths";
 import { hashScaffoldFile } from "../../../../src/lib/scaffold-manifest";
 import type { ScaffoldManifest } from "../../../../src/lib/sync/types";
+import { withFirstRedaction } from "../../../helpers/legacy-proxy";
 
 const tempDirs: string[] = [];
 
@@ -882,7 +883,7 @@ describe("ManagedFilesCheck", () => {
     const proxyPath = join(cwd, "proxy.conf.cjs");
     const unredacted = proxyConfTemplate()
       .replace(
-        /\n\n\/\* zitadel:proxy:exchange-redaction \*\/[\s\S]*?(?=\n\nfunction stripPrefix)/,
+        /\n\nconst zlib = require\("node:zlib"\);\n\n\/\* zitadel:proxy:exchange-redaction:v2 \*\/[\s\S]*?(?=\n\nfunction stripPrefix)/,
         "",
       )
       .replace(
@@ -890,6 +891,21 @@ describe("ManagedFilesCheck", () => {
         '    onProxyReq: setBearer,\n    configure: (proxy) => proxy.on("proxyReq", setBearer),\n',
       );
     await writeFile(proxyPath, unredacted);
+    const check = new ManagedFilesCheck();
+    const before = await check.run(ctxFor(cwd));
+    expect(before.status).toBe("fail");
+    expect(before.message).toContain("detached managed config wiring: proxy.conf.cjs");
+
+    await check.fix(ctxFor(cwd));
+
+    expect(await readFile(proxyPath, "utf8")).toBe(proxyConfTemplate());
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("fails on a managed proxy with the first redaction, and --fix upgrades it", async () => {
+    const cwd = await makeAngularProject();
+    const proxyPath = join(cwd, "proxy.conf.cjs");
+    await writeFile(proxyPath, withFirstRedaction(proxyConfTemplate()));
     const check = new ManagedFilesCheck();
     const before = await check.run(ctxFor(cwd));
     expect(before.status).toBe("fail");

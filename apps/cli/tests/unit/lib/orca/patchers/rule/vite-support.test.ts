@@ -1,13 +1,15 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import { viteProxyEdit } from "../../../../../../src/lib/orca/patchers/rule/vite-support";
+import { withFirstRedaction } from "../../../../../helpers/legacy-proxy";
 import {
   EXCHANGE_BODY,
   REMOTE_HOST,
   SESSION_COOKIE,
+  SESSION_TOKEN,
   useRemoteServer,
 } from "../../../../../helpers/remote-server";
-import { aViteApp, type DevApp } from "../../../../../helpers/vite";
+import { aViteApp, type DevApp, deliveryOf, wireBodyOf } from "../../../../../helpers/vite";
 
 const edit = viteProxyEdit(5173, "http://127.0.0.1:8099");
 
@@ -177,6 +179,29 @@ export default defineConfig({
     const current = viteProxyEdit(5173, "https://zitadel.example.com")(BARE_CONFIG);
 
     expect(edit(UNREDACTED_CONFIG.replace(/\n/g, "\r\n")).replace(/\r\n/g, "\n")).toBe(current);
+  });
+
+  it("moves the redaction it wrote first onto the decoding one", () => {
+    const current = viteProxyEdit(5173, "https://zitadel.example.com")(BARE_CONFIG);
+
+    expect(edit(withFirstRedaction(current))).toBe(current);
+  });
+
+  it("moves a first redaction written with CRLF line endings onto the decoding one", () => {
+    const current = viteProxyEdit(5173, "https://zitadel.example.com")(BARE_CONFIG);
+    const crlf = withFirstRedaction(current).replace(/\n/g, "\r\n");
+
+    expect(edit(crlf)).toContain("zitadel:proxy:exchange-redaction:v2");
+  });
+
+  it("leaves a first redaction changed by hand alone", () => {
+    const current = viteProxyEdit(5173, "https://zitadel.example.com")(BARE_CONFIG);
+    const changed = withFirstRedaction(current).replace(
+      "// Not JSON: an error page, say.",
+      "// Not JSON: logged elsewhere.",
+    );
+
+    expect(edit(changed)).toBe(changed);
   });
 
   it("keeps a generated entry whose response handling was already chosen by hand", () => {
@@ -356,7 +381,74 @@ describe("the generated proxy, run by Vite against a remote https server", () =>
 
     await fetch(`${origin}/__nextgen/sessions/exchange`, { method: "POST" });
 
-    expect(remote.requests.at(-1)?.headers["accept-encoding"]).toBeUndefined();
+    expect(remote.requests.at(-1)?.headers["accept-encoding"]).toBe("identity");
+  });
+
+  it.each(["gzip", "br"])(
+    "keeps the session token out of a %s-encoded exchange answer",
+    async (encoding) => {
+      const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG));
+
+      const response = await fetch(`${origin}/__nextgen/sessions/exchange?encoding=${encoding}`, {
+        method: "POST",
+      });
+
+      expect(await response.json()).toEqual({ session: EXCHANGE_BODY.session });
+    },
+  );
+
+  it("answers 502 to an exchange answer it cannot decode", async () => {
+    const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG));
+
+    const response = await fetch(`${origin}/__nextgen/sessions/exchange?encoding=garbled`, {
+      method: "POST",
+    });
+
+    expect(response.status).toBe(502);
+  });
+
+  it("never relays an exchange answer it cannot decode", async () => {
+    const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG));
+
+    const body = await wireBodyOf(`${origin}/__nextgen/sessions/exchange?encoding=garbled`, "POST");
+
+    expect(body).not.toContain(SESSION_TOKEN);
+  });
+
+  it("ends the browser's exchange request when the server drops it", async () => {
+    const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG));
+
+    const delivery = await deliveryOf(`${origin}/__nextgen/sessions/exchange?abort`, "POST");
+
+    expect(delivery).toBe("cut short");
+  });
+
+  it("ends the browser's other request when the server drops it", async () => {
+    const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG));
+
+    const delivery = await deliveryOf(`${origin}/__nextgen/sessions/me?abort`);
+
+    expect(delivery).toBe("cut short");
+  });
+
+  it("relays every other call's encoded body as the server sent it", async () => {
+    const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG));
+
+    const response = await fetch(`${origin}/__nextgen/sessions/me?encoding=gzip`);
+
+    expect(await response.json()).toEqual(EXCHANGE_BODY);
+  });
+
+  it("handed the browser the session token in a gzip answer with the redaction it wrote first", async () => {
+    const { origin } = await serve(
+      withFirstRedaction(viteProxyEdit(5173, remote.url)(BARE_CONFIG)),
+    );
+
+    const response = await fetch(`${origin}/__nextgen/sessions/exchange?encoding=gzip`, {
+      method: "POST",
+    });
+
+    expect(await response.json()).toEqual(EXCHANGE_BODY);
   });
 
   it("relays an exchange answer that is not JSON as it came", async () => {

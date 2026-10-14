@@ -4,8 +4,10 @@ import { PROXY_PATH } from "../proxy";
 import {
   assertNoUnreviewedProjectSecretProxy,
   EXCHANGE_REDACTION_MARKER,
+  EXCHANGE_REDACTION_ZLIB,
   exchangeRedactionFunctions,
   PROXY_CREDENTIAL_POLICY_MARKER,
+  upgradeExchangeRedaction,
 } from "../proxy-credential-policy";
 
 /**
@@ -194,7 +196,14 @@ function setBearer(proxyReq) {
   }
 }`;
 
-const EXCHANGE_REDACTION = exchangeRedactionFunctions("");
+/** The redaction functions and the `node:zlib` decoders they call. */
+function exchangeRedaction(indent: string): string {
+  return `${indent}const ${EXCHANGE_REDACTION_ZLIB} = require("node:zlib");
+
+${exchangeRedactionFunctions(indent)}`;
+}
+
+const EXCHANGE_REDACTION = exchangeRedaction("");
 
 /** The listener wiring emitted before the session-token redaction existed. */
 const UNREDACTED_WIRING = `    onProxyReq: setBearer,
@@ -259,10 +268,16 @@ function forwardAppOrigin(source: string): string {
   return source.replace(HOST_KEEPING_ENTRY, ORIGIN_FORWARDING_ENTRY);
 }
 
+/** Moves a managed proxy's generated parts onto their current shapes. */
+function upgradeManaged(source: string): string {
+  return redactExchange(forwardAppOrigin(upgradeExchangeRedaction(source, exchangeRedaction)));
+}
+
 /**
  * Creates the managed Angular proxy and upgrades the exact shapes earlier CLIs
- * emitted: the insecure unconditional bearer hook, the host-keeping entry, and
- * the wiring that relayed the session token to the browser.
+ * emitted: the insecure unconditional bearer hook, the host-keeping entry, the
+ * wiring that relayed the session token to the browser, and the redaction that
+ * relayed a compressed exchange answer unread.
  * Other edits are preserved; a safe custom proxy is left untouched, while an
  * unrecognized proxy that may still over-forward the project secret is
  * surfaced for manual review.
@@ -273,11 +288,9 @@ export function proxyConfEdit(): (source: string | undefined) => string {
       return proxyConfTemplate();
     }
     if (source.includes(MANAGED_MARKER) && source.includes(LEGACY_UNCONDITIONAL_BEARER)) {
-      return redactExchange(
-        forwardAppOrigin(source.replace(LEGACY_UNCONDITIONAL_BEARER, EXCHANGE_ONLY_BEARER)),
-      );
+      return upgradeManaged(source.replace(LEGACY_UNCONDITIONAL_BEARER, EXCHANGE_ONLY_BEARER));
     }
     assertNoUnreviewedProjectSecretProxy(source, "proxy.conf.cjs");
-    return source.includes(MANAGED_MARKER) ? redactExchange(forwardAppOrigin(source)) : source;
+    return source.includes(MANAGED_MARKER) ? upgradeManaged(source) : source;
   };
 }

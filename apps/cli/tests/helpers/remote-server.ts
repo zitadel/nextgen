@@ -2,12 +2,13 @@ import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import dns from "node:dns";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
-import type { IncomingHttpHeaders } from "node:http";
+import type { IncomingHttpHeaders, ServerResponse } from "node:http";
 import { createServer, type Server } from "node:https";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import tls from "node:tls";
+import { brotliCompressSync, gzipSync } from "node:zlib";
 
 import { afterAll, beforeAll } from "vitest";
 
@@ -41,6 +42,12 @@ export interface ReceivedRequest {
  * would have handled it: a `/sessions/*` path with the session exchange's
  * {@link EXCHANGE_BODY} and {@link SESSION_COOKIE} (plain text when the query
  * has `as=text`), anything else with `ok`.
+ *
+ * A `/sessions/*` query can make that answer misbehave the way an intermediary
+ * might, whatever the request asked for: `encoding=gzip` or `encoding=br`
+ * compresses it, `encoding=garbled` labels as `gzip` bytes that are neither
+ * gzip nor JSON but still carry the token, and `abort` drops the connection
+ * halfway through the body.
  */
 export interface RemoteServer {
   /** `https://zitadel.test:<port>`. */
@@ -92,8 +99,7 @@ export function useRemoteServer(): RemoteServer {
           res.writeHead(421, { "content-type": "text/plain" });
           res.end("misdirected");
         } else if (req.url?.startsWith("/sessions/") && !req.url.includes("as=text")) {
-          res.writeHead(200, { "content-type": "application/json", "set-cookie": SESSION_COOKIE });
-          res.end(JSON.stringify(EXCHANGE_BODY));
+          answerSession(new URL(req.url, url).searchParams, res);
         } else {
           res.writeHead(200, { "content-type": "text/plain" });
           res.end("ok");
@@ -118,6 +124,32 @@ export function useRemoteServer(): RemoteServer {
     },
     requests,
   };
+}
+
+/** Answers a `/sessions/*` call with the exchange's body, misbehaving as `query` asks. */
+function answerSession(query: URLSearchParams, res: ServerResponse): void {
+  const plain = Buffer.from(JSON.stringify(EXCHANGE_BODY));
+  const encoding = query.get("encoding");
+  const body =
+    encoding === "gzip"
+      ? gzipSync(plain)
+      : encoding === "br"
+        ? brotliCompressSync(plain)
+        : encoding === "garbled"
+          ? Buffer.concat([Buffer.from("garbled:"), plain])
+          : plain;
+  res.writeHead(200, {
+    "content-type": "application/json",
+    "set-cookie": SESSION_COOKIE,
+    ...(encoding === null
+      ? {}
+      : { "content-encoding": encoding === "garbled" ? "gzip" : encoding }),
+  });
+  if (query.has("abort")) {
+    res.write(body.subarray(0, body.length / 2), () => res.destroy());
+  } else {
+    res.end(body);
+  }
 }
 
 /**
