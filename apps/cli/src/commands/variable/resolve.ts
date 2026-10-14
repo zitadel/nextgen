@@ -3,6 +3,8 @@ import type { ZitadelClient } from "@zitadel/api/client";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
 import { renderRows, renderTable } from "../../lib/oclif/crud/table";
+import { listData } from "../../lib/oclif/envelope";
+import { originMatchesPattern } from "../../lib/release";
 import { ZitadelError } from "../../lib/errors";
 import { shellArg } from "../../lib/shell";
 import { toVariableRows, variableCells } from "../../lib/variables";
@@ -94,7 +96,7 @@ export default class VariableResolve extends EnvironmentCommand {
     const plain = flags.plain || !process.stdout.isTTY;
     return this.emit({
       status: "ok",
-      data: { deployment_id: live.id, origins: servedOrigins, variables: rows, count: rows.length },
+      data: { deployment_id: live.id, origins: servedOrigins, ...listData(rows) },
       pretty: plain
         ? renderRows(COLUMNS, cells)
         : rows.length === 0
@@ -131,8 +133,18 @@ export default class VariableResolve extends EnvironmentCommand {
         nextCommands: [this.suggest(`deploy --origin ${shellArg(origin)}`)],
       });
     }
-    return new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${origin}.`, {
-      hint: "A preview URL is served by a pull-request build, not by `deploy`; resolve its variables once that build has deployed it.",
+    if (
+      origins.some(
+        (entry) => entry.kind === "preview" && originMatchesPattern(entry.pattern, origin),
+      )
+    ) {
+      return new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${origin}.`, {
+        hint: "A preview URL is served by a pull-request build, not by `deploy`; resolve its variables once that build has deployed it.",
+      });
+    }
+    return new ZitadelError("E_NOT_FOUND", `${origin} is not an origin of the project.`, {
+      hint: "Check the origin for a typo, or list the project's origins.",
+      nextCommands: [this.suggest("origin list")],
     });
   }
 }

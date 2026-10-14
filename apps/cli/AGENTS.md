@@ -38,9 +38,9 @@ Scope pointers first — this file's own body covers **telemetry only**:
   `items`/`count`/`next_page_token`; a `rm`/`delete` command must confirm with
   `deleted: true`; no command anywhere may carry `removed` — so a divergent shape
   fails in that command's own spec whether or not the helper was used. The guard
-  does not police a collection surfaced under a domain key by a non-`list`
-  command (e.g. `variable resolve`'s `variables`), so build those with `listData`
-  too unless the non-canonical shape is deliberate and documented. A Biome
+  does not police a collection a non-`list` command returns (`variable resolve`
+  is one), so build those with `listData` too, alongside any fields of their
+  own, unless the non-canonical shape is deliberate and documented. A Biome
   GritQL rule (`biome-plugins/no-removed-key.grit`) also rejects a literal
   `removed: true` at lint time, before a spec runs.
 - Files that may carry a credential are written through `src/lib/fs-safe.ts`:

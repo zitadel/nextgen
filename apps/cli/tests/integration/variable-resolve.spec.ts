@@ -5,7 +5,7 @@ import { aSetUpApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 
-type Resolved = { origins: string[]; variables: { name: string; value?: string }[] };
+type Resolved = { origins: string[]; items: { name: string; value?: string }[] };
 
 describe("variable resolve", () => {
   describe("against an invalid server", () => {
@@ -63,7 +63,7 @@ describe("variable resolve", () => {
 
         expect(result).toSucceed();
         const data = app.envelopeOf<Resolved>(result).data;
-        expect(data.variables).toEqual([
+        expect(data.items).toEqual([
           { name: "API_URL", secret: false, value: "https://api.acme.com" },
         ]);
         // The chosen origin is named, so a bare resolve says which target the
@@ -80,7 +80,7 @@ describe("variable resolve", () => {
 
         const result = await app.resolveVariables();
 
-        expect(app.envelopeOf<Resolved>(result).data.variables).toEqual([
+        expect(app.envelopeOf<Resolved>(result).data.items).toEqual([
           { name: "API_URL", secret: false, value: "https://api.acme.com" },
         ]);
       });
@@ -93,6 +93,16 @@ describe("variable resolve", () => {
         const result = await app.resolveVariables({ origin: "https://not-deployed.acme.com" });
 
         expect(result).toFailWith("E_NOT_FOUND");
+      });
+
+      it("suggests listing the origins for a URL that is none of them", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.deployData();
+
+        const result = await app.resolveVariables({ origin: "https://typo.acme.com" });
+
+        expect(result).toSuggest("origin list");
       });
 
       it("suggests deploying to a primary origin nothing is deployed to, alone", async () => {
