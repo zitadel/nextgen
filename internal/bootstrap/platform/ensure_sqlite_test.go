@@ -5,6 +5,7 @@ package platform
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -125,8 +126,21 @@ func TestEnsureSQLiteSeedsAUsableProject(t *testing.T) {
 	}
 
 	// The user schema registrations validate against.
-	_, err = pool.Statements().GetJSONSchemaByID(ctx, projectID, schemas.DefaultHumanUserSchemaURL(testSchemaBase))
-	assert.NoError(t, err, "a project with no user schema cannot register anyone")
+	userSchema, err := pool.Statements().GetJSONSchemaByID(ctx, projectID, schemas.DefaultHumanUserSchemaURL(testSchemaBase))
+	require.NoError(t, err, "a project with no user schema cannot register anyone")
+
+	// The platform variant: an optional name, designated for display, so the
+	// people operating Zitadel can name themselves. Email stays the only
+	// required attribute, so registration asks for nothing more.
+	var doc struct {
+		Required   []string                  `json:"required"`
+		XDisplay   []string                  `json:"x-display"`
+		Properties map[string]map[string]any `json:"properties"`
+	}
+	require.NoError(t, json.Unmarshal(userSchema.Schema, &doc))
+	assert.Equal(t, []string{schemas.PlatformDisplayNameProperty}, doc.XDisplay)
+	assert.Equal(t, "string", doc.Properties[schemas.PlatformDisplayNameProperty]["type"])
+	assert.Equal(t, []string{"email"}, doc.Required)
 
 	// The login flows the registration walks through. Their ids are minted at
 	// insert, so this counts them against the same defaults the seeding builds
