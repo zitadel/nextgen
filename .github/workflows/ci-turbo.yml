@@ -72,10 +72,30 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Not setup-go's cache: its key (Go version and go.mod) is ci.yml's
+      # too, and the two jobs write GOCACHE in formats the other cannot read.
+      # On Depot runners ci.yml builds through GOCACHEPROG (`depot gocache`,
+      # which keeps depot-* files there); turbo's strict env drops
+      # GOCACHEPROG, so the builds here use Go's own files. Whichever job
+      # saved a shared entry first chose the format for both. The key names
+      # the installed Go, whose patch differs between Depot's runner images
+      # (a build result serves only the compiler that made it), and both
+      # modules' go.sum (tools/bench is a module of its own).
       - uses: actions/setup-go@v6
+        id: setup-go
         with:
           go-version-file: go.mod
-          cache: true
+          cache: false
+
+      - name: Cache Go modules and builds
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-turbo-${{ runner.os }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('go.sum', 'tools/bench/go.sum') }}
+          restore-keys: |
+            go-turbo-${{ runner.os }}-go${{ steps.setup-go.outputs.go-version }}-
 
       - uses: pnpm/action-setup@v5
         with:
