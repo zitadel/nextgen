@@ -19,8 +19,9 @@ const VALID_USER_SCHEMA = {
   kind: "user-schema",
   objectType: "human-user",
   metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+  "x-identifier": "email",
   "x-auth-methods": { password: { enabled: true } },
-  properties: { email: { type: "string" } },
+  properties: { email: { type: "string", "x-unique": "project" } },
 };
 
 const VALID_FLOW = {
