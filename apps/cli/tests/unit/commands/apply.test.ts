@@ -222,8 +222,10 @@ describe("apply command sync", () => {
       "Re-run plan to confirm local config and platform are in sync.",
     ]);
     expect(json.data.next_commands).toHaveLength(1);
-    // The suggested re-run carries the selector in effect (here `--server`),
-    // so it resolves the same environment this apply targeted.
-    expect(json.data.next_commands[0]).toBe(expectedPublicCliCommand(`plan --server ${server}`));
+    // The suggested re-run carries the selector in effect (here `--server`
+    // and `--cwd`), so it resolves the same environment this apply targeted.
+    expect(json.data.next_commands[0]).toBe(
+      expectedPublicCliCommand(`plan --server ${server} --cwd ${cwd}`),
+    );
   });
 });

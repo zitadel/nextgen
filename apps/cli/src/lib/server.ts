@@ -1,5 +1,6 @@
 import { ZitadelError } from "./errors";
 import { resolveLocalServer } from "./local-server/runtime";
+import type { Parsed } from "@zitadel/config/idp";
 
 /**
  * Server URL `setup` connects to when `--server` is not given. Also surfaced
@@ -44,6 +45,22 @@ export async function resolveServer(input: ResolveServerInput): Promise<Resolved
     return { value: await resolveLocalServer(input.cwd), origin: "local" };
   }
   return { value: serverOrigin(input.serverFlag), origin: "flag" };
+}
+
+/**
+ * A typed or flagged server as its origin, or the problem with it: the `parse`
+ * an input question takes, so a prompt re-asks instead of throwing out of it.
+ */
+export function parseServer(value: string): Parsed<string> {
+  const typed = value.trim();
+  if (typed === "") {
+    return { ok: false, problem: "Enter the server URL." };
+  }
+  try {
+    return { ok: true, value: serverOrigin(typed) };
+  } catch (error) {
+    return { ok: false, problem: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 /** Normalises a server URL to its origin, or throws `E_VALIDATION` when it is not an http(s) URL. */

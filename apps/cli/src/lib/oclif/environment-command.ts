@@ -35,6 +35,9 @@ export abstract class EnvironmentCommand extends BaseCommand {
   /** What the invocation resolved to; set by {@link toMeta}. */
   protected environment!: Environment;
 
+  /** `--cwd` as typed, reproduced by {@link environmentSelector}. */
+  private cwdFlag: string | undefined;
+
   /**
    * Resolve the environment, then build the invocation context from its server.
    *
@@ -50,6 +53,7 @@ export abstract class EnvironmentCommand extends BaseCommand {
   ): Promise<GlobalOptions> {
     const text = (value: unknown): string | undefined =>
       typeof value === "string" ? value : undefined;
+    this.cwdFlag = text(flags.cwd);
     this.environment = await resolveEnvironment({
       cwd: resolveCwd(text(flags.cwd)),
       env: process.env,
@@ -79,6 +83,7 @@ export abstract class EnvironmentCommand extends BaseCommand {
   protected environmentSelector(): EnvironmentSelector {
     const { environment } = this;
     return environmentSelectorSuffix({
+      cwd: this.cwdFlag,
       envFile: environment.envFile,
       envName: environment.name.source === "--env" ? environment.name.value : undefined,
       server:

@@ -150,15 +150,21 @@ describe("EnvironmentCommand.connect", () => {
 
 describe("EnvironmentCommand.environmentSelector", () => {
   it("is empty when no selector flag was passed", async () => {
-    const { selector } = await new SelectorProbe(["--cwd", dir], config).run();
+    const { selector } = await new SelectorProbe([], config).run();
 
     expect(selector).toBe("");
+  });
+
+  it("reflects --cwd, which the other flags resolve against", async () => {
+    const { selector } = await new SelectorProbe(["--cwd", dir], config).run();
+
+    expect(selector).toBe(` --cwd ${dir}`);
   });
 
   it("reflects a non-default --env", async () => {
     const { selector } = await new SelectorProbe(["--cwd", dir, "--env", "staging"], config).run();
 
-    expect(selector).toBe(" --env staging");
+    expect(selector).toBe(` --env staging --cwd ${dir}`);
   });
 
   it("reflects --env-file", async () => {
@@ -166,7 +172,7 @@ describe("EnvironmentCommand.environmentSelector", () => {
 
     const { selector } = await new SelectorProbe(["--cwd", dir, "--env-file", file], config).run();
 
-    expect(selector).toBe(` --env-file ${file}`);
+    expect(selector).toBe(` --env-file ${file} --cwd ${dir}`);
   });
 
   it("reflects --server as the resolved origin", async () => {
@@ -175,6 +181,6 @@ describe("EnvironmentCommand.environmentSelector", () => {
       config,
     ).run();
 
-    expect(selector).toBe(" --server https://staging.example");
+    expect(selector).toBe(` --server https://staging.example --cwd ${dir}`);
   });
 });

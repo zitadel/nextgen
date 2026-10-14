@@ -556,7 +556,8 @@ describe("variables set", () => {
       expect(json.hint).toContain("--project-level");
       // The server this run was pointed at, before the redirection: without
       // it the piped secret would land in the default project's store.
-      expect(retry).toContain(`--server ${SERVER} < value.txt`);
+      expect(retry).toContain(`--server ${SERVER}`);
+      expect(retry.endsWith(" < value.txt")).toBe(true);
     } finally {
       if (original) {
         Object.defineProperty(process, "stdin", original);

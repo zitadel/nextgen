@@ -1,6 +1,7 @@
 import { mkdtemp, readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { parseEnv } from "node:util";
 
 import { describe, expect, it } from "vitest";
 
@@ -30,6 +31,19 @@ describe("fs-safe managed env writers", () => {
     await appendManagedEnvValue(path, "ZITADEL_PROJECT_ID", "p1");
 
     expect(await readFile(path, "utf8")).toBe("ZITADEL_URL=https://a\nZITADEL_PROJECT_ID=p1\n");
+  });
+
+  it.each([
+    ["a #", "sk_ab#cd"],
+    ["a leading space", " sk_lead"],
+    ["a quote", '"sk"'],
+    ["an apostrophe and a #", "it's#1"],
+  ])("writes a value holding %s so it reads back unchanged", async (_what, value) => {
+    const path = await tmpFile();
+
+    await appendManagedEnvValue(path, "ZITADEL_PROJECT_SECRET", value);
+
+    expect(parseEnv(await readFile(path, "utf8")).ZITADEL_PROJECT_SECRET).toBe(value);
   });
 
   it("refuses a value with a line break as a typed E_VALIDATION error, writing nothing", async () => {

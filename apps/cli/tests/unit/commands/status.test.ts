@@ -90,7 +90,7 @@ describe("status command", () => {
     expect(json.data.project.project_id).toBe("proj-001");
     expect(json.data.project.issuer).toBe("http://localhost:3000");
     expect(json.data.next_commands).toContain(
-      expectedPublicCliCommand("doctor --server https://api.zitadel.cloud"),
+      expectedPublicCliCommand(`doctor --server https://api.zitadel.cloud --cwd ${cwd}`),
     );
   });
 
@@ -109,7 +109,7 @@ describe("status command", () => {
     expect(json.data.project.claim).toMatchObject({ kind: "detached", claimable: true });
     expect(json.data.next_actions.join("\n")).toContain("temporary and its data may be lost");
     expect(json.data.next_commands).toContain(
-      expectedPublicCliCommand("claim --server https://api.zitadel.cloud"),
+      expectedPublicCliCommand(`claim --server https://api.zitadel.cloud --cwd ${cwd}`),
     );
   });
 
@@ -140,7 +140,7 @@ describe("status command", () => {
     expect(actions).toContain("no longer be claimed");
     expect(actions).not.toContain("its data may be lost");
     expect(json.data.next_commands).toContain(
-      expectedPublicCliCommand("claim --server https://api.zitadel.cloud"),
+      expectedPublicCliCommand(`claim --server https://api.zitadel.cloud --cwd ${cwd}`),
     );
   });
 
@@ -167,7 +167,7 @@ describe("status command", () => {
     });
     expect(json.data.next_actions.join("\n")).not.toContain("its data may be lost");
     expect(json.data.next_commands).not.toContain(
-      expectedPublicCliCommand("claim --server https://api.zitadel.cloud"),
+      expectedPublicCliCommand(`claim --server https://api.zitadel.cloud --cwd ${cwd}`),
     );
   });
 
@@ -191,7 +191,7 @@ describe("status command", () => {
     };
     expect(json.data.project.claim).toBeUndefined();
     expect(json.data.next_commands).not.toContain(
-      expectedPublicCliCommand("claim --server https://api.zitadel.cloud"),
+      expectedPublicCliCommand(`claim --server https://api.zitadel.cloud --cwd ${cwd}`),
     );
   });
 
@@ -337,10 +337,10 @@ describe("status command", () => {
     // next_commands is staged in lockstep: preview is fine, publishing
     // waits for the first proven login.
     expect(json.data.next_commands).toContain(
-      expectedPublicCliCommand("plan --server https://api.zitadel.cloud"),
+      expectedPublicCliCommand(`plan --server https://api.zitadel.cloud --cwd ${cwd}`),
     );
     expect(json.data.next_commands).not.toContain(
-      expectedPublicCliCommand("apply --server https://api.zitadel.cloud"),
+      expectedPublicCliCommand(`apply --server https://api.zitadel.cloud --cwd ${cwd}`),
     );
   });
 
@@ -358,12 +358,12 @@ describe("status command", () => {
     expect(actions).toContain("Customize what you ask for and how people sign in");
     expect(actions).toContain(".zitadel/schemas/");
     expect(actions).toContain(
-      `See your changes before they go live: ${expectedPublicCliCommand("plan --server https://api.zitadel.cloud")} to preview, ` +
-        `then ${expectedPublicCliCommand("apply --server https://api.zitadel.cloud")} to publish.`,
+      `See your changes before they go live: ${expectedPublicCliCommand(`plan --server https://api.zitadel.cloud --cwd ${cwd}`)} to preview, ` +
+        `then ${expectedPublicCliCommand(`apply --server https://api.zitadel.cloud --cwd ${cwd}`)} to publish.`,
     );
     expect(actions).not.toContain("register a user");
     expect(json.data.next_commands).toContain(
-      expectedPublicCliCommand("apply --server https://api.zitadel.cloud"),
+      expectedPublicCliCommand(`apply --server https://api.zitadel.cloud --cwd ${cwd}`),
     );
   });
 
@@ -385,7 +385,7 @@ describe("status command", () => {
     expect(actions).not.toContain("Customize what you ask for");
     expect(actions).toContain("temporary and its data may be lost");
     expect(json.data.next_commands).toContain(
-      expectedPublicCliCommand("apply --server https://api.zitadel.cloud"),
+      expectedPublicCliCommand(`apply --server https://api.zitadel.cloud --cwd ${cwd}`),
     );
   });
 });

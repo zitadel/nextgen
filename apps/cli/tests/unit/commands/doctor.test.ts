@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { MANAGED_MARKER } from "../../../src/lib/paths";
 import { advisoryForWarnings } from "../../../src/commands/doctor/index";
+import { environmentSelectorSuffix } from "../../../src/lib/oclif/environment-flags";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
 
 type Check = { name: string; status: "pass" | "warn" | "fail"; message: string; path?: string };
@@ -199,7 +200,7 @@ describe("doctor command", () => {
     // The nudge carries doctor's own --server so claim reconciles the project
     // on the server doctor checked, not the default environment.
     expect(json.data.next_commands).toContain(
-      expectedPublicCliCommand("claim --server https://api.zitadel.cloud"),
+      expectedPublicCliCommand(`claim --server https://api.zitadel.cloud --cwd ${cwd}`),
     );
   });
 
@@ -223,7 +224,7 @@ describe("doctor command", () => {
     expect(claim?.message).toContain("claim window has closed");
     expect((json.data.next_actions ?? []).join("\n")).toContain("claim window has closed");
     expect(json.data.next_commands ?? []).toContain(
-      expectedPublicCliCommand("claim --server https://api.zitadel.cloud"),
+      expectedPublicCliCommand(`claim --server https://api.zitadel.cloud --cwd ${cwd}`),
     );
   });
 
@@ -603,15 +604,23 @@ describe("advisoryForWarnings", () => {
   };
 
   it("suggests claiming the local project on the server doctor checked", () => {
-    const advice = advisoryForWarnings([claimWarning], "1.0.0-alpha.25", "https://a.example");
+    const advice = advisoryForWarnings(
+      [claimWarning],
+      "1.0.0-alpha.25",
+      environmentSelectorSuffix({ server: "https://a.example" }),
+    );
 
     expect(advice?.nextCommands).toEqual([
       expectedPublicCliCommand("claim --server https://a.example"),
     ]);
   });
 
-  it("adds no selector to the claim when doctor named no server", () => {
-    const advice = advisoryForWarnings([claimWarning], "1.0.0-alpha.25", undefined);
+  it("adds no selector to the claim when doctor named no server or directory", () => {
+    const advice = advisoryForWarnings(
+      [claimWarning],
+      "1.0.0-alpha.25",
+      environmentSelectorSuffix({}),
+    );
 
     expect(advice?.nextCommands).toEqual([expectedPublicCliCommand("claim")]);
   });
