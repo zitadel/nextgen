@@ -2,8 +2,6 @@ id: "docs"
 language: "typescript"
 layer: "application"
 stack: "frontend"
-dependsOn:
-  - "design-tokens"
 
 workspace:
   inheritedTasks:
@@ -12,16 +10,9 @@ workspace:
       - "test"
 
 tasks:
-  generate-openapi:
-    command: "corepack pnpm run generate:openapi"
-    inputs:
-      - "**/*"
-      - "/api/openapi/**/*.yaml"
-      # The bundle applies the repo's Redocly config.
-      - "/redocly.yaml"
-    outputs:
-      - ".generated/openapi.mjs"
-
+  # Bundles api/openapi into .generated/, which lib/openapi.ts imports. The
+  # content needs no generation step: lib/source.ts defines its collection
+  # with Fumadocs MDX's macro.
   generate:
     command: "corepack pnpm run generate"
     inputs:
@@ -31,41 +22,74 @@ tasks:
       - "/redocly.yaml"
     outputs:
       - ".generated/openapi.mjs"
-      - ".source/**/*"
+      - ".generated/openapi.d.mts"
 
   typecheck:
     deps:
       - "generate"
 
   build:
-    command: "corepack pnpm exec waku build"
+    command: "corepack pnpm exec next build"
     deps:
-      # src/app.css imports @zitadel/design-tokens/css/tokens.css.
-      - "design-tokens:build"
+      # After typecheck, never beside it: `next build` empties .next/types and
+      # fills it again, and tsc reads the route types there (next-env.d.ts
+      # imports .next/types/routes.d.ts), so side by side typecheck failed
+      # with TS2304 on PageProps, LayoutProps and RouteContext. The build is
+      # the one that waits: it takes longer, and fails on a type error anyway.
+      # An edge, not a mutex: moon holds a mutex only while the command runs,
+      # not while it restores or archives .next.
+      - "typecheck"
+      # Listed here and not only reached through typecheck: typecheck has no
+      # outputs, so moon would not hash generate through it.
       - "generate"
-    inputs:
-      - "**/*"
-      # waku picks its adapter from VERCEL, so a Vercel build is never
-      # restored from a local-adapter cache (or the reverse).
-      - "$VERCEL"
+      # app/global.css imports the design tokens' CSS variables.
+      - "design-tokens:generate"
+    outputs:
+      - ".next/**/*"
     options:
-      # Runs waku directly (generation is the `generate` dep), replacing the
+      # Runs next directly (generation is the `generate` dep), replacing the
       # inherited `pnpm run build` arguments rather than adding to them.
       mergeArgs: "replace"
+      # Replaces the inherited dist/**/* rather than adding to it.
+      mergeOutputs: "replace"
 
   dev:
-    command: "corepack pnpm exec waku dev --port 3003"
+    command: "corepack pnpm exec next dev --port 3003"
     deps:
-      - "design-tokens:build"
       - "generate"
+      - "design-tokens:generate"
     options:
       persistent: true
       runInCI: false
 
-  preview:
-    command: "corepack pnpm run preview"
+  start:
+    command: "corepack pnpm exec next start --port 3003"
     deps:
       - "build"
     options:
       persistent: true
+      runInCI: false
+
+  # The site's contract suite (tests/, playwright.config.mts): the index and
+  # every page it lists, as HTML and as Markdown, the search, the MCP server,
+  # the assets. Opt-in like every e2e lane; Playwright serves the build on
+  # port 3003, or reuses `moon run docs:start`.
+  e2e:
+    command: "corepack pnpm exec playwright test"
+    deps:
+      - "build"
+    options:
+      cache: false
+      runInCI: false
+
+  # The same suite against a deployment of the hosted cloud, which
+  # DOCS_BASE_URL names (VERCEL_AUTOMATION_BYPASS_SECRET opens its
+  # protection); .github/workflows/deployment-checks.yml runs it for every
+  # deployment.
+  e2e-deployment:
+    script: |
+      [ -n "${DOCS_BASE_URL:-}" ] || { echo "DOCS_BASE_URL names the deployment to test" >&2; exit 1; }
+      corepack pnpm exec playwright test
+    options:
+      cache: false
       runInCI: false

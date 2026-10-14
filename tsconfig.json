@@ -7,7 +7,7 @@
       "path": "./apps/console"
     },
     {
-      "path": "./apps/console-e2e"
+      "path": "./e2e"
     },
     {
       "path": "./packages/components"
@@ -29,15 +29,6 @@
     },
     {
       "path": "./packages/api-mock"
-    },
-    {
-      "path": "./apps/demo-next-e2e"
-    },
-    {
-      "path": "./apps/cli-journey-e2e"
-    },
-    {
-      "path": "./apps/demo-nuxt-e2e"
     },
     {
       "path": "./apps/login-ui"

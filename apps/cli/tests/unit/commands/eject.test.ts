@@ -2,9 +2,15 @@ import { access, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
+
+import { cancel, confirm, isCancel } from "@clack/prompts";
+
+import Eject from "../../../src/commands/eject";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { asTerminal } from "../../helpers/terminal";
 import { MANAGED_MARKER } from "../../../src/lib/paths";
 
 function eject(cwd: string, extra: string[] = []) {
@@ -233,5 +239,49 @@ describe("eject command", () => {
     const json = parseJson(res.stdout) as { status: string; reason: string };
     expect(json.status).toBe("skipped");
     expect(json.reason).toBe("nothing-to-eject");
+  });
+});
+
+describe("eject asked on a terminal", () => {
+  // The built CLI bundles its own prompts, so a prompt can only be answered
+  // by running the command from source, where `input` is the one module asked.
+  const ejecting = (cwd: string) => asTerminal(() => Eject.run(["--cwd", cwd]));
+
+  afterEach(() => {
+    vi.mocked(confirm).mockReset();
+    vi.mocked(isCancel).mockReset();
+    vi.mocked(isCancel).mockReturnValue(false);
+  });
+
+  it("is skipped, removing nothing, when the answer is no", async () => {
+    const cwd = await makeManagedProject();
+    vi.mocked(confirm).mockResolvedValueOnce(false as never);
+
+    const envelope = await ejecting(cwd);
+
+    expect(JSON.parse(JSON.stringify(envelope))).toMatchObject({
+      status: "skipped",
+      reason: "eject-cancelled",
+    });
+    expect(await exists(join(cwd, "app/login/page.tsx"))).toBe(true);
+  });
+
+  it("does not ask on a dry run, which removes nothing", async () => {
+    const cwd = await makeManagedProject();
+
+    await asTerminal(() => Eject.run(["--cwd", cwd, "--dry-run"]));
+
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it("fails, removing nothing, on Ctrl-C", async () => {
+    const cwd = await makeManagedProject();
+    vi.mocked(isCancel).mockReturnValue(true);
+    vi.mocked(confirm).mockResolvedValueOnce(Symbol("cancel") as never);
+
+    await expect(ejecting(cwd)).rejects.toThrow();
+
+    expect(cancel).toHaveBeenCalledWith("Cancelled.");
+    expect(await exists(join(cwd, "app/login/page.tsx"))).toBe(true);
   });
 });

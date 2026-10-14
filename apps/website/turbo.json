@@ -1,0 +1,22 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  // The coming-soon page at the hosted cloud's root (Next.js). Mirrors
+  // apps/website/moon.yml; it has no tests yet.
+  "tasks": {
+    // Typecheck waits for the build, as in moon.yml: `next typegen` and
+    // `next build` both write .next/types, where tsc reads the route types,
+    // and `next build` empties it and fills it again. A task-guard mutex
+    // would leave a gap: a cache hit restores .next without running the
+    // script.
+    "typecheck": {
+      "dependsOn": ["build"]
+    },
+    "build": {
+      "outputs": [".next/**", "!.next/cache/**"]
+    },
+    "start": {
+      "dependsOn": ["build"]
+    }
+  }
+}

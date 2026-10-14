@@ -13,10 +13,27 @@ import (
 )
 
 const (
+	// The user row's lock serializes the password changes of one user: a
+	// second change waits here until the first commits, and its insert then
+	// reads the first one's row as the newest. A plain read would not wait at
+	// READ COMMITTED, so two changes would stamp from the same newest row and
+	// could collide on uq_user_passwords_user_created_at. FOR NO KEY UPDATE is
+	// the weakest mode that conflicts with itself; FOR UPDATE would also hold
+	// up every insert that references the user through a foreign key. An
+	// unknown user locks nothing, and the insert's foreign key reports it.
+	lockUserForPasswordStmt = `SELECT 1 FROM zitadel_nextgen.users` +
+		` WHERE project_id = $1 AND id = $2 FOR NO KEY UPDATE`
+
+	// The newest row is the current password, so a new row is stamped after
+	// the newest one even when the clock reads earlier: after the clock steps
+	// back, or within one microsecond, clock_timestamp() alone would leave the
+	// replaced password current or collide with it. greatest() skips the NULL
+	// of a user who has no password yet.
 	setUserPasswordStmt = `INSERT INTO zitadel_nextgen.user_passwords (
 	id, project_id, user_id, encoded_hash, created_at
-) SELECT $1, $2, $3, $4, stamp.at
-FROM (SELECT clock_timestamp() AS at) AS stamp
+) SELECT $1, $2, $3, $4, greatest(clock_timestamp(), max(created_at) + interval '1 microsecond')
+FROM zitadel_nextgen.user_passwords
+WHERE project_id = $2 AND user_id = $3
 RETURNING id`
 
 	userPasswordColumns = `id, project_id, user_id, encoded_hash, created_at`
@@ -51,13 +68,18 @@ func (ps userPasswordStatements) SetUserPassword(ctx context.Context, pw *domain
 	if err := ensureManagedID(&pw.ID, domain.PrefixUserPassword); err != nil {
 		return err
 	}
-	err := ps.client.QueryRow(ctx, setUserPasswordStmt,
-		pw.ID,
-		pw.ProjectID,
-		pw.UserID,
-		pw.EncodedHash,
-	).Scan(&pw.ID)
-	return wrapError(err)
+	// One transaction, so the lock holds until the insert commits.
+	return withTransaction(ctx, ps.client, func(ctx context.Context, tx queryExecutor) error {
+		if _, err := tx.Exec(ctx, lockUserForPasswordStmt, pw.ProjectID, pw.UserID); err != nil {
+			return wrapError(err)
+		}
+		return wrapError(tx.QueryRow(ctx, setUserPasswordStmt,
+			pw.ID,
+			pw.ProjectID,
+			pw.UserID,
+			pw.EncodedHash,
+		).Scan(&pw.ID))
+	})
 }
 
 // GetUserPassword implements [service.UserPasswordStatements].

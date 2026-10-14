@@ -1,0 +1,11 @@
+{
+  "title": "Teams",
+  "pages": [
+    "createTeam",
+    "queryTeams",
+    "getTeam",
+    "updateTeam",
+    "deleteTeam",
+    "..."
+  ]
+}

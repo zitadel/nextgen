@@ -5,14 +5,11 @@ projects:
     release: "tools/release"
     bench: "tools/bench"
     cli: "apps/cli"
-    cli-journey-e2e: "apps/cli-journey-e2e"
+    e2e: "e2e"
     console: "apps/console"
-    console-e2e: "apps/console-e2e"
     docs: "apps/docs"
     demo-next: "apps/demo-next"
-    demo-next-e2e: "apps/demo-next-e2e"
     demo-nuxt: "apps/demo-nuxt"
-    demo-nuxt-e2e: "apps/demo-nuxt-e2e"
     login-ui: "apps/login-ui"
     mock-zitadel: "apps/mock-zitadel"
     api: "packages/api"
@@ -35,6 +32,7 @@ projects:
     sdk-vue: "packages/sdk-vue"
     testing: "packages/testing"
     storybook: "apps/storybook"
+    website: "apps/website"
 
 vcs:
   defaultBranch: "main"

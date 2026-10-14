@@ -1,6 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+vi.mock("@clack/prompts", () => ({
+  confirm: vi.fn(),
+  cancel: vi.fn(),
+  isCancel: vi.fn().mockReturnValue(false),
+}));
+
+import { cancel, confirm, isCancel } from "@clack/prompts";
+
+import { asTerminal } from "../../../../helpers/terminal";
 import { BaseCommand } from "../../../../../src/lib/oclif";
 import {
   bindOperation,
@@ -239,5 +248,109 @@ describe("wire conventions", () => {
     const data = (result as { data: Record<string, unknown> }).data;
     expect(data.next_cursor).toBe("c2");
     expect(data.next_page_token).toBeUndefined();
+  });
+});
+
+describe("write results", () => {
+  it("carries data in the envelope when the server answers without a body", async () => {
+    // `grants create` by identifier answers 202 with no body.
+    const accepted: CreateSpec<Ctx> = { schema, call: async () => undefined };
+    const command = bindOperation(
+      CreateOperation as OperationClass<Ctx, CreateSpec<Ctx>>,
+      definition(accepted),
+    );
+
+    const envelope = await (command as unknown as { run(argv: string[]): Promise<unknown> }).run([
+      "--name",
+      "a",
+      "--json",
+    ]);
+
+    // Round-tripped as printed: JSON drops a key whose value is undefined.
+    expect(JSON.parse(JSON.stringify(envelope))).toHaveProperty("data", {});
+  });
+});
+
+describe("delete confirmation", () => {
+  const deleting = (verb: "delete" | "revoke" | "deactivate", call = async () => undefined) =>
+    bindOperation(
+      DeleteOperation as OperationClass<Ctx, DeleteSpec<Ctx>>,
+      definition<DeleteSpec<Ctx>>({ verb, call }),
+    ) as unknown as { run(argv: string[]): Promise<unknown> };
+
+  /** What a failing command prints, which is how an agent or a person reads the failure. */
+  const printedByFailing = async (
+    run: () => Promise<unknown>,
+  ): Promise<{ stdout: string; stderr: string }> => {
+    const written: string[] = [];
+    const errors: string[] = [];
+    const write = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      written.push(String(chunk));
+      return true;
+    });
+    const err = vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      errors.push(String(chunk));
+      return true;
+    });
+    const log = vi.spyOn(console, "log").mockImplementation((...args) => {
+      written.push(`${args.join(" ")}\n`);
+    });
+    try {
+      await run().catch(() => undefined);
+    } finally {
+      write.mockRestore();
+      log.mockRestore();
+      err.mockRestore();
+    }
+    return { stdout: written.join(""), stderr: errors.join("") };
+  };
+
+  afterEach(() => {
+    vi.mocked(confirm).mockReset();
+    vi.mocked(isCancel).mockReset();
+    vi.mocked(isCancel).mockReturnValue(false);
+  });
+
+  it.each(["delete", "revoke", "deactivate"] as const)(
+    "names the %s, the resource and the id when it refuses without --force",
+    async (verb) => {
+      const failure = JSON.parse(
+        (await printedByFailing(() => deleting(verb).run(["team_1", "--json"]))).stdout,
+      );
+
+      expect(failure).toMatchObject({
+        code: "E_VALIDATION",
+        message: `Cannot ${verb} team team_1 without --force in non-interactive mode`,
+        next_commands: [expect.stringContaining(`teams ${verb} team_1 --force`)],
+      });
+    },
+  );
+
+  it("asks the question with the verb, the resource and the id", async () => {
+    vi.mocked(confirm).mockResolvedValueOnce(true as never);
+
+    await asTerminal(() => deleting("revoke").run(["team_1"]));
+
+    expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({ message: "Revoke team team_1?" });
+  });
+
+  it("is skipped when the answer is no", async () => {
+    vi.mocked(confirm).mockResolvedValueOnce(false as never);
+
+    const envelope = await asTerminal(() => deleting("delete").run(["team_1"]));
+
+    expect(JSON.parse(JSON.stringify(envelope))).toMatchObject({
+      status: "skipped",
+      reason: "delete-cancelled",
+    });
+  });
+
+  it("fails instead of skipping on Ctrl-C", async () => {
+    vi.mocked(isCancel).mockReturnValue(true);
+    vi.mocked(confirm).mockResolvedValueOnce(Symbol("cancel") as never);
+
+    await expect(asTerminal(() => deleting("delete").run(["team_1"]))).rejects.toThrow();
+
+    expect(cancel).toHaveBeenCalledWith("Cancelled.");
   });
 });

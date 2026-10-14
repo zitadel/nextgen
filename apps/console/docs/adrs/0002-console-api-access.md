@@ -123,7 +123,7 @@ elsewhere — components authenticated by the platform send no client token (see
 > mux that mounts only `/ui/login`, `/ui/console`, `/console/runtime.json`,
 > and `/`, so every call 404'd and `/ui/console/` rendered
 > "POST /api/flow returned 404". It survived because no test lane served the
-> console the way the Go binary does — closed by `console-e2e:e2e-embedded`.
+> console the way the Go binary does — closed by `e2e:console-embedded`.
 
 ### 2. Reuse `configureZitadel()` + `getApi()`, not a bespoke `src/api/client.ts`
 
@@ -201,7 +201,7 @@ that follows from who serves the console:
   script-readable bearer:
 
 ```ts
-// vite.config.mts (dev only) — illustrative
+// vite.config.ts (dev only) — illustrative
 server: {
   proxy: {
     // Vite proxy strips the /api prefix and forwards to the Go API; no credential
@@ -217,7 +217,7 @@ env var is the escape hatch for a deployment that mounts the API elsewhere,
 `/api` is the dev-proxy path, and root is what the embedded build talks to.
 `vite preview` deliberately proxies nothing, so it cannot be mistaken for the
 production path — which also means it cannot _prove_ it; that job belongs to
-the embedded lane (`console-e2e:e2e-embedded`), which serves the console from
+the embedded lane (`e2e:console-embedded`), which serves the console from
 the Go binary.
 
 ### 5. Console-user authentication uses the existing slot

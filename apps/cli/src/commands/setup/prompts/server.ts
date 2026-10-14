@@ -1,8 +1,9 @@
-import { select, spinner, text } from "@clack/prompts";
+import { spinner } from "@clack/prompts";
+
+import type { Parsed } from "@zitadel/config/idp";
 
 import { detectHealthyLocalServer } from "../../../lib/local-server/runtime";
 import { DEFAULT_SERVER } from "../../../lib/server";
-import { bail } from "./cancel";
 import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
 
 /** Sentinel returned by the choice select when the user picks "Custom URL". */
@@ -34,7 +35,9 @@ export class ServerPrompt implements SetupPrompt {
     }
     const detected = await detectLocalServer(ctx.cwd);
 
-    const choice = await select({
+    const choice = await ctx.input({
+      kind: "select",
+      name: "server",
       message: "Which server should zitadel.json point to?",
       options: [
         {
@@ -55,24 +58,24 @@ export class ServerPrompt implements SetupPrompt {
       ],
       initialValue: detected ?? answers.server ?? DEFAULT_SERVER,
     });
-    bail(choice);
     if (choice !== CUSTOM) {
-      return { ...answers, server: choice as string };
+      return { ...answers, server: choice };
     }
-    const custom = await text({
+    const custom = await ctx.input({
+      kind: "text",
+      name: "server URL",
       message: "Server URL",
       placeholder: "https://zitadel.internal",
-      validate: (value) => {
+      parse: (value): Parsed<string> => {
         try {
-          new URL(value ?? "");
-          return;
+          new URL(value);
+          return { ok: true, value };
         } catch {
-          return "Must be a valid URL";
+          return { ok: false, problem: "Must be a valid URL" };
         }
       },
     });
-    bail(custom);
-    return { ...answers, server: custom as string };
+    return { ...answers, server: custom };
   }
 }
 

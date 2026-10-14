@@ -55,7 +55,7 @@ const tempDirs: string[] = [];
 
 beforeAll(async () => {
   localRegistry = (await import(
-    new URL("../../../../../apps/cli-journey-e2e/scripts/local-registry.mjs", import.meta.url).href
+    new URL("../../../../../e2e/journey/scripts/local-registry.mjs", import.meta.url).href
   )) as LocalRegistryModule;
 });
 
@@ -129,7 +129,7 @@ describe("local registry helper", () => {
     // The registry carries exactly the release tarball set, verified strictly.
     expect(runCalls).toContainEqual({
       command: "node",
-      args: ["apps/cli-journey-e2e/scripts/verify-tarballs.mjs", paths.tarballsDir],
+      args: ["e2e/journey/scripts/verify-tarballs.mjs", paths.tarballsDir],
       options: { cwd: repoRoot, env },
     });
     expect(calls).toContainEqual({ type: "start-registry", port: 51_234 });
@@ -142,7 +142,7 @@ describe("local registry helper", () => {
     expect(result.registry).toBe(registry);
     expect(runCalls.at(-1)).toMatchObject({
       command: "node",
-      args: ["apps/cli-journey-e2e/scripts/publish-tarballs.mjs", paths.tarballsDir],
+      args: ["e2e/journey/scripts/publish-tarballs.mjs", paths.tarballsDir],
       options: {
         cwd: repoRoot,
         env: {
@@ -230,7 +230,7 @@ describe("local registry helper", () => {
     // @zitadel/testing), so no build runs — verification comes first.
     expect(runCalls[0]).toEqual({
       command: "node",
-      args: ["apps/cli-journey-e2e/scripts/verify-tarballs.mjs", paths.tarballsDir],
+      args: ["e2e/journey/scripts/verify-tarballs.mjs", paths.tarballsDir],
       options: { cwd: repoRoot, env },
     });
     expect(await readFile(join(paths.tarballsDir, "zitadel-cli-0.1.0-alpha.5.tgz"), "utf8")).toBe(

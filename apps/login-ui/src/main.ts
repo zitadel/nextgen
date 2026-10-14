@@ -137,12 +137,12 @@ function loginWidget(projectId: string, publishableKey?: string): HTMLElement {
  * document is only "not provisioned" when the ids are *absent*, never when
  * they are present and unreadable. A non-JSON 200 is unreadable, not
  * unprovisioned: `vite dev` proxies this
- * path to the backend (`vite.config.mts`), so the only surface still
+ * path to the backend (`vite.config.ts`), so the only surface still
  * answering `index.html` here is `vite preview`, which has no backend to sign
  * into either way — previewing widget chrome without one is what
  * `?project_id=` is for. Hence no `*_RUNTIME_FALLBACK` opt-in on this side:
  * no automated lane serves the shell without the document
- * (`console-e2e:e2e-embedded` runs the real binary with both surfaces on).
+ * (`e2e:console-embedded` runs the real binary with both surfaces on).
  */
 async function fetchRuntime(): Promise<RuntimeResult> {
   let response: Response;

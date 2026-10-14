@@ -9,6 +9,7 @@ import { afterAll, beforeAll, beforeEach } from "vitest";
 
 import { clearBranding } from "./branding.js";
 import { setupMockHandlers, type MockHandle } from "./handlers.js";
+import { clearPasskey } from "./passkey.js";
 import { clearSsoProviders } from "./sso-providers.js";
 
 export interface MockFlowApi {
@@ -25,9 +26,10 @@ export interface MockSubstrate {
 /**
  * Registers the suite hooks: the substrate starts once, every test gets a
  * fresh handler set (so a widget mounted by one test never sees flow state,
- * branding, or SSO providers left by another), and the substrate stops after
- * the last test. Handlers are swapped before a test rather than cleared after
- * it, so a request a widget sends while being unmounted is still answered.
+ * branding, SSO providers, or the passkey offer left by another), and the
+ * substrate stops after the last test. Handlers are swapped before a test
+ * rather than cleared after it, so a request a widget sends while being
+ * unmounted is still answered.
  */
 export function registerMockFlowApi(
   create: (handlers: RequestHandler[]) => MockSubstrate,
@@ -44,6 +46,7 @@ export function registerMockFlowApi(
     substrate.use(handle.handlers);
     clearBranding();
     clearSsoProviders();
+    clearPasskey();
   });
 
   afterAll(async () => {

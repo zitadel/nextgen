@@ -100,10 +100,13 @@ jobs:
       #   if: ${{ steps.spanner-auth.outcome == 'success' }}
       #   env:
       #     ZITADEL_TEST_SPANNER_INSTANCE: ${{ vars.SPANNER_TEST_INSTANCE }}
-      #   run: moon run server:test-spanner
+      #   run: moon exec server:test-spanner --ignore-ci-checks
       # ---------------------------------------------------------------------
 
       # The emulator is the canary: its one-transaction-at-a-time limit forces the
       # aborts that prove the retry path still works. Do not move these off it.
+      # The task is `runInCI: "skip"` so that ci.yml's `moon ci` leaves it out;
+      # in CI `moon run` refuses such a task, `moon exec --ignore-ci-checks`
+      # runs it (and its UI build deps).
       - name: Run Go integration tests (spanner emulator)
-        run: moon run server:test-spanner
+        run: moon exec server:test-spanner --ignore-ci-checks

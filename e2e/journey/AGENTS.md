@@ -1,0 +1,91 @@
+# CLI Journey E2E Instructions
+
+These instructions apply to `e2e/journey/**`. Defer to the root
+`AGENTS.md` for repository-wide rules.
+
+## Purpose
+
+This project protects the customer local setup journey across every supported
+CLI framework. Tests must exercise a fresh app directory that runs the CLI local
+runtime path (`doctor`, `start`, `setup --server local`) before starting the
+generated app. It must not test the checked-in demo apps. The fresh directory
+starts empty (setup scaffolds the skeleton, page posture) or seeded from
+`fixtures/preexisting/<framework>` (`--preexisting-app`, widget posture per
+ADR 044) — both shapes run the same CLI path and browser journeys.
+
+## Maintenance Rules
+
+- Keep generated apps and temporary registries outside the repo worktree.
+- Use `npm` inside the generated app to match the documented user path.
+- Use `moon run release:pack` when producing workspace tarballs; it stages the
+  server platform binaries, packs all public packages, and verifies resolved
+  package metadata.
+- CI may pass prebuilt release snapshot tarballs to the journey runner with
+  `--tarballs-dir`; that path must skip rebuilding and still verify/publish the
+  provided tarballs through Verdaccio.
+- Every option CI sets has a `JOURNEY_*` variable (`journeyArgsFromEnv` in
+  `scripts/run-options.mjs`): CI's turbo job passes them that way, because
+  turbo puts arguments after `--` into every task's cache key. A new option
+  CI needs gets a variable there too.
+- CI runs all journey variants (fresh-app matrix, passkey preset,
+  pre-existing app, testkit, remote https) concurrently in a single `--ci`
+  invocation of the runner (the `e2e:journey-local` lane, run with every other
+  lane by the e2e step in `.github/workflows/ci.yml` through `e2e:all`), which
+  parallelizes them through its own concurrency pool so one process shares
+  one port allocator.
+  The tarballs come from the snapshot step, gated on `snapshot` (a journey
+  surface is affected or the e2e step runs, computed by
+  `scripts/ci-mode.mjs`), and the fresh-app framework set is collapsed per-PR
+  through `JOURNEY_MATRIX=single|full` (the `journey_matrix` output, using
+  `scripts/frameworks.mjs`). New variants belong in the runner's `--ci` set,
+  not as new workflow steps.
+- CI must install Zitadel packages from current workflow tarballs through the
+  temporary Verdaccio registry, not from public npm.
+- CI must run `npx @zitadel/cli@alpha doctor --runtime binary`,
+  `start --runtime binary`, and
+  `setup --framework <id> --server local` from the fresh app directory with
+  `--non-interactive --json`, for every id in `frameworkIds`
+  (`scripts/frameworks.mjs`) — the SPA families and the meta-frameworks alike.
+- The remote https lane (`--remote`; in `--ci`, react with the passkey-first
+  preset) is the one exception to `--server local`: setup points `--server` at
+  `scripts/https-edge.mjs`, a local https edge for `zitadel.test` in front of
+  the same local runtime. Like Vercel's edge it completes TLS only for its own
+  name, routes by `Host` and overwrites `X-Forwarded-*`, so it catches a
+  generated dev proxy that only works over plain http. The CLI and the
+  generated app's dev server reach it through a preloaded resolver and
+  `NODE_EXTRA_CA_CERTS` (`remoteHostEnv`); the browser still only talks to the
+  app on `localhost`.
+- Docker fallback coverage must opt in with `--runtime docker --image <tag>`.
+- Pack and upload only the public packages — `PUBLIC_RELEASE_PACKAGES` in
+  `scripts/release-manifest.mjs` is the authoritative list, and
+  `verify-tarballs.mjs` enforces that both the journey registry and release
+  artifact dirs carry exactly that set. Private support packages must stay out
+  of the artifact set.
+- Keep the generated app on `localhost` for browser tests. WebAuthn rejects IP
+  address relying-party IDs such as `127.0.0.1`.
+- The pre-existing-app fixtures (`fixtures/preexisting/<framework>`) must stay
+  minimal but real: exactly detectable by the CLI (ADR 044's posture hinge),
+  bootable via `npm run dev`, and carrying a distinctive shell and homepage the
+  specs assert survive setup. Only route-based frameworks (Next, Nuxt) belong
+  here — the SPA families keep the page posture.
+- The testkit suite (`moon run e2e:journey -- --suite testkit`) is the
+  customer-configuration proof for `@zitadel/testing`: it scaffolds one next
+  app, installs the kit from the journey registry, copies the checked-in
+  consumer suite from `fixtures/testkit/`, and runs it inside the app. It must
+  never set `ZITADEL_SERVER_BINARY` or `NEXTGEN_*` env — proving that the
+  published binary and its embedded UIs work unconfigured is the point.
+- Keep each framework suite Playwright-serial and one-worker. Framework suites
+  may run in parallel only when each suite gets its own generated app directory,
+  npm cache/tmp directories, app port, Zitadel port, and backend runtime state.
+- Reserve runner ports through the block allocator in `scripts/ports.mjs`,
+  never via a listen-on-zero probe: reserved ports are bound minutes later, and
+  ephemeral-range ports get taken as outbound source ports by the parallel
+  suites' npm traffic in the meantime (the why and the block layout are
+  documented in that file).
+- Passkey coverage is required in CI, and rides the `passkey-first` preset lane:
+  the shipped `password-first` default flow offers no passkey action, so the
+  passkey journey is registered only for that preset.
+  `JOURNEY_ENABLE_PASSKEY=0` is only a local debugging escape hatch.
+- Keep diagnostics focused. Upload logs, setup JSON, lockfiles, Playwright
+  traces/reports, and metadata; do not upload generated `node_modules` or
+  `.next` directories.

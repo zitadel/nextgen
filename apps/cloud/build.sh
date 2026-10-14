@@ -15,10 +15,12 @@
 set -eu
 cd "$(dirname "$0")/../.."
 
-# The service's installCommand normally ran already; the Go preset is not
-# known to honour it, so install when nothing is there.
-[ -x node_modules/.bin/moon ] || corepack pnpm install --frozen-lockfile
-corepack pnpm exec moon run login-ui:build
+# The other services' installs normally ran already; the Go preset does not
+# run this service's installCommand, so install when nothing is there.
+[ -x node_modules/.bin/turbo ] || sh apps/cloud/install.sh
+# The login UI through turbo, with the remote-cache policy every service
+# shares (turbo-build.sh: previews restore, production only uploads).
+sh apps/cloud/turbo-build.sh @zitadel/login-ui
 
 version="$(sed -n 's/^  "version": *"\([^"]*\)".*/\1/p' apps/server/package.json | head -1)"
 commit="${VERCEL_GIT_COMMIT_SHA:-$(git rev-parse HEAD 2>/dev/null || echo unknown)}"
@@ -37,5 +39,13 @@ CGO_ENABLED=0 go build -trimpath \
     -X main.buildRef=${ref}" \
   -o "$out" ./apps/cloud/launcher
 echo "built $out (version ${version}+cloud, commit ${commit})"
+
+# Go drops a build cache entry only after five days unused, and Vercel
+# carries the cache from build to build, so every rebuild's packages would
+# pile up towards the build cache's limit. On Vercel, drop what no build
+# used in the last two hours (Go refreshes an entry's time at most hourly).
+if [ -n "${VERCEL_OUTPUT_FILE:-}" ]; then
+  find -H "$(go env GOCACHE)" -mindepth 2 -type f -mmin +120 -delete
+fi
 
 "$out" migrate
