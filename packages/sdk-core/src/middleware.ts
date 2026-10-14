@@ -434,7 +434,8 @@ export type ClientAuthResult = ClientAuthState | UnauthState;
 
 /**
  * The client-safe form of an {@link AuthResult}: the same state without the
- * session token. The backend sets that token as an HttpOnly cookie so no
+ * session token. A {@link ClientAuthResult} passes through as the same shape,
+ * so a caller holding either can convert without checking which it has. The backend sets that token as an HttpOnly cookie so no
  * script can read it; anything a server hands to the browser (load data, a
  * server function's or action's return value, an SSR payload) must carry this
  * shape instead. `reason` is kept, so a client guard can still tell an outage
@@ -443,7 +444,7 @@ export type ClientAuthResult = ClientAuthState | UnauthState;
  * @param auth - The server-side auth result.
  * @returns The same state, without `session.token`.
  */
-export function toClientAuth(auth: AuthResult): ClientAuthResult {
+export function toClientAuth(auth: AuthResult | ClientAuthResult): ClientAuthResult {
   if (!auth.isAuthenticated) {
     return auth.reason
       ? { isAuthenticated: false, session: null, reason: auth.reason }

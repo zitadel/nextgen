@@ -629,6 +629,15 @@ describe("toClientAuth", () => {
   ])("keeps the signed-out state %j as it is", (auth) => {
     expect(toClientAuth(auth)).toEqual(auth);
   });
+
+  it("keeps an already client-safe result as it is", () => {
+    const auth = {
+      isAuthenticated: true as const,
+      session: { userId: "u1", identifier: null, identifierProperty: null, display: null },
+    };
+
+    expect(toClientAuth(auth)).toEqual(auth);
+  });
 });
 
 describe("isWellFormedSessionToken", () => {
