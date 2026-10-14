@@ -35,6 +35,9 @@ such as a 5xx or a network error; the detail has `phase`, `message` and, when
 a response came back, `status` and `code`). Each receives the event detail. An unset or cleared prop leaves the widget on its
 default (for example the "Signed in as" heading).
 
+`ZitadelLogin` also takes `resumeFlowId`, an existing flow to resume instead of starting a new
+one. Unset, `null` or `""` falls back to the `flow` query parameter.
+
 Children go into the element's light DOM, so `ZitadelLogout` accepts a
 `<template>` for a custom sign-out control (`{{display}}`, `{{identifier}}`
 and `{{initial}}` are filled in, and an element with `data-action="logout"`
