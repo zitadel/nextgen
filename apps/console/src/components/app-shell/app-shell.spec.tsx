@@ -28,7 +28,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
  * theme toggle writing `data-theme` and persisting the preference.
  */
 // The design's single-level sidebar ("01 / Nav Level 1"), less the screens
-// that are not built (Deployments, Sessions).
+// that are not built (Sessions).
 const NAV_ORDER = [
   "Projects",
   "Teams",
@@ -36,6 +36,7 @@ const NAV_ORDER = [
   "User schemas",
   "Login flows",
   "Branding",
+  "Deployments",
   "Authentication",
   "Project settings",
 ];
