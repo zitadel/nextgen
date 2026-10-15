@@ -24,6 +24,7 @@
     variant,
     theme,
     suppressHeader,
+    suppressPasswordToggle,
     onFlowStep,
     onFlowInput,
     onFlowComplete,
@@ -46,7 +47,7 @@
   // binding would assign `undefined` and overwrite the default.
   $effect(() => {
     if (el) {
-      assignGiven(el, { lang, variant, theme, suppressHeader });
+      assignGiven(el, { lang, variant, theme, suppressHeader, suppressPasswordToggle });
     }
   });
 

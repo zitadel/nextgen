@@ -24,6 +24,8 @@ When you add your own step or action to a flow, its keys follow the step name �
 
 Entries merge over the built-in dictionary per language, so you only supply what you add or want to change — overriding a built-in key (e.g. `identifier.title`) works the same way. `lang` forces a specific language; by default the widget follows the browser language.
 
+A step that offers sign-in providers asks for `<step>.description.sso` instead of `<step>.description`, so its description can mention the provider buttons. The built-in dictionaries only have one for the password step ("Enter your password or continue with your sign-in provider"); every other step falls back to its plain description. If you override a step's `.description` and not its `.sso` variant, your text is shown on that step either way.
+
 A key that resolves nowhere renders as the raw key string — if you see `my-step.action.submit` on a button, that's the dictionary entry to add. The engine-injected back button falls back to a generic `action.back` automatically.
 
 Flow actions can also point at any key explicitly via `text_key` in the flow definition; when omitted, the `<step>.action.<name>` convention applies.

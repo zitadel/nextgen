@@ -260,7 +260,7 @@ describe("authentication screen", () => {
     serve({ idps: [] });
     await renderAt("/authentication?tab=identity-providers");
     expect(await screen.findByText(/This project has no identity providers/)).toBeInTheDocument();
-    expect(screen.getByText("zitadel sso enable")).toBeInTheDocument();
+    expect(screen.getByText("zitadel auth-method sso enable")).toBeInTheDocument();
   });
 });
 

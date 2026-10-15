@@ -36,8 +36,8 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   await page.getByLabel("Email").fill(user.email);
   await page.getByRole("button", { name: "Continue", exact: true }).click();
 
-  await expect(page.getByLabel("Password")).toBeVisible();
-  await page.getByLabel("Password").fill(user.password);
+  await expect(page.getByRole("textbox", { name: "Password" })).toBeVisible();
+  await page.getByRole("textbox", { name: "Password" }).fill(user.password);
   // Registered before the terminal click, because the call fires as soon as
   // the console boots on the other side of the navigation.
   const myProjects = page.waitForResponse(
