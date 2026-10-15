@@ -21,10 +21,10 @@ test("lists a built release and opens the configuration it pins", async ({
   seed,
 }) => {
   await signIn(page, zitadel, await seed.user());
-  // A message unique to the run, so a release another worker built is never
-  // mistaken for this one.
-  const message = `e2e release ${Date.now()}`;
-  const release = await createRelease(zitadel, message);
+  // A release is one per pinned set: when this instance already holds a
+  // release pinning the same revisions, the server answers with that one and
+  // its message, so the screen is checked against what the server returned.
+  const release = await createRelease(zitadel, `e2e release ${Date.now()}`);
   const origin = `https://${Date.now()}.e2e.acme.test`;
   await deployToPrimary(zitadel, release.id, origin);
 
@@ -57,7 +57,7 @@ test("lists a built release and opens the configuration it pins", async ({
   await expect(page.getByText("Deployment of this release")).toBeVisible();
   await expect(page.getByRole("link", { name: origin })).toBeVisible();
 
-  await expect(page.getByText(message)).toBeVisible();
+  await expect(page.getByText(release.message)).toBeVisible();
   await expectNoErrorBoundary(page);
 });
 

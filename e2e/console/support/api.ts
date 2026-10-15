@@ -78,7 +78,7 @@ export async function withErrorBody<T>(call: Promise<T>): Promise<T> {
 export async function createRelease(
   zitadel: ConnectedZitadel,
   message: string,
-): Promise<{ id: string; handles: string[] }> {
+): Promise<{ id: string; message: string; handles: string[] }> {
   const projectId = zitadel.handle.projectId;
   const [schemas, flows] = await Promise.all([
     withErrorBody(zitadel.api.listSchemas({ project_id: projectId, revisions: "latest" })),
@@ -99,7 +99,11 @@ export async function createRelease(
       { project_id: projectId },
     ),
   );
-  return { id: release.id, handles: release.pointers.map((pointer) => pointer.handle) };
+  return {
+    id: release.id,
+    message: release.metadata.message ?? "",
+    handles: release.pointers.map((pointer) => pointer.handle),
+  };
 }
 
 /**
