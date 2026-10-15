@@ -25704,11 +25704,11 @@ func (s DeleteVariableErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case EnvNotFoundDeleteVariableErrorResponse:
+	case InternalDeleteVariableErrorResponse:
 		e.FieldStart("code")
-		e.Str("env.not_found")
+		e.Str("internal")
 		{
-			s := s.EnvNotFound
+			s := s.Internal
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -25720,11 +25720,11 @@ func (s DeleteVariableErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case InternalDeleteVariableErrorResponse:
+	case NotImplementedDeleteVariableErrorResponse:
 		e.FieldStart("code")
-		e.Str("internal")
+		e.Str("not_implemented")
 		{
-			s := s.Internal
+			s := s.NotImplemented
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -25813,11 +25813,11 @@ func (s *DeleteVariableErrorResponse) Decode(d *jx.Decoder) error {
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedDeleteVariableErrorResponse
 					found = true
-				case "env.not_found":
-					s.Type = EnvNotFoundDeleteVariableErrorResponse
-					found = true
 				case "internal":
 					s.Type = InternalDeleteVariableErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedDeleteVariableErrorResponse
 					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidDeleteVariableErrorResponse
@@ -25846,12 +25846,12 @@ func (s *DeleteVariableErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
-	case EnvNotFoundDeleteVariableErrorResponse:
-		if err := s.EnvNotFound.Decode(d); err != nil {
-			return err
-		}
 	case InternalDeleteVariableErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedDeleteVariableErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidDeleteVariableErrorResponse:
@@ -28759,194 +28759,6 @@ func (s EncKeyUnknownAlgDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *EncKeyUnknownAlgDetails) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s *EnvNotFound) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields encodes fields.
-func (s *EnvNotFound) encodeFields(e *jx.Encoder) {
-	{
-		e.FieldStart("code")
-		e.Str("env.not_found")
-	}
-	{
-		e.FieldStart("message")
-		e.Str(s.Message)
-	}
-	{
-		if s.Details.Set {
-			e.FieldStart("details")
-			s.Details.Encode(e)
-		}
-	}
-}
-
-var jsonFieldsNameOfEnvNotFound = [3]string{
-	0: "code",
-	1: "message",
-	2: "details",
-}
-
-// Decode decodes EnvNotFound from json.
-func (s *EnvNotFound) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode EnvNotFound to nil")
-	}
-	var requiredBitSet [1]uint8
-
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "code":
-			requiredBitSet[0] |= 1 << 0
-			if err := func() error {
-				v, err := d.Str()
-				s.Code = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"code\"")
-			}
-		case "message":
-			requiredBitSet[0] |= 1 << 1
-			if err := func() error {
-				v, err := d.Str()
-				s.Message = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"message\"")
-			}
-		case "details":
-			if err := func() error {
-				s.Details.Reset()
-				if err := s.Details.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"details\"")
-			}
-		default:
-			return d.Skip()
-		}
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode EnvNotFound")
-	}
-	// Validate required fields.
-	var failures []validate.FieldError
-	for i, mask := range [1]uint8{
-		0b00000011,
-	} {
-		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
-			// Mask only required fields and check equality to mask using XOR.
-			//
-			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
-			// Bits of fields which would be set are actually bits of missed fields.
-			missed := bits.OnesCount8(result)
-			for bitN := 0; bitN < missed; bitN++ {
-				bitIdx := bits.TrailingZeros8(result)
-				fieldIdx := i*8 + bitIdx
-				var name string
-				if fieldIdx < len(jsonFieldsNameOfEnvNotFound) {
-					name = jsonFieldsNameOfEnvNotFound[fieldIdx]
-				} else {
-					name = strconv.Itoa(fieldIdx)
-				}
-				failures = append(failures, validate.FieldError{
-					Name:  name,
-					Error: validate.ErrFieldRequired,
-				})
-				// Reset bit.
-				result &^= 1 << bitIdx
-			}
-		}
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *EnvNotFound) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *EnvNotFound) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s EnvNotFoundDetails) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields implements json.Marshaler.
-func (s EnvNotFoundDetails) encodeFields(e *jx.Encoder) {
-	for k, elem := range s {
-		e.FieldStart(k)
-
-		if len(elem) != 0 {
-			e.Raw(elem)
-		}
-	}
-}
-
-// Decode decodes EnvNotFoundDetails from json.
-func (s *EnvNotFoundDetails) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode EnvNotFoundDetails to nil")
-	}
-	m := s.init()
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		var elem jx.Raw
-		if err := func() error {
-			v, err := d.RawAppend(nil)
-			elem = jx.Raw(v)
-			if err != nil {
-				return err
-			}
-			return nil
-		}(); err != nil {
-			return errors.Wrapf(err, "decode field %q", k)
-		}
-		m[string(k)] = elem
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode EnvNotFoundDetails")
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s EnvNotFoundDetails) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *EnvNotFoundDetails) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -46102,6 +45914,258 @@ func (s *GetDeploymentByIdErrorResponse) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes GetDeploymentVariablesErrorResponse as json.
+func (s GetDeploymentVariablesErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s GetDeploymentVariablesErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AuthUnauthorizedGetDeploymentVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case DepNotFoundGetDeploymentVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("dep.not_found")
+		{
+			s := s.DepNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case DepPermissionDeniedGetDeploymentVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("dep.permission_denied")
+		{
+			s := s.DepPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalGetDeploymentVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedGetDeploymentVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidGetDeploymentVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case VarNotFoundGetDeploymentVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("var.not_found")
+		{
+			s := s.VarNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case VarPermissionDeniedGetDeploymentVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("var.permission_denied")
+		{
+			s := s.VarPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes GetDeploymentVariablesErrorResponse from json.
+func (s *GetDeploymentVariablesErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode GetDeploymentVariablesErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedGetDeploymentVariablesErrorResponse
+					found = true
+				case "dep.not_found":
+					s.Type = DepNotFoundGetDeploymentVariablesErrorResponse
+					found = true
+				case "dep.permission_denied":
+					s.Type = DepPermissionDeniedGetDeploymentVariablesErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalGetDeploymentVariablesErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedGetDeploymentVariablesErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidGetDeploymentVariablesErrorResponse
+					found = true
+				case "var.not_found":
+					s.Type = VarNotFoundGetDeploymentVariablesErrorResponse
+					found = true
+				case "var.permission_denied":
+					s.Type = VarPermissionDeniedGetDeploymentVariablesErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AuthUnauthorizedGetDeploymentVariablesErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case DepNotFoundGetDeploymentVariablesErrorResponse:
+		if err := s.DepNotFound.Decode(d); err != nil {
+			return err
+		}
+	case DepPermissionDeniedGetDeploymentVariablesErrorResponse:
+		if err := s.DepPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case InternalGetDeploymentVariablesErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedGetDeploymentVariablesErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidGetDeploymentVariablesErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case VarNotFoundGetDeploymentVariablesErrorResponse:
+		if err := s.VarNotFound.Decode(d); err != nil {
+			return err
+		}
+	case VarPermissionDeniedGetDeploymentVariablesErrorResponse:
+		if err := s.VarPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s GetDeploymentVariablesErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *GetDeploymentVariablesErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes GetEventForbidden as json.
 func (s *GetEventForbidden) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
@@ -50017,11 +50081,11 @@ func (s GetVariableErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case EnvNotFoundGetVariableErrorResponse:
+	case InternalGetVariableErrorResponse:
 		e.FieldStart("code")
-		e.Str("env.not_found")
+		e.Str("internal")
 		{
-			s := s.EnvNotFound
+			s := s.Internal
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -50033,11 +50097,11 @@ func (s GetVariableErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case InternalGetVariableErrorResponse:
+	case NotImplementedGetVariableErrorResponse:
 		e.FieldStart("code")
-		e.Str("internal")
+		e.Str("not_implemented")
 		{
-			s := s.Internal
+			s := s.NotImplemented
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -50126,11 +50190,11 @@ func (s *GetVariableErrorResponse) Decode(d *jx.Decoder) error {
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedGetVariableErrorResponse
 					found = true
-				case "env.not_found":
-					s.Type = EnvNotFoundGetVariableErrorResponse
-					found = true
 				case "internal":
 					s.Type = InternalGetVariableErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedGetVariableErrorResponse
 					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetVariableErrorResponse
@@ -50159,12 +50223,12 @@ func (s *GetVariableErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
-	case EnvNotFoundGetVariableErrorResponse:
-		if err := s.EnvNotFound.Decode(d); err != nil {
-			return err
-		}
 	case InternalGetVariableErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedGetVariableErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidGetVariableErrorResponse:
@@ -50223,11 +50287,11 @@ func (s GetVariablesErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case EnvNotFoundGetVariablesErrorResponse:
+	case InternalGetVariablesErrorResponse:
 		e.FieldStart("code")
-		e.Str("env.not_found")
+		e.Str("internal")
 		{
-			s := s.EnvNotFound
+			s := s.Internal
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -50239,11 +50303,11 @@ func (s GetVariablesErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case InternalGetVariablesErrorResponse:
+	case NotImplementedGetVariablesErrorResponse:
 		e.FieldStart("code")
-		e.Str("internal")
+		e.Str("not_implemented")
 		{
-			s := s.Internal
+			s := s.NotImplemented
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -50332,11 +50396,11 @@ func (s *GetVariablesErrorResponse) Decode(d *jx.Decoder) error {
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedGetVariablesErrorResponse
 					found = true
-				case "env.not_found":
-					s.Type = EnvNotFoundGetVariablesErrorResponse
-					found = true
 				case "internal":
 					s.Type = InternalGetVariablesErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedGetVariablesErrorResponse
 					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetVariablesErrorResponse
@@ -50365,12 +50429,12 @@ func (s *GetVariablesErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
-	case EnvNotFoundGetVariablesErrorResponse:
-		if err := s.EnvNotFound.Decode(d); err != nil {
-			return err
-		}
 	case InternalGetVariablesErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedGetVariablesErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidGetVariablesErrorResponse:
@@ -64867,40 +64931,6 @@ func (s *OptEncKeyUnknownAlgDetails) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes EnvNotFoundDetails as json.
-func (o OptEnvNotFoundDetails) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	o.Value.Encode(e)
-}
-
-// Decode decodes EnvNotFoundDetails from json.
-func (o *OptEnvNotFoundDetails) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptEnvNotFoundDetails to nil")
-	}
-	o.Set = true
-	o.Value = make(EnvNotFoundDetails)
-	if err := o.Value.Decode(d); err != nil {
-		return err
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptEnvNotFoundDetails) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptEnvNotFoundDetails) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode encodes EnvProjectNotFoundDetails as json.
 func (o OptEnvProjectNotFoundDetails) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -73883,6 +73913,39 @@ func (s OptVarPermissionDeniedDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptVarPermissionDeniedDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes Variable as json.
+func (o OptVariable) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes Variable from json.
+func (o *OptVariable) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptVariable to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptVariable) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptVariable) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -106725,22 +106788,6 @@ func (s UpdateVariablesErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case EnvNotFoundUpdateVariablesErrorResponse:
-		e.FieldStart("code")
-		e.Str("env.not_found")
-		{
-			s := s.EnvNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
 	case InternalUpdateVariablesErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
@@ -106810,6 +106857,22 @@ func (s UpdateVariablesErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("var.no_project_id")
 		{
 			s := s.VarNoProjectID
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedUpdateVariablesErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -106936,9 +106999,6 @@ func (s *UpdateVariablesErrorResponse) Decode(d *jx.Decoder) error {
 				case "enc_key.not_found":
 					s.Type = EncKeyNotFoundUpdateVariablesErrorResponse
 					found = true
-				case "env.not_found":
-					s.Type = EnvNotFoundUpdateVariablesErrorResponse
-					found = true
 				case "internal":
 					s.Type = InternalUpdateVariablesErrorResponse
 					found = true
@@ -106953,6 +107013,9 @@ func (s *UpdateVariablesErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "var.no_project_id":
 					s.Type = VarNoProjectIDUpdateVariablesErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedUpdateVariablesErrorResponse
 					found = true
 				case "proj.not_found":
 					s.Type = ProjNotFoundUpdateVariablesErrorResponse
@@ -106995,10 +107058,6 @@ func (s *UpdateVariablesErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.EncKeyNotFound.Decode(d); err != nil {
 			return err
 		}
-	case EnvNotFoundUpdateVariablesErrorResponse:
-		if err := s.EnvNotFound.Decode(d); err != nil {
-			return err
-		}
 	case InternalUpdateVariablesErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
 			return err
@@ -107017,6 +107076,10 @@ func (s *UpdateVariablesErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case VarNoProjectIDUpdateVariablesErrorResponse:
 		if err := s.VarNoProjectID.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedUpdateVariablesErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
 			return err
 		}
 	case ProjNotFoundUpdateVariablesErrorResponse:
@@ -113895,6 +113958,97 @@ func (s *Variable) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode implements json.Marshaler.
+func (s *VariableByKind) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *VariableByKind) encodeFields(e *jx.Encoder) {
+	{
+		if s.Primary.Set {
+			e.FieldStart("primary")
+			s.Primary.Encode(e)
+		}
+	}
+	{
+		if s.Preview.Set {
+			e.FieldStart("preview")
+			s.Preview.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfVariableByKind = [2]string{
+	0: "primary",
+	1: "preview",
+}
+
+// Decode decodes VariableByKind from json.
+func (s *VariableByKind) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode VariableByKind to nil")
+	}
+	var propertiesCount int
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		propertiesCount++
+		switch string(k) {
+		case "primary":
+			if err := func() error {
+				s.Primary.Reset()
+				if err := s.Primary.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"primary\"")
+			}
+		case "preview":
+			if err := func() error {
+				s.Preview.Reset()
+				if err := s.Preview.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"preview\"")
+			}
+		default:
+			return errors.Errorf("unexpected field %q", k)
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode VariableByKind")
+	}
+	// Validate properties count.
+	if err := (validate.Object{
+		MinProperties:    1,
+		MinPropertiesSet: true,
+		MaxProperties:    0,
+		MaxPropertiesSet: false,
+	}).ValidateProperties(propertiesCount); err != nil {
+		return errors.Wrap(err, "object")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *VariableByKind) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *VariableByKind) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes VariableInput as json.
 func (s VariableInput) Encode(e *jx.Encoder) {
 	switch s.Type {
@@ -114058,6 +114212,60 @@ func (s Variables) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *Variables) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s VariablesByKind) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s VariablesByKind) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		elem.Encode(e)
+	}
+}
+
+// Decode decodes VariablesByKind from json.
+func (s *VariablesByKind) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode VariablesByKind to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem VariableByKind
+		if err := func() error {
+			if err := elem.Decode(d); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode VariablesByKind")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s VariablesByKind) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *VariablesByKind) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

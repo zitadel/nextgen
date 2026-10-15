@@ -941,7 +941,10 @@ describe("IdpConnectionSyncer", () => {
         http.get(`${BASE}/variables`, () =>
           HttpResponse.json(
             Object.fromEntries(
-              names.map((name) => [name, name.endsWith("_SECRET") ? { secret: true } : "a-value"]),
+              names.map((name) => [
+                name,
+                { primary: name.endsWith("_SECRET") ? { secret: true } : "a-value" },
+              ]),
             ),
           ),
         ),

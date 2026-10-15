@@ -2,7 +2,7 @@ import { Flags } from "@oclif/core";
 
 import { CommandGroups, OwnerCommand, type JsonEnvelope } from "../../lib/oclif";
 import { renderRows, renderTable } from "../../lib/oclif/crud/table";
-import { toVariableRows, variableCells } from "../../lib/variables";
+import { primaryValues, toVariableRows, variableCells } from "../../lib/variables";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["name", "value"] as const;
@@ -33,7 +33,8 @@ export default class VariablesList extends OwnerCommand {
     await this.toMeta(flags);
     const { client, scope } = await this.connect();
 
-    const rows = toVariableRows(await client.getVariables(scope));
+    const body = await client.getVariables({ ...scope, kind: "primary" });
+    const rows = toVariableRows(primaryValues(body));
     this.recordTelemetry({ variable_count: rows.length });
 
     // The resource commands' list rendering: a pipe (or `--plain`) gets one

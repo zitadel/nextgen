@@ -23,6 +23,7 @@
     variant,
     theme,
     suppressHeader,
+    suppressPasswordToggle,
     onFlowStep,
     onFlowInput,
     onFlowComplete,
@@ -84,4 +85,5 @@
   variant={variant}
   theme={theme}
   suppressHeader={suppressHeader}
+  suppressPasswordToggle={suppressPasswordToggle}
 ></zitadel-login>
