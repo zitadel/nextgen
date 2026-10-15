@@ -119,8 +119,8 @@ const GO_TEST_TARGETS = [
 const TESTING_DEMO_TARGETS = ["testing:test-integration", "e2e:demo-next-real"];
 // Both real-instance console lanes: the dev-proxy suite and the embedded
 // suite (binary-served /ui/* + API at one origin). Either being affected
-// runs the console gate — the workflow steps them sequentially so two local
-// instances do not contend.
+// runs the console gate, which ci-turbo.yml's console steps read; ci.yml runs
+// both through e2e:all.
 const CONSOLE_E2E_TARGETS = ["e2e:console-real", "e2e:console-embedded"];
 // The lanes that need no backend: the console's preview smoke and the demos
 // against api-mock. ci-turbo.yml runs them in one step; moon runs them as part

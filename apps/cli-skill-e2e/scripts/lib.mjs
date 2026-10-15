@@ -4,6 +4,33 @@ import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 /**
+ * Discover the run cells on disk: out/<config>/<model>/r<k>/ dirs that actually
+ * produced a stage-1 trajectory. Lets the report and test enumerate a
+ * model×repeat matrix without knowing which models/repeats were chosen.
+ */
+export function listCells(outDir, configs) {
+  const dirs = (p) => {
+    try {
+      return readdirSync(p, { withFileTypes: true })
+        .filter((d) => d.isDirectory())
+        .map((d) => d.name);
+    } catch {
+      return [];
+    }
+  };
+  const cells = [];
+  for (const config of configs) {
+    for (const model of dirs(join(outDir, config))) {
+      for (const rep of dirs(join(outDir, config, model))) {
+        const dir = join(outDir, config, model, rep);
+        if (existsSync(join(dir, "stage1.jsonl"))) cells.push({ config, model, rep, dir });
+      }
+    }
+  }
+  return cells;
+}
+
+/**
  * Parse one stage trajectory (stream-json JSONL) into a conversation.
  *
  * A stage may be multi-turn: the agent's `claude -p` stream, then a
@@ -130,46 +157,122 @@ function readIf(path) {
 }
 
 /**
- * Grade one stage against ground truth. Returns {status, why}.
- * status ∈ "pass" | "fail" | "blocked". `grade` is the rule name from the config.
+ * Resolve a dotted path against a parsed CLI `--json` response. The CLI wraps
+ * payloads in an envelope (`{ data: … }`), and list responses nest the array
+ * under a named key, so we try the object itself and its `.data` and return the
+ * first place the path resolves — the caller writes `projects` or
+ * `schema.properties.firstName`, not the envelope boilerplate.
  */
-export function gradeStage(rule, cfgDir, parsed, stage1ok) {
+export function resolvePath(obj, path) {
+  const follow = (base) => {
+    let cur = base;
+    for (const key of path.split(".")) {
+      if (cur == null || typeof cur !== "object") return undefined;
+      cur = cur[key];
+    }
+    return cur;
+  };
+  const direct = follow(obj);
+  if (direct !== undefined) return direct;
+  if (obj && typeof obj === "object" && "data" in obj) return follow(obj.data);
+  return undefined;
+}
+
+/**
+ * Evaluate one assertion against a parsed response. Outcome grading: we read
+ * what the live instance actually holds, not what the agent said it did.
+ * ops: exists | eq | neq | count-eq | count-gte.
+ */
+export function evalAssertion(parsed, a) {
+  // `path` may be a list of alternatives (e.g. a field the CLI spells two ways)
+  // — the first that resolves wins, so an assertion tracks the capability, not
+  // one spelling.
+  const paths = Array.isArray(a.path) ? a.path : [a.path];
+  let actual;
+  for (const p of paths) {
+    actual = resolvePath(parsed, p);
+    if (actual !== undefined) break;
+  }
+  const arr = Array.isArray(actual) ? actual : undefined;
+  let passed = false;
+  switch (a.op) {
+    case "exists":
+      passed = actual !== undefined && actual !== null;
+      break;
+    case "eq":
+      passed = actual === a.value;
+      break;
+    case "neq":
+      passed = actual !== a.value;
+      break;
+    case "count-eq":
+      passed = arr !== undefined && arr.length === a.value;
+      break;
+    case "count-gte":
+      passed = arr !== undefined && arr.length >= a.value;
+      break;
+    default:
+      passed = false;
+  }
+  const shown = arr !== undefined ? `len ${arr.length}` : JSON.stringify(actual);
+  return { passed, actual: shown };
+}
+
+/** Load the live-instance assertion results a stage's run captured, if any. */
+function loadAsserts(cfgDir, stageId) {
+  const txt = readIf(join(cfgDir, `asserts-stage${stageId}.json`));
+  if (!txt) return null;
+  try {
+    return JSON.parse(txt).results ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Grade one stage. Outcome-first: if the stage declares `assert`s, it passes
+ * only when the agent's turn didn't error AND every assertion against the live
+ * instance held. Stages with no server-assertable outcome (e.g. "is this a
+ * client id?", a reasoning answer) fall back to a transcript heuristic by
+ * `grade`. Returns {status, why, asserts?}. status ∈ pass | fail | blocked.
+ */
+export function gradeStage(stage, cfgDir, parsed, stage1ok) {
+  const rule = stage.grade;
   const { pairs, final, result } = parsed;
   const ok = !(result?.is_error ?? true);
   const blob = `${pairs.map((p) => `${p.cmd} ${p.out}`).join(" ")} ${final}`;
+  const isFirst = rule === "setup";
 
-  if (rule === "setup") {
-    const sd = join(cfgDir, "artifacts/.zitadel/schemas");
-    let txt = "";
-    if (existsSync(sd)) {
-      const f = readdirSync(sd).find((n) => /human-user/.test(n) && n.endsWith(".json"));
-      if (f) txt = readIf(join(sd, f));
-    }
-    // The CLI's human-user schema names the first/last name fields
-    // `firstName`/`lastName` (older builds used `givenName`/`familyName`);
-    // accept either so the grade tracks the capability, not one spelling.
-    const hasFirst = /firstName|givenName/.test(txt);
-    const hasLast = /lastName|familyName/.test(txt);
-    if (ok && hasFirst && hasLast)
-      return { status: "pass", why: "schema has first- + last-name fields; applied" };
-    return {
-      status: "fail",
-      why: "no project created (couldn't find the CLI, or schema missing fields)",
-    };
+  // Outcome grading from the live-instance assertions captured during the run.
+  if (stage.assert?.length) {
+    if (!isFirst && !stage1ok)
+      return {
+        status: "blocked",
+        why: "stage 1 produced no project, so there's nothing to assert against",
+      };
+    const results = loadAsserts(cfgDir, stage.id);
+    if (!results)
+      return { status: "fail", why: "assertions never ran (no server state captured)", asserts: [] };
+    const failed = results.filter((r) => !r.passed);
+    if (ok && failed.length === 0)
+      return {
+        status: "pass",
+        why: `${results.length}/${results.length} live-instance checks passed`,
+        asserts: results,
+      };
+    const why = !ok
+      ? "the agent's turn errored"
+      : `failed: ${failed.map((r) => r.name).join("; ")}`;
+    return { status: "fail", why, asserts: results };
   }
 
-  if (!stage1ok)
+  if (!stage1ok && !isFirst)
     return { status: "blocked", why: "stage 1 produced no project, so there's nothing to act on" };
 
-  if (rule === "list-projects") {
-    const listed = /projects?\s+list|projects\b/.test(blob);
-    const found = /proj_[0-9A-Za-z]{6,}|"count":\s*[1-9]|\b1 project\b|found[^.]*project/i.test(
-      blob,
-    );
-    return ok && listed && found
-      ? { status: "pass", why: "ran a projects list and the project shows up" }
-      : { status: "fail", why: "listed but no project found, or errored" };
-  }
+  // Fallback for stages with no server-assertable outcome. "Does my project
+  // have a client id/secret?" is a reasoning answer (the trap: a project
+  // id/secret is NOT an OAuth client id/secret), so we check the agent looked
+  // and gave a clear yes/no — not the live instance.
   if (rule === "inspect-credentials") {
     const inspected =
       /variables|\.zitadel\/secret|client[_ ]?id|client[_ ]?secret|\.env|CLIENT_ID/i.test(blob);
@@ -178,39 +281,24 @@ export function gradeStage(rule, cfgDir, parsed, stage1ok) {
       ? { status: "pass", why: "inspected credentials and gave an evidenced answer" }
       : { status: "fail", why: "did not inspect credentials / no clear answer" };
   }
-  if (rule === "schema-has-phone") {
-    const txt = readIf(join(cfgDir, "after-stage4.json"));
-    const hasPhone = /phone|telephone|mobile/i.test(txt);
-    const applied = /\bapply\b/.test(blob);
-    return ok && hasPhone && applied
-      ? { status: "pass", why: "phone field is in the schema and was deployed" }
-      : { status: "fail", why: "phone field not in schema, or not deployed" };
-  }
-  if (rule === "passkey-enabled") {
-    const txt = readIf(join(cfgDir, "after-stage5.json"));
-    const pkOn = /"passkey"\s*:\s*\{[^}]*"enabled"\s*:\s*true/is.test(txt);
-    const applied = /\bapply\b/.test(blob);
-    return ok && pkOn && applied
-      ? { status: "pass", why: "passkeys enabled in the schema and deployed" }
-      : { status: "fail", why: "passkeys not enabled in schema, or not deployed" };
-  }
-  return { status: "fail", why: `unknown grade rule: ${rule}` };
+  return { status: "fail", why: `no assertions and no fallback rule for "${rule}"` };
 }
 
-/** Grade every stage for a config dir. Returns [{stage, status, why, parsed, tokens, turns}]. */
+/** Grade every stage for a config dir. Returns [{stage, status, why, asserts, parsed, …}]. */
 export function gradeConfig(cfgDir, stages) {
   const parsedByStage = {};
   for (const s of stages) parsedByStage[s.id] = parseStage(join(cfgDir, `stage${s.id}.jsonl`));
-  const s1 = gradeStage("setup", cfgDir, parsedByStage[stages[0].id], true);
+  const s1 = gradeStage(stages[0], cfgDir, parsedByStage[stages[0].id], true);
   const stage1ok = s1.status === "pass";
   return stages.map((s) => {
     const parsed = parsedByStage[s.id];
-    const { status, why } = gradeStage(s.grade, cfgDir, parsed, stage1ok);
+    const { status, why, asserts } = gradeStage(s, cfgDir, parsed, stage1ok);
     return {
       stage: s.id,
       title: s.title,
       status,
       why,
+      asserts: asserts ?? null,
       parsed,
       tokens: tokens(parsed.result),
       turns: parsed.result?.num_turns ?? "?",

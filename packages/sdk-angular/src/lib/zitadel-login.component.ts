@@ -65,6 +65,7 @@ import "@zitadel/components";
     [attr.resume-flow-id]="resumeFlowId"
     [attr.variant]="variant"
     [attr.theme]="theme"
+    [suppressPasswordToggle]="suppressPasswordToggle"
     (zitadel-flow-step)="onFlowStep($event)"
     (zitadel-flow-input)="onFlowInput($event)"
     (zitadel-flow-complete)="onFlowComplete($event)"
@@ -85,6 +86,7 @@ export class ZitadelLoginComponent implements ZitadelLoginConfig {
   @Input() variant?: "widget" | "page";
   @Input() theme?: "light" | "dark" | "auto";
   @Input() suppressHeader?: boolean;
+  @Input() suppressPasswordToggle?: boolean;
   @Output() flowStep = new EventEmitter<ZitadelFlowStepDetail>();
   @Output() flowInput = new EventEmitter<ZitadelFlowInputDetail>();
   @Output() flowComplete = new EventEmitter<ZitadelFlowCompleteDetail>();

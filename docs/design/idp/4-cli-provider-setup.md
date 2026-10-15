@@ -128,7 +128,7 @@ After claim, the same sub-journey runs behind the Sign-in methods journey.
 A provider the catalog does not list is not an entry in it.
 The developer describes the connection instead, and the same sub-journey
 announces, collects credentials, scaffolds and writes it
-(`sso enable --provider custom`, and the "another OpenID Connect provider"
+(`auth-method sso enable --provider custom`, and the "another OpenID Connect provider"
 option in `zitadel setup`, `--sso custom`).
 
 | Input | Rule |
@@ -159,7 +159,7 @@ What is different from a catalog provider:
 * **Credential variables follow the slug**: `ACME_SSO_CLIENT_ID` and
   `ACME_SSO_CLIENT_SECRET` for `acme-sso`, exactly as for a catalog provider.
 * **`setup` takes one custom connection.** The wizard offers the option once;
-  further connections are added with `sso enable`.
+  further connections are added with `auth-method sso enable`.
 
 ## Callback URIs
 
@@ -430,7 +430,7 @@ either preset, once the providers and the routes it writes are set aside. A
 hand-edited one, including one whose provider routes were pointed elsewhere, is
 left alone and reported, as for every other generated step.
 A password step that is exactly the shipped one reads as unedited, so a button the
-developer removed on purpose comes back on the next `sso enable`; nothing in the file
+developer removed on purpose comes back on the next `auth-method sso enable`; nothing in the file
 distinguishes that from a project enabled before the step offered providers.
 Showing only the providers linked to the identified user, or skipping the step
 for a user without a password, would tell anyone who types an email which

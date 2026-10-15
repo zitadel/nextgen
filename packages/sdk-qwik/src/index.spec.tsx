@@ -25,6 +25,7 @@ import { commands } from "vitest/browser";
 
 import type { renderWidgets } from "./__tests__/ssr-fixture";
 
+import { PasswordToggleHarness } from "./__tests__/password-toggle-harness";
 import { businessLocales, ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
 
 declare module "vitest/browser" {
@@ -688,5 +689,17 @@ describe("children", () => {
 describe("businessLocales", () => {
   it("re-exports the business copy overlay from @zitadel/components", () => {
     expect(businessLocales).toBe(componentsBusinessLocales);
+  });
+});
+
+describe("ZitadelLogin suppressPasswordToggle", () => {
+  it("returns to the default when the prop goes from true back to unset", async () => {
+    const host = await renderWidget(<PasswordToggleHarness />);
+    const el = () => host.querySelector<ZitadelLoginElement>("zitadel-login")!;
+    await expect.poll(() => el().suppressPasswordToggle).toBe(true);
+
+    await expect.poll(() => window.__unsetSuppressPasswordToggle).toBeTypeOf("function");
+    window.__unsetSuppressPasswordToggle!();
+    await expect.poll(() => el().suppressPasswordToggle).toBe(false);
   });
 });

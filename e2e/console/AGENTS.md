@@ -26,13 +26,13 @@ secret-handling caveat live in [`README.md`](README.md).
   that project on its own (the operator's only grant, as `?project=`), so the
   screens run in a project other than the one the console signs into.
 - `moon run e2e:console-deployment` — **hosted-cloud deployment
-  coverage**: no server of its own; it checks a deployment that
-  `CONSOLE_DEPLOYMENT_URL` names, where the console is a Vercel service at
-  `/console/` beside the server. It pins the routing (`/console/runtime.json`
-  to the server, the old `/ui/console` links redirected) and the signed-out
-  sign-in screen down to the login widget's first step. It holds no
-  credential but `VERCEL_AUTOMATION_BYPASS_SECRET`, so it records no traces
-  and writes no HTML report.
+  coverage**: no server of its own; it checks a deployment that `CLOUD_URL`
+  names, where the console is a Vercel service at `/console/` beside the
+  server. It pins the routing (`/console/runtime.json` to the server, the old
+  `/ui/console` links redirected) and the signed-out sign-in screen down to
+  the login widget's first step. It holds no credential but
+  `VERCEL_AUTOMATION_BYPASS_SECRET`, so it records no traces and writes no
+  HTML report. `pnpm check:cloud` runs it beside the docs' deployment suite.
 
 Console screens act on the selected project (`?project=`, see
 [`apps/console/AGENTS.md`](../../apps/console/AGENTS.md)). The guard only ever selects

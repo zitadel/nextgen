@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
 import { en as fullLocale } from "./locales/en.js";
+import { builtinLocales } from "./locales/index.js";
 import { mandatoryGatesMarkerComment } from "./mandatory-gates.js";
 import { TEMPLATE_NAMES } from "./template-names.js";
 
@@ -51,7 +52,9 @@ describe("LiquidJS engine", () => {
   it("warns once per missing key, and never for fallback-served or empty keys", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     try {
-      const engine = createLiquidEngine({ locale: { ...locale, "action.back": "Back" } });
+      const engine = createLiquidEngine({
+        locale: { ...locale, "action.back": "Back", "identifier.description": "Email" },
+      });
       // Raw-key miss: warns on first render only.
       engine.parseAndRenderSync("{{ key | t }}", { key: "unknown.key" });
       engine.parseAndRenderSync("{{ key | t }}", { key: "unknown.key" });
@@ -62,6 +65,7 @@ describe("LiquidJS engine", () => {
       // Served by the injected-key and field-label fallbacks: no warning.
       engine.parseAndRenderSync("{{ key | t }}", { key: "custom-step.action.back" });
       engine.parseAndRenderSync("{{ key | t }}", { key: "register.field.givenName" });
+      engine.parseAndRenderSync("{{ key | t }}", { key: "identifier.description.sso" });
       // Undefined text_key stringifies to "": no warning.
       engine.parseAndRenderSync("{{ key | t }}", { key: undefined });
       expect(warn).toHaveBeenCalledTimes(1);
@@ -93,6 +97,41 @@ describe("LiquidJS engine", () => {
     const result = engine.parseAndRenderSync("{{ key | t }}", { key: "custom.action.back" });
     expect(result).toBe("custom.action.back");
   });
+
+  it("the | t filter falls back from a step's SSO description to its plain one", () => {
+    // The engine asks for `<step>.description.sso` once the step offers providers
+    // (flow_state_machine.go buildStep); only some steps need their own wording.
+    const engine = createLiquidEngine({ locale: { ...locale, "identifier.description": "Email" } });
+    const result = engine.parseAndRenderSync("{{ key | t }}", {
+      key: "identifier.description.sso",
+    });
+    expect(result).toBe("Email");
+  });
+
+  it("a step's own SSO description wins over its plain one", () => {
+    const engine = createLiquidEngine({
+      locale: {
+        ...locale,
+        "password.description": "Password",
+        "password.description.sso": "Password or provider",
+      },
+    });
+    const result = engine.parseAndRenderSync("{{ key | t }}", { key: "password.description.sso" });
+    expect(result).toBe("Password or provider");
+  });
+
+  it("an SSO description with no plain one shows the plain key, which is the one to add", () => {
+    const engine = createLiquidEngine({ locale });
+    const result = engine.parseAndRenderSync("{{ key | t }}", { key: "custom.description.sso" });
+    expect(result).toBe("custom.description");
+  });
+
+  it.each(Object.entries(builtinLocales))(
+    "the builtin %s password step has its own wording when it offers providers",
+    (_lang, dictionary) => {
+      expect(dictionary["password.description.sso"]).not.toBe(dictionary["password.description"]);
+    },
+  );
 
   it("the builtin locales ship the generic action.back", () => {
     expect(fullLocale["action.back"]).toBe("Back");

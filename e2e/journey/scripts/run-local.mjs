@@ -18,7 +18,7 @@ import {
 } from "./local-registry.mjs";
 import { canListen, createJourneyPortAllocator } from "./ports.mjs";
 import {
-  assertPrebuiltTarballsOnGitHub,
+  assertPrebuiltTarballs,
   journeyArgsFromEnv,
   parseLocalJourneyArgs,
 } from "./run-options.mjs";
@@ -164,7 +164,7 @@ function parseArgsOrExit(args) {
   try {
     const parsed = parseLocalJourneyArgs(args);
     if (!parsed.help) {
-      assertPrebuiltTarballsOnGitHub(parsed, process.env);
+      assertPrebuiltTarballs(parsed, process.env);
     }
     return parsed;
   } catch (error) {
@@ -204,10 +204,12 @@ Options:
 
 Environment (the command line's arguments win):
   JOURNEY_CI=1             --ci
+  JOURNEY_CONCURRENCY      --concurrency
   JOURNEY_MATRIX           --matrix
   JOURNEY_RUNTIME          --runtime
   JOURNEY_TARBALLS_DIR     --tarballs-dir
   JOURNEY_WORK_DIR         --work-dir
+  JOURNEY_TARBALLS_REQUIRED=1  refuse to pack without --tarballs-dir
 `);
 }
 

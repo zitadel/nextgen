@@ -82,11 +82,15 @@ Useful environment overrides:
 - `JOURNEY_ZITADEL_PORT` for single-framework runs only
 - `JOURNEY_EDGE_PORT` for single-framework `--remote` runs only
 - `JOURNEY_TARBALLS_DIR` to use prebuilt release npm tarballs
-- `JOURNEY_CI=1`, `JOURNEY_MATRIX`, `JOURNEY_RUNTIME` and `JOURNEY_WORK_DIR`
-  for `--ci`, `--matrix`, `--runtime` and `--work-dir`. Arguments on the
-  command line win. CI's turbo job sets these: turbo puts arguments after `--`
-  into every task's cache key, so the journey's dependencies would rebuild
-  instead of coming from the cache.
+- `JOURNEY_TARBALLS_REQUIRED=1` to refuse to pack without them. The
+  `e2e:journey-local` lane sets it: the e2e lanes beside it read the dist
+  folders a pack wipes and rebuilds.
+- `JOURNEY_CI=1`, `JOURNEY_CONCURRENCY`, `JOURNEY_MATRIX`, `JOURNEY_RUNTIME`
+  and `JOURNEY_WORK_DIR` for `--ci`, `--concurrency`, `--matrix`, `--runtime`
+  and `--work-dir`. Arguments on the command line win. CI's turbo job sets
+  these: turbo puts arguments after `--` into every task's cache key, so the
+  journey's dependencies would rebuild instead of coming from the cache. They
+  are also how ci.yml reaches `e2e:journey-local`, whose command moon fixes.
 - `JOURNEY_ENABLE_PASSKEY=0` as a local-only escape hatch while debugging
   passkey setup. CI must run passkey coverage — the `passkey-first` preset
   lane, which is the only shipped preset whose flow offers a passkey.

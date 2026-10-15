@@ -278,12 +278,16 @@ dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
   `JOURNEY_TARBALLS_DIR`, whenever the journey can run. The journey must not
   pack inside the e2e step (a nested moon graph is forbidden), so in GitHub
   Actions it refuses to run without the snapshot. The journey's Verdaccio
-  storage comes back from the Actions cache.
+  storage comes back from the Actions cache, and goes back only when the
+  journey fetched new tarballs into it or refreshed packuments a later run can
+  still use.
 - `moon exec e2e:all --ignore-ci-checks` — the e2e suite, in a step of its own
   so its browsers and dev servers do not compete with the unit suites. Its
   lanes are `runInCI: "skip"`, which keeps them out of the `moon ci` graph.
   `e2e:all` runs every e2e lane as its dependencies: console, demo, the journey
-  (with ci-mode's framework matrix), and `testing:test-integration`.
+  (with ci-mode's framework matrix), and `testing:test-integration`. They run
+  side by side; only the two demo-next lanes, which serve the same app on one
+  port, wait for each other.
 
 Within full mode the `moon ci` graph selects only the tasks the diff affects
 (`--downstream deep --include-relations`): a lane is skipped when the diff
@@ -422,12 +426,25 @@ moon run e2e:demo-nuxt-mock
 ### Docs site suite
 
 The docs site's contract suite runs against a URL: the local build by default
-(Playwright serves it on port 3003), or a deployment of the hosted cloud named
-by `DOCS_BASE_URL` (see [the cloud runbook](docs/runbooks/cloud.md#deployment-checks)):
+(Playwright serves it on port 3003), or a deployment of the hosted cloud, below:
 
 ```sh
 corepack pnpm --filter @zitadel/docs exec playwright install chromium
 moon run docs:e2e
+```
+
+### Cloud deployment checks
+
+`pnpm check:cloud` runs every deployment suite, today the docs' and the
+console's, against the deployment of the hosted cloud that `CLOUD_URL` names:
+the checks CI runs for every deployment, and it reports every suite even when
+one fails. The production domain needs nothing else; any other deployment URL
+needs `VERCEL_AUTOMATION_BYPASS_SECRET`
+(see [the cloud runbook](docs/runbooks/cloud.md#checking-a-deployment-by-hand)):
+
+```sh
+corepack pnpm --filter @zitadel/e2e exec playwright install chromium
+CLOUD_URL=https://preview.zitadel.com pnpm check:cloud
 ```
 
 ### Fresh-app journey

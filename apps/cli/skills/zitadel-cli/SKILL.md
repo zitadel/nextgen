@@ -198,16 +198,42 @@ Ask about:
 
 - **Sign-in methods** — password (the usual default), passkeys, and single
   sign-on. If they want SSO, which providers? A provider the CLI does not list
-  by name is still possible: run `zitadel sso enable --help` to see whether the
-  installed CLI takes one, and which settings it needs, and ask for those too.
-- **Profile fields** — the user schema starts with first name, last name, and
-  the login identifier plus a password. Which additional fields do they want
-  (for example phone, username, or a display name)?
+  by name is still possible: run `zitadel auth-method sso enable --help` to see
+  whether the installed CLI takes one, and which settings it needs, and ask for
+  those too.
+- **Profile fields** — which attributes sign-up collects. The starting field
+  set depends on the use-case you pick (see *Presets and use-cases* below) —
+  the default (`minimal`) is the login identifier only, **not** names. Confirm
+  which fields they want (first/last name, phone, username, display name) and
+  choose the use-case or edit the schema accordingly.
 
 Offer only what the installed CLI actually supports: read the real sign-in
 presets, profile fields, and SSO options from the CLI first (`setup --help`,
 `resources --json`) and present those, not a list you remember — the options
 move with the CLI version.
+
+## Presets and use-cases — map the answers, don't trust the names
+
+`setup` has two independent axes, and their names do **not** mean what they look
+like. Read the current sets from `setup --help`, but know the traps:
+
+- **Use-case = which profile fields the schema collects.** `minimal` is the
+  login identifier **only** — it does *not* include names. First + last name is
+  `--use-case consumer` (adds `givenName` + `familyName`); add a company with
+  `--use-case business`. Choosing `minimal` because the developer said "keep it
+  minimal" leaves an identifier-only schema that ignores the names they asked
+  for.
+- **Preset = how they sign in (the login flow + auth methods).**
+  `password-first` makes password the primary step **but still leaves passkeys
+  enabled**; `passkey-first` leads with a passkey. Neither one gives you
+  password-only. If the developer does not want passkeys, turn them off
+  yourself: set `x-auth-methods.passkey.enabled` to `false` in
+  `.zitadel/schemas/*.json`, then `apply`.
+
+Translate the developer's answers into the right axis values, then **verify
+against what actually deployed**: read the live schema back
+(`schemas get <objectType> --json`) and confirm the fields and auth methods
+match what they asked for — don't assume a preset name did it.
 
 Skip the questions and proceed with the defaults above — stating the assumptions
 you made so the user can correct them — in exactly two cases: the user already
@@ -289,6 +315,41 @@ After `setup`, follow `data.next_commands` to start the app. Prove the generated
 auth flow in a visible browser by registering a unique user, logging out, logging
 back in with the same email/password, and ending on the signed-in profile page.
 Do not treat a rendered login or registration form as completion.
+
+To change how users sign in after setup, use the `auth-method` commands. Each
+sign-in method has its own command, with `--schema` when the project has more
+than one:
+
+- `auth-method password enable` and `auth-method password disable`
+- `auth-method passkey enable` and `auth-method passkey disable`
+- `auth-method sso enable --provider google` adds a provider. It prompts for
+  the client id and secret, or takes `--client-id` with the secret piped on
+  stdin when non-interactive. Any other OpenID Connect provider is
+  `--provider custom` with `--slug`, `--display-name`, `--issuer` and optionally
+  `--scopes` (default `openid profile email`).
+  `auth-method sso disable --provider google` removes a provider; a custom one
+  is named by its slug, as in `auth-method sso disable --provider acme-sso`.
+
+The commands change only local files, apart from
+`auth-method sso enable`, which also stores the provider's credentials on the
+project. When they refuse, they write and publish nothing, on a dry run too.
+They refuse to disable a method a login flow still asks for, to change a method
+while a login flow has errors that prevent checking it, to enable password on a
+schema without `x-identifier`, to edit a value that is not the shape they edit,
+and to edit a schema that points at an external URL. Disabling the schema's last
+way to sign in needs `--force` when non-interactive; only pass it for a schema
+whose users are managed through the API, and ask the user first. That refusal's
+`details.suggested_args` lists the `--force` re-run first, then the methods that
+could be enabled instead. A dry run of the change is not refused: it previews it
+and warns that no way to sign in would be left. A method that is enabled but not
+offered by any active flow is reported in `warnings` (and in `data.not_offered`
+for password and passkey). Every command reports `data.changed`, the
+project-relative files it wrote (on a dry run, the files it would write), empty
+when nothing changed. Follow `data.next_commands` (`plan`, `apply`, and
+`variables set` when a credential did not reach the project) to publish the
+change. When a path or schema name would need shell quoting, `next_commands` is
+empty and `data.next_args` (or `details.suggested_args` on a refusal) holds the
+same commands as argument lists.
 
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
 then re-run `plan` and `apply`. See the reference below for driving the login UI
