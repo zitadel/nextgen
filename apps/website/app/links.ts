@@ -14,6 +14,7 @@ export const links = {
   storybook: "/storybook/",
   github: "https://github.com/zitadel/nextgen",
   vision: "https://github.com/zitadel/nextgen/blob/main/VISION.md",
-  // Zitadel as it ships today, for production.
+  // Zitadel as it ships today, for production, and its people.
   zitadel: "https://zitadel.com",
+  contact: "https://zitadel.com/contact",
 } as const;

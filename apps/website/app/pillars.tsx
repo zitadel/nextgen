@@ -1,98 +1,55 @@
 import { links } from "./links";
 import { ArrowLink, SectionHeading } from "./section";
 
-type Status = "shipped" | "planned";
-
 type Pillar = {
   name: string;
   title: string;
-  summary: string;
-  items: { status: Status; text: string }[];
-  link: { href: string; text: string };
+  items: { text: string; planned?: boolean }[];
 };
 
-// The four pillars of VISION.md, each with what its "Where it stands" section
-// says ships in this preview and what is still planned. When that section
-// changes, change these with it.
+// The four pillars of VISION.md, each titled by what it gives the reader, as
+// zitadel/new-website's narrative words them, with what its "Where it stands"
+// section says ships in this preview and, marked, what is still planned. When
+// that section changes, change these with it.
 const pillars: Pillar[] = [
   {
     name: "Build",
-    title: "Auth you own",
-    summary: "Registration and login in your app, under your brand. The server holds every secret.",
+    title: "Build with your coding agent",
     items: [
-      { status: "shipped", text: "The CLI takes an empty folder to working local auth" },
-      {
-        status: "shipped",
-        text: "SDKs for Next.js, Nuxt, React, Vue, Angular, Svelte, Solid and Qwik",
-      },
-      { status: "shipped", text: "Sign-in components to embed, theme and eject" },
-      { status: "shipped", text: "Create first, claim later, with zitadel claim" },
+      { text: "The CLI sets up auth unattended and answers in JSON" },
+      { text: "Skills for Claude Code, Cursor, Copilot, Codex and more" },
+      { text: "Docs as llms.txt, Markdown and an MCP server" },
     ],
-    link: { href: links.quickstart, text: "Quickstart" },
   },
   {
     name: "Operate",
-    title: "One contract, every surface",
-    summary: "Everything Zitadel can do is defined once and reachable everywhere.",
+    title: "Run it as code",
     items: [
-      { status: "shipped", text: "OpenAPI 3.1 as the contract of record" },
-      { status: "shipped", text: "Configuration as code, with plan and apply" },
-      { status: "shipped", text: "Every CLI command answers in JSON, for scripts and agents" },
-      { status: "planned", text: "Management operations over MCP" },
+      { text: "Schemas, flows and branding as files, with plan and apply" },
+      { text: "One OpenAPI contract behind the API, the CLI and the console" },
+      { text: "Management operations over MCP", planned: true },
     ],
-    link: { href: links.planApply, text: "Plan and apply" },
   },
   {
     name: "Investigate",
-    title: "Events answer questions",
-    summary: "Identity activity as a dataset, not a log file.",
+    title: "Know what happened",
     items: [
-      {
-        status: "shipped",
-        text: "An audit trail of request, auth, session, admin and entity events",
-      },
-      { status: "planned", text: "One identity-scoped event stream for everything that happens" },
-      { status: "planned", text: "Query surfaces your agents can investigate with" },
+      { text: "An audit trail of request, auth, session, admin and entity events" },
+      { text: "One identity-scoped event stream your agents can query", planned: true },
     ],
-    link: { href: links.eventsApi, text: "Events API" },
   },
   {
     name: "Govern",
-    title: "Accountable agents",
-    summary:
-      "Agents get identities of their own, and every action on someone's behalf is accounted for.",
+    title: "Give agents their own identity",
     items: [
-      { status: "planned", text: "Agents as principals that sign in as themselves" },
+      { text: "Agents as principals that sign in as themselves", planned: true },
       {
-        status: "planned",
         text: "Delegation chains: which user granted which scope to which agent",
+        planned: true,
       },
-      { status: "planned", text: "Built on token exchange, actor claims and MCP authorization" },
     ],
-    link: { href: links.vision, text: "Read the vision" },
   },
 ];
-
-const STATUS: Record<Status, { label: string; badge: string; dot: string }> = {
-  shipped: { label: "Shipped", badge: "bg-success/15 text-success", dot: "bg-success" },
-  planned: {
-    label: "Planned",
-    badge: "bg-surface-black-secondary text-text-secondary",
-    dot: "bg-text-muted",
-  },
-};
-
-function StatusBadge({ status }: { status: Status }) {
-  const { label, badge, dot } = STATUS[status];
-  return (
-    <span
-      className={`inline-flex w-fit items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-0.5 font-semibold text-xs leading-5 ${badge}`}
-    >
-      <span aria-hidden="true" className={`size-1.5 rounded-full ${dot}`} />
-      {label}
-    </span>
-  );
-}
 
 export function Pillars() {
   return (
@@ -103,44 +60,37 @@ export function Pillars() {
           label="Where it stands"
           title="What works today, and what comes next"
         >
-          Each capability builds on the one before it. Every card says what you can use in the
-          preview today and what is still planned.
+          Everything above ships in the preview. Here is where the rest of the platform stands.
         </SectionHeading>
-        <ol className="grid gap-4 md:grid-cols-2">
-          {pillars.map((pillar, index) => (
+        <ol className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {pillars.map((pillar) => (
             <li
               key={pillar.name}
-              className="flex flex-col gap-6 rounded-2xl border border-border-primary bg-linear-to-b from-surface-black-secondary/40 to-background p-6 md:p-8"
+              className="flex flex-col gap-4 rounded-2xl border border-border-primary bg-linear-to-b from-surface-black-secondary/40 to-background p-6"
             >
-              <div className="flex flex-col gap-2">
-                <p className="font-semibold text-sm text-text-accent">
-                  {String(index + 1).padStart(2, "0")} · {pillar.name}
-                </p>
-                <h3 className="font-heading text-2xl leading-8 tracking-[-0.02em]">
-                  {pillar.title}
-                </h3>
-                <p className="text-text-secondary">{pillar.summary}</p>
-              </div>
+              <h3 className="font-heading text-xl leading-7 tracking-[-0.01em]">{pillar.title}</h3>
               <ul
-                aria-label={`Where ${pillar.name} stands`}
-                className="flex grow flex-col gap-3 border-border-primary border-t pt-6"
+                aria-label={`${pillar.name}: what ships and what is planned`}
+                className="flex flex-col gap-2.5"
               >
                 {pillar.items.map((item) => (
-                  <li
-                    key={item.text}
-                    className="grid grid-cols-[5.5rem_1fr] items-start gap-3 text-sm leading-6"
-                  >
-                    <StatusBadge status={item.status} />
-                    <span>{item.text}</span>
+                  <li key={item.text} className="text-sm text-text-secondary leading-5">
+                    {item.text}
+                    {item.planned && (
+                      <span className="ml-2 inline-flex items-center gap-1.5 whitespace-nowrap rounded-md bg-surface-black-secondary px-2 py-0.5 align-[0.0625rem] font-semibold text-text-secondary text-xs leading-4">
+                        <span aria-hidden="true" className="size-1.5 rounded-full bg-text-muted" />
+                        Planned
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>
-              <p className="text-sm">
-                <ArrowLink href={pillar.link.href}>{pillar.link.text}</ArrowLink>
-              </p>
             </li>
           ))}
         </ol>
+        <p className="text-sm">
+          <ArrowLink href={links.vision}>Read the vision</ArrowLink>
+        </p>
       </div>
     </section>
   );

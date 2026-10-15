@@ -11,7 +11,9 @@ declare module "react" {
   namespace JSX {
     interface IntrinsicElements {
       "zl-card": Atom<Pick<ZlCard, "compact">>;
-      "zl-field": Atom<Pick<ZlField, "label" | "type" | "placeholder" | "autocomplete">>;
+      "zl-field": Atom<
+        Pick<ZlField, "label" | "type" | "placeholder" | "autocomplete" | "required">
+      >;
       "zl-button": Atom<Pick<ZlButton, "hierarchy" | "size" | "type" | "label" | "block">>;
     }
   }

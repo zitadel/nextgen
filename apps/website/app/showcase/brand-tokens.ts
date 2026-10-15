@@ -1,7 +1,8 @@
-// The brand playground (brand-playground.tsx): the few --zl-* custom
-// properties an app sets on <zitadel-login> to brand it, as the docs'
-// "Customize the design" page has it, and the base layer the atoms read under
-// them.
+import type { FileLine } from "./types";
+
+// The brand playground (brand-row.tsx): the few --zl-* custom properties an
+// app sets on <zitadel-login> to brand it, as the docs' "Customize the design"
+// page has it, and the base layer the atoms read under them.
 
 export type Corners = "sharp" | "soft" | "round";
 export type Headings = "sans" | "serif" | "mono";
@@ -49,10 +50,12 @@ export const HEADINGS: Record<Headings, { label: string; css: string; painted?: 
   mono: { label: "Mono", css: "ui-monospace, SFMono-Regular, Menlo, monospace" },
 };
 
+// Zitadel's orange with the corners and heading face the recorded session set,
+// so the card shows a change before the visitor makes one.
 export const DEFAULT_CHOICE: BrandChoice = {
   color: COLORS[0].value,
-  corners: "soft",
-  headings: "sans",
+  corners: "sharp",
+  headings: "serif",
 };
 
 const channel = (value: number) => {
@@ -94,6 +97,13 @@ export function brandStylesheet(choice: BrandChoice): string {
   return ["zitadel-login {", ...declarations, "}"].join("\n");
 }
 
+/** The rule as the editor card's lines, every one of them added. */
+export function brandLines(choice: BrandChoice): FileLine[] {
+  return brandStylesheet(choice)
+    .split("\n")
+    .map((text) => ({ type: "added", text }));
+}
+
 /** The same properties as this page paints them. */
 export function paintedProperties(choice: BrandChoice): Record<string, string> {
   return Object.fromEntries(
@@ -125,7 +135,12 @@ export function baseProperties(tokens: TokenTree, cssVars: TokenTree): Record<st
     }
   };
   walk(tokens, cssVars);
-  // The body face too: Arimo, under next/font's name.
-  properties["--zl-font-family-sans"] = "var(--font-arimo), system-ui, sans-serif";
+  // The faces as an app's login shows them: Arimo, here under next/font's
+  // name. The heading token names APK Futural first, a licensed face that
+  // Zitadel's own sites load and an app does not (ADR 025), so an app's
+  // headings fall back to Arimo too.
+  const arimo = "var(--font-arimo), system-ui, sans-serif";
+  properties["--zl-font-family-sans"] = arimo;
+  properties["--zl-font-family-heading"] = arimo;
   return properties;
 }

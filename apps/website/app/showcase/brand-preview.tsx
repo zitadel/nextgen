@@ -2,21 +2,22 @@
 
 import { type CSSProperties, useEffect, useRef, useState } from "react";
 import styles from "./brand-preview.module.css";
+import { Logo } from "../logo";
 import { type BrandChoice, baseProperties, paintedProperties } from "./brand-tokens";
-import { Logo } from "./logo";
 
 // How far below the viewport the preview may still be when the atoms start
 // loading, so they are there by the time it scrolls in.
 const LOAD_MARGIN = "600px";
 
 /**
- * The first step of the default login, sign-in by email, built from the atoms
- * of @zitadel/components, the product's own UI code, under the --zl-*
- * properties the visitor's choices set. The atoms load once the preview nears
- * the viewport; until then, and if they cannot load, it says so instead.
+ * The sign-in step of the login as the flow row leaves it, email and password
+ * on one screen, built from the atoms of @zitadel/components, the product's
+ * own UI code, under the --zl-* properties the visitor's choices set; without
+ * a choice, in the design system's own look. The atoms load once the preview
+ * nears the viewport; until then, and if they cannot load, it says so instead.
  * Nothing submits: there is no server behind it.
  */
-export function BrandPreview({ choice }: { choice: BrandChoice }) {
+export function BrandPreview({ choice }: { choice?: BrandChoice }) {
   const [base, setBase] = useState<Record<string, string>>();
   const [failed, setFailed] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -60,14 +61,15 @@ export function BrandPreview({ choice }: { choice: BrandChoice }) {
     };
   }, []);
 
-  const style = base && ({ ...base, ...paintedProperties(choice) } as CSSProperties);
+  const style = base && ({ ...base, ...(choice && paintedProperties(choice)) } as CSSProperties);
 
   return (
     <div ref={root} className={styles.preview} style={style}>
       {base ? (
         <div className={styles.stack}>
           {/* The identifier step as the default template renders it, in its
-              English copy (packages/components/src/orchestrator). */}
+              English copy (packages/components/src/orchestrator), with the
+              password field the flow row adds to it. */}
           <zl-card>
             <h3 slot="header" className="zl-card-title">
               Sign in
@@ -81,17 +83,12 @@ export function BrandPreview({ choice }: { choice: BrandChoice }) {
                 type="email"
                 placeholder="you@example.com"
                 autocomplete="off"
+                required
               />
+              <zl-field label="Password" type="password" autocomplete="off" required />
             </div>
             <div className="zl-card-actions">
               <zl-button hierarchy="primary" size="medium" type="button" label="Continue" block />
-              <zl-button
-                hierarchy="secondary"
-                size="medium"
-                type="button"
-                label="Sign in with a passkey"
-                block
-              />
               <p className="zl-card-nav">
                 Don&apos;t have an account?{" "}
                 <button type="button" className="zl-card-nav__link">

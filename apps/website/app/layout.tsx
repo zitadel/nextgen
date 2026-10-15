@@ -34,9 +34,9 @@ const apkFutural = localFont({
   display: "swap",
 });
 
-const title = "Zitadel — the next generation, in developer preview";
+const title = "Zitadel preview — a login experience you control, in one minute";
 const description =
-  "Registration and login live in your app, under your brand, while Zitadel guards the credentials, sessions and tokens underneath. Built for developers and the AI agents beside them.";
+  "The open-source identity platform for users, services, and AI agents, built for developers and the agents they work with. Your user model, your login flow, and your styling are files in your repo.";
 
 // The share image is the website's own (zitadel/new-website's
 // public/cms/og-zitadel-homepage.jpg), imported so it loads from /_next/

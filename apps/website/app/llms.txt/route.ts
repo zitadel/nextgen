@@ -1,4 +1,4 @@
-import { commands } from "../commands";
+import { commands, skillsCommand } from "../commands";
 
 // The host's llms.txt (llmstxt.org): what the preview is and where an agent
 // reads on. The docs keep the index of their own pages at /docs/llms.txt.
@@ -6,15 +6,15 @@ import { commands } from "../commands";
 // vercel.json (AGENTS.md).
 const body = `# Zitadel (developer preview)
 
-> The next generation of Zitadel, built for developers and the AI agents beside them: registration and login live in your app, under your brand, while Zitadel guards the credentials, sessions and tokens underneath. Pre-release: APIs, CLI flags and packages still change.
+> A login experience you control, in one minute. Zitadel is the open-source identity platform for users, services, and AI agents, built for developers and the agents they work with. One terminal session gives an app a local Zitadel with login, registration, and profile pages; the user model, the login flow, and the styling are files in the app's repo. This is the preview of the next Zitadel: APIs, CLI flags and packages still change.
 
-Run it locally with the published CLI. Every command takes \`--non-interactive --json\` and prints one JSON envelope on stdout:
+Run it locally with the published CLI (Node.js 24 or newer). Every Zitadel command takes \`--non-interactive --json\` and prints one JSON envelope on stdout:
 
 \`\`\`sh
 ${commands.join("\n")}
 \`\`\`
 
-Install the Zitadel skills into a skills-compatible agent: \`npx skills add zitadel/nextgen --full-depth\`.
+Install the Zitadel skills into a skills-compatible agent: \`${skillsCommand}\`.
 
 ## Docs
 

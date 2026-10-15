@@ -23,14 +23,23 @@
   --font-mono: var(--font-azeret-mono), ui-monospace, monospace;
 }
 
-/* How the stage and the hero's text under it move in. */
+/* How the hero's animation and its text move in. */
 :root {
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* The centerpiece of the hero (page.tsx): the website's hero animation, its
-   own light spilling around it, leaning toward the pointer (stage.tsx sets
-   --tilt-x and --tilt-y, from -0.5 to 0.5). */
+/* The terminal of the showcase scrolls without showing a scrollbar. */
+@utility scrollbar-hidden {
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* The hero (page.tsx): the headline, the copy and the commands beside the
+   website's hero animation, its own light spilling around it, leaning toward
+   the pointer (stage.tsx sets --tilt-x and --tilt-y, from -0.5 to 0.5). */
 @layer components {
   .stage {
     --tilt-x: 0;
@@ -38,11 +47,9 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    /* As wide as the column, 36rem, and the height beside the header, the
-       caption, the lead, the commands and the buttons allow, so the hero
-       fits a laptop's screen, but never so small that the animation is lost:
-       a phone scrolls instead. */
-    width: min(100%, 36rem, max(15rem, calc((100dvh - 34rem) * 550 / 448)));
+    justify-self: center;
+    /* The column's width on wide screens; under the commands on a phone. */
+    width: min(100%, 34rem);
   }
 
   .stage-frame {
@@ -79,29 +86,20 @@
     translate: calc(var(--tilt-x) * -3rem) calc(var(--tilt-y) * -2rem);
   }
 
-  /* Tucked into the animation's faded bottom, lit by it from below. */
-  .stage-caption {
-    position: relative;
-    /* As wide as its lines, not the stage: each sentence on a line of its
-       own wherever the screen has room, centred under the animation. */
-    width: max-content;
-    max-width: calc(100vw - 3rem);
-    margin-top: -2.5rem;
+  /* The headline, lit from below by the animation's orange. */
+  .hero-title {
     font-family: var(--font-heading);
-    font-size: clamp(2.25rem, 6.5vw, 4.25rem);
+    font-size: clamp(2.5rem, 5vw, 4rem);
     line-height: 1.05;
     letter-spacing: -0.025em;
-    text-align: center;
     text-wrap: balance;
     background: linear-gradient(
       180deg,
-      var(--color-foreground) 35%,
-      var(--color-accent-strong) 150%
+      var(--color-foreground) 45%,
+      var(--color-accent-strong) 160%
     );
     background-clip: text;
     color: transparent;
-    translate: calc(var(--tilt-x) * 1rem) calc(var(--tilt-y) * 0.75rem);
-    transition: translate 900ms var(--ease);
   }
 
   @media (prefers-reduced-motion: no-preference) {
@@ -109,14 +107,8 @@
       animation: stage-in 1.6s var(--ease) both;
     }
 
-    .stage-caption {
-      animation: caption-in 1.6s var(--ease) 0.2s both;
-    }
-
-    /* The lead, the commands and the buttons under the caption (page.tsx),
-       once the words are in. */
-    .teaser {
-      animation: teaser-in 1.2s var(--ease) 0.7s both;
+    .hero-copy {
+      animation: copy-in 1.2s var(--ease) 0.15s both;
     }
   }
 
@@ -139,9 +131,7 @@
   }
 }
 
-/* The doors appear, then the words come into focus. The caption wraps, so it
-   does not gather its letters as a single line could: a line break moving
-   while they gather would shift everything below it. */
+/* The doors appear while the words rise into place. */
 @keyframes stage-in {
   from {
     opacity: 0;
@@ -149,14 +139,7 @@
   }
 }
 
-@keyframes caption-in {
-  from {
-    opacity: 0;
-    filter: blur(0.5rem);
-  }
-}
-
-@keyframes teaser-in {
+@keyframes copy-in {
   from {
     opacity: 0;
     translate: 0 0.75rem;

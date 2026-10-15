@@ -1,12 +1,24 @@
 # Agent Instructions — `apps/website`
 
-The hosted cloud's front page at `/`, the preview's front door: under a header
-to the docs, the storybook and GitHub, the promise of `VISION.md` around the new
-website's hero animation, the commands that run the preview locally today, and
-the buttons to the quickstart and the repository; below them the four pillars
-with what ships and what is planned, a brand playground built from
-`@zitadel/components`, and what the preview offers agents. Read together with
-the [root `AGENTS.md`](../../AGENTS.md) and [`apps/AGENTS.md`](../AGENTS.md).
+The hosted cloud's front page at `/`, the preview's front door. It tells the
+story of `zitadel/new-website`'s narrative redesign (the branch
+`claude/zitadel-narrative-redesign-377a49`, its `docs/narrative-ia-proposal.md`):
+the benefit first, then its proof, then the ways in, then the depth. Under a
+header to the docs, the storybook and GitHub:
+
+1. The hero: "A login experience you control, in one minute.", what one
+   terminal session gives an app, the commands to copy, the skills line for
+   coding agents, and the buttons to the quickstart and the repository, beside
+   the new website's hero animation. No small print and no line above the
+   headline: the header's Preview label frames the page.
+2. The showcase (`app/showcase/`), with no title of its own: four rows that
+   prove the headline, up in a minute, your fields, your flow, your brand.
+3. Three ways in (`app/doors.tsx`): the preview, Zitadel v4 for production, an
+   engineer to talk to.
+4. Where the rest stands (`app/pillars.tsx`).
+
+Read together with the [root `AGENTS.md`](../../AGENTS.md) and
+[`apps/AGENTS.md`](../AGENTS.md).
 
 It is the seed of the public website, so it follows `zitadel/new-website`'s
 `apps/website`: Next.js with the App Router and Tailwind 4, and that repo's
@@ -28,7 +40,7 @@ cannot parse, and a local build stalls when the network blips.
 
 - `Arimo-latin.woff2` is Arimo's variable font, every weight from 400 to 700,
   and `layout.tsx` declares it as such, as the docs do: the page sets text at
-  400 and 600, the playground's card title at 500.
+  400 and 600, the brand row's card title at 500.
   `AzeretMono-Medium-latin.woff2` is Azeret Mono at 500.
 - Each is the latin subset, byte for byte the file Google Fonts serves
   `next/font/google` (Arimo v36, Azeret Mono v21). A character outside it
@@ -56,7 +68,8 @@ no vectors, only 217 WebP frames (each asset's `p` is a base64 data URL), so it
 ships here as an animated AVIF: 49 KB instead of 907 KB, no player library, and
 the page's two copies of it, the animation and its blurred light, play in step.
 `app/hero-still.webp`, its first frame, stands in for reduced motion and for
-browsers without AVIF. From the extracted frames:
+browsers without AVIF. It stands beside the hero's text on wide screens and
+under it on a phone (`.stage` in `app/globals.css`). From the extracted frames:
 
 ```sh
 ffmpeg -framerate 30 -i %03d.webp -c:v libsvtav1 -crf 34 -preset 4 -pix_fmt yuv420p -f avif hero.avif
@@ -71,7 +84,7 @@ ships as inline SVG in the Lottie's own coordinates, its paths taken from the
 Lottie's shapes, and its motion as CSS keyframes in `app/globals.css` with the
 Lottie's timings and easings. As on the website it plays while the pointer is
 on it and returns to rest when the pointer leaves; here it also stays still
-for reduced motion. It sits in the header, the footer and the playground's
+for reduced motion. It sits in the header, the footer and the brand row's
 trustmark, so it never plays on its own, where nothing hovers, as the
 centrepiece of the coming-soon page did. Its `id` keeps each copy's SVG ids
 apart.
@@ -96,58 +109,84 @@ and uses `localhost`.
 
 ## The commands
 
-Under the caption and its lead, `app/page.tsx` shows the local preview as
-three commands of the published CLI (`@zitadel/cli@alpha`), with a button that
-copies them; `/llms.txt` hands the same ones to agents. Both take them from
-`app/commands.ts`. They follow the journey of the CLI's skill
-([`apps/cli/skills/zitadel-cli/SKILL.md`](../cli/skills/zitadel-cli/SKILL.md))
-and the docs' quickstart: a new folder, `start`, then `setup --server local`.
+The hero shows the local preview as the commands of the published CLI
+(`@zitadel/cli@alpha`) in a terminal window (`app/command-block.tsx`), with
+Node 24, the CLI's `engines` floor, in its title bar, one button that copies
+them all and one per line; `/llms.txt` hands the same ones to agents. Both take
+them from `app/commands.ts`, with the skills line under them. They follow the
+README's and the docs' quickstart, and the first row's recording: a new folder,
+`doctor`, `start`, `setup --framework next --server local`, `npm run dev`.
+`--framework` keeps setup from asking; `--server local` needs no account.
 Never `--force`: if `mkdir` fails because the folder exists, the next lines run
 in the current directory, where `--force` would replace files. When that
-journey changes, change the commands with it, and run them once against the
-published CLI before they ship.
-Their height is part of the stage's sizing in `app/globals.css`, which keeps
-the hero on a laptop's screen: a line more or less changes it.
+journey changes, change the commands, and the first row with them, and run
+them once against the published CLI before they ship.
 
-## The pillars
+## The showcase
 
-`app/pillars.tsx` lays out the four pillars of the root
-[`VISION.md`](../../VISION.md), each with its items marked Shipped or Planned
-as that file's "Where it stands" says. When that section changes, change the
-cards with it, and claim nothing it does not.
+`app/showcase/` holds the four rows under the hero, alternating sides along a
+spine on wide screens (`showcase.tsx`, `row-layout.tsx`). They are
+`zitadel/new-website`'s narrative rows, ported: the replaying terminal
+(`terminal-replay.tsx`), the editor card with the diff, the flow's steps and
+the commands that publish the change (`file-card.tsx`), and the browser frame
+with a Before / After switch (`browser-frame.tsx`).
 
-## The brand playground
+- Rows 1 to 3 are recorded (`sessions.ts`): the real output of a session run
+  with `script` on 5 October 2026 with @zitadel/cli 1.0.0-alpha.24, the
+  scratch path shortened to `myapp`, the one-time console link masked,
+  skipped lines marked as comments; the pictures are the scaffolded app's
+  pages at 520 px from the same session. Re-record rather than edit when the
+  CLI, the flow format or the login's look changes. `login-after-setup.jpg` is
+  also the third row's before-picture.
+- The first row's replay drives its picture; in rows 2 and 3 the frame's
+  switch does, and the third row's flow steps follow it.
+- No captions or dates on the rows: this is a marketing page, the provenance
+  lives here and in `sessions.ts`.
 
-`app/brand-playground.tsx` lets a visitor pick a brand colour, the corners and
-a heading face; `app/brand-preview.tsx` paints the result on the first step of
-the default login, sign-in by email, built from the atoms of
-`@zitadel/components` (`zl-card`, `zl-field`, `zl-button`) in their English
-copy, and the stylesheet beside it shows the rule an app would set on
-`<zitadel-login>`, as the docs' "Customize the design" page themes it.
+## The brand row
 
-- The atoms load, through a dynamic import, only once the preview nears the
+The fourth row is live (`brand-row.tsx`): the visitor picks a brand colour, the
+corners and a heading face in the editor card's strip; the card's lines show
+the rule an app would set on `<zitadel-login>`, as the docs' "Customize the
+design" page themes it, and `brand-preview.tsx` paints the result on the
+sign-in step as the flow row leaves it (email and password), built from the
+atoms of `@zitadel/components` (`zl-card`, `zl-field`, `zl-button`) in their
+English copy. Before shows the card without the rule.
+
+- The atoms load, through a dynamic import, only once the row nears the
   viewport. Nothing submits: there is no server behind them.
 - An atom reads the `--zl-*` properties from its ancestors, and on its own
-  brings none: `app/brand-tokens.ts` sets the base layer on the preview's
-  wrapper from the package's own `tokens` and `cssVars` (every token at its
-  dark value, under the name the generated stylesheet gives it), and the
-  visitor's choices over it.
+  brings none: `brand-tokens.ts` sets the base layer on the preview's wrapper
+  from the package's own `tokens` and `cssVars` (every token at its dark
+  value, under the name the generated stylesheet gives it), with the faces an
+  app's login shows (Arimo, not the licensed APK Futural the heading token
+  names first), and the visitor's choices over it.
 - The card's title, subtitle, field group, actions and register line are light
-  DOM, styled in `app/brand-preview.module.css` as the orchestrator's layout
-  chrome styles them
-  (`packages/components/src/orchestrator/templates/layout-chrome.css`). When
-  that chrome, the default template or its English copy changes, follow it.
+  DOM, styled in `brand-preview.module.css` as the orchestrator's layout chrome
+  styles them (`packages/components/src/orchestrator/templates/layout-chrome.css`).
+  When that chrome, the default template or its English copy changes, follow
+  it.
 - JSX for the atoms is in `app/zl-elements.d.ts`, typed from the atoms'
   classes; the package types only its orchestrators for React.
 - Next resolves the package to its `dist/`, so the website's build and dev
   tasks depend on `components:build` in moon and in turbo, and the Vercel
   service builds it through turbo before its own `pnpm run build` (Checks).
 
+## Three ways in and the pillars
+
+`app/doors.tsx` offers the next steps after the showcase, as the narrative's
+"Three ways in" does: build with the preview, ship on Zitadel v4 today, talk to
+an engineer. `app/pillars.tsx` closes the page with the four pillars of the
+root [`VISION.md`](../../VISION.md), titled by what each gives the reader, with
+what its "Where it stands" says ships and, marked, what is planned. When that
+section changes, change the cards with it, and claim nothing it does not.
+
 ## llms.txt
 
-`app/llms.txt/route.ts` serves the host's `/llms.txt`: what the preview is,
-the commands, the skills, and where an agent reads on, starting with the docs'
-own `/docs/llms.txt`. Its links are paths on the same host.
+`app/llms.txt/route.ts` serves the host's `/llms.txt`: the hero's claim and
+what the preview is, the commands, the skills, and where an agent reads on,
+starting with the docs' own `/docs/llms.txt`. Its links are paths on the same
+host.
 
 ## Routing
 
