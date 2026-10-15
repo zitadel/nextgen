@@ -37,6 +37,14 @@ const rawBodyFlags = {
 };
 
 /**
+ * The `--file` example's file name, the singular as one shell word:
+ * `./identity-provider-connection.json`, where the singular itself would be
+ * split by a shell into three arguments.
+ */
+const exampleFile = (singular: string): string =>
+  `./${singular.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-")}.json`;
+
+/**
  * `<topic> create` and `<topic> update <id>` share everything but the id
  * argument. The body comes from one flag per schema field, from `--data` /
  * `--file`, or from both — a field flag overrides the same key in the raw
@@ -50,18 +58,16 @@ const describeWrite = <Ctx, Spec extends { readonly schema: CreateSpec<Ctx>["sch
 ): OperationStatics => {
   const fields = describeBody(spec.schema);
   const example = needsRawBody(spec.schema) ? undefined : fieldExample(fields);
-  const target = verb === "create" ? topic : `${topic} update <id>`;
+  const command = `<%= config.bin %> ${topic} ${verb}${verb === "update" ? " <id>" : ""}`;
   return {
     description:
       verb === "create"
         ? `Create ${article(resource.singular)} ${resource.singular}.`
         : `Update ${article(resource.singular)} ${resource.singular} by id.`,
     examples: [
-      ...(example
-        ? [`<%= config.bin %> ${target.replace(topic, `${topic} ${verb}`)} ${example} --json`]
-        : []),
-      `<%= config.bin %> ${topic} ${verb}${verb === "update" ? " <id>" : ""} --data '{...}' --json`,
-      `<%= config.bin %> ${topic} ${verb}${verb === "update" ? " <id>" : ""} --file ./${resource.singular}.json`,
+      ...(example ? [`${command} ${example} --json`] : []),
+      `${command} --data '{...}' --json`,
+      `${command} --file ${exampleFile(resource.singular)}`,
     ],
     flags: { ...bodyFieldFlags(fields), ...rawBodyFlags, ...options.flags },
     args: verb === "create" ? {} : idArg(resource),

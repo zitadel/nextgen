@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
+  article,
   capitalize,
   dryRunResult,
   idArg,
@@ -71,6 +72,19 @@ describe("idArg", () => {
     const args = idArg({ singular: "user", idField: "id", columns: [] });
     expect(args!.id!.required).toBe(true);
     expect(args!.id!.description).toBe("user id");
+  });
+});
+
+describe("article", () => {
+  it.each([
+    ["identity provider connection", "an"],
+    ["event", "an"],
+    ["team", "a"],
+    // Spelled with a vowel, said with a "yoo".
+    ["user", "a"],
+    ["unique id", "a"],
+  ])('%s takes "%s"', (phrase, expected) => {
+    expect(article(phrase)).toBe(expected);
   });
 });
 
