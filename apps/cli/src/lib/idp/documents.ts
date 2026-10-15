@@ -731,12 +731,23 @@ export function applySsoToFlow(
   const list = steps(document);
   const terminalIndex = list.findIndex((step) => step.name === terminal);
   const insertAt = terminalIndex === -1 ? list.length : terminalIndex;
-  const wanted: Step[] = [
-    registerSsoStep(registrationFields(document), terminal),
-    ssoConflictStep(slug, enabled, loginEntry(document), terminal),
+  // Each step with every form the generator may have written it in before. The
+  // conflict step follows the methods enabled, so one written when passkey was
+  // off is still the generator's own output once passkey is on. `register-sso`
+  // and the password step do not depend on the methods, so they have one form.
+  const wanted: Array<{ step: Step; earlier: Step[] }> = [
+    { step: registerSsoStep(registrationFields(document), terminal), earlier: [] },
+    {
+      step: ssoConflictStep(slug, enabled, loginEntry(document), terminal),
+      earlier: [true, false].flatMap((password) =>
+        [true, false].map((passkey) =>
+          ssoConflictStep(slug, { password, passkey }, loginEntry(document), terminal),
+        ),
+      ),
+    },
   ];
   let offset = 0;
-  for (const step of wanted) {
+  for (const { step, earlier } of wanted) {
     const name = step.name as string;
     const existing = stepNamed(document, name);
     if (existing === undefined) {
@@ -758,10 +769,20 @@ export function applySsoToFlow(
     // as left alone while having already changed it -- the one thing the
     // report promises it did not do.
     const candidate = merged === undefined ? existing : { ...existing, sso_providers: merged };
-    if (!matches(candidate, expected)) {
-      skipped.push({ step: name, region: `steps.${name}`, reason: "hand-edited" });
-    } else if (merged !== undefined && addProvider(existing, slug)) {
+    if (matches(candidate, expected)) {
+      if (merged !== undefined && addProvider(existing, slug)) {
+        changed = true;
+      }
+    } else if (
+      merged !== undefined &&
+      earlier.some((form) => matches(candidate, { ...form, sso_providers: merged }))
+    ) {
+      // What the generator wrote for other methods: bring it up to today's, in
+      // the place it already has, keeping the providers it lists.
+      list[list.indexOf(existing)] = expected;
       changed = true;
+    } else {
+      skipped.push({ step: name, region: `steps.${name}`, reason: "hand-edited" });
     }
   }
   document.steps = list;
