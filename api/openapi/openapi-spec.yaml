@@ -112,6 +112,8 @@ paths:
     $ref: endpoints/users/query/methods.yaml
   /users/{user_id}:
     $ref: endpoints/users/by_id/methods.yaml
+  /users/{user_id}/identity_links:
+    $ref: endpoints/users/by_id/identity_links/methods.yaml
   /users/{user_id}/passkeys:
     $ref: endpoints/users/by_id/passkeys/methods.yaml
   /users/{user_id}/passkeys/registrations:

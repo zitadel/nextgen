@@ -210,6 +210,9 @@ func (s *stubQueryUsersService) ListUsers(_ context.Context, input service.ListU
 func (s *stubQueryUsersService) ListPasskeys(context.Context, service.ListPasskeysInput) ([]*domain.UserPasskey, string, error) {
 	return nil, "", errors.New("unexpected ListPasskeys")
 }
+func (s *stubQueryUsersService) ListIdentityLinks(context.Context, service.ListIdentityLinksInput) ([]*domain.IDPIdentityLink, string, error) {
+	return nil, "", errors.New("unexpected ListIdentityLinks")
+}
 func (s *stubQueryUsersService) ListUserTeams(context.Context, service.ListUserTeamsInput) (*service.ListUserTeamsOutput, error) {
 	return nil, errors.New("unexpected ListUserTeams")
 }
