@@ -1,3 +1,4 @@
+import { type ChildProcess, spawn } from "node:child_process";
 import { mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -13,8 +14,12 @@ import {
 import { LocalServer } from "../../../../src/lib/local-server/server";
 
 const dirs: string[] = [];
+const children: ChildProcess[] = [];
 
 afterEach(async () => {
+  for (const child of children.splice(0)) {
+    child.kill("SIGKILL");
+  }
   for (const dir of dirs.splice(0)) {
     await rm(dir, { recursive: true, force: true });
   }
@@ -30,13 +35,17 @@ const at = (cwd: string) => LocalServer.at(cwd, { cliVersion: "0.0.0-test" });
 
 /** A record whose process is long gone, in a directory that has data. */
 async function directoryWithAGoneServer(): Promise<string> {
+  return directoryRecording(2_147_483_000, "nextgen --migrate");
+}
+
+async function directoryRecording(pid: number, command: string): Promise<string> {
   const cwd = await directory();
   await mkdir(join(cwd, LOCAL_DATA_DIR), { recursive: true });
   const record: BinaryRuntimeMetadata = {
     schema_version: 1,
     backend: "binary",
-    pid: 2_147_483_000,
-    command: "nextgen --migrate",
+    pid,
+    command,
     log_path: join(cwd, "server.log"),
     server_package: "@zitadel/server",
     server_version: "1.0.0",
@@ -90,6 +99,54 @@ describe("LocalServer", () => {
       await expect(stat(join(cwd, LOCAL_DATA_DIR))).resolves.toBeDefined();
       await expect(stat(join(cwd, LOCAL_RUNTIME_FILE))).resolves.toBeDefined();
     });
+  });
+
+  describe("a recorded pid that now belongs to another program", () => {
+    const aliveProgram = (): ChildProcess => {
+      const child = spawn("sleep", ["60"], { stdio: "ignore" });
+      children.push(child);
+      return child;
+    };
+    const exists = (pid: number): boolean => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    it.skipIf(process.platform === "win32")("is not signalled by stop", async () => {
+      const child = aliveProgram();
+      const cwd = await directoryRecording(child.pid ?? 0, "/opt/zitadel/nextgen --migrate");
+
+      await expect(at(cwd).stop()).resolves.toMatchObject({
+        stopped: false,
+        outcome: { status: "stale" },
+      });
+      expect(exists(child.pid ?? 0)).toBe(true);
+    });
+
+    it.skipIf(process.platform === "win32")("is not reported as the running server", async () => {
+      const child = aliveProgram();
+      const cwd = await directoryRecording(child.pid ?? 0, "/opt/zitadel/nextgen --migrate");
+
+      await expect(at(cwd).status()).resolves.toMatchObject({
+        process: { running: false },
+      });
+    });
+
+    it.skipIf(process.platform === "win32")(
+      "is stopped when it is the recorded server",
+      async () => {
+        const child = aliveProgram();
+        const exited = new Promise((resolve) => child.once("exit", resolve));
+        const cwd = await directoryRecording(child.pid ?? 0, "/bin/sleep 60");
+
+        await expect(at(cwd).stop()).resolves.toMatchObject({ stopped: true });
+        await exited;
+      },
+    );
   });
 
   describe("reset", () => {

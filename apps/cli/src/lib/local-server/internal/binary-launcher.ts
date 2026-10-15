@@ -1,8 +1,8 @@
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { createReadStream } from "node:fs";
 import { mkdir, open, readFile, stat } from "node:fs/promises";
 import { createRequire } from "node:module";
-import { dirname } from "node:path";
+import { basename, dirname } from "node:path";
 
 import { resolveServerBinary, serverBinaryPath } from "@zitadel/server/binary";
 
@@ -112,12 +112,12 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     }
   }
 
-  async isAlive(record: BinaryRuntimeMetadata): Promise<boolean> {
-    return BinaryLauncher.isRunning(record.pid);
+  isAlive(record: BinaryRuntimeMetadata): Promise<boolean> {
+    return BinaryLauncher.isRecordRunning(record);
   }
 
   terminate(record: BinaryRuntimeMetadata): Promise<StopBinaryRuntimeResult> {
-    return BinaryLauncher.stopPid(record.pid);
+    return BinaryLauncher.stopRecord(record);
   }
 
   logTail(record: BinaryRuntimeMetadata, lines: number): Promise<string> {
@@ -186,6 +186,22 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
         details: { package: SERVER_NPM_PACKAGE, message: errorMessage(error) },
       });
     }
+  }
+
+  /**
+   * Whether the server a record names is alive. The pid must still belong to it:
+   * pids are reused, and after a reboot the recorded one can be any program.
+   */
+  static async isRecordRunning(record: BinaryRuntimeMetadata): Promise<boolean> {
+    return BinaryLauncher.isRunning(record.pid) && (await ownsProcess(record));
+  }
+
+  /** Stops the server a record names, and leaves alone a pid that has become something else. */
+  static async stopRecord(record: BinaryRuntimeMetadata): Promise<StopBinaryRuntimeResult> {
+    if (!(await ownsProcess(record))) {
+      return { pid: record.pid, status: "stale", target: "process" };
+    }
+    return BinaryLauncher.stopPid(record.pid);
   }
 
   /** Whether the process, or any process left in the group it led, is alive. */
@@ -280,6 +296,43 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
       process.once("SIGTERM", stop);
     });
   }
+}
+
+/**
+ * Whether the recorded pid still belongs to the server that was started: the
+ * process, or one left in the group it led, runs the same program. When the
+ * process list cannot be read (no `ps`, Windows) the pid is trusted, as it was
+ * before.
+ */
+async function ownsProcess(record: BinaryRuntimeMetadata): Promise<boolean> {
+  if (process.platform === "win32") {
+    return true;
+  }
+  const program = basename(record.command.split(" ")[0] ?? "");
+  if (program === "") {
+    return true;
+  }
+  let listing: string;
+  try {
+    listing = await new Promise<string>((resolve, reject) => {
+      execFile(
+        "ps",
+        ["-axo", "pid=,pgid=,command="],
+        { timeout: 3000, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 },
+        (error, stdout) => (error ? reject(error) : resolve(stdout)),
+      );
+    });
+  } catch {
+    return true;
+  }
+  return listing.split(/\r?\n/).some((line) => {
+    const match = line.trim().match(/^(\d+)\s+(\d+)\s+(.*)$/);
+    return (
+      match !== null &&
+      (Number(match[1]) === record.pid || Number(match[2]) === record.pid) &&
+      (match[3] ?? "").includes(program)
+    );
+  });
 }
 
 function resolveServerPackageManifest(): string {

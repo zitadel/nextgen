@@ -151,7 +151,7 @@ export class LocalServer {
           existing?.backend === "binary" &&
           version !== undefined &&
           existing.server_version !== version &&
-          BinaryLauncher.isRunning(existing.pid)
+          (await BinaryLauncher.isRecordRunning(existing))
         ) {
           consola.info(
             `Restarting the local Zitadel server on ${version}: it ran ${existing.server_version}. Its data stays.`,
@@ -182,7 +182,7 @@ export class LocalServer {
       }
       await assertDockerAvailable(this.cliVersion);
       if (existing?.backend === "binary") {
-        await BinaryLauncher.stopPid(existing.pid);
+        await BinaryLauncher.stopRecord(existing);
       }
       return await this.run<DockerRuntimeMetadata>(
         "docker",
@@ -215,7 +215,8 @@ export class LocalServer {
       }
     }
     const healthy = runtime ? await checkLocalServerHealth(runtime.server_url) : false;
-    const running = runtime?.backend === "binary" ? BinaryLauncher.isRunning(runtime.pid) : false;
+    const running =
+      runtime?.backend === "binary" ? await BinaryLauncher.isRecordRunning(runtime) : false;
     return {
       lifecycle: lifecycleOf({ runtime, healthy, running, container }),
       runtime,
@@ -273,7 +274,7 @@ export class LocalServer {
   private async halt(): Promise<StopReport> {
     const runtime = await readRuntimeMetadata(this.cwd);
     if (runtime?.backend === "binary") {
-      const outcome = await BinaryLauncher.stopPid(runtime.pid);
+      const outcome = await BinaryLauncher.stopRecord(runtime);
       if (outcome.status === "failed") {
         throw new ZitadelError("E_VALIDATION", "Local Zitadel server did not stop", {
           hint: "Inspect the local runtime process and stop it manually, then rerun the command.",
