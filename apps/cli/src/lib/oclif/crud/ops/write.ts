@@ -70,6 +70,14 @@ const fieldsOf = <Ctx>(
 ) => describeBody(spec.schema, { root: spec.root, reserved: Object.keys(options.flags ?? {}) });
 
 /**
+ * The `--file` example's file name, the singular as one shell word:
+ * `./identity-provider-connection.json`, where the singular itself would be
+ * split by a shell into three arguments.
+ */
+const exampleFile = (singular: string): string =>
+  `./${singular.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-")}.json`;
+
+/**
  * `<topic> create` and `<topic> update <id>` share everything but the id
  * argument. The body comes from a document (`--data` / `--file`), from one
  * flag per schema field, from `--set`, or from any mix of them. It is
@@ -87,16 +95,16 @@ const describeWrite = <
   const fields = fieldsOf(spec, options);
   const example =
     spec.example ?? (flagsAloneMayBeIncomplete(fields) ? undefined : fieldExample(fields));
-  const target = `${topic} ${verb}${verb === "update" ? " <id>" : ""}`;
+  const command = `<%= config.bin %> ${topic} ${verb}${verb === "update" ? " <id>" : ""}`;
   return {
     description:
       verb === "create"
         ? `Create ${article(resource.singular)} ${resource.singular}.`
         : `Update ${article(resource.singular)} ${resource.singular} by id.`,
     examples: [
-      ...(example ? [`<%= config.bin %> ${target} ${example} --json`] : []),
-      `<%= config.bin %> ${target} --data '{...}' --json`,
-      `<%= config.bin %> ${target} --file ./${resource.singular}.json`,
+      ...(example ? [`${command} ${example} --json`] : []),
+      `${command} --data '{...}' --json`,
+      `${command} --file ${exampleFile(resource.singular)}`,
     ],
     flags: { ...bodyFieldFlags(fields), ...rawBodyFlags, ...options.flags },
     args: verb === "create" ? {} : idArg(resource),
