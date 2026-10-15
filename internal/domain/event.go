@@ -99,6 +99,8 @@ const (
 	EventTypeVariableSet     EventType = "variable.set"
 	EventTypeVariableRemoved EventType = "variable.removed"
 
+	EventTypePreviewRemoved EventType = "preview.removed"
+
 	EventTypeAuthzGranted EventType = "authz.granted"
 	EventTypeAuthzRevoked EventType = "authz.revoked"
 

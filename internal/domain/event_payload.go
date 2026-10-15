@@ -34,6 +34,11 @@ type OriginPayload struct {
 	Kind    OriginKind `json:"kind"`
 }
 
+// PreviewPayload is the allowlisted body for preview.removed.
+type PreviewPayload struct {
+	Origin string `json:"origin"`
+}
+
 // ProjectCreatedPayload is an alias kept for call-site clarity.
 type ProjectCreatedPayload = ProjectPayload
 
