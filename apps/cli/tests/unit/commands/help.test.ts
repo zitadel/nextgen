@@ -23,6 +23,9 @@ Project commands
   claim:                        Claim this project to make it permanent
   doctor:                       Verify local runtime and project state
   eject:                        Remove managed files and local Zitadel state
+  env:                          Show which server and project resolve, and where each value came from
+  env list:                     List the environments bound in this directory's .env files
+  env add:                      Bind an environment to a project, creating the project if needed
 
 Local server commands
   start:                        Start a local Zitadel server

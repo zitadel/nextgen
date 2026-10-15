@@ -2,6 +2,7 @@ import { npmDistTagForCliVersion } from "../../../../public-cli";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
+import { PUBLIC_PROJECT_ID_VARIABLE } from "../public-project-id";
 import { assertMountsRootComponent, type RootMount, viteEntry } from "../root-component";
 import { type ViteSupport, buildViteProxyOp } from "../vite-support";
 import { appTemplate } from "./templates";
@@ -49,11 +50,15 @@ export class ReactPatcher extends AbstractRulePatcher implements ViteSupport {
       { kind: "write", path: ROOT.path, contents: appTemplate(ctx) },
       this.viteProxyOp(ctx.framework.devPort, ctx.server),
       // Vite only exposes VITE_-prefixed vars to client code (import.meta.env).
-      { kind: "merge-env", path: ".env.example", entries: { VITE_ZITADEL_PROJECT_ID: "" } },
+      {
+        kind: "merge-env",
+        path: ".env.example",
+        entries: { [PUBLIC_PROJECT_ID_VARIABLE.react]: "" },
+      },
       {
         kind: "merge-env",
         path: ".env.local",
-        entries: { VITE_ZITADEL_PROJECT_ID: ctx.project.id },
+        entries: { [PUBLIC_PROJECT_ID_VARIABLE.react]: ctx.project.id },
       },
       {
         kind: "add-dep",

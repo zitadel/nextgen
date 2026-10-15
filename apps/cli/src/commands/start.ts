@@ -45,8 +45,9 @@ import {
 } from "../lib/local-server/runtime";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../lib/oclif";
 import { listenersForPort, type TcpListener } from "../lib/prober/ports";
-import { publicCliCommand } from "../lib/public-cli";
 import { reportWarning } from "../lib/warnings";
+import { unscopedCommand } from "../lib/suggestion";
+import { nextCommandsData } from "../lib/oclif/envelope";
 
 const START_TIMEOUT_MS = 90_000;
 
@@ -102,7 +103,7 @@ export default class Start extends BaseCommand {
             console: `${serverUrl}/ui/console/`,
             login: `${serverUrl}/ui/login/`,
           },
-          next_commands: [publicCliCommand("start", this.meta.cliVersion)],
+          ...nextCommandsData([this.suggestUnscoped("start")]),
         },
       });
     }
@@ -343,9 +344,9 @@ function startupCleanupFailedError(
       hint: "Inspect the local runtime process and stop it manually, then rerun `zitadel start`.",
       nextCommands: unique([
         ...(startupError.nextCommands ?? []),
-        publicCliCommand("stop --all", cliVersion),
-        publicCliCommand("logs", cliVersion),
-        publicCliCommand("reset --force", cliVersion),
+        unscopedCommand("stop --all", cliVersion),
+        unscopedCommand("logs", cliVersion),
+        unscopedCommand("reset --force", cliVersion),
       ]),
       details: {
         startup_error: {
@@ -421,13 +422,13 @@ function readyData(
       "Run setup in this directory or one inside it, so it finds this server's local admin; the CLI will detect the framework or ask when needed.",
       "Setup installs dependencies when needed; then start your app dev server.",
     ],
-    next_commands: [
-      publicCliCommand("setup --server local", cliVersion),
+    ...nextCommandsData([
+      unscopedCommand("setup --server local", cliVersion),
       // Only when a link could actually be minted: `zitadel console` mints
       // the same way, so suggesting it after a failure sends the caller at a
       // command that fails again.
-      ...(console?.sign_in_url ? [publicCliCommand("console", cliVersion)] : []),
-    ],
+      ...(console?.sign_in_url ? [unscopedCommand("console", cliVersion)] : []),
+    ]),
   };
 }
 
@@ -450,8 +451,8 @@ async function waitForHealth(
   throw new ZitadelError("E_NETWORK", "Local Zitadel server did not become healthy", {
     hint: "Inspect the local runtime logs, then reset the local runtime if needed.",
     nextCommands: [
-      publicCliCommand("logs", cliVersion),
-      publicCliCommand("reset --force", cliVersion),
+      unscopedCommand("logs", cliVersion),
+      unscopedCommand("reset --force", cliVersion),
     ],
     details: { ...details, server_url: serverUrl },
   });
@@ -479,8 +480,8 @@ function portInUseError(
   return new ZitadelError("E_PORT_IN_USE", `Port ${String(port)} is already in use`, {
     hint: `Stop the process using ${serverUrl}, run \`zitadel stop --all\` for managed local runtimes, or choose another port.`,
     nextCommands: [
-      publicCliCommand("stop --all", cliVersion),
-      publicCliCommand(`start --port ${String(fallbackPort)}`, cliVersion),
+      unscopedCommand("stop --all", cliVersion),
+      unscopedCommand(`start --port ${String(fallbackPort)}`, cliVersion),
     ],
     details: { port, server_url: serverUrl, listeners },
   });
@@ -499,8 +500,8 @@ async function serverExitedError(
     {
       hint: "Inspect the local runtime logs, then retry after fixing the startup error.",
       nextCommands: [
-        publicCliCommand("logs", cliVersion),
-        publicCliCommand("reset --force", cliVersion),
+        unscopedCommand("logs", cliVersion),
+        unscopedCommand("reset --force", cliVersion),
       ],
       details: { ...details, server_url: serverUrl, ...(logTail ? { log_tail: logTail } : {}) },
     },
@@ -537,7 +538,7 @@ function assertRuntimeFlags(runtime: RuntimeBackend, image: string | undefined):
   }
 }
 
-function unique(values: string[]): string[] {
+function unique<T extends string>(values: T[]): T[] {
   return [...new Set(values)];
 }
 

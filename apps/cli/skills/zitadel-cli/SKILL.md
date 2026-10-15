@@ -57,11 +57,25 @@ The CLI requires Node.js 24+.
   drops records or fields, so you end up reasoning from partial data. It is
   finite — read it whole, or narrow it *at the source*: use a `list` verb's
   `filter_fields` and pagination to fetch fewer records, or pipe to `jq` to pull
-  just what you need (e.g. `… resources --json | jq '.data.resources[].name'`).
+  just what you need (e.g. `… resources --json | jq '.data.items[].topic'`).
   `--help` output is bounded too — read it in full rather than `head`-ing it, or
   you will miss flags further down.
 - **Working directory.** Add `--cwd <path>` when operating outside the current
   working directory.
+- **Server and project.** A command that talks to a project reads
+  `ZITADEL_URL`, `ZITADEL_PROJECT_ID` and `ZITADEL_PROJECT_SECRET`, each from the
+  first source that has it: `--server` (the URL only), `--env-file <path>`, the
+  process environment, `.env.<env>.local`, `.env.local`, `.env.<env>`, `.env`,
+  then `.zitadel/secret`. Only the default `development` environment reads
+  `.env.local` and `.zitadel/secret` (setup's project); `--env-file` reads that
+  file and the process environment only.
+  `<env>` is `--env`, else `ZITADEL_ENV`, else a hosting platform's own signal
+  (`VERCEL_ENV`, or Netlify's `CONTEXT` inside a Netlify build), else
+  `development`. A missing value fails with `E_VALIDATION` naming the variable
+  and the files it looked in; there is no cloud default outside `setup`, and
+  the server is never read from `zitadel.json`. `zitadel env` shows what resolved and where
+  each value came from; `zitadel env add <name>` binds another environment to a
+  project.
 - **Telemetry.** The CLI sends anonymous usage telemetry by default, and
   agent-driven runs are exactly the ones worth learning from — leave it on.
   Don't add `--no-telemetry` to commands. An opt-out exists for users who need
@@ -300,10 +314,10 @@ no local admin for that server on the way up, it says so in the envelope's
 `warnings` and the project stays unattached, so the local console does not
 list it.
 
-When `setup --sso` or `sso enable` adds a social sign-in provider, the user
+When `setup --sso` or `auth-method sso enable` adds a social sign-in provider, the user
 must register the connection's redirect URI with the provider themselves: give
 them `data.sso[].callback_uri` from `setup`, or `data.callback_uri` from
-`sso enable`, verbatim. Each connection has its own URI, so a URI from another
+`auth-method sso enable`, verbatim. Each connection has its own URI, so a URI from another
 provider or an older CLI version does not work.
 
 After `setup`, follow `data.next_commands` to start the app. Prove the generated

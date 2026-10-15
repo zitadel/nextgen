@@ -172,7 +172,7 @@ their JSON output.
 The journey's role is strictly to derive and surface these copyable URIs per
 environment.
 The development origin is `http://localhost:{port}` from the setup port,
-persisted as `environments.development.issuer` in the repo-root `zitadel.json`.
+persisted as `ZITADEL_ISSUER` in the environment files `setup` writes.
 A later run reads the stored issuer instead of asking for the port again.
 
 ### Multi-Environment Evaluation

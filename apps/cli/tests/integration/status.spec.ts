@@ -11,7 +11,6 @@ async function aConfiguredApp(): Promise<ScaffoldedApp> {
   await app.writeConfig({
     project: "proj-001",
     server: "https://self.example",
-    environments: { development: { issuer: "http://localhost:3000" } },
   });
   await app.writeLocalSecret("proj-001");
   return app;
@@ -78,6 +77,20 @@ describe("status", () => {
 
         const { data } = app.envelopeOf<{ next_actions: string[] }>(result);
         expect(data.next_actions.join("\n")).toContain("register a user");
+      });
+
+      it("reports the project the environment resolves under --env", async () => {
+        const app = await aSetUpApp();
+        await app.bindEnvironment("production", {
+          ZITADEL_URL: "https://prod.example",
+          ZITADEL_PROJECT_ID: "proj_prod",
+        });
+
+        const result = await app.run(["status", "--env", "production", "--json"]);
+
+        expect(
+          app.envelopeOf<{ project: { project_id: string } }>(result).data.project.project_id,
+        ).toBe("proj_prod");
       });
 
       it("calls config pointing at a project that no longer exists orphaned", async () => {

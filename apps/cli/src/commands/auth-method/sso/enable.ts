@@ -20,7 +20,7 @@ import {
   validated,
 } from "@zitadel/config/idp";
 
-import { createZitadelClient } from "../../../lib/api-client";
+import type { ZitadelClient } from "../../../lib/api-client";
 import { refuseBrokenFlows, refuseUneditable } from "../../../lib/auth-methods";
 import { isDevelopmentBuild } from "../../../lib/build-channel";
 import { ZitadelError } from "../../../lib/errors";
@@ -63,13 +63,8 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "../../../lib/oclif";
-import {
-  readDevelopmentIssuer,
-  readZitadelConfig,
-  readZitadelSecret,
-  type ZitadelSecret,
-} from "../../../lib/project";
-import { portableCommands, publicCliCommand } from "../../../lib/public-cli";
+import { environmentFlags } from "../../../lib/oclif/environment-flags";
+import { inShell, type SuggestedCommand } from "../../../lib/suggestion";
 import { reportWarning } from "../../../lib/warnings";
 
 /**
@@ -95,6 +90,9 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     `<%= config.bin %> auth-method sso enable ${customExample(ENABLE_FLAG_NAMES)}`,
     `<%= config.bin %> auth-method sso enable ${customExample(ENABLE_FLAG_NAMES, true)} --client-id abc123 --non-interactive < secret.txt`,
   ];
+  // The one `auth-method` command that resolves an environment, so the one that
+  // lists `--env` and `--env-file`; the others hide them.
+  static override baseFlags = { ...AuthMethodCommand.baseFlags, ...environmentFlags };
   static override flags = {
     // Not `required`: oclif's own "Missing required flag provider" is the one
     // refusal in this command that would carry no hint, and every other error
@@ -125,34 +123,31 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const { flags } = await this.parse(AuthMethodSsoEnable);
     const {
       cwd,
-      cwdArgs,
       schema,
       flows: candidates,
-      preflight: { selection, entry, secretFile, issuer },
+      preflight: { selection, entry, issuer },
     } = await this.target(flags, {
-      // The credentials are published to the project, so the server is
+      // The credentials are published to the project, so the environment is
       // resolved, unlike for the other auth-method commands.
       resolveServer: true,
-      preflight: (cwd) => readProject(cwd, flags),
+      preflight: () => readProject(flags, this.environment.values.ZITADEL_ISSUER?.value),
     });
-    const { nonInteractive, dryRun, cliVersion } = this.meta;
+    // Resolved before anything is asked for: being turned away after typing a
+    // secret would mean typing it again.
+    const { client, projectId } = await this.connect({ quiet: true });
+    const { nonInteractive, dryRun } = this.meta;
     const provider = selectionName(selection);
+    // `--cwd` and the run's `--env`/`--env-file`/`--server`, so every follow-up
+    // reaches the project this run published to.
+    const scopeArgs = this.environmentSelectorArgs();
     // What an agent can run once the missing credential is to hand. Only for a
     // catalog provider: a custom connection needs its settings repeated too.
-    // `--cwd` only when it can be written unquoted on every shell.
-    const cwdText = portableCommands([cwdArgs], cliVersion).length > 0 ? cwdArgs : [];
-    const retryFor = (clientId: string, pipe = ""): string | undefined =>
+    const retryFor = (clientId: string, pipe = ""): SuggestedCommand | undefined =>
       selection.kind === "catalog"
-        ? `${pipe}${publicCliCommand(
-            [
-              "auth-method sso enable --provider",
-              provider,
-              "--client-id",
-              clientId,
-              ...cwdText,
-            ].join(" "),
-            cliVersion,
-          )}`
+        ? inShell(
+            this.suggest(`auth-method sso enable --provider ${provider} --client-id ${clientId}`),
+            { before: pipe },
+          )
         : undefined;
 
     const connections = await readConnectionFiles(cwd);
@@ -220,7 +215,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       flowsAfter: edits.flows.map(({ result }) => result.document as Record<string, unknown>),
     };
 
-    consola.info(`Project   ${secretFile.project_id}`);
+    consola.info(`Project   ${projectId}`);
     consola.info(
       `Schema    ${schema.path}${schema.methods.length > 0 ? ` (${schema.methods.join(", ")})` : ""}`,
     );
@@ -231,7 +226,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         status: "skipped",
         reason: "dry-run",
         data: this.payload({
-          projectId: secretFile.project_id,
+          projectId,
           provider,
           schema: schema.name,
           plan,
@@ -266,7 +261,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       // rerunning with a changed client id now takes effect instead of being
       // silently ignored. Nothing is prompted for: an unattended rerun should
       // not start asking for credentials the project already has.
-      const publish = this.publisher(secretFile);
+      const publish = this.publisher(client, projectId);
       if (clientIdFlag !== undefined) {
         if (idVariable === undefined) {
           reportWarning(
@@ -348,7 +343,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         retry: retryFor(clientId, `printf '%s' "$CLIENT_SECRET" | `),
       });
 
-      const publish = this.publisher(secretFile);
+      const publish = this.publisher(client, projectId);
       const connection = entry.connection({
         slug: plan.slug,
         schemaProperties: schema.properties,
@@ -409,12 +404,17 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       consola.info(`${schema.name} and its login flow already offer ${entry.displayName}`);
     }
     if (clientIdState !== undefined && idVariable !== undefined) {
-      reportClientIdOutcome(idVariable, clientIdState, this.meta.cliVersion);
+      reportClientIdOutcome(
+        idVariable,
+        clientIdState,
+        this.meta.cliVersion,
+        this.environmentSelector(),
+      );
     }
     if (secret) {
       // A reuse that piped nothing in had no value to publish; a create always
       // has one, because the command refuses without it.
-      reportSecretOutcome(secret, this.meta.cliVersion, reusing);
+      reportSecretOutcome(secret, this.meta.cliVersion, reusing, this.environmentSelector());
     }
     this.reportOutcome(outcome);
     // `variables set` first, for a credential that did not reach the project:
@@ -427,14 +427,14 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         { name: idVariable, secret: false, published: clientIdState },
         { name: variable, secret: true, published: secret?.published },
       ],
-      cwdArgs,
+      scopeArgs,
     );
 
     return this.emit({
       status: "ok",
       data: {
         ...this.payload({
-          projectId: secretFile.project_id,
+          projectId,
           provider,
           schema: schema.name,
           plan,
@@ -447,7 +447,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         }),
         // An ok result carries its follow-ups in data.next_commands (errors
         // use the top-level nextCommands instead).
-        ...this.followUps(!reusing || written.length > 0, cwdArgs, recovery),
+        ...this.followUps(!reusing || written.length > 0, scopeArgs, recovery),
       },
       pretty: `Enabled ${entry.displayName} for ${schema.name}`,
     });
@@ -460,17 +460,12 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
    * taken from `OwnerCommand.connect` because this command addresses the local
    * Project it was pointed at, not an owner the developer named.
    */
-  private publisher(secret: ZitadelSecret): SecretPublisher | undefined {
-    const { source } = this.meta;
-    if (source === "mock") {
+  private publisher(client: ZitadelClient, projectId: string): SecretPublisher | undefined {
+    if (this.meta.source === "mock") {
       return undefined;
     }
-    const client = createZitadelClient({ baseUrl: source, token: secret.project_secret });
-    return async (name, value, { secret: isSecret }) => {
-      await client.updateVariables(
-        { [name]: { value, secret: isSecret } },
-        { project_id: secret.project_id },
-      );
+    return async (name, value, { secret }) => {
+      await client.updateVariables({ [name]: { value, secret } }, { project_id: projectId });
     };
   }
 
@@ -543,7 +538,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
 type ProjectContext = {
   readonly selection: ProviderSelection;
   readonly entry: IdpProvider;
-  readonly secretFile: ZitadelSecret;
   readonly issuer: string;
 };
 
@@ -556,13 +550,13 @@ type ProjectContext = {
  * asked for: being turned away after typing a secret would mean typing it
  * again.
  *
- * @param cwd - The Project directory.
  * @param flags - `--provider`, which is named rather than prompted for, and
  *   the custom connection's settings.
+ * @param issuer - The origin the app serves from, from the environment.
  */
 async function readProject(
-  cwd: string,
   flags: { readonly [K in (typeof ENABLE_FLAG_KEYS)[keyof typeof ENABLE_FLAG_KEYS]]?: string },
+  issuer: string | undefined,
 ): Promise<ProjectContext> {
   const provider = flags[ENABLE_FLAG_KEYS.provider];
   if (provider === undefined) {
@@ -584,15 +578,12 @@ async function readProject(
     reportWarning(loopback);
   }
   const entry = providerOf(selection);
-  const config = await readZitadelConfig(cwd);
-  const secretFile = await readZitadelSecret(cwd);
-  const issuer = readDevelopmentIssuer(config);
   if (issuer === undefined) {
     throw new ZitadelError("E_VALIDATION", "This Project has no development issuer", {
-      hint: "Run `zitadel setup` first, or add environments.development.issuer to zitadel.json.",
+      hint: "Run `zitadel setup` first, or set ZITADEL_ISSUER to the origin your app serves from.",
     });
   }
-  return { selection, entry, secretFile, issuer };
+  return { selection, entry, issuer };
 }
 
 /**

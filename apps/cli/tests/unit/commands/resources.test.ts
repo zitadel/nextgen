@@ -8,7 +8,12 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { type Platform, RESOURCES } from "../../../src/commands/resources";
 import { COMMANDS } from "../../../src/index";
-import { parseFilter, parseSort, type ResourceDescriptor } from "../../../src/lib/oclif/crud";
+import {
+  definitionOf,
+  parseFilter,
+  parseSort,
+  type ResourceDescriptor,
+} from "../../../src/lib/oclif/crud";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
 
 const SERVER = "https://api.zitadel.cloud";
@@ -69,23 +74,49 @@ describe("resource registry", () => {
     }
   });
 
-  it("gives no generated command an --environment flag, since none addresses one", () => {
-    const generated = Object.entries(COMMANDS).filter(([id]) => id!.split(":")[0]! in RESOURCES);
+  it("gives every generated command --env and --env-file, and no --environment flag", () => {
+    const generated = Object.entries(COMMANDS).filter(
+      ([, command]) => definitionOf(command) !== undefined,
+    );
     expect(generated.length).toBeGreaterThan(0);
     for (const [id, command] of generated) {
       const flags = { ...command.baseFlags, ...command.flags };
+      expect(Object.keys(flags), id).toEqual(expect.arrayContaining(["env", "env-file"]));
       expect(Object.keys(flags), id).not.toContain("environment");
       expect(
-        Object.values(flags).map((flag) => flag.char),
+        Object.entries(flags)
+          .filter(([, flag]) => flag.char === "e")
+          .map(([name]) => name),
         id,
-      ).not.toContain("e");
+      ).toEqual(["env"]);
     }
+  });
+
+  it("reads the project and credential of --env-file", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-resources-env-"));
+    const file = join(cwd, "staging.env");
+    await writeFile(file, "ZITADEL_PROJECT_ID=proj_staging\nZITADEL_PROJECT_SECRET=sk_staging\n");
+    let seen: { project?: string | null; authorization?: string | null } = {};
+    server.use(
+      http.post(`${SERVER}/teams/query`, ({ request }) => {
+        seen = {
+          project: new URL(request.url).searchParams.get("project_id"),
+          authorization: request.headers.get("authorization"),
+        };
+        return HttpResponse.json({ teams: [] });
+      }),
+    );
+
+    const res = await run(cwd, ["teams", "list", "--env-file", file]);
+
+    expect(res.exitCode).toBe(0);
+    expect(seen).toEqual({ project: "proj_staging", authorization: "Bearer sk_staging" });
   });
 
   // A read and a write verb, since the flag reached both through the generated
   // command's own flags and the base flags it inherits.
   it.each([
-    ["a read verb", ["users", "list", "-e", "prod"]],
+    ["a read verb", ["users", "list", "--environment", "prod"]],
     ["a write verb", ["teams", "create", "--name", "t", "--environment", "production"]],
   ])("refuses the environment flag on %s before any request", async (_case, argv) => {
     const cwd = await makeProject();

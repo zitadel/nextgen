@@ -454,7 +454,7 @@ describe("auth-method sso enable secret handling", () => {
     expect(result.exitCode).toBe(0);
     // Nothing is written to disk: the secret goes to the project's variables
     // and nowhere else, so there is no copy in the working tree to leak.
-    await expect(readFile(join(cwd, ".env.local"), "utf8")).rejects.toThrow();
+    expect(await readFile(join(cwd, ".env.local"), "utf8")).not.toContain("piped-secret");
     expect(result.stdout).not.toContain("piped-secret");
     expect(result.stderr).not.toContain("piped-secret");
   });
@@ -528,6 +528,19 @@ describe("auth-method sso enable secret handling", () => {
     expect(json.code).toBe("E_VALIDATION");
     expect(json.hint).toContain("stdin");
     await expect(readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")).rejects.toThrow();
+  });
+
+  it("keeps the run's server in the retry it suggests for a missing client id", async () => {
+    // Following a retry without it would publish the credentials to whichever
+    // project the default environment resolves to.
+    const cwd = await setUpProject();
+
+    const result = await enable(cwd, "--server", "https://api.zitadel.cloud");
+
+    const json = parseJson(result.stdout) as { next_commands?: string[] };
+    expect(json.next_commands?.[0]).toContain(
+      "auth-method sso enable --provider google --client-id <client-id> --server https://api.zitadel.cloud",
+    );
   });
 });
 

@@ -24,6 +24,56 @@ Scope pointers first — this file's own body covers **telemetry only**:
   `reportWarning` shows it in the terminal at once and adds it to the JSON
   envelope's `warnings`, and `emit` prints a result's `warnings` after its
   `pretty` text. A unit test fails on any other `consola.warn` call.
+- A command's JSON `data` is built through the helpers in
+  `src/lib/oclif/envelope.ts`, not an object literal: a collection is
+  `listData(items)` → `{ items, count, next_page_token }` (single-page passes
+  `nextPageToken: null`); a delete is `deletedData(identifier)` → `{ …id,
+  deleted: true }`; a lifecycle mutation is `mutatedData(id, verb)`. The verb is
+  always `deleted`/`revoked`/`deactivated`, **never `removed`**. The terminal
+  rendering of a list goes through `renderList` (`src/lib/oclif/crud/table.ts`),
+  which owns the `--plain`/TTY/empty/footer logic so no list forgets `--plain`.
+  Using the helpers is the rule; what `assertEnvelope` (in
+  `tests/helpers/project.ts`) actually enforces on every `--json` spec is the
+  resulting **shape** — a `list` command (keyed off `envelope.command`) must emit
+  `items`/`count`/`next_page_token`; a `rm`/`delete` command must confirm with
+  `deleted: true`; no command anywhere may carry `removed` — so a divergent shape
+  fails in that command's own spec whether or not the helper was used. The guard
+  does not police a collection surfaced under a domain key by a non-`list`
+  command (e.g. `variable resolve`'s `variables`), so build those with `listData`
+  too unless the non-canonical shape is deliberate and documented. A Biome
+  GritQL rule (`biome-plugins/no-removed-key.grit`) also rejects a literal
+  `removed: true` at lint time, before a spec runs.
+- Files that may carry a credential are written through `src/lib/fs-safe.ts`:
+  `.env.<name>.local` through `writeManagedEnvFile` / `appendManagedEnvValue`,
+  and any other write that must hold a mode (`.zitadel/secret`, the local admin
+  credential, the scaffold file-writer) through `enforceMode`, which re-asserts
+  the mode after the write. The utility owns the decisions that must not drift
+  between write sites: the `0600` mode; the chmod-failure policy (re-assert the
+  mode, but downgrade a failure to `reportWarning` and proceed — the content is
+  already on disk, so a throw would be one confusing failure followed by a next
+  run that reads it back and silently succeeds); and, for `.env` files, the
+  line-break guard (a `\n`/`\r` in a value is refused as a typed `E_VALIDATION`,
+  because one `.env` line per key means a newline would split or inject keys the
+  next read misparses). Never write `chmod(...).catch(() => undefined)`: it hides
+  a mode we could not apply from the user and from the JSON envelope. A Biome
+  GritQL rule (`biome-plugins/no-swallowed-chmod.grit`) rejects that pattern, so
+  a new write site cannot reintroduce it. The rules are registered under
+  `plugins` in the root `biome.json`; add a new `.grit` file there for the next
+  pattern that a type or a spec cannot catch.
+- A command the CLI suggests running next (`nextCommands` on a result or an
+  error, `next_commands` in data, an input question's `retry`) is a
+  `SuggestedCommand` from `src/lib/suggestion.ts`, and only its builders make
+  one: `this.suggest(args)` on an `EnvironmentCommand` appends the run's
+  `--env`/`--env-file`/`--server`; `this.suggestUnscoped(args)` /
+  `unscopedCommand` is the deliberate opt-out for a command that targets no
+  project (`setup`, `start`, `doctor`); `projectCommand` takes an
+  `EnvironmentSelector`, which only `environmentSelectorSuffix` makes;
+  `shellCommand` is for anything that is not the CLI, and `inShell` adds a pipe
+  or redirection around a suggestion. A raw string does not typecheck there, so
+  a retry cannot silently fall back to the default project (#1689). Data
+  carries its suggestions through `nextCommandsData()`; a GritQL rule
+  (`biome-plugins/no-raw-next-commands.grit`) rejects a hand-written
+  `next_commands:` key under `apps/cli/src`.
 - Input goes through one function, `input` in `src/lib/input.ts` — a command
   calls it as `this.input(...)`. It takes the value from `given` (the flag),
   else piped stdin (`stdin: true`), else a prompt, else throws one uniform
@@ -205,6 +255,7 @@ since `started` fires before the command body runs):
 - **doctor** — `runtime`, `checks_total`, `checks_failed`, `checks_warn`, `failed_checks` (failing check **names**, never messages).
 - **start** — `runtime` (`binary` / `docker`).
 - **variables** — `is_secret`, `variable_count`. Deliberately *not* recorded: the variable's name or value — a name is free text, and a value is the credential itself. There is no owner dimension: the project level is the only owner the commands can address.
+- **any command that connects to a project** (`EnvironmentCommand.connect`, so every one but `setup`, `doctor` and the local-server commands) — `credential` (`project` / `preview`), `has_env_file` (whether `--env-file` was given). Deliberately *not* recorded: the environment's name, the env file's path, the server, the project id, or any resolved value — every one of them is a name, a URL, an id or a secret.
 - **claim** — `claim_outcome` (`completed` / `already_claimed` / `expired` / `window_expired` / `timeout` / `dry_run`), `poll_count`, `browser_opened`. Deliberately *not* recorded: `challenge_id`, `team_id`, `claim_url`, `dashboard_url` — every one of them is an id or a URL.
 
 ### Naming conventions

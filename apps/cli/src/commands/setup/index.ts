@@ -62,6 +62,7 @@ import {
 } from "../../lib/idp";
 import { brandingGuidanceAction } from "../../lib/journey-guidance";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
+import { environmentSelectorSuffix } from "../../lib/oclif/environment-flags";
 import { serverKind } from "../../lib/oclif/server-kind";
 import { findLocalAdminFor } from "../../lib/local-server/admin-credential";
 import { claimProjectAsAdmin } from "../../lib/local-server/claim-as-admin";
@@ -83,7 +84,6 @@ import {
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import { type Asker, input } from "../../lib/input";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
-import { publicCliCommand } from "../../lib/public-cli";
 import { derivePosture } from "../../lib/orca/patchers/posture";
 import { writeScaffoldManifest } from "../../lib/scaffold-manifest";
 import {
@@ -112,8 +112,17 @@ import {
   type Row,
   type Section,
 } from "./summary";
+import { shellArg } from "../../lib/shell";
 import { showSkillsHint } from "../../lib/skills-hint";
 import { reportWarning } from "../../lib/warnings";
+import {
+  type EnvironmentSelector,
+  inShell,
+  projectCommand,
+  type SuggestedCommand,
+  unscopedCommand,
+} from "../../lib/suggestion";
+import { nextCommandsData } from "../../lib/oclif/envelope";
 
 /**
  * The frameworks `--framework` accepts, derived from Orca's registry so the
@@ -138,6 +147,29 @@ const RENDERER_FLAG_DESCRIPTION =
   UNAVAILABLE_RENDERER_IDS.length === 0
     ? "Renderer (default: react)."
     : `Renderer (default: react). Not yet available: ${UNAVAILABLE_RENDERER_IDS.join(", ")}.`;
+
+/**
+ * The selector appended to setup's credential-recovery commands. `variable set`
+ * is an `EnvironmentCommand` that resolves the project and server from the
+ * environment, where the process environment outranks the `.env` files — so a
+ * bare retry in a shell holding production values would publish to the wrong
+ * project. Pinning `--env-file .env.development.local` (the file setup wrote)
+ * forces the local project the recovery is for, because `--env-file` outranks
+ * the process environment (unlike `--env`); same reasoning as the SSO recovery.
+ */
+function recoverySelector(cwd: string | undefined): EnvironmentSelector {
+  // `--cwd` too, as typed: `--env-file` resolves against it, so a recovery
+  // run from where setup was launched reads the file setup wrote.
+  return environmentSelectorSuffix({ envFile: ".env.development.local", cwd });
+}
+
+/**
+ * {@link recoverySelector} plus `--server local`, for the recovery after a
+ * local-server failure (see `ssoRecovery`).
+ */
+function localRecoverySelector(cwd: string | undefined): EnvironmentSelector {
+  return environmentSelectorSuffix({ envFile: ".env.development.local", server: "local", cwd });
+}
 
 /** `zitadel setup` — create a project and scaffold local auth.
  *
@@ -491,21 +523,23 @@ export default class Setup extends BaseCommand {
     this.recordTelemetry({ step: "project_created" });
 
     const ctx = patchContext(project);
-    // `.env.local` as it is before the patch merges this project's id and
-    // secret into it, so a failure below can put it back.
-    const envLocalBefore = await readEnvLocal(cwd);
+    // The credential env files as they are before the patch merges this
+    // project's id and secrets into them, so a failure below can put them back:
+    // the merge only adds missing keys, so a leftover file would keep the
+    // abandoned project's `ZITADEL_PROJECT_ID` and a rerun would target it.
+    const envFilesBefore = await readCredentialEnvFiles(cwd);
     consola.start(`Patching project files${dryRun ? " (dry run)" : ""}`);
     let result: Awaited<ReturnType<typeof patcher.patch>>;
     try {
       result = await patcher.patch(ctx, { cwd, dryRun, force });
     } catch (error) {
       // The dry run above already ruled out conflicts, so this is an I/O
-      // failure partway through. Remove the setup markers and put
-      // `.env.local` back, as a failed resource upload does below, so a rerun
-      // starts over.
+      // failure partway through. Remove the setup markers and put the
+      // credential env files back, as a failed resource upload does below, so a
+      // rerun starts over.
       if (!dryRun) {
         await removeSetupMarkers(cwd);
-        await restoreEnvLocal(cwd, envLocalBefore);
+        await restoreCredentialEnvFiles(cwd, envFilesBefore);
       }
       throw error;
     }
@@ -540,12 +574,12 @@ export default class Setup extends BaseCommand {
       // Remove both so a rerun starts a fresh setup instead of being skipped
       // forever with no default schema or login flow anywhere. The
       // half-provisioned project has no usable resources, so its credentials
-      // are not worth keeping, and `.env.local`, where the patch merged them,
-      // goes back to what it held before.
+      // are not worth keeping, and the credential env files, where the patch
+      // merged them, go back to what they held before.
       // Only these, and never a connection file: those are tenant-owned, and
       // setup neither writes over nor removes one.
       await removeSetupMarkers(cwd);
-      await restoreEnvLocal(cwd, envLocalBefore);
+      await restoreCredentialEnvFiles(cwd, envFilesBefore);
       const cause = toZitadelError(error);
       throw new ZitadelError(cause.code, `Default resource setup failed: ${cause.message}`, {
         // The cause knows its own remedy when it has one -- a file setup
@@ -558,7 +592,7 @@ export default class Setup extends BaseCommand {
             "scaffolds. It does not cover a connection under .zitadel/idps/ -- those are " +
             "yours, so setup never replaces or removes one; delete it to scaffold a fresh " +
             "one, or keep it and enable the provider after setup to reuse it.",
-        nextCommands: cause.nextCommands ?? ["zitadel setup --force"],
+        nextCommands: cause.nextCommands ?? [this.suggestUnscoped("setup --force")],
         details: cause.details,
       });
     }
@@ -618,10 +652,15 @@ export default class Setup extends BaseCommand {
               `${answer.endpoints.issuer}, not the provider`,
           );
         }
-        reportClientIdOutcome(idVariable, clientId, this.meta.cliVersion);
+        reportClientIdOutcome(
+          idVariable,
+          clientId,
+          this.meta.cliVersion,
+          recoverySelector(flags.cwd),
+        );
         // The wizard refuses an empty secret, so a deferred publish here only
         // ever means there was no project to publish to.
-        reportSecretOutcome(secret, this.meta.cliVersion, false);
+        reportSecretOutcome(secret, this.meta.cliVersion, false, recoverySelector(flags.cwd));
       }
     }
 
@@ -747,14 +786,14 @@ export default class Setup extends BaseCommand {
         (isLocal && (dryRun || hostsPlatform)));
     const claimNudge = nudgeClaim
       ? {
-          actions: [claimAction(this.meta.cliVersion, deadline)],
-          boxActions: [claimBoxAction(this.meta.cliVersion, deadline)],
-          commands: [claimCommand(this.meta.cliVersion)],
+          actions: [claimAction(this.meta.cliVersion, deadline, recoverySelector(flags.cwd))],
+          boxActions: [claimBoxAction(this.meta.cliVersion, deadline, recoverySelector(flags.cwd))],
+          commands: [claimCommand(this.meta.cliVersion, recoverySelector(flags.cwd))],
         }
-      : { actions: [], boxActions: [], commands: [] };
+      : { actions: [], boxActions: [], commands: [] as SuggestedCommand[] };
     // Only when the project is the local admin's: the console lists nothing
     // else for them, so the command would open an empty console otherwise.
-    const consoleCommand = publicCliCommand("console", this.meta.cliVersion);
+    const consoleCommand = unscopedCommand("console", this.meta.cliVersion);
     const consoleStep = ownedByLocalAdmin
       ? {
           actions: [
@@ -768,7 +807,7 @@ export default class Setup extends BaseCommand {
           ],
           commands: [consoleCommand],
         }
-      : { actions: [], boxActions: [], commands: [] };
+      : { actions: [], boxActions: [], commands: [] as SuggestedCommand[] };
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
@@ -848,7 +887,7 @@ export default class Setup extends BaseCommand {
             client_id: answer.credentials.clientId ?? null,
             connection: `.zitadel/idps/${slug}.json`,
             // What the developer registers at the provider: the connection's
-            // own route, as `sso enable` reports it.
+            // own route, as `auth-method sso enable` reports it.
             callback_uri: callbackUriFor(issuer, slug),
             client_id_variable: outcome
               ? { variable: credentialVariables(slug).clientId, published: outcome.clientId }
@@ -868,9 +907,8 @@ export default class Setup extends BaseCommand {
         ],
         // A JSON run prints no warnings, so a credential the project never
         // received would otherwise appear only as a `published` status with
-        // nothing to act on. `auth-method sso enable` reports the same recovery
-        // step.
-        next_commands: [
+        // nothing to act on. `auth-method sso enable` reports the same recovery step.
+        ...nextCommandsData([
           ...republishCommands(
             answers.sso.flatMap((answer) => {
               const slug = providerOf(answer.selection).slug;
@@ -889,11 +927,12 @@ export default class Setup extends BaseCommand {
               ];
             }),
             this.meta.cliVersion,
+            recoverySelector(flags.cwd),
           ),
           ...installOutcome.nextCommands,
           ...consoleStep.commands,
           ...claimNudge.commands,
-        ],
+        ]),
       },
     });
   }
@@ -940,13 +979,12 @@ async function resolveScaffoldFramework(
     throw new ZitadelError("E_FRAMEWORK_NOT_DETECTED", "Empty directory — pass --framework", {
       hint: (
         "Setup asks which framework to scaffold only in a terminal. Without one, or with " +
-        `--json or --non-interactive, pass --framework with one of: ${choices.join(", ")}. ` +
-        runFromHint(guidance.retry)
+        `--json or --non-interactive, pass --framework with one of: ${choices.join(", ")}.`
       ).trimEnd(),
       nextCommands:
         guidance.serverFlag === "local" && suggested
           ? [
-              publicCliCommand(
+              unscopedCommand(
                 `setup ${setupRetryFlags({ ...guidance.retry, framework: suggested })}`,
                 guidance.cliVersion,
               ),
@@ -997,33 +1035,68 @@ function dryRunProject(issuer: string): CreateProject201 {
 /** What a command line describing a custom connection looks like, for an error to show. */
 const SSO_CUSTOM_EXAMPLE = customExample(SETUP_FLAG_NAMES);
 
-/** What `.env.local` holds, or `undefined` when there is no such file. */
-async function readEnvLocal(cwd: string): Promise<Buffer | undefined> {
-  try {
-    return await readFile(join(cwd, ".env.local"));
-  } catch (error) {
-    if (isErrno(error, "ENOENT")) {
-      return undefined;
+/**
+ * The env files the patch merges a project's id and secrets into: `.env.local`
+ * for the app, and `.env.development.local`, which the recovery commands pin
+ * with `--env-file` and which therefore decides which project they target.
+ */
+const CREDENTIAL_ENV_FILES = [".env.local", ".env.development.local"] as const;
+
+/**
+ * What each credential env file holds, or `undefined` for a file that is not
+ * there. Only a missing file counts as absent: any other read error is
+ * rethrown, because reading it as "absent" would make the rollback delete a
+ * pre-existing file it should have restored.
+ */
+export async function readCredentialEnvFiles(
+  cwd: string,
+): Promise<Map<string, Buffer | undefined>> {
+  const before = new Map<string, Buffer | undefined>();
+  for (const file of CREDENTIAL_ENV_FILES) {
+    try {
+      before.set(file, await readFile(join(cwd, file)));
+    } catch (error) {
+      if (!isErrno(error, "ENOENT")) {
+        throw error;
+      }
+      before.set(file, undefined);
     }
-    throw error;
   }
+  return before;
 }
 
 /**
- * Puts `.env.local` back to what {@link readEnvLocal} read before the patch,
- * and removes it when there was none. The patch merged the failed setup's
- * project id and secret into it, and a merge only adds the keys a file is
- * missing, `--force` or not: left in place, they would survive the rerun, and
- * the app would talk to an abandoned project with no schema or login flow.
- * `.env.example` needs nothing: it gets the same empty values on every run.
+ * Puts the credential env files back to what {@link readCredentialEnvFiles}
+ * read before the patch, and removes one setup created. The patch merged the
+ * failed setup's project id and secrets into them, and a merge only adds the
+ * keys a file is missing, `--force` or not: left in place, they would survive
+ * the rerun, and the app would talk to an abandoned project with no schema or
+ * login flow. `.env.example` needs nothing: it gets the same empty values on
+ * every run.
+ *
+ * A file that cannot be restored is reported as a warning rather than thrown:
+ * this runs while setup is already failing, and the real error carries the
+ * remedy the developer needs.
  */
-async function restoreEnvLocal(cwd: string, before: Buffer | undefined): Promise<void> {
-  const path = join(cwd, ".env.local");
-  if (before === undefined) {
-    await rm(path, { force: true });
-    return;
+export async function restoreCredentialEnvFiles(
+  cwd: string,
+  before: ReadonlyMap<string, Buffer | undefined>,
+): Promise<void> {
+  for (const [file, content] of before) {
+    const path = join(cwd, file);
+    try {
+      if (content === undefined) {
+        await rm(path, { force: true });
+      } else {
+        await writeFile(path, content);
+      }
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      reportWarning(
+        `Could not restore ${file} after the failed setup (${reason}); it may still name the abandoned project.`,
+      );
+    }
   }
-  await writeFile(path, before);
 }
 
 /**
@@ -1124,7 +1197,10 @@ export async function ssoFromFlags(
     stdin: true,
     // A concrete rerun for an agent, never carrying the value: the secret is
     // piped from the caller's own environment.
-    retry: `printf '%s' "$CLIENT_SECRET" | ${publicCliCommand(`setup --sso ${flags.sso} --sso-client-id <id> ...`, cliVersion)}`,
+    retry: inShell(
+      unscopedCommand(`setup --sso ${flags.sso} --sso-client-id <id> ...`, cliVersion),
+      { before: `printf '%s' "$CLIENT_SECRET" | ` },
+    ),
   });
   return { selection, credentials: { clientId: clientId.value, secret } };
 }
@@ -1136,12 +1212,9 @@ export async function ssoFromFlags(
  */
 export type SetupRetryOptions = {
   /**
-   * The directory setup was pointed at, when it was not the shell's own.
-   * Named in the guidance rather than passed as `--cwd` in the command text:
-   * a path can carry spaces and metacharacters, and nothing escapes a
-   * suggested command for a shell -- the same reason the client id is not
-   * interpolated either. Prose the developer reads, not an argument a shell
-   * splits.
+   * The directory setup was pointed at, as typed. Every suggested rerun
+   * carries it as `--cwd`, quoted for a shell, so it configures that project
+   * from wherever it is run.
    */
   cwd?: string;
   framework?: string;
@@ -1220,7 +1293,7 @@ export function setupRetryFlags(opts: SetupRetryOptions): string {
     parts.push("--non-interactive");
   }
   parts.push("--server local");
-  return parts.join(" ");
+  return `${parts.join(" ")}${cwdArg(opts)}`;
 }
 
 /** Whether `--sso` names a provider this CLI offers. */
@@ -1327,17 +1400,15 @@ function ssoCredentialPublisher(
  * failed project creation -- and the second was missed when this was written
  * inline, which is exactly the kind of thing one copy prevents.
  */
-function runFromHint(retry: SetupRetryOptions): string {
-  if (retry.cwd === undefined || retry.cwd === process.cwd()) {
-    return "";
-  }
-  return `Run these from ${retry.cwd}, which is the project they configure. `;
+/** `--cwd` for a suggested command, when setup was pointed at a directory. */
+function cwdArg(retry: SetupRetryOptions): string {
+  return retry.cwd === undefined ? "" : ` --cwd ${shellArg(retry.cwd)}`;
 }
 
 function ssoRecovery(
   retry: SetupRetryOptions,
   cliVersion: string,
-): { hint: string; commands: string[] } {
+): { hint: string; commands: SuggestedCommand[] } {
   const chosen = retry.sso ?? [];
   const remaining = chosen.slice(1);
   if (remaining.length === 0) {
@@ -1354,20 +1425,29 @@ function ssoRecovery(
     // what the command does. `auth-method sso enable` asks for the id, exactly as it asks
     // for the secret, which was never put in command text for the same
     // reason.
-    // `--server local`, as the setup retry pins it. Server resolution prefers
-    // `ZITADEL_API_BASE` over the project's own `zitadel.json`, so an
-    // unpinned `auth-method sso enable` run with that variable set would publish the
-    // client id and secret to whatever it names, using the local project's
-    // token -- leaving the local provider unconfigured and the credentials
-    // somewhere nobody asked for. Both callers of this are local-server
-    // failures, so `local` is the server meant in every case.
+    // localRecoverySelector carries `--server local`, as the setup retry
+    // pins it. An unpinned `auth-method sso enable`
+    // takes its server from `ZITADEL_URL`, so with that variable set to
+    // another server it would publish the client id and secret there --
+    // leaving the local provider unconfigured and the credentials somewhere
+    // nobody asked for. Both callers of this are local-server failures, so
+    // `local` is the server meant in every case.
+    //
+    // `--env-file .env.development.local` pins the project and credential too:
+    // `auth-method sso enable` is an EnvironmentCommand that resolves those from the
+    // environment, where the process environment outranks the `.env` files, so
+    // in a shell holding production values `--server local` alone would send
+    // the production token to the local server. `--env-file` outranks the
+    // process environment (unlike `--env`), so it is the one that forces the
+    // generated development credential the local project actually expects.
     commands: remaining.map((selection) =>
-      publicCliCommand(
+      projectCommand(
         `auth-method sso enable --provider ${selectionName(selection)}${
           selection.kind === "custom"
             ? ` ${customFlagText(selection.connection, ENABLE_FLAG_NAMES)}`
             : ""
-        } --server local`,
+        }`,
+        localRecoverySelector(retry.cwd),
         cliVersion,
       ),
     ),
@@ -1398,10 +1478,10 @@ async function createProjectWithLocalHint(
       hint:
         `${normalized.hint ? `${normalized.hint} ` : ""}` +
         "If you meant to use a local Zitadel server, start it first " +
-        `and retry setup with ${retryFlags}. ${runFromHint(retry)}${sso.hint}`.trimEnd(),
+        `and retry setup with ${retryFlags}. ${sso.hint}`.trimEnd(),
       nextCommands: [
-        publicCliCommand("start", cliVersion),
-        publicCliCommand(`setup ${retryFlags}`, cliVersion),
+        unscopedCommand(`start${cwdArg(retry)}`, cliVersion),
+        unscopedCommand(`setup ${retryFlags}`, cliVersion),
         ...sso.commands,
       ],
       details: {
@@ -1461,10 +1541,10 @@ async function assertLocalServerVersion(
       hint:
         "A server another CLI release started serves that release's API, so setup would stop " +
         `halfway. Run start to restart it on ${expected}; its data stays. ${where}` +
-        `Then rerun setup. ${runFromHint(retry)}`.trimEnd(),
+        "Then rerun setup.",
       nextCommands: [
-        publicCliCommand("start", cliVersion),
-        publicCliCommand(`setup ${setupRetryFlags(retry)}`, cliVersion),
+        unscopedCommand(`start --cwd ${shellArg(nearest.dir)}`, cliVersion),
+        unscopedCommand(`setup ${setupRetryFlags(retry)}`, cliVersion),
       ],
       details: {
         server_url: runtime.server_url,
@@ -1488,7 +1568,6 @@ function localSetupHint(error: unknown, retry: SetupRetryOptions, cliVersion: st
     hint:
       `${normalized.hint ? `${normalized.hint} ` : ""}` +
       "Start local Zitadel first, then rerun setup. " +
-      runFromHint(retry) +
       (retry.sso && retry.sso.length > 0
         ? "The rerun asks for the client id and secret, because a command carries neither. " +
           "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
@@ -1496,8 +1575,8 @@ function localSetupHint(error: unknown, retry: SetupRetryOptions, cliVersion: st
       sso.hint +
       "After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
     nextCommands: [
-      publicCliCommand("start", cliVersion),
-      publicCliCommand(setupCommand, cliVersion),
+      unscopedCommand(`start${cwdArg(retry)}`, cliVersion),
+      unscopedCommand(setupCommand, cliVersion),
       ...sso.commands,
     ],
     details: normalized.details,
@@ -1555,6 +1634,7 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
   "zitadel.json": { subject: "the Zitadel project configuration" },
   ".env.example": { subject: "the .env example template" },
   ".env.local": { subject: "the local development environment variables" },
+  ".env.development.local": { subject: "the environment variables the CLI reads" },
   ".zitadel/state.json": { subject: "the sync state file" },
   ".zitadel/flows/default-login.json": { subject: "the editable default login flow" },
   ".zitadel/flows/README.md": { subject: "the flows folder README" },

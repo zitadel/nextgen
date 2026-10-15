@@ -12,6 +12,7 @@ import { isObject } from "../json";
 import { resolveCwd } from "../paths";
 import { normalizePublicCliCommand, normalizePublicCliCommands } from "../public-cli";
 import { resolveServer } from "../server";
+import { type SuggestedCommand, unscopedCommand } from "../suggestion";
 import { type Properties, Telemetry, type TelemetryDeps } from "../telemetry";
 import { buildUserAgent, installUserAgent, processUserAgentFacts } from "../user-agent";
 import { takeReportedWarnings } from "../warnings";
@@ -32,6 +33,7 @@ import type {
   JsonEnvelope,
   SkippedEnvelope,
 } from "./types";
+import { shellArg } from "../shell";
 
 /**
  * Base class for every oclif command. Owns the global flags, builds the
@@ -113,6 +115,9 @@ export abstract class BaseCommand extends Command {
    */
   protected telemetryProps: Readonly<Properties> = Object.freeze({});
 
+  /** `--cwd` as typed, carried into the unscoped follow-ups this run suggests. */
+  private typedCwd: string | undefined;
+
   /** Correlates the started/completed pair; minted at instance construction. */
   private readonly telemetryInvocationId = randomUUID();
 
@@ -154,6 +159,22 @@ export abstract class BaseCommand extends Command {
     askInput(question, { interactive: !this.meta.nonInteractive, force: this.meta.force });
 
   /**
+   * A `zitadel` command that does not target a project, in the public `npx`
+   * form: `setup`, `start`, `doctor`, the local runtime. A command that talks
+   * to a project suggests through `EnvironmentCommand.suggest` instead, which
+   * keeps the run's environment selector; reaching for this one is the
+   * deliberate opt-out.
+   */
+  protected suggestUnscoped(args: string): SuggestedCommand {
+    // A follow-up run from the shell's directory would act on whatever project
+    // is there, so the directory this run addressed goes with it.
+    return unscopedCommand(
+      this.typedCwd === undefined ? args : `${args} --cwd ${shellArg(this.typedCwd)}`,
+      this.meta.cliVersion,
+    );
+  }
+
+  /**
    * Merge command-specific dimensions into {@link telemetryProps} immutably: a
    * new frozen bag replaces the previous one, so no shared object is ever
    * mutated. `step` advances by re-recording it at each milestone.
@@ -163,20 +184,24 @@ export abstract class BaseCommand extends Command {
   }
 
   /**
-   * Builds {@link GlobalOptions} from parsed flags, resolving the server
-   * `source` by the documented precedence and storing the result on
-   * `this.meta` so the error handler can render a complete envelope.
+   * Builds {@link GlobalOptions} from parsed flags and stores the result on
+   * `this.meta` so the error handler can render a complete envelope. The server
+   * `source` is `--server` or the cloud default, which is `setup`'s rule; a
+   * command that takes its server from the environment extends
+   * `EnvironmentCommand`, and one that never talks to a server passes
+   * `resolveServer: false`.
    */
   protected async toMeta(
     flags: Record<string, unknown>,
     options: { resolveServer?: boolean; source?: string } = {},
   ): Promise<GlobalOptions> {
     const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
+    this.typedCwd = typeof flags.cwd === "string" ? flags.cwd : undefined;
     const serverFlag = typeof flags.server === "string" ? flags.server : undefined;
     const source =
       options.resolveServer === false
         ? { value: options.source ?? "", origin: "default" as const }
-        : await resolveServer({ cwd, env: process.env, serverFlag });
+        : await resolveServer({ cwd, serverFlag });
     const json = this.jsonEnabled();
     const isTTY = Boolean(process.stdout.isTTY && process.stdin.isTTY);
     const verbose = Boolean(flags.verbose);

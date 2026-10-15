@@ -1,7 +1,6 @@
 import { consola } from "consola";
 
-import { createZitadelClient } from "../lib/api-client";
-import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
+import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
 import {
   buildSyncPlan,
   collectPlanWarnings,
@@ -11,7 +10,6 @@ import {
   renderPlan,
   summarizePlan,
 } from "../lib/sync";
-import { readZitadelSecret } from "../lib/project";
 
 /**
  * `zitadel plan` — validate config and preview the sync diff without mutating.
@@ -21,7 +19,7 @@ import { readZitadelSecret } from "../lib/project";
  * presence) happens in the sync engine, so an invalid file fails the same way
  * `apply` would.
  */
-export default class Plan extends BaseCommand {
+export default class Plan extends EnvironmentCommand {
   static override description = "Validate config without mutation and preview the sync diff.";
   static override group = CommandGroups.configuration;
   static override groupOrder = 1;
@@ -29,19 +27,13 @@ export default class Plan extends BaseCommand {
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Plan);
     await this.toMeta(flags);
-    const { cwd, source, env, isTTY } = this.meta;
+    const { cwd, env, isTTY } = this.meta;
 
-    const secret = await readZitadelSecret(cwd);
-    consola.info(`Project   ${secret.project_id}`);
-    consola.info(`Server    ${source}`);
     // Verbatim: the plan diffs what it reads against the project's files.
-    const client = createZitadelClient(
-      { baseUrl: source, token: secret.project_secret },
-      { verbatim: true },
-    );
+    const { client, projectId } = await this.connect({ verbatim: true });
     const syncers = makeSyncers({
       client,
-      projectId: secret.project_id,
+      projectId,
       env,
       cwd,
     });

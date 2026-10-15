@@ -6,6 +6,8 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { MANAGED_MARKER } from "../../../src/lib/paths";
+import { advisoryForWarnings } from "../../../src/commands/doctor/index";
+import { environmentSelectorSuffix } from "../../../src/lib/oclif/environment-flags";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
 
 type Check = { name: string; status: "pass" | "warn" | "fail"; message: string; path?: string };
@@ -72,9 +74,9 @@ async function makeHealthyProject(): Promise<string> {
       project: "proj-001",
       server: "https://api.zitadel.cloud",
       framework: { id: "next" },
-      environments: { development: { issuer: "http://localhost:3000" } },
     }),
   );
+  await writeFile(join(cwd, ".env.local"), "ZITADEL_ISSUER=http://localhost:3000\n");
   await writeFile(
     join(cwd, ".zitadel/secret"),
     JSON.stringify({
@@ -197,7 +199,91 @@ describe("doctor command", () => {
     const claim = json.data.checks.find((check) => check.name === "claim");
     expect(claim?.status).toBe("warn");
     expect(claim?.message).toContain("temporary and its data may be lost");
-    expect(json.data.next_commands).toContain(expectedPublicCliCommand("claim"));
+    // The nudge carries doctor's own --server so claim reconciles the project
+    // on the server doctor checked, not the default environment.
+    expect(json.data.next_commands).toContain(
+      expectedPublicCliCommand(`claim --server https://api.zitadel.cloud --cwd ${cwd}`),
+    );
+  });
+
+  it("suggests the claim on the project's own server, not the one doctor was pointed at", async () => {
+    const cwd = await makeHealthyProject();
+    await writeDetachedSecret(cwd);
+    const fake = await fakeDocker();
+
+    const res = await runCliForTest(
+      [
+        "doctor",
+        "--cwd",
+        cwd,
+        "--json",
+        "--port",
+        String(await freePort()),
+        "--server",
+        "https://self.example",
+      ],
+      { PATH: `${fake.binDir}:${process.env.PATH ?? ""}`, DOCKER_LOG: fake.logPath },
+    );
+
+    const data = (parseJson(res.stdout) as { data: { next_commands?: string[] } }).data;
+    expect(data.next_commands).toContain(
+      expectedPublicCliCommand(`claim --server https://api.zitadel.cloud --cwd ${cwd}`),
+    );
+  });
+
+  it("does not pin the claim to a file that names the project but not its secret", async () => {
+    const cwd = await makeHealthyProject();
+    await writeDetachedSecret(cwd);
+    await writeFile(join(cwd, ".env.development.local"), "ZITADEL_PROJECT_ID=proj-001\n");
+
+    const res = await doctor(cwd);
+
+    const data = (parseJson(res.stdout) as { data: { next_commands?: string[] } }).data;
+    expect((data.next_commands ?? []).some((command) => command.includes("--env-file"))).toBe(
+      false,
+    );
+  });
+
+  it("reports an unparseable zitadel.json as a failed config check rather than failing itself", async () => {
+    const cwd = await makeHealthyProject();
+    await writeFile(join(cwd, "zitadel.json"), "{");
+
+    const res = await doctor(cwd);
+
+    const json = parseJson(res.stdout) as {
+      details?: { checks?: Array<{ name: string; status: string }> };
+    };
+    expect(json.details?.checks?.find((check) => check.name === "config")?.status).toBe("fail");
+  });
+
+  it("suggests no claim when .env.development.local names another project", async () => {
+    const cwd = await makeHealthyProject();
+    await writeDetachedSecret(cwd);
+    await writeFile(join(cwd, ".env.development.local"), "ZITADEL_PROJECT_ID=someone-else\n");
+
+    const res = await doctor(cwd);
+
+    const data = (parseJson(res.stdout) as { data: { next_commands?: string[] } }).data;
+    expect((data.next_commands ?? []).some((command) => command.includes(" claim"))).toBe(false);
+  });
+
+  it("pins the claim it suggests to setup's file when there is one", async () => {
+    const cwd = await makeHealthyProject();
+    await writeDetachedSecret(cwd);
+    await writeFile(
+      join(cwd, ".env.development.local"),
+      "ZITADEL_PROJECT_ID=proj-001\nZITADEL_PROJECT_SECRET=sk_test\n",
+    );
+
+    const res = await doctor(cwd);
+
+    expect(
+      (parseJson(res.stdout) as { data: { next_commands?: string[] } }).data.next_commands,
+    ).toContain(
+      expectedPublicCliCommand(
+        `claim --env-file .env.development.local --server https://api.zitadel.cloud --cwd ${cwd}`,
+      ),
+    );
   });
 
   // Same advisory posture, reconciliation wording: past the 14-day window
@@ -219,7 +305,9 @@ describe("doctor command", () => {
     expect(claim?.status).toBe("warn");
     expect(claim?.message).toContain("claim window has closed");
     expect((json.data.next_actions ?? []).join("\n")).toContain("claim window has closed");
-    expect(json.data.next_commands ?? []).toContain(expectedPublicCliCommand("claim"));
+    expect(json.data.next_commands ?? []).toContain(
+      expectedPublicCliCommand(`claim --server https://api.zitadel.cloud --cwd ${cwd}`),
+    );
   });
 
   // Claiming needs a human in a browser, so --fix has nothing safe to do. The
@@ -249,7 +337,6 @@ describe("doctor command", () => {
         project: "proj-001",
         server: "http://localhost:8080",
         framework: { id: "next" },
-        environments: { development: { issuer: "http://localhost:3000" } },
       }),
     );
 
@@ -591,3 +678,34 @@ async function freePort(): Promise<number> {
   }
   return address.port;
 }
+
+describe("advisoryForWarnings", () => {
+  const claimWarning = {
+    name: "claim",
+    status: "warn" as const,
+    message: "temporary",
+    details: { claimable: true },
+  };
+
+  it("suggests claiming the local project on the server doctor checked", () => {
+    const advice = advisoryForWarnings(
+      [claimWarning],
+      "1.0.0-alpha.25",
+      environmentSelectorSuffix({ server: "https://a.example" }),
+    );
+
+    expect(advice?.nextCommands).toEqual([
+      expectedPublicCliCommand("claim --server https://a.example"),
+    ]);
+  });
+
+  it("adds no selector to the claim when doctor named no server or directory", () => {
+    const advice = advisoryForWarnings(
+      [claimWarning],
+      "1.0.0-alpha.25",
+      environmentSelectorSuffix({}),
+    );
+
+    expect(advice?.nextCommands).toEqual([expectedPublicCliCommand("claim")]);
+  });
+});

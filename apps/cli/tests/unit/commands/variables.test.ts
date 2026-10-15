@@ -104,11 +104,16 @@ describe("variables list", () => {
     expect(res.exitCode).toBe(0);
     const json = parseJson(res.stdout) as {
       status: string;
-      data: { count: number; variables: Array<Record<string, unknown>> };
+      data: {
+        count: number;
+        next_page_token: string | null;
+        items: Array<Record<string, unknown>>;
+      };
     };
     expect(json.status).toBe("ok");
     expect(json.data.count).toBe(2);
-    expect(json.data.variables).toEqual([
+    expect(json.data.next_page_token).toBeNull();
+    expect(json.data.items).toEqual([
       { name: "GOOGLE_CLIENT_ID", secret: false, value: "999-prod" },
       { name: "GOOGLE_CLIENT_SECRET", secret: true },
     ]);
@@ -125,8 +130,8 @@ describe("variables list", () => {
 
     const res = await runCliForTest(["variables", "list", "--project-level", ...base(cwd)]);
 
-    const json = parseJson(res.stdout) as { data: { variables: Array<Record<string, unknown>> } };
-    expect(json.data.variables[0]).not.toHaveProperty("value");
+    const json = parseJson(res.stdout) as { data: { items: Array<Record<string, unknown>> } };
+    expect(json.data.items[0]).not.toHaveProperty("value");
   });
 
   it("reads the primary values", async () => {
@@ -200,20 +205,16 @@ describe("variables list", () => {
     expect(res.stdout).toContain("No variables on the project.");
   });
 
-  it("no longer resolves as though `development` had been named", async () => {
+  it("refuses to guess a server when nothing names one", async () => {
     const cwd = await makeProject();
-    // A command with no `--environment` once resolved as though it had been
-    // given `development`, so this block became the server. With no top-level
-    // `server` the run now falls through to the default, which is what the
-    // handler below answers on.
-    await writeConfig(cwd, {
-      project: "proj_test",
-      environments: { development: { server: "https://dev.example" } },
-    });
-    let hit = "";
+    // `zitadel.json` once named the server, and a command without `--server`
+    // fell back to the cloud. Neither is a source now: the server is the
+    // environment's `ZITADEL_URL`, or it is missing.
+    await writeConfig(cwd, { project: "proj_test", server: "https://elsewhere.example" });
+    let requested = false;
     server.use(
-      http.get("*/variables", ({ request }) => {
-        hit = new URL(request.url).origin;
+      http.get("*/variables", () => {
+        requested = true;
         return HttpResponse.json({});
       }),
     );
@@ -227,8 +228,11 @@ describe("variables list", () => {
       "--json",
     ]);
 
-    expect(res.exitCode).toBe(0);
-    expect(hit).toBe(SERVER);
+    expect(res.exitCode).not.toBe(0);
+    expect(requested).toBe(false);
+    const json = parseJson(res.stdout) as { code: string; message: string };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain("ZITADEL_URL");
   });
 
   it("prints the project and the server on a terminal, and neither on a pipe", async () => {
@@ -250,17 +254,10 @@ describe("variables list", () => {
     expect(terminal.stdout).toContain(SERVER);
   });
 
-  it("ignores a per-environment server block in zitadel.json", async () => {
+  it("takes the server from ZITADEL_URL, not from zitadel.json", async () => {
     const cwd = await makeProject();
-    // `zitadel.json` names one server for the project and another under an
-    // environment. Nothing reads the per-environment entry, so the project's
-    // own server serves the request. No `--server` here: that flag
-    // short-circuits resolution and would hide it.
-    await writeConfig(cwd, {
-      project: "proj_test",
-      server: SERVER,
-      environments: { prod: { server: "https://elsewhere.example" } },
-    });
+    await writeConfig(cwd, { project: "proj_test", server: "https://elsewhere.example" });
+    await writeFile(join(cwd, ".env.local"), `ZITADEL_URL=${SERVER}\n`);
     let hit = "";
     server.use(
       http.get("*/variables", ({ request }) => {
@@ -581,6 +578,10 @@ describe("variables set", () => {
       expect(retry).toContain("--project-level");
       expect(retry).toContain("--secret");
       expect(json.hint).toContain("--project-level");
+      // The server this run was pointed at, before the redirection: without
+      // it the piped secret would land in the default project's store.
+      expect(retry).toContain(`--server ${SERVER}`);
+      expect(retry.endsWith(" < value.txt")).toBe(true);
     } finally {
       if (original) {
         Object.defineProperty(process, "stdin", original);
@@ -978,6 +979,24 @@ describe("variables delete asked on a terminal", () => {
 });
 
 describe("variables delete", () => {
+  it("keeps the run's server in the suggested --force retry", async () => {
+    const cwd = await makeProject();
+
+    const res = await runCliForTest([
+      "variables",
+      "delete",
+      "SUPPORT_EMAIL",
+      "--project-level",
+      "--non-interactive",
+      ...base(cwd),
+    ]);
+
+    const json = parseJson(res.stdout) as { next_commands?: string[] };
+    expect(json.next_commands?.[0]).toContain(
+      `variables delete SUPPORT_EMAIL --project-level --force --server ${SERVER}`,
+    );
+  });
+
   it("deletes the name at the project level", async () => {
     const cwd = await makeProject();
     let path = "";
@@ -1119,8 +1138,8 @@ describe("naming the owner", () => {
       const json = parseJson(res.stdout) as { code: string; message: string; hint: string };
       expect(json.code).toBe("E_VALIDATION");
       expect(json.message).toContain("--project-level");
-      // The refusal has to say there is nothing else to name, or it reads as
-      // a flag someone forgot rather than the only owner there is.
+      // The refusal has to say why there is nothing else to name, or it reads
+      // as a flag someone forgot rather than the only owner there is.
       expect(json.hint).toContain("only owner");
     }
   });
@@ -1154,26 +1173,23 @@ describe("naming the owner", () => {
     }
   });
 
-  it.each(["-e", "--environment", "--env"])(
-    "no longer accepts %s, which named an environment",
-    async (flag) => {
-      const cwd = await makeProject();
+  it("no longer accepts --environment, which named an environment", async () => {
+    const cwd = await makeProject();
 
-      const res = await runCliForTest([
-        "variables",
-        "list",
-        flag,
-        "prod",
-        "--project-level",
-        ...base(cwd),
-      ]);
+    const res = await runCliForTest([
+      "variables",
+      "list",
+      "--environment",
+      "prod",
+      "--project-level",
+      ...base(cwd),
+    ]);
 
-      expect(res.exitCode).not.toBe(0);
-      const json = parseJson(res.stdout) as { code: string; message: string };
-      expect(json.code).toBe("E_VALIDATION");
-      expect(json.message).toContain("Nonexistent flag");
-    },
-  );
+    expect(res.exitCode).not.toBe(0);
+    const json = parseJson(res.stdout) as { code: string; message: string };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain("Nonexistent flag");
+  });
 
   // Every command inherits the owner flag from one base class, so each one has
   // to refuse: a command that quietly resolved an owner would write where the

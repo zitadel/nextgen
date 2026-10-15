@@ -6,8 +6,8 @@ import type {
 } from "@zitadel/config/idp";
 import { consola } from "consola";
 
-import { publicCliCommand } from "../public-cli";
 import { reportWarning } from "../warnings";
+import { type EnvironmentSelector, projectCommand, type SuggestedCommand } from "../suggestion";
 
 /**
  * Publishes one variable to the project.
@@ -136,8 +136,11 @@ export function republishCommand(
   name: ClientIdVariable | ClientSecretVariable,
   secret: boolean,
   cliVersion: string,
-): string {
-  return publicCliCommand(republishArgsFor(name, secret).join(" "), cliVersion);
+  selector: EnvironmentSelector,
+): SuggestedCommand {
+  // `selector` carries the invocation's --env/--env-file/--server so the retry
+  // targets the same project.
+  return projectCommand(republishArgsFor(name, secret).join(" "), selector, cliVersion);
 }
 
 /** A credential, and whether the project ended up holding it. */
@@ -181,8 +184,11 @@ export function republishArgs(
 export function republishCommands(
   credentials: readonly CredentialRecovery[],
   cliVersion: string,
-): string[] {
-  return republishArgs(credentials).map((args) => publicCliCommand(args.join(" "), cliVersion));
+  selector: EnvironmentSelector,
+): SuggestedCommand[] {
+  return republishArgs(credentials).map((args) =>
+    projectCommand(args.join(" "), selector, cliVersion),
+  );
 }
 
 /**
@@ -222,11 +228,12 @@ export function reportSecretOutcome(
   outcome: SecretOutcome,
   cliVersion: string,
   noValue: boolean,
+  selector: EnvironmentSelector,
 ): void {
   reportPublished(
     outcome.name,
     outcome.published,
-    republishCommand(outcome.name, true, cliVersion),
+    republishCommand(outcome.name, true, cliVersion, selector),
     noValue,
   );
 }
@@ -241,6 +248,7 @@ export function reportClientIdOutcome(
   name: ClientIdVariable,
   state: PublishState,
   cliVersion: string,
+  selector: EnvironmentSelector,
 ): void {
-  reportPublished(name, state, republishCommand(name, false, cliVersion), false);
+  reportPublished(name, state, republishCommand(name, false, cliVersion, selector), false);
 }

@@ -2,7 +2,6 @@ import { nonBlankString } from "../../flags";
 
 import { ZitadelError } from "../../../errors";
 import { isObject } from "../../../json";
-import { publicCliCommand } from "../../../public-cli";
 import type { CommandResult, GlobalOptions } from "../../types";
 import { readRawBody } from "../body";
 import { bodyFieldFlags, bodyFromFlags, describeBody, fieldExample, needsRawBody } from "../fields";
@@ -20,6 +19,7 @@ import {
   type OperationStatics,
   ResourceCommand,
 } from "./command";
+import { nextCommandsData } from "../../envelope";
 
 /** `--data` / `--file`: the whole body at once, for anything the field flags cannot express. */
 const rawBodyFlags = {
@@ -112,11 +112,11 @@ abstract class WriteOperation<
       return dryRunResult(this.verb, topic, id, body);
     }
 
-    const result = await this.send(await this.connect(meta), body, id);
+    const result = await this.send(await this.context(), body, id);
     const resultId = isObject(result) ? result[resource.idField] : undefined;
     const nextCommands =
       typeof resultId === "string" && resource.get
-        ? [publicCliCommand(`${topic} get ${resultId} --json`, meta.cliVersion)]
+        ? [this.suggest(`${topic} get ${resultId} --json`)]
         : [];
     return {
       status: "ok",
@@ -124,7 +124,7 @@ abstract class WriteOperation<
       // write without a body (`grants create` by identifier answers 202).
       data:
         isObject(result) && nextCommands.length > 0
-          ? { ...result, next_commands: nextCommands }
+          ? { ...result, ...nextCommandsData(nextCommands) }
           : (result ?? {}),
       pretty: JSON.stringify(result, null, 2),
     };

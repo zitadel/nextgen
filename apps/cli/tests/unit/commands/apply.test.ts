@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
 
 const VALID_FLOW = {
   // Spec: `name` is a slug-pattern stable identifier; required fields are
@@ -89,12 +89,12 @@ describe("apply command pre-flight", () => {
     expect(json.message).toContain("Missing environment variables");
   });
 
-  it.each(["-e", "--environment"])("refuses %s, which addresses no environment", async (flag) => {
+  it("refuses --environment, which addresses no environment", async () => {
     const cwd = await makeCwd({});
 
     const res = await runCliForTest([
       "apply",
-      flag,
+      "--environment",
       "prod",
       "--cwd",
       cwd,
@@ -223,6 +223,10 @@ describe("apply command sync", () => {
       "Re-run plan to confirm local config and platform are in sync.",
     ]);
     expect(json.data.next_commands).toHaveLength(1);
-    expect(json.data.next_commands[0]).toMatch(/^npx @zitadel\/cli@\S+ plan$/);
+    // The suggested re-run carries the selector in effect (here `--server`
+    // and `--cwd`), so it resolves the same environment this apply targeted.
+    expect(json.data.next_commands[0]).toBe(
+      expectedPublicCliCommand(`plan --server ${server} --cwd ${cwd}`),
+    );
   });
 });
