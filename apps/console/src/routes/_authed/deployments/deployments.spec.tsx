@@ -79,8 +79,9 @@ describe("deployments list", () => {
     const rows = await screen.findAllByRole("row");
     // The header row, then the two deployments, newest first.
     expect(rows).toHaveLength(3);
+    const [, firstRow, secondRow] = rows as [HTMLElement, HTMLElement, HTMLElement];
 
-    const first = within(rows[1]);
+    const first = within(firstRow);
     expect(first.getByRole("link", { name: "rel_2" })).toHaveAttribute(
       "href",
       scopedPath("/releases/rel_2"),
@@ -91,7 +92,7 @@ describe("deployments list", () => {
     expect(first.getByText("Preview")).toBeInTheDocument();
     expect(first.getByText("active")).toBeInTheDocument();
 
-    const second = within(rows[2]);
+    const second = within(secondRow);
     expect(second.getByRole("link", { name: "rel_1" })).toBeInTheDocument();
     expect(second.getByText("Primary")).toBeInTheDocument();
     expect(second.getByText("Superseded")).toBeInTheDocument();
