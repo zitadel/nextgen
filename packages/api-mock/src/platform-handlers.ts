@@ -25,9 +25,11 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { serverCanonicalFlow } from "./server-canonical-flow.js";
 
 import type {
+  AddOrigin201,
   CompleteClaim200,
   CreateFlowDefinition201,
   CreateProject201,
+  CreateProject201OriginsItem,
   CreateSchema201,
   GetClaimWindow200,
   GetClaimStatus200,
@@ -40,6 +42,9 @@ import type {
   ListSchemas200,
 } from "@zitadel/api/generated/model";
 import {
+  AddOriginBody,
+  AddOriginParams,
+  AddOriginResponse,
   CompleteClaimResponse,
   CreateFlowDefinitionBody,
   CreateIdpBody,
@@ -78,12 +83,15 @@ import {
   QueryIdpsQueryParams,
   QueryIdpsResponse,
   QueryUsersBody,
+  RemoveOriginBody,
+  RemoveOriginParams,
   UpdateVariablesBody,
   UpdateVariablesQueryParams,
   UpdateVariablesResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { validateFlowDefinition } from "@zitadel/config/validate";
 import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/defaults";
+import { missingEndpoints } from "@zitadel/config/idp";
 import { http, HttpResponse } from "msw";
 import type { z } from "zod";
 
@@ -183,7 +191,7 @@ type ProjectRecord = {
   name: string;
   projectSecret: string;
   previewSecret: string;
-  previewOrigins: string[];
+  origins: CreateProject201OriginsItem[];
   createdAt: string;
   updatedAt: string;
 };
@@ -440,22 +448,11 @@ function immutableFieldClash(
       return field;
     }
   }
-  // The authority is the issuer for OIDC, and the token endpoint with the
-  // userinfo endpoint for OAuth 2.0.
-  for (const [block, fields] of [
-    ["oidc", ["issuer"]],
-    ["oauth2", ["token_endpoint", "userinfo_endpoint"]],
-  ] as const) {
-    const was = before[block];
-    const now = after[block];
-    if (!isObject(was) || !isObject(now)) {
-      continue;
-    }
-    for (const field of fields) {
-      if (was[field] !== undefined && was[field] !== now[field]) {
-        return `${block}.${field}`;
-      }
-    }
+  // The authority is the issuer.
+  const was = before.oidc;
+  const now = after.oidc;
+  if (isObject(was) && isObject(now) && was.issuer !== undefined && was.issuer !== now.issuer) {
+    return "oidc.issuer";
   }
   return undefined;
 }
@@ -782,7 +779,7 @@ export function setupPlatformHandlers() {
         name: body.data.name,
         projectSecret: `sk_proj_${id.replaceAll("-", "")}_full`,
         previewSecret: `sk_proj_${id.replaceAll("-", "")}_preview`,
-        previewOrigins: body.data.preview_origins ?? [],
+        origins: body.data.origins ?? [],
         createdAt,
         updatedAt: createdAt,
       };
@@ -795,7 +792,7 @@ export function setupPlatformHandlers() {
         name: project.name,
         project_secret: project.projectSecret,
         preview_secret: project.previewSecret,
-        preview_origins: project.previewOrigins,
+        origins: project.origins,
         created_at: project.createdAt,
       };
       return HttpResponse.json(responseBody, { status: 201 });
@@ -814,6 +811,7 @@ export function setupPlatformHandlers() {
       const responseBody: GetProject200 = {
         id: project.id,
         name: project.name,
+        origins: project.origins,
         created_at: project.createdAt,
         updated_at: project.updatedAt,
       };
@@ -822,6 +820,89 @@ export function setupPlatformHandlers() {
         return out.response;
       }
       return HttpResponse.json(out.data);
+    }),
+
+    // POST /projects/:project_id/origins/remove — drop one pattern. Missing
+    // project is 404; removing an already-absent pattern is idempotent 204.
+    http.post("*/projects/:project_id/origins/remove", async ({ params, request }) => {
+      const path = parse(RemoveOriginParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(RemoveOriginBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+
+      const project = store.projects.get(path.data.project_id);
+      if (!project) {
+        return HttpResponse.json(errorBody("origin.not_found", "origin: not found"), {
+          status: 404,
+        });
+      }
+
+      const next = project.origins.filter((o) => o.pattern !== body.data.pattern);
+      if (next.length !== project.origins.length) {
+        project.origins = next;
+        project.updatedAt = nowIso();
+      }
+      return new HttpResponse(null, { status: 204 });
+    }),
+
+    // POST /projects/:project_id/origins — add one {pattern, kind}. Same
+    // pattern+kind is idempotent 201; same pattern with a different kind is
+    // origin.kind_conflict. No check/warning field on the response.
+    http.post("*/projects/:project_id/origins", async ({ params, request }) => {
+      const path = parse(AddOriginParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(AddOriginBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+
+      const project = store.projects.get(path.data.project_id);
+      if (!project) {
+        return HttpResponse.json(errorBody("origin.not_found", "origin: not found"), {
+          status: 404,
+        });
+      }
+
+      const existing = project.origins.find((o) => o.pattern === body.data.pattern);
+      if (existing && existing.kind !== body.data.kind) {
+        return HttpResponse.json(
+          errorBody(
+            "origin.kind_conflict",
+            "origin: the pattern is already stored with a different kind",
+          ),
+          { status: 409 },
+        );
+      }
+
+      const origin: CreateProject201OriginsItem = {
+        pattern: body.data.pattern,
+        kind: body.data.kind,
+      };
+      if (!existing) {
+        project.origins = [...project.origins, origin];
+        project.updatedAt = nowIso();
+      }
+
+      const responseBody: AddOrigin201 = existing ?? origin;
+      const out = parse(AddOriginResponse, responseBody, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data, { status: 201 });
     }),
 
     // POST /projects/:project_id/claim/init — mint a claim challenge. Auth
@@ -1245,9 +1326,10 @@ export function setupPlatformHandlers() {
     }),
 
     // --- identity provider connections -----------------------------------
-    // The CLI's connection syncer publishes `.zitadel/idps/*.json` here. The
-    // Go service does not exist yet (#1003), so without these the SSO journey
-    // cannot be exercised end to end at all.
+    // The CLI's connection syncer publishes `.zitadel/idps/*.json` here. These
+    // stand in for the Go service in the CLI specs and the SSO journey, so
+    // they mirror its refusals: a CLI check the mock skipped would pass a test
+    // the real service fails.
 
     http.post("*/idps", async ({ request }) => {
       const query = parse(CreateIdpQueryParams, queryRecord(request), "invalid_query");
@@ -1264,6 +1346,20 @@ export function setupPlatformHandlers() {
       }
 
       const definition = body.data.idp as unknown as Record<string, unknown>;
+      // An oidc block names no endpoint or every one it needs. The server
+      // refuses anything in between before it looks the slug up, and nests
+      // the missing endpoints under details like any domain error's details.
+      const missing = missingEndpoints(definition.oidc);
+      if (missing.length > 0) {
+        return HttpResponse.json(
+          errorBody(
+            "idp.endpoints_partial",
+            "identity provider connection: the endpoints are partially set",
+            { details: { missing } },
+          ),
+          { status: 400 },
+        );
+      }
       const slug = definition.slug as string;
       const now = nowIso();
       // A slug that already exists is revised under its own id, so everything

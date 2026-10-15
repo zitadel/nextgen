@@ -6,10 +6,10 @@ description: |
 properties:
   name:
     type: string
-  preview_origins:
+  origins:
     type: array
     items:
-      type: string
+      $ref: ../../projects/project-origin.yaml
   password_hash_algorithm:
     type: string
     description: |

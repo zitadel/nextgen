@@ -26,6 +26,7 @@ type ManagedIDGenerator interface {
 type AllStatements interface {
 	ManagedIDGenerator
 	ProjectStatements
+	OriginStatements
 	FlowDefinitionStatements
 	CryptoKeyStatements
 	JSONSchemaStatements
@@ -76,6 +77,25 @@ type ProjectStatements interface {
 	ListProjects(ctx context.Context, filter *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error)
 	// DeleteProjectByID removes the project. changed is false when no row matched.
 	DeleteProjectByID(ctx context.Context, id string) (changed bool, err error)
+}
+
+// OriginStatements persists project origin patterns under the natural key
+// (project_id, pattern). There is no minted origin id.
+type OriginStatements interface {
+	Statements
+	// GetOrigin returns one origin matching filter, or a
+	// [database.NoRowFoundError] when none matches.
+	GetOrigin(ctx context.Context, filter database.Filter[domain.OriginField]) (*domain.Origin, error)
+	// ListOrigins returns origins matching filter. Default order is
+	// created_at, then pattern, then project_id when OrderBy is empty.
+	ListOrigins(ctx context.Context, filter *database.ListOptions[domain.OriginField]) (*database.ListResult[*domain.Origin], error)
+	// InsertOrigin stores one origin. inserted is false when the same
+	// (project_id, pattern) already exists (caller decides kind conflict vs
+	// idempotent add).
+	InsertOrigin(ctx context.Context, projectID string, origin domain.Origin) (inserted bool, err error)
+	// DeleteOriginByPattern removes one pattern. deleted is false when none
+	// matched. When deleted, removed carries the row that was deleted.
+	DeleteOriginByPattern(ctx context.Context, projectID, pattern string) (deleted bool, removed *domain.Origin, err error)
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
@@ -209,6 +229,10 @@ type IDPIdentityLinkStatements interface {
 	// GetIDPIdentityLink returns the link matching filter. No match returns
 	// *database.NoRowFoundError.
 	GetIDPIdentityLink(ctx context.Context, filter database.Filter[domain.IDPIdentityLinkField]) (*domain.IDPIdentityLink, error)
+	// ListIDPIdentityLinks pages the links matching filter. No match returns an
+	// empty page, so a caller needs UserExists to tell an unknown user from a
+	// user with no links.
+	ListIDPIdentityLinks(ctx context.Context, filter *database.ListOptions[domain.IDPIdentityLinkField]) (*database.ListResult[*domain.IDPIdentityLink], error)
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
