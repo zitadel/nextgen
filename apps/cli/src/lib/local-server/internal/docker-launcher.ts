@@ -230,7 +230,8 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
       ["logs", "--tail", String(tail), containerName],
       "Read logs",
     );
-    return result.stdout;
+    // `docker logs` replays each stream on its own: the server logs to stderr.
+    return result.stdout + result.stderr;
   }
 
   static async followLogs(containerName: string, tail: number): Promise<void> {

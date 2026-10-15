@@ -11,7 +11,7 @@ vi.mock("node:child_process", async (importOriginal) => {
   return { ...actual, spawn: vi.fn() };
 });
 
-function fakeDockerProcess(stdout: string, status = 0) {
+function fakeDockerProcess(stdout: string, status = 0, stderr = "") {
   const child = new EventEmitter() as EventEmitter & {
     stdout: EventEmitter & { setEncoding: () => void };
     stderr: EventEmitter & { setEncoding: () => void };
@@ -20,6 +20,7 @@ function fakeDockerProcess(stdout: string, status = 0) {
   child.stderr = Object.assign(new EventEmitter(), { setEncoding: () => undefined });
   queueMicrotask(() => {
     child.stdout.emit("data", stdout);
+    child.stderr.emit("data", stderr);
     child.emit("close", status);
   });
   return child;
@@ -247,7 +248,7 @@ describe("DockerLauncher", () => {
     it("reads the end of the container's log", async () => {
       const calls = fakeDocker({ existing: { running: true } });
 
-      await expect(launcher().logTail(record, 40)).resolves.toBe("");
+      await expect(launcher().logTail(record, 40)).resolves.toBe("level=INFO msg=listening\n");
       expect(calls.find((call) => call.args[0] === "logs")?.args).toEqual([
         "logs",
         "--tail",
@@ -292,6 +293,9 @@ function fakeDocker(options: { existing?: { running: boolean } }): DockerCall[] 
     }
     if (verb === "run") {
       return fakeDockerProcess("cid-1\n");
+    }
+    if (verb === "logs") {
+      return fakeDockerProcess("", 0, "level=INFO msg=listening\n");
     }
     return fakeDockerProcess("");
   }) as unknown as typeof spawn);
