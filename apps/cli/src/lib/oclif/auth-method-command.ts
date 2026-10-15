@@ -27,6 +27,9 @@ import { portableSuggestions, type SuggestedCommand } from "../suggestion";
 import { nonBlankString } from "./flags";
 import type { JsonEnvelope } from "./types";
 
+/** The message `deploy` needs, which only the caller can write. */
+const DEPLOY_MESSAGE = "<what changed>";
+
 /** What every `auth-method` command reads before changing anything. */
 type Target = {
   readonly cwd: string;
@@ -44,8 +47,8 @@ type Target = {
  * are nothing else, so {@link toggle} is all they run.
  *
  * Only `auth-method sso enable` talks to a server, to store the provider's
- * credentials. Every other edit is local, and `plan` and `apply` publish it
- * like any configuration change.
+ * credentials. Every other edit is local, and `deploy` publishes it like any
+ * configuration change.
  */
 export abstract class AuthMethodCommand extends EnvironmentCommand {
   // The environment flags are hidden here: most `auth-method` commands only
@@ -70,7 +73,7 @@ export abstract class AuthMethodCommand extends EnvironmentCommand {
    * @param flags - The parsed flags.
    * @param options.resolveServer - Whether the command talks to a server.
    *   Off by default: a stopped local runtime must not block staging a change
-   *   for a later `apply`.
+   *   for a later `deploy`.
    * @param options.preflight - Checks that must answer before the schema is
    *   read, with whatever they read handed back as `preflight`.
    */
@@ -189,9 +192,8 @@ export abstract class AuthMethodCommand extends EnvironmentCommand {
    * The follow-up commands of a result, as strings when every argument is
    * safe to run as written, and always as argument lists.
    *
-   * @param changed - Whether a file changed, which `plan` and `apply` then
-   *   publish.
-   * @param cwdArgs - `--cwd` for `plan` and `apply`, from {@link target}.
+   * @param changed - Whether a file changed, which `deploy` then publishes.
+   * @param cwdArgs - `--cwd` for `deploy`, from {@link target}.
    * @param leading - Commands that come first, such as publishing a credential
    *   that did not reach the project.
    */
@@ -204,13 +206,15 @@ export abstract class AuthMethodCommand extends EnvironmentCommand {
       ...leading,
       ...(changed
         ? [
-            ["plan", ...cwdArgs],
-            ["apply", ...cwdArgs],
+            ["deploy", "--dry-run", ...cwdArgs],
+            ["deploy", "-m", DEPLOY_MESSAGE, ...cwdArgs],
           ]
         : []),
     ];
     return {
-      ...nextCommandsData(portableSuggestions(args, this.meta.cliVersion)),
+      // The message is a placeholder the caller fills in, so it is quoted in
+      // the command string and listed as written in `next_args`.
+      ...nextCommandsData(portableSuggestions(args, this.meta.cliVersion, [DEPLOY_MESSAGE])),
       next_args: args,
     };
   }
@@ -235,7 +239,7 @@ export abstract class AuthMethodCommand extends EnvironmentCommand {
       if (enabled) {
         refuseMissingIdentifier(schema, method);
       }
-      // Both directions: a changed schema re-pins its flows, so `plan` would
+      // Both directions: a changed schema re-pins its flows, so `deploy` would
       // reject one it cannot check either way. Before the last-method guard,
       // because these refusals have no override, and nobody should be asked
       // to confirm a change that fails anyway.

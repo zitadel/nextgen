@@ -502,7 +502,7 @@ function toErrorEnvelope(error: ZitadelError, meta: GlobalOptions): ErrorEnvelop
 
 /**
  * Renders a {@link CommandResult} as human-facing text for non-JSON mode. A
- * command may supply a bespoke `pretty` string (e.g. the `apply` plan diff);
+ * command may supply a bespoke `pretty` string (e.g. `deploy`'s summary);
  * otherwise success payloads are summarised by {@link formatData} and skips are
  * shown with their reason and follow-up commands.
  */

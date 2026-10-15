@@ -285,3 +285,25 @@ func TestCreateReleaseUnauthenticated(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, status)
 	assert.Equal(t, domain.ErrAuthUnauthorized(nil).Code, code)
 }
+
+// TestRevokeReleaseNotImplemented pins revoke to 501 for an authorized caller:
+// the access check passes first, then the stub answers not-implemented until
+// the release service can revoke.
+func TestRevokeReleaseNotImplemented(t *testing.T) {
+	t.Parallel()
+
+	fixture := newReleaseFixture(t)
+	created := fixture.create(t, &api.CreateReleaseRequest{Pointers: fixture.pointers()})
+	require.IsType(t, &api.CreateReleaseCreated{}, created, helpers.MustMarshal(t, created))
+	releaseID := created.(*api.CreateReleaseCreated).ID
+
+	resp, err := fixture.client.RevokeRelease(t.Context(), api.RevokeReleaseParams{
+		ProjectID: api.ProjectID(fixture.project),
+		ReleaseID: releaseID,
+	})
+	require.NoError(t, err)
+	status, code, _, ok := errorResponseParts(t, resp)
+	require.True(t, ok, helpers.MustMarshal(t, resp))
+	assert.Equal(t, http.StatusNotImplemented, status)
+	assert.Equal(t, domain.ErrNotImplemented().Code, code)
+}

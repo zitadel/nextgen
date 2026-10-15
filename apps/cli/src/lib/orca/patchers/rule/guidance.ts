@@ -52,8 +52,8 @@ export function removeGuidanceSection(source: string): string {
 
 /** The agent-facing golden path, written into `AGENTS.md`. */
 export function agentsGuidanceSection(ctx: PatchContext): string {
-  const plan = publicCliCommand("plan", ctx.cliVersion);
-  const apply = publicCliCommand("apply", ctx.cliVersion);
+  const deployDryRun = publicCliCommand("deploy --dry-run", ctx.cliVersion);
+  const deploy = publicCliCommand("deploy", ctx.cliVersion);
   // WebAuthn ceremonies need an OS-level authenticator, so an agent driving
   // an automated browser stalls on the primary action of a passkey-first
   // flow unless told how to verify around it.
@@ -100,9 +100,9 @@ The golden path:
    - \`.zitadel/schemas/*.json\` — what a user is (fields, required, auth methods). See \`.zitadel/schemas/README.md\`.
    - \`.zitadel/flows/*.json\` — which screen collects which field/credential and how steps transition. See \`.zitadel/flows/README.md\`.
 4. Preview, then publish:
-   - \`${plan}\`
-   - \`${apply}\`
-   - Agents: append \`--non-interactive --json\` to both. \`plan\` validates flow invariants with the server's own rules **before** anything uploads — fix what it reports and re-run.
+   - \`${deployDryRun}\`
+   - \`${deploy}\`
+   - Agents: run both with \`--non-interactive\`; the publish also needs \`-m "<why this release changes>"\`, because a non-interactive \`deploy\` requires a message (\`--dry-run\` is exempt). \`deploy --dry-run\` validates flow invariants with the server's own rules and prints the diff **before** anything uploads — fix what it reports and re-run. Leave \`--json\` off the dry run to see that diff: its envelope carries only what would be published.
 
 ${presentationParagraph}${jsxTypesNote}
 
@@ -122,8 +122,8 @@ Never edit \`.zitadel/state.json\` (sync bookkeeping) or \`.zitadel/secret\` (cr
 
 /** The human-facing summary appended to the app `README.md`. */
 export function readmeGuidanceSection(ctx: PatchContext): string {
-  const plan = publicCliCommand("plan", ctx.cliVersion);
-  const apply = publicCliCommand("apply", ctx.cliVersion);
+  const deployDryRun = publicCliCommand("deploy --dry-run", ctx.cliVersion);
+  const deploy = publicCliCommand("deploy", ctx.cliVersion);
   return `## Authentication (Zitadel)
 
 Login for this app is managed by [Zitadel](https://zitadel.com). Try it: start the dev server, open ${ctx.issuer}/login (use this exact origin — passkeys are bound to it), register a user, sign out, and sign in again.
@@ -133,8 +133,8 @@ The dev server keeps its terminal busy, so run the commands below from a second 
 To change what the login collects or how sign-in works, edit the files under \`.zitadel/schemas/\` and \`.zitadel/flows/\` (each folder has a README), then:
 
 \`\`\`sh
-${plan}
-${apply}
+${deployDryRun}
+${deploy}
 \`\`\``;
 }
 

@@ -67,6 +67,13 @@ describe("resource registry", () => {
     for (const [topic, resource] of entries()) {
       expect(COMMANDS[`${topic}:list`], `${topic}:list`).toBeDefined();
       expect(COMMANDS[`${topic}:get`], `${topic}:get`).toBeDefined();
+      // `release` is the one topic that mixes generated reads (list/get) with
+      // hand-written verbs (create/revoke) under one singular topic, so the
+      // "a write command exists iff the registry declares it" invariant does
+      // not hold for it — the hand-written release create lives in src/index.ts.
+      if (topic === "release") {
+        continue;
+      }
       expect(Boolean(COMMANDS[`${topic}:create`])).toBe(Boolean(resource.create));
       expect(Boolean(COMMANDS[`${topic}:update`])).toBe(Boolean(resource.update));
       const deleteVerb = resource.delete?.verb ?? "delete";
@@ -1174,7 +1181,7 @@ describe("other resources", () => {
 
 describe("configuration resources are read-only", () => {
   it("exposes only list and get for every configuration topic", () => {
-    for (const topic of ["schemas", "releases", "flow-definitions", "branding"]) {
+    for (const topic of ["schemas", "release", "flow-definitions", "branding"]) {
       const resource = RESOURCES[topic as keyof typeof RESOURCES];
       expect(resource, topic).toBeDefined();
       expect(Object.keys(resource!), topic).toEqual(
@@ -1480,5 +1487,17 @@ describe("flow definitions list the current flows", () => {
     await run(cwd, ["flow-definitions", "list", "--filter", "revisions=all"]);
 
     expect(url?.searchParams.get("revisions")).toBe("all");
+  });
+});
+
+describe("the release resource", () => {
+  it("lists whether each release is revoked", () => {
+    expect(RESOURCES.release.columns).toContain("revoked_at");
+  });
+
+  it("shows a release's content hash and revocation", () => {
+    expect(RESOURCES.release.detail).toEqual(
+      expect.arrayContaining(["content_hash", "revoked_at"]),
+    );
   });
 });

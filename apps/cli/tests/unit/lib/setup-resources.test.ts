@@ -273,7 +273,7 @@ describe("materializeSetupResources", () => {
     // is not one of its dependencies) — every command mention must be the
     // runnable public npx form.
     for (const readme of [schemasReadme, flowsReadme]) {
-      expect(readme).toContain(`npx @zitadel/cli@${TEST_CLI_VERSION} plan`);
+      expect(readme).toContain(`npx @zitadel/cli@${TEST_CLI_VERSION} deploy`);
       expect(readme).not.toMatch(/`zitadel /);
     }
   });

@@ -45,7 +45,8 @@ exercises fresh-app setup plus registration, logout, and login across the
 supported frameworks.
 
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
-then re-run `plan` and `apply`. Schema and flow files are synced from
+then re-run `deploy` (or `deploy --dry-run` to validate and preview the diff
+without publishing). Schema and flow files are synced from
 `.zitadel/schemas/*.json` and `.zitadel/flows/*.json`. Login templates
 (branding) are synced from `.zitadel/branding/`: a single `branding.json`
 descriptor (layout, asset URLs) plus a sibling `login.liquid` LiquidJS
@@ -53,9 +54,10 @@ template referenced as `"liquid_template": { "$file": "./login.liquid" }`. Scaff
 `branding eject` command (`--design centered|minimal`,
 interactive picker on a TTY); setup never scaffolds them. Branding is
 revisioned and immutable: every edit — including a `.liquid`-only edit —
-plans as a `revise` and `apply` publishes a new revision; the login serves
-the newest one. `plan` validates templates with the authoritative LiquidJS
-validator (`E_VALIDATION` lists rule ids such as `no-script-tag` and
+is published as part of the next release when you `deploy`, and the login
+serves the newest release. `deploy` validates templates with the authoritative
+LiquidJS validator (and `deploy --dry-run` runs the same validation without
+publishing; `E_VALIDATION` lists rule ids such as `no-script-tag` and
 `mandatory-gates`; every template must keep a `{% mandatory_gates %}` tag,
 where the login adds any required field and the primary action the template
 left out). Asset URLs must be absolute `https://`; during development, images
@@ -67,16 +69,17 @@ directory. Keep exactly one descriptor in
 `.zitadel/branding/` — extra `*.json` files there fail the scan.
 Server-provisioned defaults remain a fallback for non-CLI project
 creation, but CLI-created projects are authored from local files first. Flows are
-revisioned like branding: an edit plans as a `revise` and `apply` publishes a new
-immutable flow revision. A flow names its schema by `objectType` in
-`user_schema` and runs against the schema's newest revision, so a schema revise
-needs no change to `user_schema`; one that removes or renames a property a step
-collects needs that step's `fields` updated, and `plan` checks only the flows it
-uploads. A login pinned by `flow-name` serves that flow's newest active
-revision; an unpinned login serves the newest active unscoped revision for its
-purpose in the project, whatever its flow's name. Older revisions stay active,
-so an `audience` added after a flow was applied without one doesn't take that
-earlier revision out of the running. Removing a flow file does not retire the
+revisioned like branding: an edit is published as a new immutable flow revision
+in the next `deploy`. A flow names its schema by `objectType` in `user_schema`
+and runs against the schema's newest revision, so a schema revise needs no
+change to `user_schema`; one that removes or renames a property a step
+collects needs that step's `fields` updated, and `deploy` checks each flow
+against the schema it names. A login pinned by `flow-name` serves that flow's
+newest active revision; an unpinned login serves the newest active unscoped
+revision for its purpose in the project, whatever its flow's name. Older
+revisions stay active, so an `audience` added after a flow was deployed
+without one doesn't take that earlier revision out of the running. Removing a
+flow file does not retire the
 flow. Managed files carry a marker comment; `eject` removes only
 files that still carry it, preserving anything the user replaced. For app-local
 development, `--server local` resolves through `.zitadel/local/runtime.json` and

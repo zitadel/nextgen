@@ -364,10 +364,12 @@ describe("status command", () => {
     // next_commands is staged in lockstep: preview is fine, publishing
     // waits for the first proven login.
     expect(json.data.next_commands).toContain(
-      expectedPublicCliCommand(`plan --server https://api.zitadel.cloud --cwd ${cwd}`),
+      expectedPublicCliCommand(`deploy --dry-run --server https://api.zitadel.cloud --cwd ${cwd}`),
     );
     expect(json.data.next_commands).not.toContain(
-      expectedPublicCliCommand(`apply --server https://api.zitadel.cloud --cwd ${cwd}`),
+      expectedPublicCliCommand(
+        `deploy -m '<what changed>' --server https://api.zitadel.cloud --cwd ${cwd}`,
+      ),
     );
   });
 
@@ -385,12 +387,14 @@ describe("status command", () => {
     expect(actions).toContain("Customize what you ask for and how people sign in");
     expect(actions).toContain(".zitadel/schemas/");
     expect(actions).toContain(
-      `See your changes before they go live: ${expectedPublicCliCommand(`plan --server https://api.zitadel.cloud --cwd ${cwd}`)} to preview, ` +
-        `then ${expectedPublicCliCommand(`apply --server https://api.zitadel.cloud --cwd ${cwd}`)} to publish.`,
+      `See your changes before they go live: ${expectedPublicCliCommand(`deploy --dry-run --server https://api.zitadel.cloud --cwd ${cwd}`)} to ` +
+        `preview, then ${expectedPublicCliCommand(`deploy -m '<what changed>' --server https://api.zitadel.cloud --cwd ${cwd}`)} to publish.`,
     );
     expect(actions).not.toContain("register a user");
     expect(json.data.next_commands).toContain(
-      expectedPublicCliCommand(`apply --server https://api.zitadel.cloud --cwd ${cwd}`),
+      expectedPublicCliCommand(
+        `deploy -m '<what changed>' --server https://api.zitadel.cloud --cwd ${cwd}`,
+      ),
     );
   });
 
@@ -412,7 +416,9 @@ describe("status command", () => {
     expect(actions).not.toContain("Customize what you ask for");
     expect(actions).toContain("temporary and its data may be lost");
     expect(json.data.next_commands).toContain(
-      expectedPublicCliCommand(`apply --server https://api.zitadel.cloud --cwd ${cwd}`),
+      expectedPublicCliCommand(
+        `deploy -m '<what changed>' --server https://api.zitadel.cloud --cwd ${cwd}`,
+      ),
     );
   });
 });

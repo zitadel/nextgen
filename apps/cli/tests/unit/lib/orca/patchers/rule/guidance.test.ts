@@ -107,12 +107,12 @@ describe("guidance content", () => {
     expect(readmeGuidanceSection(ctx)).toContain("http://localhost:3000/login");
   });
 
-  it("points agents at the dialect meta-schemas and the plan/apply loop", () => {
+  it("points agents at the dialect meta-schemas and the deploy loop", () => {
     const agents = agentsGuidanceSection(ctx);
     expect(agents).toContain('"$schema": "../meta/flow-definition.json"');
     expect(agents).toContain(".zitadel/meta/user-schema.json");
-    expect(agents).toContain("npx @zitadel/cli@0.1.0-alpha.15 plan");
-    expect(agents).toContain("--non-interactive --json");
+    expect(agents).toContain("npx @zitadel/cli@0.1.0-alpha.15 deploy --dry-run");
+    expect(agents).toContain("Leave `--json` off the dry run to see that diff");
     expect(agents).toContain("Never edit `.zitadel/state.json`");
   });
 
@@ -120,7 +120,7 @@ describe("guidance content", () => {
     const readme = readmeGuidanceSection(ctx);
     expect(readme).toContain("from a second terminal in this directory");
     expect(readme).toContain("register a user, sign out, and sign in again");
-    expect(readme).toContain("npx @zitadel/cli@0.1.0-alpha.15 apply");
+    expect(readme).toContain("npx @zitadel/cli@0.1.0-alpha.15 deploy");
   });
 
   it("tells agents how to verify a passkey-first flow they cannot complete", () => {

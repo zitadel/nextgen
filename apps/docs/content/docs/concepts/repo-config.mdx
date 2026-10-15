@@ -14,8 +14,8 @@ The CLI writes:
 - `.env.local`, with the project's real values, including the project secret
 - `.env.development.local`, the values the CLI reads: the server, the project and its credentials
 
-`zitadel plan` validates local configuration and previews the sync diff without mutating platform state.
+`zitadel deploy --dry-run` validates local configuration and shows the diff without mutating platform state.
 
-`zitadel apply` validates and uploads repo configuration.
+`zitadel deploy` builds a release from repo configuration and deploys it to the project.
 
 Local secrets and runtime-only state must stay out of source control: `.env.local`, `.zitadel/secret` (the project secret), and `.zitadel/local/**` (runtime data, not product configuration). Setup adds `.zitadel/secret` and `.env*` (all but `.env.example`) to `.gitignore`; `start` adds `.zitadel/local/`.

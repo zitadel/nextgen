@@ -143,7 +143,7 @@ describe("setup", () => {
 
         expect(await app.setup()).toSucceed();
 
-        expect(await app.plan()).toReportNothingToDo();
+        expect(await app.deployDryRun()).toSucceed();
       });
 
       it("installs the dependencies it added", async () => {
@@ -202,7 +202,7 @@ describe("setup", () => {
 
         expect(await app.setup()).toBeSkipped();
 
-        expect((await app.plan()).total).toBeGreaterThan(0);
+        expect(await app.deployDryRun()).toSucceed();
       });
 
       it("does not claim to be configured after a failed run", async () => {
@@ -234,7 +234,7 @@ describe("setup", () => {
 
         expect(await app.setup(["--force"])).toSucceed();
 
-        expect(await app.plan()).toReportNothingToDo();
+        expect(await app.deployDryRun()).toSucceed();
       });
 
       it.each([
@@ -398,7 +398,7 @@ describe("setup", () => {
           const app = await anApp();
           expect(await provider.setUp(app)).toSucceed();
 
-          expect(await app.plan()).toReportNothingToDo();
+          expect(await app.deployDryRun()).toSucceed();
         });
       });
 

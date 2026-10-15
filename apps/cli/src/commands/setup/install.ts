@@ -122,7 +122,7 @@ function outcome(input: {
   issuer: string;
   includeInstallCommand: boolean;
 }): SetupInstallOutcome {
-  const planCommand = unscopedCommand("plan", input.cliVersion);
+  const planCommand = unscopedCommand("deploy --dry-run", input.cliVersion);
   const statusCommand = unscopedCommand("status", input.cliVersion);
   const verifyActions = [
     ...(input.includeInstallCommand ? [`Install dependencies: ${input.install.command}`] : []),

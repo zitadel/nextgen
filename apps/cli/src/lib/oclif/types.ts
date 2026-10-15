@@ -82,7 +82,7 @@ export type GlobalOptions = {
 /**
  * What a command body returns to {@link import("./base").BaseCommand.emit}: a
  * success or a deliberate skip. The optional `pretty` string lets a command
- * supply a bespoke human rendering (e.g. the `apply` plan diff); otherwise the
+ * supply a bespoke human rendering (e.g. `deploy`'s summary); otherwise the
  * generic renderer formats `data`. Failures are thrown as `ZitadelError`,
  * never returned.
  */

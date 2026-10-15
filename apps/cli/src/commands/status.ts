@@ -36,6 +36,7 @@ import {
   unscopedCommand,
 } from "../lib/suggestion";
 import { nextCommandsData } from "../lib/oclif/envelope";
+import { DEPLOY_ARGS } from "../lib/release";
 
 /**
  * `zitadel status` — summarize the local server and project state.
@@ -302,6 +303,9 @@ function nextActionsFor(
   project: ProjectStatus,
   users: UserPresence,
   cliVersion: string,
+  // Appended to the `claim` the prose nudge quotes: the action text is a
+  // pasteable command, so it must carry the same environment selector the
+  // machine `next_commands` do, or a reader copying it retargets the project.
   selector: EnvironmentSelector,
 ): string[] {
   if (project.lifecycle === "not-configured") {
@@ -382,13 +386,13 @@ function nextCommandsFor(
     }
     if (users === "none") {
       // Staged like next_actions: before the first login is proven in a
-      // browser, publishing is premature — `plan` previews safely and the
-      // verify mission lives in next_actions. `apply` joins once users
-      // exist ("some") or when the probe can't tell ("unknown" keeps the
-      // lifecycle-only behavior rather than withholding on no signal).
-      commands.push(projectCommand("plan", selector, cliVersion));
+      // browser, publishing is premature — `deploy --dry-run` previews safely
+      // and the verify mission lives in next_actions. A full `deploy` joins
+      // once users exist ("some") or when the probe can't tell ("unknown"
+      // keeps the lifecycle-only behavior rather than withholding on no signal).
+      commands.push(projectCommand("deploy --dry-run", selector, cliVersion));
     } else {
-      commands.push(projectCommand("apply", selector, cliVersion));
+      commands.push(projectCommand(DEPLOY_ARGS, selector, cliVersion));
     }
   }
   return commands;

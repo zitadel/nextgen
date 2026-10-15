@@ -28,7 +28,7 @@ A spec drives the built CLI through `runCliForTest` against
 observe afterwards.
 
 **One spec file per command, named after the command.** `setup.spec.ts`,
-`plan.spec.ts`, `auth-method-sso-enable.spec.ts`, `variables-set.spec.ts`. A
+`deploy.spec.ts`, `auth-method-sso-enable.spec.ts`, `variables-set.spec.ts`. A
 command's spec is the only spec that drives that command as its subject. There
 are no cross-command spec files, no "contract" files and no "round-trip" files.
 
@@ -74,7 +74,7 @@ Three rules make that shape hold:
 2. **Observe by running a command.** A spec's subject is how the CLI behaves,
    not how it stores things, so what a command did is checked by running
    another one: `idps list`, `schemas list`, `flow-definitions list`,
-   `variables list --project-level`, `plan`. Never `.zitadel/state.json` and
+   `variables list --project-level`, `deployment list`. Never `.zitadel/state.json` and
    never the mock's own store — a corrupt file matters only insofar as a later
    command surfaces it, and that surfacing is the assertion.
 
@@ -83,8 +83,8 @@ Three rules make that shape hold:
    and never a literal, because a secret in version control cannot be scrubbed
    later. Nothing else — not prose copy, key ordering, generated file contents
    or marker files, all of which a unit test reaches faster.
-3. **One journey per test.** A test that runs setup, then doctor, then plan, then
-   apply, then reruns is not a spec; it is five specs sharing a temp directory.
+3. **One journey per test.** A test that runs setup, then doctor, then deploy, then
+   rollback, then reruns is not a spec; it is five specs sharing a temp directory.
    Split it and let each command's spec own its own leg.
 
 Use `it.each` for anything that varies by framework, preset or resource. A spec
@@ -130,12 +130,12 @@ A spec body contains a fixture call, a command, and matchers — nothing else:
   that is down. Most fail. Some carry on deliberately, for one of two reasons:
   they never needed the server — `resources` describes the command surface,
   `stop`, `reset` and `eject` act on the machine — or they reach it and
-  tolerate the failure, as `plan` does for its old-state fetch,
-  `auth-method sso enable` for publishing the credentials, and `doctor` and
-  `status` for their probes. Either way it is worth stating rather than leaving
-  to be discovered, and each spec's own first group is the record, not this
-  sentence. The `--json` and rendered groups never interleave, and a command
-  with no human-rendered output has no second one.
+  tolerate the failure, as `auth-method sso enable` does for publishing the
+  credentials, and `doctor` and `status` for their probes. Either way it is
+  worth stating rather than leaving to be discovered, and each spec's own first
+  group is the record, not this sentence. The `--json` and rendered groups
+  never interleave, and a command with no human-rendered output has no second
+  one.
 
 Formatting is Biome's, per the repo's `biome.json`, so nothing is
 hand-wrapped.

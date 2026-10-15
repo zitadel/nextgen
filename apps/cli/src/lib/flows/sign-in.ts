@@ -20,7 +20,7 @@ type FlowCheck =
 /**
  * Check what a schema change from `before` to `after` does to a flow.
  *
- * Only new errors count. A schema-rule error the flow already had is `plan`'s
+ * Only new errors count. A schema-rule error the flow already had is `deploy`'s
  * to report, and refusing an unrelated change because of it would block the
  * developer from an edit that might be part of the fix.
  *
@@ -39,7 +39,7 @@ export function checkFlow(
 ): FlowCheck {
   // The semantic validator reads a malformed shape leniently (a string where
   // `fields` should be a list reads as no fields), so the raw file is checked
-  // against the canonical flow schema first, as `plan` does.
+  // against the canonical flow schema first, as `deploy` does.
   const shape = flowConfigSchema.safeParse(flowAfter);
   if (!shape.success) {
     return {

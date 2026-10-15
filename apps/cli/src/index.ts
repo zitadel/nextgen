@@ -1,6 +1,5 @@
 import type { Command } from "@oclif/core";
 
-import Apply from "./commands/apply";
 import AuthMethodPasskeyDisable from "./commands/auth-method/passkey/disable";
 import AuthMethodPasskeyEnable from "./commands/auth-method/passkey/enable";
 import AuthMethodPasswordDisable from "./commands/auth-method/password/disable";
@@ -10,6 +9,11 @@ import AuthMethodSsoEnable from "./commands/auth-method/sso/enable";
 import BrandingEject from "./commands/branding/eject";
 import Claim from "./commands/claim";
 import Console from "./commands/console";
+import Deploy from "./commands/deploy";
+import DeploymentCreate from "./commands/deployment/create";
+import DeploymentGet from "./commands/deployment/get";
+import DeploymentList from "./commands/deployment/list";
+import DeploymentRollback from "./commands/deployment/rollback";
 import Doctor from "./commands/doctor/index";
 import Eject from "./commands/eject";
 import Env from "./commands/env/index";
@@ -19,7 +23,8 @@ import Logs from "./commands/logs";
 import OriginAdd from "./commands/origin/add";
 import OriginList from "./commands/origin/list";
 import OriginRm from "./commands/origin/rm";
-import Plan from "./commands/plan";
+import ReleaseCreate from "./commands/release/create";
+import ReleaseRevoke from "./commands/release/revoke";
 import Reset from "./commands/reset";
 import { RESOURCE_COMMANDS } from "./commands/resources";
 import ResourcesList from "./commands/resources-list";
@@ -42,14 +47,13 @@ import VariablesSet from "./commands/variables/set";
  * `commands/resources.ts`, so a new backend resource is one registry entry.
  */
 export const COMMANDS: Record<string, typeof Command> = {
-  apply: Apply,
   claim: Claim,
   console: Console,
+  deploy: Deploy,
   doctor: Doctor,
   eject: Eject,
   env: Env,
   logs: Logs,
-  plan: Plan,
   reset: Reset,
   resources: ResourcesList,
   setup: Setup,
@@ -63,11 +67,17 @@ export const COMMANDS: Record<string, typeof Command> = {
   "auth-method:sso:enable": AuthMethodSsoEnable,
   "auth-method:sso:disable": AuthMethodSsoDisable,
   "branding:eject": BrandingEject,
+  "deployment:create": DeploymentCreate,
+  "deployment:get": DeploymentGet,
+  "deployment:list": DeploymentList,
+  "deployment:rollback": DeploymentRollback,
   "env:add": EnvAdd,
   "env:list": EnvList,
   "origin:add": OriginAdd,
   "origin:list": OriginList,
   "origin:rm": OriginRm,
+  "release:create": ReleaseCreate,
+  "release:revoke": ReleaseRevoke,
   "variables:list": VariablesList,
   "variables:get": VariablesGet,
   "variables:set": VariablesSet,
