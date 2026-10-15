@@ -10,6 +10,7 @@
     "server": "node scripts/run-server.mjs",
     "docs": "moon run docs:dev",
     "check": "node scripts/check.mjs",
+    "check:cloud": "turbo run e2e-deployment console-deployment --continue",
     "test": "node scripts/assert-file.mjs scripts/ci-mode.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts && vitest run scripts/ci-mode.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts",
     "test:all": "pnpm run test",
     "release:snapshot": "moon run release:snapshot",

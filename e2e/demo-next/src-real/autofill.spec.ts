@@ -12,7 +12,7 @@ import { expect, test } from "@zitadel/testing/playwright";
 function pairedIdentifier(page: Page): Locator {
   return page
     .locator("form")
-    .filter({ has: page.getByLabel(/password/i) })
+    .filter({ has: page.getByRole("textbox", { name: /password/i }) })
     .locator('input[autocomplete="username"]');
 }
 
@@ -28,7 +28,7 @@ test("sign-in tags each step and pairs the identifier with the password", async 
   await email.fill(user.email);
   await page.getByRole("button", { name: "Continue", exact: true }).click();
 
-  const password = page.getByLabel(/password/i);
+  const password = page.getByRole("textbox", { name: /password/i });
   await expect(password).toHaveAttribute("autocomplete", "current-password");
   await expect(pairedIdentifier(page)).toHaveValue(user.email);
 
@@ -52,6 +52,9 @@ test("registration tags each step and pairs the identifier with the new password
   await email.fill(who.email);
   await page.getByRole("button", { name: "Continue with password", exact: true }).click();
 
-  await expect(page.getByLabel(/password/i)).toHaveAttribute("autocomplete", "new-password");
+  await expect(page.getByRole("textbox", { name: /password/i })).toHaveAttribute(
+    "autocomplete",
+    "new-password",
+  );
   await expect(pairedIdentifier(page)).toHaveValue(who.email);
 });

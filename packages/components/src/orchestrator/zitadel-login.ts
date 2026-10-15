@@ -35,7 +35,7 @@ import type { ResolvedTheme } from "./theme-controller.js";
 import type { Branding } from "./branding.js";
 import { stampExportparts } from "./exportparts.js";
 import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
-import { en, builtinLocales, type Locale } from "./locales/index.js";
+import { en, builtinLocales, mergeLocale, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
 import { resolveApi, resolveProject } from "./resolve-api.js";
 import { createSanitiser } from "./sanitiser.js";
@@ -239,6 +239,16 @@ export class ZitadelLogin extends ZitadelSurface {
     this.#resumeFlowId = orDefault(value, "");
   }
   #resumeFlowId = "";
+
+  /**
+   * Hide the show/hide button on password fields. The button is shown by
+   * default — NIST SP 800-63B recommends offering it — so this is an opt-out,
+   * named negatively because a boolean attribute can only switch something
+   * on. Local to the embedding page, and applied to the rendered fields
+   * directly, so it holds for custom templates too.
+   */
+  @property({ type: Boolean, attribute: "suppress-password-toggle" })
+  accessor suppressPasswordToggle = false;
 
   /**
    * Preview mode, for an operator surface such as the console's branding
@@ -465,8 +475,10 @@ export class ZitadelLogin extends ZitadelSurface {
   /**
    * Resolves the effective locale dictionary. The built-in dictionary for the
    * resolved language is used as the base; entries from the `locales` map (if
-   * set) are spread on top so partial overrides work without importing and
-   * spreading the full base dictionary.
+   * set) are merged on top by {@link mergeLocale}, so partial overrides work
+   * without importing the full base dictionary. The merge also drops a
+   * built-in `<step>.description.sso` when the integrator rewrote that step's
+   * description without one, so their text is what the `t` fallback shows.
    *
    * Priority: explicit `lang` attr → `navigator.language` (user preference)
    * → `document.documentElement.lang` (page default) → English fallback.
@@ -481,13 +493,7 @@ export class ZitadelLogin extends ZitadelSurface {
     const custom = this.locales?.[primary];
     if (!custom) return builtin;
 
-    // Entries are Partial — merge key-by-key and skip explicit `undefined`
-    // values, which a plain spread would let shadow the built-in copy.
-    const merged: Locale = { ...builtin };
-    for (const [key, value] of Object.entries(custom)) {
-      if (value !== undefined) merged[key] = value;
-    }
-    return merged;
+    return mergeLocale(builtin, custom);
   }
 
   override willUpdate(changed: PropertyValues<this>): void {
@@ -515,6 +521,25 @@ export class ZitadelLogin extends ZitadelSurface {
     }
     this.applySurfaceTheme(this.branding);
     this.setAttribute("aria-busy", this.loading ? "true" : "false");
+  }
+
+  /**
+   * Set on the fields rather than written by the template: the toggle is the
+   * embedding page's choice, not the flow's, so it reaches ejected templates
+   * without their cooperation. Runs before the fresh fields' first render, so
+   * the button never flashes in or out.
+   */
+  private applyPasswordToggle(root: ShadowRoot): void {
+    // Compared, not passed through: an unset framework prop arrives as
+    // `undefined`, which must keep the default (toggle shown).
+    const enabled = this.suppressPasswordToggle !== true;
+    // Every built-in dictionary carries the key, and a custom one can only
+    // override it, so the guard below only satisfies the index type.
+    const label = this.resolveLocale()["action.show_password"];
+    for (const field of root.querySelectorAll("zl-field")) {
+      field.passwordToggle = enabled;
+      if (label) field.passwordToggleLabel = label;
+    }
   }
 
   override updated(changed: PropertyValues<this>): void {
@@ -551,6 +576,7 @@ export class ZitadelLogin extends ZitadelSurface {
       for (const card of this.shadowRoot.querySelectorAll("zl-card")) {
         card.toggleAttribute("data-suppress-header", this.suppressHeader === true);
       }
+      this.applyPasswordToggle(this.shadowRoot);
     }
     const previousTheme = this.lastRenderedTheme;
     this.lastRenderedTheme = this.themeController.theme;

@@ -56,6 +56,7 @@ declare module "solid-js" {
         theme?: "light" | "dark" | "auto";
         "prop:suppressHeader"?: boolean;
         "suppress-header"?: boolean;
+        "prop:suppressPasswordToggle"?: boolean;
         "on:zitadel-flow-step"?: (event: CustomEvent<ZitadelFlowStepDetail>) => void;
         "on:zitadel-flow-input"?: (event: CustomEvent<ZitadelFlowInputDetail>) => void;
         "on:zitadel-flow-complete"?: (event: CustomEvent<ZitadelFlowCompleteDetail>) => void;
@@ -137,6 +138,7 @@ export function ZitadelLogin(
       variant={props.variant}
       theme={props.theme}
       prop:suppressHeader={props.suppressHeader}
+      prop:suppressPasswordToggle={props.suppressPasswordToggle}
       on:zitadel-flow-step={(event) => props.onFlowStep?.(event.detail)}
       on:zitadel-flow-input={(event) => props.onFlowInput?.(event.detail)}
       on:zitadel-flow-complete={(event) => props.onFlowComplete?.(event.detail)}

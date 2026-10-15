@@ -38,10 +38,13 @@ export type ZlFieldInputDetail = { name: string; value: string };
  *   input        36px tall, 10px/4px padding, `--zl-radius-md`, a
  *                `--zl-input` edge over `--zl-input-fill`
  *   focus        the edge takes `--zl-ring` and a 3px ring sits outside it
- *   trailing     cross (clear) | alert-circle (error) | check (success).
- *                The clear button is a pointer-only affordance (`tabindex="-1"`)
- *                so Tab moves from one input straight to the next; keyboard
- *                users clear via the input itself.
+ *   trailing     cross (clear) | alert-circle (error) | check (success), or
+ *                eye / eye-off on a password field with `passwordToggle` — the
+ *                toggle takes the slot in every state, so the field never
+ *                shows two icons. The clear button is a pointer-only affordance
+ *                (`tabindex="-1"`) — keyboard users clear via the input
+ *                itself. The toggle has no keyboard equivalent, so it sits in
+ *                the tab order right after the input.
  *   description  14/20 in `--zl-muted-foreground`
  *   read-only    `--zl-muted` fill at full contrast, no hover edge and no
  *                clear button; still focusable and still submitted
@@ -77,10 +80,25 @@ export class ZlField extends FormAtom {
     | string
     | undefined = undefined;
   @property({ type: Boolean, attribute: "trailing-icon" }) accessor trailingIcon = true;
+  /**
+   * Offer a show/hide button on a `type="password"` field. Property-only and
+   * left out of the manifest: `<zitadel-login>` sets it on its fields after
+   * each render from its own `suppress-password-toggle`, so neither a
+   * template nor markup decides it.
+   */
+  @property({ attribute: false }) accessor passwordToggle = false;
+  /**
+   * The toggle's accessible name. It stays the same in both states and
+   * `aria-pressed` carries the state, as the APG toggle-button pattern asks:
+   * a name that flips alongside `aria-pressed` would read "Hide, pressed".
+   */
+  @property({ attribute: false }) accessor passwordToggleLabel = "Show password";
   @property({ type: Boolean }) accessor required = false;
   @property({ type: Boolean, reflect: true, attribute: "readonly" }) accessor readOnly = false;
   @property({ type: Boolean, reflect: true }) accessor invalid = false;
 
+  /** Whether a toggle-enabled password field currently shows its value. */
+  @state() private accessor revealed = false;
   @state() private accessor hasHelp = false;
   @state() private accessor hasSuffixSlot = false;
 
@@ -101,6 +119,55 @@ export class ZlField extends FormAtom {
     if (changed.has("value") || changed.has("required") || changed.has("error")) {
       this.syncFormState();
     }
+    // Whenever the button is not drawn there is no way to hide the value
+    // again, so it must not stay revealed.
+    if (this.revealed && !this.toggleShown) {
+      this.revealed = false;
+    }
+  }
+
+  /**
+   * Form-associated lifecycle: the browser calls this whenever the owning
+   * form changes, including `null` on removal. The submit listener lives on
+   * the form because every submit path — a submit button and Enter alike —
+   * ends in `form.requestSubmit()`, which dispatches `submit` synchronously.
+   */
+  formAssociatedCallback(form: HTMLFormElement | null): void {
+    this.associatedForm?.removeEventListener("submit", this.concealOnSubmit, true);
+    this.associatedForm = form;
+    form?.addEventListener("submit", this.concealOnSubmit, true);
+  }
+
+  private associatedForm: HTMLFormElement | null = null;
+
+  /**
+   * Hide the value before the submit event reaches anyone else on the form.
+   * Setting `revealed` alone is not enough: Lit applies it on a later
+   * microtask, after the submit has already been dispatched with the input
+   * still `type="text"`.
+   */
+  private concealOnSubmit = (): void => {
+    if (!this.revealed) return;
+    this.revealed = false;
+    if (this.inputEl) this.inputEl.type = this.type;
+  };
+
+  override formResetCallback(): void {
+    this.revealed = false;
+    super.formResetCallback();
+  }
+
+  /**
+   * Whether the show/hide button is drawn. It lives in the trailing slot, so
+   * a filled `suffix` or a disabled field leaves it out.
+   */
+  private get toggleShown(): boolean {
+    return (
+      this.passwordToggle === true &&
+      this.type === "password" &&
+      !this.hasSuffixSlot &&
+      !this.isDisabled
+    );
   }
 
   override focus(options?: FocusOptions): void {
@@ -141,17 +208,28 @@ export class ZlField extends FormAtom {
       "zr-field--disabled": this.isDisabled,
       "zr-field--readonly": this.readOnly,
     });
+    // A revealed password is a `type="text"` input, which browsers hand to
+    // spellcheck and autocorrect — and "enhanced" spellcheck sends the text to
+    // a cloud service. Opting out whenever the toggle is drawn covers that.
+    const toggleShown = this.toggleShown;
     // A read-only field keeps the error and success icons but not the clear
-    // button, which would change the value.
+    // button, which would change the value. The password toggle stays: it
+    // only changes what is shown, not what is submitted.
     const showDefaultTrailing =
-      this.trailingIcon &&
-      !this.hasSuffixSlot &&
-      !this.isDisabled &&
-      (!this.readOnly || this.invalid || showError || showSuccess);
-    const trailing = showDefaultTrailing ? this.renderTrailingIcon() : null;
+      toggleShown ||
+      (this.trailingIcon &&
+        !this.hasSuffixSlot &&
+        !this.isDisabled &&
+        (!this.readOnly || this.invalid || showError || showSuccess));
+    const trailing = toggleShown
+      ? this.renderPasswordToggle()
+      : showDefaultTrailing
+        ? this.renderTrailingIcon()
+        : null;
     const wrapClass = classMap({
       "zr-field__wrap": true,
       "zr-field__wrap--trailing": showDefaultTrailing,
+      "zr-field__wrap--toggle": toggleShown,
     });
 
     return html`
@@ -165,7 +243,10 @@ export class ZlField extends FormAtom {
             id=${this.inputId}
             data-testid=${ifDefined(this.nativeInputTestId())}
             name=${this.name}
-            type=${this.type}
+            type=${this.revealed ? "text" : this.type}
+            spellcheck=${ifDefined(toggleShown ? "false" : undefined)}
+            autocapitalize=${ifDefined(toggleShown ? "off" : undefined)}
+            autocorrect=${ifDefined(toggleShown ? "off" : undefined)}
             .value=${live(this.value)}
             placeholder=${this.placeholder}
             autocomplete=${ifDefined(this.autocomplete)}
@@ -266,6 +347,55 @@ export class ZlField extends FormAtom {
       </span>
     `;
   }
+
+  private renderPasswordToggle() {
+    return html`
+      <span class="zr-field__trailing zr-field__trailing--toggle" part="trailing-icon">
+        <button
+          type="button"
+          class="zr-field__trailing-action zr-focus-ring"
+          part="trailing-action password-toggle"
+          aria-label=${this.passwordToggleLabel}
+          aria-pressed=${this.revealed ? "true" : "false"}
+          aria-controls=${this.inputId}
+          title=${this.passwordToggleLabel}
+          @mousedown=${this.keepInputFocus}
+          @click=${this.handlePasswordToggle}
+        >
+          <zl-icon name=${this.revealed ? "eye-off" : "eye"} size="16" decorative></zl-icon>
+        </button>
+      </span>
+    `;
+  }
+
+  /**
+   * A pointer press would move focus to the button and blur the field
+   * mid-typing, so focus stays in the input. Keyboard users reach the button
+   * with Tab, and focus stays on it so they hear the new state.
+   */
+  private keepInputFocus = (event: MouseEvent): void => {
+    event.preventDefault();
+  };
+
+  private handlePasswordToggle = async (): Promise<void> => {
+    const input = this.inputEl;
+    // Chrome drops the caret to 0 when a focused input's type changes while
+    // the click that caused it is still being handled — which is always the
+    // case here, since Lit renders in a microtask of this click. So carry the
+    // selection across the change.
+    const start = input?.selectionStart ?? null;
+    const end = input?.selectionEnd ?? null;
+    const direction = input?.selectionDirection ?? undefined;
+    this.revealed = !this.revealed;
+    await this.updateComplete;
+    if (input && start !== null && end !== null) {
+      // The reset is lazy: Chrome applies it when it next lays the input out.
+      // Forcing that layout first makes the restore stick, without a frame
+      // where the caret sits at 0.
+      void input.offsetWidth;
+      input.setSelectionRange(start, end, direction);
+    }
+  };
 
   private syncFormState(): void {
     this.internals.setFormValue?.(this.value);
@@ -400,6 +530,7 @@ export const zlFieldManifest: AtomManifest = {
     "input",
     "trailing-icon",
     "trailing-action",
+    "password-toggle",
     "help",
     "success",
     "error",

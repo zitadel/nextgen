@@ -31,7 +31,7 @@
   "scripts": {
     "build": "vite build --mode lib",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
-    "test": "node ../../scripts/task-guard.mjs --mutex browser-tests --retries 3 -- vitest run",
+    "test": "node ../../scripts/task-guard.mjs --retries 3 -- vitest run",
     "test:all": "vitest run",
     "lint": "biome check .",
     "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build",

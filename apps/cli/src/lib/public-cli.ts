@@ -14,6 +14,42 @@ export function npmSelectorForCliVersion(cliVersion: string): string {
   return npmDistTagForCliVersion(normalized);
 }
 
+/**
+ * Whether a value can sit in a suggested command unquoted on every shell the
+ * CLI runs under (POSIX shells, PowerShell and cmd.exe). Quoting differs
+ * between them, so a value that needs quoting is not put in a suggested
+ * command at all; callers hand it over as an argument list instead.
+ */
+function isPortableShellWord(value: string): boolean {
+  // `/` is included so a POSIX-style --cwd path can be suggested as written.
+  return /^[A-Za-z0-9_./-]+$/.test(value);
+}
+
+/**
+ * Suggested commands as strings, built from argument lists. Every argument
+ * must be a portable shell word, or none of the commands is returned: a
+ * caller then hands over the argument lists alone, which no shell interprets.
+ */
+export function portableCommands(argLists: readonly string[][], cliVersion: string): string[] {
+  if (!argLists.every((args) => args.every(isPortableShellWord))) {
+    return [];
+  }
+  return argLists.map((args) => publicCliCommand(args.join(" "), cliVersion));
+}
+
+/**
+ * An option and its value as arguments for a suggested command. A value that
+ * starts with `-` would be read as the next flag, so it is joined with `=`
+ * instead. That token is not a portable shell word, so it also keeps the
+ * string form out of {@link portableCommands}.
+ *
+ * @param option - The option, with its dashes, e.g. `--schema`.
+ * @param value - The value it takes, as the user or a file name gave it.
+ */
+export function optionArgs(option: string, value: string): string[] {
+  return value.startsWith("-") ? [`${option}=${value}`] : [option, value];
+}
+
 export function publicCliCommand(args: string, cliVersion: string): string {
   const prefix = `npx ${CLI_PACKAGE_NAME}@${npmSelectorForCliVersion(cliVersion)}`;
   return args.length > 0 ? `${prefix} ${args}` : prefix;
