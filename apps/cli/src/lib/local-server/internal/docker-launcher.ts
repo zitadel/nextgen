@@ -84,12 +84,12 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
     return (await DockerLauncher.inspect(record.container_name)).running;
   }
 
+  logTail(record: DockerRuntimeMetadata, lines: number): Promise<string> {
+    return DockerLauncher.readLogs(record.container_name, lines);
+  }
+
   async terminate(record: DockerRuntimeMetadata): Promise<StopOutcome> {
-    if (!(await DockerLauncher.inspect(record.container_name)).exists) {
-      return { status: "stale" };
-    }
-    await DockerLauncher.remove(record.container_name);
-    return { status: "stopped" };
+    return { status: (await DockerLauncher.remove(record.container_name)) ? "stopped" : "stale" };
   }
 
   static runArgs(spec: DockerRunSpec, envNames: readonly string[] = []): string[] {
@@ -212,16 +212,17 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
     return { exists: true, running: running === "true", id, image: imageParts.join(" ") };
   }
 
-  /** Stops and removes the container, doing nothing when there is none. */
-  static async remove(containerName: string): Promise<void> {
+  /** Stops and removes the container. `false` when there was none to remove. */
+  static async remove(containerName: string): Promise<boolean> {
     const inspect = await DockerLauncher.inspect(containerName);
     if (!inspect.exists) {
-      return;
+      return false;
     }
     if (inspect.running) {
       await requireDocker(["stop", containerName], `Stop ${containerName}`);
     }
     await requireDocker(["rm", containerName], `Remove ${containerName}`);
+    return true;
   }
 
   static async readLogs(containerName: string, tail: number): Promise<string> {

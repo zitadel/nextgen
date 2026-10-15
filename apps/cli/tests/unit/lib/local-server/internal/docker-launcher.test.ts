@@ -236,6 +236,26 @@ describe("DockerLauncher", () => {
       expect(calls.map((call) => call.args[0])).toEqual(expect.arrayContaining(["stop", "rm"]));
     });
 
+    it("says whether it removed a container", async () => {
+      fakeDocker({ existing: { running: true } });
+      await expect(DockerLauncher.remove("zitadel-server-test")).resolves.toBe(true);
+
+      fakeDocker({});
+      await expect(DockerLauncher.remove("zitadel-server-test")).resolves.toBe(false);
+    });
+
+    it("reads the end of the container's log", async () => {
+      const calls = fakeDocker({ existing: { running: true } });
+
+      await expect(launcher().logTail(record, 40)).resolves.toBe("");
+      expect(calls.find((call) => call.args[0] === "logs")?.args).toEqual([
+        "logs",
+        "--tail",
+        "40",
+        "zitadel-server-test",
+      ]);
+    });
+
     it("reports a container that is already gone as stale", async () => {
       const calls = fakeDocker({});
 

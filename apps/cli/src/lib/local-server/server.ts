@@ -282,10 +282,10 @@ export class LocalServer {
       }
       return { runtime, stopped: outcome.status !== "stale", outcome };
     }
-    await DockerLauncher.remove(
+    const removed = await DockerLauncher.remove(
       runtime?.backend === "docker" ? runtime.container_name : localContainerName(this.cwd),
     );
-    return { runtime, stopped: runtime !== undefined };
+    return { runtime, stopped: removed };
   }
 
   private async run<R extends RuntimeMetadata>(

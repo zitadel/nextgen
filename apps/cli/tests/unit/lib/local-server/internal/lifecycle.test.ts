@@ -33,6 +33,9 @@ class World {
     world.healthy.add(record.server_url);
   };
   terminateResult: StopOutcome["status"] = "stopped";
+  /** What the server wrote; gone once it is cleaned up, as a container's log is. */
+  logs = "";
+  logsGone = false;
 
   store: ServerStore<Fake> = {
     read: async () => this.record,
@@ -49,8 +52,15 @@ class World {
       return record;
     },
     isAlive: async (record) => this.alive.has(record.pid),
+    logTail: async () => {
+      if (this.logsGone) {
+        throw new Error("no such container");
+      }
+      return this.logs;
+    },
     terminate: async (record) => {
       this.terminated.push(record.pid);
+      this.logsGone = true;
       if (this.terminateResult === "stopped") {
         this.alive.delete(record.pid);
         this.healthy.delete(record.server_url);
@@ -282,6 +292,28 @@ describe("Lifecycle", () => {
       });
 
       expect(world.launched).toEqual([9000]);
+    });
+
+    it("keeps what the server logged, which cleaning up would remove", async () => {
+      const world = new World();
+      world.logs = "listen tcp :8080: bind: address already in use";
+      world.onLaunch = () => undefined;
+
+      await expect(world.server().start()).rejects.toMatchObject({
+        reason: "exited",
+        logTail: "listen tcp :8080: bind: address already in use",
+      });
+    });
+
+    it("still reports a failed start when the log cannot be read", async () => {
+      const world = new World();
+      world.logsGone = true;
+      world.onLaunch = () => undefined;
+
+      await expect(world.server().start()).rejects.toMatchObject({
+        reason: "exited",
+        logTail: undefined,
+      });
     });
 
     it("fails with a timeout when the process lives but never answers", async () => {

@@ -120,6 +120,10 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     return BinaryLauncher.stopPid(record.pid);
   }
 
+  logTail(record: BinaryRuntimeMetadata, lines: number): Promise<string> {
+    return BinaryLauncher.readLogs(record.log_path, lines);
+  }
+
   /**
    * What `start` runs: the `ZITADEL_SERVER_BINARY` override, else the platform
    * binary of the bundled `@zitadel/server`, which must be built.

@@ -3,7 +3,6 @@ import { publicCliCommand } from "../../public-cli";
 import { listenersForPort, type TcpListener } from "../../prober/ports";
 import { dockerRuntimeGuidance, dockerUnavailableMessage } from "../docker-guidance";
 import { DEFAULT_LOCAL_SERVER_PORT, localServerUrl, type RuntimeMetadata } from "../runtime";
-import { BinaryLauncher } from "./binary-launcher";
 import { DockerLauncher } from "./docker-launcher";
 import {
   NoFreePortError,
@@ -73,7 +72,7 @@ export async function startFailure(error: unknown, cliVersion: string): Promise<
         : { runtime: "binary", pid: record.pid, log_path: record.log_path };
     const reported =
       error.reason === "exited"
-        ? serverExitedError(record.server_url, cliVersion, details, await logTailOf(record))
+        ? serverExitedError(record.server_url, cliVersion, details, error.logTail)
         : new ZitadelError("E_NETWORK", "Local Zitadel server did not become healthy", {
             hint: "Inspect the local runtime logs, then reset the local runtime if needed.",
             nextCommands: [
@@ -106,17 +105,6 @@ export async function startFailure(error: unknown, cliVersion: string): Promise<
     });
   }
   return error;
-}
-
-/** The end of the server's own log, when there is one to read. */
-async function logTailOf(record: RuntimeMetadata): Promise<string | undefined> {
-  try {
-    return record.backend === "docker"
-      ? await DockerLauncher.readLogs(record.container_name, 40)
-      : await BinaryLauncher.readLogs(record.log_path, 40);
-  } catch {
-    return undefined;
-  }
 }
 
 function portInUseError(

@@ -29,6 +29,8 @@ export interface Launcher<R extends ServerRecord> {
   isAlive(record: R): Promise<boolean>;
   /** Stops it, `stale` when there was nothing left to stop. */
   terminate(record: R): Promise<StopOutcome>;
+  /** The end of its own log, for explaining a failed start; read before it is cleaned up. */
+  logTail?(record: R, lines: number): Promise<string | undefined>;
 }
 
 export interface PortProbe {
@@ -89,8 +91,9 @@ export class ServerStartError<R extends ServerRecord> extends Error {
   readonly reason: "exited" | "timeout";
   readonly record: R;
   readonly cleanup: StopOutcome;
+  readonly logTail: string | undefined;
 
-  constructor(reason: "exited" | "timeout", record: R, cleanup: StopOutcome) {
+  constructor(reason: "exited" | "timeout", record: R, cleanup: StopOutcome, logTail?: string) {
     super(
       reason === "exited"
         ? "The server exited before it became healthy"
@@ -99,6 +102,7 @@ export class ServerStartError<R extends ServerRecord> extends Error {
     this.reason = reason;
     this.record = record;
     this.cleanup = cleanup;
+    this.logTail = logTail;
   }
 }
 
@@ -256,7 +260,14 @@ export class Lifecycle<R extends ServerRecord> {
     reason: "exited" | "timeout",
     record: R,
   ): Promise<ServerStartError<R>> {
-    return new ServerStartError(reason, record, await this.deps.launcher.terminate(record));
+    // The log goes first: cleaning up may remove it with the server.
+    const logTail = await this.deps.launcher.logTail?.(record, 40).catch(() => undefined);
+    return new ServerStartError(
+      reason,
+      record,
+      await this.deps.launcher.terminate(record),
+      logTail,
+    );
   }
 }
 
