@@ -57,6 +57,7 @@ same TX (shared `request_id`).
 | **Token** | `scopes[]` | Token string / JWE |
 | **Auth check** | `check_id`, `check_type`, `auth_attempt_id` | Challenge/proof JSON |
 | **Auth factor** | `user_id`, `factor_id` | Hash, public key material, challenges |
+| **Variable** | `kind` (the rest of the row key beside `entity_id`); `secret` on set | `name` (it is `entity_id`); the value, plain or as ciphertext |
 
 `PATCH /projects/{id}` today only renames (`name`). Origins are set on
 **create** and changed only through add/remove (`origin.added` /
@@ -137,6 +138,8 @@ tracked below.
 | IDPConnectionService revise (existing slug) | `idp.updated` | `admin` | `idp_connection` | `revision_id`; delta: `display_name`, `template` (when changed) |
 | `CreateIDPIdentityLink` (SSO sign-in creates the user and links the provider account, same TX) | `idp.identity_link.created` | `entity` | `idp_identity_link` | `connection_id`, `user_id` (secondary; never the provider subject or claims) |
 | DeploymentService create (deploy and rollback alike; one event per deployment, whatever the number of targets) | `deployment.created` | `admin` | `deployment` | `release_id`, `targets`, `reason`, `message`, `rollback_to` |
+| VariableService set (one event per row written; entering and replacing are the same event, since the value is the only difference and it never appears; a value written for both kinds is two rows) | `variable.set` | `entity` | `variable` | `kind` (with `entity_id`, the row key), `secret` |
+| VariableService delete, a `null` in a patch, or a secret patched without a kind clearing its preview value (one event per row actually removed; a name the project did not hold emits nothing) | `variable.removed` | `entity` | `variable` | `kind` (no `secret`: a removal learns nothing about the row) |
 | Project create seed `CreateAuthzAssignment` (sk_proj) | `authz.granted` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | GrantService create (`CreateAuthzAssignment` for user/team on project.viewer, editor, or admin) | `authz.granted` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | GrantService revoke (`RevokeAuthzAssignment`) | `authz.revoked` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
