@@ -13,16 +13,16 @@ import (
 
 const (
 	projectsTable         = "projects"
-	createProjectStmt     = `INSERT INTO projects (id, name, origins, password_hash_policy) VALUES (@p1, @p2, @p3, @p4) THEN RETURN id, created_at, updated_at`
-	updateProjectStmt     = `UPDATE projects SET name = @p2, updated_at = CURRENT_TIMESTAMP() WHERE id = @p1 THEN RETURN id, name, origins, password_hash_policy, created_at, updated_at`
+	createProjectStmt     = `INSERT INTO projects (id, name, password_hash_policy) VALUES (@p1, @p2, @p3) THEN RETURN id, created_at, updated_at`
+	updateProjectStmt     = `UPDATE projects SET name = @p2, updated_at = CURRENT_TIMESTAMP() WHERE id = @p1 THEN RETURN id, name, password_hash_policy, created_at, updated_at`
 	deleteByIDProjectStmt = `DELETE FROM projects WHERE id = @p1`
-	projectQuery          = "SELECT id, name, origins, password_hash_policy, created_at, updated_at FROM projects"
+	projectQuery          = "SELECT id, name, password_hash_policy, created_at, updated_at FROM projects"
 
 	setProjectPasswordHashPolicyStmt = `UPDATE projects SET password_hash_policy = @p2, updated_at = CURRENT_TIMESTAMP() WHERE id = @p1 THEN RETURN id`
 )
 
 var projectColumns = []string{
-	"id", "name", "origins", "password_hash_policy", "created_at", "updated_at",
+	"id", "name", "password_hash_policy", "created_at", "updated_at",
 }
 
 type projectStatements struct{ statement }
@@ -40,16 +40,13 @@ func (ps projectStatements) CreateProject(ctx context.Context, project *domain.P
 	if err := ensureManagedID(&project.ID, domain.PrefixProject); err != nil {
 		return err
 	}
-	originsRaw, err := storageproject.MarshalOrigins(project.Origins)
-	if err != nil {
-		return wrapError(err)
-	}
 	policy, err := encodePasswordHashPolicy(project.PasswordHashPolicy)
 	if err != nil {
 		return wrapError(err)
 	}
+	origins := domain.NormalizeOrigins(project.Origins)
 	return withTransaction(ctx, ps.db, func(ctx context.Context, tx queryExecutor) error {
-		stmt := buildStatement(createProjectStmt, project.ID, project.Name, string(originsRaw), policy).statement()
+		stmt := buildStatement(createProjectStmt, project.ID, project.Name, policy).statement()
 		if err := tx.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
 			_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
 				return struct{}{}, row.Columns(&project.ID, &project.CreatedAt, &project.UpdatedAt)
@@ -59,12 +56,21 @@ func (ps projectStatements) CreateProject(ctx context.Context, project *domain.P
 			return err
 		}
 		rsi := newResourceScopeStatements(tx)
-		return rsi.UpsertResourceScope(ctx, domain.NewProjectResourceScope(project.ID))
+		if err := rsi.UpsertResourceScope(ctx, domain.NewProjectResourceScope(project.ID)); err != nil {
+			return err
+		}
+		originsStmts := newOriginStatements(tx)
+		for _, origin := range origins {
+			if _, err := originsStmts.InsertOrigin(ctx, project.ID, origin); err != nil {
+				return err
+			}
+		}
+		project.Origins = origins
+		return nil
 	})
 }
 
 // DeleteProjectByID implements [service.ProjectStatements].
-// resource_scope_index rows for this project cascade via the project_id FK.
 func (ps projectStatements) DeleteProjectByID(ctx context.Context, id string) (bool, error) {
 	n, err := ps.db.Update(ctx, buildStatement(deleteByIDProjectStmt, id).statement())
 	if err != nil {
@@ -79,27 +85,33 @@ func (ps projectStatements) GetProjectByID(ctx context.Context, id string) (*dom
 	if err != nil {
 		return nil, err
 	}
-	return ps.scanProject(row)
+	project, err := ps.scanProject(row)
+	if err != nil {
+		return nil, err
+	}
+	if err := ps.hydrateOrigins(ctx, project); err != nil {
+		return nil, err
+	}
+	return project, nil
 }
 
 // UpdateProject implements [service.ProjectStatements].
-// Only the name is updated; preview origins are left untouched. The whole row is
-// read back onto the project.
 func (ps projectStatements) UpdateProject(ctx context.Context, project *domain.Project) error {
 	stmt := buildStatement(updateProjectStmt, project.ID, project.Name).statement()
-	return ps.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
+	if err := ps.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
 		updated, err := collectOneRow(iter, ps.scanProject)
 		if err != nil {
 			return err
 		}
 		*project = *updated
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
+	return ps.hydrateOrigins(ctx, project)
 }
 
 // SetProjectPasswordHashPolicy implements [service.ProjectStatements].
-// A nil policy writes NULL, which hands the project back to the deployment
-// default.
 func (ps projectStatements) SetProjectPasswordHashPolicy(ctx context.Context, projectID string, policy *domain.PasswordHashPolicy) error {
 	encoded, err := encodePasswordHashPolicy(policy)
 	if err != nil {
@@ -139,37 +151,46 @@ func (ps projectStatements) ListProjects(ctx context.Context, filter *database.L
 	if err != nil {
 		return nil, err
 	}
+	if err := ps.hydrateOrigins(ctx, projects...); err != nil {
+		return nil, err
+	}
 	return &database.ListResult[*domain.Project]{
 		Items:      projects,
 		NextCursor: nextCursor,
 	}, nil
 }
 
+func (ps projectStatements) hydrateOrigins(ctx context.Context, projects ...*domain.Project) error {
+	if len(projects) == 0 {
+		return nil
+	}
+	ids := make([]string, len(projects))
+	for i, p := range projects {
+		ids[i] = p.ID
+	}
+	listed, err := newOriginStatements(ps.db).ListOrigins(ctx, storageproject.ListOriginsOptions(ids))
+	if err != nil {
+		return err
+	}
+	storageproject.AssignOrigins(projects, listed.Items)
+	return nil
+}
+
 func (ps projectStatements) scanProject(row *spanner.Row) (*domain.Project, error) {
 	project := new(domain.Project)
-	var (
-		originsJSON string
-		policyJSON  spanner.NullJSON
-	)
-	if err := row.Columns(&project.ID, &project.Name, &originsJSON, &policyJSON, &project.CreatedAt, &project.UpdatedAt); err != nil {
-		return nil, err
-	}
-	origins, err := storageproject.UnmarshalOrigins([]byte(originsJSON))
-	if err != nil {
+	var policyJSON spanner.NullJSON
+	if err := row.Columns(&project.ID, &project.Name, &policyJSON, &project.CreatedAt, &project.UpdatedAt); err != nil {
 		return nil, err
 	}
 	policy, err := decodePasswordHashPolicy(policyJSON)
 	if err != nil {
 		return nil, err
 	}
-	project.Origins = origins
 	project.PasswordHashPolicy = policy
+	project.Origins = []domain.Origin{}
 	return project, nil
 }
 
-// encodePasswordHashPolicy binds the policy as spanner.NullJSON; a plain string
-// cannot be bound to a Spanner JSON column, and a project with no policy of its
-// own stores NULL.
 func encodePasswordHashPolicy(policy *domain.PasswordHashPolicy) (spanner.NullJSON, error) {
 	raw, err := storageproject.MarshalPasswordHashPolicy(policy)
 	if err != nil {
@@ -208,9 +229,5 @@ var projectSchema = database.NewSchema(map[domain.ProjectField]database.FieldBin
 		SQLName:  "updated_at",
 		Accessor: func(p *domain.Project) any { return p.UpdatedAt },
 		Coerce:   database.CoerceTime,
-	},
-	domain.ProjectFieldOrigins: {
-		SQLName:  "origins",
-		Accessor: func(p *domain.Project) any { return p.Origins },
 	},
 })

@@ -148,46 +148,34 @@ func (h *Handler) ListMyProjects(ctx context.Context, params api.ListMyProjectsP
 	}, nil
 }
 
-// AddOrigin is a stub until the origins service lands. Authz runs first so a
-// caller without origin.write learns that before the 501. Structural write
-// rules run next so invalid patterns fail with the same origin.* codes the
-// service will return; kind_conflict stays in the analyzed error set (via
-// addOriginExposeKindConflict) so the api-mock 409 and generated client union
-// stay aligned until storage is wired.
+// AddOrigin stores one origin pattern on the project.
 func (h *Handler) AddOrigin(ctx context.Context, req *api.ProjectOrigin, params api.AddOriginParams) (api.AddOriginRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), originAccess, opWrite); err != nil {
 		return nil, err
 	}
-	if req == nil {
-		return nil, domain.ErrOriginInvalid()
-	}
-	if err := domain.ValidateOriginsWriteRules([]domain.Origin{{
+	origin, err := h.projectService.AddOrigin(ctx, string(params.ProjectID), domain.Origin{
 		Pattern: req.Pattern,
 		Kind:    domain.OriginKind(req.Kind),
-	}}); err != nil {
+	})
+	if err != nil {
 		return nil, err
 	}
-	// Storage returns kind_conflict when the pattern already exists under
-	// another kind. The analyzer does not constant-fold this package var, so
-	// ErrOriginKindConflict remains in the OpenAPI union while the stub still
-	// always returns NotImplemented at runtime.
-	if addOriginExposeKindConflict {
-		return nil, domain.ErrOriginKindConflict()
-	}
-	return nil, domain.ErrNotImplemented()
+	return &api.AddOriginResponse{
+		Pattern: origin.Pattern,
+		Kind:    api.AddOriginResponseKind(origin.Kind),
+	}, nil
 }
 
-// addOriginExposeKindConflict is always false at runtime. See AddOrigin.
-var addOriginExposeKindConflict bool
-
-// RemoveOrigin is a stub until the origins service lands. Authz runs first so a
-// caller without origin.delete learns that before the 501. opDelete maps to the
-// project.admin relation, matching other delete-shaped management ops.
-func (h *Handler) RemoveOrigin(ctx context.Context, _ *api.RemoveOriginReq, params api.RemoveOriginParams) (api.RemoveOriginRes, error) {
+// RemoveOrigin deletes one origin pattern. opDelete maps to the project.admin
+// relation, matching other delete-shaped management ops.
+func (h *Handler) RemoveOrigin(ctx context.Context, req *api.RemoveOriginReq, params api.RemoveOriginParams) (api.RemoveOriginRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), originAccess, opDelete); err != nil {
 		return nil, err
 	}
-	return nil, domain.ErrNotImplemented()
+	if err := h.projectService.RemoveOrigin(ctx, string(params.ProjectID), req.Pattern); err != nil {
+		return nil, err
+	}
+	return &api.RemoveOriginNoContent{}, nil
 }
 
 // ------------------ Converters ---------------

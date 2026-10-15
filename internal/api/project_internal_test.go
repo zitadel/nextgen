@@ -44,6 +44,12 @@ func (stubProjectService) ListAuthorized(context.Context, service.ListAuthorized
 	return nil, domain.ErrSessionTokenInvalid()
 }
 func (stubProjectService) Delete(context.Context, string) error { return nil }
+func (stubProjectService) AddOrigin(context.Context, string, domain.Origin) (*domain.Origin, error) {
+	return nil, domain.ErrNotImplemented()
+}
+func (stubProjectService) RemoveOrigin(context.Context, string, string) error {
+	return domain.ErrNotImplemented()
+}
 
 var _ service.ProjectService = stubProjectService{}
 

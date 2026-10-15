@@ -61,7 +61,7 @@ func TestProjectCreate_EventPayloadIncludesOrigins(t *testing.T) {
 	const baseURL = "https://example.com/api/schemas"
 	schemaValidator, err := domain.NewSchemaValidator(baseURL)
 	require.NoError(t, err)
-	svc := service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService, testHasherFactory(t))
+	svc := service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService, testHasherFactory(t), domain.DefaultSharedHosts)
 
 	ctx := middleware.WithRequestIDContext(t.Context(), "req_create")
 	got, err := svc.Create(ctx, "Acme", []domain.Origin{{Pattern: "https://*-acme.vercel.app", Kind: domain.OriginKindPreview}}, true)
@@ -118,7 +118,7 @@ func TestProjectUpdate_EventPayloadNameDelta(t *testing.T) {
 	const baseURL = "https://example.com/api/schemas"
 	schemaValidator, err := domain.NewSchemaValidator(baseURL)
 	require.NoError(t, err)
-	svc := service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService, testHasherFactory(t))
+	svc := service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService, testHasherFactory(t), domain.DefaultSharedHosts)
 
 	_, err = svc.Update(t.Context(), service.UpdateProjectRequest{ID: "proj_1", Name: new("renamed")})
 	require.NoError(t, err)
@@ -164,7 +164,7 @@ func TestProjectUpdated_PayloadCarriesPasswordHashAlgorithm(t *testing.T) {
 		const baseURL = "https://example.com/api/schemas"
 		schemaValidator, err := domain.NewSchemaValidator(baseURL)
 		require.NoError(t, err)
-		return service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService, testHasherFactory(t))
+		return service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService, testHasherFactory(t), domain.DefaultSharedHosts)
 	}
 
 	payloadOf := func(t *testing.T, event *domain.Event) domain.ProjectPayload {
@@ -564,7 +564,7 @@ func TestProjectCreate_SchemaCreatedPayloadCarriesKind(t *testing.T) {
 	const baseURL = "https://example.com/api/schemas"
 	schemaValidator, err := domain.NewSchemaValidator(baseURL)
 	require.NoError(t, err)
-	svc := service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService, testHasherFactory(t))
+	svc := service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService, testHasherFactory(t), domain.DefaultSharedHosts)
 
 	_, err = svc.Create(middleware.WithRequestIDContext(t.Context(), "req_kind"), "Acme", nil, true)
 	require.NoError(t, err)

@@ -66,6 +66,7 @@ func createMockedProjectService(t *testing.T) (svc service.ProjectService,
 		schemaValidator,
 		keyService,
 		testHasherFactory(t),
+		domain.DefaultSharedHosts,
 	)
 
 	return

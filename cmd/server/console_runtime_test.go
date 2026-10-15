@@ -187,6 +187,14 @@ func (f *fakeProjectService) Delete(context.Context, string) error {
 	panic("unused")
 }
 
+func (f *fakeProjectService) AddOrigin(context.Context, string, domain.Origin) (*domain.Origin, error) {
+	panic("unused")
+}
+
+func (f *fakeProjectService) RemoveOrigin(context.Context, string, string) error {
+	panic("unused")
+}
+
 func (f *fakeProjectService) DefaultProject(context.Context, string) (*domain.Project, error) {
 	return f.project, f.err
 }

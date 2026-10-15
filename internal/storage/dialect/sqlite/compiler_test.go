@@ -14,7 +14,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
 )
 
-const testProjectQuery = "SELECT id, name, origins, created_at, updated_at FROM projects"
+const testProjectQuery = "SELECT id, name, created_at, updated_at FROM projects"
 
 func compileProjectRead(t *testing.T, opts *database.ListOptions[domain.ProjectField]) (string, []any) {
 	t.Helper()

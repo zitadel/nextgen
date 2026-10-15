@@ -38,6 +38,7 @@ func (h *Harness) ensureProjectService(t *testing.T) service.ProjectService {
 			h.EnsureSchemaValidator(t),
 			h.EnsureKeyService(t),
 			h.EnsureHasherFactory(t),
+			domain.DefaultSharedHosts,
 		)
 	}
 	return h.projectService.value

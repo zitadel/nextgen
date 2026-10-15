@@ -5,19 +5,23 @@ content:
     schema:
       oneOf:
         - $ref: '../../../../../components/schemas/errors/auth-unauthorized.yaml'
+        - $ref: '../../../../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../../../../components/schemas/errors/internal.yaml'
-        - $ref: '../../../../../components/schemas/errors/not_implemented.yaml'
+        - $ref: '../../../../../components/schemas/errors/origin-invalid.yaml'
         - $ref: '../../../../../components/schemas/errors/origin-not_found.yaml'
         - $ref: '../../../../../components/schemas/errors/origin-permission_denied.yaml'
+        - $ref: '../../../../../components/schemas/errors/proj-missing_id.yaml'
         - $ref: '../../../../../components/schemas/errors/req-invalid.yaml'
       discriminator:
         propertyName: code
         mapping:
           auth.unauthorized: '../../../../../components/schemas/errors/auth-unauthorized.yaml'
+          evt.invalid: '../../../../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../../../../components/schemas/errors/internal.yaml'
-          not_implemented: '../../../../../components/schemas/errors/not_implemented.yaml'
+          origin.invalid: '../../../../../components/schemas/errors/origin-invalid.yaml'
           origin.not_found: '../../../../../components/schemas/errors/origin-not_found.yaml'
           origin.permission_denied: '../../../../../components/schemas/errors/origin-permission_denied.yaml'
+          proj.missing_id: '../../../../../components/schemas/errors/proj-missing_id.yaml'
           req.invalid: '../../../../../components/schemas/errors/req-invalid.yaml'
     examples:
       auth.unauthorized:
@@ -25,16 +29,21 @@ content:
         value:
           code: auth.unauthorized
           message: 'The request lacks valid authentication credentials.'
+      evt.invalid:
+        summary: evt.invalid
+        value:
+          code: evt.invalid
+          message: 'event: invalid'
       internal:
         summary: internal
         value:
           code: internal
           message: 'An unexpected error occurred.'
-      not_implemented:
-        summary: not_implemented
+      origin.invalid:
+        summary: origin.invalid
         value:
-          code: not_implemented
-          message: 'This feature is not implemented yet.'
+          code: origin.invalid
+          message: 'origin: must be scheme://host[:port], lowercase, with no path'
       origin.not_found:
         summary: origin.not_found
         value:
@@ -45,6 +54,11 @@ content:
         value:
           code: origin.permission_denied
           message: 'origin: permission denied'
+      proj.missing_id:
+        summary: proj.missing_id
+        value:
+          code: proj.missing_id
+          message: 'project: missing id'
       req.invalid:
         summary: req.invalid
         value:

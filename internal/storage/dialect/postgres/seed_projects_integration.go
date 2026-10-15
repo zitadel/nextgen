@@ -20,7 +20,7 @@ func SeedProjectsTiedAt(ctx context.Context, pool database.Pool, ids []string, c
 	}
 	for _, id := range ids {
 		_, err := p.pool.Exec(ctx,
-			`INSERT INTO zitadel_nextgen.projects (id, name, origins, created_at, updated_at) VALUES ($1, $2, '[]'::jsonb, $3, $3)`,
+			`INSERT INTO zitadel_nextgen.projects (id, name, created_at, updated_at) VALUES ($1, $2, $3, $3)`,
 			id, "project-"+id, createdAt,
 		)
 		if err != nil {

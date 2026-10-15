@@ -40,11 +40,11 @@ func (s AddOriginErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case InternalAddOriginErrorResponse:
+	case EvtInvalidAddOriginErrorResponse:
 		e.FieldStart("code")
-		e.Str("internal")
+		e.Str("evt.invalid")
 		{
-			s := s.Internal
+			s := s.EvtInvalid
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -56,11 +56,11 @@ func (s AddOriginErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case NotImplementedAddOriginErrorResponse:
+	case InternalAddOriginErrorResponse:
 		e.FieldStart("code")
-		e.Str("not_implemented")
+		e.Str("internal")
 		{
-			s := s.NotImplemented
+			s := s.Internal
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -152,6 +152,38 @@ func (s AddOriginErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case ProjMissingIDAddOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.missing_id")
+		{
+			s := s.ProjMissingID
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjNotFoundAddOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.not_found")
+		{
+			s := s.ProjNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidAddOriginErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -197,11 +229,11 @@ func (s *AddOriginErrorResponse) Decode(d *jx.Decoder) error {
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedAddOriginErrorResponse
 					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidAddOriginErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalAddOriginErrorResponse
-					found = true
-				case "not_implemented":
-					s.Type = NotImplementedAddOriginErrorResponse
 					found = true
 				case "origin.invalid":
 					s.Type = OriginInvalidAddOriginErrorResponse
@@ -217,6 +249,12 @@ func (s *AddOriginErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "origin.primary_not_exact":
 					s.Type = OriginPrimaryNotExactAddOriginErrorResponse
+					found = true
+				case "proj.missing_id":
+					s.Type = ProjMissingIDAddOriginErrorResponse
+					found = true
+				case "proj.not_found":
+					s.Type = ProjNotFoundAddOriginErrorResponse
 					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidAddOriginErrorResponse
@@ -239,12 +277,12 @@ func (s *AddOriginErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
-	case InternalAddOriginErrorResponse:
-		if err := s.Internal.Decode(d); err != nil {
+	case EvtInvalidAddOriginErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
 			return err
 		}
-	case NotImplementedAddOriginErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
+	case InternalAddOriginErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
 	case OriginInvalidAddOriginErrorResponse:
@@ -265,6 +303,14 @@ func (s *AddOriginErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case OriginPrimaryNotExactAddOriginErrorResponse:
 		if err := s.OriginPrimaryNotExact.Decode(d); err != nil {
+			return err
+		}
+	case ProjMissingIDAddOriginErrorResponse:
+		if err := s.ProjMissingID.Decode(d); err != nil {
+			return err
+		}
+	case ProjNotFoundAddOriginErrorResponse:
+		if err := s.ProjNotFound.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidAddOriginErrorResponse:
@@ -91827,6 +91873,22 @@ func (s RemoveOriginErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case EvtInvalidRemoveOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalRemoveOriginErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
@@ -91843,11 +91905,11 @@ func (s RemoveOriginErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case NotImplementedRemoveOriginErrorResponse:
+	case OriginInvalidRemoveOriginErrorResponse:
 		e.FieldStart("code")
-		e.Str("not_implemented")
+		e.Str("origin.invalid")
 		{
-			s := s.NotImplemented
+			s := s.OriginInvalid
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -91880,6 +91942,22 @@ func (s RemoveOriginErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("origin.permission_denied")
 		{
 			s := s.OriginPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjMissingIDRemoveOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.missing_id")
+		{
+			s := s.ProjMissingID
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -91936,17 +92014,23 @@ func (s *RemoveOriginErrorResponse) Decode(d *jx.Decoder) error {
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedRemoveOriginErrorResponse
 					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidRemoveOriginErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalRemoveOriginErrorResponse
 					found = true
-				case "not_implemented":
-					s.Type = NotImplementedRemoveOriginErrorResponse
+				case "origin.invalid":
+					s.Type = OriginInvalidRemoveOriginErrorResponse
 					found = true
 				case "origin.not_found":
 					s.Type = OriginNotFoundRemoveOriginErrorResponse
 					found = true
 				case "origin.permission_denied":
 					s.Type = OriginPermissionDeniedRemoveOriginErrorResponse
+					found = true
+				case "proj.missing_id":
+					s.Type = ProjMissingIDRemoveOriginErrorResponse
 					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidRemoveOriginErrorResponse
@@ -91969,12 +92053,16 @@ func (s *RemoveOriginErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
+	case EvtInvalidRemoveOriginErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
+			return err
+		}
 	case InternalRemoveOriginErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
-	case NotImplementedRemoveOriginErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
+	case OriginInvalidRemoveOriginErrorResponse:
+		if err := s.OriginInvalid.Decode(d); err != nil {
 			return err
 		}
 	case OriginNotFoundRemoveOriginErrorResponse:
@@ -91983,6 +92071,10 @@ func (s *RemoveOriginErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case OriginPermissionDeniedRemoveOriginErrorResponse:
 		if err := s.OriginPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case ProjMissingIDRemoveOriginErrorResponse:
+		if err := s.ProjMissingID.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidRemoveOriginErrorResponse:
