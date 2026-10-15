@@ -37,11 +37,16 @@ type VariableService interface {
 	GetVariables(ctx context.Context, owner domain.VariableOwner, kind *domain.DeploymentOriginKind, names ...string) ([]*domain.Variable, error)
 	// GetDecryptedVariables is GetVariables with every secret decrypted and
 	// still marked as one, so a caller can redact what it must not print.
+	//
+	// It must never back an API response: no endpoint returns a secret in
+	// clear. It exists for server-side consumers that use the value itself,
+	// such as the SSO flow presenting a client secret to a provider.
 	GetDecryptedVariables(ctx context.Context, owner domain.VariableOwner, kind *domain.DeploymentOriginKind, names ...string) ([]*domain.Variable, error)
 	// SetVariables applies one batch whole or not at all. A nil value removes
 	// the name. With a kind, only that kind's rows are written or removed.
 	// Without one, a plain value is written for both kinds, a secret for
-	// primary only, and a removal removes both. Removing a name the owner does
+	// primary only, removing the name's preview row, and a removal removes
+	// both. Removing a name the owner does
 	// not hold is not an error. A write after which the variables of a kind
 	// would not fit in one deployment is refused with ErrVariableLimitExceeded.
 	SetVariables(ctx context.Context, owner domain.VariableOwner, kind *domain.DeploymentOriginKind, variablesToSet []VariableToSet) error
