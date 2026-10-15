@@ -5,7 +5,7 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 import { ZitadelError } from "../errors";
-import { isObject, parseJsonObject } from "../json";
+import { parseJsonObject } from "../json";
 import { EMPTY_SUMMARY, type EnvSummary, isEnvSummary } from "./env-vars";
 
 export const LOCAL_SERVER_IMAGE_NAME = "ghcr.io/zitadel/nextgen";
@@ -342,7 +342,7 @@ export async function resolveLocalServer(cwd: string): Promise<string> {
   throw localServerNotRunning(server_url);
 }
 
-export function localServerNotRunning(serverUrl?: string): ZitadelError {
+function localServerNotRunning(serverUrl?: string): ZitadelError {
   return new ZitadelError("E_LOCAL_SERVER_NOT_RUNNING", "Local Zitadel server is not running", {
     hint: serverUrl
       ? `No healthy local server responded at ${serverUrl}.`
@@ -436,11 +436,6 @@ function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetada
   };
 }
 
-export async function assertWritableDirectory(path: string): Promise<void> {
-  await mkdir(path, { recursive: true, mode: 0o700 });
-  await access(path, constants.W_OK);
-}
-
 async function nearestExistingDirectory(path: string): Promise<string> {
   let current = path;
   while (true) {
@@ -501,10 +496,6 @@ export function runtimeSummary(metadata: RuntimeMetadata | undefined): Record<st
     container_id: metadata.container_id,
     image: metadata.image,
   };
-}
-
-export function isRuntimeObject(value: unknown): value is RuntimeMetadata {
-  return isObject(value) && value.schema_version === 1;
 }
 
 function isValidPort(value: number): boolean {
