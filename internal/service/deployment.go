@@ -35,6 +35,16 @@ type CreateDeploymentOutput struct {
 	Created    bool
 }
 
+// DeployInput carries the targets as the request gives them.
+type DeployInput struct {
+	ProjectID            string
+	ReleaseID            string
+	Targets              []string
+	Reason               domain.DeploymentReason
+	Message              *string
+	ExpectedDeploymentID *string
+}
+
 type ListDeploymentsInput struct {
 	ProjectID string
 	// Origin narrows the list to one origin's history.
@@ -102,6 +112,39 @@ func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentIn
 		}
 		return output, nil
 	}
+}
+
+// Deploy resolves the targets to the project's primary origins, then creates
+// the deployment.
+func (s *DeploymentService) Deploy(ctx context.Context, input DeployInput) (*CreateDeploymentOutput, error) {
+	origins, err := s.projectOrigins(ctx, input.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	resolved, err := domain.ResolvePrimaryTargets(origins, input.Targets)
+	if err != nil {
+		return nil, err
+	}
+	return s.Create(ctx, CreateDeploymentInput{
+		ProjectID:            input.ProjectID,
+		ReleaseID:            input.ReleaseID,
+		OriginKind:           domain.DeploymentOriginKindPrimary,
+		Origins:              resolved,
+		Reason:               input.Reason,
+		Message:              input.Message,
+		ExpectedDeploymentID: input.ExpectedDeploymentID,
+	})
+}
+
+func (s *DeploymentService) projectOrigins(ctx context.Context, projectID string) ([]domain.Origin, error) {
+	project, err := s.v2Pool.Statements().GetProjectByID(ctx, projectID)
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return nil, domain.ErrProjectNotFound()
+		}
+		return nil, domain.ErrInternal(err).WithMessage("failed to get project from database")
+	}
+	return project.Origins, nil
 }
 
 // conflict answers a deploy that lost the optimistic lock with the newest

@@ -261,6 +261,26 @@ func TestDeploymentServiceCreateGuard(t *testing.T) {
 	})
 }
 
+func expectProjectOrigins(statements *servicemocks.MockAllStatements, origins ...domain.Origin) {
+	statements.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1", Origins: origins}, nil)
+}
+
+var appPrimary = domain.Origin{Pattern: appOrigin, Kind: domain.OriginKindPrimary}
+
+func TestDeploymentServiceDeployExpandsPrimary(t *testing.T) {
+	svc, statements := newMockedDeploymentService(t)
+	expectProjectOrigins(statements, appPrimary)
+	expectInsert(statements, expectServing(statements, nil))
+
+	result, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{"primary"}})
+	require.NoError(t, err)
+	assert.True(t, result.Created)
+	assert.Equal(t, []string{appOrigin}, result.Deployment.Origins())
+}
+
+func TestDeploymentServiceDeployRejects(t *testing.T) {
+}
+
 func TestDeploymentServiceCreateErrorMapping(t *testing.T) {
 	t.Run("release missing", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)

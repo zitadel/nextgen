@@ -9,17 +9,51 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-// The deployment operations answer 501 until the deployment service deploys
-// to targets. The access check stays in front, so a caller without the
-// permission learns that before it learns the operation is not served yet.
-
-func (h *Handler) CreateDeployment(ctx context.Context, _ *api.CreateDeploymentRequest, params api.CreateDeploymentParams) (api.CreateDeploymentRes, error) {
+func (h *Handler) CreateDeployment(ctx context.Context, req *api.CreateDeploymentRequest, params api.CreateDeploymentParams) (api.CreateDeploymentRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), deploymentAccess, opWrite); err != nil {
 		return nil, err
 	}
-	return nil, domain.ErrNotImplemented()
+
+	// Naming the release by its digest lands with #1574.
+	if req.ContentHash.Set {
+		return nil, domain.ErrNotImplemented()
+	}
+	input := service.DeployInput{
+		ProjectID: string(params.ProjectID),
+		ReleaseID: string(req.ReleaseID.Value),
+		Targets:   req.Targets,
+	}
+	// Deploying to preview URLs lands on top of this.
+	if req.TTL.Set {
+		return nil, domain.ErrNotImplemented()
+	}
+	if reason, ok := req.Reason.Get(); ok {
+		parsed, err := domain.DeploymentReasonString(string(reason))
+		if err != nil {
+			return nil, domain.ErrDeploymentInvalid("unknown reason", err)
+		}
+		input.Reason = parsed
+	}
+	if message, ok := req.Message.Get(); ok {
+		input.Message = &message
+	}
+	if expected, ok := req.ExpectedDeploymentID.Get(); ok {
+		input.ExpectedDeploymentID = new(string(expected))
+	}
+
+	result, err := h.deploymentService.Deploy(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+	resp := toAPIDeployment(result.Deployment)
+	if result.Created {
+		return (*api.CreateDeploymentCreated)(&resp), nil
+	}
+	return (*api.CreateDeploymentOK)(&resp), nil
 }
 
+// RollbackDeployment answers 501 until rollback lands. The access check stays
+// in front, so a caller without the permission learns that first.
 func (h *Handler) RollbackDeployment(ctx context.Context, _ api.OptRollbackDeploymentRequest, params api.RollbackDeploymentParams) (api.RollbackDeploymentRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), deploymentAccess, opWrite); err != nil {
 		return nil, err
@@ -27,18 +61,11 @@ func (h *Handler) RollbackDeployment(ctx context.Context, _ api.OptRollbackDeplo
 	return nil, domain.ErrNotImplemented()
 }
 
+// The reads answer 501 until they land on top of the deploy. The access
+// check stays in front, so a caller without the permission learns that first.
+
 func (h *Handler) GetDeploymentById(ctx context.Context, params api.GetDeploymentByIdParams) (api.GetDeploymentByIdRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), deploymentAccess, opRead); err != nil {
-		return nil, err
-	}
-	return nil, domain.ErrNotImplemented()
-}
-
-func (h *Handler) GetDeploymentVariables(ctx context.Context, params api.GetDeploymentVariablesParams) (api.GetDeploymentVariablesRes, error) {
-	if err := h.requireProjectAccess(ctx, string(params.ProjectID), deploymentAccess, opRead); err != nil {
-		return nil, err
-	}
-	if err := h.requireProjectAccess(ctx, string(params.ProjectID), variableAccess, opRead); err != nil {
 		return nil, err
 	}
 	return nil, domain.ErrNotImplemented()
@@ -114,4 +141,34 @@ func deploymentErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	default:
 		return internalErrorResponse(err)
 	}
+}
+
+// toAPIDeployment converts a deployment.
+func toAPIDeployment(entity *domain.Deployment) api.Deployment {
+	resp := api.Deployment{
+		ID:         api.DeploymentID(entity.ID),
+		ProjectID:  api.ProjectID(entity.ProjectID),
+		ReleaseID:  api.ReleaseID(entity.ReleaseID),
+		Targets:    make([]api.DeploymentTarget, len(entity.Targets)),
+		DeployedAt: entity.DeployedAt,
+		Metadata: api.DeploymentMetadata{
+			Reason: api.DeploymentReason(entity.Metadata.Reason.String()),
+		},
+	}
+	for i, target := range entity.Targets {
+		resp.Targets[i] = api.DeploymentTarget{Origin: api.Origin(target.Origin)}
+	}
+	if m := entity.Metadata; m.Message != nil {
+		resp.Metadata.Message = api.NewOptNilString(*m.Message)
+	}
+	if m := entity.Metadata; m.RollbackTo != nil {
+		resp.Metadata.RollbackTo = api.NewOptNilDeploymentID(api.DeploymentID(*m.RollbackTo))
+	}
+	if m := entity.Metadata; m.DeployedBy != nil {
+		resp.Metadata.DeployedBy = api.NewOptNilString(*m.DeployedBy)
+	}
+	if m := entity.Metadata; m.DeployedByType != nil {
+		resp.Metadata.DeployedByType = api.NewOptNilDeploymentMetadataDeployedByType(api.DeploymentMetadataDeployedByType(*m.DeployedByType))
+	}
+	return resp
 }
