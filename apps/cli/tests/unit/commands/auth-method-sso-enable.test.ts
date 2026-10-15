@@ -1,101 +1,11 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { Readable } from "node:stream";
+import { describe, expect, it } from "vitest";
 
-import { afterEach, describe, expect, it } from "vitest";
-
+import { defaultSchema, loginFlow, setUpProject, withStdin } from "../../helpers/local-project";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
-
-const tempDirs: string[] = [];
-
-/** A Project as `zitadel setup` leaves it, minus what this command ignores. */
-async function makeProject(schemas: Record<string, unknown> = {}): Promise<string> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-sso-enable-"));
-  tempDirs.push(cwd);
-  await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
-  await writeFile(
-    join(cwd, "zitadel.json"),
-    `${JSON.stringify({ version: "0.0.1", environments: { development: { issuer: "http://localhost:3000" } } })}\n`,
-  );
-  await writeFile(
-    join(cwd, ".zitadel/secret"),
-    `${JSON.stringify({
-      project_id: "proj_01TEST",
-      project_secret: "s",
-      preview_secret: "s",
-      preview_origins: [],
-      created_at: new Date().toISOString(),
-    })}\n`,
-  );
-  const files = Object.keys(schemas).length > 0 ? schemas : { "default-human-user": defaultSchema };
-  await mkdir(join(cwd, ".zitadel/flows"), { recursive: true });
-  for (const [name, body] of Object.entries(files)) {
-    await writeFile(join(cwd, `.zitadel/schemas/${name}.json`), `${JSON.stringify(body)}\n`);
-    // Every schema gets the login flow that runs against it: the provider is
-    // offered by a flow, so a project without one is not a project this
-    // command can configure.
-    await writeFile(
-      join(cwd, `.zitadel/flows/${name}-login.json`),
-      `${JSON.stringify(loginFlow(name))}\n`,
-    );
-  }
-  // The README that ships beside the schemas must not be read as one.
-  await writeFile(join(cwd, ".zitadel/schemas/README.md"), "# schemas\n");
-  return cwd;
-}
-
-/** A login flow bound to a schema by the URL the scaffold writes. */
-function loginFlow(schemaName: string) {
-  return {
-    name: `${schemaName}-login`,
-    status: "active",
-    user_schema: `https://schemas.test.invalid/${schemaName}.json`,
-    purposes: { login: "identifier", register: "register" },
-    steps: [
-      {
-        name: "identifier",
-        fields: ["email"],
-        actions: [{ name: "submit", kind: "submit", primary: true }],
-        transitions: { submit: { target: "done" } },
-      },
-      {
-        name: "register",
-        fields: ["email"],
-        actions: [{ name: "submit", kind: "submit", primary: true }],
-        transitions: { submit: { target: "done" } },
-      },
-      { name: "done", complete: "show" },
-    ],
-  };
-}
-
-const defaultSchema = {
-  properties: { email: { type: "string" } },
-  "x-auth-methods": { password: { enabled: true }, passkey: { enabled: true } },
-};
-
-/**
- * Run the command with a stand-in stdin, the way `variables` does: a scripted
- * run reads the secret from the stream, so leaving the real one in place
- * would block on a stream that never ends. Passing no `piped` value stands
- * for a terminal — nothing was piped.
- */
-async function withStdin<T>(piped: string | undefined, run: () => Promise<T>): Promise<T> {
-  const original = Object.getOwnPropertyDescriptor(process, "stdin");
-  Object.defineProperty(process, "stdin", {
-    value: piped === undefined ? { isTTY: true } : Readable.from([piped]),
-    configurable: true,
-  });
-  try {
-    return await run();
-  } finally {
-    if (original) {
-      Object.defineProperty(process, "stdin", original);
-    }
-  }
-}
 
 /**
  * Run the command with a secret on stdin, the way a scripted caller must:
@@ -105,6 +15,7 @@ async function withStdin<T>(piped: string | undefined, run: () => Promise<T>): P
 function enable(cwd: string, ...extra: string[]) {
   return withStdin("piped-secret", () =>
     runCliForTest([
+      "auth-method",
       "sso",
       "enable",
       "--cwd",
@@ -122,6 +33,7 @@ function enable(cwd: string, ...extra: string[]) {
 function enableRendered(cwd: string, ...extra: string[]) {
   return withStdin("piped-secret", () =>
     runCliForTest([
+      "auth-method",
       "sso",
       "enable",
       "--cwd",
@@ -134,18 +46,9 @@ function enableRendered(cwd: string, ...extra: string[]) {
   );
 }
 
-afterEach(async () => {
-  while (tempDirs.length > 0) {
-    const dir = tempDirs.pop();
-    if (dir) {
-      await rm(dir, { recursive: true, force: true });
-    }
-  }
-});
-
-describe("sso enable", () => {
+describe("auth-method sso enable", () => {
   it("writes the connection and reports what changed", async () => {
-    const cwd = await makeProject();
+    const cwd = await setUpProject();
     const result = await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
     expect(result.exitCode).toBe(0);
 
@@ -170,11 +73,19 @@ describe("sso enable", () => {
 
   describe("a password step edited by hand", () => {
     async function aProjectWithAnEditedPasswordStep(): Promise<string> {
-      const cwd = await makeProject();
+      const cwd = await setUpProject();
       const path = join(cwd, ".zitadel/flows/default-human-user-login.json");
       const flow = JSON.parse(await readFile(path, "utf8")) as {
         steps: Array<Record<string, unknown>>;
       };
+      // Reached from the identifier step, or the flow would not validate.
+      const identifier = flow.steps.find((step) => step.name === "identifier");
+      if (identifier !== undefined) {
+        identifier.transitions = {
+          ...(identifier.transitions as object),
+          submit: { target: "password" },
+        };
+      }
       flow.steps.splice(flow.steps.length - 1, 0, {
         name: "password",
         fields: ["x-auth-methods#password"],
@@ -221,26 +132,53 @@ describe("sso enable", () => {
     });
   });
 
-  it("reuses the connection on a second run and writes nothing new", async () => {
-    const cwd = await makeProject();
-    await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
-    const before = await readFile(join(cwd, ".zitadel/idps/google.json"), "utf8");
+  it("brings the conflict step up to date when a method was enabled after it was written", async () => {
+    const cwd = await setUpProject({
+      "default-human-user": {
+        ...structuredClone(defaultSchema),
+        "x-auth-methods": { password: { enabled: true }, passkey: { enabled: false } },
+      },
+    });
+    const first = await enable(cwd, "--client-id", "abc");
+    expect(first.exitCode).toBe(0);
+    await writeFile(
+      join(cwd, ".zitadel/schemas/default-human-user.json"),
+      JSON.stringify({
+        ...defaultSchema,
+        "x-auth-methods": { password: { enabled: true }, passkey: { enabled: true } },
+      }),
+    );
 
-    const result = await enable(cwd);
-    const payload = parseJson(result.stdout) as { data: { connection: { action: string } } };
-    expect(payload.data.connection.action).toBe("reuse");
-    expect(await readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")).toBe(before);
+    const second = await enable(cwd);
+
+    expect(second.exitCode).toBe(0);
+    const payload = parseJson(second.stdout) as { data: { untouched: string[] } };
+    expect(payload.data.untouched).toEqual([]);
+    const flow = JSON.parse(
+      await readFile(join(cwd, ".zitadel/flows/default-human-user-login.json"), "utf8"),
+    ) as { steps: Array<{ name: string; actions?: Array<{ name: string }> }> };
+    const conflict = flow.steps.find((step) => step.name === "sso-conflict");
+    expect(conflict?.actions?.map((action) => action.name)).toContain("passkey");
   });
 
   it("prints the callback URI on reuse in text mode", async () => {
     // The URI moved to one per connection after the first release; rerunning
     // the command on the existing connection is how a developer finds the one
     // to register now, without reaching for --json.
-    const cwd = await makeProject();
+    const cwd = await setUpProject();
     await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
 
     const result = await withStdin("piped-secret", () =>
-      runCliForTest(["sso", "enable", "--cwd", cwd, "--provider", "google", "--non-interactive"]),
+      runCliForTest([
+        "auth-method",
+        "sso",
+        "enable",
+        "--cwd",
+        cwd,
+        "--provider",
+        "google",
+        "--non-interactive",
+      ]),
     );
 
     expect(result.exitCode).toBe(0);
@@ -250,15 +188,22 @@ describe("sso enable", () => {
   });
 
   it("warns when the schema defines nothing the provider maps, so the connection has no mapping", async () => {
-    const cwd = await makeProject({
+    const cwd = await setUpProject({
       "default-human-user": {
+        ...defaultSchema,
         properties: { staffNumber: { type: "string" } },
-        "x-auth-methods": { password: { enabled: true }, passkey: { enabled: true } },
       },
     });
+    // The flow collects what the schema defines, so it validates as it is.
+    const flowPath = join(cwd, ".zitadel/flows/default-human-user-login.json");
+    await writeFile(
+      flowPath,
+      (await readFile(flowPath, "utf8")).replaceAll('"email"', '"staffNumber"'),
+    );
 
     const result = await withStdin("piped-secret", () =>
       runCliForTest([
+        "auth-method",
         "sso",
         "enable",
         "--cwd",
@@ -283,12 +228,23 @@ describe("sso enable", () => {
     expect(payload.warnings?.join("\n")).toContain("has no claim_mapping");
   });
 
+  it("reuses the connection on a second run and writes nothing new", async () => {
+    const cwd = await setUpProject();
+    await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
+    const before = await readFile(join(cwd, ".zitadel/idps/google.json"), "utf8");
+
+    const result = await enable(cwd);
+    const payload = parseJson(result.stdout) as { data: { connection: { action: string } } };
+    expect(payload.data.connection.action).toBe("reuse");
+    expect(await readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")).toBe(before);
+  });
+
   it("publishes a changed client id on reuse rather than ignoring it", async () => {
     // The connection references the id rather than holding it, so a rerun with
     // a different one has nothing in the file to disagree with. Republishing
     // is what makes the second invocation mean what it says; the previous
     // refusal only made sense while the id lived in the document.
-    const cwd = await makeProject();
+    const cwd = await setUpProject();
     await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
 
     const result = await enable(cwd, "--client-id", "999-zzz.apps.googleusercontent.com");
@@ -304,7 +260,7 @@ describe("sso enable", () => {
   });
 
   it("names the schemas when the Project has more than one", async () => {
-    const cwd = await makeProject({ customers: defaultSchema, employees: defaultSchema });
+    const cwd = await setUpProject({ customers: defaultSchema, employees: defaultSchema });
     const result = await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
     expect(result.exitCode).not.toBe(0);
     const out = result.stdout + result.stderr;
@@ -313,7 +269,7 @@ describe("sso enable", () => {
   });
 
   it("changes the named schema when several exist", async () => {
-    const cwd = await makeProject({ customers: defaultSchema, employees: defaultSchema });
+    const cwd = await setUpProject({ customers: defaultSchema, employees: defaultSchema });
     const result = await enable(
       cwd,
       "--schema",
@@ -326,7 +282,7 @@ describe("sso enable", () => {
   });
 
   it("changes nothing on a dry run", async () => {
-    const cwd = await makeProject();
+    const cwd = await setUpProject();
     const result = await enable(
       cwd,
       "--client-id",
@@ -343,7 +299,7 @@ describe("sso enable", () => {
    * an agent reading only the payload has to find it there.
    */
   it("names the project it changed in both output modes", async () => {
-    const cwd = await makeProject();
+    const cwd = await setUpProject();
     const done = await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
     expect((parseJson(done.stdout) as { data: Record<string, unknown> }).data.project_id).toBe(
       "proj_01TEST",
@@ -356,14 +312,14 @@ describe("sso enable", () => {
   });
 
   it("requires a client id when there is no one to ask", async () => {
-    const cwd = await makeProject();
+    const cwd = await setUpProject();
     const result = await enable(cwd);
     expect(result.exitCode).not.toBe(0);
     expect(result.stdout + result.stderr).toContain("--client-id");
   });
 
   it("never puts the secret in its output", async () => {
-    const cwd = await makeProject();
+    const cwd = await setUpProject();
     const result = await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
     expect(result.stdout).not.toContain("GOCSPX");
     expect(result.stderr).not.toContain("GOCSPX");
@@ -373,10 +329,10 @@ describe("sso enable", () => {
     // oclif's own "Missing required flag provider" would be the one refusal in
     // this command carrying no hint, and every other error here says what to
     // do next.
-    const cwd = await makeProject();
+    const cwd = await setUpProject();
 
     const result = await withStdin(undefined, () =>
-      runCliForTest(["sso", "enable", "--cwd", cwd, "--json"]),
+      runCliForTest(["auth-method", "sso", "enable", "--cwd", cwd, "--json"]),
     );
 
     expect(result.exitCode).not.toBe(0);
@@ -389,7 +345,7 @@ describe("sso enable", () => {
     // Where a provider lives is asked for, and only on a development build:
     // the question belongs to whoever is working on the CLI, and a scripted
     // run has nobody to ask, so it gets the catalog's own issuer.
-    const cwd = await makeProject();
+    const cwd = await setUpProject();
 
     const result = await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
 
@@ -408,7 +364,7 @@ describe("sso enable", () => {
     // A scaffolded connection stores `${{ GOOGLE_CLIENT_ID }}`, not an id, so
     // there is nothing in the file for a supplied id to disagree with. Reading
     // the reference as a literal made every rerun a conflict.
-    const cwd = await makeProject();
+    const cwd = await setUpProject();
     await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
 
     const again = await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
@@ -421,7 +377,7 @@ describe("sso enable", () => {
   it("still refuses a different client id on a hand-written connection", async () => {
     // A connection someone wrote by hand may hold a literal id, and reusing it
     // for another client would be silently wrong.
-    const cwd = await makeProject();
+    const cwd = await setUpProject();
     await mkdir(join(cwd, ".zitadel/idps"), { recursive: true });
     await writeFile(
       join(cwd, ".zitadel/idps/google.json"),
@@ -448,7 +404,7 @@ describe("sso enable", () => {
     // A connection is an editable file and may point at its own variables.
     // Publishing to a slug-derived name would store the credential where the
     // connection never looks, and report it stored.
-    const cwd = await makeProject();
+    const cwd = await setUpProject();
     await mkdir(join(cwd, ".zitadel/idps"), { recursive: true });
     await writeFile(
       join(cwd, ".zitadel/idps/google.json"),
@@ -475,12 +431,13 @@ describe("sso enable", () => {
   });
 });
 
-describe("sso enable secret handling", () => {
+describe("auth-method sso enable secret handling", () => {
   it("stores a secret piped in on a scripted run", async () => {
-    const cwd = await makeProject();
+    const cwd = await setUpProject();
 
     const result = await withStdin("piped-secret", () =>
       runCliForTest([
+        "auth-method",
         "sso",
         "enable",
         "--cwd",
@@ -508,10 +465,11 @@ describe("sso enable secret handling", () => {
     // secret as `${{ NAME }}`, so a button whose credential never arrived
     // fails at token exchange rather than at enable time. The command must
     // say so and hand back the command that fixes it, not exit 0 quietly.
-    const cwd = await makeProject();
+    const cwd = await setUpProject();
 
     const result = await withStdin("piped-secret", () =>
       runCliForTest([
+        "auth-method",
         "sso",
         "enable",
         "--cwd",
@@ -547,10 +505,11 @@ describe("sso enable secret handling", () => {
     // fails at the token endpoint with invalid_client — in a browser, long
     // after this command reported success. Refusing here is the cheaper
     // failure, and it must leave no half-written connection behind.
-    const cwd = await makeProject();
+    const cwd = await setUpProject();
 
     const result = await withStdin("", () =>
       runCliForTest([
+        "auth-method",
         "sso",
         "enable",
         "--cwd",
@@ -572,12 +531,12 @@ describe("sso enable secret handling", () => {
   });
 });
 
-describe("sso enable with a connection already on disk", () => {
+describe("auth-method sso enable with a connection already on disk", () => {
   it("still configures a second schema, rather than reporting a no-op", async () => {
     // The command's own example advertises `--schema customers`. Reusing the
     // connection must not skip the schema and flow edits: they are per-schema
     // and they are the point of the command.
-    const cwd = await makeProject({
+    const cwd = await setUpProject({
       customers: structuredClone(defaultSchema),
       employees: structuredClone(defaultSchema),
     });
@@ -602,7 +561,7 @@ describe("sso enable with a connection already on disk", () => {
   });
 
   it("finishes a run interrupted after the connection file was written", async () => {
-    const cwd = await makeProject();
+    const cwd = await setUpProject();
     // What a Ctrl-C between the file write and the schema edit leaves behind.
     await mkdir(join(cwd, ".zitadel/idps"), { recursive: true });
     await writeFile(
@@ -623,7 +582,7 @@ describe("sso enable with a connection already on disk", () => {
     // The schema is the first thing the command would rewrite, so finding the
     // failure after writing it would leave `x-auth-methods.sso` enabled for a
     // provider the sign-in screen can never offer.
-    const cwd = await makeProject();
+    const cwd = await setUpProject();
     await rm(join(cwd, ".zitadel/flows/default-human-user-login.json"));
     const schemaPath = join(cwd, ".zitadel/schemas/default-human-user.json");
     const before = await readFile(schemaPath, "utf8");
@@ -645,7 +604,7 @@ describe("sso enable with a connection already on disk", () => {
     // `--client-id "$CLIENT_ID"` with the variable unset is the common way
     // here. Taking it would bypass the prompt on create and, on reuse,
     // overwrite the project's variable with nothing.
-    const cwd = await makeProject();
+    const cwd = await setUpProject();
 
     const result = await enable(cwd, "--client-id", "   ");
 
@@ -657,7 +616,7 @@ describe("sso enable with a connection already on disk", () => {
   });
 
   it("reports only a missing schema directory as no schemas", async () => {
-    const cwd = await makeProject();
+    const cwd = await setUpProject();
     // A directory that cannot be listed is not an empty one.
     await rm(join(cwd, ".zitadel/schemas"), { recursive: true });
     await writeFile(join(cwd, ".zitadel/schemas"), "not a directory");
@@ -668,37 +627,8 @@ describe("sso enable with a connection already on disk", () => {
     expect((parseJson(result.stdout) as { code: string }).code).not.toBe("E_NOT_FOUND");
   });
 
-  it("does not match a flow naming a different schema with the same file name", async () => {
-    // Two Projects' schemas can share a file name. The `$id` is the schema's
-    // own statement of what flows name it by, so a flow pointing somewhere
-    // else is about a different schema, and editing it would wire the
-    // provider into the wrong sign-in.
-    const cwd = await makeProject();
-    const schemaPath = join(cwd, ".zitadel/schemas/default-human-user.json");
-    const flowPath = join(cwd, ".zitadel/flows/default-human-user-login.json");
-    const schema = JSON.parse(await readFile(schemaPath, "utf8")) as Record<string, unknown>;
-    const flow = JSON.parse(await readFile(flowPath, "utf8")) as Record<string, unknown>;
-    await writeFile(
-      schemaPath,
-      JSON.stringify({ ...schema, $id: "https://a.example/default-human-user.json" }, null, 2),
-    );
-    await writeFile(
-      flowPath,
-      JSON.stringify(
-        { ...flow, user_schema: "https://b.example/default-human-user.json" },
-        null,
-        2,
-      ),
-    );
-
-    const result = await enable(cwd, "--client-id", "abc");
-
-    expect(result.exitCode).not.toBe(0);
-    expect((parseJson(result.stdout) as { code: string }).code).toBe("E_NOT_FOUND");
-  });
-
   it("finds the flow naming the schema by its objectType", async () => {
-    const cwd = await makeProject();
+    const cwd = await setUpProject();
     const schemaPath = join(cwd, ".zitadel/schemas/default-human-user.json");
     const flowPath = join(cwd, ".zitadel/flows/default-human-user-login.json");
     const schema = JSON.parse(await readFile(schemaPath, "utf8")) as Record<string, unknown>;
@@ -721,14 +651,155 @@ describe("sso enable with a connection already on disk", () => {
       user_schema: "human-user",
     });
   });
+
+  it("does not match a flow naming a different schema with the same file name", async () => {
+    // Two Projects' schemas can share a file name. The `$id` is the schema's
+    // own statement of what flows name it by, so a flow pointing somewhere
+    // else is about a different schema, and editing it would wire the
+    // provider into the wrong sign-in.
+    const cwd = await setUpProject();
+    const schemaPath = join(cwd, ".zitadel/schemas/default-human-user.json");
+    const flowPath = join(cwd, ".zitadel/flows/default-human-user-login.json");
+    const schema = JSON.parse(await readFile(schemaPath, "utf8")) as Record<string, unknown>;
+    const flow = JSON.parse(await readFile(flowPath, "utf8")) as Record<string, unknown>;
+    await writeFile(
+      schemaPath,
+      JSON.stringify({ ...schema, $id: "https://a.example/default-human-user.json" }, null, 2),
+    );
+    await writeFile(
+      flowPath,
+      JSON.stringify(
+        { ...flow, user_schema: "https://b.example/default-human-user.json" },
+        null,
+        2,
+      ),
+    );
+
+    const result = await enable(cwd, "--client-id", "abc");
+
+    expect(result.exitCode).not.toBe(0);
+    expect((parseJson(result.stdout) as { code: string }).code).toBe("E_NOT_FOUND");
+  });
 });
 
-describe("sso enable preflight", () => {
+describe("auth-method sso enable preflight", () => {
+  it("refuses a flow it cannot check before writing or publishing anything", async () => {
+    const cwd = await setUpProject();
+    await writeFile(
+      join(cwd, ".zitadel/flows/default-human-user-login.json"),
+      `${JSON.stringify({ ...loginFlow("default-human-user"), purposes: { login: "missing" } })}\n`,
+    );
+
+    const result = await enable(cwd, "--client-id", "abc");
+
+    expect((parseJson(result.stdout) as { message: string }).message).toContain(
+      "cannot be checked against the changed schema",
+    );
+    await expect(readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")).rejects.toThrow();
+  });
+
+  it("refuses a flow it cannot check on a dry run too", async () => {
+    const cwd = await setUpProject();
+    await writeFile(
+      join(cwd, ".zitadel/flows/default-human-user-login.json"),
+      `${JSON.stringify({ ...loginFlow("default-human-user"), purposes: { login: "missing" } })}\n`,
+    );
+
+    const result = await enable(cwd, "--client-id", "abc", "--dry-run");
+
+    expect((parseJson(result.stdout) as { code: string }).code).toBe("E_VALIDATION");
+  });
+
+  it("warns when no active flow will offer a way to sign in", async () => {
+    const cwd = await setUpProject();
+    await writeFile(
+      join(cwd, ".zitadel/flows/default-human-user-login.json"),
+      `${JSON.stringify({ ...loginFlow("default-human-user"), status: "draft" })}\n`,
+    );
+
+    const result = await enable(cwd, "--client-id", "abc", "--dry-run");
+
+    expect((parseJson(result.stdout) as { warnings: string[] }).warnings).toContain(
+      "No active login flow for default-human-user offers a method it enables, so nobody can sign in until one does.",
+    );
+  });
+
+  it("lists plan and apply, with --cwd, as next_args", async () => {
+    const cwd = await setUpProject();
+
+    const result = await enable(cwd, "--client-id", "abc");
+
+    const { data } = parseJson(result.stdout) as { data: { next_args: string[][] } };
+    expect(data.next_args).toEqual(
+      expect.arrayContaining([
+        ["plan", "--cwd", expect.any(String)],
+        ["apply", "--cwd", expect.any(String)],
+      ]),
+    );
+    for (const args of data.next_args) {
+      expect(args).toContain("--cwd");
+    }
+  });
+
+  it("lists the credential to publish again first, with --cwd", async () => {
+    const cwd = await setUpProject();
+
+    const result = await enable(cwd, "--client-id", "abc");
+
+    const { data } = parseJson(result.stdout) as { data: { next_args: string[][] } };
+    expect(data.next_args[0]).toEqual([
+      "variables",
+      "set",
+      "GOOGLE_CLIENT_ID",
+      "--project-level",
+      "--cwd",
+      expect.any(String),
+    ]);
+  });
+
+  it("lists the schema and flow files it changed", async () => {
+    const cwd = await setUpProject();
+
+    const result = await enable(cwd, "--client-id", "abc");
+
+    const { data } = parseJson(result.stdout) as { data: { changed: string[] } };
+    expect(data.changed).toEqual([
+      ".zitadel/schemas/default-human-user.json",
+      ".zitadel/flows/default-human-user-login.json",
+    ]);
+  });
+
+  it("lists the files a dry run would change", async () => {
+    const cwd = await setUpProject();
+
+    const result = await enable(cwd, "--client-id", "abc", "--dry-run");
+
+    const { data } = parseJson(result.stdout) as { data: { changed: string[] } };
+    expect(data.changed).toEqual([
+      ".zitadel/schemas/default-human-user.json",
+      ".zitadel/flows/default-human-user-login.json",
+    ]);
+  });
+
+  it("leaves the follow-ups out of next_commands when the path needs quoting", async () => {
+    const parent = await mkdtemp(join(tmpdir(), "zitadel sso enable "));
+    const cwd = join(parent, "my project");
+    await rename(await setUpProject(), cwd);
+
+    const result = await enable(cwd, "--client-id", "abc");
+
+    const { data } = parseJson(result.stdout) as {
+      data: { next_commands: string[]; next_args: string[][] };
+    };
+    expect(data.next_commands).toEqual([]);
+    expect(data.next_args.length).toBeGreaterThan(0);
+  });
+
   it("fails a dry run for the same reason the real run would", async () => {
     // A preview that reports "would create" for an invocation that cannot
     // succeed is worse than no preview: it is checked precisely to find this
     // out before committing to it.
-    const cwd = await makeProject();
+    const cwd = await setUpProject();
     await rm(join(cwd, ".zitadel/flows/default-human-user-login.json"));
 
     const result = await enable(cwd, "--client-id", "abc", "--dry-run");
@@ -741,7 +812,7 @@ describe("sso enable preflight", () => {
     // The fallback matches on a URL suffix rather than a synced id, so a
     // corrupt state file could silently point the command at a flow bound to
     // another schema.
-    const cwd = await makeProject();
+    const cwd = await setUpProject();
     await writeFile(join(cwd, ".zitadel/state.json"), "{ not json");
 
     const result = await enable(cwd, "--client-id", "abc", "--dry-run");
@@ -755,7 +826,7 @@ describe("sso enable preflight", () => {
   it("refuses a flow it cannot edit instead of overwriting the region", async () => {
     // `steps: "broken"` would otherwise read as no steps and be written back
     // as two generated ones, destroying whatever was there.
-    const cwd = await makeProject();
+    const cwd = await setUpProject();
     const flowPath = join(cwd, ".zitadel/flows/default-human-user-login.json");
     const flow = JSON.parse(await readFile(flowPath, "utf8")) as Record<string, unknown>;
     await writeFile(flowPath, JSON.stringify({ ...flow, steps: "broken" }, null, 2));

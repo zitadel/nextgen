@@ -25,6 +25,7 @@
     variant,
     theme,
     suppressHeader,
+    suppressPasswordToggle,
     onFlowStep,
     onFlowInput,
     onFlowComplete,
@@ -88,6 +89,7 @@
   {variant}
   {theme}
   {suppressHeader}
+  {suppressPasswordToggle}
 >
   <!-- Light-DOM content, e.g. the `attribution-trailing` slot. -->
   {@render children?.()}

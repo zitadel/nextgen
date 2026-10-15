@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import { createLiquidEngine } from "../liquid.js";
 import { builtinLocales } from "./index.js";
 
 /**
- * The steps `zitadel sso enable` adds to a login flow, as the engine renders
- * them.
+ * The steps `zitadel auth-method sso enable` adds to a login flow, as the
+ * engine renders them.
  *
  * A fixture rather than a call into the CLI's generator: this package
  * consumes the *rendered* step the server sends, and the authoring side that
@@ -48,6 +49,18 @@ describe.each(Object.entries(builtinLocales))("locale %s covers the sso steps", 
     // would render the same label for every provider.
     expect(locale["sso.continue_with"]).toContain("{name}");
   });
+
+  // The engine asks for `<step>.description.sso` on every step that offers
+  // providers; each must render as copy, through its own key or the fallback.
+  it.each(["identifier", "register", "password", "sso-conflict"])(
+    "renders the description %s asks for when it offers providers",
+    (step) => {
+      const engine = createLiquidEngine({ locale });
+      const key = `${step}.description.sso`;
+
+      expect(engine.parseAndRenderSync("{{ key | t }}", { key })).not.toBe(key);
+    },
+  );
 
   it.each(SSO_STEPS)("resolves every key step $name produces", (step) => {
     expect(locale, `${step.name}.title`).toHaveProperty(`${step.name}.title`);

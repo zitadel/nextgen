@@ -923,13 +923,17 @@ func acceptsSessionCookie(op methodsFileOperation) bool {
 var operationExcludedErrors = map[string][]string{
 	"listMyProjects": {"domain.ErrSessionTokenInvalid"},
 	// The flow engine catches a stale parked SSO row with errors.Is and renders
-	// the step; the analysis cannot see that check prune the error.
-	"getFlowStep": {"domain.ErrSSOStateInvalid"},
+	// the step; the analysis cannot see that check prune the error. The SSO
+	// resolver turns a user schema the project does not hold into
+	// domain.ErrInternal (storedUserSchemaMatches), so sch.not_found never
+	// reaches the response.
+	"getFlowStep": {"domain.ErrJSONSchemaNotFound", "domain.ErrSSOStateInvalid"},
 	// All are consumed in the state machine's sso branch: a missing
 	// connection becomes flow.invalid_action, an unavailable provider
 	// re-renders the step with error.sso_unavailable, and a parked row that is
-	// gone renders the step again.
-	"submitFlowStep": {"domain.ErrFlowSSOUnavailable", "domain.ErrIDPConnectionNotFound", "domain.ErrSSOStateInvalid"},
+	// gone renders the step again. sch.not_found is remapped as for
+	// getFlowStep.
+	"submitFlowStep": {"domain.ErrFlowSSOUnavailable", "domain.ErrIDPConnectionNotFound", "domain.ErrJSONSchemaNotFound", "domain.ErrSSOStateInvalid"},
 	// A new flow has no parked SSO row, so the collection step's prefill
 	// returns before it reads the attempt's row or a connection.
 	"createFlow": {
