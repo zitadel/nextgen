@@ -33,18 +33,25 @@
    --tilt-x and --tilt-y, from -0.5 to 0.5), the headline under it and the
    commands under that. */
 @layer components {
+  /* The hero takes at least the first screen under the header (h-16 and its
+     border): on a tall screen the extra height surrounds it, and the steps
+     start below the fold instead of crowding under its buttons. */
+  .hero {
+    min-height: calc(100svh - 4rem - 1px);
+  }
+
   .stage {
     --tilt-x: 0;
     --tilt-y: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
-    /* At most 36rem wide, and as high as the screen leaves beside the header,
+    /* At most 40rem wide, and as high as the screen leaves beside the header,
        the headline, the line, the commands and the buttons (32rem, with a
        little air under them), so all of them fit a laptop's first screen;
        never so small that the animation is lost: a short screen scrolls
        instead. */
-    width: min(100%, 36rem, max(15rem, calc((100svh - 32rem) * 550 / 448)));
+    width: min(100%, 40rem, max(15rem, calc((100svh - 32rem) * 550 / 448)));
   }
 
   .stage-frame {

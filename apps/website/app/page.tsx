@@ -43,7 +43,7 @@ export default function Home() {
       <main>
         <section
           aria-labelledby="hero-title"
-          className="flex flex-col items-center overflow-hidden px-6 pt-2 pb-16 md:pb-20"
+          className="hero flex flex-col items-center justify-center overflow-hidden px-6 pt-2 pb-16 md:pb-24"
         >
           <Stage>
             <div className="stage-frame">
@@ -98,7 +98,10 @@ export default function Home() {
 
         {/* What the commands do, step by step, with no title of its own: the
             numbered rows speak for themselves under the hero. */}
-        <section aria-label="Step by step" className="overflow-hidden px-6 pt-4 pb-12 md:pb-20">
+        <section
+          aria-label="Step by step"
+          className="overflow-hidden px-6 pt-8 pb-12 md:pt-12 md:pb-20"
+        >
           <div className="mx-auto max-w-5xl">
             <Showcase />
           </div>
