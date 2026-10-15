@@ -168,6 +168,9 @@ which ships in this package.
 * [`zitadel origin add PATTERN`](#zitadel-origin-add-pattern)
 * [`zitadel origin list`](#zitadel-origin-list)
 * [`zitadel origin rm PATTERN`](#zitadel-origin-rm-pattern)
+* [`zitadel preview`](#zitadel-preview)
+* [`zitadel preview list`](#zitadel-preview-list)
+* [`zitadel preview rm URL`](#zitadel-preview-rm-url)
 * [`zitadel projects get ID`](#zitadel-projects-get-id)
 * [`zitadel projects list`](#zitadel-projects-list)
 * [`zitadel projects update ID`](#zitadel-projects-update-id)
@@ -1983,6 +1986,148 @@ EXAMPLES
   $ zitadel origin rm https://app.acme.com
 
   $ zitadel origin rm https://app.acme.com --force
+```
+
+## `zitadel preview`
+
+Deploy a release from .zitadel/ to a pull-request build's preview URLs.
+
+```
+USAGE
+  $ zitadel preview [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
+    <value>] [--origin <value>...] [--ttl <value>] [--strict]
+
+FLAGS
+  -c, --cwd=<value>        Project directory to operate on.
+  -e, --env=<value>        Environment to run against, e.g. production. Defaults
+                           to ZITADEL_ENV, then the hosting platform's build
+                           (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -n, --non-interactive    Disable prompts. Required when scripting or running
+                           as an agent.
+  -s, --server=<value>     Override the resolved server URL.
+  -v, --verbose            Verbose logging.
+      --[no-]color         Colorize human output. Disable with --no-color;
+                           NO_COLOR and FORCE_COLOR are honored too.
+      --debug              Debug logging.
+      --dry-run            Preview without mutating files or the platform.
+      --env-file=<value>   Read ZITADEL_* values from this file ahead of the
+                           process environment. Cannot be combined with --env.
+      --origin=<value>...  A preview URL to deploy to, instead of detecting them
+                           from the platform build. Repeatable.
+      --strict             Fail instead of warning when no preview credential
+                           (ZITADEL_PREVIEW_TOKEN) is set.
+      --[no-]telemetry     Send anonymous usage analytics. Disable with
+                           --no-telemetry.
+      --ttl=<value>        How long each preview stays live, e.g. 7d, 12h or
+                           90m. Between 60s and 30d. Omitted, the project's
+                           default applies.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Deploy a release from .zitadel/ to a pull-request build's preview URLs.
+
+EXAMPLES
+  $ zitadel preview
+
+  $ zitadel preview --origin https://acme-git-sso-acmeinc.vercel.app
+
+  $ zitadel preview --ttl 24h
+```
+
+## `zitadel preview list`
+
+List the project's live previews, newest first.
+
+```
+USAGE
+  $ zitadel preview list [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
+    <value>] [--limit <value>] [-a | --page-token <value>] [--plain]
+
+FLAGS
+  -a, --all                 Fetch every page instead of one.
+  -c, --cwd=<value>         Project directory to operate on.
+  -e, --env=<value>         Environment to run against, e.g. production.
+                            Defaults to ZITADEL_ENV, then the hosting platform's
+                            build (VERCEL_ENV, or Netlify's CONTEXT), then
+                            development.
+  -n, --non-interactive     Disable prompts. Required when scripting or running
+                            as an agent.
+  -s, --server=<value>      Override the resolved server URL.
+  -v, --verbose             Verbose logging.
+      --[no-]color          Colorize human output. Disable with --no-color;
+                            NO_COLOR and FORCE_COLOR are honored too.
+      --debug               Debug logging.
+      --dry-run             Preview without mutating files or the platform.
+      --env-file=<value>    Read ZITADEL_* values from this file ahead of the
+                            process environment. Cannot be combined with --env.
+      --limit=<value>       Page size (server default 20, max 100).
+      --page-token=<value>  Continue from a previous page's next_page_token.
+      --plain               Tab-separated rows with no header, for piping.
+                            Implied when stdout is not a terminal.
+      --[no-]telemetry      Send anonymous usage analytics. Disable with
+                            --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  List the project's live previews, newest first.
+
+EXAMPLES
+  $ zitadel preview list
+
+  $ zitadel preview list --all
+
+  $ zitadel preview list --plain
+```
+
+## `zitadel preview rm URL`
+
+Remove a live preview from the project.
+
+```
+USAGE
+  $ zitadel preview rm URL [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
+    <value>] [-f]
+
+ARGUMENTS
+  URL  The preview URL to remove.
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment to run against, e.g. production. Defaults
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -f, --force             Remove the preview without the confirmation prompt.
+                          Required when non-interactive.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as
+                          an agent.
+  -s, --server=<value>    Override the resolved server URL.
+  -v, --verbose           Verbose logging.
+      --[no-]color        Colorize human output. Disable with --no-color;
+                          NO_COLOR and FORCE_COLOR are honored too.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
+                          process environment. Cannot be combined with --env.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with
+                          --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Remove a live preview from the project.
+
+EXAMPLES
+  $ zitadel preview rm https://acme-git-sso-acmeinc.vercel.app
+
+  $ zitadel preview rm https://acme-git-sso-acmeinc.vercel.app --force
 ```
 
 ## `zitadel projects get ID`

@@ -1,6 +1,7 @@
 import { join } from "node:path";
 
 import type { CreateIdpBodyIdp } from "@zitadel/api/generated/model";
+import { ApiError } from "@zitadel/api/runtime/fetch";
 import { consola } from "consola";
 
 import { isVariableReference, missingEndpoints, referencedVariable } from "@zitadel/config/idp";
@@ -9,7 +10,7 @@ import { idpConnectionConfigSchema } from "@zitadel/config/schemas";
 import { ZitadelError } from "../../errors";
 import { IDPS_DIR, refuseResolvedSecret } from "../../idp";
 import { readJsonDirEntries } from "../../json-dir";
-import { primaryValues } from "../../variables";
+import { valuesOfKind } from "../../variables";
 import type { Step, StepContext } from "../pipeline";
 
 /**
@@ -18,16 +19,19 @@ import type { Step, StepContext } from "../pipeline";
  * `.zitadel/idps/*.json`, before the release — because flow steps reference a
  * connection by slug and the slug must exist when the release is built. When
  * the bundle gains an `idp` kind this whole step goes away and connections ride
- * the bundle like schemas, flows and branding do. It is deploy-only: a preview
- * never writes connections.
+ * the bundle like schemas, flows and branding do. A preview runs it to validate
+ * the connection files and never writes one: the early return on
+ * `ctx.mode === "preview"` keeps a pull-request build away from `createIdp`.
  */
 export const idpConnectionsStep: Step = {
   name: "idp-connections",
-  runsFor: ["deploy"],
+  runsFor: ["deploy", "preview"],
   // Not marked `writes`: a dry run must still run this step to validate and
   // preview the connection files. The write itself (`POST /idps`) is guarded on
   // `ctx.dryRun` below rather than the whole step being skipped, so a dry run
-  // reports what it would sync without a bad file slipping past validation.
+  // reports what it would sync without a bad file slipping past validation. A
+  // preview validates the same way and never writes: a pull-request build must
+  // not reconfigure the connections a merged deploy owns.
   async run(ctx: StepContext): Promise<void> {
     const entries = await readJsonDirEntries(join(ctx.cwd, IDPS_DIR));
     const connections = entries.map((entry) => entry.body);
@@ -44,9 +48,20 @@ export const idpConnectionsStep: Step = {
     // deploy publishes a sign-in button that fails at the provider.
     if (connections.length > 0) {
       const held = await heldVariables(ctx);
-      for (const entry of entries) {
-        checkCredentialVariables(entry.body, `${IDPS_DIR}/${entry.name}`, held, ctx.suggest);
+      if (held !== undefined) {
+        for (const entry of entries) {
+          checkCredentialVariables(
+            entry.body,
+            `${IDPS_DIR}/${entry.name}`,
+            held,
+            ctx.suggest,
+            ctx.mode === "preview",
+          );
+        }
       }
+    }
+    if (ctx.mode === "preview") {
+      return;
     }
     for (const connection of connections) {
       if (ctx.dryRun) {
@@ -129,12 +144,29 @@ function valueAt(data: object, path: ReadonlyArray<PropertyKey>): unknown {
   return current;
 }
 
-/** The project's variables, by name, and whether each is a secret. */
-async function heldVariables(ctx: StepContext): Promise<Map<string, boolean>> {
-  const held = await ctx.client.getVariables({ project_id: ctx.projectId, kind: "primary" });
+/**
+ * The variables the deploy would freeze, by name, and whether each is a secret:
+ * the primary kind's for a deploy and the preview kind's for a preview, with no
+ * fallback from one to the other (ADR 069). A preview's token may not read them,
+ * which leaves the check to the deploy that merges it.
+ */
+async function heldVariables(ctx: StepContext): Promise<Map<string, boolean> | undefined> {
+  const kind = ctx.mode === "preview" ? "preview" : "primary";
+  let held: Awaited<ReturnType<StepContext["client"]["getVariables"]>>;
+  try {
+    held = await ctx.client.getVariables({ project_id: ctx.projectId, kind });
+  } catch (error) {
+    if (ctx.mode === "preview" && error instanceof ApiError && error.status === 403) {
+      return undefined;
+    }
+    throw error;
+  }
   // A secret reads back as `{ secret: true }`, a plain value as the value.
   return new Map(
-    Object.entries(primaryValues(held)).map(([name, value]) => [name, typeof value === "object"]),
+    Object.entries(valuesOfKind(held, kind)).map(([name, value]) => [
+      name,
+      typeof value === "object",
+    ]),
   );
 }
 
@@ -148,7 +180,12 @@ function checkCredentialVariables(
   file: string,
   held: ReadonlyMap<string, boolean>,
   suggest: StepContext["suggest"],
+  preview: boolean,
 ): void {
+  // A preview freezes the preview kind alone, so the value it lacks is set for
+  // that kind.
+  const setCommand = (name: string, secret: boolean) =>
+    suggest(`variable set ${name}${secret ? " --secret" : ""}${preview ? " --preview" : ""}`);
   const body = connection as {
     oidc?: { client_id?: unknown; client_secret?: unknown };
   };
@@ -180,7 +217,7 @@ function checkCredentialVariables(
         `${file}: ${field} names the variable ${name}, which the project does not have`,
         {
           hint: "Publish it with the command below, then deploy again.",
-          nextCommands: [suggest(`variable set ${name}${wantsSecret ? " --secret" : ""}`)],
+          nextCommands: [setCommand(name, wantsSecret)],
           details: { variable: name, field, file },
         },
       );
@@ -193,7 +230,7 @@ function checkCredentialVariables(
           hint: wantsSecret
             ? "The client secret must be a secret variable: publish it with the command below."
             : "The client id must be a plain variable the engine can read back: publish it with the command below, without --secret.",
-          nextCommands: [suggest(`variable set ${name}${wantsSecret ? " --secret" : ""}`)],
+          nextCommands: [setCommand(name, wantsSecret)],
           details: { variable: name, field, file, secret: isSecret },
         },
       );

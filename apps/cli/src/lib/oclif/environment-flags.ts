@@ -21,6 +21,24 @@ export const environmentFlags = {
 };
 
 /**
+ * The flags the `preview` command adds on top of the environment ones: which
+ * preview URLs to deploy to and for how long. Kept as a bag so `preview` can
+ * spread them while `preview list` and `preview rm`, which share the preview
+ * credential but take neither, stay free of them.
+ */
+export const previewFlags = {
+  origin: nonBlankString({
+    description:
+      "A preview URL to deploy to, instead of detecting them from the platform build. Repeatable.",
+    multiple: true,
+  }),
+  ttl: nonBlankString({
+    description:
+      "How long each preview stays live, e.g. 7d, 12h or 90m. Between 60s and 30d. Omitted, the project's default applies.",
+  }),
+};
+
+/**
  * The `--env`/`--env-file`/`--server` suffix — a leading-space string, or empty
  * — that reproduces an invocation's environment selection, appended to a
  * `zitadel` command a run suggests so the retry resolves the same server,

@@ -309,6 +309,30 @@ describe("deployment rollback", () => {
         expect(result).toSucceed();
       });
 
+      it("undoes the last deploy, not a preview deployed after it", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.addOrigin("https://*-acme.vercel.app", "preview");
+        const first = await app.deployData();
+        await app.editUserSchema((schema) => {
+          schema.properties.one = { type: "string" };
+        });
+        await app.deployData();
+        await app.previewData("https://x-acme.vercel.app");
+
+        const result = await app.run([
+          "deployment",
+          "rollback",
+          "--force",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf<{ release_id: string }>(result).data.release_id).toBe(
+          first.release_id,
+        );
+      });
+
       it("rolls back nothing on a dry run, needing no --force", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();

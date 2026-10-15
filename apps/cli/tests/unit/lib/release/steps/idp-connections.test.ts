@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { ApiError } from "@zitadel/api/runtime/fetch";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { IDPS_DIR } from "../../../../../src/lib/idp";
@@ -43,9 +44,15 @@ function ctx(cwd: string, over: Partial<StepContext>, held: object = HELD): Step
   return {
     cwd,
     client: {
-      // Variables read back keyed by kind; these tests hold primary values only.
-      getVariables: async () =>
-        Object.fromEntries(Object.entries(held).map(([name, value]) => [name, { primary: value }])),
+      // Variables read back keyed by kind: these tests hold the same values for
+      // whichever kind the run asks for, unless one stubs its own read.
+      getVariables: async (params: { kind?: string }) =>
+        Object.fromEntries(
+          Object.entries(held).map(([name, value]) => [
+            name,
+            { [params.kind ?? "primary"]: value },
+          ]),
+        ),
       ...(client as object | undefined),
     } as never,
     projectId: "proj_1",
@@ -94,6 +101,64 @@ describe("idp-connections step", () => {
       idpConnectionsStep.run(ctx(cwd, { dryRun: true, client: { createIdp } as never })),
     ).rejects.toThrow();
     expect(createIdp).not.toHaveBeenCalled();
+  });
+
+  it("writes no idp in a preview", async () => {
+    const cwd = await project({ "google.json": googleBody() });
+    const createIdp = vi.fn();
+
+    await idpConnectionsStep.run(ctx(cwd, { mode: "preview", client: { createIdp } as never }));
+
+    expect(createIdp).not.toHaveBeenCalled();
+  });
+
+  it("refuses a connection a preview names with a variable the project lacks", async () => {
+    const cwd = await project({ "google.json": googleBody() });
+
+    await expect(idpConnectionsStep.run(ctx(cwd, { mode: "preview" }, {}))).rejects.toMatchObject({
+      code: "E_CREDENTIAL_MISSING",
+    });
+  });
+
+  it("reads the preview kind for a preview, so a primary-only secret does not count", async () => {
+    const cwd = await project({ "google.json": googleBody() });
+    const getVariables = vi.fn(async (params: { kind?: string }) =>
+      params.kind === "preview" ? {} : { GOOGLE_CLIENT_SECRET: { primary: { secret: true } } },
+    );
+
+    await expect(
+      idpConnectionsStep.run(ctx(cwd, { mode: "preview", client: { getVariables } as never })),
+    ).rejects.toMatchObject({ code: "E_CREDENTIAL_MISSING" });
+  });
+
+  it("suggests setting the missing credential for the preview kind", async () => {
+    const cwd = await project({ "google.json": googleBody() });
+
+    await expect(idpConnectionsStep.run(ctx(cwd, { mode: "preview" }, {}))).rejects.toMatchObject({
+      nextCommands: ["variable set GOOGLE_CLIENT_SECRET --secret --preview --env staging"],
+    });
+  });
+
+  it("counts a credential the preview kind holds", async () => {
+    const cwd = await project({ "google.json": googleBody() });
+    const getVariables = vi.fn(async (params: { kind?: string }) =>
+      params.kind === "preview" ? { GOOGLE_CLIENT_SECRET: { preview: { secret: true } } } : {},
+    );
+
+    await expect(
+      idpConnectionsStep.run(ctx(cwd, { mode: "preview", client: { getVariables } as never })),
+    ).resolves.toBeUndefined();
+  });
+
+  it("leaves the variable check to the deploy when a preview's token may not read them", async () => {
+    const cwd = await project({ "google.json": googleBody() });
+    const getVariables = vi
+      .fn()
+      .mockRejectedValue(new ApiError(403, "https://api.example/variables", {}, "Forbidden"));
+
+    await expect(
+      idpConnectionsStep.run(ctx(cwd, { mode: "preview", client: { getVariables } as never })),
+    ).resolves.toBeUndefined();
   });
 
   it("names the deploy's environment in how to publish a literal client_secret", async () => {

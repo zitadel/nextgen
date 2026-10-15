@@ -37,6 +37,7 @@ Local server commands
 
 Configuration commands
   deploy:                       Build a release from .zitadel/ and deploy it to the project
+  preview:                      Deploy a release from .zitadel/ to a pull-request build's preview URLs
   branding eject:               Take ownership of the login template
   auth-method passkey disable:  Disable passkey sign-in for a user schema
   auth-method passkey enable:   Enable passkey sign-in for a user schema
@@ -55,6 +56,8 @@ Configuration commands
   origin add:                   Add an origin pattern to the project
   origin list:                  List the origin patterns on the project
   origin rm:                    Remove an origin pattern from the project
+  preview list:                 List the project's live previews, newest first
+  preview rm:                   Remove a live preview from the project
   release create:               Build a release from .zitadel/ without deploying it
   release get:                  Get one release by id
   release list:                 List release

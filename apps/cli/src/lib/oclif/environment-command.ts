@@ -176,3 +176,32 @@ export abstract class EnvironmentCommand extends BaseCommand {
     };
   }
 }
+
+/**
+ * A command that runs in a pull-request build and talks to the project with the
+ * narrower preview credential ({@link CREDENTIALS.preview}, read from
+ * `ZITADEL_PREVIEW_TOKEN`). It never falls back to the project secret, so a
+ * missing preview token fails and names the variable. The `preview` command
+ * adds the `--origin`/`--ttl` flag bag itself; `preview list` and `preview rm`
+ * extend this for the credential alone.
+ *
+ * The reach the preview credential carries — the release/deployment/preview
+ * operations these commands make — is granted and enforced by the server, not
+ * by the CLI: the CLI only chooses which token to present. Wiring the server's
+ * preview-deploy authorization to grant exactly those scopes is backend work
+ * on `@zitadel/server`, tracked there.
+ */
+export abstract class PreviewCommand extends EnvironmentCommand {
+  static override credential: CredentialKind = "preview";
+
+  /**
+   * Never prompts: a pull-request build has no one to ask, and a missing
+   * value, the preview token above all, fails naming the variable rather
+   * than being typed in and saved to `.env.<name>.local`.
+   */
+  protected override connect(
+    options: { verbatim?: boolean; quiet?: boolean; prompt?: boolean } = {},
+  ): Promise<Connection> {
+    return super.connect({ ...options, prompt: false });
+  }
+}
