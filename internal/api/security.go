@@ -179,6 +179,11 @@ var userBoundSessionOperations = map[api.OperationName]bool{
 	api.GetBrandingByIdOperation:       true,
 	api.QueryIdpsOperation:             true,
 	api.GetIdpByIdOperation:            true,
+	// The Releases screens read a project's releases and where each went.
+	api.ListReleasesOperation:      true,
+	api.GetReleaseByIdOperation:    true,
+	api.ListDeploymentsOperation:   true,
+	api.GetDeploymentByIdOperation: true,
 }
 
 // sessionUnauthorizedMessage mirrors the 401 descriptions of the

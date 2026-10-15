@@ -38,14 +38,19 @@ export const ICON_PLATE =
 /** A body card: the stock `Card` with its own gap and padding removed. */
 export const DETAIL_CARD = "gap-0 py-0";
 
+/** The sentence-case card title some cards carry instead of the eyebrow: the 14/20 display face. */
+const CARD_HEADING = "text-foreground font-serif text-sm leading-5";
+
 /**
- * A body card with a titled section: the eyebrow, an optional action beside it,
+ * A body card with a titled section: the title, an optional action beside it,
  * an optional note under them, a rule, then `children`. Inset 24px, 20px top
- * and bottom, 16px between parts.
+ * and bottom, 16px between parts. The title is the muted eyebrow unless the
+ * card's design draws it as a heading.
  */
 export function DetailSection({
   title,
   titleId,
+  titleStyle = "eyebrow",
   action,
   note,
   className,
@@ -53,14 +58,16 @@ export function DetailSection({
   ...props
 }: Omit<React.ComponentProps<typeof Card>, "title"> & {
   title: string;
-  /** Sets the eyebrow's id, for a card labelled by it. */
+  /** Sets the title's id, for a card labelled by it. */
   titleId?: string;
+  /** `heading`: sentence case in the display face, as the release cards draw it. */
+  titleStyle?: "eyebrow" | "heading";
   action?: ReactNode;
   /** A line between the header and the rule. */
   note?: ReactNode;
 }) {
-  const eyebrow = (
-    <span id={titleId} className={EYEBROW}>
+  const heading = (
+    <span id={titleId} className={titleStyle === "heading" ? CARD_HEADING : EYEBROW}>
       {title}
     </span>
   );
@@ -69,11 +76,11 @@ export function DetailSection({
       <CardContent className="flex flex-col gap-4 px-6 py-5">
         {action ? (
           <div className="flex items-center justify-between gap-4">
-            {eyebrow}
+            {heading}
             {action}
           </div>
         ) : (
-          eyebrow
+          heading
         )}
         {note}
         <Separator />
