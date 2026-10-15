@@ -1,4 +1,5 @@
 import type {
+  ListUserIdentityLinks200IdentityLinksItem,
   QueryIdps200IdpsItem,
   QueryIdps200IdpsItemDefinition,
 } from "@zitadel/api/generated/model";
@@ -54,6 +55,17 @@ export async function fetchAllIdps(projectId: string): Promise<IdpConnection[] |
     if (cause instanceof ApiError && cause.status === 403) return null;
     throw cause;
   }
+}
+
+/** One provider account linked to a user. */
+export type UserIdentityLink = ListUserIdentityLinks200IdentityLinksItem;
+
+/** A user's linked provider accounts, oldest first: the order they were linked in. */
+export function fetchUserIdentityLinks(userId: string): Promise<UserIdentityLink[]> {
+  return readAllPages(async (pageToken) => {
+    const page = await api.listUserIdentityLinks(userId, { limit: 100, page_token: pageToken });
+    return { items: page.identity_links, next: page.next_page_token };
+  });
 }
 
 /**

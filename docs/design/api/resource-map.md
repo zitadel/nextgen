@@ -87,6 +87,7 @@ Users live inside projects. A user in the platform project is a developer/admin;
 
 ```http
 /users/{id}
+/users/{id}/identity_links      # provider accounts a sign-in linked to the user
 /me                             # resolves to the calling user
 /me/memberships                 # every team_membership the caller holds
 ```
