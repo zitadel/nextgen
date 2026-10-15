@@ -14009,18 +14009,18 @@ func (m *MockProjectService) EXPECT() *MockProjectServiceMockRecorder {
 }
 
 // Create mocks base method.
-func (m *MockProjectService) Create(ctx context.Context, name string, previewOrigins []string, seedDefaults bool) (*domain.Project, error) {
+func (m *MockProjectService) Create(ctx context.Context, name string, origins []domain.Origin, seedDefaults bool) (*domain.Project, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Create", ctx, name, previewOrigins, seedDefaults)
+	ret := m.ctrl.Call(m, "Create", ctx, name, origins, seedDefaults)
 	ret0, _ := ret[0].(*domain.Project)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Create indicates an expected call of Create.
-func (mr *MockProjectServiceMockRecorder) Create(ctx, name, previewOrigins, seedDefaults any) *MockProjectServiceCreateCall {
+func (mr *MockProjectServiceMockRecorder) Create(ctx, name, origins, seedDefaults any) *MockProjectServiceCreateCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockProjectService)(nil).Create), ctx, name, previewOrigins, seedDefaults)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockProjectService)(nil).Create), ctx, name, origins, seedDefaults)
 	return &MockProjectServiceCreateCall{Call: call}
 }
 
@@ -14036,30 +14036,30 @@ func (c *MockProjectServiceCreateCall) Return(arg0 *domain.Project, arg1 error) 
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockProjectServiceCreateCall) Do(f func(context.Context, string, []string, bool) (*domain.Project, error)) *MockProjectServiceCreateCall {
+func (c *MockProjectServiceCreateCall) Do(f func(context.Context, string, []domain.Origin, bool) (*domain.Project, error)) *MockProjectServiceCreateCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockProjectServiceCreateCall) DoAndReturn(f func(context.Context, string, []string, bool) (*domain.Project, error)) *MockProjectServiceCreateCall {
+func (c *MockProjectServiceCreateCall) DoAndReturn(f func(context.Context, string, []domain.Origin, bool) (*domain.Project, error)) *MockProjectServiceCreateCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
 // CreateWithID mocks base method.
-func (m *MockProjectService) CreateWithID(ctx context.Context, id, name string, previewOrigins []string, seedDefaults bool) (*domain.Project, error) {
+func (m *MockProjectService) CreateWithID(ctx context.Context, id, name string, origins []domain.Origin, seedDefaults bool) (*domain.Project, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateWithID", ctx, id, name, previewOrigins, seedDefaults)
+	ret := m.ctrl.Call(m, "CreateWithID", ctx, id, name, origins, seedDefaults)
 	ret0, _ := ret[0].(*domain.Project)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateWithID indicates an expected call of CreateWithID.
-func (mr *MockProjectServiceMockRecorder) CreateWithID(ctx, id, name, previewOrigins, seedDefaults any) *MockProjectServiceCreateWithIDCall {
+func (mr *MockProjectServiceMockRecorder) CreateWithID(ctx, id, name, origins, seedDefaults any) *MockProjectServiceCreateWithIDCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateWithID", reflect.TypeOf((*MockProjectService)(nil).CreateWithID), ctx, id, name, previewOrigins, seedDefaults)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateWithID", reflect.TypeOf((*MockProjectService)(nil).CreateWithID), ctx, id, name, origins, seedDefaults)
 	return &MockProjectServiceCreateWithIDCall{Call: call}
 }
 
@@ -14075,13 +14075,13 @@ func (c *MockProjectServiceCreateWithIDCall) Return(arg0 *domain.Project, arg1 e
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockProjectServiceCreateWithIDCall) Do(f func(context.Context, string, string, []string, bool) (*domain.Project, error)) *MockProjectServiceCreateWithIDCall {
+func (c *MockProjectServiceCreateWithIDCall) Do(f func(context.Context, string, string, []domain.Origin, bool) (*domain.Project, error)) *MockProjectServiceCreateWithIDCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockProjectServiceCreateWithIDCall) DoAndReturn(f func(context.Context, string, string, []string, bool) (*domain.Project, error)) *MockProjectServiceCreateWithIDCall {
+func (c *MockProjectServiceCreateWithIDCall) DoAndReturn(f func(context.Context, string, string, []domain.Origin, bool) (*domain.Project, error)) *MockProjectServiceCreateWithIDCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

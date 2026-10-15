@@ -45,7 +45,8 @@ same TX (shared `request_id`).
 
 | Resource | Allowlisted in payload | Intentionally omitted |
 |----------|------------------------|------------------------|
-| **Project** | `name`, `preview_origins` (full array as stored) | Secrets, key material |
+| **Project** | `name`, `origins` (full array as stored) | Secrets, key material |
+| **Origin** | `pattern`, `kind` | — |
 | **Team** | `name` | — |
 | **Flow definition** | `name`, `status`, `user_schema`, `purposes`, `audience` | Full `steps` graph |
 | **Branding** | `layout`, `logo_url`, `font_url`, `hero_url` | `liquid_template` |
@@ -57,10 +58,10 @@ same TX (shared `request_id`).
 | **Auth check** | `check_id`, `check_type`, `auth_attempt_id` | Challenge/proof JSON |
 | **Auth factor** | `user_id`, `factor_id` | Hash, public key material, challenges |
 
-`PATCH /projects/{id}` today only renames (`name`). `preview_origins` is set
-on **create** only. Create emits both fields; update emits `name` when
-renamed. If origins become patchable later, the update delta includes the
-**full new** `preview_origins` array (whole-array replace).
+`PATCH /projects/{id}` today only renames (`name`). Origins are set on
+**create** and changed only through add/remove (`origin.added` /
+`origin.removed`), never through `patchProject`. Create emits `name` and
+`origins`; update emits `name` when renamed.
 
 ### SIEM join path
 
@@ -103,9 +104,11 @@ tracked below.
 
 | Statement / operation | `event_type` | `category` | `entity_type` | Payload properties |
 |----------------------|--------------|------------|---------------|--------------------|
-| `CreateProject` | `project.created` | `entity` | `project` | `name`, `preview_origins[]` |
+| `CreateProject` | `project.created` | `entity` | `project` | `name`, `origins[]` |
 | `UpdateProject` | `project.updated` | `entity` | `project` | delta: `name` (when renamed) |
 | `DeleteProjectByID` (when a row was deleted) | `project.deleted` | `entity` | `project` | _(empty)_ |
+| `AddOrigin` | `origin.added` | `entity` | `origin` | `pattern`, `kind` |
+| `RemoveOrigin` | `origin.removed` | `entity` | `origin` | `pattern`, `kind` |
 | `CreateUser` | `user.created` | `entity` | `user` | `schema_id`, `attribute_keys[]`, `attributes` (`x-audit` values only) |
 | Unique violation on create | `user.create.failed` | `entity` | `user` | `key_name` |
 | `PatchUser` (attribute patch) | `user.updated` | `entity` | `user` | `attribute_keys[]`, `attributes` (`x-audit` values only) |

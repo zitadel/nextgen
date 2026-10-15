@@ -8,6 +8,15 @@ import (
 
 // Handler handles operations described by OpenAPI v3 specification.
 type Handler interface {
+	// AddOrigin implements addOrigin operation.
+	//
+	// Adds one `{pattern, kind}` to the project's origins. A primary pattern
+	// must be an exact URL (no wildcard). Preview patterns may include a single
+	// DNS-label wildcard. Adding a pattern that already exists with the same
+	// kind is idempotent and answers 201 with the stored origin.
+	//
+	// POST /projects/{project_id}/origins
+	AddOrigin(ctx context.Context, req *ProjectOrigin, params AddOriginParams) (AddOriginRes, error)
 	// BeginUserPasskeyRegistration implements beginUserPasskeyRegistration operation.
 	//
 	// Starts a WebAuthn registration ceremony for the user and returns the
@@ -822,6 +831,15 @@ type Handler interface {
 	//
 	// POST /users/query
 	QueryUsers(ctx context.Context, req *QueryUsersRequest, params QueryUsersParams) (QueryUsersRes, error)
+	// RemoveOrigin implements removeOrigin operation.
+	//
+	// Removes one pattern from the project's origins. Requests from URLs only
+	// that pattern admitted are refused from then on; live previews and
+	// deployment history are untouched. Removing a pattern that is already
+	// absent is idempotent and answers 204.
+	//
+	// POST /projects/{project_id}/origins/remove
+	RemoveOrigin(ctx context.Context, req *RemoveOriginReq, params RemoveOriginParams) (RemoveOriginRes, error)
 	// RemovePreview implements removePreview operation.
 	//
 	// Ends a preview before it expires: the URL stops being served at once.

@@ -13,18 +13,18 @@ import (
 )
 
 const (
-	createProjectStmt = `INSERT INTO projects (id, name, preview_origins, password_hash_policy, created_at, updated_at)
+	createProjectStmt = `INSERT INTO projects (id, name, origins, password_hash_policy, created_at, updated_at)
 VALUES (?, ?, ?, ?, ?, ?) RETURNING id, created_at, updated_at`
 
 	deleteByIDProjectStmt = `DELETE FROM projects WHERE id = ?`
 
 	updateProjectStmt = `UPDATE projects SET name = ?, updated_at = ? WHERE id = ?
-RETURNING id, name, preview_origins, password_hash_policy, created_at, updated_at`
+RETURNING id, name, origins, password_hash_policy, created_at, updated_at`
 
 	setProjectPasswordHashPolicyStmt = `UPDATE projects SET password_hash_policy = ?, updated_at = ? WHERE id = ?
 RETURNING id`
 
-	projectQuery = `SELECT id, name, preview_origins, password_hash_policy, created_at, updated_at FROM projects`
+	projectQuery = `SELECT id, name, origins, password_hash_policy, created_at, updated_at FROM projects`
 )
 
 type projectStatements struct{ statement }
@@ -38,7 +38,7 @@ func (ps projectStatements) CreateProject(ctx context.Context, project *domain.P
 	if err := ensureManagedID(&project.ID, domain.PrefixProject); err != nil {
 		return err
 	}
-	origins, err := encodeJSON(project.PreviewOrigins)
+	origins, err := storageproject.MarshalOrigins(project.Origins)
 	if err != nil {
 		return wrapError(err)
 	}
@@ -122,7 +122,7 @@ func (ps projectStatements) scanProjectRow(row *sql.Row, project *domain.Project
 	if err := row.Scan(&project.ID, &project.Name, &originsStr, &policyStr, &createdNano, &updNano); err != nil {
 		return err
 	}
-	origins, err := decodeJSONStrings(originsStr)
+	origins, err := storageproject.UnmarshalOrigins([]byte(originsStr))
 	if err != nil {
 		return err
 	}
@@ -130,7 +130,7 @@ func (ps projectStatements) scanProjectRow(row *sql.Row, project *domain.Project
 	if err != nil {
 		return err
 	}
-	project.PreviewOrigins = origins
+	project.Origins = origins
 	project.PasswordHashPolicy = policy
 	project.CreatedAt = timeFromUnixNano(createdNano)
 	project.UpdatedAt = timeFromUnixNano(updNano)
@@ -172,15 +172,15 @@ func scanProject(rows *sql.Rows) (*domain.Project, error) {
 	if err := rows.Scan(&project.ID, &project.Name, &originsStr, &policyStr, &createdNano, &updNano); err != nil {
 		return nil, err
 	}
-	origins, err := decodeJSONStrings(originsStr)
+	origins, err := storageproject.UnmarshalOrigins([]byte(originsStr))
 	if err != nil {
-		return nil, fmt.Errorf("decode preview_origins: %w", err)
+		return nil, fmt.Errorf("decode origins: %w", err)
 	}
 	policy, err := storageproject.UnmarshalPasswordHashPolicy([]byte(policyStr.String))
 	if err != nil {
 		return nil, fmt.Errorf("decode password_hash_policy: %w", err)
 	}
-	project.PreviewOrigins = origins
+	project.Origins = origins
 	project.PasswordHashPolicy = policy
 	project.CreatedAt = timeFromUnixNano(createdNano)
 	project.UpdatedAt = timeFromUnixNano(updNano)
@@ -210,9 +210,8 @@ var projectSchema = database.NewSchema(map[domain.ProjectField]database.FieldBin
 		Accessor: func(p *domain.Project) any { return p.UpdatedAt },
 		Coerce:   database.CoerceTime,
 	},
-	domain.ProjectFieldPreviewOrigins: {
-		SQLName:  "preview_origins",
-		Accessor: func(p *domain.Project) any { return p.PreviewOrigins },
-		Coerce:   database.CoerceSliceAsAny(database.CoerceStringValue),
+	domain.ProjectFieldOrigins: {
+		SQLName:  "origins",
+		Accessor: func(p *domain.Project) any { return p.Origins },
 	},
 })

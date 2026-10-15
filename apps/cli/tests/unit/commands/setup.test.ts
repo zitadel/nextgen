@@ -574,7 +574,7 @@ describe("setup command", () => {
             name: "demo",
             project_secret: "sk_proj_test_full",
             preview_secret: "sk_proj_test_preview",
-            preview_origins: ["http://localhost:3000"],
+            origins: [{ pattern: "http://localhost:3000", kind: "preview" }],
             created_at: "2026-04-21T14:03:11.000Z",
           },
           { status: 201 },
@@ -587,7 +587,7 @@ describe("setup command", () => {
     expect(res.exitCode).toBe(0);
     expect(createProjectBody).toMatchObject({
       name: expect.any(String),
-      preview_origins: expect.arrayContaining(["http://localhost:3000"]),
+      origins: expect.arrayContaining([{ pattern: "http://localhost:3000", kind: "preview" }]),
       seed_defaults: false,
     });
     const projectName = (createProjectBody as { name?: unknown }).name;

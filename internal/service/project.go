@@ -26,13 +26,13 @@ type ProjectService interface {
 	// If seedDefaults is true, server fallback schema and flow resources are
 	// created with the project for non-CLI creation paths.
 	// Returns the stored project including timestamps.
-	Create(ctx context.Context, name string, previewOrigins []string, seedDefaults bool) (*domain.Project, error)
+	Create(ctx context.Context, name string, origins []domain.Origin, seedDefaults bool) (*domain.Project, error)
 
 	// CreateWithID is Create under a caller-supplied id, for the one project
 	// whose id the server owns rather than mints: the platform project
 	// (domain.PlatformProjectID). Reports the same already-exists error as
 	// Create when the id is taken.
-	CreateWithID(ctx context.Context, id, name string, previewOrigins []string, seedDefaults bool) (*domain.Project, error)
+	CreateWithID(ctx context.Context, id, name string, origins []domain.Origin, seedDefaults bool) (*domain.Project, error)
 
 	// Get retrieves a project by ID.
 	// Returns [database.NoRowFoundError] when no project with the given ID exists.
@@ -104,8 +104,8 @@ type projectService struct {
 
 var _ ProjectService = (*projectService)(nil)
 
-func (s *projectService) Create(ctx context.Context, name string, previewOrigins []string, seedDefaults bool) (*domain.Project, error) {
-	project, err := domain.NewProject(name, previewOrigins)
+func (s *projectService) Create(ctx context.Context, name string, origins []domain.Origin, seedDefaults bool) (*domain.Project, error) {
+	project, err := domain.NewProject(name, origins)
 	if err != nil {
 		return nil, err
 	}
@@ -117,8 +117,8 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 // needs this: its id is well-known (domain.PlatformProjectID) so that every
 // deployment can address the same project, which is the whole point of a
 // bootstrap. Everything else must keep taking a minted id.
-func (s *projectService) CreateWithID(ctx context.Context, id, name string, previewOrigins []string, seedDefaults bool) (*domain.Project, error) {
-	project, err := domain.NewProject(name, previewOrigins)
+func (s *projectService) CreateWithID(ctx context.Context, id, name string, origins []domain.Origin, seedDefaults bool) (*domain.Project, error) {
+	project, err := domain.NewProject(name, origins)
 	if err != nil {
 		return nil, err
 	}
@@ -250,8 +250,8 @@ func emitProjectCreated(ctx context.Context, stmts EventStatements, project *dom
 		EntityType: "project",
 		EntityID:   project.ID,
 		Payload: domain.ProjectPayload{
-			Name:           project.Name,
-			PreviewOrigins: project.PreviewOrigins,
+			Name:    project.Name,
+			Origins: project.Origins,
 		},
 	})
 }

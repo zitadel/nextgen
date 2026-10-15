@@ -5,12 +5,14 @@ properties:
   name:
     type: string
     description: The name of the project.
-  preview_origins:
+  origins:
     type: array
     items:
-      type: string
+      $ref: project-origin.yaml
     description: |
-      Origins which are allowed for previewing and testing the project.
+      The origins the project starts with. An omitted or empty list means
+      every origin is admitted until the first pattern is added. Loopback
+      origins are admitted without a pattern.
   seed_defaults:
     type: boolean
     default: true

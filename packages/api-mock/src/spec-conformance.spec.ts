@@ -21,9 +21,12 @@
  * Endpoints covered structurally (orval emits no `*Response` zod for these
  * because they have no static response schema — POSTs that return only an
  * `id`, or out-of-spec routes):
- *   - POST /projects                    → { id, project_secret, … }
  *   - POST /schemas                     → { id }
  *   - POST /flow_definitions            → flow-definition-response envelope
+ *
+ * Also covered by zod here:
+ *   - POST /projects                    → CreateProjectResponse
+ *   - POST /projects/:id/origins        → AddOriginResponse
  *
  * `GET /schemas/:id` is NOT zod-validated here: the mock stores whatever
  * the user POSTed verbatim, so the response shape depends on the request
@@ -33,8 +36,10 @@
 import type { Server } from "node:http";
 
 import {
+  AddOriginResponse,
   CompleteClaimResponse,
   CreateIdpResponse,
+  CreateProjectResponse,
   ExchangeHandoffResponse,
   GetClaimStatusResponse,
   GetFlowDefinitionResponse,
@@ -314,33 +319,105 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         name: "conformance-app",
-        preview_origins: ["http://localhost:3000"],
+        origins: [{ pattern: "http://localhost:3000", kind: "preview" }],
         seed_defaults: false,
       }),
     });
     expect(res.status).toBe(201);
-    const body = (await res.json()) as Record<string, unknown>;
-    // No CreateProjectResponse zod schema is emitted by orval. Validate
-    // structurally against the fields create-project-response.yaml requires.
-    expect(typeof body.id).toBe("string");
-    expect(body.name).toBe("conformance-app");
-    expect(typeof body.project_secret).toBe("string");
-    expect(typeof body.preview_secret).toBe("string");
-    expect(Array.isArray(body.preview_origins)).toBe(true);
-    expect(typeof body.created_at).toBe("string");
+    const body = await res.json();
+    expect(() => CreateProjectResponse.parse(body)).not.toThrow();
+    expect(body).toMatchObject({
+      name: "conformance-app",
+      origins: [{ pattern: "http://localhost:3000", kind: "preview" }],
+    });
   });
 
   test("GET /projects/:id matches GetProjectResponse", async () => {
     const create = await fetch(`${BASE}/projects`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "conformance-app" }),
+      body: JSON.stringify({
+        name: "conformance-app",
+        origins: [{ pattern: "http://localhost:3000", kind: "primary" }],
+      }),
     });
     const { id } = (await create.json()) as { id: string };
     const res = await fetch(`${BASE}/projects/${id}`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(() => GetProjectResponse.parse(body)).not.toThrow();
+    expect(body).toMatchObject({
+      origins: [{ pattern: "http://localhost:3000", kind: "primary" }],
+    });
+  });
+
+  test("POST /projects/:id/origins adds a pattern and is idempotent for the same kind", async () => {
+    const create = await fetch(`${BASE}/projects`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "origins-app", seed_defaults: false }),
+    });
+    const { id } = (await create.json()) as { id: string };
+
+    const first = await fetch(`${BASE}/projects/${id}/origins`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ pattern: "https://app.example.com", kind: "primary" }),
+    });
+    expect(first.status).toBe(201);
+    const firstBody = await first.json();
+    expect(() => AddOriginResponse.parse(firstBody)).not.toThrow();
+    expect(firstBody).toEqual({ pattern: "https://app.example.com", kind: "primary" });
+    expect(firstBody).not.toHaveProperty("check");
+    expect(firstBody).not.toHaveProperty("warning");
+
+    const again = await fetch(`${BASE}/projects/${id}/origins`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ pattern: "https://app.example.com", kind: "primary" }),
+    });
+    expect(again.status).toBe(201);
+    expect(await again.json()).toEqual({ pattern: "https://app.example.com", kind: "primary" });
+
+    const conflict = await fetch(`${BASE}/projects/${id}/origins`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ pattern: "https://app.example.com", kind: "preview" }),
+    });
+    expect(conflict.status).toBe(409);
+    const conflictBody = (await conflict.json()) as Record<string, unknown>;
+    expect(conflictBody.code).toBe("origin.kind_conflict");
+  });
+
+  test("POST /projects/:id/origins/remove is idempotent 204", async () => {
+    const create = await fetch(`${BASE}/projects`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "origins-remove-app",
+        origins: [{ pattern: "https://preview.example.com", kind: "preview" }],
+        seed_defaults: false,
+      }),
+    });
+    const { id } = (await create.json()) as { id: string };
+
+    const remove = await fetch(`${BASE}/projects/${id}/origins/remove`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ pattern: "https://preview.example.com" }),
+    });
+    expect(remove.status).toBe(204);
+
+    const again = await fetch(`${BASE}/projects/${id}/origins/remove`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ pattern: "https://preview.example.com" }),
+    });
+    expect(again.status).toBe(204);
+
+    const get = await fetch(`${BASE}/projects/${id}`);
+    const body = await get.json();
+    expect(body.origins).toEqual([]);
   });
 
   test("GET /projects/:id on unknown id returns spec-compliant error envelope", async () => {

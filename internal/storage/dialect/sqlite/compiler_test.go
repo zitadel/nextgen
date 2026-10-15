@@ -14,7 +14,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
 )
 
-const testProjectQuery = "SELECT id, name, preview_origins, created_at, updated_at FROM projects"
+const testProjectQuery = "SELECT id, name, origins, created_at, updated_at FROM projects"
 
 func compileProjectRead(t *testing.T, opts *database.ListOptions[domain.ProjectField]) (string, []any) {
 	t.Helper()
@@ -59,21 +59,6 @@ func TestWriteArgCoercesTimeAndDuration(t *testing.T) {
 	require.Len(t, c.args, 2)
 	assert.Equal(t, createdAt.UnixNano(), c.args[0])
 	assert.Equal(t, ttl.Nanoseconds(), c.args[1])
-}
-
-func TestCompileArrayContainsUsesJSONEach(t *testing.T) {
-	t.Parallel()
-
-	sql, args := compileProjectRead(t, &database.ListOptions[domain.ProjectField]{
-		Filter: database.ArrayContains(database.Col(domain.ProjectFieldPreviewOrigins), "https://app.example"),
-	})
-
-	assert.Equal(t,
-		testProjectQuery+` WHERE EXISTS (SELECT 1 FROM json_each(preview_origins) WHERE value = ?)`,
-		sql,
-	)
-	require.Len(t, args, 1)
-	assert.Equal(t, "https://app.example", args[0])
 }
 
 func TestCompileStringFilterIgnoreCase(t *testing.T) {
