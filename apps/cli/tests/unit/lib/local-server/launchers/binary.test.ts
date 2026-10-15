@@ -7,8 +7,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { BinaryLauncher } from "../../../../../src/lib/local-server/launchers/binary";
 
+const resolver = vi.hoisted(() => ({ missing: false }));
+
 vi.mock("@zitadel/server/binary", () => ({
-  resolveServerBinary: () => "/resolved/by/server-package/nextgen",
+  resolveServerBinary: () => {
+    if (resolver.missing) {
+      throw new Error("Missing Zitadel server binary at /nowhere/nextgen.");
+    }
+    return "/resolved/by/server-package/nextgen";
+  },
   serverBinaryPath: () => "/resolved/by/server-package/nextgen",
 }));
 
@@ -113,6 +120,24 @@ describe("local server binary helpers", () => {
     const [command, args] = vi.mocked(spawn).mock.calls[0] as unknown as [string, string[]];
     expect(command).toBe("/resolved/by/server-package/nextgen");
     expect(args).toEqual(["--migrate"]);
+  });
+
+  it("says how to repair the install when the server binary cannot be found", async () => {
+    vi.stubEnv("ZITADEL_SERVER_BINARY", "");
+    resolver.missing = true;
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-binary-test-"));
+
+    const launching = new BinaryLauncher({
+      cliVersion: "0.0.0-test",
+      dataDir: join(dir, "data"),
+      logPath: join(dir, "logs", "server.log"),
+    }).launch({ port: 8091, serverUrl: "http://localhost:8091" });
+
+    await expect(launching).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      hint: expect.stringContaining("Reinstall @zitadel/cli"),
+    });
+    resolver.missing = false;
   });
 
   it("signals the process group even when its leader is already dead", async () => {

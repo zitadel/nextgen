@@ -60,7 +60,7 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
 
   async launch(target: { port: number; serverUrl: string }): Promise<BinaryRuntimeMetadata> {
     const { spec } = this;
-    const command = BinaryLauncher.command();
+    const command = BinaryLauncher.available(() => BinaryLauncher.command());
     const env = spec.env ?? EMPTY_ENV;
     await mkdir(dirname(spec.logPath), { recursive: true, mode: 0o700 });
     const log = await open(spec.logPath, "a", 0o600);
@@ -163,11 +163,18 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
 
   /** The bundled server version, or a `ZitadelError` that says how to repair the install. */
   static assertAvailable(): string {
-    try {
+    return BinaryLauncher.available(() => {
       if (!process.env[COMMAND_ENV]) {
         serverBinaryPath();
       }
       return BinaryLauncher.version();
+    });
+  }
+
+  /** Runs `find`, turning any failure to locate the server into the error that says how to repair the install. */
+  private static available<T>(find: () => T): T {
+    try {
+      return find();
     } catch (error) {
       throw new ZitadelError("E_VALIDATION", "Zitadel server npm package is not available", {
         hint: "Reinstall @zitadel/cli so npm can install @zitadel/server and its platform package.",
