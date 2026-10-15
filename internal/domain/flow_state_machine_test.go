@@ -28,6 +28,17 @@ func containsFieldName(fields []domain.FlowField, name string) bool {
 	return false
 }
 
+func fieldByName(t *testing.T, fields []domain.FlowField, name string) domain.FlowField {
+	t.Helper()
+	for _, f := range fields {
+		if f.Name == name {
+			return f
+		}
+	}
+	t.Fatalf("no field %q among %v", name, fields)
+	return domain.FlowField{}
+}
+
 // attemptFor matches the input a rotated auth attempt is started with. The
 // session id is the load-bearing part: exchange upgrades that session in
 // place, so an attempt started without it would strand the sign-in.
@@ -4474,9 +4485,9 @@ func TestFlowStateMachine_Process_PasskeyOnPasswordStepSkipsPasswordCheck(t *tes
 	const challengeID = "ch-1"
 	const rpid = "example.com"
 
-	// The password field is required with min_length 8, so an empty value
-	// trips "required" and a short one trips the length rule. Both are the
-	// browser's form state, not something the user submitted.
+	// The password field is required, so an empty value trips "required";
+	// a short one once tripped the length rule sign-in no longer carries.
+	// Both are the browser's form state, not something the user submitted.
 	passwordFields := map[string]string{
 		"empty box":                  "",
 		"below the length minimum":   "short",
@@ -4853,6 +4864,104 @@ func TestFlowStateMachine_MultiStepRegister_PasswordStepIsANewPassword(t *testin
 
 	require.NotNil(t, result.Step.Identifier)
 	assert.Equal(t, email, result.Step.Identifier.Value)
+}
+
+// A sign-in password is checked, not chosen, so no length rule stands
+// between it and verification: a short one reaches the credential check and
+// fails there like any other wrong password, and a short real one (set before
+// the rule, or migrated) signs in. Neither the render nor the error tells a
+// prober how short a password cannot be.
+func TestFlowStateMachine_LoginShortPassword_IsVerifiedNotLengthChecked(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), gomock.Any()).
+		Return("user_alice", nil).
+		Times(1)
+	w.authAttemptService.EXPECT().
+		SubmitPassword(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitPasswordInput) bool {
+			return in.Plain == "short"
+		})).
+		Return(domain.ErrAuthAttemptProofRejected(nil)).
+		Times(1)
+
+	def := loginDefinition()
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+	password := fieldByName(t, start.Step.Fields, "x-auth-methods#password")
+	assert.Nil(t, password.Validation, "a sign-in password must not advertise a length rule")
+
+	result, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{
+			"email":                   "alice@example.com",
+			"x-auth-methods#password": "short",
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result.Step)
+	require.NotNil(t, result.Step.Error)
+	assert.Equal(t, domain.FlowStepErrorInvalidCredentials, *result.Step.Error)
+}
+
+// A password the user chooses still has to meet the minimum: the rule is
+// advertised on the render and enforced on submit, before any user is made.
+func TestFlowStateMachine_RegisterShortPassword_IsRejectedForLength(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att_01TEST", nil)
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), gomock.Any()).
+		Return("", domain.ErrAuthAttemptProofRejected(nil)).
+		Times(1)
+	w.authAttemptService.EXPECT().SubmitPassword(gomock.Any(), gomock.Any()).Times(0)
+
+	def := multiStepSignupDefinition()
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeRegister,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	setPassword, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": "newcomer@example.com"},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "set-password", setPassword.Step.Name)
+	password := fieldByName(t, setPassword.Step.Fields, "x-auth-methods#password")
+	require.NotNil(t, password.Validation)
+	assert.Equal(t, domain.PasswordMinLength, password.Validation.MinLength)
+
+	result, err := w.sm.Process(t.Context(), def, setPassword.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"x-auth-methods#password": "short"},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result.Step)
+	assert.Equal(t, "set-password", result.Step.Name)
+	require.NotNil(t, result.Step.Error)
+	assert.Equal(t, "error.x-auth-methods#password_min_length", *result.Step.Error)
 }
 
 func TestFlowStateMachine_SingleCardLogin_NeedsNoPairingHint(t *testing.T) {

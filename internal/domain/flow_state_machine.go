@@ -1198,6 +1198,7 @@ func (r *FlowStateMachineRuntime) prefillStep(ctx context.Context, state *FlowSt
 // [collectsStepFields]) additionally require declared required fields to be
 // present.
 func (r *FlowStateMachineRuntime) validateAndMerge(pc *processCtx, resolved FlowResolvedFields, actionKind FlowActionKind) (*FlowStepResult, error) {
+	applyPasswordValidation(resolved.Fields, pc.state.CurrentPurpose)
 	var errs FlowFieldValidationErrors
 	if validationErr := r.fields.Validate(resolved, pc.in.Fields); validationErr != nil {
 		v, ok := errors.AsType[FlowFieldValidationErrors](validationErr)
@@ -2406,6 +2407,7 @@ func (r *FlowStateMachineRuntime) buildStep(ctx context.Context, state *FlowStat
 		})
 	}
 	applyAutocomplete(resolved.Fields, state.CurrentPurpose)
+	applyPasswordValidation(resolved.Fields, state.CurrentPurpose)
 	// A step that offers providers reaches users who have no password, and the
 	// text cannot depend on the user without revealing how the account signs in.
 	// It gets its own key; a client without that key falls back to the plain one.
@@ -2433,6 +2435,15 @@ func (r *FlowStateMachineRuntime) buildStep(ctx context.Context, state *FlowStat
 func applyAutocomplete(fields []FlowField, purpose FlowDefinitionPurpose) {
 	for i := range fields {
 		fields[i].Autocomplete = AutocompleteForField(fields[i], purpose)
+	}
+}
+
+// applyPasswordValidation stamps the password field's length rule for the
+// purpose, on the same terms as [applyAutocomplete]: a render advertises it
+// and a submit enforces it, each under the purpose current at the time.
+func applyPasswordValidation(fields []FlowField, purpose FlowDefinitionPurpose) {
+	for i := range fields {
+		fields[i].Validation = PasswordValidationForField(fields[i], purpose)
 	}
 }
 

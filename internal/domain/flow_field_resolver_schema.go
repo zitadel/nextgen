@@ -152,15 +152,15 @@ func resolveAuthMethodField(authMethods xAuthMethodsReader, field Field, stepNam
 		challenge = FlowFieldChallengePassword
 	}
 
+	// No length rule here: whether one applies depends on whether the
+	// password is being chosen or checked, which the purpose decides at
+	// render and submit time — see [PasswordValidationForField].
 	return FlowField{
 		Name:      field.String(),
 		TextKey:   stepName + ".field." + field.AuthMethod(),
 		Type:      fieldType,
 		Challenge: challenge,
 		Required:  true,
-		Validation: &FlowFieldValidation{
-			MinLength: 8, // TODO: should come from policy or user-schema
-		},
 	}, nil
 }
 
