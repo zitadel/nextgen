@@ -5,10 +5,9 @@
  * Adding a catalog one means adding a class, naming it in {@link IDP_PROVIDERS}
  * and listing it in the registry below, which the compiler holds to the same
  * set. That is a code change rather than a data change, which is the point: a
- * provider is not only a table of values, and the ones that differ — OAuth2
- * rather than OIDC, a second request to read an email, a claim the vendor does
- * not emit — differ in behaviour. Holding that in the provider keeps it out of
- * the callers.
+ * provider is not only a table of values, and the ones that differ (a claim
+ * the vendor does not emit, a protocol setting it needs) differ in behaviour.
+ * Holding that in the provider keeps it out of the callers.
  *
  * Anything else the catalog does not list is a custom connection the developer
  * describes, and {@link ProviderSelection} is how a caller says which of the two
@@ -92,6 +91,7 @@ export {
   CustomOidcProvider,
   type CustomOidcInput,
 } from "./custom.js";
+export { missingEndpoints, OIDC_ENDPOINTS, type OidcEndpoint } from "./endpoints.js";
 export { GoogleProvider } from "./google.js";
 export { isLoopbackIssuer } from "./issuer.js";
 export { OidcProvider } from "./oidc-provider.js";
