@@ -1,5 +1,6 @@
 import {
   CreateGrantBody,
+  CreateIdpBody,
   CreateTeamBody,
   CreateUserBody,
   PatchProjectBody,
@@ -12,20 +13,33 @@ import {
   bodyFromFlags,
   describeBody,
   fieldExample,
-  needsRawBody,
+  flagsAloneMayBeIncomplete,
 } from "../../../../../src/lib/oclif/crud";
 
-const byName = (schema: Parameters<typeof describeBody>[0]) =>
-  Object.fromEntries(describeBody(schema).map((field) => [field.name, field]));
+type Described = Parameters<typeof describeBody>;
+
+const byName = (...args: Described) =>
+  Object.fromEntries(describeBody(...args).map((field) => [field.name, field]));
+
+/** The flags of a body, typed loosely enough to read their options back. */
+const flagsOf = (...args: Described) =>
+  bodyFieldFlags(describeBody(...args)) as Record<
+    string,
+    {
+      type?: string;
+      allowNo?: boolean;
+      helpGroup?: string;
+      description?: string;
+      options?: string[];
+      multiple?: boolean;
+    }
+  >;
 
 describe("describeBody", () => {
   it("marks required and optional fields from the schema", () => {
     const fields = byName(CreateGrantBody);
     expect(fields.relation?.required).toBe(true);
     expect(fields.expires_at?.required).toBe(false);
-    // `user` and `team` are nested objects: no flag, reached through --data.
-    expect(fields.user).toBeUndefined();
-    expect(fields.team).toBeUndefined();
   });
 
   it("treats a fully optional body as optional", () => {
@@ -53,9 +67,99 @@ describe("describeBody", () => {
     expect(fields.attributes?.kind).toBe("record");
   });
 
-  it("skips fields that would collide with an existing flag", () => {
-    const schema = z.object({ data: z.string(), name: z.string() });
-    expect(describeBody(schema).map((field) => field.name)).toEqual(["name"]);
+  it("walks into a nested object, naming each leaf by its path", () => {
+    const fields = byName(CreateGrantBody);
+    expect(fields["user.identifier"]).toMatchObject({
+      path: ["user", "identifier"],
+      flag: "user-identifier",
+      kind: "string",
+      required: false,
+    });
+    expect(fields["team.name"]?.flag).toBe("team-name");
+    // The object itself is no field: its leaves are.
+    expect(fields.user).toBeUndefined();
+  });
+
+  it("addresses the document under a root rather than the request around it", () => {
+    const fields = byName(CreateIdpBody, { root: "idp" });
+    expect(fields.slug?.flag).toBe("slug");
+    expect(fields["oidc.client_id"]?.flag).toBe("oidc-client-id");
+    expect(fields["idp.slug"]).toBeUndefined();
+  });
+
+  it("gives every leaf of a connection a flag of its own", () => {
+    const fields = describeBody(CreateIdpBody, { root: "idp" });
+    expect(fields.length).toBe(20);
+    expect(fields.every((field) => field.flag !== undefined)).toBe(true);
+  });
+
+  it("makes a field required with its optional object, not with every body", () => {
+    const fields = byName(CreateIdpBody, { root: "idp" });
+    expect(fields["oidc.issuer"]).toMatchObject({ required: false, requiredWith: ["oidc"] });
+    // Optional within the block too, so nothing makes it required.
+    expect(fields["oidc.jwks_uri"]?.requiredWith).toBeUndefined();
+    expect(fields.slug?.requiredWith).toBeUndefined();
+  });
+
+  it("ties a field to the innermost optional object around it", () => {
+    // `a.b.c` only has to be there once `b` is; giving `a` alone asks for `a.d`.
+    const schema = z.object({
+      a: z.object({ b: z.object({ c: z.string() }).optional(), d: z.string() }).optional(),
+    });
+    const fields = byName(schema);
+    expect(fields["a.b.c"]?.requiredWith).toEqual(["a", "b"]);
+    expect(fields["a.d"]?.requiredWith).toEqual(["a"]);
+  });
+
+  it("reads lists, booleans, integers and defaults from the schema", () => {
+    const connection = byName(CreateIdpBody, { root: "idp" });
+    expect(connection["oidc.scopes"]).toMatchObject({ kind: "list", item: "string" });
+    expect(connection["oidc.pkce_enabled"]).toMatchObject({
+      kind: "boolean",
+      default: { value: true },
+    });
+    expect(byName(PatchProjectBody)["password_hash.params.cost"]?.kind).toBe("integer");
+  });
+
+  it("walks into an object that may also be null", () => {
+    // A project's hashing method is an object or `null`, so it has leaves; the
+    // string flag the walk used to give it could never make a valid body.
+    const fields = byName(PatchProjectBody);
+    expect(fields.password_hash).toBeUndefined();
+    expect(fields["password_hash.algorithm"]).toMatchObject({
+      flag: "password-hash-algorithm",
+      kind: "enum",
+    });
+  });
+
+  it("leaves a field no single flag can hold to --set", () => {
+    const schema = z.object({ items: z.array(z.object({ id: z.string() })) });
+    expect(byName(schema).items).toMatchObject({ kind: "json", required: true });
+    expect(byName(schema).items?.flag).toBeUndefined();
+  });
+
+  it("gives no flag to a field that would collide with one the command owns", () => {
+    const fields = byName(z.object({ data: z.string(), name: z.string() }));
+    expect(fields.data?.flag).toBeUndefined();
+    expect(fields.name?.flag).toBe("name");
+  });
+
+  it("gives no flag to either of two fields that would share one", () => {
+    const fields = byName(z.object({ a_b: z.string(), a: z.object({ b: z.string() }) }));
+    expect(fields.a_b?.flag).toBeUndefined();
+    expect(fields["a.b"]?.flag).toBeUndefined();
+  });
+
+  it("counts the --no- form of a boolean as taken", () => {
+    const fields = byName(z.object({ cache: z.boolean(), no_cache: z.string() }));
+    expect(fields.cache?.flag).toBeUndefined();
+    expect(fields.no_cache?.flag).toBeUndefined();
+  });
+
+  it("keeps out of the flags the caller reserves", () => {
+    expect(byName(z.object({ extra: z.string() }), { reserved: ["extra"] }).extra?.flag).toBe(
+      undefined,
+    );
   });
 
   it("no longer reserves `environment`, which no generated command owns", () => {
@@ -75,10 +179,7 @@ describe("describeBody", () => {
 
 describe("bodyFieldFlags", () => {
   it("groups required and optional fields and keeps enum options", () => {
-    const flags = bodyFieldFlags(describeBody(CreateGrantBody)) as Record<
-      string,
-      { helpGroup?: string; description?: string; options?: string[]; multiple?: boolean }
-    >;
+    const flags = flagsOf(CreateGrantBody);
     expect(flags.relation?.helpGroup).toBe("REQUIRED FIELD");
     expect(flags.relation?.options).toEqual(["viewer", "editor", "admin"]);
     expect(flags.relation?.description).toMatch(/^\(required\) /);
@@ -87,12 +188,27 @@ describe("bodyFieldFlags", () => {
   });
 
   it("makes a record field repeatable", () => {
-    const flags = bodyFieldFlags(describeBody(CreateUserBody)) as Record<
-      string,
-      { multiple?: boolean; description?: string }
-    >;
+    const flags = flagsOf(CreateUserBody);
     expect(flags.attributes?.multiple).toBe(true);
     expect(flags.attributes?.description).toContain("key=value");
+  });
+
+  it("groups nested flags by their object and says what makes them required", () => {
+    const flags = flagsOf(CreateIdpBody, { root: "idp" });
+    expect(flags["oidc-issuer"]?.helpGroup).toBe("OIDC FIELD");
+    expect(flags["oidc-issuer"]?.description).toMatch(/^\(required with oidc\.\*\) /);
+    expect(flags["provisioning-creation"]?.helpGroup).toBe("PROVISIONING FIELD");
+  });
+
+  it("lets a boolean be turned off, and a list take one value per use", () => {
+    const flags = flagsOf(CreateIdpBody, { root: "idp" });
+    expect(flags["oidc-pkce-enabled"]).toMatchObject({ type: "boolean", allowNo: true });
+    expect(flags["oidc-scopes"]).toMatchObject({ multiple: true });
+  });
+
+  it("leaves a field without a flag out", () => {
+    const flags = flagsOf(z.object({ data: z.string(), name: z.string() }));
+    expect(Object.keys(flags)).toEqual(["name"]);
   });
 });
 
@@ -107,6 +223,24 @@ describe("bodyFromFlags", () => {
         "expires-at": "2030-01-01T00:00:00Z",
       }),
     ).toEqual({ relation: "viewer", expires_at: "2030-01-01T00:00:00Z" });
+  });
+
+  it("nests a nested field's value at its path", () => {
+    expect(
+      bodyFromFlags(describeBody(CreateIdpBody, { root: "idp" }), {
+        slug: "acme",
+        "oidc-issuer": "https://sso.acme.example",
+        "oidc-scopes": ["openid", "email"],
+        "oidc-pkce-enabled": false,
+      }),
+    ).toEqual({
+      slug: "acme",
+      oidc: {
+        issuer: "https://sso.acme.example",
+        scopes: ["openid", "email"],
+        pkce_enabled: false,
+      },
+    });
   });
 
   it("builds an object from repeated key=value entries", () => {
@@ -142,9 +276,31 @@ describe("bodyFromFlags", () => {
     });
   });
 
-  it("keeps a numeric-looking string a string with `=`", () => {
+  it("keeps a numeric-looking string a string with `=` where the values are untyped", () => {
     expect(bodyFromFlags(userFields, { attributes: ["postcode=02139", "phone=+1555"] })).toEqual({
       attributes: { postcode: "02139", phone: "+1555" },
+    });
+  });
+
+  it("reads `=` as the type a record declares for its values", () => {
+    const fields = describeBody(z.object({ limits: z.record(z.string(), z.number()) }));
+    expect(bodyFromFlags(fields, { limits: ["requests=10"] })).toEqual({
+      limits: { requests: 10 },
+    });
+    expect(() => bodyFromFlags(fields, { limits: ["requests=ten"] })).toThrowError(
+      expect.objectContaining({
+        code: "E_VALIDATION",
+        message: '--limits requests expects a number, got "ten"',
+      }),
+    );
+  });
+
+  it("keeps a string where a record's values may be a string or something else", () => {
+    // `verified_claims` takes a claim name or `true`; `email=true` names a
+    // claim called "true", and `email:=true` is the boolean.
+    const fields = describeBody(CreateIdpBody, { root: "idp" });
+    expect(bodyFromFlags(fields, { "verified-claims": ["email=true", "phone:=true"] })).toEqual({
+      verified_claims: { email: "true", phone: true },
     });
   });
 
@@ -173,52 +329,26 @@ describe("bodyFromFlags", () => {
     );
   });
 
-  it.each(["password", "api_key", "userToken", "client_secret", "PRIVATE_KEY"])(
-    "refuses %s as a flag value, since flags are visible to other processes",
-    (key) => {
-      expect(() => bodyFromFlags(userFields, { attributes: [`${key}=hunter2`] })).toThrowError(
-        expect.objectContaining({
-          code: "E_VALIDATION",
-          hint: expect.stringContaining("--file -"),
-        }),
-      );
-    },
-  );
-
-  it("refuses a secret in the JSON form too", () => {
-    expect(() => bodyFromFlags(userFields, { attributes: ['token:="abc"'] })).toThrowError(
-      expect.objectContaining({ code: "E_VALIDATION" }),
-    );
-  });
-
-  it("allows keys that merely mention a safe word", () => {
-    expect(
-      bodyFromFlags(userFields, { attributes: ["passwordless=true", "tokenizer=v2"] }),
-    ).toEqual({
-      attributes: { passwordless: "true", tokenizer: "v2" },
-    });
-  });
-
   it("returns undefined when no field flag was given", () => {
     expect(bodyFromFlags(grantFields, { json: true })).toBeUndefined();
   });
 });
 
-describe("needsRawBody", () => {
-  it("reports a body whose principal is a nested object", () => {
-    // `user` and `team` carry the grant's principal and neither becomes a flag,
-    // so no run made of flags alone is a complete grant.
-    expect(needsRawBody(CreateGrantBody)).toBe(true);
+describe("flagsAloneMayBeIncomplete", () => {
+  it("reports a body with a nested object, whose rules the required fields cannot carry", () => {
+    // A grant names exactly one of `user` and `team`, so `--relation viewer`
+    // alone is no complete grant.
+    expect(flagsAloneMayBeIncomplete(describeBody(CreateGrantBody))).toBe(true);
   });
 
-  it("reports nothing for a body every field of which is a flag", () => {
-    expect(needsRawBody(CreateTeamBody)).toBe(false);
-    expect(needsRawBody(CreateUserBody)).toBe(false);
-    expect(needsRawBody(PatchProjectBody)).toBe(false);
+  it("reports a body with a field no flag can carry", () => {
+    const schema = z.object({ items: z.array(z.object({ id: z.string() })) });
+    expect(flagsAloneMayBeIncomplete(describeBody(schema))).toBe(true);
   });
 
-  it("reports nothing for a schema it cannot introspect", () => {
-    expect(needsRawBody(z.string())).toBe(false);
+  it("reports nothing for a flat body every field of which is a flag", () => {
+    expect(flagsAloneMayBeIncomplete(describeBody(CreateTeamBody))).toBe(false);
+    expect(flagsAloneMayBeIncomplete(describeBody(CreateUserBody))).toBe(false);
   });
 });
 
@@ -229,5 +359,10 @@ describe("fieldExample", () => {
 
   it("is absent when nothing is required", () => {
     expect(fieldExample(describeBody(PatchProjectBody))).toBeUndefined();
+  });
+
+  it("is absent when a required field has no flag", () => {
+    const schema = z.object({ items: z.array(z.object({ id: z.string() })) });
+    expect(fieldExample(describeBody(schema))).toBeUndefined();
   });
 });

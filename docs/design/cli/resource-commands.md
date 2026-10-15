@@ -20,8 +20,8 @@ resource has:
 ```
 zitadel <resource> list    [--filter …] [--sort …] [--limit N] [--page-token T | --all]
 zitadel <resource> get     <id>
-zitadel <resource> create  --data '<json>' | --file <path|->
-zitadel <resource> update  <id> --data '<json>' | --file <path|->
+zitadel <resource> create  [--<field> …] [--set <path>=<value> …] [--data '<json>' | --file <path|->]
+zitadel <resource> update  <id> [--<field> …] [--set <path>=<value> …] [--data '<json>' | --file <path|->]
 zitadel <resource> delete  <id> [--force]
 ```
 
@@ -103,9 +103,12 @@ sessions  list, get, revoke                  created_at, user_id, state, …
 `--json` also carries `delete_outcome`, the property a delete's envelope puts
 beside `id` — `deleted`, `revoked`, or `deactivated` — so an agent need not
 guess which. And it adds the write fields per verb — `create_fields` and `update_fields`,
-each with flag name, kind, whether it is required, and any closed value set — so
-a create can be assembled without guessing, and an update is not described with
-the create's required fields.
+each with its dot path (`name`), its flag (`null` when only `--set` reaches it),
+kind, whether it is required, and any closed value set or default — so a create
+can be assembled as flags, `--set` assignments or a document without guessing,
+and an update is not described with the create's required fields. A resource
+whose document sits under a root in the request reports it as
+`document_root`.
 
 ## Credential and scope
 
@@ -225,34 +228,60 @@ output both say which, since it changes what the query means.
 
 ## Bodies
 
-`create` and `update` accept the body two ways, and they can be combined.
+`create` and `update` take the body from three kinds of source, in any mix:
+one flag per field, `--set` for a field by its path, and the whole document.
+The decisions behind this are ADR 064 §6 and
+[ADR 071](../../adrs/071-cli-resource-properties.md).
 
-**One flag per field.** The generated request schema names every field, its
-type, whether it is required, and its allowed values, so the factory turns each
-into a flag: `expires_at` becomes `--expires-at`, a closed value set
-becomes the flag's `options` (oclif rejects anything else at parse time), and
-the schema's own description becomes the flag help. `--help` groups them under
-`REQUIRED FIELD` and `OPTIONAL FIELD`, and each required flag also carries a
-`(required)` marker, because oclif orders help groups by their first flag
-alphabetically rather than by declaration.
+**One flag per field, nested ones included.** The generated request schema
+names every field, its type, whether it is required, and its allowed values,
+so the factory turns each leaf into a flag. `expires_at` becomes
+`--expires-at`, and a nested field's flag is its path with each segment
+kebab-cased, joined with `-`, so a connection's `oidc.client_id` is
+`--oidc-client-id`. A closed value set becomes the flag's `options` (oclif
+rejects anything else at parse time), a boolean takes `--no-<flag>` for
+`false`, a list of scalars is a repeatable flag with one value per use, and the
+schema's own description becomes the flag help. `--help` lists a top-level
+field under `REQUIRED FIELD` or `OPTIONAL FIELD`, and a nested one under its
+object (`OIDC FIELD`). Each required flag carries a `(required)` marker,
+because oclif orders help groups by their first flag alphabetically rather
+than by declaration. A field required only once its optional object is given
+says so: `(required with oidc.*)`.
 
 ```sh
 zitadel users create --schema human-user --attributes email=ada@example.com
+zitadel grants create --relation viewer --user-identifier alice@acme.com
+zitadel projects update prj_01J… --password-hash-algorithm bcrypt --password-hash-params-cost 12
 ```
 
-The two forms combine, so a field flag can sit beside a raw body:
+A field whose flag would collide with another field's, or with a flag the
+command owns, gets no flag, so neither shadows the other, and a unit test over
+the registry fails when one does. A field no single flag can hold (an array of
+objects) gets none either. Both stay reachable through `--set` and the
+document.
+
+A resource whose request wraps its document declares a **root**. An identity
+provider connection travels as `{"idp": {…}}`, so its flags, `--set` paths,
+`--data` and `--file` address the connection itself — the document `setup` and
+`auth-method sso enable` write to `.zitadel/idps/<slug>.json` — and the factory
+wraps it on the way out. A document still wrapped in `idp` is accepted too.
 
 ```sh
-zitadel grants create --relation viewer --data '{"user":{"user_id":"user_01J…"}}'
+zitadel idps create --slug acme-sso --protocol oidc --display-name 'Acme SSO' \
+  --oidc-issuer https://sso.acme.example --oidc-client-id abc123 \
+  --oidc-client-secret '${{ ACME_SSO_CLIENT_SECRET }}' --oidc-scopes openid
+zitadel idps create --file .zitadel/idps/acme-sso.json
 ```
 
 An **open record** — a user's `attributes`, whose keys come from the project's
 user schema rather than the API spec — becomes one repeatable flag with two
-forms. `key=value` is always a string, so an identifier that merely looks
-numeric (a postal code, a phone number) survives intact. `key:=value` parses the
-value as JSON, which is how a field the customer's schema declares as a number,
-boolean, null, array, or object is set. The split is HTTPie's, and keeping the
-two explicit means the CLI never guesses which was meant:
+forms. `key:=value` parses the value as JSON, which is how a field the
+customer's schema declares as a number, boolean, null, array, or object is
+set. `key=value` is the value as the record's schema types it. The API spec
+leaves `attributes` untyped, so there it is always text, and an identifier that
+merely looks numeric (a postal code, a phone number) survives intact. The split
+is HTTPie's, and keeping the two explicit means the CLI never guesses which was
+meant:
 
 ```sh
 zitadel users create --schema sch_01J… \
@@ -268,30 +297,51 @@ That stores `age` as a number, `optIn` as a boolean, `tags` as an array, and
 by the user schema, since the value would reach the server quoted. A malformed
 JSON value fails locally and the error offers the string form.
 
-Fields the CLI cannot express as a single flag (nested objects, arrays) are
-absent from the flag list and stay reachable through the raw body. A resource
-that has one — `grants create` names its principal with a nested `user` or
-`team` object — also gets no flags-only example in `--help`, because that run
-would send an incomplete body for the platform to reject.
+**`--set` reaches any field by its path.** `--set <path>=<value>` and
+`--set <path>:=<json>` assign one field of the document, in the dot-path
+language `--fields` speaks, and repeat. The path is checked against the
+request schema before any request: an unknown one is refused, naming the fields
+near it, and any key is accepted below an open record
+(`attributes.address.city`). `=` gives the value the type the schema declares
+at the path, so `--set oidc.pkce_enabled=false` is the boolean, while a path the
+schema types as a string keeps the text. A list or an object takes `:=`.
+
+```sh
+zitadel idps create --file acme-sso.json --set oidc.pkce_enabled=false
+zitadel users update user_01J… --set attributes.address.city=Zurich --set attributes.phone:=null
+```
+
+**The whole body at once.** `--data '<json>'` or `--file <path>`, where
+`--file -` reads stdin. `--file -` with nothing piped in fails immediately
+rather than waiting on the keyboard, which would look like a hang.
+
+**The order they merge in.** The document comes first, then the field flags,
+then each `--set` in the order given, each merged over the last. Objects merge
+key by key, and any other value — a list, a scalar, `null` — replaces what was
+there. So a template file and a flag mix: `--file user.json --attributes
+givenName=Augusta` changes that one attribute and keeps the file's others. On
+an update the result is a merge patch, in which `null` removes the key on the
+server, as `PATCH /users/{id}` does with `attributes`.
 
 **Credentials are refused on the command line.** Anything in argv is visible to
 anyone running `ps`, is kept in shell history, and is captured by CI logs — and
 `--data "$(cat body.json)"` is no exception, since the shell expands it before
-the CLI runs. So a property whose name reads as a secret (`password`,
-`client_secret`, `userToken`, `api_key`, …) is refused both as an `--attributes`
-entry and anywhere inside an inline `--data` body, pointing at the two routes
-that never touch argv: `--file <path>` and `--file -`. Names that merely start
-the same way, such as `passwordless`, are unaffected.
-
-**The whole body at once.** `--data '<json>'` or `--file <path>`, where
-`--file -` reads stdin. `--file -` with nothing piped in fails immediately
-rather than waiting on the keyboard, which would look like a hang. A field flag overrides the same key in the raw body, so
-the two mix: load a template from a file and override one value on the command
-line.
+the CLI runs. So free-form text under a property whose name reads as a secret
+(`password`, `client_secret`, `userToken`, `api_key`, …) is refused from a field
+flag, from a `--set` or `--attributes` entry, and anywhere inside an inline
+`--data` body. The refusal points at the two routes that never touch argv:
+`--file <path>` and `--file -`. Names that merely start the same way, such as
+`passwordless`, are unaffected, and so are names of an address
+(`token_endpoint`). A value that cannot be a credential passes too: a boolean,
+a value the schema fixes (an enum value, or a number where it declares one), and
+a `${{ NAME }}` reference to a project variable, the only form a connection's
+`client_secret` accepts. Write a reference in single quotes, since inside
+double quotes the shell reads `${` as its own expansion.
 
 Required fields are not declared required to oclif — `--data` may carry them —
-so presence is checked once both sources are merged, and reported as the flags
-the caller is missing rather than as schema issues:
+so presence is checked once every source is merged, and reported as the flags
+the caller is missing rather than as schema issues. A nested field counts once
+its optional object is given:
 
 ```console
 $ zitadel grants create --expires-at 2030-01-01T00:00:00Z --json | jq -r '.message, .hint'
@@ -299,11 +349,13 @@ grants create is missing required field: --relation
 Pass --relation, or include it in --data / --file. See `grants create --help`.
 ```
 
-Either way the assembled body is validated against the generated request schema
-locally, then sent as-is. The server's resource is echoed back as `data`;
-a create additionally carries `data.next_commands` pointing at the matching
-`get`. `--dry-run` emits `{ dry_run: true, verb, topic, id?, body }` and makes no
-request.
+The assembled body is then validated against the generated request schema
+locally, and what the schema accepts — with any default it fills in — is sent.
+The server's resource is echoed back as `data`; a create additionally carries
+`data.next_commands` pointing at the matching `get`. `--dry-run` emits
+`{ dry_run: true, verb, topic, id?, body }` and makes no request. Its `body` is
+what would be sent, with only credentials masked, so it can be checked and
+saved as a document to send later with `--file`.
 
 ## Deleting
 

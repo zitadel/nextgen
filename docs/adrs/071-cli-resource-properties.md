@@ -11,6 +11,10 @@
 > [ADR 020](020-credentials-out-of-user-schema.md),
 > [ADR 062](062-per-environment-variables-and-secrets.md),
 > [ADR 070](070-cli-auth-method-toggles.md)
+> **Implementation:** steps 1–3 of [Order of work](#order-of-work) ship with
+> this ADR: the merge order, the nested flags and discovery, `--set`, and the
+> credential rules. Prompts, `--provider` templates and the user-schema check
+> are follow-ups.
 
 The examples use the singular nouns of ADR 064's 2026-10-07 amendment
 (`zitadel idp create`). The shipped commands are still plural
@@ -126,17 +130,18 @@ assignment into that document, applied from lowest to highest precedence:
 4. the **`--set` assignments** (§3), in the order given;
 5. the **answers to prompts** for required fields that are still missing (§6).
 
-Documents merge as a JSON Merge Patch
-([RFC 7396](https://www.rfc-editor.org/rfc/rfc7396)). Objects merge key by key,
-arrays and scalars replace, and `null` removes a key. `PATCH /users/{id}`
-already applies that rule to `attributes`, so a body built locally and a patch
-applied by the server follow the same rule. A flag over a file changes one key,
-not the object around it.
+Each source merges over the one before. Objects merge key by key at every
+depth, and any other value — an array, a scalar, `null` — replaces what was
+there. That is how one JSON Merge Patch composes with another
+([RFC 7396](https://www.rfc-editor.org/rfc/rfc7396)). On an update the result
+is a merge patch: a `null` removes the key on the server, as
+`PATCH /users/{id}` already does with `attributes`. A flag over a file changes
+one key, not the object around it.
 
 The merged document is validated against the request schema before any
-request, as today. **What is sent is the document as assembled**, not the
-schema's parse result, so validation never adds a value nobody gave. A default
-belongs to the server, or to a template that sets it on purpose (§4).
+request, as today, and what the schema accepts is sent, with any default it
+fills in. Whether the CLI should fill in a default the API says it never
+applies is left open below.
 
 A registry entry may declare a **document root**. For identity providers it is
 `idp`: flags, `--set` paths, `--file` and `--data` all address the connection
@@ -289,8 +294,8 @@ zitadel idp create --provider custom --slug acme-sso --display-name 'Acme SSO' \
   --oidc-issuer https://sso.acme.example \
   --oidc-scopes openid --oidc-scopes profile --oidc-scopes email --oidc-scopes groups
 
-# Google without the account chooser it adds by default
-zitadel idp create --provider google --set oidc.static_authorize_parameters:=null
+# Google, asking for consent instead of the account chooser it adds by default
+zitadel idp create --provider google --set oidc.static_authorize_parameters.prompt=consent
 
 # No template: a document from a file, or nothing but flags
 zitadel idp create --file .zitadel/idps/acme-sso.json
@@ -338,18 +343,21 @@ not only the first.
   `zitadel idp create --provider custom` becomes a short guided create without
   becoming a wizard. A credential is never asked for here: only a template asks
   for one (§4).
-- **Otherwise** the command fails with one `E_VALIDATION` that lists them all in
-  `details.missing` (`[{ "path": "oidc.issuer", "flag": "--oidc-issuer" }, …]`),
-  with a hint that names the flags and `--set`. It suggests no command, because
-  a value the caller has not given cannot be filled in, and ADR 064 §8 allows
+- **Otherwise** the command fails with one `E_VALIDATION` that lists them all:
+  by flag in its message (`--oidc-issuer, --oidc-client-secret`, or
+  `--set <path>=…` for a field without one), and by path in `details.missing`
+  (`["oidc.issuer", "oidc.client_secret"]`). It suggests no command, because a
+  value the caller has not given cannot be filled in, and ADR 064 §8 allows
   only suggestions that run as typed.
 
 ### 7. A reference is not a credential
 
 ADR 064 §13 keeps credentials off the command line by matching field names
-against a wordlist, and admits that the list is wrong in both directions. Two
+against a wordlist, and admits that the list is wrong in both directions. Three
 exceptions remove the wrong cases this ADR runs into. The wordlist itself stays
-until the schema-derived signal §13 asks for exists.
+until the schema-derived signal §13 asks for exists. Every flag that carries
+part of the body is checked: `--data`, the field flags, `--set` and record
+entries.
 
 - **A whole-value `${{ NAME }}` reference
   ([ADR 062](062-per-environment-variables-and-secrets.md)) is not a
@@ -357,12 +365,18 @@ until the schema-derived signal §13 asks for exists.
   and a preview shows it. It is the only form the API accepts for
   `oidc.client_secret`, and it names a variable without revealing its value.
   Refusing it sends the caller to a file for no gain.
-- **Only a free-form string can be a credential.** The guard and the redaction
-  look at a value's leaves. A string leaf whose own key or an ancestor's names a
-  credential is refused and redacted, as such a key is today. A boolean, a
-  number, a value from the field's enum, or a reference is neither. That clears
+- **Only free-form text can be a credential.** The guard and the redaction
+  look at a value's leaves. A leaf whose own key or an ancestor's names a
+  credential is refused and redacted, as such a key is today, unless it is a
+  boolean, a reference, or a value the schema fixes: one of an enum's values,
+  or a number where the schema declares one. That clears
   `oidc.id_token_mapping`, `oidc.token_endpoint_auth_method` and the whole of
-  `password_hash`, whose leaves are enum values and numbers.
+  `password_hash`, whose leaves are enum values and numbers. A number under
+  `attributes.password` is still refused: nothing declares what it is.
+- **The name of an address is not a credential's name.** `token_endpoint` is
+  where a token is fetched. A key whose last word is `endpoint`, `url` or `uri`
+  names an address, and a URL is no credential, so `--oidc-token-endpoint`
+  takes one.
 
 A secret's value still never travels as an argument. It comes from a prompt or
 stdin, and is published as a variable (§4, `variables set`). Help and examples
@@ -391,14 +405,17 @@ project does not hold is reported in `warnings` rather than asked for.
 `zitadel resources --json` reports, for each entry of `create_fields` and
 `update_fields`:
 
-- `path`;
+- `name`, the field's dot path;
 - `flag`, or `null` when only `--set` reaches the path;
 - `kind`: `string`, `number`, `integer`, `boolean`, `enum`, `list`, `record` or
-  `json`;
-- `required`, `options`, `default`, and a one-line `description`.
+  `json`, and for a list the `item` it holds;
+- `required`, and `required_with` for a field required once its optional
+  object is given;
+- `options`, `default`, and a one-line `description`.
 
 Each resource also reports its `document_root`, and its templates with the flag
-that chooses them (`{ "flag": "--provider", "names": ["google", "custom"] }`).
+that chooses them (`{ "flag": "--provider", "names": ["google", "custom"] }`,
+§4).
 From that one call an agent can assemble flags, `--set` assignments or a whole
 document, which is what ADR 064 §7 asks the surface to allow. `--help` gains a
 short BODY section that states the order of §1.
@@ -466,13 +483,12 @@ open below.
 
 - **The existing forms keep their meaning.** `--data`, `--file`,
   `--attributes key=value` and `key:=json`, and the top-level flags all stay.
-  Three behaviours change. A flag over a file changes one key instead of
-  replacing its parent object. `=` on a path the schema types as a number or
-  boolean sends that type, where today it sends a string the server refuses.
-  And the CLI stops sending Zod defaults nobody asked for, which breaks one call
-  that works today: an `idp create` document without `scopes`, accepted only
-  because the CLI fills in the default the API says it never applies. A
-  `--provider` template sets the scopes on purpose (§4).
+  Two behaviours change, both toward what the
+  [design doc](../design/cli/resource-commands.md#bodies) already promised. A
+  flag over a file changes one key instead of replacing its parent object. And
+  `=` on a path the schema types as a number or boolean sends that type, where
+  a string would have been refused. A credential check that refused a
+  reference, a boolean, an enum value or an endpoint URL now lets it through.
 - **The document is the same on every path.** A connection made with
   `idp create`, written by `auth-method sso enable` or kept in
   `.zitadel/idps/` has one shape. Moving one between the imperative and the
@@ -497,11 +513,11 @@ open below.
 ## Order of work
 
 The parts are independent, and the first unblocks `idp create --data` on its
-own:
+own. Steps 1–3 ship with this ADR:
 
-1. §7, and the merge and send rules of §1. The guard and the redaction stop at
-   references and non-strings, a flag over a file merges, and the CLI sends
-   what it assembled.
+1. §7, and the merge rule of §1. The guard and the redaction stop at
+   references, booleans, values the schema fixes and address names, and a flag
+   over a file merges.
 2. The document root, the nested flags and discovery (§1, §2, §9).
 3. `--set` and the typed `=` (§3).
 4. Asking for and listing missing fields (§6).
@@ -517,10 +533,17 @@ own:
   as conditional. OIDC is the only protocol, so the mirror could list `oidc` in
   `required` outright, which ogen can express. A second protocol needs a
   discriminator.
-- **The `scopes` default.** The mirror gives `scopes` a Zod default, which is
-  how the CLI came to inject it. Under §1 the CLI stops sending it, so a
-  connection without `scopes` is refused, as the API says. Prefilling them is a
-  template's job (§4), not the validator's.
+- **Defaults the API says it never applies.** The CLI sends what the schema
+  accepts, and the mirror's Zod defaults fill in `scopes`, `pkce_enabled` and
+  others. So a connection without `scopes` is accepted, although the API says
+  it refuses one. Sending the document exactly as assembled would make the
+  preview and the stored document match what was written, but would break that
+  call; prefilling the scopes would then be a template's job (§4).
+- **Removing a key that a document or template set.** A `null` is a value
+  (§1): on an update it removes the key on the server, but on a create
+  `--set <path>:=null` sends it, and the schema decides. Dropping a key that a
+  `--file` set means editing the file; an `--unset <path>` would be the flag
+  for it.
 - **`idp update`.** A read-modify-write over `POST /idps` would make changing
   one field a single command. ADR 064 §3 rules out verbs synthesised from other
   calls, though, and `idp.revision_conflict` only refuses two revisions written

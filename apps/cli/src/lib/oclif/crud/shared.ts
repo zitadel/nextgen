@@ -2,7 +2,7 @@ import { nonBlankArg } from "../flags";
 
 import { ZitadelError } from "../../errors";
 import type { CommandResult } from "../types";
-import { redactSecrets } from "./secrets";
+import { type CredentialContext, redactCredentials } from "./secrets";
 import type { Json, ResourceDescriptor, Schema } from "./types";
 
 /** Helpers shared by more than one verb builder. */
@@ -59,10 +59,13 @@ export const dryRunResult = (
   topic: string,
   id?: string,
   body?: Json,
+  context?: CredentialContext,
 ): CommandResult => {
   // A body that came from a file may legitimately hold a credential; a preview
-  // of it must not put that value on screen or into a CI log.
-  const shown = body === undefined ? undefined : (redactSecrets(body) as Json);
+  // of it must not put that value on screen or into a CI log. Only the
+  // credentials are masked: the rest is what would be sent, so the preview can
+  // be checked, and saved as a document to send later (ADR 071 §8).
+  const shown = body === undefined ? undefined : (redactCredentials(body, context) as Json);
   return {
     status: "ok",
     data: { dry_run: true, verb, topic, id, body: shown },
