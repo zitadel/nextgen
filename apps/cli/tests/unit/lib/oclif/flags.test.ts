@@ -10,6 +10,7 @@ import { parseJson, runCliForTest } from "../../../helpers/run-cli";
 describe("a flag that must not be blank", () => {
   it("refuses an empty value, where oclif's own check passes it", async () => {
     const result = await runCliForTest([
+      "auth-method",
       "sso",
       "enable",
       "--provider",
@@ -27,6 +28,7 @@ describe("a flag that must not be blank", () => {
 
   it("refuses a value that is only whitespace", async () => {
     const result = await runCliForTest([
+      "auth-method",
       "sso",
       "enable",
       "--provider",
@@ -43,6 +45,7 @@ describe("a flag that must not be blank", () => {
     // Unquoted `--client-id $UNSET` drops the word entirely; that path was
     // never broken and must keep its own wording.
     const result = await runCliForTest([
+      "auth-method",
       "sso",
       "enable",
       "--provider",

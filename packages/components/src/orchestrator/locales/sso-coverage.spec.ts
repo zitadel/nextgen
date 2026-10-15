@@ -4,8 +4,8 @@ import { createLiquidEngine } from "../liquid.js";
 import { builtinLocales } from "./index.js";
 
 /**
- * The steps `zitadel sso enable` adds to a login flow, as the engine renders
- * them.
+ * The steps `zitadel auth-method sso enable` adds to a login flow, as the
+ * engine renders them.
  *
  * A fixture rather than a call into the CLI's generator: this package
  * consumes the *rendered* step the server sends, and the authoring side that
