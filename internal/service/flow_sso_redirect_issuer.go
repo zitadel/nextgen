@@ -101,6 +101,8 @@ func resolveSSOClientID(ctx context.Context, variables VariableService, projectI
 	}
 	// The primary value: a sign-in resolves against the primary target until
 	// it reads the set its deployment froze.
+	// TODO: take the kind from the origin the request came in on once the
+	// release runtime resolves it; the callback reads the same kind.
 	vars, err := variables.GetVariables(ctx, domain.VariableOwner{ProjectID: projectID}, new(domain.DeploymentOriginKindPrimary), name)
 	if err != nil {
 		return err
