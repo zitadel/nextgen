@@ -18,10 +18,11 @@ tasks:
     inputs:
       # Declaring inputs drops the default project folder, so it is restated.
       - "**/*"
-      # The hosted cloud's build bakes Vercel's insights and their sample
-      # rate in (src/vite-env.d.ts), so the variables are part of the cache
-      # key: that build is never restored into the server's embedded console,
-      # or the reverse.
+      # The hosted cloud's build bakes its base path, Vercel's insights and
+      # their sample rate in (vite.config.ts, src/vite-env.d.ts), so the
+      # variables are part of the cache key: that build is never restored into
+      # the server's embedded console, or the reverse.
+      - "$CONSOLE_BASE_PATH"
       - "$CONSOLE_VERCEL_INSIGHTS"
       - "$CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE"
     outputs:
@@ -32,9 +33,12 @@ tasks:
 
   build-release:
     command: "corepack pnpm run build"
+    # The build bundles the dist of sdk-react and components (neither has an
+    # `@zitadel/source` entry), so it waits for their release builds;
+    # sdk-react's reaches components'. Never a dev build here: in pack and
+    # publish it would run after the release builds and rewrite the packed dist.
     deps:
-      - "api:build-release"
-      - "sdk-react:build"
+      - "sdk-react:build-release"
     outputs:
       - "/internal/staticui/console/dist/**/*"
     options:

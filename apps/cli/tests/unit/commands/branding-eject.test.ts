@@ -2,11 +2,17 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
+
+import { cancel, isCancel, select } from "@clack/prompts";
 
 import { getDefaultBrandingConfig } from "@zitadel/config/defaults";
 
+import BrandingEject from "../../../src/commands/branding/eject";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { asTerminal } from "../../helpers/terminal";
 
 const tempDirs: string[] = [];
 
@@ -146,5 +152,39 @@ describe("branding eject", () => {
     const res = await eject(cwd);
     expect(res.exitCode).not.toBe(0);
     expect(res.stdout + res.stderr).toContain("not a Zitadel project");
+  });
+});
+
+describe("branding eject asked on a terminal", () => {
+  // The built CLI bundles its own prompts, so a prompt can only be answered
+  // by running the command from source, where `input` is the one module asked.
+  const ejecting = (cwd: string) => asTerminal(() => BrandingEject.run(["--cwd", cwd]));
+
+  afterEach(() => {
+    vi.mocked(select).mockReset();
+    vi.mocked(isCancel).mockReset();
+    vi.mocked(isCancel).mockReturnValue(false);
+  });
+
+  it("scaffolds the design that was chosen", async () => {
+    const cwd = await makeProject();
+    vi.mocked(select).mockResolvedValueOnce("minimal" as never);
+
+    await ejecting(cwd);
+
+    expect(await readFile(join(cwd, ".zitadel/branding/login.liquid"), "utf8")).toBe(
+      getDefaultBrandingConfig("minimal").template,
+    );
+  });
+
+  it("fails, scaffolding nothing, on Ctrl-C", async () => {
+    const cwd = await makeProject();
+    vi.mocked(isCancel).mockReturnValue(true);
+    vi.mocked(select).mockResolvedValueOnce(Symbol("cancel") as never);
+
+    await expect(ejecting(cwd)).rejects.toThrow();
+
+    expect(cancel).toHaveBeenCalledWith("Cancelled.");
+    await expect(readFile(join(cwd, ".zitadel/branding/branding.json"), "utf8")).rejects.toThrow();
   });
 });

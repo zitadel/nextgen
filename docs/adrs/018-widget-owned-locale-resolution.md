@@ -43,16 +43,19 @@ The private `resolveLocale()` method determines the effective dictionary:
    - `document.documentElement.lang` (`<html lang>` attribute)
    - `navigator.language` (browser preference)
 2. Extract the primary subtag (e.g. `"de"` from `"de-AT"`).
-3. If `this.locales[primary]` exists, **shallow-merge** it on top of the
-   built-in dictionary: `{ ...builtin, ...custom }`. This allows partial
-   overrides without importing the full base dictionary.
+3. If `this.locales[primary]` exists, merge it key by key on top of the
+   built-in dictionary (`mergeLocale` in `locales/index.ts`), skipping
+   explicit `undefined`. This allows partial overrides without importing the
+   full base dictionary. When the custom dictionary rewrites a step's
+   `<step>.description` but has no `<step>.description.sso` of its own, the
+   built-in `.sso` entry is dropped so the step falls back to the custom text.
 4. If no custom override exists, use the built-in dictionary directly.
 5. Fall back to `en` if no built-in matches.
 
 ### Built-in locale registry
 
 `packages/components/src/orchestrator/locales/index.ts` exports a
-`builtinLocales` map (`{ en, de }`) and the individual dictionaries. New
+`builtinLocales` map (`{ en, de, it }`) and the individual dictionaries. New
 languages are added by creating a `<code>.ts` file in the `locales/`
 directory and registering it in the map.
 

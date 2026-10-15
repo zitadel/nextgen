@@ -24,6 +24,9 @@
   "files": [
     "bin"
   ],
+  "scripts": {
+    "prepack": "publint --strict"
+  },
   "publishConfig": {
     "access": "public"
   }

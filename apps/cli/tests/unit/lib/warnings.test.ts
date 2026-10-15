@@ -1,23 +1,12 @@
-import { readdir, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { sourceFiles } from "../../helpers/source-files";
 import { reportWarning, takeReportedWarnings } from "../../../src/lib/warnings";
 
 const SRC = join(import.meta.dirname, "../../../src");
-
-async function sourceFiles(dir: string): Promise<string[]> {
-  const entries = await readdir(dir, { withFileTypes: true });
-  const nested = await Promise.all(
-    entries.map((entry) =>
-      entry.isDirectory()
-        ? sourceFiles(join(dir, entry.name))
-        : Promise.resolve(entry.name.endsWith(".ts") ? [join(dir, entry.name)] : []),
-    ),
-  );
-  return nested.flat();
-}
 
 describe("reportWarning", () => {
   it("keeps each warning until it is taken", () => {

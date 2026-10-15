@@ -25,8 +25,13 @@ share no components with the console, only what the design system owns.
   (`app/layout.tsx`): Fumadocs styles its dark theme by the class, the tokens
   switch on the attribute.
 - Arimo for text, APK Futural for the page title, the sections of a page and
-  the "Docs" beside the logo, both through `next/font`. APK Futural is a
-  licensed face with one weight, so a heading in it is never bold.
+  the "Docs" beside the logo, both through `next/font/local` from
+  `app/fonts/`, so the build fetches nothing. `Arimo-latin.woff2` is Arimo's
+  variable font (every weight from 400 to 700) in the latin subset, with its
+  licence, the SIL Open Font License, beside it (`Arimo-OFL.txt`); the website
+  holds the same file and says where it comes from
+  ([`apps/website/AGENTS.md`](../website/AGENTS.md#the-fonts)). APK Futural
+  is a licensed face with one weight, so a heading in it is never bold.
 - Code, in the pages and in the API reference's samples, is in the design
   system's syntax colours through Shiki's CSS-variables theme
   (`lib/code-theme.ts`), aliased as the console aliases them.
@@ -84,13 +89,16 @@ into `.next/output`.
 
 ## Tests
 
-`tests/` is the site's contract suite (Playwright, `playwright.config.mts`),
-written against a URL rather than the code. `moon run docs:e2e` runs it
-against the local build on port 3003; `DOCS_BASE_URL=https://cloud-….vercel.app
-moon run docs:e2e-deployment` against a deployment of the hosted cloud, with
-`VERCEL_AUTOMATION_BYPASS_SECRET` for its protection, which
+`tests/` is the site's contract suite (Playwright), written against a URL
+rather than the code. `moon run docs:e2e` runs it against the local build on
+port 3003 (`playwright.config.mts`); `CLOUD_URL=https://cloud-….vercel.app
+moon run docs:e2e-deployment` against a deployment of the hosted cloud
+(`playwright.deployment.config.mts`), with `VERCEL_AUTOMATION_BYPASS_SECRET`
+for its protection. `pnpm check:cloud` runs that beside the console's
+deployment suite, as
 [`deployment-checks.yml`](../../.github/workflows/deployment-checks.yml) does for every
-deployment. The specs use paths only, so one spec proves both.
+deployment ([runbook](../../docs/runbooks/cloud.md#checking-a-deployment-by-hand)).
+The specs use paths only, so one spec proves both.
 
 - `/docs/llms.txt` is the suite's page list: every page it names is fetched as
   HTML, at its `.md` URL and through `Accept: text/markdown`, and every site

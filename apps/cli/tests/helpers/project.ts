@@ -31,6 +31,7 @@ export interface Envelope<T = Record<string, unknown>> {
   readonly message?: string;
   readonly hint?: string;
   readonly next_commands?: string[];
+  readonly warnings?: string[];
   readonly cli_version?: string;
   readonly command?: string;
   readonly source?: string;
@@ -100,12 +101,24 @@ export interface UserSchemaDocument {
   "x-auth-methods"?: Record<string, { enabled: boolean; providers?: string[] }>;
 }
 
+/** A connection file as committed, which the developer owns and edits. */
+export interface ConnectionDocument {
+  slug: string;
+  protocol?: string;
+  display_name?: string;
+  subject_claim?: string;
+  oidc: { issuer: string; client_id?: string; client_secret?: string };
+  claim_mapping?: Record<string, string>;
+  verified_claims?: Record<string, string>;
+}
+
 /** The login flow as committed, which the developer owns and edits. */
 export interface FlowDocument {
   purposes: Record<string, string>;
   steps: Array<{
     name: string;
     fields?: string[];
+    actions?: Array<{ name: string; text_key?: string }>;
     transitions?: Record<string, unknown>;
     sso_providers?: string[];
   }>;
@@ -187,6 +200,27 @@ class CommittedFiles {
   }
 }
 
+/** What a developer says about a connection the catalog does not list. */
+export type CustomConnection = {
+  slug: string;
+  displayName: string;
+  issuer: string;
+  scopes?: string;
+};
+
+/** The flags describing a connection, under `--` for `auth-method sso enable` or `--sso-` for `setup`. */
+function customFlags(connection: CustomConnection, prefix: string): string[] {
+  return [
+    `${prefix}slug`,
+    connection.slug,
+    `${prefix}display-name`,
+    connection.displayName,
+    `${prefix}issuer`,
+    connection.issuer,
+    ...(connection.scopes === undefined ? [] : [`${prefix}scopes`, connection.scopes]),
+  ];
+}
+
 /**
  * A scaffolded app for the specs to drive the CLI against.
  *
@@ -232,10 +266,14 @@ export class ScaffoldedApp {
     );
   }
 
-  /** `sso enable` without `--json`, for a spec asserting what the developer reads. */
+  /**
+   * `auth-method sso enable` without `--json`, for a spec asserting what the
+   * developer reads.
+   */
   enableSsoRendered(provider: string, credentials: Credentials): Promise<CliResult> {
     return this.pipingStdin(credentials.secret, () =>
       this.cli([
+        "auth-method",
         "sso",
         "enable",
         "--non-interactive",
@@ -250,6 +288,7 @@ export class ScaffoldedApp {
   enableSso(provider: string, credentials: Credentials): Promise<CliResult> {
     return this.pipingSecret(credentials.secret, () =>
       this.cli([
+        "auth-method",
         "sso",
         "enable",
         "--non-interactive",
@@ -259,6 +298,100 @@ export class ScaffoldedApp {
         "--client-id",
         credentials.clientId,
       ]),
+    );
+  }
+
+  /** `auth-method password|passkey enable`. */
+  enableMethod(method: "password" | "passkey", extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli(["auth-method", method, "enable", "--non-interactive", "--json", ...extraArgs]);
+  }
+
+  /** `auth-method password|passkey disable`. */
+  disableMethod(method: "password" | "passkey", extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli([
+      "auth-method",
+      method,
+      "disable",
+      "--non-interactive",
+      "--json",
+      ...extraArgs,
+    ]);
+  }
+
+  /**
+   * `auth-method password|passkey enable` without `--json`, for what the
+   * developer reads.
+   */
+  enableMethodRendered(method: "password" | "passkey"): Promise<CliResult> {
+    return this.cli(["auth-method", method, "enable", "--non-interactive"]);
+  }
+
+  /**
+   * `auth-method password|passkey disable` without `--json`, for what the
+   * developer reads.
+   */
+  disableMethodRendered(method: "password" | "passkey"): Promise<CliResult> {
+    return this.cli(["auth-method", method, "disable", "--non-interactive"]);
+  }
+
+  /**
+   * `auth-method sso disable` without `--json`, for what the developer reads.
+   */
+  disableSsoRendered(provider: string): Promise<CliResult> {
+    return this.cli(["auth-method", "sso", "disable", "--non-interactive", "--provider", provider]);
+  }
+
+  /** `auth-method sso disable`. */
+  disableSso(provider: string, extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli([
+      "auth-method",
+      "sso",
+      "disable",
+      "--non-interactive",
+      "--json",
+      "--provider",
+      provider,
+      ...extraArgs,
+    ]);
+  }
+
+  /** `auth-method sso enable` for a connection the developer describes, secret piped as a script would. */
+  enableCustomSso(connection: CustomConnection, credentials: Credentials): Promise<CliResult> {
+    return this.enableSsoWith(
+      [
+        "--provider",
+        "custom",
+        ...customFlags(connection, "--"),
+        "--client-id",
+        credentials.clientId,
+      ],
+      credentials.secret,
+    );
+  }
+
+  /** `auth-method sso enable` with exactly these flags, for a spec asserting how it refuses. */
+  enableSsoWith(args: string[], secret = "a-client-secret"): Promise<CliResult> {
+    return this.pipingSecret(secret, () =>
+      this.cli(["auth-method", "sso", "enable", "--non-interactive", "--json", ...args]),
+    );
+  }
+
+  /** `setup` with exactly these flags and this on stdin, for a spec asserting how it refuses. */
+  setupSsoWith(args: string[], secret: string): Promise<CliResult> {
+    return this.pipingSecret(secret, () => this.setup(["--framework", "next", ...args]));
+  }
+
+  /** `setup` with a custom connection described on the command line. */
+  setupWithCustomSso(connection: CustomConnection, credentials: Credentials): Promise<CliResult> {
+    return this.setupSsoWith(
+      [
+        "--sso",
+        "custom",
+        ...customFlags(connection, "--sso-"),
+        "--sso-client-id",
+        credentials.clientId,
+      ],
+      credentials.secret,
     );
   }
 
@@ -322,6 +455,24 @@ export class ScaffoldedApp {
         "set",
         name,
         "--project-level",
+        "--json",
+        ...(secret ? ["--secret"] : []),
+      ]),
+    );
+  }
+
+  /**
+   * Sets a project variable when nothing was piped in: stdin is the keyboard,
+   * which is what a script that forgot the pipe has.
+   */
+  setVariableWithNothingPiped(name: string, { secret = false } = {}): Promise<CliResult> {
+    return this.withKeyboardOnStdin(() =>
+      this.cli([
+        "variables",
+        "set",
+        name,
+        "--project-level",
+        "--non-interactive",
         "--json",
         ...(secret ? ["--secret"] : []),
       ]),
@@ -452,6 +603,59 @@ export class ScaffoldedApp {
     return this.editDocument(SCHEMA_FILE, edit);
   }
 
+  /** Edits the password step of the committed login flow, as the developer owning it would. */
+  editPasswordStep(edit: (step: FlowDocument["steps"][number]) => void): Promise<void> {
+    return this.editLoginFlow((flow) => {
+      const step = flow.steps.find((candidate) => candidate.name === "password");
+      if (step === undefined) {
+        throw new Error("the login flow has no password step");
+      }
+      edit(step);
+    });
+  }
+
+  /** Edits a committed connection file, as the developer owning it would. */
+  editConnection(slug: string, edit: (connection: ConnectionDocument) => void): Promise<void> {
+    return this.editDocument(`.zitadel/idps/${slug}.json`, edit);
+  }
+
+  /** Adds a second connection file that claims the same slug as an existing one. */
+  async copyConnection(slug: string, name: string): Promise<void> {
+    await this.writeProjectFile(
+      `.zitadel/idps/${name}.json`,
+      await this.readProjectFile(`.zitadel/idps/${slug}.json`),
+    );
+  }
+
+  /** The project-relative path of a connection's file, as a command reports it. */
+  connectionFile(slug: string): string {
+    return `.zitadel/idps/${slug}.json`;
+  }
+
+  /** Adds a connection no schema lists, so removing it breaks nothing else. */
+  async addUnlistedConnection(slug: string): Promise<void> {
+    const prefix = slug.toUpperCase().replaceAll("-", "_");
+    await this.copyConnection("google", slug);
+    await this.editConnection(slug, (connection) => {
+      connection.slug = slug;
+      connection.oidc.client_id = `\${{ ${prefix}_CLIENT_ID }}`;
+      connection.oidc.client_secret = `\${{ ${prefix}_CLIENT_SECRET }}`;
+    });
+    await this.setVariable(`${prefix}_CLIENT_ID`, "a-client-id");
+    await this.setVariable(`${prefix}_CLIENT_SECRET`, "a-client-secret", { secret: true });
+  }
+
+  /** Removes a committed connection file, as the developer owning it would. */
+  removeConnection(slug: string): Promise<void> {
+    return this.deleteProjectFile(`.zitadel/idps/${slug}.json`);
+  }
+
+  /** Renames a committed connection file without touching its contents. */
+  async renameConnection(slug: string, name: string): Promise<void> {
+    await this.copyConnection(slug, name);
+    await this.removeConnection(slug);
+  }
+
   /** Edits the committed login flow, as the developer owning it would. */
   editLoginFlow(edit: (flow: FlowDocument) => void): Promise<void> {
     return this.editDocument(FLOW_FILE, edit);
@@ -526,6 +730,19 @@ export class ScaffoldedApp {
 
   private pipingSecret<T>(secret: string, run: () => Promise<T>): Promise<T> {
     return this.pipingStdin(secret, run);
+  }
+
+  /** Runs with a terminal on stdin, so a read would never end and has to be refused. */
+  private async withKeyboardOnStdin<T>(run: () => Promise<T>): Promise<T> {
+    const original = Object.getOwnPropertyDescriptor(process, "stdin");
+    Object.defineProperty(process, "stdin", { value: { isTTY: true }, configurable: true });
+    try {
+      return await run();
+    } finally {
+      if (original) {
+        Object.defineProperty(process, "stdin", original);
+      }
+    }
   }
 
   /**

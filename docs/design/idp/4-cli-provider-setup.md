@@ -40,7 +40,7 @@ For each selected provider:
 ```text
 ◆ Google sign-in needs an OAuth application.
 │ Callback URI (development):
-│   http://localhost:3000/__nextgen/idp/callback
+│   http://localhost:3000/__nextgen/idp/google/callback
 │ Create the application at https://console.cloud.google.com/apis/credentials
 ◆ Open the Google console in your browser?  (Y/n)
 ◆ Client ID:  1234-abc.apps.googleusercontent.com
@@ -81,7 +81,7 @@ For each selected provider:
 * **JSON output (`data.idps`):** under `--json` the journey contributes an
   `idps` entry to the result envelope's command payload
   (`apps/cli/src/lib/oclif/types.ts`), mirroring the announce step per provider:
-  slug, template, callback URI per environment, excluded environments with the
+  slug, template, the connection's callback URI per environment, excluded environments with the
   declaration kind as reason, console URL, the variable the connection
   references for the secret, and whether that variable is set.
   Exclusions are structured so agents can tell a declaration-level exclusion
@@ -123,11 +123,52 @@ After claim, the same sub-journey runs behind the Sign-in methods journey.
 * **Skip destination:** a provider skipped during setup is added later through
   this journey.
 
+## Custom OpenID Connect Connections
+
+A provider the catalog does not list is not an entry in it.
+The developer describes the connection instead, and the same sub-journey
+announces, collects credentials, scaffolds and writes it
+(`auth-method sso enable --provider custom`, and the "another OpenID Connect provider"
+option in `zitadel setup`, `--sso custom`).
+
+| Input | Rule |
+| :--- | :--- |
+| **Slug** | Names the connection; schemas and flows reference it by this. Must match the connection contract (`^[a-z0-9][a-z0-9_-]*$`, 64 characters at most) and must not be a catalog slug such as `google`. |
+| **Display name** | Shown on the sign-in button. |
+| **Issuer** | The provider's issuer URL, checked against the same pattern the server enforces. Endpoints come from OIDC discovery; none are written. |
+| **Scopes** | Space or comma separated; `openid` is required. Defaults to `openid profile email`. |
+
+What is different from a catalog provider:
+
+* **Identified by slug, never by issuer.** A Project may hold several
+  connections to one issuer, with different credentials or mappings, so the
+  slug is the only thing that says "the same connection". A slug already in use
+  is reused when it names a connection to the same issuer (rerunning changes
+  nothing) and refused when it names a connection to somewhere else, since
+  replacing it would repoint every schema and flow that references it.
+* **No vendor knowledge.** No console URL to open, no `template` written (the
+  login UI shows a text-only button), and no callback guidance.
+  The announce step names the issuer as the place to register the client.
+* **Standard claims only.** The connection maps the claims the `profile` and
+  `email` scopes define, narrowed to the properties the schema has
+  (`email → email`, `givenName → given_name`, `familyName → family_name`), and
+  trusts `email` only when the provider returns `email_verified: true`. A provider that never sends `email_verified` therefore never gets a verified email: the person lands on the collection step instead of being created automatically.
+  That is the OpenID Connect standard, not Google's behaviour.
+  Any other attribute (`contactEmail → mail`) is mapped by editing the file;
+  explicit inputs for those mappings and for `verified_claims` come later.
+* **Credential variables follow the slug**: `ACME_SSO_CLIENT_ID` and
+  `ACME_SSO_CLIENT_SECRET` for `acme-sso`, exactly as for a catalog provider.
+* **`setup` takes one custom connection.** The wizard offers the option once;
+  further connections are added with `auth-method sso enable`.
+
 ## Callback URIs
 
 The callback URI follows Area 3's exact specification
-(`{environment issuer}/__nextgen/idp/callback`), an exact-match path carrying no
-flow ID.
+(`{environment issuer}/__nextgen/idp/{slug}/callback`), an exact-match path
+carrying no flow ID, one per connection
+([area 3](3-social-login-flow.md#callback-uri)).
+Setup and `sso enable` print it in their text output and as `callback_uri` in
+their JSON output.
 The journey's role is strictly to derive and surface these copyable URIs per
 environment.
 The development origin is `http://localhost:{port}` from the setup port,
@@ -139,7 +180,8 @@ A later run reads the stored issuer instead of asking for the port again.
 The journey iterates over all environment definitions declared in
 `zitadel.json`, evaluating them by declaration type:
 
-- **Exact Issuers (`issuer`):** one copyable URI per origin.
+- **Exact Issuers (`issuer`):** one copyable URI per connection and origin:
+  a project with two connections registers two URIs per origin.
   The platform schema types `issuer` as a string or an array of exact origins
   ([`configuration-surface.md`, `zitadel.json`](../platform/configuration-surface.md#zitadeljson--the-root));
   with [#534](https://github.com/zitadel/nextgen/issues/534), an array
@@ -152,7 +194,7 @@ The journey iterates over all environment definitions declared in
 ### Default Output Example
 
 ```text
-development   http://localhost:3000/__nextgen/idp/callback
+development   http://localhost:3000/__nextgen/idp/google/callback
 preview       excluded: declared by issuer_pattern, not an exact issuer
 ```
 
@@ -372,6 +414,28 @@ login and registration in one definition.
 `sso_providers` goes on both entry steps, which settles area 2's register-step
 topology [dependency](2-auth-method-selection.md#dependencies).
 
+The `password` step carries the providers too. Someone who signed up with a
+provider has no password, and if they type their email instead of clicking the
+button the `identifier` step sends them there: a step with only a password
+field is a dead end for them. The step routes what comes back from a provider
+like the entry steps do, including `user_already_exists` to `sso-conflict`: the
+collision binds to the identified user either way, and the conflict step says
+why they are back and offers the other ways in, where the step itself would
+show an unchanged form and put itself on the back stack twice. Under
+`creation: auto`, when the provider account is someone else's, or unknown, the
+engine restarts the flow rather than creating a user; under `creation:
+disabled` an unknown account shows `error.sso_creation_disabled` on the step.
+The step is edited only when the generator recognises it: the shipped step of
+either preset, once the providers and the routes it writes are set aside. A
+hand-edited one, including one whose provider routes were pointed elsewhere, is
+left alone and reported, as for every other generated step.
+A password step that is exactly the shipped one reads as unedited, so a button the
+developer removed on purpose comes back on the next `auth-method sso enable`; nothing in the file
+distinguishes that from a project enabled before the step offered providers.
+Showing only the providers linked to the identified user, or skipping the step
+for a user without a password, would tell anyone who types an email which
+sign-in method that account uses, so neither is done.
+
 #### 2. The Three-Outcome Rule for SSO Steps
 Every step carrying `sso_providers` must explicitly handle three outcomes:
 `sso_authenticated`, `sso_user_not_found`, and `user_already_exists`.
@@ -379,7 +443,9 @@ The first two are SSO-only routes; `user_already_exists` is shared with typed
 collisions ([decision 5](#5-retargeting-registration-collisions)).
 *   **`sso_user_not_found` → `register-sso`** on every step, so an unknown
     user reaches the collection step after one ceremony whether they started
-    on the sign-in or the register page
+    on the sign-in or the register page. The `password` step carries the route
+    only because the rule requires it: the attempt there is already bound to the
+    identified user, so under `creation: auto` an unknown provider account restarts the flow instead
     ([area 3](3-social-login-flow.md#resolution-branches)).
     The engine flips `CurrentPurpose` to `register` on the way.
 *   **`user_not_found` is untouched.**
@@ -421,9 +487,9 @@ The engine binds the attempt to the colliding account.
     three-outcome rule:
     *   `sso_authenticated` routes to `done`: the user signed in with a
         provider already linked to that account.
-    *   `user_already_exists` targets the step itself: clicking the colliding
-        provider again re-runs the ceremony and resolves identically, so the
-        step re-renders with the same options.
+    *   `user_already_exists` targets `sso-conflict`: the account the provider
+        returned is the one already identified, and the conflict step explains
+        that and offers the password, passkey and providers.
     *   `sso_user_not_found` routes to `register-sso`: reachable only if the
         provider returns a different, unknown subject (the user switched
         provider accounts mid-loop).
@@ -494,7 +560,7 @@ never presented as proof that sign-in works.
 | **Multi-Schema Reuse** | Multi-schema reuse logic is specified but unreachable in Epic 851's single-schema flow; activates with the post-claim schema picker. | Sign-in methods journey (ticket work, [Post-Claim Re-entry](#post-claim-re-entry)) |
 | **"Skip for now" Destination** | The setup sub-journey's skip path hands the dropped provider to the Sign-in methods journey; the final summary names it. | Sign-in methods journey (ticket work) |
 | **Locale Keys** | `register-sso.action.submit`, `sso-conflict.action.submit`, `sso-conflict.action.passkey`, `sso-conflict.action.sign_in`; step titles derive from step names. | Login UI / Locale Work |
-| **Error Codes** | ~~`E_CREDENTIAL_MISSING` and `E_CANCELLED`~~ — **not adopted.** Neither was added. There is no local value to acquire (the engine resolves references from project variables, so `plan` has nothing to check), and cancellation exits the command rather than returning to a parent menu. Both cases are `E_VALIDATION` with a hint naming the next move. | — |
+| **Error Codes** | `E_CREDENTIAL_MISSING` is adopted: `plan` and `apply` raise it when a connection about to be written names a project variable the project does not hold, naming the variable and the file. `E_CANCELLED` was not adopted: cancellation exits the command rather than returning to a parent menu. | — |
 | **Dev-Runtime Secret Join** | ~~Inject `.env.local` values into the engine process environment at local-runtime spawn.~~ **Not needed.** The engine resolves a connection's `${{ NAME }}` from the project's own variables when it serves the connection, so the join happens server-side for development and production alike and no value passes through the CLI's process environment. | — |
 | **`create_user_with_sso`** | Meta-schema enum value plus the engine handler from area 3. | Flow meta-schema / Engine |
 | **`sso_user_not_found`** | New reserved outcome, fired by ceremony resolution for an unknown subject; joins the reserved-key list and the flip table (`login` → `register`) at every enumeration site: `RESERVED_OUTCOMES` and `PURPOSE_FLIP_TARGETS` (`packages/config/src/validate.ts`), `reservedOutcomes` and `purposeFlipTargets` (`internal/domain/flow_definition_validator.go`), `applyOutcomeFlip` (`internal/domain/flow_state_machine.go`), the `transitions` description in `flow-definition.json`, the validator's three-outcome rule, and an amendment to ADR 017's SSO note ([area 3](3-social-login-flow.md#resolution-branches)). | Flow meta-schema / Engine / Validator / ADR 017 |

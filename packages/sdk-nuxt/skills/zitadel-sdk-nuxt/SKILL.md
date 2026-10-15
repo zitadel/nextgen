@@ -22,7 +22,7 @@ The `zitadel` CLI (`zitadel setup --framework nuxt`) scaffolds the module,
 plugin, login page, and `.env.local` into a fresh or detected Nuxt project —
 prefer it for greenfield work. Reach for **this skill** when you are adding auth
 to an **existing or custom** Nuxt app by hand, adjusting a scaffolded wiring, or
-need the direct-middleware surface the module does not expose.
+wiring the middleware without the module.
 
 ## Install
 
@@ -37,30 +37,26 @@ Peer deps: `nuxt >=4`, `h3 >=1`.
 
 ## Integrate
 
-The recommended path is the Nuxt module. Register it under the `nextgen` key and
-give the client plugin your project id via public runtime config — without it
-`useZitadelProject()` returns `null` and the login widget cannot initialize.
+The recommended path is the Nuxt module. Register it under the `nextgen` key:
 
 ```ts
 // nuxt.config.ts
 export default defineNuxtConfig({
   modules: ['@zitadel/sdk-nuxt/module'],
   nextgen: {
-    url: process.env.ZITADEL_URL ?? 'http://localhost:8080',
     protectedRoutes: ['/admin', '/dashboard*'], // trailing * matches sub-paths
     loginPath: '/login',
-  },
-  runtimeConfig: {
-    public: {
-      zitadelProjectId: process.env.NUXT_PUBLIC_ZITADEL_PROJECT_ID ?? '',
-    },
   },
 });
 ```
 
 The module registers the Nitro middleware and auth plugin and auto-imports the
-composables — no manual `server/middleware/auth.ts`. It also loads the
-server-only secret from `ZITADEL_PROJECT_SECRET` (or scaffolded `.env.local`).
+composables — no manual `server/middleware/auth.ts`. It reads `ZITADEL_URL`,
+`NUXT_PUBLIC_ZITADEL_PROJECT_ID`, and the server-only `ZITADEL_PROJECT_SECRET`
+from the environment, or from `.env.local` when the environment has none (Nuxt
+itself loads only `.env`). A `nextgen.url` or
+`runtimeConfig.public.zitadelProjectId` in `nuxt.config.ts` wins over the
+variables.
 
 Register the web components in a **client-only** plugin — importing
 `@zitadel/components` from a page `<script setup>` runs during SSR and breaks:
@@ -103,10 +99,11 @@ export default defineEventHandler((event) => {
 });
 ```
 
-Need the full option set (`ignoredRoutes`, `audience`, `clockSkewMs`, the
-timeouts, a moved server proxy prefix)? Skip the module and hand-roll
-`server/middleware/auth.ts` with `createNextgenMiddleware(...)` from
-`@zitadel/sdk-nuxt/server` — the module does not forward those options.
+The other middleware options (`ignoredRoutes`, `audience`,
+`allowedAlgorithms`, `clockSkewMs`, the timeouts) go under `nextgen` too, and a
+built server takes each one from `NUXT_NEXTGEN_<OPTION>` (a list as JSON). Only
+an app without the module hand-rolls `server/middleware/auth.ts` with
+`createNextgenMiddleware(...)` from `@zitadel/sdk-nuxt/server`.
 
 ## Read these, don't guess
 
@@ -120,18 +117,17 @@ component attributes against the installed version rather than assuming.
 
 ## Gotchas
 
-- **Project id is mandatory.** Missing `runtimeConfig.public.zitadelProjectId`
-  silently skips `configureZitadel()`, so `useZitadelProject()` is `null` and
+- **Project id is mandatory.** Without `NUXT_PUBLIC_ZITADEL_PROJECT_ID` (or
+  `runtimeConfig.public.zitadelProjectId`) the plugin silently skips
+  `configureZitadel()`, so `useZitadelProject()` is `null` and
   `<zitadel-login>` never initializes.
 - **`@zitadel/components` is not transitive** under strict package managers —
   add it to the app directly or imports fail to resolve.
 - **Never import components in page `<script setup>`** — it executes during SSR.
   Use the `.client.ts` plugin and wrap the elements in `<ClientOnly>`.
-- **The module's `proxyPath` only configures the client.** The registered server
-  handler always serves `/__nextgen`; to actually move the server prefix, use the
-  direct-middleware surface.
-- **Module options are a subset.** `ignoredRoutes`, `allowedAlgorithms`,
-  `allowedTokenTypes`, `clockSkewMs`, the `*TimeoutMs` options, and `audience`
-  are not forwarded by the module — only the direct middleware accepts them.
+- **Keep `proxyPath` at `/__nextgen` for external sign-in.** The module moves
+  the server proxy and the widgets together, but a provider returns the browser
+  to `/__nextgen/idp/{slug}/callback`, which is proxied only under the default
+  prefix.
 - **`useAuth()` never carries the JWT.** It is omitted so the token is not
   serialized into the SSR payload; use `getAuth(event)` server-side for it.

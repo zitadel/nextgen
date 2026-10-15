@@ -45,7 +45,7 @@ import {
   ListFlowDefinitionsResponse,
   QueryIdpsResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 
 import { signHandoffToken } from "./crypto.js";
 import {
@@ -182,6 +182,46 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(res.status).toBe(400);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.code).toBe("sess.project_id_missing");
+  });
+
+  // The server cannot tell a replayed token from one it never issued (it
+  // deletes the attempt on exchange), so it refuses both, and an expired one,
+  // with the same 400 (internal/api/integration_test/session_exchange_test.go).
+  describe("POST /sessions/exchange refuses a handoff token it will not exchange", () => {
+    const exchange = (handoffToken: string) =>
+      fetch(`${BASE}/sessions/exchange?project_id=proj_refused`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ handoff_token: handoffToken }),
+      });
+    const expectRefused = async (res: Response) => {
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as Record<string, unknown>;
+      expect(body.code).toBe("sess.invalid_handoff_token");
+    };
+
+    test("a replay of an exchanged token", async () => {
+      const handoff = await signHandoffToken({ sub: "proj_refused", iss: BASE });
+      expect((await exchange(handoff)).status).toBe(200);
+      await expectRefused(await exchange(handoff));
+    });
+
+    test("a token it never issued", async () => {
+      await expectRefused(await exchange("handoff_never_issued"));
+    });
+
+    test("an expired token", async () => {
+      // Signed two minutes ago, so its 60-second lifetime is over.
+      vi.useFakeTimers({ toFake: ["Date"] });
+      let handoff: string;
+      try {
+        vi.setSystemTime(Date.now() - 120_000);
+        handoff = await signHandoffToken({ sub: "proj_refused", iss: BASE });
+      } finally {
+        vi.useRealTimers();
+      }
+      await expectRefused(await exchange(handoff));
+    });
   });
 
   test("DELETE /sessions/me revokes an active session and clears the cookie", async () => {
@@ -1077,9 +1117,9 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 });
 
 /**
- * The identity provider connection and variable endpoints the CLI's SSO
- * journey needs. The Go service does not exist yet (#1003), so this mock is
- * the only place `sso enable` / `plan` / `apply` can be driven end to end.
+ * The identity provider connection and variable endpoints the CLI's SSO journey
+ * needs. The Go service does not exist yet (#1003), so this mock is the only
+ * place `auth-method sso enable` / `plan` / `apply` can be driven end to end.
  */
 describe("api-mock idp connections and variables", () => {
   const connection = (over: Record<string, unknown> = {}) => ({

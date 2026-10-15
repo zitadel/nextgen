@@ -68,11 +68,12 @@ Development and test surfaces (`apps/`):
   (`@zitadel/components`), served by the hosted cloud at `/storybook/`.
 - `apps/demo-next/` and `apps/demo-nuxt/` — reference integrations of the
   embedded sign-in component on each framework.
-- `apps/*-e2e/` — Playwright projects: one per demo (real framework
-  middleware against the api-mock server), `console-e2e/` for the console,
-  and `cli-journey-e2e/` for the fresh consumer journey (CLI setup plus real
-  registration/login flows, installing local package tarballs through a
-  temporary registry).
+- `e2e/` — the single root-level end-to-end project (a system test of the
+  assembled product). Subfolders `console/`, `demo-next/`, `demo-nuxt/` and
+  `journey/` hold the lanes; the journey covers the fresh consumer path (CLI
+  setup plus real registration/login, installing local package tarballs through
+  a temporary registry). CI runs the whole suite through `e2e:all`; `:test`
+  stays unit tests.
 - `apps/mock-zitadel/` — thin deployment wrapper that serves
   `packages/api-mock` as a live per-PR preview endpoint.
 - `apps/cloud/` — deployment wrapper of the hosted cloud: `main` on Vercel
@@ -117,10 +118,11 @@ Repo tooling:
 | Try the local Zitadel CLI          | `moon run workspace:cli -- --help`       |
 | Preview the docs site              | `moon run docs:dev`                      |
 | Run the server from source         | `moon run workspace:server -- --help`    |
-| Test the fresh-app onboarding path | `moon run workspace:journey`             |
+| Test the fresh-app onboarding path | `moon run e2e:journey`             |
 | Run normal local checks            | `moon ci :lint :typecheck :build :test`  |
 | Mirror CI locally                  | `moon run workspace:check -- --full`     |
 | Rerun one failed task              | `moon run <project>:<task>`              |
+| Check a deployment of the cloud    | `CLOUD_URL=<url> pnpm check:cloud`       |
 
 ### I am adding Zitadel to my app
 
@@ -182,26 +184,28 @@ scripts so server processes are signaled and cleaned up directly.
 startup, then runs `go run .`. Direct `go run .` callers must build the embedded
 UI surfaces themselves or disable both embedded UI surfaces.
 
-Checked-in end-to-end tests are **opt-in for local runs** — they are not part
-of the default `moon ci :lint :typecheck :build :test` invocation because they
-boot real dev servers and need browsers installed. CI does run selected lanes:
-their tasks carry `runInCI: false` only to keep them out of moon's automatic
-selection, and the `full-pr` job runs the real-instance and embedded-surface
-lanes through explicit workflow steps — the canonical statement of that
-interaction is in
+Checked-in end-to-end tests run in CI as one moon target: the root `e2e`
+project's `all` task depends on every lane (console
+smoke/real/embedded/platform, demo mock/real, the CLI journey matrix, and the
+kit's real-instance suite), and ci.yml runs `e2e:all` in a step of its own
+after the build-and-test graph, whenever moon finds it affected. A plain
+`:test` (and `pnpm run check`) stays unit tests; `moon run e2e:all` runs the
+whole suite locally, which boots real servers and needs browsers installed; the
+journey lane also needs prebuilt tarballs (`moon run release:pack`, then
+`JOURNEY_TARBALLS_DIR`). The canonical details are in
 [packages/testing/AGENTS.md](packages/testing/AGENTS.md). (More in
 [CONTRIBUTING.md](CONTRIBUTING.md#running-integration-and-end-to-end-tests)):
 
 ```sh
-corepack pnpm --filter @zitadel/demo-next-e2e exec playwright install
-moon run demo-next-e2e:e2e
-moon run demo-nuxt-e2e:e2e
+corepack pnpm --filter @zitadel/e2e exec playwright install
+moon run e2e:demo-next-mock
+moon run e2e:demo-nuxt-mock
 ```
 
 The local reproduction command for the fresh-app consumer journey gate is:
 
 ```sh
-moon run workspace:journey
+moon run e2e:journey
 ```
 
 It proves the fresh-app path end to end and does not require Docker by
@@ -252,22 +256,22 @@ upward**. When deciding where a new test belongs:
    `*.browser.spec.ts`.
 3. **End-to-end (Playwright)** — full HTTP path through framework
    middleware, the `/__nextgen` proxy, real `Set-Cookie` round-trip,
-   and full-page navigation. Owned by the `apps/*-e2e/` projects: the demo
-   projects (`demo-next-e2e`, `demo-nuxt-e2e` — each with a mock lane and,
-   for next, an `e2e-real` lane on `@zitadel/testing`), `console-e2e`
-   (shell smoke, dev-proxy real-instance, binary-served embedded, and
-   platform-project lanes),
-   and `cli-journey-e2e` (the framework matrix across all 8 SDKs).
-   Middleware-owning SDKs get their own e2e project because
+   and full-page navigation. Owned by the single root-level `e2e/` project, as
+   lanes: demo-next/demo-nuxt (each a mock lane and, for next, a real lane on
+   `@zitadel/testing`), console (shell smoke, dev-proxy real-instance,
+   binary-served embedded, and platform-project lanes), and the journey (the
+   framework matrix across all 8 SDKs). Middleware-owning SDKs get their own
+   lane because
    the proxy and route-protection layers are framework-specific.
    The docs site's suite is the one that lives beside its app,
    `apps/docs/tests/`: written against a URL, it runs on the local build
    (`docs:e2e`) and on every deployment of the hosted cloud
-   (`docs:e2e-deployment`, see
+   (`docs:e2e-deployment`; `pnpm check:cloud` runs it beside the console's
+   deployment suite, see
    [docs/runbooks/cloud.md](docs/runbooks/cloud.md#deployment-checks)).
 
 The consumer journey suite is the exception to the checked-in demo ownership
-rule: it belongs in `apps/cli-journey-e2e/` and must exercise a freshly
+rule: it belongs in `e2e/journey/` and must exercise a freshly
 generated app because it protects the customer local setup path.
 
 A new test belongs at e2e level only when the boundary it covers is

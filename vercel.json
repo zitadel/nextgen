@@ -4,47 +4,66 @@
     "server": {
       "root": ".",
       "framework": "go",
-      "installCommand": "sh apps/cloud/install.sh",
       "buildCommand": "sh apps/cloud/build.sh"
     },
     "console": {
       "root": "apps/console",
       "framework": "vite",
-      "installCommand": "sh ../cloud/install.sh",
-      "buildCommand": "cd ../.. && CONSOLE_VERCEL_INSIGHTS=1 sh apps/cloud/turbo-build.sh @zitadel/console && rm -rf apps/console/dist && mkdir -p apps/console/dist/ui/console && cp -R internal/staticui/console/dist/. apps/console/dist/ui/console/",
-      "outputDirectory": "dist",
+      "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
+      "buildCommand": "CONSOLE_BASE_PATH=/console/ CONSOLE_VERCEL_INSIGHTS=1 turbo run build",
+      "outputDirectory": "../../internal/staticui/console/dist",
       "rewrites": [
         {
-          "source": "/ui/console/(.*)",
-          "destination": "/ui/console/index.html"
+          "source": "/console/:path(.*)?",
+          "destination": "/:path"
+        },
+        {
+          "source": "/:path*",
+          "destination": "/index.html"
         }
       ]
     },
     "storybook": {
       "root": "apps/storybook",
       "framework": "storybook",
-      "installCommand": "sh ../cloud/install.sh",
-      "buildCommand": "cd ../.. && sh apps/cloud/turbo-build.sh @zitadel/storybook && cd apps/storybook && mv dist storybook && mkdir dist && mv storybook dist/",
-      "outputDirectory": "dist"
+      "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
+      "buildCommand": "turbo run build",
+      "outputDirectory": "dist",
+      "rewrites": [
+        {
+          "source": "/storybook/:path(.*)?",
+          "destination": "/:path"
+        }
+      ]
     },
     "docs": {
       "root": "apps/docs",
       "framework": "nextjs",
-      "installCommand": "sh ../cloud/install.sh",
-      "buildCommand": "corepack pnpm run build"
+      "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
+      "buildCommand": "pnpm run build"
     },
     "website": {
       "root": "apps/website",
       "framework": "nextjs",
-      "installCommand": "sh ../cloud/install.sh",
-      "buildCommand": "corepack pnpm run build"
+      "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
+      "buildCommand": "pnpm run build"
     }
   },
   "redirects": [
     {
-      "source": "/ui/console",
-      "destination": "/ui/console/",
+      "source": "/console",
+      "destination": "/console/",
       "permanent": true
+    },
+    {
+      "source": "/ui/console",
+      "destination": "/console/",
+      "permanent": false
+    },
+    {
+      "source": "/ui/console/:path(.*)",
+      "destination": "/console/:path",
+      "permanent": false
     },
     {
       "source": "/storybook",
@@ -54,7 +73,13 @@
   ],
   "rewrites": [
     {
-      "source": "/ui/console/(.*)",
+      "source": "/console/runtime.json",
+      "destination": {
+        "service": "server"
+      }
+    },
+    {
+      "source": "/console/(.*)",
       "destination": {
         "service": "console"
       }

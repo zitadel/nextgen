@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -250,18 +251,61 @@ func TestPrepareServerPinsTheDeploymentShape(t *testing.T) {
 	t.Setenv("VERCEL_PROJECT_PRODUCTION_URL", "nextgen-preview-cloud.vercel.app")
 	// Leftovers from an earlier layout must not move the console or the login.
 	t.Setenv("NEXTGEN_SERVER_CONSOLE_ENABLED", "true")
-	t.Setenv("NEXTGEN_SERVER_CONSOLE_PATH", "/console")
+	t.Setenv("NEXTGEN_SERVER_CONSOLE_PATH", "/ui/console")
 	t.Setenv("NEXTGEN_SERVER_LOGIN_ENABLED", "false")
 
 	_, err := prepareServer(nil)
 	require.NoError(t, err)
 
 	assert.Equal(t, "false", os.Getenv("NEXTGEN_SERVER_CONSOLE_ENABLED"), "the console is a service of its own")
-	assert.Equal(t, "/ui/console", os.Getenv("NEXTGEN_SERVER_CONSOLE_PATH"), "where vercel.json mounts the console")
+	assert.Equal(t, "/console", os.Getenv("NEXTGEN_SERVER_CONSOLE_PATH"), "where vercel.json mounts the console")
 	assert.Equal(t, "true", os.Getenv("NEXTGEN_SERVER_LOGIN_ENABLED"), "keeps /console/runtime.json mounted")
 	assert.Equal(t, "true", os.Getenv("NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT"))
 	assert.Equal(t, "json", os.Getenv("NEXTGEN_INSTRUMENTATION_LOG_FORMAT"))
 	assert.Equal(t, "https://nextgen-preview-cloud.vercel.app", os.Getenv("NEXTGEN_SERVER_PUBLIC_BASE"))
+}
+
+// vercel.json mounts the console service, and builds it, at the path the
+// server's console links point to; JSON has no comments to say so.
+func TestVercelJSONServesTheConsoleAtConsolePath(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "vercel.json"))
+	require.NoError(t, err)
+	var config struct {
+		Services map[string]struct {
+			BuildCommand string `json:"buildCommand"`
+			Rewrites     []struct {
+				Source      string `json:"source"`
+				Destination string `json:"destination"`
+			} `json:"rewrites"`
+		} `json:"services"`
+		Rewrites []struct {
+			Source      string          `json:"source"`
+			Destination json.RawMessage `json:"destination"`
+		} `json:"rewrites"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &config))
+
+	console := config.Services["console"]
+	assert.Contains(t, console.BuildCommand, "CONSOLE_BASE_PATH="+consolePath+"/ ", "the base the console is built for")
+	// The service receives the request's full path; its first rewrite maps
+	// the mount onto the build's own root.
+	require.NotEmpty(t, console.Rewrites)
+	assert.Equal(t, consolePath+"/:path(.*)? → /:path", console.Rewrites[0].Source+" → "+console.Rewrites[0].Destination,
+		"where the console service serves the build from")
+
+	// The first matching rewrite wins, and the server's runtime document
+	// (cmd/server/console_runtime.go) lies under the console's mount.
+	var routes []string
+	for _, rewrite := range config.Rewrites {
+		var destination struct{ Service string }
+		if json.Unmarshal(rewrite.Destination, &destination) != nil {
+			continue
+		}
+		if rewrite.Source == "/console/runtime.json" || strings.HasPrefix(rewrite.Source, consolePath+"/") {
+			routes = append(routes, rewrite.Source+" → "+destination.Service)
+		}
+	}
+	assert.Equal(t, []string{"/console/runtime.json → server", consolePath + "/(.*) → console"}, routes)
 }
 
 func TestPrepareServerKeepsExplicitDefaults(t *testing.T) {
