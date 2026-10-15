@@ -62,7 +62,7 @@ export default class Status extends BaseCommand {
     }
     const healthy = runtime ? await checkLocalServerHealth(runtime.server_url) : false;
     const processRunning =
-      runtime?.backend === "binary" ? BinaryLauncher.isPidRunning(runtime.pid) : false;
+      runtime?.backend === "binary" ? BinaryLauncher.isRunning(runtime.pid) : false;
     const serverLifecycle = lifecycleForRuntime({ docker, healthy, processRunning, runtime });
 
     const project = await projectStatus(this.meta.cwd);

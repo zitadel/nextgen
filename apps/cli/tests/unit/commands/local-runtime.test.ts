@@ -660,6 +660,20 @@ describe("local runtime commands", () => {
     expect(parseJson(result.stdout)).toMatchObject({ status: "ok" });
   });
 
+  it("status reports a server whose recorded process died but which still answers", async () => {
+    const cwd = await tempProject("zitadel-status-orphan-");
+    const fake = await fakeWrappedServerBinary();
+    const started = await startWithoutPort(cwd, fake.binPath);
+    process.kill(started.pid, "SIGKILL");
+    await waitUntil(() => !processExists(started.pid));
+
+    const status = await runCliForTest(["status", "--cwd", cwd, "--json"]);
+
+    expect(parseJson(status.stdout)).toMatchObject({
+      data: { server: { lifecycle: "running" } },
+    });
+  });
+
   it("stop says nothing was running for a directory with no server", async () => {
     const cwd = await tempProject("zitadel-stop-none-");
 
