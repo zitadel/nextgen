@@ -33,66 +33,72 @@ function Hero({ className, first = false }: { className: string; first?: boolean
   );
 }
 
-// The page follows zitadel/new-website's narrative (AGENTS.md): the benefit,
-// then its proof in four rows (the showcase), and nothing after it.
+// The page follows zitadel/new-website's narrative (AGENTS.md): the benefit
+// and the commands that deliver it, then the steps those commands take and
+// what they let you change (the showcase), and nothing after it.
 export default function Home() {
   return (
     <>
       <SiteHeader />
       <main>
-        <section aria-labelledby="hero-title" className="overflow-hidden px-6 pt-8 pb-12 md:pt-10">
-          <div className="mx-auto grid max-w-6xl items-center gap-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
-            <div className="hero-copy flex min-w-0 flex-col items-start gap-5">
-              <h1 id="hero-title" className="hero-title">
-                Your login in one minute.
-              </h1>
-              <p className="text-balance text-lg text-text-secondary leading-7">
-                Open-source auth that lives in your repo: your user model, your flows, your look.
-              </p>
-              <CommandBlock title="Terminal" note="Node 24+" lines={commands} />
-              <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-text-secondary leading-5">
-                <span>Using a coding agent?</span>
-                <span className="inline-flex items-center gap-1">
-                  {/* Wraps between words, never at the hyphens of a flag. */}
-                  <code className="font-mono text-[0.8125rem] text-text-primary">
-                    {skillsCommand.split(" ").map((word, index) => (
-                      // biome-ignore lint/suspicious/noArrayIndexKey: the words of a fixed command, never reordered
-                      <Fragment key={index}>
-                        {index > 0 && " "}
-                        <span className="whitespace-nowrap">{word}</span>
-                      </Fragment>
-                    ))}
-                  </code>
-                  <CopyButton text={skillsCommand} label="the skills command" />
-                </span>
-              </p>
-              <div className="flex flex-wrap items-center gap-3">
-                <a
-                  href={links.quickstart}
-                  className={`${BUTTON} bg-text-primary text-background hover:bg-text-secondary`}
-                >
-                  Read the quickstart
-                </a>
-                <a
-                  href={links.github}
-                  className={`${BUTTON} border border-border-secondary text-text-primary hover:bg-surface-black-secondary`}
-                >
-                  View on GitHub
-                </a>
-              </div>
+        <section
+          aria-labelledby="hero-title"
+          className="flex flex-col items-center overflow-hidden px-6 pt-2 pb-16 md:pb-20"
+        >
+          <Stage>
+            <div className="stage-frame">
+              <Hero className="stage-glow" />
+              <Hero className="stage-art" first />
             </div>
-            <Stage>
-              <div className="stage-frame">
-                <Hero className="stage-glow" />
-                <Hero className="stage-art" first />
-              </div>
-            </Stage>
+            <h1 id="hero-title" className="stage-caption">
+              Your login in one minute.
+            </h1>
+          </Stage>
+          {/* Wide enough for the line on one row on a laptop; the commands
+              keep to the width of their longest line. */}
+          <div className="teaser mt-4 flex w-full max-w-[46rem] flex-col items-center gap-5">
+            <p className="text-balance text-center text-lg text-text-secondary leading-7">
+              Open-source auth that lives in your repo: your user model, your flows, your look.
+            </p>
+            <div className="w-full max-w-[40rem]">
+              <CommandBlock title="Terminal" note="Node 24+" lines={commands} />
+            </div>
+            <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-sm text-text-secondary leading-5">
+              <span>Using a coding agent?</span>
+              <span className="inline-flex items-center gap-1">
+                {/* Wraps between words, never at the hyphens of a flag. */}
+                <code className="font-mono text-[0.8125rem] text-text-primary">
+                  {skillsCommand.split(" ").map((word, index) => (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: the words of a fixed command, never reordered
+                    <Fragment key={index}>
+                      {index > 0 && " "}
+                      <span className="whitespace-nowrap">{word}</span>
+                    </Fragment>
+                  ))}
+                </code>
+                <CopyButton text={skillsCommand} label="the skills command" />
+              </span>
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <a
+                href={links.quickstart}
+                className={`${BUTTON} bg-text-primary text-background hover:bg-text-secondary`}
+              >
+                Read the quickstart
+              </a>
+              <a
+                href={links.github}
+                className={`${BUTTON} border border-border-secondary text-text-primary hover:bg-surface-black-secondary`}
+              >
+                View on GitHub
+              </a>
+            </div>
           </div>
         </section>
 
-        {/* The proof of the headline, with no title of its own: the rows
-            speak for themselves under it. */}
-        <section aria-label="What you control" className="overflow-hidden px-6 py-12 md:py-20">
+        {/* What the commands do, step by step, with no title of its own: the
+            numbered rows speak for themselves under the hero. */}
+        <section aria-label="Step by step" className="overflow-hidden px-6 pt-4 pb-12 md:pb-20">
           <div className="mx-auto max-w-5xl">
             <Showcase />
           </div>

@@ -6,13 +6,15 @@ story of `zitadel/new-website`'s narrative redesign (the branch
 the benefit first, then its proof, and nothing else. Under a header to the
 docs, the storybook and GitHub:
 
-1. The hero: "Your login in one minute.", one line on what it is, the
+1. The hero: the new website's hero animation in the middle, "Your login in
+   one minute." tucked into its faded bottom, one line on what it is, then the
    commands to copy, the skills line for coding agents, and the buttons to the
-   quickstart and the repository, beside the new website's hero animation.
-   Short on purpose: no paragraph, no small print, no line above the headline;
-   the header's Preview label frames the page, and the rows below say the rest.
-2. The showcase (`app/showcase/`), with no title of its own: four rows that
-   prove the headline, your code, your fields, your flow, your brand.
+   quickstart and the repository, all of it on a laptop's first screen. Short
+   on purpose: no paragraph, no small print, no line above the headline; the
+   header's Preview label frames the page, and the steps below say the rest.
+2. The showcase (`app/showcase/`), with no title of its own: five numbered
+   steps that prove the headline, what the commands do (start Zitadel, add the
+   login) and what they let you change (a field, the flow, the brand).
 
 The footer is the logo alone. Feature lists, ways in and roadmaps belong on the
 docs and on zitadel.com, not here.
@@ -68,8 +70,11 @@ no vectors, only 217 WebP frames (each asset's `p` is a base64 data URL), so it
 ships here as an animated AVIF: 49 KB instead of 907 KB, no player library, and
 the page's two copies of it, the animation and its blurred light, play in step.
 `app/hero-still.webp`, its first frame, stands in for reduced motion and for
-browsers without AVIF. It stands beside the hero's text on wide screens and
-under it on a phone (`.stage` in `app/globals.css`). From the extracted frames:
+browsers without AVIF. It stands in the middle of the hero, above the
+headline, as large as the screen's height leaves room for beside the headline,
+the commands and the buttons, between 15rem and 36rem wide (`.stage` in
+`app/globals.css`); when the hero's content changes height, change the 32rem
+it reserves for them. From the extracted frames:
 
 ```sh
 ffmpeg -framerate 30 -i %03d.webp -c:v libsvtav1 -crf 34 -preset 4 -pix_fmt yuv420p -f avif hero.avif
@@ -125,36 +130,40 @@ once against the published CLI before they ship.
 
 ## The showcase
 
-`app/showcase/` holds the four rows under the hero, alternating sides along a
-spine on wide screens (`showcase.tsx`, `row-layout.tsx`). They are
-`zitadel/new-website`'s narrative rows, ported: the card of the files setup
-writes (`file-tree.tsx`), the editor card with the diff, the flow's steps and
-the commands that publish the change (`file-card.tsx`), and the browser frame
-with a Before / After switch (`browser-frame.tsx`).
+`app/showcase/` holds the five steps under the hero, alternating sides along a
+spine on wide screens, each numbered on it (`showcase.tsx`, `row-layout.tsx`).
+They are `zitadel/new-website`'s narrative rows, ported: a command and what it
+printed (`terminal-card.tsx`), the card of the files setup writes
+(`file-tree.tsx`), the editor card with the diff, the flow's steps and the
+commands that publish the change (`file-card.tsx`), and the browser frame with
+a Before / After switch (`browser-frame.tsx`). A step's title is what you do,
+its line what happens; text between backticks in the line is code.
 
-- The first row shows what the hero's commands leave in the app, not the
-  commands again: the login, registration and profile pages, the proxy, and
-  the user model and login flow that rows 2 and 3 edit, beside the login the
-  app serves. The narrative's replaying terminal stood there; next to the
-  hero's own commands it said the same thing twice.
-- Rows 1 to 3 come from a recorded session (`sessions.ts`), run with `script`
-  on 5 October 2026 with @zitadel/cli 1.0.0-alpha.24: the files its setup
-  wrote, its diffs and its command output, and the scaffolded app's pages at
-  520 px. Re-record rather than edit when the CLI, the files setup writes, the
+- Steps 1 and 2 explain the hero's commands rather than repeat them: what
+  `start` printed, the console link and the local server, and the files
+  `setup` writes, the login, registration and profile pages, the proxy, and
+  the user model and login flow that steps 3 and 4 edit, beside the login
+  `npm run dev` serves. No replaying terminal: the narrative's, next to the
+  hero's own commands, said the same thing twice.
+- Steps 1 to 4 come from a recorded session (`sessions.ts`), run with `script`
+  on 5 October 2026 with @zitadel/cli 1.0.0-alpha.24: what its start printed,
+  with the one-time console link masked, the files its setup wrote, its diffs
+  and its command output, and the scaffolded app's pages at 520 px. Re-record
+  rather than edit when the CLI, what it prints, the files setup writes, the
   flow format or the login's look changes. `login-after-setup.jpg` is also the
-  third row's before-picture.
-- In rows 2 and 3 the frame's switch shows the page before or after the change,
-  and the third row's flow steps follow it.
-- No captions or dates on the rows: this is a marketing page, the provenance
+  fourth step's before-picture.
+- In steps 3 and 4 the frame's switch shows the page before or after the
+  change, and the fourth step's flow steps follow it.
+- No captions or dates on the steps: this is a marketing page, the provenance
   lives here and in `sessions.ts`.
 
 ## The brand row
 
-The fourth row is live (`brand-row.tsx`): the visitor picks a brand colour, the
+The fifth step is live (`brand-row.tsx`): the visitor picks a brand colour, the
 corners and a heading face in the editor card's strip; the card's lines show
 the rule an app would set on `<zitadel-login>`, as the docs' "Customize the
 design" page themes it, and `brand-preview.tsx` paints the result on the
-sign-in step as the flow row leaves it (email and password), built from the
+sign-in step as the flow's step leaves it (email and password), built from the
 atoms of `@zitadel/components` (`zl-card`, `zl-field`, `zl-button`) in their
 English copy. Before shows the card without the rule.
 

@@ -5,16 +5,18 @@ import { BrowserFrame } from "./browser-frame";
 import { FileCard } from "./file-card";
 import { FileTree } from "./file-tree";
 import { RowLayout } from "./row-layout";
+import { TerminalCard } from "./terminal-card";
 import type { Session } from "./types";
 
 /**
- * A recorded row: what setup wrote, or the changed files, beside the result.
- * Whether the picture shows the result is one state: the frame's switch drives
- * it, and the flow's steps follow it.
+ * A recorded step: what a command printed, what setup wrote, or the changed
+ * files, beside the result when there is one. Whether the picture shows the
+ * result is one state: the frame's switch drives it, and the flow's steps
+ * follow it.
  */
 export function RecordedRow({ session, index }: { session: Session; index: number }) {
   const [showResult, setShowResult] = useState(true);
-  const { artifact, scaffold, result } = session;
+  const { artifact, recording, scaffold, result } = session;
 
   return (
     <RowLayout
@@ -22,20 +24,20 @@ export function RecordedRow({ session, index }: { session: Session; index: numbe
       label={session.label}
       description={session.description}
       artifact={
-        artifact ? (
-          <FileCard artifact={artifact} showResult={showResult} />
-        ) : (
-          scaffold && <FileTree scaffold={scaffold} />
-        )
+        (artifact && <FileCard artifact={artifact} showResult={showResult} />) ||
+        (scaffold && <FileTree scaffold={scaffold} />) ||
+        (recording && <TerminalCard recording={recording} />)
       }
       result={
-        <BrowserFrame
-          url={result.url}
-          before={result.before}
-          image={result.image}
-          showResult={showResult}
-          onToggle={result.before ? setShowResult : undefined}
-        />
+        result && (
+          <BrowserFrame
+            url={result.url}
+            before={result.before}
+            image={result.image}
+            showResult={showResult}
+            onToggle={result.before ? setShowResult : undefined}
+          />
+        )
       }
     />
   );

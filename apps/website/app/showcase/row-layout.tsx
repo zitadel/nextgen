@@ -1,14 +1,29 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
 /** A faint glow behind each row's card, one hue per step from the design system's gradient palette. */
 const HUES = ["#bba5e4", "#9066da", "#ea8aa0", "#f25543"];
 
+/** The description's text between backticks, a command or a file, as code. */
+function Prose({ text }: { text: string }) {
+  return text.split("`").map((part, index) =>
+    index % 2 === 1 ? (
+      // biome-ignore lint/suspicious/noArrayIndexKey: the parts of a fixed sentence, never reordered
+      <code key={index} className="font-mono text-[0.875em] text-text-primary">
+        {part}
+      </code>
+    ) : (
+      // biome-ignore lint/suspicious/noArrayIndexKey: the parts of a fixed sentence, never reordered
+      <Fragment key={index}>{part}</Fragment>
+    ),
+  );
+}
+
 /**
- * One row of the showcase (zitadel/new-website's TerminalSessionRow). On wide
- * screens the terminal or the files sit on one side and the heading, the line
- * and the result on the other, sides alternating by row, with the step's
- * number on the spine between them (showcase.tsx). On narrower screens:
- * heading, terminal or files, result.
+ * One step of the showcase (zitadel/new-website's TerminalSessionRow). On
+ * wide screens the terminal or the files sit on one side and the heading, the
+ * line and the result on the other, sides alternating by step, with the
+ * step's number on the spine between them (showcase.tsx). On narrower
+ * screens: heading, terminal or files, result.
  */
 export function RowLayout({
   index,
@@ -21,7 +36,7 @@ export function RowLayout({
   label: string;
   description: string;
   artifact: ReactNode;
-  result: ReactNode;
+  result?: ReactNode;
 }) {
   const artifactLeft = index % 2 === 0;
   const number = String(index + 1).padStart(2, "0");
@@ -43,7 +58,9 @@ export function RowLayout({
         <h3 className="font-heading text-2xl leading-8 tracking-[-0.02em] xl:text-[2rem] xl:leading-10">
           {label}
         </h3>
-        <p className="text-text-secondary leading-6">{description}</p>
+        <p className="text-text-secondary leading-6">
+          <Prose text={description} />
+        </p>
       </div>
 
       <div
@@ -57,11 +74,13 @@ export function RowLayout({
         {artifact}
       </div>
 
-      <div
-        className={`w-full min-w-0 max-w-[22rem] xl:row-start-2 xl:max-w-none ${artifactLeft ? "xl:col-start-2" : "xl:col-start-1"}`}
-      >
-        {result}
-      </div>
+      {result && (
+        <div
+          className={`w-full min-w-0 max-w-[22rem] xl:row-start-2 xl:max-w-none ${artifactLeft ? "xl:col-start-2" : "xl:col-start-1"}`}
+        >
+          {result}
+        </div>
+      )}
     </li>
   );
 }

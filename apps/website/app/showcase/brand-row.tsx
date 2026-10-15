@@ -129,7 +129,7 @@ export function BrandRow({ index }: { index: number }) {
   return (
     <RowLayout
       index={index}
-      label="Your brand"
+      label="Match your brand"
       description="Set the login's design tokens in your own stylesheet. The look follows your app. Try it here."
       artifact={
         <FileCard

@@ -3,10 +3,10 @@ import { RecordedRow } from "./recorded-row";
 import { sessions } from "./sessions";
 
 /**
- * What a developer controls, as alternating rows along a spine (zitadel/
- * new-website's TerminalShowcase): up and running, the user's fields, the
- * login flow, the brand. On wide screens a line runs down the middle and the
- * step numbers sit on it.
+ * The hero's commands step by step, then what they let you change, as
+ * alternating rows along a spine (zitadel/new-website's TerminalShowcase):
+ * start, setup, a field, the flow, the brand. On wide screens a line runs
+ * down the middle and the step numbers sit on it.
  */
 export function Showcase() {
   return (

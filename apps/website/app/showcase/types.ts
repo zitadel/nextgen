@@ -32,11 +32,19 @@ export type Picture = { src: StaticImageData; alt: string };
 /** What a row produced, in a browser frame at `url`; with `before`, the frame switches between the two. */
 export type Result = { url: string; before?: Picture; image: Picture };
 
-/** One row of the showcase: what setup wrote, or the changed files, beside the result. */
+/** A command of the hero and the lines it printed, in a terminal window titled `title`. */
+export type Recording = { title: string; command: string; output: string[] };
+
+/**
+ * One step of the showcase: what a command printed, what setup wrote, or the
+ * changed files, beside the result when there is a page to show. In
+ * `description`, text between backticks is code.
+ */
 export type Session = {
   label: string;
   description: string;
+  recording?: Recording;
   scaffold?: Scaffold;
   artifact?: Artifact;
-  result: Result;
+  result?: Result;
 };
