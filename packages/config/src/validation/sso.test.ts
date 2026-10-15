@@ -556,7 +556,7 @@ describe("how the rules read the project", () => {
     ]);
   });
 
-  it.each([["$supplementary_fetch"], [true]])(
+  it.each([["email_verified"], [true]])(
     "asks for a claim_mapping row for a verified_claims value of %s, because the engine reads the row first",
     (value) => {
       const issues = validate((p) => {

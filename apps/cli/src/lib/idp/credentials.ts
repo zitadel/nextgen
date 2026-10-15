@@ -109,6 +109,22 @@ async function publishSecret(
 }
 
 /**
+ * The `variables set` arguments that publish one credential to the project.
+ *
+ * `--project-level` is not optional: every `variables` command refuses with
+ * "Name the owner" without an owner, so a command missing it would fail
+ * before it reached the API and repair nothing. The project level is also the
+ * right owner, because the engine resolves a connection's `${{ NAME }}` from
+ * the project's own variables.
+ */
+function republishArgsFor(
+  name: ClientIdVariable | ClientSecretVariable,
+  secret: boolean,
+): string[] {
+  return ["variables", "set", name, "--project-level", ...(secret ? ["--secret"] : [])];
+}
+
+/**
  * The command that puts a credential the project never received where the
  * connection looks for it.
  *
@@ -122,17 +138,9 @@ export function republishCommand(
   cliVersion: string,
   selector: EnvironmentSelector,
 ): SuggestedCommand {
-  // `--project-level` is not optional: every `variables` command refuses with
-  // "Name the owner" without an owner, so a command missing it would fail
-  // before it reached the API and repair nothing. The project level is also
-  // the right owner — the engine resolves a connection's `${{ NAME }}` from
-  // the project's own variables. `selector` carries the invocation's
-  // --env/--env-file/--server so the retry targets the same project.
-  return projectCommand(
-    `variables set ${name} --project-level${secret ? " --secret" : ""}`,
-    selector,
-    cliVersion,
-  );
+  // `selector` carries the invocation's --env/--env-file/--server so the retry
+  // targets the same project.
+  return projectCommand(republishArgsFor(name, secret).join(" "), selector, cliVersion);
 }
 
 /** A credential, and whether the project ended up holding it. */
@@ -144,8 +152,30 @@ export type CredentialRecovery = {
 };
 
 /**
- * The commands that finish the job for every credential the project did not
+ * The arguments that finish the job for every credential the project did not
  * receive — empty in the ordinary case, where both were stored.
+ *
+ * Argument lists rather than command strings, for a caller that also reports
+ * them as `next_args`; {@link republishCommands} is built from this, so the
+ * two forms list the same commands.
+ *
+ * @param credentials - Each credential of the run and what became of it.
+ * @param extraArgs - Appended to every command, such as the `--cwd` the run
+ *   was given, so the recovery reaches the same Project.
+ */
+export function republishArgs(
+  credentials: readonly CredentialRecovery[],
+  extraArgs: readonly string[] = [],
+): string[][] {
+  return credentials.flatMap(({ name, secret, published }) =>
+    name !== undefined && published !== undefined && published !== "stored"
+      ? [[...republishArgsFor(name, secret), ...extraArgs]]
+      : [],
+  );
+}
+
+/**
+ * {@link republishArgs} as commands to run.
  *
  * Built for a run that prints nothing: with `--json` consola is disabled, so
  * the warnings above never appear and this list is the only place the recovery
@@ -156,10 +186,8 @@ export function republishCommands(
   cliVersion: string,
   selector: EnvironmentSelector,
 ): SuggestedCommand[] {
-  return credentials.flatMap(({ name, secret, published }) =>
-    name !== undefined && published !== undefined && published !== "stored"
-      ? [republishCommand(name, secret, cliVersion, selector)]
-      : [],
+  return republishArgs(credentials).map((args) =>
+    projectCommand(args.join(" "), selector, cliVersion),
   );
 }
 

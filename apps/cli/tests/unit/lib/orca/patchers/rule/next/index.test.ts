@@ -20,7 +20,7 @@ function ctxFor(
       id: "proj-1",
       project_secret: "sk_proj_full",
       preview_secret: "sk_proj_preview",
-      preview_origins: [],
+      origins: [],
       created_at: "2026-01-01T00:00:00.000Z",
     },
     issuer: "http://localhost:3000",

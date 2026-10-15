@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { anApp, aSetUpApp } from "../helpers/project";
+import { anApp, aSetUpApp, SETUP_ORIGIN } from "../helpers/project";
 
 const platform = usePlatformMock();
 
@@ -55,12 +55,20 @@ describe("origin list", () => {
         expect(result).toSay("ZITADEL_PROJECT_SECRET");
       });
 
-      it("is empty on a fresh project", async () => {
+      it("lists only the origin setup registered on a fresh project", async () => {
         const app = await aSetUpApp();
 
         const result = await app.run(["origin", "list", "--json"]);
 
-        expect(result).toSucceed();
+        expect(app.envelopeOf<{ items: unknown[] }>(result).data.items).toEqual([SETUP_ORIGIN]);
+      });
+
+      it("is empty once every origin is removed", async () => {
+        const app = await aSetUpApp();
+        await app.clearOrigins();
+
+        const result = await app.run(["origin", "list", "--json"]);
+
         expect(app.envelopeOf<{ items: unknown[] }>(result).data.items).toEqual([]);
       });
 
@@ -73,6 +81,7 @@ describe("origin list", () => {
 
         expect(result).toSucceed();
         expect(app.envelopeOf<{ items: { pattern: string }[] }>(result).data.items).toEqual([
+          SETUP_ORIGIN,
           { pattern: "https://app.acme.com", kind: "primary" },
           { pattern: "https://*-acme.vercel.app", kind: "preview" },
         ]);

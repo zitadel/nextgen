@@ -70,6 +70,15 @@ func TestDeploymentsNotImplemented(t *testing.T) {
 		expectNotImplemented(t, resp)
 	})
 
+	t.Run("variables", func(t *testing.T) {
+		resp, err := fixture.client.GetDeploymentVariables(t.Context(), api.GetDeploymentVariablesParams{
+			ProjectID:    project,
+			DeploymentID: "dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",
+		})
+		require.NoError(t, err)
+		expectNotImplemented(t, resp)
+	})
+
 	t.Run("get", func(t *testing.T) {
 		resp, err := fixture.client.GetDeploymentById(t.Context(), api.GetDeploymentByIdParams{
 			ProjectID:    project,

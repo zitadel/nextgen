@@ -42,7 +42,12 @@ function ctx(cwd: string, over: Partial<StepContext>, held: object = HELD): Step
   const { client, ...rest } = over;
   return {
     cwd,
-    client: { getVariables: async () => held, ...(client as object | undefined) } as never,
+    client: {
+      // Variables read back keyed by kind; these tests hold primary values only.
+      getVariables: async () =>
+        Object.fromEntries(Object.entries(held).map(([name, value]) => [name, { primary: value }])),
+      ...(client as object | undefined),
+    } as never,
     projectId: "proj_1",
     env: {},
     mode: "deploy",
@@ -106,6 +111,46 @@ describe("idp-connections step", () => {
     await expect(idpConnectionsStep.run(ctx(cwd, {}))).rejects.toMatchObject({
       hint: expect.stringContaining("variables set NAME --project-level --secret --env staging"),
     });
+  });
+
+  it("refuses an oidc block that names some endpoints but not the rest", async () => {
+    const cwd = await project({
+      "google.json": googleBody({
+        oidc: {
+          issuer: "https://accounts.google.com",
+          client_id: "111.apps.googleusercontent.com",
+          client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+          authorization_endpoint: "https://accounts.google.com/auth",
+          scopes: ["openid"],
+        },
+      }),
+    });
+
+    await expect(idpConnectionsStep.run(ctx(cwd, {}))).rejects.toThrow(
+      /google\.json: oidc names some endpoints but not jwks_uri, token_endpoint, userinfo_endpoint/,
+    );
+  });
+
+  it("accepts an oidc block that names every endpoint", async () => {
+    const cwd = await project({
+      "google.json": googleBody({
+        oidc: {
+          issuer: "https://accounts.google.com",
+          client_id: "111.apps.googleusercontent.com",
+          client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+          authorization_endpoint: "https://accounts.google.com/auth",
+          jwks_uri: "https://accounts.google.com/jwks",
+          token_endpoint: "https://accounts.google.com/token",
+          userinfo_endpoint: "https://accounts.google.com/userinfo",
+          scopes: ["openid"],
+        },
+      }),
+    });
+    const createIdp = vi.fn().mockResolvedValue({ id: "idp_1" });
+
+    await idpConnectionsStep.run(ctx(cwd, { client: { createIdp } as never }));
+
+    expect(createIdp).toHaveBeenCalledTimes(1);
   });
 
   it("creates no connection when a later file is malformed", async () => {

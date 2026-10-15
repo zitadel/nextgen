@@ -1,0 +1,25 @@
+get:
+  operationId: getDeploymentVariables
+  summary: Get a deployment's variables
+  description: |
+    Returns the variable values the deployment froze when it was made. Later
+    changes to the project's variables do not affect them. A secret reads
+    back as `{"secret": true}`.
+  tags:
+    - Deployments
+  security:
+    - oauth2:
+        - deployment.read
+        - variable.read
+  parameters:
+    - $ref: ../../../../components/parameters/project-id.yaml
+    - $ref: ../../../../components/parameters/deployment-id.yaml
+  responses:
+    '200':
+      description: The deployment's variables were retrieved successfully.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../variables/variables.yaml
+    default:
+      $ref: getDeploymentVariables-error-response.yaml

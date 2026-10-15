@@ -1,5 +1,5 @@
 import { createWriteStream } from "node:fs";
-import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { appendFile, cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -8,20 +8,29 @@ import { spawn } from "node:child_process";
 
 import { frameworkForId, frameworkIds } from "./frameworks.mjs";
 import { remoteHostEnv, startHttpsEdge } from "./https-edge.mjs";
-import { canListen, createJourneyPortAllocator } from "./ports.mjs";
+import { errorMessage, packageName, parsePort } from "./lib.mjs";
 import {
   localRegistryPaths,
   npmEnvironment,
-  packageName,
   prepareLocalRegistry,
   stopLocalRegistry,
   waitForHttp,
 } from "./local-registry.mjs";
+import { canListen, createJourneyPortAllocator } from "./ports.mjs";
 import {
-  assertPrebuiltTarballsOnGitHub,
+  assertPrebuiltTarballs,
   journeyArgsFromEnv,
   parseLocalJourneyArgs,
 } from "./run-options.mjs";
+import {
+  formatMarkdownTable,
+  formatOffset,
+  formatPhases,
+  formatTextTable,
+  readPhases,
+  timePhase,
+  timingTable,
+} from "./timings.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(here, "..");
@@ -66,6 +75,9 @@ const registryUrl = `http://127.0.0.1:${registryPort}`;
 const cliPackage = await packageName(repoRoot, "apps/cli");
 const childProcesses = new Set();
 const journeyContexts = [];
+// What every lane waits for (browsers, registry, Docker image); the lanes'
+// own phases live on their contexts. Both feed the closing timing table.
+const sharedPhases = [];
 const prebuiltTarballsDir = options.tarballsDir;
 let registryProcess;
 let registryLogsCollected = false;
@@ -91,27 +103,29 @@ try {
   if (options.runtime === "docker") {
     await assertDockerAvailable();
   }
-  await ensurePlaywrightBrowsers();
-  const localRegistry = await prepareLocalRegistry({
-    env: process.env,
-    log,
-    onStarted: (registry) => {
-      registryProcess = registry;
-    },
-    paths: registryPaths,
-    registryPort,
-    registryUrl,
-    repoRoot,
-    resetStorage: !persistentRegistryStorage,
-    prebuiltTarballsDir: prebuiltTarballsDir ? resolve(repoRoot, prebuiltTarballsDir) : "",
-    run,
-    workDir,
-  });
+  await timePhase(sharedPhases, "browsers", ensurePlaywrightBrowsers);
+  const localRegistry = await timePhase(sharedPhases, "registry", () =>
+    prepareLocalRegistry({
+      env: process.env,
+      log,
+      onStarted: (registry) => {
+        registryProcess = registry;
+      },
+      paths: registryPaths,
+      registryPort,
+      registryUrl,
+      repoRoot,
+      resetStorage: !persistentRegistryStorage,
+      prebuiltTarballsDir: prebuiltTarballsDir ? resolve(repoRoot, prebuiltTarballsDir) : "",
+      run,
+      workDir,
+    }),
+  );
   registryProcess = localRegistry.registry;
 
   if (options.runtime === "docker" && !localRuntimeImage) {
     log("building local runtime image for npx @zitadel/cli@alpha start");
-    localRuntimeImage = await buildJourneyRuntimeImage();
+    localRuntimeImage = await timePhase(sharedPhases, "image", buildJourneyRuntimeImage);
   }
 
   // Resolve every (variant, framework) port sequentially so the shared
@@ -124,22 +138,16 @@ try {
   await runWithConcurrency(
     journeyContexts,
     Math.min(options.concurrency, journeyContexts.length),
-    (context) => {
-      const journey =
-        context.suite === "testkit" ? runTestkitJourney(context) : runFrameworkJourney(context);
-      // Release this lane's app server and runtime as soon as it finishes, so a
-      // full run never holds more than `concurrency` of them alive at once.
-      return journey.finally(() => teardownJourney(context));
-    },
-  );
+    runJourney,
+  ).finally(reportTimings);
 
   success = true;
   log("customer local setup journey matrix passed");
 } catch (error) {
   await collectRegistryLogs();
   console.error("");
-  console.error(`[journey-local] failed: ${errorMessage(error)}`);
-  console.error(`[journey-local] diagnostics preserved in ${workDir}`);
+  console.error(`${stamp()} failed: ${errorMessage(error)}`);
+  console.error(`${stamp()} diagnostics preserved in ${workDir}`);
   process.exitCode = 1;
 } finally {
   await cleanup();
@@ -156,11 +164,11 @@ function parseArgsOrExit(args) {
   try {
     const parsed = parseLocalJourneyArgs(args);
     if (!parsed.help) {
-      assertPrebuiltTarballsOnGitHub(parsed, process.env);
+      assertPrebuiltTarballs(parsed, process.env);
     }
     return parsed;
   } catch (error) {
-    console.error(`[journey-local] ${errorMessage(error)}`);
+    console.error(`${stamp()} ${errorMessage(error)}`);
     process.exit(1);
   }
 }
@@ -196,10 +204,12 @@ Options:
 
 Environment (the command line's arguments win):
   JOURNEY_CI=1             --ci
+  JOURNEY_CONCURRENCY      --concurrency
   JOURNEY_MATRIX           --matrix
   JOURNEY_RUNTIME          --runtime
   JOURNEY_TARBALLS_DIR     --tarballs-dir
   JOURNEY_WORK_DIR         --work-dir
+  JOURNEY_TARBALLS_REQUIRED=1  refuse to pack without --tarballs-dir
 `);
 }
 
@@ -313,6 +323,8 @@ async function createJourneyContext(variant, framework) {
     preset: variant.preset,
     remote: variant.remote,
     suite: variant.suite,
+    // The lane's row in the closing timing table, filled in as it runs.
+    timing: { id: `${variant.id}/${framework.id}`, phases: [] },
     variantId: variant.id,
     zitadelPort,
   };
@@ -339,98 +351,134 @@ async function resolveFrameworkPort(envName, preferred) {
   return port;
 }
 
+/** One lane of the pool, timed for the closing table from start to teardown. */
+async function runJourney(context) {
+  const { timing } = context;
+  timing.began = performance.now();
+  try {
+    await (context.suite === "testkit" ? runTestkitJourney(context) : runFrameworkJourney(context));
+  } catch (error) {
+    timing.failed = true;
+    throw error;
+  } finally {
+    // Release this lane's app server and runtime as soon as it finishes, so a
+    // full run never holds more than `concurrency` of them alive at once.
+    await timePhase(timing.phases, "teardown", () => teardownJourney(context));
+    timing.ended = performance.now();
+  }
+}
+
 async function runFrameworkJourney(context) {
   const { framework } = context;
   const prefix = `${context.variantId}/${framework.id}`;
+  const timed = (phase, fn) => timePhase(context.timing.phases, phase, fn);
   try {
     await mkdir(context.diagnosticsDir, { recursive: true });
     const edge = context.remote ? await startLaneEdge(context, prefix) : undefined;
     log(`[${prefix}] preparing fresh ${framework.displayName} app`);
-    await run("node", ["e2e/journey/scripts/prepare-app.mjs"], {
-      env: {
-        ...process.env,
-        // The CLI reaches the edge by name: preloaded resolver, trusted cert.
-        ...edge?.env,
-        // Pin every JOURNEY_* variable prepare-app reads: a preceding CI
-        // journey step exports its final values through GITHUB_ENV, so the
-        // inherited process.env may carry another run's (deleted) app dir
-        // or preset.
-        JOURNEY_APP_DIR: context.appDir,
-        JOURNEY_APP_URL: context.appUrl,
-        JOURNEY_FRAMEWORK: framework.id,
-        // Always explicit ("" = scaffold fresh) for the same GITHUB_ENV
-        // leak-proofing as JOURNEY_PRESET above.
-        JOURNEY_PREEXISTING_APP: context.preexistingApp ? "1" : "",
-        JOURNEY_PRESET: context.preset,
-        // What setup's --server points at: the local runtime, or the remote
-        // lane's https edge in front of it.
-        JOURNEY_SETUP_SERVER: edge?.url ?? "local",
-        JOURNEY_ZITADEL_PORT: String(context.zitadelPort),
-        JOURNEY_REGISTRY_URL: registryUrl,
-        JOURNEY_RUNTIME: options.runtime,
-        JOURNEY_WORK_DIR: context.frameworkWorkDir,
-        NPM_CONFIG_USERCONFIG: registryPaths.npmrcPath,
-        // The claim spec needs a platform project (claim/complete 401s without
-        // one) and the personal teams provisioned at session exchange.
-        // `zitadel start` now opts in by itself, so this is belt and braces for
-        // the framework lane, and it keeps the intent explicit here. Reaches
-        // the server through prepare-app's `start` step env.
-        NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "true",
-        ...(localRuntimeImage ? { ZITADEL_LOCAL_IMAGE: localRuntimeImage } : {}),
-      },
+    await runPrepareApp(context, {
+      ...process.env,
+      // The CLI reaches the edge by name: preloaded resolver, trusted cert.
+      ...edge?.env,
+      // Pin every JOURNEY_* variable prepare-app reads: a preceding CI
+      // journey step exports its final values through GITHUB_ENV, so the
+      // inherited process.env may carry another run's (deleted) app dir
+      // or preset.
+      JOURNEY_APP_DIR: context.appDir,
+      JOURNEY_APP_URL: context.appUrl,
+      JOURNEY_FRAMEWORK: framework.id,
+      // Always explicit ("" = scaffold fresh) for the same GITHUB_ENV
+      // leak-proofing as JOURNEY_PRESET above.
+      JOURNEY_PREEXISTING_APP: context.preexistingApp ? "1" : "",
+      JOURNEY_PRESET: context.preset,
+      JOURNEY_SUITE: context.suite,
+      // What setup's --server points at: the local runtime, or the remote
+      // lane's https edge in front of it.
+      JOURNEY_SETUP_SERVER: edge?.url ?? "local",
+      JOURNEY_ZITADEL_PORT: String(context.zitadelPort),
+      JOURNEY_REGISTRY_URL: registryUrl,
+      JOURNEY_RUNTIME: options.runtime,
+      JOURNEY_WORK_DIR: context.frameworkWorkDir,
+      NPM_CONFIG_USERCONFIG: registryPaths.npmrcPath,
+      // The claim spec needs a platform project (claim/complete 401s without
+      // one) and the personal teams provisioned at session exchange.
+      // `zitadel start` now opts in by itself, so this is belt and braces for
+      // the framework lane, and it keeps the intent explicit here. Reaches
+      // the server through prepare-app's `start` step env.
+      NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "true",
+      ...(localRuntimeImage ? { ZITADEL_LOCAL_IMAGE: localRuntimeImage } : {}),
     });
 
     log(`[${prefix}] starting generated app at ${context.appUrl}`);
-    const appProcess = startChild("npm", framework.devServerArgs(context.appPort), {
-      cwd: context.appDir,
-      // The app's dev proxy reaches the edge by name, like the CLI did.
-      env: edge ? { ...process.env, ...edge.env } : process.env,
-      logFile: context.logPath,
+    await timed("app", () => {
+      const appProcess = startChild("npm", framework.devServerArgs(context.appPort), {
+        cwd: context.appDir,
+        // The app's dev proxy reaches the edge by name, like the CLI did.
+        env: edge ? { ...process.env, ...edge.env } : process.env,
+        logFile: context.logPath,
+      });
+      context.appProcess = appProcess;
+      return waitForHttp(
+        `${context.appUrl}${framework.readyPath}`,
+        `generated ${framework.displayName} app`,
+        appProcess,
+        (message) => log(`[${prefix}] ${message}`),
+      );
     });
-    context.appProcess = appProcess;
-    await waitForHttp(
-      `${context.appUrl}${framework.readyPath}`,
-      `generated ${framework.displayName} app`,
-      appProcess,
-      (message) => log(`[${prefix}] ${message}`),
-    );
 
     log(`[${prefix}] running Playwright journey`);
-    await run(
-      "corepack",
-      [
-        "pnpm",
-        "--filter",
-        "@zitadel/e2e",
-        "exec",
-        "playwright",
-        "test",
-        "--config",
-        "journey/playwright.config.mts",
-      ],
-      {
-        env: {
-          ...process.env,
-          JOURNEY_APP_DIR: context.appDir,
-          JOURNEY_APP_URL: context.appUrl,
-          JOURNEY_FRAMEWORK: framework.id,
-          JOURNEY_OUTPUT_DIR: context.frameworkWorkDir,
-          JOURNEY_PLAYWRIGHT_OUTPUT_DIR: context.playwrightOutputDir,
-          JOURNEY_PLAYWRIGHT_REPORT_DIR: context.playwrightReportDir,
-          // The claim spec spawns the CLI through the journey registry, which
-          // needs the same npmrc the prepare-app steps used.
-          NPM_CONFIG_USERCONFIG: registryPaths.npmrcPath,
-          // Always explicit ("" = default preset / fresh scaffold): see the
-          // prepare-app note.
-          JOURNEY_PREEXISTING_APP: context.preexistingApp ? "1" : "",
-          JOURNEY_PRESET: context.preset,
+    await timed("playwright", () =>
+      run(
+        "corepack",
+        [
+          "pnpm",
+          "--filter",
+          "@zitadel/e2e",
+          "exec",
+          "playwright",
+          "test",
+          "--config",
+          "journey/playwright.config.mts",
+        ],
+        {
+          env: {
+            ...process.env,
+            JOURNEY_APP_DIR: context.appDir,
+            JOURNEY_APP_URL: context.appUrl,
+            JOURNEY_FRAMEWORK: framework.id,
+            JOURNEY_OUTPUT_DIR: context.frameworkWorkDir,
+            JOURNEY_PLAYWRIGHT_OUTPUT_DIR: context.playwrightOutputDir,
+            JOURNEY_PLAYWRIGHT_REPORT_DIR: context.playwrightReportDir,
+            // The claim spec spawns the CLI through the journey registry, which
+            // needs the same npmrc the prepare-app steps used.
+            NPM_CONFIG_USERCONFIG: registryPaths.npmrcPath,
+            // Always explicit ("" = default preset / fresh scaffold): see the
+            // prepare-app note.
+            JOURNEY_PREEXISTING_APP: context.preexistingApp ? "1" : "",
+            JOURNEY_PRESET: context.preset,
+          },
         },
-      },
+      ),
     );
     log(`[${prefix}] journey passed`);
   } catch (error) {
     await collectDiagnostics(context);
     throw new Error(`${prefix}: ${errorMessage(error)}`, { cause: error });
+  }
+}
+
+/**
+ * Runs prepare-app for a lane and adds the CLI steps it timed to the lane's
+ * phases, also when one of them failed: the table then shows how far it got.
+ */
+async function runPrepareApp(context, env) {
+  const timingsPath = join(context.frameworkWorkDir, "timings.json");
+  // A kept work dir may still hold an earlier run's.
+  await rm(timingsPath, { force: true });
+  try {
+    await run("node", ["e2e/journey/scripts/prepare-app.mjs"], { env });
+  } finally {
+    context.timing.phases.push(...(await readPhases(timingsPath)));
   }
 }
 
@@ -469,64 +517,71 @@ async function startLaneEdge(context, prefix) {
 async function runTestkitJourney(context) {
   const { framework } = context;
   const prefix = `${context.variantId}/${framework.id}`;
+  const timed = (phase, fn) => timePhase(context.timing.phases, phase, fn);
   try {
     await mkdir(context.diagnosticsDir, { recursive: true });
     log(`[${prefix}] preparing fresh ${framework.displayName} app`);
-    await run("node", ["e2e/journey/scripts/prepare-app.mjs"], {
-      env: {
-        ...scrubRepoOverrides(process.env),
-        JOURNEY_APP_DIR: context.appDir,
-        JOURNEY_APP_URL: context.appUrl,
-        JOURNEY_FRAMEWORK: framework.id,
-        // The testkit suite always scaffolds fresh; pin the flag off so a
-        // preceding CI journey step's GITHUB_ENV export cannot leak in.
-        JOURNEY_PREEXISTING_APP: "",
-        JOURNEY_PRESET: context.preset,
-        JOURNEY_ZITADEL_PORT: String(context.zitadelPort),
-        JOURNEY_REGISTRY_URL: registryUrl,
-        JOURNEY_RUNTIME: options.runtime,
-        JOURNEY_WORK_DIR: context.frameworkWorkDir,
-        NPM_CONFIG_USERCONFIG: registryPaths.npmrcPath,
-      },
+    await runPrepareApp(context, {
+      ...scrubRepoOverrides(process.env),
+      JOURNEY_APP_DIR: context.appDir,
+      JOURNEY_APP_URL: context.appUrl,
+      JOURNEY_FRAMEWORK: framework.id,
+      // The testkit suite always scaffolds fresh; pin the flag off so a
+      // preceding CI journey step's GITHUB_ENV export cannot leak in.
+      JOURNEY_PREEXISTING_APP: "",
+      JOURNEY_PRESET: context.preset,
+      // Skips the scaffold checks only the journey specs read.
+      JOURNEY_SUITE: context.suite,
+      JOURNEY_ZITADEL_PORT: String(context.zitadelPort),
+      JOURNEY_REGISTRY_URL: registryUrl,
+      JOURNEY_RUNTIME: options.runtime,
+      JOURNEY_WORK_DIR: context.frameworkWorkDir,
+      NPM_CONFIG_USERCONFIG: registryPaths.npmrcPath,
     });
 
     // Setup booted an instance to scaffold against; the kit suite boots its
     // own ephemeral one, so stop it and let the suite reuse the port.
     log(`[${prefix}] stopping the setup instance`);
-    await runCapture("npx", cliArgs(context, ["stop"]), {
-      cwd: context.appDir,
-      env: scrubRepoOverrides(npxEnv(context)),
-    });
+    await timed("stop", () =>
+      runCapture("npx", cliArgs(context, ["stop"]), {
+        cwd: context.appDir,
+        env: scrubRepoOverrides(npxEnv(context)),
+      }),
+    );
 
     const playwrightVersion = workspacePlaywrightVersion();
     log(
       `[${prefix}] installing @zitadel/testing and @playwright/test@${playwrightVersion} from the journey registry`,
     );
-    await run(
-      "npm",
-      [
-        "install",
-        "--save-dev",
-        "--no-audit",
-        "--no-fund",
-        "@zitadel/testing@alpha",
-        `@playwright/test@${playwrightVersion}`,
-      ],
-      { cwd: context.appDir, env: scrubRepoOverrides(npxEnv(context)) },
+    await timed("install", () =>
+      run(
+        "npm",
+        [
+          "install",
+          "--save-dev",
+          "--no-audit",
+          "--no-fund",
+          "@zitadel/testing@alpha",
+          `@playwright/test@${playwrightVersion}`,
+        ],
+        { cwd: context.appDir, env: scrubRepoOverrides(npxEnv(context)) },
+      ),
     );
 
     log(`[${prefix}] copying the checked-in consumer suite into the app`);
     await cp(join(projectRoot, "fixtures", "testkit"), context.appDir, { recursive: true });
 
     log(`[${prefix}] running the app's @zitadel/testing suite`);
-    await run("npx", ["playwright", "test", "--config", "playwright.testkit.config.mts"], {
-      cwd: context.appDir,
-      env: {
-        ...scrubRepoOverrides(npxEnv(context)),
-        TESTKIT_APP_PORT: String(context.appPort),
-        TESTKIT_ZITADEL_PORT: String(context.zitadelPort),
-      },
-    });
+    await timed("playwright", () =>
+      run("npx", ["playwright", "test", "--config", "playwright.testkit.config.mts"], {
+        cwd: context.appDir,
+        env: {
+          ...scrubRepoOverrides(npxEnv(context)),
+          TESTKIT_APP_PORT: String(context.appPort),
+          TESTKIT_ZITADEL_PORT: String(context.zitadelPort),
+        },
+      }),
+    );
     log(`[${prefix}] consumer suite passed`);
   } catch (error) {
     await collectTestkitDiagnostics(context);
@@ -595,20 +650,40 @@ async function runWithConcurrency(items, limit, worker) {
   }
 }
 
+/**
+ * Prints the lane × phase table (timings.mjs) once the pool has settled,
+ * passed or failed, and adds it to the job summary when running in GitHub
+ * Actions.
+ */
+async function reportTimings() {
+  const rows = timingTable(journeyContexts.map((context) => context.timing));
+  const shared = formatPhases(sharedPhases);
+  log(`phase timings in seconds (began: the lane's start); before the lanes: ${shared}`);
+  console.log(formatTextTable(rows));
+  if (!process.env.GITHUB_STEP_SUMMARY) return;
+  const summary = [
+    "### Journey phase timings",
+    "",
+    `Seconds per phase. *began* is when the lane started, counted from the runner's start. Before the lanes: ${shared}.`,
+    "",
+    formatMarkdownTable(rows),
+    "",
+  ];
+  try {
+    await appendFile(process.env.GITHUB_STEP_SUMMARY, `${summary.join("\n")}\n`);
+  } catch (error) {
+    console.error(
+      `${stamp()} could not add the timings to the job summary: ${errorMessage(error)}`,
+    );
+  }
+}
+
 async function resolvePort(envName) {
   const value = process.env[envName];
   if (value) {
-    return validatePortValue(value, envName);
+    return parsePort(value, envName);
   }
   return reserveJourneyPort(usedPorts);
-}
-
-function validatePortValue(value, name) {
-  const port = Number(value);
-  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
-    throw new Error(`${name} must be a TCP port, got ${value}`);
-  }
-  return port;
 }
 
 async function ensurePlaywrightBrowsers() {
@@ -865,7 +940,7 @@ async function cleanup() {
     try {
       await stopLocalRegistry(registryProcess);
     } catch (error) {
-      console.error(`[journey-local] Verdaccio cleanup failed: ${errorMessage(error)}`);
+      console.error(`${stamp()} Verdaccio cleanup failed: ${errorMessage(error)}`);
     }
   }
 }
@@ -878,7 +953,7 @@ async function resetLocalRuntime(context) {
     });
   } catch (error) {
     console.error(
-      `[journey-local] ${context.framework.id} local runtime reset failed: ${errorMessage(error)}`,
+      `${stamp()} ${context.framework.id} local runtime reset failed: ${errorMessage(error)}`,
     );
   }
 }
@@ -945,12 +1020,12 @@ async function removeWorkDirAfterSuccess(path) {
   try {
     await rm(path, { recursive: true, force: true, maxRetries: 10, retryDelay: 250 });
   } catch (error) {
-    console.error(`[journey-local] cleanup left work dir ${path}: ${errorMessage(error)}`);
+    console.error(`${stamp()} cleanup left work dir ${path}: ${errorMessage(error)}`);
   }
 }
 
 async function handleSignal(signal) {
-  console.error(`[journey-local] received ${signal}, cleaning up`);
+  console.error(`${stamp()} received ${signal}, cleaning up`);
   await collectRegistryLogs();
   await Promise.all(journeyContexts.map(collectDiagnostics));
   await cleanup();
@@ -983,11 +1058,16 @@ function npxEnv(context) {
 }
 
 function log(message) {
-  console.log(`[journey-local] ${message}`);
+  console.log(`${stamp()} ${message}`);
 }
 
-function errorMessage(error) {
-  return error instanceof Error ? error.message : String(error);
+/**
+ * The tag on every runner line, with the time since the runner started: a task
+ * runner may print a task's output only once it ends, all lines under one
+ * timestamp, so the line carries its own.
+ */
+function stamp() {
+  return `[journey-local ${formatOffset(performance.now())}]`;
 }
 
 function isErrno(error, code) {

@@ -103,10 +103,16 @@ jobs:
           ref: ${{ github.event_name == 'push' && github.sha || 'main' }}
           fetch-depth: 0
 
+      # Keyed like ci.yml's setup-go step (see the comment there), so this job
+      # restores the Go cache ci.yml saves: both build through GOCACHEPROG on
+      # Depot and keep the same files in GOCACHE.
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
+          cache-dependency-path: |
+            go.sum
+            tools/bench/go.sum
 
       - uses: pnpm/action-setup@v5
         with:
@@ -158,7 +164,7 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.before || 'HEAD^' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PNPM_CONFIG_PROVENANCE: "false"
+          NPM_CONFIG_PROVENANCE: "false"
           RECOVER_VERSION: ${{ inputs.recover_version }}
 
       - name: Publish release
@@ -178,5 +184,5 @@ jobs:
           # Depot runners are self-hosted from npm's provenance verifier's
           # perspective. Keep trusted publishing via OIDC, but do not request
           # npm provenance until the release job runs on GitHub-hosted runners.
-          PNPM_CONFIG_PROVENANCE: "false"
+          NPM_CONFIG_PROVENANCE: "false"
           RECOVER_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.recover_version || '' }}

@@ -261,7 +261,12 @@ export abstract class AbstractRulePatcher implements Patcher {
           project_id: ctx.project.id,
           project_secret: ctx.project.project_secret,
           preview_secret: ctx.project.preview_secret,
-          preview_origins: ctx.project.preview_origins,
+          primary_origins: ctx.project.origins
+            .filter((origin) => origin.kind === "primary")
+            .map((origin) => origin.pattern),
+          preview_origins: ctx.project.origins
+            .filter((origin) => origin.kind === "preview")
+            .map((origin) => origin.pattern),
           created_at: ctx.project.created_at,
         })}\n`,
       },

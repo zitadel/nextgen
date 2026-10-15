@@ -65,6 +65,10 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   // generated surface; recorded as a question rather than implied to be owned.
   completeClaim: "part of the claim flow, but currently called by no command — unresolved",
   getClaimWindow: "part of the claim flow, but currently called by no command — unresolved",
+  // The frozen variable set of one deployment is read where a variable is
+  // resolved, which is a later change.
+  getDeploymentVariables:
+    "read by `zitadel variable resolve`, which arrives with the variable commands",
   // A preview exists only through a deployment to it, so it has no create to
   // offer; listing and removing it are `zitadel preview`'s.
   listPreviews: "previews are listed by `zitadel preview` (#1312)",
@@ -112,6 +116,9 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   setUserPassword: "not yet exposed — follow-up, needs a credential-safe input route (ADR 064 §12)",
   listUserTeams: "not yet exposed — follow-up, a user sub-resource listing",
   listUserPasskeys: "not yet exposed — follow-up, a user sub-resource listing",
+  addOrigin: "not yet exposed — `zitadel origin add` lands with the origins CLI surface (#1578)",
+  removeOrigin:
+    "not yet exposed — `zitadel origin remove` lands with the origins CLI surface (#1578)",
 };
 
 const capitalize = (word: string): string => `${word[0]?.toUpperCase() ?? ""}${word.slice(1)}`;

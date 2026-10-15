@@ -4,12 +4,12 @@
 > **Area:** 3 of 4 (see [`README.md`](README.md))
 
 This document defines how a user signs up and signs in using external identity
-providers like Google or GitHub, detailing the OAuth2/OIDC redirect ceremony,
+providers like Google or a company's own OIDC provider, detailing the OIDC redirect ceremony,
 identity resolution, and all available recovery paths.
 
 ## The Ceremony
 
-The end-to-end OAuth2/OIDC redirect ceremony progresses through three main
+The end-to-end OIDC redirect ceremony progresses through three main
 phases:
 
 ```
@@ -18,24 +18,62 @@ submit { action: "sso", sso_provider_id: "google", return_target: "<page hosting
   engine: fill a ${{ NAME }} client_id from the project's variables
   engine: mint state record, build authorize URL (PKCE), emit sso-redirect step
 browser → provider → user authenticates
-provider → GET {issuer}/__nextgen/idp/callback?code=…&state=…
-  engine: validate state (single-use), exchange code, map claims, run strategy
+provider → GET {issuer}/__nextgen/idp/{slug}/callback?code=…&state=…
+  engine: validate state (single-use), check the path slug and issuer against
+    it, exchange code, map claims
   engine: resolve identity → fire outcome on the originating step
 frontend: GET /flow/{id} → next step per the authored transitions
 ```
 
 ### Callback URI
 
-The system uses a single fixed route with an identical shape across every
+Each connection has its own fixed route, with an identical shape across every
 environment:
 
-`{environment issuer}/__nextgen/idp/callback`
+`{environment issuer}/__nextgen/idp/{slug}/callback`
 
 Because external identity providers require exact-match redirect URIs, the path
 carries no flow ID.
 All correlation is handled dynamically via the `state` parameter.
+The slug is fixed for the life of a connection
+([area 1](1-resource-model.md#connection-lifecycle)), so the URI stays the same
+across revisions.
 
-The shape is finalized; its two structural halves:
+The route is per connection, not shared, to defend against the IdP mix-up
+attack ([RFC 9700 §4.4](https://www.rfc-editor.org/rfc/rfc9700#section-4.4)).
+With one shared route, a malicious connection's provider could send the
+browser on to an honest provider the same project uses, whose code would then
+reach the malicious connection's token endpoint with the PKCE verifier its
+`state` pinned. With one route per connection, the path names the connection
+whose provider answered. After the `state` is consumed, the callback refuses a
+path that names a different connection than the one the `state` pins, before
+any code exchange: the browser returns to the originating step with
+`error.sso_failed`, even when the provider answered with an error, and the
+server log records both slugs.
+
+The defense rests on each honest provider matching `redirect_uri` exactly
+(RFC 9700 §4.4.2). A provider registered with a wildcard, or with another
+connection's route among its URIs, can still answer on the wrong path. The
+callback therefore also checks [RFC 9207](https://www.rfc-editor.org/rfc/rfc9207)'s
+`iss` parameter when a provider sends one: a value other than the pinned
+connection's issuer is refused the same way, before the exchange. `iss` alone
+was not enough: few providers send it, and an absent value cannot be refused
+without breaking those that do not.
+
+The `iss` support is partial, deliberately. RFC 9207 §2.4 also refuses a
+response without `iss` from a provider whose discovery document advertises
+`authorization_response_iss_parameter_supported`, as Google's does; the
+callback does not, because the per-connection path already defends against
+the mix-up, and the check is defense in depth for later. An error response
+whose connection revision cannot be read leaves its `iss` unchecked too: it
+exchanges no code, so the person's answer is shown rather than a failure of
+the server.
+
+The shared route that preceded these, `/__nextgen/idp/callback` (and
+`/idp/callback`), is not served: a provider still registered with it gets no
+sign-in until the connection's own URI is registered.
+
+The shape's two structural halves:
 
 - **Origin Resolution:** The origin is the environment's declared issuer
   ([`configuration-surface.md`, Environments](../platform/configuration-surface.md#environments)).
@@ -46,11 +84,11 @@ The shape is finalized; its two structural halves:
   [#529](https://github.com/zitadel/nextgen/issues/529) releases epic); deriving
   a callback origin per environment depends on it.
 - **Server Routing:** The server mounts the handler on two spellings of the
-  route. `/__nextgen/idp/callback` is the published shape, served when the
-  instance is the browser's origin. A scaffolded app's SDK proxy strips its
+  route. `/__nextgen/idp/{slug}/callback` is the published shape, served when
+  the instance is the browser's origin. A scaffolded app's SDK proxy strips its
   `proxyPath` prefix before forwarding, so the instance receives the same
-  request as `/idp/callback`, which is mounted alongside; the path is reserved
-  for it in the API namespace.
+  request as `/idp/{slug}/callback`, which is mounted alongside; the path is
+  reserved for it in the API namespace.
 
 ### The `state` Record
 
@@ -123,20 +161,25 @@ the engine anyway it drops the configured value and keeps its own.
 
 ## Callback Processing
 
-The callback phase executes six sequential steps in order; an error at any step
+The callback phase executes seven sequential steps in order; an error at any step
 ends the attempt:
 
 1. **State:** An unknown, expired, or already-consumed `state` parameter is
    refused with the callback route's own static error page: without the record
    there is no return target, so the route cannot send the browser anywhere
    else. Every invalid shape is answered with the same page.
-2. **Code Exchange:** Performed at the connection's token endpoint and
+2. **Connection:** The callback path must name the connection the consumed
+   `state` pins, and an `iss` the provider sent must be that connection's
+   issuer ([Callback URI](#callback-uri)). A mismatch returns the browser to
+   the originating step with `error.sso_failed`; no code reaches a token
+   endpoint.
+3. **Code Exchange:** Performed at the connection's token endpoint and
    authenticated per `token_endpoint_auth_method`.
    The secret is resolved from the project's secret variables through the
    connection's whole-value `${{ NAME }}` reference
    ([area 1](1-resource-model.md#the-connection-schema)); a plain variable is
    refused.
-3. **ID Token Validation (OIDC):**
+4. **ID Token Validation (OIDC):**
     - **Signature:** verified with keys from discovery metadata or the
       connection's `jwks_uri`; fails if neither yields keys.
       This runtime check enforces that a `jwks_uri` is required when discovery
@@ -152,28 +195,21 @@ ends the attempt:
       one (OIDC Discovery 4.3).
       Discovery and JWKS documents are cached with a bounded TTL and refetched
       at most once per attempt on an unknown `kid`.
-4. **Claims Extraction:** Extracted from `id_token` when `id_token_mapping` is
+5. **Claims Extraction:** Extracted from `id_token` when `id_token_mapping` is
    set; otherwise from `userinfo`.
    For OIDC, a `userinfo` response whose `sub` does not exactly match the
    id_token `sub` fails the attempt (OIDC Core 5.3.2); without that check, a
    provider mixup could attach another subject's claims.
-   Any configured `supplementary_fetch` always runs and overwrites same-named
-   claims from either source (see
-   [area 1](1-resource-model.md#vendor-knowledge-is-data)).
 5. **Verification Evaluation:** Applies `verified_claims` rules to determine
    claim trust:
     - **Claim Lookup:** Strictly boolean `true` or string `"true"` evaluates as
       verified.
       Any other value, including a missing claim, evaluates as unverified.
     - **Literal `true`:** Inherently trusts the provider.
-    - **`"$supplementary_fetch"`:** Takes the strategy execution result for this
-      attempt, resolved through `claim_mapping` to the claim the strategy
-      reports, matching the server's
-      [Invalid Strategy Pointer](1-resource-model.md#validator-rules) rule.
 6. **Identity Resolution:** Looks up `(connection, external_subject)` where the
    stored subject is strictly a string:
     - **Numeric Coercion:** a provider may send the subject as a JSON number
-      (GitHub's `id`).
+      (a `subject_claim` naming a numeric claim, or a non-conformant `sub`).
       It is converted to its exact decimal string, so `12345` and `"12345"`
       resolve to one identity.
       The decoder reads the number as raw text (`json.Number`), never as
@@ -203,7 +239,7 @@ ends the attempt:
 ### Server-Side Fetch Policy
 
 Every URL the engine fetches for a connection is tenant-authored (discovery,
-`jwks_uri`, token, userinfo, strategy fetch); on shared infrastructure that is a
+`jwks_uri`, token, userinfo); on shared infrastructure that is a
 server-side request forgery surface.
 Webhooks and actions need the same guard, so egress policy is its own epic
 ([#928](https://github.com/zitadel/nextgen/issues/928)).
@@ -215,8 +251,7 @@ list, not a "only listed hosts" lockdown.
 This area consumes the policy and carries two constraints into it:
 
 - **Blocking for 851.**
-  The callback processor fetches discovery, JWKS, token, userinfo, and the
-  strategy URL, so SSO cannot ship to shared infrastructure without at least the
+  The callback processor fetches discovery, JWKS, token, and userinfo, so SSO cannot ship to shared infrastructure without at least the
   baseline deny behaviour: resolve the host, reject private, loopback,
   link-local, and metadata ranges (RFC 1918, `127.0.0.0/8`, `169.254.169.254`,
   and their IPv6 equivalents), connect to the address that passed the check, and
@@ -303,8 +338,7 @@ property in the schema.
     ([`capabilities.md`, Missing](../flowengine/capabilities.md#missing)), so
     until email verification exists the gate only removes the provider's
     shortcut past collection.
-  * The catalog defaults pass (`email_verified` for Google,
-    `$supplementary_fetch` for GitHub); a Google account with
+  * The catalog default passes (`email_verified` for Google); a Google account with
     `email_verified: false` collects instead.
   * Without this gate an attacker's unverified claim to a victim's email
     creates the account first, and the victim meets the conflict step at their
@@ -364,7 +398,7 @@ property in the schema.
 The schema author determines which fields the collection step renders, while the
 engine populates their values at runtime.
 This separation is necessary because external providers cannot guarantee claim
-availability for every user (e.g., GitHub's `name` may be `null`, or an `email`
+availability for every user (e.g., a provider's `name` may be `null`, or an `email`
 may arrive missing) and a single collection step may handle incoming users from
 multiple identity providers.
 
@@ -538,6 +572,7 @@ and recovery route without exposing internal technical details to the end user.
 | :--- | :--- | :--- |
 | **User cancels / provider denies (`access_denied`)** | Originating step with a localized `text_key` error. | The step remains rendered, allowing the user to retry or select another offered authentication method. |
 | **Provider configuration error (invalid client, bad scope)** | Originating step with a generic `text_key` error. | Details are written to the server log; tenant-side misconfigurations are hidden from the end user. |
+| **Callback path names another connection than the `state` pins, or `iss` is not its issuer** | Originating step with `error.sso_failed`. | The `state` is consumed and the code reaches no token endpoint. The server log records both slugs, or the `iss` and the issuer. |
 | **State expired, unknown, or reused** | The callback route's uniform error page. | The page asks the user to return to the application and try again. Every invalid state shape is answered with the same bytes, so the response confirms nothing about what exists. |
 | **Binding cookie absent or mismatched** | The callback route's uniform error page, indistinguishable from an invalid state. | The `state` is **not** consumed: a request without the right cookie cannot finish the ceremony, so the record stays pending for the user's own tab and the state expires with the attempt. The user retries from the page the sign-in started on. |
 | **Code exchange / `userinfo` failure** | Originating step with a generic error. | The user can retry; detailed error diagnostics are written to server logs. |
@@ -549,7 +584,7 @@ and recovery route without exposing internal technical details to the end user.
 
 | Requirement | Owed By / Target |
 | :--- | :--- |
-| **Callback URI Surface:** Expose `{origin}/__nextgen/idp/callback` in the setup journey and per environment. | CLI Journey (Area 4) |
+| **Callback URI Surface:** Expose each connection's `{origin}/__nextgen/idp/{slug}/callback` in the setup journey and `sso enable`, and per environment. | CLI Journey (Area 4) |
 | **Flow Scaffolding:** Scaffold `sso_providers` on the entry steps (both, in the shipped shared-entry default), the password step and the conflict step with its login route. | CLI Journey (Area 4) |
 | **Callback Route:** Register route under the server HTTP surface; the scaffolded proxy matcher is already prefix-wide (`/__nextgen/:path*`), so no patcher work remains. | Server |
 | **Localization Keys:** Export conflict-step copy (the account-exists explanation plus its submit, passkey, and sign-in actions), error copy, and provider button labels as `text_key` entries. | Login UI / Locale Work |

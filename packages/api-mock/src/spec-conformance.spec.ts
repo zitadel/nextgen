@@ -21,9 +21,12 @@
  * Endpoints covered structurally (orval emits no `*Response` zod for these
  * because they have no static response schema — POSTs that return only an
  * `id`, or out-of-spec routes):
- *   - POST /projects                    → { id, project_secret, … }
  *   - POST /schemas                     → { id }
  *   - POST /flow_definitions            → flow-definition-response envelope
+ *
+ * Also covered by zod here:
+ *   - POST /projects                    → CreateProjectResponse
+ *   - POST /projects/:id/origins        → AddOriginResponse
  *
  * `GET /schemas/:id` is NOT zod-validated here: the mock stores whatever
  * the user POSTed verbatim, so the response shape depends on the request
@@ -33,8 +36,10 @@
 import type { Server } from "node:http";
 
 import {
+  AddOriginResponse,
   CompleteClaimResponse,
   CreateIdpResponse,
+  CreateProjectResponse,
   ExchangeHandoffResponse,
   GetClaimStatusResponse,
   GetFlowDefinitionResponse,
@@ -314,33 +319,105 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         name: "conformance-app",
-        preview_origins: ["http://localhost:3000"],
+        origins: [{ pattern: "http://localhost:3000", kind: "preview" }],
         seed_defaults: false,
       }),
     });
     expect(res.status).toBe(201);
-    const body = (await res.json()) as Record<string, unknown>;
-    // No CreateProjectResponse zod schema is emitted by orval. Validate
-    // structurally against the fields create-project-response.yaml requires.
-    expect(typeof body.id).toBe("string");
-    expect(body.name).toBe("conformance-app");
-    expect(typeof body.project_secret).toBe("string");
-    expect(typeof body.preview_secret).toBe("string");
-    expect(Array.isArray(body.preview_origins)).toBe(true);
-    expect(typeof body.created_at).toBe("string");
+    const body = await res.json();
+    expect(() => CreateProjectResponse.parse(body)).not.toThrow();
+    expect(body).toMatchObject({
+      name: "conformance-app",
+      origins: [{ pattern: "http://localhost:3000", kind: "preview" }],
+    });
   });
 
   test("GET /projects/:id matches GetProjectResponse", async () => {
     const create = await fetch(`${BASE}/projects`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "conformance-app" }),
+      body: JSON.stringify({
+        name: "conformance-app",
+        origins: [{ pattern: "http://localhost:3000", kind: "primary" }],
+      }),
     });
     const { id } = (await create.json()) as { id: string };
     const res = await fetch(`${BASE}/projects/${id}`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(() => GetProjectResponse.parse(body)).not.toThrow();
+    expect(body).toMatchObject({
+      origins: [{ pattern: "http://localhost:3000", kind: "primary" }],
+    });
+  });
+
+  test("POST /projects/:id/origins adds a pattern and is idempotent for the same kind", async () => {
+    const create = await fetch(`${BASE}/projects`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "origins-app", seed_defaults: false }),
+    });
+    const { id } = (await create.json()) as { id: string };
+
+    const first = await fetch(`${BASE}/projects/${id}/origins`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ pattern: "https://app.example.com", kind: "primary" }),
+    });
+    expect(first.status).toBe(201);
+    const firstBody = await first.json();
+    expect(() => AddOriginResponse.parse(firstBody)).not.toThrow();
+    expect(firstBody).toEqual({ pattern: "https://app.example.com", kind: "primary" });
+    expect(firstBody).not.toHaveProperty("check");
+    expect(firstBody).not.toHaveProperty("warning");
+
+    const again = await fetch(`${BASE}/projects/${id}/origins`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ pattern: "https://app.example.com", kind: "primary" }),
+    });
+    expect(again.status).toBe(201);
+    expect(await again.json()).toEqual({ pattern: "https://app.example.com", kind: "primary" });
+
+    const conflict = await fetch(`${BASE}/projects/${id}/origins`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ pattern: "https://app.example.com", kind: "preview" }),
+    });
+    expect(conflict.status).toBe(409);
+    const conflictBody = (await conflict.json()) as Record<string, unknown>;
+    expect(conflictBody.code).toBe("origin.kind_conflict");
+  });
+
+  test("POST /projects/:id/origins/remove is idempotent 204", async () => {
+    const create = await fetch(`${BASE}/projects`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "origins-remove-app",
+        origins: [{ pattern: "https://preview.example.com", kind: "preview" }],
+        seed_defaults: false,
+      }),
+    });
+    const { id } = (await create.json()) as { id: string };
+
+    const remove = await fetch(`${BASE}/projects/${id}/origins/remove`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ pattern: "https://preview.example.com" }),
+    });
+    expect(remove.status).toBe(204);
+
+    const again = await fetch(`${BASE}/projects/${id}/origins/remove`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ pattern: "https://preview.example.com" }),
+    });
+    expect(again.status).toBe(204);
+
+    const get = await fetch(`${BASE}/projects/${id}`);
+    const body = await get.json();
+    expect(body.origins).toEqual([]);
   });
 
   test("GET /projects/:id on unknown id returns spec-compliant error envelope", async () => {
@@ -1117,9 +1194,9 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 });
 
 /**
- * The identity provider connection and variable endpoints the CLI's SSO
- * journey needs. The Go service does not exist yet (#1003), so this mock is
- * the only place `sso enable` / `plan` / `apply` can be driven end to end.
+ * The identity provider connection and variable endpoints the CLI's SSO journey
+ * needs. The Go service does not exist yet (#1003), so this mock is the only
+ * place `auth-method sso enable` / `plan` / `apply` can be driven end to end.
  */
 describe("api-mock idp connections and variables", () => {
   const connection = (over: Record<string, unknown> = {}) => ({
@@ -1183,6 +1260,77 @@ describe("api-mock idp connections and variables", () => {
     expect((body.definition as Record<string, unknown>).display_name).toBe("Google Workspace");
   });
 
+  describe("an oidc block that names only some endpoints", () => {
+    // The server's rule: none (discovery), or authorization_endpoint, jwks_uri,
+    // token_endpoint, and userinfo_endpoint unless id_token_mapping is true.
+    const endpoints = {
+      authorization_endpoint: "https://idp.test/authorize",
+      jwks_uri: "https://idp.test/jwks",
+      token_endpoint: "https://idp.test/token",
+      userinfo_endpoint: "https://idp.test/userinfo",
+    };
+    const withOidc = (over: object) =>
+      connection({
+        oidc: {
+          issuer: "https://idp.test",
+          scopes: ["openid"],
+          client_id: "${{ GOOGLE_CLIENT_ID }}",
+          client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+          ...over,
+        },
+      });
+
+    test.each<[string, object, string[]]>([
+      [
+        "one endpoint",
+        { token_endpoint: endpoints.token_endpoint },
+        ["authorization_endpoint", "jwks_uri", "userinfo_endpoint"],
+      ],
+      ["all but jwks_uri", { ...endpoints, jwks_uri: undefined }, ["jwks_uri"]],
+      [
+        "userinfo_endpoint alone under id_token_mapping",
+        { userinfo_endpoint: endpoints.userinfo_endpoint, id_token_mapping: true },
+        ["authorization_endpoint", "jwks_uri", "token_endpoint"],
+      ],
+    ])(
+      "refuses %s with idp.endpoints_partial, listing what is missing",
+      async (_case, over, missing) => {
+        const projectId = await newProject("idp-endpoints-partial");
+
+        const res = await putIdp(projectId, withOidc(over));
+
+        expect(res.status).toBe(400);
+        expect(await res.json()).toEqual({
+          code: "idp.endpoints_partial",
+          message: "identity provider connection: the endpoints are partially set",
+          details: { details: { missing } },
+        });
+      },
+    );
+
+    test("refuses a revision too, before the slug is looked up", async () => {
+      const projectId = await newProject("idp-endpoints-partial-revise");
+      expect((await putIdp(projectId, connection())).status).toBe(201);
+
+      const res = await putIdp(projectId, withOidc({ jwks_uri: endpoints.jwks_uri }));
+
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as { code: string }).code).toBe("idp.endpoints_partial");
+    });
+
+    test.each<[string, object]>([
+      ["every endpoint", endpoints],
+      [
+        "every endpoint but userinfo under id_token_mapping",
+        { ...endpoints, userinfo_endpoint: undefined, id_token_mapping: true },
+      ],
+    ])("accepts %s", async (_case, over) => {
+      const projectId = await newProject("idp-endpoints-full");
+
+      expect((await putIdp(projectId, withOidc(over))).status).toBe(201);
+    });
+  });
+
   test("reads one back by id, and 404s an id the project does not own", async () => {
     const mine = await newProject("idp-read-mine");
     const other = await newProject("idp-read-other");
@@ -1223,14 +1371,18 @@ describe("api-mock idp connections and variables", () => {
     });
     // 200 with the addressed owner read back, not 204.
     expect(patch.status).toBe(200);
-    expect(((await patch.json()) as Record<string, unknown>).GOOGLE_CLIENT_ID).toBe(
-      "824.apps.googleusercontent.com",
-    );
+    expect(((await patch.json()) as Record<string, unknown>).GOOGLE_CLIENT_ID).toEqual({
+      primary: "824.apps.googleusercontent.com",
+      preview: "824.apps.googleusercontent.com",
+    });
 
     const res = await fetch(`${BASE}/variables?project_id=${projectId}`);
     const body = (await res.json()) as Record<string, unknown>;
     expect(GetVariablesResponse.safeParse(body).success).toBe(true);
-    expect(body.GOOGLE_CLIENT_ID).toBe("824.apps.googleusercontent.com");
+    expect(body.GOOGLE_CLIENT_ID).toEqual({
+      primary: "824.apps.googleusercontent.com",
+      preview: "824.apps.googleusercontent.com",
+    });
   });
 
   test("reads and deletes one variable by name", async () => {
@@ -1243,7 +1395,7 @@ describe("api-mock idp connections and variables", () => {
 
     const read = await fetch(`${BASE}/variables/SESSION_TTL?project_id=${projectId}`);
     expect(read.status).toBe(200);
-    expect(await read.json()).toBe(900);
+    expect(await read.json()).toEqual({ primary: 900, preview: 900 });
 
     const removed = await fetch(`${BASE}/variables/SESSION_TTL?project_id=${projectId}`, {
       method: "DELETE",
@@ -1252,7 +1404,7 @@ describe("api-mock idp connections and variables", () => {
     expect((await fetch(`${BASE}/variables/SESSION_TTL?project_id=${projectId}`)).status).toBe(404);
   });
 
-  test("answers var.not_found for a name this owner does not hold", async () => {
+  test("answers var.not_found for a name the project does not hold", async () => {
     const projectId = await newProject("vars-missing");
 
     const res = await fetch(`${BASE}/variables/ABSENT?project_id=${projectId}`);
@@ -1290,7 +1442,7 @@ describe("api-mock idp connections and variables", () => {
       await fetch(`${BASE}/variables?project_id=${projectId}`)
     ).json()) as Record<string, unknown>;
 
-    expect(body.GOOGLE_CLIENT_SECRET).toEqual({ secret: true });
+    expect(body.GOOGLE_CLIENT_SECRET).toEqual({ primary: { secret: true } });
     expect(JSON.stringify(body)).not.toContain("GOCSPX-real");
   });
 
@@ -1308,7 +1460,7 @@ describe("api-mock idp connections and variables", () => {
     await patch({ DROP: null });
 
     const body = (await (await fetch(url)).json()) as Record<string, unknown>;
-    expect(body.KEEP).toBe("a");
+    expect(body.KEEP).toEqual({ primary: "a", preview: "a" });
     expect(body).not.toHaveProperty("DROP");
   });
 
@@ -1430,30 +1582,65 @@ describe("api-mock idp and variable contract details", () => {
     expect(res.status).toBe(400);
   });
 
-  test("keeps an environment's variables separate from the project's", async () => {
-    // The project level does not see into its environments and an environment
-    // does not inherit the project's: they are distinct owners.
-    const projectId = await newProject("vars-owners");
-    const write = (query: string, payload: object) =>
-      fetch(`${BASE}/variables?${query}`, {
+  test("keeps each kind's value separate", async () => {
+    // Nothing falls back between kinds: a preview value is its own, and a
+    // removal naming a kind leaves the other kind's value.
+    const projectId = await newProject("vars-kinds");
+    const url = (kind?: string) =>
+      `${BASE}/variables?project_id=${projectId}${kind === undefined ? "" : `&kind=${kind}`}`;
+    const write = (kind: string | undefined, payload: object) =>
+      fetch(url(kind), {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload),
       });
-    await write(`project_id=${projectId}`, { SHARED: { value: "project", secret: false } });
-    await write(`project_id=${projectId}&environment_name=production`, {
-      SHARED: { value: "prod", secret: false },
+    await write(undefined, { SHARED: "prod" });
+    await write("preview", { SHARED: "test" });
+
+    expect(await (await fetch(url())).json()).toEqual({
+      SHARED: { primary: "prod", preview: "test" },
+    });
+    expect(await (await fetch(url("primary"))).json()).toEqual({ SHARED: { primary: "prod" } });
+
+    const removed = await fetch(`${BASE}/variables/SHARED?project_id=${projectId}&kind=preview`, {
+      method: "DELETE",
+    });
+    expect(removed.status).toBe(204);
+    expect(
+      (await fetch(`${BASE}/variables/SHARED?project_id=${projectId}&kind=preview`)).status,
+    ).toBe(404);
+    expect(await (await fetch(url())).json()).toEqual({ SHARED: { primary: "prod" } });
+  });
+
+  test("writes a secret naming no kind for primary only, removing the preview value", async () => {
+    const projectId = await newProject("vars-secret-kind");
+    const url = `${BASE}/variables?project_id=${projectId}`;
+    await fetch(url, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ TOKEN: "plain", HOST: "example.com" }),
+    });
+    await fetch(url, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ TOKEN: { value: "s3cr3t", secret: true } }),
     });
 
-    const atProject = (await (
-      await fetch(`${BASE}/variables?project_id=${projectId}`)
-    ).json()) as Record<string, unknown>;
-    const atEnv = (await (
-      await fetch(`${BASE}/variables?project_id=${projectId}&environment_name=production`)
-    ).json()) as Record<string, unknown>;
+    expect(await (await fetch(url)).json()).toEqual({
+      TOKEN: { primary: { secret: true } },
+      HOST: { primary: "example.com", preview: "example.com" },
+    });
+  });
 
-    expect(atProject.SHARED).toBe("project");
-    expect(atEnv.SHARED).toBe("prod");
+  test("answers not_implemented for a deployment's variables", async () => {
+    const projectId = await newProject("vars-deployment");
+
+    const res = await fetch(
+      `${BASE}/deployments/dep_01KX5N7C9D2E7F0N9WD3P2E4YM6/variables?project_id=${projectId}`,
+    );
+
+    expect(res.status).toBe(501);
+    expect(((await res.json()) as { code?: string }).code).toBe("not_implemented");
   });
 
   test("reads back what the write did not touch", async () => {
@@ -1470,7 +1657,10 @@ describe("api-mock idp and variable contract details", () => {
     const second = await write({ SECOND: { value: "b", secret: false } });
 
     const body = (await second.json()) as Record<string, unknown>;
-    expect(body).toEqual({ FIRST: "a", SECOND: "b" });
+    expect(body).toEqual({
+      FIRST: { primary: "a", preview: "a" },
+      SECOND: { primary: "b", preview: "b" },
+    });
   });
 });
 
@@ -1621,15 +1811,14 @@ describe("api-mock project origins", () => {
     expect(await projectOrigins(project.id)).toEqual([]);
   });
 
-  test("404s removing a pattern the project does not hold", async () => {
+  test("answers 204 removing a pattern the project does not hold", async () => {
     const project = await newProject("origins-remove-missing");
 
     const res = await removeOrigin(project.id, project.projectSecret, {
       pattern: "https://app.acme.com",
     });
 
-    expect(res.status).toBe(404);
-    expect(((await res.json()) as { code: string }).code).toBe("origin.not_found");
+    expect(res.status).toBe(204);
   });
 
   test("refuses a write made with the preview secret", async () => {

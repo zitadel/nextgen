@@ -1,0 +1,15 @@
+title: OriginPayload
+type: object
+description: |
+  Allowlisted fields for `origin.added` and `origin.removed`.
+required:
+  - pattern
+  - kind
+properties:
+  pattern:
+    type: string
+  kind:
+    type: string
+    enum:
+      - primary
+      - preview

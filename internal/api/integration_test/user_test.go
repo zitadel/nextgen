@@ -1082,6 +1082,19 @@ func TestListPasskeys(t *testing.T) {
 		})
 	})
 
+	t.Run("a malformed page token is the caller's error", func(t *testing.T) {
+		t.Parallel()
+
+		_, user, client := dependencies(t)
+		resp, err := client.ListUserPasskeys(t.Context(), api.ListUserPasskeysParams{
+			UserID:    api.UserID(user.ID),
+			PageToken: api.NewOptPageToken("not-a-token"),
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListUserPasskeysBadRequest{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("req.invalid"), resp.(*api.ListUserPasskeysBadRequest).Code)
+	})
+
 	t.Run("unknown user returns 404", func(t *testing.T) {
 		t.Parallel()
 
