@@ -8,6 +8,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
 	"github.com/zitadel/nextgen/internal/storage/idpidentitylink"
 )
 
@@ -62,6 +63,30 @@ func (s idpIdentityLinkStatements) GetIDPIdentityLink(ctx context.Context, filte
 		return nil, wrapError(err)
 	}
 	return link, nil
+}
+
+// ListIDPIdentityLinks implements [service.IDPIdentityLinkStatements].
+func (s idpIdentityLinkStatements) ListIDPIdentityLinks(ctx context.Context, filter *database.ListOptions[domain.IDPIdentityLinkField]) (*database.ListResult[*domain.IDPIdentityLink], error) {
+	links, nextCursor, err := pagination.Page(filter.Pagination, idpidentitylink.Schema, func(limit uint32) ([]*domain.IDPIdentityLink, error) {
+		filter := filter.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileRead(&compiler, idpIdentityLinkQuery, filter, idpidentitylink.Schema); err != nil {
+			return nil, err
+		}
+		rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		links, err := pgx.CollectRows(rows, scanIDPIdentityLink)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		return links, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &database.ListResult[*domain.IDPIdentityLink]{Items: links, NextCursor: nextCursor}, nil
 }
 
 func scanIDPIdentityLink(row pgx.CollectableRow) (*domain.IDPIdentityLink, error) {

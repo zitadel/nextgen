@@ -4809,6 +4809,45 @@ func (c *MockAllStatementsListIDPConnectionsCall) DoAndReturn(f func(context.Con
 	return c
 }
 
+// ListIDPIdentityLinks mocks base method.
+func (m *MockAllStatements) ListIDPIdentityLinks(ctx context.Context, filter *database.ListOptions[domain.IDPIdentityLinkField]) (*database.ListResult[*domain.IDPIdentityLink], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListIDPIdentityLinks", ctx, filter)
+	ret0, _ := ret[0].(*database.ListResult[*domain.IDPIdentityLink])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListIDPIdentityLinks indicates an expected call of ListIDPIdentityLinks.
+func (mr *MockAllStatementsMockRecorder) ListIDPIdentityLinks(ctx, filter any) *MockAllStatementsListIDPIdentityLinksCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListIDPIdentityLinks", reflect.TypeOf((*MockAllStatements)(nil).ListIDPIdentityLinks), ctx, filter)
+	return &MockAllStatementsListIDPIdentityLinksCall{Call: call}
+}
+
+// MockAllStatementsListIDPIdentityLinksCall wrap *gomock.Call
+type MockAllStatementsListIDPIdentityLinksCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsListIDPIdentityLinksCall) Return(arg0 *database.ListResult[*domain.IDPIdentityLink], arg1 error) *MockAllStatementsListIDPIdentityLinksCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsListIDPIdentityLinksCall) Do(f func(context.Context, *database.ListOptions[domain.IDPIdentityLinkField]) (*database.ListResult[*domain.IDPIdentityLink], error)) *MockAllStatementsListIDPIdentityLinksCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsListIDPIdentityLinksCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.IDPIdentityLinkField]) (*database.ListResult[*domain.IDPIdentityLink], error)) *MockAllStatementsListIDPIdentityLinksCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ListJSONSchemas mocks base method.
 func (m *MockAllStatements) ListJSONSchemas(ctx context.Context, filter *database.ListOptions[domain.JSONSchemaField], opts service.JSONSchemaQueryOptions) (*database.ListResult[*domain.JSONSchema], error) {
 	m.ctrl.T.Helper()
