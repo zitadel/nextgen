@@ -64,6 +64,8 @@
       "web-component-analyzer>typescript": "^6.0.3",
       "@angular/build>rolldown": "^1.2.12",
       "unrun>rolldown": "^1.2.12",
+      "@vercel/analytics>nuxt": "-",
+      "@vercel/speed-insights>nuxt": "-",
       "launch-editor": "2.14.1",
       "qs": "^6.16.0",
       "@hono/node-server@>=1.0.0 <2.0.12": "^2.0.12",

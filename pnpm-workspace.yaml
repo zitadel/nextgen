@@ -8,6 +8,12 @@ packages:
   - "tools/*"
 
 catalog:
+  # Babel 7 for the Nuxt projects: Nuxt's sub-packages have optional peers on
+  # Babel 7 plugins, which pnpm auto-installs into every project with Nuxt in
+  # its graph, and it pairs their required @babel/core peer with the newest
+  # @babel/core in the lockfile (8.x, for Angular) unless the project declares
+  # its own. Without it, an install that re-resolves fails strictPeerDependencies.
+  "@babel/core": ^7.29.7
   "@biomejs/biome": ^2.5.15
   "@clack/prompts": ^1.2.0
   "@faker-js/faker": ^10.5.0
