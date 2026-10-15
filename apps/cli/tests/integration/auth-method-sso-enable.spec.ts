@@ -25,7 +25,7 @@ const ACME: CustomConnection = {
 };
 const ACME_CREDENTIALS = { clientId: "acme-client-id", secret: "acme-client-secret" };
 
-/** A provider `sso enable` can add, and how to ask for it. */
+/** A provider `auth-method sso enable` can add, and how to ask for it. */
 type Provider = {
   readonly name: string;
   readonly slug: string;
@@ -72,7 +72,7 @@ const anAppWithAcme = () => anAppWith(PROVIDERS[1] as Provider);
 /** A set-up project serving a custom connection. */
 const anAppServingAcme = () => anAppServing(PROVIDERS[1] as Provider);
 
-describe("sso enable", () => {
+describe("auth-method sso enable", () => {
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
       it("still writes the provider into the project", async () => {
@@ -644,13 +644,13 @@ describe("sso enable", () => {
         missing: "client secret",
         args: ["--provider", "google", "--client-id", "a-client-id"],
         secret: "",
-        suggests: "sso enable --provider google --client-id a-client-id",
+        suggests: "auth-method sso enable --provider google --client-id a-client-id",
       },
       {
         missing: "client id",
         args: ["--provider", "google"],
         secret: "a-client-secret",
-        suggests: "sso enable --provider google --client-id <client-id>",
+        suggests: "auth-method sso enable --provider google --client-id <client-id>",
       },
     ])("a catalog provider without a $missing", ({ args, secret, suggests }) => {
       it("suggests the command to run once it is to hand", async () => {

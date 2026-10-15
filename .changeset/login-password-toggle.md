@@ -10,6 +10,7 @@
 "@zitadel/sdk-angular": minor
 "@zitadel/sdk-next": minor
 "@zitadel/sdk-nuxt": minor
+"@zitadel/testing": minor
 ---
 
 feat: password fields in `<zitadel-login>` now have a show/hide button, as
@@ -25,3 +26,8 @@ field opts out of spellcheck and autocorrect, and it is hidden again on
 submit, form reset and step change. The widget applies the setting to its
 fields directly, so it also holds for ejected templates; it is not a
 `<zl-field>` attribute.
+
+`@zitadel/testing`: the flow helpers' label fallback (`flowField` with a
+`label`, used by `loginWithPassword` and `registerWithPassword`) now matches
+the field by its textbox role, so the toggle's "Show password" name never
+competes with the password field.

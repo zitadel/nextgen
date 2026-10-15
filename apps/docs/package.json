@@ -15,7 +15,7 @@
     "typecheck": "next typegen && tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json",
     "lint": "biome check .",
     "e2e": "playwright test",
-    "e2e-deployment": "test -n \"$DOCS_BASE_URL\" || { echo 'DOCS_BASE_URL names the deployment to test' >&2; exit 1; }; playwright test"
+    "e2e-deployment": "playwright test --config playwright.deployment.config.mts"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "catalog:",
