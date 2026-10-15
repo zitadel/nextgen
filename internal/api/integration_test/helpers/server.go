@@ -47,6 +47,7 @@ func (h *Harness) EnsureTestServer(t *testing.T) *httptest.Server {
 			h.EnsureAuthAttemptService(t),
 			h.EnsureKeyService(t),
 			h.EnsureVariableService(t),
+			h.EnsureVariableResolver(t),
 			h.EnsureHttpClient(t),
 		)), "code", "state")
 		// The same paths as the production mux (buildHTTPMux), not its

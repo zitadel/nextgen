@@ -36,14 +36,17 @@ type FlowSSOCallback struct {
 	connections IDPConnectionService
 	attempts    AuthAttemptService
 	keys        KeyService
-	variables   VariableService
+	// variables resolves the plain client_id, as the redirect did; only the
+	// resolver can read the client secret in clear.
+	variables VariableService
+	resolver  VariableResolver
 	// httpClient is the hardened egress client; the token endpoint is a
 	// tenant-authored URL (ADR 061).
 	httpClient *http.Client
 }
 
-func NewFlowSSOCallback(connections IDPConnectionService, attempts AuthAttemptService, keys KeyService, variables VariableService, httpClient *http.Client) *FlowSSOCallback {
-	return &FlowSSOCallback{connections: connections, attempts: attempts, keys: keys, variables: variables, httpClient: httpClient}
+func NewFlowSSOCallback(connections IDPConnectionService, attempts AuthAttemptService, keys KeyService, variables VariableService, resolver VariableResolver, httpClient *http.Client) *FlowSSOCallback {
+	return &FlowSSOCallback{connections: connections, attempts: attempts, keys: keys, variables: variables, resolver: resolver, httpClient: httpClient}
 }
 
 // FlowSSOCallbackInput is the provider's redirect, picked apart by the
@@ -213,7 +216,7 @@ func (c *FlowSSOCallback) resolveClientSecret(ctx context.Context, projectID str
 	// The primary value, as the redirect resolved the client_id.
 	// TODO: take the kind from the origin the request came in on once the
 	// release runtime resolves it, so a preview sign-in reads preview values.
-	vars, err := c.variables.GetDecryptedVariables(ctx, domain.VariableOwner{ProjectID: projectID}, new(domain.DeploymentOriginKindPrimary), name)
+	vars, err := c.resolver.GetDecryptedVariables(ctx, domain.VariableOwner{ProjectID: projectID}, new(domain.DeploymentOriginKindPrimary), name)
 	if err != nil {
 		return "", err
 	}

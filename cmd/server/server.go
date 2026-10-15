@@ -282,6 +282,9 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	grantService := service.NewGrantService(serviceDBPool, userRefs, cfg.Platform.ResolvedProjectID())
 	brandingService := service.NewBrandingService(serviceDBPool)
 	variableService := service.NewVariableService(serviceDBPool, keyService)
+	// The resolver reads secrets in clear; only the SSO callback holds it, the
+	// API handler gets the service above and cannot reach a decrypted value.
+	variableResolver := service.NewVariableResolver(serviceDBPool, keyService)
 	releaseService := service.NewReleaseService(serviceDBPool)
 	idpConnectionService := service.NewIDPConnectionService(serviceDBPool, schemaValidator)
 	eventService := service.NewEventService(serviceDBPool)
@@ -325,7 +328,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		service.NewFlowSSORedirectIssuer(idpConnectionService, authAttemptSvc, keyService, variableService, egressClient),
 		time.Now,
 	)
-	ssoCallback := service.NewFlowSSOCallback(idpConnectionService, authAttemptSvc, keyService, variableService, egressClient)
+	ssoCallback := service.NewFlowSSOCallback(idpConnectionService, authAttemptSvc, keyService, variableService, variableResolver, egressClient)
 
 	flowService := service.NewFlowService(serviceDBPool, stateMachine)
 	tokenService := service.NewTokenService(keyService, serviceDBPool)

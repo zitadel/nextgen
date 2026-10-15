@@ -61,7 +61,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 		consumeErr    error
 		setResultErrs []error
 		connections   func(m *servicemocks.MockIDPConnectionService)
-		variables     func(m *servicemocks.MockVariableService)
+		variables     func(m *servicemocks.MockVariableResolver)
 		wantErr       error
 		// wantResult is what must have been stored on the record; nil means
 		// nothing was stored.
@@ -195,7 +195,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 				m.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").
 					Return(&domain.IDPConnection{Slug: "google", RevisionID: "idprev_1", Document: revisionDoc}, nil)
 			},
-			variables: func(m *servicemocks.MockVariableService) {
+			variables: func(m *servicemocks.MockVariableResolver) {
 				m.EXPECT().GetDecryptedVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, new(domain.DeploymentOriginKindPrimary), "GOOGLE_SECRET").Return(nil, nil)
 			},
 			wantResult: &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed},
@@ -208,7 +208,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 				m.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").
 					Return(&domain.IDPConnection{Slug: "google", RevisionID: "idprev_1", Document: revisionDoc}, nil)
 			},
-			variables: func(m *servicemocks.MockVariableService) {
+			variables: func(m *servicemocks.MockVariableResolver) {
 				m.EXPECT().GetDecryptedVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, new(domain.DeploymentOriginKindPrimary), "GOOGLE_SECRET").
 					Return([]*domain.Variable{{Name: "GOOGLE_SECRET", Value: "plain", IsSecret: false}}, nil)
 			},
@@ -263,7 +263,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 			if tt.connections != nil {
 				tt.connections(connections)
 			}
-			variables := servicemocks.NewMockVariableService(ctrl)
+			variables := servicemocks.NewMockVariableResolver(ctrl)
 			if tt.variables != nil {
 				tt.variables(variables)
 			}
@@ -272,7 +272,7 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 				consumeErr:    tt.consumeErr,
 				setResultErrs: tt.setResultErrs,
 			}
-			svc := service.NewFlowSSOCallback(connections, attempts, servicemocks.NewMockKeyService(ctrl), variables, &http.Client{Transport: tripwireTransport{t}})
+			svc := service.NewFlowSSOCallback(connections, attempts, servicemocks.NewMockKeyService(ctrl), servicemocks.NewMockVariableService(ctrl), variables, &http.Client{Transport: tripwireTransport{t}})
 
 			out, err := svc.Process(t.Context(), tt.in)
 
@@ -328,7 +328,7 @@ func TestFlowSSOCallback_Process_WarnsUnlessCancelled(t *testing.T) {
 			connections.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").
 				Return(&domain.IDPConnection{Slug: "google", RevisionID: "idprev_1", Document: doc}, nil)
 			attempts := &fakeAuthAttempts{consumeCheck: &domain.SSOCallbackCheck{Pending: ssoCallbackPending()}}
-			svc := service.NewFlowSSOCallback(connections, attempts, servicemocks.NewMockKeyService(ctrl), servicemocks.NewMockVariableService(ctrl), &http.Client{Transport: tripwireTransport{t}})
+			svc := service.NewFlowSSOCallback(connections, attempts, servicemocks.NewMockKeyService(ctrl), servicemocks.NewMockVariableService(ctrl), servicemocks.NewMockVariableResolver(ctrl), &http.Client{Transport: tripwireTransport{t}})
 
 			_, err := svc.Process(ctx, service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"})
 			require.NoError(t, err)
@@ -358,7 +358,7 @@ func TestFlowSSOCallback_Process_BindsTheProjectAfterConsume(t *testing.T) {
 				consumeCheck: &domain.SSOCallbackCheck{Pending: ssoCallbackPending()},
 				consumeErr:   tt.consumeErr,
 			}
-			svc := service.NewFlowSSOCallback(servicemocks.NewMockIDPConnectionService(ctrl), attempts, servicemocks.NewMockKeyService(ctrl), servicemocks.NewMockVariableService(ctrl), &http.Client{Transport: tripwireTransport{t}})
+			svc := service.NewFlowSSOCallback(servicemocks.NewMockIDPConnectionService(ctrl), attempts, servicemocks.NewMockKeyService(ctrl), servicemocks.NewMockVariableService(ctrl), servicemocks.NewMockVariableResolver(ctrl), &http.Client{Transport: tripwireTransport{t}})
 
 			_, _ = svc.Process(ctx, service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Error: "access_denied"})
 
@@ -479,14 +479,14 @@ func TestFlowSSOCallback_Process_StoresTheIdentity(t *testing.T) {
 			connections := servicemocks.NewMockIDPConnectionService(ctrl)
 			connections.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").
 				Return(&domain.IDPConnection{Slug: ssoCallbackSlug, RevisionID: "idprev_1", Document: doc}, nil)
-			variables := servicemocks.NewMockVariableService(ctrl)
+			variables := servicemocks.NewMockVariableResolver(ctrl)
 			variables.EXPECT().GetDecryptedVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, new(domain.DeploymentOriginKindPrimary), "GOOGLE_SECRET").
 				Return([]*domain.Variable{{Name: "GOOGLE_SECRET", Value: "secret-1", IsSecret: true}}, nil)
 			attempts := &fakeAuthAttempts{
 				consumeCheck:  &domain.SSOCallbackCheck{Pending: ssoCallbackPending()},
 				setResultErrs: tt.setResultErrs,
 			}
-			svc := service.NewFlowSSOCallback(connections, attempts, servicemocks.NewMockKeyService(ctrl), variables, &http.Client{})
+			svc := service.NewFlowSSOCallback(connections, attempts, servicemocks.NewMockKeyService(ctrl), servicemocks.NewMockVariableService(ctrl), variables, &http.Client{})
 
 			in := service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code", BindingNonce: "bind-1"}
 			if tt.sendIssuer {
