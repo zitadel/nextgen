@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/url"
 	"strings"
 
 	"github.com/zitadel/nextgen/internal/audit"
@@ -20,8 +19,8 @@ const maxReleasePointers = 50
 // BuildSchema is one schemas[] entry: either an inline user-schema document or a schema-url.
 type BuildSchema struct {
 	Index    int
-	Document []byte // inline user-schema JSON; mutually exclusive with URL
-	URL      string // schema-url; mutually exclusive with Document
+	Document []byte
+	URL      string
 }
 
 // BuildIDP is one idps[] entry.
@@ -57,17 +56,12 @@ func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (*C
 	}
 
 	failures := &BundleValidationError{}
-	preparedSchemas, schemaByHandle, err := s.prepareBundleSchemas(ctx, input, failures)
-	if err != nil {
-		return nil, err
-	}
-	preparedFlows, err := s.prepareBundleFlows(ctx, input, schemaByHandle, failures)
-	if err != nil {
-		return nil, err
-	}
+	preparedSchemas, schemaByHandle := s.prepareBundleSchemas(input, failures)
+	preparedFlows := s.prepareBundleFlows(ctx, input, schemaByHandle, failures)
 	preparedIDPs := s.prepareBundleIDPs(input, failures)
 	var preparedBranding *domain.Branding
 	if input.Branding != nil {
+		var err error
 		preparedBranding, err = prepareBranding(*input.Branding)
 		if err != nil {
 			failures.add(domain.ReleasePointerKindBranding, 0, domain.ReleaseBrandingHandle, err)
@@ -81,7 +75,7 @@ func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (*C
 		out         *CreateReleaseOutput
 		contentHash string
 	)
-	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		stmts := tx.Statements()
 		content := domain.ReleaseContent{}
 
@@ -253,10 +247,9 @@ type preparedSchema struct {
 }
 
 func (s *releaseService) prepareBundleSchemas(
-	ctx context.Context,
 	input BuildReleaseInput,
 	failures *BundleValidationError,
-) ([]preparedSchema, map[string]*domain.JSONSchema, error) {
+) ([]preparedSchema, map[string]*domain.JSONSchema) {
 	prepared := make([]preparedSchema, len(input.Schemas))
 	byHandle := make(map[string]*domain.JSONSchema, len(input.Schemas))
 	for i, schema := range input.Schemas {
@@ -278,8 +271,7 @@ func (s *releaseService) prepareBundleSchemas(
 			byHandle[*model.ObjectType] = model
 		}
 	}
-	_ = ctx
-	return prepared, byHandle, nil
+	return prepared, byHandle
 }
 
 func (s *releaseService) prepareBundleFlows(
@@ -287,7 +279,7 @@ func (s *releaseService) prepareBundleFlows(
 	input BuildReleaseInput,
 	bundleSchemas map[string]*domain.JSONSchema,
 	failures *BundleValidationError,
-) ([]*domain.FlowDefinition, error) {
+) []*domain.FlowDefinition {
 	prepared := make([]*domain.FlowDefinition, 0, len(input.FlowDefinitions))
 	stmts := s.v2Pool.Statements()
 	for _, flow := range input.FlowDefinitions {
@@ -300,7 +292,7 @@ func (s *releaseService) prepareBundleFlows(
 		}
 		prepared = append(prepared, definition)
 	}
-	return prepared, nil
+	return prepared
 }
 
 func (s *releaseService) prepareBundleIDPs(input BuildReleaseInput, failures *BundleValidationError) [][]byte {
@@ -598,13 +590,4 @@ func brandingComparable(b *domain.Branding) map[string]any {
 		"typography":      b.Typography,
 		"shape":           b.Shape,
 	}
-}
-
-// ParseSchemaURL validates a schema-url string for Build.
-func ParseSchemaURL(raw string) (string, error) {
-	u, err := url.Parse(raw)
-	if err != nil || !u.IsAbs() {
-		return "", domain.ErrReleaseInvalid(fmt.Sprintf("schema-url %q is not an absolute URL", raw), err)
-	}
-	return u.String(), nil
 }

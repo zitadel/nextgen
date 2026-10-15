@@ -80,7 +80,7 @@ func TestBuildRelease(t *testing.T) {
 	})
 
 	t.Run("reports every failing resource at once", func(t *testing.T) {
-		// Passes OpenAPI decode; fails schema designation (x-identifier without x-unique:project).
+		// Designation fails: x-identifier without x-unique:project.
 		badSchema := fmt.Sprintf(`{
 			"$schema": "https://json-schema.org/draft/2020-12/schema",
 			"kind": "user-schema",
@@ -93,7 +93,7 @@ func TestBuildRelease(t *testing.T) {
 		var userSchema api.UserSchema
 		require.NoError(t, userSchema.UnmarshalJSON([]byte(badSchema)))
 
-		// Passes OpenAPI (purposes required); fails flow validation (entry step missing).
+		// Wire-valid; entry step for login is missing.
 		badFlow := api.FlowDefinition{
 			Name:       "build-bad-flow",
 			Status:     "active",
@@ -146,7 +146,6 @@ func TestBuildRelease(t *testing.T) {
 	})
 
 	t.Run("allocates a new branding revision only when content changes", func(t *testing.T) {
-		// Own project so the first build is not the shared project's reused branding.
 		own, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 		require.NoError(t, err)
 		ownClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)

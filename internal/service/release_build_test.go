@@ -164,7 +164,6 @@ func TestBuildRelease_ReusesUnchangedBranding(t *testing.T) {
 	statements.EXPECT().
 		ListBrandings(gomock.Any(), gomock.Any()).
 		Return(&database.ListResult[*domain.Branding]{Items: []*domain.Branding{existing}}, nil)
-	// CreateBranding must not be called when content matches.
 	existingRelease := &domain.Release{
 		ProjectID: "proj_1",
 		ID:        "rel_existing",

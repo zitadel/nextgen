@@ -13,21 +13,20 @@ import (
 func TestBundleValidationError(t *testing.T) {
 	t.Parallel()
 
-	err := &service.BundleValidationError{}
-	// Exercise add through an exported path: Build's empty/duplicate checks use
-	// ErrReleaseInvalid directly; this covers the collector shape the handler maps.
-	err.Resources = []service.BundleResourceFailure{
-		{
-			Kind:   domain.ReleasePointerKindSchema,
-			Index:  0,
-			Handle: "human-user",
-			Err:    domain.ErrJSONSchemaInvalid().WithMessage("bad schema"),
-		},
-		{
-			Kind:   domain.ReleasePointerKindFlowDefinition,
-			Index:  1,
-			Handle: "login",
-			Err:    domain.ErrFlowDefinitionInvalid("no purposes", nil),
+	err := &service.BundleValidationError{
+		Resources: []service.BundleResourceFailure{
+			{
+				Kind:   domain.ReleasePointerKindSchema,
+				Index:  0,
+				Handle: "human-user",
+				Err:    domain.ErrJSONSchemaInvalid().WithMessage("bad schema"),
+			},
+			{
+				Kind:   domain.ReleasePointerKindFlowDefinition,
+				Index:  1,
+				Handle: "login",
+				Err:    domain.ErrFlowDefinitionInvalid("no purposes", nil),
+			},
 		},
 	}
 	require.Error(t, err)
