@@ -138,6 +138,8 @@ export { enableVirtualPasskey } from "./passkey";
 export type { VirtualPasskey } from "./passkey";
 export { withZitadel } from "./playwright-config";
 export type { WithZitadelOptions } from "./playwright-config";
+export { identity } from "./seed";
+export { SESSION_COOKIE_NAME } from "./session";
 export type {
   ConnectedZitadel,
   Identity,

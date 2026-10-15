@@ -322,7 +322,7 @@ export const RESOURCES = {
     idField: "id",
     columns: ["id", "name", "created_at"],
     heading: "name",
-    detail: ["id", "preview_origins", "created_at", "updated_at"],
+    detail: ["id", "origins", "created_at", "updated_at"],
     list: list({
       items: "projects",
       body: QueryProjectsBody,

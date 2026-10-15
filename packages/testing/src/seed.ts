@@ -13,7 +13,9 @@ export interface SeedContext {
 /**
  * A unique unused email + password. Nothing is created on the instance —
  * this is the input for registration-flow specs, which must prove the flow
- * creates the user.
+ * creates the user. It needs no instance either, so both entry points export
+ * it for specs that run without `withZitadel()`; `seed.identity()` and
+ * `zitadel.identity()` call this function.
  */
 export function identity(): Identity {
   return {

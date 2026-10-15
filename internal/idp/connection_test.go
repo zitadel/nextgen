@@ -238,39 +238,33 @@ func TestParseConnection(t *testing.T) {
 			},
 		},
 		{
-			name: "an oauth2 body is refused",
+			name: "a userinfo endpoint alone under id_token mapping is partial",
+			body: `{
+				"slug": "custom",
+				"protocol": "oidc",
+				"display_name": "Custom",
+				"oidc": {
+					"issuer": "https://idp.example.test",
+					"id_token_mapping": true,
+					"userinfo_endpoint": "https://idp.example.test/userinfo",
+					"client_id": "client",
+					"client_secret": "${{ CUSTOM_SECRET }}",
+					"scopes": ["openid"]
+				}
+			}`,
+			wantErr:      new(domain.ErrIDPEndpointsPartial([]string{"authorization_endpoint", "jwks_uri", "token_endpoint"})),
+			wantCauseMsg: "missing endpoints: authorization_endpoint, jwks_uri, token_endpoint",
+		},
+		{
+			name: "a protocol other than oidc is an internal error",
 			body: `{
 				"slug": "github",
 				"protocol": "oauth2",
 				"display_name": "GitHub",
-				"subject_claim": "id",
-				"oauth2": {
-					"authorization_endpoint": "https://github.example.test/login/oauth/authorize",
-					"token_endpoint": "https://github.example.test/login/oauth/access_token",
-					"userinfo_endpoint": "https://api.github.example.test/user",
-					"client_id": "client",
-					"client_secret": "${{ GITHUB_SECRET }}"
-				}
+				"subject_claim": "id"
 			}`,
-			wantErr: new(domain.ErrIDPOAuth2Unsupported()),
-		},
-		{
-			name: "strategy pointers on an oidc body are refused, all of them in order",
-			body: `{
-				"slug": "google",
-				"protocol": "oidc",
-				"display_name": "Google",
-				"claim_mapping": {"email": "email", "phone": "phone_number"},
-				"verified_claims": {"phone": "$supplementary_fetch", "email": "$supplementary_fetch"},
-				"oidc": {
-					"issuer": "https://accounts.example.test",
-					"client_id": "client",
-					"client_secret": "${{ GOOGLE_SECRET }}",
-					"scopes": ["openid", "email"]
-				}
-			}`,
-			wantErr:      new(domain.ErrIDPStrategyPointerUnsupported([]string{"email", "phone"})),
-			wantCauseMsg: "verified by a strategy: email, phone",
+			wantErr:      new(domain.ErrInternal(nil)),
+			wantCauseMsg: `unknown protocol "oauth2"`,
 		},
 		{
 			name:         "an undecodable body is an internal error",

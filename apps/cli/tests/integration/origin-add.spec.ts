@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { anApp, aSetUpApp } from "../helpers/project";
+import { anApp, aSetUpApp, SETUP_ORIGIN } from "../helpers/project";
 
 const platform = usePlatformMock();
 
@@ -71,6 +71,7 @@ describe("origin add", () => {
 
         expect(result).toSucceed();
         expect(await app.projectOrigins()).toEqual([
+          SETUP_ORIGIN,
           { pattern: "https://app.acme.com", kind: "primary" },
         ]);
       });
@@ -81,7 +82,7 @@ describe("origin add", () => {
         const result = await app.addOrigin("https://*.acme.com", "primary");
 
         expect(result).toFailWith("E_VALIDATION");
-        expect(await app.projectOrigins()).toEqual([]);
+        expect(await app.projectOrigins()).toEqual([SETUP_ORIGIN]);
       });
 
       it("refuses an unbounded preview wildcard on a shared host", async () => {

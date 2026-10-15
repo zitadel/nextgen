@@ -41,40 +41,24 @@ func TestIdPConnectionMirrorMatchesSchema(t *testing.T) {
 		"the mirror no longer refs idp-protocol.yaml; compare protocol inline")
 	mirrorProperties["protocol"] = readYAML(t, "../idps/idp-protocol.yaml")
 
-	// A root allOf and an oauth2 allOf each turn their whole object into an
-	// untyped field, so the mirror states neither. Which protocol block is
-	// required, and the scope a supplementary fetch needs, are enforced by the
-	// server against the schema. Their bodies are pinned because the createIdp
-	// description and the mirror header restate them in prose.
+	// A root allOf turns the whole object into an untyped field, so the mirror
+	// does not state it. That the oidc protocol requires its block is enforced
+	// by the server against the schema. The body is pinned because the mirror
+	// header restates it in prose.
 	require.Equal(t, []any{
 		map[string]any{
 			"if":   map[string]any{"properties": map[string]any{"protocol": map[string]any{"const": "oidc"}}, "required": []any{"protocol"}},
-			"then": map[string]any{"required": []any{"oidc"}, "properties": map[string]any{"oauth2": false}},
+			"then": map[string]any{"required": []any{"oidc"}},
 		},
-		map[string]any{
-			"if":   map[string]any{"properties": map[string]any{"protocol": map[string]any{"const": "oauth2"}}, "required": []any{"protocol"}},
-			"then": map[string]any{"required": []any{"oauth2", "subject_claim"}, "properties": map[string]any{"oidc": false}},
-		},
-	}, schema["allOf"], "the root allOf changed; update the createIdp description and the mirror header")
+	}, schema["allOf"], "the root allOf changed; update the mirror header")
 	delete(schema, "allOf")
 
-	oauth2 := schemaProperties["oauth2"].(map[string]any)
-	require.Equal(t, []any{
-		map[string]any{
-			"if":   map[string]any{"properties": map[string]any{"supplementary_fetch": map[string]any{"const": "github_primary_email"}}, "required": []any{"supplementary_fetch"}},
-			"then": map[string]any{"required": []any{"scopes"}, "properties": map[string]any{"scopes": map[string]any{"contains": map[string]any{"const": "user:email"}}}},
-		},
-	}, oauth2["allOf"], "the oauth2 allOf changed; update the mirror header")
-	delete(oauth2, "allOf")
-
-	// An anyOf of consts aborts ogen with "sum types with same names not
-	// implemented" and the operation is dropped from the client altogether.
+	// ogen cannot carry the anyOf's const and pattern branches as one type.
 	// The mirror widens it to the two value classes ogen can carry; the schema
 	// keeps the exact set.
 	verifiedClaims := schemaProperties["verified_claims"].(map[string]any)
 	require.Equal(t, map[string]any{"anyOf": []any{
 		map[string]any{"const": true},
-		map[string]any{"const": "$supplementary_fetch"},
 		map[string]any{"pattern": "^[^$]", "type": "string"},
 	}}, verifiedClaims["additionalProperties"],
 		"the verified_claims value classes changed; widen the mirror's oneOf to match")
@@ -91,13 +75,6 @@ func TestIdPConnectionMirrorMatchesSchema(t *testing.T) {
 		field := oidcFields[name].(map[string]any)
 		_, ok := field["format"]
 		require.True(t, ok, "oidc.%s no longer carries format, drop it from this list", name)
-		delete(field, "format")
-	}
-	oauth2Fields := oauth2["properties"].(map[string]any)
-	for _, name := range []string{"authorization_endpoint", "token_endpoint", "userinfo_endpoint"} {
-		field := oauth2Fields[name].(map[string]any)
-		_, ok := field["format"]
-		require.True(t, ok, "oauth2.%s no longer carries format, drop it from this list", name)
 		delete(field, "format")
 	}
 

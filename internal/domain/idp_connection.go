@@ -21,9 +21,8 @@ func ErrIDPConnectionNotFound() Error {
 }
 
 // ErrIDPConnectionFieldImmutable rejects a revision that changes a field the
-// connection is identified by: protocol, subject_claim, and the field naming
-// the authority, which is issuer for OIDC and token_endpoint with
-// userinfo_endpoint for OAuth 2.0.
+// connection is identified by: protocol, subject_claim, and issuer, the field
+// naming the authority.
 // Those values decide which provider account a stored subject belongs to, so
 // changing one would repoint existing identities rather than reconfigure
 // them. details names the offending field.
@@ -53,10 +52,6 @@ type IDPConnectionDocument struct {
 	OIDC         struct {
 		Issuer *string `json:"issuer"`
 	} `json:"oidc"`
-	OAuth2 struct {
-		TokenEndpoint    *string `json:"token_endpoint"`
-		UserinfoEndpoint *string `json:"userinfo_endpoint"`
-	} `json:"oauth2"`
 }
 
 func ParseIDPConnectionDocument(document []byte) (IDPConnectionDocument, error) {
@@ -66,13 +61,9 @@ func ParseIDPConnectionDocument(document []byte) (IDPConnectionDocument, error) 
 }
 
 // IDPConnectionImmutableFieldsChanged returns the dotted paths of the identity
-// fields that next changes against stored (see ErrIDPConnectionFieldImmutable).
-// subject_claim is always compared. On an OIDC connection whose protocol
-// stays OIDC, an absent subject_claim counts as "sub", because the engine
-// resolves it to that claim (internal/idp). On a protocol change it is
-// compared as written, since the two protocols' defaults differ, and the
-// endpoint fields are skipped: those of two protocols are not comparable.
-// The order is protocol, subject_claim, then endpoints.
+// fields that next changes against stored (see ErrIDPConnectionFieldImmutable),
+// in the order protocol, subject_claim, oidc.issuer. An absent subject_claim
+// counts as "sub", because the engine resolves it to that claim (internal/idp).
 func IDPConnectionImmutableFieldsChanged(stored, next []byte) ([]string, error) {
 	before, err := ParseIDPConnectionDocument(stored)
 	if err != nil {
@@ -83,27 +74,13 @@ func IDPConnectionImmutableFieldsChanged(stored, next []byte) ([]string, error) 
 		return nil, err
 	}
 	var changed []string
-	protocolChanged := !sameString(before.Protocol, after.Protocol)
-	if protocolChanged {
-		changed = append(changed, "protocol")
-	}
-	beforeClaim, afterClaim := before.SubjectClaim, after.SubjectClaim
-	if !protocolChanged && sameString(before.Protocol, &oidcProtocol) {
-		beforeClaim, afterClaim = subOrClaim(beforeClaim), subOrClaim(afterClaim)
-	}
-	if !sameString(beforeClaim, afterClaim) {
-		changed = append(changed, "subject_claim")
-	}
-	if protocolChanged {
-		return changed, nil
-	}
 	for _, field := range []struct {
 		path          string
 		before, after *string
 	}{
+		{"protocol", before.Protocol, after.Protocol},
+		{"subject_claim", subOrClaim(before.SubjectClaim), subOrClaim(after.SubjectClaim)},
 		{"oidc.issuer", before.OIDC.Issuer, after.OIDC.Issuer},
-		{"oauth2.token_endpoint", before.OAuth2.TokenEndpoint, after.OAuth2.TokenEndpoint},
-		{"oauth2.userinfo_endpoint", before.OAuth2.UserinfoEndpoint, after.OAuth2.UserinfoEndpoint},
 	} {
 		if !sameString(field.before, field.after) {
 			changed = append(changed, field.path)
@@ -112,7 +89,7 @@ func IDPConnectionImmutableFieldsChanged(stored, next []byte) ([]string, error) 
 	return changed, nil
 }
 
-var oidcProtocol, oidcDefaultSubjectClaim = "oidc", "sub"
+var oidcDefaultSubjectClaim = "sub"
 
 // subOrClaim returns claim, or "sub" when it is absent.
 func subOrClaim(claim *string) *string {
@@ -136,12 +113,13 @@ func ErrIDPDiscoveryFailed(cause error) Error {
 	return newError(PrefixIDPConnection.ErrorCodePrefix("discovery_failed"), "identity provider connection: discovery failed", nil, cause)
 }
 
-// The following errors re-check at the start of an attempt what the schema enforced at
-// write time (defense in depth). Each is a distinct kind, so the log names
-// the rule; the user sees the generic misconfigured-provider error. Where a
-// rule applies to one of several fields, details names the field for the
-// client and the parent names it for the log; a value never appears in
-// either. The messages stay literal so the error schema generator sees them.
+// The following errors come from the engine's connection parse, which runs at
+// write time after the schema and again at the start of an attempt (defense
+// in depth). Each is a distinct kind, so the log names the rule; at sign-in
+// the user sees the generic misconfigured-provider error. Where a rule
+// applies to one of several fields, details names the field for the client
+// and the parent names it for the log; a value never appears in either. The
+// messages stay literal so the error schema generator sees them.
 
 // ErrIDPProtocolBlockMissing reports a document whose protocol names a block
 // the document does not carry. protocol is the schema enum value.
@@ -159,23 +137,10 @@ func ErrIDPEndpointCleartext(field string) Error {
 	return newError(PrefixIDPConnection.ErrorCodePrefix("endpoint_cleartext"), "identity provider connection: an endpoint is not https", map[string]any{"field": field}, fmt.Errorf("%s is not https", field))
 }
 
-// ErrIDPEndpointsPartial rejects an OIDC block that names some of the
-// endpoints the connection needs but not all.
+// ErrIDPEndpointsPartial rejects an OIDC block that sets an endpoint without
+// every other endpoint the connection needs. details lists the missing ones.
 func ErrIDPEndpointsPartial(missing []string) Error {
 	return newError(PrefixIDPConnection.ErrorCodePrefix("endpoints_partial"), "identity provider connection: the endpoints are partially set", map[string]any{"missing": missing}, fmt.Errorf("missing endpoints: %s", strings.Join(missing, ", ")))
-}
-
-// ErrIDPOAuth2Unsupported refuses a stored oauth2 connection: the schema
-// accepts the protocol, but the engine does not serve it yet (#1066).
-func ErrIDPOAuth2Unsupported() Error {
-	return newError(PrefixIDPConnection.ErrorCodePrefix("oauth2_unsupported"), "identity provider connection: the oauth2 protocol is not supported yet", nil, nil)
-}
-
-// ErrIDPStrategyPointerUnsupported refuses an oidc connection whose
-// verified_claims entries point at the supplementary_fetch strategy: only the
-// oauth2 block selects one. properties are the verified_claims keys.
-func ErrIDPStrategyPointerUnsupported(properties []string) Error {
-	return newError(PrefixIDPConnection.ErrorCodePrefix("strategy_pointer_unsupported"), "identity provider connection: an oidc connection cannot verify a property by strategy", map[string]any{"properties": properties}, fmt.Errorf("verified by a strategy: %s", strings.Join(properties, ", ")))
 }
 
 // ErrIDPExchangeFailed reports that the code exchange yielded no token. One
@@ -200,13 +165,6 @@ func ErrIDPIDTokenInvalid(cause error) Error {
 // object, or a sub other than the id_token's.
 func ErrIDPUserinfoFailed(cause error) Error {
 	return newError(PrefixIDPConnection.ErrorCodePrefix("userinfo_failed"), "identity provider connection: the userinfo request failed", nil, cause)
-}
-
-// ErrIDPSupplementaryFetchFailed reports that the connection's
-// supplementary_fetch strategy could not complete: its request failed or
-// its response did not parse. An empty result is not a failure.
-func ErrIDPSupplementaryFetchFailed(cause error) Error {
-	return newError(PrefixIDPConnection.ErrorCodePrefix("supplementary_fetch_failed"), "identity provider connection: the supplementary fetch failed", nil, cause)
 }
 
 // ErrIDPSubjectInvalid reports a subject claim the engine cannot key an

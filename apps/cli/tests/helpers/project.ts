@@ -31,6 +31,7 @@ export interface Envelope<T = Record<string, unknown>> {
   readonly message?: string;
   readonly hint?: string;
   readonly next_commands?: string[];
+  readonly warnings?: string[];
   readonly cli_version?: string;
   readonly command?: string;
   readonly source?: string;
@@ -80,6 +81,12 @@ export interface ProjectOrigin {
   readonly pattern: string;
   readonly kind: string;
 }
+
+/**
+ * The origin `zitadel setup` registers for the app it scaffolds: the development
+ * server, as a preview pattern. A fresh project already holds it.
+ */
+export const SETUP_ORIGIN: ProjectOrigin = { pattern: "http://localhost:3000", kind: "preview" };
 
 export interface RegisteredIdp {
   readonly id: string;
@@ -212,7 +219,7 @@ export type CustomConnection = {
   scopes?: string;
 };
 
-/** The flags describing a connection, under `--` for `sso enable` or `--sso-` for `setup`. */
+/** The flags describing a connection, under `--` for `auth-method sso enable` or `--sso-` for `setup`. */
 function customFlags(connection: CustomConnection, prefix: string): string[] {
   return [
     `${prefix}slug`,
@@ -270,10 +277,14 @@ export class ScaffoldedApp {
     );
   }
 
-  /** `sso enable` without `--json`, for a spec asserting what the developer reads. */
+  /**
+   * `auth-method sso enable` without `--json`, for a spec asserting what the
+   * developer reads.
+   */
   enableSsoRendered(provider: string, credentials: Credentials): Promise<CliResult> {
     return this.pipingStdin(credentials.secret, () =>
       this.cli([
+        "auth-method",
         "sso",
         "enable",
         "--non-interactive",
@@ -288,6 +299,7 @@ export class ScaffoldedApp {
   enableSso(provider: string, credentials: Credentials): Promise<CliResult> {
     return this.pipingSecret(credentials.secret, () =>
       this.cli([
+        "auth-method",
         "sso",
         "enable",
         "--non-interactive",
@@ -300,7 +312,61 @@ export class ScaffoldedApp {
     );
   }
 
-  /** `sso enable` for a connection the developer describes, secret piped as a script would. */
+  /** `auth-method password|passkey enable`. */
+  enableMethod(method: "password" | "passkey", extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli(["auth-method", method, "enable", "--non-interactive", "--json", ...extraArgs]);
+  }
+
+  /** `auth-method password|passkey disable`. */
+  disableMethod(method: "password" | "passkey", extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli([
+      "auth-method",
+      method,
+      "disable",
+      "--non-interactive",
+      "--json",
+      ...extraArgs,
+    ]);
+  }
+
+  /**
+   * `auth-method password|passkey enable` without `--json`, for what the
+   * developer reads.
+   */
+  enableMethodRendered(method: "password" | "passkey"): Promise<CliResult> {
+    return this.cli(["auth-method", method, "enable", "--non-interactive"]);
+  }
+
+  /**
+   * `auth-method password|passkey disable` without `--json`, for what the
+   * developer reads.
+   */
+  disableMethodRendered(method: "password" | "passkey"): Promise<CliResult> {
+    return this.cli(["auth-method", method, "disable", "--non-interactive"]);
+  }
+
+  /**
+   * `auth-method sso disable` without `--json`, for what the developer reads.
+   */
+  disableSsoRendered(provider: string): Promise<CliResult> {
+    return this.cli(["auth-method", "sso", "disable", "--non-interactive", "--provider", provider]);
+  }
+
+  /** `auth-method sso disable`. */
+  disableSso(provider: string, extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli([
+      "auth-method",
+      "sso",
+      "disable",
+      "--non-interactive",
+      "--json",
+      "--provider",
+      provider,
+      ...extraArgs,
+    ]);
+  }
+
+  /** `auth-method sso enable` for a connection the developer describes, secret piped as a script would. */
   enableCustomSso(connection: CustomConnection, credentials: Credentials): Promise<CliResult> {
     return this.enableSsoWith(
       [
@@ -314,10 +380,10 @@ export class ScaffoldedApp {
     );
   }
 
-  /** `sso enable` with exactly these flags, for a spec asserting how it refuses. */
+  /** `auth-method sso enable` with exactly these flags, for a spec asserting how it refuses. */
   enableSsoWith(args: string[], secret = "a-client-secret"): Promise<CliResult> {
     return this.pipingSecret(secret, () =>
-      this.cli(["sso", "enable", "--non-interactive", "--json", ...args]),
+      this.cli(["auth-method", "sso", "enable", "--non-interactive", "--json", ...args]),
     );
   }
 
@@ -436,6 +502,16 @@ export class ScaffoldedApp {
   /** Removes one origin pattern, non-interactively. */
   removeOrigin(pattern: string): Promise<CliResult> {
     return this.cli(["origin", "rm", pattern, "--force", "--json"]);
+  }
+
+  /**
+   * Removes every origin the project holds, `setup`'s own included, so a spec
+   * starts from the empty list, which admits any origin.
+   */
+  async clearOrigins(): Promise<void> {
+    for (const { pattern } of await this.projectOrigins()) {
+      expect(await this.removeOrigin(pattern), `removing ${pattern}`).toSucceed();
+    }
   }
 
   /** The origin patterns the project admits, read back through `origin list`. */
@@ -654,6 +730,7 @@ export class ScaffoldedApp {
         project_id: projectId,
         project_secret: "sk",
         preview_secret: "sk",
+        primary_origins: [],
         preview_origins: [],
         created_at: "2026-01-01T00:00:00.000Z",
       }),

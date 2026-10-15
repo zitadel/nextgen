@@ -237,7 +237,14 @@ describe("setup command", () => {
 
     expect(res.exitCode).toBe(0);
     const json = parseJson(res.stdout) as {
-      data: { sso: Array<{ provider: string; client_id: string; connection: string }> };
+      data: {
+        sso: Array<{
+          provider: string;
+          client_id: string;
+          connection: string;
+          callback_uri: string;
+        }>;
+      };
     };
     expect(Array.isArray(json.data.sso)).toBe(true);
     expect(json.data.sso).toHaveLength(1);
@@ -246,6 +253,39 @@ describe("setup command", () => {
       client_id: "1234-abc.apps.googleusercontent.com",
       connection: ".zitadel/idps/google.json",
     });
+    // The connection's own route: an agent registering the OAuth application
+    // reads it from here, since a JSON run shows no prompt.
+    expect(json.data.sso[0]?.callback_uri).toMatch(
+      /^http:\/\/localhost:\d+\/__nextgen\/idp\/google\/callback$/,
+    );
+  });
+
+  // A scripted `--sso` run without `--json` shows no prompt, so the summary
+  // box is the only place the developer reads the URI to register.
+  it("names the connection's redirect URI in the summary of a scripted --sso run", async () => {
+    const cwd = await makeNextProject();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--server",
+      "https://api.zitadel.cloud",
+      "--non-interactive",
+      "--dry-run",
+      "--skip-install",
+      "--framework",
+      "next",
+      "--sso",
+      "google",
+      "--sso-client-id",
+      "1234-abc.apps.googleusercontent.com",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    const output = `${res.stdout}${res.stderr}`;
+    expect(output).toContain("Redirect URI");
+    expect(output).toMatch(/http:\/\/localhost:\d+\/__nextgen\/idp\/google\/callback/);
   });
 
   describe("a custom provider", () => {
@@ -538,7 +578,7 @@ describe("setup command", () => {
             name: "demo",
             project_secret: "sk_proj_test_full",
             preview_secret: "sk_proj_test_preview",
-            preview_origins: ["http://localhost:3000"],
+            origins: [{ pattern: "http://localhost:3000", kind: "preview" }],
             created_at: "2026-04-21T14:03:11.000Z",
           },
           { status: 201 },
@@ -551,7 +591,7 @@ describe("setup command", () => {
     expect(res.exitCode).toBe(0);
     expect(createProjectBody).toMatchObject({
       name: expect.any(String),
-      preview_origins: expect.arrayContaining(["http://localhost:3000"]),
+      origins: expect.arrayContaining([{ pattern: "http://localhost:3000", kind: "preview" }]),
       seed_defaults: false,
     });
     const projectName = (createProjectBody as { name?: unknown }).name;

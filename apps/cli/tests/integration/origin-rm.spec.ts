@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { anApp, aSetUpApp } from "../helpers/project";
+import { anApp, aSetUpApp, SETUP_ORIGIN } from "../helpers/project";
 
 const platform = usePlatformMock();
 
@@ -70,11 +70,12 @@ describe("origin rm", () => {
         const result = await app.removeOrigin("https://app.acme.com");
 
         expect(result).toSucceed();
-        expect(await app.projectOrigins()).toEqual([]);
+        expect(await app.projectOrigins()).toEqual([SETUP_ORIGIN]);
       });
 
       it("warns that removing the last origin admits every origin", async () => {
         const app = await aSetUpApp();
+        await app.clearOrigins();
         await app.addOrigin("https://app.acme.com", "primary");
 
         const result = await app.removeOrigin("https://app.acme.com");
@@ -84,6 +85,7 @@ describe("origin rm", () => {
 
       it("says how to add an origin back after removing the last one", async () => {
         const app = await aSetUpApp();
+        await app.clearOrigins();
         await app.addOrigin("https://app.acme.com", "primary");
 
         const result = await app.removeOrigin("https://app.acme.com");
@@ -101,12 +103,12 @@ describe("origin rm", () => {
         expect(result).not.toSay("admits every origin");
       });
 
-      it("fails on a pattern the project does not hold", async () => {
+      it("succeeds on a pattern the project does not hold, as the server answers 204", async () => {
         const app = await aSetUpApp();
 
         const result = await app.removeOrigin("https://app.acme.com");
 
-        expect(result).toFailWith("E_NOT_FOUND");
+        expect(result).toSucceed();
       });
 
       it("refuses to remove without --force when non-interactive", async () => {
@@ -117,6 +119,7 @@ describe("origin rm", () => {
 
         expect(result).toFailWith("E_VALIDATION");
         expect(await app.projectOrigins()).toEqual([
+          SETUP_ORIGIN,
           { pattern: "https://app.acme.com", kind: "primary" },
         ]);
       });

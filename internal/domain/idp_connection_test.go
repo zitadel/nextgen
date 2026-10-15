@@ -9,14 +9,8 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-const (
-	oidcConnection = `{"slug":"google","protocol":"oidc","display_name":"Google",
-		"oidc":{"issuer":"https://accounts.google.com","client_id":"id","client_secret":"${{ S }}","scopes":["openid"]}}`
-	oauth2Connection = `{"slug":"github","protocol":"oauth2","display_name":"GitHub","subject_claim":"id",
-		"oauth2":{"authorization_endpoint":"https://github.com/login/oauth/authorize",
-		"token_endpoint":"https://github.com/login/oauth/access_token",
-		"userinfo_endpoint":"https://api.github.com/user","client_id":"id","client_secret":"${{ S }}"}}`
-)
+const oidcConnection = `{"slug":"google","protocol":"oidc","display_name":"Google",
+	"oidc":{"issuer":"https://accounts.google.com","client_id":"id","client_secret":"${{ S }}","scopes":["openid"]}}`
 
 func TestIDPConnectionImmutableFieldsChanged(t *testing.T) {
 	t.Parallel()
@@ -61,25 +55,12 @@ func TestIDPConnectionImmutableFieldsChanged(t *testing.T) {
 			want: []string{"subject_claim"},
 		},
 		{
-			name:   "both oauth2 endpoints are reported together",
-			stored: oauth2Connection,
-			next: `{"slug":"github","protocol":"oauth2","display_name":"GitHub","subject_claim":"id",
-				"oauth2":{"authorization_endpoint":"https://github.com/login/oauth/authorize",
-				"token_endpoint":"https://other.example.com/token",
-				"userinfo_endpoint":"https://other.example.com/user","client_id":"id","client_secret":"${{ S }}"}}`,
-			want: []string{"oauth2.token_endpoint", "oauth2.userinfo_endpoint"},
-		},
-		{
-			name:   "a protocol change still compares subject_claim",
+			// The schema allows only oidc, so this guards a protocol added later.
+			name:   "every changed field is reported, protocol first",
 			stored: oidcConnection,
-			next:   `{"slug":"google","protocol":"oauth2","display_name":"Google","subject_claim":"id","oauth2":{"token_endpoint":"https://x.example.com"}}`,
-			want:   []string{"protocol", "subject_claim"},
-		},
-		{
-			name:   "a protocol change skips the endpoints",
-			stored: oauth2Connection,
-			next:   `{"slug":"github","protocol":"oidc","display_name":"GitHub","subject_claim":"id","oidc":{"issuer":"https://x.example.com"}}`,
-			want:   []string{"protocol"},
+			next: `{"slug":"google","protocol":"saml","display_name":"Google","subject_claim":"oid",
+				"oidc":{"issuer":"https://evil.example.com","client_id":"id","client_secret":"${{ S }}","scopes":["openid"]}}`,
+			want: []string{"protocol", "subject_claim", "oidc.issuer"},
 		},
 	}
 	for _, tt := range tests {
