@@ -33,6 +33,11 @@ Where the two differ on purpose:
   real-instance lanes of `e2e`). They set them as defaults
   (`${VAR-default}`), so a caller's own value still wins, as it does over
   moon's `env`.
+- Turbo's console `build` lists the package's `.env*` files as inputs, which
+  git ignores and `vite.config.ts` reads the build's variables from. Moon
+  hashes only the files git sees, listed or not, so `moon.yml` does not list
+  them: under moon a changed `.env.local` still restores the build made
+  without it.
 
 ## Shared tasks live in `.moon/tasks`
 
