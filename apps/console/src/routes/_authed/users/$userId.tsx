@@ -97,6 +97,8 @@ const CARD_HEAD = "flex items-center gap-3 px-6 pt-5 pb-4";
 // 18px between fields on both axes.
 const GRID = "grid gap-4.5 px-6 pt-4 pb-5 sm:grid-cols-2";
 const ROW = "flex items-center justify-between gap-4 px-6 pt-4 pb-5";
+// A row's secondary text: counts, dates, and the states that stand in for them.
+const ROW_NOTE = "text-muted-foreground text-[13px] leading-[22px]";
 // The divider sits inside the body padding rather than spanning the card, and
 // `w-full` is applied by an orientation variant that out-specifies a plain
 // utility — so the override has to carry the same variant.
@@ -200,14 +202,10 @@ function UserDetail() {
             <div className={ROW}>
               <span className="text-foreground text-sm font-medium">Passkey</span>
               {passkeys === undefined ? (
-                <span className="text-muted-foreground text-[13px] leading-[22px]">
-                  Could not be loaded
-                </span>
+                <span className={ROW_NOTE}>Could not be loaded</span>
               ) : (
                 <div className="flex items-center gap-3">
-                  <span className="text-muted-foreground text-[13px] leading-[22px]">
-                    {passkeys.length} registered
-                  </span>
+                  <span className={ROW_NOTE}>{passkeys.length} registered</span>
                   {/* The design's only badge here is `Enabled`.
                       With nothing registered the count already says so, and a
                       second capsule reading `None` restates it. */}
@@ -241,17 +239,10 @@ function IdentityLinks({
   links: UserIdentityLink[] | undefined;
   idps: IdpConnection[] | null;
 }) {
-  if (links === undefined) {
+  if (!links?.length) {
     return (
-      <p className="text-muted-foreground px-6 pt-4 pb-5 text-[13px] leading-[22px]">
-        Could not be loaded
-      </p>
-    );
-  }
-  if (links.length === 0) {
-    return (
-      <p className="text-muted-foreground px-6 pt-4 pb-5 text-[13px] leading-[22px]">
-        No identity provider is linked to this user.
+      <p className={`${ROW_NOTE} px-6 pt-4 pb-5`}>
+        {links ? "No identity provider is linked to this user." : "Could not be loaded"}
       </p>
     );
   }
@@ -278,9 +269,7 @@ function IdentityLinks({
                 {link.connection_id}
               </span>
             )}
-            <span className="text-muted-foreground shrink-0 text-[13px] leading-[22px]">
-              Linked {formatDate(link.created_at)}
-            </span>
+            <span className={`${ROW_NOTE} shrink-0`}>Linked {formatDate(link.created_at)}</span>
           </li>
         );
       })}
