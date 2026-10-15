@@ -49,16 +49,45 @@ type ListReleasesOutput struct {
 
 type ReleaseService interface {
 	Create(ctx context.Context, input CreateReleaseInput) (*CreateReleaseOutput, error)
+	Build(ctx context.Context, input BuildReleaseInput) (*CreateReleaseOutput, error)
 	Get(ctx context.Context, projectID, id string) (*domain.Release, error)
 	List(ctx context.Context, input ListReleasesInput) (*ListReleasesOutput, error)
 }
 
 type releaseService struct {
-	v2Pool *DB
+	v2Pool   *DB
+	schemas  *SchemaService
+	flows    *flowDefinitionService
+	branding *BrandingService
+	idps     *idpConnectionService
 }
 
-func NewReleaseService(v2Pool *DB) ReleaseService {
-	return &releaseService{v2Pool: v2Pool}
+// NewReleaseService wires Build's kind writers. flows and idps must be the
+// concretes returned by NewFlowDefinitionService and NewIDPConnectionService
+// so Build can call their package-private AllStatements methods.
+func NewReleaseService(
+	v2Pool *DB,
+	schemas *SchemaService,
+	flows FlowDefinitionService,
+	branding *BrandingService,
+	idps IDPConnectionService,
+) ReleaseService {
+	rs := &releaseService{v2Pool: v2Pool, schemas: schemas, branding: branding}
+	if flows != nil {
+		fs, ok := flows.(*flowDefinitionService)
+		if !ok {
+			panic(fmt.Sprintf("NewReleaseService: flows must be NewFlowDefinitionService, got %T", flows))
+		}
+		rs.flows = fs
+	}
+	if idps != nil {
+		is, ok := idps.(*idpConnectionService)
+		if !ok {
+			panic(fmt.Sprintf("NewReleaseService: idps must be NewIDPConnectionService, got %T", idps))
+		}
+		rs.idps = is
+	}
+	return rs
 }
 
 // Create assembles a release from revisions that already exist.

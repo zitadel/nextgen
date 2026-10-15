@@ -92,6 +92,54 @@ func (s *idpConnectionService) CreateOrRevise(ctx context.Context, projectID str
 	return s.revise(ctx, projectID, existing.ID, document)
 }
 
+// createOrRevise validates and writes document on stmts. When equalToCurrent
+// is true and a connection already exists with identical content, the current
+// revision is returned without writing.
+func (s *idpConnectionService) createOrRevise(ctx context.Context, stmts AllStatements, projectID string, document []byte) (*CreateIDPConnectionOutput, error) {
+	slug, err := s.validate(document)
+	if err != nil {
+		return nil, err
+	}
+	existing, err := stmts.GetIDPConnection(ctx, idpConnectionBy(projectID, domain.IDPConnectionFieldSlug, slug))
+	if err == nil {
+		same, eqErr := domain.JSONEqual(existing.Document, document)
+		if eqErr == nil && same {
+			return &CreateIDPConnectionOutput{Connection: existing}, nil
+		}
+		if err := stmts.LockIDPConnection(ctx, projectID, existing.ID); err != nil {
+			return nil, err
+		}
+		current, err := stmts.GetIDPConnection(ctx, idpConnectionBy(projectID, domain.IDPConnectionFieldID, existing.ID))
+		if err != nil {
+			return nil, err
+		}
+		entity, reviseErr := s.reviseWith(ctx, stmts, current, document)
+		if reviseErr != nil {
+			return nil, reviseErr
+		}
+		return &CreateIDPConnectionOutput{Connection: entity}, nil
+	}
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
+		return nil, domain.ErrInternal(err).WithMessage("failed to look up identity provider connection")
+	}
+	entity := &domain.IDPConnection{ProjectID: projectID, Slug: slug, Document: document}
+	if err := s.createWith(ctx, stmts, entity); err != nil {
+		if errors.Is(err, errIDPSlugTaken) {
+			existing, getErr := stmts.GetIDPConnection(ctx, idpConnectionBy(projectID, domain.IDPConnectionFieldSlug, slug))
+			if getErr != nil {
+				return nil, getErr
+			}
+			revised, reviseErr := s.reviseWith(ctx, stmts, existing, document)
+			if reviseErr != nil {
+				return nil, reviseErr
+			}
+			return &CreateIDPConnectionOutput{Connection: revised}, nil
+		}
+		return nil, err
+	}
+	return &CreateIDPConnectionOutput{Connection: entity, Created: true}, nil
+}
+
 // errIDPSlugTaken reports that create lost the race for a slug to another
 // caller, which CreateOrRevise answers by revising the winner's connection.
 var errIDPSlugTaken = errors.New("identity provider connection slug taken")
@@ -121,14 +169,7 @@ func (s *idpConnectionService) validate(document []byte) (string, error) {
 
 func (s *idpConnectionService) create(ctx context.Context, entity *domain.IDPConnection) (*domain.IDPConnection, error) {
 	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		if err := tx.Statements().CreateIDPConnection(ctx, entity); err != nil {
-			return err
-		}
-		payload, err := domain.IDPConnectionPayloadSnapshot(entity)
-		if err != nil {
-			return err
-		}
-		return emitIDPConnectionEvent(ctx, tx, domain.EventTypeIDPCreated, entity, payload)
+		return s.createWith(ctx, tx.Statements(), entity)
 	})
 	if err == nil {
 		return entity, nil
@@ -138,10 +179,30 @@ func (s *idpConnectionService) create(ctx context.Context, entity *domain.IDPCon
 	if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
 		return nil, domain.ErrIDPConnectionNotFound().WithParent(err)
 	}
-	if _, ok := errors.AsType[*database.UniqueError](err); ok {
-		return nil, fmt.Errorf("%w: %w", errIDPSlugTaken, err)
+	if errors.Is(err, errIDPSlugTaken) {
+		return nil, err
+	}
+	if de, ok := errors.AsType[domain.Error](err); ok {
+		return nil, de
 	}
 	return nil, domain.ErrInternal(err).WithMessage("failed to create identity provider connection")
+}
+
+func (s *idpConnectionService) createWith(ctx context.Context, stmts AllStatements, entity *domain.IDPConnection) error {
+	if err := stmts.CreateIDPConnection(ctx, entity); err != nil {
+		if _, ok := errors.AsType[*database.UniqueError](err); ok {
+			return fmt.Errorf("%w: %w", errIDPSlugTaken, err)
+		}
+		if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
+			return domain.ErrIDPConnectionNotFound().WithParent(err)
+		}
+		return domain.ErrInternal(err).WithMessage("failed to create identity provider connection")
+	}
+	payload, err := domain.IDPConnectionPayloadSnapshot(entity)
+	if err != nil {
+		return err
+	}
+	return emitIDPConnectionEvent(ctx, stmts, domain.EventTypeIDPCreated, entity, payload)
 }
 
 // revise appends document as a new revision of connection id. The newest
@@ -156,38 +217,19 @@ func (s *idpConnectionService) create(ctx context.Context, entity *domain.IDPCon
 func (s *idpConnectionService) revise(ctx context.Context, projectID, id string, document []byte) (*CreateIDPConnectionOutput, error) {
 	var entity *domain.IDPConnection
 	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		if err := tx.Statements().LockIDPConnection(ctx, projectID, id); err != nil {
+		stmts := tx.Statements()
+		if err := stmts.LockIDPConnection(ctx, projectID, id); err != nil {
 			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 				return domain.ErrIDPConnectionNotFound().WithParent(err)
 			}
 			return err
 		}
-		current, err := tx.Statements().GetIDPConnection(ctx, idpConnectionBy(projectID, domain.IDPConnectionFieldID, id))
+		current, err := stmts.GetIDPConnection(ctx, idpConnectionBy(projectID, domain.IDPConnectionFieldID, id))
 		if err != nil {
 			return err
 		}
-		changed, err := domain.IDPConnectionImmutableFieldsChanged(current.Document, document)
-		if err != nil {
-			return err
-		}
-		if len(changed) > 0 {
-			return domain.ErrIDPConnectionFieldImmutable(map[string][]string{"fields": changed})
-		}
-		entity = &domain.IDPConnection{
-			ProjectID: current.ProjectID,
-			ID:        current.ID,
-			Slug:      current.Slug,
-			Document:  document,
-			CreatedAt: current.CreatedAt,
-		}
-		if err := tx.Statements().ReviseIDPConnection(ctx, entity); err != nil {
-			return err
-		}
-		payload, err := domain.IDPConnectionPayloadDelta(current, entity)
-		if err != nil {
-			return err
-		}
-		return emitIDPConnectionEvent(ctx, tx, domain.EventTypeIDPUpdated, entity, payload)
+		entity, err = s.reviseWith(ctx, stmts, current, document)
+		return err
 	})
 	if err != nil {
 		// Two revisions of one connection on the same instant have no newest,
@@ -203,8 +245,36 @@ func (s *idpConnectionService) revise(ctx context.Context, projectID, id string,
 	return &CreateIDPConnectionOutput{Connection: entity}, nil
 }
 
-func emitIDPConnectionEvent(ctx context.Context, tx Statementer[AllStatements], eventType domain.EventType, entity *domain.IDPConnection, payload domain.IDPConnectionPayload) error {
-	return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+func (s *idpConnectionService) reviseWith(ctx context.Context, stmts AllStatements, current *domain.IDPConnection, document []byte) (*domain.IDPConnection, error) {
+	changed, err := domain.IDPConnectionImmutableFieldsChanged(current.Document, document)
+	if err != nil {
+		return nil, err
+	}
+	if len(changed) > 0 {
+		return nil, domain.ErrIDPConnectionFieldImmutable(map[string][]string{"fields": changed})
+	}
+	entity := &domain.IDPConnection{
+		ProjectID: current.ProjectID,
+		ID:        current.ID,
+		Slug:      current.Slug,
+		Document:  document,
+		CreatedAt: current.CreatedAt,
+	}
+	if err := stmts.ReviseIDPConnection(ctx, entity); err != nil {
+		return nil, err
+	}
+	payload, err := domain.IDPConnectionPayloadDelta(current, entity)
+	if err != nil {
+		return nil, err
+	}
+	if err := emitIDPConnectionEvent(ctx, stmts, domain.EventTypeIDPUpdated, entity, payload); err != nil {
+		return nil, err
+	}
+	return entity, nil
+}
+
+func emitIDPConnectionEvent(ctx context.Context, stmts AllStatements, eventType domain.EventType, entity *domain.IDPConnection, payload domain.IDPConnectionPayload) error {
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
 		Type:       eventType,
 		Category:   domain.EventCategoryAdmin,
 		ProjectID:  entity.ProjectID,

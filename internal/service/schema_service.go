@@ -66,49 +66,13 @@ func NewSchemaService(
 }
 
 func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInput) (_ *domain.JSONSchema, err error) {
-	model, err := domain.NewJSONSchema(input.ProjectID, input.Schema)
+	model, err := s.prepareSchema(input)
 	if err != nil {
 		return nil, err
 	}
 
-	err = s.schemaValidator.ValidateAgainstMetaSchema(input.Schema)
-	if err != nil {
-		invalid := domain.ErrJSONSchemaInvalid().WithParent(err)
-		if errors.Is(err, domain.ErrSchemaDesignationInvalid) {
-			// The designation rules are semantic and their text is the only
-			// pointer to which rule fired; Parent is never serialized
-			// (ADR 030), so carry the message to the client.
-			invalid = invalid.WithMessage(err.Error())
-		}
-		return nil, invalid
-	}
-
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		stmts := tx.Statements()
-		if err := stmts.CreateJSONSchema(ctx, model); err != nil {
-			if _, ok := errors.AsType[*database.IntegrityViolationError](err); ok {
-				// Which of the two unique constraints fired is settled after the
-				// transaction ends, by classifyCreateConflict.
-				return err
-			}
-			return domain.ErrInternal(err).WithMessage("failed to create schema in database")
-		}
-
-		// Pass the just-created payload so Resolve does not re-load (or HTTP-refetch
-		// and re-insert) the same URL inside this transaction — Spanner can surface
-		// the duplicate as a commit-time AlreadyExists otherwise.
-		_, err := s.schemaResolver.Resolve(ctx, stmts, input.ProjectID, model.URL, model.Schema)
-		if err != nil {
-			return resolveSchemaError(err)
-		}
-		return audit.Emit(ctx, stmts, audit.EmitSpec{
-			Type:       domain.EventTypeSchemaCreated,
-			Category:   domain.EventCategoryAdmin,
-			ProjectID:  model.ProjectID,
-			EntityType: "json_schema",
-			EntityID:   model.URL,
-			Payload:    domain.SchemaCreatedPayloadSnapshot(model),
-		})
+		return s.createSchema(ctx, tx.Statements(), model)
 	})
 	if err != nil {
 		if de, ok := errors.AsType[domain.Error](err); ok {
@@ -121,6 +85,54 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 	}
 
 	return model, nil
+}
+
+// prepareSchema validates and builds the domain model without writing.
+func (s *SchemaService) prepareSchema(input CreateSchemaInput) (*domain.JSONSchema, error) {
+	model, err := domain.NewJSONSchema(input.ProjectID, input.Schema)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.schemaValidator.ValidateAgainstMetaSchema(input.Schema); err != nil {
+		invalid := domain.ErrJSONSchemaInvalid().WithParent(err)
+		if errors.Is(err, domain.ErrSchemaDesignationInvalid) {
+			// The designation rules are semantic and their text is the only
+			// pointer to which rule fired; Parent is never serialized
+			// (ADR 030), so carry the message to the client.
+			invalid = invalid.WithMessage(err.Error())
+		}
+		return nil, invalid
+	}
+	return model, nil
+}
+
+// createSchema inserts a prepared schema and emits its event on stmts.
+// Callers that open their own transaction (CreateSchema, ReleaseService.Build)
+// share this write path.
+func (s *SchemaService) createSchema(ctx context.Context, stmts AllStatements, model *domain.JSONSchema) error {
+	if err := stmts.CreateJSONSchema(ctx, model); err != nil {
+		if _, ok := errors.AsType[*database.IntegrityViolationError](err); ok {
+			// Which of the two unique constraints fired is settled after the
+			// transaction ends, by classifyCreateConflict.
+			return err
+		}
+		return domain.ErrInternal(err).WithMessage("failed to create schema in database")
+	}
+
+	// Pass the just-created payload so Resolve does not re-load (or HTTP-refetch
+	// and re-insert) the same URL inside this transaction — Spanner can surface
+	// the duplicate as a commit-time AlreadyExists otherwise.
+	if _, err := s.schemaResolver.Resolve(ctx, stmts, model.ProjectID, model.URL, model.Schema); err != nil {
+		return resolveSchemaError(err)
+	}
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeSchemaCreated,
+		Category:   domain.EventCategoryAdmin,
+		ProjectID:  model.ProjectID,
+		EntityType: "json_schema",
+		EntityID:   model.URL,
+		Payload:    domain.SchemaCreatedPayloadSnapshot(model),
+	})
 }
 
 // classifyCreateConflict tells the two unique constraints on json_schemas apart.
@@ -168,11 +180,7 @@ func resolveSchemaError(err error) error {
 func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, input CreateSchemaByURLInput) (*domain.JSONSchema, error) {
 	strURI := input.URL.String()
 	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		_, err := s.schemaResolver.Resolve(ctx, tx.Statements(), input.ProjectID, strURI, nil)
-		if err != nil {
-			return resolveSchemaError(err)
-		}
-		return nil
+		return s.createSchemaByURL(ctx, tx.Statements(), input.ProjectID, strURI)
 	})
 	if err != nil {
 		if de, ok := errors.AsType[domain.Error](err); ok {
@@ -182,6 +190,15 @@ func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, input CreateSchem
 	}
 
 	return s.v2Pool.Statements().GetJSONSchemaByID(ctx, input.ProjectID, strURI)
+}
+
+// createSchemaByURL resolves and stores a schema-url entry on stmts.
+func (s *SchemaService) createSchemaByURL(ctx context.Context, stmts AllStatements, projectID, schemaURL string) error {
+	_, err := s.schemaResolver.Resolve(ctx, stmts, projectID, schemaURL, nil)
+	if err != nil {
+		return resolveSchemaError(err)
+	}
+	return nil
 }
 
 func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
