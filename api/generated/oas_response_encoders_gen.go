@@ -17,7 +17,7 @@ import (
 
 func encodeAddOriginResponse(response AddOriginRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *ProjectOrigin:
+	case *AddOriginResponse:
 		if err := func() error {
 			if err := response.Validate(); err != nil {
 				return err
@@ -3971,7 +3971,7 @@ func encodeGetUserByIDResponse(response GetUserByIDRes, w http.ResponseWriter, s
 
 func encodeGetVariableResponse(response GetVariableRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *Variable:
+	case *VariableByKind:
 		if err := func() error {
 			if err := response.Validate(); err != nil {
 				return err
@@ -4024,7 +4024,7 @@ func encodeGetVariableResponse(response GetVariableRes, w http.ResponseWriter, s
 
 func encodeGetVariablesResponse(response GetVariablesRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *Variables:
+	case *VariablesByKind:
 		if err := func() error {
 			if err := response.Validate(); err != nil {
 				return err
@@ -6797,7 +6797,7 @@ func encodeUpdateTeamResponse(response UpdateTeamRes, w http.ResponseWriter, spa
 
 func encodeUpdateVariablesResponse(response UpdateVariablesRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *Variables:
+	case *VariablesByKind:
 		if err := func() error {
 			if err := response.Validate(); err != nil {
 				return err

@@ -17,7 +17,7 @@ import (
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 )
 
-func TestProjectCreate_EventPayloadIncludesPreviewOrigins(t *testing.T) {
+func TestProjectCreate_EventPayloadIncludesOrigins(t *testing.T) {
 	t.Parallel()
 	ctrl := gomock.NewController(t)
 	pool := servicemocks.NewMockPool(ctrl)
@@ -61,10 +61,10 @@ func TestProjectCreate_EventPayloadIncludesPreviewOrigins(t *testing.T) {
 	const baseURL = "https://example.com/api/schemas"
 	schemaValidator, err := domain.NewSchemaValidator(baseURL)
 	require.NoError(t, err)
-	svc := service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService, testHasherFactory(t))
+	svc := service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService, testHasherFactory(t), domain.DefaultSharedHosts)
 
 	ctx := middleware.WithRequestIDContext(t.Context(), "req_create")
-	got, err := svc.Create(ctx, "Acme", []string{"*.vercel.app"}, true)
+	got, err := svc.Create(ctx, "Acme", []domain.Origin{{Pattern: "https://*-acme.vercel.app", Kind: domain.OriginKindPreview}}, true)
 	require.NoError(t, err)
 	require.NotNil(t, got)
 
@@ -85,7 +85,7 @@ func TestProjectCreate_EventPayloadIncludesPreviewOrigins(t *testing.T) {
 	var payload domain.ProjectPayload
 	require.NoError(t, json.Unmarshal(created.Payload, &payload))
 	assert.Equal(t, "Acme", payload.Name)
-	assert.Equal(t, []string{"*.vercel.app"}, payload.PreviewOrigins)
+	assert.Equal(t, []domain.Origin{{Pattern: "https://*-acme.vercel.app", Kind: domain.OriginKindPreview}}, payload.Origins)
 }
 
 func TestProjectUpdate_EventPayloadNameDelta(t *testing.T) {
@@ -118,7 +118,7 @@ func TestProjectUpdate_EventPayloadNameDelta(t *testing.T) {
 	const baseURL = "https://example.com/api/schemas"
 	schemaValidator, err := domain.NewSchemaValidator(baseURL)
 	require.NoError(t, err)
-	svc := service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService, testHasherFactory(t))
+	svc := service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService, testHasherFactory(t), domain.DefaultSharedHosts)
 
 	_, err = svc.Update(t.Context(), service.UpdateProjectRequest{ID: "proj_1", Name: new("renamed")})
 	require.NoError(t, err)
@@ -127,7 +127,7 @@ func TestProjectUpdate_EventPayloadNameDelta(t *testing.T) {
 	var payload domain.ProjectPayload
 	require.NoError(t, json.Unmarshal(gotEvent.Payload, &payload))
 	assert.Equal(t, "renamed", payload.Name)
-	assert.Nil(t, payload.PreviewOrigins)
+	assert.Nil(t, payload.Origins)
 	assert.Nil(t, payload.PasswordHashAlgorithm, "a rename says nothing about hashing")
 }
 
@@ -164,7 +164,7 @@ func TestProjectUpdated_PayloadCarriesPasswordHashAlgorithm(t *testing.T) {
 		const baseURL = "https://example.com/api/schemas"
 		schemaValidator, err := domain.NewSchemaValidator(baseURL)
 		require.NoError(t, err)
-		return service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService, testHasherFactory(t))
+		return service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService, testHasherFactory(t), domain.DefaultSharedHosts)
 	}
 
 	payloadOf := func(t *testing.T, event *domain.Event) domain.ProjectPayload {
@@ -564,7 +564,7 @@ func TestProjectCreate_SchemaCreatedPayloadCarriesKind(t *testing.T) {
 	const baseURL = "https://example.com/api/schemas"
 	schemaValidator, err := domain.NewSchemaValidator(baseURL)
 	require.NoError(t, err)
-	svc := service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService, testHasherFactory(t))
+	svc := service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService, testHasherFactory(t), domain.DefaultSharedHosts)
 
 	_, err = svc.Create(middleware.WithRequestIDContext(t.Context(), "req_kind"), "Acme", nil, true)
 	require.NoError(t, err)

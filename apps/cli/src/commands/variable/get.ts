@@ -1,21 +1,22 @@
 import { Flags } from "@oclif/core";
 
+import { ZitadelError } from "../../lib/errors";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
 import { renderDetail } from "../../lib/oclif/crud/table";
 import {
   assertVariableName,
   toVariableRow,
   variableCells,
-  variableScope,
+  variableReadScope,
 } from "../../lib/variables";
 
 /**
  * `zitadel variable get NAME` — read one variable by name from the project.
  *
  * A name the project has not entered answers `var.not_found`. A secret is found
- * but not disclosed, so the answer says it is held and nothing more. `--preview`
- * reads the override a preview deploy prefers instead of the frozen value; a
- * name with no preview override is a miss under `--preview`.
+ * but not disclosed, so the answer says it is held and nothing more. Without
+ * `--preview` it reads the primary value; with it, the preview value. A name with
+ * no value of the kind asked for is a miss.
  */
 export default class VariableGet extends EnvironmentCommand {
   static override description = "Get one variable from the project.";
@@ -31,7 +32,7 @@ export default class VariableGet extends EnvironmentCommand {
   static override flags = {
     preview: Flags.boolean({
       default: false,
-      description: "Read the preview override instead of the value every deploy freezes.",
+      description: "Read the preview value instead of the primary one.",
     }),
   };
 
@@ -42,11 +43,19 @@ export default class VariableGet extends EnvironmentCommand {
 
     assertVariableName(name);
     const { client, projectId } = await this.connect();
-    const scope = variableScope(projectId, flags.preview);
+    const scope = variableReadScope(projectId, flags.preview);
 
     // The single-name endpoint answers in the same two forms the collection
     // does, so the row projection is shared rather than duplicated.
-    const row = toVariableRow(name, await client.getVariable(name, scope));
+    const value = (await client.getVariable(name, scope))[scope.kind];
+    if (value === undefined) {
+      throw new ZitadelError("E_NOT_FOUND", `Variable ${name} has no ${scope.kind} value.`, {
+        hint: flags.preview
+          ? "A name has a preview value only once one is set with `--preview`."
+          : "Set one with `variable set`.",
+      });
+    }
+    const row = toVariableRow(name, value);
     this.recordTelemetry({ is_secret: row.secret });
 
     const data = row;

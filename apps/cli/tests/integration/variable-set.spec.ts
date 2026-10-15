@@ -116,8 +116,37 @@ describe("variable set", () => {
 
         const result = await app.setVariable("TOKEN", "s3cret", { secret: true });
 
-        const { all } = app.envelopeOf<{ all: { held: boolean; secret?: boolean } }>(result).data;
-        expect(all).toEqual({ held: true, secret: true });
+        const { primary } = app.envelopeOf<{ primary: { held: boolean; secret?: boolean } }>(
+          result,
+        ).data;
+        expect(primary).toEqual({ held: true, secret: true });
+      });
+
+      it("stores a plain value for both kinds", async () => {
+        const app = await aSetUpApp();
+
+        await app.setVariable("API_URL", "https://api.acme.com");
+
+        expect(await app.projectVariables({ preview: true })).toEqual([
+          { name: "API_URL", secret: false, value: "https://api.acme.com" },
+        ]);
+      });
+
+      it("stores a secret for the primary kind only", async () => {
+        const app = await aSetUpApp();
+
+        await app.setVariable("TOKEN", "s3cret", { secret: true });
+
+        expect(await app.projectVariables({ preview: true })).toEqual([]);
+      });
+
+      it("drops a preview value a secret replaces, so a preview keeps no plaintext copy", async () => {
+        const app = await aSetUpApp();
+        await app.setVariable("TOKEN", "plain");
+
+        await app.setVariable("TOKEN", "s3cret", { secret: true });
+
+        expect(await app.projectVariables({ preview: true })).toEqual([]);
       });
 
       it("refuses a plain preview value for a secret", async () => {
@@ -147,16 +176,7 @@ describe("variable set", () => {
         expect(await app.projectVariables({ preview: true })).toEqual([]);
       });
 
-      it("warns when making a name secret leaves a plain preview value", async () => {
-        const app = await aSetUpApp();
-        await app.setVariable("TOKEN", "plain", { preview: true });
-
-        const result = await app.setVariable("TOKEN", "s3cret", { secret: true });
-
-        expect(result).toSay("its preview value is stored plain");
-      });
-
-      it("reports a preview write back in the preview slot", async () => {
+      it("reports a preview write back in the preview kind", async () => {
         const app = await aSetUpApp();
         await app.setVariable("API_URL", "https://api.acme.com");
 
@@ -171,7 +191,7 @@ describe("variable set", () => {
         });
       });
 
-      it("reports the all slot still standing after a preview write", async () => {
+      it("reports the primary value still standing after a preview write", async () => {
         const app = await aSetUpApp();
         await app.setVariable("API_URL", "https://api.acme.com");
 
@@ -179,14 +199,14 @@ describe("variable set", () => {
           preview: true,
         });
 
-        expect(app.envelopeOf<{ all: Record<string, unknown> }>(result).data.all).toEqual({
+        expect(app.envelopeOf<{ primary: Record<string, unknown> }>(result).data.primary).toEqual({
           held: true,
           secret: false,
           value: "https://api.acme.com",
         });
       });
 
-      it("writes the preview override into its own bucket", async () => {
+      it("writes the preview value into its own kind", async () => {
         const app = await aSetUpApp();
         await app.setVariable("API_URL", "https://api.acme.com");
 
@@ -197,7 +217,7 @@ describe("variable set", () => {
         ]);
       });
 
-      it("leaves the all bucket alone on a preview write", async () => {
+      it("leaves the primary kind alone on a preview write", async () => {
         const app = await aSetUpApp();
         await app.setVariable("API_URL", "https://api.acme.com");
 

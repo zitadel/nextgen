@@ -16,7 +16,7 @@ const ctx: PatchContext = {
     id: "proj_test",
     project_secret: "sk",
     preview_secret: "pk",
-    preview_origins: [],
+    origins: [],
     created_at: "2026-01-01T00:00:00Z",
   },
   issuer: "http://localhost:3000",

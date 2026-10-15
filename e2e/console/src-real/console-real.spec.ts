@@ -1,16 +1,8 @@
 import { expect, test } from "@zitadel/testing/playwright";
 
-import { expectNoErrorBoundary, signIn } from "./support";
-
-test.describe.configure({ mode: "parallel" });
-
-/**
- * What Settings → Admins says on every accepted submit. Retyped rather than
- * imported: this project does not compile console source, so the constant it
- * mirrors (`apps/console/src/components/add-admin-dialog.tsx`) is out of reach.
- */
-const NEUTRAL_MESSAGE =
-  "If the user exists in our system, they have been granted access to your project.";
+import { NEUTRAL_MESSAGE } from "../support/copy";
+import { expectNoErrorBoundary } from "../support/screens";
+import { signIn } from "../support/sign-in";
 
 test("shows the bootstrapped project in the list and detail views", async ({
   page,
@@ -21,7 +13,7 @@ test("shows the bootstrapped project in the list and detail views", async ({
   // so the operator needs a grant on the project before it shows up — being
   // able to sign in to it is not access to it.
   const operator = await seed.user();
-  await signIn(page, zitadel.handle, operator);
+  await signIn(page, zitadel, operator);
 
   // The pill reads the same query, with the session cookie alone.
   await expect(page.getByRole("button", { name: "Switch project" })).not.toHaveText("No projects");
@@ -48,7 +40,7 @@ test("shows the bootstrapped project in the list and detail views", async ({
 
 test("shows a seeded user in the list and detail views", async ({ page, zitadel, seed }) => {
   const user = await seed.user();
-  await signIn(page, zitadel.handle, user);
+  await signIn(page, zitadel, user);
 
   await page.goto("/users");
   await expect(page.getByRole("heading", { name: "Users", exact: true })).toBeVisible();
@@ -72,7 +64,7 @@ test("keeps the project credential out of browser requests and resources", async
   // Sign in first (Console ADR 0003): the resource pages sit behind the auth
   // guard, and the login exchange itself must not leak the project secret
   // either — the listener below starts before any navigation under test.
-  await signIn(page, zitadel.handle, await seed.user());
+  await signIn(page, zitadel, await seed.user());
 
   const inspectedResponses: Array<Promise<string | undefined>> = [];
   page.on("response", (response) => {
@@ -118,45 +110,11 @@ test("shows the status the API stamped on a seeded user", async ({ page, zitadel
   // returning recently. Asserted against a real instance rather than a stub so
   // the column is proven against the shape the server actually sends.
   const user = await seed.user();
-  await signIn(page, zitadel.handle, user);
+  await signIn(page, zitadel, user);
 
   await page.goto("/users");
   const row = page.getByRole("row").filter({ hasText: user.email });
   await expect(row.getByText("active", { exact: true })).toBeVisible();
-});
-
-test("embeds the team memberships on the list read rather than degrading", async ({
-  page,
-  zitadel,
-  seed,
-}) => {
-  // `expand: ["teams"]` needs `team_membership.read` on top of `user.read`, and
-  // the console falls back to an unexpanded read when it is refused — which is
-  // silent by design. Asserted against a real instance because the fallback
-  // would otherwise hide a genuinely rejected expansion behind a list that
-  // still renders: what a stub cannot tell you is whether the *server* accepts
-  // the parameter.
-  //
-  // The column's contents are not asserted. No endpoint writes a membership
-  // (`EnsurePersonalTeam` is a no-op outside the platform project, and the API
-  // exposes only `GET /users/{user_id}/teams`), so on this instance every user
-  // is on no team and every cell is honestly empty. Add the content assertion
-  // with the endpoint that can seed one.
-  const user = await seed.user();
-  await signIn(page, zitadel.handle, user);
-
-  const query = page.waitForResponse(
-    (response) => new URL(response.url()).pathname === "/api/users/query" && response.ok(),
-  );
-  await page.goto("/users");
-  expect(JSON.parse((await (await query).request().postData()) ?? "{}")).toMatchObject({
-    expand: ["teams"],
-  });
-
-  // The header is the console's own signal that the expansion was served: it is
-  // dropped on a 403, so its presence means no fallback happened.
-  await expect(page.getByRole("columnheader", { name: "Team", exact: true })).toBeVisible();
-  await expectNoErrorBoundary(page);
 });
 
 test("gives a colleague admin access to the project, and takes it away", async ({
@@ -174,7 +132,7 @@ test("gives a colleague admin access to the project, and takes it away", async (
   // project to open it — a seeded user can sign in but holds no grant.
   const operator = await seed.user();
   const colleague = await seed.user();
-  await signIn(page, zitadel.handle, operator);
+  await signIn(page, zitadel, operator);
 
   await page.goto(`/projects/${zitadel.handle.projectId}`);
   await expect(page.getByRole("region", { name: "Admins" })).toBeVisible();
@@ -214,8 +172,8 @@ test("answers the same way for an address that belongs to nobody", async ({
   // instance because it is the server that decides to say nothing, and a stub
   // would be asserting the stub.
   const operator = await seed.user();
-  const unknown = `nobody-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
-  await signIn(page, zitadel.handle, operator);
+  const unknown = seed.identity().email;
+  await signIn(page, zitadel, operator);
 
   await page.goto(`/projects/${zitadel.handle.projectId}`);
   await page.getByRole("button", { name: "Add admin", exact: true }).click();

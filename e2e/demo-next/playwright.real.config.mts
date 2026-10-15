@@ -1,8 +1,14 @@
-import { join } from "node:path";
-
-import { defineConfig, devices } from "@playwright/test";
+import { defineConfig } from "@playwright/test";
 import { nextAppEnv, withZitadel } from "@zitadel/testing/playwright";
-import { e2eActionTimeouts, e2eTimeouts, e2eTrace } from "../playwright.shared";
+import {
+  chromiumProjects,
+  e2eActionTimeouts,
+  e2eTimeouts,
+  e2eTrace,
+  inRepoZitadel,
+  realLaneDefaults,
+  workspaceRoot,
+} from "../playwright.shared";
 
 /**
  * Real-instance variant of the embedded sign-in e2e:
@@ -17,16 +23,13 @@ import { e2eActionTimeouts, e2eTimeouts, e2eTrace } from "../playwright.shared";
  * config is the fidelity check against the real server.
  */
 const appDir = import.meta.dirname;
-const workspaceRoot = join(appDir, "../..");
 const zitadelPort = Number(process.env.REAL_ZITADEL_PORT ?? 8092);
 const appOrigin = process.env.REAL_APP_ORIGIN ?? "http://localhost:3002";
 
 export default defineConfig({
   ...e2eTimeouts,
   testDir: "./src-real",
-  outputDir: "test-results/real",
-  fullyParallel: true,
-  workers: 2,
+  ...realLaneDefaults("real"),
   use: {
     ...e2eActionTimeouts,
     baseURL: appOrigin,
@@ -36,13 +39,7 @@ export default defineConfig({
     configDir: appDir,
     port: zitadelPort,
     appOrigin,
-    zitadel: {
-      // In-repo runs use the source-built binary; run `moon run server:build`
-      // first (the moon task wires this env var).
-      serverBinary:
-        process.env.ZITADEL_SERVER_BINARY ?? join(workspaceRoot, "dist", "server", "nextgen"),
-      serverBinaryHint: "run `moon run server:build` first.",
-    },
+    zitadel: inRepoZitadel,
     app: {
       command: ["corepack", "pnpm", "--filter", "@zitadel/demo-next", "dev"],
       cwd: workspaceRoot,
@@ -50,10 +47,5 @@ export default defineConfig({
       env: nextAppEnv,
     },
   }),
-  projects: [
-    {
-      name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
-    },
-  ],
+  projects: chromiumProjects,
 });

@@ -3,6 +3,7 @@ description: The current state of a project.
 required:
   - id
   - name
+  - origins
   - created_at
   - updated_at
 properties:
@@ -12,19 +13,14 @@ properties:
   name:
     type: string
     description: The name of the project.
-  preview_origins:
-    type: array
-    items:
-      type: string
-    description: |
-      Origins which are allowed for previewing and testing the project.
   origins:
     type: array
     items:
       $ref: project-origin.yaml
     description: |
-      The project's origin patterns, each a `{pattern, kind}`. An empty list
-      admits every origin until the first pattern is added.
+      The project's origins. An empty list means every origin is admitted
+      until the first pattern is added. Loopback origins are admitted without
+      a pattern.
   created_at:
     type: string
     format: date-time

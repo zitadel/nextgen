@@ -71,3 +71,36 @@ func TestResolveUserSchema(t *testing.T) {
 		})
 	}
 }
+
+func TestSameUserSchema(t *testing.T) {
+	v1 := &domain.JSONSchema{URL: "sch_human_v1", ObjectType: new("human-user")}
+	v2 := &domain.JSONSchema{URL: "sch_human_v2", ObjectType: new("human-user")}
+	staff := &domain.JSONSchema{URL: "https://example.com/staff.json", ObjectType: new("staff-user")}
+	unparsed := &domain.JSONSchema{URL: "https://example.com/fetched.json"}
+	schemas := fakeUserSchemas{v1, v2, staff, unparsed}
+
+	tests := []struct {
+		name    string
+		a, b    string
+		want    bool
+		wantErr error
+	}{
+		{name: "same id", a: "sch_human_v1", b: "sch_human_v1", want: true},
+		{name: "same id needs no read", a: "sch_unknown", b: "sch_unknown", want: true},
+		{name: "older revision of the same schema", a: v1.URL, b: v2.URL, want: true},
+		{name: "another schema", a: staff.URL, b: v2.URL, want: false},
+		{name: "unknown id", a: "sch_unknown", b: v2.URL, wantErr: domain.ErrJSONSchemaNotFound()},
+		{name: "schema declaring no objectType", a: unparsed.URL, b: v2.URL, wantErr: domain.ErrJSONSchemaNotFound()},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := sameUserSchema(t.Context(), schemas, "proj", tt.a, tt.b)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

@@ -75,9 +75,9 @@ describe("variable list", () => {
         expect(listed.find((variable) => variable.name === "FOO")?.value).toBe("bar");
       });
 
-      it("lists only the preview overrides under --preview", async () => {
+      it("lists only the names that hold a preview value under --preview", async () => {
         const app = await aSetUpApp();
-        expect(await app.setVariable("FOO", "bar")).toSucceed();
+        expect(await app.setVariable("TOKEN", "s3cret", { secret: true })).toSucceed();
         expect(
           await app.setVariable("API_URL", "https://preview.acme.com", { preview: true }),
         ).toSucceed();

@@ -28,9 +28,9 @@ A spec drives the built CLI through `runCliForTest` against
 observe afterwards.
 
 **One spec file per command, named after the command.** `setup.spec.ts`,
-`deploy.spec.ts`, `sso-enable.spec.ts`, `variable-set.spec.ts`. A command's spec is
-the only spec that drives that command as its subject. There are no
-cross-command spec files, no "contract" files and no "round-trip" files.
+`deploy.spec.ts`, `auth-method-sso-enable.spec.ts`, `variable-set.spec.ts`. A
+command's spec is the only spec that drives that command as its subject. There
+are no cross-command spec files, no "contract" files and no "round-trip" files.
 
 A property that must hold for *every* command belongs in the fixture, not in a
 suite of its own. The envelope contract works this way: `ScaffoldedApp` checks
@@ -57,7 +57,7 @@ describe("<command>", () => {
     const app = await aNextApp();
     await app.setup();                 // arrange with flags, non-interactively
 
-    const result = await app.ssoEnable({ provider: "google", ...CREDENTIALS });
+    const result = await app.enableSso("google", CREDENTIALS);
 
     expect(result.exitCode).toBe(0);
     expect(snapshotPlatformStore().idpSlugs).toEqual(["google"]);
@@ -130,10 +130,10 @@ A spec body contains a fixture call, a command, and matchers — nothing else:
   that is down. Most fail. Some carry on deliberately, for one of two reasons:
   they never needed the server — `resources` describes the command surface,
   `stop`, `reset` and `eject` act on the machine — or they reach it and
-  tolerate the failure, as `sso enable` does
-  for publishing the credentials, and `doctor` and `status` for their probes.
-  Either way it is worth stating rather than leaving to be discovered, and each
-  spec's own first group is the record, not this sentence. The `--json` and rendered groups
+  tolerate the failure, as `auth-method sso enable` does for publishing the
+  credentials, and `doctor` and `status` for their probes. Either way it is
+  worth stating rather than leaving to be discovered, and each spec's own first
+  group is the record, not this sentence. The `--json` and rendered groups
   never interleave, and a command with no human-rendered output has no second
   one.
 

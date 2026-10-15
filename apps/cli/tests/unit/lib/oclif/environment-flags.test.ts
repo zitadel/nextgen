@@ -35,7 +35,12 @@ describe("the flag bags", () => {
   });
 
   it("are the same flags on every command that takes them", () => {
-    const takers = Object.values(COMMANDS).filter((command) => "env" in command.baseFlags);
+    // Hidden copies sit on the `auth-method` commands that only edit files and
+    // resolve no environment; they exist so those commands share a base class
+    // with the one that does, and `--env` means nothing to them.
+    const takers = Object.values(COMMANDS).filter(
+      (command) => "env" in command.baseFlags && !command.baseFlags.env.hidden,
+    );
 
     expect(takers.length).toBeGreaterThan(0);
     for (const command of takers) {

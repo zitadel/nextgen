@@ -6,6 +6,8 @@ import {
   normalizePublicCliProse,
   npmDistTagForCliVersion,
   npmSelectorForCliVersion,
+  optionArgs,
+  portableCommands,
   publicCliCommand,
 } from "../../../src/lib/public-cli";
 
@@ -111,5 +113,55 @@ describe("normalizePublicCliJson", () => {
       pattern: "^https://",
       nothing: null,
     });
+  });
+});
+
+describe("portableCommands", () => {
+  it("prefixes every command when every argument is portable", () => {
+    expect(portableCommands([["plan"], ["apply", "--cwd", "/home/dev/app"]], "1.0.0")).toEqual([
+      expect.stringMatching(/ plan$/),
+      expect.stringMatching(/ apply --cwd \/home\/dev\/app$/),
+    ]);
+  });
+
+  it("accepts a plain value and a POSIX-style path", () => {
+    expect(
+      portableCommands(
+        [["plan", "--schema", "default-human-user", "--cwd", "/home/dev/my-app"]],
+        "1.0.0",
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("rejects anything a POSIX shell, PowerShell or cmd.exe could read differently", () => {
+    for (const value of [
+      "my users",
+      "x;y",
+      "$(id)",
+      "a&b",
+      "%PATH%",
+      "it's",
+      "a|b",
+      "a`b",
+      "C:\\dev",
+    ]) {
+      expect(portableCommands([["plan", "--cwd", value]], "1.0.0"), value).toEqual([]);
+    }
+  });
+
+  it("returns none when any argument in any command needs quoting", () => {
+    expect(portableCommands([["plan"], ["apply", "--cwd", "/home/dev/my app"]], "1.0.0")).toEqual(
+      [],
+    );
+  });
+});
+
+describe("optionArgs", () => {
+  it("passes the option and its value as two arguments", () => {
+    expect(optionArgs("--schema", "customers")).toEqual(["--schema", "customers"]);
+  });
+
+  it("joins a value that starts with a dash to its option", () => {
+    expect(optionArgs("--schema", "--force")).toEqual(["--schema=--force"]);
   });
 });

@@ -14,10 +14,18 @@ import (
 
 // AddOriginErrorResponse represents sum type.
 type AddOriginErrorResponse struct {
-	Type             AddOriginErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	ReqInvalid       ReqInvalid
+	Type                   AddOriginErrorResponseType // switch on this field
+	AuthUnauthorized       AuthUnauthorized
+	EvtInvalid             EvtInvalid
+	Internal               Internal
+	OriginInvalid          OriginInvalid
+	OriginKindConflict     OriginKindConflict
+	OriginNotFound         OriginNotFound
+	OriginPermissionDenied OriginPermissionDenied
+	OriginPrimaryNotExact  OriginPrimaryNotExact
+	ProjMissingID          ProjMissingID
+	ProjNotFound           ProjNotFound
+	ReqInvalid             ReqInvalid
 }
 
 // AddOriginErrorResponseType is oneOf type of AddOriginErrorResponse.
@@ -25,9 +33,17 @@ type AddOriginErrorResponseType string
 
 // Possible values for AddOriginErrorResponseType.
 const (
-	AuthUnauthorizedAddOriginErrorResponse AddOriginErrorResponseType = "auth.unauthorized"
-	InternalAddOriginErrorResponse         AddOriginErrorResponseType = "internal"
-	ReqInvalidAddOriginErrorResponse       AddOriginErrorResponseType = "req.invalid"
+	AuthUnauthorizedAddOriginErrorResponse       AddOriginErrorResponseType = "auth.unauthorized"
+	EvtInvalidAddOriginErrorResponse             AddOriginErrorResponseType = "evt.invalid"
+	InternalAddOriginErrorResponse               AddOriginErrorResponseType = "internal"
+	OriginInvalidAddOriginErrorResponse          AddOriginErrorResponseType = "origin.invalid"
+	OriginKindConflictAddOriginErrorResponse     AddOriginErrorResponseType = "origin.kind_conflict"
+	OriginNotFoundAddOriginErrorResponse         AddOriginErrorResponseType = "origin.not_found"
+	OriginPermissionDeniedAddOriginErrorResponse AddOriginErrorResponseType = "origin.permission_denied"
+	OriginPrimaryNotExactAddOriginErrorResponse  AddOriginErrorResponseType = "origin.primary_not_exact"
+	ProjMissingIDAddOriginErrorResponse          AddOriginErrorResponseType = "proj.missing_id"
+	ProjNotFoundAddOriginErrorResponse           AddOriginErrorResponseType = "proj.not_found"
+	ReqInvalidAddOriginErrorResponse             AddOriginErrorResponseType = "req.invalid"
 )
 
 // IsAuthUnauthorized reports whether AddOriginErrorResponse is AuthUnauthorized.
@@ -35,8 +51,48 @@ func (s AddOriginErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedAddOriginErrorResponse
 }
 
+// IsEvtInvalid reports whether AddOriginErrorResponse is EvtInvalid.
+func (s AddOriginErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidAddOriginErrorResponse
+}
+
 // IsInternal reports whether AddOriginErrorResponse is Internal.
 func (s AddOriginErrorResponse) IsInternal() bool { return s.Type == InternalAddOriginErrorResponse }
+
+// IsOriginInvalid reports whether AddOriginErrorResponse is OriginInvalid.
+func (s AddOriginErrorResponse) IsOriginInvalid() bool {
+	return s.Type == OriginInvalidAddOriginErrorResponse
+}
+
+// IsOriginKindConflict reports whether AddOriginErrorResponse is OriginKindConflict.
+func (s AddOriginErrorResponse) IsOriginKindConflict() bool {
+	return s.Type == OriginKindConflictAddOriginErrorResponse
+}
+
+// IsOriginNotFound reports whether AddOriginErrorResponse is OriginNotFound.
+func (s AddOriginErrorResponse) IsOriginNotFound() bool {
+	return s.Type == OriginNotFoundAddOriginErrorResponse
+}
+
+// IsOriginPermissionDenied reports whether AddOriginErrorResponse is OriginPermissionDenied.
+func (s AddOriginErrorResponse) IsOriginPermissionDenied() bool {
+	return s.Type == OriginPermissionDeniedAddOriginErrorResponse
+}
+
+// IsOriginPrimaryNotExact reports whether AddOriginErrorResponse is OriginPrimaryNotExact.
+func (s AddOriginErrorResponse) IsOriginPrimaryNotExact() bool {
+	return s.Type == OriginPrimaryNotExactAddOriginErrorResponse
+}
+
+// IsProjMissingID reports whether AddOriginErrorResponse is ProjMissingID.
+func (s AddOriginErrorResponse) IsProjMissingID() bool {
+	return s.Type == ProjMissingIDAddOriginErrorResponse
+}
+
+// IsProjNotFound reports whether AddOriginErrorResponse is ProjNotFound.
+func (s AddOriginErrorResponse) IsProjNotFound() bool {
+	return s.Type == ProjNotFoundAddOriginErrorResponse
+}
 
 // IsReqInvalid reports whether AddOriginErrorResponse is ReqInvalid.
 func (s AddOriginErrorResponse) IsReqInvalid() bool {
@@ -64,6 +120,27 @@ func NewAuthUnauthorizedAddOriginErrorResponse(v AuthUnauthorized) AddOriginErro
 	return s
 }
 
+// SetEvtInvalid sets AddOriginErrorResponse to EvtInvalid.
+func (s *AddOriginErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidAddOriginErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if AddOriginErrorResponse is EvtInvalid.
+func (s AddOriginErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidAddOriginErrorResponse returns new AddOriginErrorResponse from EvtInvalid.
+func NewEvtInvalidAddOriginErrorResponse(v EvtInvalid) AddOriginErrorResponse {
+	var s AddOriginErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
 // SetInternal sets AddOriginErrorResponse to Internal.
 func (s *AddOriginErrorResponse) SetInternal(v Internal) {
 	s.Type = InternalAddOriginErrorResponse
@@ -82,6 +159,153 @@ func (s AddOriginErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalAddOriginErrorResponse(v Internal) AddOriginErrorResponse {
 	var s AddOriginErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetOriginInvalid sets AddOriginErrorResponse to OriginInvalid.
+func (s *AddOriginErrorResponse) SetOriginInvalid(v OriginInvalid) {
+	s.Type = OriginInvalidAddOriginErrorResponse
+	s.OriginInvalid = v
+}
+
+// GetOriginInvalid returns OriginInvalid and true boolean if AddOriginErrorResponse is OriginInvalid.
+func (s AddOriginErrorResponse) GetOriginInvalid() (v OriginInvalid, ok bool) {
+	if !s.IsOriginInvalid() {
+		return v, false
+	}
+	return s.OriginInvalid, true
+}
+
+// NewOriginInvalidAddOriginErrorResponse returns new AddOriginErrorResponse from OriginInvalid.
+func NewOriginInvalidAddOriginErrorResponse(v OriginInvalid) AddOriginErrorResponse {
+	var s AddOriginErrorResponse
+	s.SetOriginInvalid(v)
+	return s
+}
+
+// SetOriginKindConflict sets AddOriginErrorResponse to OriginKindConflict.
+func (s *AddOriginErrorResponse) SetOriginKindConflict(v OriginKindConflict) {
+	s.Type = OriginKindConflictAddOriginErrorResponse
+	s.OriginKindConflict = v
+}
+
+// GetOriginKindConflict returns OriginKindConflict and true boolean if AddOriginErrorResponse is OriginKindConflict.
+func (s AddOriginErrorResponse) GetOriginKindConflict() (v OriginKindConflict, ok bool) {
+	if !s.IsOriginKindConflict() {
+		return v, false
+	}
+	return s.OriginKindConflict, true
+}
+
+// NewOriginKindConflictAddOriginErrorResponse returns new AddOriginErrorResponse from OriginKindConflict.
+func NewOriginKindConflictAddOriginErrorResponse(v OriginKindConflict) AddOriginErrorResponse {
+	var s AddOriginErrorResponse
+	s.SetOriginKindConflict(v)
+	return s
+}
+
+// SetOriginNotFound sets AddOriginErrorResponse to OriginNotFound.
+func (s *AddOriginErrorResponse) SetOriginNotFound(v OriginNotFound) {
+	s.Type = OriginNotFoundAddOriginErrorResponse
+	s.OriginNotFound = v
+}
+
+// GetOriginNotFound returns OriginNotFound and true boolean if AddOriginErrorResponse is OriginNotFound.
+func (s AddOriginErrorResponse) GetOriginNotFound() (v OriginNotFound, ok bool) {
+	if !s.IsOriginNotFound() {
+		return v, false
+	}
+	return s.OriginNotFound, true
+}
+
+// NewOriginNotFoundAddOriginErrorResponse returns new AddOriginErrorResponse from OriginNotFound.
+func NewOriginNotFoundAddOriginErrorResponse(v OriginNotFound) AddOriginErrorResponse {
+	var s AddOriginErrorResponse
+	s.SetOriginNotFound(v)
+	return s
+}
+
+// SetOriginPermissionDenied sets AddOriginErrorResponse to OriginPermissionDenied.
+func (s *AddOriginErrorResponse) SetOriginPermissionDenied(v OriginPermissionDenied) {
+	s.Type = OriginPermissionDeniedAddOriginErrorResponse
+	s.OriginPermissionDenied = v
+}
+
+// GetOriginPermissionDenied returns OriginPermissionDenied and true boolean if AddOriginErrorResponse is OriginPermissionDenied.
+func (s AddOriginErrorResponse) GetOriginPermissionDenied() (v OriginPermissionDenied, ok bool) {
+	if !s.IsOriginPermissionDenied() {
+		return v, false
+	}
+	return s.OriginPermissionDenied, true
+}
+
+// NewOriginPermissionDeniedAddOriginErrorResponse returns new AddOriginErrorResponse from OriginPermissionDenied.
+func NewOriginPermissionDeniedAddOriginErrorResponse(v OriginPermissionDenied) AddOriginErrorResponse {
+	var s AddOriginErrorResponse
+	s.SetOriginPermissionDenied(v)
+	return s
+}
+
+// SetOriginPrimaryNotExact sets AddOriginErrorResponse to OriginPrimaryNotExact.
+func (s *AddOriginErrorResponse) SetOriginPrimaryNotExact(v OriginPrimaryNotExact) {
+	s.Type = OriginPrimaryNotExactAddOriginErrorResponse
+	s.OriginPrimaryNotExact = v
+}
+
+// GetOriginPrimaryNotExact returns OriginPrimaryNotExact and true boolean if AddOriginErrorResponse is OriginPrimaryNotExact.
+func (s AddOriginErrorResponse) GetOriginPrimaryNotExact() (v OriginPrimaryNotExact, ok bool) {
+	if !s.IsOriginPrimaryNotExact() {
+		return v, false
+	}
+	return s.OriginPrimaryNotExact, true
+}
+
+// NewOriginPrimaryNotExactAddOriginErrorResponse returns new AddOriginErrorResponse from OriginPrimaryNotExact.
+func NewOriginPrimaryNotExactAddOriginErrorResponse(v OriginPrimaryNotExact) AddOriginErrorResponse {
+	var s AddOriginErrorResponse
+	s.SetOriginPrimaryNotExact(v)
+	return s
+}
+
+// SetProjMissingID sets AddOriginErrorResponse to ProjMissingID.
+func (s *AddOriginErrorResponse) SetProjMissingID(v ProjMissingID) {
+	s.Type = ProjMissingIDAddOriginErrorResponse
+	s.ProjMissingID = v
+}
+
+// GetProjMissingID returns ProjMissingID and true boolean if AddOriginErrorResponse is ProjMissingID.
+func (s AddOriginErrorResponse) GetProjMissingID() (v ProjMissingID, ok bool) {
+	if !s.IsProjMissingID() {
+		return v, false
+	}
+	return s.ProjMissingID, true
+}
+
+// NewProjMissingIDAddOriginErrorResponse returns new AddOriginErrorResponse from ProjMissingID.
+func NewProjMissingIDAddOriginErrorResponse(v ProjMissingID) AddOriginErrorResponse {
+	var s AddOriginErrorResponse
+	s.SetProjMissingID(v)
+	return s
+}
+
+// SetProjNotFound sets AddOriginErrorResponse to ProjNotFound.
+func (s *AddOriginErrorResponse) SetProjNotFound(v ProjNotFound) {
+	s.Type = ProjNotFoundAddOriginErrorResponse
+	s.ProjNotFound = v
+}
+
+// GetProjNotFound returns ProjNotFound and true boolean if AddOriginErrorResponse is ProjNotFound.
+func (s AddOriginErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
+	if !s.IsProjNotFound() {
+		return v, false
+	}
+	return s.ProjNotFound, true
+}
+
+// NewProjNotFoundAddOriginErrorResponse returns new AddOriginErrorResponse from ProjNotFound.
+func NewProjNotFoundAddOriginErrorResponse(v ProjNotFound) AddOriginErrorResponse {
+	var s AddOriginErrorResponse
+	s.SetProjNotFound(v)
 	return s
 }
 
@@ -133,6 +357,75 @@ func (s *AddOriginErrorResponseStatusCode) SetResponse(val AddOriginErrorRespons
 }
 
 func (*AddOriginErrorResponseStatusCode) addOriginRes() {}
+
+// Ref: #
+type AddOriginResponse struct {
+	Pattern string                `json:"pattern"`
+	Kind    AddOriginResponseKind `json:"kind"`
+}
+
+// GetPattern returns the value of Pattern.
+func (s *AddOriginResponse) GetPattern() string {
+	return s.Pattern
+}
+
+// GetKind returns the value of Kind.
+func (s *AddOriginResponse) GetKind() AddOriginResponseKind {
+	return s.Kind
+}
+
+// SetPattern sets the value of Pattern.
+func (s *AddOriginResponse) SetPattern(val string) {
+	s.Pattern = val
+}
+
+// SetKind sets the value of Kind.
+func (s *AddOriginResponse) SetKind(val AddOriginResponseKind) {
+	s.Kind = val
+}
+
+func (*AddOriginResponse) addOriginRes() {}
+
+type AddOriginResponseKind string
+
+const (
+	AddOriginResponseKindPrimary AddOriginResponseKind = "primary"
+	AddOriginResponseKindPreview AddOriginResponseKind = "preview"
+)
+
+// AllValues returns all AddOriginResponseKind values.
+func (AddOriginResponseKind) AllValues() []AddOriginResponseKind {
+	return []AddOriginResponseKind{
+		AddOriginResponseKindPrimary,
+		AddOriginResponseKindPreview,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AddOriginResponseKind) MarshalText() ([]byte, error) {
+	switch s {
+	case AddOriginResponseKindPrimary:
+		return []byte(s), nil
+	case AddOriginResponseKindPreview:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AddOriginResponseKind) UnmarshalText(data []byte) error {
+	switch AddOriginResponseKind(data) {
+	case AddOriginResponseKindPrimary:
+		*s = AddOriginResponseKindPrimary
+		return nil
+	case AddOriginResponseKindPreview:
+		*s = AddOriginResponseKindPreview
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
 
 // Merged schema.
 // Ref: #
@@ -12739,6 +13032,7 @@ type CreateIdpErrorResponse struct {
 	IdpNotFound         IdpNotFound
 	IdpPermissionDenied IdpPermissionDenied
 	IdpRevisionConflict IdpRevisionConflict
+	IdpEndpointsPartial IdpEndpointsPartial
 	Internal            Internal
 	ReqInvalid          ReqInvalid
 }
@@ -12754,6 +13048,7 @@ const (
 	IdpNotFoundCreateIdpErrorResponse         CreateIdpErrorResponseType = "idp.not_found"
 	IdpPermissionDeniedCreateIdpErrorResponse CreateIdpErrorResponseType = "idp.permission_denied"
 	IdpRevisionConflictCreateIdpErrorResponse CreateIdpErrorResponseType = "idp.revision_conflict"
+	IdpEndpointsPartialCreateIdpErrorResponse CreateIdpErrorResponseType = "idp.endpoints_partial"
 	InternalCreateIdpErrorResponse            CreateIdpErrorResponseType = "internal"
 	ReqInvalidCreateIdpErrorResponse          CreateIdpErrorResponseType = "req.invalid"
 )
@@ -12786,6 +13081,11 @@ func (s CreateIdpErrorResponse) IsIdpPermissionDenied() bool {
 // IsIdpRevisionConflict reports whether CreateIdpErrorResponse is IdpRevisionConflict.
 func (s CreateIdpErrorResponse) IsIdpRevisionConflict() bool {
 	return s.Type == IdpRevisionConflictCreateIdpErrorResponse
+}
+
+// IsIdpEndpointsPartial reports whether CreateIdpErrorResponse is IdpEndpointsPartial.
+func (s CreateIdpErrorResponse) IsIdpEndpointsPartial() bool {
+	return s.Type == IdpEndpointsPartialCreateIdpErrorResponse
 }
 
 // IsInternal reports whether CreateIdpErrorResponse is Internal.
@@ -12922,6 +13222,27 @@ func NewIdpRevisionConflictCreateIdpErrorResponse(v IdpRevisionConflict) CreateI
 	return s
 }
 
+// SetIdpEndpointsPartial sets CreateIdpErrorResponse to IdpEndpointsPartial.
+func (s *CreateIdpErrorResponse) SetIdpEndpointsPartial(v IdpEndpointsPartial) {
+	s.Type = IdpEndpointsPartialCreateIdpErrorResponse
+	s.IdpEndpointsPartial = v
+}
+
+// GetIdpEndpointsPartial returns IdpEndpointsPartial and true boolean if CreateIdpErrorResponse is IdpEndpointsPartial.
+func (s CreateIdpErrorResponse) GetIdpEndpointsPartial() (v IdpEndpointsPartial, ok bool) {
+	if !s.IsIdpEndpointsPartial() {
+		return v, false
+	}
+	return s.IdpEndpointsPartial, true
+}
+
+// NewIdpEndpointsPartialCreateIdpErrorResponse returns new CreateIdpErrorResponse from IdpEndpointsPartial.
+func NewIdpEndpointsPartialCreateIdpErrorResponse(v IdpEndpointsPartial) CreateIdpErrorResponse {
+	var s CreateIdpErrorResponse
+	s.SetIdpEndpointsPartial(v)
+	return s
+}
+
 // SetInternal sets CreateIdpErrorResponse to Internal.
 func (s *CreateIdpErrorResponse) SetInternal(v Internal) {
 	s.Type = InternalCreateIdpErrorResponse
@@ -13032,19 +13353,22 @@ func (*CreateIdpUnauthorized) createIdpRes() {}
 
 // CreateProjectErrorResponse represents sum type.
 type CreateProjectErrorResponse struct {
-	Type                CreateProjectErrorResponseType // switch on this field
-	EncKeyDecryptFailed EncKeyDecryptFailed
-	EncKeyNotFound      EncKeyNotFound
-	EvtInvalid          EvtInvalid
-	Internal            Internal
-	TknInvalid          TknInvalid
-	TknInvalidTknid     TknInvalidTknid
-	SchInvalidRequest   SchInvalidRequest
-	NotImplemented      NotImplemented
-	ProjNameInvalid     ProjNameInvalid
-	ReqInvalid          ReqInvalid
-	EncKeyUnknownAlg    EncKeyUnknownAlg
-	Unavailable         Unavailable
+	Type                  CreateProjectErrorResponseType // switch on this field
+	EncKeyDecryptFailed   EncKeyDecryptFailed
+	EncKeyNotFound        EncKeyNotFound
+	EvtInvalid            EvtInvalid
+	Internal              Internal
+	TknInvalid            TknInvalid
+	TknInvalidTknid       TknInvalidTknid
+	SchInvalidRequest     SchInvalidRequest
+	NotImplemented        NotImplemented
+	OriginInvalid         OriginInvalid
+	OriginKindConflict    OriginKindConflict
+	OriginPrimaryNotExact OriginPrimaryNotExact
+	ProjNameInvalid       ProjNameInvalid
+	ReqInvalid            ReqInvalid
+	EncKeyUnknownAlg      EncKeyUnknownAlg
+	Unavailable           Unavailable
 }
 
 // CreateProjectErrorResponseType is oneOf type of CreateProjectErrorResponse.
@@ -13052,18 +13376,21 @@ type CreateProjectErrorResponseType string
 
 // Possible values for CreateProjectErrorResponseType.
 const (
-	EncKeyDecryptFailedCreateProjectErrorResponse CreateProjectErrorResponseType = "enc_key.decrypt_failed"
-	EncKeyNotFoundCreateProjectErrorResponse      CreateProjectErrorResponseType = "enc_key.not_found"
-	EvtInvalidCreateProjectErrorResponse          CreateProjectErrorResponseType = "evt.invalid"
-	InternalCreateProjectErrorResponse            CreateProjectErrorResponseType = "internal"
-	TknInvalidCreateProjectErrorResponse          CreateProjectErrorResponseType = "tkn.invalid"
-	TknInvalidTknidCreateProjectErrorResponse     CreateProjectErrorResponseType = "tkn.invalid_tknid"
-	SchInvalidRequestCreateProjectErrorResponse   CreateProjectErrorResponseType = "sch.invalid_request"
-	NotImplementedCreateProjectErrorResponse      CreateProjectErrorResponseType = "not_implemented"
-	ProjNameInvalidCreateProjectErrorResponse     CreateProjectErrorResponseType = "proj.name_invalid"
-	ReqInvalidCreateProjectErrorResponse          CreateProjectErrorResponseType = "req.invalid"
-	EncKeyUnknownAlgCreateProjectErrorResponse    CreateProjectErrorResponseType = "enc_key.unknown_alg"
-	UnavailableCreateProjectErrorResponse         CreateProjectErrorResponseType = "unavailable"
+	EncKeyDecryptFailedCreateProjectErrorResponse   CreateProjectErrorResponseType = "enc_key.decrypt_failed"
+	EncKeyNotFoundCreateProjectErrorResponse        CreateProjectErrorResponseType = "enc_key.not_found"
+	EvtInvalidCreateProjectErrorResponse            CreateProjectErrorResponseType = "evt.invalid"
+	InternalCreateProjectErrorResponse              CreateProjectErrorResponseType = "internal"
+	TknInvalidCreateProjectErrorResponse            CreateProjectErrorResponseType = "tkn.invalid"
+	TknInvalidTknidCreateProjectErrorResponse       CreateProjectErrorResponseType = "tkn.invalid_tknid"
+	SchInvalidRequestCreateProjectErrorResponse     CreateProjectErrorResponseType = "sch.invalid_request"
+	NotImplementedCreateProjectErrorResponse        CreateProjectErrorResponseType = "not_implemented"
+	OriginInvalidCreateProjectErrorResponse         CreateProjectErrorResponseType = "origin.invalid"
+	OriginKindConflictCreateProjectErrorResponse    CreateProjectErrorResponseType = "origin.kind_conflict"
+	OriginPrimaryNotExactCreateProjectErrorResponse CreateProjectErrorResponseType = "origin.primary_not_exact"
+	ProjNameInvalidCreateProjectErrorResponse       CreateProjectErrorResponseType = "proj.name_invalid"
+	ReqInvalidCreateProjectErrorResponse            CreateProjectErrorResponseType = "req.invalid"
+	EncKeyUnknownAlgCreateProjectErrorResponse      CreateProjectErrorResponseType = "enc_key.unknown_alg"
+	UnavailableCreateProjectErrorResponse           CreateProjectErrorResponseType = "unavailable"
 )
 
 // IsEncKeyDecryptFailed reports whether CreateProjectErrorResponse is EncKeyDecryptFailed.
@@ -13104,6 +13431,21 @@ func (s CreateProjectErrorResponse) IsSchInvalidRequest() bool {
 // IsNotImplemented reports whether CreateProjectErrorResponse is NotImplemented.
 func (s CreateProjectErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedCreateProjectErrorResponse
+}
+
+// IsOriginInvalid reports whether CreateProjectErrorResponse is OriginInvalid.
+func (s CreateProjectErrorResponse) IsOriginInvalid() bool {
+	return s.Type == OriginInvalidCreateProjectErrorResponse
+}
+
+// IsOriginKindConflict reports whether CreateProjectErrorResponse is OriginKindConflict.
+func (s CreateProjectErrorResponse) IsOriginKindConflict() bool {
+	return s.Type == OriginKindConflictCreateProjectErrorResponse
+}
+
+// IsOriginPrimaryNotExact reports whether CreateProjectErrorResponse is OriginPrimaryNotExact.
+func (s CreateProjectErrorResponse) IsOriginPrimaryNotExact() bool {
+	return s.Type == OriginPrimaryNotExactCreateProjectErrorResponse
 }
 
 // IsProjNameInvalid reports whether CreateProjectErrorResponse is ProjNameInvalid.
@@ -13294,6 +13636,69 @@ func NewNotImplementedCreateProjectErrorResponse(v NotImplemented) CreateProject
 	return s
 }
 
+// SetOriginInvalid sets CreateProjectErrorResponse to OriginInvalid.
+func (s *CreateProjectErrorResponse) SetOriginInvalid(v OriginInvalid) {
+	s.Type = OriginInvalidCreateProjectErrorResponse
+	s.OriginInvalid = v
+}
+
+// GetOriginInvalid returns OriginInvalid and true boolean if CreateProjectErrorResponse is OriginInvalid.
+func (s CreateProjectErrorResponse) GetOriginInvalid() (v OriginInvalid, ok bool) {
+	if !s.IsOriginInvalid() {
+		return v, false
+	}
+	return s.OriginInvalid, true
+}
+
+// NewOriginInvalidCreateProjectErrorResponse returns new CreateProjectErrorResponse from OriginInvalid.
+func NewOriginInvalidCreateProjectErrorResponse(v OriginInvalid) CreateProjectErrorResponse {
+	var s CreateProjectErrorResponse
+	s.SetOriginInvalid(v)
+	return s
+}
+
+// SetOriginKindConflict sets CreateProjectErrorResponse to OriginKindConflict.
+func (s *CreateProjectErrorResponse) SetOriginKindConflict(v OriginKindConflict) {
+	s.Type = OriginKindConflictCreateProjectErrorResponse
+	s.OriginKindConflict = v
+}
+
+// GetOriginKindConflict returns OriginKindConflict and true boolean if CreateProjectErrorResponse is OriginKindConflict.
+func (s CreateProjectErrorResponse) GetOriginKindConflict() (v OriginKindConflict, ok bool) {
+	if !s.IsOriginKindConflict() {
+		return v, false
+	}
+	return s.OriginKindConflict, true
+}
+
+// NewOriginKindConflictCreateProjectErrorResponse returns new CreateProjectErrorResponse from OriginKindConflict.
+func NewOriginKindConflictCreateProjectErrorResponse(v OriginKindConflict) CreateProjectErrorResponse {
+	var s CreateProjectErrorResponse
+	s.SetOriginKindConflict(v)
+	return s
+}
+
+// SetOriginPrimaryNotExact sets CreateProjectErrorResponse to OriginPrimaryNotExact.
+func (s *CreateProjectErrorResponse) SetOriginPrimaryNotExact(v OriginPrimaryNotExact) {
+	s.Type = OriginPrimaryNotExactCreateProjectErrorResponse
+	s.OriginPrimaryNotExact = v
+}
+
+// GetOriginPrimaryNotExact returns OriginPrimaryNotExact and true boolean if CreateProjectErrorResponse is OriginPrimaryNotExact.
+func (s CreateProjectErrorResponse) GetOriginPrimaryNotExact() (v OriginPrimaryNotExact, ok bool) {
+	if !s.IsOriginPrimaryNotExact() {
+		return v, false
+	}
+	return s.OriginPrimaryNotExact, true
+}
+
+// NewOriginPrimaryNotExactCreateProjectErrorResponse returns new CreateProjectErrorResponse from OriginPrimaryNotExact.
+func NewOriginPrimaryNotExactCreateProjectErrorResponse(v OriginPrimaryNotExact) CreateProjectErrorResponse {
+	var s CreateProjectErrorResponse
+	s.SetOriginPrimaryNotExact(v)
+	return s
+}
+
 // SetProjNameInvalid sets CreateProjectErrorResponse to ProjNameInvalid.
 func (s *CreateProjectErrorResponse) SetProjNameInvalid(v ProjNameInvalid) {
 	s.Type = ProjNameInvalidCreateProjectErrorResponse
@@ -13410,8 +13815,10 @@ func (*CreateProjectErrorResponseStatusCode) createProjectRes() {}
 type CreateProjectRequest struct {
 	// The name of the project.
 	Name string `json:"name"`
-	// Origins which are allowed for previewing and testing the project.
-	PreviewOrigins []string `json:"preview_origins"`
+	// The origins the project starts with. An omitted or empty list means
+	// every origin is admitted until the first pattern is added. Loopback
+	// origins are admitted without a pattern.
+	Origins []ProjectOrigin `json:"origins"`
 	// Whether the server should provision fallback default user schema and flow
 	// resources for the project. CLI-managed projects set this to false and
 	// upload their local .zitadel config files through the schema and flow APIs.
@@ -13423,9 +13830,9 @@ func (s *CreateProjectRequest) GetName() string {
 	return s.Name
 }
 
-// GetPreviewOrigins returns the value of PreviewOrigins.
-func (s *CreateProjectRequest) GetPreviewOrigins() []string {
-	return s.PreviewOrigins
+// GetOrigins returns the value of Origins.
+func (s *CreateProjectRequest) GetOrigins() []ProjectOrigin {
+	return s.Origins
 }
 
 // GetSeedDefaults returns the value of SeedDefaults.
@@ -13438,9 +13845,9 @@ func (s *CreateProjectRequest) SetName(val string) {
 	s.Name = val
 }
 
-// SetPreviewOrigins sets the value of PreviewOrigins.
-func (s *CreateProjectRequest) SetPreviewOrigins(val []string) {
-	s.PreviewOrigins = val
+// SetOrigins sets the value of Origins.
+func (s *CreateProjectRequest) SetOrigins(val []ProjectOrigin) {
+	s.Origins = val
 }
 
 // SetSeedDefaults sets the value of SeedDefaults.
@@ -13458,8 +13865,10 @@ type CreateProjectResponse struct {
 	ProjectSecret string `json:"project_secret"`
 	// Secret which can be used for previewing and testing the project.
 	PreviewSecret string `json:"preview_secret"`
-	// Origins which are allowed for previewing and testing the project.
-	PreviewOrigins []string `json:"preview_origins"`
+	// The project's origins. An empty list means every origin is admitted
+	// until the first pattern is added. Loopback origins are admitted without
+	// a pattern.
+	Origins []ProjectOrigin `json:"origins"`
 	// The time when the project was created.
 	CreatedAt time.Time `json:"created_at"`
 }
@@ -13484,9 +13893,9 @@ func (s *CreateProjectResponse) GetPreviewSecret() string {
 	return s.PreviewSecret
 }
 
-// GetPreviewOrigins returns the value of PreviewOrigins.
-func (s *CreateProjectResponse) GetPreviewOrigins() []string {
-	return s.PreviewOrigins
+// GetOrigins returns the value of Origins.
+func (s *CreateProjectResponse) GetOrigins() []ProjectOrigin {
+	return s.Origins
 }
 
 // GetCreatedAt returns the value of CreatedAt.
@@ -13514,9 +13923,9 @@ func (s *CreateProjectResponse) SetPreviewSecret(val string) {
 	s.PreviewSecret = val
 }
 
-// SetPreviewOrigins sets the value of PreviewOrigins.
-func (s *CreateProjectResponse) SetPreviewOrigins(val []string) {
-	s.PreviewOrigins = val
+// SetOrigins sets the value of Origins.
+func (s *CreateProjectResponse) SetOrigins(val []ProjectOrigin) {
+	s.Origins = val
 }
 
 // SetCreatedAt sets the value of CreatedAt.
@@ -15849,8 +16258,8 @@ func (*DeleteUserByIDUnauthorized) deleteUserByIDRes() {}
 type DeleteVariableErrorResponse struct {
 	Type                DeleteVariableErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
-	EnvNotFound         EnvNotFound
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
 	VarNotFound         VarNotFound
 	VarPermissionDenied VarPermissionDenied
@@ -15862,8 +16271,8 @@ type DeleteVariableErrorResponseType string
 // Possible values for DeleteVariableErrorResponseType.
 const (
 	AuthUnauthorizedDeleteVariableErrorResponse    DeleteVariableErrorResponseType = "auth.unauthorized"
-	EnvNotFoundDeleteVariableErrorResponse         DeleteVariableErrorResponseType = "env.not_found"
 	InternalDeleteVariableErrorResponse            DeleteVariableErrorResponseType = "internal"
+	NotImplementedDeleteVariableErrorResponse      DeleteVariableErrorResponseType = "not_implemented"
 	ReqInvalidDeleteVariableErrorResponse          DeleteVariableErrorResponseType = "req.invalid"
 	VarNotFoundDeleteVariableErrorResponse         DeleteVariableErrorResponseType = "var.not_found"
 	VarPermissionDeniedDeleteVariableErrorResponse DeleteVariableErrorResponseType = "var.permission_denied"
@@ -15874,14 +16283,14 @@ func (s DeleteVariableErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedDeleteVariableErrorResponse
 }
 
-// IsEnvNotFound reports whether DeleteVariableErrorResponse is EnvNotFound.
-func (s DeleteVariableErrorResponse) IsEnvNotFound() bool {
-	return s.Type == EnvNotFoundDeleteVariableErrorResponse
-}
-
 // IsInternal reports whether DeleteVariableErrorResponse is Internal.
 func (s DeleteVariableErrorResponse) IsInternal() bool {
 	return s.Type == InternalDeleteVariableErrorResponse
+}
+
+// IsNotImplemented reports whether DeleteVariableErrorResponse is NotImplemented.
+func (s DeleteVariableErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedDeleteVariableErrorResponse
 }
 
 // IsReqInvalid reports whether DeleteVariableErrorResponse is ReqInvalid.
@@ -15920,27 +16329,6 @@ func NewAuthUnauthorizedDeleteVariableErrorResponse(v AuthUnauthorized) DeleteVa
 	return s
 }
 
-// SetEnvNotFound sets DeleteVariableErrorResponse to EnvNotFound.
-func (s *DeleteVariableErrorResponse) SetEnvNotFound(v EnvNotFound) {
-	s.Type = EnvNotFoundDeleteVariableErrorResponse
-	s.EnvNotFound = v
-}
-
-// GetEnvNotFound returns EnvNotFound and true boolean if DeleteVariableErrorResponse is EnvNotFound.
-func (s DeleteVariableErrorResponse) GetEnvNotFound() (v EnvNotFound, ok bool) {
-	if !s.IsEnvNotFound() {
-		return v, false
-	}
-	return s.EnvNotFound, true
-}
-
-// NewEnvNotFoundDeleteVariableErrorResponse returns new DeleteVariableErrorResponse from EnvNotFound.
-func NewEnvNotFoundDeleteVariableErrorResponse(v EnvNotFound) DeleteVariableErrorResponse {
-	var s DeleteVariableErrorResponse
-	s.SetEnvNotFound(v)
-	return s
-}
-
 // SetInternal sets DeleteVariableErrorResponse to Internal.
 func (s *DeleteVariableErrorResponse) SetInternal(v Internal) {
 	s.Type = InternalDeleteVariableErrorResponse
@@ -15959,6 +16347,27 @@ func (s DeleteVariableErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalDeleteVariableErrorResponse(v Internal) DeleteVariableErrorResponse {
 	var s DeleteVariableErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets DeleteVariableErrorResponse to NotImplemented.
+func (s *DeleteVariableErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedDeleteVariableErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if DeleteVariableErrorResponse is NotImplemented.
+func (s DeleteVariableErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedDeleteVariableErrorResponse returns new DeleteVariableErrorResponse from NotImplemented.
+func NewNotImplementedDeleteVariableErrorResponse(v NotImplemented) DeleteVariableErrorResponse {
+	var s DeleteVariableErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 
@@ -17382,59 +17791,6 @@ func (s *EncKeyUnknownAlgDetails) init() EncKeyUnknownAlgDetails {
 
 // Merged schema.
 // Ref: #
-type EnvNotFound struct {
-	// Merged property.
-	Code string `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Additional error-specific context.
-	Details OptEnvNotFoundDetails `json:"details"`
-}
-
-// GetCode returns the value of Code.
-func (s *EnvNotFound) GetCode() string {
-	return s.Code
-}
-
-// GetMessage returns the value of Message.
-func (s *EnvNotFound) GetMessage() string {
-	return s.Message
-}
-
-// GetDetails returns the value of Details.
-func (s *EnvNotFound) GetDetails() OptEnvNotFoundDetails {
-	return s.Details
-}
-
-// SetCode sets the value of Code.
-func (s *EnvNotFound) SetCode(val string) {
-	s.Code = val
-}
-
-// SetMessage sets the value of Message.
-func (s *EnvNotFound) SetMessage(val string) {
-	s.Message = val
-}
-
-// SetDetails sets the value of Details.
-func (s *EnvNotFound) SetDetails(val OptEnvNotFoundDetails) {
-	s.Details = val
-}
-
-// Additional error-specific context.
-type EnvNotFoundDetails map[string]jx.Raw
-
-func (s *EnvNotFoundDetails) init() EnvNotFoundDetails {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
-// Merged schema.
-// Ref: #
 type EnvProjectNotFound struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -17485,8 +17841,6 @@ func (s *EnvProjectNotFoundDetails) init() EnvProjectNotFoundDetails {
 	}
 	return m
 }
-
-type EnvironmentName string
 
 type ErrorCode string
 
@@ -17624,6 +17978,8 @@ type Event struct {
 	IdpCreatedEvent                 IdpCreatedEvent
 	IdpIdentityLinkCreatedEvent     IdpIdentityLinkCreatedEvent
 	IdpUpdatedEvent                 IdpUpdatedEvent
+	OriginAddedEvent                OriginAddedEvent
+	OriginRemovedEvent              OriginRemovedEvent
 	ProjectCreatedEvent             ProjectCreatedEvent
 	ProjectDeletedEvent             ProjectDeletedEvent
 	ProjectUpdatedEvent             ProjectUpdatedEvent
@@ -17668,6 +18024,8 @@ const (
 	IdpCreatedEventEvent                 EventType = "idp.created"
 	IdpIdentityLinkCreatedEventEvent     EventType = "idp.identity_link.created"
 	IdpUpdatedEventEvent                 EventType = "idp.updated"
+	OriginAddedEventEvent                EventType = "origin.added"
+	OriginRemovedEventEvent              EventType = "origin.removed"
 	ProjectCreatedEventEvent             EventType = "project.created"
 	ProjectDeletedEventEvent             EventType = "project.deleted"
 	ProjectUpdatedEventEvent             EventType = "project.updated"
@@ -17756,6 +18114,12 @@ func (s Event) IsIdpIdentityLinkCreatedEvent() bool {
 
 // IsIdpUpdatedEvent reports whether Event is IdpUpdatedEvent.
 func (s Event) IsIdpUpdatedEvent() bool { return s.Type == IdpUpdatedEventEvent }
+
+// IsOriginAddedEvent reports whether Event is OriginAddedEvent.
+func (s Event) IsOriginAddedEvent() bool { return s.Type == OriginAddedEventEvent }
+
+// IsOriginRemovedEvent reports whether Event is OriginRemovedEvent.
+func (s Event) IsOriginRemovedEvent() bool { return s.Type == OriginRemovedEventEvent }
 
 // IsProjectCreatedEvent reports whether Event is ProjectCreatedEvent.
 func (s Event) IsProjectCreatedEvent() bool { return s.Type == ProjectCreatedEventEvent }
@@ -18243,6 +18607,48 @@ func (s Event) GetIdpUpdatedEvent() (v IdpUpdatedEvent, ok bool) {
 func NewIdpUpdatedEventEvent(v IdpUpdatedEvent) Event {
 	var s Event
 	s.SetIdpUpdatedEvent(v)
+	return s
+}
+
+// SetOriginAddedEvent sets Event to OriginAddedEvent.
+func (s *Event) SetOriginAddedEvent(v OriginAddedEvent) {
+	s.Type = OriginAddedEventEvent
+	s.OriginAddedEvent = v
+}
+
+// GetOriginAddedEvent returns OriginAddedEvent and true boolean if Event is OriginAddedEvent.
+func (s Event) GetOriginAddedEvent() (v OriginAddedEvent, ok bool) {
+	if !s.IsOriginAddedEvent() {
+		return v, false
+	}
+	return s.OriginAddedEvent, true
+}
+
+// NewOriginAddedEventEvent returns new Event from OriginAddedEvent.
+func NewOriginAddedEventEvent(v OriginAddedEvent) Event {
+	var s Event
+	s.SetOriginAddedEvent(v)
+	return s
+}
+
+// SetOriginRemovedEvent sets Event to OriginRemovedEvent.
+func (s *Event) SetOriginRemovedEvent(v OriginRemovedEvent) {
+	s.Type = OriginRemovedEventEvent
+	s.OriginRemovedEvent = v
+}
+
+// GetOriginRemovedEvent returns OriginRemovedEvent and true boolean if Event is OriginRemovedEvent.
+func (s Event) GetOriginRemovedEvent() (v OriginRemovedEvent, ok bool) {
+	if !s.IsOriginRemovedEvent() {
+		return v, false
+	}
+	return s.OriginRemovedEvent, true
+}
+
+// NewOriginRemovedEventEvent returns new Event from OriginRemovedEvent.
+func NewOriginRemovedEventEvent(v OriginRemovedEvent) Event {
+	var s Event
+	s.SetOriginRemovedEvent(v)
 	return s
 }
 
@@ -25063,6 +25469,8 @@ type GetDeploymentVariablesErrorResponse struct {
 	Internal            Internal
 	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
+	VarNotFound         VarNotFound
+	VarPermissionDenied VarPermissionDenied
 }
 
 // GetDeploymentVariablesErrorResponseType is oneOf type of GetDeploymentVariablesErrorResponse.
@@ -25076,6 +25484,8 @@ const (
 	InternalGetDeploymentVariablesErrorResponse            GetDeploymentVariablesErrorResponseType = "internal"
 	NotImplementedGetDeploymentVariablesErrorResponse      GetDeploymentVariablesErrorResponseType = "not_implemented"
 	ReqInvalidGetDeploymentVariablesErrorResponse          GetDeploymentVariablesErrorResponseType = "req.invalid"
+	VarNotFoundGetDeploymentVariablesErrorResponse         GetDeploymentVariablesErrorResponseType = "var.not_found"
+	VarPermissionDeniedGetDeploymentVariablesErrorResponse GetDeploymentVariablesErrorResponseType = "var.permission_denied"
 )
 
 // IsAuthUnauthorized reports whether GetDeploymentVariablesErrorResponse is AuthUnauthorized.
@@ -25106,6 +25516,16 @@ func (s GetDeploymentVariablesErrorResponse) IsNotImplemented() bool {
 // IsReqInvalid reports whether GetDeploymentVariablesErrorResponse is ReqInvalid.
 func (s GetDeploymentVariablesErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidGetDeploymentVariablesErrorResponse
+}
+
+// IsVarNotFound reports whether GetDeploymentVariablesErrorResponse is VarNotFound.
+func (s GetDeploymentVariablesErrorResponse) IsVarNotFound() bool {
+	return s.Type == VarNotFoundGetDeploymentVariablesErrorResponse
+}
+
+// IsVarPermissionDenied reports whether GetDeploymentVariablesErrorResponse is VarPermissionDenied.
+func (s GetDeploymentVariablesErrorResponse) IsVarPermissionDenied() bool {
+	return s.Type == VarPermissionDeniedGetDeploymentVariablesErrorResponse
 }
 
 // SetAuthUnauthorized sets GetDeploymentVariablesErrorResponse to AuthUnauthorized.
@@ -25231,6 +25651,48 @@ func (s GetDeploymentVariablesErrorResponse) GetReqInvalid() (v ReqInvalid, ok b
 func NewReqInvalidGetDeploymentVariablesErrorResponse(v ReqInvalid) GetDeploymentVariablesErrorResponse {
 	var s GetDeploymentVariablesErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetVarNotFound sets GetDeploymentVariablesErrorResponse to VarNotFound.
+func (s *GetDeploymentVariablesErrorResponse) SetVarNotFound(v VarNotFound) {
+	s.Type = VarNotFoundGetDeploymentVariablesErrorResponse
+	s.VarNotFound = v
+}
+
+// GetVarNotFound returns VarNotFound and true boolean if GetDeploymentVariablesErrorResponse is VarNotFound.
+func (s GetDeploymentVariablesErrorResponse) GetVarNotFound() (v VarNotFound, ok bool) {
+	if !s.IsVarNotFound() {
+		return v, false
+	}
+	return s.VarNotFound, true
+}
+
+// NewVarNotFoundGetDeploymentVariablesErrorResponse returns new GetDeploymentVariablesErrorResponse from VarNotFound.
+func NewVarNotFoundGetDeploymentVariablesErrorResponse(v VarNotFound) GetDeploymentVariablesErrorResponse {
+	var s GetDeploymentVariablesErrorResponse
+	s.SetVarNotFound(v)
+	return s
+}
+
+// SetVarPermissionDenied sets GetDeploymentVariablesErrorResponse to VarPermissionDenied.
+func (s *GetDeploymentVariablesErrorResponse) SetVarPermissionDenied(v VarPermissionDenied) {
+	s.Type = VarPermissionDeniedGetDeploymentVariablesErrorResponse
+	s.VarPermissionDenied = v
+}
+
+// GetVarPermissionDenied returns VarPermissionDenied and true boolean if GetDeploymentVariablesErrorResponse is VarPermissionDenied.
+func (s GetDeploymentVariablesErrorResponse) GetVarPermissionDenied() (v VarPermissionDenied, ok bool) {
+	if !s.IsVarPermissionDenied() {
+		return v, false
+	}
+	return s.VarPermissionDenied, true
+}
+
+// NewVarPermissionDeniedGetDeploymentVariablesErrorResponse returns new GetDeploymentVariablesErrorResponse from VarPermissionDenied.
+func NewVarPermissionDeniedGetDeploymentVariablesErrorResponse(v VarPermissionDenied) GetDeploymentVariablesErrorResponse {
+	var s GetDeploymentVariablesErrorResponse
+	s.SetVarPermissionDenied(v)
 	return s
 }
 
@@ -25516,41 +25978,39 @@ func (*GetFlowStepConflict) getFlowStepRes() {}
 
 // GetFlowStepErrorResponse represents sum type.
 type GetFlowStepErrorResponse struct {
-	Type                          GetFlowStepErrorResponseType // switch on this field
-	AttAlreadyHandedOff           AttAlreadyHandedOff
-	AttInvalidRequest             AttInvalidRequest
-	AttInvalidState               AttInvalidState
-	AttNotCompleted               AttNotCompleted
-	AttNotFound                   AttNotFound
-	EncKeyDecryptFailed           EncKeyDecryptFailed
-	EncKeyEncryptFailed           EncKeyEncryptFailed
-	EncKeyNotFound                EncKeyNotFound
-	EvtInvalid                    EvtInvalid
-	FlowCompleted                 FlowCompleted
-	FlowCookieExpired             FlowCookieExpired
-	FlowCookieInvalid             FlowCookieInvalid
-	FlowIntegrity                 FlowIntegrity
-	FlowInvalidAction             FlowInvalidAction
-	FlowNotFound                  FlowNotFound
-	FlowRestartRequired           FlowRestartRequired
-	FlowUnsupported               FlowUnsupported
-	IdpNotFound                   IdpNotFound
-	IdpEndpointCleartext          IdpEndpointCleartext
-	IdpEndpointsPartial           IdpEndpointsPartial
-	IdpOAuth2Unsupported          IdpOAuth2Unsupported
-	IdpProtocolBlockMissing       IdpProtocolBlockMissing
-	IdpScopesMissingOpenid        IdpScopesMissingOpenid
-	IdpStrategyPointerUnsupported IdpStrategyPointerUnsupported
-	Internal                      Internal
-	TknInvalid                    TknInvalid
-	ReqInvalid                    ReqInvalid
-	EncKeyUnknownAlg              EncKeyUnknownAlg
-	UserAlreadyExists             UserAlreadyExists
-	UserConflict                  UserConflict
-	UserInvalid                   UserInvalid
-	UserNotFound                  UserNotFound
-	UserPasswordEmpty             UserPasswordEmpty
-	UserPasswordTooLong           UserPasswordTooLong
+	Type                    GetFlowStepErrorResponseType // switch on this field
+	AttAlreadyHandedOff     AttAlreadyHandedOff
+	AttInvalidRequest       AttInvalidRequest
+	AttInvalidState         AttInvalidState
+	AttNotCompleted         AttNotCompleted
+	AttNotFound             AttNotFound
+	EncKeyDecryptFailed     EncKeyDecryptFailed
+	EncKeyEncryptFailed     EncKeyEncryptFailed
+	EncKeyNotFound          EncKeyNotFound
+	EvtInvalid              EvtInvalid
+	FlowCompleted           FlowCompleted
+	FlowCookieExpired       FlowCookieExpired
+	FlowCookieInvalid       FlowCookieInvalid
+	FlowIntegrity           FlowIntegrity
+	FlowInvalidAction       FlowInvalidAction
+	FlowNotFound            FlowNotFound
+	FlowRestartRequired     FlowRestartRequired
+	FlowUnsupported         FlowUnsupported
+	IdpNotFound             IdpNotFound
+	IdpEndpointCleartext    IdpEndpointCleartext
+	IdpEndpointsPartial     IdpEndpointsPartial
+	IdpProtocolBlockMissing IdpProtocolBlockMissing
+	IdpScopesMissingOpenid  IdpScopesMissingOpenid
+	Internal                Internal
+	TknInvalid              TknInvalid
+	ReqInvalid              ReqInvalid
+	EncKeyUnknownAlg        EncKeyUnknownAlg
+	UserAlreadyExists       UserAlreadyExists
+	UserConflict            UserConflict
+	UserInvalid             UserInvalid
+	UserNotFound            UserNotFound
+	UserPasswordEmpty       UserPasswordEmpty
+	UserPasswordTooLong     UserPasswordTooLong
 }
 
 // GetFlowStepErrorResponseType is oneOf type of GetFlowStepErrorResponse.
@@ -25558,40 +26018,38 @@ type GetFlowStepErrorResponseType string
 
 // Possible values for GetFlowStepErrorResponseType.
 const (
-	AttAlreadyHandedOffGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "att.already_handed_off"
-	AttInvalidRequestGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "att.invalid_request"
-	AttInvalidStateGetFlowStepErrorResponse               GetFlowStepErrorResponseType = "att.invalid_state"
-	AttNotCompletedGetFlowStepErrorResponse               GetFlowStepErrorResponseType = "att.not_completed"
-	AttNotFoundGetFlowStepErrorResponse                   GetFlowStepErrorResponseType = "att.not_found"
-	EncKeyDecryptFailedGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "enc_key.decrypt_failed"
-	EncKeyEncryptFailedGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "enc_key.encrypt_failed"
-	EncKeyNotFoundGetFlowStepErrorResponse                GetFlowStepErrorResponseType = "enc_key.not_found"
-	EvtInvalidGetFlowStepErrorResponse                    GetFlowStepErrorResponseType = "evt.invalid"
-	FlowCompletedGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "flow.completed"
-	FlowCookieExpiredGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "flow.cookie_expired"
-	FlowCookieInvalidGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "flow.cookie_invalid"
-	FlowIntegrityGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "flow.integrity"
-	FlowInvalidActionGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "flow.invalid_action"
-	FlowNotFoundGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "flow.not_found"
-	FlowRestartRequiredGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "flow.restart_required"
-	FlowUnsupportedGetFlowStepErrorResponse               GetFlowStepErrorResponseType = "flow.unsupported"
-	IdpNotFoundGetFlowStepErrorResponse                   GetFlowStepErrorResponseType = "idp.not_found"
-	IdpEndpointCleartextGetFlowStepErrorResponse          GetFlowStepErrorResponseType = "idp.endpoint_cleartext"
-	IdpEndpointsPartialGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "idp.endpoints_partial"
-	IdpOAuth2UnsupportedGetFlowStepErrorResponse          GetFlowStepErrorResponseType = "idp.oauth2_unsupported"
-	IdpProtocolBlockMissingGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "idp.protocol_block_missing"
-	IdpScopesMissingOpenidGetFlowStepErrorResponse        GetFlowStepErrorResponseType = "idp.scopes_missing_openid"
-	IdpStrategyPointerUnsupportedGetFlowStepErrorResponse GetFlowStepErrorResponseType = "idp.strategy_pointer_unsupported"
-	InternalGetFlowStepErrorResponse                      GetFlowStepErrorResponseType = "internal"
-	TknInvalidGetFlowStepErrorResponse                    GetFlowStepErrorResponseType = "tkn.invalid"
-	ReqInvalidGetFlowStepErrorResponse                    GetFlowStepErrorResponseType = "req.invalid"
-	EncKeyUnknownAlgGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "enc_key.unknown_alg"
-	UserAlreadyExistsGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "user.already_exists"
-	UserConflictGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "user.conflict"
-	UserInvalidGetFlowStepErrorResponse                   GetFlowStepErrorResponseType = "user.invalid"
-	UserNotFoundGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "user.not_found"
-	UserPasswordEmptyGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "user.password_empty"
-	UserPasswordTooLongGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "user.password_too_long"
+	AttAlreadyHandedOffGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "att.already_handed_off"
+	AttInvalidRequestGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "att.invalid_request"
+	AttInvalidStateGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "att.invalid_state"
+	AttNotCompletedGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "att.not_completed"
+	AttNotFoundGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "att.not_found"
+	EncKeyDecryptFailedGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "enc_key.decrypt_failed"
+	EncKeyEncryptFailedGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "enc_key.encrypt_failed"
+	EncKeyNotFoundGetFlowStepErrorResponse          GetFlowStepErrorResponseType = "enc_key.not_found"
+	EvtInvalidGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "evt.invalid"
+	FlowCompletedGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "flow.completed"
+	FlowCookieExpiredGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "flow.cookie_expired"
+	FlowCookieInvalidGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "flow.cookie_invalid"
+	FlowIntegrityGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "flow.integrity"
+	FlowInvalidActionGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "flow.invalid_action"
+	FlowNotFoundGetFlowStepErrorResponse            GetFlowStepErrorResponseType = "flow.not_found"
+	FlowRestartRequiredGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "flow.restart_required"
+	FlowUnsupportedGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "flow.unsupported"
+	IdpNotFoundGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "idp.not_found"
+	IdpEndpointCleartextGetFlowStepErrorResponse    GetFlowStepErrorResponseType = "idp.endpoint_cleartext"
+	IdpEndpointsPartialGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "idp.endpoints_partial"
+	IdpProtocolBlockMissingGetFlowStepErrorResponse GetFlowStepErrorResponseType = "idp.protocol_block_missing"
+	IdpScopesMissingOpenidGetFlowStepErrorResponse  GetFlowStepErrorResponseType = "idp.scopes_missing_openid"
+	InternalGetFlowStepErrorResponse                GetFlowStepErrorResponseType = "internal"
+	TknInvalidGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "tkn.invalid"
+	ReqInvalidGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "req.invalid"
+	EncKeyUnknownAlgGetFlowStepErrorResponse        GetFlowStepErrorResponseType = "enc_key.unknown_alg"
+	UserAlreadyExistsGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "user.already_exists"
+	UserConflictGetFlowStepErrorResponse            GetFlowStepErrorResponseType = "user.conflict"
+	UserInvalidGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "user.invalid"
+	UserNotFoundGetFlowStepErrorResponse            GetFlowStepErrorResponseType = "user.not_found"
+	UserPasswordEmptyGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "user.password_empty"
+	UserPasswordTooLongGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "user.password_too_long"
 )
 
 // IsAttAlreadyHandedOff reports whether GetFlowStepErrorResponse is AttAlreadyHandedOff.
@@ -25694,11 +26152,6 @@ func (s GetFlowStepErrorResponse) IsIdpEndpointsPartial() bool {
 	return s.Type == IdpEndpointsPartialGetFlowStepErrorResponse
 }
 
-// IsIdpOAuth2Unsupported reports whether GetFlowStepErrorResponse is IdpOAuth2Unsupported.
-func (s GetFlowStepErrorResponse) IsIdpOAuth2Unsupported() bool {
-	return s.Type == IdpOAuth2UnsupportedGetFlowStepErrorResponse
-}
-
 // IsIdpProtocolBlockMissing reports whether GetFlowStepErrorResponse is IdpProtocolBlockMissing.
 func (s GetFlowStepErrorResponse) IsIdpProtocolBlockMissing() bool {
 	return s.Type == IdpProtocolBlockMissingGetFlowStepErrorResponse
@@ -25707,11 +26160,6 @@ func (s GetFlowStepErrorResponse) IsIdpProtocolBlockMissing() bool {
 // IsIdpScopesMissingOpenid reports whether GetFlowStepErrorResponse is IdpScopesMissingOpenid.
 func (s GetFlowStepErrorResponse) IsIdpScopesMissingOpenid() bool {
 	return s.Type == IdpScopesMissingOpenidGetFlowStepErrorResponse
-}
-
-// IsIdpStrategyPointerUnsupported reports whether GetFlowStepErrorResponse is IdpStrategyPointerUnsupported.
-func (s GetFlowStepErrorResponse) IsIdpStrategyPointerUnsupported() bool {
-	return s.Type == IdpStrategyPointerUnsupportedGetFlowStepErrorResponse
 }
 
 // IsInternal reports whether GetFlowStepErrorResponse is Internal.
@@ -26184,27 +26632,6 @@ func NewIdpEndpointsPartialGetFlowStepErrorResponse(v IdpEndpointsPartial) GetFl
 	return s
 }
 
-// SetIdpOAuth2Unsupported sets GetFlowStepErrorResponse to IdpOAuth2Unsupported.
-func (s *GetFlowStepErrorResponse) SetIdpOAuth2Unsupported(v IdpOAuth2Unsupported) {
-	s.Type = IdpOAuth2UnsupportedGetFlowStepErrorResponse
-	s.IdpOAuth2Unsupported = v
-}
-
-// GetIdpOAuth2Unsupported returns IdpOAuth2Unsupported and true boolean if GetFlowStepErrorResponse is IdpOAuth2Unsupported.
-func (s GetFlowStepErrorResponse) GetIdpOAuth2Unsupported() (v IdpOAuth2Unsupported, ok bool) {
-	if !s.IsIdpOAuth2Unsupported() {
-		return v, false
-	}
-	return s.IdpOAuth2Unsupported, true
-}
-
-// NewIdpOAuth2UnsupportedGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from IdpOAuth2Unsupported.
-func NewIdpOAuth2UnsupportedGetFlowStepErrorResponse(v IdpOAuth2Unsupported) GetFlowStepErrorResponse {
-	var s GetFlowStepErrorResponse
-	s.SetIdpOAuth2Unsupported(v)
-	return s
-}
-
 // SetIdpProtocolBlockMissing sets GetFlowStepErrorResponse to IdpProtocolBlockMissing.
 func (s *GetFlowStepErrorResponse) SetIdpProtocolBlockMissing(v IdpProtocolBlockMissing) {
 	s.Type = IdpProtocolBlockMissingGetFlowStepErrorResponse
@@ -26244,27 +26671,6 @@ func (s GetFlowStepErrorResponse) GetIdpScopesMissingOpenid() (v IdpScopesMissin
 func NewIdpScopesMissingOpenidGetFlowStepErrorResponse(v IdpScopesMissingOpenid) GetFlowStepErrorResponse {
 	var s GetFlowStepErrorResponse
 	s.SetIdpScopesMissingOpenid(v)
-	return s
-}
-
-// SetIdpStrategyPointerUnsupported sets GetFlowStepErrorResponse to IdpStrategyPointerUnsupported.
-func (s *GetFlowStepErrorResponse) SetIdpStrategyPointerUnsupported(v IdpStrategyPointerUnsupported) {
-	s.Type = IdpStrategyPointerUnsupportedGetFlowStepErrorResponse
-	s.IdpStrategyPointerUnsupported = v
-}
-
-// GetIdpStrategyPointerUnsupported returns IdpStrategyPointerUnsupported and true boolean if GetFlowStepErrorResponse is IdpStrategyPointerUnsupported.
-func (s GetFlowStepErrorResponse) GetIdpStrategyPointerUnsupported() (v IdpStrategyPointerUnsupported, ok bool) {
-	if !s.IsIdpStrategyPointerUnsupported() {
-		return v, false
-	}
-	return s.IdpStrategyPointerUnsupported, true
-}
-
-// NewIdpStrategyPointerUnsupportedGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from IdpStrategyPointerUnsupported.
-func NewIdpStrategyPointerUnsupportedGetFlowStepErrorResponse(v IdpStrategyPointerUnsupported) GetFlowStepErrorResponse {
-	var s GetFlowStepErrorResponse
-	s.SetIdpStrategyPointerUnsupported(v)
 	return s
 }
 
@@ -28510,8 +28916,8 @@ func (*GetUserByIDUnauthorized) getUserByIDRes() {}
 type GetVariableErrorResponse struct {
 	Type                GetVariableErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
-	EnvNotFound         EnvNotFound
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
 	VarNotFound         VarNotFound
 	VarPermissionDenied VarPermissionDenied
@@ -28523,8 +28929,8 @@ type GetVariableErrorResponseType string
 // Possible values for GetVariableErrorResponseType.
 const (
 	AuthUnauthorizedGetVariableErrorResponse    GetVariableErrorResponseType = "auth.unauthorized"
-	EnvNotFoundGetVariableErrorResponse         GetVariableErrorResponseType = "env.not_found"
 	InternalGetVariableErrorResponse            GetVariableErrorResponseType = "internal"
+	NotImplementedGetVariableErrorResponse      GetVariableErrorResponseType = "not_implemented"
 	ReqInvalidGetVariableErrorResponse          GetVariableErrorResponseType = "req.invalid"
 	VarNotFoundGetVariableErrorResponse         GetVariableErrorResponseType = "var.not_found"
 	VarPermissionDeniedGetVariableErrorResponse GetVariableErrorResponseType = "var.permission_denied"
@@ -28535,14 +28941,14 @@ func (s GetVariableErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedGetVariableErrorResponse
 }
 
-// IsEnvNotFound reports whether GetVariableErrorResponse is EnvNotFound.
-func (s GetVariableErrorResponse) IsEnvNotFound() bool {
-	return s.Type == EnvNotFoundGetVariableErrorResponse
-}
-
 // IsInternal reports whether GetVariableErrorResponse is Internal.
 func (s GetVariableErrorResponse) IsInternal() bool {
 	return s.Type == InternalGetVariableErrorResponse
+}
+
+// IsNotImplemented reports whether GetVariableErrorResponse is NotImplemented.
+func (s GetVariableErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetVariableErrorResponse
 }
 
 // IsReqInvalid reports whether GetVariableErrorResponse is ReqInvalid.
@@ -28581,27 +28987,6 @@ func NewAuthUnauthorizedGetVariableErrorResponse(v AuthUnauthorized) GetVariable
 	return s
 }
 
-// SetEnvNotFound sets GetVariableErrorResponse to EnvNotFound.
-func (s *GetVariableErrorResponse) SetEnvNotFound(v EnvNotFound) {
-	s.Type = EnvNotFoundGetVariableErrorResponse
-	s.EnvNotFound = v
-}
-
-// GetEnvNotFound returns EnvNotFound and true boolean if GetVariableErrorResponse is EnvNotFound.
-func (s GetVariableErrorResponse) GetEnvNotFound() (v EnvNotFound, ok bool) {
-	if !s.IsEnvNotFound() {
-		return v, false
-	}
-	return s.EnvNotFound, true
-}
-
-// NewEnvNotFoundGetVariableErrorResponse returns new GetVariableErrorResponse from EnvNotFound.
-func NewEnvNotFoundGetVariableErrorResponse(v EnvNotFound) GetVariableErrorResponse {
-	var s GetVariableErrorResponse
-	s.SetEnvNotFound(v)
-	return s
-}
-
 // SetInternal sets GetVariableErrorResponse to Internal.
 func (s *GetVariableErrorResponse) SetInternal(v Internal) {
 	s.Type = InternalGetVariableErrorResponse
@@ -28620,6 +29005,27 @@ func (s GetVariableErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalGetVariableErrorResponse(v Internal) GetVariableErrorResponse {
 	var s GetVariableErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets GetVariableErrorResponse to NotImplemented.
+func (s *GetVariableErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetVariableErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetVariableErrorResponse is NotImplemented.
+func (s GetVariableErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetVariableErrorResponse returns new GetVariableErrorResponse from NotImplemented.
+func NewNotImplementedGetVariableErrorResponse(v NotImplemented) GetVariableErrorResponse {
+	var s GetVariableErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 
@@ -28718,8 +29124,8 @@ func (*GetVariableErrorResponseStatusCode) getVariableRes() {}
 type GetVariablesErrorResponse struct {
 	Type                GetVariablesErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
-	EnvNotFound         EnvNotFound
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
 	VarNotFound         VarNotFound
 	VarPermissionDenied VarPermissionDenied
@@ -28731,8 +29137,8 @@ type GetVariablesErrorResponseType string
 // Possible values for GetVariablesErrorResponseType.
 const (
 	AuthUnauthorizedGetVariablesErrorResponse    GetVariablesErrorResponseType = "auth.unauthorized"
-	EnvNotFoundGetVariablesErrorResponse         GetVariablesErrorResponseType = "env.not_found"
 	InternalGetVariablesErrorResponse            GetVariablesErrorResponseType = "internal"
+	NotImplementedGetVariablesErrorResponse      GetVariablesErrorResponseType = "not_implemented"
 	ReqInvalidGetVariablesErrorResponse          GetVariablesErrorResponseType = "req.invalid"
 	VarNotFoundGetVariablesErrorResponse         GetVariablesErrorResponseType = "var.not_found"
 	VarPermissionDeniedGetVariablesErrorResponse GetVariablesErrorResponseType = "var.permission_denied"
@@ -28743,14 +29149,14 @@ func (s GetVariablesErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedGetVariablesErrorResponse
 }
 
-// IsEnvNotFound reports whether GetVariablesErrorResponse is EnvNotFound.
-func (s GetVariablesErrorResponse) IsEnvNotFound() bool {
-	return s.Type == EnvNotFoundGetVariablesErrorResponse
-}
-
 // IsInternal reports whether GetVariablesErrorResponse is Internal.
 func (s GetVariablesErrorResponse) IsInternal() bool {
 	return s.Type == InternalGetVariablesErrorResponse
+}
+
+// IsNotImplemented reports whether GetVariablesErrorResponse is NotImplemented.
+func (s GetVariablesErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetVariablesErrorResponse
 }
 
 // IsReqInvalid reports whether GetVariablesErrorResponse is ReqInvalid.
@@ -28789,27 +29195,6 @@ func NewAuthUnauthorizedGetVariablesErrorResponse(v AuthUnauthorized) GetVariabl
 	return s
 }
 
-// SetEnvNotFound sets GetVariablesErrorResponse to EnvNotFound.
-func (s *GetVariablesErrorResponse) SetEnvNotFound(v EnvNotFound) {
-	s.Type = EnvNotFoundGetVariablesErrorResponse
-	s.EnvNotFound = v
-}
-
-// GetEnvNotFound returns EnvNotFound and true boolean if GetVariablesErrorResponse is EnvNotFound.
-func (s GetVariablesErrorResponse) GetEnvNotFound() (v EnvNotFound, ok bool) {
-	if !s.IsEnvNotFound() {
-		return v, false
-	}
-	return s.EnvNotFound, true
-}
-
-// NewEnvNotFoundGetVariablesErrorResponse returns new GetVariablesErrorResponse from EnvNotFound.
-func NewEnvNotFoundGetVariablesErrorResponse(v EnvNotFound) GetVariablesErrorResponse {
-	var s GetVariablesErrorResponse
-	s.SetEnvNotFound(v)
-	return s
-}
-
 // SetInternal sets GetVariablesErrorResponse to Internal.
 func (s *GetVariablesErrorResponse) SetInternal(v Internal) {
 	s.Type = InternalGetVariablesErrorResponse
@@ -28828,6 +29213,27 @@ func (s GetVariablesErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalGetVariablesErrorResponse(v Internal) GetVariablesErrorResponse {
 	var s GetVariablesErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets GetVariablesErrorResponse to NotImplemented.
+func (s *GetVariablesErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetVariablesErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetVariablesErrorResponse is NotImplemented.
+func (s GetVariablesErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetVariablesErrorResponse returns new GetVariablesErrorResponse from NotImplemented.
+func NewNotImplementedGetVariablesErrorResponse(v NotImplemented) GetVariablesErrorResponse {
+	var s GetVariablesErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 
@@ -29859,22 +30265,17 @@ type IdpConnection struct {
 	Template OptString `json:"template"`
 	// Shown to the user on the sign-in button.
 	DisplayName string `json:"display_name"`
-	// Claim carrying the provider's stable subject identifier. Optional for OIDC (the engine uses `sub`
-	// per spec; override where `sub` is pairwise, e.g. Entra `oid`). Required for OAuth2 — no `sub`
-	// guarantee.
+	// Claim carrying the provider's stable subject identifier. Optional; the engine uses `sub` per spec.
+	// Override it where `sub` is pairwise, e.g. Entra `oid`.
 	SubjectClaim OptString `json:"subject_claim"`
 	// Maps user-schema property names (keys) to provider claim names (values). A value is an exact
 	// top-level claim key: no path syntax, and a dot is part of the key, so nested claims (OIDC
-	// `address`, GitHub `plan`) are not addressable yet. `$`-prefixed strings and non-string values are
-	// reserved for future mapping forms. Add properties defined in the user schemas; unmatched entries
-	// are ignored.
+	// `address`) are not addressable yet. `$`-prefixed strings and non-string values are reserved for
+	// future mapping forms. Add properties defined in the user schemas; unmatched entries are ignored.
 	ClaimMapping OptIdpConnectionClaimMapping `json:"claim_mapping"`
-	// Maps a verifiable user-schema property to its verification source: a claim name (read the claim),
-	// the literal `true` (trust this provider unconditionally), or the `$`-pointer
-	// `"$supplementary_fetch"` (verified by the selected supplementary_fetch strategy per its contract -
-	// e.g. github_primary_email verifies `email` via primary && verified). Values starting with `$` are
-	// reserved; only `$supplementary_fetch` is defined. Distinct from claim_mapping, which carries
-	// values, not verification state.
+	// Maps a verifiable user-schema property to its verification source: a claim name (read the claim)
+	// or the literal `true` (trust this provider unconditionally). Values starting with `$` are reserved
+	// for future sources. Distinct from claim_mapping, which carries values, not verification state.
 	VerifiedClaims OptIdpConnectionVerifiedClaims `json:"verified_claims"`
 	// How far this provider's data is trusted. `creation` defines what happens to a subject that has no
 	// account yet. With `disabled`, a user is not created. With `auto`, the user is created without a
@@ -29889,11 +30290,9 @@ type IdpConnection struct {
 	Provisioning OptIdpConnectionProvisioning `json:"provisioning"`
 	// OIDC connection details. Endpoints come from the issuer's discovery document. A provider that
 	// exposes no .well-known document names them all instead: authorization_endpoint, token_endpoint,
-	// jwks_uri, and userinfo_endpoint unless id_token_mapping is set. Setting some but not all is
-	// rejected.
+	// jwks_uri, and userinfo_endpoint unless id_token_mapping is set. Setting any endpoint without the
+	// others is rejected with idp.endpoints_partial.
 	Oidc OptIdpConnectionOidc `json:"oidc"`
-	// OAuth 2.0 connection details.
-	OAuth2 OptIdpConnectionOAuth2 `json:"oauth2"`
 }
 
 // GetSchema returns the value of Schema.
@@ -29946,11 +30345,6 @@ func (s *IdpConnection) GetOidc() OptIdpConnectionOidc {
 	return s.Oidc
 }
 
-// GetOAuth2 returns the value of OAuth2.
-func (s *IdpConnection) GetOAuth2() OptIdpConnectionOAuth2 {
-	return s.OAuth2
-}
-
 // SetSchema sets the value of Schema.
 func (s *IdpConnection) SetSchema(val OptString) {
 	s.Schema = val
@@ -30001,16 +30395,10 @@ func (s *IdpConnection) SetOidc(val OptIdpConnectionOidc) {
 	s.Oidc = val
 }
 
-// SetOAuth2 sets the value of OAuth2.
-func (s *IdpConnection) SetOAuth2(val OptIdpConnectionOAuth2) {
-	s.OAuth2 = val
-}
-
 // Maps user-schema property names (keys) to provider claim names (values). A value is an exact
 // top-level claim key: no path syntax, and a dot is part of the key, so nested claims (OIDC
-// `address`, GitHub `plan`) are not addressable yet. `$`-prefixed strings and non-string values are
-// reserved for future mapping forms. Add properties defined in the user schemas; unmatched entries
-// are ignored.
+// `address`) are not addressable yet. `$`-prefixed strings and non-string values are reserved for
+// future mapping forms. Add properties defined in the user schemas; unmatched entries are ignored.
 type IdpConnectionClaimMapping map[string]string
 
 func (s *IdpConnectionClaimMapping) init() IdpConnectionClaimMapping {
@@ -30022,234 +30410,10 @@ func (s *IdpConnectionClaimMapping) init() IdpConnectionClaimMapping {
 	return m
 }
 
-// OAuth 2.0 connection details.
-type IdpConnectionOAuth2 struct {
-	// Where the user is sent to authorize.
-	AuthorizationEndpoint string `json:"authorization_endpoint"`
-	// Where the authorization code is exchanged.
-	TokenEndpoint string `json:"token_endpoint"`
-	// Where the authenticated user's profile is fetched.
-	UserinfoEndpoint string `json:"userinfo_endpoint"`
-	// Either a literal in case the same client is used in all environments, or a `${{ NAME }}` reference
-	// to a variable in case of separate clients per environment.
-	ClientID string `json:"client_id"`
-	// A reference to the variable holding the client secret, never the secret itself. A secret may only
-	// be referenced as the entire value: text around the placeholder would be rendered into the resolved
-	// credential, so it is rejected. The engine resolves it against the environment serving the request.
-	ClientSecret string `json:"client_secret"`
-	// How the client authenticates at the token endpoint.
-	TokenEndpointAuthMethod OptIdpConnectionOAuth2TokenEndpointAuthMethod `json:"token_endpoint_auth_method"`
-	// Provider-specific; OAuth 2.0 defines no universal scope.
-	Scopes []string `json:"scopes"`
-	// Send PKCE (code_challenge/code_verifier). Providers that do not support PKCE typically ignore the
-	// parameters, so `true` is safe and future-proofs; set `false` only for a provider whose token
-	// endpoint rejects them.
-	PkceEnabled OptBool `json:"pkce_enabled"`
-	// Extra provider-specific authorize parameters (for example `prompt`). Engine-owned protocol
-	// parameters are reserved and rejected by `propertyNames`: the engine composes them itself, and an
-	// override of `state` or `nonce` would silently defeat CSRF and token binding. `client_secret` and
-	// `client_assertion` are rejected as they could be appended to the public authorize URL.
-	StaticAuthorizeParameters OptIdpConnectionOAuth2StaticAuthorizeParameters `json:"static_authorize_parameters"`
-	// Provider-specific follow-up call after userinfo. New values are non-breaking.
-	SupplementaryFetch OptIdpConnectionOAuth2SupplementaryFetch `json:"supplementary_fetch"`
-}
-
-// GetAuthorizationEndpoint returns the value of AuthorizationEndpoint.
-func (s *IdpConnectionOAuth2) GetAuthorizationEndpoint() string {
-	return s.AuthorizationEndpoint
-}
-
-// GetTokenEndpoint returns the value of TokenEndpoint.
-func (s *IdpConnectionOAuth2) GetTokenEndpoint() string {
-	return s.TokenEndpoint
-}
-
-// GetUserinfoEndpoint returns the value of UserinfoEndpoint.
-func (s *IdpConnectionOAuth2) GetUserinfoEndpoint() string {
-	return s.UserinfoEndpoint
-}
-
-// GetClientID returns the value of ClientID.
-func (s *IdpConnectionOAuth2) GetClientID() string {
-	return s.ClientID
-}
-
-// GetClientSecret returns the value of ClientSecret.
-func (s *IdpConnectionOAuth2) GetClientSecret() string {
-	return s.ClientSecret
-}
-
-// GetTokenEndpointAuthMethod returns the value of TokenEndpointAuthMethod.
-func (s *IdpConnectionOAuth2) GetTokenEndpointAuthMethod() OptIdpConnectionOAuth2TokenEndpointAuthMethod {
-	return s.TokenEndpointAuthMethod
-}
-
-// GetScopes returns the value of Scopes.
-func (s *IdpConnectionOAuth2) GetScopes() []string {
-	return s.Scopes
-}
-
-// GetPkceEnabled returns the value of PkceEnabled.
-func (s *IdpConnectionOAuth2) GetPkceEnabled() OptBool {
-	return s.PkceEnabled
-}
-
-// GetStaticAuthorizeParameters returns the value of StaticAuthorizeParameters.
-func (s *IdpConnectionOAuth2) GetStaticAuthorizeParameters() OptIdpConnectionOAuth2StaticAuthorizeParameters {
-	return s.StaticAuthorizeParameters
-}
-
-// GetSupplementaryFetch returns the value of SupplementaryFetch.
-func (s *IdpConnectionOAuth2) GetSupplementaryFetch() OptIdpConnectionOAuth2SupplementaryFetch {
-	return s.SupplementaryFetch
-}
-
-// SetAuthorizationEndpoint sets the value of AuthorizationEndpoint.
-func (s *IdpConnectionOAuth2) SetAuthorizationEndpoint(val string) {
-	s.AuthorizationEndpoint = val
-}
-
-// SetTokenEndpoint sets the value of TokenEndpoint.
-func (s *IdpConnectionOAuth2) SetTokenEndpoint(val string) {
-	s.TokenEndpoint = val
-}
-
-// SetUserinfoEndpoint sets the value of UserinfoEndpoint.
-func (s *IdpConnectionOAuth2) SetUserinfoEndpoint(val string) {
-	s.UserinfoEndpoint = val
-}
-
-// SetClientID sets the value of ClientID.
-func (s *IdpConnectionOAuth2) SetClientID(val string) {
-	s.ClientID = val
-}
-
-// SetClientSecret sets the value of ClientSecret.
-func (s *IdpConnectionOAuth2) SetClientSecret(val string) {
-	s.ClientSecret = val
-}
-
-// SetTokenEndpointAuthMethod sets the value of TokenEndpointAuthMethod.
-func (s *IdpConnectionOAuth2) SetTokenEndpointAuthMethod(val OptIdpConnectionOAuth2TokenEndpointAuthMethod) {
-	s.TokenEndpointAuthMethod = val
-}
-
-// SetScopes sets the value of Scopes.
-func (s *IdpConnectionOAuth2) SetScopes(val []string) {
-	s.Scopes = val
-}
-
-// SetPkceEnabled sets the value of PkceEnabled.
-func (s *IdpConnectionOAuth2) SetPkceEnabled(val OptBool) {
-	s.PkceEnabled = val
-}
-
-// SetStaticAuthorizeParameters sets the value of StaticAuthorizeParameters.
-func (s *IdpConnectionOAuth2) SetStaticAuthorizeParameters(val OptIdpConnectionOAuth2StaticAuthorizeParameters) {
-	s.StaticAuthorizeParameters = val
-}
-
-// SetSupplementaryFetch sets the value of SupplementaryFetch.
-func (s *IdpConnectionOAuth2) SetSupplementaryFetch(val OptIdpConnectionOAuth2SupplementaryFetch) {
-	s.SupplementaryFetch = val
-}
-
-// Extra provider-specific authorize parameters (for example `prompt`). Engine-owned protocol
-// parameters are reserved and rejected by `propertyNames`: the engine composes them itself, and an
-// override of `state` or `nonce` would silently defeat CSRF and token binding. `client_secret` and
-// `client_assertion` are rejected as they could be appended to the public authorize URL.
-type IdpConnectionOAuth2StaticAuthorizeParameters map[string]string
-
-func (s *IdpConnectionOAuth2StaticAuthorizeParameters) init() IdpConnectionOAuth2StaticAuthorizeParameters {
-	m := *s
-	if m == nil {
-		m = map[string]string{}
-		*s = m
-	}
-	return m
-}
-
-// Provider-specific follow-up call after userinfo. New values are non-breaking.
-type IdpConnectionOAuth2SupplementaryFetch string
-
-const (
-	IdpConnectionOAuth2SupplementaryFetchGithubPrimaryEmail IdpConnectionOAuth2SupplementaryFetch = "github_primary_email"
-)
-
-// AllValues returns all IdpConnectionOAuth2SupplementaryFetch values.
-func (IdpConnectionOAuth2SupplementaryFetch) AllValues() []IdpConnectionOAuth2SupplementaryFetch {
-	return []IdpConnectionOAuth2SupplementaryFetch{
-		IdpConnectionOAuth2SupplementaryFetchGithubPrimaryEmail,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s IdpConnectionOAuth2SupplementaryFetch) MarshalText() ([]byte, error) {
-	switch s {
-	case IdpConnectionOAuth2SupplementaryFetchGithubPrimaryEmail:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *IdpConnectionOAuth2SupplementaryFetch) UnmarshalText(data []byte) error {
-	switch IdpConnectionOAuth2SupplementaryFetch(data) {
-	case IdpConnectionOAuth2SupplementaryFetchGithubPrimaryEmail:
-		*s = IdpConnectionOAuth2SupplementaryFetchGithubPrimaryEmail
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
-}
-
-// How the client authenticates at the token endpoint.
-type IdpConnectionOAuth2TokenEndpointAuthMethod string
-
-const (
-	IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretBasic IdpConnectionOAuth2TokenEndpointAuthMethod = "client_secret_basic"
-	IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretPost  IdpConnectionOAuth2TokenEndpointAuthMethod = "client_secret_post"
-)
-
-// AllValues returns all IdpConnectionOAuth2TokenEndpointAuthMethod values.
-func (IdpConnectionOAuth2TokenEndpointAuthMethod) AllValues() []IdpConnectionOAuth2TokenEndpointAuthMethod {
-	return []IdpConnectionOAuth2TokenEndpointAuthMethod{
-		IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretBasic,
-		IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretPost,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s IdpConnectionOAuth2TokenEndpointAuthMethod) MarshalText() ([]byte, error) {
-	switch s {
-	case IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretBasic:
-		return []byte(s), nil
-	case IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretPost:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *IdpConnectionOAuth2TokenEndpointAuthMethod) UnmarshalText(data []byte) error {
-	switch IdpConnectionOAuth2TokenEndpointAuthMethod(data) {
-	case IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretBasic:
-		*s = IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretBasic
-		return nil
-	case IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretPost:
-		*s = IdpConnectionOAuth2TokenEndpointAuthMethodClientSecretPost
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
-}
-
 // OIDC connection details. Endpoints come from the issuer's discovery document. A provider that
 // exposes no .well-known document names them all instead: authorization_endpoint, token_endpoint,
-// jwks_uri, and userinfo_endpoint unless id_token_mapping is set. Setting some but not all is
-// rejected.
+// jwks_uri, and userinfo_endpoint unless id_token_mapping is set. Setting any endpoint without the
+// others is rejected with idp.endpoints_partial.
 type IdpConnectionOidc struct {
 	// Discovery base. Endpoints are resolved from its .well-known document unless the connection names
 	// them all.
@@ -30533,12 +30697,9 @@ func (s *IdpConnectionProvisioningCreation) UnmarshalText(data []byte) error {
 	}
 }
 
-// Maps a verifiable user-schema property to its verification source: a claim name (read the claim),
-// the literal `true` (trust this provider unconditionally), or the `$`-pointer
-// `"$supplementary_fetch"` (verified by the selected supplementary_fetch strategy per its contract -
-// e.g. github_primary_email verifies `email` via primary && verified). Values starting with `$` are
-// reserved; only `$supplementary_fetch` is defined. Distinct from claim_mapping, which carries
-// values, not verification state.
+// Maps a verifiable user-schema property to its verification source: a claim name (read the claim)
+// or the literal `true` (trust this provider unconditionally). Values starting with `$` are reserved
+// for future sources. Distinct from claim_mapping, which carries values, not verification state.
 type IdpConnectionVerifiedClaims map[string]IdpConnectionVerifiedClaimsItem
 
 func (s *IdpConnectionVerifiedClaims) init() IdpConnectionVerifiedClaims {
@@ -31797,59 +31958,6 @@ func (s *IdpNotFoundDetails) init() IdpNotFoundDetails {
 	return m
 }
 
-// Merged schema.
-// Ref: #
-type IdpOAuth2Unsupported struct {
-	// Merged property.
-	Code string `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Additional error-specific context.
-	Details OptIdpOAuth2UnsupportedDetails `json:"details"`
-}
-
-// GetCode returns the value of Code.
-func (s *IdpOAuth2Unsupported) GetCode() string {
-	return s.Code
-}
-
-// GetMessage returns the value of Message.
-func (s *IdpOAuth2Unsupported) GetMessage() string {
-	return s.Message
-}
-
-// GetDetails returns the value of Details.
-func (s *IdpOAuth2Unsupported) GetDetails() OptIdpOAuth2UnsupportedDetails {
-	return s.Details
-}
-
-// SetCode sets the value of Code.
-func (s *IdpOAuth2Unsupported) SetCode(val string) {
-	s.Code = val
-}
-
-// SetMessage sets the value of Message.
-func (s *IdpOAuth2Unsupported) SetMessage(val string) {
-	s.Message = val
-}
-
-// SetDetails sets the value of Details.
-func (s *IdpOAuth2Unsupported) SetDetails(val OptIdpOAuth2UnsupportedDetails) {
-	s.Details = val
-}
-
-// Additional error-specific context.
-type IdpOAuth2UnsupportedDetails map[string]jx.Raw
-
-func (s *IdpOAuth2UnsupportedDetails) init() IdpOAuth2UnsupportedDetails {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
 // Shared allowlisted fields for `idp.created` (snapshot) and `idp.updated`
 // (delta: only changed fields present, plus the new `revision_id`). The
 // connection id is the event's `entity_id`. The connection document, and with
@@ -31969,20 +32077,18 @@ func (s *IdpPermissionDeniedDetails) init() IdpPermissionDeniedDetails {
 	return m
 }
 
-// The protocol used by the identity provider.
+// The protocol used by the identity provider. OIDC is the only protocol.
 // Ref: #
 type IdpProtocol string
 
 const (
-	IdpProtocolOidc   IdpProtocol = "oidc"
-	IdpProtocolOAuth2 IdpProtocol = "oauth2"
+	IdpProtocolOidc IdpProtocol = "oidc"
 )
 
 // AllValues returns all IdpProtocol values.
 func (IdpProtocol) AllValues() []IdpProtocol {
 	return []IdpProtocol{
 		IdpProtocolOidc,
-		IdpProtocolOAuth2,
 	}
 }
 
@@ -31990,8 +32096,6 @@ func (IdpProtocol) AllValues() []IdpProtocol {
 func (s IdpProtocol) MarshalText() ([]byte, error) {
 	switch s {
 	case IdpProtocolOidc:
-		return []byte(s), nil
-	case IdpProtocolOAuth2:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -32003,9 +32107,6 @@ func (s *IdpProtocol) UnmarshalText(data []byte) error {
 	switch IdpProtocol(data) {
 	case IdpProtocolOidc:
 		*s = IdpProtocolOidc
-		return nil
-	case IdpProtocolOAuth2:
-		*s = IdpProtocolOAuth2
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -32248,59 +32349,6 @@ func (s *IdpScopesMissingOpenid) SetDetails(val OptIdpScopesMissingOpenidDetails
 type IdpScopesMissingOpenidDetails map[string]jx.Raw
 
 func (s *IdpScopesMissingOpenidDetails) init() IdpScopesMissingOpenidDetails {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
-// Merged schema.
-// Ref: #
-type IdpStrategyPointerUnsupported struct {
-	// Merged property.
-	Code string `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Additional error-specific context.
-	Details OptIdpStrategyPointerUnsupportedDetails `json:"details"`
-}
-
-// GetCode returns the value of Code.
-func (s *IdpStrategyPointerUnsupported) GetCode() string {
-	return s.Code
-}
-
-// GetMessage returns the value of Message.
-func (s *IdpStrategyPointerUnsupported) GetMessage() string {
-	return s.Message
-}
-
-// GetDetails returns the value of Details.
-func (s *IdpStrategyPointerUnsupported) GetDetails() OptIdpStrategyPointerUnsupportedDetails {
-	return s.Details
-}
-
-// SetCode sets the value of Code.
-func (s *IdpStrategyPointerUnsupported) SetCode(val string) {
-	s.Code = val
-}
-
-// SetMessage sets the value of Message.
-func (s *IdpStrategyPointerUnsupported) SetMessage(val string) {
-	s.Message = val
-}
-
-// SetDetails sets the value of Details.
-func (s *IdpStrategyPointerUnsupported) SetDetails(val OptIdpStrategyPointerUnsupportedDetails) {
-	s.Details = val
-}
-
-// Additional error-specific context.
-type IdpStrategyPointerUnsupportedDetails map[string]jx.Raw
-
-func (s *IdpStrategyPointerUnsupportedDetails) init() IdpStrategyPointerUnsupportedDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -38504,52 +38552,6 @@ func (o OptEncKeyUnknownAlgDetails) Or(d EncKeyUnknownAlgDetails) EncKeyUnknownA
 	return d
 }
 
-// NewOptEnvNotFoundDetails returns new OptEnvNotFoundDetails with value set to v.
-func NewOptEnvNotFoundDetails(v EnvNotFoundDetails) OptEnvNotFoundDetails {
-	return OptEnvNotFoundDetails{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptEnvNotFoundDetails is optional EnvNotFoundDetails.
-type OptEnvNotFoundDetails struct {
-	Value EnvNotFoundDetails
-	Set   bool
-}
-
-// IsSet returns true if OptEnvNotFoundDetails was set.
-func (o OptEnvNotFoundDetails) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptEnvNotFoundDetails) Reset() {
-	var v EnvNotFoundDetails
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptEnvNotFoundDetails) SetTo(v EnvNotFoundDetails) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptEnvNotFoundDetails) Get() (v EnvNotFoundDetails, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptEnvNotFoundDetails) Or(d EnvNotFoundDetails) EnvNotFoundDetails {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptEnvProjectNotFoundDetails returns new OptEnvProjectNotFoundDetails with value set to v.
 func NewOptEnvProjectNotFoundDetails(v EnvProjectNotFoundDetails) OptEnvProjectNotFoundDetails {
 	return OptEnvProjectNotFoundDetails{
@@ -38590,52 +38592,6 @@ func (o OptEnvProjectNotFoundDetails) Get() (v EnvProjectNotFoundDetails, ok boo
 
 // Or returns value if set, or given parameter if does not.
 func (o OptEnvProjectNotFoundDetails) Or(d EnvProjectNotFoundDetails) EnvProjectNotFoundDetails {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptEnvironmentName returns new OptEnvironmentName with value set to v.
-func NewOptEnvironmentName(v EnvironmentName) OptEnvironmentName {
-	return OptEnvironmentName{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptEnvironmentName is optional EnvironmentName.
-type OptEnvironmentName struct {
-	Value EnvironmentName
-	Set   bool
-}
-
-// IsSet returns true if OptEnvironmentName was set.
-func (o OptEnvironmentName) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptEnvironmentName) Reset() {
-	var v EnvironmentName
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptEnvironmentName) SetTo(v EnvironmentName) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptEnvironmentName) Get() (v EnvironmentName, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptEnvironmentName) Or(d EnvironmentName) EnvironmentName {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -41126,190 +41082,6 @@ func (o OptIdpConnectionClaimMapping) Or(d IdpConnectionClaimMapping) IdpConnect
 	return d
 }
 
-// NewOptIdpConnectionOAuth2 returns new OptIdpConnectionOAuth2 with value set to v.
-func NewOptIdpConnectionOAuth2(v IdpConnectionOAuth2) OptIdpConnectionOAuth2 {
-	return OptIdpConnectionOAuth2{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptIdpConnectionOAuth2 is optional IdpConnectionOAuth2.
-type OptIdpConnectionOAuth2 struct {
-	Value IdpConnectionOAuth2
-	Set   bool
-}
-
-// IsSet returns true if OptIdpConnectionOAuth2 was set.
-func (o OptIdpConnectionOAuth2) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptIdpConnectionOAuth2) Reset() {
-	var v IdpConnectionOAuth2
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptIdpConnectionOAuth2) SetTo(v IdpConnectionOAuth2) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptIdpConnectionOAuth2) Get() (v IdpConnectionOAuth2, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptIdpConnectionOAuth2) Or(d IdpConnectionOAuth2) IdpConnectionOAuth2 {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptIdpConnectionOAuth2StaticAuthorizeParameters returns new OptIdpConnectionOAuth2StaticAuthorizeParameters with value set to v.
-func NewOptIdpConnectionOAuth2StaticAuthorizeParameters(v IdpConnectionOAuth2StaticAuthorizeParameters) OptIdpConnectionOAuth2StaticAuthorizeParameters {
-	return OptIdpConnectionOAuth2StaticAuthorizeParameters{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptIdpConnectionOAuth2StaticAuthorizeParameters is optional IdpConnectionOAuth2StaticAuthorizeParameters.
-type OptIdpConnectionOAuth2StaticAuthorizeParameters struct {
-	Value IdpConnectionOAuth2StaticAuthorizeParameters
-	Set   bool
-}
-
-// IsSet returns true if OptIdpConnectionOAuth2StaticAuthorizeParameters was set.
-func (o OptIdpConnectionOAuth2StaticAuthorizeParameters) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptIdpConnectionOAuth2StaticAuthorizeParameters) Reset() {
-	var v IdpConnectionOAuth2StaticAuthorizeParameters
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptIdpConnectionOAuth2StaticAuthorizeParameters) SetTo(v IdpConnectionOAuth2StaticAuthorizeParameters) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptIdpConnectionOAuth2StaticAuthorizeParameters) Get() (v IdpConnectionOAuth2StaticAuthorizeParameters, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptIdpConnectionOAuth2StaticAuthorizeParameters) Or(d IdpConnectionOAuth2StaticAuthorizeParameters) IdpConnectionOAuth2StaticAuthorizeParameters {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptIdpConnectionOAuth2SupplementaryFetch returns new OptIdpConnectionOAuth2SupplementaryFetch with value set to v.
-func NewOptIdpConnectionOAuth2SupplementaryFetch(v IdpConnectionOAuth2SupplementaryFetch) OptIdpConnectionOAuth2SupplementaryFetch {
-	return OptIdpConnectionOAuth2SupplementaryFetch{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptIdpConnectionOAuth2SupplementaryFetch is optional IdpConnectionOAuth2SupplementaryFetch.
-type OptIdpConnectionOAuth2SupplementaryFetch struct {
-	Value IdpConnectionOAuth2SupplementaryFetch
-	Set   bool
-}
-
-// IsSet returns true if OptIdpConnectionOAuth2SupplementaryFetch was set.
-func (o OptIdpConnectionOAuth2SupplementaryFetch) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptIdpConnectionOAuth2SupplementaryFetch) Reset() {
-	var v IdpConnectionOAuth2SupplementaryFetch
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptIdpConnectionOAuth2SupplementaryFetch) SetTo(v IdpConnectionOAuth2SupplementaryFetch) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptIdpConnectionOAuth2SupplementaryFetch) Get() (v IdpConnectionOAuth2SupplementaryFetch, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptIdpConnectionOAuth2SupplementaryFetch) Or(d IdpConnectionOAuth2SupplementaryFetch) IdpConnectionOAuth2SupplementaryFetch {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptIdpConnectionOAuth2TokenEndpointAuthMethod returns new OptIdpConnectionOAuth2TokenEndpointAuthMethod with value set to v.
-func NewOptIdpConnectionOAuth2TokenEndpointAuthMethod(v IdpConnectionOAuth2TokenEndpointAuthMethod) OptIdpConnectionOAuth2TokenEndpointAuthMethod {
-	return OptIdpConnectionOAuth2TokenEndpointAuthMethod{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptIdpConnectionOAuth2TokenEndpointAuthMethod is optional IdpConnectionOAuth2TokenEndpointAuthMethod.
-type OptIdpConnectionOAuth2TokenEndpointAuthMethod struct {
-	Value IdpConnectionOAuth2TokenEndpointAuthMethod
-	Set   bool
-}
-
-// IsSet returns true if OptIdpConnectionOAuth2TokenEndpointAuthMethod was set.
-func (o OptIdpConnectionOAuth2TokenEndpointAuthMethod) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptIdpConnectionOAuth2TokenEndpointAuthMethod) Reset() {
-	var v IdpConnectionOAuth2TokenEndpointAuthMethod
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptIdpConnectionOAuth2TokenEndpointAuthMethod) SetTo(v IdpConnectionOAuth2TokenEndpointAuthMethod) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptIdpConnectionOAuth2TokenEndpointAuthMethod) Get() (v IdpConnectionOAuth2TokenEndpointAuthMethod, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptIdpConnectionOAuth2TokenEndpointAuthMethod) Or(d IdpConnectionOAuth2TokenEndpointAuthMethod) IdpConnectionOAuth2TokenEndpointAuthMethod {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptIdpConnectionOidc returns new OptIdpConnectionOidc with value set to v.
 func NewOptIdpConnectionOidc(v IdpConnectionOidc) OptIdpConnectionOidc {
 	return OptIdpConnectionOidc{
@@ -41862,52 +41634,6 @@ func (o OptIdpNotFoundDetails) Or(d IdpNotFoundDetails) IdpNotFoundDetails {
 	return d
 }
 
-// NewOptIdpOAuth2UnsupportedDetails returns new OptIdpOAuth2UnsupportedDetails with value set to v.
-func NewOptIdpOAuth2UnsupportedDetails(v IdpOAuth2UnsupportedDetails) OptIdpOAuth2UnsupportedDetails {
-	return OptIdpOAuth2UnsupportedDetails{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptIdpOAuth2UnsupportedDetails is optional IdpOAuth2UnsupportedDetails.
-type OptIdpOAuth2UnsupportedDetails struct {
-	Value IdpOAuth2UnsupportedDetails
-	Set   bool
-}
-
-// IsSet returns true if OptIdpOAuth2UnsupportedDetails was set.
-func (o OptIdpOAuth2UnsupportedDetails) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptIdpOAuth2UnsupportedDetails) Reset() {
-	var v IdpOAuth2UnsupportedDetails
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptIdpOAuth2UnsupportedDetails) SetTo(v IdpOAuth2UnsupportedDetails) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptIdpOAuth2UnsupportedDetails) Get() (v IdpOAuth2UnsupportedDetails, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptIdpOAuth2UnsupportedDetails) Or(d IdpOAuth2UnsupportedDetails) IdpOAuth2UnsupportedDetails {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptIdpPermissionDeniedDetails returns new OptIdpPermissionDeniedDetails with value set to v.
 func NewOptIdpPermissionDeniedDetails(v IdpPermissionDeniedDetails) OptIdpPermissionDeniedDetails {
 	return OptIdpPermissionDeniedDetails{
@@ -42086,52 +41812,6 @@ func (o OptIdpScopesMissingOpenidDetails) Get() (v IdpScopesMissingOpenidDetails
 
 // Or returns value if set, or given parameter if does not.
 func (o OptIdpScopesMissingOpenidDetails) Or(d IdpScopesMissingOpenidDetails) IdpScopesMissingOpenidDetails {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptIdpStrategyPointerUnsupportedDetails returns new OptIdpStrategyPointerUnsupportedDetails with value set to v.
-func NewOptIdpStrategyPointerUnsupportedDetails(v IdpStrategyPointerUnsupportedDetails) OptIdpStrategyPointerUnsupportedDetails {
-	return OptIdpStrategyPointerUnsupportedDetails{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptIdpStrategyPointerUnsupportedDetails is optional IdpStrategyPointerUnsupportedDetails.
-type OptIdpStrategyPointerUnsupportedDetails struct {
-	Value IdpStrategyPointerUnsupportedDetails
-	Set   bool
-}
-
-// IsSet returns true if OptIdpStrategyPointerUnsupportedDetails was set.
-func (o OptIdpStrategyPointerUnsupportedDetails) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptIdpStrategyPointerUnsupportedDetails) Reset() {
-	var v IdpStrategyPointerUnsupportedDetails
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptIdpStrategyPointerUnsupportedDetails) SetTo(v IdpStrategyPointerUnsupportedDetails) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptIdpStrategyPointerUnsupportedDetails) Get() (v IdpStrategyPointerUnsupportedDetails, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptIdpStrategyPointerUnsupportedDetails) Or(d IdpStrategyPointerUnsupportedDetails) IdpStrategyPointerUnsupportedDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -44282,6 +43962,132 @@ func (o OptNilIdpUpdatedEventActorType) Or(d IdpUpdatedEventActorType) IdpUpdate
 	return d
 }
 
+// NewOptNilOriginAddedEventActorType returns new OptNilOriginAddedEventActorType with value set to v.
+func NewOptNilOriginAddedEventActorType(v OriginAddedEventActorType) OptNilOriginAddedEventActorType {
+	return OptNilOriginAddedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilOriginAddedEventActorType is optional nullable OriginAddedEventActorType.
+type OptNilOriginAddedEventActorType struct {
+	Value OriginAddedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilOriginAddedEventActorType was set.
+func (o OptNilOriginAddedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilOriginAddedEventActorType) Reset() {
+	var v OriginAddedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilOriginAddedEventActorType) SetTo(v OriginAddedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilOriginAddedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilOriginAddedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v OriginAddedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilOriginAddedEventActorType) Get() (v OriginAddedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilOriginAddedEventActorType) Or(d OriginAddedEventActorType) OriginAddedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilOriginRemovedEventActorType returns new OptNilOriginRemovedEventActorType with value set to v.
+func NewOptNilOriginRemovedEventActorType(v OriginRemovedEventActorType) OptNilOriginRemovedEventActorType {
+	return OptNilOriginRemovedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilOriginRemovedEventActorType is optional nullable OriginRemovedEventActorType.
+type OptNilOriginRemovedEventActorType struct {
+	Value OriginRemovedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilOriginRemovedEventActorType was set.
+func (o OptNilOriginRemovedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilOriginRemovedEventActorType) Reset() {
+	var v OriginRemovedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilOriginRemovedEventActorType) SetTo(v OriginRemovedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilOriginRemovedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilOriginRemovedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v OriginRemovedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilOriginRemovedEventActorType) Get() (v OriginRemovedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilOriginRemovedEventActorType) Or(d OriginRemovedEventActorType) OriginRemovedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptNilPageToken returns new OptNilPageToken with value set to v.
 func NewOptNilPageToken(v PageToken) OptNilPageToken {
 	return OptNilPageToken{
@@ -46069,6 +45875,328 @@ func (o OptOrigin) Get() (v Origin, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptOrigin) Or(d Origin) Origin {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptOriginAddedEventDelegationType returns new OptOriginAddedEventDelegationType with value set to v.
+func NewOptOriginAddedEventDelegationType(v OriginAddedEventDelegationType) OptOriginAddedEventDelegationType {
+	return OptOriginAddedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptOriginAddedEventDelegationType is optional OriginAddedEventDelegationType.
+type OptOriginAddedEventDelegationType struct {
+	Value OriginAddedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptOriginAddedEventDelegationType was set.
+func (o OptOriginAddedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptOriginAddedEventDelegationType) Reset() {
+	var v OriginAddedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptOriginAddedEventDelegationType) SetTo(v OriginAddedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptOriginAddedEventDelegationType) Get() (v OriginAddedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptOriginAddedEventDelegationType) Or(d OriginAddedEventDelegationType) OriginAddedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptOriginInvalidDetails returns new OptOriginInvalidDetails with value set to v.
+func NewOptOriginInvalidDetails(v OriginInvalidDetails) OptOriginInvalidDetails {
+	return OptOriginInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptOriginInvalidDetails is optional OriginInvalidDetails.
+type OptOriginInvalidDetails struct {
+	Value OriginInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptOriginInvalidDetails was set.
+func (o OptOriginInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptOriginInvalidDetails) Reset() {
+	var v OriginInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptOriginInvalidDetails) SetTo(v OriginInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptOriginInvalidDetails) Get() (v OriginInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptOriginInvalidDetails) Or(d OriginInvalidDetails) OriginInvalidDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptOriginKindConflictDetails returns new OptOriginKindConflictDetails with value set to v.
+func NewOptOriginKindConflictDetails(v OriginKindConflictDetails) OptOriginKindConflictDetails {
+	return OptOriginKindConflictDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptOriginKindConflictDetails is optional OriginKindConflictDetails.
+type OptOriginKindConflictDetails struct {
+	Value OriginKindConflictDetails
+	Set   bool
+}
+
+// IsSet returns true if OptOriginKindConflictDetails was set.
+func (o OptOriginKindConflictDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptOriginKindConflictDetails) Reset() {
+	var v OriginKindConflictDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptOriginKindConflictDetails) SetTo(v OriginKindConflictDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptOriginKindConflictDetails) Get() (v OriginKindConflictDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptOriginKindConflictDetails) Or(d OriginKindConflictDetails) OriginKindConflictDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptOriginNotFoundDetails returns new OptOriginNotFoundDetails with value set to v.
+func NewOptOriginNotFoundDetails(v OriginNotFoundDetails) OptOriginNotFoundDetails {
+	return OptOriginNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptOriginNotFoundDetails is optional OriginNotFoundDetails.
+type OptOriginNotFoundDetails struct {
+	Value OriginNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptOriginNotFoundDetails was set.
+func (o OptOriginNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptOriginNotFoundDetails) Reset() {
+	var v OriginNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptOriginNotFoundDetails) SetTo(v OriginNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptOriginNotFoundDetails) Get() (v OriginNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptOriginNotFoundDetails) Or(d OriginNotFoundDetails) OriginNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptOriginPermissionDeniedDetails returns new OptOriginPermissionDeniedDetails with value set to v.
+func NewOptOriginPermissionDeniedDetails(v OriginPermissionDeniedDetails) OptOriginPermissionDeniedDetails {
+	return OptOriginPermissionDeniedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptOriginPermissionDeniedDetails is optional OriginPermissionDeniedDetails.
+type OptOriginPermissionDeniedDetails struct {
+	Value OriginPermissionDeniedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptOriginPermissionDeniedDetails was set.
+func (o OptOriginPermissionDeniedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptOriginPermissionDeniedDetails) Reset() {
+	var v OriginPermissionDeniedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptOriginPermissionDeniedDetails) SetTo(v OriginPermissionDeniedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptOriginPermissionDeniedDetails) Get() (v OriginPermissionDeniedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptOriginPermissionDeniedDetails) Or(d OriginPermissionDeniedDetails) OriginPermissionDeniedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptOriginPrimaryNotExactDetails returns new OptOriginPrimaryNotExactDetails with value set to v.
+func NewOptOriginPrimaryNotExactDetails(v OriginPrimaryNotExactDetails) OptOriginPrimaryNotExactDetails {
+	return OptOriginPrimaryNotExactDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptOriginPrimaryNotExactDetails is optional OriginPrimaryNotExactDetails.
+type OptOriginPrimaryNotExactDetails struct {
+	Value OriginPrimaryNotExactDetails
+	Set   bool
+}
+
+// IsSet returns true if OptOriginPrimaryNotExactDetails was set.
+func (o OptOriginPrimaryNotExactDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptOriginPrimaryNotExactDetails) Reset() {
+	var v OriginPrimaryNotExactDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptOriginPrimaryNotExactDetails) SetTo(v OriginPrimaryNotExactDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptOriginPrimaryNotExactDetails) Get() (v OriginPrimaryNotExactDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptOriginPrimaryNotExactDetails) Or(d OriginPrimaryNotExactDetails) OriginPrimaryNotExactDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptOriginRemovedEventDelegationType returns new OptOriginRemovedEventDelegationType with value set to v.
+func NewOptOriginRemovedEventDelegationType(v OriginRemovedEventDelegationType) OptOriginRemovedEventDelegationType {
+	return OptOriginRemovedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptOriginRemovedEventDelegationType is optional OriginRemovedEventDelegationType.
+type OptOriginRemovedEventDelegationType struct {
+	Value OriginRemovedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptOriginRemovedEventDelegationType was set.
+func (o OptOriginRemovedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptOriginRemovedEventDelegationType) Reset() {
+	var v OriginRemovedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptOriginRemovedEventDelegationType) SetTo(v OriginRemovedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptOriginRemovedEventDelegationType) Get() (v OriginRemovedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptOriginRemovedEventDelegationType) Or(d OriginRemovedEventDelegationType) OriginRemovedEventDelegationType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -50537,38 +50665,38 @@ func (o OptVarPermissionDeniedDetails) Or(d VarPermissionDeniedDetails) VarPermi
 	return d
 }
 
-// NewOptVariableAppliesTo returns new OptVariableAppliesTo with value set to v.
-func NewOptVariableAppliesTo(v VariableAppliesTo) OptVariableAppliesTo {
-	return OptVariableAppliesTo{
+// NewOptVariable returns new OptVariable with value set to v.
+func NewOptVariable(v Variable) OptVariable {
+	return OptVariable{
 		Value: v,
 		Set:   true,
 	}
 }
 
-// OptVariableAppliesTo is optional VariableAppliesTo.
-type OptVariableAppliesTo struct {
-	Value VariableAppliesTo
+// OptVariable is optional Variable.
+type OptVariable struct {
+	Value Variable
 	Set   bool
 }
 
-// IsSet returns true if OptVariableAppliesTo was set.
-func (o OptVariableAppliesTo) IsSet() bool { return o.Set }
+// IsSet returns true if OptVariable was set.
+func (o OptVariable) IsSet() bool { return o.Set }
 
 // Reset unsets value.
-func (o *OptVariableAppliesTo) Reset() {
-	var v VariableAppliesTo
+func (o *OptVariable) Reset() {
+	var v Variable
 	o.Value = v
 	o.Set = false
 }
 
 // SetTo sets value to v.
-func (o *OptVariableAppliesTo) SetTo(v VariableAppliesTo) {
+func (o *OptVariable) SetTo(v Variable) {
 	o.Set = true
 	o.Value = v
 }
 
 // Get returns value and boolean that denotes whether value was set.
-func (o OptVariableAppliesTo) Get() (v VariableAppliesTo, ok bool) {
+func (o OptVariable) Get() (v Variable, ok bool) {
 	if !o.Set {
 		return v, false
 	}
@@ -50576,7 +50704,53 @@ func (o OptVariableAppliesTo) Get() (v VariableAppliesTo, ok bool) {
 }
 
 // Or returns value if set, or given parameter if does not.
-func (o OptVariableAppliesTo) Or(d VariableAppliesTo) VariableAppliesTo {
+func (o OptVariable) Or(d Variable) Variable {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptVariableKind returns new OptVariableKind with value set to v.
+func NewOptVariableKind(v VariableKind) OptVariableKind {
+	return OptVariableKind{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptVariableKind is optional VariableKind.
+type OptVariableKind struct {
+	Value VariableKind
+	Set   bool
+}
+
+// IsSet returns true if OptVariableKind was set.
+func (o OptVariableKind) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptVariableKind) Reset() {
+	var v VariableKind
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptVariableKind) SetTo(v VariableKind) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptVariableKind) Get() (v VariableKind, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptVariableKind) Or(d VariableKind) VariableKind {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -50584,6 +50758,1229 @@ func (o OptVariableAppliesTo) Or(d VariableAppliesTo) VariableAppliesTo {
 }
 
 type Origin string
+
+// Merged schema.
+// Ref: #
+type OriginAddedEvent struct {
+	// Managed event id (`evt_<opaque>`).
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// Emit-time team scope, when the actor operated under a team.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// Wide-event category.
+	Category OriginAddedEventCategory `json:"category"`
+	// When the action happened (server/storage clock, dialect-owned).
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the row was inserted (server/storage clock, dialect-owned).
+	CreatedAt time.Time `json:"created_at"`
+	// Who triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// Actor kind.
+	ActorType OptNilOriginAddedEventActorType `json:"actor_type"`
+	// Resource type affected.
+	EntityType OptNilString `json:"entity_type"`
+	// Resource id affected.
+	EntityID OptNilString `json:"entity_id"`
+	// Application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// Token id present at emit time, when any.
+	TokenID OptString `json:"token_id"`
+	// Delegation kind (omit when unset).
+	DelegationType OptOriginAddedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                         `json:"delegation_id"`
+	Grantor        OptString                         `json:"grantor"`
+	// Device fingerprint correlation id.
+	Fingerprint OptString `json:"fingerprint"`
+	// HTTP request correlation id.
+	RequestID OptNilString `json:"request_id"`
+	// Session correlation id.
+	SessionID OptNilString `json:"session_id"`
+	// Login flow correlation id.
+	FlowID   OptNilString     `json:"flow_id"`
+	Metadata OptEventMetadata `json:"metadata"`
+	Payload  OriginPayload    `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *OriginAddedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *OriginAddedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *OriginAddedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *OriginAddedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *OriginAddedEvent) GetCategory() OriginAddedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *OriginAddedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *OriginAddedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *OriginAddedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *OriginAddedEvent) GetActorType() OptNilOriginAddedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *OriginAddedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *OriginAddedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *OriginAddedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *OriginAddedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *OriginAddedEvent) GetDelegationType() OptOriginAddedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *OriginAddedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *OriginAddedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *OriginAddedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *OriginAddedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *OriginAddedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *OriginAddedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *OriginAddedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *OriginAddedEvent) GetPayload() OriginPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *OriginAddedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *OriginAddedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *OriginAddedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *OriginAddedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *OriginAddedEvent) SetCategory(val OriginAddedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *OriginAddedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *OriginAddedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *OriginAddedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *OriginAddedEvent) SetActorType(val OptNilOriginAddedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *OriginAddedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *OriginAddedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *OriginAddedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *OriginAddedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *OriginAddedEvent) SetDelegationType(val OptOriginAddedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *OriginAddedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *OriginAddedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *OriginAddedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *OriginAddedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *OriginAddedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *OriginAddedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *OriginAddedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *OriginAddedEvent) SetPayload(val OriginPayload) {
+	s.Payload = val
+}
+
+type OriginAddedEventActorType string
+
+const (
+	OriginAddedEventActorTypeHuman   OriginAddedEventActorType = "human"
+	OriginAddedEventActorTypeService OriginAddedEventActorType = "service"
+	OriginAddedEventActorTypeSystem  OriginAddedEventActorType = "system"
+	OriginAddedEventActorTypeAgent   OriginAddedEventActorType = "agent"
+)
+
+// AllValues returns all OriginAddedEventActorType values.
+func (OriginAddedEventActorType) AllValues() []OriginAddedEventActorType {
+	return []OriginAddedEventActorType{
+		OriginAddedEventActorTypeHuman,
+		OriginAddedEventActorTypeService,
+		OriginAddedEventActorTypeSystem,
+		OriginAddedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s OriginAddedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case OriginAddedEventActorTypeHuman:
+		return []byte(s), nil
+	case OriginAddedEventActorTypeService:
+		return []byte(s), nil
+	case OriginAddedEventActorTypeSystem:
+		return []byte(s), nil
+	case OriginAddedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *OriginAddedEventActorType) UnmarshalText(data []byte) error {
+	switch OriginAddedEventActorType(data) {
+	case OriginAddedEventActorTypeHuman:
+		*s = OriginAddedEventActorTypeHuman
+		return nil
+	case OriginAddedEventActorTypeService:
+		*s = OriginAddedEventActorTypeService
+		return nil
+	case OriginAddedEventActorTypeSystem:
+		*s = OriginAddedEventActorTypeSystem
+		return nil
+	case OriginAddedEventActorTypeAgent:
+		*s = OriginAddedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Wide-event category.
+type OriginAddedEventCategory string
+
+const (
+	OriginAddedEventCategoryRequest OriginAddedEventCategory = "request"
+	OriginAddedEventCategoryAuth    OriginAddedEventCategory = "auth"
+	OriginAddedEventCategorySession OriginAddedEventCategory = "session"
+	OriginAddedEventCategoryAdmin   OriginAddedEventCategory = "admin"
+	OriginAddedEventCategoryEntity  OriginAddedEventCategory = "entity"
+	OriginAddedEventCategorySignal  OriginAddedEventCategory = "signal"
+)
+
+// AllValues returns all OriginAddedEventCategory values.
+func (OriginAddedEventCategory) AllValues() []OriginAddedEventCategory {
+	return []OriginAddedEventCategory{
+		OriginAddedEventCategoryRequest,
+		OriginAddedEventCategoryAuth,
+		OriginAddedEventCategorySession,
+		OriginAddedEventCategoryAdmin,
+		OriginAddedEventCategoryEntity,
+		OriginAddedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s OriginAddedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case OriginAddedEventCategoryRequest:
+		return []byte(s), nil
+	case OriginAddedEventCategoryAuth:
+		return []byte(s), nil
+	case OriginAddedEventCategorySession:
+		return []byte(s), nil
+	case OriginAddedEventCategoryAdmin:
+		return []byte(s), nil
+	case OriginAddedEventCategoryEntity:
+		return []byte(s), nil
+	case OriginAddedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *OriginAddedEventCategory) UnmarshalText(data []byte) error {
+	switch OriginAddedEventCategory(data) {
+	case OriginAddedEventCategoryRequest:
+		*s = OriginAddedEventCategoryRequest
+		return nil
+	case OriginAddedEventCategoryAuth:
+		*s = OriginAddedEventCategoryAuth
+		return nil
+	case OriginAddedEventCategorySession:
+		*s = OriginAddedEventCategorySession
+		return nil
+	case OriginAddedEventCategoryAdmin:
+		*s = OriginAddedEventCategoryAdmin
+		return nil
+	case OriginAddedEventCategoryEntity:
+		*s = OriginAddedEventCategoryEntity
+		return nil
+	case OriginAddedEventCategorySignal:
+		*s = OriginAddedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Delegation kind (omit when unset).
+type OriginAddedEventDelegationType string
+
+const (
+	OriginAddedEventDelegationTypeDirect    OriginAddedEventDelegationType = "direct"
+	OriginAddedEventDelegationTypeDelegated OriginAddedEventDelegationType = "delegated"
+	OriginAddedEventDelegationTypePatShared OriginAddedEventDelegationType = "pat_shared"
+	OriginAddedEventDelegationTypeExchanged OriginAddedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all OriginAddedEventDelegationType values.
+func (OriginAddedEventDelegationType) AllValues() []OriginAddedEventDelegationType {
+	return []OriginAddedEventDelegationType{
+		OriginAddedEventDelegationTypeDirect,
+		OriginAddedEventDelegationTypeDelegated,
+		OriginAddedEventDelegationTypePatShared,
+		OriginAddedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s OriginAddedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case OriginAddedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case OriginAddedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case OriginAddedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case OriginAddedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *OriginAddedEventDelegationType) UnmarshalText(data []byte) error {
+	switch OriginAddedEventDelegationType(data) {
+	case OriginAddedEventDelegationTypeDirect:
+		*s = OriginAddedEventDelegationTypeDirect
+		return nil
+	case OriginAddedEventDelegationTypeDelegated:
+		*s = OriginAddedEventDelegationTypeDelegated
+		return nil
+	case OriginAddedEventDelegationTypePatShared:
+		*s = OriginAddedEventDelegationTypePatShared
+		return nil
+	case OriginAddedEventDelegationTypeExchanged:
+		*s = OriginAddedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Merged schema.
+// Ref: #
+type OriginInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptOriginInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *OriginInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *OriginInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *OriginInvalid) GetDetails() OptOriginInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *OriginInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *OriginInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *OriginInvalid) SetDetails(val OptOriginInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type OriginInvalidDetails map[string]jx.Raw
+
+func (s *OriginInvalidDetails) init() OriginInvalidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type OriginKindConflict struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptOriginKindConflictDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *OriginKindConflict) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *OriginKindConflict) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *OriginKindConflict) GetDetails() OptOriginKindConflictDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *OriginKindConflict) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *OriginKindConflict) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *OriginKindConflict) SetDetails(val OptOriginKindConflictDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type OriginKindConflictDetails map[string]jx.Raw
+
+func (s *OriginKindConflictDetails) init() OriginKindConflictDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type OriginNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptOriginNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *OriginNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *OriginNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *OriginNotFound) GetDetails() OptOriginNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *OriginNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *OriginNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *OriginNotFound) SetDetails(val OptOriginNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type OriginNotFoundDetails map[string]jx.Raw
+
+func (s *OriginNotFoundDetails) init() OriginNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Allowlisted fields for `origin.added` and `origin.removed`.
+// Ref: #
+type OriginPayload struct {
+	Pattern string            `json:"pattern"`
+	Kind    OriginPayloadKind `json:"kind"`
+}
+
+// GetPattern returns the value of Pattern.
+func (s *OriginPayload) GetPattern() string {
+	return s.Pattern
+}
+
+// GetKind returns the value of Kind.
+func (s *OriginPayload) GetKind() OriginPayloadKind {
+	return s.Kind
+}
+
+// SetPattern sets the value of Pattern.
+func (s *OriginPayload) SetPattern(val string) {
+	s.Pattern = val
+}
+
+// SetKind sets the value of Kind.
+func (s *OriginPayload) SetKind(val OriginPayloadKind) {
+	s.Kind = val
+}
+
+type OriginPayloadKind string
+
+const (
+	OriginPayloadKindPrimary OriginPayloadKind = "primary"
+	OriginPayloadKindPreview OriginPayloadKind = "preview"
+)
+
+// AllValues returns all OriginPayloadKind values.
+func (OriginPayloadKind) AllValues() []OriginPayloadKind {
+	return []OriginPayloadKind{
+		OriginPayloadKindPrimary,
+		OriginPayloadKindPreview,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s OriginPayloadKind) MarshalText() ([]byte, error) {
+	switch s {
+	case OriginPayloadKindPrimary:
+		return []byte(s), nil
+	case OriginPayloadKindPreview:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *OriginPayloadKind) UnmarshalText(data []byte) error {
+	switch OriginPayloadKind(data) {
+	case OriginPayloadKindPrimary:
+		*s = OriginPayloadKindPrimary
+		return nil
+	case OriginPayloadKindPreview:
+		*s = OriginPayloadKindPreview
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Merged schema.
+// Ref: #
+type OriginPermissionDenied struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptOriginPermissionDeniedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *OriginPermissionDenied) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *OriginPermissionDenied) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *OriginPermissionDenied) GetDetails() OptOriginPermissionDeniedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *OriginPermissionDenied) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *OriginPermissionDenied) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *OriginPermissionDenied) SetDetails(val OptOriginPermissionDeniedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type OriginPermissionDeniedDetails map[string]jx.Raw
+
+func (s *OriginPermissionDeniedDetails) init() OriginPermissionDeniedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type OriginPrimaryNotExact struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptOriginPrimaryNotExactDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *OriginPrimaryNotExact) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *OriginPrimaryNotExact) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *OriginPrimaryNotExact) GetDetails() OptOriginPrimaryNotExactDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *OriginPrimaryNotExact) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *OriginPrimaryNotExact) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *OriginPrimaryNotExact) SetDetails(val OptOriginPrimaryNotExactDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type OriginPrimaryNotExactDetails map[string]jx.Raw
+
+func (s *OriginPrimaryNotExactDetails) init() OriginPrimaryNotExactDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type OriginRemovedEvent struct {
+	// Managed event id (`evt_<opaque>`).
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// Emit-time team scope, when the actor operated under a team.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// Wide-event category.
+	Category OriginRemovedEventCategory `json:"category"`
+	// When the action happened (server/storage clock, dialect-owned).
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the row was inserted (server/storage clock, dialect-owned).
+	CreatedAt time.Time `json:"created_at"`
+	// Who triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// Actor kind.
+	ActorType OptNilOriginRemovedEventActorType `json:"actor_type"`
+	// Resource type affected.
+	EntityType OptNilString `json:"entity_type"`
+	// Resource id affected.
+	EntityID OptNilString `json:"entity_id"`
+	// Application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// Token id present at emit time, when any.
+	TokenID OptString `json:"token_id"`
+	// Delegation kind (omit when unset).
+	DelegationType OptOriginRemovedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                           `json:"delegation_id"`
+	Grantor        OptString                           `json:"grantor"`
+	// Device fingerprint correlation id.
+	Fingerprint OptString `json:"fingerprint"`
+	// HTTP request correlation id.
+	RequestID OptNilString `json:"request_id"`
+	// Session correlation id.
+	SessionID OptNilString `json:"session_id"`
+	// Login flow correlation id.
+	FlowID   OptNilString     `json:"flow_id"`
+	Metadata OptEventMetadata `json:"metadata"`
+	Payload  OriginPayload    `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *OriginRemovedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *OriginRemovedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *OriginRemovedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *OriginRemovedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *OriginRemovedEvent) GetCategory() OriginRemovedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *OriginRemovedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *OriginRemovedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *OriginRemovedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *OriginRemovedEvent) GetActorType() OptNilOriginRemovedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *OriginRemovedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *OriginRemovedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *OriginRemovedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *OriginRemovedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *OriginRemovedEvent) GetDelegationType() OptOriginRemovedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *OriginRemovedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *OriginRemovedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *OriginRemovedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *OriginRemovedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *OriginRemovedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *OriginRemovedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *OriginRemovedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *OriginRemovedEvent) GetPayload() OriginPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *OriginRemovedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *OriginRemovedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *OriginRemovedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *OriginRemovedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *OriginRemovedEvent) SetCategory(val OriginRemovedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *OriginRemovedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *OriginRemovedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *OriginRemovedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *OriginRemovedEvent) SetActorType(val OptNilOriginRemovedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *OriginRemovedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *OriginRemovedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *OriginRemovedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *OriginRemovedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *OriginRemovedEvent) SetDelegationType(val OptOriginRemovedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *OriginRemovedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *OriginRemovedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *OriginRemovedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *OriginRemovedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *OriginRemovedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *OriginRemovedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *OriginRemovedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *OriginRemovedEvent) SetPayload(val OriginPayload) {
+	s.Payload = val
+}
+
+type OriginRemovedEventActorType string
+
+const (
+	OriginRemovedEventActorTypeHuman   OriginRemovedEventActorType = "human"
+	OriginRemovedEventActorTypeService OriginRemovedEventActorType = "service"
+	OriginRemovedEventActorTypeSystem  OriginRemovedEventActorType = "system"
+	OriginRemovedEventActorTypeAgent   OriginRemovedEventActorType = "agent"
+)
+
+// AllValues returns all OriginRemovedEventActorType values.
+func (OriginRemovedEventActorType) AllValues() []OriginRemovedEventActorType {
+	return []OriginRemovedEventActorType{
+		OriginRemovedEventActorTypeHuman,
+		OriginRemovedEventActorTypeService,
+		OriginRemovedEventActorTypeSystem,
+		OriginRemovedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s OriginRemovedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case OriginRemovedEventActorTypeHuman:
+		return []byte(s), nil
+	case OriginRemovedEventActorTypeService:
+		return []byte(s), nil
+	case OriginRemovedEventActorTypeSystem:
+		return []byte(s), nil
+	case OriginRemovedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *OriginRemovedEventActorType) UnmarshalText(data []byte) error {
+	switch OriginRemovedEventActorType(data) {
+	case OriginRemovedEventActorTypeHuman:
+		*s = OriginRemovedEventActorTypeHuman
+		return nil
+	case OriginRemovedEventActorTypeService:
+		*s = OriginRemovedEventActorTypeService
+		return nil
+	case OriginRemovedEventActorTypeSystem:
+		*s = OriginRemovedEventActorTypeSystem
+		return nil
+	case OriginRemovedEventActorTypeAgent:
+		*s = OriginRemovedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Wide-event category.
+type OriginRemovedEventCategory string
+
+const (
+	OriginRemovedEventCategoryRequest OriginRemovedEventCategory = "request"
+	OriginRemovedEventCategoryAuth    OriginRemovedEventCategory = "auth"
+	OriginRemovedEventCategorySession OriginRemovedEventCategory = "session"
+	OriginRemovedEventCategoryAdmin   OriginRemovedEventCategory = "admin"
+	OriginRemovedEventCategoryEntity  OriginRemovedEventCategory = "entity"
+	OriginRemovedEventCategorySignal  OriginRemovedEventCategory = "signal"
+)
+
+// AllValues returns all OriginRemovedEventCategory values.
+func (OriginRemovedEventCategory) AllValues() []OriginRemovedEventCategory {
+	return []OriginRemovedEventCategory{
+		OriginRemovedEventCategoryRequest,
+		OriginRemovedEventCategoryAuth,
+		OriginRemovedEventCategorySession,
+		OriginRemovedEventCategoryAdmin,
+		OriginRemovedEventCategoryEntity,
+		OriginRemovedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s OriginRemovedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case OriginRemovedEventCategoryRequest:
+		return []byte(s), nil
+	case OriginRemovedEventCategoryAuth:
+		return []byte(s), nil
+	case OriginRemovedEventCategorySession:
+		return []byte(s), nil
+	case OriginRemovedEventCategoryAdmin:
+		return []byte(s), nil
+	case OriginRemovedEventCategoryEntity:
+		return []byte(s), nil
+	case OriginRemovedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *OriginRemovedEventCategory) UnmarshalText(data []byte) error {
+	switch OriginRemovedEventCategory(data) {
+	case OriginRemovedEventCategoryRequest:
+		*s = OriginRemovedEventCategoryRequest
+		return nil
+	case OriginRemovedEventCategoryAuth:
+		*s = OriginRemovedEventCategoryAuth
+		return nil
+	case OriginRemovedEventCategorySession:
+		*s = OriginRemovedEventCategorySession
+		return nil
+	case OriginRemovedEventCategoryAdmin:
+		*s = OriginRemovedEventCategoryAdmin
+		return nil
+	case OriginRemovedEventCategoryEntity:
+		*s = OriginRemovedEventCategoryEntity
+		return nil
+	case OriginRemovedEventCategorySignal:
+		*s = OriginRemovedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Delegation kind (omit when unset).
+type OriginRemovedEventDelegationType string
+
+const (
+	OriginRemovedEventDelegationTypeDirect    OriginRemovedEventDelegationType = "direct"
+	OriginRemovedEventDelegationTypeDelegated OriginRemovedEventDelegationType = "delegated"
+	OriginRemovedEventDelegationTypePatShared OriginRemovedEventDelegationType = "pat_shared"
+	OriginRemovedEventDelegationTypeExchanged OriginRemovedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all OriginRemovedEventDelegationType values.
+func (OriginRemovedEventDelegationType) AllValues() []OriginRemovedEventDelegationType {
+	return []OriginRemovedEventDelegationType{
+		OriginRemovedEventDelegationTypeDirect,
+		OriginRemovedEventDelegationTypeDelegated,
+		OriginRemovedEventDelegationTypePatShared,
+		OriginRemovedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s OriginRemovedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case OriginRemovedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case OriginRemovedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case OriginRemovedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case OriginRemovedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *OriginRemovedEventDelegationType) UnmarshalText(data []byte) error {
+	switch OriginRemovedEventDelegationType(data) {
+	case OriginRemovedEventDelegationTypeDirect:
+		*s = OriginRemovedEventDelegationTypeDirect
+		return nil
+	case OriginRemovedEventDelegationTypeDelegated:
+		*s = OriginRemovedEventDelegationTypeDelegated
+		return nil
+	case OriginRemovedEventDelegationTypePatShared:
+		*s = OriginRemovedEventDelegationTypePatShared
+		return nil
+	case OriginRemovedEventDelegationTypeExchanged:
+		*s = OriginRemovedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
 
 type PageToken string
 
@@ -53739,11 +55136,13 @@ func (s *ProjectDeletedEventDelegationType) UnmarshalText(data []byte) error {
 type ProjectID string
 
 // One of a project's origins: a pattern and what it is for. A `primary`
-// pattern admits requests from the URLs it matches; a `preview` pattern only
-// bounds which URLs a preview deploy may register, and a request from such a
-// URL is admitted by its live preview alone. A `primary` pattern is an exact
-// URL with no wildcard. A `*` matches one or more characters, none of them a
-// dot, and a literal beats a wildcard.
+// pattern is an exact origin (scheme and host, no `*`) that admits requests
+// from the URLs it matches. A `preview` pattern only bounds which URLs a
+// preview deploy may register; it may include at most one `*` inside a single
+// host label (`*` matches one or more characters, none of them a dot). A
+// literal beats a wildcard. Unknown hosts are accepted as written. An empty
+// list means every origin is admitted until the first pattern is added.
+// Loopback origins are admitted without a pattern.
 // Ref: #
 type ProjectOrigin struct {
 	Pattern string            `json:"pattern"`
@@ -53769,8 +55168,6 @@ func (s *ProjectOrigin) SetPattern(val string) {
 func (s *ProjectOrigin) SetKind(val ProjectOriginKind) {
 	s.Kind = val
 }
-
-func (*ProjectOrigin) addOriginRes() {}
 
 type ProjectOriginKind string
 
@@ -53817,8 +55214,8 @@ func (s *ProjectOriginKind) UnmarshalText(data []byte) error {
 // `project.updated` (delta: only changed fields present).
 // Ref: #
 type ProjectPayload struct {
-	Name           OptString `json:"name"`
-	PreviewOrigins []string  `json:"preview_origins"`
+	Name    OptString       `json:"name"`
+	Origins []ProjectOrigin `json:"origins"`
 	// The password hashing algorithm the project switched to. The empty string
 	// means it was handed back to the server default. Absent when the update
 	// did not touch hashing.
@@ -53830,9 +55227,9 @@ func (s *ProjectPayload) GetName() OptString {
 	return s.Name
 }
 
-// GetPreviewOrigins returns the value of PreviewOrigins.
-func (s *ProjectPayload) GetPreviewOrigins() []string {
-	return s.PreviewOrigins
+// GetOrigins returns the value of Origins.
+func (s *ProjectPayload) GetOrigins() []ProjectOrigin {
+	return s.Origins
 }
 
 // GetPasswordHashAlgorithm returns the value of PasswordHashAlgorithm.
@@ -53845,9 +55242,9 @@ func (s *ProjectPayload) SetName(val OptString) {
 	s.Name = val
 }
 
-// SetPreviewOrigins sets the value of PreviewOrigins.
-func (s *ProjectPayload) SetPreviewOrigins(val []string) {
-	s.PreviewOrigins = val
+// SetOrigins sets the value of Origins.
+func (s *ProjectPayload) SetOrigins(val []ProjectOrigin) {
+	s.Origins = val
 }
 
 // SetPasswordHashAlgorithm sets the value of PasswordHashAlgorithm.
@@ -53862,10 +55259,9 @@ type ProjectResponse struct {
 	ID string `json:"id"`
 	// The name of the project.
 	Name string `json:"name"`
-	// Origins which are allowed for previewing and testing the project.
-	PreviewOrigins []string `json:"preview_origins"`
-	// The project's origin patterns, each a `{pattern, kind}`. An empty list
-	// admits every origin until the first pattern is added.
+	// The project's origins. An empty list means every origin is admitted
+	// until the first pattern is added. Loopback origins are admitted without
+	// a pattern.
 	Origins []ProjectOrigin `json:"origins"`
 	// The time when the project was created.
 	CreatedAt time.Time `json:"created_at"`
@@ -53884,11 +55280,6 @@ func (s *ProjectResponse) GetID() string {
 // GetName returns the value of Name.
 func (s *ProjectResponse) GetName() string {
 	return s.Name
-}
-
-// GetPreviewOrigins returns the value of PreviewOrigins.
-func (s *ProjectResponse) GetPreviewOrigins() []string {
-	return s.PreviewOrigins
 }
 
 // GetOrigins returns the value of Origins.
@@ -53919,11 +55310,6 @@ func (s *ProjectResponse) SetID(val string) {
 // SetName sets the value of Name.
 func (s *ProjectResponse) SetName(val string) {
 	s.Name = val
-}
-
-// SetPreviewOrigins sets the value of PreviewOrigins.
-func (s *ProjectResponse) SetPreviewOrigins(val []string) {
-	s.PreviewOrigins = val
 }
 
 // SetOrigins sets the value of Origins.
@@ -58443,10 +59829,15 @@ func (s *ReleaseSummary) SetRevokedAt(val NilDateTime) {
 
 // RemoveOriginErrorResponse represents sum type.
 type RemoveOriginErrorResponse struct {
-	Type             RemoveOriginErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	ReqInvalid       ReqInvalid
+	Type                   RemoveOriginErrorResponseType // switch on this field
+	AuthUnauthorized       AuthUnauthorized
+	EvtInvalid             EvtInvalid
+	Internal               Internal
+	OriginInvalid          OriginInvalid
+	OriginNotFound         OriginNotFound
+	OriginPermissionDenied OriginPermissionDenied
+	ProjMissingID          ProjMissingID
+	ReqInvalid             ReqInvalid
 }
 
 // RemoveOriginErrorResponseType is oneOf type of RemoveOriginErrorResponse.
@@ -58454,9 +59845,14 @@ type RemoveOriginErrorResponseType string
 
 // Possible values for RemoveOriginErrorResponseType.
 const (
-	AuthUnauthorizedRemoveOriginErrorResponse RemoveOriginErrorResponseType = "auth.unauthorized"
-	InternalRemoveOriginErrorResponse         RemoveOriginErrorResponseType = "internal"
-	ReqInvalidRemoveOriginErrorResponse       RemoveOriginErrorResponseType = "req.invalid"
+	AuthUnauthorizedRemoveOriginErrorResponse       RemoveOriginErrorResponseType = "auth.unauthorized"
+	EvtInvalidRemoveOriginErrorResponse             RemoveOriginErrorResponseType = "evt.invalid"
+	InternalRemoveOriginErrorResponse               RemoveOriginErrorResponseType = "internal"
+	OriginInvalidRemoveOriginErrorResponse          RemoveOriginErrorResponseType = "origin.invalid"
+	OriginNotFoundRemoveOriginErrorResponse         RemoveOriginErrorResponseType = "origin.not_found"
+	OriginPermissionDeniedRemoveOriginErrorResponse RemoveOriginErrorResponseType = "origin.permission_denied"
+	ProjMissingIDRemoveOriginErrorResponse          RemoveOriginErrorResponseType = "proj.missing_id"
+	ReqInvalidRemoveOriginErrorResponse             RemoveOriginErrorResponseType = "req.invalid"
 )
 
 // IsAuthUnauthorized reports whether RemoveOriginErrorResponse is AuthUnauthorized.
@@ -58464,9 +59860,34 @@ func (s RemoveOriginErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedRemoveOriginErrorResponse
 }
 
+// IsEvtInvalid reports whether RemoveOriginErrorResponse is EvtInvalid.
+func (s RemoveOriginErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidRemoveOriginErrorResponse
+}
+
 // IsInternal reports whether RemoveOriginErrorResponse is Internal.
 func (s RemoveOriginErrorResponse) IsInternal() bool {
 	return s.Type == InternalRemoveOriginErrorResponse
+}
+
+// IsOriginInvalid reports whether RemoveOriginErrorResponse is OriginInvalid.
+func (s RemoveOriginErrorResponse) IsOriginInvalid() bool {
+	return s.Type == OriginInvalidRemoveOriginErrorResponse
+}
+
+// IsOriginNotFound reports whether RemoveOriginErrorResponse is OriginNotFound.
+func (s RemoveOriginErrorResponse) IsOriginNotFound() bool {
+	return s.Type == OriginNotFoundRemoveOriginErrorResponse
+}
+
+// IsOriginPermissionDenied reports whether RemoveOriginErrorResponse is OriginPermissionDenied.
+func (s RemoveOriginErrorResponse) IsOriginPermissionDenied() bool {
+	return s.Type == OriginPermissionDeniedRemoveOriginErrorResponse
+}
+
+// IsProjMissingID reports whether RemoveOriginErrorResponse is ProjMissingID.
+func (s RemoveOriginErrorResponse) IsProjMissingID() bool {
+	return s.Type == ProjMissingIDRemoveOriginErrorResponse
 }
 
 // IsReqInvalid reports whether RemoveOriginErrorResponse is ReqInvalid.
@@ -58495,6 +59916,27 @@ func NewAuthUnauthorizedRemoveOriginErrorResponse(v AuthUnauthorized) RemoveOrig
 	return s
 }
 
+// SetEvtInvalid sets RemoveOriginErrorResponse to EvtInvalid.
+func (s *RemoveOriginErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidRemoveOriginErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if RemoveOriginErrorResponse is EvtInvalid.
+func (s RemoveOriginErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidRemoveOriginErrorResponse returns new RemoveOriginErrorResponse from EvtInvalid.
+func NewEvtInvalidRemoveOriginErrorResponse(v EvtInvalid) RemoveOriginErrorResponse {
+	var s RemoveOriginErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
 // SetInternal sets RemoveOriginErrorResponse to Internal.
 func (s *RemoveOriginErrorResponse) SetInternal(v Internal) {
 	s.Type = InternalRemoveOriginErrorResponse
@@ -58513,6 +59955,90 @@ func (s RemoveOriginErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalRemoveOriginErrorResponse(v Internal) RemoveOriginErrorResponse {
 	var s RemoveOriginErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetOriginInvalid sets RemoveOriginErrorResponse to OriginInvalid.
+func (s *RemoveOriginErrorResponse) SetOriginInvalid(v OriginInvalid) {
+	s.Type = OriginInvalidRemoveOriginErrorResponse
+	s.OriginInvalid = v
+}
+
+// GetOriginInvalid returns OriginInvalid and true boolean if RemoveOriginErrorResponse is OriginInvalid.
+func (s RemoveOriginErrorResponse) GetOriginInvalid() (v OriginInvalid, ok bool) {
+	if !s.IsOriginInvalid() {
+		return v, false
+	}
+	return s.OriginInvalid, true
+}
+
+// NewOriginInvalidRemoveOriginErrorResponse returns new RemoveOriginErrorResponse from OriginInvalid.
+func NewOriginInvalidRemoveOriginErrorResponse(v OriginInvalid) RemoveOriginErrorResponse {
+	var s RemoveOriginErrorResponse
+	s.SetOriginInvalid(v)
+	return s
+}
+
+// SetOriginNotFound sets RemoveOriginErrorResponse to OriginNotFound.
+func (s *RemoveOriginErrorResponse) SetOriginNotFound(v OriginNotFound) {
+	s.Type = OriginNotFoundRemoveOriginErrorResponse
+	s.OriginNotFound = v
+}
+
+// GetOriginNotFound returns OriginNotFound and true boolean if RemoveOriginErrorResponse is OriginNotFound.
+func (s RemoveOriginErrorResponse) GetOriginNotFound() (v OriginNotFound, ok bool) {
+	if !s.IsOriginNotFound() {
+		return v, false
+	}
+	return s.OriginNotFound, true
+}
+
+// NewOriginNotFoundRemoveOriginErrorResponse returns new RemoveOriginErrorResponse from OriginNotFound.
+func NewOriginNotFoundRemoveOriginErrorResponse(v OriginNotFound) RemoveOriginErrorResponse {
+	var s RemoveOriginErrorResponse
+	s.SetOriginNotFound(v)
+	return s
+}
+
+// SetOriginPermissionDenied sets RemoveOriginErrorResponse to OriginPermissionDenied.
+func (s *RemoveOriginErrorResponse) SetOriginPermissionDenied(v OriginPermissionDenied) {
+	s.Type = OriginPermissionDeniedRemoveOriginErrorResponse
+	s.OriginPermissionDenied = v
+}
+
+// GetOriginPermissionDenied returns OriginPermissionDenied and true boolean if RemoveOriginErrorResponse is OriginPermissionDenied.
+func (s RemoveOriginErrorResponse) GetOriginPermissionDenied() (v OriginPermissionDenied, ok bool) {
+	if !s.IsOriginPermissionDenied() {
+		return v, false
+	}
+	return s.OriginPermissionDenied, true
+}
+
+// NewOriginPermissionDeniedRemoveOriginErrorResponse returns new RemoveOriginErrorResponse from OriginPermissionDenied.
+func NewOriginPermissionDeniedRemoveOriginErrorResponse(v OriginPermissionDenied) RemoveOriginErrorResponse {
+	var s RemoveOriginErrorResponse
+	s.SetOriginPermissionDenied(v)
+	return s
+}
+
+// SetProjMissingID sets RemoveOriginErrorResponse to ProjMissingID.
+func (s *RemoveOriginErrorResponse) SetProjMissingID(v ProjMissingID) {
+	s.Type = ProjMissingIDRemoveOriginErrorResponse
+	s.ProjMissingID = v
+}
+
+// GetProjMissingID returns ProjMissingID and true boolean if RemoveOriginErrorResponse is ProjMissingID.
+func (s RemoveOriginErrorResponse) GetProjMissingID() (v ProjMissingID, ok bool) {
+	if !s.IsProjMissingID() {
+		return v, false
+	}
+	return s.ProjMissingID, true
+}
+
+// NewProjMissingIDRemoveOriginErrorResponse returns new RemoveOriginErrorResponse from ProjMissingID.
+func NewProjMissingIDRemoveOriginErrorResponse(v ProjMissingID) RemoveOriginErrorResponse {
+	var s RemoveOriginErrorResponse
+	s.SetProjMissingID(v)
 	return s
 }
 
@@ -58571,6 +60097,8 @@ type RemoveOriginNoContent struct{}
 func (*RemoveOriginNoContent) removeOriginRes() {}
 
 type RemoveOriginReq struct {
+	// The origin pattern exactly as stored on the project (same
+	// string returned by create/get or addOrigin).
 	Pattern string `json:"pattern"`
 }
 
@@ -61666,13 +63194,10 @@ func (s *SchemaURL) SetURL(val url.URL) {
 // that the value is secret; it never carries the value itself.
 // A secret is stored encrypted and reads back as ciphertext, so there is
 // nothing here that could be returned honestly: the plaintext would defeat the
-// encryption, and the ciphertext would be a value no caller can use. Whether
-// secrets ever become readable — and if so under which permission — is left
-// open by ADR 062 §9; this shape is what keeps that question open rather than
-// answering it by accident.
+// encryption, and the ciphertext would be a value no caller can use.
 // Secrets are still usable without being readable: a configuration document
 // referencing `${{ NAME }}` resolves against the decrypted value when it is
-// served (§7).
+// served.
 // Ref: #
 type SecretVariable struct {
 	// Always `true`. A non-secret variable is returned as a bare scalar instead.
@@ -61691,7 +63216,7 @@ func (s *SecretVariable) SetSecret(val bool) {
 
 // A variable written with its secrecy stated explicitly.
 // Use this form to enter a secret. `{"value": "s3cr3t", "secret": true}` is
-// stored encrypted with the project's active `secret` key (ADR 062 §7) and
+// stored encrypted with the project's active `secret` key and
 // never reads back; the bare-scalar form is the same write with
 // `secret: false`.
 // Ref: #
@@ -61700,7 +63225,7 @@ type SecretVariableInput struct {
 	// Whether the value is stored encrypted. Changing it on an existing name
 	// re-writes the value under the new flag — the documents referencing that
 	// name do not change, because secrecy is a property of the value, not of
-	// the reference to it (ADR 062 §2).
+	// the reference to it.
 	Secret bool `json:"secret"`
 }
 
@@ -64028,7 +65553,10 @@ func (s *StepActionKind) UnmarshalText(data []byte) error {
 type StepTexts struct {
 	// Localization key for the step heading.
 	TitleKey OptString `json:"title_key"`
-	// Localization key for explanatory text.
+	// Localization key for explanatory text: `<step>.description`, or
+	// `<step>.description.sso` when the step offers sign-in providers
+	// (`sso_providers`). A client without the `.sso` key falls back to
+	// `<step>.description`.
 	DescriptionKey OptNilString `json:"description_key"`
 }
 
@@ -64058,43 +65586,41 @@ func (*SubmitFlowStepBadRequest) submitFlowStepRes() {}
 
 // SubmitFlowStepErrorResponse represents sum type.
 type SubmitFlowStepErrorResponse struct {
-	Type                          SubmitFlowStepErrorResponseType // switch on this field
-	AttAlreadyHandedOff           AttAlreadyHandedOff
-	AttInvalidRequest             AttInvalidRequest
-	AttInvalidState               AttInvalidState
-	AttNotCompleted               AttNotCompleted
-	AttNotFound                   AttNotFound
-	AttProofRejected              AttProofRejected
-	AttStaleChallenge             AttStaleChallenge
-	EncKeyDecryptFailed           EncKeyDecryptFailed
-	EncKeyEncryptFailed           EncKeyEncryptFailed
-	EncKeyNotFound                EncKeyNotFound
-	EvtInvalid                    EvtInvalid
-	FlowCookieExpired             FlowCookieExpired
-	FlowCookieInvalid             FlowCookieInvalid
-	FlowIntegrity                 FlowIntegrity
-	FlowInvalidAction             FlowInvalidAction
-	FlowNotFound                  FlowNotFound
-	FlowRestartRequired           FlowRestartRequired
-	FlowUnsupported               FlowUnsupported
-	IdpEndpointCleartext          IdpEndpointCleartext
-	IdpEndpointsPartial           IdpEndpointsPartial
-	IdpOAuth2Unsupported          IdpOAuth2Unsupported
-	IdpProtocolBlockMissing       IdpProtocolBlockMissing
-	IdpScopesMissingOpenid        IdpScopesMissingOpenid
-	IdpStrategyPointerUnsupported IdpStrategyPointerUnsupported
-	Internal                      Internal
-	TknInvalid                    TknInvalid
-	NotImplemented                NotImplemented
-	ReqInvalid                    ReqInvalid
-	EncKeyUnknownAlg              EncKeyUnknownAlg
-	Unavailable                   Unavailable
-	UserAlreadyExists             UserAlreadyExists
-	UserConflict                  UserConflict
-	UserInvalid                   UserInvalid
-	UserNotFound                  UserNotFound
-	UserPasswordEmpty             UserPasswordEmpty
-	UserPasswordTooLong           UserPasswordTooLong
+	Type                    SubmitFlowStepErrorResponseType // switch on this field
+	AttAlreadyHandedOff     AttAlreadyHandedOff
+	AttInvalidRequest       AttInvalidRequest
+	AttInvalidState         AttInvalidState
+	AttNotCompleted         AttNotCompleted
+	AttNotFound             AttNotFound
+	AttProofRejected        AttProofRejected
+	AttStaleChallenge       AttStaleChallenge
+	EncKeyDecryptFailed     EncKeyDecryptFailed
+	EncKeyEncryptFailed     EncKeyEncryptFailed
+	EncKeyNotFound          EncKeyNotFound
+	EvtInvalid              EvtInvalid
+	FlowCookieExpired       FlowCookieExpired
+	FlowCookieInvalid       FlowCookieInvalid
+	FlowIntegrity           FlowIntegrity
+	FlowInvalidAction       FlowInvalidAction
+	FlowNotFound            FlowNotFound
+	FlowRestartRequired     FlowRestartRequired
+	FlowUnsupported         FlowUnsupported
+	IdpEndpointCleartext    IdpEndpointCleartext
+	IdpEndpointsPartial     IdpEndpointsPartial
+	IdpProtocolBlockMissing IdpProtocolBlockMissing
+	IdpScopesMissingOpenid  IdpScopesMissingOpenid
+	Internal                Internal
+	TknInvalid              TknInvalid
+	NotImplemented          NotImplemented
+	ReqInvalid              ReqInvalid
+	EncKeyUnknownAlg        EncKeyUnknownAlg
+	Unavailable             Unavailable
+	UserAlreadyExists       UserAlreadyExists
+	UserConflict            UserConflict
+	UserInvalid             UserInvalid
+	UserNotFound            UserNotFound
+	UserPasswordEmpty       UserPasswordEmpty
+	UserPasswordTooLong     UserPasswordTooLong
 }
 
 // SubmitFlowStepErrorResponseType is oneOf type of SubmitFlowStepErrorResponse.
@@ -64102,42 +65628,40 @@ type SubmitFlowStepErrorResponseType string
 
 // Possible values for SubmitFlowStepErrorResponseType.
 const (
-	AttAlreadyHandedOffSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "att.already_handed_off"
-	AttInvalidRequestSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "att.invalid_request"
-	AttInvalidStateSubmitFlowStepErrorResponse               SubmitFlowStepErrorResponseType = "att.invalid_state"
-	AttNotCompletedSubmitFlowStepErrorResponse               SubmitFlowStepErrorResponseType = "att.not_completed"
-	AttNotFoundSubmitFlowStepErrorResponse                   SubmitFlowStepErrorResponseType = "att.not_found"
-	AttProofRejectedSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "att.proof_rejected"
-	AttStaleChallengeSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "att.stale_challenge"
-	EncKeyDecryptFailedSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "enc_key.decrypt_failed"
-	EncKeyEncryptFailedSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "enc_key.encrypt_failed"
-	EncKeyNotFoundSubmitFlowStepErrorResponse                SubmitFlowStepErrorResponseType = "enc_key.not_found"
-	EvtInvalidSubmitFlowStepErrorResponse                    SubmitFlowStepErrorResponseType = "evt.invalid"
-	FlowCookieExpiredSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "flow.cookie_expired"
-	FlowCookieInvalidSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "flow.cookie_invalid"
-	FlowIntegritySubmitFlowStepErrorResponse                 SubmitFlowStepErrorResponseType = "flow.integrity"
-	FlowInvalidActionSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "flow.invalid_action"
-	FlowNotFoundSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "flow.not_found"
-	FlowRestartRequiredSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "flow.restart_required"
-	FlowUnsupportedSubmitFlowStepErrorResponse               SubmitFlowStepErrorResponseType = "flow.unsupported"
-	IdpEndpointCleartextSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "idp.endpoint_cleartext"
-	IdpEndpointsPartialSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "idp.endpoints_partial"
-	IdpOAuth2UnsupportedSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "idp.oauth2_unsupported"
-	IdpProtocolBlockMissingSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "idp.protocol_block_missing"
-	IdpScopesMissingOpenidSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "idp.scopes_missing_openid"
-	IdpStrategyPointerUnsupportedSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "idp.strategy_pointer_unsupported"
-	InternalSubmitFlowStepErrorResponse                      SubmitFlowStepErrorResponseType = "internal"
-	TknInvalidSubmitFlowStepErrorResponse                    SubmitFlowStepErrorResponseType = "tkn.invalid"
-	NotImplementedSubmitFlowStepErrorResponse                SubmitFlowStepErrorResponseType = "not_implemented"
-	ReqInvalidSubmitFlowStepErrorResponse                    SubmitFlowStepErrorResponseType = "req.invalid"
-	EncKeyUnknownAlgSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "enc_key.unknown_alg"
-	UnavailableSubmitFlowStepErrorResponse                   SubmitFlowStepErrorResponseType = "unavailable"
-	UserAlreadyExistsSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "user.already_exists"
-	UserConflictSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "user.conflict"
-	UserInvalidSubmitFlowStepErrorResponse                   SubmitFlowStepErrorResponseType = "user.invalid"
-	UserNotFoundSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "user.not_found"
-	UserPasswordEmptySubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "user.password_empty"
-	UserPasswordTooLongSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "user.password_too_long"
+	AttAlreadyHandedOffSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "att.already_handed_off"
+	AttInvalidRequestSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "att.invalid_request"
+	AttInvalidStateSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "att.invalid_state"
+	AttNotCompletedSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "att.not_completed"
+	AttNotFoundSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "att.not_found"
+	AttProofRejectedSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "att.proof_rejected"
+	AttStaleChallengeSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "att.stale_challenge"
+	EncKeyDecryptFailedSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "enc_key.decrypt_failed"
+	EncKeyEncryptFailedSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "enc_key.encrypt_failed"
+	EncKeyNotFoundSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "enc_key.not_found"
+	EvtInvalidSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "evt.invalid"
+	FlowCookieExpiredSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "flow.cookie_expired"
+	FlowCookieInvalidSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "flow.cookie_invalid"
+	FlowIntegritySubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "flow.integrity"
+	FlowInvalidActionSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "flow.invalid_action"
+	FlowNotFoundSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "flow.not_found"
+	FlowRestartRequiredSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "flow.restart_required"
+	FlowUnsupportedSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "flow.unsupported"
+	IdpEndpointCleartextSubmitFlowStepErrorResponse    SubmitFlowStepErrorResponseType = "idp.endpoint_cleartext"
+	IdpEndpointsPartialSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "idp.endpoints_partial"
+	IdpProtocolBlockMissingSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "idp.protocol_block_missing"
+	IdpScopesMissingOpenidSubmitFlowStepErrorResponse  SubmitFlowStepErrorResponseType = "idp.scopes_missing_openid"
+	InternalSubmitFlowStepErrorResponse                SubmitFlowStepErrorResponseType = "internal"
+	TknInvalidSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "tkn.invalid"
+	NotImplementedSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "not_implemented"
+	ReqInvalidSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "req.invalid"
+	EncKeyUnknownAlgSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "enc_key.unknown_alg"
+	UnavailableSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "unavailable"
+	UserAlreadyExistsSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "user.already_exists"
+	UserConflictSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "user.conflict"
+	UserInvalidSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "user.invalid"
+	UserNotFoundSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "user.not_found"
+	UserPasswordEmptySubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "user.password_empty"
+	UserPasswordTooLongSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "user.password_too_long"
 )
 
 // IsAttAlreadyHandedOff reports whether SubmitFlowStepErrorResponse is AttAlreadyHandedOff.
@@ -64240,11 +65764,6 @@ func (s SubmitFlowStepErrorResponse) IsIdpEndpointsPartial() bool {
 	return s.Type == IdpEndpointsPartialSubmitFlowStepErrorResponse
 }
 
-// IsIdpOAuth2Unsupported reports whether SubmitFlowStepErrorResponse is IdpOAuth2Unsupported.
-func (s SubmitFlowStepErrorResponse) IsIdpOAuth2Unsupported() bool {
-	return s.Type == IdpOAuth2UnsupportedSubmitFlowStepErrorResponse
-}
-
 // IsIdpProtocolBlockMissing reports whether SubmitFlowStepErrorResponse is IdpProtocolBlockMissing.
 func (s SubmitFlowStepErrorResponse) IsIdpProtocolBlockMissing() bool {
 	return s.Type == IdpProtocolBlockMissingSubmitFlowStepErrorResponse
@@ -64253,11 +65772,6 @@ func (s SubmitFlowStepErrorResponse) IsIdpProtocolBlockMissing() bool {
 // IsIdpScopesMissingOpenid reports whether SubmitFlowStepErrorResponse is IdpScopesMissingOpenid.
 func (s SubmitFlowStepErrorResponse) IsIdpScopesMissingOpenid() bool {
 	return s.Type == IdpScopesMissingOpenidSubmitFlowStepErrorResponse
-}
-
-// IsIdpStrategyPointerUnsupported reports whether SubmitFlowStepErrorResponse is IdpStrategyPointerUnsupported.
-func (s SubmitFlowStepErrorResponse) IsIdpStrategyPointerUnsupported() bool {
-	return s.Type == IdpStrategyPointerUnsupportedSubmitFlowStepErrorResponse
 }
 
 // IsInternal reports whether SubmitFlowStepErrorResponse is Internal.
@@ -64740,27 +66254,6 @@ func NewIdpEndpointsPartialSubmitFlowStepErrorResponse(v IdpEndpointsPartial) Su
 	return s
 }
 
-// SetIdpOAuth2Unsupported sets SubmitFlowStepErrorResponse to IdpOAuth2Unsupported.
-func (s *SubmitFlowStepErrorResponse) SetIdpOAuth2Unsupported(v IdpOAuth2Unsupported) {
-	s.Type = IdpOAuth2UnsupportedSubmitFlowStepErrorResponse
-	s.IdpOAuth2Unsupported = v
-}
-
-// GetIdpOAuth2Unsupported returns IdpOAuth2Unsupported and true boolean if SubmitFlowStepErrorResponse is IdpOAuth2Unsupported.
-func (s SubmitFlowStepErrorResponse) GetIdpOAuth2Unsupported() (v IdpOAuth2Unsupported, ok bool) {
-	if !s.IsIdpOAuth2Unsupported() {
-		return v, false
-	}
-	return s.IdpOAuth2Unsupported, true
-}
-
-// NewIdpOAuth2UnsupportedSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from IdpOAuth2Unsupported.
-func NewIdpOAuth2UnsupportedSubmitFlowStepErrorResponse(v IdpOAuth2Unsupported) SubmitFlowStepErrorResponse {
-	var s SubmitFlowStepErrorResponse
-	s.SetIdpOAuth2Unsupported(v)
-	return s
-}
-
 // SetIdpProtocolBlockMissing sets SubmitFlowStepErrorResponse to IdpProtocolBlockMissing.
 func (s *SubmitFlowStepErrorResponse) SetIdpProtocolBlockMissing(v IdpProtocolBlockMissing) {
 	s.Type = IdpProtocolBlockMissingSubmitFlowStepErrorResponse
@@ -64800,27 +66293,6 @@ func (s SubmitFlowStepErrorResponse) GetIdpScopesMissingOpenid() (v IdpScopesMis
 func NewIdpScopesMissingOpenidSubmitFlowStepErrorResponse(v IdpScopesMissingOpenid) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetIdpScopesMissingOpenid(v)
-	return s
-}
-
-// SetIdpStrategyPointerUnsupported sets SubmitFlowStepErrorResponse to IdpStrategyPointerUnsupported.
-func (s *SubmitFlowStepErrorResponse) SetIdpStrategyPointerUnsupported(v IdpStrategyPointerUnsupported) {
-	s.Type = IdpStrategyPointerUnsupportedSubmitFlowStepErrorResponse
-	s.IdpStrategyPointerUnsupported = v
-}
-
-// GetIdpStrategyPointerUnsupported returns IdpStrategyPointerUnsupported and true boolean if SubmitFlowStepErrorResponse is IdpStrategyPointerUnsupported.
-func (s SubmitFlowStepErrorResponse) GetIdpStrategyPointerUnsupported() (v IdpStrategyPointerUnsupported, ok bool) {
-	if !s.IsIdpStrategyPointerUnsupported() {
-		return v, false
-	}
-	return s.IdpStrategyPointerUnsupported, true
-}
-
-// NewIdpStrategyPointerUnsupportedSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from IdpStrategyPointerUnsupported.
-func NewIdpStrategyPointerUnsupportedSubmitFlowStepErrorResponse(v IdpStrategyPointerUnsupported) SubmitFlowStepErrorResponse {
-	var s SubmitFlowStepErrorResponse
-	s.SetIdpStrategyPointerUnsupported(v)
 	return s
 }
 
@@ -66913,12 +68385,12 @@ type UpdateVariablesErrorResponse struct {
 	AuthUnauthorized    AuthUnauthorized
 	EncKeyDecryptFailed EncKeyDecryptFailed
 	EncKeyNotFound      EncKeyNotFound
-	EnvNotFound         EnvNotFound
 	Internal            Internal
 	TknInvalid          TknInvalid
 	VarInvalidName      VarInvalidName
 	VarInvalidValue     VarInvalidValue
 	VarNoProjectID      VarNoProjectID
+	NotImplemented      NotImplemented
 	ProjNotFound        ProjNotFound
 	ReqInvalid          ReqInvalid
 	EncKeyUnknownAlg    EncKeyUnknownAlg
@@ -66934,12 +68406,12 @@ const (
 	AuthUnauthorizedUpdateVariablesErrorResponse    UpdateVariablesErrorResponseType = "auth.unauthorized"
 	EncKeyDecryptFailedUpdateVariablesErrorResponse UpdateVariablesErrorResponseType = "enc_key.decrypt_failed"
 	EncKeyNotFoundUpdateVariablesErrorResponse      UpdateVariablesErrorResponseType = "enc_key.not_found"
-	EnvNotFoundUpdateVariablesErrorResponse         UpdateVariablesErrorResponseType = "env.not_found"
 	InternalUpdateVariablesErrorResponse            UpdateVariablesErrorResponseType = "internal"
 	TknInvalidUpdateVariablesErrorResponse          UpdateVariablesErrorResponseType = "tkn.invalid"
 	VarInvalidNameUpdateVariablesErrorResponse      UpdateVariablesErrorResponseType = "var.invalid_name"
 	VarInvalidValueUpdateVariablesErrorResponse     UpdateVariablesErrorResponseType = "var.invalid_value"
 	VarNoProjectIDUpdateVariablesErrorResponse      UpdateVariablesErrorResponseType = "var.no_project_id"
+	NotImplementedUpdateVariablesErrorResponse      UpdateVariablesErrorResponseType = "not_implemented"
 	ProjNotFoundUpdateVariablesErrorResponse        UpdateVariablesErrorResponseType = "proj.not_found"
 	ReqInvalidUpdateVariablesErrorResponse          UpdateVariablesErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgUpdateVariablesErrorResponse    UpdateVariablesErrorResponseType = "enc_key.unknown_alg"
@@ -66960,11 +68432,6 @@ func (s UpdateVariablesErrorResponse) IsEncKeyDecryptFailed() bool {
 // IsEncKeyNotFound reports whether UpdateVariablesErrorResponse is EncKeyNotFound.
 func (s UpdateVariablesErrorResponse) IsEncKeyNotFound() bool {
 	return s.Type == EncKeyNotFoundUpdateVariablesErrorResponse
-}
-
-// IsEnvNotFound reports whether UpdateVariablesErrorResponse is EnvNotFound.
-func (s UpdateVariablesErrorResponse) IsEnvNotFound() bool {
-	return s.Type == EnvNotFoundUpdateVariablesErrorResponse
 }
 
 // IsInternal reports whether UpdateVariablesErrorResponse is Internal.
@@ -66990,6 +68457,11 @@ func (s UpdateVariablesErrorResponse) IsVarInvalidValue() bool {
 // IsVarNoProjectID reports whether UpdateVariablesErrorResponse is VarNoProjectID.
 func (s UpdateVariablesErrorResponse) IsVarNoProjectID() bool {
 	return s.Type == VarNoProjectIDUpdateVariablesErrorResponse
+}
+
+// IsNotImplemented reports whether UpdateVariablesErrorResponse is NotImplemented.
+func (s UpdateVariablesErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedUpdateVariablesErrorResponse
 }
 
 // IsProjNotFound reports whether UpdateVariablesErrorResponse is ProjNotFound.
@@ -67077,27 +68549,6 @@ func (s UpdateVariablesErrorResponse) GetEncKeyNotFound() (v EncKeyNotFound, ok 
 func NewEncKeyNotFoundUpdateVariablesErrorResponse(v EncKeyNotFound) UpdateVariablesErrorResponse {
 	var s UpdateVariablesErrorResponse
 	s.SetEncKeyNotFound(v)
-	return s
-}
-
-// SetEnvNotFound sets UpdateVariablesErrorResponse to EnvNotFound.
-func (s *UpdateVariablesErrorResponse) SetEnvNotFound(v EnvNotFound) {
-	s.Type = EnvNotFoundUpdateVariablesErrorResponse
-	s.EnvNotFound = v
-}
-
-// GetEnvNotFound returns EnvNotFound and true boolean if UpdateVariablesErrorResponse is EnvNotFound.
-func (s UpdateVariablesErrorResponse) GetEnvNotFound() (v EnvNotFound, ok bool) {
-	if !s.IsEnvNotFound() {
-		return v, false
-	}
-	return s.EnvNotFound, true
-}
-
-// NewEnvNotFoundUpdateVariablesErrorResponse returns new UpdateVariablesErrorResponse from EnvNotFound.
-func NewEnvNotFoundUpdateVariablesErrorResponse(v EnvNotFound) UpdateVariablesErrorResponse {
-	var s UpdateVariablesErrorResponse
-	s.SetEnvNotFound(v)
 	return s
 }
 
@@ -67203,6 +68654,27 @@ func (s UpdateVariablesErrorResponse) GetVarNoProjectID() (v VarNoProjectID, ok 
 func NewVarNoProjectIDUpdateVariablesErrorResponse(v VarNoProjectID) UpdateVariablesErrorResponse {
 	var s UpdateVariablesErrorResponse
 	s.SetVarNoProjectID(v)
+	return s
+}
+
+// SetNotImplemented sets UpdateVariablesErrorResponse to NotImplemented.
+func (s *UpdateVariablesErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedUpdateVariablesErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if UpdateVariablesErrorResponse is NotImplemented.
+func (s UpdateVariablesErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedUpdateVariablesErrorResponse returns new UpdateVariablesErrorResponse from NotImplemented.
+func NewNotImplementedUpdateVariablesErrorResponse(v NotImplemented) UpdateVariablesErrorResponse {
+	var s UpdateVariablesErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 
@@ -71006,52 +72478,34 @@ func NewSecretVariableVariable(v SecretVariable) Variable {
 	return s
 }
 
-func (*Variable) getVariableRes() {}
-
-// Which value of a variable a request addresses. `all` is the value every
-// deploy freezes; `preview` is the override a preview deploy prefers where one
-// exists. A name holds at most these two values.
+// One variable's values, per kind. A kind with no value is absent.
 // Ref: #
-type VariableAppliesTo string
-
-const (
-	VariableAppliesToAll     VariableAppliesTo = "all"
-	VariableAppliesToPreview VariableAppliesTo = "preview"
-)
-
-// AllValues returns all VariableAppliesTo values.
-func (VariableAppliesTo) AllValues() []VariableAppliesTo {
-	return []VariableAppliesTo{
-		VariableAppliesToAll,
-		VariableAppliesToPreview,
-	}
+type VariableByKind struct {
+	Primary OptVariable `json:"primary"`
+	Preview OptVariable `json:"preview"`
 }
 
-// MarshalText implements encoding.TextMarshaler.
-func (s VariableAppliesTo) MarshalText() ([]byte, error) {
-	switch s {
-	case VariableAppliesToAll:
-		return []byte(s), nil
-	case VariableAppliesToPreview:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
+// GetPrimary returns the value of Primary.
+func (s *VariableByKind) GetPrimary() OptVariable {
+	return s.Primary
 }
 
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *VariableAppliesTo) UnmarshalText(data []byte) error {
-	switch VariableAppliesTo(data) {
-	case VariableAppliesToAll:
-		*s = VariableAppliesToAll
-		return nil
-	case VariableAppliesToPreview:
-		*s = VariableAppliesToPreview
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
+// GetPreview returns the value of Preview.
+func (s *VariableByKind) GetPreview() OptVariable {
+	return s.Preview
 }
+
+// SetPrimary sets the value of Primary.
+func (s *VariableByKind) SetPrimary(val OptVariable) {
+	s.Primary = val
+}
+
+// SetPreview sets the value of Preview.
+func (s *VariableByKind) SetPreview(val OptVariable) {
+	s.Preview = val
+}
+
+func (*VariableByKind) getVariableRes() {}
 
 // One entry of an update. A bare scalar enters a non-secret value, an object
 // states the flag explicitly, and `null` removes the name.
@@ -71161,15 +72615,58 @@ func NewSecretVariableInputVariableInput(v SecretVariableInput) VariableInput {
 	return s
 }
 
+// Which deployments a value reaches: `primary` for primary origins,
+// `preview` for preview URLs. There is no fallback between kinds.
+// Ref: #
+type VariableKind string
+
+const (
+	VariableKindPrimary VariableKind = "primary"
+	VariableKindPreview VariableKind = "preview"
+)
+
+// AllValues returns all VariableKind values.
+func (VariableKind) AllValues() []VariableKind {
+	return []VariableKind{
+		VariableKindPrimary,
+		VariableKindPreview,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s VariableKind) MarshalText() ([]byte, error) {
+	switch s {
+	case VariableKindPrimary:
+		return []byte(s), nil
+	case VariableKindPreview:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *VariableKind) UnmarshalText(data []byte) error {
+	switch VariableKind(data) {
+	case VariableKindPrimary:
+		*s = VariableKindPrimary
+		return nil
+	case VariableKindPreview:
+		*s = VariableKindPreview
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 type VariableName string
 
-// A variable's value. JSON scalars only — a string, a number, or a boolean
-// (ADR 062 §1).
+// A variable's value. JSON scalars only — a string, a number, or a boolean.
 // The value travels through JSON in both directions, so the set of types is
 // JSON's. A number always reads back as a JSON number however it was written;
 // a type JSON has no scalar for (a timestamp, say) is rejected rather than
 // quietly coming back as the string it serialized to. Strings are capped at
-// 16 KiB: a variable is a configuration value, not a payload (§8).
+// 16 KiB: a variable is a configuration value, not a payload.
 // Ref: #
 // VariableScalar represents sum type.
 type VariableScalar struct {
@@ -71261,9 +72758,8 @@ func NewBoolVariableScalar(v bool) VariableScalar {
 	return s
 }
 
-// The project's variables, keyed by name. One name is one value.
-// An empty object is an ordinary answer, not an error — it means nothing has
-// been entered.
+// The variables a deployment froze, keyed by name.
+// An empty object is an ordinary answer, not an error.
 // Ref: #
 type Variables map[string]Variable
 
@@ -71277,8 +72773,23 @@ func (s *Variables) init() Variables {
 }
 
 func (*Variables) getDeploymentVariablesRes() {}
-func (*Variables) getVariablesRes()           {}
-func (*Variables) updateVariablesRes()        {}
+
+// The project's variables, keyed by name, each with its value per kind.
+// An empty object is an ordinary answer, not an error.
+// Ref: #
+type VariablesByKind map[string]VariableByKind
+
+func (s *VariablesByKind) init() VariablesByKind {
+	m := *s
+	if m == nil {
+		m = map[string]VariableByKind{}
+		*s = m
+	}
+	return m
+}
+
+func (*VariablesByKind) getVariablesRes()    {}
+func (*VariablesByKind) updateVariablesRes() {}
 
 // VerifyChallengeProofErrorResponse represents sum type.
 type VerifyChallengeProofErrorResponse struct {

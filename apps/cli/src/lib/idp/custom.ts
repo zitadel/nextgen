@@ -71,7 +71,7 @@ const flagNamesOf = (keys: FlagKeys): CustomFlagNames => ({
   scopes: `--${keys.scopes}`,
 });
 
-/** The flags on `sso enable`, which a failed setup suggests running instead. */
+/** The flags on `auth-method sso enable`, which a failed setup suggests running instead. */
 export const ENABLE_FLAG_NAMES: CustomFlagNames = flagNamesOf(ENABLE_FLAG_KEYS);
 
 /** The `--sso-*` flags on `setup` that describe the same settings. */

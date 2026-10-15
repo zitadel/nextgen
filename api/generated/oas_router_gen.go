@@ -2876,7 +2876,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 								switch method {
 								case "GET":
 									r.name = GetDeploymentVariablesOperation
-									r.summary = "Get the variables a deployment runs"
+									r.summary = "Get a deployment's variables"
 									r.operationID = "getDeploymentVariables"
 									r.operationGroup = ""
 									r.pathPattern = "/deployments/{deployment_id}/variables"

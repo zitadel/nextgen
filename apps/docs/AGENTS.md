@@ -89,13 +89,16 @@ into `.next/output`.
 
 ## Tests
 
-`tests/` is the site's contract suite (Playwright, `playwright.config.mts`),
-written against a URL rather than the code. `moon run docs:e2e` runs it
-against the local build on port 3003; `DOCS_BASE_URL=https://cloud-….vercel.app
-moon run docs:e2e-deployment` against a deployment of the hosted cloud, with
-`VERCEL_AUTOMATION_BYPASS_SECRET` for its protection, which
+`tests/` is the site's contract suite (Playwright), written against a URL
+rather than the code. `moon run docs:e2e` runs it against the local build on
+port 3003 (`playwright.config.mts`); `CLOUD_URL=https://cloud-….vercel.app
+moon run docs:e2e-deployment` against a deployment of the hosted cloud
+(`playwright.deployment.config.mts`), with `VERCEL_AUTOMATION_BYPASS_SECRET`
+for its protection. `pnpm check:cloud` runs that beside the console's
+deployment suite, as
 [`deployment-checks.yml`](../../.github/workflows/deployment-checks.yml) does for every
-deployment. The specs use paths only, so one spec proves both.
+deployment ([runbook](../../docs/runbooks/cloud.md#checking-a-deployment-by-hand)).
+The specs use paths only, so one spec proves both.
 
 - `/docs/llms.txt` is the suite's page list: every page it names is fetched as
   HTML, at its `.md` URL and through `Accept: text/markdown`, and every site

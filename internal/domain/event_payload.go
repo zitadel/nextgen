@@ -16,8 +16,8 @@ type RequestAPIPayload struct {
 // ProjectPayload is shared by project.created (full snapshot) and
 // project.updated (delta: only changed fields set).
 type ProjectPayload struct {
-	Name           string   `json:"name,omitempty"`
-	PreviewOrigins []string `json:"preview_origins,omitempty"`
+	Name    string   `json:"name,omitempty"`
+	Origins []Origin `json:"origins,omitempty"`
 	// PasswordHashAlgorithm records a change to the method the project's
 	// passwords are hashed with (ADR 029 §Hashing). It is a pointer so the
 	// delta can tell "not touched" (absent) from "handed back to the deployment
@@ -26,6 +26,12 @@ type ProjectPayload struct {
 	// stay out of the audit trail -- the algorithm is what a reader is checking,
 	// and the full method is readable from the project.
 	PasswordHashAlgorithm *string `json:"password_hash_algorithm,omitempty"`
+}
+
+// OriginPayload is the allowlisted body for origin.added and origin.removed.
+type OriginPayload struct {
+	Pattern string     `json:"pattern"`
+	Kind    OriginKind `json:"kind"`
 }
 
 // ProjectCreatedPayload is an alias kept for call-site clarity.

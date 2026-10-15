@@ -734,7 +734,7 @@ func startSSOStepFlow(t *testing.T, w *flowTestWorld, def *domain.FlowDefinition
 }
 
 var ssoSubmitReturn = &domain.FlowSSOReturn{
-	RedirectURI:  "https://auth.example.com/__nextgen/idp/callback",
+	RedirectURI:  "https://auth.example.com/__nextgen/idp/google/callback",
 	ReturnTarget: "https://auth.example.com/login?flow=flow-1",
 }
 
@@ -938,6 +938,71 @@ func TestFlowStateMachine_Start_RendersSSOProvidersInStepOrder(t *testing.T) {
 	require.NotNil(t, result.Step)
 	assert.Equal(t, []domain.FlowSSOProvider{google, github}, result.Step.SSOProviders)
 	assert.True(t, containsFieldName(result.Step.Fields, "email"), "the step's inputs render alongside the providers")
+}
+
+func TestFlowStateMachine_Start_AsksForTheSSODescriptionOnAStepOfferingProviders(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil)
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+	w.ssoProviders.EXPECT().
+		Resolve(gomock.Any(), testProjectID, "credentials", []string{"google", "github"}).
+		Return([]domain.FlowSSOProvider{{ID: "google", Name: "Google", Template: "google"}}, nil)
+
+	result, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    ssoStepDefinition(),
+		Purpose:       domain.FlowDefinitionPurposeRegister,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "credentials.description.sso", result.Step.Texts.DescriptionKey)
+}
+
+// The key follows the providers the step renders, not the ones it declares: a
+// listed provider whose connection is gone shows no button, so no wording for one.
+func TestFlowStateMachine_Start_KeepsThePlainDescriptionWhenNoListedProviderResolves(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil)
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+	w.ssoProviders.EXPECT().
+		Resolve(gomock.Any(), testProjectID, "credentials", []string{"google", "github"}).
+		Return(nil, nil)
+
+	result, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    ssoStepDefinition(),
+		Purpose:       domain.FlowDefinitionPurposeRegister,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "credentials.description", result.Step.Texts.DescriptionKey)
+}
+
+func TestFlowStateMachine_Start_KeepsThePlainDescriptionWhenNoProviderIsOffered(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil)
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+
+	result, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    signupDefinition(),
+		Purpose:       domain.FlowDefinitionPurposeRegister,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "credentials.description", result.Step.Texts.DescriptionKey)
 }
 
 // Providers are resolved on every render, not once per flow, so an edit to

@@ -4,12 +4,13 @@ import type { CreateIdpBodyIdp } from "@zitadel/api/generated/model";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import { consola } from "consola";
 
-import { isVariableReference, referencedVariable } from "@zitadel/config/idp";
+import { isVariableReference, missingEndpoints, referencedVariable } from "@zitadel/config/idp";
 import { idpConnectionConfigSchema } from "@zitadel/config/schemas";
 
 import { ZitadelError } from "../../errors";
 import { IDPS_DIR, refuseResolvedSecret } from "../../idp";
 import { readJsonDirEntries } from "../../json-dir";
+import { valuesOfKind } from "../../variables";
 import type { Step, StepContext } from "../pipeline";
 
 /**
@@ -39,8 +40,8 @@ export const idpConnectionsStep: Step = {
     // earlier ones already created — a partial write. Checking the whole set
     // first means a bad file stops the deploy before any connection is written.
     // A dry run surfaces the same failures, which is why it validates here too.
-    for (const connection of connections) {
-      validateConnection(connection, ctx.suggest);
+    for (const entry of entries) {
+      validateConnection(entry.body, `${IDPS_DIR}/${entry.name}`, ctx.suggest);
     }
     // The credentials a connection names must be variables the project holds,
     // the client id a plain one and the secret a secret one: otherwise the
@@ -49,7 +50,13 @@ export const idpConnectionsStep: Step = {
       const held = await heldVariables(ctx);
       if (held !== undefined) {
         for (const entry of entries) {
-          checkCredentialVariables(entry.body, `${IDPS_DIR}/${entry.name}`, held, ctx.suggest);
+          checkCredentialVariables(
+            entry.body,
+            `${IDPS_DIR}/${entry.name}`,
+            held,
+            ctx.suggest,
+            ctx.mode === "preview",
+          );
         }
       }
     }
@@ -81,7 +88,7 @@ export const idpConnectionsStep: Step = {
  * The connection's shape, and the one mistake that would publish a credential:
  * a `client_secret` held as a value rather than a `${{ NAME }}` reference.
  */
-function validateConnection(data: object, suggest: StepContext["suggest"]): void {
+function validateConnection(data: object, file: string, suggest: StepContext["suggest"]): void {
   const result = idpConnectionConfigSchema.safeParse(data);
   if (!result.success) {
     const literalSecret = result.error.issues.some((issue) => {
@@ -104,6 +111,23 @@ function validateConnection(data: object, suggest: StepContext["suggest"]): void
       },
     );
   }
+  // A valid document is then held to the server's endpoint rule: an `oidc`
+  // block names no endpoint or every one it needs. The server refuses anything
+  // in between, so it is refused here, before a deploy could stop part-way.
+  const missing = missingEndpoints((data as { oidc?: unknown }).oidc);
+  if (missing.length > 0) {
+    throw new ZitadelError(
+      "E_VALIDATION",
+      `${file}: oidc names some endpoints but not ${missing.join(", ")}`,
+      {
+        hint:
+          "Name every endpoint (authorization_endpoint, jwks_uri, token_endpoint, and " +
+          "userinfo_endpoint unless id_token_mapping is true), or none to read them from " +
+          "the issuer's discovery document.",
+        details: { file, missing },
+      },
+    );
+  }
   // A read that resolved a secret must never be sent on; validate the body too.
   refuseResolvedSecret(data, "the connection");
 }
@@ -121,21 +145,16 @@ function valueAt(data: object, path: ReadonlyArray<PropertyKey>): unknown {
 }
 
 /**
- * The project's variables, by name, and whether each is a secret. A preview's
- * token may not read them, which leaves the check to the deploy that merges it.
+ * The variables the deploy would freeze, by name, and whether each is a secret:
+ * the primary kind's for a deploy and the preview kind's for a preview, with no
+ * fallback from one to the other (ADR 069). A preview's token may not read them,
+ * which leaves the check to the deploy that merges it.
  */
 async function heldVariables(ctx: StepContext): Promise<Map<string, boolean> | undefined> {
+  const kind = ctx.mode === "preview" ? "preview" : "primary";
   let held: Awaited<ReturnType<StepContext["client"]["getVariables"]>>;
   try {
-    held = await ctx.client.getVariables({ project_id: ctx.projectId });
-    // A preview deploy freezes the preview overrides too, so a credential set
-    // only for previews (`variable set NAME --preview`) is one it holds.
-    if (ctx.mode === "preview") {
-      held = {
-        ...held,
-        ...(await ctx.client.getVariables({ project_id: ctx.projectId, applies_to: "preview" })),
-      };
-    }
+    held = await ctx.client.getVariables({ project_id: ctx.projectId, kind });
   } catch (error) {
     if (ctx.mode === "preview" && error instanceof ApiError && error.status === 403) {
       return undefined;
@@ -143,7 +162,12 @@ async function heldVariables(ctx: StepContext): Promise<Map<string, boolean> | u
     throw error;
   }
   // A secret reads back as `{ secret: true }`, a plain value as the value.
-  return new Map(Object.entries(held).map(([name, value]) => [name, typeof value === "object"]));
+  return new Map(
+    Object.entries(valuesOfKind(held, kind)).map(([name, value]) => [
+      name,
+      typeof value === "object",
+    ]),
+  );
 }
 
 /**
@@ -156,12 +180,16 @@ function checkCredentialVariables(
   file: string,
   held: ReadonlyMap<string, boolean>,
   suggest: StepContext["suggest"],
+  preview: boolean,
 ): void {
+  // A preview freezes the preview kind alone, so the value it lacks is set for
+  // that kind.
+  const setCommand = (name: string, secret: boolean) =>
+    suggest(`variable set ${name}${secret ? " --secret" : ""}${preview ? " --preview" : ""}`);
   const body = connection as {
     oidc?: { client_id?: unknown; client_secret?: unknown };
-    oauth2?: { client_id?: unknown; client_secret?: unknown };
   };
-  const block = body.oidc ?? body.oauth2;
+  const block = body.oidc;
   const nameOf = (value: unknown) =>
     typeof value === "string" ? referencedVariable(value) : undefined;
   const named = [
@@ -189,7 +217,7 @@ function checkCredentialVariables(
         `${file}: ${field} names the variable ${name}, which the project does not have`,
         {
           hint: "Publish it with the command below, then deploy again.",
-          nextCommands: [suggest(`variable set ${name}${wantsSecret ? " --secret" : ""}`)],
+          nextCommands: [setCommand(name, wantsSecret)],
           details: { variable: name, field, file },
         },
       );
@@ -202,7 +230,7 @@ function checkCredentialVariables(
           hint: wantsSecret
             ? "The client secret must be a secret variable: publish it with the command below."
             : "The client id must be a plain variable the engine can read back: publish it with the command below, without --secret.",
-          nextCommands: [suggest(`variable set ${name}${wantsSecret ? " --secret" : ""}`)],
+          nextCommands: [setCommand(name, wantsSecret)],
           details: { variable: name, field, file, secret: isSecret },
         },
       );

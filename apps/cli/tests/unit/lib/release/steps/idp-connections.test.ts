@@ -43,7 +43,18 @@ function ctx(cwd: string, over: Partial<StepContext>, held: object = HELD): Step
   const { client, ...rest } = over;
   return {
     cwd,
-    client: { getVariables: async () => held, ...(client as object | undefined) } as never,
+    client: {
+      // Variables read back keyed by kind: these tests hold the same values for
+      // whichever kind the run asks for, unless one stubs its own read.
+      getVariables: async (params: { kind?: string }) =>
+        Object.fromEntries(
+          Object.entries(held).map(([name, value]) => [
+            name,
+            { [params.kind ?? "primary"]: value },
+          ]),
+        ),
+      ...(client as object | undefined),
+    } as never,
     projectId: "proj_1",
     env: {},
     mode: "deploy",
@@ -109,10 +120,29 @@ describe("idp-connections step", () => {
     });
   });
 
-  it("counts a credential a preview holds only as a preview override", async () => {
+  it("reads the preview kind for a preview, so a primary-only secret does not count", async () => {
     const cwd = await project({ "google.json": googleBody() });
-    const getVariables = vi.fn(async (params: { applies_to?: string }) =>
-      params.applies_to === "preview" ? { GOOGLE_CLIENT_SECRET: { secret: true } } : {},
+    const getVariables = vi.fn(async (params: { kind?: string }) =>
+      params.kind === "preview" ? {} : { GOOGLE_CLIENT_SECRET: { primary: { secret: true } } },
+    );
+
+    await expect(
+      idpConnectionsStep.run(ctx(cwd, { mode: "preview", client: { getVariables } as never })),
+    ).rejects.toMatchObject({ code: "E_CREDENTIAL_MISSING" });
+  });
+
+  it("suggests setting the missing credential for the preview kind", async () => {
+    const cwd = await project({ "google.json": googleBody() });
+
+    await expect(idpConnectionsStep.run(ctx(cwd, { mode: "preview" }, {}))).rejects.toMatchObject({
+      nextCommands: ["variable set GOOGLE_CLIENT_SECRET --secret --preview --env staging"],
+    });
+  });
+
+  it("counts a credential the preview kind holds", async () => {
+    const cwd = await project({ "google.json": googleBody() });
+    const getVariables = vi.fn(async (params: { kind?: string }) =>
+      params.kind === "preview" ? { GOOGLE_CLIENT_SECRET: { preview: { secret: true } } } : {},
     );
 
     await expect(
@@ -146,6 +176,46 @@ describe("idp-connections step", () => {
     await expect(idpConnectionsStep.run(ctx(cwd, {}))).rejects.toMatchObject({
       hint: expect.stringContaining("variable set NAME --secret --env staging"),
     });
+  });
+
+  it("refuses an oidc block that names some endpoints but not the rest", async () => {
+    const cwd = await project({
+      "google.json": googleBody({
+        oidc: {
+          issuer: "https://accounts.google.com",
+          client_id: "111.apps.googleusercontent.com",
+          client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+          authorization_endpoint: "https://accounts.google.com/auth",
+          scopes: ["openid"],
+        },
+      }),
+    });
+
+    await expect(idpConnectionsStep.run(ctx(cwd, {}))).rejects.toThrow(
+      /google\.json: oidc names some endpoints but not jwks_uri, token_endpoint, userinfo_endpoint/,
+    );
+  });
+
+  it("accepts an oidc block that names every endpoint", async () => {
+    const cwd = await project({
+      "google.json": googleBody({
+        oidc: {
+          issuer: "https://accounts.google.com",
+          client_id: "111.apps.googleusercontent.com",
+          client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+          authorization_endpoint: "https://accounts.google.com/auth",
+          jwks_uri: "https://accounts.google.com/jwks",
+          token_endpoint: "https://accounts.google.com/token",
+          userinfo_endpoint: "https://accounts.google.com/userinfo",
+          scopes: ["openid"],
+        },
+      }),
+    });
+    const createIdp = vi.fn().mockResolvedValue({ id: "idp_1" });
+
+    await idpConnectionsStep.run(ctx(cwd, { client: { createIdp } as never }));
+
+    expect(createIdp).toHaveBeenCalledTimes(1);
   });
 
   it("creates no connection when a later file is malformed", async () => {

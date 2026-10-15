@@ -8,6 +8,7 @@ import { CREDENTIALS, type CredentialKind } from "./credentials";
 import { environmentFlags, environmentSelectorSuffix } from "./environment-flags";
 import type { GlobalOptions } from "./types";
 import { type EnvironmentSelector, projectCommand, type SuggestedCommand } from "../suggestion";
+import { optionArgs } from "../public-cli";
 
 /** The platform connection {@link EnvironmentCommand.connect} opens. */
 export type Connection = Readonly<{
@@ -49,11 +50,16 @@ export abstract class EnvironmentCommand extends BaseCommand {
    */
   protected override async toMeta(
     flags: Record<string, unknown>,
-    options: { resolveServer?: boolean; source?: string } = {},
+    options: { resolveServer?: boolean; source?: string; environment?: boolean } = {},
   ): Promise<GlobalOptions> {
     const text = (value: unknown): string | undefined =>
       typeof value === "string" ? value : undefined;
     this.cwdFlag = text(flags.cwd);
+    // A command that only edits files in the project directory resolves none:
+    // a stray ZITADEL_ENV must not stop it, and it names no server or project.
+    if (options.environment === false) {
+      return super.toMeta(flags, { resolveServer: options.resolveServer, source: options.source });
+    }
     this.environment = await resolveEnvironment({
       cwd: resolveCwd(text(flags.cwd)),
       env: process.env,
@@ -91,6 +97,25 @@ export abstract class EnvironmentCommand extends BaseCommand {
           ? environment.values.ZITADEL_URL.value
           : undefined,
     });
+  }
+
+  /**
+   * {@link environmentSelector} as arguments, for a result that reports its
+   * follow-ups as argument lists too (`next_args`).
+   */
+  protected environmentSelectorArgs(): string[] {
+    const { environment } = this;
+    return [
+      ...(environment.envFile !== undefined
+        ? optionArgs("--env-file", environment.envFile)
+        : environment.name.source === "--env"
+          ? optionArgs("--env", environment.name.value)
+          : []),
+      ...(environment.values.ZITADEL_URL?.source === "--server"
+        ? optionArgs("--server", environment.values.ZITADEL_URL.value)
+        : []),
+      ...(this.cwdFlag === undefined ? [] : optionArgs("--cwd", this.cwdFlag)),
+    ];
   }
 
   /**

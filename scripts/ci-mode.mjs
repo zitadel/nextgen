@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-import { appendFileSync } from "node:fs";
+import { appendFileSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { posix } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { isDirectRun } from "./dev-process.mjs";
 import { moonTargetOf, taskRunner } from "./task-runner.mjs";
@@ -29,6 +30,11 @@ import { moonTargetOf, taskRunner } from "./task-runner.mjs";
 // full run unless every changed
 // file is on the explicit inert allowlist — unclaimed files are not assumed
 // inert. A gate may only ever skip work that provably cannot be affected.
+//
+// A second entry point runs after ci.yml's graph step (`moon ci`):
+// `--ran-in-graph <output>=<target>...` reads that step's report and sets each
+// output to whether the graph ran its target, so the steps that run the Go
+// database lanes on their own run only the lanes the graph did not.
 
 // Files whose effects moon cannot fully see (no task, or not every task they
 // reach, lists them as inputs) but which reach builds, tests, or release
@@ -113,8 +119,8 @@ const GO_TEST_TARGETS = [
 const TESTING_DEMO_TARGETS = ["testing:test-integration", "e2e:demo-next-real"];
 // Both real-instance console lanes: the dev-proxy suite and the embedded
 // suite (binary-served /ui/* + API at one origin). Either being affected
-// runs the console gate — the workflow steps them sequentially so two local
-// instances do not contend.
+// runs the console gate, which ci-turbo.yml's console steps read; ci.yml runs
+// both through e2e:all.
 const CONSOLE_E2E_TARGETS = ["e2e:console-real", "e2e:console-embedded"];
 // The lanes that need no backend: the console's preview smoke and the demos
 // against api-mock. ci-turbo.yml runs them in one step; moon runs them as part
@@ -407,7 +413,62 @@ function isVersionOutputFile(file) {
   );
 }
 
+// `moon ci` writes its report here (`moon run` writes runReport.json beside
+// it), and writes none when it finds no task affected.
+const CI_REPORT_PATH = fileURLToPath(new URL("../.moon/cache/ciReport.json", import.meta.url));
+
+/**
+ * moon's ci report, or null when there is none or it cannot be read. Both
+ * count as a graph that ran nothing, which at worst runs a lane twice.
+ */
+export function readCiReport(path = CI_REPORT_PATH) {
+  try {
+    return JSON.parse(readFileSync(path, "utf8"));
+  } catch (error) {
+    console.log(`# no moon ci report read (${error.code ?? error.message})`);
+    return null;
+  }
+}
+
+/**
+ * The targets among `targets` that `report` ran to a pass. Only "passed"
+ * counts: a skipped task did not run, and a cached one replayed an earlier
+ * result.
+ */
+export function ranInGraph(report, targets) {
+  const actions = Array.isArray(report?.actions) ? report.actions : [];
+  const passed = new Set(
+    actions
+      .filter((action) => action?.node?.action === "run-task" && action.status === "passed")
+      .map((action) => action.node.params?.target),
+  );
+  return targets.filter((target) => passed.has(target));
+}
+
+function ranInGraphMain(pairs) {
+  const outputs = pairs.map((pair) => {
+    const [name, target] = pair.split("=");
+    if (!name || !target) {
+      throw new Error(`--ran-in-graph takes <output>=<target> pairs, got "${pair}"`);
+    }
+    return { name, target };
+  });
+  const targets = outputs.map(({ target }) => target);
+  const ran = new Set(ranInGraph(readCiReport(), targets));
+  const lines = outputs.map(({ name, target }) => `${name}=${ran.has(target)}`);
+  for (const line of lines) {
+    console.log(line);
+  }
+  if (process.env.GITHUB_OUTPUT) {
+    appendFileSync(process.env.GITHUB_OUTPUT, `${lines.join("\n")}\n`);
+  }
+}
+
 function main() {
+  if (process.argv[2] === "--ran-in-graph") {
+    ranInGraphMain(process.argv.slice(3));
+    return;
+  }
   const base = process.argv[2] || "origin/main";
   const diff = spawnSync("git", ["diff", "--name-only", `${base}...HEAD`], {
     encoding: "utf8",

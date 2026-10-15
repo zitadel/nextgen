@@ -241,7 +241,7 @@ function IdentityProviders({ idps, schemas }: { idps: IdpConnection[]; schemas: 
           {idps.length === 0 ? (
             <ResourceEmptyRow colSpan={4}>
               This project has no identity providers. Add one with{" "}
-              <InlineCode>zitadel sso enable</InlineCode>.
+              <InlineCode>zitadel auth-method sso enable</InlineCode>.
             </ResourceEmptyRow>
           ) : (
             idps.map((idp) => <IdpRow key={idp.id} idp={idp} users={users.get(idp.slug) ?? []} />)

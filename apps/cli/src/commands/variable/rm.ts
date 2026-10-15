@@ -8,9 +8,9 @@ import { assertVariableName, variableScope } from "../../lib/variables";
 /**
  * `zitadel variable rm NAME` — remove one variable from the project.
  *
- * `--preview` removes the override a preview deploy prefers and leaves the frozen
- * value standing; without it the frozen value is removed. Destructive, so it
- * takes the same `--force`-or-confirm gate the resource commands' `rm` uses.
+ * `--preview` removes the preview value and leaves the primary one standing;
+ * without it the variable is removed for both kinds. Destructive, so it takes the
+ * same `--force`-or-confirm gate the resource commands' `rm` uses.
  */
 export default class VariableRm extends EnvironmentCommand {
   static override description = "Remove one variable from the project.";
@@ -26,7 +26,7 @@ export default class VariableRm extends EnvironmentCommand {
   static override flags = {
     preview: Flags.boolean({
       default: false,
-      description: "Remove the preview override instead of the value every deploy freezes.",
+      description: "Remove the preview value alone, leaving the primary one standing.",
     }),
     // `--force` is per command, not global: here it permits a removal.
     force: Flags.boolean({
@@ -46,6 +46,7 @@ export default class VariableRm extends EnvironmentCommand {
 
     const { client, projectId } = await this.connect();
     const scope = variableScope(projectId, flags.preview);
+    const kinds = flags.preview ? ["preview"] : ["primary", "preview"];
 
     // A dry run makes no request, so it answers before the guard — the order
     // the resource commands' `rm` uses, which keeps `--dry-run
@@ -54,7 +55,7 @@ export default class VariableRm extends EnvironmentCommand {
       const preview = dryRunResult("remove", "variable", name);
       return this.emit({
         ...preview,
-        data: { ...(preview.data as object), applies_to: flags.preview ? "preview" : "all" },
+        data: { ...(preview.data as object), kinds },
         pretty: `${preview.pretty} from the project${flags.preview ? " (preview)" : ""}`,
       });
     }
@@ -73,7 +74,7 @@ export default class VariableRm extends EnvironmentCommand {
 
     return this.emit({
       status: "ok",
-      data: { ...deletedData({ name }), applies_to: flags.preview ? "preview" : "all" },
+      data: { ...deletedData({ name }), kinds },
       pretty: `Removed ${name} from the project${flags.preview ? " (preview)" : ""}`,
     });
   }

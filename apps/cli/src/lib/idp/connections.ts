@@ -114,23 +114,18 @@ function describesProvider(file: ConnectionFile, entry: IdpProvider): boolean {
   );
 }
 
-/** The client id a connection file carries, whichever protocol it uses. */
+/** The client id a connection file carries. */
 function clientIdOf(file: ConnectionFile): string | undefined {
   return credentialOf(file, "client_id");
 }
 
-/** One credential field, from whichever protocol block the file carries. */
+/** One credential field, from the file's `oidc` block. */
 function credentialOf(
   file: ConnectionFile,
   field: "client_id" | "client_secret",
 ): string | undefined {
-  for (const key of ["oidc", "oauth2"] as const) {
-    const block = file.body[key];
-    if (isObject(block) && typeof block[field] === "string") {
-      return block[field];
-    }
-  }
-  return undefined;
+  const block = file.body.oidc;
+  return isObject(block) && typeof block[field] === "string" ? block[field] : undefined;
 }
 
 /**
@@ -195,20 +190,15 @@ export type StoredVariables = {
  * `.zitadel/idps/`, which is the one place the secret must never reach.
  */
 export function refuseResolvedSecret(definition: object, id: string): void {
-  for (const key of ["oidc", "oauth2"] as const) {
-    const block = (definition as Record<string, unknown>)[key];
-    if (!isObject(block)) {
-      continue;
-    }
-    const stored = block.client_secret;
-    if (typeof stored === "string" && !isVariableReference(stored)) {
-      throw new ZitadelError("E_VALIDATION", `${id} came back holding a client_secret value`, {
-        hint:
-          "A stored connection must keep the ${{ NAME }} reference. Report this: the endpoint " +
-          "is resolving secrets, and the value would be written to disk.",
-        details: { id, block: key },
-      });
-    }
+  const block = (definition as Record<string, unknown>).oidc;
+  const stored = isObject(block) ? block.client_secret : undefined;
+  if (typeof stored === "string" && !isVariableReference(stored)) {
+    throw new ZitadelError("E_VALIDATION", `${id} came back holding a client_secret value`, {
+      hint:
+        "A stored connection must keep the ${{ NAME }} reference. Report this: the endpoint " +
+        "is resolving secrets, and the value would be written to disk.",
+      details: { id, block: "oidc" },
+    });
   }
 }
 

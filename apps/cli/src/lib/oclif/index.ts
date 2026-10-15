@@ -5,6 +5,7 @@
  */
 export { BaseCommand } from "./base";
 export { EnvironmentCommand, PreviewCommand, type Connection } from "./environment-command";
+export { AuthMethodCommand } from "./auth-method-command";
 export { CommandGroups, type CommandGroup } from "./groups";
 export { nonBlankArg, nonBlankString } from "./flags";
 export { previewFlags } from "./environment-flags";

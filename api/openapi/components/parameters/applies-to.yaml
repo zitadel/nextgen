@@ -1,9 +1,0 @@
-name: applies_to
-in: query
-required: false
-description: |
-  Which value of a variable the request addresses. `all` (the default) is the
-  value every deploy freezes; `preview` is the override a preview deploy prefers
-  where one exists. A name holds at most these two values.
-schema:
-  $ref: '../schemas/variable-applies-to.yaml'

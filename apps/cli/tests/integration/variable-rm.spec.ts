@@ -73,7 +73,16 @@ describe("variable rm", () => {
         expect(await app.projectVariables({ preview: true })).toEqual([]);
       });
 
-      it("leaves the value every deploy freezes when removing the preview override", async () => {
+      it("removes a variable for both kinds without --preview", async () => {
+        const app = await aSetUpApp();
+        await app.setVariable("API_URL", "https://api.acme.com");
+
+        await app.removeVariable("API_URL");
+
+        expect(await app.projectVariables({ preview: true })).toEqual([]);
+      });
+
+      it("leaves the primary value when removing the preview value", async () => {
         const app = await aSetUpApp();
         await app.setVariable("API_URL", "https://api.acme.com");
         await app.setVariable("API_URL", "https://preview.acme.com", { preview: true });

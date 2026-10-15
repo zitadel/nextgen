@@ -439,7 +439,7 @@ func (s *userService) ListPasskeys(ctx context.Context, input ListPasskeysInput)
 		},
 	)
 	if err != nil {
-		return nil, "", domain.ErrInternal(err).WithMessage("failed to get user passkeys from database")
+		return nil, "", mapListError(err, "failed to list user passkeys from database")
 	}
 
 	// Distinguish "user not found" from "user has no passkeys".

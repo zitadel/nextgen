@@ -297,3 +297,47 @@ describe("fields the platform blames", () => {
     expect(immutable({ code: "req.invalid", message: "nope" }).hint).toBeUndefined();
   });
 });
+
+/**
+ * `idp.endpoints_partial` names the endpoints a connection left out only in
+ * the envelope, so the hint carries them, as it does the blamed fields.
+ */
+describe("endpoints the platform reports missing", () => {
+  const partial = (body: unknown) =>
+    toZitadelError(
+      new ApiError(400, "http://localhost:8140/idps?project_id=p", body, "Bad Request"),
+    );
+
+  it("names them, in the server's order, as the server nests them", () => {
+    const error = partial({
+      code: "idp.endpoints_partial",
+      message: "identity provider connection: the endpoints are partially set",
+      details: { details: { missing: ["jwks_uri", "userinfo_endpoint"] } },
+    });
+
+    expect(error.code).toBe("E_VALIDATION");
+    expect(error.hint).toBe(
+      "The server reports these endpoints missing: jwks_uri, userinfo_endpoint.",
+    );
+  });
+
+  it("says endpoint, singular, when one is missing", () => {
+    const error = partial({
+      code: "idp.endpoints_partial",
+      details: { missing: ["token_endpoint"] },
+    });
+
+    expect(error.hint).toBe("The server reports this endpoint missing: token_endpoint.");
+  });
+
+  it("keeps the blamed fields when an envelope lists both", () => {
+    const error = partial({
+      code: "req.invalid",
+      details: { details: { fields: ["oidc.issuer"], missing: ["jwks_uri"] } },
+    });
+
+    expect(error.hint).toBe(
+      "The server rejected this field: oidc.issuer. The server reports this endpoint missing: jwks_uri.",
+    );
+  });
+});
