@@ -344,7 +344,7 @@ function planConnections(
  * developer's (see {@link connectionExists}), and finding out after the
  * create would leave the project holding a connection no local file tracks.
  *
- * The same questions `sso enable` asks: which file holds the slug, and whose
+ * The same questions `auth-method sso enable` asks: which file holds the slug, and whose
  * variables would collide. A plan that throws names the conflict; one that
  * says reuse means a connection file already holds this provider.
  */
@@ -410,7 +410,7 @@ function connectionExists(selection: ProviderSelection): { hint: string; nextCom
       "Remove it and run setup again to scaffold a fresh one, or keep it and enable the " +
       "provider afterwards to reuse it.",
     nextCommands: [
-      `zitadel sso enable --provider ${selectionName(selection)}${
+      `zitadel auth-method sso enable --provider ${selectionName(selection)}${
         selection.kind === "custom"
           ? ` ${customFlagText(selection.connection, ENABLE_FLAG_NAMES)}`
           : ""

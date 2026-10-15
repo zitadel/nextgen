@@ -66009,7 +66009,10 @@ func (s *StepActionKind) UnmarshalText(data []byte) error {
 type StepTexts struct {
 	// Localization key for the step heading.
 	TitleKey OptString `json:"title_key"`
-	// Localization key for explanatory text.
+	// Localization key for explanatory text: `<step>.description`, or
+	// `<step>.description.sso` when the step offers sign-in providers
+	// (`sso_providers`). A client without the `.sso` key falls back to
+	// `<step>.description`.
 	DescriptionKey OptNilString `json:"description_key"`
 }
 

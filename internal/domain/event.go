@@ -65,7 +65,9 @@ const (
 	// The SSO callback's outcome, separate from auth.check.*: a succeeded
 	// exchange is not a sign-in, since the identity may still match no account.
 	// An authorization failure is the provider's error response, or a callback
-	// with no code; an exchange failure is anything after a code arrived.
+	// with no code; an exchange failure is anything after a code arrived. A
+	// callback refused before its exchange, on another connection's path or
+	// with a foreign `iss`, follows the same split.
 	EventTypeAuthSSOAuthorizationFailed EventType = "auth.sso.authorization.failed"
 	EventTypeAuthSSOExchangeSucceeded   EventType = "auth.sso.exchange.succeeded"
 	EventTypeAuthSSOExchangeFailed      EventType = "auth.sso.exchange.failed"

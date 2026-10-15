@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 
 import { appPortFromUrl, frameworkForId } from "./frameworks.mjs";
+import { errorMessage, packageName, parsePort } from "./lib.mjs";
+import { timePhase } from "./timings.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const defaultRepoRoot = resolve(here, "../../..");
@@ -27,6 +29,9 @@ export async function prepareApp(options = {}) {
   const runtime = localRuntime(env.JOURNEY_RUNTIME);
   const preset = options.preset ?? env.JOURNEY_PRESET ?? "";
   const preexistingApp = options.preexistingApp ?? env.JOURNEY_PREEXISTING_APP === "1";
+  // The runner's suite: `frameworks`, or `testkit`, which scaffolds the app
+  // for the kit's own consumer suite and runs none of the journey specs.
+  const suite = options.suite ?? (env.JOURNEY_SUITE || "frameworks");
   // `local`, or the remote lane's https edge in front of the same local runtime.
   const setupServer = options.setupServer ?? (env.JOURNEY_SETUP_SERVER || "local");
   const fs = {
@@ -39,8 +44,7 @@ export async function prepareApp(options = {}) {
   };
   const runCaptureFn = options.runCapture ?? runCapture;
   const packageNameFn =
-    options.packageName ??
-    ((relativePath) => packageName(relativePath, { readFile: fs.readFile, repoRoot }));
+    options.packageName ?? ((relativePath) => packageName(repoRoot, relativePath, fs.readFile));
   const cliPackage = env.JOURNEY_CLI_PACKAGE ?? (await packageNameFn("apps/cli"));
   const sdkPackage =
     env.JOURNEY_SDK_PACKAGE ??
@@ -67,63 +71,74 @@ export async function prepareApp(options = {}) {
     });
   }
 
+  // How long each CLI step took, for the runner's timing table (timings.mjs).
+  // Written in `finally`, so a failed step is in it too.
+  const phases = [];
   let startJson;
   let setupJson;
   try {
-    await runCliJsonStep({
-      appDir,
-      cliPackage,
-      env: npmEnv,
-      outputDir,
-      runCapture: runCaptureFn,
-      step: "doctor",
-      stepArgs: withRuntime(withPort(["doctor"], zitadelPort), runtime),
-      writeFile: fs.writeFile,
-    });
-    startJson = await runCliJsonStep({
-      appDir,
-      cliPackage,
-      env: npmEnv,
-      outputDir,
-      runCapture: runCaptureFn,
-      step: "start",
-      stepArgs: withRuntime(withPort(["start"], zitadelPort), runtime),
-      writeFile: fs.writeFile,
-    });
-    setupJson = await runCliJsonStep({
-      appDir,
-      cliPackage,
-      env: npmEnv,
-      outputDir,
-      runCapture: runCaptureFn,
-      step: "setup",
-      stepArgs: [
-        "setup",
-        "--framework",
-        framework.id,
-        "--server",
-        setupServer,
-        "--dev-port",
-        String(appPort),
-        // A fresh app dir holds only what `start` just left there, which setup
-        // scaffolds beside as the quickstart does: no --force. The pre-existing
-        // lane keeps the --force it has always passed; there setup patches a
-        // detected app.
-        ...(preexistingApp ? ["--force"] : []),
-        ...(preset ? ["--preset", preset] : []),
-      ],
-      writeFile: fs.writeFile,
-    });
-    if (framework.id === "next") {
-      await runManagedFileDriftProbe({
+    await timePhase(phases, "doctor", () =>
+      runCliJsonStep({
         appDir,
         cliPackage,
         env: npmEnv,
-        fs,
         outputDir,
         runCapture: runCaptureFn,
-        stepArgsFor: (base) => withRuntime(withPort(base, zitadelPort), runtime),
-      });
+        step: "doctor",
+        stepArgs: withRuntime(withPort(["doctor"], zitadelPort), runtime),
+        writeFile: fs.writeFile,
+      }),
+    );
+    startJson = await timePhase(phases, "start", () =>
+      runCliJsonStep({
+        appDir,
+        cliPackage,
+        env: npmEnv,
+        outputDir,
+        runCapture: runCaptureFn,
+        step: "start",
+        stepArgs: withRuntime(withPort(["start"], zitadelPort), runtime),
+        writeFile: fs.writeFile,
+      }),
+    );
+    setupJson = await timePhase(phases, "setup", () =>
+      runCliJsonStep({
+        appDir,
+        cliPackage,
+        env: npmEnv,
+        outputDir,
+        runCapture: runCaptureFn,
+        step: "setup",
+        stepArgs: [
+          "setup",
+          "--framework",
+          framework.id,
+          "--server",
+          setupServer,
+          "--dev-port",
+          String(appPort),
+          // A fresh app dir holds only what `start` just left there, which setup
+          // scaffolds beside as the quickstart does: no --force. The pre-existing
+          // lane keeps the --force it has always passed; there setup patches a
+          // detected app.
+          ...(preexistingApp ? ["--force"] : []),
+          ...(preset ? ["--preset", preset] : []),
+        ],
+        writeFile: fs.writeFile,
+      }),
+    );
+    if (framework.id === "next" && suite === "frameworks" && !preset && !preexistingApp) {
+      await timePhase(phases, "drift", () =>
+        runManagedFileDriftProbe({
+          appDir,
+          cliPackage,
+          env: npmEnv,
+          fs,
+          outputDir,
+          runCapture: runCaptureFn,
+          stepArgsFor: (base) => withRuntime(withPort(base, zitadelPort), runtime),
+        }),
+      );
     }
   } catch (error) {
     await collectLocalRuntimeLogs({
@@ -135,6 +150,8 @@ export async function prepareApp(options = {}) {
       writeFile: fs.writeFile,
     });
     throw error;
+  } finally {
+    await fs.writeFile(join(outputDir, "timings.json"), `${JSON.stringify(phases, null, 2)}\n`);
   }
 
   await assertNoNestedApp(appDir, fs.readFile);
@@ -241,10 +258,11 @@ async function runCliJsonStep(input) {
 /**
  * Journey-level proof of the doctor managed-files contract on the freshly
  * generated app: deleting the scaffolded request boundary must fail
- * `doctor`, and `doctor --fix` must restore the file and pass. Runs on the
- * Next suite only — the contract is framework-neutral and unit-covered in
- * apps/cli; one framework proves the published consumer path end to end
- * without slowing every suite. Writes `doctor-drift.json` and
+ * `doctor`, and `doctor --fix` must restore the file and pass. Runs in the
+ * fresh-app Next suite only (no preset, no pre-existing app, not the
+ * testkit's scaffold) — the contract is framework-neutral and unit-covered
+ * in apps/cli; one suite proves the published consumer path end to end
+ * without slowing the others. Writes `doctor-drift.json` and
  * `doctor-fix.json` artifacts that `contract.spec.ts` asserts on.
  */
 async function runManagedFileDriftProbe(input) {
@@ -448,16 +466,6 @@ async function readOptionalFile(path, readFileFn) {
   }
 }
 
-async function packageName(relativePath, options) {
-  const pkg = JSON.parse(
-    await options.readFile(join(options.repoRoot, relativePath, "package.json"), "utf8"),
-  );
-  if (typeof pkg.name !== "string" || pkg.name.length === 0) {
-    throw new Error(`${relativePath}/package.json has no name`);
-  }
-  return pkg.name;
-}
-
 function npmEnvironment(env, registryUrl, outputDir) {
   const next = { ...env };
   for (const key of Object.keys(next)) {
@@ -480,12 +488,7 @@ function npmEnvironment(env, registryUrl, outputDir) {
 }
 
 function optionalPort(value, name) {
-  if (!value) return undefined;
-  const port = Number(value);
-  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
-    throw new Error(`${name} must be a TCP port, got ${value}`);
-  }
-  return port;
+  return value ? parsePort(value, name) : undefined;
 }
 
 function withPort(args, port) {
@@ -547,8 +550,4 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     console.error(errorMessage(error));
     process.exit(1);
   }
-}
-
-function errorMessage(error) {
-  return error instanceof Error ? error.message : String(error);
 }
