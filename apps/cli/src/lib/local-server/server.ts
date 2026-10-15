@@ -1,8 +1,10 @@
 import { setTimeout as sleep } from "node:timers/promises";
 
-/** What the lifecycle needs to know about a running server, whatever started it. */
+/**
+ * What the lifecycle needs to know about a running server, whatever started it.
+ * Which process or container it is stays in the launcher's own record type.
+ */
 export type ServerRecord = Readonly<{
-  pid: number;
   port: number;
   server_url: string;
 }>;
@@ -14,17 +16,19 @@ export interface ServerStore<R extends ServerRecord> {
 }
 
 export type StopOutcome = Readonly<{
-  pid: number;
+  pid?: number;
   status: "failed" | "stale" | "stopped";
   target?: "process" | "process-group";
   signal?: NodeJS.Signals;
 }>;
 
-/** Runs the server process. The binary and Docker runtimes are two implementations. */
+/** Runs the server. The binary and Docker runtimes are two implementations. */
 export interface Launcher<R extends ServerRecord> {
   launch(spec: { port: number; serverUrl: string }): Promise<R>;
-  isAlive(pid: number): boolean;
-  terminate(pid: number): Promise<StopOutcome>;
+  /** Whether what `launch` started still exists, answering or not. */
+  isAlive(record: R): Promise<boolean>;
+  /** Stops it, `stale` when there was nothing left to stop. */
+  terminate(record: R): Promise<StopOutcome>;
 }
 
 export interface PortProbe {
@@ -88,7 +92,7 @@ export class ServerStartError<R extends ServerRecord> extends Error {
   constructor(reason: "exited" | "timeout", record: R, cleanup: StopOutcome) {
     super(
       reason === "exited"
-        ? "The server process exited before it became healthy"
+        ? "The server exited before it became healthy"
         : "The server did not become healthy in time",
     );
     this.reason = reason;
@@ -123,15 +127,15 @@ export class LocalServer<R extends ServerRecord> {
   }
 
   /**
-   * `running` needs both a live process and a healthy answer at its URL; a
-   * recorded pid that is gone, or one that does not answer, is `dead`.
+   * `running` needs both a live server and a healthy answer at its URL; a
+   * recorded server that is gone, or one that does not answer, is `dead`.
    */
   async state(): Promise<ServerState<R>> {
     const record = await this.deps.store.read();
     if (!record) {
       return { kind: "stopped" };
     }
-    const alive = this.deps.launcher.isAlive(record.pid);
+    const alive = await this.deps.launcher.isAlive(record);
     return alive && (await this.deps.health.isHealthy(record.server_url))
       ? { kind: "running", record }
       : { kind: "dead", record };
@@ -186,7 +190,7 @@ export class LocalServer<R extends ServerRecord> {
   }
 
   private async terminate(record: R): Promise<StopOutcome> {
-    const outcome = await this.deps.launcher.terminate(record.pid);
+    const outcome = await this.deps.launcher.terminate(record);
     if (outcome.status === "failed") {
       throw new ServerStopError(record, outcome);
     }
@@ -203,11 +207,11 @@ export class LocalServer<R extends ServerRecord> {
     const interval = this.options.pollIntervalMs ?? 1000;
     const started = Date.now();
     while (Date.now() - started < timeout) {
-      if (!this.deps.launcher.isAlive(record.pid)) {
+      if (!(await this.deps.launcher.isAlive(record))) {
         throw await this.startFailure("exited", record);
       }
       if (await this.deps.health.isHealthy(record.server_url)) {
-        if (!this.deps.launcher.isAlive(record.pid)) {
+        if (!(await this.deps.launcher.isAlive(record))) {
           throw await this.startFailure("exited", record);
         }
         return;
@@ -221,7 +225,7 @@ export class LocalServer<R extends ServerRecord> {
     reason: "exited" | "timeout",
     record: R,
   ): Promise<ServerStartError<R>> {
-    return new ServerStartError(reason, record, await this.deps.launcher.terminate(record.pid));
+    return new ServerStartError(reason, record, await this.deps.launcher.terminate(record));
   }
 }
 

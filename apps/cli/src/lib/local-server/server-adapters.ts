@@ -7,12 +7,23 @@ import {
   stopBinaryRuntime,
 } from "./binary";
 import {
+  type ContainerIdentity,
+  type DockerRuntimeMetadata,
   type BinaryRuntimeMetadata,
+  type RuntimeMetadata,
   checkLocalServerHealth,
   readRuntimeMetadata,
   writeRuntimeMetadata,
 } from "./runtime";
-import type { HealthProbe, Launcher, PortProbe, ServerStore } from "./server";
+import {
+  ensureImage,
+  inspectContainer,
+  metadataFromStart,
+  startContainer,
+  stopAndRemoveContainer,
+} from "./docker";
+import type { ResolvedEnv } from "./env-vars";
+import type { HealthProbe, Launcher, PortProbe, ServerStore, StopOutcome } from "./server";
 
 /**
  * A port is free when it can be bound and nothing answers on it. Binding alone
@@ -66,20 +77,26 @@ export class HttpHealth implements HealthProbe {
   }
 }
 
-/** The folder's `.zitadel/local/runtime.json`. */
-export class RuntimeFileStore implements ServerStore<BinaryRuntimeMetadata> {
+/**
+ * The folder's `.zitadel/local/runtime.json`, seen as the record of one backend.
+ * A record the other backend wrote reads as nothing here: that server is not
+ * this launcher's to manage.
+ */
+export class RuntimeFileStore<R extends RuntimeMetadata> implements ServerStore<R> {
   private readonly cwd: string;
+  private readonly backend: R["backend"];
 
-  constructor(cwd: string) {
+  constructor(cwd: string, backend: R["backend"]) {
     this.cwd = cwd;
+    this.backend = backend;
   }
 
-  async read(): Promise<BinaryRuntimeMetadata | undefined> {
+  async read(): Promise<R | undefined> {
     const runtime = await readRuntimeMetadata(this.cwd);
-    return runtime?.backend === "binary" ? runtime : undefined;
+    return runtime?.backend === this.backend ? (runtime as R) : undefined;
   }
 
-  write(record: BinaryRuntimeMetadata): Promise<void> {
+  write(record: R): Promise<void> {
     return writeRuntimeMetadata(this.cwd, record);
   }
 }
@@ -96,11 +113,69 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     return startBinaryRuntime({ ...this.spec, ...target });
   }
 
-  isAlive(pid: number): boolean {
-    return isRuntimeRunning(pid);
+  async isAlive(record: BinaryRuntimeMetadata): Promise<boolean> {
+    return isRuntimeRunning(record.pid);
   }
 
-  terminate(pid: number) {
-    return stopBinaryRuntime(pid);
+  terminate(record: BinaryRuntimeMetadata): Promise<StopOutcome> {
+    return stopBinaryRuntime(record.pid);
+  }
+}
+
+export type DockerLauncherSpec = Readonly<{
+  cliVersion: string;
+  containerName: string;
+  image: string;
+  dataDir: string;
+  identity?: ContainerIdentity;
+  env?: ResolvedEnv;
+  userFile?: string;
+}>;
+
+/** Runs the server in a container named for the folder, published on the chosen port. */
+export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
+  private readonly spec: DockerLauncherSpec;
+
+  constructor(spec: DockerLauncherSpec) {
+    this.spec = spec;
+  }
+
+  async launch(target: { port: number; serverUrl: string }): Promise<DockerRuntimeMetadata> {
+    const { spec } = this;
+    // The name is the folder's alone, so whatever holds it is a leftover of an
+    // earlier start (a record that was lost, or a container that stopped).
+    await stopAndRemoveContainer(spec.containerName);
+    await ensureImage(spec.image);
+    const { containerId, env } = await startContainer({
+      containerName: spec.containerName,
+      image: spec.image,
+      port: target.port,
+      dataDir: spec.dataDir,
+      identity: spec.identity,
+      env: spec.env,
+      userFile: spec.userFile,
+    });
+    return metadataFromStart({
+      cwdDataDir: spec.dataDir,
+      cliVersion: spec.cliVersion,
+      containerName: spec.containerName,
+      containerId,
+      image: spec.image,
+      port: target.port,
+      serverUrl: target.serverUrl,
+      env,
+    });
+  }
+
+  async isAlive(record: DockerRuntimeMetadata): Promise<boolean> {
+    return (await inspectContainer(record.container_name)).running;
+  }
+
+  async terminate(record: DockerRuntimeMetadata): Promise<StopOutcome> {
+    if (!(await inspectContainer(record.container_name)).exists) {
+      return { status: "stale" };
+    }
+    await stopAndRemoveContainer(record.container_name);
+    return { status: "stopped" };
   }
 }

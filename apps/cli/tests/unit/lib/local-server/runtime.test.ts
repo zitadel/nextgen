@@ -201,7 +201,7 @@ describe("detectHealthyLocalServer", () => {
 
     await expect(resolveLocalServer(cwd)).rejects.toMatchObject({
       code: "E_LOCAL_SERVER_NOT_RUNNING",
-      hint: "No local server has been started in this directory or a parent.",
+      hint: "No local server has been started in this directory or a parent. Run `zitadel start`, or name a server another directory started with --server <url>.",
     });
   });
 

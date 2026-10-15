@@ -15,11 +15,11 @@ import {
   type StopOutcome,
 } from "../../../../src/lib/local-server/server";
 
-type Record = ServerRecord & { version?: string };
+type Fake = ServerRecord & { pid: number };
 
 /** A machine with ports, processes and a store held in memory. */
 class World {
-  record: Record | undefined;
+  record: Fake | undefined;
   takenPorts = new Set<number>();
   alive = new Set<number>();
   /** Origins that answer /healthz, whoever answers them. */
@@ -28,45 +28,42 @@ class World {
   terminated: number[] = [];
   nextPid = 100;
   /** What `launch` does to the world, to model a process that dies or never answers. */
-  onLaunch: (record: Record, world: World) => void = (record, world) => {
+  onLaunch: (record: Fake, world: World) => void = (record, world) => {
     world.alive.add(record.pid);
     world.healthy.add(record.server_url);
   };
   terminateResult: StopOutcome["status"] = "stopped";
 
-  store: ServerStore<Record> = {
+  store: ServerStore<Fake> = {
     read: async () => this.record,
     write: async (record) => {
       this.record = record;
     },
   };
 
-  launcher: Launcher<Record> = {
+  launcher: Launcher<Fake> = {
     launch: async ({ port, serverUrl }) => {
       const record = { pid: this.nextPid++, port, server_url: serverUrl };
       this.launched.push(port);
       this.onLaunch(record, this);
       return record;
     },
-    isAlive: (pid) => this.alive.has(pid),
-    terminate: async (pid) => {
-      this.terminated.push(pid);
+    isAlive: async (record) => this.alive.has(record.pid),
+    terminate: async (record) => {
+      this.terminated.push(record.pid);
       if (this.terminateResult === "stopped") {
-        this.alive.delete(pid);
-        const url = this.record?.pid === pid ? this.record.server_url : undefined;
-        if (url) {
-          this.healthy.delete(url);
-        }
+        this.alive.delete(record.pid);
+        this.healthy.delete(record.server_url);
       }
-      return { pid, status: this.terminateResult };
+      return { pid: record.pid, status: this.terminateResult };
     },
   };
 
   ports: PortProbe = { isFree: async (port) => !this.takenPorts.has(port) };
   health: HealthProbe = { isHealthy: async (url) => this.healthy.has(url) };
 
-  server(options: ConstructorParameters<typeof LocalServer<Record>>[1] = {}) {
-    return new LocalServer<Record>(
+  server(options: ConstructorParameters<typeof LocalServer<Fake>>[1] = {}) {
+    return new LocalServer<Fake>(
       { store: this.store, launcher: this.launcher, ports: this.ports, health: this.health },
       { startTimeoutMs: 30, pollIntervalMs: 5, ...options },
     );

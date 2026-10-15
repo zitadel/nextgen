@@ -12,7 +12,7 @@ import {
   CONTAINER_DATA_DIR,
   CONTAINER_HTTP_PORT,
   type ContainerIdentity,
-  type RuntimeMetadata,
+  type DockerRuntimeMetadata,
 } from "./runtime";
 
 export type DockerResult = {
@@ -248,7 +248,7 @@ export function metadataFromStart(input: {
   port: number;
   serverUrl: string;
   env?: EnvSummary;
-}): RuntimeMetadata {
+}): DockerRuntimeMetadata {
   return {
     schema_version: 1,
     backend: "docker",

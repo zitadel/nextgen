@@ -1,5 +1,3 @@
-import { setTimeout as sleep } from "node:timers/promises";
-
 import { Flags } from "@oclif/core";
 
 import consola from "consola";
@@ -14,12 +12,9 @@ import {
   stopBinaryRuntime,
 } from "../lib/local-server/binary";
 import {
+  containerLogs,
   currentUser,
   dockerAvailable,
-  ensureImage,
-  inspectContainer,
-  metadataFromStart,
-  startContainer,
   stopAndRemoveContainer,
 } from "../lib/local-server/docker";
 import {
@@ -30,19 +25,18 @@ import { EMPTY_SUMMARY, loadProjectEnv } from "../lib/local-server/env-vars";
 import {
   DEFAULT_LOCAL_SERVER_PORT,
   PLATFORM_PROJECT_ID,
-  checkLocalServerHealth,
   defaultLocalServerImageForCliVersion,
   ensureContainerIdentity,
   ensureLocalState,
   localContainerName,
   localServerUrl,
   readRuntimeMetadata,
-  writeRuntimeMetadata,
+  type BinaryRuntimeMetadata,
+  type DockerRuntimeMetadata,
   type RuntimeBackend,
   type RuntimeMetadata,
 } from "../lib/local-server/runtime";
 import {
-  chooseFreePort,
   LocalServer,
   NoFreePortError,
   PortInUseError,
@@ -52,6 +46,7 @@ import {
 } from "../lib/local-server/server";
 import {
   BinaryLauncher,
+  DockerLauncher,
   HttpHealth,
   RuntimeFileStore,
   TcpPorts,
@@ -61,8 +56,6 @@ import { resolveCwd } from "../lib/paths";
 import { listenersForPort, type TcpListener } from "../lib/prober/ports";
 import { publicCliCommand } from "../lib/public-cli";
 import { reportWarning } from "../lib/warnings";
-
-const START_TIMEOUT_MS = 90_000;
 
 export default class Start extends BaseCommand {
   static override description = "Start a local Zitadel server.";
@@ -169,126 +162,75 @@ export default class Start extends BaseCommand {
       if (existingRuntime?.backend === "docker") {
         await stopExistingRuntime(existingRuntime);
       }
-      const server = new LocalServer(
-        {
-          store: new RuntimeFileStore(this.meta.cwd),
-          launcher: new BinaryLauncher({
-            cliVersion: this.meta.cliVersion,
-            dataDir: paths.dataDir,
-            logPath: paths.logFile,
-            env,
-            userFile: local?.userFile,
-          }),
-          ports: new TcpPorts(),
-          health: new HttpHealth(),
-        },
-        {
-          port: requestedPort,
-          reusable: (record) =>
-            serverVersion === undefined || record.server_version === serverVersion,
-        },
-      );
-      let started: Awaited<ReturnType<typeof server.start>>;
-      try {
-        started = await server.start();
-      } catch (error) {
-        throw await startFailure(error, this.meta.cliVersion);
-      }
-      const { record, alreadyRunning } = started;
-      return this.emit({
-        status: "ok",
-        data: readyData(
-          record,
-          alreadyRunning,
-          this.meta.cliVersion,
-          await consoleLoginFor(record.server_url, local?.admin),
+      return this.startAndReport(
+        new LocalServer(
+          {
+            store: new RuntimeFileStore<BinaryRuntimeMetadata>(this.meta.cwd, "binary"),
+            launcher: new BinaryLauncher({
+              cliVersion: this.meta.cliVersion,
+              dataDir: paths.dataDir,
+              logPath: paths.logFile,
+              env,
+              userFile: local?.userFile,
+            }),
+            ports: new TcpPorts(),
+            health: new HttpHealth(),
+          },
+          {
+            port: requestedPort,
+            reusable: (record) =>
+              serverVersion === undefined || record.server_version === serverVersion,
+          },
         ),
-      });
+        local?.admin,
+      );
     }
 
     await assertDockerAvailable(this.meta.cliVersion);
     if (existingRuntime?.backend === "binary") {
       await stopBinaryRuntime(existingRuntime.pid);
     }
-    const existing = await inspectContainer(containerName);
-    if (
-      existing.exists &&
-      existing.running &&
-      existing.image === image &&
-      (await checkLocalServerHealth(serverUrl))
-    ) {
-      const metadata = metadataFromStart({
-        cwdDataDir: paths.dataDir,
-        cliVersion: this.meta.cliVersion,
-        containerName,
-        containerId: existing.id ?? containerName,
-        image,
-        port,
-        serverUrl,
-        // The container was started with whatever was recorded then.
-        env: existingRuntime?.backend === "docker" ? existingRuntime.env : undefined,
-      });
-      await writeRuntimeMetadata(this.meta.cwd, metadata);
-      return this.emit({
-        status: "ok",
-        data: readyData(
-          metadata,
-          true,
-          this.meta.cliVersion,
-          await consoleLoginFor(serverUrl, local?.admin),
-        ),
-      });
-    }
+    return this.startAndReport(
+      new LocalServer(
+        {
+          store: new RuntimeFileStore<DockerRuntimeMetadata>(this.meta.cwd, "docker"),
+          launcher: new DockerLauncher({
+            cliVersion: this.meta.cliVersion,
+            containerName,
+            image,
+            dataDir: paths.dataDir,
+            identity: await ensureContainerIdentity(this.meta.cwd, currentUser()),
+            env,
+            userFile: local?.userFile,
+          }),
+          ports: new TcpPorts(),
+          health: new HttpHealth(),
+        },
+        { port: requestedPort, reusable: (record) => record.image === image },
+      ),
+      local?.admin,
+    );
+  }
 
-    if (existing.exists) {
-      await stopAndRemoveContainer(containerName);
+  /** Starts (or finds running) the directory's server and reports it, whatever runs it. */
+  private async startAndReport<R extends RuntimeMetadata>(
+    server: LocalServer<R>,
+    admin: LocalAdmin | undefined,
+  ): Promise<JsonEnvelope> {
+    let started: Awaited<ReturnType<typeof server.start>>;
+    try {
+      started = await server.start();
+    } catch (error) {
+      throw await startFailure(error, this.meta.cliVersion);
     }
-
-    // An explicit port is taken as asked, and refused if held. Without one the
-    // directory keeps its port when it is free and otherwise moves up to one that is.
-    let containerPort = port;
-    if (requestedPort === undefined) {
-      try {
-        containerPort = await chooseFreePort(new TcpPorts(), port);
-      } catch (error) {
-        throw await startFailure(error, this.meta.cliVersion);
-      }
-    }
-    const containerUrl = localServerUrl(containerPort);
-    await assertPortAvailableForStart(containerPort, containerUrl, this.meta.cliVersion);
-    await ensureImage(image);
-    const { containerId, env: containerEnv } = await startContainer({
-      containerName,
-      image,
-      port: containerPort,
-      dataDir: paths.dataDir,
-      identity: await ensureContainerIdentity(this.meta.cwd, currentUser()),
-      env,
-      userFile: local?.userFile,
-    });
-    await waitForHealth(containerUrl, this.meta.cliVersion, {
-      runtime: "docker",
-      container_name: containerName,
-    });
-
-    const metadata = metadataFromStart({
-      cwdDataDir: paths.dataDir,
-      cliVersion: this.meta.cliVersion,
-      containerName,
-      containerId,
-      image,
-      port: containerPort,
-      serverUrl: containerUrl,
-      env: containerEnv,
-    });
-    await writeRuntimeMetadata(this.meta.cwd, metadata);
+    const { record, alreadyRunning } = started;
     return this.emit({
       status: "ok",
       data: readyData(
-        metadata,
-        false,
+        record,
+        alreadyRunning,
         this.meta.cliVersion,
-        await consoleLoginFor(containerUrl, local?.admin),
+        await consoleLoginFor(record.server_url, admin),
       ),
     });
   }
@@ -443,52 +385,17 @@ function readyData(
   };
 }
 
-async function waitForHealth(
-  serverUrl: string,
-  cliVersion: string,
-  details: Record<string, unknown>,
-  runtime?: { logPath?: string; pid?: number },
-): Promise<void> {
-  const started = Date.now();
-  while (Date.now() - started < START_TIMEOUT_MS) {
-    if (runtime?.pid && !isRuntimeRunning(runtime.pid)) {
-      throw await serverExitedError(serverUrl, cliVersion, details, runtime.logPath);
-    }
-    if (await checkLocalServerHealth(serverUrl, 1000)) {
-      return;
-    }
-    await sleep(1000);
-  }
-  throw new ZitadelError("E_NETWORK", "Local Zitadel server did not become healthy", {
-    hint: "Inspect the local runtime logs, then reset the local runtime if needed.",
-    nextCommands: [
-      publicCliCommand("logs", cliVersion),
-      publicCliCommand("reset --force", cliVersion),
-    ],
-    details: { ...details, server_url: serverUrl },
-  });
-}
-
-async function assertPortAvailableForStart(
-  port: number,
-  serverUrl: string,
-  cliVersion: string,
-): Promise<void> {
-  if (await new TcpPorts().isFree(port)) {
-    return;
-  }
-  // Who holds the port is only for the message; whether it is held was decided above.
-  throw portInUseError(port, serverUrl, await listenersForPort(port), cliVersion);
-}
-
 /** Turns what the lifecycle threw into the error the command reports. */
 async function startFailure(error: unknown, cliVersion: string): Promise<unknown> {
   if (error instanceof ServerStartError) {
-    const { record } = error;
-    const details = { runtime: "binary", pid: record.pid, log_path: record.log_path };
+    const record = error.record as RuntimeMetadata;
+    const details =
+      record.backend === "docker"
+        ? { runtime: "docker", container_name: record.container_name }
+        : { runtime: "binary", pid: record.pid, log_path: record.log_path };
     const reported =
       error.reason === "exited"
-        ? await serverExitedError(record.server_url, cliVersion, details, record.log_path)
+        ? serverExitedError(record.server_url, cliVersion, details, await logTailOf(record))
         : new ZitadelError("E_NETWORK", "Local Zitadel server did not become healthy", {
             hint: "Inspect the local runtime logs, then reset the local runtime if needed.",
             nextCommands: [
@@ -509,7 +416,9 @@ async function startFailure(error: unknown, cliVersion: string): Promise<unknown
   }
   if (error instanceof PortInUseError) {
     const url = localServerUrl(error.port);
-    return portInUseError(error.port, url, await listenersForPort(error.port), cliVersion);
+    // Who holds the port is only for the message, so it can afford to wait for `lsof`.
+    const listeners = await listenersForPort(error.port, { timeoutMs: 5000 });
+    return portInUseError(error.port, url, listeners, cliVersion);
   }
   if (error instanceof NoFreePortError) {
     return new ZitadelError("E_PORT_IN_USE", error.message, {
@@ -519,6 +428,17 @@ async function startFailure(error: unknown, cliVersion: string): Promise<unknown
     });
   }
   return error;
+}
+
+/** The end of the server's own log, when there is one to read. */
+async function logTailOf(record: RuntimeMetadata): Promise<string | undefined> {
+  try {
+    return record.backend === "docker"
+      ? await containerLogs(record.container_name, 40)
+      : await binaryLogs(record.log_path, 40);
+  } catch {
+    return undefined;
+  }
 }
 
 function portInUseError(
@@ -538,13 +458,12 @@ function portInUseError(
   });
 }
 
-async function serverExitedError(
+function serverExitedError(
   serverUrl: string,
   cliVersion: string,
   details: Record<string, unknown>,
-  logPath: string | undefined,
-): Promise<ZitadelError> {
-  const logTail = logPath ? await binaryLogs(logPath, 40) : undefined;
+  logTail: string | undefined,
+): ZitadelError {
   return new ZitadelError(
     "E_NETWORK",
     "Local Zitadel server process exited before becoming healthy",

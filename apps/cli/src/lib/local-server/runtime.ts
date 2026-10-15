@@ -333,7 +333,7 @@ export function localServerNotRunning(serverUrl?: string): ZitadelError {
   return new ZitadelError("E_LOCAL_SERVER_NOT_RUNNING", "Local Zitadel server is not running", {
     hint: serverUrl
       ? `No healthy local server responded at ${serverUrl}.`
-      : "No local server has been started in this directory or a parent.",
+      : "No local server has been started in this directory or a parent. Run `zitadel start`, or name a server another directory started with --server <url>.",
     nextCommands: ["zitadel start"],
     details: { server_url: serverUrl },
   });

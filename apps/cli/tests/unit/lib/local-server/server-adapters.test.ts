@@ -3,14 +3,35 @@ import { createServer, type Server } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   type BinaryRuntimeMetadata,
   type DockerRuntimeMetadata,
   writeRuntimeMetadata,
 } from "../../../../src/lib/local-server/runtime";
-import { RuntimeFileStore, TcpPorts } from "../../../../src/lib/local-server/server-adapters";
+import {
+  ensureImage,
+  inspectContainer,
+  startContainer,
+  stopAndRemoveContainer,
+} from "../../../../src/lib/local-server/docker";
+import {
+  DockerLauncher,
+  RuntimeFileStore,
+  TcpPorts,
+} from "../../../../src/lib/local-server/server-adapters";
+
+vi.mock("../../../../src/lib/local-server/docker", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../../src/lib/local-server/docker")>()),
+  ensureImage: vi.fn(async () => "local"),
+  inspectContainer: vi.fn(async () => ({ exists: false, running: false })),
+  startContainer: vi.fn(async () => ({
+    containerId: "cid-1",
+    env: { injected: [] },
+  })),
+  stopAndRemoveContainer: vi.fn(async () => undefined),
+}));
 
 const servers: Server[] = [];
 const dirs: string[] = [];
@@ -80,7 +101,7 @@ describe("RuntimeFileStore", () => {
 
   it("reads back what it wrote", async () => {
     const cwd = await folder();
-    const store = new RuntimeFileStore(cwd);
+    const store = new RuntimeFileStore<BinaryRuntimeMetadata>(cwd, "binary");
 
     await store.write(binary(cwd));
 
@@ -88,7 +109,9 @@ describe("RuntimeFileStore", () => {
   });
 
   it("reads nothing from a directory that has no record", async () => {
-    await expect(new RuntimeFileStore(await folder()).read()).resolves.toBeUndefined();
+    await expect(
+      new RuntimeFileStore<BinaryRuntimeMetadata>(await folder(), "binary").read(),
+    ).resolves.toBeUndefined();
   });
 
   it("does not treat a Docker record as a binary server", async () => {
@@ -107,6 +130,77 @@ describe("RuntimeFileStore", () => {
     };
     await writeRuntimeMetadata(cwd, docker);
 
-    await expect(new RuntimeFileStore(cwd).read()).resolves.toBeUndefined();
+    await expect(
+      new RuntimeFileStore<BinaryRuntimeMetadata>(cwd, "binary").read(),
+    ).resolves.toBeUndefined();
+  });
+});
+
+describe("DockerLauncher", () => {
+  const launcher = () =>
+    new DockerLauncher({
+      cliVersion: "1.0.0",
+      containerName: "zitadel-server-abc",
+      image: "ghcr.io/zitadel/nextgen:latest",
+      dataDir: "/work/.zitadel/local/nextgen-data",
+    });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("starts the container on the port it is given and records it", async () => {
+    const record = await launcher().launch({ port: 8085, serverUrl: "http://localhost:8085" });
+
+    expect(vi.mocked(startContainer)).toHaveBeenCalledWith(
+      expect.objectContaining({ containerName: "zitadel-server-abc", port: 8085 }),
+    );
+    expect(record).toMatchObject({
+      backend: "docker",
+      container_name: "zitadel-server-abc",
+      container_id: "cid-1",
+      port: 8085,
+      server_url: "http://localhost:8085",
+    });
+  });
+
+  it("removes a leftover container of the same name before it starts", async () => {
+    await launcher().launch({ port: 8085, serverUrl: "http://localhost:8085" });
+
+    expect(vi.mocked(stopAndRemoveContainer).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(startContainer).mock.invocationCallOrder[0] ?? 0,
+    );
+    expect(vi.mocked(ensureImage)).toHaveBeenCalledWith("ghcr.io/zitadel/nextgen:latest");
+  });
+
+  it("is alive while its container runs", async () => {
+    const record = await launcher().launch({ port: 8085, serverUrl: "http://localhost:8085" });
+    vi.mocked(inspectContainer).mockResolvedValueOnce({ exists: true, running: true });
+
+    await expect(launcher().isAlive(record)).resolves.toBe(true);
+  });
+
+  it("is not alive once its container has stopped", async () => {
+    const record = await launcher().launch({ port: 8085, serverUrl: "http://localhost:8085" });
+    vi.mocked(inspectContainer).mockResolvedValueOnce({ exists: true, running: false });
+
+    await expect(launcher().isAlive(record)).resolves.toBe(false);
+  });
+
+  it("stops and removes a container that exists", async () => {
+    const record = await launcher().launch({ port: 8085, serverUrl: "http://localhost:8085" });
+    vi.mocked(stopAndRemoveContainer).mockClear();
+    vi.mocked(inspectContainer).mockResolvedValueOnce({ exists: true, running: true });
+
+    await expect(launcher().terminate(record)).resolves.toMatchObject({ status: "stopped" });
+    expect(vi.mocked(stopAndRemoveContainer)).toHaveBeenCalledWith("zitadel-server-abc");
+  });
+
+  it("reports a container that is already gone as stale", async () => {
+    const record = await launcher().launch({ port: 8085, serverUrl: "http://localhost:8085" });
+    vi.mocked(stopAndRemoveContainer).mockClear();
+
+    await expect(launcher().terminate(record)).resolves.toMatchObject({ status: "stale" });
+    expect(vi.mocked(stopAndRemoveContainer)).not.toHaveBeenCalled();
   });
 });

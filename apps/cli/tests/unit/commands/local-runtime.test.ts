@@ -1099,6 +1099,9 @@ const childProcess = require("node:child_process");
 const fs = require("node:fs");
 const args = process.argv.slice(2);
 fs.appendFileSync(process.env.DOCKER_LOG, JSON.stringify(args) + "\\n");
+const stateDir = ${JSON.stringify(join(binDir, "containers"))};
+fs.mkdirSync(stateDir, { recursive: true });
+const stateFile = (name) => stateDir + "/" + name;
 function startHealthServer() {
   const publishIndex = args.indexOf("--publish");
   const publish = publishIndex >= 0 ? args[publishIndex + 1] : "";
@@ -1144,6 +1147,11 @@ if (args[0] === "manifest" && args[1] === "inspect") {
   process.exit(${options.imageAvailable === false ? "1" : "0"});
 }
 if (args[0] === "inspect") {
+  const inspected = args[args.length - 1];
+  if (fs.existsSync(stateFile(inspected))) {
+    console.log("container-test-id true " + fs.readFileSync(stateFile(inspected), "utf8"));
+    process.exit(0);
+  }
   if (${options.existingContainerImage ? "true" : "false"}) {
     console.log("container-test-id true ${options.existingContainerImage ?? ""}");
     process.exit(0);
@@ -1151,11 +1159,16 @@ if (args[0] === "inspect") {
   process.exit(1);
 }
 if (args[0] === "run") {
+  const nameIndex = args.indexOf("--name");
+  const migrateIndex = args.indexOf("--migrate");
+  const image = migrateIndex >= 0 ? args[migrateIndex - 1] : args[args.length - 1];
+  if (nameIndex >= 0) fs.writeFileSync(stateFile(args[nameIndex + 1]), image);
   startHealthServer();
   console.log("container-test-id");
   process.exit(0);
 }
 if (args[0] === "stop" || args[0] === "rm") {
+  fs.rmSync(stateFile(args[args.length - 1]), { force: true });
   process.exit(0);
 }
 if (args[0] === "logs") {
