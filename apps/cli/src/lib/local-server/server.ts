@@ -1,3 +1,5 @@
+import { join } from "node:path";
+
 import consola from "consola";
 
 import { ZitadelError } from "../errors";
@@ -8,6 +10,7 @@ import { BinaryLauncher, type StopBinaryRuntimeResult } from "./internal/binary-
 import { DockerLauncher, type DockerResult } from "./internal/docker-launcher";
 import { Lifecycle, type Launcher, type LifecycleOptions } from "./internal/lifecycle";
 import { HttpHealth, TcpPorts } from "./internal/probes";
+import { withStartLock } from "./internal/start-lock";
 import { RuntimeFileStore } from "./internal/store";
 import { discoverManagedRuntimeProcesses, type ManagedRuntimeProcess } from "./processes";
 import {
@@ -137,6 +140,17 @@ export class LocalServer {
   async start(
     config: RunConfig,
     options: { port?: number } = {},
+  ): Promise<{ runtime: RuntimeMetadata; alreadyRunning: boolean }> {
+    // One start at a time per directory: two at once would pick the same port
+    // and run two servers over one data directory. The second finds the first's.
+    return withStartLock(join(localRuntimePaths(this.cwd).runtimeDir, "start.lock"), () =>
+      this.startLocked(config, options),
+    );
+  }
+
+  private async startLocked(
+    config: RunConfig,
+    options: { port?: number },
   ): Promise<{ runtime: RuntimeMetadata; alreadyRunning: boolean }> {
     const existing = await readRuntimeMetadata(this.cwd);
     const paths = localRuntimePaths(this.cwd);

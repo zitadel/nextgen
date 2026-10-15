@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import { useLocalServers } from "../helpers/local-server";
 import { usePlatformMock } from "../helpers/platform";
 import { aSetUpApp } from "../helpers/project";
 
 const platform = usePlatformMock();
+useLocalServers();
 
 describe("start", () => {
   describe("against an invalid server", () => {
@@ -74,6 +76,54 @@ describe("start", () => {
 
         expect(result).toFailWith("E_VALIDATION");
         expect(result).toExplain("--image requires --runtime docker");
+      });
+
+      it("brings a directory back on the port it had", async () => {
+        const app = await aSetUpApp();
+        const first = await app.startLocalServer();
+        await app.run(["stop", "--json"]);
+
+        const again = await app.restartLocalServer();
+
+        expect(app.localPortOf(again)).toBe(app.localPortOf(first));
+      });
+
+      it("refuses a port another directory's server holds", async () => {
+        const owner = await aSetUpApp();
+        const held = await owner.startLocalServer();
+        const other = await aSetUpApp();
+
+        const result = await other.startLocalServer({ port: owner.localPortOf(held) });
+
+        expect(result).toFailWith("E_PORT_IN_USE");
+      });
+
+      it("leaves a running server alone when the port it is asked to move to is held", async () => {
+        const owner = await aSetUpApp();
+        const held = await owner.startLocalServer();
+        const app = await aSetUpApp();
+        await app.startLocalServer();
+
+        await app.startLocalServer({ port: owner.localPortOf(held) });
+
+        expect(await app.localServerLifecycle()).toBe("running");
+      });
+
+      it("runs one server when two starts race in one directory", async () => {
+        const app = await aSetUpApp();
+
+        const [first, second] = await app.startLocalServerTwiceAtOnce();
+
+        expect(app.localPidOf(second!)).toBe(app.localPidOf(first!));
+      });
+
+      it("plans a start although the directory's server record cannot be read", async () => {
+        const app = await aSetUpApp();
+        await app.corruptLocalServerRecord();
+
+        const result = await app.run(["start", "--dry-run", "--json"]);
+
+        expect(result).toSucceed();
       });
     });
   });

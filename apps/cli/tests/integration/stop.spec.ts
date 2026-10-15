@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import { useLocalServers } from "../helpers/local-server";
 import { usePlatformMock } from "../helpers/platform";
 import { anApp, aSetUpApp } from "../helpers/project";
 
 const platform = usePlatformMock();
+useLocalServers();
 
 describe("stop", () => {
   describe("against an invalid server", () => {
@@ -57,6 +59,16 @@ describe("stop", () => {
         const result = await app.run(["stop", "--json"]);
 
         expect(result).toSucceed();
+      });
+
+      it("stops a server whose recorded process has died", async () => {
+        const app = await aSetUpApp();
+        await app.startLocalServer({ shape: "wrapped" });
+        await app.orphanLocalServer();
+
+        await app.run(["stop", "--json"]);
+
+        expect(await app.localServerLifecycle()).toBe("stopped");
       });
 
       it("can be run twice without complaining", async () => {

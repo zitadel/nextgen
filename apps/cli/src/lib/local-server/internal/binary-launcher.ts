@@ -17,6 +17,8 @@ const COMMAND_VERSION_ENV = "ZITADEL_SERVER_BINARY_VERSION";
 const STOP_TIMEOUT_MS = 10_000;
 const STOP_KILL_TIMEOUT_MS = 2_000;
 const MIGRATE_FLAG = "--migrate";
+/** What the server binary is called, whatever launched it. */
+const SERVER_PROGRAM = "nextgen";
 
 const require = createRequire(import.meta.url);
 
@@ -300,7 +302,8 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
 
 /**
  * Whether the recorded pid still belongs to the server that was started: the
- * process, or one left in the group it led, runs the same program. When the
+ * process, or one left in the group it led, runs the program that was started
+ * or the server itself, which is what a launcher that died leaves behind. When the
  * process list cannot be read (no `ps`, Windows) the pid is trusted, as it was
  * before.
  */
@@ -308,10 +311,11 @@ async function ownsProcess(record: BinaryRuntimeMetadata): Promise<boolean> {
   if (process.platform === "win32") {
     return true;
   }
-  const program = basename(record.command.split(" ")[0] ?? "");
-  if (program === "") {
+  const started = basename(record.command.split(" ")[0] ?? "");
+  if (started === "") {
     return true;
   }
+  const programs = [started, SERVER_PROGRAM];
   let listing: string;
   try {
     listing = await new Promise<string>((resolve, reject) => {
@@ -330,7 +334,7 @@ async function ownsProcess(record: BinaryRuntimeMetadata): Promise<boolean> {
     return (
       match !== null &&
       (Number(match[1]) === record.pid || Number(match[2]) === record.pid) &&
-      (match[3] ?? "").includes(program)
+      programs.some((program) => (match[3] ?? "").includes(program))
     );
   });
 }

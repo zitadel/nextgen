@@ -1,3 +1,4 @@
+import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -6,6 +7,8 @@ import { Readable } from "node:stream";
 
 import { expect } from "vitest";
 
+import { aFakeServerBinary, trackLocalServer, type ServerShape } from "./local-server";
+import { cliPackageRoot } from "./oclif-build";
 import { parseJson, runCliForTest } from "./run-cli";
 
 const SCHEMA_FILE = ".zitadel/schemas/default-human-user.json";
@@ -402,6 +405,106 @@ export class ScaffoldedApp {
       PATH: `${docker.binDir}:${process.env.PATH ?? ""}`,
       DOCKER_LOG: docker.logPath,
     });
+  }
+
+  /**
+   * Starts this app's local server from a stand-in for the server binary, on a
+   * port from this worker unless one is named.
+   */
+  async startLocalServer({
+    shape = "plain",
+    port = nextPort(),
+  }: {
+    shape?: ServerShape;
+    port?: number;
+  } = {}): Promise<CliResult> {
+    const result = await this.cli(["start", "--port", String(port), "--json"], {
+      ZITADEL_SERVER_BINARY: await aFakeServerBinary(shape),
+    });
+    this.trackStarted(result);
+    return result;
+  }
+
+  /** Starts the server again without naming a port, so the one the directory had is used. */
+  async restartLocalServer(): Promise<CliResult> {
+    const result = await this.cli(["start", "--json"], {
+      ZITADEL_SERVER_BINARY: await aFakeServerBinary("plain"),
+    });
+    this.trackStarted(result);
+    return result;
+  }
+
+  /**
+   * Two starts racing in this app's directory, each its own process: the
+   * in-process runner captures output globally, so two runs at once in it
+   * would garble each other's.
+   */
+  async startLocalServerTwiceAtOnce(): Promise<CliResult[]> {
+    const env = { ...process.env, ZITADEL_SERVER_BINARY: await aFakeServerBinary("plain") };
+    const port = String(nextPort());
+    const results = await Promise.all(
+      [0, 1].map(
+        () =>
+          new Promise<CliResult>((resolve) => {
+            execFile(
+              process.execPath,
+              [
+                join(cliPackageRoot, "bin/run.js"),
+                ...["start", "--cwd", this.path, "--server", MOCK_SERVER_URL],
+                ...["--port", port, "--json"],
+              ],
+              { env },
+              (error, stdout, stderr) =>
+                resolve({
+                  exitCode: typeof error?.code === "number" ? error.code : 0,
+                  stdout,
+                  stderr,
+                }),
+            );
+          }),
+      ),
+    );
+    for (const result of results) {
+      this.trackStarted(result);
+    }
+    return results;
+  }
+
+  /** The port a start reported its server on. */
+  localPortOf(result: CliResult): number {
+    return this.envelopeOf<{ runtime: { port: number } }>(result).data.runtime.port;
+  }
+
+  /** The process a start reported its server as. */
+  localPidOf(result: CliResult): number {
+    return this.envelopeOf<{ runtime: { pid: number } }>(result).data.runtime.pid;
+  }
+
+  /** Kills the recorded server process and leaves whatever it started running, as when a launcher is killed. */
+  async orphanLocalServer(): Promise<void> {
+    const status = await this.cli(["status", "--json"]);
+    const pid = this.envelopeOf<{ server: { process: { pid: number } } }>(status).data.server
+      .process.pid;
+    process.kill(pid, "SIGKILL");
+    await waitUntilGone(pid);
+  }
+
+  /** Leaves this directory with a record of its local server that cannot be read. */
+  async corruptLocalServerRecord(): Promise<void> {
+    await mkdir(join(this.path, ".zitadel/local"), { recursive: true });
+    await writeFile(join(this.path, ".zitadel/local/runtime.json"), "{not json");
+  }
+
+  /** The lifecycle `status` reports for the local server. */
+  async localServerLifecycle(): Promise<string> {
+    const status = await this.cli(["status", "--json"]);
+    return this.envelopeOf<{ server: { lifecycle: string } }>(status).data.server.lifecycle;
+  }
+
+  private trackStarted(result: CliResult): void {
+    if (result.exitCode === 0) {
+      trackLocalServer(this.localPidOf(result));
+    }
   }
 
   status(extraArgs: string[] = []): Promise<CliResult> {
@@ -902,6 +1005,17 @@ export async function aSetUpApp(extraArgs: string[] = []): Promise<ScaffoldedApp
   const result = await app.setup(extraArgs);
   expect(result, "arranging setup should have succeeded").toSucceed();
   return app;
+}
+
+async function waitUntilGone(pid: number): Promise<void> {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    try {
+      process.kill(pid, 0);
+    } catch {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
 }
 
 /** A fake `npm` on PATH that records its invocation instead of installing. */
