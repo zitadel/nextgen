@@ -242,10 +242,7 @@ const metricsTable = `<table class="metrics">
       const m = metricsFor(g);
       const tps = m.verified ? Math.round(m.tokensAll / m.verified).toLocaleString() : "—";
       const stageCells = m.perStage
-        .map(
-          (p) =>
-            `<td class="sr ${p.pass === m.runs ? "ok" : p.pass ? "mid" : "no"}">${p.pass}/${m.runs}</td>`,
-        )
+        .map((p) => `<td class="sr ${p.pass === m.runs ? "ok" : p.pass ? "mid" : "no"}">${p.pass}/${m.runs}</td>`)
         .join("");
       return `<tr><th scope="row">${esc(CONFIG_LABELS[g.config] || g.config)} · ${esc(g.model)}</th><td>${m.runs}</td><td><b>${pct(m.verified, m.runs)}</b> <span class="muted">(${m.verified}/${m.runs})</span></td><td>${pct(m.falseRuns, m.runs)} <span class="muted">(${m.falseRuns}/${m.runs})</span></td><td>${m.medMs ? dur(m.medMs) : "—"}</td><td>${tps}</td>${stageCells}</tr>`;
     })

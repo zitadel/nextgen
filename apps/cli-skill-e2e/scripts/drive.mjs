@@ -228,10 +228,11 @@ function runAsserts(stage) {
   );
   // Dump the raw responses too: when an assertion's `path` is wrong, the pass/
   // fail line can't show you where the value really lives — this can.
-  const raw = Object.fromEntries(
-    [...cache].map(([get, out]) => [get, out.json ?? { err: out.err }]),
+  const raw = Object.fromEntries([...cache].map(([get, out]) => [get, out.json ?? { err: out.err }]));
+  writeFileSync(
+    join(OUT, `asserts-raw-stage${stage.id}.json`),
+    JSON.stringify(raw, null, 2),
   );
-  writeFileSync(join(OUT, `asserts-raw-stage${stage.id}.json`), JSON.stringify(raw, null, 2));
   const pass = results.filter((r) => r.passed).length;
   console.log(`[drive] stage ${stage.id} live-instance assertions: ${pass}/${results.length}`);
 }

@@ -252,11 +252,7 @@ export function gradeStage(stage, cfgDir, parsed, stage1ok) {
       };
     const results = loadAsserts(cfgDir, stage.id);
     if (!results)
-      return {
-        status: "fail",
-        why: "assertions never ran (no server state captured)",
-        asserts: [],
-      };
+      return { status: "fail", why: "assertions never ran (no server state captured)", asserts: [] };
     const failed = results.filter((r) => !r.passed);
     if (ok && failed.length === 0)
       return {

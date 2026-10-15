@@ -92,8 +92,7 @@ function runCell(config, model, rep) {
   else args.push("-e", "ANTHROPIC_API_KEY");
   args.push("-e", `MODEL=${model}`, "-e", `SIM_MODEL=${SIM_MODEL}`, "-e", `MAX_TURNS=${MAX_TURNS}`);
   args.push("-e", `BASELINE_MAX_TURNS=${BASELINE_MAX_TURNS}`, "-e", `CONFIG=${config}`);
-  if (process.env.CALL_TIMEOUT_MS)
-    args.push("-e", `CALL_TIMEOUT_MS=${process.env.CALL_TIMEOUT_MS}`);
+  if (process.env.CALL_TIMEOUT_MS) args.push("-e", `CALL_TIMEOUT_MS=${process.env.CALL_TIMEOUT_MS}`);
   args.push("-e", `MAX_QA=${MAX_QA}`, "-e", "OUT=/out", "-e", "WORK=/work", "-e", "IS_SANDBOX=1");
   args.push("-e", "ZITADEL_TELEMETRY=0", "-e", "DO_NOT_TRACK=1", "-e", "DISABLE_TELEMETRY=1");
   args.push("-e", "DISABLE_AUTOUPDATER=1", "-e", "DISABLE_ERROR_REPORTING=1");
@@ -107,9 +106,7 @@ function runCell(config, model, rep) {
 }
 
 mkdirSync(OUT, { recursive: true });
-console.log(
-  `matrix: models [${MODELS.join(", ")}] × ${REPEATS} repeat(s) × configs [${cfg.configs.join(", ")}]`,
-);
+console.log(`matrix: models [${MODELS.join(", ")}] × ${REPEATS} repeat(s) × configs [${cfg.configs.join(", ")}]`);
 for (const model of MODELS) {
   for (const config of cfg.configs) {
     // The baseline fails fast and deterministically (it never finds the CLI),
