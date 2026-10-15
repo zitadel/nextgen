@@ -8,6 +8,7 @@ import Doctor from "./commands/doctor/index";
 import Eject from "./commands/eject";
 import Logs from "./commands/logs";
 import Plan from "./commands/plan";
+import Pull from "./commands/pull";
 import Reset from "./commands/reset";
 import { RESOURCE_COMMANDS } from "./commands/resources";
 import ResourcesList from "./commands/resources-list";
@@ -38,6 +39,7 @@ export const COMMANDS: Record<string, typeof Command> = {
   eject: Eject,
   logs: Logs,
   plan: Plan,
+  pull: Pull,
   reset: Reset,
   resources: ResourcesList,
   setup: Setup,

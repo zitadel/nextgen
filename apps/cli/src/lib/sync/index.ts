@@ -16,6 +16,7 @@
  */
 export type { ResourceSyncer, SyncAction, SyncPlanSummary } from "./types";
 export { makeSyncers } from "./syncers";
+export { updateState } from "./state";
 export type { SyncLoopResult } from "./loop";
 export {
   buildSyncPlan,
