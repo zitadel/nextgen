@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { Box, MoreVertical, Plus, User } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Box, Link2, MoreVertical, Plus, User } from "lucide-react";
+import { type CSSProperties, useEffect, useMemo, useState } from "react";
 
 import { AddUserSheet } from "@/components/add-user-sheet";
 import { DeleteUserDialog } from "@/components/delete-user-dialog";
@@ -21,6 +21,7 @@ import {
 } from "@/components/resource-list";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
+import { CopyButton } from "@/components/ui/copy-button";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { useLoadMore } from "@/hooks/use-load-more";
@@ -29,8 +30,11 @@ import {
   requireProjectScope,
   useRequiredProjectScope,
 } from "@/lib/project-scope";
+import { isPresent } from "@/lib/record";
+import { identifierAccents } from "@/lib/identifier-accent";
 import type { SchemaField } from "@/lib/schema";
 import type { UserTeam } from "@/lib/user";
+import { cn } from "@/lib/utils";
 import { columnsForUsers, fetchUsers, toUserRow } from "@/lib/user-list";
 
 export const Route = createFileRoute("/_authed/users/")({
@@ -105,6 +109,36 @@ function UsersScreen() {
     [users, columns],
   );
 
+  // One property for the whole list moves its name into the header; a list
+  // mixing schemas keeps it on each row, where it tells an email from a
+  // username at a glance.
+  const { sharedProperty, identifierKeys } = useMemo(() => {
+    const properties = [...new Set(rows.map((row) => row.identifierProperty).filter(isPresent))];
+    return {
+      sharedProperty: properties.length === 1 ? properties[0] : undefined,
+      // The attribute columns some row's identifier is read from, each with
+      // its own accent.
+      identifierKeys: identifierAccents(properties),
+    };
+  }, [rows]);
+
+  // The identifier property of the row under the pointer (or holding focus).
+  // The table is neutral at rest; this is what lights the matching column
+  // header, which sits outside the row and so out of reach of `group-hover`.
+  const [activeProperty, setActiveProperty] = useState<string>();
+
+  // The identifier's source columns lead the attribute set, right after ID, so
+  // the marked headers sit beside the identifier they feed — and stay in view
+  // however many schemas push the other columns off to the right. The rest
+  // keep their own order.
+  const orderedColumns = useMemo(
+    () => [
+      ...columns.filter((column) => identifierKeys.has(column.key)),
+      ...columns.filter((column) => !identifierKeys.has(column.key)),
+    ],
+    [columns, identifierKeys],
+  );
+
   return (
     <ResourcePage>
       {/* No search beside the title: it is out of the page headers until there
@@ -131,14 +165,41 @@ function UsersScreen() {
           <TableHeader>
             <ResourceHeaderRow>
               <ResourceHeadCell>User</ResourceHeadCell>
-              <ResourceHeadCell>Identifier</ResourceHeadCell>
-              {columns.map((column) => (
-                <ResourceHeadCell key={column.key}>{column.label}</ResourceHeadCell>
-              ))}
+              {/* Identifier and ID sit side by side: the identifier is the
+                  handle a person types, and it resolves to the one ID every
+                  reference stores. */}
+              <ResourceHeadCell>
+                <span className="flex items-center gap-2">
+                  Identifier
+                  {sharedProperty && (
+                    <PropertyChip
+                      property={sharedProperty}
+                      accent={identifierKeys.get(sharedProperty)}
+                      active={activeProperty === sharedProperty}
+                    />
+                  )}
+                </span>
+              </ResourceHeadCell>
+              <ResourceHeadCell>ID</ResourceHeadCell>
+              {orderedColumns.map((column) => {
+                const accent = identifierKeys.get(column.key);
+                return (
+                  <ResourceHeadCell key={column.key}>
+                    {accent ? (
+                      <IdentifierSourceHead
+                        label={column.label}
+                        accent={accent}
+                        active={activeProperty === column.key}
+                      />
+                    ) : (
+                      column.label
+                    )}
+                  </ResourceHeadCell>
+                );
+              })}
               <ResourceHeadCell>Status</ResourceHeadCell>
               {/* After `Status`, where the design's column order puts it. */}
               {teamsExpanded && <ResourceHeadCell>Team</ResourceHeadCell>}
-              <ResourceHeadCell>ID</ResourceHeadCell>
               <ResourceMenuHead className="w-15" />
             </ResourceHeaderRow>
           </TableHeader>
@@ -149,7 +210,14 @@ function UsersScreen() {
               </ResourceEmptyRow>
             ) : (
               rows.map((user) => (
-                <ResourceRow key={user.id}>
+                <ResourceRow
+                  key={user.id}
+                  className="group"
+                  onMouseEnter={() => setActiveProperty(user.identifierProperty)}
+                  onMouseLeave={() => setActiveProperty(undefined)}
+                  onFocus={() => setActiveProperty(user.identifierProperty)}
+                  onBlur={() => setActiveProperty(undefined)}
+                >
                   {/* The User column renders the server-resolved identity
                       (display → identifier → id, ADR 058 §3a) and carries the
                       link to the detail screen — schema-driven columns cannot
@@ -165,19 +233,29 @@ function UsersScreen() {
                   </TableCell>
                   {/* The designated identifier (x-identifier) — role-named, so a
                       mixed-schema list reads down one column whether a row's
-                      identifier is an email or a loginname; the tooltip names
-                      the property it came from. */}
-                  <TableCell
-                    className={`${RESOURCE_CELL_MUTED} ${CLAMP}`}
-                    title={user.identifierProperty}
-                  >
-                    {user.identifier ?? "—"}
+                      identifier is an email or a username. */}
+                  <TableCell className={`${RESOURCE_CELL_MUTED} ${CLAMP}`}>
+                    <IdentifierCell
+                      value={user.identifier}
+                      property={sharedProperty ? undefined : user.identifierProperty}
+                      accent={identifierKeys.get(user.identifierProperty ?? "")}
+                    />
                   </TableCell>
-                  {columns.map((column) => (
-                    <TableCell key={column.key} className={`${RESOURCE_CELL_MUTED} ${CLAMP}`}>
-                      {user.values[column.key] ?? "—"}
-                    </TableCell>
-                  ))}
+                  <TableCell className={RESOURCE_CELL}>
+                    <IdCell id={user.id} name={user.name} />
+                  </TableCell>
+                  {orderedColumns.map((column) => {
+                    const value = user.values[column.key];
+                    return (
+                      <TableCell key={column.key} className={`${RESOURCE_CELL_MUTED} ${CLAMP}`}>
+                        {value !== undefined && column.key === user.identifierProperty ? (
+                          <IdentifierSource value={value} accent={identifierKeys.get(column.key)} />
+                        ) : (
+                          (value ?? "—")
+                        )}
+                      </TableCell>
+                    );
+                  })}
                   <TableCell className={RESOURCE_CELL}>
                     <StatusBadge status={user.status} />
                   </TableCell>
@@ -186,9 +264,6 @@ function UsersScreen() {
                       <TeamCell teams={user.teams} truncated={user.teamsTruncated} />
                     </TableCell>
                   )}
-                  <TableCell className={`${RESOURCE_CELL} text-foreground truncate text-sm`}>
-                    {user.id}
-                  </TableCell>
                   <TableCell className={RESOURCE_CELL}>
                     <RowActions
                       userId={user.id}
@@ -205,6 +280,141 @@ function UsersScreen() {
       {/* Full width and `secondary`, 24px under the table, not a centred pill. */}
       <LoadMore paging={paging} />
     </ResourcePage>
+  );
+}
+
+/** Exposes an accent to the classes below as `--accent`, with a soft fill beside it. */
+function accentStyle(accent: string | undefined): CSSProperties | undefined {
+  if (!accent) return undefined;
+  return {
+    "--accent": accent,
+    "--accent-soft": `color-mix(in oklch, ${accent} 14%, transparent)`,
+  } as CSSProperties;
+}
+
+/**
+ * The accent, on the hovered or focused row only, so the table stays neutral
+ * at rest. Colour is never the only cue: the chip names the property and its
+ * link glyph marks it as a reference, and the header names the column.
+ */
+const ON_ROW = "group-focus-within:text-(--accent) group-hover:text-(--accent)";
+
+/**
+ * The schema property an identifier came from (`email`, `username`, …), in the
+ * mono face the API's own keys are written in, behind a link glyph: the
+ * identifier is a reference, resolved to the ID beside it. Neutral until its
+ * row is hovered (or, in the header, until any row with that property is).
+ */
+function PropertyChip({
+  property,
+  accent,
+  active,
+}: {
+  property: string;
+  accent?: string;
+  /** Lit from outside the row — the header copy, which no row contains. */
+  active?: boolean;
+}) {
+  return (
+    <code
+      className={cn(
+        "bg-muted text-muted-foreground inline-flex shrink-0 items-center gap-1 rounded-full px-2 font-mono text-[10px] leading-4 tracking-normal normal-case transition-colors",
+        accent &&
+          (active
+            ? "bg-(--accent-soft) text-(--accent)"
+            : `${ON_ROW} group-focus-within:bg-(--accent-soft) group-hover:bg-(--accent-soft)`),
+      )}
+      style={accentStyle(accent)}
+    >
+      <Link2 aria-hidden strokeWidth={1.5} className="size-2.5 shrink-0" />
+      {property}
+    </code>
+  );
+}
+
+/**
+ * The header of an attribute column that is some row's identifier: plain at
+ * rest, in the row's accent while a row whose identifier it holds is hovered.
+ * The hidden text names the role for a screen reader, which no colour reaches.
+ */
+function IdentifierSourceHead({
+  label,
+  accent,
+  active,
+}: {
+  label: string;
+  accent: string;
+  active: boolean;
+}) {
+  return (
+    <span
+      className={cn("transition-colors", active && "text-(--accent)")}
+      data-active={active || undefined}
+      style={accentStyle(accent)}
+      title="Identifier for some of these users"
+    >
+      {label}
+      <span className="sr-only"> (identifier)</span>
+    </span>
+  );
+}
+
+/** A cell the row's identifier is read from, in the row's accent while it is hovered. */
+function IdentifierSource({ value, accent }: { value: string; accent?: string }) {
+  return (
+    <span className={cn("transition-colors", ON_ROW)} style={accentStyle(accent)}>
+      {value}
+    </span>
+  );
+}
+
+/**
+ * The identifier, then its property when the list mixes schemas. Each chip
+ * fits its own property and sits at the cell's trailing edge, so the chips
+ * align on their right and the values keep the leading edge.
+ */
+function IdentifierCell({
+  value,
+  property,
+  accent,
+}: {
+  value?: string;
+  property?: string;
+  accent?: string;
+}) {
+  if (!value) return <>—</>;
+  return (
+    <span className="flex items-center gap-2">
+      {/* The cell clamps, so the full value stays reachable on hover. */}
+      <span className="truncate" title={value}>
+        {value}
+      </span>
+      {property && (
+        <span className="ml-auto flex">
+          <PropertyChip property={property} accent={accent} />
+        </span>
+      )}
+    </span>
+  );
+}
+
+/**
+ * The user ID: mono, since it is a machine value, and copyable, since it is
+ * what an API call or a log search needs. The copy control shows on row hover
+ * or focus — and always where there is no hover to reveal it.
+ */
+function IdCell({ id, name }: { id: string; name: string }) {
+  return (
+    <span className="flex items-center gap-1">
+      <span className="text-muted-foreground group-hover:text-foreground font-mono text-xs whitespace-nowrap transition-colors">
+        {id}
+      </span>
+      <CopyButton
+        value={id}
+        label={`Copy the ID of ${name}`}
+        className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+      />
+    </span>
   );
 }
 
