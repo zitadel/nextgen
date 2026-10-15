@@ -5,94 +5,34 @@ import registerBefore from "./register-before.jpg";
 import type { Session } from "./types";
 
 // The showcase's recorded rows, from zitadel/new-website's narrative redesign
-// (its homepage's terminalSection, recorded with `script` on 5 October 2026
-// with @zitadel/cli 1.0.0-alpha.24): the real output, with the scratch path
-// shortened to "myapp", the one-time console link masked, and skipped lines
-// marked as comments. The pictures are the scaffolded app's pages at 520px, as
-// that session left them. Re-record rather than edit when the CLI changes
-// (AGENTS.md). The fourth row, the brand, is live (brand-row.tsx).
+// (its homepage's terminalSection, a session recorded with `script` on
+// 5 October 2026 with @zitadel/cli 1.0.0-alpha.24, the hero's commands with
+// `doctor` first): the first row lists the files that session's setup wrote
+// (the rest it summed up as "env, project config, the editable user schema and
+// login flow"), the next two its recorded diffs and command output. The
+// pictures are the scaffolded app's pages at 520px, as that session left
+// them. Re-record rather than edit when the CLI changes (AGENTS.md). The
+// fourth row, the brand, is live (brand-row.tsx).
 export const sessions: Session[] = [
   {
-    label: "Up in a minute",
+    label: "Your code",
     description:
-      "Four commands, and a local Zitadel, login and registration pages in your app, and the app running.",
-    recording: {
-      title: "myapp",
-      lines: [
-        { type: "command", text: "mkdir myapp && cd myapp" },
-        { type: "command", text: "npx @zitadel/cli@alpha doctor" },
-        { type: "output", text: "Zitadel doctor passed." },
-        { type: "output", text: "(server: localhost:8080)" },
-        { type: "output", text: "Project: lifecycle=not-configured" },
-        { type: "output", text: "Checks:" },
+      "Setup writes the login pages into your app, with your user model and login flow as files beside them.",
+    scaffold: {
+      root: "myapp",
+      entries: [
+        { path: "app/login/page.tsx", note: "Login page" },
+        { path: "app/register/page.tsx", note: "Registration page" },
+        { path: "app/profile/page.tsx", note: "Profile page" },
+        { path: "proxy.ts", note: "Next.js proxy" },
         {
-          type: "output",
-          text: "  [ok] server-binary: @zitadel/server 1.0.0-alpha.24 is available",
+          path: ".zitadel/schemas/default-human-user.json",
+          note: "User model",
+          highlight: true,
         },
-        {
-          type: "output",
-          text: "  [ok] state-dir: myapp/.zitadel/local/nextgen-data can be created (myapp is writable)",
-        },
-        { type: "output", text: "  [ok] port: Port 8080 is available" },
-        { type: "output", text: "  [ok] runtime: No existing runtime metadata" },
-        {
-          type: "output",
-          text: "  [ok] managed-runtime-processes: No additional host-wide managed local runtime processes found.",
-        },
-        { type: "command", text: "npx @zitadel/cli@alpha start" },
-        {
-          type: "output",
-          text: "Console: signed in as admin@zitadel.localhost. Open this link (works once):",
-        },
-        { type: "output", text: "http://localhost:8080/ui/console/login?handoff=…" },
-        { type: "output", text: "Local Zitadel server is ready." },
-        { type: "output", text: "(server: localhost:8080)" },
-        { type: "output", text: "Next:" },
-        {
-          type: "output",
-          text: "  From your app directory, run setup; the CLI will detect the framework or ask when needed.",
-        },
-        { type: "command", text: "npx @zitadel/cli@alpha setup --framework next --server local" },
-        { type: "output", text: "◐ Detecting framework in myapp" },
-        { type: "output", text: "ℹ Fresh app directory — scaffolding a fresh project" },
-        { type: "output", text: "✔ Scaffolded next skeleton" },
-        { type: "output", text: "✔ Detected next (dev port 3000)" },
-        { type: "output", text: "◐ Creating project on http://localhost:8080" },
-        { type: "output", text: "✔ Created project proj_01M47Q1JG830SMMH0J71X03R0E" },
-        { type: "output", text: "◐ Patching project files" },
-        { type: "output", text: "ℹ Wrote the login page (app/login/page.tsx)" },
-        { type: "output", text: "ℹ Wrote the registration page (app/register/page.tsx)" },
-        { type: "output", text: "ℹ Wrote the profile page (app/profile/page.tsx)" },
-        { type: "output", text: "ℹ Wrote the Next.js proxy (proxy.ts)" },
-        { type: "output", text: "ℹ Wrote package.json with the SDK dependency (package.json)" },
-        {
-          type: "comment",
-          text: "  … 22 more files: env, project config, the editable user schema and login flow",
-        },
-        { type: "output", text: "✔ Patched 27 files (1 unchanged)" },
-        { type: "output", text: "◐ Installing dependencies with npm install" },
-        { type: "output", text: "✔ Installed dependencies" },
-        {
-          type: "output",
-          text: "✔ Project owned by admin@zitadel.localhost (team team_localadmin)",
-        },
-        { type: "output", text: "Zitadel is ready" },
-        { type: "output", text: "Start your project (then open http://localhost:3000/login):" },
-        { type: "output", text: "  npm run dev" },
-        { type: "command", text: "npm run dev" },
-        { type: "output", text: "▲ Next.js 16.2.4 (Turbopack)" },
-        { type: "output", text: "- Local:         http://localhost:3000" },
-        { type: "output", text: "- Environments: .env.local" },
-        { type: "output", text: "✓ Ready in 153ms" },
-        {
-          type: "output",
-          text: " GET /login 200 in 958ms (next.js: 895ms, application-code: 63ms)",
-        },
-        {
-          type: "comment",
-          text: "# open http://localhost:3000/login and register your first user",
-        },
+        { path: ".zitadel/flows/default-login.json", note: "Login flow", highlight: true },
       ],
+      rest: "+ package.json, .env.local, zitadel.json and more",
     },
     result: {
       url: "localhost:3000/login",

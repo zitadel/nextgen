@@ -28,15 +28,6 @@
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* The terminal of the showcase scrolls without showing a scrollbar. */
-@utility scrollbar-hidden {
-  scrollbar-width: none;
-
-  &::-webkit-scrollbar {
-    display: none;
-  }
-}
-
 /* The hero (page.tsx): the headline, the copy and the commands beside the
    website's hero animation, its own light spilling around it, leaning toward
    the pointer (stage.tsx sets --tilt-x and --tilt-y, from -0.5 to 0.5). */

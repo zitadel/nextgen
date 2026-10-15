@@ -12,7 +12,7 @@ docs, the storybook and GitHub:
    Short on purpose: no paragraph, no small print, no line above the headline;
    the header's Preview label frames the page, and the rows below say the rest.
 2. The showcase (`app/showcase/`), with no title of its own: four rows that
-   prove the headline, up in a minute, your fields, your flow, your brand.
+   prove the headline, your code, your fields, your flow, your brand.
 
 The footer is the logo alone. Feature lists, ways in and roadmaps belong on the
 docs and on zitadel.com, not here.
@@ -116,31 +116,35 @@ them all and one per line; `/llms.txt` hands the same ones to agents. Both take
 them from `app/commands.ts`, with the skills line under them. They follow the
 README's quick start, and the docs' quickstart without its optional `doctor`: a
 new folder, `start`, `setup --framework next --server local`, `npm run dev`;
-the first row's recording ran the same with `doctor` first. `--framework` keeps
-setup from asking; `--server local` needs no account.
+the session the showcase was recorded from ran the same with `doctor` first.
+`--framework` keeps setup from asking; `--server local` needs no account.
 Never `--force`: if `mkdir` fails because the folder exists, the next lines run
 in the current directory, where `--force` would replace files. When that
-journey changes, change the commands, and the first row with them, and run
-them once against the published CLI before they ship.
+journey changes, change the commands, and the showcase with them, and run them
+once against the published CLI before they ship.
 
 ## The showcase
 
 `app/showcase/` holds the four rows under the hero, alternating sides along a
 spine on wide screens (`showcase.tsx`, `row-layout.tsx`). They are
-`zitadel/new-website`'s narrative rows, ported: the replaying terminal
-(`terminal-replay.tsx`), the editor card with the diff, the flow's steps and
+`zitadel/new-website`'s narrative rows, ported: the card of the files setup
+writes (`file-tree.tsx`), the editor card with the diff, the flow's steps and
 the commands that publish the change (`file-card.tsx`), and the browser frame
 with a Before / After switch (`browser-frame.tsx`).
 
-- Rows 1 to 3 are recorded (`sessions.ts`): the real output of a session run
-  with `script` on 5 October 2026 with @zitadel/cli 1.0.0-alpha.24, the
-  scratch path shortened to `myapp`, the one-time console link masked,
-  skipped lines marked as comments; the pictures are the scaffolded app's
-  pages at 520 px from the same session. Re-record rather than edit when the
-  CLI, the flow format or the login's look changes. `login-after-setup.jpg` is
-  also the third row's before-picture.
-- The first row's replay drives its picture; in rows 2 and 3 the frame's
-  switch does, and the third row's flow steps follow it.
+- The first row shows what the hero's commands leave in the app, not the
+  commands again: the login, registration and profile pages, the proxy, and
+  the user model and login flow that rows 2 and 3 edit, beside the login the
+  app serves. The narrative's replaying terminal stood there; next to the
+  hero's own commands it said the same thing twice.
+- Rows 1 to 3 come from a recorded session (`sessions.ts`), run with `script`
+  on 5 October 2026 with @zitadel/cli 1.0.0-alpha.24: the files its setup
+  wrote, its diffs and its command output, and the scaffolded app's pages at
+  520 px. Re-record rather than edit when the CLI, the files setup writes, the
+  flow format or the login's look changes. `login-after-setup.jpg` is also the
+  third row's before-picture.
+- In rows 2 and 3 the frame's switch shows the page before or after the change,
+  and the third row's flow steps follow it.
 - No captions or dates on the rows: this is a marketing page, the provenance
   lives here and in `sessions.ts`.
 

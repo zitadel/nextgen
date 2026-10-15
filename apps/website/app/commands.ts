@@ -1,8 +1,8 @@
 // The local preview with the published CLI, as the README's quick start runs
 // it and the docs' quickstart without its optional `doctor` (AGENTS.md): a new
-// folder, start, setup for a Next.js app, the app's dev server. The first
-// recorded session of the showcase (showcase/sessions.ts) ran the same, with
-// `doctor` first. The hero shows them; /llms.txt hands them to agents.
+// folder, start, setup for a Next.js app, the app's dev server. The session the
+// showcase was recorded from (showcase/sessions.ts) ran the same, with `doctor`
+// first. The hero shows them; /llms.txt hands them to agents.
 export const commands = [
   "mkdir myapp && cd myapp",
   "npx @zitadel/cli@alpha start",

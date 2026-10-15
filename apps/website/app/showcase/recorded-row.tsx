@@ -3,18 +3,18 @@
 import { useState } from "react";
 import { BrowserFrame } from "./browser-frame";
 import { FileCard } from "./file-card";
+import { FileTree } from "./file-tree";
 import { RowLayout } from "./row-layout";
-import { TerminalReplay } from "./terminal-replay";
 import type { Session } from "./types";
 
 /**
- * A recorded row: the replaying terminal or the changed files beside the
- * result. Whether the picture shows the result is one state: the terminal's
- * replay drives it, and so do the frame's switch and the flow's steps.
+ * A recorded row: what setup wrote, or the changed files, beside the result.
+ * Whether the picture shows the result is one state: the frame's switch drives
+ * it, and the flow's steps follow it.
  */
 export function RecordedRow({ session, index }: { session: Session; index: number }) {
   const [showResult, setShowResult] = useState(true);
-  const { artifact, recording, result } = session;
+  const { artifact, scaffold, result } = session;
 
   return (
     <RowLayout
@@ -25,7 +25,7 @@ export function RecordedRow({ session, index }: { session: Session; index: numbe
         artifact ? (
           <FileCard artifact={artifact} showResult={showResult} />
         ) : (
-          recording && <TerminalReplay recording={recording} onDoneChange={setShowResult} />
+          scaffold && <FileTree scaffold={scaffold} />
         )
       }
       result={
