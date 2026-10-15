@@ -63,6 +63,11 @@ builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
   `["$TURBO_DEFAULT$", "$TURBO_ROOT$/api/openapi/**/*.yaml"]`. The Go tasks
   list the server's inputs in full (`apps/server/turbo.json`); turbo has no
   file groups, so the list is repeated per task.
+- An ignored file a task reads is not a default input either, so the task
+  lists it. The console's build reads its `.env*` files (Vite's `loadEnv`)
+  and lists `["$TURBO_DEFAULT$", ".env*"]`; without them, a changed
+  `.env.local` would restore a build made without it. Moon hashes only what
+  git sees, listed or not ([.moon/AGENTS.md](../../../.moon/AGENTS.md)).
 - Outputs may lie outside the package (`$TURBO_ROOT$/internal/staticui/
   console/dist/**`). Framework caches are excluded (`!.next/cache/**`).
 - `cache: false` for anything that is not a pure function of its inputs: the
@@ -79,6 +84,13 @@ builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
   names variables a task reads at run time without affecting its output
   (`NEXTGEN_*` for the e2e lanes, `DOCKER_*` for the database lanes). The Go
   cache locations pass through globally.
+- A dev server or preview that reads a variable the task does not list never
+  sees it and quietly runs with its default. The console's `dev`, `dev:real`,
+  `dev:claim` and `preview` pass `CONSOLE_*` through; without that, the dev
+  proxy went to `:8080` whatever the caller's `CONSOLE_BACKEND_URL` said,
+  `dev:real` ignored the `CONSOLE_DEV_*` ports, and the preview served
+  `/ui/console/` while its build dependency, which hashes
+  `CONSOLE_BASE_PATH`, was made for `/console/`.
 - A variable meant for one package does not get a framework prefix
   (`VITE_`, `NEXT_PUBLIC_`): inference hashes a prefixed variable into every
   package of that framework in the run, so its dependencies would get other
@@ -143,8 +155,15 @@ change (the server embeds the console through a task edge). Run the whole
 gate; the cache skips the unchanged tasks. `scripts/ci-mode.mjs` computes the
 task-level affected set for the CI lanes.
 
-Turbo needs a `pnpm` binary on `PATH` (`corepack enable`). In a git worktree
-turbo's cache defaults to the main checkout's `.turbo/cache`; set
+Turbo needs a `pnpm` binary on `PATH` (`corepack enable`). A checkout has no
+`turbo` on `PATH`: install it globally (`npm install --global turbo`), which
+hands over to the workspace's pinned version, or call `node_modules/.bin/turbo`.
+Run through pnpm (`pnpm turbo`, `pnpm exec turbo`, a script such as
+`pnpm check:cloud`), every task prints pnpm's `Unsupported platform` warning
+for each other platform's server package: pnpm sets
+`pnpm_config_verify_deps_before_run` for what it starts, each task's own
+`pnpm run` inherits it, and the cache keeps those lines in the task's log. In a
+git worktree turbo's cache defaults to the main checkout's `.turbo/cache`; set
 `TURBO_CACHE_DIR` to keep worktrees apart. Telemetry is off in CI and on
 Vercel (`TURBO_TELEMETRY_DISABLED=1`); set it locally too.
 
