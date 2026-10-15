@@ -1,5 +1,7 @@
 import { setTimeout as sleep } from "node:timers/promises";
 
+import { DEFAULT_LOCAL_SERVER_PORT } from "../runtime";
+
 /**
  * What the lifecycle needs to know about a running server, whatever started it.
  * Which process or container it is stays in the launcher's own record type.
@@ -65,7 +67,6 @@ export type LifecycleDeps<R extends ServerRecord> = Readonly<{
   health: HealthProbe;
 }>;
 
-export const FIRST_LOCAL_SERVER_PORT = 8080;
 const PORT_SEARCH_RANGE = 100;
 const PORT_RACE_RETRIES = 3;
 
@@ -275,7 +276,7 @@ export class Lifecycle<R extends ServerRecord> {
 export async function chooseFreePort(
   ports: PortProbe,
   preferred?: number,
-  firstPort: number = FIRST_LOCAL_SERVER_PORT,
+  firstPort: number = DEFAULT_LOCAL_SERVER_PORT,
 ): Promise<number> {
   const first = preferred ?? firstPort;
   for (let port = first; port < first + PORT_SEARCH_RANGE; port++) {
