@@ -760,6 +760,130 @@ function resolveUserSchema(projectId: string, ref: unknown): SchemaRecord | unde
     .sort(compareNewestFirst)[0];
 }
 
+// --- origins -----------------------------------------------------------
+// Origin patterns are project state (#1582). The Go handler is an
+// unimplemented stub for now, so this mock is where the add-time rules live:
+// a `primary` pattern is an exact URL, a `preview` pattern may carry a `*`
+// (one or more characters, none a dot), and a `*` on a shared host needs a
+// literal label the tenant owns. A host the server has no rule for is stored
+// as written. Kept in one block so parallel PRs do not collide.
+
+/** A host anyone can mint names under, and the shape a tenant-unique label takes there. */
+const SHARED_ORIGIN_HOSTS: readonly { suffix: string; bounded: (left: string) => boolean }[] = [
+  // <project>-git-<branch>-<team>.vercel.app: the team slug ends the label.
+  { suffix: ".vercel.app", bounded: (left) => /^\*-[^*]+$/.test(left) },
+  // deploy-preview-<n>--<site>.netlify.app: the site name ends the label.
+  { suffix: ".netlify.app", bounded: (left) => /^\*--[^*]+$/.test(left) },
+  // <hash>.<project>.pages.dev: the project is its own dotted label.
+  { suffix: ".pages.dev", bounded: dottedOriginLabel },
+  // <version>-<worker>.<account>.workers.dev: the account is its own dotted label.
+  { suffix: ".workers.dev", bounded: dottedOriginLabel },
+];
+
+/** Accepts `*.<label>` where the label carries no wildcard of its own. */
+function dottedOriginLabel(left: string): boolean {
+  const rest = left.startsWith("*.") ? left.slice(2) : undefined;
+  return rest !== undefined && rest.length > 0 && !rest.includes("*");
+}
+
+/**
+ * Lowercase and validate an origin or an origin pattern: `scheme://host[:port]`
+ * with no path, query, fragment or credentials. A `*` is accepted anywhere in
+ * the host, which is what makes this usable for patterns too. Returns the
+ * normalised form, or null when it is malformed.
+ */
+function normalizeOrigin(raw: string): string | null {
+  const origin = raw.trim().toLowerCase();
+  const sep = origin.indexOf("://");
+  if (sep < 0) {
+    return null;
+  }
+  const scheme = origin.slice(0, sep);
+  const host = origin.slice(sep + 3);
+  if ((scheme !== "http" && scheme !== "https") || host === "" || /[/?#@ \t]/.test(host)) {
+    return null;
+  }
+  const hostname = host.replace(/:\d+$/, "");
+  // A port is digits only: what is left of the host may hold a colon only as
+  // an IPv6 literal in brackets, so `host:*` or `host:abc` is refused rather
+  // than stored with a "port" the shared-host check would never see past.
+  const ipv6 = hostname.startsWith("[") && hostname.endsWith("]");
+  if (
+    (!ipv6 && hostname.includes(":")) ||
+    hostname === "" ||
+    hostname.startsWith(".") ||
+    hostname.endsWith(".") ||
+    hostname.includes("..")
+  ) {
+    return null;
+  }
+  return origin;
+}
+
+/**
+ * Whether a wildcard pattern sits on a shared host the server knows with no
+ * tenant-unique label beside the wildcard. A host with no rule returns false:
+ * it is stored as written.
+ */
+function originUnbounded(pattern: string): boolean {
+  const host = pattern.slice(pattern.indexOf("://") + 3).replace(/:\d+$/, "");
+  for (const shared of SHARED_ORIGIN_HOSTS) {
+    if (host.endsWith(shared.suffix)) {
+      return !shared.bounded(host.slice(0, host.length - shared.suffix.length));
+    }
+  }
+  return false;
+}
+
+/**
+ * The project the write addresses, once the bearer is checked. Add and remove
+ * carry no session fallback (#1582): the project secret is the only credential
+ * that widens or narrows the list, so a preview-deploy token is refused with
+ * `proj.permission_denied` and an unknown token with `auth.unauthorized`.
+ */
+function authorizeProjectWrite(
+  request: Request,
+  projectId: string,
+): { ok: true; project: ProjectRecord } | { ok: false; response: HttpResponse<ErrorBody> } {
+  const project = store.projects.get(projectId);
+  if (!project) {
+    return {
+      ok: false,
+      response: HttpResponse.json(errorBody("proj.not_found", "project not found"), {
+        status: 404,
+      }),
+    };
+  }
+  // A request that presents no credential at all is let through, as every
+  // other project handler here lets one through: the conformance suite drives
+  // them bare. A credential that is presented is checked.
+  if (request.headers.get("authorization") === null) {
+    return { ok: true, project };
+  }
+  const token = bearerToken(request);
+  if (token === project.projectSecret) {
+    return { ok: true, project };
+  }
+  if (token === project.previewSecret) {
+    return {
+      ok: false,
+      response: HttpResponse.json(
+        errorBody(
+          "proj.permission_denied",
+          "the project management API requires the project secret",
+        ),
+        { status: 403 },
+      ),
+    };
+  }
+  return {
+    ok: false,
+    response: HttpResponse.json(errorBody("auth.unauthorized", "missing or invalid credentials"), {
+      status: 401,
+    }),
+  };
+}
+
 export function setupPlatformHandlers() {
   return [
     http.post("*/projects", async ({ request }) => {
@@ -822,8 +946,9 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(out.data);
     }),
 
-    // POST /projects/:project_id/origins/remove — drop one pattern. Missing
-    // project is 404; removing an already-absent pattern is idempotent 204.
+    // POST /projects/:project_id/origins/remove — drop one pattern. Removing an
+    // already-absent pattern is idempotent 204. The project secret is the only
+    // credential that narrows the list (#1582).
     http.post("*/projects/:project_id/origins/remove", async ({ params, request }) => {
       const path = parse(RemoveOriginParams, params, "invalid_request");
       if (!path.ok) {
@@ -837,25 +962,31 @@ export function setupPlatformHandlers() {
       if (!body.ok) {
         return body.response;
       }
-
-      const project = store.projects.get(path.data.project_id);
-      if (!project) {
-        return HttpResponse.json(errorBody("origin.not_found", "origin: not found"), {
-          status: 404,
-        });
+      const auth = authorizeProjectWrite(request, path.data.project_id);
+      if (!auth.ok) {
+        return auth.response;
       }
 
-      const next = project.origins.filter((o) => o.pattern !== body.data.pattern);
-      if (next.length !== project.origins.length) {
-        project.origins = next;
-        project.updatedAt = nowIso();
+      // Stored patterns keep their submitted casing, so match case-insensitively
+      // through `normalizeOrigin`; otherwise a mixed-case `https://App.Acme.com`
+      // could never be removed. A malformed pattern cannot match a stored one.
+      const normalized =
+        normalizeOrigin(body.data.pattern) ?? body.data.pattern.trim().toLowerCase();
+      const next = auth.project.origins.filter(
+        (origin) =>
+          (normalizeOrigin(origin.pattern) ?? origin.pattern.trim().toLowerCase()) !== normalized,
+      );
+      if (next.length !== auth.project.origins.length) {
+        auth.project.origins = next;
+        auth.project.updatedAt = nowIso();
       }
       return new HttpResponse(null, { status: 204 });
     }),
 
     // POST /projects/:project_id/origins — add one {pattern, kind}. Same
     // pattern+kind is idempotent 201; same pattern with a different kind is
-    // origin.kind_conflict. No check/warning field on the response.
+    // origin.kind_conflict. The validation stands in for the server rules
+    // (#1582); the project secret is the only credential that widens the list.
     http.post("*/projects/:project_id/origins", async ({ params, request }) => {
       const path = parse(AddOriginParams, params, "invalid_request");
       if (!path.ok) {
@@ -869,15 +1000,41 @@ export function setupPlatformHandlers() {
       if (!body.ok) {
         return body.response;
       }
-
-      const project = store.projects.get(path.data.project_id);
-      if (!project) {
-        return HttpResponse.json(errorBody("origin.not_found", "origin: not found"), {
-          status: 404,
-        });
+      const auth = authorizeProjectWrite(request, path.data.project_id);
+      if (!auth.ok) {
+        return auth.response;
       }
 
-      const existing = project.origins.find((o) => o.pattern === body.data.pattern);
+      const normalized = normalizeOrigin(body.data.pattern);
+      if (normalized === null) {
+        return HttpResponse.json(
+          errorBody("origin.invalid", "origin: must be scheme://host[:port] with no path"),
+          { status: 400 },
+        );
+      }
+      const hasStar = normalized.includes("*");
+      if (body.data.kind === "primary" && hasStar) {
+        return HttpResponse.json(
+          errorBody("origin.primary_not_exact", "a primary origin is an exact URL, no wildcard"),
+          { status: 400 },
+        );
+      }
+      if (hasStar && originUnbounded(normalized)) {
+        return HttpResponse.json(
+          errorBody(
+            "origin.unbounded",
+            "origin: a wildcard on a shared host needs a literal label of your own beside the host",
+          ),
+          { status: 400 },
+        );
+      }
+
+      // One row per `(project, pattern)`, folding case: a host that differs only
+      // in case is the same origin. The stored and echoed value keeps the casing
+      // submitted, which validation and the shared-host checks fold away.
+      const existing = auth.project.origins.find(
+        (origin) => normalizeOrigin(origin.pattern) === normalized,
+      );
       if (existing && existing.kind !== body.data.kind) {
         return HttpResponse.json(
           errorBody(
@@ -887,18 +1044,16 @@ export function setupPlatformHandlers() {
           { status: 409 },
         );
       }
-
-      const origin: CreateProject201OriginsItem = {
-        pattern: body.data.pattern,
+      const origin: CreateProject201OriginsItem = existing ?? {
+        pattern: body.data.pattern.trim(),
         kind: body.data.kind,
       };
       if (!existing) {
-        project.origins = [...project.origins, origin];
-        project.updatedAt = nowIso();
+        auth.project.origins = [...auth.project.origins, origin];
+        auth.project.updatedAt = nowIso();
       }
 
-      const responseBody: AddOrigin201 = existing ?? origin;
-      const out = parse(AddOriginResponse, responseBody, "mock_response_invalid");
+      const out = parse(AddOriginResponse, origin satisfies AddOrigin201, "mock_response_invalid");
       if (!out.ok) {
         return out.response;
       }

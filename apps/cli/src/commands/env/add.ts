@@ -218,6 +218,13 @@ export default class EnvAdd extends BaseCommand {
     // would send the user to a value that is not there — point them at the
     // project's own secret instead.
     const writtenKeys = new Set(Object.keys(values));
+    // The new environment, by name and directory: this run's own selection is
+    // not it.
+    const newEnvironment = environmentSelectorSuffix({
+      envName: name,
+      ...(typeof flags.cwd === "string" ? { cwd: flags.cwd } : {}),
+    });
+    const { cliVersion } = this.meta;
     const render = (variables: PlatformVariable[]): string[] =>
       variables.map((variable) =>
         variable.secret
@@ -237,22 +244,40 @@ export default class EnvAdd extends BaseCommand {
         project_id: projectId,
         keys: Object.keys(values),
         platform,
-        // The new environment, by name: this run's own selection is not it.
+        // A freshly bound project admits every origin until the first pattern
+        // closes it, so the first step is to add one and restrict the project —
+        // `origin add` — before anything ships. `next_commands` is machine-
+        // readable, so the entry is included only when it is actually runnable:
+        // a concrete origin (without `--app-url` it would be a `<your-app-url>`
+        // placeholder the shell reads as redirection) and a project secret in
+        // the file for it to authenticate with (a `--project` bind with no
+        // secret cannot). The human-facing line below still spells it out.
+        // Both target the new environment by name: this run's own selection is
+        // not it.
         ...nextCommandsData([
-          projectCommand(
-            "env",
-            environmentSelectorSuffix({
-              envName: name,
-              ...(typeof flags.cwd === "string" ? { cwd: flags.cwd } : {}),
-            }),
-            this.meta.cliVersion,
-          ),
+          ...(issuer !== undefined && writtenKeys.has("ZITADEL_PROJECT_SECRET")
+            ? // shellArg quotes the origin: an IPv6 issuer like http://[::1]:3000
+              // carries brackets a shell such as zsh would treat as a glob.
+              [
+                projectCommand(
+                  `origin add ${shellArg(issuer)} --kind primary`,
+                  newEnvironment,
+                  cliVersion,
+                ),
+              ]
+            : []),
+          projectCommand("env", newEnvironment, cliVersion),
         ]),
       },
       pretty: [
         `Wrote ${file} with ${Object.keys(values).join(", ")}`,
         "",
-        `Check what resolves: zitadel env --env ${shellArg(name)}${typeof flags.cwd === "string" ? ` --cwd ${shellArg(flags.cwd)}` : ""}`,
+        // Quoted like the machine command, and only offered when it can run:
+        // without the project secret in the file it would fail to authenticate.
+        writtenKeys.has("ZITADEL_PROJECT_SECRET")
+          ? `Allow this project's origin: zitadel origin add ${issuer === undefined ? "<your-app-url>" : shellArg(issuer)} --kind primary${newEnvironment}`
+          : `Allow this project's origin once ZITADEL_PROJECT_SECRET is in ${file}: zitadel origin add ${issuer === undefined ? "<your-app-url>" : shellArg(issuer)} --kind primary${newEnvironment}`,
+        `Check what resolves: zitadel env${newEnvironment}`,
         "",
         "The deployed app never reads that file. Set these where it is built and run.",
         "",
