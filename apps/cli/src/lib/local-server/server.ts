@@ -65,6 +65,7 @@ export type LocalServerDeps<R extends ServerRecord> = Readonly<{
 
 export const FIRST_LOCAL_SERVER_PORT = 8080;
 const PORT_SEARCH_RANGE = 100;
+const PORT_RACE_RETRIES = 3;
 
 export class NoFreePortError extends Error {
   readonly firstPort: number;
@@ -167,11 +168,31 @@ export class LocalServer<R extends ServerRecord> {
     if (requested !== undefined) {
       await this.assertFree(requested);
     }
-    const port = requested ?? (await this.choosePort(previous?.port));
-    const record = await this.deps.launcher.launch({ port, serverUrl: serverUrlFor(port) });
-    await this.waitUntilReady(record);
-    await this.deps.store.write(record);
-    return { record, alreadyRunning: false };
+    let preferred = previous?.port;
+    for (let attempt = 0; ; attempt++) {
+      const port = requested ?? (await this.choosePort(preferred));
+      const record = await this.deps.launcher.launch({ port, serverUrl: serverUrlFor(port) });
+      try {
+        await this.waitUntilReady(record);
+      } catch (error) {
+        // Two directories that choose the same free port at the same moment: the
+        // loser exits because the winner holds the port now. It tries the next
+        // one. A server that exits with its port still free crashed, and says so.
+        if (
+          requested === undefined &&
+          attempt < PORT_RACE_RETRIES &&
+          error instanceof ServerStartError &&
+          error.reason === "exited" &&
+          !(await this.deps.ports.isFree(port))
+        ) {
+          preferred = port + 1;
+          continue;
+        }
+        throw error;
+      }
+      await this.deps.store.write(record);
+      return { record, alreadyRunning: false };
+    }
   }
 
   /** Stops the recorded server. `not-running` when nothing was recorded or nothing was left. */

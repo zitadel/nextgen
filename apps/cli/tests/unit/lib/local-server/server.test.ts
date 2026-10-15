@@ -245,6 +245,45 @@ describe("LocalServer", () => {
       expect(world.record).toBeUndefined();
     });
 
+    it("takes the next port when another start won the same port at the same moment", async () => {
+      const world = new World();
+      world.onLaunch = (record, w) => {
+        if (record.port === 8080) {
+          w.takenPorts.add(8080);
+          return;
+        }
+        w.alive.add(record.pid);
+        w.healthy.add(record.server_url);
+      };
+
+      const { record } = await world.server().start();
+
+      expect(world.launched).toEqual([8080, 8081]);
+      expect(record.port).toBe(8081);
+    });
+
+    it("does not retry a server that exited while its port was still free", async () => {
+      const world = new World();
+      world.onLaunch = () => undefined;
+
+      await expect(world.server().start()).rejects.toMatchObject({ reason: "exited" });
+
+      expect(world.launched).toEqual([8080]);
+    });
+
+    it("does not move to another port when one was asked for and lost", async () => {
+      const world = new World();
+      world.onLaunch = (record, w) => {
+        w.takenPorts.add(record.port);
+      };
+
+      await expect(world.server({ port: 9000 }).start()).rejects.toMatchObject({
+        reason: "exited",
+      });
+
+      expect(world.launched).toEqual([9000]);
+    });
+
     it("fails with a timeout when the process lives but never answers", async () => {
       const world = new World();
       world.onLaunch = (record, w) => w.alive.add(record.pid);
