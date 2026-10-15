@@ -89,6 +89,8 @@ var payloadByEventType = map[string]string{
 	"variable.set":     "variable-set-payload.yaml",
 	"variable.removed": "variable-removed-payload.yaml",
 
+	"preview.removed": "preview-payload.yaml",
+
 	"authz.granted": "authz-granted-payload.yaml",
 	"authz.revoked": "authz-granted-payload.yaml",
 
@@ -192,6 +194,8 @@ var webhookByEventType = map[string]webhookDoc{
 	"variable.set": {description: "A variable was given a value, new or replacing one. One event per kind " +
 		"written; the value never appears."},
 	"variable.removed": {description: "A variable's value was removed. One event per kind removed."},
+
+	"preview.removed": {description: "A preview was removed before its expiry."},
 
 	"authz.granted": {description: "A role on a project was granted."},
 	"authz.revoked": {description: "A role on a project was revoked."},
