@@ -90,7 +90,7 @@ function FlowDefinitionDetail() {
           </div>
 
           {/* The design draws a third value, `EXPIRES AT`; nothing backs it. */}
-          <MetaCard>
+          <MetaCard bordered={false}>
             <MetaValue label="Flow ID" value={definitionId} copyable />
             <MetaRule />
             <MetaValue label="Created" value={formatDate(createdAt)} />
