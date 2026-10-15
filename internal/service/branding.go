@@ -92,6 +92,44 @@ func (s *BrandingService) createBranding(ctx context.Context, stmts AllStatement
 	})
 }
 
+// resolveOrCreateBranding reuses the project's newest branding when content
+// matches, otherwise inserts the prepared revision.
+func (s *BrandingService) resolveOrCreateBranding(
+	ctx context.Context,
+	stmts AllStatements,
+	projectID string,
+	prepared *domain.Branding,
+) (*domain.Branding, error) {
+	latest, err := latestBranding(ctx, stmts, projectID)
+	if err != nil {
+		return nil, err
+	}
+	if latest != nil {
+		same, eqErr := domain.BrandingsEqual(prepared, latest)
+		if eqErr != nil {
+			return nil, domain.ErrInternal(eqErr).WithMessage("failed to compare branding documents")
+		}
+		if same {
+			return latest, nil
+		}
+	}
+	if err := s.createBranding(ctx, stmts, prepared); err != nil {
+		return nil, err
+	}
+	return prepared, nil
+}
+
+func latestBranding(ctx context.Context, stmts AllStatements, projectID string) (*domain.Branding, error) {
+	result, err := stmts.ListBrandings(WithAuthzListUnrestricted(ctx), branding.ListOptions(projectID, 1))
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to list branding")
+	}
+	if len(result.Items) == 0 {
+		return nil, nil
+	}
+	return result.Items[0], nil
+}
+
 // Get returns a single revision by id.
 func (s *BrandingService) Get(ctx context.Context, projectID, id string) (*domain.Branding, error) {
 	entity, err := s.v2Pool.Statements().GetBrandingByID(ctx, projectID, id)

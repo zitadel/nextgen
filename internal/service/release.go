@@ -62,32 +62,22 @@ type releaseService struct {
 	idps     *idpConnectionService
 }
 
-// NewReleaseService wires Build's kind writers. flows and idps must be the
-// concretes returned by NewFlowDefinitionService and NewIDPConnectionService
-// so Build can call their package-private AllStatements methods.
+// NewReleaseService wires Build's kind writers. flows and idps are the
+// concretes from NewFlowDefinitionService and NewIDPConnectionService.
 func NewReleaseService(
 	v2Pool *DB,
 	schemas *SchemaService,
-	flows FlowDefinitionService,
+	flows *flowDefinitionService,
 	branding *BrandingService,
-	idps IDPConnectionService,
+	idps *idpConnectionService,
 ) ReleaseService {
-	rs := &releaseService{v2Pool: v2Pool, schemas: schemas, branding: branding}
-	if flows != nil {
-		fs, ok := flows.(*flowDefinitionService)
-		if !ok {
-			panic(fmt.Sprintf("NewReleaseService: flows must be NewFlowDefinitionService, got %T", flows))
-		}
-		rs.flows = fs
+	return &releaseService{
+		v2Pool:   v2Pool,
+		schemas:  schemas,
+		flows:    flows,
+		branding: branding,
+		idps:     idps,
 	}
-	if idps != nil {
-		is, ok := idps.(*idpConnectionService)
-		if !ok {
-			panic(fmt.Sprintf("NewReleaseService: idps must be NewIDPConnectionService, got %T", idps))
-		}
-		rs.idps = is
-	}
-	return rs
 }
 
 // Create assembles a release from revisions that already exist.
@@ -103,14 +93,9 @@ func (s *releaseService) Create(ctx context.Context, input CreateReleaseInput) (
 		return nil, err
 	}
 
-	actor, _ := audit.ActorFromContext(ctx)
-	entity, err := domain.NewRelease(input.ProjectID, content.Pointers(), domain.ReleaseMetadata{
-		Message:       input.Message,
-		GitSHA:        input.GitSHA,
-		GitDirty:      input.GitDirty,
-		CreatedBy:     actor.ActorID,
-		CreatedByType: actor.ActorType,
-	})
+	// NewRelease first: it rejects duplicate handles before ValidateRelease
+	// walks documents that may be incomplete for that case.
+	entity, err := s.newReleaseEntity(ctx, input.ProjectID, content, releaseMetadataFromCreate(input))
 	if err != nil {
 		return nil, err
 	}
@@ -130,36 +115,13 @@ func (s *releaseService) Create(ctx context.Context, input CreateReleaseInput) (
 	}
 
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		if err := tx.Statements().CreateRelease(ctx, entity); err != nil {
-			return err
-		}
-		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
-			Type:       domain.EventTypeReleaseCreated,
-			Category:   domain.EventCategoryAdmin,
-			ProjectID:  entity.ProjectID,
-			EntityType: "release",
-			EntityID:   entity.ID,
-			Payload:    domain.ReleasePayloadSnapshot(entity),
-		})
+		return insertRelease(ctx, tx.Statements(), entity)
 	})
 	if err != nil {
-		// Two callers pinned the same set at once and this one lost the race.
-		// The winner's release is the answer: the loser asked for a release
-		// pinning exactly that set, and one now exists.
-		if _, ok := errors.AsType[*database.UniqueError](err); ok {
-			raced, hashErr := s.getByContentHash(ctx, input.ProjectID, entity.ContentHash)
-			if hashErr != nil {
-				return nil, hashErr
-			}
-			if raced != nil {
-				return &CreateReleaseOutput{Release: raced}, nil
-			}
-		}
-		// project_id is the only foreign key on releases, and every pinned
-		// revision was read from this project a moment ago, so a violation
-		// means the project was deleted underneath the call.
-		if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
-			return nil, domain.ErrReleaseProjectNotFound().WithParent(err)
+		if out, mapped, mapErr := s.mapReleasePersistError(ctx, input.ProjectID, entity.ContentHash, err); mapErr != nil {
+			return nil, mapErr
+		} else if mapped {
+			return out, nil
 		}
 		if de, ok := errors.AsType[domain.Error](err); ok {
 			return nil, de
@@ -168,6 +130,83 @@ func (s *releaseService) Create(ctx context.Context, input CreateReleaseInput) (
 	}
 
 	return &CreateReleaseOutput{Release: entity, Created: true}, nil
+}
+
+func releaseMetadataFromCreate(input CreateReleaseInput) domain.ReleaseMetadata {
+	return domain.ReleaseMetadata{
+		Message:  input.Message,
+		GitSHA:   input.GitSHA,
+		GitDirty: input.GitDirty,
+	}
+}
+
+func (s *releaseService) newReleaseEntity(
+	ctx context.Context,
+	projectID string,
+	content domain.ReleaseContent,
+	meta domain.ReleaseMetadata,
+) (*domain.Release, error) {
+	actor, _ := audit.ActorFromContext(ctx)
+	meta.CreatedBy = actor.ActorID
+	meta.CreatedByType = actor.ActorType
+	return domain.NewRelease(projectID, content.Pointers(), meta)
+}
+
+func insertRelease(ctx context.Context, stmts AllStatements, entity *domain.Release) error {
+	if err := stmts.CreateRelease(ctx, entity); err != nil {
+		return err
+	}
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeReleaseCreated,
+		Category:   domain.EventCategoryAdmin,
+		ProjectID:  entity.ProjectID,
+		EntityType: "release",
+		EntityID:   entity.ID,
+		Payload:    domain.ReleasePayloadSnapshot(entity),
+	})
+}
+
+// finalizeReleaseOn looks up entity by content hash on stmts and inserts when
+// absent. Used inside Build's transaction so the hash check sees the same
+// snapshot as the resource writes.
+func finalizeReleaseOn(
+	ctx context.Context,
+	stmts AllStatements,
+	entity *domain.Release,
+) (*CreateReleaseOutput, error) {
+	existing, err := stmts.GetReleaseByContentHash(ctx, entity.ProjectID, entity.ContentHash)
+	if err == nil {
+		return &CreateReleaseOutput{Release: existing}, nil
+	}
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
+		return nil, domain.ErrInternal(err).WithMessage("failed to look up release by content hash")
+	}
+	if err := insertRelease(ctx, stmts, entity); err != nil {
+		return nil, err
+	}
+	return &CreateReleaseOutput{Release: entity, Created: true}, nil
+}
+
+// mapReleasePersistError recovers a concurrent content-hash winner or a
+// missing project. mapped is true when out is the answer for that race/FK.
+func (s *releaseService) mapReleasePersistError(
+	ctx context.Context,
+	projectID, contentHash string,
+	err error,
+) (out *CreateReleaseOutput, mapped bool, mapErr error) {
+	if _, ok := errors.AsType[*database.UniqueError](err); ok && contentHash != "" {
+		raced, hashErr := s.getByContentHash(ctx, projectID, contentHash)
+		if hashErr != nil {
+			return nil, false, hashErr
+		}
+		if raced != nil {
+			return &CreateReleaseOutput{Release: raced}, true, nil
+		}
+	}
+	if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
+		return nil, false, domain.ErrReleaseProjectNotFound().WithParent(err)
+	}
+	return nil, false, nil
 }
 
 func (s *releaseService) Get(ctx context.Context, projectID, id string) (*domain.Release, error) {

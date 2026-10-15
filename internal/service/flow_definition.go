@@ -46,7 +46,7 @@ func NewFlowDefinitionService(
 	v2Pool *DB,
 	schemaProvider BuiltinSchemaProvider,
 	flowDefinitionValidatorFn flowDefinitionValidatorFunc,
-) FlowDefinitionService {
+) *flowDefinitionService {
 	if flowDefinitionValidatorFn == nil {
 		flowDefinitionValidatorFn = domain.ValidateFlowDefinition
 	}
@@ -58,7 +58,15 @@ func NewFlowDefinitionService(
 }
 
 func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionRequest) (*domain.FlowDefinition, error) {
-	flowDefinition, err := fd.prepareFlowDefinition(ctx, fd.v2Pool.Statements(), req, nil)
+	stmts := fd.v2Pool.Statements()
+	userSchema, err := resolveUserSchema(ctx, stmts, req.ProjectID, req.UserSchema)
+	if err != nil {
+		if errors.Is(err, domain.ErrJSONSchemaNotFound()) {
+			return nil, domain.ErrFlowDefinitionInvalid(fmt.Sprintf("user schema %q not found", req.UserSchema), err)
+		}
+		return nil, domain.ErrSchemaFetchFailed("failed to fetch user schema", err)
+	}
+	flowDefinition, err := fd.prepareFlowDefinition(ctx, stmts, req, userSchema)
 	if err != nil {
 		return nil, err
 	}
@@ -79,13 +87,12 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionR
 }
 
 // prepareFlowDefinition validates and builds a flow definition without writing.
-// bundleSchemas, when non-nil, resolves user_schema handles from that map
-// before falling back to stmts (used by ReleaseService.Build).
+// userSchema is the schema the flow operates on — callers resolve the handle.
 func (fd *flowDefinitionService) prepareFlowDefinition(
 	ctx context.Context,
 	stmts AllStatements,
 	req FlowDefinitionRequest,
-	bundleSchemas map[string]*domain.JSONSchema,
+	userSchema *domain.JSONSchema,
 ) (*domain.FlowDefinition, error) {
 	purposes, err := mapPurposesToDomain(req.Purposes)
 	if err != nil {
@@ -94,13 +101,6 @@ func (fd *flowDefinitionService) prepareFlowDefinition(
 	status, err := domain.FlowDefinitionStatusString(req.Status)
 	if err != nil {
 		return nil, domain.ErrFlowDefinitionInvalid(fmt.Sprintf("invalid status: %q", req.Status), err)
-	}
-	userSchema, err := resolveUserSchemaForBuild(ctx, stmts, req.ProjectID, req.UserSchema, bundleSchemas)
-	if err != nil {
-		if errors.Is(err, domain.ErrJSONSchemaNotFound()) {
-			return nil, domain.ErrFlowDefinitionInvalid(fmt.Sprintf("user schema %q not found", req.UserSchema), err)
-		}
-		return nil, domain.ErrSchemaFetchFailed("failed to fetch user schema", err)
 	}
 	if userSchema.ObjectType == nil || *userSchema.ObjectType == "" {
 		return nil, domain.ErrFlowDefinitionInvalid(fmt.Sprintf("user schema %q declares no objectType", req.UserSchema), nil)
@@ -140,6 +140,50 @@ func (fd *flowDefinitionService) createFlowDefinition(ctx context.Context, stmts
 	})
 }
 
+// resolveOrCreateFlow reuses the project's newest revision of the flow name
+// when content matches, otherwise inserts the prepared definition.
+func (fd *flowDefinitionService) resolveOrCreateFlow(
+	ctx context.Context,
+	stmts AllStatements,
+	projectID string,
+	definition *domain.FlowDefinition,
+) (*domain.FlowDefinition, error) {
+	latest, err := latestFlowByName(ctx, stmts, projectID, definition.Name)
+	if err != nil {
+		return nil, err
+	}
+	if latest != nil {
+		same, eqErr := domain.FlowDefinitionsEqual(definition, latest)
+		if eqErr != nil {
+			return nil, domain.ErrInternal(eqErr).WithMessage("failed to compare flow definitions")
+		}
+		if same {
+			return latest, nil
+		}
+	}
+	if err := fd.createFlowDefinition(ctx, stmts, definition); err != nil {
+		return nil, err
+	}
+	return definition, nil
+}
+
+func latestFlowByName(ctx context.Context, stmts AllStatements, projectID, name string) (*domain.FlowDefinition, error) {
+	result, err := stmts.ListFlowDefinitions(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.FlowDefinitionField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
+			database.Equal(database.Col(domain.FlowDefinitionFieldName), name),
+		),
+		Pagination: database.Page[domain.FlowDefinitionField]{Limit: 1},
+	}, FlowDefinitionQueryOptions{LatestRevisionPerName: true})
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to list flow definitions")
+	}
+	if len(result.Items) == 0 {
+		return nil, nil
+	}
+	return result.Items[0], nil
+}
+
 func (fd *flowDefinitionService) validate(ctx context.Context, stmts AllStatements, flowDefinition *domain.FlowDefinition, sch *domain.JSONSchema) error {
 	userSchema, err := sch.Document()
 	if err != nil {
@@ -175,21 +219,6 @@ func (fd *flowDefinitionService) validatePivotingTargets(ctx context.Context, st
 		}
 	}
 	return nil
-}
-
-// resolveUserSchemaForBuild resolves a handle from the bundle first, then the project.
-func resolveUserSchemaForBuild(
-	ctx context.Context,
-	stmts AllStatements,
-	projectID, handle string,
-	bundleSchemas map[string]*domain.JSONSchema,
-) (*domain.JSONSchema, error) {
-	if bundleSchemas != nil {
-		if schema, ok := bundleSchemas[handle]; ok {
-			return schema, nil
-		}
-	}
-	return resolveUserSchema(ctx, stmts, projectID, handle)
 }
 
 func mapPurposesToDomain(reqPurposes map[string]string) (map[domain.FlowDefinitionPurpose]string, error) {

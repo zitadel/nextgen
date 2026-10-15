@@ -7,9 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/branding"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -47,6 +45,16 @@ type BuildReleaseInput struct {
 	GitDirty        bool
 }
 
+type preparedIDP struct {
+	slug     string
+	document []byte
+}
+
+type preparedSchema struct {
+	model *domain.JSONSchema // nil for schema-url until resolved/created
+	url   string
+}
+
 // Build turns a configuration bundle into a release in one transaction:
 // unchanged resources reuse their newest revision, changed ones allocate, and
 // the release is created or the existing content-hash match is returned.
@@ -80,28 +88,31 @@ func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (*C
 		content := domain.ReleaseContent{}
 
 		for i, prepared := range preparedSchemas {
-			schema, err := s.resolveOrCreateSchema(ctx, stmts, input.ProjectID, input.Schemas[i], prepared)
+			schema, err := s.schemas.resolveOrCreateSchema(
+				ctx, stmts, input.ProjectID,
+				input.Schemas[i].Document, prepared.model, prepared.url,
+			)
 			if err != nil {
 				return err
 			}
 			content.Schemas = append(content.Schemas, schema)
 		}
 		for _, flow := range preparedFlows {
-			definition, err := s.resolveOrCreateFlow(ctx, stmts, input.ProjectID, flow)
+			definition, err := s.flows.resolveOrCreateFlow(ctx, stmts, input.ProjectID, flow)
 			if err != nil {
 				return err
 			}
 			content.FlowDefinitions = append(content.FlowDefinitions, definition)
 		}
-		for _, doc := range preparedIDPs {
-			connection, err := s.idps.createOrRevise(ctx, stmts, input.ProjectID, doc)
+		for _, idp := range preparedIDPs {
+			connection, err := s.idps.createOrRevise(ctx, stmts, input.ProjectID, idp.slug, idp.document)
 			if err != nil {
 				return err
 			}
 			content.IDPConnections = append(content.IDPConnections, connection.Connection)
 		}
 		if preparedBranding != nil {
-			brandingEntity, err := s.resolveOrCreateBranding(ctx, stmts, input.ProjectID, preparedBranding)
+			brandingEntity, err := s.branding.resolveOrCreateBranding(ctx, stmts, input.ProjectID, preparedBranding)
 			if err != nil {
 				return err
 			}
@@ -119,59 +130,26 @@ func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (*C
 			return err
 		}
 
-		actor, _ := audit.ActorFromContext(ctx)
-		entity, err := domain.NewRelease(input.ProjectID, content.Pointers(), domain.ReleaseMetadata{
-			Message:       input.Message,
-			GitSHA:        input.GitSHA,
-			GitDirty:      input.GitDirty,
-			CreatedBy:     actor.ActorID,
-			CreatedByType: actor.ActorType,
+		entity, err := s.newReleaseEntity(ctx, input.ProjectID, content, domain.ReleaseMetadata{
+			Message:  input.Message,
+			GitSHA:   input.GitSHA,
+			GitDirty: input.GitDirty,
 		})
 		if err != nil {
 			return err
 		}
 		contentHash = entity.ContentHash
-
-		existing, err := stmts.GetReleaseByContentHash(ctx, input.ProjectID, entity.ContentHash)
-		if err == nil {
-			out = &CreateReleaseOutput{Release: existing}
-			return nil
-		}
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
-			return domain.ErrInternal(err).WithMessage("failed to look up release by content hash")
-		}
-
-		if err := stmts.CreateRelease(ctx, entity); err != nil {
-			return err
-		}
-		if err := audit.Emit(ctx, stmts, audit.EmitSpec{
-			Type:       domain.EventTypeReleaseCreated,
-			Category:   domain.EventCategoryAdmin,
-			ProjectID:  entity.ProjectID,
-			EntityType: "release",
-			EntityID:   entity.ID,
-			Payload:    domain.ReleasePayloadSnapshot(entity),
-		}); err != nil {
-			return err
-		}
-		out = &CreateReleaseOutput{Release: entity, Created: true}
-		return nil
+		out, err = finalizeReleaseOn(ctx, stmts, entity)
+		return err
 	})
 	if err != nil {
-		if _, ok := errors.AsType[*database.UniqueError](err); ok && contentHash != "" {
-			raced, hashErr := s.getByContentHash(ctx, input.ProjectID, contentHash)
-			if hashErr != nil {
-				return nil, hashErr
-			}
-			if raced != nil {
-				return &CreateReleaseOutput{Release: raced}, nil
-			}
+		if recovered, mapped, mapErr := s.mapReleasePersistError(ctx, input.ProjectID, contentHash, err); mapErr != nil {
+			return nil, mapErr
+		} else if mapped {
+			return recovered, nil
 		}
 		if de, ok := errors.AsType[domain.Error](err); ok {
 			return nil, de
-		}
-		if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
-			return nil, domain.ErrReleaseProjectNotFound().WithParent(err)
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to build release")
 	}
@@ -241,11 +219,6 @@ func (s *releaseService) validateBundleShape(input BuildReleaseInput) error {
 	return nil
 }
 
-type preparedSchema struct {
-	model *domain.JSONSchema // nil for schema-url until resolved/created
-	url   string
-}
-
 func (s *releaseService) prepareBundleSchemas(
 	input BuildReleaseInput,
 	failures *BundleValidationError,
@@ -285,7 +258,17 @@ func (s *releaseService) prepareBundleFlows(
 	for _, flow := range input.FlowDefinitions {
 		req := flow.Request
 		req.ProjectID = input.ProjectID
-		definition, err := s.flows.prepareFlowDefinition(ctx, stmts, req, bundleSchemas)
+		userSchema, err := resolveBundleOrProjectSchema(ctx, stmts, input.ProjectID, req.UserSchema, bundleSchemas)
+		if err != nil {
+			if errors.Is(err, domain.ErrJSONSchemaNotFound()) {
+				err = domain.ErrFlowDefinitionInvalid(fmt.Sprintf("user schema %q not found", req.UserSchema), err)
+			} else if _, ok := errors.AsType[domain.Error](err); !ok {
+				err = domain.ErrSchemaFetchFailed("failed to fetch user schema", err)
+			}
+			failures.add(domain.ReleasePointerKindFlowDefinition, flow.Index, req.Name, err)
+			continue
+		}
+		definition, err := s.flows.prepareFlowDefinition(ctx, stmts, req, userSchema)
 		if err != nil {
 			failures.add(domain.ReleasePointerKindFlowDefinition, flow.Index, req.Name, err)
 			continue
@@ -295,102 +278,29 @@ func (s *releaseService) prepareBundleFlows(
 	return prepared
 }
 
-func (s *releaseService) prepareBundleIDPs(input BuildReleaseInput, failures *BundleValidationError) [][]byte {
-	docs := make([][]byte, 0, len(input.IDPs))
+func resolveBundleOrProjectSchema(
+	ctx context.Context,
+	stmts AllStatements,
+	projectID, handle string,
+	bundleSchemas map[string]*domain.JSONSchema,
+) (*domain.JSONSchema, error) {
+	if schema, ok := bundleSchemas[handle]; ok {
+		return schema, nil
+	}
+	return resolveUserSchema(ctx, stmts, projectID, handle)
+}
+
+func (s *releaseService) prepareBundleIDPs(input BuildReleaseInput, failures *BundleValidationError) []preparedIDP {
+	docs := make([]preparedIDP, 0, len(input.IDPs))
 	for _, idp := range input.IDPs {
 		slug, err := s.idps.validate(idp.Document)
 		if err != nil {
 			failures.add(domain.ReleasePointerKindIDP, idp.Index, slug, err)
 			continue
 		}
-		docs = append(docs, idp.Document)
+		docs = append(docs, preparedIDP{slug: slug, document: idp.Document})
 	}
 	return docs
-}
-
-func (s *releaseService) resolveOrCreateSchema(
-	ctx context.Context,
-	stmts AllStatements,
-	projectID string,
-	entry BuildSchema,
-	prepared preparedSchema,
-) (*domain.JSONSchema, error) {
-	if prepared.url != "" {
-		existing, err := stmts.GetJSONSchemaByID(ctx, projectID, prepared.url)
-		if err == nil {
-			return existing, nil
-		}
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
-			return nil, domain.ErrInternal(err).WithMessage("failed to look up schema by url")
-		}
-		if err := s.schemas.createSchemaByURL(ctx, stmts, projectID, prepared.url); err != nil {
-			return nil, err
-		}
-		return stmts.GetJSONSchemaByID(ctx, projectID, prepared.url)
-	}
-
-	handle := ""
-	if prepared.model.ObjectType != nil {
-		handle = *prepared.model.ObjectType
-	}
-	latest, err := latestSchemaByObjectType(ctx, stmts, projectID, handle)
-	if err != nil {
-		return nil, err
-	}
-	if latest != nil {
-		same, eqErr := domain.JSONEqual(entry.Document, latest.Schema, "$id")
-		if eqErr == nil && same {
-			return latest, nil
-		}
-	}
-	if err := s.schemas.createSchema(ctx, stmts, prepared.model); err != nil {
-		return nil, err
-	}
-	return prepared.model, nil
-}
-
-func (s *releaseService) resolveOrCreateFlow(
-	ctx context.Context,
-	stmts AllStatements,
-	projectID string,
-	definition *domain.FlowDefinition,
-) (*domain.FlowDefinition, error) {
-	latest, err := latestFlowByName(ctx, stmts, projectID, definition.Name)
-	if err != nil {
-		return nil, err
-	}
-	if latest != nil {
-		same, eqErr := flowDefinitionsEqual(definition, latest)
-		if eqErr == nil && same {
-			return latest, nil
-		}
-	}
-	if err := s.flows.createFlowDefinition(ctx, stmts, definition); err != nil {
-		return nil, err
-	}
-	return definition, nil
-}
-
-func (s *releaseService) resolveOrCreateBranding(
-	ctx context.Context,
-	stmts AllStatements,
-	projectID string,
-	prepared *domain.Branding,
-) (*domain.Branding, error) {
-	latest, err := latestBranding(ctx, stmts, projectID)
-	if err != nil {
-		return nil, err
-	}
-	if latest != nil {
-		same, eqErr := brandingEqual(prepared, latest)
-		if eqErr == nil && same {
-			return latest, nil
-		}
-	}
-	if err := s.branding.createBranding(ctx, stmts, prepared); err != nil {
-		return nil, err
-	}
-	return prepared, nil
 }
 
 // autoPinReferences adds project revisions for handles named by the bundle
@@ -464,54 +374,6 @@ func (s *releaseService) autoPinReferences(
 	return nil
 }
 
-func latestSchemaByObjectType(ctx context.Context, stmts AllStatements, projectID, objectType string) (*domain.JSONSchema, error) {
-	if objectType == "" {
-		return nil, nil
-	}
-	result, err := stmts.ListJSONSchemas(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.JSONSchemaField]{
-		Filter: database.And(
-			database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID),
-			database.Equal(database.Col(domain.JSONSchemaFieldObjectType), objectType),
-		),
-		Pagination: database.Page[domain.JSONSchemaField]{Limit: 1},
-	}, JSONSchemaQueryOptions{LatestRevisionPerObjectType: true})
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to list schemas")
-	}
-	if len(result.Items) == 0 {
-		return nil, nil
-	}
-	return result.Items[0], nil
-}
-
-func latestFlowByName(ctx context.Context, stmts AllStatements, projectID, name string) (*domain.FlowDefinition, error) {
-	result, err := stmts.ListFlowDefinitions(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.FlowDefinitionField]{
-		Filter: database.And(
-			database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
-			database.Equal(database.Col(domain.FlowDefinitionFieldName), name),
-		),
-		Pagination: database.Page[domain.FlowDefinitionField]{Limit: 1},
-	}, FlowDefinitionQueryOptions{LatestRevisionPerName: true})
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to list flow definitions")
-	}
-	if len(result.Items) == 0 {
-		return nil, nil
-	}
-	return result.Items[0], nil
-}
-
-func latestBranding(ctx context.Context, stmts AllStatements, projectID string) (*domain.Branding, error) {
-	result, err := stmts.ListBrandings(WithAuthzListUnrestricted(ctx), branding.ListOptions(projectID, 1))
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to list branding")
-	}
-	if len(result.Items) == 0 {
-		return nil, nil
-	}
-	return result.Items[0], nil
-}
-
 func schemaObjectType(document []byte) (string, error) {
 	var doc struct {
 		ObjectType string `json:"objectType"`
@@ -539,55 +401,4 @@ func idpSlug(document []byte) (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(doc.Slug), nil
-}
-
-func flowDefinitionsEqual(a, b *domain.FlowDefinition) (bool, error) {
-	ab, err := json.Marshal(flowDefinitionComparable(a))
-	if err != nil {
-		return false, err
-	}
-	bb, err := json.Marshal(flowDefinitionComparable(b))
-	if err != nil {
-		return false, err
-	}
-	return domain.JSONEqual(ab, bb)
-}
-
-func flowDefinitionComparable(d *domain.FlowDefinition) map[string]any {
-	purposes := map[string]string{}
-	for purpose, step := range d.Purposes {
-		purposes[purpose.String()] = step
-	}
-	return map[string]any{
-		"name":        d.Name,
-		"status":      d.Status.String(),
-		"user_schema": d.UserSchema,
-		"purposes":    purposes,
-		"audience":    d.Audience,
-		"steps":       d.Steps,
-	}
-}
-
-func brandingEqual(a, b *domain.Branding) (bool, error) {
-	ab, err := json.Marshal(brandingComparable(a))
-	if err != nil {
-		return false, err
-	}
-	bb, err := json.Marshal(brandingComparable(b))
-	if err != nil {
-		return false, err
-	}
-	return domain.JSONEqual(ab, bb)
-}
-
-func brandingComparable(b *domain.Branding) map[string]any {
-	return map[string]any{
-		"layout":          b.Layout,
-		"liquid_template": b.LiquidTemplate,
-		"logo_url":        b.LogoURL,
-		"hero_url":        b.HeroURL,
-		"theme":           b.Theme,
-		"typography":      b.Typography,
-		"shape":           b.Shape,
-	}
 }

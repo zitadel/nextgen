@@ -56,7 +56,7 @@ type idpConnectionService struct {
 	schemas BuiltinSchemaProvider
 }
 
-func NewIDPConnectionService(v2Pool *DB, schemas BuiltinSchemaProvider) IDPConnectionService {
+func NewIDPConnectionService(v2Pool *DB, schemas BuiltinSchemaProvider) *idpConnectionService {
 	return &idpConnectionService{v2Pool: v2Pool, schemas: schemas}
 }
 
@@ -92,18 +92,17 @@ func (s *idpConnectionService) CreateOrRevise(ctx context.Context, projectID str
 	return s.revise(ctx, projectID, existing.ID, document)
 }
 
-// createOrRevise validates and writes document on stmts. When equalToCurrent
-// is true and a connection already exists with identical content, the current
-// revision is returned without writing.
-func (s *idpConnectionService) createOrRevise(ctx context.Context, stmts AllStatements, projectID string, document []byte) (*CreateIDPConnectionOutput, error) {
-	slug, err := s.validate(document)
-	if err != nil {
-		return nil, err
-	}
+// createOrRevise writes a validated document on stmts. When a connection with
+// slug already exists and its document matches, that revision is returned
+// without writing. Callers must have validated document already.
+func (s *idpConnectionService) createOrRevise(ctx context.Context, stmts AllStatements, projectID, slug string, document []byte) (*CreateIDPConnectionOutput, error) {
 	existing, err := stmts.GetIDPConnection(ctx, idpConnectionBy(projectID, domain.IDPConnectionFieldSlug, slug))
 	if err == nil {
 		same, eqErr := domain.JSONEqual(existing.Document, document)
-		if eqErr == nil && same {
+		if eqErr != nil {
+			return nil, domain.ErrInternal(eqErr).WithMessage("failed to compare identity provider documents")
+		}
+		if same {
 			return &CreateIDPConnectionOutput{Connection: existing}, nil
 		}
 		if err := stmts.LockIDPConnection(ctx, projectID, existing.ID); err != nil {
