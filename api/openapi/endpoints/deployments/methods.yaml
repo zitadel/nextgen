@@ -283,6 +283,7 @@ get:
   security:
     - oauth2:
         - deployment.read
+    - nextgenSession: []
   responses:
     '200':
       description: The deployments were listed successfully.
