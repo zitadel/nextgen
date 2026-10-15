@@ -108,17 +108,23 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 	t.Run("releases", func(t *testing.T) {
 		t.Parallel()
 		// Releases are built with the secret only; the session reads them.
+		// There is no release delete, so the release lives in a project of
+		// this test's own and goes with it.
+		owned, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+		harness.SeedProjectAdmin(t, owned.ID, claimerID)
+		ownedID := api.ProjectID(owned.ID)
 		secret, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 		require.NoError(t, err)
-		harness.SetProjectSecretOnApiClient(t, secret, console)
-		created := seedRelease(t, secret, console.ID)
+		harness.SetProjectSecretOnApiClient(t, secret, owned)
+		created := seedRelease(t, secret, owned.ID)
 
-		listed, err := session.ListReleases(t.Context(), api.ListReleasesParams{ProjectID: projectID})
+		listed, err := session.ListReleases(t.Context(), api.ListReleasesParams{ProjectID: ownedID})
 		require.NoError(t, err)
 		require.IsType(t, &api.ListReleasesResponse{}, listed, helpers.MustMarshal(t, listed))
 		require.Contains(t, releaseIDs(listed.(*api.ListReleasesResponse).Releases), created.ID)
 
-		got, err := session.GetReleaseById(t.Context(), api.GetReleaseByIdParams{ProjectID: projectID, ReleaseID: created.ID})
+		got, err := session.GetReleaseById(t.Context(), api.GetReleaseByIdParams{ProjectID: ownedID, ReleaseID: created.ID})
 		require.NoError(t, err)
 		require.IsType(t, &api.Release{}, got, helpers.MustMarshal(t, got))
 	})
