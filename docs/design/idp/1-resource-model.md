@@ -69,9 +69,9 @@ block.
 Both were removed: GitHub speaks OAuth 2.0 only, so it is not connectable, and
 with no OAuth 2.0 provider nothing needs a strategy.
 Removing the block is a breaking change ([Forward Compatibility](#forward-compatibility)):
-a storage migration deletes `oauth2` connections stored by earlier alpha
-releases, together with their revisions, identity links, and authz resource
-index rows.
+`oauth2` connections stored by earlier alpha releases are not migrated. The
+engine refuses one at sign-in, and the author recreates it as `oidc` or deletes
+it.
 A provider that needs behaviour beyond the OIDC ceremony returns as an additive
 schema change once it is scoped; Apple's signed secret is listed under
 [Deferred and Cut Fields](#deferred-and-cut-fields).
