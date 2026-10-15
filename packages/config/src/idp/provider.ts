@@ -4,10 +4,10 @@
  * application, and how to compose the connection document.
  *
  * One class per provider, because a provider is not only a table of values.
- * Google is pure data today; GitHub speaks OAuth2 rather than OIDC, has no
- * family-name claim, and needs a second request to read an email at all. A
- * shape that only holds data forces that behaviour somewhere else, where it
- * stops being the provider's business and starts being a branch in shared code.
+ * Google is pure data today; another vendor may not emit a claim, or need a
+ * protocol setting of its own. A shape that only holds data forces that
+ * behaviour somewhere else, where it stops being the provider's business and
+ * starts being a branch in shared code.
  */
 
 import type {

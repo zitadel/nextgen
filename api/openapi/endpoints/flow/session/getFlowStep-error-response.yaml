@@ -24,10 +24,8 @@ content:
         - $ref: '../../../components/schemas/errors/idp-not_found.yaml'
         - $ref: '../../../components/schemas/errors/idp-endpoint_cleartext.yaml'
         - $ref: '../../../components/schemas/errors/idp-endpoints_partial.yaml'
-        - $ref: '../../../components/schemas/errors/idp-oauth2_unsupported.yaml'
         - $ref: '../../../components/schemas/errors/idp-protocol_block_missing.yaml'
         - $ref: '../../../components/schemas/errors/idp-scopes_missing_openid.yaml'
-        - $ref: '../../../components/schemas/errors/idp-strategy_pointer_unsupported.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../components/schemas/errors/tkn-invalid.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
@@ -61,10 +59,8 @@ content:
           idp.not_found: '../../../components/schemas/errors/idp-not_found.yaml'
           idp.endpoint_cleartext: '../../../components/schemas/errors/idp-endpoint_cleartext.yaml'
           idp.endpoints_partial: '../../../components/schemas/errors/idp-endpoints_partial.yaml'
-          idp.oauth2_unsupported: '../../../components/schemas/errors/idp-oauth2_unsupported.yaml'
           idp.protocol_block_missing: '../../../components/schemas/errors/idp-protocol_block_missing.yaml'
           idp.scopes_missing_openid: '../../../components/schemas/errors/idp-scopes_missing_openid.yaml'
-          idp.strategy_pointer_unsupported: '../../../components/schemas/errors/idp-strategy_pointer_unsupported.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
           tkn.invalid: '../../../components/schemas/errors/tkn-invalid.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
@@ -176,11 +172,6 @@ content:
         value:
           code: idp.endpoints_partial
           message: 'identity provider connection: the endpoints are partially set'
-      idp.oauth2_unsupported:
-        summary: idp.oauth2_unsupported
-        value:
-          code: idp.oauth2_unsupported
-          message: 'identity provider connection: the oauth2 protocol is not supported yet'
       idp.protocol_block_missing:
         summary: idp.protocol_block_missing
         value:
@@ -191,11 +182,6 @@ content:
         value:
           code: idp.scopes_missing_openid
           message: 'identity provider connection: OIDC scopes must contain openid'
-      idp.strategy_pointer_unsupported:
-        summary: idp.strategy_pointer_unsupported
-        value:
-          code: idp.strategy_pointer_unsupported
-          message: 'identity provider connection: an oidc connection cannot verify a property by strategy'
       internal:
         summary: internal
         value:

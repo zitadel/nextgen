@@ -36,6 +36,7 @@ const SECRET = {
   project_id: "proj-001",
   project_secret: "sk_proj_test",
   preview_secret: "sk_proj_preview",
+  primary_origins: [],
   preview_origins: [],
   created_at: "2026-01-01T00:00:00.000Z",
   schema_version: 2,
