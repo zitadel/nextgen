@@ -33,13 +33,17 @@ type CreateDeploymentInput struct {
 type CreateDeploymentOutput struct {
 	Deployment *domain.Deployment
 	Created    bool
+	// PreviewExpiresAt is the expiry a written preview deployment set.
+	PreviewExpiresAt *time.Time
 }
 
 // DeployInput carries the targets as the request gives them.
 type DeployInput struct {
-	ProjectID            string
-	ReleaseID            string
-	Targets              []string
+	ProjectID string
+	ReleaseID string
+	Targets   []string
+	// TTL is nil to take the default.
+	TTL                  *time.Duration
 	Reason               domain.DeploymentReason
 	Message              *string
 	ExpectedDeploymentID *string
@@ -114,25 +118,35 @@ func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentIn
 	}
 }
 
-// Deploy resolves the targets to the project's primary origins, then creates
+// Deploy resolves the targets against the project's origins, then creates
 // the deployment.
 func (s *DeploymentService) Deploy(ctx context.Context, input DeployInput) (*CreateDeploymentOutput, error) {
 	origins, err := s.projectOrigins(ctx, input.ProjectID)
 	if err != nil {
 		return nil, err
 	}
-	resolved, err := domain.ResolvePrimaryTargets(origins, input.Targets)
+	kind, resolved, err := domain.ResolveDeploymentTargets(origins, input.Targets)
 	if err != nil {
 		return nil, err
+	}
+	var ttl time.Duration
+	switch {
+	case kind == domain.DeploymentOriginKindPreview && input.TTL != nil:
+		ttl = *input.TTL
+	case kind == domain.DeploymentOriginKindPreview:
+		ttl = domain.DefaultPreviewTTL
+	case input.TTL != nil:
+		return nil, domain.ErrDeploymentInvalid("ttl is only valid for preview URLs", nil)
 	}
 	return s.Create(ctx, CreateDeploymentInput{
 		ProjectID:            input.ProjectID,
 		ReleaseID:            input.ReleaseID,
-		OriginKind:           domain.DeploymentOriginKindPrimary,
+		OriginKind:           kind,
 		Origins:              resolved,
 		Reason:               input.Reason,
 		Message:              input.Message,
 		ExpectedDeploymentID: input.ExpectedDeploymentID,
+		PreviewTTL:           ttl,
 	})
 }
 
@@ -206,17 +220,16 @@ func (s *DeploymentService) create(ctx context.Context, entity *domain.Deploymen
 			}
 			return err
 		}
+		output = &CreateDeploymentOutput{Deployment: &written, Created: true}
 		if written.OriginKind == domain.DeploymentOriginKindPreview {
+			expiresAt := written.DeployedAt.Add(input.PreviewTTL)
 			if err := stmts.UpsertPreviews(ctx, written.ProjectID, written.Origins(),
-				written.DeployedAt.Add(input.PreviewTTL), written.DeployedAt); err != nil {
+				expiresAt, written.DeployedAt); err != nil {
 				return err
 			}
+			output.PreviewExpiresAt = &expiresAt
 		}
-		if err := emitDeploymentCreated(ctx, stmts, &written); err != nil {
-			return err
-		}
-		output = &CreateDeploymentOutput{Deployment: &written, Created: true}
-		return nil
+		return emitDeploymentCreated(ctx, stmts, &written)
 	})
 	return output, err
 }

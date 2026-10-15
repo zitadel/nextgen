@@ -276,9 +276,16 @@ func TestDeploymentServiceDeployExpandsPrimary(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, result.Created)
 	assert.Equal(t, []string{appOrigin}, result.Deployment.Origins())
+	assert.Nil(t, result.PreviewExpiresAt)
 }
 
 func TestDeploymentServiceDeployRejects(t *testing.T) {
+	t.Run("a ttl for primary origins", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		expectProjectOrigins(statements, appPrimary)
+		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{"primary"}, TTL: new(time.Hour)})
+		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid(nil, nil).Code)
+	})
 }
 
 func TestDeploymentServiceCreateErrorMapping(t *testing.T) {

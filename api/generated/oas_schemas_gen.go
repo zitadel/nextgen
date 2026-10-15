@@ -10962,19 +10962,20 @@ func (*CreateDeploymentCreated) createDeploymentRes() {}
 
 // CreateDeploymentErrorResponse represents sum type.
 type CreateDeploymentErrorResponse struct {
-	Type                CreateDeploymentErrorResponseType // switch on this field
-	AuthUnauthorized    AuthUnauthorized
-	DepConflict         DepConflict
-	DepInvalid          DepInvalid
-	DepNotFound         DepNotFound
-	DepPermissionDenied DepPermissionDenied
-	EnvProjectNotFound  EnvProjectNotFound
-	EvtInvalid          EvtInvalid
-	Internal            Internal
-	NotImplemented      NotImplemented
-	ProjNotFound        ProjNotFound
-	RelNotFound         RelNotFound
-	ReqInvalid          ReqInvalid
+	Type                 CreateDeploymentErrorResponseType // switch on this field
+	AuthUnauthorized     AuthUnauthorized
+	DepConflict          DepConflict
+	DepInvalid           DepInvalid
+	DepNotFound          DepNotFound
+	DepPermissionDenied  DepPermissionDenied
+	EnvProjectNotFound   EnvProjectNotFound
+	EvtInvalid           EvtInvalid
+	Internal             Internal
+	NotImplemented       NotImplemented
+	ProjNotFound         ProjNotFound
+	ProjOriginNotAllowed ProjOriginNotAllowed
+	RelNotFound          RelNotFound
+	ReqInvalid           ReqInvalid
 }
 
 // CreateDeploymentErrorResponseType is oneOf type of CreateDeploymentErrorResponse.
@@ -10982,18 +10983,19 @@ type CreateDeploymentErrorResponseType string
 
 // Possible values for CreateDeploymentErrorResponseType.
 const (
-	AuthUnauthorizedCreateDeploymentErrorResponse    CreateDeploymentErrorResponseType = "auth.unauthorized"
-	DepConflictCreateDeploymentErrorResponse         CreateDeploymentErrorResponseType = "dep.conflict"
-	DepInvalidCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "dep.invalid"
-	DepNotFoundCreateDeploymentErrorResponse         CreateDeploymentErrorResponseType = "dep.not_found"
-	DepPermissionDeniedCreateDeploymentErrorResponse CreateDeploymentErrorResponseType = "dep.permission_denied"
-	EnvProjectNotFoundCreateDeploymentErrorResponse  CreateDeploymentErrorResponseType = "env.project_not_found"
-	EvtInvalidCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "evt.invalid"
-	InternalCreateDeploymentErrorResponse            CreateDeploymentErrorResponseType = "internal"
-	NotImplementedCreateDeploymentErrorResponse      CreateDeploymentErrorResponseType = "not_implemented"
-	ProjNotFoundCreateDeploymentErrorResponse        CreateDeploymentErrorResponseType = "proj.not_found"
-	RelNotFoundCreateDeploymentErrorResponse         CreateDeploymentErrorResponseType = "rel.not_found"
-	ReqInvalidCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "req.invalid"
+	AuthUnauthorizedCreateDeploymentErrorResponse     CreateDeploymentErrorResponseType = "auth.unauthorized"
+	DepConflictCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "dep.conflict"
+	DepInvalidCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "dep.invalid"
+	DepNotFoundCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "dep.not_found"
+	DepPermissionDeniedCreateDeploymentErrorResponse  CreateDeploymentErrorResponseType = "dep.permission_denied"
+	EnvProjectNotFoundCreateDeploymentErrorResponse   CreateDeploymentErrorResponseType = "env.project_not_found"
+	EvtInvalidCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "evt.invalid"
+	InternalCreateDeploymentErrorResponse             CreateDeploymentErrorResponseType = "internal"
+	NotImplementedCreateDeploymentErrorResponse       CreateDeploymentErrorResponseType = "not_implemented"
+	ProjNotFoundCreateDeploymentErrorResponse         CreateDeploymentErrorResponseType = "proj.not_found"
+	ProjOriginNotAllowedCreateDeploymentErrorResponse CreateDeploymentErrorResponseType = "proj.origin_not_allowed"
+	RelNotFoundCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "rel.not_found"
+	ReqInvalidCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "req.invalid"
 )
 
 // IsAuthUnauthorized reports whether CreateDeploymentErrorResponse is AuthUnauthorized.
@@ -11044,6 +11046,11 @@ func (s CreateDeploymentErrorResponse) IsNotImplemented() bool {
 // IsProjNotFound reports whether CreateDeploymentErrorResponse is ProjNotFound.
 func (s CreateDeploymentErrorResponse) IsProjNotFound() bool {
 	return s.Type == ProjNotFoundCreateDeploymentErrorResponse
+}
+
+// IsProjOriginNotAllowed reports whether CreateDeploymentErrorResponse is ProjOriginNotAllowed.
+func (s CreateDeploymentErrorResponse) IsProjOriginNotAllowed() bool {
+	return s.Type == ProjOriginNotAllowedCreateDeploymentErrorResponse
 }
 
 // IsRelNotFound reports whether CreateDeploymentErrorResponse is RelNotFound.
@@ -11263,6 +11270,27 @@ func (s CreateDeploymentErrorResponse) GetProjNotFound() (v ProjNotFound, ok boo
 func NewProjNotFoundCreateDeploymentErrorResponse(v ProjNotFound) CreateDeploymentErrorResponse {
 	var s CreateDeploymentErrorResponse
 	s.SetProjNotFound(v)
+	return s
+}
+
+// SetProjOriginNotAllowed sets CreateDeploymentErrorResponse to ProjOriginNotAllowed.
+func (s *CreateDeploymentErrorResponse) SetProjOriginNotAllowed(v ProjOriginNotAllowed) {
+	s.Type = ProjOriginNotAllowedCreateDeploymentErrorResponse
+	s.ProjOriginNotAllowed = v
+}
+
+// GetProjOriginNotAllowed returns ProjOriginNotAllowed and true boolean if CreateDeploymentErrorResponse is ProjOriginNotAllowed.
+func (s CreateDeploymentErrorResponse) GetProjOriginNotAllowed() (v ProjOriginNotAllowed, ok bool) {
+	if !s.IsProjOriginNotAllowed() {
+		return v, false
+	}
+	return s.ProjOriginNotAllowed, true
+}
+
+// NewProjOriginNotAllowedCreateDeploymentErrorResponse returns new CreateDeploymentErrorResponse from ProjOriginNotAllowed.
+func NewProjOriginNotAllowedCreateDeploymentErrorResponse(v ProjOriginNotAllowed) CreateDeploymentErrorResponse {
+	var s CreateDeploymentErrorResponse
+	s.SetProjOriginNotAllowed(v)
 	return s
 }
 
@@ -47367,6 +47395,52 @@ func (o OptProjNotFoundDetails) Or(d ProjNotFoundDetails) ProjNotFoundDetails {
 	return d
 }
 
+// NewOptProjOriginNotAllowedDetails returns new OptProjOriginNotAllowedDetails with value set to v.
+func NewOptProjOriginNotAllowedDetails(v ProjOriginNotAllowedDetails) OptProjOriginNotAllowedDetails {
+	return OptProjOriginNotAllowedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptProjOriginNotAllowedDetails is optional ProjOriginNotAllowedDetails.
+type OptProjOriginNotAllowedDetails struct {
+	Value ProjOriginNotAllowedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptProjOriginNotAllowedDetails was set.
+func (o OptProjOriginNotAllowedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptProjOriginNotAllowedDetails) Reset() {
+	var v ProjOriginNotAllowedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptProjOriginNotAllowedDetails) SetTo(v ProjOriginNotAllowedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptProjOriginNotAllowedDetails) Get() (v ProjOriginNotAllowedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptProjOriginNotAllowedDetails) Or(d ProjOriginNotAllowedDetails) ProjOriginNotAllowedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptProjPasswordHashInvalidDetails returns new OptProjPasswordHashInvalidDetails with value set to v.
 func NewOptProjPasswordHashInvalidDetails(v ProjPasswordHashInvalidDetails) OptProjPasswordHashInvalidDetails {
 	return OptProjPasswordHashInvalidDetails{
@@ -55476,6 +55550,59 @@ func (*ProjNotFound) initClaimRes() {}
 type ProjNotFoundDetails map[string]jx.Raw
 
 func (s *ProjNotFoundDetails) init() ProjNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type ProjOriginNotAllowed struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptProjOriginNotAllowedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ProjOriginNotAllowed) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ProjOriginNotAllowed) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ProjOriginNotAllowed) GetDetails() OptProjOriginNotAllowedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ProjOriginNotAllowed) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ProjOriginNotAllowed) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ProjOriginNotAllowed) SetDetails(val OptProjOriginNotAllowedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type ProjOriginNotAllowedDetails map[string]jx.Raw
+
+func (s *ProjOriginNotAllowedDetails) init() ProjOriginNotAllowedDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
