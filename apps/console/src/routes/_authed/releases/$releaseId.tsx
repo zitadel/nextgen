@@ -73,7 +73,7 @@ function ReleaseDetail() {
             <ReleaseStatusBadge status={releaseStatus(release)} />
           </div>
 
-          <MetaCard bordered={false}>
+          <MetaCard>
             <MetaValue label="Release ID" value={release.id} size="sm" copyable />
             <MetaRule />
             <MetaValue label="Created" value={formatDate(release.metadata.created_at)} size="sm" />
