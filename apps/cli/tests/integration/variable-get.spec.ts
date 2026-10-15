@@ -5,7 +5,7 @@ import { aSetUpApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 
-describe("variables get", () => {
+describe("variable get", () => {
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
       it("fails", async () => {
@@ -51,6 +51,20 @@ describe("variables get", () => {
 
         expect(result).toSucceed();
         expect(app.envelopeOf<{ value: string }>(result).data.value).toBe("bar");
+      });
+
+      it("reads the preview override under --preview", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("API_URL", "https://api.acme.com")).toSucceed();
+        expect(
+          await app.setVariable("API_URL", "https://preview.acme.com", { preview: true }),
+        ).toSucceed();
+
+        const result = await app.getVariable("API_URL", { preview: true });
+
+        expect(app.envelopeOf<{ value: string }>(result).data.value).toBe(
+          "https://preview.acme.com",
+        );
       });
 
       it("refuses a name the project does not hold", async () => {

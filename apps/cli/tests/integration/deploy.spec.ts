@@ -122,7 +122,7 @@ describe("deploy", () => {
           clientId: "1234-abc.apps.googleusercontent.com",
           secret: "the-client-secret",
         });
-        await app.deleteVariable("GOOGLE_CLIENT_SECRET");
+        await app.removeVariable("GOOGLE_CLIENT_SECRET");
 
         const result = await app.deploy();
 

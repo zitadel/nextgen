@@ -65,10 +65,6 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   // generated surface; recorded as a question rather than implied to be owned.
   completeClaim: "part of the claim flow, but currently called by no command — unresolved",
   getClaimWindow: "part of the claim flow, but currently called by no command — unresolved",
-  // The frozen variable set of one deployment is read where a variable is
-  // resolved, which is a later change.
-  getDeploymentVariables:
-    "read by `zitadel variable resolve`, which arrives with the variable commands",
   // A preview exists only through a deployment to it, so it has no create to
   // offer; listing and removing it are `zitadel preview`'s.
   listPreviews: "previews are listed by `zitadel preview` (#1312)",
@@ -169,9 +165,11 @@ const REFS = ["ID", "sch_1", "flowdef_1", "https://example.com/schema.json"] as 
  * is a map keyed by name rather than rows, and the write is one RFC 7386 merge
  * where `null` removes — an upsert, which is why the commands use `set` rather
  * than create and update, as `gh variable set` does (ADR 062, ADR 064).
+ * `variable resolve` reads a deployment's frozen map, which is a deployment
+ * operation served by a variable command.
  */
 const STANDALONE: Readonly<Record<string, readonly string[]>> = {
-  variables: ["variables/list", "variables/get", "variables/set", "variables/delete"],
+  variables: ["variable/set", "variable/get", "variable/list", "variable/rm", "variable/resolve"],
   // Origins are nested under a project rather than a root collection, so they
   // have no `/origins/query` grammar; the hand-written commands add, list (off
   // the project) and remove one pattern at a time.

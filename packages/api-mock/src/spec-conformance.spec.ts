@@ -1632,6 +1632,23 @@ describe("api-mock idp and variable contract details", () => {
     });
   });
 
+  test("reads both kinds back after a write to one", async () => {
+    const projectId = await newProject("variables-read-back-both");
+    const patch = (query: string, body: object) =>
+      fetch(`${BASE}/variables?project_id=${projectId}${query}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    await patch("", { API_URL: "https://api.acme.com" });
+
+    const res = await patch("&kind=preview", { API_URL: "https://preview.acme.com" });
+
+    expect(await res.json()).toEqual({
+      API_URL: { primary: "https://api.acme.com", preview: "https://preview.acme.com" },
+    });
+  });
+
   test("answers not_implemented for a deployment's variables", async () => {
     const projectId = await newProject("vars-deployment");
 

@@ -109,7 +109,7 @@ describe("idp-connections step", () => {
     });
 
     await expect(idpConnectionsStep.run(ctx(cwd, {}))).rejects.toMatchObject({
-      hint: expect.stringContaining("variables set NAME --project-level --secret --env staging"),
+      hint: expect.stringContaining("variable set NAME --secret --env staging"),
     });
   });
 
@@ -190,7 +190,7 @@ describe("idp-connections step", () => {
     const cwd = await project({ "google.json": googleBody() });
 
     await expect(idpConnectionsStep.run(ctx(cwd, {}, {}))).rejects.toMatchObject({
-      nextCommands: ["variables set GOOGLE_CLIENT_SECRET --project-level --secret --env staging"],
+      nextCommands: ["variable set GOOGLE_CLIENT_SECRET --secret --env staging"],
     });
   });
 

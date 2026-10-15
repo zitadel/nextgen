@@ -5,6 +5,34 @@ import type { Parsed } from "@zitadel/config/idp";
 import { escapeControlCharacters } from "./api-client";
 import { ZitadelError } from "./errors";
 
+/** The kinds of value a name can hold: what primary deploys freeze, and what preview deploys freeze. */
+export type VariableKind = "primary" | "preview";
+
+/**
+ * The query a variable write or delete takes: the project and, for `--preview`,
+ * the kind. Without a kind the platform's default applies: a plain value is
+ * stored for both kinds and a secret for the primary kind only, and a delete
+ * removes both.
+ */
+export type VariableScope = { project_id: string; kind?: "preview" };
+
+/** The scope a variable write or delete addresses, from the project and `--preview`. */
+export function variableScope(projectId: string, preview: boolean): VariableScope {
+  return preview ? { project_id: projectId, kind: "preview" } : { project_id: projectId };
+}
+
+/**
+ * The scope of a read. A read names one kind, because the platform answers a
+ * name with a value per kind and the two are never merged: `--preview` reads the
+ * preview values, and without it the primary ones.
+ */
+export function variableReadScope(
+  projectId: string,
+  preview: boolean,
+): { project_id: string; kind: VariableKind } {
+  return { project_id: projectId, kind: preview ? "preview" : "primary" };
+}
+
 /**
  * A variable as the platform reports it. A non-secret carries its value; a
  * secret carries none, because a read answers `{"secret": true}` and never
@@ -19,13 +47,21 @@ export type VariableRow = {
 /** One value on the wire: a bare scalar, or `{"secret": true}` for a secret. */
 export type VariableValue = NonNullable<GetVariable200["primary"]>;
 
-/** The primary values of a read, keyed by name. */
-export function primaryValues(body: GetVariables200): Record<string, VariableValue> {
+/** The values of one kind in a read, keyed by name. */
+export function valuesOfKind(
+  body: GetVariables200,
+  kind: VariableKind,
+): Record<string, VariableValue> {
   return Object.fromEntries(
     Object.entries(body).flatMap(([name, byKind]) =>
-      byKind.primary === undefined ? [] : [[name, byKind.primary]],
+      byKind[kind] === undefined ? [] : [[name, byKind[kind]]],
     ),
   );
+}
+
+/** The primary values of a read, keyed by name. */
+export function primaryValues(body: GetVariables200): Record<string, VariableValue> {
+  return valuesOfKind(body, "primary");
 }
 
 /**
@@ -178,7 +214,7 @@ export function parseVariableValue(
 
 /**
  * Read a value from stdin, for the non-interactive path
- * (`variables set NAME --project-level --secret < secret.txt`).
+ * (`variable set NAME --secret < secret.txt`).
  *
  * A single trailing newline is stripped — a here-doc or `echo` adds one and it
  * is not part of the credential — but nothing else is trimmed, because

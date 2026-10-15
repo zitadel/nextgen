@@ -38,9 +38,9 @@ Scope pointers first — this file's own body covers **telemetry only**:
   `items`/`count`/`next_page_token`; a `rm`/`delete` command must confirm with
   `deleted: true`; no command anywhere may carry `removed` — so a divergent shape
   fails in that command's own spec whether or not the helper was used. The guard
-  does not police a collection surfaced under a domain key by a non-`list`
-  command (e.g. `variable resolve`'s `variables`), so build those with `listData`
-  too unless the non-canonical shape is deliberate and documented. A Biome
+  does not police a collection a non-`list` command returns (`variable resolve`
+  is one), so build those with `listData` too, alongside any fields of their
+  own, unless the non-canonical shape is deliberate and documented. A Biome
   GritQL rule (`biome-plugins/no-removed-key.grit`) also rejects a literal
   `removed: true` at lint time, before a spec runs.
 - Files that may carry a credential are written through `src/lib/fs-safe.ts`:
@@ -254,7 +254,7 @@ since `started` fires before the command body runs):
 - **deploy** — `resources` (how many the bundle pinned) and `origin_count` (how many origins it went live on). Counts only; never a handle, a digest, or an origin.
 - **doctor** — `runtime`, `checks_total`, `checks_failed`, `checks_warn`, `failed_checks` (failing check **names**, never messages).
 - **start** — `runtime` (`binary` / `docker`).
-- **variables** — `is_secret`, `variable_count`. Deliberately *not* recorded: the variable's name or value — a name is free text, and a value is the credential itself. There is no owner dimension: the project level is the only owner the commands can address.
+- **variable** — `is_secret` (set, get), `variable_count` (list, resolve). Deliberately *not* recorded: the variable's name or value — a name is free text, and a value is the credential itself; whether `--preview` was used — the value a run addresses is the variable's business, not a usage dimension; and any origin or deployment id `resolve` touches. There is no owner dimension: the project is the only owner the commands address.
 - **any command that connects to a project** (`EnvironmentCommand.connect`, so every one but `setup`, `doctor` and the local-server commands) — `credential` (`project` / `preview`), `has_env_file` (whether `--env-file` was given). Deliberately *not* recorded: the environment's name, the env file's path, the server, the project id, or any resolved value — every one of them is a name, a URL, an id or a secret.
 - **claim** — `claim_outcome` (`completed` / `already_claimed` / `expired` / `window_expired` / `timeout` / `dry_run`), `poll_count`, `browser_opened`. Deliberately *not* recorded: `challenge_id`, `team_id`, `claim_url`, `dashboard_url` — every one of them is an id or a URL.
 

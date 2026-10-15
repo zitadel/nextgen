@@ -106,7 +106,7 @@ export abstract class AuthMethodCommand extends EnvironmentCommand {
    * nobody can be asked. The question goes through `input`, which `--force`
    * answers yes without asking.
    *
-   * A dry run answers before the guard, as it does `variables delete`'s: it
+   * A dry run answers before the guard, as it does `variable rm`'s: it
    * changes nothing, so there is nothing to confirm, and {@link reportOutcome}
    * still warns that the schema would have no way to sign in left.
    *

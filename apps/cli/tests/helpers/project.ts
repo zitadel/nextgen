@@ -501,15 +501,19 @@ export class ScaffoldedApp {
   }
 
   /** Sets a project variable, whose value is piped rather than passed as a flag. */
-  setVariable(name: string, value: string, { secret = false } = {}): Promise<CliResult> {
+  setVariable(
+    name: string,
+    value: string,
+    { secret = false, preview = false } = {},
+  ): Promise<CliResult> {
     return this.pipingStdin(value, () =>
       this.cli([
-        "variables",
+        "variable",
         "set",
         name,
-        "--project-level",
         "--json",
         ...(secret ? ["--secret"] : []),
+        ...(preview ? ["--preview"] : []),
       ]),
     );
   }
@@ -521,10 +525,9 @@ export class ScaffoldedApp {
   setVariableWithNothingPiped(name: string, { secret = false } = {}): Promise<CliResult> {
     return this.withKeyboardOnStdin(() =>
       this.cli([
-        "variables",
+        "variable",
         "set",
         name,
-        "--project-level",
         "--non-interactive",
         "--json",
         ...(secret ? ["--secret"] : []),
@@ -532,8 +535,8 @@ export class ScaffoldedApp {
     );
   }
 
-  getVariable(name: string): Promise<CliResult> {
-    return this.cli(["variables", "get", name, "--project-level", "--json"]);
+  getVariable(name: string, { preview = false } = {}): Promise<CliResult> {
+    return this.cli(["variable", "get", name, "--json", ...(preview ? ["--preview"] : [])]);
   }
 
   /** Adds one origin pattern to the project. */
@@ -563,8 +566,25 @@ export class ScaffoldedApp {
     return this.envelopeOf<{ items: ProjectOrigin[] }>(result).data.items;
   }
 
-  deleteVariable(name: string): Promise<CliResult> {
-    return this.cli(["variables", "delete", name, "--project-level", "--force", "--json"]);
+  removeVariable(name: string, { preview = false } = {}): Promise<CliResult> {
+    return this.cli([
+      "variable",
+      "rm",
+      name,
+      "--force",
+      "--json",
+      ...(preview ? ["--preview"] : []),
+    ]);
+  }
+
+  /** The variables a target's live deployment froze, read through `variable resolve`. */
+  resolveVariables({ origin }: { origin?: string } = {}): Promise<CliResult> {
+    return this.cli([
+      "variable",
+      "resolve",
+      "--json",
+      ...(origin === undefined ? [] : ["--origin", origin]),
+    ]);
   }
 
   /** The providers the platform has registered. */
@@ -595,9 +615,14 @@ export class ScaffoldedApp {
    * than a ladder, so this is the project's own set and not a merge of
    * anything an environment holds.
    */
-  async projectVariables(): Promise<ProjectVariable[]> {
-    const result = await this.cli(["variables", "list", "--project-level", "--json"]);
-    expect(result, "variables list should have succeeded").toSucceed();
+  async projectVariables({ preview = false } = {}): Promise<ProjectVariable[]> {
+    const result = await this.cli([
+      "variable",
+      "list",
+      "--json",
+      ...(preview ? ["--preview"] : []),
+    ]);
+    expect(result, "variable list should have succeeded").toSucceed();
     return this.envelopeOf<{ items: ProjectVariable[] }>(result).data.items;
   }
 

@@ -172,7 +172,7 @@ Common error codes point at their own fix in `next_commands`:
   `details` often lists the missing or available values.
 - `E_CREDENTIAL_MISSING`: a connection's `client_id` or `client_secret` names a
   project variable that does not exist; `details.variable` is the name. Publish it
-  with `variables set NAME --project-level` (add `--secret` for the secret), then retry.
+  with `variable set NAME` (add `--secret` for the secret), then retry.
 - `E_LOCAL_SERVER_NOT_RUNNING`: start the local runtime, then retry with
   `--server local`.
 - `E_NOT_FOUND`: an HTTP 404 — a missing resource, or a `--server` that is not a
@@ -356,7 +356,7 @@ offered by any active flow is reported in `warnings` (and in `data.not_offered`
 for password and passkey). Every command reports `data.changed`, the
 project-relative files it wrote (on a dry run, the files it would write), empty
 when nothing changed. Follow `data.next_commands` (`deploy --dry-run`, `deploy`, and
-`variables set` when a credential did not reach the project) to publish the
+`variable set` when a credential did not reach the project) to publish the
 change. When a path or schema name would need shell quoting, `next_commands` is
 empty and `data.next_args` (or `details.suggested_args` on a refusal) holds the
 same commands as argument lists.

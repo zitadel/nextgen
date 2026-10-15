@@ -111,8 +111,9 @@ and agent UIs may display stderr package-manager progress together with stdout.
   (`--dry-run` validates and shows the diff without publishing)
 - `zitadel branding eject`: scaffold an editable login template from a design
 - `zitadel schemas list`: list the project's user schemas
-- `zitadel variables list|get|set|delete`: manage the project's variables and
-  secrets (`--project-level`)
+- `zitadel variable set|get|list|rm`: manage the project's variables and secrets
+  (`--preview` for a preview override); `zitadel variable resolve` shows what a
+  target's live deployment runs
 - `zitadel origin add|list|rm`: manage the origin patterns the project admits
   (`--kind primary|preview`)
 - `zitadel eject`: remove what setup wrote (alias: `zitadel uninstall`)
@@ -197,10 +198,11 @@ which ships in this package.
 * [`zitadel users get ID`](#zitadel-users-get-id)
 * [`zitadel users list`](#zitadel-users-list)
 * [`zitadel users update ID`](#zitadel-users-update-id)
-* [`zitadel variables delete NAME`](#zitadel-variables-delete-name)
-* [`zitadel variables get NAME`](#zitadel-variables-get-name)
-* [`zitadel variables list`](#zitadel-variables-list)
-* [`zitadel variables set NAME`](#zitadel-variables-set-name)
+* [`zitadel variable get NAME`](#zitadel-variable-get-name)
+* [`zitadel variable list`](#zitadel-variable-list)
+* [`zitadel variable resolve`](#zitadel-variable-resolve)
+* [`zitadel variable rm NAME`](#zitadel-variable-rm-name)
+* [`zitadel variable set NAME [VALUE]`](#zitadel-variable-set-name-value)
 * [`zitadel version`](#zitadel-version)
 * [`zitadel which`](#zitadel-which)
 
@@ -3488,62 +3490,15 @@ EXAMPLES
   $ zitadel users update <id> --file ./user.json
 ```
 
-## `zitadel variables delete NAME`
-
-Delete one variable from the project.
-
-```
-USAGE
-  $ zitadel variables delete NAME [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
-    <value>] [--project-level] [-f]
-
-ARGUMENTS
-  NAME  Variable name to delete.
-
-FLAGS
-  -c, --cwd=<value>       Project directory to operate on.
-  -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then the hosting platform's build
-                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
-  -f, --force             Delete the variable without the confirmation prompt.
-                          Required when non-interactive.
-  -n, --non-interactive   Disable prompts. Required when scripting or running as
-                          an agent.
-  -s, --server=<value>    Override the resolved server URL.
-  -v, --verbose           Verbose logging.
-      --[no-]color        Colorize human output. Disable with --no-color;
-                          NO_COLOR and FORCE_COLOR are honored too.
-      --debug             Debug logging.
-      --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
-      --project-level     Address the project level. Required: it is the only
-                          owner the CLI can address today.
-      --[no-]telemetry    Send anonymous usage analytics. Disable with
-                          --no-telemetry.
-
-GLOBAL FLAGS
-  --json  Format output as json.
-
-DESCRIPTION
-  Delete one variable from the project.
-
-EXAMPLES
-  $ zitadel variables delete GOOGLE_CLIENT_ID --project-level
-
-  $ zitadel variables delete GOOGLE_CLIENT_ID --project-level --force
-```
-
-## `zitadel variables get NAME`
+## `zitadel variable get NAME`
 
 Get one variable from the project.
 
 ```
 USAGE
-  $ zitadel variables get NAME [--json] [-c <value>] [-s <value>] [-n]
+  $ zitadel variable get NAME [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
-    <value>] [--project-level]
+    <value>] [--preview]
 
 ARGUMENTS
   NAME  Variable name to read.
@@ -3563,8 +3518,7 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
                           process environment. Cannot be combined with --env.
-      --project-level     Address the project level. Required: it is the only
-                          owner the CLI can address today.
+      --preview           Read the preview value instead of the primary one.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
@@ -3575,20 +3529,22 @@ DESCRIPTION
   Get one variable from the project.
 
 EXAMPLES
-  $ zitadel variables get GOOGLE_CLIENT_ID --project-level
+  $ zitadel variable get GOOGLE_CLIENT_ID
 
-  $ zitadel variables get GOOGLE_CLIENT_ID --project-level --json
+  $ zitadel variable get API_URL --preview
+
+  $ zitadel variable get GOOGLE_CLIENT_ID --json
 ```
 
-## `zitadel variables list`
+## `zitadel variable list`
 
 List the variables entered on the project.
 
 ```
 USAGE
-  $ zitadel variables list [--json] [-c <value>] [-s <value>] [-n]
+  $ zitadel variable list [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
-    <value>] [--project-level] [--plain]
+    <value>] [--preview] [--plain]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -3607,8 +3563,7 @@ FLAGS
                           process environment. Cannot be combined with --env.
       --plain             Tab-separated rows with no header, for piping. Implied
                           when stdout is not a terminal.
-      --project-level     Address the project level. Required: it is the only
-                          owner the CLI can address today.
+      --preview           List the preview values instead of the primary ones.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
@@ -3619,23 +3574,120 @@ DESCRIPTION
   List the variables entered on the project.
 
 EXAMPLES
-  $ zitadel variables list --project-level
+  $ zitadel variable list
 
-  $ zitadel variables list --project-level --json
+  $ zitadel variable list --preview
+
+  $ zitadel variable list --json
 ```
 
-## `zitadel variables set NAME`
+## `zitadel variable resolve`
+
+Show the variables the live deployment froze for a target.
+
+```
+USAGE
+  $ zitadel variable resolve [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
+    <value>] [--origin <value>] [--plain]
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment to run against, e.g. production. Defaults
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as
+                          an agent.
+  -s, --server=<value>    Override the resolved server URL.
+  -v, --verbose           Verbose logging.
+      --[no-]color        Colorize human output. Disable with --no-color;
+                          NO_COLOR and FORCE_COLOR are honored too.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
+                          process environment. Cannot be combined with --env.
+      --origin=<value>    The origin whose live deployment to read.
+      --plain             Tab-separated rows with no header, for piping. Implied
+                          when stdout is not a terminal.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with
+                          --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Show the variables the live deployment froze for a target.
+
+EXAMPLES
+  $ zitadel variable resolve
+
+  $ zitadel variable resolve --origin https://app.acme.com
+
+  $ zitadel variable resolve --json
+```
+
+## `zitadel variable rm NAME`
+
+Remove one variable from the project.
+
+```
+USAGE
+  $ zitadel variable rm NAME [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
+    <value>] [--preview] [-f]
+
+ARGUMENTS
+  NAME  Variable name to remove.
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment to run against, e.g. production. Defaults
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -f, --force             Remove the variable without the confirmation prompt.
+                          Required when non-interactive.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as
+                          an agent.
+  -s, --server=<value>    Override the resolved server URL.
+  -v, --verbose           Verbose logging.
+      --[no-]color        Colorize human output. Disable with --no-color;
+                          NO_COLOR and FORCE_COLOR are honored too.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
+                          process environment. Cannot be combined with --env.
+      --preview           Remove the preview value alone, leaving the primary
+                          one standing.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with
+                          --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Remove one variable from the project.
+
+EXAMPLES
+  $ zitadel variable rm GOOGLE_CLIENT_ID
+
+  $ zitadel variable rm API_URL --preview
+
+  $ zitadel variable rm GOOGLE_CLIENT_ID --force
+```
+
+## `zitadel variable set NAME [VALUE]`
 
 Set one variable on the project.
 
 ```
 USAGE
-  $ zitadel variables set NAME [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
-    <value>] [--project-level] [--secret] [--as string|number|boolean]
+  $ zitadel variable set NAME [VALUE] [--json] [-c <value>] [-s <value>]
+    [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>]
+    [--env-file <value>] [--secret] [--as string|number|boolean] [--preview]
 
 ARGUMENTS
-  NAME  Variable name (letters, digits and underscores).
+  NAME     Variable name (letters, digits and underscores).
+  [VALUE]  The value, for a plain (non-secret) variable.
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -3654,8 +3706,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
                           process environment. Cannot be combined with --env.
-      --project-level     Address the project level. Required: it is the only
-                          owner the CLI can address today.
+      --preview           Write the preview value alone, leaving the primary one
+                          as it is.
       --secret            Store the value encrypted. It can be replaced later
                           but never read back.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
@@ -3668,11 +3720,13 @@ DESCRIPTION
   Set one variable on the project.
 
 EXAMPLES
-  $ zitadel variables set GOOGLE_CLIENT_ID --project-level
+  $ zitadel variable set GOOGLE_CLIENT_ID 1234.apps.googleusercontent.com
 
-  $ zitadel variables set GOOGLE_CLIENT_SECRET --project-level --secret < secret.txt
+  $ zitadel variable set GOOGLE_CLIENT_SECRET --secret < secret.txt
 
-  $ zitadel variables set SESSION_TTL --project-level --as number
+  $ zitadel variable set SESSION_TTL 3600 --as number
+
+  $ zitadel variable set API_URL https://preview.acme.com --preview
 ```
 
 ## `zitadel version`

@@ -2708,8 +2708,9 @@ export function setupPlatformHandlers() {
           }
         }
       }
-      // 200 with the variables read back, including what the write did not touch.
-      const response = variablesResponse(store.variables, projectId, kinds);
+      // 200 with the project's variables read back, both kinds, including what
+      // the write did not touch (a write to one kind reads the other too).
+      const response = variablesResponse(store.variables, projectId, ["primary", "preview"]);
       const out = parse(UpdateVariablesResponse, response, "mock_response_invalid");
       if (!out.ok) {
         return out.response;
