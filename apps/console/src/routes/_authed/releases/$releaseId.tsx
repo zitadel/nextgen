@@ -4,7 +4,7 @@ import { Fragment, type ReactNode } from "react";
 
 import { api } from "@/api/zitadel";
 import { MetaCard, MetaRule, MetaValue } from "@/components/detail-meta";
-import { DetailPanel, DetailSection, PanelTitle } from "@/components/detail-page";
+import { CARD_HEADING, DetailPanel, DetailSection, PanelTitle } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
 import { DETAIL_PANEL_PAGE } from "@/components/layout";
 import { ReleaseDeployments } from "@/components/release-deployments";
@@ -83,7 +83,7 @@ function ReleaseDetail() {
         <Separator />
 
         {/* The section's own heading, ruled off from the groups it heads. */}
-        <h2 className="text-sm leading-5 font-medium text-foreground">Release content</h2>
+        <h2 className={CARD_HEADING}>Release content</h2>
         <Separator />
 
         {groups.map((group) => (
@@ -119,12 +119,13 @@ function PointerGroupSection({ group }: { group: PointerGroup }) {
             value={pointer.revisionId}
             className="py-4 first:pt-0 last:pb-0"
           >
-            {/* 40px: a 20px line with 10px above and below. The shared trigger
-                underlines on hover and tops its chevron on the first line of a
-                wrapped label; this row is one line, centred. `min-w-0` lets the
-                row shrink below the pill's text, which is what makes the pill
+            {/* 24px: a 20px line with 2px above and below, so the row's text
+                sits level with the group's label. The shared trigger underlines
+                on hover and tops its chevron on the first line of a wrapped
+                label; this row is one line, centred. `min-w-0` lets the row
+                shrink below the pill's text, which is what makes the pill
                 truncate on a phone instead of pushing the chevron off the card. */}
-            <AccordionTrigger className="min-w-0 items-center py-2.5 hover:no-underline [&>svg]:translate-y-0">
+            <AccordionTrigger className="min-w-0 items-center py-0.5 hover:no-underline [&>svg]:translate-y-0">
               {/* The literal space is for the accessible name: a flex row drops it
                   visually, and without it the row reads "Customersch_1". */}
               <span className="flex min-w-0 flex-wrap items-center gap-2">
