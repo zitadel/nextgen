@@ -4755,26 +4755,6 @@ func (s DeploymentTargetsRequest) Validate() error {
 	return nil
 }
 
-func (s EnvironmentName) Validate() error {
-	alias := (string)(s)
-	if err := (validate.String{
-		MinLength:     0,
-		MinLengthSet:  false,
-		MaxLength:     63,
-		MaxLengthSet:  true,
-		Email:         false,
-		Hostname:      false,
-		Regex:         regexMap["^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"],
-		MinNumeric:    0,
-		MinNumericSet: false,
-		MaxNumeric:    0,
-		MaxNumericSet: false,
-	}).Validate(string(alias)); err != nil {
-		return errors.Wrap(err, "string")
-	}
-	return nil
-}
-
 func (s Event) Validate() error {
 	switch s.Type {
 	case AuthAttemptCreatedEventEvent:
@@ -14227,6 +14207,54 @@ func (s Variable) Validate() error {
 	}
 }
 
+func (s *VariableByKind) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if value, ok := s.Primary.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "primary",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.Preview.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "preview",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s VariableInput) Validate() error {
 	switch s.Type {
 	case NullVariableInput:
@@ -14243,6 +14271,17 @@ func (s VariableInput) Validate() error {
 		return nil
 	default:
 		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s VariableKind) Validate() error {
+	switch s {
+	case "primary":
+		return nil
+	case "preview":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
 	}
 }
 
@@ -14298,6 +14337,28 @@ func (s VariableScalar) Validate() error {
 }
 
 func (s Variables) Validate() error {
+	var failures []validate.FieldError
+	for key, elem := range s {
+		if err := func() error {
+			if err := elem.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			failures = append(failures, validate.FieldError{
+				Name:  key,
+				Error: err,
+			})
+		}
+	}
+
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s VariablesByKind) Validate() error {
 	var failures []validate.FieldError
 	for key, elem := range s {
 		if err := func() error {

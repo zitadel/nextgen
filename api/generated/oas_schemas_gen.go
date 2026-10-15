@@ -15727,8 +15727,8 @@ func (*DeleteUserByIDUnauthorized) deleteUserByIDRes() {}
 type DeleteVariableErrorResponse struct {
 	Type                DeleteVariableErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
-	EnvNotFound         EnvNotFound
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
 	VarNotFound         VarNotFound
 	VarPermissionDenied VarPermissionDenied
@@ -15740,8 +15740,8 @@ type DeleteVariableErrorResponseType string
 // Possible values for DeleteVariableErrorResponseType.
 const (
 	AuthUnauthorizedDeleteVariableErrorResponse    DeleteVariableErrorResponseType = "auth.unauthorized"
-	EnvNotFoundDeleteVariableErrorResponse         DeleteVariableErrorResponseType = "env.not_found"
 	InternalDeleteVariableErrorResponse            DeleteVariableErrorResponseType = "internal"
+	NotImplementedDeleteVariableErrorResponse      DeleteVariableErrorResponseType = "not_implemented"
 	ReqInvalidDeleteVariableErrorResponse          DeleteVariableErrorResponseType = "req.invalid"
 	VarNotFoundDeleteVariableErrorResponse         DeleteVariableErrorResponseType = "var.not_found"
 	VarPermissionDeniedDeleteVariableErrorResponse DeleteVariableErrorResponseType = "var.permission_denied"
@@ -15752,14 +15752,14 @@ func (s DeleteVariableErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedDeleteVariableErrorResponse
 }
 
-// IsEnvNotFound reports whether DeleteVariableErrorResponse is EnvNotFound.
-func (s DeleteVariableErrorResponse) IsEnvNotFound() bool {
-	return s.Type == EnvNotFoundDeleteVariableErrorResponse
-}
-
 // IsInternal reports whether DeleteVariableErrorResponse is Internal.
 func (s DeleteVariableErrorResponse) IsInternal() bool {
 	return s.Type == InternalDeleteVariableErrorResponse
+}
+
+// IsNotImplemented reports whether DeleteVariableErrorResponse is NotImplemented.
+func (s DeleteVariableErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedDeleteVariableErrorResponse
 }
 
 // IsReqInvalid reports whether DeleteVariableErrorResponse is ReqInvalid.
@@ -15798,27 +15798,6 @@ func NewAuthUnauthorizedDeleteVariableErrorResponse(v AuthUnauthorized) DeleteVa
 	return s
 }
 
-// SetEnvNotFound sets DeleteVariableErrorResponse to EnvNotFound.
-func (s *DeleteVariableErrorResponse) SetEnvNotFound(v EnvNotFound) {
-	s.Type = EnvNotFoundDeleteVariableErrorResponse
-	s.EnvNotFound = v
-}
-
-// GetEnvNotFound returns EnvNotFound and true boolean if DeleteVariableErrorResponse is EnvNotFound.
-func (s DeleteVariableErrorResponse) GetEnvNotFound() (v EnvNotFound, ok bool) {
-	if !s.IsEnvNotFound() {
-		return v, false
-	}
-	return s.EnvNotFound, true
-}
-
-// NewEnvNotFoundDeleteVariableErrorResponse returns new DeleteVariableErrorResponse from EnvNotFound.
-func NewEnvNotFoundDeleteVariableErrorResponse(v EnvNotFound) DeleteVariableErrorResponse {
-	var s DeleteVariableErrorResponse
-	s.SetEnvNotFound(v)
-	return s
-}
-
 // SetInternal sets DeleteVariableErrorResponse to Internal.
 func (s *DeleteVariableErrorResponse) SetInternal(v Internal) {
 	s.Type = InternalDeleteVariableErrorResponse
@@ -15837,6 +15816,27 @@ func (s DeleteVariableErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalDeleteVariableErrorResponse(v Internal) DeleteVariableErrorResponse {
 	var s DeleteVariableErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets DeleteVariableErrorResponse to NotImplemented.
+func (s *DeleteVariableErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedDeleteVariableErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if DeleteVariableErrorResponse is NotImplemented.
+func (s DeleteVariableErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedDeleteVariableErrorResponse returns new DeleteVariableErrorResponse from NotImplemented.
+func NewNotImplementedDeleteVariableErrorResponse(v NotImplemented) DeleteVariableErrorResponse {
+	var s DeleteVariableErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 
@@ -17260,59 +17260,6 @@ func (s *EncKeyUnknownAlgDetails) init() EncKeyUnknownAlgDetails {
 
 // Merged schema.
 // Ref: #
-type EnvNotFound struct {
-	// Merged property.
-	Code string `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Additional error-specific context.
-	Details OptEnvNotFoundDetails `json:"details"`
-}
-
-// GetCode returns the value of Code.
-func (s *EnvNotFound) GetCode() string {
-	return s.Code
-}
-
-// GetMessage returns the value of Message.
-func (s *EnvNotFound) GetMessage() string {
-	return s.Message
-}
-
-// GetDetails returns the value of Details.
-func (s *EnvNotFound) GetDetails() OptEnvNotFoundDetails {
-	return s.Details
-}
-
-// SetCode sets the value of Code.
-func (s *EnvNotFound) SetCode(val string) {
-	s.Code = val
-}
-
-// SetMessage sets the value of Message.
-func (s *EnvNotFound) SetMessage(val string) {
-	s.Message = val
-}
-
-// SetDetails sets the value of Details.
-func (s *EnvNotFound) SetDetails(val OptEnvNotFoundDetails) {
-	s.Details = val
-}
-
-// Additional error-specific context.
-type EnvNotFoundDetails map[string]jx.Raw
-
-func (s *EnvNotFoundDetails) init() EnvNotFoundDetails {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
-// Merged schema.
-// Ref: #
 type EnvProjectNotFound struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -17363,8 +17310,6 @@ func (s *EnvProjectNotFoundDetails) init() EnvProjectNotFoundDetails {
 	}
 	return m
 }
-
-type EnvironmentName string
 
 type ErrorCode string
 
@@ -24932,6 +24877,270 @@ func (s *GetDeploymentByIdErrorResponseStatusCode) SetResponse(val GetDeployment
 
 func (*GetDeploymentByIdErrorResponseStatusCode) getDeploymentByIdRes() {}
 
+// GetDeploymentVariablesErrorResponse represents sum type.
+type GetDeploymentVariablesErrorResponse struct {
+	Type                GetDeploymentVariablesErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	DepNotFound         DepNotFound
+	DepPermissionDenied DepPermissionDenied
+	Internal            Internal
+	NotImplemented      NotImplemented
+	ReqInvalid          ReqInvalid
+	VarNotFound         VarNotFound
+	VarPermissionDenied VarPermissionDenied
+}
+
+// GetDeploymentVariablesErrorResponseType is oneOf type of GetDeploymentVariablesErrorResponse.
+type GetDeploymentVariablesErrorResponseType string
+
+// Possible values for GetDeploymentVariablesErrorResponseType.
+const (
+	AuthUnauthorizedGetDeploymentVariablesErrorResponse    GetDeploymentVariablesErrorResponseType = "auth.unauthorized"
+	DepNotFoundGetDeploymentVariablesErrorResponse         GetDeploymentVariablesErrorResponseType = "dep.not_found"
+	DepPermissionDeniedGetDeploymentVariablesErrorResponse GetDeploymentVariablesErrorResponseType = "dep.permission_denied"
+	InternalGetDeploymentVariablesErrorResponse            GetDeploymentVariablesErrorResponseType = "internal"
+	NotImplementedGetDeploymentVariablesErrorResponse      GetDeploymentVariablesErrorResponseType = "not_implemented"
+	ReqInvalidGetDeploymentVariablesErrorResponse          GetDeploymentVariablesErrorResponseType = "req.invalid"
+	VarNotFoundGetDeploymentVariablesErrorResponse         GetDeploymentVariablesErrorResponseType = "var.not_found"
+	VarPermissionDeniedGetDeploymentVariablesErrorResponse GetDeploymentVariablesErrorResponseType = "var.permission_denied"
+)
+
+// IsAuthUnauthorized reports whether GetDeploymentVariablesErrorResponse is AuthUnauthorized.
+func (s GetDeploymentVariablesErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetDeploymentVariablesErrorResponse
+}
+
+// IsDepNotFound reports whether GetDeploymentVariablesErrorResponse is DepNotFound.
+func (s GetDeploymentVariablesErrorResponse) IsDepNotFound() bool {
+	return s.Type == DepNotFoundGetDeploymentVariablesErrorResponse
+}
+
+// IsDepPermissionDenied reports whether GetDeploymentVariablesErrorResponse is DepPermissionDenied.
+func (s GetDeploymentVariablesErrorResponse) IsDepPermissionDenied() bool {
+	return s.Type == DepPermissionDeniedGetDeploymentVariablesErrorResponse
+}
+
+// IsInternal reports whether GetDeploymentVariablesErrorResponse is Internal.
+func (s GetDeploymentVariablesErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetDeploymentVariablesErrorResponse
+}
+
+// IsNotImplemented reports whether GetDeploymentVariablesErrorResponse is NotImplemented.
+func (s GetDeploymentVariablesErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetDeploymentVariablesErrorResponse
+}
+
+// IsReqInvalid reports whether GetDeploymentVariablesErrorResponse is ReqInvalid.
+func (s GetDeploymentVariablesErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetDeploymentVariablesErrorResponse
+}
+
+// IsVarNotFound reports whether GetDeploymentVariablesErrorResponse is VarNotFound.
+func (s GetDeploymentVariablesErrorResponse) IsVarNotFound() bool {
+	return s.Type == VarNotFoundGetDeploymentVariablesErrorResponse
+}
+
+// IsVarPermissionDenied reports whether GetDeploymentVariablesErrorResponse is VarPermissionDenied.
+func (s GetDeploymentVariablesErrorResponse) IsVarPermissionDenied() bool {
+	return s.Type == VarPermissionDeniedGetDeploymentVariablesErrorResponse
+}
+
+// SetAuthUnauthorized sets GetDeploymentVariablesErrorResponse to AuthUnauthorized.
+func (s *GetDeploymentVariablesErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetDeploymentVariablesErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetDeploymentVariablesErrorResponse is AuthUnauthorized.
+func (s GetDeploymentVariablesErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetDeploymentVariablesErrorResponse returns new GetDeploymentVariablesErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetDeploymentVariablesErrorResponse(v AuthUnauthorized) GetDeploymentVariablesErrorResponse {
+	var s GetDeploymentVariablesErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetDepNotFound sets GetDeploymentVariablesErrorResponse to DepNotFound.
+func (s *GetDeploymentVariablesErrorResponse) SetDepNotFound(v DepNotFound) {
+	s.Type = DepNotFoundGetDeploymentVariablesErrorResponse
+	s.DepNotFound = v
+}
+
+// GetDepNotFound returns DepNotFound and true boolean if GetDeploymentVariablesErrorResponse is DepNotFound.
+func (s GetDeploymentVariablesErrorResponse) GetDepNotFound() (v DepNotFound, ok bool) {
+	if !s.IsDepNotFound() {
+		return v, false
+	}
+	return s.DepNotFound, true
+}
+
+// NewDepNotFoundGetDeploymentVariablesErrorResponse returns new GetDeploymentVariablesErrorResponse from DepNotFound.
+func NewDepNotFoundGetDeploymentVariablesErrorResponse(v DepNotFound) GetDeploymentVariablesErrorResponse {
+	var s GetDeploymentVariablesErrorResponse
+	s.SetDepNotFound(v)
+	return s
+}
+
+// SetDepPermissionDenied sets GetDeploymentVariablesErrorResponse to DepPermissionDenied.
+func (s *GetDeploymentVariablesErrorResponse) SetDepPermissionDenied(v DepPermissionDenied) {
+	s.Type = DepPermissionDeniedGetDeploymentVariablesErrorResponse
+	s.DepPermissionDenied = v
+}
+
+// GetDepPermissionDenied returns DepPermissionDenied and true boolean if GetDeploymentVariablesErrorResponse is DepPermissionDenied.
+func (s GetDeploymentVariablesErrorResponse) GetDepPermissionDenied() (v DepPermissionDenied, ok bool) {
+	if !s.IsDepPermissionDenied() {
+		return v, false
+	}
+	return s.DepPermissionDenied, true
+}
+
+// NewDepPermissionDeniedGetDeploymentVariablesErrorResponse returns new GetDeploymentVariablesErrorResponse from DepPermissionDenied.
+func NewDepPermissionDeniedGetDeploymentVariablesErrorResponse(v DepPermissionDenied) GetDeploymentVariablesErrorResponse {
+	var s GetDeploymentVariablesErrorResponse
+	s.SetDepPermissionDenied(v)
+	return s
+}
+
+// SetInternal sets GetDeploymentVariablesErrorResponse to Internal.
+func (s *GetDeploymentVariablesErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetDeploymentVariablesErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetDeploymentVariablesErrorResponse is Internal.
+func (s GetDeploymentVariablesErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetDeploymentVariablesErrorResponse returns new GetDeploymentVariablesErrorResponse from Internal.
+func NewInternalGetDeploymentVariablesErrorResponse(v Internal) GetDeploymentVariablesErrorResponse {
+	var s GetDeploymentVariablesErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets GetDeploymentVariablesErrorResponse to NotImplemented.
+func (s *GetDeploymentVariablesErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetDeploymentVariablesErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetDeploymentVariablesErrorResponse is NotImplemented.
+func (s GetDeploymentVariablesErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetDeploymentVariablesErrorResponse returns new GetDeploymentVariablesErrorResponse from NotImplemented.
+func NewNotImplementedGetDeploymentVariablesErrorResponse(v NotImplemented) GetDeploymentVariablesErrorResponse {
+	var s GetDeploymentVariablesErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets GetDeploymentVariablesErrorResponse to ReqInvalid.
+func (s *GetDeploymentVariablesErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetDeploymentVariablesErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetDeploymentVariablesErrorResponse is ReqInvalid.
+func (s GetDeploymentVariablesErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetDeploymentVariablesErrorResponse returns new GetDeploymentVariablesErrorResponse from ReqInvalid.
+func NewReqInvalidGetDeploymentVariablesErrorResponse(v ReqInvalid) GetDeploymentVariablesErrorResponse {
+	var s GetDeploymentVariablesErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetVarNotFound sets GetDeploymentVariablesErrorResponse to VarNotFound.
+func (s *GetDeploymentVariablesErrorResponse) SetVarNotFound(v VarNotFound) {
+	s.Type = VarNotFoundGetDeploymentVariablesErrorResponse
+	s.VarNotFound = v
+}
+
+// GetVarNotFound returns VarNotFound and true boolean if GetDeploymentVariablesErrorResponse is VarNotFound.
+func (s GetDeploymentVariablesErrorResponse) GetVarNotFound() (v VarNotFound, ok bool) {
+	if !s.IsVarNotFound() {
+		return v, false
+	}
+	return s.VarNotFound, true
+}
+
+// NewVarNotFoundGetDeploymentVariablesErrorResponse returns new GetDeploymentVariablesErrorResponse from VarNotFound.
+func NewVarNotFoundGetDeploymentVariablesErrorResponse(v VarNotFound) GetDeploymentVariablesErrorResponse {
+	var s GetDeploymentVariablesErrorResponse
+	s.SetVarNotFound(v)
+	return s
+}
+
+// SetVarPermissionDenied sets GetDeploymentVariablesErrorResponse to VarPermissionDenied.
+func (s *GetDeploymentVariablesErrorResponse) SetVarPermissionDenied(v VarPermissionDenied) {
+	s.Type = VarPermissionDeniedGetDeploymentVariablesErrorResponse
+	s.VarPermissionDenied = v
+}
+
+// GetVarPermissionDenied returns VarPermissionDenied and true boolean if GetDeploymentVariablesErrorResponse is VarPermissionDenied.
+func (s GetDeploymentVariablesErrorResponse) GetVarPermissionDenied() (v VarPermissionDenied, ok bool) {
+	if !s.IsVarPermissionDenied() {
+		return v, false
+	}
+	return s.VarPermissionDenied, true
+}
+
+// NewVarPermissionDeniedGetDeploymentVariablesErrorResponse returns new GetDeploymentVariablesErrorResponse from VarPermissionDenied.
+func NewVarPermissionDeniedGetDeploymentVariablesErrorResponse(v VarPermissionDenied) GetDeploymentVariablesErrorResponse {
+	var s GetDeploymentVariablesErrorResponse
+	s.SetVarPermissionDenied(v)
+	return s
+}
+
+// GetDeploymentVariablesErrorResponseStatusCode wraps GetDeploymentVariablesErrorResponse with StatusCode.
+type GetDeploymentVariablesErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetDeploymentVariablesErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetDeploymentVariablesErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetDeploymentVariablesErrorResponseStatusCode) GetResponse() GetDeploymentVariablesErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetDeploymentVariablesErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetDeploymentVariablesErrorResponseStatusCode) SetResponse(val GetDeploymentVariablesErrorResponse) {
+	s.Response = val
+}
+
+func (*GetDeploymentVariablesErrorResponseStatusCode) getDeploymentVariablesRes() {}
+
 type GetEventForbidden ErrorDetails
 
 func (*GetEventForbidden) getEventRes() {}
@@ -28180,8 +28389,8 @@ func (*GetUserByIDUnauthorized) getUserByIDRes() {}
 type GetVariableErrorResponse struct {
 	Type                GetVariableErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
-	EnvNotFound         EnvNotFound
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
 	VarNotFound         VarNotFound
 	VarPermissionDenied VarPermissionDenied
@@ -28193,8 +28402,8 @@ type GetVariableErrorResponseType string
 // Possible values for GetVariableErrorResponseType.
 const (
 	AuthUnauthorizedGetVariableErrorResponse    GetVariableErrorResponseType = "auth.unauthorized"
-	EnvNotFoundGetVariableErrorResponse         GetVariableErrorResponseType = "env.not_found"
 	InternalGetVariableErrorResponse            GetVariableErrorResponseType = "internal"
+	NotImplementedGetVariableErrorResponse      GetVariableErrorResponseType = "not_implemented"
 	ReqInvalidGetVariableErrorResponse          GetVariableErrorResponseType = "req.invalid"
 	VarNotFoundGetVariableErrorResponse         GetVariableErrorResponseType = "var.not_found"
 	VarPermissionDeniedGetVariableErrorResponse GetVariableErrorResponseType = "var.permission_denied"
@@ -28205,14 +28414,14 @@ func (s GetVariableErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedGetVariableErrorResponse
 }
 
-// IsEnvNotFound reports whether GetVariableErrorResponse is EnvNotFound.
-func (s GetVariableErrorResponse) IsEnvNotFound() bool {
-	return s.Type == EnvNotFoundGetVariableErrorResponse
-}
-
 // IsInternal reports whether GetVariableErrorResponse is Internal.
 func (s GetVariableErrorResponse) IsInternal() bool {
 	return s.Type == InternalGetVariableErrorResponse
+}
+
+// IsNotImplemented reports whether GetVariableErrorResponse is NotImplemented.
+func (s GetVariableErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetVariableErrorResponse
 }
 
 // IsReqInvalid reports whether GetVariableErrorResponse is ReqInvalid.
@@ -28251,27 +28460,6 @@ func NewAuthUnauthorizedGetVariableErrorResponse(v AuthUnauthorized) GetVariable
 	return s
 }
 
-// SetEnvNotFound sets GetVariableErrorResponse to EnvNotFound.
-func (s *GetVariableErrorResponse) SetEnvNotFound(v EnvNotFound) {
-	s.Type = EnvNotFoundGetVariableErrorResponse
-	s.EnvNotFound = v
-}
-
-// GetEnvNotFound returns EnvNotFound and true boolean if GetVariableErrorResponse is EnvNotFound.
-func (s GetVariableErrorResponse) GetEnvNotFound() (v EnvNotFound, ok bool) {
-	if !s.IsEnvNotFound() {
-		return v, false
-	}
-	return s.EnvNotFound, true
-}
-
-// NewEnvNotFoundGetVariableErrorResponse returns new GetVariableErrorResponse from EnvNotFound.
-func NewEnvNotFoundGetVariableErrorResponse(v EnvNotFound) GetVariableErrorResponse {
-	var s GetVariableErrorResponse
-	s.SetEnvNotFound(v)
-	return s
-}
-
 // SetInternal sets GetVariableErrorResponse to Internal.
 func (s *GetVariableErrorResponse) SetInternal(v Internal) {
 	s.Type = InternalGetVariableErrorResponse
@@ -28290,6 +28478,27 @@ func (s GetVariableErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalGetVariableErrorResponse(v Internal) GetVariableErrorResponse {
 	var s GetVariableErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets GetVariableErrorResponse to NotImplemented.
+func (s *GetVariableErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetVariableErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetVariableErrorResponse is NotImplemented.
+func (s GetVariableErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetVariableErrorResponse returns new GetVariableErrorResponse from NotImplemented.
+func NewNotImplementedGetVariableErrorResponse(v NotImplemented) GetVariableErrorResponse {
+	var s GetVariableErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 
@@ -28388,8 +28597,8 @@ func (*GetVariableErrorResponseStatusCode) getVariableRes() {}
 type GetVariablesErrorResponse struct {
 	Type                GetVariablesErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
-	EnvNotFound         EnvNotFound
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
 	VarNotFound         VarNotFound
 	VarPermissionDenied VarPermissionDenied
@@ -28401,8 +28610,8 @@ type GetVariablesErrorResponseType string
 // Possible values for GetVariablesErrorResponseType.
 const (
 	AuthUnauthorizedGetVariablesErrorResponse    GetVariablesErrorResponseType = "auth.unauthorized"
-	EnvNotFoundGetVariablesErrorResponse         GetVariablesErrorResponseType = "env.not_found"
 	InternalGetVariablesErrorResponse            GetVariablesErrorResponseType = "internal"
+	NotImplementedGetVariablesErrorResponse      GetVariablesErrorResponseType = "not_implemented"
 	ReqInvalidGetVariablesErrorResponse          GetVariablesErrorResponseType = "req.invalid"
 	VarNotFoundGetVariablesErrorResponse         GetVariablesErrorResponseType = "var.not_found"
 	VarPermissionDeniedGetVariablesErrorResponse GetVariablesErrorResponseType = "var.permission_denied"
@@ -28413,14 +28622,14 @@ func (s GetVariablesErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedGetVariablesErrorResponse
 }
 
-// IsEnvNotFound reports whether GetVariablesErrorResponse is EnvNotFound.
-func (s GetVariablesErrorResponse) IsEnvNotFound() bool {
-	return s.Type == EnvNotFoundGetVariablesErrorResponse
-}
-
 // IsInternal reports whether GetVariablesErrorResponse is Internal.
 func (s GetVariablesErrorResponse) IsInternal() bool {
 	return s.Type == InternalGetVariablesErrorResponse
+}
+
+// IsNotImplemented reports whether GetVariablesErrorResponse is NotImplemented.
+func (s GetVariablesErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetVariablesErrorResponse
 }
 
 // IsReqInvalid reports whether GetVariablesErrorResponse is ReqInvalid.
@@ -28459,27 +28668,6 @@ func NewAuthUnauthorizedGetVariablesErrorResponse(v AuthUnauthorized) GetVariabl
 	return s
 }
 
-// SetEnvNotFound sets GetVariablesErrorResponse to EnvNotFound.
-func (s *GetVariablesErrorResponse) SetEnvNotFound(v EnvNotFound) {
-	s.Type = EnvNotFoundGetVariablesErrorResponse
-	s.EnvNotFound = v
-}
-
-// GetEnvNotFound returns EnvNotFound and true boolean if GetVariablesErrorResponse is EnvNotFound.
-func (s GetVariablesErrorResponse) GetEnvNotFound() (v EnvNotFound, ok bool) {
-	if !s.IsEnvNotFound() {
-		return v, false
-	}
-	return s.EnvNotFound, true
-}
-
-// NewEnvNotFoundGetVariablesErrorResponse returns new GetVariablesErrorResponse from EnvNotFound.
-func NewEnvNotFoundGetVariablesErrorResponse(v EnvNotFound) GetVariablesErrorResponse {
-	var s GetVariablesErrorResponse
-	s.SetEnvNotFound(v)
-	return s
-}
-
 // SetInternal sets GetVariablesErrorResponse to Internal.
 func (s *GetVariablesErrorResponse) SetInternal(v Internal) {
 	s.Type = InternalGetVariablesErrorResponse
@@ -28498,6 +28686,27 @@ func (s GetVariablesErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalGetVariablesErrorResponse(v Internal) GetVariablesErrorResponse {
 	var s GetVariablesErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets GetVariablesErrorResponse to NotImplemented.
+func (s *GetVariablesErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetVariablesErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetVariablesErrorResponse is NotImplemented.
+func (s GetVariablesErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetVariablesErrorResponse returns new GetVariablesErrorResponse from NotImplemented.
+func NewNotImplementedGetVariablesErrorResponse(v NotImplemented) GetVariablesErrorResponse {
+	var s GetVariablesErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 
@@ -38174,52 +38383,6 @@ func (o OptEncKeyUnknownAlgDetails) Or(d EncKeyUnknownAlgDetails) EncKeyUnknownA
 	return d
 }
 
-// NewOptEnvNotFoundDetails returns new OptEnvNotFoundDetails with value set to v.
-func NewOptEnvNotFoundDetails(v EnvNotFoundDetails) OptEnvNotFoundDetails {
-	return OptEnvNotFoundDetails{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptEnvNotFoundDetails is optional EnvNotFoundDetails.
-type OptEnvNotFoundDetails struct {
-	Value EnvNotFoundDetails
-	Set   bool
-}
-
-// IsSet returns true if OptEnvNotFoundDetails was set.
-func (o OptEnvNotFoundDetails) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptEnvNotFoundDetails) Reset() {
-	var v EnvNotFoundDetails
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptEnvNotFoundDetails) SetTo(v EnvNotFoundDetails) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptEnvNotFoundDetails) Get() (v EnvNotFoundDetails, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptEnvNotFoundDetails) Or(d EnvNotFoundDetails) EnvNotFoundDetails {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptEnvProjectNotFoundDetails returns new OptEnvProjectNotFoundDetails with value set to v.
 func NewOptEnvProjectNotFoundDetails(v EnvProjectNotFoundDetails) OptEnvProjectNotFoundDetails {
 	return OptEnvProjectNotFoundDetails{
@@ -38260,52 +38423,6 @@ func (o OptEnvProjectNotFoundDetails) Get() (v EnvProjectNotFoundDetails, ok boo
 
 // Or returns value if set, or given parameter if does not.
 func (o OptEnvProjectNotFoundDetails) Or(d EnvProjectNotFoundDetails) EnvProjectNotFoundDetails {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptEnvironmentName returns new OptEnvironmentName with value set to v.
-func NewOptEnvironmentName(v EnvironmentName) OptEnvironmentName {
-	return OptEnvironmentName{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptEnvironmentName is optional EnvironmentName.
-type OptEnvironmentName struct {
-	Value EnvironmentName
-	Set   bool
-}
-
-// IsSet returns true if OptEnvironmentName was set.
-func (o OptEnvironmentName) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptEnvironmentName) Reset() {
-	var v EnvironmentName
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptEnvironmentName) SetTo(v EnvironmentName) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptEnvironmentName) Get() (v EnvironmentName, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptEnvironmentName) Or(d EnvironmentName) EnvironmentName {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -50207,6 +50324,98 @@ func (o OptVarPermissionDeniedDetails) Or(d VarPermissionDeniedDetails) VarPermi
 	return d
 }
 
+// NewOptVariable returns new OptVariable with value set to v.
+func NewOptVariable(v Variable) OptVariable {
+	return OptVariable{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptVariable is optional Variable.
+type OptVariable struct {
+	Value Variable
+	Set   bool
+}
+
+// IsSet returns true if OptVariable was set.
+func (o OptVariable) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptVariable) Reset() {
+	var v Variable
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptVariable) SetTo(v Variable) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptVariable) Get() (v Variable, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptVariable) Or(d Variable) Variable {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptVariableKind returns new OptVariableKind with value set to v.
+func NewOptVariableKind(v VariableKind) OptVariableKind {
+	return OptVariableKind{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptVariableKind is optional VariableKind.
+type OptVariableKind struct {
+	Value VariableKind
+	Set   bool
+}
+
+// IsSet returns true if OptVariableKind was set.
+func (o OptVariableKind) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptVariableKind) Reset() {
+	var v VariableKind
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptVariableKind) SetTo(v VariableKind) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptVariableKind) Get() (v VariableKind, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptVariableKind) Or(d VariableKind) VariableKind {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 type Origin string
 
 type PageToken string
@@ -61059,13 +61268,10 @@ func (s *SchemaURL) SetURL(val url.URL) {
 // that the value is secret; it never carries the value itself.
 // A secret is stored encrypted and reads back as ciphertext, so there is
 // nothing here that could be returned honestly: the plaintext would defeat the
-// encryption, and the ciphertext would be a value no caller can use. Whether
-// secrets ever become readable — and if so under which permission — is left
-// open by ADR 062 §9; this shape is what keeps that question open rather than
-// answering it by accident.
+// encryption, and the ciphertext would be a value no caller can use.
 // Secrets are still usable without being readable: a configuration document
 // referencing `${{ NAME }}` resolves against the decrypted value when it is
-// served (§7).
+// served.
 // Ref: #
 type SecretVariable struct {
 	// Always `true`. A non-secret variable is returned as a bare scalar instead.
@@ -61084,7 +61290,7 @@ func (s *SecretVariable) SetSecret(val bool) {
 
 // A variable written with its secrecy stated explicitly.
 // Use this form to enter a secret. `{"value": "s3cr3t", "secret": true}` is
-// stored encrypted with the project's active `secret` key (ADR 062 §7) and
+// stored encrypted with the project's active `secret` key and
 // never reads back; the bare-scalar form is the same write with
 // `secret: false`.
 // Ref: #
@@ -61093,7 +61299,7 @@ type SecretVariableInput struct {
 	// Whether the value is stored encrypted. Changing it on an existing name
 	// re-writes the value under the new flag — the documents referencing that
 	// name do not change, because secrecy is a property of the value, not of
-	// the reference to it (ADR 062 §2).
+	// the reference to it.
 	Secret bool `json:"secret"`
 }
 
@@ -66309,12 +66515,12 @@ type UpdateVariablesErrorResponse struct {
 	AuthUnauthorized    AuthUnauthorized
 	EncKeyDecryptFailed EncKeyDecryptFailed
 	EncKeyNotFound      EncKeyNotFound
-	EnvNotFound         EnvNotFound
 	Internal            Internal
 	TknInvalid          TknInvalid
 	VarInvalidName      VarInvalidName
 	VarInvalidValue     VarInvalidValue
 	VarNoProjectID      VarNoProjectID
+	NotImplemented      NotImplemented
 	ProjNotFound        ProjNotFound
 	ReqInvalid          ReqInvalid
 	EncKeyUnknownAlg    EncKeyUnknownAlg
@@ -66330,12 +66536,12 @@ const (
 	AuthUnauthorizedUpdateVariablesErrorResponse    UpdateVariablesErrorResponseType = "auth.unauthorized"
 	EncKeyDecryptFailedUpdateVariablesErrorResponse UpdateVariablesErrorResponseType = "enc_key.decrypt_failed"
 	EncKeyNotFoundUpdateVariablesErrorResponse      UpdateVariablesErrorResponseType = "enc_key.not_found"
-	EnvNotFoundUpdateVariablesErrorResponse         UpdateVariablesErrorResponseType = "env.not_found"
 	InternalUpdateVariablesErrorResponse            UpdateVariablesErrorResponseType = "internal"
 	TknInvalidUpdateVariablesErrorResponse          UpdateVariablesErrorResponseType = "tkn.invalid"
 	VarInvalidNameUpdateVariablesErrorResponse      UpdateVariablesErrorResponseType = "var.invalid_name"
 	VarInvalidValueUpdateVariablesErrorResponse     UpdateVariablesErrorResponseType = "var.invalid_value"
 	VarNoProjectIDUpdateVariablesErrorResponse      UpdateVariablesErrorResponseType = "var.no_project_id"
+	NotImplementedUpdateVariablesErrorResponse      UpdateVariablesErrorResponseType = "not_implemented"
 	ProjNotFoundUpdateVariablesErrorResponse        UpdateVariablesErrorResponseType = "proj.not_found"
 	ReqInvalidUpdateVariablesErrorResponse          UpdateVariablesErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgUpdateVariablesErrorResponse    UpdateVariablesErrorResponseType = "enc_key.unknown_alg"
@@ -66356,11 +66562,6 @@ func (s UpdateVariablesErrorResponse) IsEncKeyDecryptFailed() bool {
 // IsEncKeyNotFound reports whether UpdateVariablesErrorResponse is EncKeyNotFound.
 func (s UpdateVariablesErrorResponse) IsEncKeyNotFound() bool {
 	return s.Type == EncKeyNotFoundUpdateVariablesErrorResponse
-}
-
-// IsEnvNotFound reports whether UpdateVariablesErrorResponse is EnvNotFound.
-func (s UpdateVariablesErrorResponse) IsEnvNotFound() bool {
-	return s.Type == EnvNotFoundUpdateVariablesErrorResponse
 }
 
 // IsInternal reports whether UpdateVariablesErrorResponse is Internal.
@@ -66386,6 +66587,11 @@ func (s UpdateVariablesErrorResponse) IsVarInvalidValue() bool {
 // IsVarNoProjectID reports whether UpdateVariablesErrorResponse is VarNoProjectID.
 func (s UpdateVariablesErrorResponse) IsVarNoProjectID() bool {
 	return s.Type == VarNoProjectIDUpdateVariablesErrorResponse
+}
+
+// IsNotImplemented reports whether UpdateVariablesErrorResponse is NotImplemented.
+func (s UpdateVariablesErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedUpdateVariablesErrorResponse
 }
 
 // IsProjNotFound reports whether UpdateVariablesErrorResponse is ProjNotFound.
@@ -66473,27 +66679,6 @@ func (s UpdateVariablesErrorResponse) GetEncKeyNotFound() (v EncKeyNotFound, ok 
 func NewEncKeyNotFoundUpdateVariablesErrorResponse(v EncKeyNotFound) UpdateVariablesErrorResponse {
 	var s UpdateVariablesErrorResponse
 	s.SetEncKeyNotFound(v)
-	return s
-}
-
-// SetEnvNotFound sets UpdateVariablesErrorResponse to EnvNotFound.
-func (s *UpdateVariablesErrorResponse) SetEnvNotFound(v EnvNotFound) {
-	s.Type = EnvNotFoundUpdateVariablesErrorResponse
-	s.EnvNotFound = v
-}
-
-// GetEnvNotFound returns EnvNotFound and true boolean if UpdateVariablesErrorResponse is EnvNotFound.
-func (s UpdateVariablesErrorResponse) GetEnvNotFound() (v EnvNotFound, ok bool) {
-	if !s.IsEnvNotFound() {
-		return v, false
-	}
-	return s.EnvNotFound, true
-}
-
-// NewEnvNotFoundUpdateVariablesErrorResponse returns new UpdateVariablesErrorResponse from EnvNotFound.
-func NewEnvNotFoundUpdateVariablesErrorResponse(v EnvNotFound) UpdateVariablesErrorResponse {
-	var s UpdateVariablesErrorResponse
-	s.SetEnvNotFound(v)
 	return s
 }
 
@@ -66599,6 +66784,27 @@ func (s UpdateVariablesErrorResponse) GetVarNoProjectID() (v VarNoProjectID, ok 
 func NewVarNoProjectIDUpdateVariablesErrorResponse(v VarNoProjectID) UpdateVariablesErrorResponse {
 	var s UpdateVariablesErrorResponse
 	s.SetVarNoProjectID(v)
+	return s
+}
+
+// SetNotImplemented sets UpdateVariablesErrorResponse to NotImplemented.
+func (s *UpdateVariablesErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedUpdateVariablesErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if UpdateVariablesErrorResponse is NotImplemented.
+func (s UpdateVariablesErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedUpdateVariablesErrorResponse returns new UpdateVariablesErrorResponse from NotImplemented.
+func NewNotImplementedUpdateVariablesErrorResponse(v NotImplemented) UpdateVariablesErrorResponse {
+	var s UpdateVariablesErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 
@@ -70402,7 +70608,34 @@ func NewSecretVariableVariable(v SecretVariable) Variable {
 	return s
 }
 
-func (*Variable) getVariableRes() {}
+// One variable's values, per kind. A kind with no value is absent.
+// Ref: #
+type VariableByKind struct {
+	Primary OptVariable `json:"primary"`
+	Preview OptVariable `json:"preview"`
+}
+
+// GetPrimary returns the value of Primary.
+func (s *VariableByKind) GetPrimary() OptVariable {
+	return s.Primary
+}
+
+// GetPreview returns the value of Preview.
+func (s *VariableByKind) GetPreview() OptVariable {
+	return s.Preview
+}
+
+// SetPrimary sets the value of Primary.
+func (s *VariableByKind) SetPrimary(val OptVariable) {
+	s.Primary = val
+}
+
+// SetPreview sets the value of Preview.
+func (s *VariableByKind) SetPreview(val OptVariable) {
+	s.Preview = val
+}
+
+func (*VariableByKind) getVariableRes() {}
 
 // One entry of an update. A bare scalar enters a non-secret value, an object
 // states the flag explicitly, and `null` removes the name.
@@ -70512,15 +70745,58 @@ func NewSecretVariableInputVariableInput(v SecretVariableInput) VariableInput {
 	return s
 }
 
+// Which deployments a value reaches: `primary` for primary origins,
+// `preview` for preview URLs. There is no fallback between kinds.
+// Ref: #
+type VariableKind string
+
+const (
+	VariableKindPrimary VariableKind = "primary"
+	VariableKindPreview VariableKind = "preview"
+)
+
+// AllValues returns all VariableKind values.
+func (VariableKind) AllValues() []VariableKind {
+	return []VariableKind{
+		VariableKindPrimary,
+		VariableKindPreview,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s VariableKind) MarshalText() ([]byte, error) {
+	switch s {
+	case VariableKindPrimary:
+		return []byte(s), nil
+	case VariableKindPreview:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *VariableKind) UnmarshalText(data []byte) error {
+	switch VariableKind(data) {
+	case VariableKindPrimary:
+		*s = VariableKindPrimary
+		return nil
+	case VariableKindPreview:
+		*s = VariableKindPreview
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 type VariableName string
 
-// A variable's value. JSON scalars only — a string, a number, or a boolean
-// (ADR 062 §1).
+// A variable's value. JSON scalars only — a string, a number, or a boolean.
 // The value travels through JSON in both directions, so the set of types is
 // JSON's. A number always reads back as a JSON number however it was written;
 // a type JSON has no scalar for (a timestamp, say) is rejected rather than
 // quietly coming back as the string it serialized to. Strings are capped at
-// 16 KiB: a variable is a configuration value, not a payload (§8).
+// 16 KiB: a variable is a configuration value, not a payload.
 // Ref: #
 // VariableScalar represents sum type.
 type VariableScalar struct {
@@ -70612,9 +70888,8 @@ func NewBoolVariableScalar(v bool) VariableScalar {
 	return s
 }
 
-// The project's variables, keyed by name. One name is one value.
-// An empty object is an ordinary answer, not an error — it means nothing has
-// been entered.
+// The variables a deployment froze, keyed by name.
+// An empty object is an ordinary answer, not an error.
 // Ref: #
 type Variables map[string]Variable
 
@@ -70627,8 +70902,24 @@ func (s *Variables) init() Variables {
 	return m
 }
 
-func (*Variables) getVariablesRes()    {}
-func (*Variables) updateVariablesRes() {}
+func (*Variables) getDeploymentVariablesRes() {}
+
+// The project's variables, keyed by name, each with its value per kind.
+// An empty object is an ordinary answer, not an error.
+// Ref: #
+type VariablesByKind map[string]VariableByKind
+
+func (s *VariablesByKind) init() VariablesByKind {
+	m := *s
+	if m == nil {
+		m = map[string]VariableByKind{}
+		*s = m
+	}
+	return m
+}
+
+func (*VariablesByKind) getVariablesRes()    {}
+func (*VariablesByKind) updateVariablesRes() {}
 
 // VerifyChallengeProofErrorResponse represents sum type.
 type VerifyChallengeProofErrorResponse struct {
