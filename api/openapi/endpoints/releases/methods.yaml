@@ -168,6 +168,7 @@ get:
   security:
     - oauth2:
         - release.read
+    - nextgenSession: []
   responses:
     '200':
       description: The releases were retrieved successfully.

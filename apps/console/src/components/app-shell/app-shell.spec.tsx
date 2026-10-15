@@ -35,6 +35,7 @@ const NAV_ORDER = [
   "Users",
   "Authentication",
   "Login flows",
+  "Deployments",
   "Project settings",
 ];
 const NESTED_NAV = { parent: "Users", label: "User schemas" };
