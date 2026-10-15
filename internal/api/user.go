@@ -186,9 +186,6 @@ func (h *Handler) ListUserPasskeys(ctx context.Context, params api.ListUserPassk
 	return res, nil
 }
 
-// ListUserIdentityLinks serves the provider accounts linked to the user. The
-// subject stays in storage: the link is what a client manages, and the
-// provider's identifier for the account is the provider's to show.
 func (h *Handler) ListUserIdentityLinks(ctx context.Context, params api.ListUserIdentityLinksParams) (api.ListUserIdentityLinksRes, error) {
 	projectID, err := h.requireResourceAccess(ctx, string(params.UserID), userAccess, opRead)
 	if err != nil {

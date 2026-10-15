@@ -13,8 +13,8 @@ properties:
   connection_id:
     type: string
     description: |
-      The IdP connection the account signs in through: the connection's id,
-      never a revision id, so the link survives edits to the connection.
+      The IdP connection the account signs in through, by its id rather than a
+      revision id; `GET /idps/{id}` resolves it.
     example: idp_01KWH3A9F2J7K5P3Q1W8E6Y4UB
   created_at:
     type: string

@@ -12176,12 +12176,8 @@ func (s *Server) handleListSchemasRequest(args [0]string, argsEscaped bool, w ht
 
 // handleListUserIdentityLinksRequest handles listUserIdentityLinks operation.
 //
-// The identity provider accounts linked to the user, oldest first. A link is
-// created when a sign-in through a connection resolves to this user, and it
-// pins that provider account to the user from then on.
-// Each entry names the connection by its revision-stable id, which
-// `GET /idps/{id}` resolves. The provider's subject and claims are never
-// returned.
+// The identity provider accounts a sign-in linked to the user, oldest first.
+// The provider's subject and claims are never returned.
 //
 // GET /users/{user_id}/identity_links
 func (s *Server) handleListUserIdentityLinksRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {

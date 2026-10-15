@@ -1204,6 +1204,20 @@ func TestListUserIdentityLinks(t *testing.T) {
 		fixture := newIdpFixture(t)
 		resp, err := fixture.client.ListUserIdentityLinks(t.Context(), api.ListUserIdentityLinksParams{UserID: "user_does_not_exist"})
 		require.NoError(t, err)
-		assert.IsType(t, &api.ListUserIdentityLinksNotFound{}, resp, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.ListUserIdentityLinksNotFound{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("user.not_found"), resp.(*api.ListUserIdentityLinksNotFound).Code)
+	})
+
+	t.Run("a malformed page token is the caller's error", func(t *testing.T) {
+		t.Parallel()
+
+		fixture, user := dependencies(t)
+		resp, err := fixture.client.ListUserIdentityLinks(t.Context(), api.ListUserIdentityLinksParams{
+			UserID:    api.UserID(user.ID),
+			PageToken: api.NewOptPageToken("not-a-token"),
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListUserIdentityLinksBadRequest{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("req.invalid"), resp.(*api.ListUserIdentityLinksBadRequest).Code)
 	})
 }

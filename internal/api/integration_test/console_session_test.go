@@ -208,6 +208,7 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 		links, err := session.ListUserIdentityLinks(t.Context(), api.ListUserIdentityLinksParams{UserID: api.UserID(foreignUserID)})
 		require.NoError(t, err)
 		require.IsType(t, &api.ListUserIdentityLinksNotFound{}, links, helpers.MustMarshal(t, links))
+		assert.Equal(t, api.ErrorCode("user.not_found"), links.(*api.ListUserIdentityLinksNotFound).Code)
 	})
 
 	// The by-id operations resolve the path id before authorizing, so each is

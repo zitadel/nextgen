@@ -70904,8 +70904,8 @@ type UserID string
 type UserIdentityLink struct {
 	// The unique identifier of the link.
 	ID string `json:"id"`
-	// The IdP connection the account signs in through: the connection's id,
-	// never a revision id, so the link survives edits to the connection.
+	// The IdP connection the account signs in through, by its id rather than a
+	// revision id; `GET /idps/{id}` resolves it.
 	ConnectionID string `json:"connection_id"`
 	// When the account was linked to the user.
 	CreatedAt time.Time `json:"created_at"`

@@ -763,12 +763,8 @@ type Invoker interface {
 	ListSchemas(ctx context.Context, params ListSchemasParams) (ListSchemasRes, error)
 	// ListUserIdentityLinks invokes listUserIdentityLinks operation.
 	//
-	// The identity provider accounts linked to the user, oldest first. A link is
-	// created when a sign-in through a connection resolves to this user, and it
-	// pins that provider account to the user from then on.
-	// Each entry names the connection by its revision-stable id, which
-	// `GET /idps/{id}` resolves. The provider's subject and claims are never
-	// returned.
+	// The identity provider accounts a sign-in linked to the user, oldest first.
+	// The provider's subject and claims are never returned.
 	//
 	// GET /users/{user_id}/identity_links
 	ListUserIdentityLinks(ctx context.Context, params ListUserIdentityLinksParams) (ListUserIdentityLinksRes, error)
@@ -10504,12 +10500,8 @@ func (c *Client) sendListSchemas(ctx context.Context, params ListSchemasParams) 
 
 // ListUserIdentityLinks invokes listUserIdentityLinks operation.
 //
-// The identity provider accounts linked to the user, oldest first. A link is
-// created when a sign-in through a connection resolves to this user, and it
-// pins that provider account to the user from then on.
-// Each entry names the connection by its revision-stable id, which
-// `GET /idps/{id}` resolves. The provider's subject and claims are never
-// returned.
+// The identity provider accounts a sign-in linked to the user, oldest first.
+// The provider's subject and claims are never returned.
 //
 // GET /users/{user_id}/identity_links
 func (c *Client) ListUserIdentityLinks(ctx context.Context, params ListUserIdentityLinksParams) (ListUserIdentityLinksRes, error) {
