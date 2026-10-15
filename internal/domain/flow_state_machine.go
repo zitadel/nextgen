@@ -1227,6 +1227,28 @@ func (r *FlowStateMachineRuntime) validateAndMerge(pc *processCtx, resolved Flow
 	return nil, nil
 }
 
+// chosenPasswordError returns the step error for a collected password too
+// short to become an account's credential, or nil when there is none or it
+// is long enough. A step that collects the password enforces the minimum on
+// submit under a purpose that chooses one, but a password can also reach
+// creation from a step that only checked it: a login card collecting the
+// identifier and the password together banks the password before dispatch,
+// and user_not_found carries it into registration unverified. Creating the
+// account is where the password becomes one the user chose, so the rule is
+// held there too, whatever path the password came by.
+func chosenPasswordError(state *FlowState) *string {
+	password := state.CollectedData.AuthMethods.Password
+	if password == "" {
+		return nil
+	}
+	rules := &FlowFieldValidation{MinLength: PasswordMinLength}
+	errs := FlowFieldValidationErrors(applyValidationRules(authMethodPrefix+"password", password, rules))
+	if len(errs) == 0 {
+		return nil
+	}
+	return new(errs.StepError())
+}
+
 // renderStepError re-renders the current step with an error key set,
 // so the user stays put and sees what went wrong.
 func (r *FlowStateMachineRuntime) renderStepError(pc *processCtx, resolved FlowResolvedFields, errKey *string) (FlowStepResult, error) {
@@ -1383,6 +1405,10 @@ func (r *FlowStateMachineRuntime) processSubmit(pc *processCtx, resolved FlowRes
 		return r.routeOutcome(pc, resolved, pc.in.Action, false)
 	}
 
+	if errKey := chosenPasswordError(pc.state); errKey != nil {
+		return r.renderStepError(pc, resolved, errKey)
+	}
+
 	// on_success reads across every visited step, not just the current one.
 	visitedResolved, err := r.resolveVisitedFields(pc)
 	if err != nil {
@@ -1513,6 +1539,9 @@ func (r *FlowStateMachineRuntime) processSSOCollection(pc *processCtx, resolved 
 		if _, ok := present[path]; !ok {
 			return r.renderStepError(pc, resolved, new(FlowStepErrorSSOUserCannotBeCreated))
 		}
+	}
+	if errKey := chosenPasswordError(state); errKey != nil {
+		return r.renderStepError(pc, resolved, errKey)
 	}
 	userID, err := r.ssoIdentities.CreateLinked(pc.ctx, FlowSSOCreateInput{
 		ProjectID:     state.ProjectID,

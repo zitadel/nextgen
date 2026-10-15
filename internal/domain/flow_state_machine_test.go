@@ -4964,6 +4964,137 @@ func TestFlowStateMachine_RegisterShortPassword_IsRejectedForLength(t *testing.T
 	assert.Equal(t, "error.x-auth-methods#password_min_length", *result.Step.Error)
 }
 
+// combinedLoginToRegisterDefinition is a login card collecting the email and
+// the password together, whose user_not_found routes to a register step that
+// creates the user without collecting the password again — so the password
+// typed on the login card is the one the account gets.
+func combinedLoginToRegisterDefinition() *domain.FlowDefinition {
+	createUser := domain.FlowOnSuccessCreateUser
+	show := domain.FlowStepCompleteShow
+	return &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-combined-login-register",
+		UserSchema: defaultSchemaURL,
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin:    "credentials",
+			domain.FlowDefinitionPurposeRegister: "register",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "credentials",
+				Fields: []domain.Field{"email", "x-auth-methods#password"},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit:                {Target: "done"},
+					domain.FlowImplicitOutcomeUserNotFound: {Target: "register"},
+				},
+			},
+			{
+				Name:      "register",
+				Fields:    []domain.Field{"email"},
+				OnSuccess: &createUser,
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit: {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: &show},
+		},
+	}
+}
+
+// A password a login card collects is only checked there, so it carries no
+// length rule; but when user_not_found carries it into registration it becomes
+// the new account's password, and creation holds it to the minimum the
+// registration step would have.
+func TestFlowStateMachine_LoginToRegister_CarriedPasswordMeetsMinimumAtCreation(t *testing.T) {
+	t.Parallel()
+	const email = "newcomer@example.com"
+	const handlerStop = "error.test_handler_reached"
+
+	tests := []struct {
+		name        string
+		password    string
+		wantHandled bool
+		wantError   string
+	}{
+		{
+			name:      "a short carried password is refused before the user is created",
+			password:  "short",
+			wantError: "error.x-auth-methods#password_min_length",
+		},
+		{
+			name:        "a carried password at the minimum reaches creation",
+			password:    "long-enough",
+			wantHandled: true,
+			wantError:   handlerStop,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			w := newFlowTestWorld(t)
+			def := combinedLoginToRegisterDefinition()
+
+			w.schemaResolver.EXPECT().
+				Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+				Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+				AnyTimes()
+			w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+			// Unknown on the login card (user_not_found), and again on the
+			// register step, where it is what lets registration go ahead.
+			w.authAttemptService.EXPECT().
+				SubmitIdentifier(gomock.Any(), gomock.Any()).
+				Return("", domain.ErrAuthAttemptProofRejected(nil)).
+				Times(2)
+			w.authAttemptService.EXPECT().SubmitPassword(gomock.Any(), gomock.Any()).Times(0)
+			handled := 0
+			if tc.wantHandled {
+				handled = 1
+			}
+			// The handler stands in for creation with a step error, so the test
+			// stops where the password would be stored.
+			w.createUser.EXPECT().
+				Handle(gomock.Any(), gomock.Cond(func(in domain.FlowOnSuccessInput) bool {
+					return in.State.CollectedData.AuthMethods.Password == tc.password
+				})).
+				Return(domain.FlowOnSuccessResult{StepError: new(handlerStop)}, nil).
+				Times(handled)
+
+			start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+				Definition:    def,
+				Purpose:       domain.FlowDefinitionPurposeLogin,
+				Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+				UserSchemaURL: defaultSchemaURL,
+			})
+			require.NoError(t, err)
+
+			register, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+				Action: domain.FlowActionSubmit,
+				Fields: map[string]any{"email": email, "x-auth-methods#password": tc.password},
+			})
+			require.NoError(t, err)
+			require.Equal(t, "register", register.State.CurrentStep)
+			require.Equal(t, domain.FlowDefinitionPurposeRegister, register.State.CurrentPurpose)
+
+			result, err := w.sm.Process(t.Context(), def, register.State, domain.FlowSubmitInput{
+				Action: domain.FlowActionSubmit,
+				Fields: map[string]any{"email": email},
+			})
+			require.NoError(t, err)
+			require.NotNil(t, result.Step)
+			assert.Equal(t, "register", result.Step.Name)
+			require.NotNil(t, result.Step.Error)
+			assert.Equal(t, tc.wantError, *result.Step.Error)
+		})
+	}
+}
+
 func TestFlowStateMachine_SingleCardLogin_NeedsNoPairingHint(t *testing.T) {
 	t.Parallel()
 	w := newFlowTestWorld(t)
