@@ -1,5 +1,6 @@
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
@@ -20,6 +21,22 @@ describe("@zitadel/server binary resolver", () => {
     expect(supportedPlatforms.map((entry) => entry.packageName).sort()).toEqual(
       Object.keys(optionalDependencies).sort(),
     );
+  });
+
+  it("points every export of the server package at a file it ships", async () => {
+    const manifest = createRequire(import.meta.url).resolve("@zitadel/server/package.json");
+    const { exports, files } = JSON.parse(await readFile(manifest, "utf8")) as {
+      exports: Record<string, string | { types?: string; default: string }>;
+      files: string[];
+    };
+    const targets = Object.values(exports).flatMap((entry) =>
+      typeof entry === "string" ? [entry] : [entry.default, ...(entry.types ? [entry.types] : [])],
+    );
+
+    for (const target of targets.filter((path) => path !== "./package.json")) {
+      await expect(access(join(dirname(manifest), target))).resolves.toBeUndefined();
+      expect(files.some((entry) => target.startsWith(`./${entry}/`))).toBe(true);
+    }
   });
 
   it("names the platform package for a platform", () => {
