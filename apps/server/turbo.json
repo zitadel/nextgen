@@ -200,7 +200,10 @@
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
         "$TURBO_ROOT$/api/.ogen.yaml",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
-        "$TURBO_ROOT$/scripts/generate-meta-schemas.ts"
+        "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
+        // Read by the cloud launcher's tests, as in moon.yml.
+        "$TURBO_ROOT$/vercel.json",
+        "$TURBO_ROOT$/apps/cloud/build.sh"
       ]
     },
     // The database lanes talk to a database whose state no hash sees, so
