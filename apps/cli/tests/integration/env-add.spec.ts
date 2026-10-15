@@ -133,6 +133,18 @@ describe("env add", () => {
         );
       });
 
+      it("registers the app url as a preview origin on the project it creates", async () => {
+        const app = await aSetUpApp();
+        await app.run([...ADD, "--app-url", "https://app.example.com"]);
+
+        const listed = await app.run(["origin", "list", "--env", "production", "--json"]);
+
+        expect(app.envelopeOf<{ items: unknown[] }>(listed).data.items).toContainEqual({
+          pattern: "https://app.example.com",
+          kind: "preview",
+        });
+      });
+
       it("writes nothing on a dry run", async () => {
         const app = await aSetUpApp();
 
