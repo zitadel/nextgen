@@ -3,11 +3,9 @@ import { Fragment } from "react";
 import { CommandBlock } from "./command-block";
 import { commands, skillsCommand } from "./commands";
 import { CopyButton } from "./copy-button";
-import { Doors } from "./doors";
 import hero from "./hero.avif";
 import heroStill from "./hero-still.webp";
 import { links } from "./links";
-import { Pillars } from "./pillars";
 import { Showcase } from "./showcase/showcase";
 import { SiteFooter } from "./site-footer";
 import { SiteHeader } from "./site-header";
@@ -36,28 +34,24 @@ function Hero({ className, first = false }: { className: string; first?: boolean
 }
 
 // The page follows zitadel/new-website's narrative (AGENTS.md): the benefit,
-// then its proof in four rows (the showcase), then the ways in, then where the
-// rest of the platform stands.
+// then its proof in four rows (the showcase), and nothing after it.
 export default function Home() {
   return (
     <>
       <SiteHeader />
       <main>
-        <section aria-labelledby="hero-title" className="overflow-hidden px-6 pt-8 pb-16 md:pt-12">
-          <div className="mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+        <section aria-labelledby="hero-title" className="overflow-hidden px-6 pt-8 pb-12 md:pt-10">
+          <div className="mx-auto grid max-w-6xl items-center gap-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
             <div className="hero-copy flex min-w-0 flex-col items-start gap-5">
               <h1 id="hero-title" className="hero-title">
-                A login experience you control, in one minute.
+                Your login in one minute.
               </h1>
-              <p className="text-pretty text-lg text-text-secondary leading-8">
-                Zitadel is the open-source identity platform for users, services, and AI agents,
-                built for developers and the agents they work with. One terminal session gives your
-                app a local Zitadel with login, registration, and profile pages. Your user model,
-                your login flow, and your styling are files in your repo.
+              <p className="text-balance text-lg text-text-secondary leading-7">
+                Open-source auth that lives in your repo: your user model, your flows, your look.
               </p>
               <CommandBlock title="Terminal" note="Node 24+" lines={commands} />
               <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-text-secondary leading-5">
-                <span>Using a coding agent? Install the skills:</span>
+                <span>Using a coding agent?</span>
                 <span className="inline-flex items-center gap-1">
                   {/* Wraps between words, never at the hyphens of a flag. */}
                   <code className="font-mono text-[0.8125rem] text-text-primary">
@@ -103,9 +97,6 @@ export default function Home() {
             <Showcase />
           </div>
         </section>
-
-        <Doors />
-        <Pillars />
       </main>
       <SiteFooter />
     </>

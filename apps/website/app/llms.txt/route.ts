@@ -6,7 +6,7 @@ import { commands, skillsCommand } from "../commands";
 // vercel.json (AGENTS.md).
 const body = `# Zitadel (developer preview)
 
-> A login experience you control, in one minute. Zitadel is the open-source identity platform for users, services, and AI agents, built for developers and the agents they work with. One terminal session gives an app a local Zitadel with login, registration, and profile pages; the user model, the login flow, and the styling are files in the app's repo. This is the preview of the next Zitadel: APIs, CLI flags and packages still change.
+> Your login in one minute. Zitadel is open-source auth for users, services, and AI agents that lives in the app's repo: one terminal session gives an app a local Zitadel with login, registration, and profile pages, and the user model, the login flow, and the styling are files in the repo. This is the preview of the next Zitadel: APIs, CLI flags and packages still change.
 
 Run it locally with the published CLI (Node.js 24 or newer). Every Zitadel command takes \`--non-interactive --json\` and prints one JSON envelope on stdout:
 

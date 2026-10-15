@@ -3,19 +3,19 @@
 The hosted cloud's front page at `/`, the preview's front door. It tells the
 story of `zitadel/new-website`'s narrative redesign (the branch
 `claude/zitadel-narrative-redesign-377a49`, its `docs/narrative-ia-proposal.md`):
-the benefit first, then its proof, then the ways in, then the depth. Under a
-header to the docs, the storybook and GitHub:
+the benefit first, then its proof, and nothing else. Under a header to the
+docs, the storybook and GitHub:
 
-1. The hero: "A login experience you control, in one minute.", what one
-   terminal session gives an app, the commands to copy, the skills line for
-   coding agents, and the buttons to the quickstart and the repository, beside
-   the new website's hero animation. No small print and no line above the
-   headline: the header's Preview label frames the page.
+1. The hero: "Your login in one minute.", one line on what it is, the
+   commands to copy, the skills line for coding agents, and the buttons to the
+   quickstart and the repository, beside the new website's hero animation.
+   Short on purpose: no paragraph, no small print, no line above the headline;
+   the header's Preview label frames the page, and the rows below say the rest.
 2. The showcase (`app/showcase/`), with no title of its own: four rows that
    prove the headline, up in a minute, your fields, your flow, your brand.
-3. Three ways in (`app/doors.tsx`): the preview, Zitadel v4 for production, an
-   engineer to talk to.
-4. Where the rest stands (`app/pillars.tsx`).
+
+The footer is the logo alone. Feature lists, ways in and roadmaps belong on the
+docs and on zitadel.com, not here.
 
 Read together with the [root `AGENTS.md`](../../AGENTS.md) and
 [`apps/AGENTS.md`](../AGENTS.md).
@@ -84,10 +84,10 @@ ships as inline SVG in the Lottie's own coordinates, its paths taken from the
 Lottie's shapes, and its motion as CSS keyframes in `app/globals.css` with the
 Lottie's timings and easings. As on the website it plays while the pointer is
 on it and returns to rest when the pointer leaves; here it also stays still
-for reduced motion. It sits in the header, the footer and the brand row's
-trustmark, so it never plays on its own, where nothing hovers, as the
-centrepiece of the coming-soon page did. Its `id` keeps each copy's SVG ids
-apart.
+for reduced motion. It sits in the header, the footer, where it is all there
+is, and the brand row's trustmark, so it never plays on its own, where nothing
+hovers, as the centrepiece of the coming-soon page did. Its `id` keeps each
+copy's SVG ids apart.
 
 `public/favicons/` holds the website's favicons,
 `packages/theme/assets/favicons` in `zitadel/new-website`, and
@@ -114,9 +114,10 @@ The hero shows the local preview as the commands of the published CLI
 Node 24, the CLI's `engines` floor, in its title bar, one button that copies
 them all and one per line; `/llms.txt` hands the same ones to agents. Both take
 them from `app/commands.ts`, with the skills line under them. They follow the
-README's and the docs' quickstart, and the first row's recording: a new folder,
-`doctor`, `start`, `setup --framework next --server local`, `npm run dev`.
-`--framework` keeps setup from asking; `--server local` needs no account.
+README's quick start, and the docs' quickstart without its optional `doctor`: a
+new folder, `start`, `setup --framework next --server local`, `npm run dev`;
+the first row's recording ran the same with `doctor` first. `--framework` keeps
+setup from asking; `--server local` needs no account.
 Never `--force`: if `mkdir` fails because the folder exists, the next lines run
 in the current directory, where `--force` would replace files. When that
 journey changes, change the commands, and the first row with them, and run
@@ -171,15 +172,6 @@ English copy. Before shows the card without the rule.
 - Next resolves the package to its `dist/`, so the website's build and dev
   tasks depend on `components:build` in moon and in turbo, and the Vercel
   service builds it through turbo before its own `pnpm run build` (Checks).
-
-## Three ways in and the pillars
-
-`app/doors.tsx` offers the next steps after the showcase, as the narrative's
-"Three ways in" does: build with the preview, ship on Zitadel v4 today, talk to
-an engineer. `app/pillars.tsx` closes the page with the four pillars of the
-root [`VISION.md`](../../VISION.md), titled by what each gives the reader, with
-what its "Where it stands" says ships and, marked, what is planned. When that
-section changes, change the cards with it, and claim nothing it does not.
 
 ## llms.txt
 

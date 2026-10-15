@@ -48,8 +48,15 @@
     flex-direction: column;
     align-items: center;
     justify-self: center;
-    /* The column's width on wide screens; under the commands on a phone. */
-    width: min(100%, 34rem);
+    /* Small under the buttons on a phone, so the rows come soon after; the
+       column's width beside the text on wide screens. */
+    width: min(100%, 16rem);
+  }
+
+  @media (min-width: 64rem) {
+    .stage {
+      width: min(100%, 30rem);
+    }
   }
 
   .stage-frame {
@@ -89,7 +96,7 @@
   /* The headline, lit from below by the animation's orange. */
   .hero-title {
     font-family: var(--font-heading);
-    font-size: clamp(2.5rem, 5vw, 4rem);
+    font-size: clamp(2.25rem, 4.5vw, 3.5rem);
     line-height: 1.05;
     letter-spacing: -0.025em;
     text-wrap: balance;
