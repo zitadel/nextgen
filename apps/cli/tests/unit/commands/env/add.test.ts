@@ -325,12 +325,14 @@ describe("env add", () => {
       expect(created).toEqual([{ name: `${basename(cwd)}-production`, seed_defaults: false }]);
     });
 
-    it("registers the app's own URL as an origin", async () => {
+    it("registers the app's own URL as a preview origin", async () => {
       const cwd = await makeProject();
 
       await add(cwd, "--app-url", "https://app.acme.com/some/path");
 
-      expect(created[0]).toMatchObject({ preview_origins: ["https://app.acme.com"] });
+      expect(created[0]).toMatchObject({
+        origins: [{ pattern: "https://app.acme.com", kind: "preview" }],
+      });
     });
   });
 
