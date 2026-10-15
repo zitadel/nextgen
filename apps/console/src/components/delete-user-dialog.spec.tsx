@@ -73,11 +73,13 @@ describe("delete user dialog", () => {
     );
     await userEvent.click(await screen.findByRole("button", { name: "Actions for Maya Patel" }));
 
-    expect(await screen.findByRole("menuitem", { name: "View details" })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: "Delete" })).toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: "Edit user" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: "Reset password" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("menuitem", { name: "Deactivate" })).not.toBeInTheDocument();
+    // Exactly these: Edit user, Reset password and Deactivate stay out until
+    // something serves them, and nothing new slips in unnoticed.
+    await screen.findByRole("menuitem", { name: "View details" });
+    expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
+      "View details",
+      "Delete",
+    ]);
   });
 
   it("names the user in the heading and keeps Delete locked until DELETE is typed", async () => {
@@ -94,11 +96,15 @@ describe("delete user dialog", () => {
     expect(confirm).toBeDisabled();
   });
 
-  it("does not accept the confirmation in the wrong case", async () => {
+  it("does not accept the confirmation in the wrong case or padded", async () => {
     server.use(http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [USER] })));
     await openDialog();
 
-    await userEvent.type(screen.getByLabelText("Type DELETE to confirm"), "delete");
+    const input = screen.getByLabelText("Type DELETE to confirm");
+    await userEvent.type(input, "delete");
+    expect(screen.getByRole("button", { name: "Delete user" })).toBeDisabled();
+    await userEvent.clear(input);
+    await userEvent.type(input, "DELETE ");
     expect(screen.getByRole("button", { name: "Delete user" })).toBeDisabled();
   });
 
@@ -154,6 +160,13 @@ describe("delete user dialog", () => {
     // underneath, and its `aria-hidden` on the rest of the page outlived the
     // dialog — so the list was invisible to assistive tech after cancelling.
     expect(screen.getByRole("link", { name: "Maya Patel" })).toBeInTheDocument();
+
+    // Reopening starts blank: the form remounts per opening, so the typed
+    // confirmation does not carry over.
+    await userEvent.click(screen.getByRole("button", { name: "Actions for Maya Patel" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    expect(await screen.findByLabelText("Type DELETE to confirm")).toHaveValue("");
+    expect(screen.getByRole("button", { name: "Delete user" })).toBeDisabled();
   });
 
   it("keeps the dialog open and shows the server's message when the delete fails", async () => {

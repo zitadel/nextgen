@@ -64,4 +64,3 @@ tasks:
     options:
       cache: false
       runInCI: "skip"
-      mutex: "e2e-serial"

@@ -5,8 +5,25 @@ import { dirname, join } from "node:path";
 
 import { PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
 import { runnerCommand } from "../../../scripts/task-runner.mjs";
+import { packageName, parsePort } from "./lib.mjs";
 
 export const packageDirs = [...PUBLIC_PACKAGE_DIRS];
+
+// Verdaccio serves a proxied packument from its storage until it is `maxage`
+// old, then asks npmjs again; the default is 2m. CI restores the storage of an
+// earlier run (JOURNEY_REGISTRY_STORAGE), so with the default every packument
+// is stale from the start, and the scaffolds' installs wait on thousands of
+// npmjs round trips that almost all come back 304 Not Modified. With an hour,
+// most CI runs restore packuments another run refreshed within the hour and
+// ask npmjs nothing; a fresh local store only skips repeat checks within a run.
+//
+// Longer is not better: npmjs releases reach the journey up to `maxage` late
+// (`npm create vite@latest`, `nuxi@latest` and `@angular/cli@latest` resolve
+// `latest` here), and `nuxi init` downloads its starter template from GitHub,
+// which has adopted a new nuxt release as soon as two hours after it was
+// published. A packument cached past that point lacks the version the
+// template asks for, and the nuxt install fails until the entry expires.
+export const UPLINK_MAXAGE = "1h";
 
 export function localRegistryPaths(workDir) {
   return {
@@ -226,14 +243,6 @@ export function npmEnvironment(env, registryUrl, npmrcPath) {
   };
 }
 
-export async function packageName(repoRoot, relativePath) {
-  const manifest = JSON.parse(await readFile(join(repoRoot, relativePath, "package.json"), "utf8"));
-  if (typeof manifest.name !== "string" || manifest.name.length === 0) {
-    throw new Error(`${relativePath}/package.json has no name`);
-  }
-  return manifest.name;
-}
-
 export async function packageVersion(repoRoot, relativePath) {
   const manifest = JSON.parse(await readFile(join(repoRoot, relativePath, "package.json"), "utf8"));
   if (typeof manifest.version !== "string" || manifest.version.length === 0) {
@@ -245,11 +254,7 @@ export async function packageVersion(repoRoot, relativePath) {
 export function localRegistryPort(repoRoot, env = process.env) {
   const explicit = env.ZITADEL_CLI_LOCAL_REGISTRY_PORT;
   if (explicit) {
-    const port = Number(explicit);
-    if (!Number.isInteger(port) || port <= 0 || port > 65_535) {
-      throw new Error(`ZITADEL_CLI_LOCAL_REGISTRY_PORT must be a TCP port, got ${explicit}`);
-    }
-    return port;
+    return parsePort(explicit, "ZITADEL_CLI_LOCAL_REGISTRY_PORT");
   }
   const hash = createHash("sha256").update(repoRoot).digest("hex").slice(0, 8);
   return 54_873 + (Number.parseInt(hash, 16) % 10_000);
@@ -268,6 +273,7 @@ max_body_size: 200mb
 uplinks:
   npmjs:
     url: https://registry.npmjs.org/
+    maxage: ${UPLINK_MAXAGE}
 packages:
   '@zitadel/*':
     access: $all

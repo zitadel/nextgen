@@ -4,7 +4,10 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 
 import { expect, test } from "@playwright/test";
-import { registerWithPassword } from "@zitadel/testing/playwright";
+import { identity, registerWithPassword } from "@zitadel/testing/playwright";
+
+import { ERROR_BOUNDARY_TITLE, NEUTRAL_MESSAGE } from "../../console/support/copy";
+import { requiredEnv } from "./support";
 
 /**
  * The local ownership journey. `zitadel start` boots the server with the
@@ -35,24 +38,6 @@ type JourneyMetadata = {
   registryUrl: string;
   runtime: string;
 };
-
-/**
- * Labels and copy owned by the console, retyped rather than imported: this
- * project does not compile console source, and the real-instance lane
- * (`e2e/console/src-real/console-real.spec.ts`) mirrors them the same way.
- */
-const NEUTRAL_MESSAGE =
-  "If the user exists in our system, they have been granted access to your project.";
-/**
- * The headings `describeError` gives the error boundary in
- * `apps/console/src/components/boundaries.tsx`: "Not authorized" for a 403,
- * "Request failed (<status>)" for any other refusal, and the generic fallback.
- * One locator, so which status the read answers with does not decide whether
- * the boundary is found. A failed loader always lands here rather than in the
- * not-found state, which the router only renders for a path that matches no
- * route.
- */
-const ERROR_BOUNDARY_HEADING = /Not authorized|Request failed \(\d+\)|Something went wrong/;
 
 test("a local project is owned from setup, and the console signs the local admin in", async ({
   page,
@@ -109,7 +94,7 @@ test("the setup admin can add and remove a project admin, and the colleague sees
     project_id: string;
   };
   const projectUrl = `${serverOrigin}/ui/console/projects/${secret.project_id}`;
-  const email = `colleague-${Date.now()}@example.com`;
+  const { email, password } = identity();
 
   // The colleague signs up at the console's own sign-in screen, in their own
   // context. That screen signs in to the platform project, which is the only
@@ -120,7 +105,7 @@ test("the setup admin can add and remove a project admin, and the colleague sees
   try {
     const colleaguePage = await colleagueContext.newPage();
     await colleaguePage.goto(`${serverOrigin}/ui/console/login`);
-    await registerWithPassword(colleaguePage, { email, password: "Colleague-pass-123!" });
+    await registerWithPassword(colleaguePage, { email, password });
     await expect(colleaguePage).not.toHaveURL(/\/login/, { timeout: 60_000 });
 
     // The admin signs in through a fresh one-time link, as above.
@@ -166,8 +151,11 @@ test("the setup admin can add and remove a project admin, and the colleague sees
 
     // The colleague loses the project with the grant: the page's loader fails,
     // so the route's error boundary replaces the screen it rendered before.
+    // Any of the boundary's titles, so which status the read answers with does
+    // not decide whether it is found; never the not-found state, which only a
+    // path no route matches renders.
     await colleaguePage.reload();
-    await expect(colleaguePage.getByText(ERROR_BOUNDARY_HEADING)).toBeVisible();
+    await expect(colleaguePage.getByText(ERROR_BOUNDARY_TITLE)).toBeVisible();
   } finally {
     await colleagueContext.close();
   }
@@ -175,8 +163,8 @@ test("the setup admin can add and remove a project admin, and the colleague sees
 
 /**
  * The journey's own metadata, plus the lanes this suite stays out of: local
- * ownership is framework-independent, the fresh-app lane already covers it, and
- * the docker lane keeps to the scaffold journey.
+ * ownership is framework- and preset-independent, the fresh-app lane already
+ * covers it, and the docker lane keeps to the scaffold journey.
  */
 async function journeyMetadataOrSkip(): Promise<JourneyMetadata & { localRuntimeUrl: string }> {
   const metadata = JSON.parse(
@@ -185,6 +173,10 @@ async function journeyMetadataOrSkip(): Promise<JourneyMetadata & { localRuntime
   test.skip(
     metadata.framework !== "next",
     "local ownership is framework-independent; next lane only",
+  );
+  test.skip(
+    metadata.preset !== null,
+    "the fresh-app lane already proves local ownership; a preset lane keeps to its sign-in journey",
   );
   test.skip(
     process.env.JOURNEY_PREEXISTING_APP === "1",
@@ -220,10 +212,4 @@ async function runCli(metadata: JourneyMetadata, args: string[]): Promise<unknow
     },
   );
   return JSON.parse(stdout) as unknown;
-}
-
-function requiredEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`${name} is required`);
-  return value;
 }
