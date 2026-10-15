@@ -3,7 +3,7 @@ import { EventEmitter } from "node:events";
 import { readFile } from "node:fs/promises";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { DockerLauncher } from "../../../../../src/lib/local-server/launchers/docker";
+import { DockerLauncher } from "../../../../../src/lib/local-server/internal/docker-launcher";
 import { CONTAINER_DATA_DIR } from "../../../../../src/lib/local-server/runtime";
 
 vi.mock("node:child_process", async (importOriginal) => {

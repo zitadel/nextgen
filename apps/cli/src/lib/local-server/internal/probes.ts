@@ -1,12 +1,7 @@
 import { createConnection, createServer } from "node:net";
 
-import {
-  type RuntimeMetadata,
-  checkLocalServerHealth,
-  readRuntimeMetadata,
-  writeRuntimeMetadata,
-} from "./runtime";
-import type { HealthProbe, PortProbe, ServerStore } from "./server";
+import { checkLocalServerHealth } from "../runtime";
+import type { HealthProbe, PortProbe } from "./lifecycle";
 
 /**
  * A port is free when it can be bound and nothing answers on it. Binding alone
@@ -57,29 +52,5 @@ function connects(host: string, port: number): Promise<boolean> {
 export class HttpHealth implements HealthProbe {
   isHealthy(serverUrl: string): Promise<boolean> {
     return checkLocalServerHealth(serverUrl, 1000);
-  }
-}
-
-/**
- * The folder's `.zitadel/local/runtime.json`, seen as the record of one backend.
- * A record the other backend wrote reads as nothing here: that server is not
- * this launcher's to manage.
- */
-export class RuntimeFileStore<R extends RuntimeMetadata> implements ServerStore<R> {
-  private readonly cwd: string;
-  private readonly backend: R["backend"];
-
-  constructor(cwd: string, backend: R["backend"]) {
-    this.cwd = cwd;
-    this.backend = backend;
-  }
-
-  async read(): Promise<R | undefined> {
-    const runtime = await readRuntimeMetadata(this.cwd);
-    return runtime?.backend === this.backend ? (runtime as R) : undefined;
-  }
-
-  write(record: R): Promise<void> {
-    return writeRuntimeMetadata(this.cwd, record);
   }
 }

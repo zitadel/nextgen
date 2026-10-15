@@ -1,280 +1,328 @@
-import { setTimeout as sleep } from "node:timers/promises";
+import consola from "consola";
+
+import { ZitadelError } from "../errors";
+import { publicCliCommand } from "../public-cli";
+import type { ResolvedEnv } from "./env-vars";
+import { assertDockerAvailable, startFailure } from "./internal/failures";
+import { BinaryLauncher, type StopBinaryRuntimeResult } from "./internal/binary-launcher";
+import { DockerLauncher, type DockerResult } from "./internal/docker-launcher";
+import { Lifecycle, type Launcher, type LifecycleOptions } from "./internal/lifecycle";
+import { HttpHealth, TcpPorts } from "./internal/probes";
+import { RuntimeFileStore } from "./internal/store";
+import { discoverManagedRuntimeProcesses, type ManagedRuntimeProcess } from "./processes";
+import {
+  type BinaryRuntimeMetadata,
+  type DockerRuntimeMetadata,
+  type RuntimeBackend,
+  type RuntimeMetadata,
+  checkLocalServerHealth,
+  ensureContainerIdentity,
+  localContainerName,
+  localRuntimePaths,
+  readRuntimeMetadata,
+  removeLocalData,
+  removeRuntimeMetadata,
+} from "./runtime";
+
+/** What to run when starting: everything a server needs that the directory does not already say. */
+export type RunConfig = Readonly<{
+  backend: RuntimeBackend;
+  /** The Docker image, for the Docker backend. */
+  image?: string;
+  /** Project variables for the server's environment. */
+  env: ResolvedEnv;
+  /** Bootstrap user document for the local admin. */
+  userFile?: string;
+}>;
+
+export type ServerStatus = Readonly<{
+  lifecycle: "missing" | "running" | "unhealthy" | "stopped";
+  runtime: RuntimeMetadata | undefined;
+  healthy: boolean;
+  /** The recorded process, for the binary backend. */
+  process?: { pid: number; running: boolean };
+  docker: {
+    available: boolean;
+    error?: string;
+    container_exists: boolean;
+    container_running: boolean;
+  };
+}>;
+
+export type StopReport = Readonly<{
+  runtime: RuntimeMetadata | undefined;
+  /** False when there was nothing to stop: no record, or the process was already gone. */
+  stopped: boolean;
+  /** How the process was stopped, for the binary backend. */
+  outcome?: StopBinaryRuntimeResult;
+}>;
+
+export type SweepResult = Readonly<
+  | { supported: false; error?: string }
+  | {
+      supported: true;
+      results: ReadonlyArray<{
+        process: ManagedRuntimeProcess;
+        stop_result: StopBinaryRuntimeResult;
+      }>;
+    }
+>;
 
 /**
- * What the lifecycle needs to know about a running server, whatever started it.
- * Which process or container it is stays in the launcher's own record type.
+ * The local server of one directory. A directory has at most one, running as a
+ * process or as a container, and `.zitadel/local/runtime.json` records which. It
+ * is the only way the commands start, stop, inspect or read the logs of it: how
+ * a server is run, which port it gets and how it is stopped stay behind it.
  */
-export type ServerRecord = Readonly<{
-  port: number;
-  server_url: string;
-}>;
+export class LocalServer {
+  private readonly cwd: string;
+  private readonly cliVersion: string;
 
-/** Where a folder keeps its record of the server it started. */
-export interface ServerStore<R extends ServerRecord> {
-  read(): Promise<R | undefined>;
-  write(record: R): Promise<void>;
-}
-
-export type StopOutcome = Readonly<{
-  pid?: number;
-  status: "failed" | "stale" | "stopped";
-  target?: "process" | "process-group";
-  signal?: NodeJS.Signals;
-}>;
-
-/** Runs the server. The binary and Docker runtimes are two implementations. */
-export interface Launcher<R extends ServerRecord> {
-  launch(spec: { port: number; serverUrl: string }): Promise<R>;
-  /** Whether what `launch` started still exists, answering or not. */
-  isAlive(record: R): Promise<boolean>;
-  /** Stops it, `stale` when there was nothing left to stop. */
-  terminate(record: R): Promise<StopOutcome>;
-}
-
-export interface PortProbe {
-  isFree(port: number): Promise<boolean>;
-}
-
-export interface HealthProbe {
-  isHealthy(serverUrl: string): Promise<boolean>;
-}
-
-export type ServerState<R extends ServerRecord> =
-  | { kind: "stopped" }
-  | { kind: "running"; record: R }
-  | { kind: "dead"; record: R };
-
-export type LocalServerOptions<R extends ServerRecord> = Readonly<{
-  /** The port to use. Absent, the folder keeps the port it had, or takes the first free one. */
-  port?: number;
-  /** The port a folder without a record tries first. */
-  firstPort?: number;
-  /** A running server is kept only when this holds; otherwise it is restarted. */
-  reusable?: (record: R) => boolean;
-  /** How long to wait for the new server to answer. */
-  startTimeoutMs?: number;
-  pollIntervalMs?: number;
-}>;
-
-export type LocalServerDeps<R extends ServerRecord> = Readonly<{
-  store: ServerStore<R>;
-  launcher: Launcher<R>;
-  ports: PortProbe;
-  health: HealthProbe;
-}>;
-
-export const FIRST_LOCAL_SERVER_PORT = 8080;
-const PORT_SEARCH_RANGE = 100;
-const PORT_RACE_RETRIES = 3;
-
-export class NoFreePortError extends Error {
-  readonly firstPort: number;
-
-  constructor(firstPort: number) {
-    super(`No free port from ${String(firstPort)} to ${String(firstPort + PORT_SEARCH_RANGE - 1)}`);
-    this.firstPort = firstPort;
+  private constructor(cwd: string, cliVersion: string) {
+    this.cwd = cwd;
+    this.cliVersion = cliVersion;
   }
-}
 
-export class PortInUseError extends Error {
-  readonly port: number;
-
-  constructor(port: number) {
-    super(`Port ${String(port)} is already in use`);
-    this.port = port;
+  static at(cwd: string, options: { cliVersion: string }): LocalServer {
+    return new LocalServer(cwd, options.cliVersion);
   }
-}
 
-export class ServerStartError<R extends ServerRecord> extends Error {
-  readonly reason: "exited" | "timeout";
-  readonly record: R;
-  readonly cleanup: StopOutcome;
-
-  constructor(reason: "exited" | "timeout", record: R, cleanup: StopOutcome) {
-    super(
-      reason === "exited"
-        ? "The server exited before it became healthy"
-        : "The server did not become healthy in time",
-    );
-    this.reason = reason;
-    this.record = record;
-    this.cleanup = cleanup;
+  /** The server version this CLI ships, for comparing with a running server's. */
+  static bundledVersion(): string | undefined {
+    return BinaryLauncher.bundledVersion();
   }
-}
 
-export class ServerStopError<R extends ServerRecord> extends Error {
-  readonly record: R;
-  readonly outcome: StopOutcome;
-
-  constructor(record: R, outcome: StopOutcome) {
-    super("The server did not stop");
-    this.record = record;
-    this.outcome = outcome;
+  /** The bundled server version, or the error that says how to repair the install. */
+  static assertBinaryAvailable(): string {
+    return BinaryLauncher.assertAvailable();
   }
-}
 
-/**
- * One server for one folder: it starts, reports on and stops the server whose
- * record the folder's store holds. Everything it touches arrives through its
- * dependencies, so the lifecycle is testable without processes or sockets.
- */
-export class LocalServer<R extends ServerRecord> {
-  private readonly deps: LocalServerDeps<R>;
-  private readonly options: LocalServerOptions<R>;
+  static dockerReachable(): Promise<DockerResult> {
+    return DockerLauncher.available();
+  }
 
-  constructor(deps: LocalServerDeps<R>, options: LocalServerOptions<R> = {}) {
-    this.deps = deps;
-    this.options = options;
+  static imageAvailable(image: string): Promise<"local" | "remote"> {
+    return DockerLauncher.imageAvailable(image);
+  }
+
+  /** Stops every CLI-managed server process on the machine, whichever directory started it. */
+  static async stopAll(): Promise<SweepResult> {
+    const discovery = await discoverManagedRuntimeProcesses();
+    if (!discovery.supported) {
+      return { supported: false, error: discovery.error };
+    }
+    const results: Array<{ process: ManagedRuntimeProcess; stop_result: StopBinaryRuntimeResult }> =
+      [];
+    for (const processInfo of discovery.processes) {
+      results.push({
+        process: processInfo,
+        stop_result: await BinaryLauncher.stopPid(processInfo.pid),
+      });
+    }
+    if (results.some((result) => result.stop_result.status === "failed")) {
+      throw new ZitadelError("E_VALIDATION", "Some managed local runtime processes did not stop", {
+        hint: "Inspect the failed process IDs and stop them manually, then rerun `zitadel stop --all`.",
+        details: { supported: true, results },
+      });
+    }
+    return { supported: true, results };
   }
 
   /**
-   * `running` needs both a live server and a healthy answer at its URL; a
-   * recorded server that is gone, or one that does not answer, is `dead`.
+   * Starts the directory's server, or finds it already running. A running one
+   * is kept only when it is the version (binary) or image (Docker) asked for. The
+   * directory keeps the port it had, takes the first free one otherwise, and an
+   * explicit `port` is taken as asked or refused.
    */
-  async state(): Promise<ServerState<R>> {
-    const record = await this.deps.store.read();
-    if (!record) {
-      return { kind: "stopped" };
-    }
-    const alive = await this.deps.launcher.isAlive(record);
-    return alive && (await this.deps.health.isHealthy(record.server_url))
-      ? { kind: "running", record }
-      : { kind: "dead", record };
-  }
-
-  async start(): Promise<{ record: R; alreadyRunning: boolean }> {
-    const state = await this.state();
-    const requested = this.options.port;
-    if (
-      state.kind === "running" &&
-      (requested === undefined || requested === state.record.port) &&
-      (this.options.reusable?.(state.record) ?? true)
-    ) {
-      await this.deps.store.write(state.record);
-      return { record: state.record, alreadyRunning: true };
-    }
-
-    const previous = state.kind === "stopped" ? undefined : state.record;
-    // A port that was asked for is taken as asked, or refused: moving to another
-    // one would start a server where the caller did not look for it. A port
-    // other than the running server's own is checked before that server is
-    // touched, so a refused move leaves it running.
-    if (requested !== undefined && requested !== previous?.port) {
-      await this.assertFree(requested);
-    }
-    if (previous) {
-      await this.terminate(previous);
-    }
-    if (requested !== undefined) {
-      await this.assertFree(requested);
-    }
-    let preferred = previous?.port;
-    for (let attempt = 0; ; attempt++) {
-      const port = requested ?? (await this.choosePort(preferred));
-      const record = await this.deps.launcher.launch({ port, serverUrl: serverUrlFor(port) });
-      try {
-        await this.waitUntilReady(record);
-      } catch (error) {
-        // Two directories that choose the same free port at the same moment: the
-        // loser exits because the winner holds the port now. It tries the next
-        // one. A server that exits with its port still free crashed, and says so.
+  async start(
+    config: RunConfig,
+    options: { port?: number } = {},
+  ): Promise<{ runtime: RuntimeMetadata; alreadyRunning: boolean }> {
+    const existing = await readRuntimeMetadata(this.cwd);
+    const paths = localRuntimePaths(this.cwd);
+    try {
+      if (config.backend === "binary") {
+        // A server another CLI release started serves that release's API, and
+        // `setup` against it fails halfway, after the project exists. So a
+        // running server is reused only when it is the version this CLI ships;
+        // the Docker backend compares the image for the same reason.
+        const version = BinaryLauncher.bundledVersion();
         if (
-          requested === undefined &&
-          attempt < PORT_RACE_RETRIES &&
-          error instanceof ServerStartError &&
-          error.reason === "exited" &&
-          !(await this.deps.ports.isFree(port))
+          existing?.backend === "binary" &&
+          version !== undefined &&
+          existing.server_version !== version &&
+          BinaryLauncher.isRunning(existing.pid)
         ) {
-          preferred = port + 1;
-          continue;
+          consola.info(
+            `Restarting the local Zitadel server on ${version}: it ran ${existing.server_version}. Its data stays.`,
+          );
         }
-        throw error;
-      }
-      await this.deps.store.write(record);
-      return { record, alreadyRunning: false };
-    }
-  }
-
-  /** Stops the recorded server. `not-running` when nothing was recorded or nothing was left. */
-  async stop(): Promise<{ result: "stopped" | "not-running"; record?: R }> {
-    const record = await this.deps.store.read();
-    if (!record) {
-      return { result: "not-running" };
-    }
-    const outcome = await this.terminate(record);
-    return { result: outcome.status === "stopped" ? "stopped" : "not-running", record };
-  }
-
-  /**
-   * The folder's own port when it is free, so URLs written into the app's
-   * configuration stay valid across restarts, and otherwise the first free port
-   * above it. A port someone else holds is skipped, never shared.
-   */
-  choosePort(preferred?: number): Promise<number> {
-    return chooseFreePort(this.deps.ports, preferred, this.options.firstPort);
-  }
-
-  private async assertFree(port: number): Promise<void> {
-    if (!(await this.deps.ports.isFree(port))) {
-      throw new PortInUseError(port);
-    }
-  }
-
-  private async terminate(record: R): Promise<StopOutcome> {
-    const outcome = await this.deps.launcher.terminate(record);
-    if (outcome.status === "failed") {
-      throw new ServerStopError(record, outcome);
-    }
-    return outcome;
-  }
-
-  /**
-   * Ready means the process is alive and answering, and still alive once it
-   * has answered: a process that lost the race for its port dies right after
-   * binding fails, while the server that holds the port keeps answering.
-   */
-  private async waitUntilReady(record: R): Promise<void> {
-    const timeout = this.options.startTimeoutMs ?? 90_000;
-    const interval = this.options.pollIntervalMs ?? 1000;
-    const started = Date.now();
-    while (Date.now() - started < timeout) {
-      if (!(await this.deps.launcher.isAlive(record))) {
-        throw await this.startFailure("exited", record);
-      }
-      if (await this.deps.health.isHealthy(record.server_url)) {
-        if (!(await this.deps.launcher.isAlive(record))) {
-          throw await this.startFailure("exited", record);
+        if (existing?.backend === "docker") {
+          await DockerLauncher.remove(existing.container_name);
         }
-        return;
+        return await this.run<BinaryRuntimeMetadata>(
+          "binary",
+          new BinaryLauncher({
+            cliVersion: this.cliVersion,
+            dataDir: paths.dataDir,
+            logPath: paths.logFile,
+            env: config.env,
+            userFile: config.userFile,
+          }),
+          {
+            port: options.port,
+            reusable: (record) => version === undefined || record.server_version === version,
+          },
+        );
       }
-      await sleep(interval);
+
+      const image = config.image;
+      if (image === undefined) {
+        throw new ZitadelError("E_VALIDATION", "The Docker backend needs an image", {});
+      }
+      await assertDockerAvailable(this.cliVersion);
+      if (existing?.backend === "binary") {
+        await BinaryLauncher.stopPid(existing.pid);
+      }
+      return await this.run<DockerRuntimeMetadata>(
+        "docker",
+        new DockerLauncher({
+          cliVersion: this.cliVersion,
+          containerName: localContainerName(this.cwd),
+          image,
+          dataDir: paths.dataDir,
+          identity: await ensureContainerIdentity(this.cwd, DockerLauncher.currentUser()),
+          env: config.env,
+          userFile: config.userFile,
+        }),
+        { port: options.port, reusable: (record) => record.image === image },
+      );
+    } catch (error) {
+      throw await startFailure(error, this.cliVersion);
     }
-    throw await this.startFailure("timeout", record);
   }
 
-  private async startFailure(
-    reason: "exited" | "timeout",
-    record: R,
-  ): Promise<ServerStartError<R>> {
-    return new ServerStartError(reason, record, await this.deps.launcher.terminate(record));
+  /** Where the directory's server stands: whether it is recorded, alive and answering. */
+  async status(): Promise<ServerStatus> {
+    const runtime = await readRuntimeMetadata(this.cwd);
+    let container: Awaited<ReturnType<typeof DockerLauncher.inspect>> | undefined;
+    let dockerError: string | undefined;
+    if (runtime?.backend === "docker") {
+      try {
+        container = await DockerLauncher.inspect(runtime.container_name);
+      } catch (error) {
+        dockerError = error instanceof Error ? error.message : String(error);
+      }
+    }
+    const healthy = runtime ? await checkLocalServerHealth(runtime.server_url) : false;
+    const running = runtime?.backend === "binary" ? BinaryLauncher.isRunning(runtime.pid) : false;
+    return {
+      lifecycle: lifecycleOf({ runtime, healthy, running, container }),
+      runtime,
+      healthy,
+      ...(runtime?.backend === "binary" ? { process: { pid: runtime.pid, running } } : {}),
+      docker: {
+        available: dockerError === undefined,
+        error: dockerError,
+        container_exists: container?.exists ?? false,
+        container_running: container?.running ?? false,
+      },
+    };
+  }
+
+  /** Stops the directory's server and keeps its data. */
+  async stop(): Promise<StopReport> {
+    return this.halt();
+  }
+
+  /** Stops the directory's server and deletes its data and its record. */
+  async reset(): Promise<StopReport> {
+    const report = await this.halt();
+    await removeLocalData(this.cwd);
+    await removeRuntimeMetadata(this.cwd);
+    return report;
+  }
+
+  /** The end of the server's log, or the whole of it followed until interrupted. */
+  async logs(options: {
+    tail: number;
+    follow?: boolean;
+  }): Promise<{ runtime: RuntimeMetadata; logs: string }> {
+    const runtime = await readRuntimeMetadata(this.cwd);
+    if (!runtime) {
+      throw new ZitadelError("E_VALIDATION", "Local Zitadel runtime has not been started", {
+        hint: "Run `zitadel start` first.",
+        nextCommands: [publicCliCommand("start", this.cliVersion)],
+      });
+    }
+    if (options.follow) {
+      if (runtime.backend === "binary") {
+        await BinaryLauncher.followLogs(runtime.log_path, options.tail);
+      } else {
+        await DockerLauncher.followLogs(runtime.container_name, options.tail);
+      }
+      return { runtime, logs: "" };
+    }
+    const logs =
+      runtime.backend === "binary"
+        ? await BinaryLauncher.readLogs(runtime.log_path, options.tail)
+        : await DockerLauncher.readLogs(runtime.container_name, options.tail);
+    return { runtime, logs };
+  }
+
+  private async halt(): Promise<StopReport> {
+    const runtime = await readRuntimeMetadata(this.cwd);
+    if (runtime?.backend === "binary") {
+      const outcome = await BinaryLauncher.stopPid(runtime.pid);
+      if (outcome.status === "failed") {
+        throw new ZitadelError("E_VALIDATION", "Local Zitadel server did not stop", {
+          hint: "Inspect the local runtime process and stop it manually, then rerun the command.",
+          details: { runtime, stop_result: outcome },
+        });
+      }
+      return { runtime, stopped: outcome.status !== "stale", outcome };
+    }
+    await DockerLauncher.remove(
+      runtime?.backend === "docker" ? runtime.container_name : localContainerName(this.cwd),
+    );
+    return { runtime, stopped: runtime !== undefined };
+  }
+
+  private async run<R extends RuntimeMetadata>(
+    backend: R["backend"],
+    launcher: Launcher<R>,
+    options: LifecycleOptions<R>,
+  ): Promise<{ runtime: RuntimeMetadata; alreadyRunning: boolean }> {
+    const { record, alreadyRunning } = await new Lifecycle<R>(
+      {
+        store: new RuntimeFileStore<R>(this.cwd, backend),
+        launcher,
+        ports: new TcpPorts(),
+        health: new HttpHealth(),
+      },
+      options,
+    ).start();
+    return { runtime: record, alreadyRunning };
   }
 }
 
-/** `preferred` when free, else the first free port above it; `firstPort` (8080) when there is no preference. */
-export async function chooseFreePort(
-  ports: PortProbe,
-  preferred?: number,
-  firstPort: number = FIRST_LOCAL_SERVER_PORT,
-): Promise<number> {
-  const first = preferred ?? firstPort;
-  for (let port = first; port < first + PORT_SEARCH_RANGE; port++) {
-    if (await ports.isFree(port)) {
-      return port;
-    }
+function lifecycleOf(input: {
+  runtime: RuntimeMetadata | undefined;
+  healthy: boolean;
+  running: boolean;
+  container: { exists: boolean; running: boolean } | undefined;
+}): ServerStatus["lifecycle"] {
+  if (!input.runtime) {
+    return "missing";
   }
-  throw new NoFreePortError(first);
-}
-
-export function serverUrlFor(port: number): string {
-  return `http://localhost:${String(port)}`;
+  if (input.runtime.backend === "binary") {
+    if (input.running && input.healthy) {
+      return "running";
+    }
+    return input.running ? "unhealthy" : "stopped";
+  }
+  if (input.container?.running && input.healthy) {
+    return "running";
+  }
+  return input.container?.exists ? "unhealthy" : "stopped";
 }

@@ -7,7 +7,7 @@ import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { buildSummary } from "../../../../src/commands/setup/index";
-import { BinaryLauncher } from "../../../../src/lib/local-server/launchers/binary";
+import { LocalServer } from "../../../../src/lib/local-server/server";
 import {
   localContainerName,
   localRuntimePaths,
@@ -209,7 +209,7 @@ describe("setup command pre-flight", () => {
     };
     expect(json.code).toBe("E_CONFLICT");
     expect(json.message).toBe(
-      `The local Zitadel server runs 0.0.1, but this CLI ships ${String(BinaryLauncher.bundledVersion())}`,
+      `The local Zitadel server runs 0.0.1, but this CLI ships ${String(LocalServer.bundledVersion())}`,
     );
     expect(json.hint).toContain("Run start to restart it");
     expect(json.next_commands).toEqual([
@@ -224,7 +224,7 @@ describe("setup command pre-flight", () => {
   it("goes on against a local server of this CLI's own version", async () => {
     const cwd = await makeTempDir();
     const serverUrl = await startHealthServer();
-    const version = BinaryLauncher.bundledVersion();
+    const version = LocalServer.bundledVersion();
     expect(version).toBeDefined();
     await writeRuntimeMetadata(cwd, binaryRuntimeFor(cwd, serverUrl, String(version)));
 

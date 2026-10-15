@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { BinaryLauncher } from "../../../../../src/lib/local-server/launchers/binary";
+import { BinaryLauncher } from "../../../../../src/lib/local-server/internal/binary-launcher";
 
 const resolver = vi.hoisted(() => ({ missing: false }));
 

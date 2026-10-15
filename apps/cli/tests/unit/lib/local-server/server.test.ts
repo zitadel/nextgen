@@ -1,399 +1,129 @@
-import { describe, expect, it } from "vitest";
+import { mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { afterEach, describe, expect, it } from "vitest";
 
 import {
-  chooseFreePort,
-  LocalServer,
-  NoFreePortError,
-  PortInUseError,
-  ServerStartError,
-  ServerStopError,
-  type HealthProbe,
-  type Launcher,
-  type PortProbe,
-  type ServerRecord,
-  type ServerStore,
-  type StopOutcome,
-} from "../../../../src/lib/local-server/server";
+  LOCAL_DATA_DIR,
+  LOCAL_RUNTIME_FILE,
+  type BinaryRuntimeMetadata,
+  writeRuntimeMetadata,
+} from "../../../../src/lib/local-server/runtime";
+import { LocalServer } from "../../../../src/lib/local-server/server";
 
-type Fake = ServerRecord & { pid: number };
+const dirs: string[] = [];
 
-/** A machine with ports, processes and a store held in memory. */
-class World {
-  record: Fake | undefined;
-  takenPorts = new Set<number>();
-  alive = new Set<number>();
-  /** Origins that answer /healthz, whoever answers them. */
-  healthy = new Set<string>();
-  launched: number[] = [];
-  terminated: number[] = [];
-  nextPid = 100;
-  /** What `launch` does to the world, to model a process that dies or never answers. */
-  onLaunch: (record: Fake, world: World) => void = (record, world) => {
-    world.alive.add(record.pid);
-    world.healthy.add(record.server_url);
-  };
-  terminateResult: StopOutcome["status"] = "stopped";
-
-  store: ServerStore<Fake> = {
-    read: async () => this.record,
-    write: async (record) => {
-      this.record = record;
-    },
-  };
-
-  launcher: Launcher<Fake> = {
-    launch: async ({ port, serverUrl }) => {
-      const record = { pid: this.nextPid++, port, server_url: serverUrl };
-      this.launched.push(port);
-      this.onLaunch(record, this);
-      return record;
-    },
-    isAlive: async (record) => this.alive.has(record.pid),
-    terminate: async (record) => {
-      this.terminated.push(record.pid);
-      if (this.terminateResult === "stopped") {
-        this.alive.delete(record.pid);
-        this.healthy.delete(record.server_url);
-      }
-      return { pid: record.pid, status: this.terminateResult };
-    },
-  };
-
-  ports: PortProbe = { isFree: async (port) => !this.takenPorts.has(port) };
-  health: HealthProbe = { isHealthy: async (url) => this.healthy.has(url) };
-
-  server(options: ConstructorParameters<typeof LocalServer<Fake>>[1] = {}) {
-    return new LocalServer<Fake>(
-      { store: this.store, launcher: this.launcher, ports: this.ports, health: this.health },
-      { startTimeoutMs: 30, pollIntervalMs: 5, ...options },
-    );
+afterEach(async () => {
+  for (const dir of dirs.splice(0)) {
+    await rm(dir, { recursive: true, force: true });
   }
+});
+
+async function directory(): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), "zitadel-local-server-"));
+  dirs.push(dir);
+  return dir;
+}
+
+const at = (cwd: string) => LocalServer.at(cwd, { cliVersion: "0.0.0-test" });
+
+/** A record whose process is long gone, in a directory that has data. */
+async function directoryWithAGoneServer(): Promise<string> {
+  const cwd = await directory();
+  await mkdir(join(cwd, LOCAL_DATA_DIR), { recursive: true });
+  const record: BinaryRuntimeMetadata = {
+    schema_version: 1,
+    backend: "binary",
+    pid: 2_147_483_000,
+    command: "nextgen --migrate",
+    log_path: join(cwd, "server.log"),
+    server_package: "@zitadel/server",
+    server_version: "1.0.0",
+    port: 8099,
+    server_url: "http://localhost:8099",
+    data_dir: join(cwd, LOCAL_DATA_DIR),
+    created_at: "2026-01-01T00:00:00.000Z",
+    cli_version: "1.0.0",
+  };
+  await writeRuntimeMetadata(cwd, record);
+  return cwd;
 }
 
 describe("LocalServer", () => {
-  describe("state", () => {
-    it("is stopped when the directory has no record", async () => {
-      const world = new World();
-
-      await expect(world.server().state()).resolves.toEqual({ kind: "stopped" });
-    });
-
-    it("is running when the recorded process is alive and answers", async () => {
-      const world = new World();
-      world.record = { pid: 7, port: 8080, server_url: "http://localhost:8080" };
-      world.alive.add(7);
-      world.healthy.add("http://localhost:8080");
-
-      await expect(world.server().state()).resolves.toMatchObject({ kind: "running" });
-    });
-
-    it("is dead when the recorded process is gone, even if something else answers there", async () => {
-      const world = new World();
-      world.record = { pid: 7, port: 8080, server_url: "http://localhost:8080" };
-      world.healthy.add("http://localhost:8080");
-
-      await expect(world.server().state()).resolves.toMatchObject({ kind: "dead" });
-    });
-
-    it("is dead when the recorded process is alive but does not answer", async () => {
-      const world = new World();
-      world.record = { pid: 7, port: 8080, server_url: "http://localhost:8080" };
-      world.alive.add(7);
-
-      await expect(world.server().state()).resolves.toMatchObject({ kind: "dead" });
-    });
-  });
-
-  describe("start", () => {
-    it("takes 8080 for a directory that has no server", async () => {
-      const world = new World();
-
-      const { record, alreadyRunning } = await world.server().start();
-
-      expect(record.port).toBe(8080);
-      expect(alreadyRunning).toBe(false);
-    });
-
-    it("takes the next free port when 8080 is held by another directory's server", async () => {
-      const world = new World();
-      world.takenPorts.add(8080);
-
-      const { record } = await world.server().start();
-
-      expect(record.port).toBe(8081);
-      expect(record.server_url).toBe("http://localhost:8081");
-    });
-
-    it("records the server it started", async () => {
-      const world = new World();
-
-      const { record } = await world.server().start();
-
-      expect(world.record).toEqual(record);
-    });
-
-    it("reuses a running server and does not launch another", async () => {
-      const world = new World();
-      await world.server().start();
-
-      const second = await world.server().start();
-
-      expect(second.alreadyRunning).toBe(true);
-      expect(world.launched).toEqual([8080]);
-    });
-
-    it("keeps the port the directory had when it restarts", async () => {
-      const world = new World();
-      world.takenPorts.add(8080);
-      await world.server().start();
-      await world.server().stop();
-
-      const { record } = await world.server().start();
-
-      expect(record.port).toBe(8081);
-    });
-
-    it("moves a directory up when the port it had is now held by someone else", async () => {
-      const world = new World();
-      world.record = { pid: 7, port: 8085, server_url: "http://localhost:8085" };
-      world.takenPorts.add(8085);
-
-      const { record } = await world.server().start();
-
-      expect(record.port).toBe(8086);
-    });
-
-    it("starts on the port it was asked for", async () => {
-      const world = new World();
-
-      const { record } = await world.server({ port: 9000 }).start();
-
-      expect(record.port).toBe(9000);
-    });
-
-    it("refuses a port it was asked for that is held, instead of using another", async () => {
-      const world = new World();
-      world.takenPorts.add(9000);
-
-      await expect(world.server({ port: 9000 }).start()).rejects.toBeInstanceOf(PortInUseError);
-      expect(world.launched).toEqual([]);
-    });
-
-    it("leaves a running server alone when the port it is asked to move to is held", async () => {
-      const world = new World();
-      await world.server().start();
-      world.takenPorts.add(9000);
-
-      await expect(world.server({ port: 9000 }).start()).rejects.toBeInstanceOf(PortInUseError);
-
-      expect(world.terminated).toEqual([]);
-      await expect(world.server().state()).resolves.toMatchObject({ kind: "running" });
-    });
-
-    it("restarts a running server that is not reusable", async () => {
-      const world = new World();
-      const { record: first } = await world.server().start();
-
-      const second = await world.server({ reusable: () => false }).start();
-
-      expect(world.terminated).toEqual([first.pid]);
-      expect(second.alreadyRunning).toBe(false);
-    });
-
-    it("restarts a running server onto a different port when one is asked for", async () => {
-      const world = new World();
-      const { record: first } = await world.server().start();
-
-      const { record } = await world.server({ port: 9000 }).start();
-
-      expect(world.terminated).toEqual([first.pid]);
-      expect(record.port).toBe(9000);
-    });
-
-    it("clears a dead record before it starts", async () => {
-      const world = new World();
-      world.record = { pid: 7, port: 8080, server_url: "http://localhost:8080" };
-
-      await world.server().start();
-
-      expect(world.terminated).toEqual([7]);
-    });
-
-    it("fails when the server cannot be stopped before the restart", async () => {
-      const world = new World();
-      world.record = { pid: 7, port: 8080, server_url: "http://localhost:8080" };
-      world.terminateResult = "failed";
-
-      await expect(world.server().start()).rejects.toBeInstanceOf(ServerStopError);
-    });
-
-    it("does not call another server's answer its own when its process dies at once", async () => {
-      const world = new World();
-      world.healthy.add("http://localhost:8080");
-      world.onLaunch = (record, w) => {
-        w.alive.add(record.pid);
-        queueMicrotask(() => w.alive.delete(record.pid));
-      };
-
-      const error = await world
-        .server()
-        .start()
-        .catch((e: unknown) => e);
-
-      expect(error).toBeInstanceOf(ServerStartError);
-      expect(error).toMatchObject({ reason: "exited" });
-      expect(world.record).toBeUndefined();
-    });
-
-    it("takes the next port when another start won the same port at the same moment", async () => {
-      const world = new World();
-      world.onLaunch = (record, w) => {
-        if (record.port === 8080) {
-          w.takenPorts.add(8080);
-          return;
-        }
-        w.alive.add(record.pid);
-        w.healthy.add(record.server_url);
-      };
-
-      const { record } = await world.server().start();
-
-      expect(world.launched).toEqual([8080, 8081]);
-      expect(record.port).toBe(8081);
-    });
-
-    it("does not retry a server that exited while its port was still free", async () => {
-      const world = new World();
-      world.onLaunch = () => undefined;
-
-      await expect(world.server().start()).rejects.toMatchObject({ reason: "exited" });
-
-      expect(world.launched).toEqual([8080]);
-    });
-
-    it("does not move to another port when one was asked for and lost", async () => {
-      const world = new World();
-      world.onLaunch = (record, w) => {
-        w.takenPorts.add(record.port);
-      };
-
-      await expect(world.server({ port: 9000 }).start()).rejects.toMatchObject({
-        reason: "exited",
+  describe("status", () => {
+    it("is missing for a directory that never started a server", async () => {
+      await expect(at(await directory()).status()).resolves.toMatchObject({
+        lifecycle: "missing",
+        healthy: false,
       });
-
-      expect(world.launched).toEqual([9000]);
     });
 
-    it("fails with a timeout when the process lives but never answers", async () => {
-      const world = new World();
-      world.onLaunch = (record, w) => w.alive.add(record.pid);
-
-      const error = await world
-        .server()
-        .start()
-        .catch((e: unknown) => e);
-
-      expect(error).toMatchObject({ reason: "timeout" });
-      expect(world.record).toBeUndefined();
-    });
-
-    it("stops the process it launched when it never became ready", async () => {
-      const world = new World();
-      world.onLaunch = (record, w) => w.alive.add(record.pid);
-
-      await world
-        .server()
-        .start()
-        .catch(() => undefined);
-
-      expect(world.terminated).toEqual([100]);
-    });
-
-    it("reports what the cleanup of a failed start did", async () => {
-      const world = new World();
-      world.onLaunch = (record, w) => w.alive.add(record.pid);
-      world.terminateResult = "failed";
-
-      const error = await world
-        .server()
-        .start()
-        .catch((e: unknown) => e);
-
-      expect(error).toMatchObject({ cleanup: { status: "failed" } });
-    });
-
-    it("fails when no port in range is free", async () => {
-      const world = new World();
-      world.ports = { isFree: async () => false };
-
-      await expect(world.server().start()).rejects.toBeInstanceOf(NoFreePortError);
+    it("is stopped when the recorded process is gone", async () => {
+      await expect(at(await directoryWithAGoneServer()).status()).resolves.toMatchObject({
+        lifecycle: "stopped",
+        process: { pid: 2_147_483_000, running: false },
+      });
     });
   });
 
   describe("stop", () => {
-    it("is not running when the directory has no record", async () => {
-      const world = new World();
-
-      await expect(world.server().stop()).resolves.toEqual({ result: "not-running" });
-      expect(world.terminated).toEqual([]);
+    it("reports nothing stopped for a directory that never started a server", async () => {
+      await expect(at(await directory()).stop()).resolves.toMatchObject({
+        runtime: undefined,
+        stopped: false,
+      });
     });
 
-    it("stops the recorded server", async () => {
-      const world = new World();
-      const { record } = await world.server().start();
-
-      const stopped = await world.server().stop();
-
-      expect(stopped.result).toBe("stopped");
-      expect(world.terminated).toEqual([record.pid]);
+    it("reports nothing stopped when the recorded process is already gone", async () => {
+      await expect(at(await directoryWithAGoneServer()).stop()).resolves.toMatchObject({
+        stopped: false,
+        outcome: { status: "stale" },
+      });
     });
 
-    it("asks the launcher to stop a recorded process even when it looks dead", async () => {
-      const world = new World();
-      world.record = { pid: 7, port: 8080, server_url: "http://localhost:8080" };
+    it("keeps the data and the record", async () => {
+      const cwd = await directoryWithAGoneServer();
 
-      await world.server().stop();
+      await at(cwd).stop();
 
-      expect(world.terminated).toEqual([7]);
-    });
-
-    it("is not running when the launcher finds nothing left to stop", async () => {
-      const world = new World();
-      world.record = { pid: 7, port: 8080, server_url: "http://localhost:8080" };
-      world.terminateResult = "stale";
-
-      await expect(world.server().stop()).resolves.toMatchObject({ result: "not-running" });
-    });
-
-    it("fails when the server does not stop", async () => {
-      const world = new World();
-      world.record = { pid: 7, port: 8080, server_url: "http://localhost:8080" };
-      world.terminateResult = "failed";
-
-      await expect(world.server().stop()).rejects.toBeInstanceOf(ServerStopError);
+      await expect(stat(join(cwd, LOCAL_DATA_DIR))).resolves.toBeDefined();
+      await expect(stat(join(cwd, LOCAL_RUNTIME_FILE))).resolves.toBeDefined();
     });
   });
-});
 
-describe("chooseFreePort", () => {
-  it("prefers the port it is given when it is free", async () => {
-    await expect(chooseFreePort({ isFree: async () => true }, 9100)).resolves.toBe(9100);
+  describe("reset", () => {
+    it("deletes the data and the record, even when the recorded process is gone", async () => {
+      const cwd = await directoryWithAGoneServer();
+
+      await at(cwd).reset();
+
+      await expect(stat(join(cwd, LOCAL_DATA_DIR))).rejects.toMatchObject({ code: "ENOENT" });
+      await expect(stat(join(cwd, LOCAL_RUNTIME_FILE))).rejects.toMatchObject({ code: "ENOENT" });
+    });
   });
 
-  it("starts from 8080 without a preference", async () => {
-    await expect(chooseFreePort({ isFree: async () => true })).resolves.toBe(8080);
+  describe("logs", () => {
+    it("refuses a directory that never started a server, and says how to start one", async () => {
+      await expect(at(await directory()).logs({ tail: 10 })).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        hint: "Run `zitadel start` first.",
+      });
+    });
+
+    it("reads the end of the server's log", async () => {
+      const cwd = await directoryWithAGoneServer();
+      await writeFile(join(cwd, "server.log"), "one\ntwo\nthree\n");
+
+      await expect(at(cwd).logs({ tail: 2 })).resolves.toMatchObject({ logs: "two\nthree\n" });
+    });
   });
 
-  it("gives up after a hundred ports", async () => {
-    const tried: number[] = [];
-    const ports = {
-      isFree: async (port: number) => {
-        tried.push(port);
-        return false;
-      },
-    };
-
-    await expect(chooseFreePort(ports, 8080)).rejects.toBeInstanceOf(NoFreePortError);
-    expect(tried).toHaveLength(100);
+  describe("start", () => {
+    it("refuses the Docker backend without an image", async () => {
+      await expect(
+        at(await directory()).start({ backend: "docker", env: { values: {}, injected: [] } }),
+      ).rejects.toMatchObject({ code: "E_VALIDATION" });
+    });
   });
 });

@@ -14,7 +14,7 @@ import {
   type ContainerIdentity,
   type DockerRuntimeMetadata,
 } from "../runtime";
-import type { Launcher, StopOutcome } from "../server";
+import type { Launcher, StopOutcome } from "./lifecycle";
 
 export type DockerResult = {
   status: number;

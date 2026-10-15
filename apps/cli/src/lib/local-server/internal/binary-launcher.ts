@@ -9,7 +9,7 @@ import { resolveServerBinary, serverBinaryPath } from "@zitadel/server/binary";
 import { ZitadelError } from "../../errors";
 import { EMPTY_ENV, type ResolvedEnv, envSummary } from "../env-vars";
 import type { BinaryRuntimeMetadata } from "../runtime";
-import type { Launcher } from "../server";
+import type { Launcher } from "./lifecycle";
 
 export const SERVER_NPM_PACKAGE = "@zitadel/server";
 const COMMAND_ENV = "ZITADEL_SERVER_BINARY";

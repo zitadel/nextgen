@@ -3,8 +3,6 @@ import consola from "consola";
 
 import { claimAction, claimCommand, claimWindowClosedAction } from "../../lib/claim-state";
 import { ZitadelError } from "../../lib/errors";
-import { BinaryLauncher } from "../../lib/local-server/launchers/binary";
-import { DockerLauncher } from "../../lib/local-server/launchers/docker";
 import {
   dockerRuntimeGuidance,
   dockerUnavailableMessage,
@@ -24,6 +22,7 @@ import {
   type RuntimeBackend,
   type RuntimeMetadata,
 } from "../../lib/local-server/runtime";
+import { LocalServer } from "../../lib/local-server/server";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { createOrca } from "../../lib/orca";
 import { resolveCwd } from "../../lib/paths";
@@ -322,7 +321,7 @@ async function runLocalRuntimeChecks(
   if (runtimeBackend === "binary") {
     return [
       await check("server-binary", "Server npm package is available", async () => {
-        const version = await BinaryLauncher.assertAvailable();
+        const version = LocalServer.assertBinaryAvailable();
         return `@zitadel/server ${version} is available`;
       }),
       await check(
@@ -348,9 +347,9 @@ async function runLocalRuntimeChecks(
     "docker-cli",
     "Docker is reachable",
     async () => {
-      let result: Awaited<ReturnType<typeof DockerLauncher.available>>;
+      let result: Awaited<ReturnType<typeof LocalServer.dockerReachable>>;
       try {
-        result = await DockerLauncher.available();
+        result = await LocalServer.dockerReachable();
       } catch (error) {
         throw new Error(dockerUnavailableMessage(error), { cause: error });
       }
@@ -369,7 +368,7 @@ async function runLocalRuntimeChecks(
           `Image ${image} is available`,
           async () => {
             try {
-              const source = await DockerLauncher.imageAvailable(image);
+              const source = await LocalServer.imageAvailable(image);
               return source === "local"
                 ? `Image ${image} is available locally`
                 : `Image ${image} is available from the registry`;
