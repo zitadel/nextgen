@@ -24,6 +24,8 @@ oneOf:
   - $ref: types/idp-created-event.yaml
   - $ref: types/idp-identity_link-created-event.yaml
   - $ref: types/idp-updated-event.yaml
+  - $ref: types/origin-added-event.yaml
+  - $ref: types/origin-removed-event.yaml
   - $ref: types/project-created-event.yaml
   - $ref: types/project-deleted-event.yaml
   - $ref: types/project-updated-event.yaml
@@ -64,6 +66,8 @@ discriminator:
     idp.created: types/idp-created-event.yaml
     idp.identity_link.created: types/idp-identity_link-created-event.yaml
     idp.updated: types/idp-updated-event.yaml
+    origin.added: types/origin-added-event.yaml
+    origin.removed: types/origin-removed-event.yaml
     project.created: types/project-created-event.yaml
     project.deleted: types/project-deleted-event.yaml
     project.updated: types/project-updated-event.yaml

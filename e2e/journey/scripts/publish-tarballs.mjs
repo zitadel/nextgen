@@ -1,6 +1,8 @@
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
+
+import { readManifest } from "./lib.mjs";
 
 const tarballsDir = process.argv[2];
 if (!tarballsDir) {
@@ -54,20 +56,6 @@ await mapWithConcurrency(packages, 6, async ({ tarball, manifest }) => {
   ]);
   console.log(`published ${manifest.name}@${manifest.version} as alpha and latest`);
 });
-
-function readManifest(tarball) {
-  const result = spawnSync("tar", ["-xOf", tarball, "package/package.json"], {
-    encoding: "utf8",
-  });
-  if (result.status !== 0) {
-    throw new Error(`failed to read package.json from ${tarball}: ${result.stderr}`);
-  }
-  const manifest = JSON.parse(result.stdout);
-  if (typeof manifest.name !== "string" || typeof manifest.version !== "string") {
-    throw new Error(`${tarball} has invalid package metadata`);
-  }
-  return manifest;
-}
 
 // After the first failure no lane starts another item; the ones in flight
 // finish before the error is thrown, so no npm process outlives the script.

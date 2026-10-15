@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"strings"
 
 	"github.com/ianlancetaylor/jsonschema"
@@ -26,13 +27,19 @@ type ProjectService interface {
 	// If seedDefaults is true, server fallback schema and flow resources are
 	// created with the project for non-CLI creation paths.
 	// Returns the stored project including timestamps.
-	Create(ctx context.Context, name string, previewOrigins []string, seedDefaults bool) (*domain.Project, error)
+	Create(ctx context.Context, name string, origins []domain.Origin, seedDefaults bool) (*domain.Project, error)
+
+	// AddOrigin stores one origin pattern on the project (idempotent for the
+	// same pattern+kind; rejects kind conflicts).
+	AddOrigin(ctx context.Context, projectID string, origin domain.Origin) (*domain.Origin, error)
+	// RemoveOrigin deletes one origin pattern (idempotent when missing).
+	RemoveOrigin(ctx context.Context, projectID, pattern string) error
 
 	// CreateWithID is Create under a caller-supplied id, for the one project
 	// whose id the server owns rather than mints: the platform project
 	// (domain.PlatformProjectID). Reports the same already-exists error as
 	// Create when the id is taken.
-	CreateWithID(ctx context.Context, id, name string, previewOrigins []string, seedDefaults bool) (*domain.Project, error)
+	CreateWithID(ctx context.Context, id, name string, origins []domain.Origin, seedDefaults bool) (*domain.Project, error)
 
 	// Get retrieves a project by ID.
 	// Returns [database.NoRowFoundError] when no project with the given ID exists.
@@ -76,12 +83,15 @@ type ProjectService interface {
 }
 
 // NewProjectService returns a [ProjectService] backed by the given repository.
+// sharedHosts is the effective origins.shared_hosts host→allow-regexp map after
+// config replace-defaults (nil/empty disables shared-host unbounded checks).
 func NewProjectService(
 	v2Pool *DB,
 	serverURL string,
 	schemaValidator *domain.SchemaValidator,
 	keyService KeyService,
 	hashers *crypto.HasherFactory,
+	sharedHosts map[string]*regexp.Regexp,
 ) ProjectService {
 	return &projectService{
 		v2Pool:          v2Pool,
@@ -89,6 +99,7 @@ func NewProjectService(
 		schemaValidator: schemaValidator,
 		keyService:      keyService,
 		hashers:         hashers,
+		originValidator: domain.OriginValidator{SharedHosts: sharedHosts},
 	}
 }
 
@@ -99,14 +110,18 @@ type projectService struct {
 	keyService      KeyService
 	// hashers is the deployment's hashing configuration, which is what decides
 	// whether a project may write with the method it asked for.
-	hashers *crypto.HasherFactory
+	hashers         *crypto.HasherFactory
+	originValidator domain.OriginValidator
 }
 
 var _ ProjectService = (*projectService)(nil)
 
-func (s *projectService) Create(ctx context.Context, name string, previewOrigins []string, seedDefaults bool) (*domain.Project, error) {
-	project, err := domain.NewProject(name, previewOrigins)
+func (s *projectService) Create(ctx context.Context, name string, origins []domain.Origin, seedDefaults bool) (*domain.Project, error) {
+	project, err := domain.NewProject(name, origins)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.originValidator.ValidateAll(project.Origins); err != nil {
 		return nil, err
 	}
 	return s.create(ctx, project, seedDefaults)
@@ -117,9 +132,12 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 // needs this: its id is well-known (domain.PlatformProjectID) so that every
 // deployment can address the same project, which is the whole point of a
 // bootstrap. Everything else must keep taking a minted id.
-func (s *projectService) CreateWithID(ctx context.Context, id, name string, previewOrigins []string, seedDefaults bool) (*domain.Project, error) {
-	project, err := domain.NewProject(name, previewOrigins)
+func (s *projectService) CreateWithID(ctx context.Context, id, name string, origins []domain.Origin, seedDefaults bool) (*domain.Project, error) {
+	project, err := domain.NewProject(name, origins)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.originValidator.ValidateAll(project.Origins); err != nil {
 		return nil, err
 	}
 	project.ID = id
@@ -250,8 +268,8 @@ func emitProjectCreated(ctx context.Context, stmts EventStatements, project *dom
 		EntityType: "project",
 		EntityID:   project.ID,
 		Payload: domain.ProjectPayload{
-			Name:           project.Name,
-			PreviewOrigins: project.PreviewOrigins,
+			Name:    project.Name,
+			Origins: project.Origins,
 		},
 	})
 }

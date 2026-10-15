@@ -24,9 +24,14 @@ stack: "frontend"
 # `env -u CI -u GITHUB_ACTIONS` steps did, so the suites behave as local runs
 # (no Playwright CI retries). A task `env` entry cannot do it: moon only sets a
 # task's env vars when they are missing, unless `options.envOverride` says so.
-# The backend-booting lanes share the `e2e-serial` mutex so moon runs them one
-# at a time — the old workflow ran them as sequential steps, and several bind
-# the same ports (both demo-next lanes drive demo-next on :3002).
+#
+# The lanes run side by side: each binds ports of its own (pinned in its
+# Playwright config) and keeps its results, report and handshake file apart.
+# Only the two demo-next lanes collide — both serve apps/demo-next with
+# `next dev` on :3002 from one .next folder — so they share the
+# `demo-next-app` mutex, the lock their package.json scripts take under turbo.
+# A new lane that boots a server takes a port no other lane uses, or joins the
+# mutex of the lane it shares one with.
 dependsOn:
   - "api-mock"
   - "cli"
@@ -65,8 +70,9 @@ tasks:
   # The whole suite: moon counts `e2e:all` affected whenever a lane is (a lane's
   # dependency changed, or a file the lane lists), and running it runs every
   # lane as its dependencies. CI runs it in a step of its own; run it by hand
-  # with `moon run e2e:all`. `test` stays the inherited unit run, so `:test`
-  # never boots a server.
+  # with `moon run e2e:all` and the journey's tarballs in JOURNEY_TARBALLS_DIR
+  # (see journey-local). `test` stays the inherited unit run, so `:test` never
+  # boots a server.
   all:
     command: "noop"
     # Affected only through its lanes (their folders and their dependencies),
@@ -90,7 +96,7 @@ tasks:
   # ── console lanes (former @zitadel/console-e2e) ──────────────────────────────
 
   # Embedded shell smoke: Vite preview of the built console under its production
-  # embed base. No live API, own port — safe to run alongside the serial lanes.
+  # embed base. No live API.
   console-smoke:
     command: "env -u CI -u GITHUB_ACTIONS corepack pnpm exec playwright test --config console/playwright.config.mts"
     inputs:
@@ -120,7 +126,6 @@ tasks:
     options:
       cache: false
       runInCI: "skip"
-      mutex: "e2e-serial"
 
   # The embedded surfaces, served by the binary itself — no Vite, no proxy. The
   # only lane proving the console's API base and the Go mux routing table agree.
@@ -140,7 +145,6 @@ tasks:
     options:
       cache: false
       runInCI: "skip"
-      mutex: "e2e-serial"
 
   # The embedded console against a deployment with the platform project
   # bootstrapped (the server default).
@@ -159,14 +163,14 @@ tasks:
     options:
       cache: false
       runInCI: "skip"
-      mutex: "e2e-serial"
 
-  # The hosted cloud's console on a deployment, which CONSOLE_DEPLOYMENT_URL names
+  # The hosted cloud's console on a deployment, which CLOUD_URL names
   # (VERCEL_AUTOMATION_BYPASS_SECRET opens its protection): how vercel.json routes
   # the console's paths, and the console signed out, down to the login widget's
-  # first step. Nothing to build or boot, no credential; the deployment-checks
-  # workflow runs it for every deployment. Not a dependency of `all`: the config
-  # refuses to run without CONSOLE_DEPLOYMENT_URL.
+  # first step. Nothing to build or boot, no credential; the root's
+  # `pnpm check:cloud` runs it beside every other deployment suite, and the
+  # deployment-checks workflow runs it for every deployment. Not a dependency of
+  # `all`: the config refuses to run without CLOUD_URL.
   console-deployment:
     command: "corepack pnpm exec playwright test --config console/playwright.deployment.config.mts"
     inputs:
@@ -193,7 +197,7 @@ tasks:
     options:
       cache: false
       runInCI: "skip"
-      mutex: "e2e-serial"
+      mutex: "demo-next-app"
 
   # Real lane: the same sign-in journey against a real ephemeral instance seeded
   # via @zitadel/testing instead of api-mock.
@@ -215,7 +219,7 @@ tasks:
     options:
       cache: false
       runInCI: "skip"
-      mutex: "e2e-serial"
+      mutex: "demo-next-app"
 
   # ── demo-nuxt lane (former @zitadel/demo-nuxt-e2e) ───────────────────────────
 
@@ -233,7 +237,6 @@ tasks:
     options:
       cache: false
       runInCI: "skip"
-      mutex: "e2e-serial"
 
   # ── journey lane (former @zitadel/cli-journey-e2e) ───────────────────────────
 
@@ -245,6 +248,8 @@ tasks:
     inputs:
       - "journey/**/*"
       - "package.json"
+      # The console copy the claim suite asserts on.
+      - "console/support/copy.ts"
     env:
       ZITADEL_TELEMETRY: "0"
     deps:
@@ -256,11 +261,12 @@ tasks:
 
   # The CLI customer setup journey. `--ci` runs the fixed variant set in one
   # process (fresh-app framework matrix, passkey preset, pre-existing app,
-  # testkit); `--runtime binary` drives the built server binary. In CI the
-  # runner reads prebuilt tarballs from JOURNEY_TARBALLS_DIR (built by a prior
-  # workflow step, outside this graph) and refuses to run without them, so it
-  # never starts a nested `moon run` inside the workflow's graph. Run by hand
-  # with that env unset, it packs its own through `moon run release:pack`.
+  # testkit); `--runtime binary` drives the built server binary. It reads
+  # prebuilt tarballs from JOURNEY_TARBALLS_DIR (in CI built by a prior workflow
+  # step, outside this graph) and refuses to run without them
+  # (JOURNEY_TARBALLS_REQUIRED): packing its own takes a nested
+  # `moon run release:pack`, which wipes and rebuilds the dist folders the lanes
+  # beside it read. By hand, run `moon run e2e:journey -- --ci`, which packs.
   #
   # Like every lane, the command unsets CI / GITHUB_ACTIONS so the runner
   # behaves as a local run, matching the old `env -u CI` step.
@@ -273,8 +279,10 @@ tasks:
     inputs:
       - "journey/**/*"
       - "package.json"
+      - "console/support/copy.ts"
     env:
       ZITADEL_TELEMETRY: "0"
+      JOURNEY_TARBALLS_REQUIRED: "1"
     deps:
       - "cli:build"
       - "testing:build"
@@ -289,4 +297,3 @@ tasks:
     options:
       cache: false
       runInCI: "skip"
-      mutex: "e2e-serial"

@@ -554,7 +554,9 @@ describe("setup command pre-flight", () => {
     expect(capture.body).toBeTruthy();
     expect(capture.body).toMatchObject({
       name: expect.any(String),
-      preview_origins: expect.arrayContaining([expect.any(String)]),
+      origins: expect.arrayContaining([
+        expect.objectContaining({ pattern: expect.any(String), kind: "preview" }),
+      ]),
       seed_defaults: false,
     });
     const projectName = capture.body?.name;
@@ -1056,7 +1058,7 @@ async function startCreateProjectCaptureServer(
           ...project,
           name: "demo",
           preview_secret: "sk_proj_test_preview",
-          preview_origins: [],
+          origins: [],
           created_at: "2026-06-01T00:00:00.000Z",
         }),
       );

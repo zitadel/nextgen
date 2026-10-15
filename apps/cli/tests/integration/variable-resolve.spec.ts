@@ -5,8 +5,6 @@ import { aSetUpApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 
-type Resolved = { origins: string[]; items: { name: string; value?: string }[] };
-
 describe("variable resolve", () => {
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
@@ -53,27 +51,14 @@ describe("variable resolve", () => {
         expect(result).toFailWith("E_NOT_FOUND");
       });
 
-      it("shows the variables the live deployment froze", async () => {
-        const app = await aSetUpApp();
-        await app.addPrimaryOrigin();
-        await app.setVariable("API_URL", "https://api.acme.com");
-        await app.deployData();
-
-        const result = await app.resolveVariables();
-
-        expect(app.envelopeOf<Resolved>(result).data.items).toEqual([
-          { name: "API_URL", secret: false, value: "https://api.acme.com" },
-        ]);
-      });
-
-      it("names the origin whose deployment it resolved", async () => {
+      it("says the server cannot hand back a deployment's variables yet", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
         await app.deployData();
 
         const result = await app.resolveVariables();
 
-        expect(app.envelopeOf<Resolved>(result).data.origins).toEqual(["https://app.example.com"]);
+        expect(result).toFailWith("E_NETWORK");
       });
 
       it("refuses to pick between two live deployments", async () => {
@@ -89,20 +74,6 @@ describe("variable resolve", () => {
         const result = await app.resolveVariables();
 
         expect(result).toFailWith("E_VALIDATION");
-      });
-
-      it("serves the frozen value, not a later write to the store", async () => {
-        const app = await aSetUpApp();
-        await app.addPrimaryOrigin();
-        await app.setVariable("API_URL", "https://api.acme.com");
-        await app.deployData();
-        await app.setVariable("API_URL", "https://api.changed.com");
-
-        const result = await app.resolveVariables();
-
-        expect(app.envelopeOf<Resolved>(result).data.items).toEqual([
-          { name: "API_URL", secret: false, value: "https://api.acme.com" },
-        ]);
       });
 
       it("is a miss for an origin with nothing deployed", async () => {

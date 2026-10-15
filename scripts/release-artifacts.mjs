@@ -161,44 +161,49 @@ export async function createArchives(options = {}) {
   await rm(archivesDir, { recursive: true, force: true });
   await mkdir(archivesDir, { recursive: true });
 
-  const archives = [];
-  for (const platform of SERVER_PLATFORMS) {
-    const name = `nextgen_${version}_${platformName(platform)}`;
-    const sourceDir = platformDir(outDir, platform);
-    if (platform.goos === "windows") {
-      const stagingDir = join(outDir, "archive-staging", name);
-      await rm(stagingDir, { recursive: true, force: true });
-      await mkdir(stagingDir, { recursive: true });
-      await copyFile(
-        join(sourceDir, binaryName(platform.goos)),
-        join(stagingDir, binaryName(platform.goos)),
-      );
-      await copyFile(join(repoRoot, "LICENSE"), join(stagingDir, "LICENSE"));
-      await copyFile(join(repoRoot, "README.md"), join(stagingDir, "README.md"));
-      const archivePath = join(archivesDir, `${name}.zip`);
-      await runFn("zip", ["-qr", archivePath, "."], { cwd: stagingDir, env: process.env });
-      archives.push(archivePath);
-      continue;
-    }
+  // The archives are independent (one platform's binary each, distinct file
+  // names) and gzip and zip use one core each, so compress all platforms at
+  // once. The results keep platform order, so checksums.txt keeps its order.
+  const archives = await mapWithConcurrency(
+    SERVER_PLATFORMS,
+    SERVER_PLATFORMS.length,
+    async (platform) => {
+      const name = `nextgen_${version}_${platformName(platform)}`;
+      const sourceDir = platformDir(outDir, platform);
+      if (platform.goos === "windows") {
+        const stagingDir = join(outDir, "archive-staging", name);
+        await rm(stagingDir, { recursive: true, force: true });
+        await mkdir(stagingDir, { recursive: true });
+        await copyFile(
+          join(sourceDir, binaryName(platform.goos)),
+          join(stagingDir, binaryName(platform.goos)),
+        );
+        await copyFile(join(repoRoot, "LICENSE"), join(stagingDir, "LICENSE"));
+        await copyFile(join(repoRoot, "README.md"), join(stagingDir, "README.md"));
+        const archivePath = join(archivesDir, `${name}.zip`);
+        await runFn("zip", ["-qr", archivePath, "."], { cwd: stagingDir, env: process.env });
+        return archivePath;
+      }
 
-    const archivePath = join(archivesDir, `${name}.tar.gz`);
-    await runFn(
-      "tar",
-      [
-        "-czf",
-        archivePath,
-        "-C",
-        sourceDir,
-        binaryName(platform.goos),
-        "-C",
-        repoRoot,
-        "LICENSE",
-        "README.md",
-      ],
-      { cwd: repoRoot, env: process.env },
-    );
-    archives.push(archivePath);
-  }
+      const archivePath = join(archivesDir, `${name}.tar.gz`);
+      await runFn(
+        "tar",
+        [
+          "-czf",
+          archivePath,
+          "-C",
+          sourceDir,
+          binaryName(platform.goos),
+          "-C",
+          repoRoot,
+          "LICENSE",
+          "README.md",
+        ],
+        { cwd: repoRoot, env: process.env },
+      );
+      return archivePath;
+    },
+  );
 
   const checksumLines = [];
   for (const archive of archives) {

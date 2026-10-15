@@ -38,8 +38,8 @@ flows:
       feature.read: Permission to read project feature configuration (reserved; endpoints not yet available)
       feature.write: Permission to change project feature configuration (reserved; endpoints not yet available)
       origin.read: Permission to read project origins
-      origin.write: Permission to create and manage project origins
-      origin.delete: Permission to delete project origins
+      origin.write: Permission to add project origins
+      origin.delete: Permission to remove project origins
       signing_key.create: Permission to create signing keys (reserved; endpoints not yet available)
       signing_key.read: Permission to read signing keys (reserved; endpoints not yet available)
       signing_key.delete: Permission to delete signing keys (reserved; endpoints not yet available)
@@ -86,8 +86,8 @@ flows:
       feature.read: Permission to read project feature configuration (reserved; endpoints not yet available)
       feature.write: Permission to change project feature configuration (reserved; endpoints not yet available)
       origin.read: Permission to read project origins
-      origin.write: Permission to create and manage project origins
-      origin.delete: Permission to delete project origins
+      origin.write: Permission to add project origins
+      origin.delete: Permission to remove project origins
       signing_key.create: Permission to create signing keys (reserved; endpoints not yet available)
       signing_key.read: Permission to read signing keys (reserved; endpoints not yet available)
       signing_key.delete: Permission to delete signing keys (reserved; endpoints not yet available)

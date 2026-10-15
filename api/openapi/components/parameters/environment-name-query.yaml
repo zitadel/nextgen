@@ -1,8 +1,0 @@
-name: environment_name
-in: query
-required: false
-description: |
-  No environment exists, so any well-formed value answers `env.not_found`.
-  Omit it to address the project's variables.
-schema:
-  $ref: '../schemas/environment-name.yaml'

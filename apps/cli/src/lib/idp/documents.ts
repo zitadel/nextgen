@@ -161,6 +161,26 @@ export function ssoEditRefusal(document: object, target: SsoEditTarget): string 
 }
 
 function flowRefusal(flow: Json): string | undefined {
+  const providers = ssoProvidersRefusal(flow);
+  if (providers !== undefined) {
+    return providers;
+  }
+  // Last, because it is about where the generated routes point rather than
+  // whether the document can be read at all.
+  if (terminalStep(flow) === undefined) {
+    return "no step marks where a completed sign-in ends";
+  }
+  return undefined;
+}
+
+/**
+ * Why a flow's steps cannot be read for their provider lists, or `undefined`
+ * when they can. This is all removing a provider needs
+ * (`auth-method sso disable`): unlike enabling, it writes no route, so it does
+ * not care where a completed sign-in ends.
+ */
+export function ssoProvidersRefusal(document: object): string | undefined {
+  const flow = document as Json;
   if (flow.steps !== undefined && !Array.isArray(flow.steps)) {
     return "steps is not a list";
   }
@@ -179,11 +199,6 @@ function flowRefusal(flow: Json): string | undefined {
       return `steps.${name}.sso_providers is not a list`;
     }
   }
-  // Last, because it is about where the generated routes point rather than
-  // whether the document can be read at all.
-  if (terminalStep(flow) === undefined) {
-    return "no step marks where a completed sign-in ends";
-  }
   return undefined;
 }
 
@@ -200,6 +215,11 @@ function schemaRefusal(schema: Json): string | undefined {
   }
   if (!isObject(methods.sso)) {
     return "x-auth-methods.sso is not an object";
+  }
+  // The meta-schema requires a boolean. A missing one or a string "true" is
+  // neither on nor off, so it is refused rather than overwritten.
+  if (typeof methods.sso.enabled !== "boolean") {
+    return "x-auth-methods.sso.enabled is not a boolean";
   }
   const providers = methods.sso.providers;
   if (providers !== undefined && !Array.isArray(providers)) {
@@ -504,13 +524,13 @@ const LEGACY_OUTCOMES: ReadonlyArray<readonly [string, string]> = [
 
 /**
  * Rename the previous outcome keys on every step, in place. The validator
- * rejects the old keys, so leaving them would make `sso enable` write an
- * invalid flow. Where a step already has the new key, that one wins. A key
- * that is also one of the step's action names is the action's transition and
- * stays. A new key that is an action name is refused: the old route would be
- * dropped for the action's. A legacy key with `purpose` or `action` is
- * refused: the new keys may declare neither, and dropping them would change
- * the author's routing.
+ * rejects the old keys, so leaving them would make `auth-method sso enable`
+ * write an invalid flow. Where a step already has the new key, that one wins. A
+ * key that is also one of the step's action names is the action's transition
+ * and stays. A new key that is an action name is refused: the old route would
+ * be dropped for the action's. A legacy key with `purpose` or `action` is
+ * refused: the new keys may declare neither, and dropping them would change the
+ * author's routing.
  */
 function migrateLegacyOutcomes(document: Json): boolean {
   let changed = false;
@@ -532,7 +552,7 @@ function migrateLegacyOutcomes(document: Json): boolean {
           "E_VALIDATION",
           `steps.${String(step.name)}: transition "${old}" is renamed to "${next}", which is an action on this step`,
           {
-            hint: `Rename the action "${next}" on step "${String(step.name)}" (and its transition), then run sso enable again.`,
+            hint: `Rename the action "${next}" on step "${String(step.name)}" (and its transition), then run auth-method sso enable again.`,
             details: { step: step.name, action: next },
           },
         );
@@ -547,7 +567,7 @@ function migrateLegacyOutcomes(document: Json): boolean {
             "E_VALIDATION",
             `steps.${String(step.name)}: transition "${old}" declares purpose or action, which "${next}" cannot`,
             {
-              hint: `Remove purpose and action from the transition "${old}" on step "${String(step.name)}", then run sso enable again.`,
+              hint: `Remove purpose and action from the transition "${old}" on step "${String(step.name)}", then run auth-method sso enable again.`,
               details: { step: step.name, transition: old },
             },
           );
@@ -587,9 +607,9 @@ function refuseOutcomeActionCollision(document: Json): void {
       if (isObject(action) && typeof action.name === "string" && keys.has(action.name)) {
         throw new ZitadelError(
           "E_VALIDATION",
-          `steps.${name}: action "${action.name}" uses a name sso enable writes as an outcome on this step`,
+          `steps.${name}: action "${action.name}" uses a name auth-method sso enable writes as an outcome on this step`,
           {
-            hint: `Rename the action "${action.name}" on step "${name}" (and its transition), then run sso enable again.`,
+            hint: `Rename the action "${action.name}" on step "${name}" (and its transition), then run auth-method sso enable again.`,
             details: { step: name, action: action.name },
           },
         );
@@ -711,12 +731,23 @@ export function applySsoToFlow(
   const list = steps(document);
   const terminalIndex = list.findIndex((step) => step.name === terminal);
   const insertAt = terminalIndex === -1 ? list.length : terminalIndex;
-  const wanted: Step[] = [
-    registerSsoStep(registrationFields(document), terminal),
-    ssoConflictStep(slug, enabled, loginEntry(document), terminal),
+  // Each step with every form the generator may have written it in before. The
+  // conflict step follows the methods enabled, so one written when passkey was
+  // off is still the generator's own output once passkey is on. `register-sso`
+  // and the password step do not depend on the methods, so they have one form.
+  const wanted: Array<{ step: Step; earlier: Step[] }> = [
+    { step: registerSsoStep(registrationFields(document), terminal), earlier: [] },
+    {
+      step: ssoConflictStep(slug, enabled, loginEntry(document), terminal),
+      earlier: [true, false].flatMap((password) =>
+        [true, false].map((passkey) =>
+          ssoConflictStep(slug, { password, passkey }, loginEntry(document), terminal),
+        ),
+      ),
+    },
   ];
   let offset = 0;
-  for (const step of wanted) {
+  for (const { step, earlier } of wanted) {
     const name = step.name as string;
     const existing = stepNamed(document, name);
     if (existing === undefined) {
@@ -738,10 +769,20 @@ export function applySsoToFlow(
     // as left alone while having already changed it -- the one thing the
     // report promises it did not do.
     const candidate = merged === undefined ? existing : { ...existing, sso_providers: merged };
-    if (!matches(candidate, expected)) {
-      skipped.push({ step: name, region: `steps.${name}`, reason: "hand-edited" });
-    } else if (merged !== undefined && addProvider(existing, slug)) {
+    if (matches(candidate, expected)) {
+      if (merged !== undefined && addProvider(existing, slug)) {
+        changed = true;
+      }
+    } else if (
+      merged !== undefined &&
+      earlier.some((form) => matches(candidate, { ...form, sso_providers: merged }))
+    ) {
+      // What the generator wrote for other methods: bring it up to today's, in
+      // the place it already has, keeping the providers it lists.
+      list[list.indexOf(existing)] = expected;
       changed = true;
+    } else {
+      skipped.push({ step: name, region: `steps.${name}`, reason: "hand-edited" });
     }
   }
   document.steps = list;
@@ -749,4 +790,53 @@ export function applySsoToFlow(
   return changed || skipped.length > 0
     ? { document, changed, skipped }
     : { document: flow, changed: false, skipped };
+}
+
+/**
+ * Remove a provider from a user schema (`auth-method sso disable`, ADR 070).
+ *
+ * Only `x-auth-methods.sso` is touched. The provider leaves the list, and when
+ * none is left `sso` becomes `{ "enabled": false }`: the meta-schema requires
+ * at least one provider whenever the list is present. A provider the schema
+ * does not offer is a no-op.
+ */
+export function removeSsoFromSchema(schema: object, slug: string): SsoResult<object> {
+  const document = clone(schema) as Json;
+  const methods = isObject(document["x-auth-methods"]) ? { ...document["x-auth-methods"] } : {};
+  const sso = methods.sso;
+  if (!isObject(sso) || !Array.isArray(sso.providers) || !sso.providers.includes(slug)) {
+    return { document: schema, changed: false, skipped: [] };
+  }
+  const providers = sso.providers.filter((provider) => provider !== slug);
+  methods.sso = providers.length === 0 ? { enabled: false } : { ...sso, providers };
+  document["x-auth-methods"] = methods;
+  return { document, changed: true, skipped: [] };
+}
+
+/**
+ * Remove a provider from every step of a login flow that offers it.
+ *
+ * Only the `sso_providers` lists change; a list left empty is dropped. The
+ * routes and steps `auth-method sso enable` added stay: without a provider they
+ * are never reached, they validate as they are, and enabling a provider again
+ * uses them as they stand rather than rebuilding them.
+ */
+export function removeSsoFromFlow(flow: object, slug: string): SsoResult<object> {
+  const document = clone(flow) as Json;
+  let changed = false;
+  for (const step of steps(document)) {
+    if (!Array.isArray(step.sso_providers) || !step.sso_providers.includes(slug)) {
+      continue;
+    }
+    const providers = (step.sso_providers as unknown[]).filter((provider) => provider !== slug);
+    if (providers.length === 0) {
+      delete step.sso_providers;
+    } else {
+      step.sso_providers = providers;
+    }
+    changed = true;
+  }
+  return changed
+    ? { document, changed, skipped: [] }
+    : { document: flow, changed: false, skipped: [] };
 }

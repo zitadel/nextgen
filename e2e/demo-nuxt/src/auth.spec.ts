@@ -29,7 +29,7 @@ test("signs in via the embedded component and lands on /admin", async ({ page })
   await page.getByLabel(/email/i).fill(email);
   await page.getByRole("button", { name: "Continue", exact: true }).click();
 
-  await page.getByLabel(/password/i).fill("hunter2");
+  await page.getByRole("textbox", { name: /password/i }).fill("hunter2");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
 
   await page.waitForURL("**/admin", { timeout: 15_000 });

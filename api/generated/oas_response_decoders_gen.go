@@ -32,7 +32,7 @@ func decodeAddOriginResponse(resp *http.Response) (res AddOriginRes, _ error) {
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ProjectOrigin
+			var response AddOriginResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -8184,7 +8184,7 @@ func decodeGetVariableResponse(resp *http.Response) (res GetVariableRes, _ error
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response Variable
+			var response VariableByKind
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -8276,7 +8276,7 @@ func decodeGetVariablesResponse(resp *http.Response) (res GetVariablesRes, _ err
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response Variables
+			var response VariablesByKind
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -13952,7 +13952,7 @@ func decodeUpdateVariablesResponse(resp *http.Response) (res UpdateVariablesRes,
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response Variables
+			var response VariablesByKind
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err

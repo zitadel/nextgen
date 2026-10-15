@@ -5,21 +5,24 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 // @ts-expect-error — plain JS helper, no types
-import { gradeConfig } from "../scripts/lib.mjs";
+import { gradeConfig, listCells } from "../scripts/lib.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = process.env.OUT || join(root, "out");
 const cfg = JSON.parse(readFileSync(join(root, "journey.config.json"), "utf8"));
 
-// globalSetup has already produced results in OUT by the time this runs.
-const dir = join(OUT, "with-skill");
+// globalSetup has produced a model×repeat matrix under OUT. We assert on the
+// first with-skill cell as a representative signal (the report aggregates the
+// full matrix into success rates); these are eval signals, not CI gates.
+const cells: Array<{ dir: string }> = existsSync(OUT) ? listCells(OUT, ["with-skill"]) : [];
+const dir = cells[0]?.dir;
 type Row = {
   stage: number;
   status: string;
   why: string;
   parsed: { transcript: Array<{ role: string; kind: string }> };
 };
-const rows: Row[] = existsSync(dir) ? gradeConfig(dir, cfg.stages) : [];
+const rows: Row[] = dir ? gradeConfig(dir, cfg.stages) : [];
 
 // We assert the WITH-SKILL run only — that's the thing under test. The baseline
 // is captured for comparison in the HTML report, not asserted (it is expected to

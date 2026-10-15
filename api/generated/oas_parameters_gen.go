@@ -1497,13 +1497,8 @@ type DeleteVariableParams struct {
 	ProjectID ProjectID
 	// The name of the variable.
 	VariableName VariableName
-	// No environment exists, so any well-formed value answers `env.not_found`.
-	// Omit it to address the project's variables.
-	EnvironmentName OptEnvironmentName `json:",omitempty,omitzero"`
-	// Which value of a variable the request addresses. `all` (the default) is the
-	// value every deploy freezes; `preview` is the override a preview deploy prefers
-	// where one exists. A name holds at most these two values.
-	AppliesTo OptVariableAppliesTo `json:",omitempty,omitzero"`
+	// The kind of value to address. Omit it for both kinds.
+	Kind OptVariableKind `json:",omitempty,omitzero"`
 }
 
 func unpackDeleteVariableParams(packed middleware.Parameters) (params DeleteVariableParams) {
@@ -1523,20 +1518,11 @@ func unpackDeleteVariableParams(packed middleware.Parameters) (params DeleteVari
 	}
 	{
 		key := middleware.ParameterKey{
-			Name: "environment_name",
+			Name: "kind",
 			In:   "query",
 		}
 		if v, ok := packed[key]; ok {
-			params.EnvironmentName = v.(OptEnvironmentName)
-		}
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "applies_to",
-			In:   "query",
-		}
-		if v, ok := packed[key]; ok {
-			params.AppliesTo = v.(OptVariableAppliesTo)
+			params.Kind = v.(OptVariableKind)
 		}
 	}
 	return params
@@ -1655,85 +1641,17 @@ func decodeDeleteVariableParams(args [1]string, argsEscaped bool, r *http.Reques
 			Err:  err,
 		}
 	}
-	// Decode query: environment_name.
+	// Decode query: kind.
 	if err := func() error {
 		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "environment_name",
+			Name:    "kind",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
 
 		if err := q.HasParam(cfg); err == nil {
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotEnvironmentNameVal EnvironmentName
-				if err := func() error {
-					var paramsDotEnvironmentNameValVal string
-					if err := func() error {
-						val, err := d.DecodeValue()
-						if err != nil {
-							return err
-						}
-
-						c, err := conv.ToString(val)
-						if err != nil {
-							return err
-						}
-
-						paramsDotEnvironmentNameValVal = c
-						return nil
-					}(); err != nil {
-						return err
-					}
-					paramsDotEnvironmentNameVal = EnvironmentName(paramsDotEnvironmentNameValVal)
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.EnvironmentName.SetTo(paramsDotEnvironmentNameVal)
-				return nil
-			}); err != nil {
-				return err
-			}
-			if err := func() error {
-				if value, ok := params.EnvironmentName.Get(); ok {
-					if err := func() error {
-						if err := value.Validate(); err != nil {
-							return err
-						}
-						return nil
-					}(); err != nil {
-						return err
-					}
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "environment_name",
-			In:   "query",
-			Err:  err,
-		}
-	}
-	// Set default value for query: applies_to.
-	{
-		val := VariableAppliesTo("all")
-		params.AppliesTo.SetTo(val)
-	}
-	// Decode query: applies_to.
-	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "applies_to",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotAppliesToVal VariableAppliesTo
+				var paramsDotKindVal VariableKind
 				if err := func() error {
 					val, err := d.DecodeValue()
 					if err != nil {
@@ -1745,18 +1663,18 @@ func decodeDeleteVariableParams(args [1]string, argsEscaped bool, r *http.Reques
 						return err
 					}
 
-					paramsDotAppliesToVal = VariableAppliesTo(c)
+					paramsDotKindVal = VariableKind(c)
 					return nil
 				}(); err != nil {
 					return err
 				}
-				params.AppliesTo.SetTo(paramsDotAppliesToVal)
+				params.Kind.SetTo(paramsDotKindVal)
 				return nil
 			}); err != nil {
 				return err
 			}
 			if err := func() error {
-				if value, ok := params.AppliesTo.Get(); ok {
+				if value, ok := params.Kind.Get(); ok {
 					if err := func() error {
 						if err := value.Validate(); err != nil {
 							return err
@@ -1774,7 +1692,7 @@ func decodeDeleteVariableParams(args [1]string, argsEscaped bool, r *http.Reques
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "applies_to",
+			Name: "kind",
 			In:   "query",
 			Err:  err,
 		}
@@ -4307,13 +4225,8 @@ type GetVariableParams struct {
 	ProjectID ProjectID
 	// The name of the variable.
 	VariableName VariableName
-	// No environment exists, so any well-formed value answers `env.not_found`.
-	// Omit it to address the project's variables.
-	EnvironmentName OptEnvironmentName `json:",omitempty,omitzero"`
-	// Which value of a variable the request addresses. `all` (the default) is the
-	// value every deploy freezes; `preview` is the override a preview deploy prefers
-	// where one exists. A name holds at most these two values.
-	AppliesTo OptVariableAppliesTo `json:",omitempty,omitzero"`
+	// The kind of value to address. Omit it for both kinds.
+	Kind OptVariableKind `json:",omitempty,omitzero"`
 }
 
 func unpackGetVariableParams(packed middleware.Parameters) (params GetVariableParams) {
@@ -4333,20 +4246,11 @@ func unpackGetVariableParams(packed middleware.Parameters) (params GetVariablePa
 	}
 	{
 		key := middleware.ParameterKey{
-			Name: "environment_name",
+			Name: "kind",
 			In:   "query",
 		}
 		if v, ok := packed[key]; ok {
-			params.EnvironmentName = v.(OptEnvironmentName)
-		}
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "applies_to",
-			In:   "query",
-		}
-		if v, ok := packed[key]; ok {
-			params.AppliesTo = v.(OptVariableAppliesTo)
+			params.Kind = v.(OptVariableKind)
 		}
 	}
 	return params
@@ -4465,85 +4369,17 @@ func decodeGetVariableParams(args [1]string, argsEscaped bool, r *http.Request) 
 			Err:  err,
 		}
 	}
-	// Decode query: environment_name.
+	// Decode query: kind.
 	if err := func() error {
 		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "environment_name",
+			Name:    "kind",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
 
 		if err := q.HasParam(cfg); err == nil {
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotEnvironmentNameVal EnvironmentName
-				if err := func() error {
-					var paramsDotEnvironmentNameValVal string
-					if err := func() error {
-						val, err := d.DecodeValue()
-						if err != nil {
-							return err
-						}
-
-						c, err := conv.ToString(val)
-						if err != nil {
-							return err
-						}
-
-						paramsDotEnvironmentNameValVal = c
-						return nil
-					}(); err != nil {
-						return err
-					}
-					paramsDotEnvironmentNameVal = EnvironmentName(paramsDotEnvironmentNameValVal)
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.EnvironmentName.SetTo(paramsDotEnvironmentNameVal)
-				return nil
-			}); err != nil {
-				return err
-			}
-			if err := func() error {
-				if value, ok := params.EnvironmentName.Get(); ok {
-					if err := func() error {
-						if err := value.Validate(); err != nil {
-							return err
-						}
-						return nil
-					}(); err != nil {
-						return err
-					}
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "environment_name",
-			In:   "query",
-			Err:  err,
-		}
-	}
-	// Set default value for query: applies_to.
-	{
-		val := VariableAppliesTo("all")
-		params.AppliesTo.SetTo(val)
-	}
-	// Decode query: applies_to.
-	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "applies_to",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotAppliesToVal VariableAppliesTo
+				var paramsDotKindVal VariableKind
 				if err := func() error {
 					val, err := d.DecodeValue()
 					if err != nil {
@@ -4555,18 +4391,18 @@ func decodeGetVariableParams(args [1]string, argsEscaped bool, r *http.Request) 
 						return err
 					}
 
-					paramsDotAppliesToVal = VariableAppliesTo(c)
+					paramsDotKindVal = VariableKind(c)
 					return nil
 				}(); err != nil {
 					return err
 				}
-				params.AppliesTo.SetTo(paramsDotAppliesToVal)
+				params.Kind.SetTo(paramsDotKindVal)
 				return nil
 			}); err != nil {
 				return err
 			}
 			if err := func() error {
-				if value, ok := params.AppliesTo.Get(); ok {
+				if value, ok := params.Kind.Get(); ok {
 					if err := func() error {
 						if err := value.Validate(); err != nil {
 							return err
@@ -4584,7 +4420,7 @@ func decodeGetVariableParams(args [1]string, argsEscaped bool, r *http.Request) 
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "applies_to",
+			Name: "kind",
 			In:   "query",
 			Err:  err,
 		}
@@ -4596,13 +4432,8 @@ func decodeGetVariableParams(args [1]string, argsEscaped bool, r *http.Request) 
 type GetVariablesParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
-	// No environment exists, so any well-formed value answers `env.not_found`.
-	// Omit it to address the project's variables.
-	EnvironmentName OptEnvironmentName `json:",omitempty,omitzero"`
-	// Which value of a variable the request addresses. `all` (the default) is the
-	// value every deploy freezes; `preview` is the override a preview deploy prefers
-	// where one exists. A name holds at most these two values.
-	AppliesTo OptVariableAppliesTo `json:",omitempty,omitzero"`
+	// The kind of value to address. Omit it for both kinds.
+	Kind OptVariableKind `json:",omitempty,omitzero"`
 }
 
 func unpackGetVariablesParams(packed middleware.Parameters) (params GetVariablesParams) {
@@ -4615,20 +4446,11 @@ func unpackGetVariablesParams(packed middleware.Parameters) (params GetVariables
 	}
 	{
 		key := middleware.ParameterKey{
-			Name: "environment_name",
+			Name: "kind",
 			In:   "query",
 		}
 		if v, ok := packed[key]; ok {
-			params.EnvironmentName = v.(OptEnvironmentName)
-		}
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "applies_to",
-			In:   "query",
-		}
-		if v, ok := packed[key]; ok {
-			params.AppliesTo = v.(OptVariableAppliesTo)
+			params.Kind = v.(OptVariableKind)
 		}
 	}
 	return params
@@ -4687,85 +4509,17 @@ func decodeGetVariablesParams(args [0]string, argsEscaped bool, r *http.Request)
 			Err:  err,
 		}
 	}
-	// Decode query: environment_name.
+	// Decode query: kind.
 	if err := func() error {
 		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "environment_name",
+			Name:    "kind",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
 
 		if err := q.HasParam(cfg); err == nil {
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotEnvironmentNameVal EnvironmentName
-				if err := func() error {
-					var paramsDotEnvironmentNameValVal string
-					if err := func() error {
-						val, err := d.DecodeValue()
-						if err != nil {
-							return err
-						}
-
-						c, err := conv.ToString(val)
-						if err != nil {
-							return err
-						}
-
-						paramsDotEnvironmentNameValVal = c
-						return nil
-					}(); err != nil {
-						return err
-					}
-					paramsDotEnvironmentNameVal = EnvironmentName(paramsDotEnvironmentNameValVal)
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.EnvironmentName.SetTo(paramsDotEnvironmentNameVal)
-				return nil
-			}); err != nil {
-				return err
-			}
-			if err := func() error {
-				if value, ok := params.EnvironmentName.Get(); ok {
-					if err := func() error {
-						if err := value.Validate(); err != nil {
-							return err
-						}
-						return nil
-					}(); err != nil {
-						return err
-					}
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "environment_name",
-			In:   "query",
-			Err:  err,
-		}
-	}
-	// Set default value for query: applies_to.
-	{
-		val := VariableAppliesTo("all")
-		params.AppliesTo.SetTo(val)
-	}
-	// Decode query: applies_to.
-	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "applies_to",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotAppliesToVal VariableAppliesTo
+				var paramsDotKindVal VariableKind
 				if err := func() error {
 					val, err := d.DecodeValue()
 					if err != nil {
@@ -4777,18 +4531,18 @@ func decodeGetVariablesParams(args [0]string, argsEscaped bool, r *http.Request)
 						return err
 					}
 
-					paramsDotAppliesToVal = VariableAppliesTo(c)
+					paramsDotKindVal = VariableKind(c)
 					return nil
 				}(); err != nil {
 					return err
 				}
-				params.AppliesTo.SetTo(paramsDotAppliesToVal)
+				params.Kind.SetTo(paramsDotKindVal)
 				return nil
 			}); err != nil {
 				return err
 			}
 			if err := func() error {
-				if value, ok := params.AppliesTo.Get(); ok {
+				if value, ok := params.Kind.Get(); ok {
 					if err := func() error {
 						if err := value.Validate(); err != nil {
 							return err
@@ -4806,7 +4560,7 @@ func decodeGetVariablesParams(args [0]string, argsEscaped bool, r *http.Request)
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "applies_to",
+			Name: "kind",
 			In:   "query",
 			Err:  err,
 		}
@@ -10217,13 +9971,8 @@ func decodeUpdateTeamParams(args [1]string, argsEscaped bool, r *http.Request) (
 type UpdateVariablesParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
-	// No environment exists, so any well-formed value answers `env.not_found`.
-	// Omit it to address the project's variables.
-	EnvironmentName OptEnvironmentName `json:",omitempty,omitzero"`
-	// Which value of a variable the request addresses. `all` (the default) is the
-	// value every deploy freezes; `preview` is the override a preview deploy prefers
-	// where one exists. A name holds at most these two values.
-	AppliesTo OptVariableAppliesTo `json:",omitempty,omitzero"`
+	// The kind of value to address. Omit it for both kinds.
+	Kind OptVariableKind `json:",omitempty,omitzero"`
 }
 
 func unpackUpdateVariablesParams(packed middleware.Parameters) (params UpdateVariablesParams) {
@@ -10236,20 +9985,11 @@ func unpackUpdateVariablesParams(packed middleware.Parameters) (params UpdateVar
 	}
 	{
 		key := middleware.ParameterKey{
-			Name: "environment_name",
+			Name: "kind",
 			In:   "query",
 		}
 		if v, ok := packed[key]; ok {
-			params.EnvironmentName = v.(OptEnvironmentName)
-		}
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "applies_to",
-			In:   "query",
-		}
-		if v, ok := packed[key]; ok {
-			params.AppliesTo = v.(OptVariableAppliesTo)
+			params.Kind = v.(OptVariableKind)
 		}
 	}
 	return params
@@ -10308,85 +10048,17 @@ func decodeUpdateVariablesParams(args [0]string, argsEscaped bool, r *http.Reque
 			Err:  err,
 		}
 	}
-	// Decode query: environment_name.
+	// Decode query: kind.
 	if err := func() error {
 		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "environment_name",
+			Name:    "kind",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
 
 		if err := q.HasParam(cfg); err == nil {
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotEnvironmentNameVal EnvironmentName
-				if err := func() error {
-					var paramsDotEnvironmentNameValVal string
-					if err := func() error {
-						val, err := d.DecodeValue()
-						if err != nil {
-							return err
-						}
-
-						c, err := conv.ToString(val)
-						if err != nil {
-							return err
-						}
-
-						paramsDotEnvironmentNameValVal = c
-						return nil
-					}(); err != nil {
-						return err
-					}
-					paramsDotEnvironmentNameVal = EnvironmentName(paramsDotEnvironmentNameValVal)
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.EnvironmentName.SetTo(paramsDotEnvironmentNameVal)
-				return nil
-			}); err != nil {
-				return err
-			}
-			if err := func() error {
-				if value, ok := params.EnvironmentName.Get(); ok {
-					if err := func() error {
-						if err := value.Validate(); err != nil {
-							return err
-						}
-						return nil
-					}(); err != nil {
-						return err
-					}
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "environment_name",
-			In:   "query",
-			Err:  err,
-		}
-	}
-	// Set default value for query: applies_to.
-	{
-		val := VariableAppliesTo("all")
-		params.AppliesTo.SetTo(val)
-	}
-	// Decode query: applies_to.
-	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "applies_to",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotAppliesToVal VariableAppliesTo
+				var paramsDotKindVal VariableKind
 				if err := func() error {
 					val, err := d.DecodeValue()
 					if err != nil {
@@ -10398,18 +10070,18 @@ func decodeUpdateVariablesParams(args [0]string, argsEscaped bool, r *http.Reque
 						return err
 					}
 
-					paramsDotAppliesToVal = VariableAppliesTo(c)
+					paramsDotKindVal = VariableKind(c)
 					return nil
 				}(); err != nil {
 					return err
 				}
-				params.AppliesTo.SetTo(paramsDotAppliesToVal)
+				params.Kind.SetTo(paramsDotKindVal)
 				return nil
 			}); err != nil {
 				return err
 			}
 			if err := func() error {
-				if value, ok := params.AppliesTo.Get(); ok {
+				if value, ok := params.Kind.Get(); ok {
 					if err := func() error {
 						if err := value.Validate(); err != nil {
 							return err
@@ -10427,7 +10099,7 @@ func decodeUpdateVariablesParams(args [0]string, argsEscaped bool, r *http.Reque
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "applies_to",
+			Name: "kind",
 			In:   "query",
 			Err:  err,
 		}

@@ -10,12 +10,10 @@ import (
 type Handler interface {
 	// AddOrigin implements addOrigin operation.
 	//
-	// Adds one `{pattern, kind}` to the project's origins. A `primary` pattern
-	// must be an exact URL with no wildcard; a `preview` pattern may carry a
-	// wildcard but a wildcard on a shared host needs a literal label of your own
-	// beside the host. A malformed pattern, a wildcard primary and an unbounded
-	// preview wildcard are each rejected; a host the server has no rule for is
-	// stored as written.
+	// Adds one `{pattern, kind}` to the project's origins. A primary pattern
+	// must be an exact URL (no wildcard). Preview patterns may include a single
+	// DNS-label wildcard. Adding a pattern that already exists with the same
+	// kind is idempotent and answers 201 with the stored origin.
 	//
 	// POST /projects/{project_id}/origins
 	AddOrigin(ctx context.Context, req *ProjectOrigin, params AddOriginParams) (AddOriginRes, error)
@@ -211,17 +209,25 @@ type Handler interface {
 	// `id`, so identity links that reference the connection keep resolving while
 	// releases and auth attempts stay pinned to the revision they captured.
 	// Identity fields are fixed for the life of the connection and a revision
-	// that changes one is rejected: `protocol`, `subject_claim`, and the
-	// endpoints that name the authority (`issuer` for OIDC, `token_endpoint`
-	// and `userinfo_endpoint` for OAuth 2.0). Their values decide which provider
+	// that changes one is rejected: `protocol`, `subject_claim`, and `issuer`,
+	// the field that names the authority. Their values decide which provider
 	// account a stored subject belongs to, so changing one would silently
 	// repoint existing identities at a different provider.
-	// `subject_claim` is optional for OIDC and required for OAuth 2.0. For an
-	// OIDC connection, `sub` is used as the default value. If a revision updates
-	// `subject_claim` to a different value than the one set during creation, the
-	// request is rejected.
+	// `subject_claim` is optional, and `sub` is used as the default value. If a
+	// revision updates `subject_claim` to a different value than the one set
+	// during creation, the request is rejected.
+	// OIDC is the only protocol.
 	// The document is validated against the `idp-connection.json` schema before
-	// anything is stored.
+	// anything is stored. The rules the engine applies when it starts a sign-in
+	// then run on the document, so a connection that could never start one is
+	// refused here instead with `idp.endpoints_partial`: the OIDC block sets an
+	// endpoint without the others. It either sets no endpoint, and discovery
+	// fills them, or sets `authorization_endpoint`, `token_endpoint`, `jwks_uri`,
+	// and `userinfo_endpoint`. `userinfo_endpoint` may be left out when
+	// `id_token_mapping` is on, but setting it alone still counts as setting an
+	// endpoint. The details list the missing endpoints.
+	// A refused document stores nothing, and on a revise the current revision
+	// stays unchanged.
 	//
 	// POST /idps
 	CreateIdp(ctx context.Context, req *CreateIdpRequest, params CreateIdpParams) (CreateIdpRes, error)
@@ -341,10 +347,9 @@ type Handler interface {
 	DeleteUserByID(ctx context.Context, params DeleteUserByIDParams) (DeleteUserByIDRes, error)
 	// DeleteVariable implements deleteVariable operation.
 	//
-	// Removes the project's variable under this name. Deleting a name the
-	// project does not hold answers `var.not_found`.
-	// `applies_to` selects which value is removed: `all` (the default) or the
-	// `preview` override. Removing one leaves the other standing.
+	// Removes a variable for the requested kind, or for both kinds without
+	// `kind`. A name with no value for that kind answers `var.not_found`.
+	// Existing deployments keep the values they froze.
 	//
 	// DELETE /variables/{variable_name}
 	DeleteVariable(ctx context.Context, params DeleteVariableParams) (DeleteVariableRes, error)
@@ -430,11 +435,9 @@ type Handler interface {
 	GetDeploymentById(ctx context.Context, params GetDeploymentByIdParams) (GetDeploymentByIdRes, error)
 	// GetDeploymentVariables implements getDeploymentVariables operation.
 	//
-	// The values frozen onto the deployment when it was written — what the target
-	// serves, not what the store holds now. A preview deployment prefers the
-	// `preview` override of each name and falls back to the `all` value; a primary
-	// deployment runs only the `all` values. Secrets are reported as held and
-	// never disclosed.
+	// Returns the variable values the deployment froze when it was made. Later
+	// changes to the project's variables do not affect them. A secret reads
+	// back as `{"secret": true}`.
 	//
 	// GET /deployments/{deployment_id}/variables
 	GetDeploymentVariables(ctx context.Context, params GetDeploymentVariablesParams) (GetDeploymentVariablesRes, error)
@@ -601,24 +604,18 @@ type Handler interface {
 	GetUserByID(ctx context.Context, params GetUserByIDParams) (GetUserByIDRes, error)
 	// GetVariable implements getVariable operation.
 	//
-	// Reads one of the project's variables by name. A name the project has not
-	// entered answers `var.not_found`. A secret is found but not disclosed: the
-	// response is `{"secret": true}`.
-	// `applies_to` selects which value is read: `all` (the default) or the
-	// `preview` override. A name with no value for the selected `applies_to`
-	// answers `var.not_found`.
+	// Reads one variable by name, with its value per kind. A name with no
+	// value for the requested kind answers `var.not_found`. A secret reads
+	// back as `{"secret": true}`.
 	//
 	// GET /variables/{variable_name}
 	GetVariable(ctx context.Context, params GetVariableParams) (GetVariableRes, error)
 	// GetVariables implements getVariables operation.
 	//
-	// Returns the project's variables, keyed by name.
+	// Returns the project's variables, keyed by name, each with its value per
+	// kind. With `kind`, only that kind's values are returned.
 	// Secret values are not returned. A secret appears as `{"secret": true}`,
 	// which says a value is held without disclosing it.
-	// `applies_to` selects which value is read: `all` (the default) is the value
-	// every deploy freezes, `preview` is the override a preview deploy prefers.
-	// The two are not merged — a `preview` read returns only the names that hold a
-	// preview override.
 	//
 	// GET /variables
 	GetVariables(ctx context.Context, params GetVariablesParams) (GetVariablesRes, error)
@@ -845,8 +842,9 @@ type Handler interface {
 	// RemoveOrigin implements removeOrigin operation.
 	//
 	// Removes one pattern from the project's origins. Requests from URLs only
-	// that pattern admitted are refused from now on; live previews and
-	// deployment history are untouched.
+	// that pattern admitted are refused from then on; live previews and
+	// deployment history are untouched. Removing a pattern that is already
+	// absent is idempotent and answers 204.
 	//
 	// POST /projects/{project_id}/origins/remove
 	RemoveOrigin(ctx context.Context, req *RemoveOriginReq, params RemoveOriginParams) (RemoveOriginRes, error)
@@ -990,8 +988,13 @@ type Handler interface {
 	UpdateTeam(ctx context.Context, req *UpdateTeamRequest, params UpdateTeamParams) (UpdateTeamRes, error)
 	// UpdateVariables implements updateVariables operation.
 	//
-	// Enters, replaces and removes the project's variables. Names not in the
-	// body are untouched.
+	// Enters, replaces and removes the project's variables for the requested
+	// kind. Names not in the body are untouched. Existing deployments keep the
+	// values they froze.
+	// Without `kind`, a plain value is written for both kinds. A secret is
+	// written for `primary` only and removes the name's `preview` value, so a
+	// preview never keeps a plaintext copy; set a preview secret with
+	// `kind=preview`. `null` removes the name from both.
 	// A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
 	// stores the value encrypted under the project's active `secret` key, after
 	// which it can be referenced but not read back. `null` removes the name
@@ -1000,11 +1003,6 @@ type Handler interface {
 	// The body is applied whole or not at all, so a rejected request leaves the
 	// project's variables exactly as they were. Writing the same name twice
 	// replaces the value rather than duplicating it, which makes a retry safe.
-	// `applies_to` selects which value is written: `all` (the default) is the
-	// value every deploy freezes, `preview` is the override a preview deploy
-	// prefers. A name holds at most these two values, and writing one does not
-	// touch the other. Nothing written here reaches a deployment already made:
-	// every deploy freezes the values it resolved.
 	//
 	// PATCH /variables
 	UpdateVariables(ctx context.Context, req UpdateVariablesRequest, params UpdateVariablesParams) (UpdateVariablesRes, error)

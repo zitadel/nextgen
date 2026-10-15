@@ -57,15 +57,15 @@ export async function fetchAllIdps(projectId: string): Promise<IdpConnection[] |
 }
 
 /**
- * The connection's client id, as written: `oidc` or `oauth2`, whichever block
- * the protocol uses. A `${{ VAR }}` reference is shown verbatim — the value
- * differs per environment, and resolving it is the engine's job.
+ * The connection's client id, as written in its `oidc` block. A `${{ VAR }}`
+ * reference is shown verbatim: the value differs per environment, and
+ * resolving it is the engine's job.
  */
 export function idpClientId(definition: IdpDefinition): string | undefined {
-  return definition.oidc?.client_id ?? definition.oauth2?.client_id;
+  return definition.oidc?.client_id;
 }
 
-const PROTOCOL_LABELS: Record<string, string> = { oidc: "OIDC", oauth2: "OAuth 2.0" };
+const PROTOCOL_LABELS: Record<string, string> = { oidc: "OIDC" };
 
 /** `oidc` → `OIDC`. An unknown protocol renders verbatim rather than blank. */
 export function idpProtocolLabel(protocol: string): string {

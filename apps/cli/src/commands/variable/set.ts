@@ -1,7 +1,4 @@
 import { Args, Flags } from "@oclif/core";
-import { ApiError } from "@zitadel/api/runtime/fetch";
-
-import type { GetVariables200 } from "@zitadel/api/generated/model";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
@@ -15,10 +12,10 @@ import {
   variableCells,
   type VariableRow,
   type VariableType,
+  type VariableValue,
   variableScope,
 } from "../../lib/variables";
 import { inShell } from "../../lib/suggestion";
-import { reportWarning } from "../../lib/warnings";
 
 /**
  * `zitadel variable set NAME [VALUE]` — enter or replace one variable on the
@@ -28,8 +25,12 @@ import { reportWarning } from "../../lib/warnings";
  * is prompted for, or read from stdin when scripting, so a credential cannot
  * land in shell history, a process listing, or CI logs. `--secret` stores it
  * encrypted under the project's own key, after which it can be replaced but
- * never read back (ADR 062 §7). `--preview` writes the override a preview
- * deploy prefers instead of the value every deploy freezes.
+ * never read back (ADR 062 §7).
+ *
+ * Without `--preview` the platform's default applies: a plain value is stored
+ * for both kinds, so primary and preview deploys both see it, and a secret for
+ * the primary kind only, removing any preview value so a preview never keeps a
+ * plaintext copy. `--preview` writes the preview kind alone.
  */
 export default class VariableSet extends EnvironmentCommand {
   static override description = "Set one variable on the project.";
@@ -68,7 +69,7 @@ export default class VariableSet extends EnvironmentCommand {
     }),
     preview: Flags.boolean({
       default: false,
-      description: "Write the preview override instead of the value every deploy freezes.",
+      description: "Write the preview value alone, leaving the primary one as it is.",
     }),
   };
 
@@ -98,14 +99,20 @@ export default class VariableSet extends EnvironmentCommand {
 
     const { client, projectId } = await this.connect();
     const scope = variableScope(projectId, flags.preview);
+    // The kinds this write sets, as the platform's rule gives them: the preview
+    // kind alone under `--preview`, otherwise both for a plain value and the
+    // primary kind for a secret.
+    const kinds = flags.preview ? ["preview"] : flags.secret ? ["primary"] : ["primary", "preview"];
 
-    // A name whose value every deploy freezes is a secret holds a credential,
-    // so its preview override is one too: stored plain it would be readable,
-    // and a preview deploy would freeze the credential in the clear. A token
-    // that may not read the slot leaves the check to whoever can.
+    // A name whose primary value is a secret holds a credential, so its preview
+    // value is one too: stored plain it would be readable, and a preview deploy
+    // would freeze the credential in the clear. A token that may not read the
+    // primary values leaves the check to whoever can.
     if (flags.preview && !flags.secret) {
-      const all = await client.getVariables({ project_id: projectId }).catch(() => undefined);
-      const held = all?.[name];
+      const held = await client
+        .getVariables({ project_id: projectId, kind: "primary" })
+        .then((body) => body[name]?.primary)
+        .catch(() => undefined);
       if (typeof held === "object" && held !== null) {
         throw new ZitadelError(
           "E_VALIDATION",
@@ -139,7 +146,7 @@ export default class VariableSet extends EnvironmentCommand {
           name,
           type,
           secret: flags.secret,
-          applies_to: flags.preview ? "preview" : "all",
+          kinds,
         },
         pretty: `${preview.pretty} on the project${flags.secret ? " (secret)" : ""}${type === "string" ? "" : ` as ${type}`}${flags.preview ? " (preview)" : ""}`,
       });
@@ -163,94 +170,64 @@ export default class VariableSet extends EnvironmentCommand {
       parse: (raw: string) => parseVariableValue(raw, type),
     });
 
-    // The write answers with the slot it wrote, read back, so the output is the
-    // store's own answer for that slot — a secret says only that a value is held
-    // (ADR 062 §7), never the value itself.
-    const written = slotState(
-      name,
-      (await client.updateVariables(
-        { [name]: { value, secret: flags.secret } },
-        scope,
-      )) as GetVariables200,
-    );
+    // The write answers with the project's variables read back, so the output is
+    // the store's own answer: a secret says only that a value is held (ADR 062
+    // §7), never the value itself. The kind this write did not touch is read in
+    // the same answer.
+    const stored = (
+      await client.updateVariables({ [name]: { value, secret: flags.secret } }, scope)
+    )[name];
     this.recordTelemetry({ is_secret: flags.secret });
-
-    // A write to one slot leaves the other standing, so that one is read too.
-    // It is only reported: a token that may write but not read variables has
-    // still stored the value, and must not be told the write failed.
-    const otherSlot = await readSlot(() =>
-      client.getVariables({
-        project_id: projectId,
-        ...(flags.preview ? {} : { applies_to: "preview" as const }),
-      }),
-    );
-    const other = otherSlot === undefined ? undefined : slotState(name, otherSlot);
-    const all = flags.preview ? other : written;
-    const preview = flags.preview ? written : other;
-    // The other half of the rule a plain `--preview` write is refused by: a
-    // name made a secret here may still hold a readable preview override,
-    // which a preview deploy would freeze in the clear. The write has landed,
-    // so it is said aloud with the command that replaces it.
-    if (!flags.preview && flags.secret && preview?.held === true && !preview.secret) {
-      reportWarning(
-        `${name} is now a secret, but its preview value is stored plain. Replace it with \`zitadel ${pipeArgs(name, true, "string", true)}${this.environmentSelector()} < value.txt\`.`,
-      );
-    }
+    const primary = stateOf(stored?.primary);
+    const previewState = stateOf(stored?.preview);
 
     return this.emit({
       status: "ok",
-      data: {
-        name,
-        type,
-        applies_to: flags.preview ? "preview" : "all",
-        ...(all === undefined ? {} : { all }),
-        ...(preview === undefined ? {} : { preview }),
-      },
-      pretty: renderDetail(`Set ${name} on the project`, ["all", "preview"], {
-        all: all === undefined ? "(not readable)" : slotCell(all),
-        preview: preview === undefined ? "(not readable)" : slotCell(preview),
+      data: { name, type, kinds, primary, preview: previewState },
+      pretty: renderDetail(`Set ${name} on the project`, ["primary", "preview"], {
+        primary: stateCell(primary),
+        preview: stateCell(previewState),
       }),
     });
   }
 }
 
 /**
- * What the store holds for one name in one slot, as a read reports it. A name
- * the slot does not hold is `held: false` rather than omitted, so the output
+ * What the store holds for one name of one kind, as a read reports it. A kind
+ * the name has no value for is `held: false` rather than omitted, so the output
  * tells an empty value apart from a withdrawn one. A secret is `held` without a
  * value: the platform never discloses one.
  */
-type SlotState =
+type KindState =
   | { held: false }
   | { held: true; secret: true }
   | { held: true; secret: false; value: string | number | boolean };
 
-function slotState(name: string, bucket: GetVariables200): SlotState {
-  // A held name always carries a value — a scalar, or `{secret:true}` for a
-  // secret — so `undefined` is exactly the slot not holding the name.
-  const held = bucket[name];
-  if (held === undefined) {
+function stateOf(value: VariableValue | undefined): KindState {
+  // A held kind always carries a value — a scalar, or `{secret:true}` for a
+  // secret — so `undefined` is exactly the name not holding that kind.
+  if (value === undefined) {
     return { held: false };
   }
-  const row = toVariableRow(name, held);
+  const row = toVariableRow("", value);
   return row.secret
     ? { held: true, secret: true }
     : { held: true, secret: false, value: row.value as string | number | boolean };
 }
 
 /**
- * One slot rendered for a terminal. A held value goes through the same escaping
+ * One kind rendered for a terminal. A held value goes through the same escaping
  * the tables use — a stored value is attacker-influenceable — and a secret
- * prints its marker rather than a value. A slot the name does not hold reads as
- * `(not set)` so it is not mistaken for an empty value.
+ * prints its marker rather than a value. A kind the name has no value for reads
+ * as `(not set)` so it is not mistaken for an empty value.
  */
-function slotCell(slot: SlotState): string {
-  if (!slot.held) {
+function stateCell(state: KindState): string {
+  if (!state.held) {
     return "(not set)";
   }
-  const row: VariableRow = slot.secret
+  const row: VariableRow = state.secret
     ? { name: "", secret: true }
-    : { name: "", secret: false, value: slot.value };
+    : { name: "", secret: false, value: state.value };
   const [cell] = variableCells([row]);
   return cell === undefined || cell.value === "" ? '""' : cell.value;
 }
@@ -260,7 +237,7 @@ function slotCell(slot: SlotState): string {
  *
  * It carries the secret flag, the type and the preview flag the run actually
  * used. Dropping any of them would hand back a command that writes a credential
- * as a readable value, stores a number as a string, or writes the wrong value.
+ * as a readable value, stores a number as a string, or writes the wrong kind.
  */
 function pipeArgs(name: string, secret: boolean, type: VariableType, preview: boolean): string {
   return [
@@ -271,24 +248,4 @@ function pipeArgs(name: string, secret: boolean, type: VariableType, preview: bo
     ...(type === "string" ? [] : ["--as", type]),
     ...(preview ? ["--preview"] : []),
   ].join(" ");
-}
-
-/**
- * A bucket read after the write has landed, or nothing when it cannot be read:
- * the value is already stored, so a refused or failed courtesy read is said
- * aloud rather than reported as a failed write.
- */
-async function readSlot(
-  read: () => Promise<GetVariables200>,
-): Promise<GetVariables200 | undefined> {
-  try {
-    return await read();
-  } catch (error) {
-    if (!(error instanceof ApiError && (error.status === 401 || error.status === 403))) {
-      reportWarning(
-        `The value was stored, but the other slot could not be read back: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-    return undefined;
-  }
 }

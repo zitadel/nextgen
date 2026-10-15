@@ -5,17 +5,32 @@ import type { Parsed } from "@zitadel/config/idp";
 import { escapeControlCharacters } from "./api-client";
 import { ZitadelError } from "./errors";
 
-/**
- * The query the variables endpoints take: the project, and which value of a
- * name a request addresses. `applies_to` is omitted for the `all` value the
- * endpoints default to, and set to `preview` for the override a preview deploy
- * prefers — the two are separate values of one name, never merged.
- */
-export type VariableScope = { project_id: string; applies_to?: "preview" };
+/** The kinds of value a name can hold: what primary deploys freeze, and what preview deploys freeze. */
+export type VariableKind = "primary" | "preview";
 
-/** The scope a variable command addresses, from the project and `--preview`. */
+/**
+ * The query a variable write or delete takes: the project and, for `--preview`,
+ * the kind. Without a kind the platform's default applies: a plain value is
+ * stored for both kinds and a secret for the primary kind only, and a delete
+ * removes both.
+ */
+export type VariableScope = { project_id: string; kind?: "preview" };
+
+/** The scope a variable write or delete addresses, from the project and `--preview`. */
 export function variableScope(projectId: string, preview: boolean): VariableScope {
-  return preview ? { project_id: projectId, applies_to: "preview" } : { project_id: projectId };
+  return preview ? { project_id: projectId, kind: "preview" } : { project_id: projectId };
+}
+
+/**
+ * The scope of a read. A read names one kind, because the platform answers a
+ * name with a value per kind and the two are never merged: `--preview` reads the
+ * preview values, and without it the primary ones.
+ */
+export function variableReadScope(
+  projectId: string,
+  preview: boolean,
+): { project_id: string; kind: VariableKind } {
+  return { project_id: projectId, kind: preview ? "preview" : "primary" };
 }
 
 /**
@@ -29,23 +44,43 @@ export type VariableRow = {
   value?: string | number | boolean;
 };
 
+/** One value on the wire: a bare scalar, or `{"secret": true}` for a secret. */
+export type VariableValue = NonNullable<GetVariable200["primary"]>;
+
+/** The values of one kind in a read, keyed by name. */
+export function valuesOfKind(
+  body: GetVariables200,
+  kind: VariableKind,
+): Record<string, VariableValue> {
+  return Object.fromEntries(
+    Object.entries(body).flatMap(([name, byKind]) =>
+      byKind[kind] === undefined ? [] : [[name, byKind[kind]]],
+    ),
+  );
+}
+
+/** The primary values of a read, keyed by name. */
+export function primaryValues(body: GetVariables200): Record<string, VariableValue> {
+  return valuesOfKind(body, "primary");
+}
+
 /**
  * Project one wire value into a row. Both endpoints answer in the same two
  * forms — a bare scalar for a non-secret, `{"secret": true}` for a secret — so
  * the collection and the single-name read share this.
  */
-export function toVariableRow(name: string, value: GetVariable200): VariableRow {
+export function toVariableRow(name: string, value: VariableValue): VariableRow {
   return typeof value === "object" && value !== null
     ? { name, secret: true }
     : { name, secret: false, value };
 }
 
 /**
- * Project the wire map into rows, sorted by name so output is stable between
+ * Project the values into rows, sorted by name so output is stable between
  * runs.
  */
-export function toVariableRows(body: GetVariables200): VariableRow[] {
-  return Object.entries(body)
+export function toVariableRows(values: Record<string, VariableValue>): VariableRow[] {
+  return Object.entries(values)
     .map(([name, value]) => toVariableRow(name, value))
     .sort((a, b) => a.name.localeCompare(b.name));
 }

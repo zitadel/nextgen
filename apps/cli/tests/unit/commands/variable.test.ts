@@ -37,6 +37,7 @@ async function makeProject(): Promise<string> {
       project_id: "proj_test",
       project_secret: "sk_proj_test_full",
       preview_secret: "sk_proj_test_preview",
+      primary_origins: [],
       preview_origins: [],
       created_at: "2026-01-01T00:00:00Z",
     }),
@@ -91,8 +92,9 @@ describe("variable list", () => {
     server.use(
       http.get("*/variables", () =>
         HttpResponse.json({
-          GOOGLE_CLIENT_SECRET: { secret: true },
-          GOOGLE_CLIENT_ID: "999-prod",
+          GOOGLE_CLIENT_SECRET: { primary: { secret: true } },
+          GOOGLE_CLIENT_ID: { primary: "999-prod", preview: "999-test" },
+          PREVIEW_ONLY: { preview: "x" },
         }),
       ),
     );
@@ -122,7 +124,9 @@ describe("variable list", () => {
 
   it("never emits a value key for a secret", async () => {
     const cwd = await makeProject();
-    server.use(http.get("*/variables", () => HttpResponse.json({ S: { secret: true } })));
+    server.use(
+      http.get("*/variables", () => HttpResponse.json({ S: { primary: { secret: true } } })),
+    );
 
     const res = await runCliForTest(["variable", "list", ...base(cwd)]);
 
@@ -130,12 +134,12 @@ describe("variable list", () => {
     expect(json.data.items[0]).not.toHaveProperty("value");
   });
 
-  it("sends no environment_name, so the project level is the owner", async () => {
+  it("reads the primary values", async () => {
     const cwd = await makeProject();
     let seen: string | null = "unset";
     server.use(
       http.get("*/variables", ({ request }) => {
-        seen = new URL(request.url).searchParams.get("environment_name");
+        seen = new URL(request.url).searchParams.get("kind");
         return HttpResponse.json({});
       }),
     );
@@ -143,9 +147,27 @@ describe("variable list", () => {
     const res = await runCliForTest(["variable", "list", ...base(cwd)]);
 
     expect(res.exitCode).toBe(0);
-    expect(seen).toBeNull();
+    expect(seen).toBe("primary");
     const json = parseJson(res.stdout) as { data: { count: number } };
     expect(json.data.count).toBe(0);
+  });
+
+  it("reads the preview values under --preview", async () => {
+    const cwd = await makeProject();
+    let kind: string | null = "unset";
+    server.use(
+      http.get("*/variables", ({ request }) => {
+        kind = new URL(request.url).searchParams.get("kind");
+        return HttpResponse.json({ API_URL: { preview: "https://preview.acme.com" } });
+      }),
+    );
+
+    const res = await runCliForTest(["variable", "list", "--preview", ...base(cwd)]);
+
+    expect(kind).toBe("preview");
+    expect((parseJson(res.stdout) as { data: { items: unknown[] } }).data.items).toEqual([
+      { name: "API_URL", secret: false, value: "https://preview.acme.com" },
+    ]);
   });
 
   it("prints tab-separated rows with no header on a pipe, and nothing when empty", async () => {
@@ -153,7 +175,9 @@ describe("variable list", () => {
     let call = 0;
     server.use(
       http.get("*/variables", () =>
-        HttpResponse.json(call++ === 0 ? { B: "two", A: { secret: true } } : {}),
+        HttpResponse.json(
+          call++ === 0 ? { B: { primary: "two" }, A: { primary: { secret: true } } } : {},
+        ),
       ),
     );
 
@@ -168,7 +192,9 @@ describe("variable list", () => {
 
   it("renders a table and a count on a terminal, unless --plain", async () => {
     const cwd = await makeProject();
-    server.use(http.get("*/variables", () => HttpResponse.json({ V: "one\ntwo\u001b[31m" })));
+    server.use(
+      http.get("*/variables", () => HttpResponse.json({ V: { primary: "one\ntwo\u001b[31m" } })),
+    );
 
     const table = await asTerminal(() => runCliForTest(["variable", "list", ...plainArgs(cwd)]));
     const plain = await asTerminal(() =>
@@ -218,7 +244,7 @@ describe("variable list", () => {
 
   it("prints the project and the server on a terminal, and neither on a pipe", async () => {
     const cwd = await makeProject();
-    server.use(http.get("*/variables", () => HttpResponse.json({ A: "b" })));
+    server.use(http.get("*/variables", () => HttpResponse.json({ A: { primary: "b" } })));
 
     // The harness captures stdout, so process.stdout.isTTY is undefined here —
     // the same condition a pipe or a redirect creates.
@@ -256,12 +282,12 @@ describe("variable get", () => {
   it("returns a non-secret value, addressing the project level", async () => {
     const cwd = await makeProject();
     let path = "";
-    let environment: string | null = "unset";
+    let kind: string | null = "unset";
     server.use(
       http.get("*/variables/:name", ({ request, params }) => {
         path = String(params.name);
-        environment = new URL(request.url).searchParams.get("environment_name");
-        return HttpResponse.json("999-prod");
+        kind = new URL(request.url).searchParams.get("kind");
+        return HttpResponse.json({ primary: "999-prod" });
       }),
     );
 
@@ -269,7 +295,7 @@ describe("variable get", () => {
 
     expect(res.exitCode).toBe(0);
     expect(path).toBe("GOOGLE_CLIENT_ID");
-    expect(environment).toBeNull();
+    expect(kind).toBe("primary");
     const json = parseJson(res.stdout) as {
       data: { name: string; secret: boolean; value: string };
     };
@@ -282,7 +308,7 @@ describe("variable get", () => {
 
   it("prints the whole record on a pipe, as every other get does", async () => {
     const cwd = await makeProject();
-    server.use(http.get("*/variables/:name", () => HttpResponse.json("999-prod")));
+    server.use(http.get("*/variables/:name", () => HttpResponse.json({ primary: "999-prod" })));
 
     const res = await runCliForTest(["variable", "get", "GOOGLE_CLIENT_ID", ...plainArgs(cwd)]);
 
@@ -296,7 +322,9 @@ describe("variable get", () => {
 
   it("gives a pipe no value to capture for a secret", async () => {
     const cwd = await makeProject();
-    server.use(http.get("*/variables/:name", () => HttpResponse.json({ secret: true })));
+    server.use(
+      http.get("*/variables/:name", () => HttpResponse.json({ primary: { secret: true } })),
+    );
 
     const res = await runCliForTest(["variable", "get", "TOKEN", ...plainArgs(cwd)]);
 
@@ -306,7 +334,7 @@ describe("variable get", () => {
 
   it("lays the record out field by field on a terminal", async () => {
     const cwd = await makeProject();
-    server.use(http.get("*/variables/:name", () => HttpResponse.json("999-prod")));
+    server.use(http.get("*/variables/:name", () => HttpResponse.json({ primary: "999-prod" })));
 
     const res = await asTerminal(() =>
       runCliForTest(["variable", "get", "GOOGLE_CLIENT_ID", ...plainArgs(cwd)]),
@@ -323,7 +351,7 @@ describe("variable get", () => {
     const cwd = await makeProject();
     server.use(
       http.get("*/variables/:name", ({ params }) =>
-        HttpResponse.json(params.name === "TOKEN" ? { secret: true } : ""),
+        HttpResponse.json({ primary: params.name === "TOKEN" ? { secret: true } : "" }),
       ),
     );
 
@@ -338,9 +366,34 @@ describe("variable get", () => {
     expect(empty.stdout).toMatch(/value\s+""/);
   });
 
+  it("fails with E_NOT_FOUND when the answer has no primary value", async () => {
+    const cwd = await makeProject();
+    server.use(http.get("*/variables/:name", () => HttpResponse.json({ preview: "x" })));
+
+    const res = await runCliForTest(["variable", "get", "TOKEN", ...base(cwd)]);
+
+    expect(res.exitCode).not.toBe(0);
+    const json = parseJson(res.stdout) as { code: string; message: string };
+    expect(json.code).toBe("E_NOT_FOUND");
+    expect(json.message).toContain("TOKEN has no primary value");
+  });
+
+  it("reads the preview value under --preview, and misses a name that has none", async () => {
+    const cwd = await makeProject();
+    server.use(http.get("*/variables/:name", () => HttpResponse.json({ primary: "x" })));
+
+    const res = await runCliForTest(["variable", "get", "TOKEN", "--preview", ...base(cwd)]);
+
+    expect((parseJson(res.stdout) as { message: string }).message).toContain(
+      "TOKEN has no preview value",
+    );
+  });
+
   it("reports a secret as held and carries no value", async () => {
     const cwd = await makeProject();
-    server.use(http.get("*/variables/:name", () => HttpResponse.json({ secret: true })));
+    server.use(
+      http.get("*/variables/:name", () => HttpResponse.json({ primary: { secret: true } })),
+    );
 
     const res = await runCliForTest(["variable", "get", "TOKEN", ...base(cwd)]);
 
@@ -352,7 +405,7 @@ describe("variable get", () => {
 
   it("escapes a value that would otherwise drive the terminal", async () => {
     const cwd = await makeProject();
-    server.use(http.get("*/variables/:name", () => HttpResponse.json("a\u001b[31mb")));
+    server.use(http.get("*/variables/:name", () => HttpResponse.json({ primary: "a\u001b[31mb" })));
 
     const res = await asTerminal(() =>
       runCliForTest(["variable", "get", "NASTY", ...plainArgs(cwd)]),
@@ -378,11 +431,11 @@ describe("variable set", () => {
   it("sends the piped value and marks it secret", async () => {
     const cwd = await makeProject();
     let body: Record<string, unknown> = {};
-    let environment: string | null = "unset";
+    let kind: string | null = "unset";
     server.use(
       http.patch("*/variables", async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
-        environment = new URL(request.url).searchParams.get("environment_name");
+        kind = new URL(request.url).searchParams.get("kind");
         return HttpResponse.json({});
       }),
     );
@@ -399,23 +452,23 @@ describe("variable set", () => {
     );
 
     expect(res.exitCode).toBe(0);
-    expect(environment).toBeNull();
+    expect(kind).toBeNull();
     expect(body).toEqual({ GOOGLE_CLIENT_SECRET: { value: "GOCSPX-abc", secret: true } });
     const json = parseJson(res.stdout) as { data: Record<string, unknown> };
-    // The write targeted the `all` slot as a string; the slot state is read back
-    // separately (see the stored-state test), so the request-shaping assertion
-    // only checks what this write asked for.
+    // A secret is stored for the primary kind only, as the platform's rule has
+    // it; the state is read back in the response (see the stored-state test), so
+    // this only checks what the write asked for.
     expect(json.data).toMatchObject({
       name: "GOOGLE_CLIENT_SECRET",
       type: "string",
-      applies_to: "all",
+      kinds: ["primary"],
     });
   });
 
-  it("reports both slots' state read back from the store, never a secret's value", async () => {
+  it("reports both kinds' state read back from the store, never a secret's value", async () => {
     // The output reflects what the store holds after the write, not the request
-    // flags: here the real mock persists, so the `all` slot reports the secret
-    // as held with no value, and the untouched `preview` slot reports not set.
+    // flags: here the real mock persists, so the primary kind reports the secret
+    // as held with no value, and the preview kind reports not set.
     const cwd = await makeProject();
 
     const res = await withStdin("GOCSPX-abc", () =>
@@ -432,45 +485,17 @@ describe("variable set", () => {
     expect(res.exitCode).toBe(0);
     expect(res.stdout).not.toContain("GOCSPX-abc");
     const json = parseJson(res.stdout) as {
-      data: { all: Record<string, unknown>; preview: Record<string, unknown> };
+      data: { primary: Record<string, unknown>; preview: Record<string, unknown> };
     };
-    expect(json.data.all).toEqual({ held: true, secret: true });
-    expect(json.data.all).not.toHaveProperty("value");
+    expect(json.data.primary).toEqual({ held: true, secret: true });
+    expect(json.data.primary).not.toHaveProperty("value");
     expect(json.data.preview).toEqual({ held: false });
   });
 
-  it("succeeds when the token may write variables but not read them", async () => {
-    const cwd = await makeProject();
-    server.use(
-      http.get("*/variables", () =>
-        HttpResponse.json({ code: "auth.unauthorized", message: "no" }, { status: 403 }),
-      ),
-    );
-
-    const res = await runCliForTest(["variable", "set", "GREETING", "hello", ...base(cwd)]);
-
-    expect(res.exitCode).toBe(0);
-  });
-
-  it("succeeds, warning, when the read back after the write fails", async () => {
-    const cwd = await makeProject();
-    server.use(
-      http.get("*/variables", () =>
-        HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
-      ),
-    );
-
-    const res = await runCliForTest(["variable", "set", "GREETING", "hello", ...base(cwd)]);
-
-    expect((parseJson(res.stdout) as { warnings?: string[] }).warnings).toEqual([
-      expect.stringContaining("The value was stored"),
-    ]);
-  });
-
-  it("says on a terminal what each slot holds after the write", async () => {
-    // Real mock, so the read-back after the write is honest: a plain value
-    // prints in the `all` slot, a secret prints its marker, and the untouched
-    // slot prints `(not set)`.
+  it("says on a terminal what each kind holds after the write", async () => {
+    // Real mock, so the read-back after the write is honest: a plain value is
+    // stored for both kinds, a secret prints its marker for the primary kind
+    // alone, and a kind with no value prints `(not set)`.
     const cwd = await makeProject();
 
     const plain = await asTerminal(() =>
@@ -483,10 +508,11 @@ describe("variable set", () => {
     );
 
     expect(plain.stdout).toContain("Set GREETING on the project");
-    expect(plain.stdout).toMatch(/all\s+hello/);
-    expect(plain.stdout).toMatch(/preview\s+\(not set\)/);
+    expect(plain.stdout).toMatch(/primary\s+hello/);
+    expect(plain.stdout).toMatch(/preview\s+hello/);
     expect(secret.stdout).toContain("Set TOKEN on the project");
-    expect(secret.stdout).toMatch(/all\s+\(secret\)/);
+    expect(secret.stdout).toMatch(/primary\s+\(secret\)/);
+    expect(secret.stdout).toMatch(/preview\s+\(not set\)/);
   });
 
   it("fails rather than blocking when a scripted run pipes nothing in", async () => {
@@ -632,7 +658,9 @@ describe("variable set", () => {
   it("refuses a plain preview value for a name whose value is a secret", async () => {
     const cwd = await makeProject();
     server.use(
-      http.get("*/variables", () => HttpResponse.json({ GOOGLE_CLIENT_SECRET: { secret: true } })),
+      http.get("*/variables", () =>
+        HttpResponse.json({ GOOGLE_CLIENT_SECRET: { primary: { secret: true } } }),
+      ),
     );
 
     const res = await runCliForTest([
@@ -986,11 +1014,11 @@ describe("variable rm", () => {
   it("deletes the name at the project level", async () => {
     const cwd = await makeProject();
     let path = "";
-    let environment: string | null = "unset";
+    let kind: string | null = "unset";
     server.use(
       http.delete("*/variables/:name", ({ request, params }) => {
         path = String(params.name);
-        environment = new URL(request.url).searchParams.get("environment_name");
+        kind = new URL(request.url).searchParams.get("kind");
         return new HttpResponse(null, { status: 204 });
       }),
     );
@@ -1006,9 +1034,13 @@ describe("variable rm", () => {
 
     expect(res.exitCode).toBe(0);
     expect(path).toBe("SUPPORT_EMAIL");
-    expect(environment).toBeNull();
+    expect(kind).toBeNull();
     const json = parseJson(res.stdout) as { data: Record<string, unknown> };
-    expect(json.data).toEqual({ name: "SUPPORT_EMAIL", deleted: true, applies_to: "all" });
+    expect(json.data).toEqual({
+      name: "SUPPORT_EMAIL",
+      deleted: true,
+      kinds: ["primary", "preview"],
+    });
   });
 
   it("says on a terminal that the name was removed from the project", async () => {
@@ -1136,12 +1168,12 @@ describe("variable set value argument and --preview", () => {
     expect(json.code).toBe("E_VALIDATION");
   });
 
-  it("writes the preview override under --preview", async () => {
+  it("writes the preview value alone under --preview", async () => {
     const cwd = await makeProject();
-    let appliesTo: string | null = "unset";
+    let kind: string | null = "unset";
     server.use(
       http.patch("*/variables", ({ request }) => {
-        appliesTo = new URL(request.url).searchParams.get("applies_to");
+        kind = new URL(request.url).searchParams.get("kind");
         return HttpResponse.json({});
       }),
     );
@@ -1156,9 +1188,9 @@ describe("variable set value argument and --preview", () => {
     ]);
 
     expect(res.exitCode).toBe(0);
-    expect(appliesTo).toBe("preview");
-    const json = parseJson(res.stdout) as { data: { applies_to: string } };
-    expect(json.data.applies_to).toBe("preview");
+    expect(kind).toBe("preview");
+    const json = parseJson(res.stdout) as { data: { kinds: string[] } };
+    expect(json.data.kinds).toEqual(["preview"]);
   });
 
   it("keeps --preview in the retry it suggests when nothing is piped in", async () => {

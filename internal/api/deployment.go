@@ -34,11 +34,10 @@ func (h *Handler) GetDeploymentById(ctx context.Context, params api.GetDeploymen
 }
 
 func (h *Handler) GetDeploymentVariables(ctx context.Context, params api.GetDeploymentVariablesParams) (api.GetDeploymentVariablesRes, error) {
-	// The deployment gate is enough to settle who may read the frozen map:
-	// variable.read is declared alongside deployment.read on the operation, but
-	// a token the project trusts to read its deployments is already trusted with
-	// the values they froze, so the one check stands in for both here.
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), deploymentAccess, opRead); err != nil {
+		return nil, err
+	}
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), variableAccess, opRead); err != nil {
 		return nil, err
 	}
 	return nil, domain.ErrNotImplemented()

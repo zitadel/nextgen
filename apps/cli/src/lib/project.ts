@@ -44,6 +44,9 @@ export type ZitadelSecret = {
   project_id: string;
   project_secret: string;
   preview_secret: string;
+  /** Exact primary origin patterns that admit requests. */
+  primary_origins: string[];
+  /** Preview origin patterns that bound which preview URLs may register. */
   preview_origins: string[];
   created_at: string;
   /**
@@ -95,6 +98,15 @@ export async function readZitadelSecret(cwd: string): Promise<ZitadelSecret> {
       typeof secret.preview_secret !== "string" ||
       !Array.isArray(secret.preview_origins)
     ) {
+      throw new Error(".zitadel/secret is missing required fields");
+    }
+    // primary_origins was added with kinded origins; older secrets only have
+    // preview_origins. Treat a missing array as empty so doctor --fix can
+    // still rebuild from the rest of the file.
+    if (secret.primary_origins === undefined) {
+      secret.primary_origins = [];
+    }
+    if (!Array.isArray(secret.primary_origins)) {
       throw new Error(".zitadel/secret is missing required fields");
     }
     return secret as ZitadelSecret;

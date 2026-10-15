@@ -1,12 +1,10 @@
 get:
   operationId: getDeploymentVariables
-  summary: Get the variables a deployment runs
+  summary: Get a deployment's variables
   description: |
-    The values frozen onto the deployment when it was written — what the target
-    serves, not what the store holds now. A preview deployment prefers the
-    `preview` override of each name and falls back to the `all` value; a primary
-    deployment runs only the `all` values. Secrets are reported as held and
-    never disclosed.
+    Returns the variable values the deployment froze when it was made. Later
+    changes to the project's variables do not affect them. A secret reads
+    back as `{"secret": true}`.
   tags:
     - Deployments
   security:
@@ -18,7 +16,7 @@ get:
     - $ref: ../../../../components/parameters/deployment-id.yaml
   responses:
     '200':
-      description: The frozen variables, keyed by name.
+      description: The deployment's variables were retrieved successfully.
       content:
         application/json:
           schema:
