@@ -154,14 +154,18 @@ export class LocalServer<R extends ServerRecord> {
     }
 
     const previous = state.kind === "stopped" ? undefined : state.record;
+    // A port that was asked for is taken as asked, or refused: moving to another
+    // one would start a server where the caller did not look for it. A port
+    // other than the running server's own is checked before that server is
+    // touched, so a refused move leaves it running.
+    if (requested !== undefined && requested !== previous?.port) {
+      await this.assertFree(requested);
+    }
     if (previous) {
       await this.terminate(previous);
     }
-
-    // A port that was asked for is taken as asked, or refused: moving to another
-    // one would start a server where the caller did not look for it.
-    if (requested !== undefined && !(await this.deps.ports.isFree(requested))) {
-      throw new PortInUseError(requested);
+    if (requested !== undefined) {
+      await this.assertFree(requested);
     }
     const port = requested ?? (await this.choosePort(previous?.port));
     const record = await this.deps.launcher.launch({ port, serverUrl: serverUrlFor(port) });
@@ -187,6 +191,12 @@ export class LocalServer<R extends ServerRecord> {
    */
   choosePort(preferred?: number): Promise<number> {
     return chooseFreePort(this.deps.ports, preferred, this.options.firstPort);
+  }
+
+  private async assertFree(port: number): Promise<void> {
+    if (!(await this.deps.ports.isFree(port))) {
+      throw new PortInUseError(port);
+    }
   }
 
   private async terminate(record: R): Promise<StopOutcome> {

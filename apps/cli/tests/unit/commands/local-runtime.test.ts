@@ -650,6 +650,16 @@ describe("local runtime commands", () => {
     expect(await healthy(started.port)).toBe(false);
   });
 
+  it("start --dry-run does not read the runtime record, so a malformed one does not fail it", async () => {
+    const cwd = await tempProject("zitadel-start-dry-malformed-");
+    await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
+    await writeFile(join(cwd, LOCAL_RUNTIME_FILE), "{not json");
+
+    const result = await runCliForTest(["start", "--cwd", cwd, "--dry-run", "--json"]);
+
+    expect(parseJson(result.stdout)).toMatchObject({ status: "ok" });
+  });
+
   it("stop says nothing was running for a directory with no server", async () => {
     const cwd = await tempProject("zitadel-stop-none-");
 

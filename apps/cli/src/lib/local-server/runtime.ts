@@ -247,6 +247,19 @@ export async function readNearestRuntimeMetadata(
   return dir && runtime ? { dir, runtime } : undefined;
 }
 
+/**
+ * The runtime record when it can be read, `undefined` when it is missing or
+ * malformed. For commands that only want a hint from it (the port a directory
+ * had) before they report a malformed record themselves, with the fix.
+ */
+export async function peekRuntimeMetadata(cwd: string): Promise<RuntimeMetadata | undefined> {
+  try {
+    return await readRuntimeMetadata(cwd);
+  } catch {
+    return undefined;
+  }
+}
+
 export async function readRuntimeMetadata(cwd: string): Promise<RuntimeMetadata | undefined> {
   const paths = localRuntimePaths(cwd);
   let raw: string;

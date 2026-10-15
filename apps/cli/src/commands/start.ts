@@ -20,6 +20,7 @@ import {
   ensureLocalState,
   localContainerName,
   localServerUrl,
+  peekRuntimeMetadata,
   readRuntimeMetadata,
   type BinaryRuntimeMetadata,
   type DockerRuntimeMetadata,
@@ -62,7 +63,7 @@ export default class Start extends BaseCommand {
     const requestedPort = flags.port;
     // Where the server will be, as far as is known before one is chosen: the
     // port asked for, else the one this directory already has.
-    const recorded = await readRuntimeMetadata(
+    const recorded = await peekRuntimeMetadata(
       resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined),
     );
     const port = requestedPort ?? recorded?.port ?? DEFAULT_LOCAL_SERVER_PORT;

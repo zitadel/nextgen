@@ -19,6 +19,7 @@ import {
   checkLocalServerHealth,
   defaultLocalServerImageForCliVersion,
   localServerUrl,
+  peekRuntimeMetadata,
   readRuntimeMetadata,
   type RuntimeBackend,
   type RuntimeMetadata,
@@ -72,12 +73,13 @@ export default class Doctor extends BaseCommand {
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Doctor);
-    const existingRuntime = await readRuntimeMetadata(
+    const recorded = await peekRuntimeMetadata(
       resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined),
     );
-    const port = flags.port ?? existingRuntime?.port ?? DEFAULT_LOCAL_SERVER_PORT;
+    const port = flags.port ?? recorded?.port ?? DEFAULT_LOCAL_SERVER_PORT;
     await this.toMeta(flags, { resolveServer: false, source: localServerUrl(port) });
     const { cwd, dryRun } = this.meta;
+    const existingRuntime = await readRuntimeMetadata(cwd);
     const runtimeBackend = resolveRuntimeBackend({
       runtime: flags.runtime,
       image: flags.image,

@@ -179,6 +179,17 @@ describe("LocalServer", () => {
       expect(world.launched).toEqual([]);
     });
 
+    it("leaves a running server alone when the port it is asked to move to is held", async () => {
+      const world = new World();
+      await world.server().start();
+      world.takenPorts.add(9000);
+
+      await expect(world.server({ port: 9000 }).start()).rejects.toBeInstanceOf(PortInUseError);
+
+      expect(world.terminated).toEqual([]);
+      await expect(world.server().state()).resolves.toMatchObject({ kind: "running" });
+    });
+
     it("restarts a running server that is not reusable", async () => {
       const world = new World();
       const { record: first } = await world.server().start();
