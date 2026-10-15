@@ -39,7 +39,7 @@ export const ICON_PLATE =
 export const DETAIL_CARD = "gap-0 py-0";
 
 /** The sentence-case card title some cards carry instead of the eyebrow: the 14/20 display face. */
-const CARD_HEADING = "text-foreground font-serif text-sm leading-5";
+export const CARD_HEADING = "text-foreground font-serif text-sm leading-5";
 
 /**
  * A body card with a titled section: the title, an optional action beside it,
