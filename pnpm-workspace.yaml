@@ -8,9 +8,15 @@ packages:
   - "tools/*"
 
 catalog:
+  # Babel 7 for the Nuxt projects: Nuxt's sub-packages have optional peers on
+  # Babel 7 plugins, which pnpm auto-installs into every project with Nuxt in
+  # its graph, and it pairs their required @babel/core peer with the newest
+  # @babel/core in the lockfile (8.x, for Angular) unless the project declares
+  # its own. Without it, an install that re-resolves fails strictPeerDependencies.
+  "@babel/core": ^7.29.7
   "@biomejs/biome": ^2.5.15
   "@clack/prompts": ^1.2.0
-  "@faker-js/faker": ^10.4.0
+  "@faker-js/faker": ^10.5.0
   '@fontsource/arimo': ^5.2.8
   "@modelcontextprotocol/server": ^2.3.1
   "@moonrepo/cli": ^2.6.1
@@ -63,7 +69,7 @@ catalog:
   cmdk: ^1.1.1
   cookie-parser: ^1.4.7
   culori: ^4.0.2
-  dompurify: ^3.4.13
+  dompurify: ^3.4.16
   express: ^4.18.2
   fumadocs-core: ^16.17.1
   fumadocs-mdx: ^15.4.7
@@ -79,7 +85,7 @@ catalog:
   marked: ^18.0.14
   msw: ^2.14.6
   msw-storybook-addon: ^3.0.3
-  next: ^16.2.11
+  next: ^16.3.8
   nuxt: ^4.5.1
   oclif: ^4.17.46
   orval: ^8.42.0
@@ -92,7 +98,7 @@ catalog:
   safe-stable-stringify: ^2.5.0
   sanitize-html: ^2.18.0
   semver: ^7.7.3
-  sharp: ^0.35.3
+  sharp: ^0.35.5
   shiki: ^4.2.0
   sonner: ^2.0.7
   storybook: ^10.3.6
@@ -110,7 +116,7 @@ catalog:
   vite-plugin-dts: ^5.1.2
   vite-plugin-web-components-hmr: ^0.1.3
   vitest: ^4.1.11
-  vue: ^3.5.41
+  vue: ^3.5.42
   vue-tsc: ^3.2.8
   xstate: ^5.31.1
   yaml: ^2.9.0
