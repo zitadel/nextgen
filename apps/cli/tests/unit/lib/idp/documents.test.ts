@@ -245,6 +245,63 @@ describe("applySsoToFlow", () => {
     expect(second.document).toEqual(first.document);
   });
 
+  it.each([
+    { from: { password: true, passkey: false }, to: { password: true, passkey: true } },
+    { from: { password: true, passkey: true }, to: { password: false, passkey: true } },
+    { from: { password: false, passkey: false }, to: { password: true, passkey: false } },
+    { from: { password: false, passkey: true }, to: { password: true, passkey: true } },
+  ])(
+    "brings a step the generator wrote for other methods up to date ($from -> $to)",
+    ({ from, to }) => {
+      const first = applySsoToFlow(shippedFlow(), slug("google"), from);
+
+      const second = applySsoToFlow(first.document, slug("google"), to);
+      const fresh = applySsoToFlow(shippedFlow(), slug("google"), to);
+
+      expect(second.skipped).toEqual([]);
+      expect(second.changed).toBe(true);
+      const conflict = (document: object) =>
+        (document as { steps: Array<Record<string, unknown>> }).steps.find(
+          (s) => s.name === "sso-conflict",
+        );
+      expect(conflict(second.document)).toEqual(conflict(fresh.document));
+    },
+  );
+
+  it("keeps the providers and the position of a step it brings up to date", () => {
+    const first = applySsoToFlow(shippedFlow(), slug("google"), {
+      password: true,
+      passkey: false,
+    });
+    const names = (document: object) =>
+      (document as { steps: Array<Record<string, unknown>> }).steps.map((s) => s.name);
+
+    const second = applySsoToFlow(first.document, slug("github"), bothMethods);
+
+    expect(names(second.document)).toEqual(names(first.document));
+    const conflict = (second.document as { steps: Array<Record<string, unknown>> }).steps.find(
+      (s) => s.name === "sso-conflict",
+    );
+    expect(conflict?.sso_providers).toEqual(["google", "github"]);
+  });
+
+  it("still leaves a step that matches no combination of methods alone", () => {
+    const first = applySsoToFlow(shippedFlow(), slug("google"), {
+      password: true,
+      passkey: false,
+    });
+    const edited = structuredClone(first.document) as { steps: Array<Record<string, unknown>> };
+    const conflict = edited.steps.find((s) => s.name === "sso-conflict");
+    (conflict as Record<string, unknown>).fields = ["email"];
+
+    const second = applySsoToFlow(edited, slug("google"), bothMethods);
+
+    expect(second.changed).toBe(false);
+    expect(second.skipped).toEqual([
+      { step: "sso-conflict", region: "steps.sso-conflict", reason: "hand-edited" },
+    ]);
+  });
+
   it("leaves a hand-edited step alone and reports it", () => {
     const first = applySsoToFlow(shippedFlow(), slug("google"), bothMethods);
     const edited = structuredClone(first.document) as { steps: Array<Record<string, unknown>> };

@@ -132,6 +132,35 @@ describe("auth-method sso enable", () => {
     });
   });
 
+  it("brings the conflict step up to date when a method was enabled after it was written", async () => {
+    const cwd = await setUpProject({
+      "default-human-user": {
+        ...structuredClone(defaultSchema),
+        "x-auth-methods": { password: { enabled: true }, passkey: { enabled: false } },
+      },
+    });
+    const first = await enable(cwd, "--client-id", "abc");
+    expect(first.exitCode).toBe(0);
+    await writeFile(
+      join(cwd, ".zitadel/schemas/default-human-user.json"),
+      JSON.stringify({
+        ...defaultSchema,
+        "x-auth-methods": { password: { enabled: true }, passkey: { enabled: true } },
+      }),
+    );
+
+    const second = await enable(cwd);
+
+    expect(second.exitCode).toBe(0);
+    const payload = parseJson(second.stdout) as { data: { untouched: string[] } };
+    expect(payload.data.untouched).toEqual([]);
+    const flow = JSON.parse(
+      await readFile(join(cwd, ".zitadel/flows/default-human-user-login.json"), "utf8"),
+    ) as { steps: Array<{ name: string; actions?: Array<{ name: string }> }> };
+    const conflict = flow.steps.find((step) => step.name === "sso-conflict");
+    expect(conflict?.actions?.map((action) => action.name)).toContain("passkey");
+  });
+
   it("prints the callback URI on reuse in text mode", async () => {
     // The URI moved to one per connection after the first release; rerunning
     // the command on the existing connection is how a developer finds the one
