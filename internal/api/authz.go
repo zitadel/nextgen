@@ -164,6 +164,15 @@ var deploymentAccess = resourceAccess{
 	denied:    domain.ErrDeploymentPermissionDenied,
 }
 
+// originAccess gates add/remove of project origin patterns. Origins have no
+// minted id and no RSI row — they are addressed by pattern under the
+// project_id the request carries — so every op is project-scoped.
+var originAccess = resourceAccess{
+	readMiss:  domain.ErrOriginNotFound,
+	writeMiss: domain.ErrOriginNotFound,
+	denied:    domain.ErrOriginPermissionDenied,
+}
+
 // eventsAccess gates the operator audit stream (ADR 049). List/get are
 // project-scoped (no RSI kind); credential ceiling is project.write like other
 // management resources until #420 mints a fine-grained events relation.

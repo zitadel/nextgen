@@ -88,6 +88,13 @@ type ListPasskeysInput struct {
 	Limit     int
 }
 
+type ListIdentityLinksInput struct {
+	ProjectID string
+	UserID    string
+	PageToken string
+	Limit     int
+}
+
 type ListUserTeamsInput struct {
 	ProjectID string
 	UserID    string
@@ -124,6 +131,7 @@ type UserService interface {
 	DeleteUser(ctx context.Context, input DeleteUserInput) error
 	ListUsers(ctx context.Context, input ListUsersInput) (*ListUsersOutput, error)
 	ListPasskeys(ctx context.Context, input ListPasskeysInput) (passkeys []*domain.UserPasskey, nextPage string, err error)
+	ListIdentityLinks(ctx context.Context, input ListIdentityLinksInput) (links []*domain.IDPIdentityLink, nextPage string, err error)
 	ListUserTeams(ctx context.Context, input ListUserTeamsInput) (*ListUserTeamsOutput, error)
 	GetUserByID(ctx context.Context, input GetUserInput) (*domain.User, error)
 	PatchUser(ctx context.Context, input PatchUserInput) (*domain.User, error)
@@ -439,21 +447,51 @@ func (s *userService) ListPasskeys(ctx context.Context, input ListPasskeysInput)
 		},
 	)
 	if err != nil {
-		return nil, "", domain.ErrInternal(err).WithMessage("failed to get user passkeys from database")
+		return nil, "", mapListError(err, "failed to list user passkeys from database")
 	}
 
-	// Distinguish "user not found" from "user has no passkeys".
 	if len(dbpasskeys.Items) == 0 {
-		exists, err := s.v2Pool.Statements().UserExists(ctx, input.ProjectID, input.UserID)
-		if err != nil {
-			return nil, "", domain.ErrInternal(err).WithMessage("failed to get user from database")
-		}
-		if !exists {
-			return nil, "", domain.ErrUserNotFound()
+		if err := s.requireUser(ctx, input.ProjectID, input.UserID); err != nil {
+			return nil, "", err
 		}
 	}
 
 	return dbpasskeys.Items, string(dbpasskeys.NextCursor), nil
+}
+
+// ListIdentityLinks pages the user's identity links. The id breaks ties
+// between links created in the same instant, so a page boundary never skips or
+// repeats one.
+func (s *userService) ListIdentityLinks(ctx context.Context, input ListIdentityLinksInput) (links []*domain.IDPIdentityLink, nextPage string, err error) {
+	result, err := s.v2Pool.Statements().ListIDPIdentityLinks(
+		ctx, &database.ListOptions[domain.IDPIdentityLinkField]{
+			Filter: database.And(
+				database.Equal(database.Col(domain.IDPIdentityLinkFieldProjectID), input.ProjectID),
+				database.Equal(database.Col(domain.IDPIdentityLinkFieldUserID), input.UserID),
+			),
+			Pagination: database.Page[domain.IDPIdentityLinkField]{
+				Limit:  uint32(normalizeLimit(input.Limit)),
+				Cursor: []byte(input.PageToken),
+				OrderBy: database.OrderBy[domain.IDPIdentityLinkField]{
+					Columns: []database.Column[domain.IDPIdentityLinkField]{
+						database.Col(domain.IDPIdentityLinkFieldCreatedAt),
+						database.Col(domain.IDPIdentityLinkFieldID),
+					},
+					Direction: database.OrderAsc,
+				},
+			},
+		},
+	)
+	if err != nil {
+		return nil, "", mapListError(err, "failed to list user identity links from database")
+	}
+	if len(result.Items) == 0 {
+		if err := s.requireUser(ctx, input.ProjectID, input.UserID); err != nil {
+			return nil, "", err
+		}
+	}
+
+	return result.Items, string(result.NextCursor), nil
 }
 
 // ListUserTeams serves the user's team roster one page at a time, each entry
@@ -491,12 +529,8 @@ func (s *userService) ListUserTeams(ctx context.Context, input ListUserTeamsInpu
 	}
 
 	if len(teams.Items) == 0 {
-		exists, err := s.v2Pool.Statements().UserExists(ctx, input.ProjectID, input.UserID)
-		if err != nil {
-			return nil, domain.ErrInternal(err).WithMessage("failed to get user from database")
-		}
-		if !exists {
-			return nil, domain.ErrUserNotFound()
+		if err := s.requireUser(ctx, input.ProjectID, input.UserID); err != nil {
+			return nil, err
 		}
 	}
 
@@ -504,6 +538,20 @@ func (s *userService) ListUserTeams(ctx context.Context, input ListUserTeamsInpu
 		Items:         teams.Items,
 		NextPageToken: string(teams.NextCursor),
 	}, nil
+}
+
+// requireUser answers ErrUserNotFound for a user that does not exist. A list
+// keyed on the user calls it on an empty page, where no row proved the user
+// exists, to tell an unknown user from one with nothing to list.
+func (s *userService) requireUser(ctx context.Context, projectID, userID string) error {
+	exists, err := s.v2Pool.Statements().UserExists(ctx, projectID, userID)
+	if err != nil {
+		return domain.ErrInternal(err).WithMessage("failed to get user from database")
+	}
+	if !exists {
+		return domain.ErrUserNotFound()
+	}
+	return nil
 }
 
 func (s *userService) GetUserByID(ctx context.Context, input GetUserInput) (*domain.User, error) {

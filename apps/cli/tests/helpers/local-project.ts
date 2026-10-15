@@ -42,6 +42,7 @@ export async function makeProject({
       project_id: "proj_01TEST",
       project_secret: "s",
       preview_secret: "s",
+      primary_origins: [],
       preview_origins: [],
       created_at: new Date().toISOString(),
     });

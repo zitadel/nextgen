@@ -28,6 +28,15 @@ func trimTrailingSlashes(u *url.URL) {
 
 // Invoker invokes operations described by OpenAPI v3 specification.
 type Invoker interface {
+	// AddOrigin invokes addOrigin operation.
+	//
+	// Adds one `{pattern, kind}` to the project's origins. A primary pattern
+	// must be an exact URL (no wildcard). Preview patterns may include a single
+	// DNS-label wildcard. Adding a pattern that already exists with the same
+	// kind is idempotent and answers 201 with the stored origin.
+	//
+	// POST /projects/{project_id}/origins
+	AddOrigin(ctx context.Context, request *ProjectOrigin, params AddOriginParams) (AddOriginRes, error)
 	// BeginUserPasskeyRegistration invokes beginUserPasskeyRegistration operation.
 	//
 	// Starts a WebAuthn registration ceremony for the user and returns the
@@ -220,17 +229,25 @@ type Invoker interface {
 	// `id`, so identity links that reference the connection keep resolving while
 	// releases and auth attempts stay pinned to the revision they captured.
 	// Identity fields are fixed for the life of the connection and a revision
-	// that changes one is rejected: `protocol`, `subject_claim`, and the
-	// endpoints that name the authority (`issuer` for OIDC, `token_endpoint`
-	// and `userinfo_endpoint` for OAuth 2.0). Their values decide which provider
+	// that changes one is rejected: `protocol`, `subject_claim`, and `issuer`,
+	// the field that names the authority. Their values decide which provider
 	// account a stored subject belongs to, so changing one would silently
 	// repoint existing identities at a different provider.
-	// `subject_claim` is optional for OIDC and required for OAuth 2.0. For an
-	// OIDC connection, `sub` is used as the default value. If a revision updates
-	// `subject_claim` to a different value than the one set during creation, the
-	// request is rejected.
+	// `subject_claim` is optional, and `sub` is used as the default value. If a
+	// revision updates `subject_claim` to a different value than the one set
+	// during creation, the request is rejected.
+	// OIDC is the only protocol.
 	// The document is validated against the `idp-connection.json` schema before
-	// anything is stored.
+	// anything is stored. The rules the engine applies when it starts a sign-in
+	// then run on the document, so a connection that could never start one is
+	// refused here instead with `idp.endpoints_partial`: the OIDC block sets an
+	// endpoint without the others. It either sets no endpoint, and discovery
+	// fills them, or sets `authorization_endpoint`, `token_endpoint`, `jwks_uri`,
+	// and `userinfo_endpoint`. `userinfo_endpoint` may be left out when
+	// `id_token_mapping` is on, but setting it alone still counts as setting an
+	// endpoint. The details list the missing endpoints.
+	// A refused document stores nothing, and on a revise the current revision
+	// stays unchanged.
 	//
 	// POST /idps
 	CreateIdp(ctx context.Context, request *CreateIdpRequest, params CreateIdpParams) (CreateIdpRes, error)
@@ -744,6 +761,13 @@ type Invoker interface {
 	//
 	// GET /schemas
 	ListSchemas(ctx context.Context, params ListSchemasParams) (ListSchemasRes, error)
+	// ListUserIdentityLinks invokes listUserIdentityLinks operation.
+	//
+	// The identity provider accounts a sign-in linked to the user, oldest first.
+	// The provider's subject and claims are never returned.
+	//
+	// GET /users/{user_id}/identity_links
+	ListUserIdentityLinks(ctx context.Context, params ListUserIdentityLinksParams) (ListUserIdentityLinksRes, error)
 	// ListUserPasskeys invokes listUserPasskeys operation.
 	//
 	// List user passkeys.
@@ -842,6 +866,15 @@ type Invoker interface {
 	//
 	// POST /users/query
 	QueryUsers(ctx context.Context, request *QueryUsersRequest, params QueryUsersParams) (QueryUsersRes, error)
+	// RemoveOrigin invokes removeOrigin operation.
+	//
+	// Removes one pattern from the project's origins. Requests from URLs only
+	// that pattern admitted are refused from then on; live previews and
+	// deployment history are untouched. Removing a pattern that is already
+	// absent is idempotent and answers 204.
+	//
+	// POST /projects/{project_id}/origins/remove
+	RemoveOrigin(ctx context.Context, request *RemoveOriginReq, params RemoveOriginParams) (RemoveOriginRes, error)
 	// RemovePreview invokes removePreview operation.
 	//
 	// Ends a preview before it expires: the URL stops being served at once.
@@ -1054,6 +1087,150 @@ func (c *Client) requestURL(ctx context.Context) *url.URL {
 		return c.serverURL
 	}
 	return u
+}
+
+// AddOrigin invokes addOrigin operation.
+//
+// Adds one `{pattern, kind}` to the project's origins. A primary pattern
+// must be an exact URL (no wildcard). Preview patterns may include a single
+// DNS-label wildcard. Adding a pattern that already exists with the same
+// kind is idempotent and answers 201 with the stored origin.
+//
+// POST /projects/{project_id}/origins
+func (c *Client) AddOrigin(ctx context.Context, request *ProjectOrigin, params AddOriginParams) (AddOriginRes, error) {
+	res, err := c.sendAddOrigin(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendAddOrigin(ctx context.Context, request *ProjectOrigin, params AddOriginParams) (res AddOriginRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("addOrigin"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/projects/{project_id}/origins"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, AddOriginOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [3]string
+	pathParts[0] = "/projects/"
+	{
+		// Encode "project_id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "project_id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/origins"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeAddOriginRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, AddOriginOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeAddOriginResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
 }
 
 // BeginUserPasskeyRegistration invokes beginUserPasskeyRegistration operation.
@@ -2512,17 +2689,25 @@ func (c *Client) sendCreateHandoff(ctx context.Context, params CreateHandoffPara
 // `id`, so identity links that reference the connection keep resolving while
 // releases and auth attempts stay pinned to the revision they captured.
 // Identity fields are fixed for the life of the connection and a revision
-// that changes one is rejected: `protocol`, `subject_claim`, and the
-// endpoints that name the authority (`issuer` for OIDC, `token_endpoint`
-// and `userinfo_endpoint` for OAuth 2.0). Their values decide which provider
+// that changes one is rejected: `protocol`, `subject_claim`, and `issuer`,
+// the field that names the authority. Their values decide which provider
 // account a stored subject belongs to, so changing one would silently
 // repoint existing identities at a different provider.
-// `subject_claim` is optional for OIDC and required for OAuth 2.0. For an
-// OIDC connection, `sub` is used as the default value. If a revision updates
-// `subject_claim` to a different value than the one set during creation, the
-// request is rejected.
+// `subject_claim` is optional, and `sub` is used as the default value. If a
+// revision updates `subject_claim` to a different value than the one set
+// during creation, the request is rejected.
+// OIDC is the only protocol.
 // The document is validated against the `idp-connection.json` schema before
-// anything is stored.
+// anything is stored. The rules the engine applies when it starts a sign-in
+// then run on the document, so a connection that could never start one is
+// refused here instead with `idp.endpoints_partial`: the OIDC block sets an
+// endpoint without the others. It either sets no endpoint, and discovery
+// fills them, or sets `authorization_endpoint`, `token_endpoint`, `jwks_uri`,
+// and `userinfo_endpoint`. `userinfo_endpoint` may be left out when
+// `id_token_mapping` is on, but setting it alone still counts as setting an
+// endpoint. The details list the missing endpoints.
+// A refused document stores nothing, and on a revise the current revision
+// stays unchanged.
 //
 // POST /idps
 func (c *Client) CreateIdp(ctx context.Context, request *CreateIdpRequest, params CreateIdpParams) (CreateIdpRes, error) {
@@ -2671,6 +2856,15 @@ func (c *Client) CreateProject(ctx context.Context, request *CreateProjectReques
 }
 
 func (c *Client) sendCreateProject(ctx context.Context, request *CreateProjectRequest) (res CreateProjectRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("createProject"),
 		semconv.HTTPRequestMethodKey.String("POST"),
@@ -10304,6 +10498,192 @@ func (c *Client) sendListSchemas(ctx context.Context, params ListSchemasParams) 
 	return result, nil
 }
 
+// ListUserIdentityLinks invokes listUserIdentityLinks operation.
+//
+// The identity provider accounts a sign-in linked to the user, oldest first.
+// The provider's subject and claims are never returned.
+//
+// GET /users/{user_id}/identity_links
+func (c *Client) ListUserIdentityLinks(ctx context.Context, params ListUserIdentityLinksParams) (ListUserIdentityLinksRes, error) {
+	res, err := c.sendListUserIdentityLinks(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendListUserIdentityLinks(ctx context.Context, params ListUserIdentityLinksParams) (res ListUserIdentityLinksRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("listUserIdentityLinks"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/users/{user_id}/identity_links"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, ListUserIdentityLinksOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [3]string
+	pathParts[0] = "/users/"
+	{
+		// Encode "user_id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "user_id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.UserID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/identity_links"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "limit" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "limit",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Limit.Get(); ok {
+				if unwrapped := int(val); true {
+					return e.EncodeValue(conv.IntToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "page_token" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "page_token",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.PageToken.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, ListUserIdentityLinksOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, ListUserIdentityLinksOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeListUserIdentityLinksResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
 // ListUserPasskeys invokes listUserPasskeys operation.
 //
 // List user passkeys.
@@ -11968,6 +12348,141 @@ func (c *Client) sendQueryUsers(ctx context.Context, request *QueryUsersRequest,
 
 	stage = "DecodeResponse"
 	result, err := decodeQueryUsersResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// RemoveOrigin invokes removeOrigin operation.
+//
+// Removes one pattern from the project's origins. Requests from URLs only
+// that pattern admitted are refused from then on; live previews and
+// deployment history are untouched. Removing a pattern that is already
+// absent is idempotent and answers 204.
+//
+// POST /projects/{project_id}/origins/remove
+func (c *Client) RemoveOrigin(ctx context.Context, request *RemoveOriginReq, params RemoveOriginParams) (RemoveOriginRes, error) {
+	res, err := c.sendRemoveOrigin(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendRemoveOrigin(ctx context.Context, request *RemoveOriginReq, params RemoveOriginParams) (res RemoveOriginRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("removeOrigin"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/projects/{project_id}/origins/remove"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, RemoveOriginOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [3]string
+	pathParts[0] = "/projects/"
+	{
+		// Encode "project_id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "project_id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/origins/remove"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeRemoveOriginRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, RemoveOriginOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeRemoveOriginResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}

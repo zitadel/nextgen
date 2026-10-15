@@ -53,6 +53,7 @@
     "nuxt": ">=4"
   },
   "devDependencies": {
+    "@babel/core": "catalog:",
     "@nuxt/kit": "catalog:",
     "@nuxt/schema": "catalog:",
     "@types/node": "catalog:",

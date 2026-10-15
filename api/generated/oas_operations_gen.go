@@ -6,6 +6,7 @@ package api
 type OperationName = string
 
 const (
+	AddOriginOperation                     OperationName = "AddOrigin"
 	BeginUserPasskeyRegistrationOperation  OperationName = "BeginUserPasskeyRegistration"
 	BuildReleaseOperation                  OperationName = "BuildRelease"
 	CompleteClaimOperation                 OperationName = "CompleteClaim"
@@ -66,6 +67,7 @@ const (
 	ListPreviewsOperation                  OperationName = "ListPreviews"
 	ListReleasesOperation                  OperationName = "ListReleases"
 	ListSchemasOperation                   OperationName = "ListSchemas"
+	ListUserIdentityLinksOperation         OperationName = "ListUserIdentityLinks"
 	ListUserPasskeysOperation              OperationName = "ListUserPasskeys"
 	ListUserTeamsOperation                 OperationName = "ListUserTeams"
 	PatchMyUserOperation                   OperationName = "PatchMyUser"
@@ -77,6 +79,7 @@ const (
 	QuerySessionsOperation                 OperationName = "QuerySessions"
 	QueryTeamsOperation                    OperationName = "QueryTeams"
 	QueryUsersOperation                    OperationName = "QueryUsers"
+	RemoveOriginOperation                  OperationName = "RemoveOrigin"
 	RemovePreviewOperation                 OperationName = "RemovePreview"
 	RevokeMySessionOperation               OperationName = "RevokeMySession"
 	RevokeReleaseOperation                 OperationName = "RevokeRelease"

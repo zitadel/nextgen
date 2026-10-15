@@ -183,12 +183,6 @@ describe("plan", () => {
               c.subject_claim = "email";
             },
           ],
-          [
-            "protocol",
-            (c: ConnectionDocument) => {
-              c.protocol = "oauth2";
-            },
-          ],
         ])("refuses an edit of %s on a connection already applied", async (_field, edit) => {
           const app = await anAppServingGoogle();
           await app.editConnection("google", edit);

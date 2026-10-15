@@ -989,7 +989,7 @@ function dryRunProject(issuer: string): CreateProject201 {
     name: "dry-run",
     project_secret: "sk_proj_dry_run_full",
     preview_secret: "sk_proj_dry_run_preview",
-    preview_origins: [issuer],
+    origins: [{ pattern: issuer, kind: "preview" }],
     created_at: "2026-04-21T14:03:11.000Z",
   };
 }
@@ -1383,16 +1383,13 @@ async function createProjectWithLocalHint(
   retry: SetupRetryOptions,
 ): Promise<CreateProject201> {
   try {
-    // API contract requires a project name; generated TS models may lag
-    // briefly until `packages/api` regeneration catches up.
-    const payload = { name: projectName, preview_origins: [issuer], seed_defaults: false } as {
-      name: string;
-      preview_origins: string[];
-      seed_defaults: false;
-    };
     // Register the app's own origin so the backend's origin check allows the
     // requests the dev proxy forwards from it.
-    return await client.createProject(payload as Parameters<typeof client.createProject>[0]);
+    return await client.createProject({
+      name: projectName,
+      origins: [{ pattern: issuer, kind: "preview" }],
+      seed_defaults: false,
+    });
   } catch (error) {
     const normalized = toZitadelError(error);
     const retryFlags = setupRetryFlags(retry);

@@ -40,8 +40,8 @@ export abstract class OidcProvider implements IdpProvider {
   protected readonly subjectClaim: string = "sub";
 
   /**
-   * Schema property name → how its value is verified: a claim to read, `true`
-   * for a provider trusted outright, or `"$supplementary_fetch"`.
+   * Schema property name → how its value is verified: a claim to read, or
+   * `true` for a provider trusted outright.
    *
    * Keyed by schema property, like {@link claimTable}, so it narrows with it.
    */

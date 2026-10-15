@@ -18,7 +18,6 @@ properties:
       maxLength: 64
       examples:
       - google
-      - github
       - corp_idp
     description: Slugs of the Project-level identity provider connections available to users of this schema.
       Each entry must match the `slug` of a connection under `.zitadel/idps/`; a connection existing does
