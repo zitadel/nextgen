@@ -292,13 +292,12 @@ export async function checkLocalServerHealth(
 
 /**
  * Best-effort local-server detection for optional UI (the setup wizard's
- * server choice). Same sources as {@link resolveLocalServer} — the runtime
- * metadata written by `zitadel start` in this directory or a parent, then the
- * default localhost URL — but
- * never throws: a malformed `runtime.json` or an unhealthy server yields
- * `undefined` (doctor owns diagnosing those states), and an unhealthy
- * metadata URL still falls back to the default-port probe so a server
- * started from a different directory is found.
+ * server choice). Same source as {@link resolveLocalServer}: the runtime
+ * metadata written by `zitadel start` in this directory or a parent. It never
+ * throws: a malformed `runtime.json` or an unhealthy server yields
+ * `undefined` (doctor owns diagnosing those states). A server some other
+ * directory started is not looked for: it holds another directory's data and
+ * admin credential, so it is only used when named with `--server`.
  */
 export async function detectHealthyLocalServer(cwd: string): Promise<string | undefined> {
   let runtime: RuntimeMetadata | undefined;
@@ -310,36 +309,31 @@ export async function detectHealthyLocalServer(cwd: string): Promise<string | un
   if (runtime && (await checkLocalServerHealth(runtime.server_url))) {
     return runtime.server_url;
   }
-  const alreadyProbedDefault = runtime?.server_url === DEFAULT_LOCAL_SERVER_URL;
-  if (!alreadyProbedDefault && (await checkLocalServerHealth(DEFAULT_LOCAL_SERVER_URL))) {
-    return DEFAULT_LOCAL_SERVER_URL;
-  }
   return undefined;
 }
 
+/**
+ * The server the nearest `runtime.json` names, when it is healthy. There is no
+ * fallback to a default port: every directory runs its own server, and whatever
+ * answers on port 8080 may belong to another directory.
+ */
 export async function resolveLocalServer(cwd: string): Promise<string> {
   const nearest = await readNearestRuntimeMetadata(cwd);
-  if (nearest) {
-    const { server_url } = nearest.runtime;
-    if (await checkLocalServerHealth(server_url)) {
-      return server_url;
-    }
-    // This directory's own metadata is authoritative. A parent's can outlive
-    // its server (`stop` keeps it), so it does not rule out the default one.
-    if (nearest.dir === cwd || server_url === DEFAULT_LOCAL_SERVER_URL) {
-      throw localServerNotRunning(server_url);
-    }
+  if (!nearest) {
+    throw localServerNotRunning();
   }
-
-  if (await checkLocalServerHealth(DEFAULT_LOCAL_SERVER_URL)) {
-    return DEFAULT_LOCAL_SERVER_URL;
+  const { server_url } = nearest.runtime;
+  if (await checkLocalServerHealth(server_url)) {
+    return server_url;
   }
-  throw localServerNotRunning(DEFAULT_LOCAL_SERVER_URL);
+  throw localServerNotRunning(server_url);
 }
 
-export function localServerNotRunning(serverUrl: string): ZitadelError {
+export function localServerNotRunning(serverUrl?: string): ZitadelError {
   return new ZitadelError("E_LOCAL_SERVER_NOT_RUNNING", "Local Zitadel server is not running", {
-    hint: `No healthy local server responded at ${serverUrl}.`,
+    hint: serverUrl
+      ? `No healthy local server responded at ${serverUrl}.`
+      : "No local server has been started in this directory or a parent.",
     nextCommands: ["zitadel start"],
     details: { server_url: serverUrl },
   });

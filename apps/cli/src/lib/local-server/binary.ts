@@ -56,12 +56,49 @@ export function resolveServerCommand(env: NodeJS.ProcessEnv = process.env): {
 
   const manifestPath = resolveServerPackageManifest();
   const manifest = require(manifestPath) as { version?: unknown };
+  // The binary itself, not the `zitadel-server.js` wrapper that launches it: the
+  // pid the CLI records is then the pid that holds the port, so `stop` signals
+  // the server and a wrapper that dies cannot leave it running.
   return {
-    command: process.execPath,
-    args: [join(dirname(manifestPath), "bin", "zitadel-server.js")],
+    command: resolvePlatformBinary(manifestPath),
+    args: [],
     serverPackage: SERVER_NPM_PACKAGE,
     serverVersion: typeof manifest.version === "string" ? manifest.version : "unknown",
   };
+}
+
+/** The platform packages `@zitadel/server` ships the `nextgen` binary in. */
+export const SERVER_PLATFORM_PACKAGES: Readonly<Record<string, string>> = {
+  "darwin-arm64": "@zitadel/server-darwin-arm64",
+  "darwin-x64": "@zitadel/server-darwin-x64",
+  "linux-arm64": "@zitadel/server-linux-arm64",
+  "linux-x64": "@zitadel/server-linux-x64",
+  "win32-x64": "@zitadel/server-win32-x64",
+};
+
+/**
+ * The `nextgen` binary for a platform. The platform package is an optional
+ * dependency of `@zitadel/server`, so it is resolved from there and not from the
+ * CLI, where a strict package manager does not expose it.
+ */
+export function resolvePlatformBinary(
+  serverManifestPath: string,
+  platform: string = process.platform,
+  arch: string = process.arch,
+): string {
+  const packageName = SERVER_PLATFORM_PACKAGES[`${platform}-${arch}`];
+  if (!packageName) {
+    throw new Error(
+      `Unsupported platform for ${SERVER_NPM_PACKAGE}: ${platform}/${arch}. Supported: ${Object.keys(SERVER_PLATFORM_PACKAGES).join(", ")}.`,
+    );
+  }
+  let platformManifest: string;
+  try {
+    platformManifest = createRequire(serverManifestPath).resolve(`${packageName}/package.json`);
+  } catch (error) {
+    throw new Error(`Missing ${packageName}. Reinstall @zitadel/cli.`, { cause: error });
+  }
+  return join(dirname(platformManifest), "bin", platform === "win32" ? "nextgen.exe" : "nextgen");
 }
 
 /**
@@ -134,9 +171,10 @@ export async function startBinaryRuntime(spec: BinaryRunSpec): Promise<BinaryRun
 }
 
 export async function stopBinaryRuntime(pid: number): Promise<StopBinaryRuntimeResult> {
-  if (!isProcessRunning(pid)) {
-    return { pid, status: "stale", target: "process" };
-  }
+  // The recorded pid is also the id of the process group the server was started
+  // in, and a group outlives its leader. A server whose leader died is still
+  // reached by signalling the group, so liveness is the signal's answer, not a
+  // check on the leader alone.
   const term = signalRuntime(pid, "SIGTERM");
   if (!term.sent) {
     return { pid, status: "stale", target: term.target };
@@ -145,13 +183,29 @@ export async function stopBinaryRuntime(pid: number): Promise<StopBinaryRuntimeR
     return { pid, status: "stopped", target: term.target, signal: "SIGTERM" };
   }
 
-  if (isProcessRunning(pid)) {
+  if (isRuntimeRunning(pid)) {
     const kill = signalRuntime(pid, "SIGKILL");
     if (kill.sent && (await waitForExit(pid, STOP_KILL_TIMEOUT_MS))) {
       return { pid, status: "stopped", target: kill.target, signal: "SIGKILL" };
     }
   }
   return { pid, status: "failed", target: term.target, signal: "SIGKILL" };
+}
+
+/** Whether the process, or any process left in the group it led, is alive. */
+export function isRuntimeRunning(pid: number): boolean {
+  if (isProcessRunning(pid)) {
+    return true;
+  }
+  if (process.platform === "win32") {
+    return false;
+  }
+  try {
+    process.kill(-pid, 0);
+    return true;
+  } catch (error) {
+    return isErrno(error, "EPERM");
+  }
 }
 
 export function isProcessRunning(pid: number): boolean {
@@ -288,12 +342,12 @@ function signalRuntime(
 async function waitForExit(pid: number, timeoutMs: number): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (!isProcessRunning(pid)) {
+    if (!isRuntimeRunning(pid)) {
       return true;
     }
     await delay(200);
   }
-  return !isProcessRunning(pid);
+  return !isRuntimeRunning(pid);
 }
 
 function errorMessage(error: unknown): string {

@@ -76,7 +76,7 @@ export default class Stop extends BaseCommand {
       status: "ok",
       data: {
         title:
-          stopResult?.status === "stale"
+          runtime === undefined || stopResult?.status === "stale"
             ? "Local Zitadel server was not running."
             : "Local Zitadel server stopped.",
         runtime: {

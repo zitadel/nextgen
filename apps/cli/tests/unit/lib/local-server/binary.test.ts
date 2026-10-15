@@ -1,11 +1,13 @@
 import { spawn } from "node:child_process";
 import { mkdtemp } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  resolvePlatformBinary,
   resolveServerCommand,
   startBinaryRuntime,
   stopBinaryRuntime,
@@ -103,6 +105,55 @@ describe("local server binary helpers", () => {
     ).toBe("override");
   });
 
+  it("starts the platform binary itself, not the wrapper script", () => {
+    vi.stubEnv("ZITADEL_SERVER_BINARY", "");
+
+    const { command, args } = resolveServerCommand();
+
+    expect(command).toMatch(/nextgen(\.exe)?$/);
+    expect(args).toEqual([]);
+  });
+
+  it("finds the binary in the platform package of the server package", () => {
+    const manifest = createRequire(import.meta.url).resolve("@zitadel/server/package.json");
+
+    expect(resolvePlatformBinary(manifest)).toMatch(/server-[a-z0-9-]+\/bin\/nextgen(\.exe)?$/);
+  });
+
+  it("refuses a platform the server is not built for", () => {
+    const manifest = createRequire(import.meta.url).resolve("@zitadel/server/package.json");
+
+    expect(() => resolvePlatformBinary(manifest, "freebsd", "x64")).toThrow(
+      "Unsupported platform for @zitadel/server: freebsd/x64",
+    );
+  });
+
+  it("signals the process group even when its leader is already dead", async () => {
+    let groupAlive = true;
+    const kill = vi
+      .spyOn(process, "kill")
+      .mockImplementation((pid: number, signal?: string | number) => {
+        if (pid === 12345) {
+          throw errno("ESRCH");
+        }
+        if (signal === "SIGTERM") {
+          groupAlive = false;
+          return true;
+        }
+        if (groupAlive) {
+          return true;
+        }
+        throw errno("ESRCH");
+      });
+
+    await expect(stopBinaryRuntime(12345)).resolves.toMatchObject({
+      pid: 12345,
+      status: "stopped",
+      target: "process-group",
+    });
+    expect(kill).toHaveBeenCalledWith(-12345, "SIGTERM");
+  });
+
   it("falls back from process-group SIGTERM to pid SIGTERM and reports a stale process", async () => {
     const kill = vi
       .spyOn(process, "kill")
@@ -122,7 +173,6 @@ describe("local server binary helpers", () => {
       target: "process",
     });
 
-    expect(kill).toHaveBeenCalledWith(12345, 0);
     expect(kill).toHaveBeenCalledWith(-12345, "SIGTERM");
     expect(kill).toHaveBeenCalledWith(12345, "SIGTERM");
   });

@@ -1,5 +1,6 @@
 import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
+import { request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -19,6 +20,7 @@ import {
   writeRuntimeMetadata,
   type RuntimeMetadata,
 } from "../../../src/lib/local-server/runtime";
+import * as ports from "../../../src/lib/prober/ports";
 import Reset from "../../../src/commands/reset";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
 import { asTerminal } from "../../helpers/terminal";
@@ -47,10 +49,12 @@ afterEach(async () => {
     }
   }
   for (const pid of binaryPids.splice(0)) {
-    try {
-      process.kill(pid, "SIGKILL");
-    } catch {
-      // Already stopped by the command under test.
+    for (const target of [-pid, pid]) {
+      try {
+        process.kill(target, "SIGKILL");
+      } catch {
+        // Already stopped by the command under test.
+      }
     }
   }
   for (const server of servers.splice(0)) {
@@ -571,6 +575,89 @@ describe("local runtime commands", () => {
     expect(envelope.details.port).toBe(port);
     expect(envelope.details.listeners.length).toBeGreaterThan(0);
     expect(envelope.next_commands).toContain(expectedPublicCliCommand("stop --all"));
+  });
+
+  it("start gives each directory its own server and port", async () => {
+    const first = await tempProject("zitadel-start-first-");
+    const second = await tempProject("zitadel-start-second-");
+    const fake = await fakeServerBinary();
+
+    const a = await startWithoutPort(first, fake.binPath);
+    const b = await startWithoutPort(second, fake.binPath);
+
+    expect(b.port).not.toBe(a.port);
+    expect(await healthy(a.port)).toBe(true);
+    expect(await healthy(b.port)).toBe(true);
+    expect((await readRuntimeMetadata(second))?.server_url).toBe(`http://localhost:${b.port}`);
+  });
+
+  it("start does not take another directory's server for its own", async () => {
+    const first = await tempProject("zitadel-start-owner-");
+    const second = await tempProject("zitadel-start-other-");
+    const fake = await fakeServerBinary();
+    const owner = await startWithoutPort(first, fake.binPath);
+
+    const result = await runCliForTest(
+      ["start", "--cwd", second, "--json", "--port", String(owner.port)],
+      { ZITADEL_SERVER_BINARY: fake.binPath },
+    );
+
+    expect(parseJson(result.stdout)).toMatchObject({ status: "error", code: "E_PORT_IN_USE" });
+    await expect(readRuntimeMetadata(second)).resolves.toBeUndefined();
+  });
+
+  it("start refuses a busy port even when the listener listing finds nothing", async () => {
+    const cwd = await tempProject("zitadel-start-blind-");
+    const fake = await fakeServerBinary();
+    const serverUrl = await startHealthServer();
+    const port = Number(new URL(serverUrl).port);
+    vi.spyOn(ports, "listenersForPort").mockResolvedValue([]);
+
+    const result = await runCliForTest(["start", "--cwd", cwd, "--json", "--port", String(port)], {
+      ZITADEL_SERVER_BINARY: fake.binPath,
+    });
+
+    expect(parseJson(result.stdout)).toMatchObject({ status: "error", code: "E_PORT_IN_USE" });
+    await expect(readRuntimeMetadata(cwd)).resolves.toBeUndefined();
+  });
+
+  it("start brings a directory back on the port it had", async () => {
+    const cwd = await tempProject("zitadel-start-keeps-port-");
+    const fake = await fakeServerBinary();
+    const first = await startWithoutPort(cwd, fake.binPath);
+    await runCliForTest(["stop", "--cwd", cwd, "--json"]);
+
+    const again = await startWithoutPort(cwd, fake.binPath);
+
+    expect(again.port).toBe(first.port);
+  });
+
+  it("stop reaches a server whose recorded process died", async () => {
+    const cwd = await tempProject("zitadel-stop-orphan-");
+    const fake = await fakeWrappedServerBinary();
+    const started = await startWithoutPort(cwd, fake.binPath);
+    process.kill(started.pid, "SIGKILL");
+    await waitUntil(() => !processExists(started.pid));
+    expect(await healthy(started.port)).toBe(true);
+
+    const stop = await runCliForTest(["stop", "--cwd", cwd, "--json"]);
+
+    expect(parseJson(stop.stdout)).toMatchObject({
+      status: "ok",
+      data: { title: "Local Zitadel server stopped." },
+    });
+    await waitUntil(async () => !(await healthy(started.port)));
+    expect(await healthy(started.port)).toBe(false);
+  });
+
+  it("stop says nothing was running for a directory with no server", async () => {
+    const cwd = await tempProject("zitadel-stop-none-");
+
+    const stop = await runCliForTest(["stop", "--cwd", cwd, "--json"]);
+
+    expect(parseJson(stop.stdout)).toMatchObject({
+      data: { title: "Local Zitadel server was not running." },
+    });
   });
 
   // The platform project and the local admin travel together: a harness that
@@ -1227,6 +1314,78 @@ async function startHealthServer(): Promise<string> {
     throw new Error("health server did not expose a TCP address");
   }
   return `http://localhost:${String(address.port)}`;
+}
+
+async function startWithoutPort(
+  cwd: string,
+  binPath: string,
+): Promise<{ port: number; pid: number }> {
+  const result = await runCliForTest(["start", "--cwd", cwd, "--json"], {
+    ZITADEL_SERVER_BINARY: binPath,
+  });
+  const envelope = parseJson(result.stdout) as {
+    status: string;
+    data: { runtime: { pid: number; port: number } };
+  };
+  expect(envelope.status).toBe("ok");
+  binaryPids.push(envelope.data.runtime.pid);
+  return { port: envelope.data.runtime.port, pid: envelope.data.runtime.pid };
+}
+
+function healthy(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const req = request({ host: "localhost", port, path: "/healthz", timeout: 1000 }, (res) => {
+      res.resume();
+      resolve(res.statusCode === 200);
+    });
+    req.on("error", () => resolve(false));
+    req.on("timeout", () => {
+      req.destroy();
+      resolve(false);
+    });
+    req.end();
+  });
+}
+
+function processExists(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function waitUntil(condition: () => boolean | Promise<boolean>): Promise<void> {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    if (await condition()) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error("condition was not met in time");
+}
+
+/**
+ * A server shaped like the real runtime: the process the CLI records starts the
+ * one that listens, in the same process group, and does nothing else.
+ */
+async function fakeWrappedServerBinary(): Promise<{ binPath: string }> {
+  const inner = await fakeServerBinary();
+  const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-wrapped-"));
+  tempDirs.push(binDir);
+  const binPath = join(binDir, "zitadel-server");
+  await writeFile(
+    binPath,
+    `#!/usr/bin/env node
+const { spawn } = require("node:child_process");
+spawn(${JSON.stringify(inner.binPath)}, [], { stdio: "ignore", env: process.env });
+setInterval(() => undefined, 1 << 30);
+`,
+  );
+  await chmod(binPath, 0o755);
+  return { binPath };
 }
 
 async function freePort(): Promise<number> {

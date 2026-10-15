@@ -25,6 +25,7 @@ import {
 } from "../../lib/local-server/runtime";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { createOrca } from "../../lib/orca";
+import { resolveCwd } from "../../lib/paths";
 import { hasZitadelConfig } from "../../lib/project";
 import { listenersForPort } from "../../lib/prober/ports";
 import { publicCliCommand } from "../../lib/public-cli";
@@ -60,7 +61,9 @@ export default class Doctor extends BaseCommand {
   static override flags = {
     fix: Flags.boolean({ description: "Repair missing files and stale managed wiring." }),
     image: nonBlankString({ description: "Container image to check." }),
-    port: Flags.integer({ description: "Local HTTP port.", default: DEFAULT_LOCAL_SERVER_PORT }),
+    port: Flags.integer({
+      description: "Local HTTP port to check. Defaults to the port this directory's server uses.",
+    }),
     runtime: Flags.string({
       description: "Local runtime backend.",
       options: ["binary", "docker"],
@@ -69,10 +72,12 @@ export default class Doctor extends BaseCommand {
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Doctor);
-    const port = flags.port ?? DEFAULT_LOCAL_SERVER_PORT;
+    const existingRuntime = await readRuntimeMetadata(
+      resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined),
+    );
+    const port = flags.port ?? existingRuntime?.port ?? DEFAULT_LOCAL_SERVER_PORT;
     await this.toMeta(flags, { resolveServer: false, source: localServerUrl(port) });
     const { cwd, dryRun } = this.meta;
-    const existingRuntime = await readRuntimeMetadata(cwd);
     const runtimeBackend = resolveRuntimeBackend({
       runtime: flags.runtime,
       image: flags.image,
