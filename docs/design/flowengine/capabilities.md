@@ -61,7 +61,7 @@ to be a fast answer to "can I build flow X right now?"
 
 ### Step response shape
 
-- `name`, `texts` (`title_key`, `description_key`), optional `error`, optional `complete`.
+- `name`, `texts` (`title_key`, `description_key`), optional `error`, optional `complete`. `description_key` is `<step>.description`, or `<step>.description.sso` when the step renders sign-in providers.
 - `fields` **ordered array** of entries carrying `name`, `type`, `text_key`, `required`, optional `value`, optional `read_only`, optional `validation` ([ADR 021](../../adrs/021-ordered-arrays-for-step-fields-actions-gates.md)).
 - `read_only` is set on a `create_user_with_sso` step for a field prefilled from a verified unique claim, since the submit refuses a changed value. Only string claims are prefilled and locked. A verified unique number claim renders empty, and the submit refuses any typed value ([#779](https://github.com/zitadel/nextgen/issues/779)).
 - `actions` **ordered array** of entries carrying `name`, `kind`, `text_key`, and a `primary` flag. The LiquidJS template iterates the arrays in order and builds name-keyed indexes locally for lookup.

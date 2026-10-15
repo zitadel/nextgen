@@ -1,4 +1,4 @@
-import { publicCliCommand } from "./public-cli";
+import { portableCommands, publicCliCommand } from "./public-cli";
 
 declare const suggestedCommand: unique symbol;
 
@@ -54,6 +54,19 @@ export function unscopedCommand(args: string, cliVersion?: string): SuggestedCom
   return (
     cliVersion === undefined ? `zitadel ${args}` : publicCliCommand(args, cliVersion)
   ) as SuggestedCommand;
+}
+
+/**
+ * Commands built from argument lists, for a caller that also reports the lists
+ * (`next_args`). Every argument must be a portable shell word, or none is
+ * returned and the lists stand alone, which no shell interprets. The lists
+ * carry whatever selector the command needs: they are the arguments as run.
+ */
+export function portableSuggestions(
+  argLists: readonly string[][],
+  cliVersion: string,
+): SuggestedCommand[] {
+  return portableCommands(argLists, cliVersion) as SuggestedCommand[];
 }
 
 /** A command that is not the CLI (`npm install …`, `rm …`), suggested as written. */

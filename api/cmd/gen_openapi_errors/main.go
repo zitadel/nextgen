@@ -923,13 +923,27 @@ func acceptsSessionCookie(op methodsFileOperation) bool {
 var operationExcludedErrors = map[string][]string{
 	"listMyProjects": {"domain.ErrSessionTokenInvalid"},
 	// The flow engine catches a stale parked SSO row with errors.Is and renders
-	// the step; the analysis cannot see that check prune the error.
-	"getFlowStep": {"domain.ErrSSOStateInvalid"},
+	// the step; the analysis cannot see that check prune the error. The SSO
+	// resolver turns a user schema the project does not hold into
+	// domain.ErrInternal (storedUserSchemaMatches), so sch.not_found never
+	// reaches the response.
+	"getFlowStep": {"domain.ErrJSONSchemaNotFound", "domain.ErrSSOStateInvalid"},
 	// All are consumed in the state machine's sso branch: a missing
 	// connection becomes flow.invalid_action, an unavailable provider
 	// re-renders the step with error.sso_unavailable, and a parked row that is
-	// gone renders the step again.
-	"submitFlowStep": {"domain.ErrFlowSSOUnavailable", "domain.ErrIDPConnectionNotFound", "domain.ErrSSOStateInvalid"},
+	// gone renders the step again. sch.not_found is remapped as for
+	// getFlowStep.
+	"submitFlowStep": {"domain.ErrFlowSSOUnavailable", "domain.ErrIDPConnectionNotFound", "domain.ErrJSONSchemaNotFound", "domain.ErrSSOStateInvalid"},
+	// Create and revise run the engine's connection parse after the schema
+	// check. The schema already refuses a missing protocol block, scopes
+	// without openid, and a cleartext endpoint as req.invalid, so only the
+	// parse's own rule, the partial endpoint block, reaches the caller; any
+	// other parse refusal is reported as req.invalid.
+	"createIdp": {
+		"domain.ErrIDPEndpointCleartext",
+		"domain.ErrIDPProtocolBlockMissing",
+		"domain.ErrIDPScopesMissingOpenID",
+	},
 	// A new flow has no parked SSO row, so the collection step's prefill
 	// returns before it reads the attempt's row or a connection.
 	"createFlow": {
@@ -938,10 +952,8 @@ var operationExcludedErrors = map[string][]string{
 		"domain.ErrIDPConnectionNotFound",
 		"domain.ErrIDPEndpointCleartext",
 		"domain.ErrIDPEndpointsPartial",
-		"domain.ErrIDPOAuth2Unsupported",
 		"domain.ErrIDPProtocolBlockMissing",
 		"domain.ErrIDPScopesMissingOpenID",
-		"domain.ErrIDPStrategyPointerUnsupported",
 	},
 }
 

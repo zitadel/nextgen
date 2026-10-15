@@ -33,6 +33,211 @@ func (c *codeRecorder) Unwrap() http.ResponseWriter {
 	return c.ResponseWriter
 }
 
+// handleAddOriginRequest handles addOrigin operation.
+//
+// Adds one `{pattern, kind}` to the project's origins. A primary pattern
+// must be an exact URL (no wildcard). Preview patterns may include a single
+// DNS-label wildcard. Adding a pattern that already exists with the same
+// kind is idempotent and answers 201 with the stored origin.
+//
+// POST /projects/{project_id}/origins
+func (s *Server) handleAddOriginRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("addOrigin"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.HTTPRouteKey.String("/projects/{project_id}/origins"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), AddOriginOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(codeAttr)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: AddOriginOperation,
+			ID:   "addOrigin",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityOAuth2(ctx, AddOriginOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "OAuth2",
+					Err:              err,
+				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodeAddOriginParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+	request, rawBody, close, err := s.decodeAddOriginRequest(r)
+	if err != nil {
+		err = &ogenerrors.DecodeRequestError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeRequest", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+	defer func() {
+		if err := close(); err != nil {
+			recordError("CloseRequest", err)
+		}
+	}()
+
+	var response AddOriginRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    AddOriginOperation,
+			OperationSummary: "Add an origin pattern",
+			OperationID:      "addOrigin",
+			Body:             request,
+			RawBody:          rawBody,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "path",
+				}: params.ProjectID,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = *ProjectOrigin
+			Params   = AddOriginParams
+			Response = AddOriginRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackAddOriginParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.AddOrigin(ctx, request, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.AddOrigin(ctx, request, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodeAddOriginResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
 // handleBeginUserPasskeyRegistrationRequest handles beginUserPasskeyRegistration operation.
 //
 // Starts a WebAuthn registration ceremony for the user and returns the
@@ -2103,17 +2308,25 @@ func (s *Server) handleCreateHandoffRequest(args [1]string, argsEscaped bool, w 
 // `id`, so identity links that reference the connection keep resolving while
 // releases and auth attempts stay pinned to the revision they captured.
 // Identity fields are fixed for the life of the connection and a revision
-// that changes one is rejected: `protocol`, `subject_claim`, and the
-// endpoints that name the authority (`issuer` for OIDC, `token_endpoint`
-// and `userinfo_endpoint` for OAuth 2.0). Their values decide which provider
+// that changes one is rejected: `protocol`, `subject_claim`, and `issuer`,
+// the field that names the authority. Their values decide which provider
 // account a stored subject belongs to, so changing one would silently
 // repoint existing identities at a different provider.
-// `subject_claim` is optional for OIDC and required for OAuth 2.0. For an
-// OIDC connection, `sub` is used as the default value. If a revision updates
-// `subject_claim` to a different value than the one set during creation, the
-// request is rejected.
+// `subject_claim` is optional, and `sub` is used as the default value. If a
+// revision updates `subject_claim` to a different value than the one set
+// during creation, the request is rejected.
+// OIDC is the only protocol.
 // The document is validated against the `idp-connection.json` schema before
-// anything is stored.
+// anything is stored. The rules the engine applies when it starts a sign-in
+// then run on the document, so a connection that could never start one is
+// refused here instead with `idp.endpoints_partial`: the OIDC block sets an
+// endpoint without the others. It either sets no endpoint, and discovery
+// fills them, or sets `authorization_endpoint`, `token_endpoint`, `jwks_uri`,
+// and `userinfo_endpoint`. `userinfo_endpoint` may be left out when
+// `id_token_mapping` is on, but setting it alone still counts as setting an
+// endpoint. The details list the missing endpoints.
+// A refused document stores nothing, and on a revise the current revision
+// stays unchanged.
 //
 // POST /idps
 func (s *Server) handleCreateIdpRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -4158,8 +4371,9 @@ func (s *Server) handleDeleteUserByIDRequest(args [1]string, argsEscaped bool, w
 
 // handleDeleteVariableRequest handles deleteVariable operation.
 //
-// Removes the project's variable under this name. Deleting a name the
-// project does not hold answers `var.not_found`.
+// Removes a variable for the requested kind, or for both kinds without
+// `kind`. A name with no value for that kind answers `var.not_found`.
+// Existing deployments keep the values they froze.
 //
 // DELETE /variables/{variable_name}
 func (s *Server) handleDeleteVariableRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -4309,9 +4523,9 @@ func (s *Server) handleDeleteVariableRequest(args [1]string, argsEscaped bool, w
 					In:   "path",
 				}: params.VariableName,
 				{
-					Name: "environment_name",
+					Name: "kind",
 					In:   "query",
-				}: params.EnvironmentName,
+				}: params.Kind,
 			},
 			Raw: r,
 		}
@@ -5715,6 +5929,199 @@ func (s *Server) handleGetDeploymentByIdRequest(args [1]string, argsEscaped bool
 	}
 
 	if err := encodeGetDeploymentByIdResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
+// handleGetDeploymentVariablesRequest handles getDeploymentVariables operation.
+//
+// Returns the variable values the deployment froze when it was made. Later
+// changes to the project's variables do not affect them. A secret reads
+// back as `{"secret": true}`.
+//
+// GET /deployments/{deployment_id}/variables
+func (s *Server) handleGetDeploymentVariablesRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getDeploymentVariables"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.HTTPRouteKey.String("/deployments/{deployment_id}/variables"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), GetDeploymentVariablesOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(codeAttr)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: GetDeploymentVariablesOperation,
+			ID:   "getDeploymentVariables",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityOAuth2(ctx, GetDeploymentVariablesOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "OAuth2",
+					Err:              err,
+				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodeGetDeploymentVariablesParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+
+	var response GetDeploymentVariablesRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    GetDeploymentVariablesOperation,
+			OperationSummary: "Get a deployment's variables",
+			OperationID:      "getDeploymentVariables",
+			Body:             nil,
+			RawBody:          rawBody,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+				{
+					Name: "deployment_id",
+					In:   "path",
+				}: params.DeploymentID,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = struct{}
+			Params   = GetDeploymentVariablesParams
+			Response = GetDeploymentVariablesRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackGetDeploymentVariablesParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.GetDeploymentVariables(ctx, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.GetDeploymentVariables(ctx, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodeGetDeploymentVariablesResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -9032,9 +9439,9 @@ func (s *Server) handleGetUserByIDRequest(args [1]string, argsEscaped bool, w ht
 
 // handleGetVariableRequest handles getVariable operation.
 //
-// Reads one of the project's variables by name. A name the project has not
-// entered answers `var.not_found`. A secret is found but not disclosed: the
-// response is `{"secret": true}`.
+// Reads one variable by name, with its value per kind. A name with no
+// value for the requested kind answers `var.not_found`. A secret reads
+// back as `{"secret": true}`.
 //
 // GET /variables/{variable_name}
 func (s *Server) handleGetVariableRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -9184,9 +9591,9 @@ func (s *Server) handleGetVariableRequest(args [1]string, argsEscaped bool, w ht
 					In:   "path",
 				}: params.VariableName,
 				{
-					Name: "environment_name",
+					Name: "kind",
 					In:   "query",
-				}: params.EnvironmentName,
+				}: params.Kind,
 			},
 			Raw: r,
 		}
@@ -9229,7 +9636,8 @@ func (s *Server) handleGetVariableRequest(args [1]string, argsEscaped bool, w ht
 
 // handleGetVariablesRequest handles getVariables operation.
 //
-// Returns the project's variables, keyed by name.
+// Returns the project's variables, keyed by name, each with its value per
+// kind. With `kind`, only that kind's values are returned.
 // Secret values are not returned. A secret appears as `{"secret": true}`,
 // which says a value is held without disclosing it.
 //
@@ -9377,9 +9785,9 @@ func (s *Server) handleGetVariablesRequest(args [0]string, argsEscaped bool, w h
 					In:   "query",
 				}: params.ProjectID,
 				{
-					Name: "environment_name",
+					Name: "kind",
 					In:   "query",
-				}: params.EnvironmentName,
+				}: params.Kind,
 			},
 			Raw: r,
 		}
@@ -14084,6 +14492,211 @@ func (s *Server) handleQueryUsersRequest(args [0]string, argsEscaped bool, w htt
 	}
 }
 
+// handleRemoveOriginRequest handles removeOrigin operation.
+//
+// Removes one pattern from the project's origins. Requests from URLs only
+// that pattern admitted are refused from then on; live previews and
+// deployment history are untouched. Removing a pattern that is already
+// absent is idempotent and answers 204.
+//
+// POST /projects/{project_id}/origins/remove
+func (s *Server) handleRemoveOriginRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("removeOrigin"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.HTTPRouteKey.String("/projects/{project_id}/origins/remove"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), RemoveOriginOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(codeAttr)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: RemoveOriginOperation,
+			ID:   "removeOrigin",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityOAuth2(ctx, RemoveOriginOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "OAuth2",
+					Err:              err,
+				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodeRemoveOriginParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+	request, rawBody, close, err := s.decodeRemoveOriginRequest(r)
+	if err != nil {
+		err = &ogenerrors.DecodeRequestError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeRequest", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+	defer func() {
+		if err := close(); err != nil {
+			recordError("CloseRequest", err)
+		}
+	}()
+
+	var response RemoveOriginRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    RemoveOriginOperation,
+			OperationSummary: "Remove an origin pattern",
+			OperationID:      "removeOrigin",
+			Body:             request,
+			RawBody:          rawBody,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "path",
+				}: params.ProjectID,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = *RemoveOriginReq
+			Params   = RemoveOriginParams
+			Response = RemoveOriginRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackRemoveOriginParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.RemoveOrigin(ctx, request, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.RemoveOrigin(ctx, request, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodeRemoveOriginResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
 // handleRemovePreviewRequest handles removePreview operation.
 //
 // Ends a preview before it expires: the URL stops being served at once.
@@ -15722,8 +16335,13 @@ func (s *Server) handleUpdateTeamRequest(args [1]string, argsEscaped bool, w htt
 
 // handleUpdateVariablesRequest handles updateVariables operation.
 //
-// Enters, replaces and removes the project's variables. Names not in the
-// body are untouched.
+// Enters, replaces and removes the project's variables for the requested
+// kind. Names not in the body are untouched. Existing deployments keep the
+// values they froze.
+// Without `kind`, a plain value is written for both kinds. A secret is
+// written for `primary` only and removes the name's `preview` value, so a
+// preview never keeps a plaintext copy; set a preview secret with
+// `kind=preview`. `null` removes the name from both.
 // A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
 // stores the value encrypted under the project's active `secret` key, after
 // which it can be referenced but not read back. `null` removes the name
@@ -15892,9 +16510,9 @@ func (s *Server) handleUpdateVariablesRequest(args [0]string, argsEscaped bool, 
 					In:   "query",
 				}: params.ProjectID,
 				{
-					Name: "environment_name",
+					Name: "kind",
 					In:   "query",
-				}: params.EnvironmentName,
+				}: params.Kind,
 			},
 			Raw: r,
 		}

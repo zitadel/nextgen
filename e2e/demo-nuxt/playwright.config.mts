@@ -1,8 +1,12 @@
-import { defineConfig, devices } from "@playwright/test";
-import { resolve } from "node:path";
-import { e2eActionTimeouts, e2eTimeouts, e2eTrace } from "../playwright.shared";
-
-const workspaceRoot = resolve(import.meta.dirname, "../..");
+import { defineConfig } from "@playwright/test";
+import {
+  apiMockServer,
+  chromiumProjects,
+  e2eActionTimeouts,
+  e2eTimeouts,
+  e2eTrace,
+  workspaceRoot,
+} from "../playwright.shared";
 
 /**
  * E2E coverage for the embedded sign-in path on Nuxt:
@@ -39,17 +43,7 @@ export default defineConfig({
   // the SDKs (ZITADEL_URL) already accept the override; no
   // application code changes.
   webServer: [
-    {
-      command: "pnpm --filter @zitadel/api-mock start",
-      url: "http://localhost:8081/.well-known/jwks.json",
-      reuseExistingServer: true,
-      cwd: workspaceRoot,
-      stdout: "pipe",
-      stderr: "pipe",
-      env: {
-        PORT: "8081",
-      },
-    },
+    apiMockServer(8081),
     {
       command: "pnpm --filter @zitadel/demo-nuxt dev",
       url: "http://localhost:3001/login",
@@ -63,10 +57,5 @@ export default defineConfig({
       },
     },
   ],
-  projects: [
-    {
-      name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
-    },
-  ],
+  projects: chromiumProjects,
 });

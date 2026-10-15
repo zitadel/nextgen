@@ -39,6 +39,7 @@ import {
 } from "../../lib/claim-state";
 import { isErrno, toZitadelError, ZitadelError } from "../../lib/errors";
 import {
+  callbackUriFor,
   customFlagText,
   checkGivenCustomFlags,
   customExample,
@@ -885,6 +886,9 @@ export default class Setup extends BaseCommand {
             slug,
             client_id: answer.credentials.clientId ?? null,
             connection: `.zitadel/idps/${slug}.json`,
+            // What the developer registers at the provider: the connection's
+            // own route, as `auth-method sso enable` reports it.
+            callback_uri: callbackUriFor(issuer, slug),
             client_id_variable: outcome
               ? { variable: credentialVariables(slug).clientId, published: outcome.clientId }
               : null,
@@ -903,7 +907,7 @@ export default class Setup extends BaseCommand {
         ],
         // A JSON run prints no warnings, so a credential the project never
         // received would otherwise appear only as a `published` status with
-        // nothing to act on. `sso enable` reports the same recovery step.
+        // nothing to act on. `auth-method sso enable` reports the same recovery step.
         ...nextCommandsData([
           ...republishCommands(
             answers.sso.flatMap((answer) => {
@@ -1023,7 +1027,7 @@ function dryRunProject(issuer: string): CreateProject201 {
     name: "dry-run",
     project_secret: "sk_proj_dry_run_full",
     preview_secret: "sk_proj_dry_run_preview",
-    preview_origins: [issuer],
+    origins: [{ pattern: issuer, kind: "preview" }],
     created_at: "2026-04-21T14:03:11.000Z",
   };
 }
@@ -1177,8 +1181,8 @@ export async function ssoFromFlags(
     // The wizard asks for the secret, the way it asks for a client id that
     // `--sso-client-id` did not answer. A preview publishes nothing and
     // materialises nothing, so demanding a real credential to see what setup
-    // would do is a toll for no reason -- and `sso enable --dry-run` returns
-    // before asking for one at all.
+    // would do is a toll for no reason -- and `auth-method sso enable --dry-run`
+    // returns before asking for one at all.
     return { selection, credentials: { clientId: clientId.value } };
   }
   // Required, not optional: scaffolding the connection without it writes a
@@ -1261,7 +1265,7 @@ export function setupRetryFlags(opts: SetupRetryOptions): string {
   // Only the first: `--sso` takes one provider, and a scripted rerun can pipe
   // only one secret. A retry naming several would not be runnable, which is
   // the whole point of this line. The rest are not silently dropped -- the
-  // guidance that uses this emits an `sso enable` command for each, because
+  // guidance that uses this emits an `auth-method sso enable` command for each, because
   // `--sso` makes the rerun skip the multi-select, so a provider left out here
   // could not be reselected.
   const [firstSso] = opts.sso ?? [];
@@ -1412,17 +1416,17 @@ function ssoRecovery(
   }
   return {
     hint:
-      `The rerun configures ${chosen[0] ? providerOf(chosen[0]).slug : ""} only; add the rest with the sso enable ` +
+      `The rerun configures ${chosen[0] ? providerOf(chosen[0]).slug : ""} only; add the rest with the auth-method sso enable ` +
       "commands below, which ask for each client id. ",
     // The client id is not interpolated into the command. These strings are
     // run verbatim, especially by agents, and nothing escapes them for a
     // shell: a value the wizard accepted -- it only refuses an empty one --
     // could split into two arguments or carry a metacharacter that changes
-    // what the command does. `sso enable` asks for the id, exactly as it asks
+    // what the command does. `auth-method sso enable` asks for the id, exactly as it asks
     // for the secret, which was never put in command text for the same
     // reason.
     // localRecoverySelector carries `--server local`, as the setup retry
-    // pins it. An unpinned `sso enable`
+    // pins it. An unpinned `auth-method sso enable`
     // takes its server from `ZITADEL_URL`, so with that variable set to
     // another server it would publish the client id and secret there --
     // leaving the local provider unconfigured and the credentials somewhere
@@ -1430,7 +1434,7 @@ function ssoRecovery(
     // `local` is the server meant in every case.
     //
     // `--env-file .env.development.local` pins the project and credential too:
-    // `sso enable` is an EnvironmentCommand that resolves those from the
+    // `auth-method sso enable` is an EnvironmentCommand that resolves those from the
     // environment, where the process environment outranks the `.env` files, so
     // in a shell holding production values `--server local` alone would send
     // the production token to the local server. `--env-file` outranks the
@@ -1438,7 +1442,7 @@ function ssoRecovery(
     // generated development credential the local project actually expects.
     commands: remaining.map((selection) =>
       projectCommand(
-        `sso enable --provider ${selectionName(selection)}${
+        `auth-method sso enable --provider ${selectionName(selection)}${
           selection.kind === "custom"
             ? ` ${customFlagText(selection.connection, ENABLE_FLAG_NAMES)}`
             : ""
@@ -1459,16 +1463,13 @@ async function createProjectWithLocalHint(
   retry: SetupRetryOptions,
 ): Promise<CreateProject201> {
   try {
-    // API contract requires a project name; generated TS models may lag
-    // briefly until `packages/api` regeneration catches up.
-    const payload = { name: projectName, preview_origins: [issuer], seed_defaults: false } as {
-      name: string;
-      preview_origins: string[];
-      seed_defaults: false;
-    };
     // Register the app's own origin so the backend's origin check allows the
     // requests the dev proxy forwards from it.
-    return await client.createProject(payload as Parameters<typeof client.createProject>[0]);
+    return await client.createProject({
+      name: projectName,
+      origins: [{ pattern: issuer, kind: "preview" }],
+      seed_defaults: false,
+    });
   } catch (error) {
     const normalized = toZitadelError(error);
     const retryFlags = setupRetryFlags(retry);
@@ -1749,6 +1750,12 @@ export function buildSummary(opts: {
       label: "Social sign-in",
       value: providerOf(answer.selection).displayName,
       secondary: stylePath(`.zitadel/idps/${providerOf(answer.selection).slug}.json`),
+    });
+    // A scripted `--sso` run asks nothing, so the prompt that announces the
+    // URI never shows; the summary is where it reaches the developer then.
+    customizeRows.push({
+      label: "Redirect URI",
+      value: styleUrl(callbackUriFor(issuer, providerOf(answer.selection).slug)),
     });
   }
 

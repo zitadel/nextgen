@@ -39,7 +39,7 @@ moon run e2e:console-real
 
 Boots one ephemeral Zitadel instance through `@zitadel/testing`, starts the
 console Vite dev server with its API proxy, and exercises real project and user
-API data. The proxy adds no credential: `signIn` in `src-real/support.ts`
+API data. The proxy adds no credential: `signIn` in `support/sign-in.ts`
 grants each test's user admin through the API, and the console authorizes with
 that user's session cookie (#1300). Playwright workers share the instance and seed a
 fresh user per test.
@@ -100,7 +100,7 @@ its seeded users into the harness project.
 ## Deployment coverage
 
 ```sh
-CONSOLE_DEPLOYMENT_URL=https://cloud-….vercel.app VERCEL_AUTOMATION_BYPASS_SECRET=… \
+CLOUD_URL=https://cloud-….vercel.app VERCEL_AUTOMATION_BYPASS_SECRET=… \
   moon run e2e:console-deployment
 ```
 
@@ -114,9 +114,10 @@ takes the server's runtime document and its `POST /flow`. It signs nobody in,
 so it needs no credential but Vercel's bypass secret.
 
 [`deployment-checks.yml`](../../.github/workflows/deployment-checks.yml) runs it
-for every deployment, as it runs the docs' suite. Like that suite, it records no
-traces and writes no HTML report, and the workflow uploads only its screenshots:
-everything else Playwright writes can hold the bypass secret
+for every deployment, as it runs the docs' suite, and `pnpm check:cloud` runs
+both from a checkout. Like that suite, it records no traces and writes no HTML
+report, and the workflow uploads only its screenshots: everything else
+Playwright writes can hold the bypass secret
 ([the runbook](../../docs/runbooks/cloud.md#deployment-checks)).
 
 ## Handling the handshake

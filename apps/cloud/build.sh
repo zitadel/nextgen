@@ -15,14 +15,15 @@
 set -eu
 cd "$(dirname "$0")/../.."
 
-# The other services' installs normally ran already; the Go preset does not
-# run this service's installCommand, so install when nothing is there.
-[ -x node_modules/.bin/turbo ] || sh apps/cloud/install.sh
-# The login UI through turbo, with the remote-cache policy every service
-# shares (turbo-build.sh: previews restore, production only uploads).
-sh apps/cloud/turbo-build.sh @zitadel/login-ui
+# The Go preset runs no installCommand, so the install the other services
+# declare in vercel.json runs here; pnpm skips it once a service built
+# earlier in the deployment has installed.
+pnpm install --os=current --cpu=current --optimistic-repeat-install
+# turbo's own binary: through `pnpm exec`, every task's `pnpm run` would
+# re-check the workspace and warn about each other platform's package.
+node_modules/.bin/turbo run build --filter=@zitadel/login-ui
 
-version="$(sed -n 's/^  "version": *"\([^"]*\)".*/\1/p' apps/server/package.json | head -1)"
+version="$(node -p 'require("./apps/server/package.json").version')"
 commit="${VERCEL_GIT_COMMIT_SHA:-$(git rev-parse HEAD 2>/dev/null || echo unknown)}"
 # The branch picks a preview's database; stamped in so the serving function
 # knows it even where Vercel exposes no Git metadata at runtime.

@@ -101,8 +101,8 @@ export async function buildSyncPlan(
       }
     }
 
-    for (const content of onDisk.values()) {
-      syncer.validate(content);
+    for (const [absPath, content] of onDisk.entries()) {
+      syncer.validate(content, toStatePath(absPath, cwd));
     }
 
     for (const [filePath, entry] of Object.entries(state.resources)) {
