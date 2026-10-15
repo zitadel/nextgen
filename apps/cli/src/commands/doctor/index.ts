@@ -3,8 +3,8 @@ import consola from "consola";
 
 import { claimAction, claimCommand, claimWindowClosedAction } from "../../lib/claim-state";
 import { ZitadelError } from "../../lib/errors";
-import { assertServerPackageAvailable } from "../../lib/local-server/binary";
-import { dockerAvailable, imageAvailable } from "../../lib/local-server/docker";
+import { BinaryLauncher } from "../../lib/local-server/launchers/binary";
+import { DockerLauncher } from "../../lib/local-server/launchers/docker";
 import {
   dockerRuntimeGuidance,
   dockerUnavailableMessage,
@@ -320,7 +320,7 @@ async function runLocalRuntimeChecks(
   if (runtimeBackend === "binary") {
     return [
       await check("server-binary", "Server npm package is available", async () => {
-        const version = await assertServerPackageAvailable();
+        const version = await BinaryLauncher.assertAvailable();
         return `@zitadel/server ${version} is available`;
       }),
       await check(
@@ -346,9 +346,9 @@ async function runLocalRuntimeChecks(
     "docker-cli",
     "Docker is reachable",
     async () => {
-      let result: Awaited<ReturnType<typeof dockerAvailable>>;
+      let result: Awaited<ReturnType<typeof DockerLauncher.available>>;
       try {
-        result = await dockerAvailable();
+        result = await DockerLauncher.available();
       } catch (error) {
         throw new Error(dockerUnavailableMessage(error), { cause: error });
       }
@@ -367,7 +367,7 @@ async function runLocalRuntimeChecks(
           `Image ${image} is available`,
           async () => {
             try {
-              const source = await imageAvailable(image);
+              const source = await DockerLauncher.imageAvailable(image);
               return source === "local"
                 ? `Image ${image} is available locally`
                 : `Image ${image} is available from the registry`;

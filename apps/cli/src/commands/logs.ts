@@ -1,8 +1,8 @@
 import { Flags } from "@oclif/core";
 
 import { ZitadelError } from "../lib/errors";
-import { binaryLogs, followBinaryLogs } from "../lib/local-server/binary";
-import { containerLogs, followContainerLogs } from "../lib/local-server/docker";
+import { BinaryLauncher } from "../lib/local-server/launchers/binary";
+import { DockerLauncher } from "../lib/local-server/launchers/docker";
 import { DEFAULT_LOCAL_SERVER_URL, readRuntimeMetadata } from "../lib/local-server/runtime";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { resolveCwd } from "../lib/paths";
@@ -47,9 +47,9 @@ export default class Logs extends BaseCommand {
         });
       }
       if (runtime.backend === "binary") {
-        await followBinaryLogs(runtime.log_path, tail);
+        await BinaryLauncher.followLogs(runtime.log_path, tail);
       } else {
-        await followContainerLogs(runtime.container_name, tail);
+        await DockerLauncher.followLogs(runtime.container_name, tail);
       }
       return this.emit({
         status: "ok",
@@ -59,8 +59,8 @@ export default class Logs extends BaseCommand {
 
     const logs =
       runtime.backend === "binary"
-        ? await binaryLogs(runtime.log_path, tail)
-        : await containerLogs(runtime.container_name, tail);
+        ? await BinaryLauncher.readLogs(runtime.log_path, tail)
+        : await DockerLauncher.readLogs(runtime.container_name, tail);
     return this.emit({
       status: "ok",
       pretty: logs.trimEnd(),

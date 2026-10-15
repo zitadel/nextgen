@@ -3,19 +3,15 @@ import { EventEmitter } from "node:events";
 import { readFile } from "node:fs/promises";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { CONTAINER_DATA_DIR } from "../../../../src/lib/local-server/runtime";
-import {
-  dockerRunArgs,
-  metadataFromStart,
-  startContainer,
-} from "../../../../src/lib/local-server/docker";
+import { DockerLauncher } from "../../../../../src/lib/local-server/launchers/docker";
+import { CONTAINER_DATA_DIR } from "../../../../../src/lib/local-server/runtime";
 
 vi.mock("node:child_process", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:child_process")>();
   return { ...actual, spawn: vi.fn() };
 });
 
-function fakeDockerProcess(stdout: string) {
+function fakeDockerProcess(stdout: string, status = 0) {
   const child = new EventEmitter() as EventEmitter & {
     stdout: EventEmitter & { setEncoding: () => void };
     stderr: EventEmitter & { setEncoding: () => void };
@@ -24,12 +20,12 @@ function fakeDockerProcess(stdout: string) {
   child.stderr = Object.assign(new EventEmitter(), { setEncoding: () => undefined });
   queueMicrotask(() => {
     child.stdout.emit("data", stdout);
-    child.emit("close", 0);
+    child.emit("close", status);
   });
   return child;
 }
 
-describe("local server Docker helpers", () => {
+describe("DockerLauncher", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -40,7 +36,7 @@ describe("local server Docker helpers", () => {
   // serving. CI has no Docker, so this parity check is the gate.
   it("ships an image whose data dir default matches the mount the CLI provides", async () => {
     const dockerfile = await readFile(
-      new URL("../../../../../../Dockerfile", import.meta.url),
+      new URL("../../../../../../../Dockerfile", import.meta.url),
       "utf8",
     );
 
@@ -54,7 +50,8 @@ describe("local server Docker helpers", () => {
   });
 
   it("builds the single-container run command without an explicit encryption key", () => {
-    const args = dockerRunArgs({
+    const args = DockerLauncher.runArgs({
+      cliVersion: "0.0.0-test",
       containerName: "zitadel-server-test",
       image: "ghcr.io/zitadel/nextgen:test",
       port: 8090,
@@ -97,7 +94,8 @@ describe("local server Docker helpers", () => {
   });
 
   it("mounts the local admin document and boots the platform project with it", () => {
-    const args = dockerRunArgs({
+    const args = DockerLauncher.runArgs({
+      cliVersion: "0.0.0-test",
       containerName: "zitadel-server-test",
       image: "ghcr.io/zitadel/nextgen:test",
       port: 8090,
@@ -121,8 +119,9 @@ describe("local server Docker helpers", () => {
   });
 
   it("declares project variables as bare --env NAME so values stay out of argv", () => {
-    const args = dockerRunArgs(
+    const args = DockerLauncher.runArgs(
       {
+        cliVersion: "0.0.0-test",
         containerName: "zitadel-server-test",
         image: "ghcr.io/zitadel/nextgen:test",
         port: 8090,
@@ -144,44 +143,137 @@ describe("local server Docker helpers", () => {
   });
 
   it("hands resolved values to the docker client through its environment only", async () => {
-    vi.mocked(spawn).mockImplementation(
-      () => fakeDockerProcess("abc123\n") as unknown as ReturnType<typeof spawn>,
-    );
+    const calls = fakeDocker({});
 
-    const { containerId, env } = await startContainer({
+    const metadata = await new DockerLauncher({
+      cliVersion: "0.0.0-test",
       containerName: "zitadel-server-test",
       image: "ghcr.io/zitadel/nextgen:test",
-      port: 8090,
       dataDir: "/tmp/app/.zitadel/local/nextgen-data",
       env: {
         values: { GOOGLE_CLIENT_SECRET: "canary-secret" },
         injected: ["GOOGLE_CLIENT_SECRET"],
       },
-    });
+    }).launch({ port: 8090, serverUrl: "http://localhost:8090" });
 
-    const [command, args, options] = vi.mocked(spawn).mock.calls[0] as unknown as [
-      string,
-      string[],
-      { env: NodeJS.ProcessEnv },
-    ];
-    expect(command).toBe("docker");
-    expect(args).toContain("GOOGLE_CLIENT_SECRET");
-    expect(args.join(" ")).not.toContain("canary-secret");
-    expect(options.env.GOOGLE_CLIENT_SECRET).toBe("canary-secret");
-    expect(containerId).toBe("abc123");
-    expect(env.injected).toEqual(["GOOGLE_CLIENT_SECRET"]);
-
-    const metadata = metadataFromStart({
-      cwdDataDir: "/tmp/app/.zitadel/local/nextgen-data",
-      cliVersion: "0.0.0-test",
-      containerName: "zitadel-server-test",
-      containerId,
-      image: "ghcr.io/zitadel/nextgen:test",
-      port: 8090,
-      serverUrl: "http://localhost:8090",
-      env,
-    });
+    const run = calls.find((call) => call.args[0] === "run");
+    expect(run?.command).toBe("docker");
+    expect(run?.args).toContain("GOOGLE_CLIENT_SECRET");
+    expect(run?.args.join(" ")).not.toContain("canary-secret");
+    expect(run?.env.GOOGLE_CLIENT_SECRET).toBe("canary-secret");
+    expect(metadata.container_id).toBe("cid-1");
     expect(metadata.env).toEqual({ injected: ["GOOGLE_CLIENT_SECRET"] });
     expect(JSON.stringify(metadata)).not.toContain("canary-secret");
   });
+
+  describe("lifecycle", () => {
+    const launcher = () =>
+      new DockerLauncher({
+        cliVersion: "0.0.0-test",
+        containerName: "zitadel-server-test",
+        image: "ghcr.io/zitadel/nextgen:test",
+        dataDir: "/tmp/app/.zitadel/local/nextgen-data",
+      });
+    const record = DockerLauncher.metadata({
+      cwdDataDir: "/tmp/app/.zitadel/local/nextgen-data",
+      cliVersion: "0.0.0-test",
+      containerName: "zitadel-server-test",
+      containerId: "cid-1",
+      image: "ghcr.io/zitadel/nextgen:test",
+      port: 8090,
+      serverUrl: "http://localhost:8090",
+    });
+
+    it("records the container it started on the port it was given", async () => {
+      fakeDocker({});
+
+      await expect(
+        launcher().launch({ port: 8090, serverUrl: "http://localhost:8090" }),
+      ).resolves.toMatchObject({
+        backend: "docker",
+        container_name: "zitadel-server-test",
+        container_id: "cid-1",
+        port: 8090,
+        server_url: "http://localhost:8090",
+      });
+    });
+
+    it("publishes the container on the port it was given", async () => {
+      const calls = fakeDocker({});
+
+      await launcher().launch({ port: 8085, serverUrl: "http://localhost:8085" });
+
+      const run = calls.find((call) => call.args[0] === "run");
+      expect(run?.args).toContain("127.0.0.1:8085:8080");
+    });
+
+    it("removes a leftover container of the same name before it starts", async () => {
+      const calls = fakeDocker({ existing: { running: true } });
+
+      await launcher().launch({ port: 8090, serverUrl: "http://localhost:8090" });
+
+      const verbs = calls.map((call) => call.args[0]);
+      expect(verbs.indexOf("rm")).toBeGreaterThan(-1);
+      expect(verbs.indexOf("rm")).toBeLessThan(verbs.indexOf("run"));
+    });
+
+    it("is alive while its container runs", async () => {
+      fakeDocker({ existing: { running: true } });
+
+      await expect(launcher().isAlive(record)).resolves.toBe(true);
+    });
+
+    it("is not alive once its container has stopped", async () => {
+      fakeDocker({ existing: { running: false } });
+
+      await expect(launcher().isAlive(record)).resolves.toBe(false);
+    });
+
+    it("stops and removes a container that exists", async () => {
+      const calls = fakeDocker({ existing: { running: true } });
+
+      await expect(launcher().terminate(record)).resolves.toMatchObject({ status: "stopped" });
+      expect(calls.map((call) => call.args[0])).toEqual(expect.arrayContaining(["stop", "rm"]));
+    });
+
+    it("reports a container that is already gone as stale", async () => {
+      const calls = fakeDocker({});
+
+      await expect(launcher().terminate(record)).resolves.toMatchObject({ status: "stale" });
+      expect(calls.map((call) => call.args[0])).not.toContain("rm");
+    });
+  });
 });
+
+type DockerCall = { command: string; args: string[]; env: NodeJS.ProcessEnv };
+
+/** Answers each `docker` the code spawns from a script, and records what it was asked. */
+function fakeDocker(options: { existing?: { running: boolean } }): DockerCall[] {
+  const calls: DockerCall[] = [];
+  vi.mocked(spawn).mockImplementation(((
+    command: string,
+    args: string[],
+    spawnOptions: { env: NodeJS.ProcessEnv },
+  ) => {
+    calls.push({ command, args, env: spawnOptions.env });
+    const verb = args[0];
+    if (verb === "inspect" && args[1] !== undefined && args[1] !== "--format") {
+      return fakeDockerProcess("", 1);
+    }
+    if (verb === "inspect") {
+      return options.existing
+        ? fakeDockerProcess(
+            `cid-1 ${String(options.existing.running)} ghcr.io/zitadel/nextgen:test\n`,
+          )
+        : fakeDockerProcess("", 1);
+    }
+    if (verb === "image") {
+      return fakeDockerProcess("");
+    }
+    if (verb === "run") {
+      return fakeDockerProcess("cid-1\n");
+    }
+    return fakeDockerProcess("");
+  }) as unknown as typeof spawn);
+  return calls;
+}

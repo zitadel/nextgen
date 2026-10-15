@@ -5,18 +5,8 @@ import consola from "consola";
 import { ZitadelError, toZitadelError } from "../lib/errors";
 import { ensureLocalAdmin, type LocalAdmin } from "../lib/local-server/admin-credential";
 import { consoleSignInUrl } from "../lib/local-server/sign-in";
-import {
-  binaryLogs,
-  bundledServerVersion,
-  isRuntimeRunning,
-  stopBinaryRuntime,
-} from "../lib/local-server/binary";
-import {
-  containerLogs,
-  currentUser,
-  dockerAvailable,
-  stopAndRemoveContainer,
-} from "../lib/local-server/docker";
+import { BinaryLauncher } from "../lib/local-server/launchers/binary";
+import { DockerLauncher } from "../lib/local-server/launchers/docker";
 import {
   dockerRuntimeGuidance,
   dockerUnavailableMessage,
@@ -44,13 +34,7 @@ import {
   ServerStopError,
   type StopOutcome,
 } from "../lib/local-server/server";
-import {
-  BinaryLauncher,
-  DockerLauncher,
-  HttpHealth,
-  RuntimeFileStore,
-  TcpPorts,
-} from "../lib/local-server/server-adapters";
+import { HttpHealth, RuntimeFileStore, TcpPorts } from "../lib/local-server/server-adapters";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../lib/oclif";
 import { resolveCwd } from "../lib/paths";
 import { listenersForPort, type TcpListener } from "../lib/prober/ports";
@@ -147,14 +131,14 @@ export default class Start extends BaseCommand {
       // `setup` against it fails halfway, after the project exists. So a
       // running server is reused only when it is the version this CLI ships;
       // the Docker path compares the image for the same reason.
-      const serverVersion = bundledServerVersion();
+      const serverVersion = BinaryLauncher.bundledVersion();
       const otherRelease =
         existingRuntime?.backend === "binary" &&
         serverVersion !== undefined &&
         existingRuntime.server_version !== serverVersion
           ? existingRuntime
           : undefined;
-      if (otherRelease && isRuntimeRunning(otherRelease.pid)) {
+      if (otherRelease && BinaryLauncher.isRunning(otherRelease.pid)) {
         consola.info(
           `Restarting the local Zitadel server on ${String(serverVersion)}: it ran ${otherRelease.server_version}. Its data stays.`,
         );
@@ -188,7 +172,7 @@ export default class Start extends BaseCommand {
 
     await assertDockerAvailable(this.meta.cliVersion);
     if (existingRuntime?.backend === "binary") {
-      await stopBinaryRuntime(existingRuntime.pid);
+      await BinaryLauncher.stopPid(existingRuntime.pid);
     }
     return this.startAndReport(
       new LocalServer(
@@ -199,7 +183,7 @@ export default class Start extends BaseCommand {
             containerName,
             image,
             dataDir: paths.dataDir,
-            identity: await ensureContainerIdentity(this.meta.cwd, currentUser()),
+            identity: await ensureContainerIdentity(this.meta.cwd, DockerLauncher.currentUser()),
             env,
             userFile: local?.userFile,
           }),
@@ -314,9 +298,9 @@ function startupCleanupFailedError(
 }
 
 async function assertDockerAvailable(cliVersion: string): Promise<void> {
-  let result: Awaited<ReturnType<typeof dockerAvailable>>;
+  let result: Awaited<ReturnType<typeof DockerLauncher.available>>;
   try {
-    result = await dockerAvailable();
+    result = await DockerLauncher.available();
   } catch (error) {
     throw dockerUnavailableError(error, cliVersion);
   }
@@ -434,8 +418,8 @@ async function startFailure(error: unknown, cliVersion: string): Promise<unknown
 async function logTailOf(record: RuntimeMetadata): Promise<string | undefined> {
   try {
     return record.backend === "docker"
-      ? await containerLogs(record.container_name, 40)
-      : await binaryLogs(record.log_path, 40);
+      ? await DockerLauncher.readLogs(record.container_name, 40)
+      : await BinaryLauncher.readLogs(record.log_path, 40);
   } catch {
     return undefined;
   }
@@ -517,7 +501,7 @@ async function stopExistingRuntime(runtime: RuntimeMetadata | undefined): Promis
     return;
   }
   if (runtime.backend === "binary") {
-    const stopResult = await stopBinaryRuntime(runtime.pid);
+    const stopResult = await BinaryLauncher.stopPid(runtime.pid);
     if (stopResult.status === "failed") {
       throw new ZitadelError("E_VALIDATION", "Existing local Zitadel server did not stop", {
         hint: "Stop the existing local runtime manually, then rerun start.",
@@ -526,5 +510,5 @@ async function stopExistingRuntime(runtime: RuntimeMetadata | undefined): Promis
     }
     return;
   }
-  await stopAndRemoveContainer(runtime.container_name);
+  await DockerLauncher.remove(runtime.container_name);
 }

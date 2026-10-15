@@ -1,8 +1,8 @@
 import { Flags } from "@oclif/core";
 
 import { ZitadelError } from "../lib/errors";
-import { stopBinaryRuntime } from "../lib/local-server/binary";
-import { stopAndRemoveContainer } from "../lib/local-server/docker";
+import { BinaryLauncher } from "../lib/local-server/launchers/binary";
+import { DockerLauncher } from "../lib/local-server/launchers/docker";
 import {
   DEFAULT_LOCAL_SERVER_URL,
   localContainerName,
@@ -64,7 +64,7 @@ export default class Reset extends BaseCommand {
     }
 
     if (runtime?.backend === "binary") {
-      const stopResult = await stopBinaryRuntime(runtime.pid);
+      const stopResult = await BinaryLauncher.stopPid(runtime.pid);
       if (stopResult.status === "failed") {
         throw new ZitadelError("E_VALIDATION", "Local Zitadel server did not stop", {
           hint: "Stop the local runtime manually, then rerun reset.",
@@ -72,7 +72,7 @@ export default class Reset extends BaseCommand {
         });
       }
     } else {
-      await stopAndRemoveContainer(containerName);
+      await DockerLauncher.remove(containerName);
     }
     await removeLocalData(this.meta.cwd);
     await removeRuntimeMetadata(this.meta.cwd);

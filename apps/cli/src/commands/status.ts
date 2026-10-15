@@ -6,8 +6,8 @@ import {
   claimWindowClosedAction,
   type ClaimState,
 } from "../lib/claim-state";
-import { isProcessRunning } from "../lib/local-server/binary";
-import { inspectContainer } from "../lib/local-server/docker";
+import { BinaryLauncher } from "../lib/local-server/launchers/binary";
+import { DockerLauncher } from "../lib/local-server/launchers/docker";
 import { customizeAndPublishActions, verifyLoginAction } from "../lib/journey-guidance";
 import {
   DEFAULT_LOCAL_SERVER_URL,
@@ -51,17 +51,18 @@ export default class Status extends BaseCommand {
     } else {
       await this.toMeta(flags);
     }
-    let docker: Awaited<ReturnType<typeof inspectContainer>> | undefined;
+    let docker: Awaited<ReturnType<typeof DockerLauncher.inspect>> | undefined;
     let dockerError: string | undefined;
     if (runtime?.backend === "docker") {
       try {
-        docker = await inspectContainer(runtime.container_name);
+        docker = await DockerLauncher.inspect(runtime.container_name);
       } catch (error) {
         dockerError = error instanceof Error ? error.message : String(error);
       }
     }
     const healthy = runtime ? await checkLocalServerHealth(runtime.server_url) : false;
-    const processRunning = runtime?.backend === "binary" ? isProcessRunning(runtime.pid) : false;
+    const processRunning =
+      runtime?.backend === "binary" ? BinaryLauncher.isPidRunning(runtime.pid) : false;
     const serverLifecycle = lifecycleForRuntime({ docker, healthy, processRunning, runtime });
 
     const project = await projectStatus(this.meta.cwd);
@@ -106,7 +107,7 @@ export default class Status extends BaseCommand {
 }
 
 function lifecycleForRuntime(input: {
-  docker: Awaited<ReturnType<typeof inspectContainer>> | undefined;
+  docker: Awaited<ReturnType<typeof DockerLauncher.inspect>> | undefined;
   healthy: boolean;
   processRunning: boolean;
   runtime: Awaited<ReturnType<typeof readRuntimeMetadata>>;

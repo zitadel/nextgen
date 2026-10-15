@@ -1,29 +1,12 @@
 import { createConnection, createServer } from "node:net";
 
 import {
-  type BinaryRunSpec,
-  isRuntimeRunning,
-  startBinaryRuntime,
-  stopBinaryRuntime,
-} from "./binary";
-import {
-  type ContainerIdentity,
-  type DockerRuntimeMetadata,
-  type BinaryRuntimeMetadata,
   type RuntimeMetadata,
   checkLocalServerHealth,
   readRuntimeMetadata,
   writeRuntimeMetadata,
 } from "./runtime";
-import {
-  ensureImage,
-  inspectContainer,
-  metadataFromStart,
-  startContainer,
-  stopAndRemoveContainer,
-} from "./docker";
-import type { ResolvedEnv } from "./env-vars";
-import type { HealthProbe, Launcher, PortProbe, ServerStore, StopOutcome } from "./server";
+import type { HealthProbe, PortProbe, ServerStore } from "./server";
 
 /**
  * A port is free when it can be bound and nothing answers on it. Binding alone
@@ -98,84 +81,5 @@ export class RuntimeFileStore<R extends RuntimeMetadata> implements ServerStore<
 
   write(record: R): Promise<void> {
     return writeRuntimeMetadata(this.cwd, record);
-  }
-}
-
-/** Starts the `nextgen` binary itself, detached, and signals its process group to stop it. */
-export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
-  private readonly spec: Omit<BinaryRunSpec, "port" | "serverUrl">;
-
-  constructor(spec: Omit<BinaryRunSpec, "port" | "serverUrl">) {
-    this.spec = spec;
-  }
-
-  launch(target: { port: number; serverUrl: string }): Promise<BinaryRuntimeMetadata> {
-    return startBinaryRuntime({ ...this.spec, ...target });
-  }
-
-  async isAlive(record: BinaryRuntimeMetadata): Promise<boolean> {
-    return isRuntimeRunning(record.pid);
-  }
-
-  terminate(record: BinaryRuntimeMetadata): Promise<StopOutcome> {
-    return stopBinaryRuntime(record.pid);
-  }
-}
-
-export type DockerLauncherSpec = Readonly<{
-  cliVersion: string;
-  containerName: string;
-  image: string;
-  dataDir: string;
-  identity?: ContainerIdentity;
-  env?: ResolvedEnv;
-  userFile?: string;
-}>;
-
-/** Runs the server in a container named for the folder, published on the chosen port. */
-export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
-  private readonly spec: DockerLauncherSpec;
-
-  constructor(spec: DockerLauncherSpec) {
-    this.spec = spec;
-  }
-
-  async launch(target: { port: number; serverUrl: string }): Promise<DockerRuntimeMetadata> {
-    const { spec } = this;
-    // The name is the folder's alone, so whatever holds it is a leftover of an
-    // earlier start (a record that was lost, or a container that stopped).
-    await stopAndRemoveContainer(spec.containerName);
-    await ensureImage(spec.image);
-    const { containerId, env } = await startContainer({
-      containerName: spec.containerName,
-      image: spec.image,
-      port: target.port,
-      dataDir: spec.dataDir,
-      identity: spec.identity,
-      env: spec.env,
-      userFile: spec.userFile,
-    });
-    return metadataFromStart({
-      cwdDataDir: spec.dataDir,
-      cliVersion: spec.cliVersion,
-      containerName: spec.containerName,
-      containerId,
-      image: spec.image,
-      port: target.port,
-      serverUrl: target.serverUrl,
-      env,
-    });
-  }
-
-  async isAlive(record: DockerRuntimeMetadata): Promise<boolean> {
-    return (await inspectContainer(record.container_name)).running;
-  }
-
-  async terminate(record: DockerRuntimeMetadata): Promise<StopOutcome> {
-    if (!(await inspectContainer(record.container_name)).exists) {
-      return { status: "stale" };
-    }
-    await stopAndRemoveContainer(record.container_name);
-    return { status: "stopped" };
   }
 }

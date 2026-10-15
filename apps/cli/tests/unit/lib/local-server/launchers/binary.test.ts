@@ -1,17 +1,16 @@
 import { spawn } from "node:child_process";
 import { mkdtemp } from "node:fs/promises";
-import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  resolvePlatformBinary,
-  resolveServerCommand,
-  startBinaryRuntime,
-  stopBinaryRuntime,
-} from "../../../../src/lib/local-server/binary";
+import { BinaryLauncher } from "../../../../../src/lib/local-server/launchers/binary";
+
+vi.mock("@zitadel/server/binary", () => ({
+  resolveServerBinary: () => "/resolved/by/server-package/nextgen",
+  serverBinaryPath: () => "/resolved/by/server-package/nextgen",
+}));
 
 vi.mock("node:child_process", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:child_process")>();
@@ -34,13 +33,11 @@ describe("local server binary helpers", () => {
     vi.stubEnv("ZITADEL_SERVER_BINARY", "/tmp/fake-nextgen-server");
     const dir = await mkdtemp(join(tmpdir(), "zitadel-binary-test-"));
 
-    const runtime = await startBinaryRuntime({
+    const runtime = await new BinaryLauncher({
       cliVersion: "0.0.0-test",
       dataDir: join(dir, "data"),
       logPath: join(dir, "logs", "server.log"),
-      port: 8091,
-      serverUrl: "http://localhost:8091",
-    });
+    }).launch({ port: 8091, serverUrl: "http://localhost:8091" });
 
     const [command, args, options] = vi.mocked(spawn).mock.calls[0] as unknown as [
       string,
@@ -59,17 +56,15 @@ describe("local server binary helpers", () => {
     vi.stubEnv("ZITADEL_SERVER_BINARY", "/tmp/fake-nextgen-server");
     const dir = await mkdtemp(join(tmpdir(), "zitadel-binary-test-"));
 
-    const runtime = await startBinaryRuntime({
+    const runtime = await new BinaryLauncher({
       cliVersion: "0.0.0-test",
       dataDir: join(dir, "data"),
       logPath: join(dir, "logs", "server.log"),
-      port: 8091,
-      serverUrl: "http://localhost:8091",
       env: {
         values: { GOOGLE_CLIENT_SECRET: "canary-secret" },
         injected: ["GOOGLE_CLIENT_SECRET"],
       },
-    });
+    }).launch({ port: 8091, serverUrl: "http://localhost:8091" });
 
     const [command, args, options] = vi.mocked(spawn).mock.calls[0] as unknown as [
       string,
@@ -87,7 +82,7 @@ describe("local server binary helpers", () => {
 
   it("records an explicit source build version with a binary override", () => {
     expect(
-      resolveServerCommand({
+      BinaryLauncher.command({
         ZITADEL_SERVER_BINARY: "/repo/dist/server/nextgen",
         ZITADEL_SERVER_BINARY_VERSION: "dev+abcdef123456",
       }),
@@ -101,31 +96,23 @@ describe("local server binary helpers", () => {
 
   it("keeps the generic label for an unversioned user override", () => {
     expect(
-      resolveServerCommand({ ZITADEL_SERVER_BINARY: "/tmp/custom-nextgen" }).serverVersion,
+      BinaryLauncher.command({ ZITADEL_SERVER_BINARY: "/tmp/custom-nextgen" }).serverVersion,
     ).toBe("override");
   });
 
-  it("starts the platform binary itself, not the wrapper script", () => {
+  it("starts the binary the server package resolves, not its wrapper script", async () => {
     vi.stubEnv("ZITADEL_SERVER_BINARY", "");
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-binary-test-"));
 
-    const { command, args } = resolveServerCommand();
+    await new BinaryLauncher({
+      cliVersion: "0.0.0-test",
+      dataDir: join(dir, "data"),
+      logPath: join(dir, "logs", "server.log"),
+    }).launch({ port: 8091, serverUrl: "http://localhost:8091" });
 
-    expect(command).toMatch(/nextgen(\.exe)?$/);
-    expect(args).toEqual([]);
-  });
-
-  it("finds the binary in the platform package of the server package", () => {
-    const manifest = createRequire(import.meta.url).resolve("@zitadel/server/package.json");
-
-    expect(resolvePlatformBinary(manifest)).toMatch(/server-[a-z0-9-]+\/bin\/nextgen(\.exe)?$/);
-  });
-
-  it("refuses a platform the server is not built for", () => {
-    const manifest = createRequire(import.meta.url).resolve("@zitadel/server/package.json");
-
-    expect(() => resolvePlatformBinary(manifest, "freebsd", "x64")).toThrow(
-      "Unsupported platform for @zitadel/server: freebsd/x64",
-    );
+    const [command, args] = vi.mocked(spawn).mock.calls[0] as unknown as [string, string[]];
+    expect(command).toBe("/resolved/by/server-package/nextgen");
+    expect(args).toEqual(["--migrate"]);
   });
 
   it("signals the process group even when its leader is already dead", async () => {
@@ -146,7 +133,7 @@ describe("local server binary helpers", () => {
         throw errno("ESRCH");
       });
 
-    await expect(stopBinaryRuntime(12345)).resolves.toMatchObject({
+    await expect(BinaryLauncher.stopPid(12345)).resolves.toMatchObject({
       pid: 12345,
       status: "stopped",
       target: "process-group",
@@ -167,7 +154,7 @@ describe("local server binary helpers", () => {
         return true;
       });
 
-    await expect(stopBinaryRuntime(12345)).resolves.toMatchObject({
+    await expect(BinaryLauncher.stopPid(12345)).resolves.toMatchObject({
       pid: 12345,
       status: "stale",
       target: "process",
@@ -185,7 +172,7 @@ describe("local server binary helpers", () => {
         return true;
       });
 
-    const stopped = stopBinaryRuntime(12345);
+    const stopped = BinaryLauncher.stopPid(12345);
     await vi.advanceTimersByTimeAsync(12_500);
 
     await expect(stopped).resolves.toMatchObject({

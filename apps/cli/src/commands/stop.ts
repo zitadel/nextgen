@@ -1,8 +1,8 @@
 import { Flags } from "@oclif/core";
 
 import { ZitadelError } from "../lib/errors";
-import { stopBinaryRuntime, type StopBinaryRuntimeResult } from "../lib/local-server/binary";
-import { stopAndRemoveContainer } from "../lib/local-server/docker";
+import { BinaryLauncher, type StopBinaryRuntimeResult } from "../lib/local-server/launchers/binary";
+import { DockerLauncher } from "../lib/local-server/launchers/docker";
 import {
   discoverManagedRuntimeProcesses,
   type ManagedRuntimeProcess,
@@ -61,7 +61,7 @@ export default class Stop extends BaseCommand {
 
     let stopResult: StopBinaryRuntimeResult | undefined;
     if (runtime?.backend === "binary") {
-      stopResult = await stopBinaryRuntime(runtime.pid);
+      stopResult = await BinaryLauncher.stopPid(runtime.pid);
       if (stopResult.status === "failed") {
         throw new ZitadelError("E_VALIDATION", "Local Zitadel server did not stop", {
           hint: "Inspect the local runtime process and stop it manually, then rerun `zitadel stop`.",
@@ -69,7 +69,7 @@ export default class Stop extends BaseCommand {
         });
       }
     } else {
-      await stopAndRemoveContainer(containerName);
+      await DockerLauncher.remove(containerName);
     }
 
     return this.emit({
@@ -112,7 +112,7 @@ export default class Stop extends BaseCommand {
     for (const processInfo of discovery.processes) {
       results.push({
         process: processInfo,
-        stop_result: await stopBinaryRuntime(processInfo.pid),
+        stop_result: await BinaryLauncher.stopPid(processInfo.pid),
       });
     }
     const failed = results.filter((result) => result.stop_result.status === "failed");
