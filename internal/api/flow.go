@@ -204,8 +204,11 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 		if !strings.EqualFold(returnTarget.Scheme+"://"+returnTarget.Host, requestOrigin) {
 			return nil, domain.ErrRequestInvalid().WithMessage(fmt.Sprintf("return_target %q is not on the request origin %q", rawTarget, requestOrigin))
 		}
+		// The engine refuses a missing provider or one the step does not
+		// offer, so the URI is never issued for a slug outside the flow.
+		slug, _ := req.SSOProviderID.Get()
 		submitReq.SSOReturn = &domain.FlowSSOReturn{
-			RedirectURI:  requestOrigin + IDPCallbackPath,
+			RedirectURI:  requestOrigin + IDPCallbackPath(slug),
 			ReturnTarget: returnTarget.String(),
 		}
 	}

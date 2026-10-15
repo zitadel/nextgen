@@ -40,7 +40,7 @@ For each selected provider:
 ```text
 ◆ Google sign-in needs an OAuth application.
 │ Callback URI (development):
-│   http://localhost:3000/__nextgen/idp/callback
+│   http://localhost:3000/__nextgen/idp/google/callback
 │ Create the application at https://console.cloud.google.com/apis/credentials
 ◆ Open the Google console in your browser?  (Y/n)
 ◆ Client ID:  1234-abc.apps.googleusercontent.com
@@ -81,7 +81,7 @@ For each selected provider:
 * **JSON output (`data.idps`):** under `--json` the journey contributes an
   `idps` entry to the result envelope's command payload
   (`apps/cli/src/lib/oclif/types.ts`), mirroring the announce step per provider:
-  slug, template, callback URI per environment, excluded environments with the
+  slug, template, the connection's callback URI per environment, excluded environments with the
   declaration kind as reason, console URL, the variable the connection
   references for the secret, and whether that variable is set.
   Exclusions are structured so agents can tell a declaration-level exclusion
@@ -128,7 +128,7 @@ After claim, the same sub-journey runs behind the Sign-in methods journey.
 A provider the catalog does not list is not an entry in it.
 The developer describes the connection instead, and the same sub-journey
 announces, collects credentials, scaffolds and writes it
-(`sso enable --provider custom`, and the "another OpenID Connect provider"
+(`auth-method sso enable --provider custom`, and the "another OpenID Connect provider"
 option in `zitadel setup`, `--sso custom`).
 
 | Input | Rule |
@@ -159,13 +159,16 @@ What is different from a catalog provider:
 * **Credential variables follow the slug**: `ACME_SSO_CLIENT_ID` and
   `ACME_SSO_CLIENT_SECRET` for `acme-sso`, exactly as for a catalog provider.
 * **`setup` takes one custom connection.** The wizard offers the option once;
-  further connections are added with `sso enable`.
+  further connections are added with `auth-method sso enable`.
 
 ## Callback URIs
 
 The callback URI follows Area 3's exact specification
-(`{environment issuer}/__nextgen/idp/callback`), an exact-match path carrying no
-flow ID.
+(`{environment issuer}/__nextgen/idp/{slug}/callback`), an exact-match path
+carrying no flow ID, one per connection
+([area 3](3-social-login-flow.md#callback-uri)).
+Setup and `sso enable` print it in their text output and as `callback_uri` in
+their JSON output.
 The journey's role is strictly to derive and surface these copyable URIs per
 environment.
 The development origin is `http://localhost:{port}` from the setup port,
@@ -177,7 +180,8 @@ A later run reads the stored issuer instead of asking for the port again.
 The journey iterates over all environment definitions declared in
 `zitadel.json`, evaluating them by declaration type:
 
-- **Exact Issuers (`issuer`):** one copyable URI per origin.
+- **Exact Issuers (`issuer`):** one copyable URI per connection and origin:
+  a project with two connections registers two URIs per origin.
   The platform schema types `issuer` as a string or an array of exact origins
   ([`configuration-surface.md`, `zitadel.json`](../platform/configuration-surface.md#zitadeljson--the-root));
   with [#534](https://github.com/zitadel/nextgen/issues/534), an array
@@ -190,7 +194,7 @@ The journey iterates over all environment definitions declared in
 ### Default Output Example
 
 ```text
-development   http://localhost:3000/__nextgen/idp/callback
+development   http://localhost:3000/__nextgen/idp/google/callback
 preview       excluded: declared by issuer_pattern, not an exact issuer
 ```
 
@@ -426,7 +430,7 @@ either preset, once the providers and the routes it writes are set aside. A
 hand-edited one, including one whose provider routes were pointed elsewhere, is
 left alone and reported, as for every other generated step.
 A password step that is exactly the shipped one reads as unedited, so a button the
-developer removed on purpose comes back on the next `sso enable`; nothing in the file
+developer removed on purpose comes back on the next `auth-method sso enable`; nothing in the file
 distinguishes that from a project enabled before the step offered providers.
 Showing only the providers linked to the identified user, or skipping the step
 for a user without a password, would tell anyone who types an email which

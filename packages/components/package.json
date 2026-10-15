@@ -62,14 +62,15 @@
   },
   "scripts": {
     "build": "tsdown",
-    "test": "node ../../scripts/task-guard.mjs --mutex browser-tests --retries 3 -- vitest run",
+    "test": "node ../../scripts/task-guard.mjs --retries 3 -- vitest run",
     "test:browser": "vitest run --project browser",
     "test:all": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "lint": "biome check .",
     "test:unit": "vitest run --project unit",
     "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build && node scripts/check-standalone-artifact.mjs",
-    "install-browsers": "playwright install chromium"
+    "install-browsers": "playwright install chromium",
+    "prepack": "publint --strict"
   },
   "dependencies": {
     "@zitadel/config": "workspace:*",

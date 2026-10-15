@@ -193,8 +193,9 @@ Ask about:
 
 - **Sign-in methods** — password (the usual default), passkeys, and single
   sign-on. If they want SSO, which providers? A provider the CLI does not list
-  by name is still possible: run `zitadel sso enable --help` to see whether the
-  installed CLI takes one, and which settings it needs, and ask for those too.
+  by name is still possible: run `zitadel auth-method sso enable --help` to see
+  whether the installed CLI takes one, and which settings it needs, and ask for
+  those too.
 - **Profile fields** — the user schema starts with first name, last name, and
   the login identifier plus a password. Which additional fields do they want
   (for example phone, username, or a display name)?
@@ -274,10 +275,51 @@ no local admin for that server on the way up, it says so in the envelope's
 `warnings` and the project stays unattached, so the local console does not
 list it.
 
+When `setup --sso` or `sso enable` adds a social sign-in provider, the user
+must register the connection's redirect URI with the provider themselves: give
+them `data.sso[].callback_uri` from `setup`, or `data.callback_uri` from
+`sso enable`, verbatim. Each connection has its own URI, so a URI from another
+provider or an older CLI version does not work.
+
 After `setup`, follow `data.next_commands` to start the app. Prove the generated
 auth flow in a visible browser by registering a unique user, logging out, logging
 back in with the same email/password, and ending on the signed-in profile page.
 Do not treat a rendered login or registration form as completion.
+
+To change how users sign in after setup, use the `auth-method` commands. Each
+sign-in method has its own command, with `--schema` when the project has more
+than one:
+
+- `auth-method password enable` and `auth-method password disable`
+- `auth-method passkey enable` and `auth-method passkey disable`
+- `auth-method sso enable --provider google` adds a provider. It prompts for
+  the client id and secret, or takes `--client-id` with the secret piped on
+  stdin when non-interactive. Any other OpenID Connect provider is
+  `--provider custom` with `--slug`, `--display-name`, `--issuer` and optionally
+  `--scopes` (default `openid profile email`).
+  `auth-method sso disable --provider google` removes a provider; a custom one
+  is named by its slug, as in `auth-method sso disable --provider acme-sso`.
+
+The commands change only local files, apart from
+`auth-method sso enable`, which also stores the provider's credentials on the
+project. When they refuse, they write and publish nothing, on a dry run too.
+They refuse to disable a method a login flow still asks for, to change a method
+while a login flow has errors that prevent checking it, to enable password on a
+schema without `x-identifier`, to edit a value that is not the shape they edit,
+and to edit a schema that points at an external URL. Disabling the schema's last
+way to sign in needs `--force` when non-interactive; only pass it for a schema
+whose users are managed through the API, and ask the user first. That refusal's
+`details.suggested_args` lists the `--force` re-run first, then the methods that
+could be enabled instead. A dry run of the change is not refused: it previews it
+and warns that no way to sign in would be left. A method that is enabled but not
+offered by any active flow is reported in `warnings` (and in `data.not_offered`
+for password and passkey). Every command reports `data.changed`, the
+project-relative files it wrote (on a dry run, the files it would write), empty
+when nothing changed. Follow `data.next_commands` (`plan`, `apply`, and
+`variables set` when a credential did not reach the project) to publish the
+change. When a path or schema name would need shell quoting, `next_commands` is
+empty and `data.next_args` (or `details.suggested_args` on a refusal) holds the
+same commands as argument lists.
 
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
 then re-run `plan` and `apply`. See the reference below for driving the login UI

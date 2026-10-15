@@ -424,7 +424,7 @@ func TestSubmitFlowStep_SSO_BindsTheBrowserAndResealsTheFlowCookie(t *testing.T)
 
 			require.Equal(t, "google", *ts.fake.gotSubmitReq.SSOProviderID)
 			require.Equal(t, &domain.FlowSSOReturn{
-				RedirectURI:  bareOrigin + "/__nextgen/idp/callback",
+				RedirectURI:  bareOrigin + "/__nextgen/idp/google/callback",
 				ReturnTarget: returnTarget,
 			}, ts.fake.gotSubmitReq.SSOReturn)
 			var out struct {

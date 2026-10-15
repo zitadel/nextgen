@@ -32,7 +32,8 @@
     "test-postgres": "cd ../.. && go test -v -count=1 -tags postgres_integration -timeout 10m ./...",
     "test-spanner": "cd ../.. && go test -v -count=1 -tags spanner_integration -timeout 10m -p 1 ./...",
     "test-sqlite": "cd ../.. && go test -v -count=1 -tags sqlite_integration -timeout 5m ./...",
-    "build": "cd ../.. && node scripts/server-build.mjs"
+    "build": "cd ../.. && node scripts/server-build.mjs",
+    "prepack": "publint --strict"
   },
   "publishConfig": {
     "access": "public"
