@@ -348,6 +348,98 @@ if (!claimMode && !(await seedAuthentication())) {
   );
 }
 
+/**
+ * Two releases pinning the project's configuration, and their deployments, so
+ * the release and deployment screens render against real data: one built from
+ * a clean tree with a message, pinning the newest revision of every user
+ * schema and login flow seeded above and a branding revision; one from a dirty
+ * tree without a message, pinning the flows alone. The identity provider connection is not
+ * pinned: the server does not accept an `idp` pointer yet (#851). Releases are
+ * otherwise only ever built by the CLI from a repository. Best-effort, like
+ * the rest: a failure costs the screens their rows, not the instance, and the
+ * warning says why.
+ */
+async function seedReleases(): Promise<string | null> {
+  const headers = { authorization: `Bearer ${projectSecret}`, "content-type": "application/json" };
+  const scoped = (path: string, extra: Record<string, string> = {}) =>
+    `${baseUrl}${path}?${new URLSearchParams({ project_id: projectId, ...extra }).toString()}`;
+  const list = async <T,>(
+    path: string,
+    key: string,
+    extra: Record<string, string>,
+  ): Promise<T[]> => {
+    const response = await fetch(scoped(path, extra), {
+      headers,
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!response.ok) throw new Error(`GET ${path} answered ${response.status}`);
+    return ((await response.json()) as Record<string, T[]>)[key] ?? [];
+  };
+  try {
+    const latest = { revisions: "latest" };
+    const [schemas, flows] = await Promise.all([
+      list<{ id: string }>("/schemas", "schemas", latest),
+      list<{ id: string }>("/flow_definitions", "flow_definitions", latest),
+    ]);
+    const schemaPointers = schemas.map(({ id }) => ({ kind: "schema", revision_id: id }));
+    const flowPointers = flows.map(({ id }) => ({ kind: "flow_definition", revision_id: id }));
+    const post = async <T,>(path: string, body: unknown): Promise<T> => {
+      const response = await fetch(scoped(path), {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(5_000),
+      });
+      if (!response.ok) {
+        throw new Error(`POST ${path} answered ${response.status}: ${await response.text()}`);
+      }
+      return (await response.json()) as T;
+    };
+    // Nothing seeds a branding revision, and a release that pins none has no
+    // Branding group to show; one revision of the bundled template is enough.
+    const branding = await post<{ id: string }>("/branding", { layout: "split" });
+    const first = await post<{ id: string }>("/releases", {
+      pointers: [
+        ...schemaPointers,
+        ...flowPointers,
+        { kind: "branding", revision_id: branding.id },
+      ],
+      message: "Add phone_number to human-user",
+      git_sha: "4a5b268343c0ffee0123456789abcdef01234567",
+    });
+    const second = await post<{ id: string }>("/releases", {
+      pointers: flowPointers,
+      git_sha: "9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de9",
+      git_dirty: true,
+    });
+    // Where the releases went: two primary origins and a preview pattern,
+    // then the first release to primary, the second after it (so the first
+    // reads as superseded), and the first again to a preview URL. Loopback
+    // stays admitted without a pattern, so the console itself is unaffected.
+    const origins = `/projects/${projectId}/origins`;
+    await post(origins, { pattern: "https://app.acme.com", kind: "primary" });
+    await post(origins, { pattern: "https://www.acme.com", kind: "primary" });
+    await post(origins, { pattern: "https://*-acmeinc.vercel.app", kind: "preview" });
+    await post("/deployments", { release_id: first.id, targets: ["primary"] });
+    await post("/deployments", { release_id: second.id, targets: ["primary"] });
+    await post("/deployments", {
+      release_id: first.id,
+      targets: ["https://acme-k3x9v2-acmeinc.vercel.app"],
+      ttl: "168h",
+    });
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
+const releaseSeedFailure = claimMode ? null : await seedReleases();
+if (releaseSeedFailure !== null) {
+  console.warn(
+    `[console-dev-real] could not seed releases (${releaseSeedFailure}); the release and deployment screens will have no rows to show.`,
+  );
+}
+
 // Claim mode signs in against the platform project, because that is the only
 // session `claim/complete` accepts; bootstrapping it makes it the project
 // `runtime.json` names. The seeded users stay in the project being claimed —
