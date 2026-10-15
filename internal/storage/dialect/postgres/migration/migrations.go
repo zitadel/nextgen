@@ -37,23 +37,19 @@ func Migrate(ctx context.Context, db *sql.DB) (err error) {
 		return err
 	}
 
-	p, err := newProvider(db, locker)
+	sqlFS, err := fs.Sub(sqlFiles, "sql")
+	if err != nil {
+		return err
+	}
+	p, err := goose.NewProvider(goose.DialectPostgres, db, sqlFS,
+		goose.WithTableName(schemaName+".goose_db_version"),
+		goose.WithSessionLocker(locker),
+	)
 	if err != nil {
 		return err
 	}
 	_, err = p.Up(ctx)
 	return err
-}
-
-func newProvider(db *sql.DB, locker migrationSessionLocker) (*goose.Provider, error) {
-	sqlFS, err := fs.Sub(sqlFiles, "sql")
-	if err != nil {
-		return nil, err
-	}
-	return goose.NewProvider(goose.DialectPostgres, db, sqlFS,
-		goose.WithTableName(schemaName+".goose_db_version"),
-		goose.WithSessionLocker(locker),
-	)
 }
 
 // createSchema bootstraps the schema under the same advisory lock goose uses.

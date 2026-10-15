@@ -104,7 +104,8 @@ var errIDPSlugTaken = errors.New("identity provider connection slug taken")
 // The engine's parse then runs on the document, so a connection the engine
 // would refuse at sign-in is refused here, while the author can still fix it:
 // an oidc block that sets an endpoint without the others. The parse's other
-// rules repeat the schema's, which already passed.
+// rules repeat the schema's, which already passed, so any other refusal is
+// reported as req.invalid.
 func (s *idpConnectionService) validate(document []byte) (string, error) {
 	uri, err := s.schemas.LatestSchemaURI(domain.SchemaKindIDPConnection)
 	if err != nil {
@@ -122,7 +123,10 @@ func (s *idpConnectionService) validate(document []byte) (string, error) {
 		return "", domain.ErrRequestInvalid().WithDetails(domain.FlattenValidationErrors(err)).WithParent(err)
 	}
 	if _, err := idp.ParseConnection("", document); err != nil {
-		return "", err
+		if de, ok := errors.AsType[domain.Error](err); ok && de.Code == domain.ErrIDPEndpointsPartial(nil).Code {
+			return "", err
+		}
+		return "", domain.ErrRequestInvalid().WithParent(err)
 	}
 	slug, _ := doc["slug"].(string)
 	return slug, nil

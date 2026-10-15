@@ -933,7 +933,8 @@ var operationExcludedErrors = map[string][]string{
 	// Create and revise run the engine's connection parse after the schema
 	// check. The schema already refuses a missing protocol block, scopes
 	// without openid, and a cleartext endpoint as req.invalid, so only the
-	// parse's own rule, the partial endpoint block, reaches the caller.
+	// parse's own rule, the partial endpoint block, reaches the caller; any
+	// other parse refusal is reported as req.invalid.
 	"createIdp": {
 		"domain.ErrIDPEndpointCleartext",
 		"domain.ErrIDPProtocolBlockMissing",

@@ -15,18 +15,14 @@ var sqlFS embed.FS
 
 // Migrate applies all pending migrations to db.
 func Migrate(ctx context.Context, sqlDB *sql.DB) error {
-	p, err := newProvider(sqlDB)
+	sub, err := fs.Sub(sqlFS, "sql")
+	if err != nil {
+		return err
+	}
+	p, err := goose.NewProvider(goose.DialectSQLite3, sqlDB, sub)
 	if err != nil {
 		return err
 	}
 	_, err = p.Up(ctx)
 	return err
-}
-
-func newProvider(sqlDB *sql.DB) (*goose.Provider, error) {
-	sub, err := fs.Sub(sqlFS, "sql")
-	if err != nil {
-		return nil, err
-	}
-	return goose.NewProvider(goose.DialectSQLite3, sqlDB, sub)
 }

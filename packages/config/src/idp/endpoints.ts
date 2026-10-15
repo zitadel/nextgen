@@ -28,7 +28,7 @@ export function missingEndpoints(oidc: unknown): OidcEndpoint[] {
     return [];
   }
   const block = oidc as Record<string, unknown>;
-  const isSet = (name: OidcEndpoint) => block[name] !== undefined && block[name] !== "";
+  const isSet = (name: OidcEndpoint) => typeof block[name] === "string" && block[name] !== "";
   if (!OIDC_ENDPOINTS.some(isSet)) {
     return [];
   }
