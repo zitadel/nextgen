@@ -94,7 +94,7 @@ func TestFlowSSOSubmitRedirectsToProvider(t *testing.T) {
 	require.Equal(t, "https://accounts.example.test/authorize", redirect.Scheme+"://"+redirect.Host+redirect.Path)
 	query := redirect.Query()
 	require.Equal(t, "google-client", query.Get("client_id"))
-	require.Equal(t, "https://login.example.test/__nextgen/idp/callback", query.Get("redirect_uri"))
+	require.Equal(t, "https://login.example.test/__nextgen/idp/google/callback", query.Get("redirect_uri"))
 	require.Equal(t, "code", query.Get("response_type"))
 	require.Equal(t, "openid", query.Get("scope"))
 	require.Equal(t, "S256", query.Get("code_challenge_method"))
@@ -128,7 +128,7 @@ func TestFlowSSOSubmitRedirectsToProvider(t *testing.T) {
 	require.NotEmpty(t, record.AuthAttemptID)
 	require.Equal(t, "google", record.Pending.ProviderSlug)
 	require.Equal(t, created.RevisionID, record.Pending.ConnectionRevisionID)
-	require.Equal(t, "https://login.example.test/__nextgen/idp/callback", record.Pending.RedirectURI)
+	require.Equal(t, "https://login.example.test/__nextgen/idp/google/callback", record.Pending.RedirectURI)
 	require.Equal(t, returnTarget.String(), record.Pending.ReturnTarget)
 	require.Equal(t, query.Get("nonce"), record.Pending.OIDCNonce)
 

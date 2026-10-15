@@ -2,7 +2,7 @@ import { Flags } from "@oclif/core";
 
 import { AuthMethodCommand, CommandGroups, type JsonEnvelope } from "../../../lib/oclif";
 
-/** `auth-method password disable` (ADR 069). */
+/** `auth-method password disable` (ADR 070). */
 export default class AuthMethodPasswordDisable extends AuthMethodCommand {
   static override description = "Disable password sign-in for a user schema.";
   static override group = CommandGroups.configuration;

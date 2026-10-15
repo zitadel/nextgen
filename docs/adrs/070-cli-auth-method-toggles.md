@@ -1,4 +1,4 @@
-# ADR 069: CLI Commands to Enable and Disable Sign-In Methods
+# ADR 070: CLI Commands to Enable and Disable Sign-In Methods
 
 > **Status:** Proposed
 > **Date:** 2026-10-09

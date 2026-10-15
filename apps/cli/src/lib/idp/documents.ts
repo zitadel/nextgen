@@ -772,7 +772,7 @@ export function applySsoToFlow(
 }
 
 /**
- * Remove a provider from a user schema (`auth-method sso disable`, ADR 069).
+ * Remove a provider from a user schema (`auth-method sso disable`, ADR 070).
  *
  * Only `x-auth-methods.sso` is touched. The provider leaves the list, and when
  * none is left `sso` becomes `{ "enabled": false }`: the meta-schema requires

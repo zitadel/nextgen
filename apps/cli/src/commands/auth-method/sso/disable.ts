@@ -28,7 +28,7 @@ import {
 import { optionArgs } from "../../../lib/public-cli";
 
 /**
- * `auth-method sso disable` (ADR 069 §2): remove one provider from a schema
+ * `auth-method sso disable` (ADR 070 §2): remove one provider from a schema
  * and from the login flows that run against it.
  *
  * The connection file and its published credentials are kept, so enabling the

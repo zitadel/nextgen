@@ -21,9 +21,11 @@
       "outputs": ["$TURBO_ROOT$/internal/staticui/console/dist/**"]
     },
     // The release UI build consumes the package release output and runs after
-    // the public packages' release builds (tools/release/turbo.json).
+    // the public packages' release builds (tools/release/turbo.json). It
+    // bundles the dist of sdk-react and components; sdk-react's release build
+    // reaches components'.
     "build-release": {
-      "dependsOn": ["@zitadel/api#build-release", "@zitadel/sdk-react#build", "@zitadel/release#build-public-packages"],
+      "dependsOn": ["@zitadel/sdk-react#build-release", "@zitadel/release#build-public-packages"],
       "env": ["CONSOLE_BASE_PATH", "CONSOLE_VERCEL_INSIGHTS", "CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE"],
       "outputs": ["$TURBO_ROOT$/internal/staticui/console/dist/**"]
     },

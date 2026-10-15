@@ -39,6 +39,7 @@ import {
 } from "../../lib/claim-state";
 import { isErrno, toZitadelError, ZitadelError } from "../../lib/errors";
 import {
+  callbackUriFor,
   customFlagText,
   checkGivenCustomFlags,
   customExample,
@@ -846,6 +847,9 @@ export default class Setup extends BaseCommand {
             slug,
             client_id: answer.credentials.clientId ?? null,
             connection: `.zitadel/idps/${slug}.json`,
+            // What the developer registers at the provider: the connection's
+            // own route, as `sso enable` reports it.
+            callback_uri: callbackUriFor(issuer, slug),
             client_id_variable: outcome
               ? { variable: credentialVariables(slug).clientId, published: outcome.clientId }
               : null,
@@ -1669,6 +1673,12 @@ export function buildSummary(opts: {
       label: "Social sign-in",
       value: providerOf(answer.selection).displayName,
       secondary: stylePath(`.zitadel/idps/${providerOf(answer.selection).slug}.json`),
+    });
+    // A scripted `--sso` run asks nothing, so the prompt that announces the
+    // URI never shows; the summary is where it reaches the developer then.
+    customizeRows.push({
+      label: "Redirect URI",
+      value: styleUrl(callbackUriFor(issuer, providerOf(answer.selection).slug)),
     });
   }
 

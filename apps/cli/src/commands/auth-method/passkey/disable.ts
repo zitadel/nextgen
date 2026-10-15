@@ -2,7 +2,7 @@ import { Flags } from "@oclif/core";
 
 import { AuthMethodCommand, CommandGroups, type JsonEnvelope } from "../../../lib/oclif";
 
-/** `auth-method passkey disable` (ADR 069). */
+/** `auth-method passkey disable` (ADR 070). */
 export default class AuthMethodPasskeyDisable extends AuthMethodCommand {
   static override description = "Disable passkey sign-in for a user schema.";
   static override group = CommandGroups.configuration;

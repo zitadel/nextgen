@@ -1,6 +1,8 @@
 import { expect, test } from "@zitadel/testing/playwright";
 
-import { createIdpConnection, expectNoErrorBoundary, signIn } from "./support";
+import { createIdpConnection } from "../support/api";
+import { expectNoErrorBoundary } from "../support/screens";
+import { signIn } from "../support/sign-in";
 
 /**
  * The Authentication screen against a real instance, read on the session
@@ -24,8 +26,8 @@ test("lists a connection with its schemas and opens its detail", async ({
   zitadel,
   seed,
 }) => {
-  const created = await createIdpConnection(zitadel.handle, CONNECTION);
-  await signIn(page, zitadel.handle, await seed.user());
+  const created = await createIdpConnection(zitadel, CONNECTION);
+  await signIn(page, zitadel, await seed.user());
 
   await page.goto("/authentication?tab=identity-providers");
   const row = page.getByRole("row").filter({ hasText: CONNECTION.display_name });
@@ -48,8 +50,8 @@ test("lists the methods in use, without a connection no schema lists", async ({
   zitadel,
   seed,
 }) => {
-  await createIdpConnection(zitadel.handle, CONNECTION);
-  await signIn(page, zitadel.handle, await seed.user());
+  await createIdpConnection(zitadel, CONNECTION);
+  await signIn(page, zitadel, await seed.user());
 
   await page.goto("/authentication");
   await expect(page.getByRole("tab", { name: "Sign-in methods", selected: true })).toBeVisible();

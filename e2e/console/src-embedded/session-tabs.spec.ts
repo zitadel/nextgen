@@ -1,7 +1,8 @@
 import type { Page, Response } from "@playwright/test";
 import { expect, test } from "@zitadel/testing/playwright";
 
-import { grantProjectAdmin } from "../src-real/support";
+import { openAddTeam, uniqueName } from "../support/screens";
+import { completeLogin, EMBEDDED_LOGIN_URL, signIn } from "../support/sign-in";
 
 /**
  * Two tabs, one cookie jar (ADR 053 §5, Console ADR 0002).
@@ -22,15 +23,6 @@ import { grantProjectAdmin } from "../src-real/support";
 
 type Person = { email: string; password: string };
 
-async function signIn(page: Page, person: Person): Promise<void> {
-  await page.getByLabel("Email").fill(person.email);
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByLabel("Password").fill(person.password);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.waitForURL((url) => !url.pathname.endsWith("/login"));
-  await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
-}
-
 /** Logs the current person out in `page` and signs `person` in there. */
 async function switchTo(page: Page, person: Person): Promise<void> {
   await page.goto("/ui/console/");
@@ -38,16 +30,15 @@ async function switchTo(page: Page, person: Person): Promise<void> {
   await page.getByRole("button", { name: /^Account:/ }).click();
   await page.getByRole("menuitem", { name: "Log out" }).click();
   await expect(page).toHaveURL(/\/ui\/console\/login/);
-  await signIn(page, person);
+  await completeLogin(page, person, EMBEDDED_LOGIN_URL);
 }
 
 /** Opens Add team with a name filled in, ready to submit. */
 async function prepareTeam(page: Page, name: string) {
   await page.goto("/ui/console/teams?status=active");
-  await page.getByRole("button", { name: "Add", exact: true }).click();
-  const drawer = page.getByRole("dialog", { name: "Add team" });
-  await drawer.getByLabel("Team name").fill(name);
-  return drawer.getByRole("button", { name: "Add team", exact: true });
+  const addTeam = await openAddTeam(page);
+  await addTeam.name.fill(name);
+  return addTeam.submit;
 }
 
 /** Every `POST /teams` answer `page` sees, in order. */
@@ -79,11 +70,8 @@ test("a write after the same person signed in again in another tab goes through"
   zitadel,
 }) => {
   const operator = await seed.user();
-  await grantProjectAdmin(zitadel.handle, operator.id);
-
-  await page.goto("/ui/console/");
-  await signIn(page, operator);
-  const name = `Retried ${Date.now().toString(36)}`;
+  await signIn(page, zitadel, operator, EMBEDDED_LOGIN_URL);
+  const name = uniqueName("Retried");
   const submit = await prepareTeam(page, name);
   const sameDocument = await markDocument(page);
   const writes = teamWrites(page);
@@ -109,12 +97,9 @@ test("a write after someone else signed in in another tab reloads instead of wri
   zitadel,
 }) => {
   const operator = await seed.user();
-  await grantProjectAdmin(zitadel.handle, operator.id);
   const colleague = await seed.user();
-
-  await page.goto("/ui/console/");
-  await signIn(page, operator);
-  const submit = await prepareTeam(page, `Never ${Date.now().toString(36)}`);
+  await signIn(page, zitadel, operator, EMBEDDED_LOGIN_URL);
+  const submit = await prepareTeam(page, uniqueName("Never"));
   const sameDocument = await markDocument(page);
   const writes = teamWrites(page);
 

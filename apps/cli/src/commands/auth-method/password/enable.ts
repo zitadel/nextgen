@@ -1,6 +1,6 @@
 import { AuthMethodCommand, CommandGroups, type JsonEnvelope } from "../../../lib/oclif";
 
-/** `auth-method password enable` (ADR 069). */
+/** `auth-method password enable` (ADR 070). */
 export default class AuthMethodPasswordEnable extends AuthMethodCommand {
   static override description = "Enable password sign-in for a user schema.";
   static override group = CommandGroups.configuration;

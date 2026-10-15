@@ -1,8 +1,12 @@
-import { defineConfig, devices } from "@playwright/test";
-import { resolve } from "node:path";
-import { e2eActionTimeouts, e2eTimeouts, e2eTrace } from "../playwright.shared";
-
-const workspaceRoot = resolve(import.meta.dirname, "../..");
+import { defineConfig } from "@playwright/test";
+import {
+  apiMockServer,
+  chromiumProjects,
+  e2eActionTimeouts,
+  e2eTimeouts,
+  e2eTrace,
+  workspaceRoot,
+} from "../playwright.shared";
 
 /**
  * E2E coverage for the embedded sign-in path:
@@ -27,21 +31,14 @@ export default defineConfig({
     baseURL: "http://localhost:3002",
     trace: e2eTrace,
   },
-  // Boot the mock auth server first so the Next dev server can proxy to
-  // it on the very first request. `reuseExistingServer` lets developers
-  // run either server manually and have Playwright skip its own boot.
+  // The mock auth server first, then the Next dev server against it.
+  // `reuseExistingServer` lets developers run either server manually and
+  // have Playwright skip its own boot.
   //
   // Direct pnpm filter commands keep these long-running processes outside
   // Moon's task graph; Playwright owns their lifecycle for this e2e suite.
   webServer: [
-    {
-      command: "pnpm --filter @zitadel/api-mock start",
-      url: "http://localhost:8080/.well-known/jwks.json",
-      reuseExistingServer: true,
-      cwd: workspaceRoot,
-      stdout: "pipe",
-      stderr: "pipe",
-    },
+    apiMockServer(8080),
     {
       command: "pnpm --filter @zitadel/demo-next dev",
       url: "http://localhost:3002/login",
@@ -55,10 +52,5 @@ export default defineConfig({
       },
     },
   ],
-  projects: [
-    {
-      name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
-    },
-  ],
+  projects: chromiumProjects,
 });

@@ -52,7 +52,7 @@ func TestWithLogging_redactsTheNamedQueryValues(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}), "code", "state")
 
-	req := httptest.NewRequest(http.MethodGet, "/__nextgen/idp/callback?code=the-code&state=proj-1.the-state&error=x", nil).WithContext(ctx)
+	req := httptest.NewRequest(http.MethodGet, "/__nextgen/idp/google/callback?code=the-code&state=proj-1.the-state&error=x", nil).WithContext(ctx)
 	rec := httptest.NewRecorder()
 	mw.ServeHTTP(rec, req)
 

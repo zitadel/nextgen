@@ -7,7 +7,7 @@ import { isObject } from "./json";
 
 /**
  * The methods `auth-method password` and `auth-method passkey` switch on and
- * off by a flag alone (ADR 069).
+ * off by a flag alone (ADR 070).
  *
  * SSO is not one of them: a provider needs credentials, a connection file and
  * flow edits, so `auth-method sso` handles it with its own commands.

@@ -35,7 +35,7 @@ type Target = {
 };
 
 /**
- * What the `auth-method` commands share (ADR 069): finding the schema and its
+ * What the `auth-method` commands share (ADR 070): finding the schema and its
  * flows, the last-method guard and the refusals in §3, the warnings in §3 and
  * §4, and the result shape. `auth-method password` and `auth-method passkey`
  * are nothing else, so {@link toggle} is all they run.
@@ -83,7 +83,7 @@ export abstract class AuthMethodCommand extends BaseCommand {
   }
 
   /**
-   * The last-method guard (ADR 069 §3). Returns `false` when the user declined
+   * The last-method guard (ADR 070 §3). Returns `false` when the user declined
    * the prompt, which ends the run as skipped; refuses without `--force` when
    * nobody can be asked. The question goes through `input`, which `--force`
    * answers yes without asking.
@@ -124,7 +124,7 @@ export abstract class AuthMethodCommand extends BaseCommand {
   }
 
   /**
-   * Report what the change leaves behind (ADR 069 §3 and §4). Called once the
+   * Report what the change leaves behind (ADR 070 §3 and §4). Called once the
    * change is previewed or written, never before: a failed write must not
    * claim it.
    *
@@ -162,7 +162,7 @@ export abstract class AuthMethodCommand extends BaseCommand {
       reachableSignInMethods(input.after, input.flowsAfter).length === 0
     ) {
       // The schema still enables something, but no active flow offers it.
-      // Flows are not these commands' to rewrite (ADR 069 §2), so it is said.
+      // Flows are not these commands' to rewrite (ADR 070 §2), so it is said.
       reportWarning(
         `No active login flow for ${input.schema.name} offers a method it enables, ` +
           "so nobody can sign in until one does.",

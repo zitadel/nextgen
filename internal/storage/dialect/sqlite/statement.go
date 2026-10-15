@@ -24,6 +24,7 @@ type statements struct {
 	idpConnectionStatements
 	idpIdentityLinkStatements
 	deploymentStatements
+	previewStatements
 	teamStatements
 	teamMembershipStatements
 	tokenStatements
@@ -36,6 +37,7 @@ type statements struct {
 	userRecoveryCodesStatements
 	brandingStatements
 	variableStatements
+	variableSetStatements
 	claimStatements
 	resourceScopeStatements
 	authzAssignmentStatements
@@ -62,6 +64,7 @@ func newStatements(client queryExecutor) statements {
 		idpConnectionStatements:       newIDPConnectionStatements(client),
 		idpIdentityLinkStatements:     newIDPIdentityLinkStatements(client),
 		deploymentStatements:          newDeploymentStatements(client),
+		previewStatements:             newPreviewStatements(client),
 		teamStatements:                newTeamStatements(client),
 		teamMembershipStatements:      newTeamMembershipStatements(client),
 		tokenStatements:               newTokenStatements(client),
@@ -74,6 +77,7 @@ func newStatements(client queryExecutor) statements {
 		userRecoveryCodesStatements:   newUserRecoveryCodesStatements(client),
 		brandingStatements:            newBrandingStatements(client),
 		variableStatements:            newVariableStatements(client),
+		variableSetStatements:         newVariableSetStatements(client),
 		claimStatements:               newClaimStatements(client),
 		resourceScopeStatements:       newResourceScopeStatements(client),
 		authzAssignmentStatements:     newAuthzAssignmentStatements(client),

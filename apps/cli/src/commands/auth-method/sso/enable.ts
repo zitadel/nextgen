@@ -73,7 +73,7 @@ import { portableCommands, publicCliCommand } from "../../../lib/public-cli";
 import { reportWarning } from "../../../lib/warnings";
 
 /**
- * The `auth-method sso enable` command (ADR 069) — add a provider to a
+ * The `auth-method sso enable` command (ADR 070) — add a provider to a
  * Project's sign-in methods. It replaces the former `sso enable`.
  *
  * One direct journey: the developer is told what to register with the
@@ -128,7 +128,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       cwdArgs,
       schema,
       flows: candidates,
-      preflight: { selection, entry, secretFile, callbackUri },
+      preflight: { selection, entry, secretFile, issuer },
     } = await this.target(flags, {
       // The credentials are published to the project, so the server is
       // resolved, unlike for the other auth-method commands.
@@ -166,6 +166,9 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       scopesGiven: flags[ENABLE_FLAG_KEYS.scopes] !== undefined,
       slugFlag: ENABLE_FLAG_NAMES.slug,
     });
+    // The connection's own route, so the slug decides it: a reused connection
+    // keeps the slug it was created with.
+    const callbackUri = callbackUriFor(issuer, plan.slug);
 
     const reusing = plan.action === "reuse";
     if (plan.action === "create" && plan.alsoUsesIssuer !== undefined) {
@@ -200,7 +203,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     // The schema and flow edits are worked out now, before the dry-run return
     // and before the connection is written or a credential published, so a
     // refusal (an edit the editors cannot make, or a flow `plan` would then
-    // reject) stops the run with nothing changed (ADR 069 §3).
+    // reject) stops the run with nothing changed (ADR 070 §3).
     const edits = planEdits(schema, plan.slug, flows);
     refuseBrokenFlows(
       schema,
@@ -251,6 +254,10 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
 
     if (reusing) {
       consola.success(`Reusing ${plan.file.path}`);
+      // Shown on reuse too: the URI moved to one per connection after the
+      // first release, and rerunning this command is how a developer finds
+      // the one to register now.
+      consola.info(`Callback URI   ${callbackUri}`);
       // The connection references its credentials rather than holding them, so
       // reuse is not evidence they were ever published: a run interrupted
       // between writing the file and publishing leaves the document pointing
@@ -537,7 +544,7 @@ type ProjectContext = {
   readonly selection: ProviderSelection;
   readonly entry: IdpProvider;
   readonly secretFile: ZitadelSecret;
-  readonly callbackUri: string;
+  readonly issuer: string;
 };
 
 /**
@@ -585,7 +592,7 @@ async function readProject(
       hint: "Run `zitadel setup` first, or add environments.development.issuer to zitadel.json.",
     });
   }
-  return { selection, entry, secretFile, callbackUri: callbackUriFor(issuer) };
+  return { selection, entry, secretFile, issuer };
 }
 
 /**
