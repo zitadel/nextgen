@@ -23,9 +23,12 @@
   --font-mono: var(--font-azeret-mono), ui-monospace, monospace;
 }
 
-/* How the stage, the headline and the commands under it move in. */
+/* How the stage, the headline and the commands under it move in, and how
+   much of the first step the first screen shows under the hero: its number,
+   its title and the top of its card, to tease what comes below. */
 :root {
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --peek: 3.5rem;
 }
 
 /* The centerpiece of the hero (page.tsx): the website's hero animation, its
@@ -33,11 +36,12 @@
    --tilt-x and --tilt-y, from -0.5 to 0.5), the headline under it and the
    commands under that. */
 @layer components {
-  /* The hero takes at least the first screen under the header (h-16 and its
-     border): on a tall screen the extra height surrounds it, and the steps
-     start below the fold instead of crowding under its buttons. */
+  /* The hero takes the first screen under the header (h-16 and its border)
+     but the peek: on a tall screen the extra height surrounds it, and the
+     first step shows just its top at the fold instead of crowding under the
+     buttons. */
   .hero {
-    min-height: calc(100svh - 4rem - 1px);
+    min-height: calc(100svh - 4rem - 1px - var(--peek));
   }
 
   .stage {
@@ -47,11 +51,15 @@
     flex-direction: column;
     align-items: center;
     /* At most 40rem wide, and as high as the screen leaves beside the header,
-       the headline, the line, the commands and the buttons (32rem, with a
-       little air under them), so all of them fit a laptop's first screen;
-       never so small that the animation is lost: a short screen scrolls
-       instead. */
-    width: min(100%, 40rem, max(15rem, calc((100svh - 32rem) * 550 / 448)));
+       the headline, the line, the commands, the buttons and the air under
+       them (33.5rem), and the peek, so all of them fit a laptop's first
+       screen; never so small that the animation is lost: a short screen
+       scrolls instead. */
+    width: min(
+      100%,
+      40rem,
+      max(15rem, calc((100svh - 33.5rem - var(--peek)) * 550 / 448))
+    );
   }
 
   .stage-frame {

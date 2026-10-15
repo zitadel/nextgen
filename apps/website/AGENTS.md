@@ -9,8 +9,8 @@ docs, the storybook and GitHub:
 1. The hero: the new website's hero animation in the middle, "Your login in
    one minute." tucked into its faded bottom, one line on what it is, then the
    commands to copy, the skills line for coding agents, and the buttons to the
-   quickstart and the repository, all of it on a laptop's first screen, and
-   the first screen is the hero's alone: the steps start below the fold. Short
+   quickstart and the repository, all of it on a laptop's first screen, with
+   the top of the first step under it to tease what comes below. Short
    on purpose: no paragraph, no small print, no line above the headline; the
    header's Preview label frames the page, and the steps below say the rest.
 2. The showcase (`app/showcase/`), with no title of its own: five numbered
@@ -73,12 +73,13 @@ the page's two copies of it, the animation and its blurred light, play in step.
 `app/hero-still.webp`, its first frame, stands in for reduced motion and for
 browsers without AVIF. It stands in the middle of the hero, above the
 headline, as large as the screen's height leaves room for beside the headline,
-the commands and the buttons, between 15rem and 40rem wide (`.stage` in
-`app/globals.css`); when the hero's content changes height, change the 32rem
-it reserves for them. The hero takes at least the screen under the header
-(`.hero`), its content centred in it, so a tall screen surrounds it with air
-instead of showing the first step under its buttons. From the extracted
-frames:
+the commands, the buttons and the top of the first step, between 15rem and
+40rem wide (`.stage` in `app/globals.css`); when the hero's content changes
+height, change the 33.5rem it reserves for it. The hero takes the screen
+under the header but that top of the first step (`.hero`, `--peek`), its
+content centred in it, so a tall screen surrounds it with air and every
+screen from a laptop's up shows the first step's number, title and the top of
+its card at the fold, with room above them. From the extracted frames:
 
 ```sh
 ffmpeg -framerate 30 -i %03d.webp -c:v libsvtav1 -crf 34 -preset 4 -pix_fmt yuv420p -f avif hero.avif

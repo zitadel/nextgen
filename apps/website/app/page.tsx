@@ -43,7 +43,7 @@ export default function Home() {
       <main>
         <section
           aria-labelledby="hero-title"
-          className="hero flex flex-col items-center justify-center overflow-hidden px-6 pt-2 pb-16 md:pb-24"
+          className="hero flex flex-col items-center justify-center overflow-hidden px-6 pt-2 pb-16"
         >
           <Stage>
             <div className="stage-frame">
@@ -97,11 +97,10 @@ export default function Home() {
         </section>
 
         {/* What the commands do, step by step, with no title of its own: the
-            numbered rows speak for themselves under the hero. */}
-        <section
-          aria-label="Step by step"
-          className="overflow-hidden px-6 pt-8 pb-12 md:pt-12 md:pb-20"
-        >
+            numbered rows speak for themselves under the hero. No top padding:
+            the first step's top is what the first screen shows of it (--peek
+            in globals.css). */}
+        <section aria-label="Step by step" className="overflow-hidden px-6 pb-12 md:pb-20">
           <div className="mx-auto max-w-5xl">
             <Showcase />
           </div>
