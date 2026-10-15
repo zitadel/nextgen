@@ -7,22 +7,34 @@ import { cn } from "@/lib/utils";
 import { EYEBROW } from "./typography";
 
 /**
- * The block of labelled values (`MetaValue`, split by `MetaRule`) that
- * identifies a resource: stacked below `sm`, where the rule becomes a tick on
- * its own row, and in a row above it. The values sit on the page with no
- * border or fill around them.
+ * The card of labelled values (`MetaValue`, split by `MetaRule`) that identifies
+ * what a detail screen shows: stacked below `sm`, where the rule becomes a tick
+ * on its own row, and in a row above it.
+ *
+ * A resource (user, team) draws the card. A configuration screen (schema,
+ * login flow, identity provider, release) passes `bordered={false}` and sets
+ * the values on the page with no border or fill.
  *
  * `max-w-full` + `overflow-x-auto`: its width is set by the id, which is never
- * truncated, so a narrow screen scrolls the block rather than the page.
+ * truncated, so a narrow screen scrolls the card rather than the page.
  *
  * `MetaValue`, not `MetaItem`: `@/components/ui/meta-item` owns that name for
  * the small uppercase annotation beside a field label.
  */
-export function MetaCard({ children, className }: { children: ReactNode; className?: string }) {
+export function MetaCard({
+  children,
+  className,
+  bordered = true,
+}: {
+  children: ReactNode;
+  className?: string;
+  bordered?: boolean;
+}) {
   return (
     <Card
       className={cn(
-        "max-w-full gap-0 overflow-x-auto border-0 bg-transparent py-0 shadow-none",
+        "max-w-full gap-0 overflow-x-auto py-0",
+        !bordered && "border-0 bg-transparent shadow-none",
         className,
       )}
     >
