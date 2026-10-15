@@ -245,6 +245,10 @@ type ListSchemasRes interface {
 	listSchemasRes()
 }
 
+type ListUserIdentityLinksRes interface {
+	listUserIdentityLinksRes()
+}
+
 type ListUserPasskeysRes interface {
 	listUserPasskeysRes()
 }
