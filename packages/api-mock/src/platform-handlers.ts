@@ -467,23 +467,32 @@ function immutableFieldClash(
   return undefined;
 }
 
-/**
- * The owner a variables request addresses. An absent environment is the project
- * level, which is a different owner from any environment under it.
- */
-function variableOwner(projectId: string, environmentName?: string): string {
-  return environmentName === undefined
-    ? `project:${projectId}`
-    : `env:${projectId}/${environmentName}`;
+type VariableKind = "primary" | "preview";
+
+/** The requested kind, or both. */
+function variableKinds(kind?: VariableKind): VariableKind[] {
+  return kind === undefined ? ["primary", "preview"] : [kind];
 }
 
-/** What a read of one owner says: a value, or that a secret is held. */
-function variablesResponse(owned: Map<string, VariableRecord>): Record<string, unknown> {
-  // A secret says that a value is held and withholds it (ADR 062 §7):
-  // returning the plaintext would defeat the encryption it stands for.
-  return Object.fromEntries(
-    [...owned.entries()].map(([name, held]) => [name, held.secret ? { secret: true } : held.value]),
-  );
+/** The store key of one kind of a project's variables. */
+function variableOwner(projectId: string, kind: VariableKind): string {
+  return `${projectId}/${kind}`;
+}
+
+/** The project's variables for the given kinds, keyed by name. */
+function variablesResponse(
+  variables: Map<string, Map<string, VariableRecord>>,
+  projectId: string,
+  kinds: VariableKind[],
+): Record<string, Record<string, unknown>> {
+  const out: Record<string, Record<string, unknown>> = {};
+  for (const kind of kinds) {
+    for (const [name, held] of variables.get(variableOwner(projectId, kind)) ?? []) {
+      // A secret is never returned.
+      out[name] = { ...out[name], [kind]: held.secret ? { secret: true } : held.value };
+    }
+  }
+  return out;
 }
 
 /** One connection, in the wire shape every idp endpoint answers with. */
@@ -1455,14 +1464,25 @@ export function setupPlatformHandlers() {
     // publishes the client id and secret here, so without them a scaffolded
     // provider has no credentials and sign-in fails at the token endpoint.
 
+    // Registered ahead of `*/variables`, which would otherwise match it. The
+    // server answers 501 until it stores frozen sets, and so does the mock.
+    http.get("*/deployments/:deploymentId/variables", () =>
+      HttpResponse.json(errorBody("not_implemented", "This feature is not implemented yet."), {
+        status: 501,
+      }),
+    ),
+
     http.get("*/variables", ({ request }) => {
       const query = parse(GetVariablesQueryParams, queryRecord(request), "invalid_query");
       if (!query.ok) {
         return query.response;
       }
-      const owner = variableOwner(query.data.project_id, query.data.environment_name);
-      const owned = store.variables.get(owner) ?? new Map<string, VariableRecord>();
-      const out = parse(GetVariablesResponse, variablesResponse(owned), "mock_response_invalid");
+      const body = variablesResponse(
+        store.variables,
+        query.data.project_id,
+        variableKinds(query.data.kind),
+      );
+      const out = parse(GetVariablesResponse, body, "mock_response_invalid");
       if (!out.ok) {
         return out.response;
       }
@@ -1470,9 +1490,7 @@ export function setupPlatformHandlers() {
     }),
 
     // One variable by name, which `variables get` and `variables delete`
-    // address directly. A variable belongs to the owner that entered it, so a
-    // name another owner of the same project holds answers `var.not_found`
-    // and leaves that owner's value standing.
+    // address directly.
     http.get("*/variables/:variableName", ({ request, params }) => {
       const path = parse(
         GetVariableParams,
@@ -1486,12 +1504,14 @@ export function setupPlatformHandlers() {
       if (!query.ok) {
         return query.response;
       }
-      const owner = variableOwner(query.data.project_id, query.data.environment_name);
-      const held = store.variables.get(owner)?.get(path.data.variable_name);
-      if (held === undefined) {
+      const body = variablesResponse(
+        store.variables,
+        query.data.project_id,
+        variableKinds(query.data.kind),
+      )[path.data.variable_name];
+      if (body === undefined) {
         return HttpResponse.json(errorBody("var.not_found", "variable not found"), { status: 404 });
       }
-      const body = held.secret ? { secret: true } : held.value;
       const out = parse(GetVariableResponse, body, "mock_response_invalid");
       if (!out.ok) {
         return out.response;
@@ -1512,14 +1532,15 @@ export function setupPlatformHandlers() {
       if (!query.ok) {
         return query.response;
       }
-      const owner = variableOwner(query.data.project_id, query.data.environment_name);
-      const owned = store.variables.get(owner);
-      const name = path.data.variable_name;
-      if (owned?.has(name) !== true) {
+      // A removal naming a kind leaves the other kind's value.
+      let removed = false;
+      for (const kind of variableKinds(query.data.kind)) {
+        const owned = store.variables.get(variableOwner(query.data.project_id, kind));
+        removed = (owned?.delete(path.data.variable_name) ?? false) || removed;
+      }
+      if (!removed) {
         return HttpResponse.json(errorBody("var.not_found", "variable not found"), { status: 404 });
       }
-      owned.delete(name);
-      store.variables.set(owner, owned);
       return new HttpResponse(null, { status: 204 });
     }),
 
@@ -1537,24 +1558,40 @@ export function setupPlatformHandlers() {
         return body.response;
       }
 
-      const owner = variableOwner(query.data.project_id, query.data.environment_name);
-      const owned = store.variables.get(owner) ?? new Map<string, VariableRecord>();
+      const projectId = query.data.project_id;
+      const kinds = variableKinds(query.data.kind);
+      const owned = (kind: VariableKind) => {
+        const owner = variableOwner(projectId, kind);
+        const held = store.variables.get(owner) ?? new Map<string, VariableRecord>();
+        store.variables.set(owner, held);
+        return held;
+      };
       // RFC 7386: a name present is written, `null` removes it, and a name
-      // absent is left alone.
+      // absent is left alone. Without a kind, a plain value is written for
+      // both kinds, and a secret for primary only, removing the preview value.
       for (const [name, value] of Object.entries(body.data as Record<string, unknown>)) {
         if (value === null) {
-          owned.delete(name);
+          for (const kind of kinds) {
+            owned(kind).delete(name);
+          }
         } else if (typeof value === "object") {
           const input = value as { value: string | number | boolean; secret: boolean };
-          owned.set(name, { value: input.value, secret: input.secret });
+          const kindless = input.secret && query.data.kind === undefined;
+          for (const kind of kindless ? (["primary"] as const) : kinds) {
+            owned(kind).set(name, { value: input.value, secret: input.secret });
+          }
+          if (kindless) {
+            owned("preview").delete(name);
+          }
         } else {
-          owned.set(name, { value: value as string | number | boolean, secret: false });
+          for (const kind of kinds) {
+            owned(kind).set(name, { value: value as string | number | boolean, secret: false });
+          }
         }
       }
-      store.variables.set(owner, owned);
-      // 200 with the addressed owner read back, so the response also carries
-      // what that owner held and this write did not touch.
-      const out = parse(UpdateVariablesResponse, variablesResponse(owned), "mock_response_invalid");
+      // 200 with the variables read back, including what the write did not touch.
+      const response = variablesResponse(store.variables, projectId, kinds);
+      const out = parse(UpdateVariablesResponse, response, "mock_response_invalid");
       if (!out.ok) {
         return out.response;
       }

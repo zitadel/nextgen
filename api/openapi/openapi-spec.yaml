@@ -91,13 +91,9 @@ tags:
   - name: Variables
     description: |
       Named values a project enters and references from configuration documents
-      as `${{ NAME }}` (ADR 062). A variable belongs to the project or to one of
-      its environments, which is how a value that must differ per environment
-      reaches a release that is promoted between them unchanged.
-
-      Those owners are separate rather than a hierarchy: a variable is read,
-      written and deleted at exactly the owner a request addresses, and nothing
-      is inherited in either direction.
+      as `${{ NAME }}`. A variable has a value per kind, `primary` or `preview`,
+      and each deployment freezes the values of its kind. There is no fallback
+      between kinds.
 
       Secrets are the same resource with the value stored encrypted: same
       names, same references, same endpoints. They are write-only — a read says
@@ -236,6 +232,8 @@ paths:
     $ref: endpoints/deployments/by_id/methods.yaml
   /deployments/{deployment_id}/rollback:
     $ref: endpoints/deployments/by_id/rollback/methods.yaml
+  /deployments/{deployment_id}/variables:
+    $ref: endpoints/deployments/by_id/variables/methods.yaml
 
 components:
   securitySchemes:

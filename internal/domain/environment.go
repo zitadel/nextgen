@@ -1,9 +1,8 @@
 package domain
 
 // PrefixEnvironment only namespaces the error codes below: no resource is
-// minted under it. The variables operations still accept environment_name and
-// answer env.not_found for it, and the deployment access check answers
-// env.project_not_found.
+// minted under it. The deployment service and its access check still answer
+// them.
 const PrefixEnvironment ResourcePrefix = "env"
 
 func ErrEnvironmentNotFound() Error {

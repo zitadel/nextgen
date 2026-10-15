@@ -29,6 +29,8 @@ declare module "react" {
           theme?: ZitadelLogin["theme"];
           suppressHeader?: ZitadelLogin["suppressHeader"];
           "suppress-header"?: boolean;
+          suppressPasswordToggle?: ZitadelLogin["suppressPasswordToggle"];
+          "suppress-password-toggle"?: boolean;
           purpose?: ZitadelLogin["purpose"];
           "flow-name"?: string;
           "project-id"?: string;

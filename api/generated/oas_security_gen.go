@@ -177,6 +177,10 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetDeploymentByIdOperation: []string{
 		"deployment.read",
 	},
+	GetDeploymentVariablesOperation: []string{
+		"deployment.read",
+		"variable.read",
+	},
 	GetEventOperation: []string{
 		"events.read",
 	},

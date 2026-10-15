@@ -339,8 +339,9 @@ type Handler interface {
 	DeleteUserByID(ctx context.Context, params DeleteUserByIDParams) (DeleteUserByIDRes, error)
 	// DeleteVariable implements deleteVariable operation.
 	//
-	// Removes the project's variable under this name. Deleting a name the
-	// project does not hold answers `var.not_found`.
+	// Removes a variable for the requested kind, or for both kinds without
+	// `kind`. A name with no value for that kind answers `var.not_found`.
+	// Existing deployments keep the values they froze.
 	//
 	// DELETE /variables/{variable_name}
 	DeleteVariable(ctx context.Context, params DeleteVariableParams) (DeleteVariableRes, error)
@@ -424,6 +425,14 @@ type Handler interface {
 	//
 	// GET /deployments/{deployment_id}
 	GetDeploymentById(ctx context.Context, params GetDeploymentByIdParams) (GetDeploymentByIdRes, error)
+	// GetDeploymentVariables implements getDeploymentVariables operation.
+	//
+	// Returns the variable values the deployment froze when it was made. Later
+	// changes to the project's variables do not affect them. A secret reads
+	// back as `{"secret": true}`.
+	//
+	// GET /deployments/{deployment_id}/variables
+	GetDeploymentVariables(ctx context.Context, params GetDeploymentVariablesParams) (GetDeploymentVariablesRes, error)
 	// GetEvent implements getEvent operation.
 	//
 	// Loads a single event by `(project_id, id)`. Requires `events.read`.
@@ -587,15 +596,16 @@ type Handler interface {
 	GetUserByID(ctx context.Context, params GetUserByIDParams) (GetUserByIDRes, error)
 	// GetVariable implements getVariable operation.
 	//
-	// Reads one of the project's variables by name. A name the project has not
-	// entered answers `var.not_found`. A secret is found but not disclosed: the
-	// response is `{"secret": true}`.
+	// Reads one variable by name, with its value per kind. A name with no
+	// value for the requested kind answers `var.not_found`. A secret reads
+	// back as `{"secret": true}`.
 	//
 	// GET /variables/{variable_name}
 	GetVariable(ctx context.Context, params GetVariableParams) (GetVariableRes, error)
 	// GetVariables implements getVariables operation.
 	//
-	// Returns the project's variables, keyed by name.
+	// Returns the project's variables, keyed by name, each with its value per
+	// kind. With `kind`, only that kind's values are returned.
 	// Secret values are not returned. A secret appears as `{"secret": true}`,
 	// which says a value is held without disclosing it.
 	//
@@ -970,8 +980,13 @@ type Handler interface {
 	UpdateTeam(ctx context.Context, req *UpdateTeamRequest, params UpdateTeamParams) (UpdateTeamRes, error)
 	// UpdateVariables implements updateVariables operation.
 	//
-	// Enters, replaces and removes the project's variables. Names not in the
-	// body are untouched.
+	// Enters, replaces and removes the project's variables for the requested
+	// kind. Names not in the body are untouched. Existing deployments keep the
+	// values they froze.
+	// Without `kind`, a plain value is written for both kinds. A secret is
+	// written for `primary` only and removes the name's `preview` value, so a
+	// preview never keeps a plaintext copy; set a preview secret with
+	// `kind=preview`. `null` removes the name from both.
 	// A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
 	// stores the value encrypted under the project's active `secret` key, after
 	// which it can be referenced but not read back. `null` removes the name

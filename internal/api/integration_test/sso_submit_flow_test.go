@@ -41,7 +41,7 @@ func TestFlowSSOSubmitRedirectsToProvider(t *testing.T) {
 		"GOOGLE_CLIENT_ID": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("google-client")),
 	}, api.UpdateVariablesParams{ProjectID: f.projectID()})
 	require.NoError(t, err)
-	require.IsType(t, &api.Variables{}, varsResp, helpers.MustMarshal(t, varsResp))
+	require.IsType(t, &api.VariablesByKind{}, varsResp, helpers.MustMarshal(t, varsResp))
 
 	defResp, err := f.client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      f.projectID(),
