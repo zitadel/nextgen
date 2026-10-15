@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"net/http"
+	"slices"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -64,14 +65,16 @@ func (h *Handler) RollbackDeployment(ctx context.Context, _ api.OptRollbackDeplo
 	return nil, domain.ErrNotImplemented()
 }
 
-// The reads answer 501 until they land on top of the deploy. The access
-// check stays in front, so a caller without the permission learns that first.
-
 func (h *Handler) GetDeploymentById(ctx context.Context, params api.GetDeploymentByIdParams) (api.GetDeploymentByIdRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), deploymentAccess, opRead); err != nil {
 		return nil, err
 	}
-	return nil, domain.ErrNotImplemented()
+	entity, err := h.deploymentService.Get(ctx, string(params.ProjectID), string(params.DeploymentID))
+	if err != nil {
+		return nil, err
+	}
+	resp := toAPIDeployment(entity, nil)
+	return &resp, nil
 }
 
 func (h *Handler) ListDeployments(ctx context.Context, params api.ListDeploymentsParams) (api.ListDeploymentsRes, error) {
@@ -79,14 +82,36 @@ func (h *Handler) ListDeployments(ctx context.Context, params api.ListDeployment
 	if err != nil {
 		return nil, err
 	}
-	for _, expand := range params.Expand {
-		if expand == api.DeploymentExpandRelease {
-			if err := requireReleaseRead(ctx); err != nil {
-				return nil, err
-			}
+	includeReleases := slices.Contains(params.Expand, api.DeploymentExpandRelease)
+	if includeReleases {
+		if err := requireReleaseRead(ctx); err != nil {
+			return nil, err
 		}
 	}
-	return nil, domain.ErrNotImplemented()
+
+	input := service.ListDeploymentsInput{
+		ProjectID:       string(params.ProjectID),
+		Live:            params.Live.Value,
+		IncludeReleases: includeReleases,
+		PageToken:       string(params.PageToken.Value),
+		Limit:           int(params.Limit.Value),
+	}
+	if origin, ok := params.Origin.Get(); ok {
+		input.Origin = new(string(origin))
+	}
+	result, err := h.deploymentService.List(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := api.ListDeploymentsResponse{Deployments: make([]api.Deployment, len(result.Items))}
+	for i, entity := range result.Items {
+		resp.Deployments[i] = toAPIDeployment(entity, result.ReleasesByID[entity.ReleaseID])
+	}
+	if result.NextPageToken != "" {
+		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(result.NextPageToken))
+	}
+	return &resp, nil
 }
 
 func (h *Handler) ListPreviews(ctx context.Context, params api.ListPreviewsParams) (api.ListPreviewsRes, error) {
@@ -149,7 +174,7 @@ func deploymentErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 // toAPIDeploymentWritten converts a create result; every target of a written
 // preview deployment carries the expiry it set.
 func toAPIDeploymentWritten(result *service.CreateDeploymentOutput) api.Deployment {
-	resp := toAPIDeployment(result.Deployment)
+	resp := toAPIDeployment(result.Deployment, nil)
 	if result.PreviewExpiresAt != nil {
 		for i := range resp.Targets {
 			resp.Targets[i].ExpiresAt = api.NewOptDateTime(*result.PreviewExpiresAt)
@@ -158,8 +183,8 @@ func toAPIDeploymentWritten(result *service.CreateDeploymentOutput) api.Deployme
 	return resp
 }
 
-// toAPIDeployment converts a deployment.
-func toAPIDeployment(entity *domain.Deployment) api.Deployment {
+// toAPIDeployment converts a deployment; release is embedded when non-nil.
+func toAPIDeployment(entity *domain.Deployment, release *domain.Release) api.Deployment {
 	resp := api.Deployment{
 		ID:         api.DeploymentID(entity.ID),
 		ProjectID:  api.ProjectID(entity.ProjectID),
@@ -184,6 +209,9 @@ func toAPIDeployment(entity *domain.Deployment) api.Deployment {
 	}
 	if m := entity.Metadata; m.DeployedByType != nil {
 		resp.Metadata.DeployedByType = api.NewOptNilDeploymentMetadataDeployedByType(api.DeploymentMetadataDeployedByType(*m.DeployedByType))
+	}
+	if release != nil {
+		resp.Release = api.NewOptRelease(toAPIRelease(release))
 	}
 	return resp
 }

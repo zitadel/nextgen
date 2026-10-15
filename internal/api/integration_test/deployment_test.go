@@ -232,8 +232,75 @@ func TestPreviews(t *testing.T) {
 	})
 }
 
-// TestDeploymentsNotImplemented pins the reads, rollback and the frozen-
-// variables read (#1781) to 501 until they land.
+func TestDeploymentReads(t *testing.T) {
+	t.Parallel()
+
+	fixture := newDeploymentFixture(t)
+	project := api.ProjectID(fixture.project)
+	releaseID := fixture.release.ID
+
+	deployed := fixture.created(t, &api.CreateDeploymentRequest{
+		ReleaseID: api.NewOptReleaseID(releaseID),
+		Targets:   api.DeploymentTargetsRequest{previewOrigin},
+		Message:   api.NewOptString("add phone_number"),
+	})
+
+	list := func(t *testing.T, params api.ListDeploymentsParams) []api.Deployment {
+		t.Helper()
+		params.ProjectID = project
+		resp, err := fixture.client.ListDeployments(t.Context(), params)
+		require.NoError(t, err)
+		require.IsType(t, &api.ListDeploymentsResponse{}, resp, helpers.MustMarshal(t, resp))
+		return resp.(*api.ListDeploymentsResponse).Deployments
+	}
+
+	t.Run("get", func(t *testing.T) {
+		resp, err := fixture.client.GetDeploymentById(t.Context(), api.GetDeploymentByIdParams{
+			ProjectID: project, DeploymentID: deployed.ID,
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.Deployment{}, resp, helpers.MustMarshal(t, resp))
+		got := resp.(*api.Deployment)
+		assert.Equal(t, releaseID, got.ReleaseID)
+		assert.Equal(t, []string{previewOrigin}, origins(got.Targets))
+		assert.Equal(t, "add phone_number", got.Metadata.Message.Value)
+		assert.False(t, got.Release.Set)
+	})
+
+	t.Run("get an unknown id", func(t *testing.T) {
+		resp, err := fixture.client.GetDeploymentById(t.Context(), api.GetDeploymentByIdParams{
+			ProjectID: project, DeploymentID: "dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",
+		})
+		require.NoError(t, err)
+		assertAuthzError(t, resp, domain.ErrDeploymentNotFound().Code)
+	})
+
+	t.Run("list the history", func(t *testing.T) {
+		got := list(t, api.ListDeploymentsParams{})
+		require.Len(t, got, 1)
+		assert.Equal(t, deployed.ID, got[0].ID)
+	})
+
+	t.Run("list the live view of one origin", func(t *testing.T) {
+		got := list(t, api.ListDeploymentsParams{Origin: api.NewOptOrigin(previewOrigin), Live: api.NewOptBool(true)})
+		require.Len(t, got, 1)
+		assert.Equal(t, deployed.ID, got[0].ID)
+	})
+
+	t.Run("list the live view of an origin serving nothing", func(t *testing.T) {
+		assert.Empty(t, list(t, api.ListDeploymentsParams{Origin: api.NewOptOrigin(appOrigin), Live: api.NewOptBool(true)}))
+	})
+
+	t.Run("list with the release embedded", func(t *testing.T) {
+		got := list(t, api.ListDeploymentsParams{Expand: []api.DeploymentExpand{api.DeploymentExpandRelease}})
+		require.Len(t, got, 1)
+		require.True(t, got[0].Release.Set)
+		assert.Equal(t, releaseID, got[0].Release.Value.ID)
+	})
+}
+
+// TestDeploymentsNotImplemented pins rollback and the frozen-variables read
+// to 501 until they land (#1781 for the variables).
 func TestDeploymentsNotImplemented(t *testing.T) {
 	t.Parallel()
 
@@ -246,20 +313,6 @@ func TestDeploymentsNotImplemented(t *testing.T) {
 		assert.Equal(t, http.StatusNotImplemented, status)
 		assert.Equal(t, domain.ErrNotImplemented().Code, code)
 	}
-
-	t.Run("get", func(t *testing.T) {
-		resp, err := fixture.client.GetDeploymentById(t.Context(), api.GetDeploymentByIdParams{
-			ProjectID: project, DeploymentID: "dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",
-		})
-		require.NoError(t, err)
-		expectNotImplemented(t, resp)
-	})
-
-	t.Run("list", func(t *testing.T) {
-		resp, err := fixture.client.ListDeployments(t.Context(), api.ListDeploymentsParams{ProjectID: project})
-		require.NoError(t, err)
-		expectNotImplemented(t, resp)
-	})
 
 	t.Run("rollback", func(t *testing.T) {
 		resp, err := fixture.client.RollbackDeployment(t.Context(),

@@ -53,6 +53,8 @@ type ListDeploymentsInput struct {
 	ProjectID string
 	// Origin narrows the list to one origin's history.
 	Origin *string
+	// Live lists what each origin serves now instead of the history.
+	Live bool
 	// IncludeReleases embeds the release each deployment made live (ADR 059).
 	IncludeReleases bool
 	PageToken       string
@@ -274,10 +276,7 @@ func (s *DeploymentService) GetByIDs(ctx context.Context, projectID string, ids 
 }
 
 func (s *DeploymentService) List(ctx context.Context, input ListDeploymentsInput) (*ListDeploymentsOutput, error) {
-	opts := deployment.ListOptions(input.ProjectID, input.Origin, uint32(normalizeLimit(input.Limit)))
-	opts.Pagination.Cursor = []byte(input.PageToken)
-
-	result, err := s.v2Pool.Statements().ListDeployments(ctx, opts)
+	result, err := s.list(ctx, input)
 	if err != nil {
 		return nil, mapListError(err, "failed to list deployments")
 	}
@@ -294,6 +293,30 @@ func (s *DeploymentService) List(ctx context.Context, input ListDeploymentsInput
 		output.ReleasesByID = releases
 	}
 	return output, nil
+}
+
+func (s *DeploymentService) list(ctx context.Context, input ListDeploymentsInput) (*database.ListResult[*domain.Deployment], error) {
+	stmts := s.v2Pool.Statements()
+	limit := uint32(normalizeLimit(input.Limit))
+	if !input.Live {
+		opts := deployment.ListOptions(input.ProjectID, input.Origin, limit)
+		opts.Pagination.Cursor = []byte(input.PageToken)
+		return stmts.ListDeployments(ctx, opts)
+	}
+	if input.Origin == nil {
+		opts := deployment.LiveListOptions(input.ProjectID, nil, limit)
+		opts.Pagination.Cursor = []byte(input.PageToken)
+		return stmts.ListLiveDeployments(ctx, time.Now(), opts)
+	}
+	// One origin serves at most one deployment.
+	live, err := stmts.GetLiveDeployment(ctx, input.ProjectID, *input.Origin, time.Now())
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+		return &database.ListResult[*domain.Deployment]{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{live}}, nil
 }
 
 // releasesFor hydrates the releases a page of deployments points at, batched:

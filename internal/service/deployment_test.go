@@ -119,6 +119,38 @@ func TestDeploymentServiceCreateInsertsAgainstWhatItRead(t *testing.T) {
 	assert.True(t, result.Created)
 }
 
+func TestDeploymentServiceListLive(t *testing.T) {
+	svc, statements := newMockedDeploymentService(t)
+	serving := servingDeployment("rel_1")
+	statements.EXPECT().ListLiveDeployments(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{serving}}, nil)
+
+	result, err := svc.List(t.Context(), service.ListDeploymentsInput{ProjectID: "proj_1", Live: true})
+	require.NoError(t, err)
+	assert.Equal(t, []*domain.Deployment{serving}, result.Items)
+}
+
+func TestDeploymentServiceListLiveOrigin(t *testing.T) {
+	svc, statements := newMockedDeploymentService(t)
+	serving := servingDeployment("rel_1")
+	statements.EXPECT().GetLiveDeployment(gomock.Any(), "proj_1", appOrigin, gomock.Any()).Return(serving, nil)
+
+	result, err := svc.List(t.Context(), service.ListDeploymentsInput{ProjectID: "proj_1", Live: true, Origin: new(appOrigin)})
+	require.NoError(t, err)
+	assert.Equal(t, []*domain.Deployment{serving}, result.Items)
+}
+
+// An origin that serves nothing lists empty, not an error.
+func TestDeploymentServiceListLiveOriginServingNothing(t *testing.T) {
+	svc, statements := newMockedDeploymentService(t)
+	statements.EXPECT().GetLiveDeployment(gomock.Any(), "proj_1", appOrigin, gomock.Any()).
+		Return(nil, database.NewNoRowFoundError(nil))
+
+	result, err := svc.List(t.Context(), service.ListDeploymentsInput{ProjectID: "proj_1", Live: true, Origin: new(appOrigin)})
+	require.NoError(t, err)
+	assert.Empty(t, result.Items)
+}
+
 // Losing the optimistic lock: an unguarded deploy retries on what the winner
 // left, a guarded one answers a conflict.
 func TestDeploymentServiceCreateRetriesALostLock(t *testing.T) {
