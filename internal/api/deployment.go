@@ -56,13 +56,33 @@ func (h *Handler) CreateDeployment(ctx context.Context, req *api.CreateDeploymen
 	return (*api.CreateDeploymentOK)(&resp), nil
 }
 
-// RollbackDeployment answers 501 until rollback lands. The access check stays
-// in front, so a caller without the permission learns that first.
-func (h *Handler) RollbackDeployment(ctx context.Context, _ api.OptRollbackDeploymentRequest, params api.RollbackDeploymentParams) (api.RollbackDeploymentRes, error) {
+func (h *Handler) RollbackDeployment(ctx context.Context, req api.OptRollbackDeploymentRequest, params api.RollbackDeploymentParams) (api.RollbackDeploymentRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), deploymentAccess, opWrite); err != nil {
 		return nil, err
 	}
-	return nil, domain.ErrNotImplemented()
+
+	input := service.RollbackDeploymentInput{
+		ProjectID:    string(params.ProjectID),
+		DeploymentID: string(params.DeploymentID),
+	}
+	if body, ok := req.Get(); ok {
+		if message, ok := body.Message.Get(); ok {
+			input.Message = &message
+		}
+		if expected, ok := body.ExpectedDeploymentID.Get(); ok {
+			input.ExpectedDeploymentID = new(string(expected))
+		}
+	}
+
+	result, err := h.deploymentService.Rollback(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+	resp := toAPIDeploymentWritten(result)
+	if result.Created {
+		return (*api.RollbackDeploymentCreated)(&resp), nil
+	}
+	return (*api.RollbackDeploymentOK)(&resp), nil
 }
 
 func (h *Handler) GetDeploymentById(ctx context.Context, params api.GetDeploymentByIdParams) (api.GetDeploymentByIdRes, error) {

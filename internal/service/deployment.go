@@ -49,6 +49,13 @@ type DeployInput struct {
 	ExpectedDeploymentID *string
 }
 
+type RollbackDeploymentInput struct {
+	ProjectID            string
+	DeploymentID         string
+	Message              *string
+	ExpectedDeploymentID *string
+}
+
 type ListDeploymentsInput struct {
 	ProjectID string
 	// Origin narrows the list to one origin's history.
@@ -149,6 +156,35 @@ func (s *DeploymentService) Deploy(ctx context.Context, input DeployInput) (*Cre
 		Message:              input.Message,
 		ExpectedDeploymentID: input.ExpectedDeploymentID,
 		PreviewTTL:           ttl,
+	})
+}
+
+// Rollback re-deploys the release of a primary deployment to its targets,
+// each of which must still be a primary origin of the project.
+func (s *DeploymentService) Rollback(ctx context.Context, input RollbackDeploymentInput) (*CreateDeploymentOutput, error) {
+	previous, err := s.Get(ctx, input.ProjectID, input.DeploymentID)
+	if err != nil {
+		return nil, err
+	}
+	if previous.OriginKind != domain.DeploymentOriginKindPrimary {
+		return nil, domain.ErrDeploymentInvalid("only a deployment to primary origins rolls back", nil)
+	}
+	origins, err := s.projectOrigins(ctx, input.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	if err := domain.CheckPrimaryOrigins(origins, previous.Origins()); err != nil {
+		return nil, err
+	}
+	return s.Create(ctx, CreateDeploymentInput{
+		ProjectID:            input.ProjectID,
+		ReleaseID:            previous.ReleaseID,
+		OriginKind:           domain.DeploymentOriginKindPrimary,
+		Origins:              previous.Origins(),
+		Reason:               domain.DeploymentReasonRollback,
+		Message:              input.Message,
+		RollbackTo:           &previous.ID,
+		ExpectedDeploymentID: input.ExpectedDeploymentID,
 	})
 }
 

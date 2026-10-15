@@ -232,6 +232,62 @@ func TestPreviews(t *testing.T) {
 	})
 }
 
+func TestRollbackDeployment(t *testing.T) {
+	t.Parallel()
+
+	fixture := newDeploymentFixture(t)
+	project := api.ProjectID(fixture.project)
+
+	good := fixture.created(t, &api.CreateDeploymentRequest{
+		ReleaseID: api.NewOptReleaseID(fixture.release.ID),
+		Targets:   api.DeploymentTargetsRequest{"primary"},
+	})
+	fixture.created(t, &api.CreateDeploymentRequest{
+		ReleaseID: api.NewOptReleaseID(fixture.otherRelease(t)),
+		Targets:   api.DeploymentTargetsRequest{"primary"},
+	})
+
+	rollback := func(t *testing.T, id api.DeploymentID) api.RollbackDeploymentRes {
+		t.Helper()
+		resp, err := fixture.client.RollbackDeployment(t.Context(),
+			api.NewOptRollbackDeploymentRequest(api.RollbackDeploymentRequest{
+				Message: api.NewOptString("phone_number broke sign-up"),
+			}),
+			api.RollbackDeploymentParams{ProjectID: project, DeploymentID: id})
+		require.NoError(t, err)
+		return resp
+	}
+
+	t.Run("re-deploys the release to its targets", func(t *testing.T) {
+		resp := rollback(t, good.ID)
+		require.IsType(t, &api.RollbackDeploymentCreated{}, resp, helpers.MustMarshal(t, resp))
+		got := resp.(*api.RollbackDeploymentCreated)
+		assert.Equal(t, fixture.release.ID, got.ReleaseID)
+		assert.Equal(t, origins(good.Targets), origins(got.Targets))
+		assert.Equal(t, api.DeploymentReasonRollback, got.Metadata.Reason)
+		assert.Equal(t, good.ID, got.Metadata.RollbackTo.Value)
+	})
+
+	t.Run("again is a no-op", func(t *testing.T) {
+		resp := rollback(t, good.ID)
+		require.IsType(t, &api.RollbackDeploymentOK{}, resp, helpers.MustMarshal(t, resp))
+	})
+
+	t.Run("a preview deployment", func(t *testing.T) {
+		preview := fixture.created(t, &api.CreateDeploymentRequest{
+			ReleaseID: api.NewOptReleaseID(fixture.release.ID),
+			Targets:   api.DeploymentTargetsRequest{previewOrigin},
+		})
+		status, code := fixture.postRaw(t, "/deployments/"+string(preview.ID)+"/rollback", `{}`)
+		assert.Equal(t, http.StatusBadRequest, status)
+		assert.Equal(t, domain.ErrDeploymentInvalid(nil, nil).Code, code)
+	})
+
+	t.Run("an unknown deployment", func(t *testing.T) {
+		assertAuthzError(t, rollback(t, "dep_01KX4SB9C8E1F0N9WD3P2E4YM5"), domain.ErrDeploymentNotFound().Code)
+	})
+}
+
 func TestDeploymentReads(t *testing.T) {
 	t.Parallel()
 
@@ -299,39 +355,21 @@ func TestDeploymentReads(t *testing.T) {
 	})
 }
 
-// TestDeploymentsNotImplemented pins rollback and the frozen-variables read
-// to 501 until they land (#1781 for the variables).
-func TestDeploymentsNotImplemented(t *testing.T) {
+// TestDeploymentVariablesNotImplemented pins the frozen-variables read to 501
+// until the freeze lands (#1781).
+func TestDeploymentVariablesNotImplemented(t *testing.T) {
 	t.Parallel()
 
 	fixture := newReleaseFixture(t)
-	project := api.ProjectID(fixture.project)
-	expectNotImplemented := func(t *testing.T, resp any) {
-		t.Helper()
-		status, code, _, ok := errorResponseParts(t, resp)
-		require.True(t, ok, helpers.MustMarshal(t, resp))
-		assert.Equal(t, http.StatusNotImplemented, status)
-		assert.Equal(t, domain.ErrNotImplemented().Code, code)
-	}
-
-	t.Run("rollback", func(t *testing.T) {
-		resp, err := fixture.client.RollbackDeployment(t.Context(),
-			api.NewOptRollbackDeploymentRequest(api.RollbackDeploymentRequest{
-				Message: api.NewOptString("phone_number broke sign-up"),
-			}),
-			api.RollbackDeploymentParams{ProjectID: project, DeploymentID: "dep_01KX4SB9C8E1F0N9WD3P2E4YM5"})
-		require.NoError(t, err)
-		expectNotImplemented(t, resp)
+	resp, err := fixture.client.GetDeploymentVariables(t.Context(), api.GetDeploymentVariablesParams{
+		ProjectID:    api.ProjectID(fixture.project),
+		DeploymentID: "dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",
 	})
-
-	t.Run("variables", func(t *testing.T) {
-		resp, err := fixture.client.GetDeploymentVariables(t.Context(), api.GetDeploymentVariablesParams{
-			ProjectID:    project,
-			DeploymentID: "dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",
-		})
-		require.NoError(t, err)
-		expectNotImplemented(t, resp)
-	})
+	require.NoError(t, err)
+	status, code, _, ok := errorResponseParts(t, resp)
+	require.True(t, ok, helpers.MustMarshal(t, resp))
+	assert.Equal(t, http.StatusNotImplemented, status)
+	assert.Equal(t, domain.ErrNotImplemented().Code, code)
 }
 
 // TestDeploymentsCheckAccess pins that a caller without access to the project
