@@ -4,12 +4,12 @@
 > **Area:** 3 of 4 (see [`README.md`](README.md))
 
 This document defines how a user signs up and signs in using external identity
-providers like Google or GitHub, detailing the OAuth2/OIDC redirect ceremony,
+providers like Google or a company's own OIDC provider, detailing the OIDC redirect ceremony,
 identity resolution, and all available recovery paths.
 
 ## The Ceremony
 
-The end-to-end OAuth2/OIDC redirect ceremony progresses through three main
+The end-to-end OIDC redirect ceremony progresses through three main
 phases:
 
 ```
@@ -19,7 +19,8 @@ submit { action: "sso", sso_provider_id: "google", return_target: "<page hosting
   engine: mint state record, build authorize URL (PKCE), emit sso-redirect step
 browser → provider → user authenticates
 provider → GET {issuer}/__nextgen/idp/{slug}/callback?code=…&state=…
-  engine: validate state (single-use), check the path slug against it, exchange code, map claims, run strategy
+  engine: validate state (single-use), check the path slug and issuer against
+    it, exchange code, map claims
   engine: resolve identity → fire outcome on the originating step
 frontend: GET /flow/{id} → next step per the authored transitions
 ```
@@ -199,23 +200,16 @@ ends the attempt:
    For OIDC, a `userinfo` response whose `sub` does not exactly match the
    id_token `sub` fails the attempt (OIDC Core 5.3.2); without that check, a
    provider mixup could attach another subject's claims.
-   Any configured `supplementary_fetch` always runs and overwrites same-named
-   claims from either source (see
-   [area 1](1-resource-model.md#vendor-knowledge-is-data)).
-6. **Verification Evaluation:** Applies `verified_claims` rules to determine
+5. **Verification Evaluation:** Applies `verified_claims` rules to determine
    claim trust:
     - **Claim Lookup:** Strictly boolean `true` or string `"true"` evaluates as
       verified.
       Any other value, including a missing claim, evaluates as unverified.
     - **Literal `true`:** Inherently trusts the provider.
-    - **`"$supplementary_fetch"`:** Takes the strategy execution result for this
-      attempt, resolved through `claim_mapping` to the claim the strategy
-      reports, matching the server's
-      [Invalid Strategy Pointer](1-resource-model.md#validator-rules) rule.
-7. **Identity Resolution:** Looks up `(connection, external_subject)` where the
+6. **Identity Resolution:** Looks up `(connection, external_subject)` where the
    stored subject is strictly a string:
     - **Numeric Coercion:** a provider may send the subject as a JSON number
-      (GitHub's `id`).
+      (a `subject_claim` naming a numeric claim, or a non-conformant `sub`).
       It is converted to its exact decimal string, so `12345` and `"12345"`
       resolve to one identity.
       The decoder reads the number as raw text (`json.Number`), never as
@@ -245,7 +239,7 @@ ends the attempt:
 ### Server-Side Fetch Policy
 
 Every URL the engine fetches for a connection is tenant-authored (discovery,
-`jwks_uri`, token, userinfo, strategy fetch); on shared infrastructure that is a
+`jwks_uri`, token, userinfo); on shared infrastructure that is a
 server-side request forgery surface.
 Webhooks and actions need the same guard, so egress policy is its own epic
 ([#928](https://github.com/zitadel/nextgen/issues/928)).
@@ -257,8 +251,7 @@ list, not a "only listed hosts" lockdown.
 This area consumes the policy and carries two constraints into it:
 
 - **Blocking for 851.**
-  The callback processor fetches discovery, JWKS, token, userinfo, and the
-  strategy URL, so SSO cannot ship to shared infrastructure without at least the
+  The callback processor fetches discovery, JWKS, token, and userinfo, so SSO cannot ship to shared infrastructure without at least the
   baseline deny behaviour: resolve the host, reject private, loopback,
   link-local, and metadata ranges (RFC 1918, `127.0.0.0/8`, `169.254.169.254`,
   and their IPv6 equivalents), connect to the address that passed the check, and
@@ -345,8 +338,7 @@ property in the schema.
     ([`capabilities.md`, Missing](../flowengine/capabilities.md#missing)), so
     until email verification exists the gate only removes the provider's
     shortcut past collection.
-  * The catalog defaults pass (`email_verified` for Google,
-    `$supplementary_fetch` for GitHub); a Google account with
+  * The catalog default passes (`email_verified` for Google); a Google account with
     `email_verified: false` collects instead.
   * Without this gate an attacker's unverified claim to a victim's email
     creates the account first, and the victim meets the conflict step at their
@@ -406,7 +398,7 @@ property in the schema.
 The schema author determines which fields the collection step renders, while the
 engine populates their values at runtime.
 This separation is necessary because external providers cannot guarantee claim
-availability for every user (e.g., GitHub's `name` may be `null`, or an `email`
+availability for every user (e.g., a provider's `name` may be `null`, or an `email`
 may arrive missing) and a single collection step may handle incoming users from
 multiple identity providers.
 

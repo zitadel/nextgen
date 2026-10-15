@@ -269,9 +269,12 @@ describe("identity provider detail", () => {
     serve({
       idps: [
         connection("idp_google", "google", "Google", {
-          oidc: undefined,
-          protocol: "oauth2",
-          oauth2: { client_id: "1234.apps.example.com", client_secret: "${{ SECRET }}" },
+          oidc: {
+            issuer: "https://accounts.example.com",
+            client_id: "1234.apps.example.com",
+            client_secret: "${{ SECRET }}",
+            scopes: ["openid"],
+          },
         }),
       ],
     });

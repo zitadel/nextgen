@@ -197,9 +197,6 @@ func (c *FlowSSOCallback) exchange(ctx context.Context, projectID, code string, 
 		RedirectURI:  pending.RedirectURI,
 		RevisionID:   pending.ConnectionRevisionID,
 		ClientSecret: secret,
-		// No strategy registry exists yet; a connection whose
-		// verified_claims need one fails the ceremony (requireStrategy).
-		SupplementaryFetch: nil,
 	})
 }
 

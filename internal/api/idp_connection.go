@@ -2,12 +2,17 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
+
+// idpEndpointsPartialCode is read once: building a domain.Error captures its
+// origin.
+var idpEndpointsPartialCode = domain.ErrIDPEndpointsPartial(nil).Code
 
 func (h *Handler) CreateIdp(ctx context.Context, req *api.CreateIdpRequest, params api.CreateIdpParams) (api.CreateIdpRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), idpAccess, opWrite); err != nil {
@@ -20,6 +25,12 @@ func (h *Handler) CreateIdp(ctx context.Context, req *api.CreateIdpRequest, para
 		return nil, domain.ErrInternal(err).WithMessage("failed to encode identity provider connection")
 	}
 	result, err := h.idpConnectionService.CreateOrRevise(ctx, string(params.ProjectID), document)
+	if de, ok := errors.AsType[domain.Error](err); ok && de.Code == idpEndpointsPartialCode {
+		// The engine refuses this at sign-in too, where it is the server's
+		// fault. Only here is it the author's, so only here is it a 400.
+		refused := api.CreateIdpBadRequest(domainErrorDetails(de))
+		return &refused, nil
+	}
 	if err != nil {
 		return nil, err
 	}
