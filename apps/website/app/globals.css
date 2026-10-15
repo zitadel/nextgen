@@ -9,9 +9,12 @@
   --color-text-primary: #f4f4f6;
   --color-text-secondary: #bfbfcf;
   --color-text-muted: #82829c;
+  --color-text-accent: #bba5e4;
   --color-border-primary: #252528;
+  --color-border-secondary: #484a57;
   --color-surface-black-secondary: #252528;
   --color-accent-strong: #bd2514;
+  --color-success: #33a779;
 
   /* layout.tsx sets --font-arimo, --font-apk-futural and --font-azeret-mono
      on <html>. */
@@ -20,14 +23,14 @@
   --font-mono: var(--font-azeret-mono), ui-monospace, monospace;
 }
 
-/* How the stage and the commands under it move in. */
+/* How the stage and the hero's text under it move in. */
 :root {
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* The centerpiece (page.tsx): the website's hero animation, its own light
-   spilling around it, leaning toward the pointer (stage.tsx sets --tilt-x and
-   --tilt-y, from -0.5 to 0.5). */
+/* The centerpiece of the hero (page.tsx): the website's hero animation, its
+   own light spilling around it, leaning toward the pointer (stage.tsx sets
+   --tilt-x and --tilt-y, from -0.5 to 0.5). */
 @layer components {
   .stage {
     --tilt-x: 0;
@@ -35,22 +38,11 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    /* As wide as the column, 44rem, and the height beside the logo, the
-       caption and the commands allow, but never so small that the animation
-       is lost: a phone held sideways scrolls instead. */
-    width: min(100%, 44rem, max(18rem, calc((100dvh - 19rem) * 550 / 448)));
-  }
-
-  /* Over the animation's dark top, a little nearer than it, like the caption. */
-  .stage-logo {
-    position: relative;
-    z-index: 1;
-    height: 1.75rem;
-    width: auto;
-    /* A share of the stage's width, so of the frame's height too. */
-    margin-bottom: -3%;
-    translate: calc(var(--tilt-x) * 1rem) calc(var(--tilt-y) * 0.75rem);
-    transition: translate 900ms var(--ease);
+    /* As wide as the column, 36rem, and the height beside the header, the
+       caption, the lead, the commands and the buttons allow, so the hero
+       fits a laptop's screen, but never so small that the animation is lost:
+       a phone scrolls instead. */
+    width: min(100%, 36rem, max(15rem, calc((100dvh - 34rem) * 550 / 448)));
   }
 
   .stage-frame {
@@ -89,15 +81,18 @@
 
   /* Tucked into the animation's faded bottom, lit by it from below. */
   .stage-caption {
+    position: relative;
+    /* As wide as its lines, not the stage: each sentence on a line of its
+       own wherever the screen has room, centred under the animation. */
+    width: max-content;
+    max-width: calc(100vw - 3rem);
     margin-top: -2.5rem;
     font-family: var(--font-heading);
-    font-size: clamp(2.75rem, 9vw, 5rem);
-    line-height: 1.1;
+    font-size: clamp(2.25rem, 6.5vw, 4.25rem);
+    line-height: 1.05;
     letter-spacing: -0.025em;
     text-align: center;
-    /* One line even while its letters gather (caption-in), so nothing below
-       it moves. */
-    white-space: nowrap;
+    text-wrap: balance;
     background: linear-gradient(
       180deg,
       var(--color-foreground) 35%,
@@ -115,17 +110,19 @@
     }
 
     .stage-caption {
-      animation: caption-in 2s var(--ease) 0.2s both;
+      animation: caption-in 1.6s var(--ease) 0.2s both;
     }
 
-    /* The commands under the caption (page.tsx), once the words are in. */
+    /* The lead, the commands and the buttons under the caption (page.tsx),
+       once the words are in. */
     .teaser {
-      animation: teaser-in 1.2s var(--ease) 1s both;
+      animation: teaser-in 1.2s var(--ease) 0.7s both;
     }
   }
 
-  /* The logo (logo.tsx) moves as on the website: while the pointer is on it,
-     back at rest when it leaves, and on its own where nothing hovers. */
+  /* The logo (logo.tsx) moves as on the website while the pointer is on it,
+     and is back at rest when it leaves. In the header and the footer it never
+     moves on its own. */
   .logo-icon {
     transform-box: view-box;
     transform-origin: 63px 63px;
@@ -139,20 +136,12 @@
     .logo:hover .logo-letter {
       animation: logo-roll 5s infinite both;
     }
-
-    @media (hover: none) {
-      .logo .logo-icon {
-        animation: logo-spin 5s infinite;
-      }
-
-      .logo .logo-letter {
-        animation: logo-roll 5s infinite both;
-      }
-    }
   }
 }
 
-/* The doors appear, then the words gather. */
+/* The doors appear, then the words come into focus. The caption wraps, so it
+   does not gather its letters as a single line could: a line break moving
+   while they gather would shift everything below it. */
 @keyframes stage-in {
   from {
     opacity: 0;
@@ -163,7 +152,7 @@
 @keyframes caption-in {
   from {
     opacity: 0;
-    letter-spacing: 0.4em;
+    filter: blur(0.5rem);
   }
 }
 

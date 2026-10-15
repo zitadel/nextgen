@@ -1,7 +1,7 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "extends": ["//"],
-  // The coming-soon page at the hosted cloud's root (Next.js). Mirrors
+  // The hosted cloud's front page at / (Next.js). Mirrors
   // apps/website/moon.yml; it has no tests yet.
   "tasks": {
     // Typecheck waits for the build, as in moon.yml: `next typegen` and
@@ -12,11 +12,17 @@
     "typecheck": {
       "dependsOn": ["build"]
     },
+    // The brand playground (app/brand-preview.tsx) imports the atoms of
+    // @zitadel/components, which Next resolves to the package's dist/.
     "build": {
+      "dependsOn": ["@zitadel/components#build"],
       "outputs": [".next/**", "!.next/cache/**"]
     },
     "start": {
       "dependsOn": ["build"]
+    },
+    "dev": {
+      "dependsOn": ["@zitadel/components#build"]
     }
   }
 }

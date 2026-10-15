@@ -67,6 +67,12 @@ So the template's root routes live under `/docs` here:
 - The favicons are the one exception: `app/layout.tsx` links the cloud's, which
   the website serves at `/favicons/`
   ([`apps/website/AGENTS.md`](../website/AGENTS.md#the-logo-and-the-favicons)).
+- The sidebar links the host's other apps above the pages, the website at `/`
+  and the storybook at `/storybook/` (`lib/layout.shared.tsx`). Each is a
+  deployment of its own, so each link is a plain `<a>`: a custom item, styled
+  as the layout's own items. A link item would go through `next/link`, which
+  prefetches from this app and routes there in it, or, marked external, opens
+  a new tab.
 
 ## Content
 

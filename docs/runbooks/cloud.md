@@ -28,7 +28,7 @@ One Vercel deployment, five [services](https://vercel.com/docs/services):
 | `console` | Vite; `turbo run build` with `CONSOLE_BASE_PATH=/console/` and `CONSOLE_VERCEL_INSIGHTS=1`, so it reports Vercel Web Analytics and Speed Insights; the service serves the build where it lands, `internal/staticui/console/dist` | `/console/*` (bare `/console` redirects to the slash form; `/ui/console` and `/ui/console/*` redirect here with a 307) |
 | `storybook` | Storybook; `turbo run build` | `/storybook/*` (bare `/storybook` redirects to the slash form) |
 | `docs` | Next.js; `apps/docs`' own `pnpm run build`, without a task runner: moon cannot archive the symlinks Vercel's Next.js adapter writes, and turbo could never reuse a build, whose cache key holds the deployment's ID under Skew Protection | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
-| `website` | Next.js; `apps/website`'s own `pnpm run build`, without a task runner, as the docs' | `/`, the coming-soon page, and its assets at `/_next/*`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link |
+| `website` | Next.js; `turbo run build --filter=@zitadel/components`, for the atoms its brand playground renders, then `apps/website`'s own `pnpm run build`, without a task runner, as the docs' | `/`, the front page, and its assets at `/_next/*`; the host's `/llms.txt`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link |
 
 The console lives on the same origin, at `/console/` rather than a
 self-hosted server's `/ui/console/`. The server's own console is switched
