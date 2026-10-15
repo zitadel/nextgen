@@ -35236,6 +35236,237 @@ func (s *ListSchemasRevisions) UnmarshalText(data []byte) error {
 	}
 }
 
+type ListUserIdentityLinksBadRequest ErrorDetails
+
+func (*ListUserIdentityLinksBadRequest) listUserIdentityLinksRes() {}
+
+// ListUserIdentityLinksErrorResponse represents sum type.
+type ListUserIdentityLinksErrorResponse struct {
+	Type                 ListUserIdentityLinksErrorResponseType // switch on this field
+	AuthUnauthorized     AuthUnauthorized
+	Internal             Internal
+	ReqInvalid           ReqInvalid
+	UserNotFound         UserNotFound
+	UserPermissionDenied UserPermissionDenied
+}
+
+// ListUserIdentityLinksErrorResponseType is oneOf type of ListUserIdentityLinksErrorResponse.
+type ListUserIdentityLinksErrorResponseType string
+
+// Possible values for ListUserIdentityLinksErrorResponseType.
+const (
+	AuthUnauthorizedListUserIdentityLinksErrorResponse     ListUserIdentityLinksErrorResponseType = "auth.unauthorized"
+	InternalListUserIdentityLinksErrorResponse             ListUserIdentityLinksErrorResponseType = "internal"
+	ReqInvalidListUserIdentityLinksErrorResponse           ListUserIdentityLinksErrorResponseType = "req.invalid"
+	UserNotFoundListUserIdentityLinksErrorResponse         ListUserIdentityLinksErrorResponseType = "user.not_found"
+	UserPermissionDeniedListUserIdentityLinksErrorResponse ListUserIdentityLinksErrorResponseType = "user.permission_denied"
+)
+
+// IsAuthUnauthorized reports whether ListUserIdentityLinksErrorResponse is AuthUnauthorized.
+func (s ListUserIdentityLinksErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedListUserIdentityLinksErrorResponse
+}
+
+// IsInternal reports whether ListUserIdentityLinksErrorResponse is Internal.
+func (s ListUserIdentityLinksErrorResponse) IsInternal() bool {
+	return s.Type == InternalListUserIdentityLinksErrorResponse
+}
+
+// IsReqInvalid reports whether ListUserIdentityLinksErrorResponse is ReqInvalid.
+func (s ListUserIdentityLinksErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListUserIdentityLinksErrorResponse
+}
+
+// IsUserNotFound reports whether ListUserIdentityLinksErrorResponse is UserNotFound.
+func (s ListUserIdentityLinksErrorResponse) IsUserNotFound() bool {
+	return s.Type == UserNotFoundListUserIdentityLinksErrorResponse
+}
+
+// IsUserPermissionDenied reports whether ListUserIdentityLinksErrorResponse is UserPermissionDenied.
+func (s ListUserIdentityLinksErrorResponse) IsUserPermissionDenied() bool {
+	return s.Type == UserPermissionDeniedListUserIdentityLinksErrorResponse
+}
+
+// SetAuthUnauthorized sets ListUserIdentityLinksErrorResponse to AuthUnauthorized.
+func (s *ListUserIdentityLinksErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedListUserIdentityLinksErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListUserIdentityLinksErrorResponse is AuthUnauthorized.
+func (s ListUserIdentityLinksErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedListUserIdentityLinksErrorResponse returns new ListUserIdentityLinksErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedListUserIdentityLinksErrorResponse(v AuthUnauthorized) ListUserIdentityLinksErrorResponse {
+	var s ListUserIdentityLinksErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets ListUserIdentityLinksErrorResponse to Internal.
+func (s *ListUserIdentityLinksErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListUserIdentityLinksErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListUserIdentityLinksErrorResponse is Internal.
+func (s ListUserIdentityLinksErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListUserIdentityLinksErrorResponse returns new ListUserIdentityLinksErrorResponse from Internal.
+func NewInternalListUserIdentityLinksErrorResponse(v Internal) ListUserIdentityLinksErrorResponse {
+	var s ListUserIdentityLinksErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets ListUserIdentityLinksErrorResponse to ReqInvalid.
+func (s *ListUserIdentityLinksErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListUserIdentityLinksErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListUserIdentityLinksErrorResponse is ReqInvalid.
+func (s ListUserIdentityLinksErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListUserIdentityLinksErrorResponse returns new ListUserIdentityLinksErrorResponse from ReqInvalid.
+func NewReqInvalidListUserIdentityLinksErrorResponse(v ReqInvalid) ListUserIdentityLinksErrorResponse {
+	var s ListUserIdentityLinksErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUserNotFound sets ListUserIdentityLinksErrorResponse to UserNotFound.
+func (s *ListUserIdentityLinksErrorResponse) SetUserNotFound(v UserNotFound) {
+	s.Type = UserNotFoundListUserIdentityLinksErrorResponse
+	s.UserNotFound = v
+}
+
+// GetUserNotFound returns UserNotFound and true boolean if ListUserIdentityLinksErrorResponse is UserNotFound.
+func (s ListUserIdentityLinksErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
+	if !s.IsUserNotFound() {
+		return v, false
+	}
+	return s.UserNotFound, true
+}
+
+// NewUserNotFoundListUserIdentityLinksErrorResponse returns new ListUserIdentityLinksErrorResponse from UserNotFound.
+func NewUserNotFoundListUserIdentityLinksErrorResponse(v UserNotFound) ListUserIdentityLinksErrorResponse {
+	var s ListUserIdentityLinksErrorResponse
+	s.SetUserNotFound(v)
+	return s
+}
+
+// SetUserPermissionDenied sets ListUserIdentityLinksErrorResponse to UserPermissionDenied.
+func (s *ListUserIdentityLinksErrorResponse) SetUserPermissionDenied(v UserPermissionDenied) {
+	s.Type = UserPermissionDeniedListUserIdentityLinksErrorResponse
+	s.UserPermissionDenied = v
+}
+
+// GetUserPermissionDenied returns UserPermissionDenied and true boolean if ListUserIdentityLinksErrorResponse is UserPermissionDenied.
+func (s ListUserIdentityLinksErrorResponse) GetUserPermissionDenied() (v UserPermissionDenied, ok bool) {
+	if !s.IsUserPermissionDenied() {
+		return v, false
+	}
+	return s.UserPermissionDenied, true
+}
+
+// NewUserPermissionDeniedListUserIdentityLinksErrorResponse returns new ListUserIdentityLinksErrorResponse from UserPermissionDenied.
+func NewUserPermissionDeniedListUserIdentityLinksErrorResponse(v UserPermissionDenied) ListUserIdentityLinksErrorResponse {
+	var s ListUserIdentityLinksErrorResponse
+	s.SetUserPermissionDenied(v)
+	return s
+}
+
+// ListUserIdentityLinksErrorResponseStatusCode wraps ListUserIdentityLinksErrorResponse with StatusCode.
+type ListUserIdentityLinksErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListUserIdentityLinksErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListUserIdentityLinksErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListUserIdentityLinksErrorResponseStatusCode) GetResponse() ListUserIdentityLinksErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListUserIdentityLinksErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListUserIdentityLinksErrorResponseStatusCode) SetResponse(val ListUserIdentityLinksErrorResponse) {
+	s.Response = val
+}
+
+func (*ListUserIdentityLinksErrorResponseStatusCode) listUserIdentityLinksRes() {}
+
+type ListUserIdentityLinksForbidden ErrorDetails
+
+func (*ListUserIdentityLinksForbidden) listUserIdentityLinksRes() {}
+
+type ListUserIdentityLinksInternalServerError ErrorDetails
+
+func (*ListUserIdentityLinksInternalServerError) listUserIdentityLinksRes() {}
+
+type ListUserIdentityLinksNotFound ErrorDetails
+
+func (*ListUserIdentityLinksNotFound) listUserIdentityLinksRes() {}
+
+// Response containing the provider accounts linked to the user.
+// Ref: #
+type ListUserIdentityLinksResponse struct {
+	IdentityLinks []UserIdentityLink `json:"identity_links"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetIdentityLinks returns the value of IdentityLinks.
+func (s *ListUserIdentityLinksResponse) GetIdentityLinks() []UserIdentityLink {
+	return s.IdentityLinks
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListUserIdentityLinksResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetIdentityLinks sets the value of IdentityLinks.
+func (s *ListUserIdentityLinksResponse) SetIdentityLinks(val []UserIdentityLink) {
+	s.IdentityLinks = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListUserIdentityLinksResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*ListUserIdentityLinksResponse) listUserIdentityLinksRes() {}
+
+type ListUserIdentityLinksUnauthorized ErrorDetails
+
+func (*ListUserIdentityLinksUnauthorized) listUserIdentityLinksRes() {}
+
 type ListUserPasskeysBadRequest ErrorDetails
 
 func (*ListUserPasskeysBadRequest) listUserPasskeysRes() {}
@@ -70667,6 +70898,48 @@ func (s *UserFilterField) UnmarshalText(data []byte) error {
 }
 
 type UserID string
+
+// One provider account linked to the user.
+// Ref: #
+type UserIdentityLink struct {
+	// The unique identifier of the link.
+	ID string `json:"id"`
+	// The IdP connection the account signs in through, by its id rather than a
+	// revision id; `GET /idps/{id}` resolves it.
+	ConnectionID string `json:"connection_id"`
+	// When the account was linked to the user.
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// GetID returns the value of ID.
+func (s *UserIdentityLink) GetID() string {
+	return s.ID
+}
+
+// GetConnectionID returns the value of ConnectionID.
+func (s *UserIdentityLink) GetConnectionID() string {
+	return s.ConnectionID
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *UserIdentityLink) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// SetID sets the value of ID.
+func (s *UserIdentityLink) SetID(val string) {
+	s.ID = val
+}
+
+// SetConnectionID sets the value of ConnectionID.
+func (s *UserIdentityLink) SetConnectionID(val string) {
+	s.ConnectionID = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *UserIdentityLink) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
 
 // Merged schema.
 // Ref: #

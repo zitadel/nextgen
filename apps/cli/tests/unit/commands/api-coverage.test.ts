@@ -116,6 +116,7 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   setUserPassword: "not yet exposed — follow-up, needs a credential-safe input route (ADR 064 §12)",
   listUserTeams: "not yet exposed — follow-up, a user sub-resource listing",
   listUserPasskeys: "not yet exposed — follow-up, a user sub-resource listing",
+  listUserIdentityLinks: "not yet exposed — follow-up, a user sub-resource listing",
   addOrigin: "not yet exposed — `zitadel origin add` lands with the origins CLI surface (#1578)",
   removeOrigin:
     "not yet exposed — `zitadel origin remove` lands with the origins CLI surface (#1578)",
