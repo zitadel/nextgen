@@ -17968,7 +17968,7 @@ type Event struct {
 	UserCreatedEvent                UserCreatedEvent
 	UserDeletedEvent                UserDeletedEvent
 	UserUpdatedEvent                UserUpdatedEvent
-	VariableDeletedEvent            VariableDeletedEvent
+	VariableRemovedEvent            VariableRemovedEvent
 	VariableSetEvent                VariableSetEvent
 }
 
@@ -18016,7 +18016,7 @@ const (
 	UserCreatedEventEvent                EventType = "user.created"
 	UserDeletedEventEvent                EventType = "user.deleted"
 	UserUpdatedEventEvent                EventType = "user.updated"
-	VariableDeletedEventEvent            EventType = "variable.deleted"
+	VariableRemovedEventEvent            EventType = "variable.removed"
 	VariableSetEventEvent                EventType = "variable.set"
 )
 
@@ -18145,8 +18145,8 @@ func (s Event) IsUserDeletedEvent() bool { return s.Type == UserDeletedEventEven
 // IsUserUpdatedEvent reports whether Event is UserUpdatedEvent.
 func (s Event) IsUserUpdatedEvent() bool { return s.Type == UserUpdatedEventEvent }
 
-// IsVariableDeletedEvent reports whether Event is VariableDeletedEvent.
-func (s Event) IsVariableDeletedEvent() bool { return s.Type == VariableDeletedEventEvent }
+// IsVariableRemovedEvent reports whether Event is VariableRemovedEvent.
+func (s Event) IsVariableRemovedEvent() bool { return s.Type == VariableRemovedEventEvent }
 
 // IsVariableSetEvent reports whether Event is VariableSetEvent.
 func (s Event) IsVariableSetEvent() bool { return s.Type == VariableSetEventEvent }
@@ -18970,24 +18970,24 @@ func NewUserUpdatedEventEvent(v UserUpdatedEvent) Event {
 	return s
 }
 
-// SetVariableDeletedEvent sets Event to VariableDeletedEvent.
-func (s *Event) SetVariableDeletedEvent(v VariableDeletedEvent) {
-	s.Type = VariableDeletedEventEvent
-	s.VariableDeletedEvent = v
+// SetVariableRemovedEvent sets Event to VariableRemovedEvent.
+func (s *Event) SetVariableRemovedEvent(v VariableRemovedEvent) {
+	s.Type = VariableRemovedEventEvent
+	s.VariableRemovedEvent = v
 }
 
-// GetVariableDeletedEvent returns VariableDeletedEvent and true boolean if Event is VariableDeletedEvent.
-func (s Event) GetVariableDeletedEvent() (v VariableDeletedEvent, ok bool) {
-	if !s.IsVariableDeletedEvent() {
+// GetVariableRemovedEvent returns VariableRemovedEvent and true boolean if Event is VariableRemovedEvent.
+func (s Event) GetVariableRemovedEvent() (v VariableRemovedEvent, ok bool) {
+	if !s.IsVariableRemovedEvent() {
 		return v, false
 	}
-	return s.VariableDeletedEvent, true
+	return s.VariableRemovedEvent, true
 }
 
-// NewVariableDeletedEventEvent returns new Event from VariableDeletedEvent.
-func NewVariableDeletedEventEvent(v VariableDeletedEvent) Event {
+// NewVariableRemovedEventEvent returns new Event from VariableRemovedEvent.
+func NewVariableRemovedEventEvent(v VariableRemovedEvent) Event {
 	var s Event
-	s.SetVariableDeletedEvent(v)
+	s.SetVariableRemovedEvent(v)
 	return s
 }
 
@@ -46447,52 +46447,52 @@ func (o OptNilUserUpdatedEventActorType) Or(d UserUpdatedEventActorType) UserUpd
 	return d
 }
 
-// NewOptNilVariableDeletedEventActorType returns new OptNilVariableDeletedEventActorType with value set to v.
-func NewOptNilVariableDeletedEventActorType(v VariableDeletedEventActorType) OptNilVariableDeletedEventActorType {
-	return OptNilVariableDeletedEventActorType{
+// NewOptNilVariableRemovedEventActorType returns new OptNilVariableRemovedEventActorType with value set to v.
+func NewOptNilVariableRemovedEventActorType(v VariableRemovedEventActorType) OptNilVariableRemovedEventActorType {
+	return OptNilVariableRemovedEventActorType{
 		Value: v,
 		Set:   true,
 	}
 }
 
-// OptNilVariableDeletedEventActorType is optional nullable VariableDeletedEventActorType.
-type OptNilVariableDeletedEventActorType struct {
-	Value VariableDeletedEventActorType
+// OptNilVariableRemovedEventActorType is optional nullable VariableRemovedEventActorType.
+type OptNilVariableRemovedEventActorType struct {
+	Value VariableRemovedEventActorType
 	Set   bool
 	Null  bool
 }
 
-// IsSet returns true if OptNilVariableDeletedEventActorType was set.
-func (o OptNilVariableDeletedEventActorType) IsSet() bool { return o.Set }
+// IsSet returns true if OptNilVariableRemovedEventActorType was set.
+func (o OptNilVariableRemovedEventActorType) IsSet() bool { return o.Set }
 
 // Reset unsets value.
-func (o *OptNilVariableDeletedEventActorType) Reset() {
-	var v VariableDeletedEventActorType
+func (o *OptNilVariableRemovedEventActorType) Reset() {
+	var v VariableRemovedEventActorType
 	o.Value = v
 	o.Set = false
 	o.Null = false
 }
 
 // SetTo sets value to v.
-func (o *OptNilVariableDeletedEventActorType) SetTo(v VariableDeletedEventActorType) {
+func (o *OptNilVariableRemovedEventActorType) SetTo(v VariableRemovedEventActorType) {
 	o.Set = true
 	o.Null = false
 	o.Value = v
 }
 
 // IsNull returns true if value is Null.
-func (o OptNilVariableDeletedEventActorType) IsNull() bool { return o.Null }
+func (o OptNilVariableRemovedEventActorType) IsNull() bool { return o.Null }
 
 // SetToNull sets value to null.
-func (o *OptNilVariableDeletedEventActorType) SetToNull() {
+func (o *OptNilVariableRemovedEventActorType) SetToNull() {
 	o.Set = true
 	o.Null = true
-	var v VariableDeletedEventActorType
+	var v VariableRemovedEventActorType
 	o.Value = v
 }
 
 // Get returns value and boolean that denotes whether value was set.
-func (o OptNilVariableDeletedEventActorType) Get() (v VariableDeletedEventActorType, ok bool) {
+func (o OptNilVariableRemovedEventActorType) Get() (v VariableRemovedEventActorType, ok bool) {
 	if o.Null {
 		return v, false
 	}
@@ -46503,7 +46503,7 @@ func (o OptNilVariableDeletedEventActorType) Get() (v VariableDeletedEventActorT
 }
 
 // Or returns value if set, or given parameter if does not.
-func (o OptNilVariableDeletedEventActorType) Or(d VariableDeletedEventActorType) VariableDeletedEventActorType {
+func (o OptNilVariableRemovedEventActorType) Or(d VariableRemovedEventActorType) VariableRemovedEventActorType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -51541,98 +51541,6 @@ func (o OptVariable) Or(d Variable) Variable {
 	return d
 }
 
-// NewOptVariableDeletedEventDelegationType returns new OptVariableDeletedEventDelegationType with value set to v.
-func NewOptVariableDeletedEventDelegationType(v VariableDeletedEventDelegationType) OptVariableDeletedEventDelegationType {
-	return OptVariableDeletedEventDelegationType{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptVariableDeletedEventDelegationType is optional VariableDeletedEventDelegationType.
-type OptVariableDeletedEventDelegationType struct {
-	Value VariableDeletedEventDelegationType
-	Set   bool
-}
-
-// IsSet returns true if OptVariableDeletedEventDelegationType was set.
-func (o OptVariableDeletedEventDelegationType) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptVariableDeletedEventDelegationType) Reset() {
-	var v VariableDeletedEventDelegationType
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptVariableDeletedEventDelegationType) SetTo(v VariableDeletedEventDelegationType) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptVariableDeletedEventDelegationType) Get() (v VariableDeletedEventDelegationType, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptVariableDeletedEventDelegationType) Or(d VariableDeletedEventDelegationType) VariableDeletedEventDelegationType {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptVariableDeletedPayloadKind returns new OptVariableDeletedPayloadKind with value set to v.
-func NewOptVariableDeletedPayloadKind(v VariableDeletedPayloadKind) OptVariableDeletedPayloadKind {
-	return OptVariableDeletedPayloadKind{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptVariableDeletedPayloadKind is optional VariableDeletedPayloadKind.
-type OptVariableDeletedPayloadKind struct {
-	Value VariableDeletedPayloadKind
-	Set   bool
-}
-
-// IsSet returns true if OptVariableDeletedPayloadKind was set.
-func (o OptVariableDeletedPayloadKind) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptVariableDeletedPayloadKind) Reset() {
-	var v VariableDeletedPayloadKind
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptVariableDeletedPayloadKind) SetTo(v VariableDeletedPayloadKind) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptVariableDeletedPayloadKind) Get() (v VariableDeletedPayloadKind, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptVariableDeletedPayloadKind) Or(d VariableDeletedPayloadKind) VariableDeletedPayloadKind {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptVariableKind returns new OptVariableKind with value set to v.
 func NewOptVariableKind(v VariableKind) OptVariableKind {
 	return OptVariableKind{
@@ -51673,6 +51581,98 @@ func (o OptVariableKind) Get() (v VariableKind, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptVariableKind) Or(d VariableKind) VariableKind {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptVariableRemovedEventDelegationType returns new OptVariableRemovedEventDelegationType with value set to v.
+func NewOptVariableRemovedEventDelegationType(v VariableRemovedEventDelegationType) OptVariableRemovedEventDelegationType {
+	return OptVariableRemovedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptVariableRemovedEventDelegationType is optional VariableRemovedEventDelegationType.
+type OptVariableRemovedEventDelegationType struct {
+	Value VariableRemovedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptVariableRemovedEventDelegationType was set.
+func (o OptVariableRemovedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptVariableRemovedEventDelegationType) Reset() {
+	var v VariableRemovedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptVariableRemovedEventDelegationType) SetTo(v VariableRemovedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptVariableRemovedEventDelegationType) Get() (v VariableRemovedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptVariableRemovedEventDelegationType) Or(d VariableRemovedEventDelegationType) VariableRemovedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptVariableRemovedPayloadKind returns new OptVariableRemovedPayloadKind with value set to v.
+func NewOptVariableRemovedPayloadKind(v VariableRemovedPayloadKind) OptVariableRemovedPayloadKind {
+	return OptVariableRemovedPayloadKind{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptVariableRemovedPayloadKind is optional VariableRemovedPayloadKind.
+type OptVariableRemovedPayloadKind struct {
+	Value VariableRemovedPayloadKind
+	Set   bool
+}
+
+// IsSet returns true if OptVariableRemovedPayloadKind was set.
+func (o OptVariableRemovedPayloadKind) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptVariableRemovedPayloadKind) Reset() {
+	var v VariableRemovedPayloadKind
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptVariableRemovedPayloadKind) SetTo(v VariableRemovedPayloadKind) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptVariableRemovedPayloadKind) Get() (v VariableRemovedPayloadKind, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptVariableRemovedPayloadKind) Or(d VariableRemovedPayloadKind) VariableRemovedPayloadKind {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -73658,508 +73658,6 @@ func (s *VariableByKind) SetPreview(val OptVariable) {
 
 func (*VariableByKind) getVariableRes() {}
 
-// Merged schema.
-// Ref: #
-type VariableDeletedEvent struct {
-	// Managed event id (`evt_<opaque>`).
-	ID        string    `json:"id"`
-	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
-	TeamID OptNilString `json:"team_id"`
-	// Merged property.
-	EventType string `json:"event_type"`
-	// Wide-event category.
-	Category VariableDeletedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
-	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
-	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
-	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
-	ActorType OptNilVariableDeletedEventActorType `json:"actor_type"`
-	// Resource type affected.
-	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
-	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
-	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
-	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
-	DelegationType OptVariableDeletedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                             `json:"delegation_id"`
-	Grantor        OptString                             `json:"grantor"`
-	// Device fingerprint correlation id.
-	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
-	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
-	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
-	FlowID   OptNilString           `json:"flow_id"`
-	Metadata OptEventMetadata       `json:"metadata"`
-	Payload  VariableDeletedPayload `json:"payload"`
-}
-
-// GetID returns the value of ID.
-func (s *VariableDeletedEvent) GetID() string {
-	return s.ID
-}
-
-// GetProjectID returns the value of ProjectID.
-func (s *VariableDeletedEvent) GetProjectID() ProjectID {
-	return s.ProjectID
-}
-
-// GetTeamID returns the value of TeamID.
-func (s *VariableDeletedEvent) GetTeamID() OptNilString {
-	return s.TeamID
-}
-
-// GetEventType returns the value of EventType.
-func (s *VariableDeletedEvent) GetEventType() string {
-	return s.EventType
-}
-
-// GetCategory returns the value of Category.
-func (s *VariableDeletedEvent) GetCategory() VariableDeletedEventCategory {
-	return s.Category
-}
-
-// GetOccurredAt returns the value of OccurredAt.
-func (s *VariableDeletedEvent) GetOccurredAt() time.Time {
-	return s.OccurredAt
-}
-
-// GetCreatedAt returns the value of CreatedAt.
-func (s *VariableDeletedEvent) GetCreatedAt() time.Time {
-	return s.CreatedAt
-}
-
-// GetActorID returns the value of ActorID.
-func (s *VariableDeletedEvent) GetActorID() OptNilString {
-	return s.ActorID
-}
-
-// GetActorType returns the value of ActorType.
-func (s *VariableDeletedEvent) GetActorType() OptNilVariableDeletedEventActorType {
-	return s.ActorType
-}
-
-// GetEntityType returns the value of EntityType.
-func (s *VariableDeletedEvent) GetEntityType() OptNilString {
-	return s.EntityType
-}
-
-// GetEntityID returns the value of EntityID.
-func (s *VariableDeletedEvent) GetEntityID() OptNilString {
-	return s.EntityID
-}
-
-// GetClientID returns the value of ClientID.
-func (s *VariableDeletedEvent) GetClientID() string {
-	return s.ClientID
-}
-
-// GetTokenID returns the value of TokenID.
-func (s *VariableDeletedEvent) GetTokenID() OptString {
-	return s.TokenID
-}
-
-// GetDelegationType returns the value of DelegationType.
-func (s *VariableDeletedEvent) GetDelegationType() OptVariableDeletedEventDelegationType {
-	return s.DelegationType
-}
-
-// GetDelegationID returns the value of DelegationID.
-func (s *VariableDeletedEvent) GetDelegationID() OptString {
-	return s.DelegationID
-}
-
-// GetGrantor returns the value of Grantor.
-func (s *VariableDeletedEvent) GetGrantor() OptString {
-	return s.Grantor
-}
-
-// GetFingerprint returns the value of Fingerprint.
-func (s *VariableDeletedEvent) GetFingerprint() OptString {
-	return s.Fingerprint
-}
-
-// GetRequestID returns the value of RequestID.
-func (s *VariableDeletedEvent) GetRequestID() OptNilString {
-	return s.RequestID
-}
-
-// GetSessionID returns the value of SessionID.
-func (s *VariableDeletedEvent) GetSessionID() OptNilString {
-	return s.SessionID
-}
-
-// GetFlowID returns the value of FlowID.
-func (s *VariableDeletedEvent) GetFlowID() OptNilString {
-	return s.FlowID
-}
-
-// GetMetadata returns the value of Metadata.
-func (s *VariableDeletedEvent) GetMetadata() OptEventMetadata {
-	return s.Metadata
-}
-
-// GetPayload returns the value of Payload.
-func (s *VariableDeletedEvent) GetPayload() VariableDeletedPayload {
-	return s.Payload
-}
-
-// SetID sets the value of ID.
-func (s *VariableDeletedEvent) SetID(val string) {
-	s.ID = val
-}
-
-// SetProjectID sets the value of ProjectID.
-func (s *VariableDeletedEvent) SetProjectID(val ProjectID) {
-	s.ProjectID = val
-}
-
-// SetTeamID sets the value of TeamID.
-func (s *VariableDeletedEvent) SetTeamID(val OptNilString) {
-	s.TeamID = val
-}
-
-// SetEventType sets the value of EventType.
-func (s *VariableDeletedEvent) SetEventType(val string) {
-	s.EventType = val
-}
-
-// SetCategory sets the value of Category.
-func (s *VariableDeletedEvent) SetCategory(val VariableDeletedEventCategory) {
-	s.Category = val
-}
-
-// SetOccurredAt sets the value of OccurredAt.
-func (s *VariableDeletedEvent) SetOccurredAt(val time.Time) {
-	s.OccurredAt = val
-}
-
-// SetCreatedAt sets the value of CreatedAt.
-func (s *VariableDeletedEvent) SetCreatedAt(val time.Time) {
-	s.CreatedAt = val
-}
-
-// SetActorID sets the value of ActorID.
-func (s *VariableDeletedEvent) SetActorID(val OptNilString) {
-	s.ActorID = val
-}
-
-// SetActorType sets the value of ActorType.
-func (s *VariableDeletedEvent) SetActorType(val OptNilVariableDeletedEventActorType) {
-	s.ActorType = val
-}
-
-// SetEntityType sets the value of EntityType.
-func (s *VariableDeletedEvent) SetEntityType(val OptNilString) {
-	s.EntityType = val
-}
-
-// SetEntityID sets the value of EntityID.
-func (s *VariableDeletedEvent) SetEntityID(val OptNilString) {
-	s.EntityID = val
-}
-
-// SetClientID sets the value of ClientID.
-func (s *VariableDeletedEvent) SetClientID(val string) {
-	s.ClientID = val
-}
-
-// SetTokenID sets the value of TokenID.
-func (s *VariableDeletedEvent) SetTokenID(val OptString) {
-	s.TokenID = val
-}
-
-// SetDelegationType sets the value of DelegationType.
-func (s *VariableDeletedEvent) SetDelegationType(val OptVariableDeletedEventDelegationType) {
-	s.DelegationType = val
-}
-
-// SetDelegationID sets the value of DelegationID.
-func (s *VariableDeletedEvent) SetDelegationID(val OptString) {
-	s.DelegationID = val
-}
-
-// SetGrantor sets the value of Grantor.
-func (s *VariableDeletedEvent) SetGrantor(val OptString) {
-	s.Grantor = val
-}
-
-// SetFingerprint sets the value of Fingerprint.
-func (s *VariableDeletedEvent) SetFingerprint(val OptString) {
-	s.Fingerprint = val
-}
-
-// SetRequestID sets the value of RequestID.
-func (s *VariableDeletedEvent) SetRequestID(val OptNilString) {
-	s.RequestID = val
-}
-
-// SetSessionID sets the value of SessionID.
-func (s *VariableDeletedEvent) SetSessionID(val OptNilString) {
-	s.SessionID = val
-}
-
-// SetFlowID sets the value of FlowID.
-func (s *VariableDeletedEvent) SetFlowID(val OptNilString) {
-	s.FlowID = val
-}
-
-// SetMetadata sets the value of Metadata.
-func (s *VariableDeletedEvent) SetMetadata(val OptEventMetadata) {
-	s.Metadata = val
-}
-
-// SetPayload sets the value of Payload.
-func (s *VariableDeletedEvent) SetPayload(val VariableDeletedPayload) {
-	s.Payload = val
-}
-
-type VariableDeletedEventActorType string
-
-const (
-	VariableDeletedEventActorTypeHuman   VariableDeletedEventActorType = "human"
-	VariableDeletedEventActorTypeService VariableDeletedEventActorType = "service"
-	VariableDeletedEventActorTypeSystem  VariableDeletedEventActorType = "system"
-	VariableDeletedEventActorTypeAgent   VariableDeletedEventActorType = "agent"
-)
-
-// AllValues returns all VariableDeletedEventActorType values.
-func (VariableDeletedEventActorType) AllValues() []VariableDeletedEventActorType {
-	return []VariableDeletedEventActorType{
-		VariableDeletedEventActorTypeHuman,
-		VariableDeletedEventActorTypeService,
-		VariableDeletedEventActorTypeSystem,
-		VariableDeletedEventActorTypeAgent,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s VariableDeletedEventActorType) MarshalText() ([]byte, error) {
-	switch s {
-	case VariableDeletedEventActorTypeHuman:
-		return []byte(s), nil
-	case VariableDeletedEventActorTypeService:
-		return []byte(s), nil
-	case VariableDeletedEventActorTypeSystem:
-		return []byte(s), nil
-	case VariableDeletedEventActorTypeAgent:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *VariableDeletedEventActorType) UnmarshalText(data []byte) error {
-	switch VariableDeletedEventActorType(data) {
-	case VariableDeletedEventActorTypeHuman:
-		*s = VariableDeletedEventActorTypeHuman
-		return nil
-	case VariableDeletedEventActorTypeService:
-		*s = VariableDeletedEventActorTypeService
-		return nil
-	case VariableDeletedEventActorTypeSystem:
-		*s = VariableDeletedEventActorTypeSystem
-		return nil
-	case VariableDeletedEventActorTypeAgent:
-		*s = VariableDeletedEventActorTypeAgent
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
-}
-
-// Wide-event category.
-type VariableDeletedEventCategory string
-
-const (
-	VariableDeletedEventCategoryRequest VariableDeletedEventCategory = "request"
-	VariableDeletedEventCategoryAuth    VariableDeletedEventCategory = "auth"
-	VariableDeletedEventCategorySession VariableDeletedEventCategory = "session"
-	VariableDeletedEventCategoryAdmin   VariableDeletedEventCategory = "admin"
-	VariableDeletedEventCategoryEntity  VariableDeletedEventCategory = "entity"
-	VariableDeletedEventCategorySignal  VariableDeletedEventCategory = "signal"
-)
-
-// AllValues returns all VariableDeletedEventCategory values.
-func (VariableDeletedEventCategory) AllValues() []VariableDeletedEventCategory {
-	return []VariableDeletedEventCategory{
-		VariableDeletedEventCategoryRequest,
-		VariableDeletedEventCategoryAuth,
-		VariableDeletedEventCategorySession,
-		VariableDeletedEventCategoryAdmin,
-		VariableDeletedEventCategoryEntity,
-		VariableDeletedEventCategorySignal,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s VariableDeletedEventCategory) MarshalText() ([]byte, error) {
-	switch s {
-	case VariableDeletedEventCategoryRequest:
-		return []byte(s), nil
-	case VariableDeletedEventCategoryAuth:
-		return []byte(s), nil
-	case VariableDeletedEventCategorySession:
-		return []byte(s), nil
-	case VariableDeletedEventCategoryAdmin:
-		return []byte(s), nil
-	case VariableDeletedEventCategoryEntity:
-		return []byte(s), nil
-	case VariableDeletedEventCategorySignal:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *VariableDeletedEventCategory) UnmarshalText(data []byte) error {
-	switch VariableDeletedEventCategory(data) {
-	case VariableDeletedEventCategoryRequest:
-		*s = VariableDeletedEventCategoryRequest
-		return nil
-	case VariableDeletedEventCategoryAuth:
-		*s = VariableDeletedEventCategoryAuth
-		return nil
-	case VariableDeletedEventCategorySession:
-		*s = VariableDeletedEventCategorySession
-		return nil
-	case VariableDeletedEventCategoryAdmin:
-		*s = VariableDeletedEventCategoryAdmin
-		return nil
-	case VariableDeletedEventCategoryEntity:
-		*s = VariableDeletedEventCategoryEntity
-		return nil
-	case VariableDeletedEventCategorySignal:
-		*s = VariableDeletedEventCategorySignal
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
-}
-
-// Delegation kind (omit when unset).
-type VariableDeletedEventDelegationType string
-
-const (
-	VariableDeletedEventDelegationTypeDirect    VariableDeletedEventDelegationType = "direct"
-	VariableDeletedEventDelegationTypeDelegated VariableDeletedEventDelegationType = "delegated"
-	VariableDeletedEventDelegationTypePatShared VariableDeletedEventDelegationType = "pat_shared"
-	VariableDeletedEventDelegationTypeExchanged VariableDeletedEventDelegationType = "exchanged"
-)
-
-// AllValues returns all VariableDeletedEventDelegationType values.
-func (VariableDeletedEventDelegationType) AllValues() []VariableDeletedEventDelegationType {
-	return []VariableDeletedEventDelegationType{
-		VariableDeletedEventDelegationTypeDirect,
-		VariableDeletedEventDelegationTypeDelegated,
-		VariableDeletedEventDelegationTypePatShared,
-		VariableDeletedEventDelegationTypeExchanged,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s VariableDeletedEventDelegationType) MarshalText() ([]byte, error) {
-	switch s {
-	case VariableDeletedEventDelegationTypeDirect:
-		return []byte(s), nil
-	case VariableDeletedEventDelegationTypeDelegated:
-		return []byte(s), nil
-	case VariableDeletedEventDelegationTypePatShared:
-		return []byte(s), nil
-	case VariableDeletedEventDelegationTypeExchanged:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *VariableDeletedEventDelegationType) UnmarshalText(data []byte) error {
-	switch VariableDeletedEventDelegationType(data) {
-	case VariableDeletedEventDelegationTypeDirect:
-		*s = VariableDeletedEventDelegationTypeDirect
-		return nil
-	case VariableDeletedEventDelegationTypeDelegated:
-		*s = VariableDeletedEventDelegationTypeDelegated
-		return nil
-	case VariableDeletedEventDelegationTypePatShared:
-		*s = VariableDeletedEventDelegationTypePatShared
-		return nil
-	case VariableDeletedEventDelegationTypeExchanged:
-		*s = VariableDeletedEventDelegationTypeExchanged
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
-}
-
-// Payload for `variable.deleted` events, one row removed.
-// Ref: #
-type VariableDeletedPayload struct {
-	Kind OptVariableDeletedPayloadKind `json:"kind"`
-}
-
-// GetKind returns the value of Kind.
-func (s *VariableDeletedPayload) GetKind() OptVariableDeletedPayloadKind {
-	return s.Kind
-}
-
-// SetKind sets the value of Kind.
-func (s *VariableDeletedPayload) SetKind(val OptVariableDeletedPayloadKind) {
-	s.Kind = val
-}
-
-type VariableDeletedPayloadKind string
-
-const (
-	VariableDeletedPayloadKindPrimary VariableDeletedPayloadKind = "primary"
-	VariableDeletedPayloadKindPreview VariableDeletedPayloadKind = "preview"
-)
-
-// AllValues returns all VariableDeletedPayloadKind values.
-func (VariableDeletedPayloadKind) AllValues() []VariableDeletedPayloadKind {
-	return []VariableDeletedPayloadKind{
-		VariableDeletedPayloadKindPrimary,
-		VariableDeletedPayloadKindPreview,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s VariableDeletedPayloadKind) MarshalText() ([]byte, error) {
-	switch s {
-	case VariableDeletedPayloadKindPrimary:
-		return []byte(s), nil
-	case VariableDeletedPayloadKindPreview:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *VariableDeletedPayloadKind) UnmarshalText(data []byte) error {
-	switch VariableDeletedPayloadKind(data) {
-	case VariableDeletedPayloadKindPrimary:
-		*s = VariableDeletedPayloadKindPrimary
-		return nil
-	case VariableDeletedPayloadKindPreview:
-		*s = VariableDeletedPayloadKindPreview
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
-}
-
 // One entry of an update. A bare scalar enters a non-secret value, an object
 // states the flag explicitly, and `null` removes the name.
 // The shorthand exists because most variables are not secrets and spelling
@@ -74313,6 +73811,508 @@ func (s *VariableKind) UnmarshalText(data []byte) error {
 }
 
 type VariableName string
+
+// Merged schema.
+// Ref: #
+type VariableRemovedEvent struct {
+	// Managed event id (`evt_<opaque>`).
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// Emit-time team scope, when the actor operated under a team.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// Wide-event category.
+	Category VariableRemovedEventCategory `json:"category"`
+	// When the action happened (server/storage clock, dialect-owned).
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the row was inserted (server/storage clock, dialect-owned).
+	CreatedAt time.Time `json:"created_at"`
+	// Who triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// Actor kind.
+	ActorType OptNilVariableRemovedEventActorType `json:"actor_type"`
+	// Resource type affected.
+	EntityType OptNilString `json:"entity_type"`
+	// Resource id affected.
+	EntityID OptNilString `json:"entity_id"`
+	// Application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// Token id present at emit time, when any.
+	TokenID OptString `json:"token_id"`
+	// Delegation kind (omit when unset).
+	DelegationType OptVariableRemovedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                             `json:"delegation_id"`
+	Grantor        OptString                             `json:"grantor"`
+	// Device fingerprint correlation id.
+	Fingerprint OptString `json:"fingerprint"`
+	// HTTP request correlation id.
+	RequestID OptNilString `json:"request_id"`
+	// Session correlation id.
+	SessionID OptNilString `json:"session_id"`
+	// Login flow correlation id.
+	FlowID   OptNilString           `json:"flow_id"`
+	Metadata OptEventMetadata       `json:"metadata"`
+	Payload  VariableRemovedPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *VariableRemovedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *VariableRemovedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *VariableRemovedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *VariableRemovedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *VariableRemovedEvent) GetCategory() VariableRemovedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *VariableRemovedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *VariableRemovedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *VariableRemovedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *VariableRemovedEvent) GetActorType() OptNilVariableRemovedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *VariableRemovedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *VariableRemovedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *VariableRemovedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *VariableRemovedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *VariableRemovedEvent) GetDelegationType() OptVariableRemovedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *VariableRemovedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *VariableRemovedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *VariableRemovedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *VariableRemovedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *VariableRemovedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *VariableRemovedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *VariableRemovedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *VariableRemovedEvent) GetPayload() VariableRemovedPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *VariableRemovedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *VariableRemovedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *VariableRemovedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *VariableRemovedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *VariableRemovedEvent) SetCategory(val VariableRemovedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *VariableRemovedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *VariableRemovedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *VariableRemovedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *VariableRemovedEvent) SetActorType(val OptNilVariableRemovedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *VariableRemovedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *VariableRemovedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *VariableRemovedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *VariableRemovedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *VariableRemovedEvent) SetDelegationType(val OptVariableRemovedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *VariableRemovedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *VariableRemovedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *VariableRemovedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *VariableRemovedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *VariableRemovedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *VariableRemovedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *VariableRemovedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *VariableRemovedEvent) SetPayload(val VariableRemovedPayload) {
+	s.Payload = val
+}
+
+type VariableRemovedEventActorType string
+
+const (
+	VariableRemovedEventActorTypeHuman   VariableRemovedEventActorType = "human"
+	VariableRemovedEventActorTypeService VariableRemovedEventActorType = "service"
+	VariableRemovedEventActorTypeSystem  VariableRemovedEventActorType = "system"
+	VariableRemovedEventActorTypeAgent   VariableRemovedEventActorType = "agent"
+)
+
+// AllValues returns all VariableRemovedEventActorType values.
+func (VariableRemovedEventActorType) AllValues() []VariableRemovedEventActorType {
+	return []VariableRemovedEventActorType{
+		VariableRemovedEventActorTypeHuman,
+		VariableRemovedEventActorTypeService,
+		VariableRemovedEventActorTypeSystem,
+		VariableRemovedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s VariableRemovedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case VariableRemovedEventActorTypeHuman:
+		return []byte(s), nil
+	case VariableRemovedEventActorTypeService:
+		return []byte(s), nil
+	case VariableRemovedEventActorTypeSystem:
+		return []byte(s), nil
+	case VariableRemovedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *VariableRemovedEventActorType) UnmarshalText(data []byte) error {
+	switch VariableRemovedEventActorType(data) {
+	case VariableRemovedEventActorTypeHuman:
+		*s = VariableRemovedEventActorTypeHuman
+		return nil
+	case VariableRemovedEventActorTypeService:
+		*s = VariableRemovedEventActorTypeService
+		return nil
+	case VariableRemovedEventActorTypeSystem:
+		*s = VariableRemovedEventActorTypeSystem
+		return nil
+	case VariableRemovedEventActorTypeAgent:
+		*s = VariableRemovedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Wide-event category.
+type VariableRemovedEventCategory string
+
+const (
+	VariableRemovedEventCategoryRequest VariableRemovedEventCategory = "request"
+	VariableRemovedEventCategoryAuth    VariableRemovedEventCategory = "auth"
+	VariableRemovedEventCategorySession VariableRemovedEventCategory = "session"
+	VariableRemovedEventCategoryAdmin   VariableRemovedEventCategory = "admin"
+	VariableRemovedEventCategoryEntity  VariableRemovedEventCategory = "entity"
+	VariableRemovedEventCategorySignal  VariableRemovedEventCategory = "signal"
+)
+
+// AllValues returns all VariableRemovedEventCategory values.
+func (VariableRemovedEventCategory) AllValues() []VariableRemovedEventCategory {
+	return []VariableRemovedEventCategory{
+		VariableRemovedEventCategoryRequest,
+		VariableRemovedEventCategoryAuth,
+		VariableRemovedEventCategorySession,
+		VariableRemovedEventCategoryAdmin,
+		VariableRemovedEventCategoryEntity,
+		VariableRemovedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s VariableRemovedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case VariableRemovedEventCategoryRequest:
+		return []byte(s), nil
+	case VariableRemovedEventCategoryAuth:
+		return []byte(s), nil
+	case VariableRemovedEventCategorySession:
+		return []byte(s), nil
+	case VariableRemovedEventCategoryAdmin:
+		return []byte(s), nil
+	case VariableRemovedEventCategoryEntity:
+		return []byte(s), nil
+	case VariableRemovedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *VariableRemovedEventCategory) UnmarshalText(data []byte) error {
+	switch VariableRemovedEventCategory(data) {
+	case VariableRemovedEventCategoryRequest:
+		*s = VariableRemovedEventCategoryRequest
+		return nil
+	case VariableRemovedEventCategoryAuth:
+		*s = VariableRemovedEventCategoryAuth
+		return nil
+	case VariableRemovedEventCategorySession:
+		*s = VariableRemovedEventCategorySession
+		return nil
+	case VariableRemovedEventCategoryAdmin:
+		*s = VariableRemovedEventCategoryAdmin
+		return nil
+	case VariableRemovedEventCategoryEntity:
+		*s = VariableRemovedEventCategoryEntity
+		return nil
+	case VariableRemovedEventCategorySignal:
+		*s = VariableRemovedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Delegation kind (omit when unset).
+type VariableRemovedEventDelegationType string
+
+const (
+	VariableRemovedEventDelegationTypeDirect    VariableRemovedEventDelegationType = "direct"
+	VariableRemovedEventDelegationTypeDelegated VariableRemovedEventDelegationType = "delegated"
+	VariableRemovedEventDelegationTypePatShared VariableRemovedEventDelegationType = "pat_shared"
+	VariableRemovedEventDelegationTypeExchanged VariableRemovedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all VariableRemovedEventDelegationType values.
+func (VariableRemovedEventDelegationType) AllValues() []VariableRemovedEventDelegationType {
+	return []VariableRemovedEventDelegationType{
+		VariableRemovedEventDelegationTypeDirect,
+		VariableRemovedEventDelegationTypeDelegated,
+		VariableRemovedEventDelegationTypePatShared,
+		VariableRemovedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s VariableRemovedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case VariableRemovedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case VariableRemovedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case VariableRemovedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case VariableRemovedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *VariableRemovedEventDelegationType) UnmarshalText(data []byte) error {
+	switch VariableRemovedEventDelegationType(data) {
+	case VariableRemovedEventDelegationTypeDirect:
+		*s = VariableRemovedEventDelegationTypeDirect
+		return nil
+	case VariableRemovedEventDelegationTypeDelegated:
+		*s = VariableRemovedEventDelegationTypeDelegated
+		return nil
+	case VariableRemovedEventDelegationTypePatShared:
+		*s = VariableRemovedEventDelegationTypePatShared
+		return nil
+	case VariableRemovedEventDelegationTypeExchanged:
+		*s = VariableRemovedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Payload for `variable.removed` events, one row removed.
+// Ref: #
+type VariableRemovedPayload struct {
+	Kind OptVariableRemovedPayloadKind `json:"kind"`
+}
+
+// GetKind returns the value of Kind.
+func (s *VariableRemovedPayload) GetKind() OptVariableRemovedPayloadKind {
+	return s.Kind
+}
+
+// SetKind sets the value of Kind.
+func (s *VariableRemovedPayload) SetKind(val OptVariableRemovedPayloadKind) {
+	s.Kind = val
+}
+
+type VariableRemovedPayloadKind string
+
+const (
+	VariableRemovedPayloadKindPrimary VariableRemovedPayloadKind = "primary"
+	VariableRemovedPayloadKindPreview VariableRemovedPayloadKind = "preview"
+)
+
+// AllValues returns all VariableRemovedPayloadKind values.
+func (VariableRemovedPayloadKind) AllValues() []VariableRemovedPayloadKind {
+	return []VariableRemovedPayloadKind{
+		VariableRemovedPayloadKindPrimary,
+		VariableRemovedPayloadKindPreview,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s VariableRemovedPayloadKind) MarshalText() ([]byte, error) {
+	switch s {
+	case VariableRemovedPayloadKindPrimary:
+		return []byte(s), nil
+	case VariableRemovedPayloadKindPreview:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *VariableRemovedPayloadKind) UnmarshalText(data []byte) error {
+	switch VariableRemovedPayloadKind(data) {
+	case VariableRemovedPayloadKindPrimary:
+		*s = VariableRemovedPayloadKindPrimary
+		return nil
+	case VariableRemovedPayloadKindPreview:
+		*s = VariableRemovedPayloadKindPreview
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
 
 // A variable's value. JSON scalars only — a string, a number, or a boolean.
 // The value travels through JSON in both directions, so the set of types is

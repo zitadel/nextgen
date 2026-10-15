@@ -535,10 +535,10 @@ func TestVariables(t *testing.T) {
 			{domain.EventTypeVariableSet, "AUDITED", map[string]any{"kind": "primary", "secret": false}},
 			{domain.EventTypeVariableSet, "AUDITED", map[string]any{"kind": "preview", "secret": false}},
 			{domain.EventTypeVariableSet, "AUDITED_SECRET", map[string]any{"kind": "preview", "secret": false}},
-			{domain.EventTypeVariableDeleted, "AUDITED_SECRET", map[string]any{"kind": "preview"}},
+			{domain.EventTypeVariableRemoved, "AUDITED_SECRET", map[string]any{"kind": "preview"}},
 			{domain.EventTypeVariableSet, "AUDITED_SECRET", map[string]any{"kind": "primary", "secret": true}},
-			{domain.EventTypeVariableDeleted, "AUDITED", map[string]any{"kind": "primary"}},
-			{domain.EventTypeVariableDeleted, "AUDITED", map[string]any{"kind": "preview"}},
+			{domain.EventTypeVariableRemoved, "AUDITED", map[string]any{"kind": "primary"}},
+			{domain.EventTypeVariableRemoved, "AUDITED", map[string]any{"kind": "preview"}},
 		}, got)
 	})
 }

@@ -33788,11 +33788,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				s.Payload.Encode(e)
 			}
 		}
-	case VariableDeletedEventEvent:
+	case VariableRemovedEventEvent:
 		e.FieldStart("event_type")
-		e.Str("variable.deleted")
+		e.Str("variable.removed")
 		{
-			s := s.VariableDeletedEvent
+			s := s.VariableRemovedEvent
 			{
 				e.FieldStart("id")
 				e.Str(s.ID)
@@ -34167,8 +34167,8 @@ func (s *Event) Decode(d *jx.Decoder) error {
 				case "user.updated":
 					s.Type = UserUpdatedEventEvent
 					found = true
-				case "variable.deleted":
-					s.Type = VariableDeletedEventEvent
+				case "variable.removed":
+					s.Type = VariableRemovedEventEvent
 					found = true
 				case "variable.set":
 					s.Type = VariableSetEventEvent
@@ -34343,8 +34343,8 @@ func (s *Event) Decode(d *jx.Decoder) error {
 		if err := s.UserUpdatedEvent.Decode(d); err != nil {
 			return err
 		}
-	case VariableDeletedEventEvent:
-		if err := s.VariableDeletedEvent.Decode(d); err != nil {
+	case VariableRemovedEventEvent:
+		if err := s.VariableRemovedEvent.Decode(d); err != nil {
 			return err
 		}
 	case VariableSetEventEvent:
@@ -70626,8 +70626,8 @@ func (s *OptNilUserUpdatedEventActorType) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes VariableDeletedEventActorType as json.
-func (o OptNilVariableDeletedEventActorType) Encode(e *jx.Encoder) {
+// Encode encodes VariableRemovedEventActorType as json.
+func (o OptNilVariableRemovedEventActorType) Encode(e *jx.Encoder) {
 	if !o.Set {
 		return
 	}
@@ -70638,17 +70638,17 @@ func (o OptNilVariableDeletedEventActorType) Encode(e *jx.Encoder) {
 	e.Str(string(o.Value))
 }
 
-// Decode decodes VariableDeletedEventActorType from json.
-func (o *OptNilVariableDeletedEventActorType) Decode(d *jx.Decoder) error {
+// Decode decodes VariableRemovedEventActorType from json.
+func (o *OptNilVariableRemovedEventActorType) Decode(d *jx.Decoder) error {
 	if o == nil {
-		return errors.New("invalid: unable to decode OptNilVariableDeletedEventActorType to nil")
+		return errors.New("invalid: unable to decode OptNilVariableRemovedEventActorType to nil")
 	}
 	if d.Next() == jx.Null {
 		if err := d.Null(); err != nil {
 			return err
 		}
 
-		var v VariableDeletedEventActorType
+		var v VariableRemovedEventActorType
 		o.Value = v
 		o.Set = true
 		o.Null = true
@@ -70663,14 +70663,14 @@ func (o *OptNilVariableDeletedEventActorType) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s OptNilVariableDeletedEventActorType) MarshalJSON() ([]byte, error) {
+func (s OptNilVariableRemovedEventActorType) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptNilVariableDeletedEventActorType) UnmarshalJSON(data []byte) error {
+func (s *OptNilVariableRemovedEventActorType) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -74286,18 +74286,18 @@ func (s *OptVariable) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes VariableDeletedEventDelegationType as json.
-func (o OptVariableDeletedEventDelegationType) Encode(e *jx.Encoder) {
+// Encode encodes VariableRemovedEventDelegationType as json.
+func (o OptVariableRemovedEventDelegationType) Encode(e *jx.Encoder) {
 	if !o.Set {
 		return
 	}
 	e.Str(string(o.Value))
 }
 
-// Decode decodes VariableDeletedEventDelegationType from json.
-func (o *OptVariableDeletedEventDelegationType) Decode(d *jx.Decoder) error {
+// Decode decodes VariableRemovedEventDelegationType from json.
+func (o *OptVariableRemovedEventDelegationType) Decode(d *jx.Decoder) error {
 	if o == nil {
-		return errors.New("invalid: unable to decode OptVariableDeletedEventDelegationType to nil")
+		return errors.New("invalid: unable to decode OptVariableRemovedEventDelegationType to nil")
 	}
 	o.Set = true
 	if err := o.Value.Decode(d); err != nil {
@@ -74307,30 +74307,30 @@ func (o *OptVariableDeletedEventDelegationType) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s OptVariableDeletedEventDelegationType) MarshalJSON() ([]byte, error) {
+func (s OptVariableRemovedEventDelegationType) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptVariableDeletedEventDelegationType) UnmarshalJSON(data []byte) error {
+func (s *OptVariableRemovedEventDelegationType) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes VariableDeletedPayloadKind as json.
-func (o OptVariableDeletedPayloadKind) Encode(e *jx.Encoder) {
+// Encode encodes VariableRemovedPayloadKind as json.
+func (o OptVariableRemovedPayloadKind) Encode(e *jx.Encoder) {
 	if !o.Set {
 		return
 	}
 	e.Str(string(o.Value))
 }
 
-// Decode decodes VariableDeletedPayloadKind from json.
-func (o *OptVariableDeletedPayloadKind) Decode(d *jx.Decoder) error {
+// Decode decodes VariableRemovedPayloadKind from json.
+func (o *OptVariableRemovedPayloadKind) Decode(d *jx.Decoder) error {
 	if o == nil {
-		return errors.New("invalid: unable to decode OptVariableDeletedPayloadKind to nil")
+		return errors.New("invalid: unable to decode OptVariableRemovedPayloadKind to nil")
 	}
 	o.Set = true
 	if err := o.Value.Decode(d); err != nil {
@@ -74340,14 +74340,14 @@ func (o *OptVariableDeletedPayloadKind) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s OptVariableDeletedPayloadKind) MarshalJSON() ([]byte, error) {
+func (s OptVariableRemovedPayloadKind) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptVariableDeletedPayloadKind) UnmarshalJSON(data []byte) error {
+func (s *OptVariableRemovedPayloadKind) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -114728,15 +114728,69 @@ func (s *VariableByKind) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes VariableInput as json.
+func (s VariableInput) Encode(e *jx.Encoder) {
+	switch s.Type {
+	case NullVariableInput:
+		_ = s.Null
+		e.Null()
+	case VariableScalarVariableInput:
+		s.VariableScalar.Encode(e)
+	case SecretVariableInputVariableInput:
+		s.SecretVariableInput.Encode(e)
+	}
+}
+
+// Decode decodes VariableInput from json.
+func (s *VariableInput) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode VariableInput to nil")
+	}
+	// Sum type type_discriminator.
+	switch t := d.Next(); t {
+	case jx.Bool, jx.Number, jx.String:
+		if err := s.VariableScalar.Decode(d); err != nil {
+			return err
+		}
+		s.Type = VariableScalarVariableInput
+	case jx.Null:
+		if err := d.Null(); err != nil {
+			return err
+		}
+		s.Type = NullVariableInput
+	case jx.Object:
+		if err := s.SecretVariableInput.Decode(d); err != nil {
+			return err
+		}
+		s.Type = SecretVariableInputVariableInput
+	default:
+		return errors.Errorf("unexpected json type %q", t)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s VariableInput) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *VariableInput) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode implements json.Marshaler.
-func (s *VariableDeletedEvent) Encode(e *jx.Encoder) {
+func (s *VariableRemovedEvent) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
 // encodeFields encodes fields.
-func (s *VariableDeletedEvent) encodeFields(e *jx.Encoder) {
+func (s *VariableRemovedEvent) encodeFields(e *jx.Encoder) {
 	{
 		e.FieldStart("id")
 		e.Str(s.ID)
@@ -114753,7 +114807,7 @@ func (s *VariableDeletedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("event_type")
-		e.Str("variable.deleted")
+		e.Str("variable.removed")
 	}
 	{
 		e.FieldStart("category")
@@ -114855,7 +114909,7 @@ func (s *VariableDeletedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfVariableDeletedEvent = [22]string{
+var jsonFieldsNameOfVariableRemovedEvent = [22]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -114880,10 +114934,10 @@ var jsonFieldsNameOfVariableDeletedEvent = [22]string{
 	21: "payload",
 }
 
-// Decode decodes VariableDeletedEvent from json.
-func (s *VariableDeletedEvent) Decode(d *jx.Decoder) error {
+// Decode decodes VariableRemovedEvent from json.
+func (s *VariableRemovedEvent) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode VariableDeletedEvent to nil")
+		return errors.New("invalid: unable to decode VariableRemovedEvent to nil")
 	}
 	var requiredBitSet [3]uint8
 
@@ -115124,7 +115178,7 @@ func (s *VariableDeletedEvent) Decode(d *jx.Decoder) error {
 		}
 		return nil
 	}); err != nil {
-		return errors.Wrap(err, "decode VariableDeletedEvent")
+		return errors.Wrap(err, "decode VariableRemovedEvent")
 	}
 	// Validate required fields.
 	var failures []validate.FieldError
@@ -115143,8 +115197,8 @@ func (s *VariableDeletedEvent) Decode(d *jx.Decoder) error {
 				bitIdx := bits.TrailingZeros8(result)
 				fieldIdx := i*8 + bitIdx
 				var name string
-				if fieldIdx < len(jsonFieldsNameOfVariableDeletedEvent) {
-					name = jsonFieldsNameOfVariableDeletedEvent[fieldIdx]
+				if fieldIdx < len(jsonFieldsNameOfVariableRemovedEvent) {
+					name = jsonFieldsNameOfVariableRemovedEvent[fieldIdx]
 				} else {
 					name = strconv.Itoa(fieldIdx)
 				}
@@ -115165,163 +115219,163 @@ func (s *VariableDeletedEvent) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *VariableDeletedEvent) MarshalJSON() ([]byte, error) {
+func (s *VariableRemovedEvent) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *VariableDeletedEvent) UnmarshalJSON(data []byte) error {
+func (s *VariableRemovedEvent) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes VariableDeletedEventActorType as json.
-func (s VariableDeletedEventActorType) Encode(e *jx.Encoder) {
+// Encode encodes VariableRemovedEventActorType as json.
+func (s VariableRemovedEventActorType) Encode(e *jx.Encoder) {
 	e.Str(string(s))
 }
 
-// Decode decodes VariableDeletedEventActorType from json.
-func (s *VariableDeletedEventActorType) Decode(d *jx.Decoder) error {
+// Decode decodes VariableRemovedEventActorType from json.
+func (s *VariableRemovedEventActorType) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode VariableDeletedEventActorType to nil")
+		return errors.New("invalid: unable to decode VariableRemovedEventActorType to nil")
 	}
 	v, err := d.StrBytes()
 	if err != nil {
 		return err
 	}
 	// Try to use constant string.
-	switch VariableDeletedEventActorType(v) {
-	case VariableDeletedEventActorTypeHuman:
-		*s = VariableDeletedEventActorTypeHuman
-	case VariableDeletedEventActorTypeService:
-		*s = VariableDeletedEventActorTypeService
-	case VariableDeletedEventActorTypeSystem:
-		*s = VariableDeletedEventActorTypeSystem
-	case VariableDeletedEventActorTypeAgent:
-		*s = VariableDeletedEventActorTypeAgent
+	switch VariableRemovedEventActorType(v) {
+	case VariableRemovedEventActorTypeHuman:
+		*s = VariableRemovedEventActorTypeHuman
+	case VariableRemovedEventActorTypeService:
+		*s = VariableRemovedEventActorTypeService
+	case VariableRemovedEventActorTypeSystem:
+		*s = VariableRemovedEventActorTypeSystem
+	case VariableRemovedEventActorTypeAgent:
+		*s = VariableRemovedEventActorTypeAgent
 	default:
-		*s = VariableDeletedEventActorType(v)
+		*s = VariableRemovedEventActorType(v)
 	}
 
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s VariableDeletedEventActorType) MarshalJSON() ([]byte, error) {
+func (s VariableRemovedEventActorType) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *VariableDeletedEventActorType) UnmarshalJSON(data []byte) error {
+func (s *VariableRemovedEventActorType) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes VariableDeletedEventCategory as json.
-func (s VariableDeletedEventCategory) Encode(e *jx.Encoder) {
+// Encode encodes VariableRemovedEventCategory as json.
+func (s VariableRemovedEventCategory) Encode(e *jx.Encoder) {
 	e.Str(string(s))
 }
 
-// Decode decodes VariableDeletedEventCategory from json.
-func (s *VariableDeletedEventCategory) Decode(d *jx.Decoder) error {
+// Decode decodes VariableRemovedEventCategory from json.
+func (s *VariableRemovedEventCategory) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode VariableDeletedEventCategory to nil")
+		return errors.New("invalid: unable to decode VariableRemovedEventCategory to nil")
 	}
 	v, err := d.StrBytes()
 	if err != nil {
 		return err
 	}
 	// Try to use constant string.
-	switch VariableDeletedEventCategory(v) {
-	case VariableDeletedEventCategoryRequest:
-		*s = VariableDeletedEventCategoryRequest
-	case VariableDeletedEventCategoryAuth:
-		*s = VariableDeletedEventCategoryAuth
-	case VariableDeletedEventCategorySession:
-		*s = VariableDeletedEventCategorySession
-	case VariableDeletedEventCategoryAdmin:
-		*s = VariableDeletedEventCategoryAdmin
-	case VariableDeletedEventCategoryEntity:
-		*s = VariableDeletedEventCategoryEntity
-	case VariableDeletedEventCategorySignal:
-		*s = VariableDeletedEventCategorySignal
+	switch VariableRemovedEventCategory(v) {
+	case VariableRemovedEventCategoryRequest:
+		*s = VariableRemovedEventCategoryRequest
+	case VariableRemovedEventCategoryAuth:
+		*s = VariableRemovedEventCategoryAuth
+	case VariableRemovedEventCategorySession:
+		*s = VariableRemovedEventCategorySession
+	case VariableRemovedEventCategoryAdmin:
+		*s = VariableRemovedEventCategoryAdmin
+	case VariableRemovedEventCategoryEntity:
+		*s = VariableRemovedEventCategoryEntity
+	case VariableRemovedEventCategorySignal:
+		*s = VariableRemovedEventCategorySignal
 	default:
-		*s = VariableDeletedEventCategory(v)
+		*s = VariableRemovedEventCategory(v)
 	}
 
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s VariableDeletedEventCategory) MarshalJSON() ([]byte, error) {
+func (s VariableRemovedEventCategory) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *VariableDeletedEventCategory) UnmarshalJSON(data []byte) error {
+func (s *VariableRemovedEventCategory) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes VariableDeletedEventDelegationType as json.
-func (s VariableDeletedEventDelegationType) Encode(e *jx.Encoder) {
+// Encode encodes VariableRemovedEventDelegationType as json.
+func (s VariableRemovedEventDelegationType) Encode(e *jx.Encoder) {
 	e.Str(string(s))
 }
 
-// Decode decodes VariableDeletedEventDelegationType from json.
-func (s *VariableDeletedEventDelegationType) Decode(d *jx.Decoder) error {
+// Decode decodes VariableRemovedEventDelegationType from json.
+func (s *VariableRemovedEventDelegationType) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode VariableDeletedEventDelegationType to nil")
+		return errors.New("invalid: unable to decode VariableRemovedEventDelegationType to nil")
 	}
 	v, err := d.StrBytes()
 	if err != nil {
 		return err
 	}
 	// Try to use constant string.
-	switch VariableDeletedEventDelegationType(v) {
-	case VariableDeletedEventDelegationTypeDirect:
-		*s = VariableDeletedEventDelegationTypeDirect
-	case VariableDeletedEventDelegationTypeDelegated:
-		*s = VariableDeletedEventDelegationTypeDelegated
-	case VariableDeletedEventDelegationTypePatShared:
-		*s = VariableDeletedEventDelegationTypePatShared
-	case VariableDeletedEventDelegationTypeExchanged:
-		*s = VariableDeletedEventDelegationTypeExchanged
+	switch VariableRemovedEventDelegationType(v) {
+	case VariableRemovedEventDelegationTypeDirect:
+		*s = VariableRemovedEventDelegationTypeDirect
+	case VariableRemovedEventDelegationTypeDelegated:
+		*s = VariableRemovedEventDelegationTypeDelegated
+	case VariableRemovedEventDelegationTypePatShared:
+		*s = VariableRemovedEventDelegationTypePatShared
+	case VariableRemovedEventDelegationTypeExchanged:
+		*s = VariableRemovedEventDelegationTypeExchanged
 	default:
-		*s = VariableDeletedEventDelegationType(v)
+		*s = VariableRemovedEventDelegationType(v)
 	}
 
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s VariableDeletedEventDelegationType) MarshalJSON() ([]byte, error) {
+func (s VariableRemovedEventDelegationType) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *VariableDeletedEventDelegationType) UnmarshalJSON(data []byte) error {
+func (s *VariableRemovedEventDelegationType) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
 // Encode implements json.Marshaler.
-func (s *VariableDeletedPayload) Encode(e *jx.Encoder) {
+func (s *VariableRemovedPayload) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
 // encodeFields encodes fields.
-func (s *VariableDeletedPayload) encodeFields(e *jx.Encoder) {
+func (s *VariableRemovedPayload) encodeFields(e *jx.Encoder) {
 	{
 		if s.Kind.Set {
 			e.FieldStart("kind")
@@ -115330,14 +115384,14 @@ func (s *VariableDeletedPayload) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfVariableDeletedPayload = [1]string{
+var jsonFieldsNameOfVariableRemovedPayload = [1]string{
 	0: "kind",
 }
 
-// Decode decodes VariableDeletedPayload from json.
-func (s *VariableDeletedPayload) Decode(d *jx.Decoder) error {
+// Decode decodes VariableRemovedPayload from json.
+func (s *VariableRemovedPayload) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode VariableDeletedPayload to nil")
+		return errors.New("invalid: unable to decode VariableRemovedPayload to nil")
 	}
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
@@ -115357,115 +115411,61 @@ func (s *VariableDeletedPayload) Decode(d *jx.Decoder) error {
 		}
 		return nil
 	}); err != nil {
-		return errors.Wrap(err, "decode VariableDeletedPayload")
+		return errors.Wrap(err, "decode VariableRemovedPayload")
 	}
 
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *VariableDeletedPayload) MarshalJSON() ([]byte, error) {
+func (s *VariableRemovedPayload) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *VariableDeletedPayload) UnmarshalJSON(data []byte) error {
+func (s *VariableRemovedPayload) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes VariableDeletedPayloadKind as json.
-func (s VariableDeletedPayloadKind) Encode(e *jx.Encoder) {
+// Encode encodes VariableRemovedPayloadKind as json.
+func (s VariableRemovedPayloadKind) Encode(e *jx.Encoder) {
 	e.Str(string(s))
 }
 
-// Decode decodes VariableDeletedPayloadKind from json.
-func (s *VariableDeletedPayloadKind) Decode(d *jx.Decoder) error {
+// Decode decodes VariableRemovedPayloadKind from json.
+func (s *VariableRemovedPayloadKind) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode VariableDeletedPayloadKind to nil")
+		return errors.New("invalid: unable to decode VariableRemovedPayloadKind to nil")
 	}
 	v, err := d.StrBytes()
 	if err != nil {
 		return err
 	}
 	// Try to use constant string.
-	switch VariableDeletedPayloadKind(v) {
-	case VariableDeletedPayloadKindPrimary:
-		*s = VariableDeletedPayloadKindPrimary
-	case VariableDeletedPayloadKindPreview:
-		*s = VariableDeletedPayloadKindPreview
+	switch VariableRemovedPayloadKind(v) {
+	case VariableRemovedPayloadKindPrimary:
+		*s = VariableRemovedPayloadKindPrimary
+	case VariableRemovedPayloadKindPreview:
+		*s = VariableRemovedPayloadKindPreview
 	default:
-		*s = VariableDeletedPayloadKind(v)
+		*s = VariableRemovedPayloadKind(v)
 	}
 
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s VariableDeletedPayloadKind) MarshalJSON() ([]byte, error) {
+func (s VariableRemovedPayloadKind) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *VariableDeletedPayloadKind) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes VariableInput as json.
-func (s VariableInput) Encode(e *jx.Encoder) {
-	switch s.Type {
-	case NullVariableInput:
-		_ = s.Null
-		e.Null()
-	case VariableScalarVariableInput:
-		s.VariableScalar.Encode(e)
-	case SecretVariableInputVariableInput:
-		s.SecretVariableInput.Encode(e)
-	}
-}
-
-// Decode decodes VariableInput from json.
-func (s *VariableInput) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode VariableInput to nil")
-	}
-	// Sum type type_discriminator.
-	switch t := d.Next(); t {
-	case jx.Bool, jx.Number, jx.String:
-		if err := s.VariableScalar.Decode(d); err != nil {
-			return err
-		}
-		s.Type = VariableScalarVariableInput
-	case jx.Null:
-		if err := d.Null(); err != nil {
-			return err
-		}
-		s.Type = NullVariableInput
-	case jx.Object:
-		if err := s.SecretVariableInput.Decode(d); err != nil {
-			return err
-		}
-		s.Type = SecretVariableInputVariableInput
-	default:
-		return errors.Errorf("unexpected json type %q", t)
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s VariableInput) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *VariableInput) UnmarshalJSON(data []byte) error {
+func (s *VariableRemovedPayloadKind) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

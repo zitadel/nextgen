@@ -222,7 +222,7 @@ func (s *variableService) SetVariables(ctx context.Context, owner domain.Variabl
 			if err != nil {
 				return err
 			}
-			if err := emitVariableDeleted(ctx, stmts, owner, removal.kind, removal.name); err != nil {
+			if err := emitVariableRemoved(ctx, stmts, owner, removal.kind, removal.name); err != nil {
 				return err
 			}
 		}
@@ -329,7 +329,7 @@ func (s *variableService) DeleteVariable(ctx context.Context, owner domain.Varia
 				return err
 			}
 			removed++
-			if err := emitVariableDeleted(ctx, stmts, owner, kind, name); err != nil {
+			if err := emitVariableRemoved(ctx, stmts, owner, kind, name); err != nil {
 				return err
 			}
 		}
@@ -361,14 +361,14 @@ func emitVariableSet(ctx context.Context, stmts EventStatements, v *domain.Varia
 	})
 }
 
-func emitVariableDeleted(ctx context.Context, stmts EventStatements, owner domain.VariableOwner, kind domain.DeploymentOriginKind, name string) error {
+func emitVariableRemoved(ctx context.Context, stmts EventStatements, owner domain.VariableOwner, kind domain.DeploymentOriginKind, name string) error {
 	return audit.Emit(ctx, stmts, audit.EmitSpec{
-		Type:       domain.EventTypeVariableDeleted,
+		Type:       domain.EventTypeVariableRemoved,
 		Category:   domain.EventCategoryEntity,
 		ProjectID:  owner.ProjectID,
 		EntityType: "variable",
 		EntityID:   name,
-		Payload: domain.VariableDeletedPayload{
+		Payload: domain.VariableRemovedPayload{
 			Kind: kind.String(),
 		},
 	})

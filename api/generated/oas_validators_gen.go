@@ -5040,8 +5040,8 @@ func (s Event) Validate() error {
 			return err
 		}
 		return nil
-	case VariableDeletedEventEvent:
-		if err := s.VariableDeletedEvent.Validate(); err != nil {
+	case VariableRemovedEventEvent:
+		if err := s.VariableRemovedEvent.Validate(); err != nil {
 			return err
 		}
 		return nil
@@ -14778,7 +14778,57 @@ func (s *VariableByKind) Validate() error {
 	return nil
 }
 
-func (s *VariableDeletedEvent) Validate() error {
+func (s VariableInput) Validate() error {
+	switch s.Type {
+	case NullVariableInput:
+		return nil // no validation needed
+	case VariableScalarVariableInput:
+		if err := s.VariableScalar.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SecretVariableInputVariableInput:
+		if err := s.SecretVariableInput.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s VariableKind) Validate() error {
+	switch s {
+	case "primary":
+		return nil
+	case "preview":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s VariableName) Validate() error {
+	alias := (string)(s)
+	if err := (validate.String{
+		MinLength:     1,
+		MinLengthSet:  true,
+		MaxLength:     255,
+		MaxLengthSet:  true,
+		Email:         false,
+		Hostname:      false,
+		Regex:         regexMap["^\\w+$"],
+		MinNumeric:    0,
+		MinNumericSet: false,
+		MaxNumeric:    0,
+		MaxNumericSet: false,
+	}).Validate(string(alias)); err != nil {
+		return errors.Wrap(err, "string")
+	}
+	return nil
+}
+
+func (s *VariableRemovedEvent) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
@@ -14859,7 +14909,7 @@ func (s *VariableDeletedEvent) Validate() error {
 	return nil
 }
 
-func (s VariableDeletedEventActorType) Validate() error {
+func (s VariableRemovedEventActorType) Validate() error {
 	switch s {
 	case "human":
 		return nil
@@ -14874,7 +14924,7 @@ func (s VariableDeletedEventActorType) Validate() error {
 	}
 }
 
-func (s VariableDeletedEventCategory) Validate() error {
+func (s VariableRemovedEventCategory) Validate() error {
 	switch s {
 	case "request":
 		return nil
@@ -14893,7 +14943,7 @@ func (s VariableDeletedEventCategory) Validate() error {
 	}
 }
 
-func (s VariableDeletedEventDelegationType) Validate() error {
+func (s VariableRemovedEventDelegationType) Validate() error {
 	switch s {
 	case "direct":
 		return nil
@@ -14908,7 +14958,7 @@ func (s VariableDeletedEventDelegationType) Validate() error {
 	}
 }
 
-func (s *VariableDeletedPayload) Validate() error {
+func (s *VariableRemovedPayload) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
@@ -14938,7 +14988,7 @@ func (s *VariableDeletedPayload) Validate() error {
 	return nil
 }
 
-func (s VariableDeletedPayloadKind) Validate() error {
+func (s VariableRemovedPayloadKind) Validate() error {
 	switch s {
 	case "primary":
 		return nil
@@ -14947,56 +14997,6 @@ func (s VariableDeletedPayloadKind) Validate() error {
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}
-}
-
-func (s VariableInput) Validate() error {
-	switch s.Type {
-	case NullVariableInput:
-		return nil // no validation needed
-	case VariableScalarVariableInput:
-		if err := s.VariableScalar.Validate(); err != nil {
-			return err
-		}
-		return nil
-	case SecretVariableInputVariableInput:
-		if err := s.SecretVariableInput.Validate(); err != nil {
-			return err
-		}
-		return nil
-	default:
-		return errors.Errorf("invalid type %q", s.Type)
-	}
-}
-
-func (s VariableKind) Validate() error {
-	switch s {
-	case "primary":
-		return nil
-	case "preview":
-		return nil
-	default:
-		return errors.Errorf("invalid value: %v", s)
-	}
-}
-
-func (s VariableName) Validate() error {
-	alias := (string)(s)
-	if err := (validate.String{
-		MinLength:     1,
-		MinLengthSet:  true,
-		MaxLength:     255,
-		MaxLengthSet:  true,
-		Email:         false,
-		Hostname:      false,
-		Regex:         regexMap["^\\w+$"],
-		MinNumeric:    0,
-		MinNumericSet: false,
-		MaxNumeric:    0,
-		MaxNumericSet: false,
-	}).Validate(string(alias)); err != nil {
-		return errors.Wrap(err, "string")
-	}
-	return nil
 }
 
 func (s VariableScalar) Validate() error {

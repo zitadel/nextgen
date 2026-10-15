@@ -42,7 +42,7 @@ oneOf:
   - $ref: types/user-created-event.yaml
   - $ref: types/user-deleted-event.yaml
   - $ref: types/user-updated-event.yaml
-  - $ref: types/variable-deleted-event.yaml
+  - $ref: types/variable-removed-event.yaml
   - $ref: types/variable-set-event.yaml
 discriminator:
   propertyName: event_type
@@ -86,5 +86,5 @@ discriminator:
     user.created: types/user-created-event.yaml
     user.deleted: types/user-deleted-event.yaml
     user.updated: types/user-updated-event.yaml
-    variable.deleted: types/variable-deleted-event.yaml
+    variable.removed: types/variable-removed-event.yaml
     variable.set: types/variable-set-event.yaml

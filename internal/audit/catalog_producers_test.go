@@ -50,7 +50,7 @@ var livePathBProducers = map[domain.EventType]string{
 	domain.EventTypeOriginAdded:                "internal/service",
 	domain.EventTypeOriginRemoved:              "internal/service",
 	domain.EventTypeVariableSet:                "internal/service",
-	domain.EventTypeVariableDeleted:            "internal/service",
+	domain.EventTypeVariableRemoved:            "internal/service",
 	domain.EventTypeAuthzGranted:               "internal/service",
 	domain.EventTypeAuthzRevoked:               "internal/service",
 	domain.EventTypeAuthFactorPasswordSet:      "internal/service",

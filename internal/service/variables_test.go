@@ -310,7 +310,7 @@ func TestVariableService_SetVariables(t *testing.T) {
 				{Name: "token", Value: "s3cret", IsSecret: true},
 			}))
 			require.Len(t, *events, 2, "the removal and the write are each recorded")
-			assert.Equal(t, domain.EventTypeVariableDeleted, (*events)[0].EventType)
+			assert.Equal(t, domain.EventTypeVariableRemoved, (*events)[0].EventType)
 			assert.JSONEq(t, `{"kind":"preview"}`, string((*events)[0].Payload))
 			assert.Equal(t, domain.EventTypeVariableSet, (*events)[1].EventType)
 		})
@@ -657,7 +657,7 @@ func TestVariableService_SetVariables(t *testing.T) {
 			got = append(got, recorded{event.EventType, *event.EntityID, string(event.Payload)})
 		}
 		want := []recorded{
-			{domain.EventTypeVariableDeleted, "legacy", `{"kind":"primary"}`},
+			{domain.EventTypeVariableRemoved, "legacy", `{"kind":"primary"}`},
 			{domain.EventTypeVariableSet, "theme", `{"kind":"primary","secret":false}`},
 			{domain.EventTypeVariableSet, "theme", `{"kind":"preview","secret":false}`},
 			{domain.EventTypeVariableSet, "token", `{"kind":"primary","secret":true}`},
@@ -679,7 +679,7 @@ func TestVariableService_DeleteVariable(t *testing.T) {
 
 		require.NoError(t, svc.DeleteVariable(t.Context(), variablesOwner, primaryKind, "theme"))
 		require.Len(t, *events, 1)
-		assert.Equal(t, domain.EventTypeVariableDeleted, (*events)[0].EventType)
+		assert.Equal(t, domain.EventTypeVariableRemoved, (*events)[0].EventType)
 		assert.JSONEq(t, `{"kind":"primary"}`, string((*events)[0].Payload))
 	})
 

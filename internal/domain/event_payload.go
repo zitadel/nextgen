@@ -291,10 +291,10 @@ type VariableSetPayload struct {
 	Secret bool   `json:"secret"`
 }
 
-// VariableDeletedPayload is the record of one variable row removed. It
+// VariableRemovedPayload is the record of one variable row removed. It
 // carries no secret flag: a removal learns nothing about the row it deleted,
 // and reading it first would be a round-trip spent on the audit record alone.
-type VariableDeletedPayload struct {
+type VariableRemovedPayload struct {
 	Kind string `json:"kind"`
 }
 
