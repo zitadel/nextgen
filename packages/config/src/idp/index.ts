@@ -1,5 +1,6 @@
 /**
- * The providers `zitadel setup` and `sso enable` can scaffold a connection for.
+ * The providers `zitadel setup` and `auth-method sso enable` can scaffold a
+ * connection for.
  *
  * Adding a catalog one means adding a class, naming it in {@link IDP_PROVIDERS}
  * and listing it in the registry below, which the compiler holds to the same

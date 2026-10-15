@@ -30,6 +30,7 @@ import {
 import { FLOWS_DIR, flowEnvRefs } from "../flows";
 import { IDPS_DIR, refuseResolvedSecret } from "../idp";
 import { SCHEMAS_DIR } from "../user-schema";
+import { primaryValues } from "../variables";
 import { ZitadelError } from "../errors";
 import { FatalFetchError } from "./types.js";
 import type { ResourceSyncer } from "./types.js";
@@ -373,10 +374,15 @@ class IdpConnectionSyncer implements ResourceSyncer {
       return;
     }
     this.variables ??= this.client
-      .getVariables({ project_id: this.projectId })
+      .getVariables({ project_id: this.projectId, kind: "primary" })
       .then(
         (held) =>
-          new Map(Object.entries(held).map(([name, value]) => [name, typeof value === "object"])),
+          new Map(
+            Object.entries(primaryValues(held)).map(([name, value]) => [
+              name,
+              typeof value === "object",
+            ]),
+          ),
       );
     const held = await this.variables;
     const [id, secret] = named;

@@ -1,0 +1,34 @@
+post:
+  operationId: addOrigin
+  summary: Add an origin pattern
+  description: |
+    Adds one `{pattern, kind}` to the project's origins. A primary pattern
+    must be an exact URL (no wildcard). Preview patterns may include a single
+    DNS-label wildcard. Adding a pattern that already exists with the same
+    kind is idempotent and answers 201 with the stored origin.
+  tags:
+    - Projects
+  parameters:
+    - name: project_id
+      in: path
+      required: true
+      schema:
+        $ref: ../../../../components/schemas/project-id.yaml
+  security:
+    - oauth2:
+        - origin.write
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../../project-origin.yaml
+  responses:
+    '201':
+      description: The pattern was added.
+      content:
+        application/json:
+          schema:
+            $ref: add-origin-response.yaml
+    default:
+      $ref: addOrigin-error-response.yaml

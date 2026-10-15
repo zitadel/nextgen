@@ -111,6 +111,12 @@ test("prepares the customer local setup journey in the app root", async () => {
     await assert.rejects(readFile(join(appDir, "myapp/package.json"), "utf8"), {
       code: "ENOENT",
     });
+    // Each CLI step's duration, for the runner's timing table.
+    assert.deepEqual(await timedSteps(workDir), [
+      { phase: "doctor", ok: true },
+      { phase: "start", ok: true },
+      { phase: "setup", ok: true },
+    ]);
   } finally {
     await rm(workDir, { recursive: true, force: true });
   }
@@ -163,6 +169,11 @@ test("collects local runtime logs when a CLI step fails", async () => {
     assert.equal(logs.data.logs, "runtime log");
     const start = JSON.parse(await readFile(join(workDir, "start.json"), "utf8"));
     assert.equal(start.status, "error");
+    // The timings end at the failed step, so the table shows where the lane stopped.
+    assert.deepEqual(await timedSteps(workDir), [
+      { phase: "doctor", ok: true },
+      { phase: "start", ok: false },
+    ]);
   } finally {
     await rm(workDir, { recursive: true, force: true });
   }
@@ -175,44 +186,9 @@ test("passes the sign-in preset through to setup and records it", async () => {
 
   try {
     const metadata = await prepareApp({
-      env: {
-        JOURNEY_APP_URL: "http://localhost:3010",
-        JOURNEY_CLI_PACKAGE: "@zitadel/cli",
-        JOURNEY_FRAMEWORK: "next",
-        JOURNEY_PRESET: "passkey-first",
-        JOURNEY_REGISTRY_URL: registryUrl,
-        JOURNEY_SDK_PACKAGE: "@zitadel/sdk-next",
-        JOURNEY_WORK_DIR: workDir,
-      },
+      env: { ...freshNextEnv(workDir, registryUrl), JOURNEY_PRESET: "passkey-first" },
       logMetadata: false,
-      runCapture: async (command, args, options) => {
-        calls.push({ command, args });
-        if (args.includes("setup")) {
-          await writeGeneratedApp(options.cwd, registryUrl, "@zitadel/sdk-next");
-          await writeBoundaryFile(options.cwd);
-        }
-        // The Next suite runs the managed-file drift probe after setup:
-        // the doctor call against the deleted boundary must fail, and
-        // `doctor --fix` must restore the file before the probe re-reads it.
-        if (args.includes("doctor") && !args.includes("--fix")) {
-          const boundaryExists = await fileExists(join(options.cwd, "proxy.ts"));
-          if (!boundaryExists && calls.some((call) => call.args.includes("setup"))) {
-            return {
-              code: 3,
-              stdout: `${JSON.stringify(driftEnvelope())}\n`,
-              stderr: "",
-            };
-          }
-        }
-        if (args.includes("doctor") && args.includes("--fix")) {
-          await writeBoundaryFile(options.cwd);
-        }
-        return {
-          code: 0,
-          stdout: `${JSON.stringify(okEnvelope(args))}\n`,
-          stderr: "",
-        };
-      },
+      runCapture: nextCli(calls, registryUrl),
     });
 
     const setupCall = calls.find((call) => call.args.includes("setup"));
@@ -222,6 +198,24 @@ test("passes the sign-in preset through to setup and records it", async () => {
 
     const doctorCall = calls.find((call) => call.args.includes("doctor"));
     assert.ok(!doctorCall.args.includes("--preset"), "only setup takes the preset");
+    // The drift probe is the fresh-app suite's; a preset suite runs doctor once.
+    await assertNoDriftProbe(calls, workDir);
+  } finally {
+    await rm(workDir, { recursive: true, force: true });
+  }
+});
+
+test("probes doctor's managed-file drift in the fresh-app Next suite", async () => {
+  const workDir = await mkdtemp(join(tmpdir(), "zitadel-journey-prepare-drift-test-"));
+  const calls = [];
+  const registryUrl = "http://127.0.0.1:4873";
+
+  try {
+    await prepareApp({
+      env: freshNextEnv(workDir, registryUrl),
+      logMetadata: false,
+      runCapture: nextCli(calls, registryUrl),
+    });
 
     // The drift probe ran: a failing doctor snapshot, a --fix invocation,
     // and the restored boundary file.
@@ -232,6 +226,30 @@ test("passes the sign-in preset through to setup and records it", async () => {
     assert.ok(JSON.parse(await readFile(join(workDir, "doctor-fix.json"), "utf8")));
     const boundary = await readFile(join(workDir, "myapp", "proxy.ts"), "utf8");
     assert.ok(boundary.includes("zitadel-cli: managed-file"));
+    assert.deepEqual(
+      (await timedSteps(workDir)).map(({ phase }) => phase),
+      ["doctor", "start", "setup", "drift"],
+    );
+  } finally {
+    await rm(workDir, { recursive: true, force: true });
+  }
+});
+
+test("scaffolds the testkit suite's app without the drift probe", async () => {
+  const workDir = await mkdtemp(join(tmpdir(), "zitadel-journey-prepare-testkit-test-"));
+  const calls = [];
+  const registryUrl = "http://127.0.0.1:4873";
+
+  try {
+    await prepareApp({
+      env: { ...freshNextEnv(workDir, registryUrl), JOURNEY_SUITE: "testkit" },
+      logMetadata: false,
+      runCapture: nextCli(calls, registryUrl),
+    });
+
+    // The kit's consumer suite runs in that app, not the journey specs that
+    // read the probe's artifacts.
+    await assertNoDriftProbe(calls, workDir);
   } finally {
     await rm(workDir, { recursive: true, force: true });
   }
@@ -310,17 +328,6 @@ test("seeds the checked-in pre-existing app before any CLI step (ADR 044)", asyn
             homepage: await readFile(join(options.cwd, "app/page.tsx"), "utf8"),
           };
           await writeGeneratedApp(options.cwd, registryUrl, "@zitadel/sdk-next");
-          await writeBoundaryFile(options.cwd);
-        }
-        // The Next suite's drift probe: doctor fails on the deleted
-        // boundary, and --fix restores it (same emulation as the preset test).
-        if (args.includes("doctor") && !args.includes("--fix")) {
-          if (appStateAtSetup && !(await fileExists(join(options.cwd, "proxy.ts")))) {
-            return { code: 3, stdout: `${JSON.stringify(driftEnvelope())}\n`, stderr: "" };
-          }
-        }
-        if (args.includes("doctor") && args.includes("--fix")) {
-          await writeBoundaryFile(options.cwd);
         }
         return { code: 0, stdout: `${JSON.stringify(okEnvelope(args))}\n`, stderr: "" };
       },
@@ -339,6 +346,8 @@ test("seeds the checked-in pre-existing app before any CLI step (ADR 044)", asyn
       "exact pins: caret ^19.0.0 lets npm pair react 19.2 with react-dom 19.3 (ERESOLVE)",
     );
     assert.ok(appStateAtSetup.homepage.includes("Welcome to Orbit Notes"));
+    // The drift probe is the fresh-app suite's; a pre-existing app gets none.
+    await assert.rejects(readFile(join(workDir, "doctor-drift.json"), "utf8"), { code: "ENOENT" });
   } finally {
     await rm(workDir, { recursive: true, force: true });
   }
@@ -516,6 +525,58 @@ function okEnvelope(args) {
     return { status: "ok", data: { server: `http://localhost:${port}` } };
   }
   return { status: "ok", data: { ok: true } };
+}
+
+/** A fresh Next app's journey env, as the runner's fresh-app lane passes it. */
+function freshNextEnv(workDir, registryUrl) {
+  return {
+    JOURNEY_APP_URL: "http://localhost:3010",
+    JOURNEY_CLI_PACKAGE: "@zitadel/cli",
+    JOURNEY_FRAMEWORK: "next",
+    JOURNEY_REGISTRY_URL: registryUrl,
+    JOURNEY_SDK_PACKAGE: "@zitadel/sdk-next",
+    JOURNEY_WORK_DIR: workDir,
+  };
+}
+
+/**
+ * A CLI double for a Next app, recording each call into `calls`: setup
+ * writes the scaffold with its managed boundary, doctor fails once the
+ * boundary is gone, and `doctor --fix` restores it — what the drift probe
+ * expects of the real CLI.
+ */
+function nextCli(calls, registryUrl) {
+  return async (command, args, options) => {
+    calls.push({ command, args });
+    if (args.includes("setup")) {
+      await writeGeneratedApp(options.cwd, registryUrl, "@zitadel/sdk-next");
+      await writeBoundaryFile(options.cwd);
+    }
+    if (args.includes("doctor") && !args.includes("--fix")) {
+      const boundaryExists = await fileExists(join(options.cwd, "proxy.ts"));
+      if (!boundaryExists && calls.some((call) => call.args.includes("setup"))) {
+        return { code: 3, stdout: `${JSON.stringify(driftEnvelope())}\n`, stderr: "" };
+      }
+    }
+    if (args.includes("doctor") && args.includes("--fix")) {
+      await writeBoundaryFile(options.cwd);
+    }
+    return { code: 0, stdout: `${JSON.stringify(okEnvelope(args))}\n`, stderr: "" };
+  };
+}
+
+/** The steps prepare-app timed into `timings.json`, without their durations. */
+async function timedSteps(workDir) {
+  const phases = JSON.parse(await readFile(join(workDir, "timings.json"), "utf8"));
+  for (const { ms } of phases) {
+    assert.ok(Number.isInteger(ms) && ms >= 0, `duration ${ms} is whole milliseconds`);
+  }
+  return phases.map(({ phase, ok }) => ({ phase, ok }));
+}
+
+async function assertNoDriftProbe(calls, workDir) {
+  assert.ok(!calls.some((call) => call.args.includes("--fix")), "no doctor --fix step");
+  await assert.rejects(readFile(join(workDir, "doctor-drift.json"), "utf8"), { code: "ENOENT" });
 }
 
 /** The doctor failure envelope the drift probe expects for a deleted boundary. */

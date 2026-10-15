@@ -354,7 +354,7 @@ describe("plan", () => {
         });
       });
 
-      it("accepts what sso enable writes", async () => {
+      it("accepts what auth-method sso enable writes", async () => {
         const app = await anAppWithGoogle();
 
         expect(await app.planAttempt()).toSucceed();

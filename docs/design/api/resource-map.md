@@ -19,7 +19,8 @@ A project is a tenant / deployment. One project is reserved as the **platform pr
 /projects/{id}
 /projects/{id}/domains
 /projects/{id}/features
-/projects/{id}/allowed_origins
+/projects/{id}/origins
+/projects/{id}/origins/remove
 /projects/{id}/signing_keys
 /projects/{id}/api_keys
 /projects/{id}/webhooks

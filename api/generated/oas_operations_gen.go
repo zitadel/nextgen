@@ -6,6 +6,7 @@ package api
 type OperationName = string
 
 const (
+	AddOriginOperation                     OperationName = "AddOrigin"
 	BeginUserPasskeyRegistrationOperation  OperationName = "BeginUserPasskeyRegistration"
 	BuildReleaseOperation                  OperationName = "BuildRelease"
 	CompleteClaimOperation                 OperationName = "CompleteClaim"
@@ -34,6 +35,7 @@ const (
 	GetClaimStatusOperation                OperationName = "GetClaimStatus"
 	GetClaimWindowOperation                OperationName = "GetClaimWindow"
 	GetDeploymentByIdOperation             OperationName = "GetDeploymentById"
+	GetDeploymentVariablesOperation        OperationName = "GetDeploymentVariables"
 	GetEventOperation                      OperationName = "GetEvent"
 	GetFlowDefinitionOperation             OperationName = "GetFlowDefinition"
 	GetFlowStepOperation                   OperationName = "GetFlowStep"
@@ -76,6 +78,7 @@ const (
 	QuerySessionsOperation                 OperationName = "QuerySessions"
 	QueryTeamsOperation                    OperationName = "QueryTeams"
 	QueryUsersOperation                    OperationName = "QueryUsers"
+	RemoveOriginOperation                  OperationName = "RemoveOrigin"
 	RemovePreviewOperation                 OperationName = "RemovePreview"
 	RevokeMySessionOperation               OperationName = "RevokeMySession"
 	RevokeReleaseOperation                 OperationName = "RevokeRelease"

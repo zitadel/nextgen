@@ -91,7 +91,15 @@ export function createLiquidEngine(options: CreateLiquidOptions): Liquid {
   engine.registerFilter(
     "t",
     function tFilter(this: { context: unknown }, key: unknown, ...args: unknown[]) {
-      const lookupKey = stringify(key);
+      const requested = stringify(key);
+      // A step with providers asks for `<step>.description.sso`; when neither it
+      // nor the plain description exists, the plain key is the one to add.
+      const lookupKey =
+        requested.endsWith(SSO_DESCRIPTION_SUFFIX) &&
+        options.locale[requested] === undefined &&
+        options.locale[requested.slice(0, -".sso".length)] === undefined
+          ? requested.slice(0, -".sso".length)
+          : requested;
       let template =
         options.locale[lookupKey] ??
         injectedKeyFallback(options.locale, lookupKey) ??
@@ -205,9 +213,18 @@ const INJECTED_KEY_FALLBACKS: ReadonlyArray<{ suffix: string; fallback: string }
   { suffix: ".action.back", fallback: "action.back" },
 ];
 
+const SSO_DESCRIPTION_SUFFIX = ".description.sso";
+
 function injectedKeyFallback(locale: Locale, key: string): string | undefined {
   for (const { suffix, fallback } of INJECTED_KEY_FALLBACKS) {
     if (key.endsWith(suffix)) return locale[fallback];
+  }
+  // A step that offers providers asks for `<step>.description.sso` (see
+  // `buildStep`). Only the steps whose plain text would mislead need their own;
+  // every other step, and any locale written before the key existed, shows the
+  // plain description.
+  if (key.endsWith(SSO_DESCRIPTION_SUFFIX)) {
+    return locale[key.slice(0, -".sso".length)];
   }
   return undefined;
 }

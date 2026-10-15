@@ -122,7 +122,7 @@ catalogMode: strict
 # SWC, sharp, …), not only this machine's. Set here, not in package.json: in
 # a workspace, pnpm 10 lets package.json's value override the `--os` and
 # `--cpu` flags of `pnpm install`, which the cloud build passes to install
-# only its own platform (apps/cloud/install.sh).
+# only its own platform (the services' installCommand in vercel.json).
 supportedArchitectures:
   os:
     - current

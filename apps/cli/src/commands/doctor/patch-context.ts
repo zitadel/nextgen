@@ -47,7 +47,16 @@ export async function loadPatchContext(
       id: secret.project_id,
       project_secret: secret.project_secret,
       preview_secret: secret.preview_secret,
-      preview_origins: secret.preview_origins,
+      origins: [
+        ...(secret.primary_origins ?? []).map((pattern) => ({
+          pattern,
+          kind: "primary" as const,
+        })),
+        ...secret.preview_origins.map((pattern) => ({
+          pattern,
+          kind: "preview" as const,
+        })),
+      ],
       created_at: secret.created_at,
     },
   };
