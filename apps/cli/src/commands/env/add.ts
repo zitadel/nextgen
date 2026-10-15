@@ -155,7 +155,9 @@ export default class EnvAdd extends BaseCommand {
     if (projectId === undefined) {
       const created = await createZitadelClient({ baseUrl: server }).createProject({
         name: `${basename(cwd)}-${name}`,
-        ...(issuer === undefined ? {} : { preview_origins: [issuer] }),
+        ...(issuer === undefined
+          ? {}
+          : { origins: [{ pattern: issuer, kind: "preview" as const }] }),
         seed_defaults: false,
       });
       consola.success(`Created project ${created.id}`);
