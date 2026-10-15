@@ -229,6 +229,10 @@ type IDPIdentityLinkStatements interface {
 	// GetIDPIdentityLink returns the link matching filter. No match returns
 	// *database.NoRowFoundError.
 	GetIDPIdentityLink(ctx context.Context, filter database.Filter[domain.IDPIdentityLinkField]) (*domain.IDPIdentityLink, error)
+	// ListIDPIdentityLinks pages the links matching filter. No match returns an
+	// empty page, so a caller needs UserExists to tell an unknown user from a
+	// user with no links.
+	ListIDPIdentityLinks(ctx context.Context, filter *database.ListOptions[domain.IDPIdentityLinkField]) (*database.ListResult[*domain.IDPIdentityLink], error)
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods

@@ -741,6 +741,13 @@ type Handler interface {
 	//
 	// GET /schemas
 	ListSchemas(ctx context.Context, params ListSchemasParams) (ListSchemasRes, error)
+	// ListUserIdentityLinks implements listUserIdentityLinks operation.
+	//
+	// The identity provider accounts a sign-in linked to the user, oldest first.
+	// The provider's subject and claims are never returned.
+	//
+	// GET /users/{user_id}/identity_links
+	ListUserIdentityLinks(ctx context.Context, params ListUserIdentityLinksParams) (ListUserIdentityLinksRes, error)
 	// ListUserPasskeys implements listUserPasskeys operation.
 	//
 	// List user passkeys.
