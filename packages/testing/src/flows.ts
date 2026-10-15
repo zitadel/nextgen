@@ -135,7 +135,10 @@ export function flowField(page: Page, field: string, options: FlowFieldOptions =
     .getByTestId(`zitadel-input-${field}`)
     .or(page.getByTestId(`zitadel-field-${field}`).locator("input"));
   if (options.label) {
-    candidates = candidates.or(widgetRoot(page).getByLabel(options.label));
+    // By role, not `getByLabel`: a label lookup also matches other controls
+    // named after the field, such as the password field's "Show password"
+    // toggle. Every field this fills is a text input.
+    candidates = candidates.or(widgetRoot(page).getByRole("textbox", { name: options.label }));
   }
   return candidates.first();
 }
