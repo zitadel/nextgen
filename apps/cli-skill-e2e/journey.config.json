@@ -1,19 +1,64 @@
 {
-  "description": "Common questions a developer asks the zitadel CLI, run as one stateful journey against a single project. Each stage is a fresh agent task sharing the project and server the earlier stages built. The agent drives the CLI non-interactively, but may converse with the user: a stage with a `user` persona is run as a multi-turn conversation where a simulated user answers the agent's questions from that persona.",
+  "description": "Common questions a developer asks the zitadel CLI, run as one stateful journey against a single project. Each stage is a fresh agent task sharing the project and server the earlier stages built. The agent drives the CLI non-interactively, but may converse with the user: a stage with a `user` persona is run as a multi-turn conversation where a simulated user answers the agent's questions from that persona. Each stage grades on OUTCOME: after the agent's turn, the harness runs the stage's `assert` list against the live local instance (read commands, `--json`) and the stage passes only if every assertion holds. `grade` is a fallback for stages that have no server-assertable outcome.",
   "configs": ["with-skill", "baseline"],
+  "cliSpec": "@zitadel/cli@alpha",
   "stages": [
     {
       "id": 1,
       "title": "Set up a project (agent elicits the fields + sign-in method)",
       "grade": "setup",
       "prompt": "I want to add sign-up and sign-in to the app in this directory using Zitadel. Set up a new Zitadel project and apply it to a running local server. This is my app, so ask me whatever you need to decide how sign-up and sign-in should work rather than guessing.",
-      "user": "You are the developer who owns this app. You want people to sign up with their first name and last name, and sign in with a password. You do NOT want passkeys or single sign-on yet. Answer the agent's questions briefly and concretely from these preferences, and don't volunteer requirements it didn't ask about."
+      "user": "You are the developer who owns this app. You want people to sign up with their first name and last name, and sign in with a password. You do NOT want passkeys or single sign-on yet. Answer the agent's questions briefly and concretely from these preferences, and don't volunteer requirements it didn't ask about.",
+      "assert": [
+        {
+          "name": "a project exists on the instance",
+          "get": "projects list",
+          "path": "items",
+          "op": "count-gte",
+          "value": 1
+        },
+        {
+          "name": "deployed schema collects a first name",
+          "get": "schemas get human-user",
+          "path": ["schema.properties.givenName", "schema.properties.firstName"],
+          "op": "exists"
+        },
+        {
+          "name": "deployed schema collects a last name",
+          "get": "schemas get human-user",
+          "path": ["schema.properties.familyName", "schema.properties.lastName"],
+          "op": "exists"
+        },
+        {
+          "name": "password sign-in is enabled",
+          "get": "schemas get human-user",
+          "path": "schema.x-auth-methods.password.enabled",
+          "op": "eq",
+          "value": true
+        },
+        {
+          "name": "passkeys are NOT enabled (the developer said no)",
+          "get": "schemas get human-user",
+          "path": "schema.x-auth-methods.passkey.enabled",
+          "op": "neq",
+          "value": true
+        }
+      ]
     },
     {
       "id": 2,
       "title": "List all the projects",
       "grade": "list-projects",
-      "prompt": "Using the zitadel CLI in this directory, list all the projects and tell me what you find. Drive the CLI non-interactively."
+      "prompt": "Using the zitadel CLI in this directory, list all the projects and tell me what you find. Drive the CLI non-interactively.",
+      "assert": [
+        {
+          "name": "exactly one project exists",
+          "get": "projects list",
+          "path": "items",
+          "op": "count-eq",
+          "value": 1
+        }
+      ]
     },
     {
       "id": 3,
@@ -25,13 +70,35 @@
       "id": 4,
       "title": "Add a telephone number field + deploy",
       "grade": "schema-has-phone",
-      "prompt": "Using the zitadel CLI in this directory, add a telephone number field to my user schema and deploy the change. Drive the CLI non-interactively."
+      "prompt": "Using the zitadel CLI in this directory, add a telephone number field to my user schema and deploy the change. Drive the CLI non-interactively.",
+      "assert": [
+        {
+          "name": "a phone field is live on the deployed schema",
+          "get": "schemas get human-user",
+          "path": [
+            "schema.properties.phoneNumber",
+            "schema.properties.telephoneNumber",
+            "schema.properties.phone",
+            "schema.properties.telephone"
+          ],
+          "op": "exists"
+        }
+      ]
     },
     {
       "id": 5,
       "title": "Enable passkeys + deploy",
       "grade": "passkey-enabled",
-      "prompt": "Using the zitadel CLI in this directory, enable passkeys for my users and deploy the change. Drive the CLI non-interactively."
+      "prompt": "Using the zitadel CLI in this directory, enable passkeys for my users and deploy the change. Drive the CLI non-interactively.",
+      "assert": [
+        {
+          "name": "passkeys are enabled on the deployed schema",
+          "get": "schemas get human-user",
+          "path": "schema.x-auth-methods.passkey.enabled",
+          "op": "eq",
+          "value": true
+        }
+      ]
     }
   ]
 }
