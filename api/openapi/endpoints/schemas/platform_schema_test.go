@@ -34,11 +34,11 @@ func TestPlatformHumanUserSchemaExtendsTheDefault(t *testing.T) {
 
 	assert.Equal(t, base["$id"], platform["$id"])
 	assert.Equal(t, base["required"], platform["required"])
-	assert.Equal(t, []any{schemas.PlatformDisplayNameProperty}, platform["x-display"])
+	assert.Equal(t, []string{schemas.PlatformDisplayNameProperty}, domain.DesignatedDisplay(doc))
 
 	props := platform["properties"].(map[string]any)
 	assert.Contains(t, props, "email")
 	assert.Contains(t, props, schemas.PlatformDisplayNameProperty)
 	assert.Len(t, props, len(base["properties"].(map[string]any))+1)
-	assert.NotContains(t, base, "x-display", "customer projects keep the default untouched")
+	assert.Empty(t, domain.DesignatedDisplay(schemas.DefaultHumanUserSchema(testBase)), "customer projects keep the default untouched")
 }
