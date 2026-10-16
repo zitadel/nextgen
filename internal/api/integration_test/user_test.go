@@ -1099,3 +1099,48 @@ func TestListPasskeys(t *testing.T) {
 		assert.IsType(t, &api.ListUserPasskeysNotFound{}, resp, helpers.MustMarshal(t, resp))
 	})
 }
+
+// TestGetMyUserSchema: a person reads the schema their own record is validated
+// against with nothing but their session — no grant in the project (self-access,
+// like the rest of /users/me).
+func TestGetMyUserSchema(t *testing.T) {
+	t.Parallel()
+
+	t.Run("own schema, without a grant", func(t *testing.T) {
+		t.Parallel()
+		_, _, cookie := ownSessionUser(t)
+
+		status, body := consoleCall(t, cookie, http.MethodGet, "/users/me", "")
+		require.Equal(t, http.StatusOK, status, body)
+		var me struct {
+			Schema string `json:"schema"`
+		}
+		require.NoError(t, json.Unmarshal([]byte(body), &me), body)
+
+		status, body = consoleCall(t, cookie, http.MethodGet, "/users/me/schema", "")
+		require.Equal(t, http.StatusOK, status, body)
+		var schema struct {
+			ID string `json:"id"`
+		}
+		require.NoError(t, json.Unmarshal([]byte(body), &schema), body)
+		assert.Equal(t, me.Schema, schema.ID)
+	})
+
+	t.Run("missing session cookie", func(t *testing.T) {
+		t.Parallel()
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, harness.EnsureTestServer(t).URL+"/users/me/schema", nil)
+		require.NoError(t, err)
+		resp, err := harness.EnsureHttpClient(t).Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+
+		require.Equal(t, http.StatusUnauthorized, resp.StatusCode, string(body))
+		var answer struct {
+			Code string `json:"code"`
+		}
+		require.NoError(t, json.Unmarshal(body, &answer))
+		assert.Equal(t, "auth.unauthorized", answer.Code)
+	})
+}

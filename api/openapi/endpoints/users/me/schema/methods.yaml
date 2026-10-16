@@ -1,0 +1,35 @@
+get:
+  operationId: getMyUserSchema
+  summary: Get my user schema
+  description: |
+    The schema the signed-in user's own record is validated against — the
+    document `PATCH /users/me` validates against. Self-access: the session is
+    the authorization, like the rest of `/users/me`.
+  tags:
+    - Users
+  security:
+    - nextgenSession: []
+  responses:
+    '200':
+      description: The user's schema.
+      headers:
+        Cache-Control:
+          $ref: ../../../../components/headers/cache-control-private-no-store.yaml
+      content:
+        application/json:
+          schema:
+            $ref: ../../../schemas/schema.yaml
+    '401':
+      description: Missing or invalid session token.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/schemas/errors/auth-unauthorized.yaml
+    '404':
+      description: User referenced by the current session was not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/schemas/errors/user-not_found.yaml
+    default:
+      $ref: getMyUserSchema-error-response.yaml

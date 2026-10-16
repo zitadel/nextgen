@@ -635,6 +635,17 @@ func (UnimplementedHandler) GetMyUser(ctx context.Context) (r GetMyUserRes, _ er
 	return r, ht.ErrNotImplemented
 }
 
+// GetMyUserSchema implements getMyUserSchema operation.
+//
+// The schema the signed-in user's own record is validated against — the
+// document `PATCH /users/me` validates against. Self-access: the session is
+// the authorization, like the rest of `/users/me`.
+//
+// GET /users/me/schema
+func (UnimplementedHandler) GetMyUserSchema(ctx context.Context) (r GetMyUserSchemaRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetProject implements getProject operation.
 //
 // Returns the current state of a project.

@@ -513,6 +513,14 @@ type Handler interface {
 	//
 	// GET /users/me
 	GetMyUser(ctx context.Context) (GetMyUserRes, error)
+	// GetMyUserSchema implements getMyUserSchema operation.
+	//
+	// The schema the signed-in user's own record is validated against — the
+	// document `PATCH /users/me` validates against. Self-access: the session is
+	// the authorization, like the rest of `/users/me`.
+	//
+	// GET /users/me/schema
+	GetMyUserSchema(ctx context.Context) (GetMyUserSchemaRes, error)
 	// GetProject implements getProject operation.
 	//
 	// Returns the current state of a project.

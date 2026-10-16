@@ -285,9 +285,9 @@ func (h *Handler) PatchUserByID(ctx context.Context, req *api.PatchUserRequest, 
 }
 
 func (h *Handler) PatchMyUser(ctx context.Context, req *api.PatchMyUserRequest) (api.PatchMyUserRes, error) {
-	sessionToken, ok := sessionTokenFromContext(ctx)
-	if !ok {
-		return nil, domain.ErrSessionTokenInvalid()
+	self, err := requireSelf(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	attributes, err := convertUsingJson[map[string]any](req.Attributes)
@@ -296,8 +296,8 @@ func (h *Handler) PatchMyUser(ctx context.Context, req *api.PatchMyUserRequest) 
 	}
 
 	user, err := h.userService.PatchMyUser(ctx, service.PatchMyUserInput{
-		SessionToken: sessionToken,
-		Attributes:   *attributes,
+		Self:       self,
+		Attributes: *attributes,
 	})
 	if err != nil {
 		return nil, err
@@ -324,20 +324,34 @@ func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordR
 }
 
 func (h *Handler) GetMyUser(ctx context.Context) (api.GetMyUserRes, error) {
-	sessionToken, ok := sessionTokenFromContext(ctx)
-	if !ok {
-		return nil, domain.ErrSessionTokenInvalid()
-	}
-	input := service.GetMyUserInput{
-		SessionToken: sessionToken,
-	}
-
-	user, err := h.userService.GetMyUser(ctx, input)
+	self, err := requireSelf(ctx)
 	if err != nil {
 		return nil, err
 	}
-
+	user, err := h.userService.GetMyUser(ctx, service.GetMyUserInput{Self: self})
+	if err != nil {
+		return nil, err
+	}
 	return domainUserToApiUser(user)
+}
+
+func (h *Handler) GetMyUserSchema(ctx context.Context) (api.GetMyUserSchemaRes, error) {
+	self, err := requireSelf(ctx)
+	if err != nil {
+		return nil, err
+	}
+	schema, err := h.userService.GetMyUserSchema(ctx, service.GetMyUserInput{Self: self})
+	if err != nil {
+		return nil, err
+	}
+	apiSchema, err := domainSchemaToApiSchema(schema)
+	if err != nil {
+		return nil, err
+	}
+	return &api.SchemaHeaders{
+		CacheControl: api.NewOptString(sessionStateCacheControl),
+		Response:     *apiSchema,
+	}, nil
 }
 
 // ------------------ Mappers ---------------

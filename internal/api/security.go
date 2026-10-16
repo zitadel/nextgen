@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/ogen-go/ogen/ogenerrors"
 	api "github.com/zitadel/nextgen/api/generated"
@@ -117,6 +118,7 @@ var sessionCookieOperations = map[api.OperationName]bool{
 	api.PatchMyUserOperation:           true,
 	api.CompleteClaimOperation:         true,
 	api.ListMyProjectsOperation:        true,
+	api.GetMyUserSchemaOperation:       true,
 }
 
 // userBoundSessionOperations require a session with UserID. Anonymous
@@ -181,6 +183,15 @@ func sessionCookieFromContext(ctx context.Context) (string, bool) {
 func sessionTokenFromContext(ctx context.Context) (*domain.Token, bool) {
 	v, ok := ctx.Value(sessionTokenKey{}).(*domain.Token)
 	return v, ok && v != nil
+}
+
+// requireSelf is the check every self-access operation (`/me`) runs: who the
+// verified session belongs to (domain.SelfFromSession). The session is the
+// authorization, so no resolver check follows; the operation acts on that
+// user, in that project, and nothing else.
+func requireSelf(ctx context.Context) (domain.Self, error) {
+	token, _ := sessionTokenFromContext(ctx)
+	return domain.SelfFromSession(token, time.Now())
 }
 
 type contextKey struct{}

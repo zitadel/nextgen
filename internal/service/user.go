@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -60,9 +59,8 @@ type PatchUserInput struct {
 }
 
 type PatchMyUserInput struct {
-	// SessionToken is the parsed session token, already verified at the API
-	// security boundary.
-	SessionToken *domain.Token
+	// Self is the caller, from their verified session (domain.SelfFromSession).
+	Self domain.Self
 	// Attributes is the partial attribute patch; nil values delete. The
 	// schema pointer is not self-service: it stays where it is.
 	Attributes map[string]any
@@ -96,9 +94,8 @@ type ListUserTeamsInput struct {
 }
 
 type GetMyUserInput struct {
-	// SessionToken is the parsed session token, already verified at the API
-	// security boundary.
-	SessionToken *domain.Token
+	// Self is the caller, from their verified session (domain.SelfFromSession).
+	Self domain.Self
 }
 
 type DeleteUserInput struct {
@@ -129,6 +126,7 @@ type UserService interface {
 	PatchUser(ctx context.Context, input PatchUserInput) (*domain.User, error)
 	SetPassword(ctx context.Context, input SetPasswordInput) (err error)
 	GetMyUser(ctx context.Context, input GetMyUserInput) (*domain.User, error)
+	GetMyUserSchema(ctx context.Context, input GetMyUserInput) (*domain.JSONSchema, error)
 	PatchMyUser(ctx context.Context, input PatchMyUserInput) (*domain.User, error)
 }
 
@@ -548,16 +546,9 @@ func (s *userService) PatchUser(ctx context.Context, input PatchUserInput) (*dom
 }
 
 func (s *userService) PatchMyUser(ctx context.Context, input PatchMyUserInput) (*domain.User, error) {
-	sessionToken := input.SessionToken
-	if !validSessionToken(sessionToken) {
-		return nil, domain.ErrSessionTokenInvalid()
-	}
-
-	// Identity and project both come from the token, so a caller can only
-	// ever patch themself — the same containment GetMyUser relies on.
 	return s.PatchUser(ctx, PatchUserInput{
-		ProjectID:  sessionToken.ProjectID,
-		UserID:     sessionToken.UserID,
+		ProjectID:  input.Self.ProjectID,
+		UserID:     input.Self.UserID,
 		Attributes: input.Attributes,
 	})
 }
@@ -568,14 +559,36 @@ func (s *userService) SetPassword(ctx context.Context, input SetPasswordInput) (
 }
 
 func (s *userService) GetMyUser(ctx context.Context, input GetMyUserInput) (*domain.User, error) {
-	sessionToken := input.SessionToken
-	if !validSessionToken(sessionToken) {
-		return nil, domain.ErrSessionTokenInvalid()
+	user, err := s.ownUser(ctx, input.Self)
+	if err != nil {
+		return nil, err
 	}
+	if err := s.attachUserRefs(ctx, input.Self.ProjectID, user); err != nil {
+		return nil, err
+	}
+	return user, nil
+}
 
+// GetMyUserSchema returns the schema the caller's own record is validated
+// against — the one PatchMyUser validates against.
+func (s *userService) GetMyUserSchema(ctx context.Context, input GetMyUserInput) (*domain.JSONSchema, error) {
+	user, err := s.ownUser(ctx, input.Self)
+	if err != nil {
+		return nil, err
+	}
+	schema, err := s.v2Pool.Statements().GetJSONSchemaByID(ctx, input.Self.ProjectID, user.SchemaURL)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to get the user's schema from database")
+	}
+	return schema, nil
+}
+
+// ownUser reads the caller's own record: identity and project both come from
+// the session, so a self-access operation cannot reach anyone else.
+func (s *userService) ownUser(ctx context.Context, self domain.Self) (*domain.User, error) {
 	user, err := s.v2Pool.Statements().GetUser(ctx, database.And(
-		database.Equal(database.Col(domain.UserFieldProjectID), sessionToken.ProjectID),
-		database.Equal(database.Col(domain.UserFieldID), sessionToken.UserID),
+		database.Equal(database.Col(domain.UserFieldProjectID), self.ProjectID),
+		database.Equal(database.Col(domain.UserFieldID), self.UserID),
 	), UserQueryOptions{})
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -583,10 +596,6 @@ func (s *userService) GetMyUser(ctx context.Context, input GetMyUserInput) (*dom
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get user from database")
 	}
-	if err := s.attachUserRefs(ctx, sessionToken.ProjectID, user); err != nil {
-		return nil, err
-	}
-
 	return user, nil
 }
 
@@ -872,11 +881,6 @@ func (o *DeleteUserAction) Apply(ctx context.Context, stmts AllStatements) error
 		EntityType: "user",
 		EntityID:   o.UserID,
 	})
-}
-
-// validSessionToken reports whether the token is present and not expired.
-func validSessionToken(token *domain.Token) bool {
-	return token != nil && (token.ExpiresAt == nil || !time.Now().After(*token.ExpiresAt))
 }
 
 // UserStatementsLookup adapts [UserStatements] to [UserLookup] for AuthAttemptService.

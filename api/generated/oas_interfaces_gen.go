@@ -157,6 +157,10 @@ type GetMyUserRes interface {
 	getMyUserRes()
 }
 
+type GetMyUserSchemaRes interface {
+	getMyUserSchemaRes()
+}
+
 type GetProjectRes interface {
 	getProjectRes()
 }
