@@ -48,6 +48,13 @@ func ListOptions(projectID string, origin *string, limit uint32) *database.ListO
 	}
 }
 
+// NewestOfKindOptions lists the project's newest deployment of kind.
+func NewestOfKindOptions(projectID string, kind domain.DeploymentOriginKind) *database.ListOptions[domain.DeploymentField] {
+	opts := ListOptions(projectID, nil, 1)
+	opts.Filter = database.And(opts.Filter, database.Equal(database.Col(domain.DeploymentFieldOriginKind), kind.String()))
+	return opts
+}
+
 // LiveListOptions lists the deployments some origin still serves, newest
 // first; a non-nil releaseID narrows it to that release. ListLiveDeployments
 // applies the time with LiveAt.
