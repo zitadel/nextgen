@@ -94,6 +94,7 @@ func TestConsoleSessionForeignTargetIsIndistinguishable(t *testing.T) {
 	}{
 		// By id: a foreign resource vs an id that names nothing.
 		{"get user", http.MethodGet, "/users/" + otherUserID, "/users/" + unknownLike(otherUserID), "", 0},
+		{"list user teams", http.MethodGet, "/users/" + otherUserID + "/teams", "/users/" + unknownLike(otherUserID) + "/teams", "", 0},
 		{"delete user", http.MethodDelete, "/users/" + otherUserID, "/users/" + unknownLike(otherUserID), "", 0},
 		{"get team", http.MethodGet, "/teams/" + otherTeamID, "/teams/" + unknownLike(otherTeamID), "", 0},
 		{"update team", http.MethodPatch, "/teams/" + otherTeamID, "/teams/" + unknownLike(otherTeamID), `{"name":"x"}`, 0},
