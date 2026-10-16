@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { Readable } from "node:stream";
 
 import { expect } from "vitest";
@@ -641,6 +641,15 @@ export class ScaffoldedApp {
     return writeFile(join(this.path, relativePath), contents);
   }
 
+  /** Leaves `version` of `name` in the app's `node_modules`, as its lockfile installed it. */
+  async hasInstalled(name: string, version: string): Promise<void> {
+    await mkdir(join(this.path, "node_modules", name), { recursive: true });
+    await this.writeProjectFile(
+      `node_modules/${name}/package.json`,
+      JSON.stringify({ name, version }),
+    );
+  }
+
   deleteProjectFile(relativePath: string): Promise<void> {
     return rm(join(this.path, relativePath));
   }
@@ -726,6 +735,22 @@ export class ScaffoldedApp {
     return this.writeProjectFile(
       `.zitadel/flows/${name}.json`,
       `${JSON.stringify(definition, null, 2)}\n`,
+    );
+  }
+
+  /**
+   * Leaves a Nuxt app as an older setup did, after the developer deleted the
+   * server auth plugin that setup wrote: the scaffold record still lists it.
+   */
+  deletedTheRetiredNuxtAuthPlugin(): Promise<void> {
+    return this.editDocument<{ scaffold: { files: Record<string, unknown> } }>(
+      ".zitadel/state.json",
+      (state) => {
+        state.scaffold.files["app/plugins/auth.server.ts"] = {
+          hash: "0".repeat(64),
+          class: "infrastructure",
+        };
+      },
     );
   }
 
@@ -925,36 +950,84 @@ export function assertEnvelope(result: CliResult, args: string[] = []): void {
  * hit on a busy filesystem (the CLI awaits every write, so nothing is in flight).
  */
 export async function anApp({
-  nextVersion = "^16.0.0",
+  framework = "next",
+  version,
 }: {
-  nextVersion?: string;
+  framework?: AppFramework;
+  /** The framework package's range in `package.json`; each framework has a supported default. */
+  version?: string;
 } = {}): Promise<ScaffoldedApp> {
-  const path = await mkdtemp(join(tmpdir(), "zitadel-next-"));
+  const shape = APP_SHAPES[framework];
+  const path = await mkdtemp(join(tmpdir(), `zitadel-${framework}-`));
 
-  await mkdir(join(path, "app"), { recursive: true });
   await writeFile(
     join(path, "package.json"),
     JSON.stringify(
       {
-        name: "demo-next-app",
+        name: `demo-${framework}-app`,
         private: true,
-        dependencies: { next: nextVersion, react: "^19.0.0", "react-dom": "^19.0.0" },
+        dependencies: {
+          ...shape.dependencies,
+          [shape.framework]: version ?? shape.dependencies[shape.framework],
+        },
       },
       null,
       2,
     ),
   );
   await writeFile(join(path, ".gitignore"), "node_modules\n");
-  await writeFile(
-    join(path, "app/layout.tsx"),
-    "export default function RootLayout({ children }: { children: React.ReactNode }) { return <html><body>{children}</body></html>; }\n",
-  );
+  for (const [file, contents] of Object.entries(shape.files)) {
+    await mkdir(dirname(join(path, file)), { recursive: true });
+    await writeFile(join(path, file), contents);
+  }
   return new ScaffoldedApp(path);
 }
 
+/** The frameworks `anApp` can build. */
+export type AppFramework = "next" | "nuxt" | "vue" | "solid";
+
+/**
+ * What each framework's app starts with: its dependencies, which one carries
+ * the version floor, and the files its patcher edits rather than writes.
+ */
+const APP_SHAPES: Record<
+  AppFramework,
+  { framework: string; dependencies: Record<string, string>; files: Record<string, string> }
+> = {
+  next: {
+    framework: "next",
+    dependencies: { next: "^16.0.0", react: "^19.0.0", "react-dom": "^19.0.0" },
+    files: {
+      "app/layout.tsx":
+        "export default function RootLayout({ children }: { children: React.ReactNode }) { return <html><body>{children}</body></html>; }\n",
+    },
+  },
+  nuxt: {
+    framework: "nuxt",
+    dependencies: { nuxt: "^4.1.0", vue: "^3.5.0" },
+    files: {
+      "nuxt.config.ts": "export default defineNuxtConfig({});\n",
+      "app/app.vue": "<template><NuxtPage /></template>\n",
+    },
+  },
+  vue: {
+    framework: "vue",
+    dependencies: { vue: "^3.5.0", vite: "^7.0.0" },
+    files: {},
+  },
+  solid: {
+    framework: "solid-js",
+    dependencies: { "solid-js": "^1.9.0", vite: "^7.0.0" },
+    files: {},
+  },
+};
+
 /** An app already through `setup`, for specs about the commands after it. */
-export async function aSetUpApp(extraArgs: string[] = []): Promise<ScaffoldedApp> {
-  const app = await anApp();
+export async function aSetUpApp(
+  extraArgs: string[] = [],
+  { framework = "next" }: { framework?: AppFramework } = {},
+): Promise<ScaffoldedApp> {
+  const app = await anApp({ framework });
   const result = await app.setup(extraArgs);
   expect(result, "arranging setup should have succeeded").toSucceed();
   return app;

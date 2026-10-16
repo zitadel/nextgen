@@ -1,7 +1,9 @@
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 import semver from "semver";
+
+import { ZitadelError } from "../../errors";
 
 /**
  * Minimal shape of the `package.json` fields detectors read. Intentionally
@@ -50,22 +52,124 @@ export function dependencyVersionMajor(pkg: PackageJson, name: string): number |
 
 /**
  * Returns the declared spec for `name` when that spec provably cannot resolve
- * to `floorMajor` or newer: a valid semver range with no overlap with
- * `>=floorMajor.0.0-0`. Everything unprovable returns `undefined` — protocol
- * specs (`file:`, `link:`, `workspace:`, git URLs), dist-tags (`latest`,
- * `canary`), absent deps, and ranges that also admit a compliant version
- * (`>=14`, `14 || 16`). The floor comparator includes prereleases so a
- * `15.0.0-rc` user is not rejected by the 15 floor.
+ * to `floorMajor` or newer. Shorthand for {@link dependencySpecProvablyBelow}
+ * with a whole-major floor.
  */
 export function dependencySpecProvablyBelowMajor(
   pkg: PackageJson,
   name: string,
   floorMajor: number,
 ): string | undefined {
+  return dependencySpecProvablyBelow(pkg, name, String(floorMajor));
+}
+
+/**
+ * Returns the declared spec for `name` when that spec provably cannot resolve
+ * to `minimum` (a version such as `15` or `1.8`) or newer: a valid semver
+ * range with no overlap with `>=minimum-0`. Everything unprovable returns
+ * `undefined` — protocol specs (`file:`, `link:`, `workspace:`, git URLs),
+ * dist-tags (`latest`, `canary`), absent deps, and ranges that also admit a
+ * compliant version (`>=14`, `14 || 16`). The floor comparator includes
+ * prereleases so a `15.0.0-rc` user is not rejected by the 15 floor.
+ */
+export function dependencySpecProvablyBelow(
+  pkg: PackageJson,
+  name: string,
+  minimum: string,
+): string | undefined {
   const spec = pkg.dependencies?.[name] ?? pkg.devDependencies?.[name];
-  if (!spec || semver.validRange(spec) === null) {
+  const floor = semver.coerce(minimum);
+  if (!spec || !floor || semver.validRange(spec) === null) {
     return undefined;
   }
-  const atOrAboveFloor = `>=${String(floorMajor)}.0.0-0`;
+  const atOrAboveFloor = `>=${floor.version}-0`;
   return semver.intersects(spec, atOrAboveFloor, { includePrerelease: true }) ? undefined : spec;
+}
+
+/**
+ * A framework version the CLI integrates no older than: the oldest release
+ * its SDK peers and its generated templates compile on (ADR 043).
+ */
+export type DependencyFloor = Readonly<{
+  /** The package whose declared spec is judged, e.g. `nuxt` or `@angular/core`. */
+  dependency: string;
+  /** The oldest supported version, as written in the message: `4`, `1.8`. */
+  minimum: string;
+  /** The product name the message uses, e.g. `Nuxt`. */
+  product: string;
+  /** How to get onto a supported version. */
+  hint: string;
+}>;
+
+/**
+ * Throws `E_UNSUPPORTED_PROJECT_SHAPE` when the app's declared spec for the
+ * floor's dependency provably cannot resolve to a supported version. Every
+ * detector gates its framework through this one function, so setup and
+ * doctor refuse an old app early, with one error code and one wording,
+ * instead of failing later at install with a peer-dependency conflict.
+ */
+export function assertDependencyFloor(pkg: PackageJson, floor: DependencyFloor): void {
+  const below = dependencySpecProvablyBelow(pkg, floor.dependency, floor.minimum);
+  if (below !== undefined) {
+    throw new ZitadelError(
+      "E_UNSUPPORTED_PROJECT_SHAPE",
+      `${floor.product} "${below}" is below the supported floor — the CLI integrates ${floor.product} ${floor.minimum} and newer`,
+      { hint: floor.hint },
+    );
+  }
+}
+
+/**
+ * The version of `name` installed for the app at `cwd`: the `package.json` that
+ * Node's own lookup reaches first, walking up from `cwd` through each
+ * `node_modules`, so a hoisted install in a monorepo counts too. `undefined`
+ * when nothing is installed there, or the file names no valid version.
+ */
+export async function installedVersion(cwd: string, name: string): Promise<string | undefined> {
+  let dir = resolve(cwd);
+  for (;;) {
+    const contents = await readFile(join(dir, "node_modules", name, "package.json"), "utf8").catch(
+      () => undefined,
+    );
+    if (contents !== undefined) {
+      return versionIn(contents);
+    }
+    const parent = dirname(dir);
+    if (parent === dir) {
+      return undefined;
+    }
+    dir = parent;
+  }
+}
+
+/** The valid semver `version` a `package.json` declares, if any. */
+function versionIn(contents: string): string | undefined {
+  try {
+    const { version } = JSON.parse(contents) as { version?: unknown };
+    return typeof version === "string" ? (semver.valid(version) ?? undefined) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Throws `E_UNSUPPORTED_PROJECT_SHAPE` when the version of the floor's
+ * dependency installed for the app at `cwd` is older than the floor. A range
+ * such as `^15.0.0` passes {@link assertDependencyFloor} because it can resolve
+ * to a supported release, but the lockfile may still hold an older one; this
+ * judges what actually runs. Nothing installed passes, leaving the declared
+ * spec as the only gate. A prerelease of the floor itself passes, as it does
+ * for the spec.
+ */
+export async function assertInstalledFloor(cwd: string, floor: DependencyFloor): Promise<void> {
+  const installed = await installedVersion(cwd, floor.dependency);
+  const minimum = semver.coerce(floor.minimum);
+  if (installed === undefined || !minimum || !semver.lt(installed, `${minimum.version}-0`)) {
+    return;
+  }
+  throw new ZitadelError(
+    "E_UNSUPPORTED_PROJECT_SHAPE",
+    `${floor.product} ${installed} is installed, below the supported floor — the CLI integrates ${floor.product} ${floor.minimum} and newer`,
+    { hint: floor.hint },
+  );
 }

@@ -42,3 +42,23 @@ describe("VueDetector", () => {
     expect(await new VueDetector().detect(await project({ vite: "^5" }))).toBeNull();
   });
 });
+
+describe("VueDetector version floor", () => {
+  it("refuses a Vue 2 app, which cannot install the Vue 3 widgets", async () => {
+    await expect(
+      new VueDetector().detect(await project({ vue: "^2.7.16", vite: "^5" })),
+    ).rejects.toMatchObject({ code: "E_UNSUPPORTED_PROJECT_SHAPE" });
+  });
+
+  it("names the floor in the refusal", async () => {
+    await expect(
+      new VueDetector().detect(await project({ vue: "^2.7.16", vite: "^5" })),
+    ).rejects.toThrow("Vue 3");
+  });
+
+  it("accepts a spec that may resolve to a supported version", async () => {
+    expect(
+      await new VueDetector().detect(await project({ vue: ">=2", vite: "^5" })),
+    ).not.toBeNull();
+  });
+});

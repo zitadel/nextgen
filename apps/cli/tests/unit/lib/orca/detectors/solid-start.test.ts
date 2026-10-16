@@ -62,3 +62,13 @@ describe("SolidStartDetector version floor", () => {
     ).not.toBeNull();
   });
 });
+
+describe("SolidStartDetector solid-js floor", () => {
+  it("refuses a solid-js the widgets cannot run on", async () => {
+    await expect(
+      new SolidStartDetector().detect(
+        await project({ "solid-js": "~1.7.0", "@solidjs/start": "^2", vite: "^8" }),
+      ),
+    ).rejects.toMatchObject({ code: "E_UNSUPPORTED_PROJECT_SHAPE" });
+  });
+});

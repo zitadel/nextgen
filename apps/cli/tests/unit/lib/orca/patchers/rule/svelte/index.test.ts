@@ -62,11 +62,11 @@ describe("SveltePatcher.plan", () => {
     expect(writeContents(consumer, "src/App.svelte")).not.toContain("businessLocales");
   });
 
-  it("adds the SDK dependency at the CLI's prerelease tag", () => {
+  it("pins the SDK dependency at the CLI's exact version", () => {
     const dep = new SveltePatcher()
       .plan(ctx())
       .ops.find((op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep");
-    expect(dep).toMatchObject({ name: "@zitadel/sdk-svelte", version: "alpha" });
+    expect(dep).toMatchObject({ name: "@zitadel/sdk-svelte", version: "0.1.0-alpha.0" });
   });
 
   it("exposes the project id through a VITE_-prefixed env var", () => {

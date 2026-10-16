@@ -44,3 +44,26 @@ describe("SolidDetector", () => {
     expect(await new SolidDetector().detect(await project({ vite: "^5" }))).toBeNull();
   });
 });
+
+describe("SolidDetector version floor", () => {
+  it.each(["~1.7.0", "~1.6.16", "1.7.12"])(
+    "refuses solid-js %s, below the widgets' solid-js peer",
+    async (version) => {
+      await expect(
+        new SolidDetector().detect(await project({ "solid-js": version, vite: "^5" })),
+      ).rejects.toMatchObject({ code: "E_UNSUPPORTED_PROJECT_SHAPE" });
+    },
+  );
+
+  it("names the floor in the refusal", async () => {
+    await expect(
+      new SolidDetector().detect(await project({ "solid-js": "~1.7.0", vite: "^5" })),
+    ).rejects.toThrow("Solid 1.8");
+  });
+
+  it.each(["^1.8.0", "^1.9.12", "^1"])("accepts solid-js %s", async (version) => {
+    expect(
+      await new SolidDetector().detect(await project({ "solid-js": version, vite: "^5" })),
+    ).not.toBeNull();
+  });
+});

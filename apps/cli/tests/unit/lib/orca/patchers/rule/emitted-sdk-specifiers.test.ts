@@ -11,7 +11,6 @@ import {
 import { reactRenderer } from "../../../../../../src/lib/orca/patchers/rule/next/renderers/react";
 import {
   appVueTemplate,
-  authPluginTemplate,
   componentsPluginTemplate,
   indexPageTemplate,
   loginPageTemplate,
@@ -86,8 +85,8 @@ function emittedCorpus(): string[] {
   corpus.push(
     appVueTemplate(),
     indexPageTemplate(),
-    componentsPluginTemplate(),
-    authPluginTemplate(),
+    componentsPluginTemplate({}),
+    componentsPluginTemplate({ useCase: "business" }),
   );
   for (const frameworkId of ["next", "nuxt", "react"]) {
     for (const posture of postures) {

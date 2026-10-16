@@ -153,19 +153,24 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { ZitadelSession } from "@zitadel/sdk-tanstack-start/react";
 import { configureZitadel } from "@zitadel/sdk-tanstack-start/client";
-import { getAuth } from "@zitadel/sdk-tanstack-start/server";
+import { getClientAuth } from "@zitadel/sdk-tanstack-start/server";
 
 const projectId = import.meta.env.VITE_ZITADEL_PROJECT_ID ?? "";
 
 const project = configureZitadel({ projectId, proxyPath: "${PROXY_PATH}" });
 
-// Runs on the server on every navigation, client-side ones included.
-const fetchAuth = createServerFn().handler(({ context }) => getAuth(context));
+// Runs on the server on every navigation, client-side ones included. Its
+// return value is sent to the browser, so it returns the auth state without
+// the session token, which stays in the HttpOnly cookie.
+const fetchAuth = createServerFn().handler(({ context }) => getClientAuth(context));
 
 export const Route = createFileRoute("/profile")({
   beforeLoad: async () => {
     const auth = await fetchAuth();
     if (!auth.isAuthenticated) {
+      // The session could not be checked (the auth backend is down): an
+      // error, not a sign-in prompt, since the visitor may well be signed in.
+      if (auth.reason === "unavailable") throw new Error("Try again shortly");
       throw redirect({ to: "/login" });
     }
   },

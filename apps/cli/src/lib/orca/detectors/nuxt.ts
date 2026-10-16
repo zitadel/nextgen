@@ -1,7 +1,7 @@
 import { stat } from "node:fs/promises";
 import { join } from "node:path";
 
-import { hasDependency, readPackageJson } from "./package-json";
+import { assertDependencyFloor, hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
 import type { Detector, FrameworkFacts } from "./types";
 
@@ -12,8 +12,13 @@ import type { Detector, FrameworkFacts } from "./types";
  * Runs before the Vue detector (which excludes Nuxt) since Nuxt ships Vue.
  *
  * `appDir` tracks the Nuxt srcDir: Nuxt 4 (what `nuxi init` now scaffolds) keeps
- * `app.vue`/`pages/`/`plugins/` under `app/`, while Nuxt 3 keeps them at the
- * root — so the patcher writes its files relative to whichever this project uses.
+ * `app.vue`/`pages/`/`plugins/` under `app/`, while a project that opted out of
+ * the `app/` layout keeps them at the root — so the patcher writes its files
+ * relative to whichever this project uses.
+ *
+ * `@zitadel/sdk-nuxt` peers Nuxt 4, so a Nuxt 3 app is refused here rather
+ * than failing at install with a peer-dependency conflict after setup has
+ * written its files and created the project.
  */
 export class NuxtDetector implements Detector {
   readonly framework = "nuxt";
@@ -23,6 +28,13 @@ export class NuxtDetector implements Detector {
     if (!pkg || !hasDependency(pkg, "nuxt")) {
       return null;
     }
+
+    assertDependencyFloor(pkg, {
+      dependency: "nuxt",
+      minimum: "4",
+      product: "Nuxt",
+      hint: "Upgrade the app to Nuxt 4 (`npx nuxi@latest upgrade`) and rerun.",
+    });
 
     const appDir = (await dirExists(join(cwd, "app"))) ? "app" : ".";
     const devPort = await detectDevPort(cwd, pkg);

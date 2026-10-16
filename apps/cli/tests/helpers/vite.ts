@@ -1,4 +1,5 @@
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { request } from "node:http";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -46,6 +47,49 @@ export async function aProxyConfApp(proxyConf: string, env: AppEnv): Promise<Dev
     configFile: false,
     server: { proxy: requireHere(join(dir, "proxy.conf.cjs")) as Record<string, ProxyOptions> },
   }));
+}
+
+/** How a dev server's answer reached the client. */
+export type Delivery = "complete" | "cut short" | "left waiting";
+
+/**
+ * Requests `url` with plain `node:http` and reports whether the answer arrived
+ * whole, was cut short, or never finished within three seconds. `fetch` cannot
+ * tell: it accepts a body cut short on a `Connection: close` answer as whole.
+ */
+export function deliveryOf(url: string, method = "GET"): Promise<Delivery> {
+  return new Promise((resolve) => {
+    const sent = request(url, { method }, (response) => {
+      response.resume();
+      response.on("end", () => resolve(response.complete ? "complete" : "cut short"));
+      response.on("error", () => resolve("cut short"));
+    });
+    const timer = setTimeout(() => {
+      resolve("left waiting");
+      sent.destroy();
+    }, 3000);
+    sent.on("error", () => resolve("cut short"));
+    sent.on("close", () => clearTimeout(timer));
+    sent.end();
+  });
+}
+
+/**
+ * The bytes of the answer to `url` as they crossed the wire, before any
+ * `Content-Encoding` is undone, which is what a client that decodes them —
+ * a browser — gets to read.
+ */
+export function wireBodyOf(url: string, method = "GET"): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const sent = request(url, { method }, (response) => {
+      const chunks: Buffer[] = [];
+      response.on("data", (chunk: Buffer) => chunks.push(chunk));
+      response.on("end", () => resolve(Buffer.concat(chunks).toString("latin1")));
+      response.on("error", reject);
+    });
+    sent.on("error", reject);
+    sent.end();
+  });
 }
 
 async function serve(dir: string, env: AppEnv, config: () => InlineConfig): Promise<DevApp> {

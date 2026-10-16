@@ -25,9 +25,12 @@ This ADR records the floors and the enforcement point.
 
 ## Decision
 
-- **Floors:** Next.js **15+** (App Router, as before) and React **18+** (both
-  18 and 19 are supported; templates that need React-19-only behavior must
-  degrade safely on 18, as the ref-assigned copy overlay does).
+- **Floors:** Next.js **15.2.3+** (App Router, as before) and React **18+**
+  (both 18 and 19 are supported; templates that need React-19-only behavior
+  must degrade safely on 18, as the ref-assigned copy overlay does). The Next
+  floor is a patch release, not the major: 15.0.0 to 15.2.2 skip middleware
+  for a request that sends `x-middleware-subrequest` (CVE-2025-29927), which
+  bypasses the generated `protectedRoutes`.
 - **Enforcement lives in the framework detectors** (`NextDetector`,
   `ReactDetector`): a detected framework below its floor throws
   `E_UNSUPPORTED_PROJECT_SHAPE` (exit 3) with the floor in the message and an
@@ -39,13 +42,18 @@ This ADR records the floors and the enforcement point.
   and agents already branch on it.
 - **Only provable violations reject.** The gate evaluates the declared spec
   with semver range semantics: it rejects only when the range cannot resolve
-  to the floor major or newer (`^14.2.0` and `<15` reject; `>=14` and
-  `14 || 16` pass because a supported version satisfies them). Specs that
+  to the floor or newer (`^14.2.0`, `<15` and `15.2.2` reject; `>=14`,
+  `14 || 16` and `^15.0.0` pass because a supported version satisfies them —
+  for `^15.0.0` the lockfile decides). Next.js is also judged by what is
+  installed: when `node_modules/next/package.json` resolves from the app root,
+  a release below the floor rejects even under an accepting range, because
+  pnpm only warns on the SDK's peer range and would run 15.2.2. With nothing
+  installed, the spec is the only gate. Specs that
   carry no provable version at all — protocol specs (`file:`, `link:`,
   `workspace:`, git URLs) and dist-tags (`latest`, `canary`) — always pass;
   blocking on them would be hostile guessing. Prereleases of the floor major
   count as at-floor.
-- **Peer ranges follow the floor:** `@zitadel/sdk-next` declares `next >=15`
+- **Peer ranges follow the floor:** `@zitadel/sdk-next` declares `next >=15.2.3`
   (its `react >=18` was already correct). Other frameworks currently declare
   no floor; adding one later means extending its detector the same way and
   amending this ADR.

@@ -25,6 +25,7 @@ import { proxyConfTemplate } from "../../../../src/lib/orca/patchers/rule/angula
 import { MANAGED_MARKER } from "../../../../src/lib/paths";
 import { hashScaffoldFile } from "../../../../src/lib/scaffold-manifest";
 import type { ScaffoldManifest } from "../../../../src/lib/sync/types";
+import { withFirstRedaction } from "../../../helpers/legacy-proxy";
 
 const tempDirs: string[] = [];
 
@@ -184,6 +185,59 @@ async function makeAngularProject(): Promise<string> {
   await writeFile(join(cwd, "src/app/app.ts"), `${MANAGED_MARKER}\nexport class App {}\n`);
   await writeFile(join(cwd, "src/app/app.html"), `<!-- ${MANAGED_MARKER} -->\n<main></main>\n`);
   await writeFile(join(cwd, "proxy.conf.cjs"), proxyConfTemplate());
+  return cwd;
+}
+
+/**
+ * A Nuxt 4 app as an older setup left it: every page and plugin it wrote is
+ * on disk, and its manifest also records the retired
+ * `app/plugins/auth.server.ts` as infrastructure.
+ */
+async function makeOlderNuxtProject(): Promise<string> {
+  const cwd = await mkdtemp(join(tmpdir(), "zitadel-checks-nuxt-"));
+  tempDirs.push(cwd);
+  await mkdir(join(cwd, ".zitadel"), { recursive: true });
+  await mkdir(join(cwd, "app/pages"), { recursive: true });
+  await mkdir(join(cwd, "app/plugins"), { recursive: true });
+  await writeFile(
+    join(cwd, "package.json"),
+    JSON.stringify({
+      name: "demo",
+      dependencies: {
+        nuxt: "^4.1.0",
+        "@zitadel/sdk-nuxt": "latest",
+        "@zitadel/components": "latest",
+      },
+    }),
+  );
+  await writeFile(
+    join(cwd, "zitadel.json"),
+    JSON.stringify({
+      project: "proj-001",
+      server: "https://api.zitadel.cloud",
+      framework: { id: "nuxt" },
+      environments: { development: { issuer: "http://localhost:3000" } },
+    }),
+  );
+  await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
+  await chmod(join(cwd, ".zitadel/secret"), 0o600);
+  await writeFile(join(cwd, "nuxt.config.ts"), "export default defineNuxtConfig({});\n");
+  const files: ScaffoldManifest["files"] = {};
+  for (const [path, cls] of [
+    ["app/pages/login.vue", "presentation"],
+    ["app/pages/register.vue", "presentation"],
+    ["app/pages/profile.vue", "presentation"],
+    ["app/plugins/zitadel-components.client.ts", "infrastructure"],
+    ["app/plugins/auth.server.ts", "infrastructure"],
+  ] as const) {
+    const contents = `// ${MANAGED_MARKER}\n`;
+    await writeFile(join(cwd, path), contents);
+    files[path] = { hash: hashScaffoldFile(contents), class: cls };
+  }
+  await writeFile(
+    join(cwd, ".zitadel/state.json"),
+    JSON.stringify({ framework: "nuxt", resources: {}, scaffold: { files } }),
+  );
   return cwd;
 }
 
@@ -387,6 +441,85 @@ describe("DependencyCheck", () => {
       JSON.stringify({ name: "demo", dependencies: { next: "^15" } }),
     );
     expect((await new DependencyCheck().run(ctxFor(cwd))).status).toBe("fail");
+  });
+
+  it("fails when the only @zitadel package is not the SDK the app imports", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { next: "^15" },
+        devDependencies: { "@zitadel/cli": "0.1.0-alpha.0" },
+      }),
+    );
+    const outcome = await new DependencyCheck().run(ctxFor(cwd));
+    expect(outcome).toMatchObject({ status: "fail" });
+  });
+
+  it("names the SDK package that is missing", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { next: "^15" },
+        devDependencies: { "@zitadel/cli": "0.1.0-alpha.0" },
+      }),
+    );
+    const outcome = await new DependencyCheck().run(ctxFor(cwd));
+    expect(outcome.message).toBe(
+      "package.json does not declare @zitadel/sdk-next, which the app imports",
+    );
+  });
+
+  it("fails a meta-framework app that lacks the widget SDK its pages import", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { "@sveltejs/kit": "^3", svelte: "^5", "@zitadel/sdk-sveltekit": "latest" },
+      }),
+    );
+    const outcome = await new DependencyCheck().run(ctxFor(cwd));
+    expect(outcome.message).toBe(
+      "package.json does not declare @zitadel/sdk-svelte, which the app imports",
+    );
+  });
+
+  it("passes a meta-framework app that declares both of its SDKs", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: {
+          "@sveltejs/kit": "^3",
+          svelte: "^5",
+          "@zitadel/sdk-sveltekit": "latest",
+          "@zitadel/sdk-svelte": "latest",
+        },
+      }),
+    );
+    expect((await new DependencyCheck().run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("fix re-adds the SDK an app kept only the CLI in place of", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { next: "^15" },
+        devDependencies: { "@zitadel/cli": "0.1.0-alpha.0" },
+      }),
+    );
+    const check = new DependencyCheck();
+
+    await check.fix(ctxFor(cwd));
+
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
   });
 
   it("fix re-adds the SDK dependency via the patcher", async () => {
@@ -746,6 +879,45 @@ describe("ManagedFilesCheck", () => {
     expect(angularJson.projects.demo.architect.serve.options.proxyConfig).toBe("proxy.conf.cjs");
   });
 
+  it("fails on a managed proxy that relays the session token, and --fix adds the redaction", async () => {
+    const cwd = await makeAngularProject();
+    const proxyPath = join(cwd, "proxy.conf.cjs");
+    const unredacted = proxyConfTemplate()
+      .replace(
+        /\n\nconst zlib = require\("node:zlib"\);\n\n\/\* zitadel:proxy:exchange-redaction:v2 \*\/[\s\S]*?(?=\n\nfunction stripPrefix)/,
+        "",
+      )
+      .replace(
+        / {4}selfHandleResponse: true,\n[\s\S]*?\n {4}},\n(?= {2}},\n};)/,
+        '    onProxyReq: setBearer,\n    configure: (proxy) => proxy.on("proxyReq", setBearer),\n',
+      );
+    await writeFile(proxyPath, unredacted);
+    const check = new ManagedFilesCheck();
+    const before = await check.run(ctxFor(cwd));
+    expect(before.status).toBe("fail");
+    expect(before.message).toContain("detached managed config wiring: proxy.conf.cjs");
+
+    await check.fix(ctxFor(cwd));
+
+    expect(await readFile(proxyPath, "utf8")).toBe(proxyConfTemplate());
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("fails on a managed proxy with the first redaction, and --fix upgrades it", async () => {
+    const cwd = await makeAngularProject();
+    const proxyPath = join(cwd, "proxy.conf.cjs");
+    await writeFile(proxyPath, withFirstRedaction(proxyConfTemplate()));
+    const check = new ManagedFilesCheck();
+    const before = await check.run(ctxFor(cwd));
+    expect(before.status).toBe("fail");
+    expect(before.message).toContain("detached managed config wiring: proxy.conf.cjs");
+
+    await check.fix(ctxFor(cwd));
+
+    expect(await readFile(proxyPath, "utf8")).toBe(proxyConfTemplate());
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+  });
+
   it("fails when a wiring's host config file is deleted outright", async () => {
     const cwd = await makeAngularProject();
     await rm(join(cwd, "angular.json"));
@@ -1028,6 +1200,26 @@ function setBearer(proxyReq) {
 
     expect((await check.run(ctxFor(cwd))).status).toBe("pass");
     expect(await readFile(join(cwd, "app/page.tsx"), "utf8")).toContain(MANAGED_MARKER);
+  });
+
+  it("drops the retired Nuxt auth plugin an older setup recorded once the user deleted it", async () => {
+    const cwd = await makeOlderNuxtProject();
+    await rm(join(cwd, "app/plugins/auth.server.ts"));
+    const check = new ManagedFilesCheck();
+    expect((await check.run(ctxFor(cwd))).message).toContain("app/plugins/auth.server.ts");
+
+    await check.fix(ctxFor(cwd));
+
+    expect((await readScaffoldState(cwd)).files).not.toHaveProperty("app/plugins/auth.server.ts");
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("keeps the retired Nuxt auth plugin an older setup recorded while it is on disk", async () => {
+    const cwd = await makeOlderNuxtProject();
+
+    await new ManagedFilesCheck().fix(ctxFor(cwd));
+
+    expect((await readScaffoldState(cwd)).files).toHaveProperty("app/plugins/auth.server.ts");
   });
 });
 

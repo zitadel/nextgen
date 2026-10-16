@@ -55,7 +55,8 @@ falls back to the `flow` query parameter.
 | `<zitadel-auth-session>` | `signout`, `sessionMissing`, `sessionError`                          |
 
 `sessionMissing` fires when the visitor has no session: the widget renders nothing, and the
-session card goes to its `postSignOutUrl` when one is set, unless that URL is the page it is on.
+session card goes to its `postSignOutUrl` when one is set, unless that URL is the page it is
+on, unless that URL is the page it is on.
 `sessionError` fires when loading the session (`phase: "load"`) or signing out
 (`phase: "signout"`) fails some other way, such as a 5xx or a network error: the widget keeps
 its surface and shows the error, and the detail carries `message` and, when a response came

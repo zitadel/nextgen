@@ -7,6 +7,7 @@ import type {
 import { NextPatcher } from "../../../../../../../src/lib/orca/patchers/rule/next";
 import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
+import { sdkVersionForCli } from "../../../../../../../src/lib/public-cli";
 
 function ctxFor(
   appDir: "app" | "src/app",
@@ -167,6 +168,17 @@ describe("NextPatcher.plan", () => {
     );
     expect(dep).toMatchObject({ name: "@zitadel/sdk-next", version: "0.1.0-alpha.0" });
   });
+
+  it.each(["1.2.0", "2.0.0-beta.3", "2.0.0-rc-1"])(
+    "pins the SDK with the CLI's one pin rule for CLI %s",
+    (cliVersion) => {
+      const plan = new NextPatcher().plan({ ...ctxFor("app"), cliVersion });
+      const dep = plan.ops.find(
+        (op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep",
+      );
+      expect(dep?.version).toBe(sdkVersionForCli(cliVersion));
+    },
+  );
 
   it("leaves schema and flow files for setup's resource materializer", () => {
     const plan = new NextPatcher().plan(ctxFor("app"));

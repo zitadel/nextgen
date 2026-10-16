@@ -100,7 +100,8 @@ middleware redirects before anything renders. Client-side navigation, such as
 following an `<A>` link to `/profile`, does not request the page from the
 server, so the middleware does not run. There the `ZitadelSession` card is the
 guard: when it finds no session it navigates to its `postSignOutUrl`, so a
-signed-out visitor still ends at `/login`.
+signed-out visitor still ends at `/login`. When that URL is the page the card is
+on, the card renders nothing instead of navigating, so it guards nothing there.
 
 To keep a route from rendering at all without a session, check the session in a
 server query and preload it. The query runs on the server on client-side

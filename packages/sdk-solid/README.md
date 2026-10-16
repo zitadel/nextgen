@@ -31,7 +31,7 @@ The widgets' events are also surfaced as optional callbacks:
   `onFlowError`.
 - `ZitadelLogout` and `ZitadelSession`: `onSignout`, `onSessionMissing` (the visitor has no
   session: the widget renders nothing, and the session card goes to its `postSignOutUrl` when
-  one is set) and `onSessionError` (loading the session or signing out failed some other way,
+  one is set, unless that URL is the page it is on) and `onSessionError` (loading the session or signing out failed some other way,
   such as a 5xx or a network error; the detail has `phase`, `message` and, when a response came
   back, `status` and `code`).
 
