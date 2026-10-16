@@ -63,7 +63,7 @@ func TestOgenErrorHandlerInvalidSessionCookie(t *testing.T) {
 	t.Parallel()
 	mock := gomock.NewController(t)
 	tokenService := mocks.NewMockTokenService(mock)
-	tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, errors.New("bad token"))
+	tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, domain.ErrInvalidToken())
 
 	srv := newErrorHandlerTestServer(t, tokenService)
 
@@ -178,7 +178,7 @@ func TestOgenErrorHandlerGrantSecurityStaysCredentialNeutral(t *testing.T) {
 				t.Parallel()
 				mock := gomock.NewController(t)
 				tokenService := mocks.NewMockTokenService(mock)
-				tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, errors.New("bad token"))
+				tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, domain.ErrInvalidToken())
 				srv := newErrorHandlerTestServer(t, tokenService)
 
 				tc.req.Header.Set("Content-Type", "application/json")
@@ -214,7 +214,7 @@ func TestOgenErrorHandlerQueryUsersSecurityStaysCredentialNeutral(t *testing.T) 
 		t.Parallel()
 		mock := gomock.NewController(t)
 		tokenService := mocks.NewMockTokenService(mock)
-		tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, errors.New("bad token"))
+		tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, domain.ErrInvalidToken())
 		srv := newErrorHandlerTestServer(t, tokenService)
 
 		req := httptest.NewRequest(http.MethodPost, "/users/query", strings.NewReader(`{}`))
@@ -294,7 +294,7 @@ func TestOgenErrorHandlerDualSchemeInvalidCookieStaysCredentialNeutral(t *testin
 			t.Parallel()
 			mock := gomock.NewController(t)
 			tokenService := mocks.NewMockTokenService(mock)
-			tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, errors.New("bad token"))
+			tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, domain.ErrInvalidToken())
 			srv := newErrorHandlerTestServer(t, tokenService)
 
 			req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))

@@ -109,17 +109,24 @@ func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName
 var _ api.SecurityHandler = (*SecurityHandler)(nil)
 
 // introspectionFailure decides what a failed IntrospectToken means for the
-// request. A credential that is malformed, undecryptable, unknown, expired or
-// revoked is an unsatisfied requirement: 401. An internal error means the
-// server could not tell (the token store or key store is unreachable), so it
-// propagates and the error handler answers 500. Collapsing it into a 401 would
-// tell every client its session is dead during an outage, and SDKs clear their
-// session cookie on a 401.
+// request. Only a credential the server judged and rejected (malformed,
+// undecryptable, naming an unknown key, expired or revoked) is an unsatisfied
+// requirement: 401. Anything else means the server could not tell (the token
+// store or key store failed), so it becomes an internal error and the error
+// handler answers 500. Collapsing it into a 401 would tell every client its
+// session is dead during an outage, and SDKs clear their session cookie on a
+// 401.
 func introspectionFailure(err error) error {
+	if errors.Is(err, domain.ErrInvalidToken()) ||
+		errors.Is(err, domain.ErrInvalidTokenIdentifiers()) ||
+		errors.Is(err, domain.ErrTokenRevoked()) ||
+		errors.Is(err, domain.ErrEncryptionKeyNotFound()) {
+		return ogenerrors.ErrSecurityRequirementIsNotSatisfied
+	}
 	if errors.Is(err, domain.ErrInternal(nil)) {
 		return err
 	}
-	return ogenerrors.ErrSecurityRequirementIsNotSatisfied
+	return domain.ErrInternal(err)
 }
 
 // sessionCookieOperations is the session-only 401 rewrite allowlist.
