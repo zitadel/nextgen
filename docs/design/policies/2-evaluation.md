@@ -108,7 +108,5 @@ extensions, nothing else.
 Evaluating the three password rules on a bound instance takes about 2.8 µs
 and 76 allocations; the same checks written in Go take about 0.08 µs
 (`BenchmarkEvaluate_CEL` / `BenchmarkEvaluate_Go`, Apple M5 Pro). CEL costs
-roughly 30 times plain Go here. The team's alarm line for the whole check is
-10 ms, the point at which the approach needs rethinking, not a budget to
-fill; evaluation sits more than three orders of magnitude below it. Building the context and verifying history
+roughly 30 times plain Go here, still a few microseconds per evaluation. Building the context and verifying history
 hashes are not included.
