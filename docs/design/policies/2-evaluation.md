@@ -104,3 +104,10 @@ per-request runtime budget); OpenFGA caps condition cost the same way.
 
 The environment is the CEL standard library plus the `strings` and `lists`
 extensions, nothing else.
+
+Evaluating the three password rules on a bound instance takes about 2.8 µs
+and 76 allocations; the same checks written in Go take about 0.08 µs
+(`BenchmarkEvaluate_CEL` / `BenchmarkEvaluate_Go`, Apple M5 Pro). CEL costs
+roughly 30 times plain Go here, and still well under a thousandth of the
+10 ms the whole check may take. Building the context and verifying history
+hashes are not included.
