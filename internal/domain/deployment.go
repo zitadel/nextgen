@@ -215,13 +215,7 @@ const DeploymentTargetPrimary = "primary"
 // primary origin, which are deployed as a whole, so naming one is invalid,
 // and primary and preview targets never mix.
 func ResolveDeploymentTargets(projectOrigins []Origin, deploymentTargets []string) (DeploymentOriginKind, []string, error) {
-	var primary []string
-	for _, o := range projectOrigins {
-		if o.Kind == OriginKindPrimary {
-			primary = append(primary, o.Pattern)
-		}
-	}
-
+	primary := PrimaryOrigins(projectOrigins)
 	keyword := false
 	var previews []string
 	for _, target := range deploymentTargets {
@@ -246,4 +240,16 @@ func ResolveDeploymentTargets(projectOrigins []Origin, deploymentTargets []strin
 	}
 	// TODO(#1572): cap primary origins at MaxDeploymentTargets.
 	return DeploymentOriginKindPrimary, primary, nil
+}
+
+// PrimaryOrigins returns the patterns of the project's primary origins, which
+// are exact.
+func PrimaryOrigins(projectOrigins []Origin) []string {
+	var primary []string
+	for _, o := range projectOrigins {
+		if o.Kind == OriginKindPrimary {
+			primary = append(primary, o.Pattern)
+		}
+	}
+	return primary
 }
