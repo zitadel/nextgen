@@ -739,7 +739,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --fix               Repair missing files and stale managed wiring.
       --image=<value>     Container image to check.
-      --port=<value>      [default: 8080] Local HTTP port.
+      --port=<value>      Local HTTP port to check. Defaults to the port this
+                          directory's server uses.
       --runtime=<option>  Local runtime backend.
                           <options: binary|docker>
       --[no-]telemetry    Send anonymous usage analytics. Disable with
@@ -2108,7 +2109,8 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --image=<value>     Container image to run.
-      --port=<value>      [default: 8080] Local HTTP port.
+      --port=<value>      Local HTTP port. By default this directory keeps the
+                          port it had, or takes the first free one from 8080.
       --runtime=<option>  Local runtime backend.
                           <options: binary|docker>
       --[no-]telemetry    Send anonymous usage analytics. Disable with
