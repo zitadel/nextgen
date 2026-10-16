@@ -304,27 +304,49 @@ export class Lifecycle<R extends ServerRecord> {
         this.options.firstPort,
       );
       try {
-        const record = await this.launchAndWait(claim.port);
-        await this.deps.store.write(record);
-        return { record, alreadyRunning: false };
-      } catch (error) {
-        // Someone else took the port between claiming it and binding it (a
-        // process outside our claims, or a Docker publish that failed). The
-        // choice was automatic, so the next port is tried. A server that failed
-        // with its port still free crashed, and says so instead of being retried.
-        if (
-          requested === undefined &&
-          attempt < PORT_RACE_RETRIES &&
-          (error instanceof ServerStartError ? error.reason === "exited" : true) &&
-          !(await this.deps.ports.isFree(claim.port))
-        ) {
-          preferred = claim.port + 1;
-          continue;
+        let record: Launched<R>;
+        try {
+          record = await this.launchAndWait(claim.port);
+        } catch (error) {
+          // Someone else took the port between claiming it and binding it (a
+          // process outside our claims, or a Docker publish that failed). The
+          // choice was automatic, so the next port is tried. A server that failed
+          // with its port still free crashed, and says so instead of being retried.
+          if (
+            requested === undefined &&
+            attempt < PORT_RACE_RETRIES &&
+            (error instanceof ServerStartError ? error.reason === "exited" : true) &&
+            !(await this.deps.ports.isFree(claim.port))
+          ) {
+            preferred = claim.port + 1;
+            continue;
+          }
+          throw error;
         }
-        throw error;
+        await this.save(record);
+        return { record, alreadyRunning: false };
       } finally {
         await claim.release();
       }
+    }
+  }
+
+  /**
+   * Records a server that is ready. If the record cannot be written, the server
+   * is stopped rather than left running unrecorded, where nothing could stop it
+   * and the next start would run a second one over its data. This is outside the
+   * port retry above on purpose: the server itself holds the port, so a retry
+   * would launch another beside it.
+   */
+  private async save(record: Launched<R>): Promise<void> {
+    try {
+      await this.deps.store.write(record);
+    } catch (error) {
+      const outcome = await this.deps.launcher.terminate(record);
+      if (outcome.status === "failed") {
+        throw new ServerStopError(record, outcome);
+      }
+      throw error;
     }
   }
 
@@ -426,21 +448,32 @@ export async function claimFreePort(
   preferred?: number,
   firstPort: number = DEFAULT_LOCAL_SERVER_PORT,
 ): Promise<PortClaim> {
+  // A port is looked at again once it is claimed: another start may have bound
+  // it and let go of its claim between the first look and this claim.
   if (requested !== undefined) {
-    const release = (await ports.isFree(requested)) ? await ports.reserve(requested) : undefined;
+    const release = await ports.reserve(requested);
     if (!release) {
+      throw new PortInUseError(requested);
+    }
+    if (!(await ports.isFree(requested))) {
+      await release();
       throw new PortInUseError(requested);
     }
     return { port: requested, release };
   }
   const first = preferred ?? firstPort;
   for (let port = first; port < first + PORT_SEARCH_RANGE; port++) {
-    if (await ports.isFree(port)) {
-      const release = await ports.reserve(port);
-      if (release) {
-        return { port, release };
-      }
+    if (!(await ports.isFree(port))) {
+      continue;
     }
+    const release = await ports.reserve(port);
+    if (!release) {
+      continue;
+    }
+    if (await ports.isFree(port)) {
+      return { port, release };
+    }
+    await release();
   }
   throw new NoFreePortError(first);
 }

@@ -1,5 +1,5 @@
 import { createConnection, createServer } from "node:net";
-import { tmpdir } from "node:os";
+import { tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
 
 import { checkLocalServerHealth } from "../runtime";
@@ -22,13 +22,17 @@ export class TcpPorts implements PortProbe {
   private readonly network: Network;
 
   /**
-   * `claimsDir` is where claims are kept; every `zitadel` on the machine must use
-   * the same one. `network` is how the machine is asked about a port, and is only
+   * `claimsDir` is where claims are kept; every `zitadel` of the same user on the
+   * machine must use the same one. It is the user's own folder because the
+   * shared temp directory is shared by accounts, and a folder one account made
+   * private would refuse every other. Servers of different users are still told
+   * apart by {@link isFree}, which asks the machine; only the coordination of
+   * starts at the same instant is per user. `network` is how the machine is asked about a port, and is only
    * replaced in tests, so the logic that combines the answers can be tested
    * without depending on which ports happen to be in use.
    */
   constructor(
-    claimsDir: string = join(tmpdir(), "zitadel-local-ports"),
+    claimsDir: string = join(tmpdir(), `zitadel-local-ports-${userInfo().username}`),
     network: Network = realNetwork,
   ) {
     this.claimsDir = claimsDir;

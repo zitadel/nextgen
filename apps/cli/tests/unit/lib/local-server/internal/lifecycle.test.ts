@@ -42,9 +42,15 @@ class World {
   logs = "";
   logsGone = false;
 
+  /** Set to make the next writes of the record fail, as a full or read-only disk does. */
+  writeError: Error | undefined;
+
   store: ServerStore<Fake> = {
     read: async () => this.record,
     write: async (record) => {
+      if (this.writeError) {
+        throw this.writeError;
+      }
       this.record = record;
     },
   };
@@ -394,6 +400,36 @@ describe("Lifecycle", () => {
       expect(record.port).toBe(8081);
     });
 
+    it("stops the server it launched when its record cannot be written", async () => {
+      const world = new World();
+      world.writeError = new Error("read-only file system");
+
+      await expect(world.server().start()).rejects.toThrow("read-only file system");
+
+      expect(world.terminated).toEqual([100]);
+      expect(world.alive.size).toBe(0);
+    });
+
+    it("does not launch another server when the record cannot be written", async () => {
+      const world = new World();
+      world.writeError = new Error("read-only file system");
+
+      await world
+        .server()
+        .start()
+        .catch(() => undefined);
+
+      expect(world.launched).toEqual([8080]);
+    });
+
+    it("says so when the server it launched cannot be stopped after the record failed", async () => {
+      const world = new World();
+      world.writeError = new Error("read-only file system");
+      world.terminateResult = "failed";
+
+      await expect(world.server().start()).rejects.toBeInstanceOf(ServerStopError);
+    });
+
     it("does not retry a launch that failed for another reason", async () => {
       const world = new World();
       world.launcher.launch = async () => {
@@ -535,6 +571,54 @@ describe("claimFreePort", () => {
 
   it("takes a port that was asked for as it is", async () => {
     await expect(claimFreePort(open(), 9200, 9100)).resolves.toMatchObject({ port: 9200 });
+  });
+
+  describe("when another start binds a port between the look and the claim", () => {
+    /** Free when first looked at, taken once anyone has claimed it, as after a start that bound it and let go. */
+    const takenOnceClaimed = (claimed: number[]): PortProbe => ({
+      isFree: async (port) => !claimed.includes(port),
+      reserve: async (port) => {
+        claimed.push(port);
+        return async () => undefined;
+      },
+    });
+
+    it("skips an automatic port and takes the next", async () => {
+      const claimed: number[] = [];
+      let released = 0;
+      const ports: PortProbe = {
+        isFree: async (port) => port !== 8080 || claimed.length === 0,
+        reserve: async (port) => {
+          claimed.push(port);
+          return async () => {
+            released++;
+          };
+        },
+      };
+
+      await expect(claimFreePort(ports, undefined, 8080)).resolves.toMatchObject({ port: 8081 });
+      expect(released).toBe(1);
+    });
+
+    it("refuses a port that was asked for", async () => {
+      await expect(claimFreePort(takenOnceClaimed([]), 9200)).rejects.toBeInstanceOf(
+        PortInUseError,
+      );
+    });
+
+    it("releases the claim on a port that was asked for and refused", async () => {
+      let released = 0;
+      const ports: PortProbe = {
+        isFree: async () => false,
+        reserve: async () => async () => {
+          released++;
+        },
+      };
+
+      await claimFreePort(ports, 9200).catch(() => undefined);
+
+      expect(released).toBe(1);
+    });
   });
 
   it("gives up after a hundred ports", async () => {

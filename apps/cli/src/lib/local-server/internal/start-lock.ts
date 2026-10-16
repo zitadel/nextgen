@@ -46,18 +46,55 @@ export async function tryLock(lockFile: string): Promise<(() => Promise<void>) |
   for (;;) {
     try {
       await writeFile(lockFile, String(process.pid), { flag: "wx", mode: 0o600 });
-      return () => rm(lockFile, { force: true });
+      return async () => {
+        // Only the owner's own lock is removed, so a release that comes after
+        // someone else has taken the lock over cannot remove theirs.
+        if ((await readOwner(lockFile)) === process.pid) {
+          await rm(lockFile, { force: true });
+        }
+      };
     } catch (error) {
       if (!isErrno(error, "EEXIST")) {
         throw error;
       }
     }
     const owner = await readOwner(lockFile);
-    if (owner === undefined || isAlive(owner)) {
+    if (owner === undefined || isAlive(owner) || !(await clearStale(lockFile, owner))) {
       return undefined;
     }
-    await rm(lockFile, { force: true });
   }
+}
+
+/**
+ * Removes the lock of a dead owner. Two starts that both saw the same dead owner
+ * must not both remove it: the first would then take the lock, and the second,
+ * removing it a moment later, would remove the first's live one. So removal
+ * itself is exclusive (a second file, created the same way), and the owner is
+ * read again once it is held: if the lock has a different owner by then, it is
+ * not the stale one and stays. `false` when another start is clearing it.
+ */
+async function clearStale(lockFile: string, staleOwner: number): Promise<boolean> {
+  const guardFile = `${lockFile}.clearing`;
+  try {
+    await writeFile(guardFile, String(process.pid), { flag: "wx", mode: 0o600 });
+  } catch (error) {
+    if (!isErrno(error, "EEXIST")) {
+      throw error;
+    }
+    const clearing = await readOwner(guardFile);
+    if (clearing !== undefined && !isAlive(clearing)) {
+      await rm(guardFile, { force: true });
+    }
+    return false;
+  }
+  try {
+    if ((await readOwner(lockFile)) === staleOwner) {
+      await rm(lockFile, { force: true });
+    }
+  } finally {
+    await rm(guardFile, { force: true });
+  }
+  return true;
 }
 
 async function acquireLock(lockFile: string, options: LockOptions): Promise<() => Promise<void>> {

@@ -52,6 +52,50 @@ describe("tryLock", () => {
   });
 });
 
+describe("tryLock when two starts find the same dead owner", () => {
+  it("lets only one of them take the lock", async () => {
+    const lock = await lockPath();
+    await tryLock(lock);
+    await writeFile(lock, "2147483000");
+
+    const taken = await Promise.all([tryLock(lock), tryLock(lock), tryLock(lock), tryLock(lock)]);
+
+    expect(taken.filter((release) => release !== undefined)).toHaveLength(1);
+  });
+
+  it("leaves the lock of the one that won", async () => {
+    const lock = await lockPath();
+    await tryLock(lock);
+    await writeFile(lock, "2147483000");
+
+    await Promise.all([tryLock(lock), tryLock(lock)]);
+
+    await expect(readFile(lock, "utf8")).resolves.toBe(String(process.pid));
+  });
+
+  it("does not leave the file it cleared the lock with behind", async () => {
+    const lock = await lockPath();
+    await tryLock(lock);
+    await writeFile(lock, "2147483000");
+
+    await tryLock(lock);
+
+    await expect(stat(`${lock}.clearing`)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+});
+
+describe("releasing a lock", () => {
+  it("does not remove a lock that someone else holds now", async () => {
+    const lock = await lockPath();
+    const release = await tryLock(lock);
+    await writeFile(lock, "2147483000");
+
+    await release?.();
+
+    await expect(readFile(lock, "utf8")).resolves.toBe("2147483000");
+  });
+});
+
 describe("withStartLock", () => {
   it("runs the work and removes the lock", async () => {
     const lock = await lockPath();
