@@ -24376,6 +24376,22 @@ func (s CreateUserErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UserAttributesConflictCreateUserErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.attributes_conflict")
+		{
+			s := s.UserAttributesConflict
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case UserInvalidCreateUserErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.invalid")
@@ -24468,6 +24484,9 @@ func (s *CreateUserErrorResponse) Decode(d *jx.Decoder) error {
 				case "user.already_exists":
 					s.Type = UserAlreadyExistsCreateUserErrorResponse
 					found = true
+				case "user.attributes_conflict":
+					s.Type = UserAttributesConflictCreateUserErrorResponse
+					found = true
 				case "user.invalid":
 					s.Type = UserInvalidCreateUserErrorResponse
 					found = true
@@ -24513,6 +24532,10 @@ func (s *CreateUserErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case UserAlreadyExistsCreateUserErrorResponse:
 		if err := s.UserAlreadyExists.Decode(d); err != nil {
+			return err
+		}
+	case UserAttributesConflictCreateUserErrorResponse:
+		if err := s.UserAttributesConflict.Decode(d); err != nil {
 			return err
 		}
 	case UserInvalidCreateUserErrorResponse:
@@ -47284,6 +47307,22 @@ func (s GetFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UserAttributesConflictGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.attributes_conflict")
+		{
+			s := s.UserAttributesConflict
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case UserConflictGetFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.conflict")
@@ -47471,6 +47510,9 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "user.already_exists":
 					s.Type = UserAlreadyExistsGetFlowStepErrorResponse
 					found = true
+				case "user.attributes_conflict":
+					s.Type = UserAttributesConflictGetFlowStepErrorResponse
+					found = true
 				case "user.conflict":
 					s.Type = UserConflictGetFlowStepErrorResponse
 					found = true
@@ -47606,6 +47648,10 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case UserAlreadyExistsGetFlowStepErrorResponse:
 		if err := s.UserAlreadyExists.Decode(d); err != nil {
+			return err
+		}
+	case UserAttributesConflictGetFlowStepErrorResponse:
+		if err := s.UserAttributesConflict.Decode(d); err != nil {
 			return err
 		}
 	case UserConflictGetFlowStepErrorResponse:
@@ -72981,6 +73027,40 @@ func (s *OptUserAttributes) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes UserAttributesConflictDetails as json.
+func (o OptUserAttributesConflictDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes UserAttributesConflictDetails from json.
+func (o *OptUserAttributesConflictDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptUserAttributesConflictDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(UserAttributesConflictDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptUserAttributesConflictDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptUserAttributesConflictDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes UserConflictDetails as json.
 func (o OptUserConflictDetails) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -78045,11 +78125,11 @@ func (s PatchMyUserErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case UserAlreadyExistsPatchMyUserErrorResponse:
+	case UserAttributesConflictPatchMyUserErrorResponse:
 		e.FieldStart("code")
-		e.Str("user.already_exists")
+		e.Str("user.attributes_conflict")
 		{
-			s := s.UserAlreadyExists
+			s := s.UserAttributesConflict
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -78153,8 +78233,8 @@ func (s *PatchMyUserErrorResponse) Decode(d *jx.Decoder) error {
 				case "sess.token_invalid":
 					s.Type = SessTokenInvalidPatchMyUserErrorResponse
 					found = true
-				case "user.already_exists":
-					s.Type = UserAlreadyExistsPatchMyUserErrorResponse
+				case "user.attributes_conflict":
+					s.Type = UserAttributesConflictPatchMyUserErrorResponse
 					found = true
 				case "user.conflict":
 					s.Type = UserConflictPatchMyUserErrorResponse
@@ -78203,8 +78283,8 @@ func (s *PatchMyUserErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.SessTokenInvalid.Decode(d); err != nil {
 			return err
 		}
-	case UserAlreadyExistsPatchMyUserErrorResponse:
-		if err := s.UserAlreadyExists.Decode(d); err != nil {
+	case UserAttributesConflictPatchMyUserErrorResponse:
+		if err := s.UserAttributesConflict.Decode(d); err != nil {
 			return err
 		}
 	case UserConflictPatchMyUserErrorResponse:
@@ -79080,11 +79160,11 @@ func (s PatchUserByIDErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case UserAlreadyExistsPatchUserByIDErrorResponse:
+	case UserAttributesConflictPatchUserByIDErrorResponse:
 		e.FieldStart("code")
-		e.Str("user.already_exists")
+		e.Str("user.attributes_conflict")
 		{
-			s := s.UserAlreadyExists
+			s := s.UserAttributesConflict
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -79198,8 +79278,8 @@ func (s *PatchUserByIDErrorResponse) Decode(d *jx.Decoder) error {
 				case "req.invalid":
 					s.Type = ReqInvalidPatchUserByIDErrorResponse
 					found = true
-				case "user.already_exists":
-					s.Type = UserAlreadyExistsPatchUserByIDErrorResponse
+				case "user.attributes_conflict":
+					s.Type = UserAttributesConflictPatchUserByIDErrorResponse
 					found = true
 				case "user.conflict":
 					s.Type = UserConflictPatchUserByIDErrorResponse
@@ -79243,8 +79323,8 @@ func (s *PatchUserByIDErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
 		}
-	case UserAlreadyExistsPatchUserByIDErrorResponse:
-		if err := s.UserAlreadyExists.Decode(d); err != nil {
+	case UserAttributesConflictPatchUserByIDErrorResponse:
+		if err := s.UserAttributesConflict.Decode(d); err != nil {
 			return err
 		}
 	case UserConflictPatchUserByIDErrorResponse:
@@ -103313,6 +103393,22 @@ func (s SubmitFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UserAttributesConflictSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.attributes_conflict")
+		{
+			s := s.UserAttributesConflict
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case UserConflictSubmitFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.conflict")
@@ -103506,6 +103602,9 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "user.already_exists":
 					s.Type = UserAlreadyExistsSubmitFlowStepErrorResponse
 					found = true
+				case "user.attributes_conflict":
+					s.Type = UserAttributesConflictSubmitFlowStepErrorResponse
+					found = true
 				case "user.conflict":
 					s.Type = UserConflictSubmitFlowStepErrorResponse
 					found = true
@@ -103649,6 +103748,10 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case UserAlreadyExistsSubmitFlowStepErrorResponse:
 		if err := s.UserAlreadyExists.Decode(d); err != nil {
+			return err
+		}
+	case UserAttributesConflictSubmitFlowStepErrorResponse:
+		if err := s.UserAttributesConflict.Decode(d); err != nil {
 			return err
 		}
 	case UserConflictSubmitFlowStepErrorResponse:
@@ -107835,6 +107938,194 @@ func (s UserAttributes) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *UserAttributes) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *UserAttributesConflict) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *UserAttributesConflict) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("user.attributes_conflict")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfUserAttributesConflict = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes UserAttributesConflict from json.
+func (s *UserAttributesConflict) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UserAttributesConflict to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode UserAttributesConflict")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfUserAttributesConflict) {
+					name = jsonFieldsNameOfUserAttributesConflict[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *UserAttributesConflict) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UserAttributesConflict) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s UserAttributesConflictDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s UserAttributesConflictDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes UserAttributesConflictDetails from json.
+func (s *UserAttributesConflictDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UserAttributesConflictDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode UserAttributesConflictDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s UserAttributesConflictDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UserAttributesConflictDetails) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -116351,6 +116642,22 @@ func (s VerifyChallengeProofErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UserAttributesConflictVerifyChallengeProofErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.attributes_conflict")
+		{
+			s := s.UserAttributesConflict
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case UserInvalidVerifyChallengeProofErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.invalid")
@@ -116477,6 +116784,9 @@ func (s *VerifyChallengeProofErrorResponse) Decode(d *jx.Decoder) error {
 				case "user.already_exists":
 					s.Type = UserAlreadyExistsVerifyChallengeProofErrorResponse
 					found = true
+				case "user.attributes_conflict":
+					s.Type = UserAttributesConflictVerifyChallengeProofErrorResponse
+					found = true
 				case "user.invalid":
 					s.Type = UserInvalidVerifyChallengeProofErrorResponse
 					found = true
@@ -116549,6 +116859,10 @@ func (s *VerifyChallengeProofErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case UserAlreadyExistsVerifyChallengeProofErrorResponse:
 		if err := s.UserAlreadyExists.Decode(d); err != nil {
+			return err
+		}
+	case UserAttributesConflictVerifyChallengeProofErrorResponse:
+		if err := s.UserAttributesConflict.Decode(d); err != nil {
 			return err
 		}
 	case UserInvalidVerifyChallengeProofErrorResponse:

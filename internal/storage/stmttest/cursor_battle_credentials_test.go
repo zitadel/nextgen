@@ -7,6 +7,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -171,3 +172,74 @@ func battleUserRecoveryCodes(t *testing.T, d dialect) {
 		})
 	}, func(item *domain.UserRecoveryCodes) string { return item.ID }, 2)
 }
+
+// battleUserAttributes pages ListUserAttributes over every attribute of a
+// project's users, unique and not.
+func battleUserAttributes(t *testing.T, d dialect) {
+	t.Helper()
+	projectID, want := seedUserAttributes(t, d)
+	orderAsc := database.OrderBy[domain.UserAttributeField]{
+		Columns: []database.Column[domain.UserAttributeField]{
+			database.Col(domain.UserAttributeFieldUserID),
+			database.Col(domain.UserAttributeFieldKey),
+		},
+		Direction: database.OrderAsc,
+	}
+	slices.Sort(want)
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.UserAttributeField]) (*database.ListResult[*domain.UserAttribute], error) {
+		return d.stmts.ListUserAttributes(t.Context(), &database.ListOptions[domain.UserAttributeField]{
+			Filter:     database.Equal(database.Col(domain.UserAttributeFieldProjectID), projectID),
+			Pagination: page,
+		})
+	}, userAttributeID, 3)
+}
+
+// battleUserAttributesValueHash sorts on the claim's value hash, which is NULL
+// for an attribute without a claim. Ascending and descending must both drain
+// every row.
+func battleUserAttributesValueHash(t *testing.T, d dialect) {
+	t.Helper()
+	projectID, want := seedUserAttributes(t, d)
+	for name, direction := range map[string]database.OrderDirection{
+		"asc":  database.OrderAsc,
+		"desc": database.OrderDesc,
+	} {
+		t.Run(name, func(t *testing.T) {
+			got := pageAll(t, len(want), nil, func(cursor []byte) (*database.ListResult[*domain.UserAttribute], error) {
+				return d.stmts.ListUserAttributes(t.Context(), &database.ListOptions[domain.UserAttributeField]{
+					Filter: database.Equal(database.Col(domain.UserAttributeFieldProjectID), projectID),
+					Pagination: database.Page[domain.UserAttributeField]{
+						Limit:  2,
+						Cursor: cursor,
+						OrderBy: database.OrderBy[domain.UserAttributeField]{
+							Columns: []database.Column[domain.UserAttributeField]{
+								database.Col(domain.UserAttributeFieldValueHash),
+								database.Col(domain.UserAttributeFieldUserID),
+								database.Col(domain.UserAttributeFieldKey),
+							},
+							Direction: direction,
+						},
+					},
+				})
+			}, userAttributeID)
+			assert.ElementsMatch(t, want, got, "every attribute must appear exactly once across all pages")
+		})
+	}
+}
+
+// seedUserAttributes creates users with a unique email and a non-unique name
+// and returns the ids of their attributes.
+func seedUserAttributes(t *testing.T, d dialect) (string, []string) {
+	t.Helper()
+	projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+	want := make([]string, 0, 6)
+	for i := range 3 {
+		userID := "usr-attr-" + string(rune('a'+i)) + "-" + uniqueSuffix(t)
+		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "Attr")))
+		t.Cleanup(func() { _ = d.stmts.DeleteUserByID(context.Background(), projectID, userID) })
+		want = append(want, userID+"|email", userID+"|name")
+	}
+	return projectID, want
+}
+
+func userAttributeID(a *domain.UserAttribute) string { return a.UserID + "|" + string(a.Key) }

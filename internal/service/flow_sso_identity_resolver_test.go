@@ -140,6 +140,9 @@ func (f *ssoResolverFixture) expectCreateUser(createErr error) *servicemocks.Moc
 	f.schemaStore.EXPECT().GetJSONSchemaByID(gomock.Any(), ssoProjectID, ssoSchemaURL).
 		Return(&domain.JSONSchema{ProjectID: ssoProjectID, URL: ssoSchemaURL, Schema: []byte(ssoUserSchema)}, nil)
 	createUser := f.stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).Return(createErr)
+	// A unique violation looks up which attributes are taken.
+	f.stmts.EXPECT().ListUserAttributes(gomock.Any(), gomock.Any()).
+		Return(&database.ListResult[*domain.UserAttribute]{}, nil).AnyTimes()
 	f.stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, ev *domain.Event) error {
 		f.events = append(f.events, ev)
 		return nil
@@ -842,7 +845,7 @@ func TestFlowSSOIdentityResolver_CreateLinked_UniqueErrorMapsToUserAlreadyExists
 			f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil)
 
 			_, err := f.resolver.CreateLinked(t.Context(), createInput())
-			require.ErrorIs(t, err, domain.ErrUserAlreadyExists())
+			require.True(t, domain.IsUserAlreadyExists(err), err)
 		})
 	}
 }
@@ -888,7 +891,8 @@ func TestFlowSSOIdentityResolver_CreateLinked_InvalidUserLogsLocations(t *testin
 	ctx := zlog.WithLoggingContext(t.Context(), slog.New(slog.NewTextHandler(&logged, nil)))
 
 	_, err := f.resolver.CreateLinked(ctx, in)
-	require.ErrorIs(t, err, domain.ErrUserInvalid())
+	require.ErrorIs(t, err, domain.ErrUserAttributesInvalid(nil))
+	assert.True(t, domain.IsUserInvalid(err))
 	assert.Contains(t, logged.String(), "level=WARN")
 	assert.Contains(t, logged.String(), "/email")
 	assert.NotContains(t, logged.String(), "secret-value")
@@ -902,6 +906,22 @@ func TestFlowSSOIdentityResolver_CreateLinked_LostRaceEmitsUserCreateFailed(t *t
 	f.inTransaction(t)
 	f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil)
 	f.expectCreateUser(database.NewUniqueError("users", "uq_unique_attributes", nil))
+
+	_, err := f.resolver.CreateLinked(t.Context(), createInput())
+	require.ErrorIs(t, err, domain.ErrUserAlreadyExists())
+	assert.NotNil(t, f.event(domain.EventTypeUserCreateFailed))
+}
+
+// Losing the link race rolls the created user back, so it is audited like a
+// lost create.
+func TestFlowSSOIdentityResolver_CreateLinked_LostLinkRaceEmitsUserCreateFailed(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	f.inTransaction(t)
+	f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil)
+	f.expectCreateUser(nil)
+	f.stmts.EXPECT().CreateIDPIdentityLink(gomock.Any(), gomock.Any()).
+		Return(database.NewUniqueError("idp_identity_links", "uq_idp_identity_links_connection_subject", nil))
 
 	_, err := f.resolver.CreateLinked(t.Context(), createInput())
 	require.ErrorIs(t, err, domain.ErrUserAlreadyExists())

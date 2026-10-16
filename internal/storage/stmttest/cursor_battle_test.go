@@ -88,6 +88,8 @@ func TestCursorBattle_DrainAllListIncarnations(t *testing.T) {
 		t.Run("team_memberships", func(t *testing.T) { battleTeamMemberships(t, d) })
 		t.Run("user_teams", func(t *testing.T) { battleUserTeams(t, d) })
 		t.Run("user_passwords", func(t *testing.T) { battleUserPasswords(t, d) })
+		t.Run("user_attributes", func(t *testing.T) { battleUserAttributes(t, d) })
+		t.Run("user_attributes_value_hash", func(t *testing.T) { battleUserAttributesValueHash(t, d) })
 		t.Run("user_totps", func(t *testing.T) { battleUserTOTPs(t, d) })
 		t.Run("user_passkeys", func(t *testing.T) { battleUserPasskeys(t, d) })
 		t.Run("user_recovery_codes", func(t *testing.T) { battleUserRecoveryCodes(t, d) })

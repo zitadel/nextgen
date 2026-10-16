@@ -285,6 +285,9 @@ func writeErrorResponses(
 		if endpoint.csrfChecked {
 			errFuncs = append(errFuncs, csrfErrors...)
 		}
+		errFuncs = slices.DeleteFunc(errFuncs, func(errFunc string) bool {
+			return slices.Contains(remappedErrors, errFunc)
+		})
 		if excluded := operationExcludedErrors[endpoint.operationID]; len(excluded) > 0 {
 			errFuncs = slices.DeleteFunc(errFuncs, func(errFunc string) bool {
 				return slices.Contains(excluded, errFunc)
@@ -915,6 +918,15 @@ func acceptsSessionCookie(op methodsFileOperation) bool {
 		}
 	}
 	return false
+}
+
+// remappedErrors are domain sentinels that errorResponse answers under another
+// code, on every operation, so none of them ever reaches a client. Each one's
+// public code is a transport error, already in every union.
+var remappedErrors = []string{
+	// Attributes failing the user schema answer req.invalid, the way request
+	// validation answers a malformed body.
+	"domain.ErrUserAttributesInvalid",
 }
 
 // operationExcludedErrors drops internal sentinels from the generated default

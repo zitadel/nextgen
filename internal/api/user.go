@@ -32,7 +32,7 @@ func (h *Handler) CreateUser(ctx context.Context, req *api.CreateUserRequest, pa
 		Attributes: *attributes,
 	})
 	if err != nil {
-		return nil, err
+		return nil, userAttributesRequestInvalid(err)
 	}
 
 	return domainUserToApiUser(user)
@@ -311,7 +311,7 @@ func (h *Handler) PatchUserByID(ctx context.Context, req *api.PatchUserRequest, 
 
 	user, err := h.userService.PatchUser(ctx, input)
 	if err != nil {
-		return nil, err
+		return nil, userAttributesRequestInvalid(err)
 	}
 
 	return domainUserToApiUser(user)
@@ -333,7 +333,7 @@ func (h *Handler) PatchMyUser(ctx context.Context, req *api.PatchMyUserRequest) 
 		Attributes:   *attributes,
 	})
 	if err != nil {
-		return nil, err
+		return nil, userAttributesRequestInvalid(err)
 	}
 
 	return domainUserToApiUser(user)
@@ -482,9 +482,18 @@ func userErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		domain.ErrUserPasswordEmpty().Code,
 		domain.ErrUserPasswordTooLong().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
+	case domain.ErrUserAttributesInvalid(nil).Code:
+		// Outside the /users endpoints (which answer req.invalid, see
+		// userAttributesRequestInvalid) no request body carries attributes
+		// to name.
+		return errorResponseWithStatusCode(http.StatusBadRequest,
+			domain.ErrUserInvalid().WithMessage("user is not valid according to schema").WithParent(err))
 	case domain.ErrUserNotFound().Code:
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
-	case domain.ErrUserAlreadyExists().Code:
+	case domain.ErrUserAlreadyExists().Code, domain.ErrUserAttributesConflict().Code:
+		if _, ok := err.Details.(domain.UserAttributesDetails); ok {
+			err = err.WithDetails(userAttributeFieldPaths(err.Details))
+		}
 		return errorResponseWithStatusCode(http.StatusConflict, err)
 	case domain.ErrUserConflict().Code:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
@@ -493,4 +502,30 @@ func userErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	default:
 		return internalErrorResponse(err)
 	}
+}
+
+// userAttributesRequestInvalid answers a user schema failure of a /users write
+// like request validation: the client gets one shape for "fix these fields",
+// whether ogen or the user schema refused them, named by their path from the
+// request body.
+func userAttributesRequestInvalid(err error) error {
+	if invalid, ok := errors.AsType[domain.Error](err); ok && invalid.Code == domain.ErrUserAttributesInvalid(nil).Code {
+		return domain.ErrRequestInvalid().WithParent(err).WithDetails(userAttributeFieldPaths(invalid.Details))
+	}
+	return err
+}
+
+// userAttributeFieldPaths names the attributes in details by their path from
+// the request body, which carries them under attributes.
+func userAttributeFieldPaths(details any) domain.InvalidFieldPathsDetails {
+	attrs, _ := details.(domain.UserAttributesDetails)
+	fields := make([]string, 0, len(attrs.Keys))
+	for _, key := range attrs.Keys {
+		path := domain.AttributeKey("attributes")
+		if key != "" {
+			path = path.AppendNode(string(key))
+		}
+		fields = append(fields, string(path))
+	}
+	return domain.InvalidFieldPathsDetails{Fields: fields}
 }

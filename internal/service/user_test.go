@@ -478,3 +478,185 @@ func newMockedUserService(t *testing.T) (service.UserService, *servicemocks.Mock
 	svcPool := service.NewPool(pool)
 	return service.NewUserService(svcPool, nil, nil, service.StatementsUserRefResolver{Pool: svcPool}), stmts
 }
+
+const takenAttributesSchema = `{
+	"type": "object",
+	"properties": {
+		"email": {"type": "string", "x-unique": "project"},
+		"username": {"type": "string", "x-unique": "team"},
+		"givenName": {"type": "string"}
+	}
+}`
+
+// newTakenAttributesFixture wires a user service whose write collides on a
+// unique value. holders answers the registry probe per attribute key with the
+// id of the user holding it; a key it does not name is free.
+func newTakenAttributesFixture(t *testing.T, holders map[domain.AttributeKey]string) (service.UserService, *servicemocks.MockAllStatements) {
+	t.Helper()
+
+	ctrl := gomock.NewController(t)
+	pool := servicemocks.NewMockPool(ctrl)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	statementer := servicemocks.NewMockStatementer[service.AllStatements](ctrl)
+	pool.EXPECT().Statements().Return(stmts).AnyTimes()
+	pool.EXPECT().Transaction(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(ctx context.Context, tx func(context.Context, service.Statementer[service.AllStatements]) error) error {
+			return tx(ctx, statementer)
+		},
+	).AnyTimes()
+	statementer.EXPECT().Statements().Return(stmts).AnyTimes()
+	stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	stmts.EXPECT().GetUserUniqueAttributeScopes(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(map[domain.AttributeKey]string{"username": "team_1"}, nil).AnyTimes()
+
+	schemaStore := domainmock.NewMockJSONSchemaStore(ctrl)
+	schemaStore.EXPECT().GetJSONSchemaByID(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(&domain.JSONSchema{Schema: []byte(takenAttributesSchema)}, nil).AnyTimes()
+
+	stmts.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.User{
+		// The patch's read of the user it merges into.
+		ProjectID:  "proj_1",
+		SchemaURL:  "https://example.test/schema.json",
+		ID:         "user_1",
+		Attributes: domain.Attributes{{Key: "givenName", Value: "Alice"}},
+	}, nil).AnyTimes()
+	stmts.EXPECT().ListUserAttributes(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, opts *database.ListOptions[domain.UserAttributeField]) (*database.ListResult[*domain.UserAttribute], error) {
+			// Each unique attribute of the write is one claim under its
+			// registry team scope.
+			claims := opts.Filter.(database.AndFilter[domain.UserAttributeField]).Filters[1].(database.OrFilter[domain.UserAttributeField]).Filters
+			var held []*domain.UserAttribute
+			for _, c := range claims {
+				terms := c.(database.AndFilter[domain.UserAttributeField]).Filters
+				team := terms[0].(*database.CompareFilter[domain.UserAttributeField]).Terms[0].Value.(string)
+				key := domain.AttributeKey(terms[1].(*database.CompareFilter[domain.UserAttributeField]).Terms[0].Value.(string))
+				if key == "username" {
+					assert.Equal(t, "team_1", team)
+				} else {
+					assert.Empty(t, team)
+				}
+				if holder, ok := holders[key]; ok {
+					held = append(held, &domain.UserAttribute{ProjectID: "proj_1", UserID: holder, Key: key, UniqueTeamID: &team})
+				}
+			}
+			return &database.ListResult[*domain.UserAttribute]{Items: held}, nil
+		},
+	).AnyTimes()
+
+	svcPool := service.NewPool(pool)
+	return service.NewUserService(svcPool, schemaStore, nil, service.StatementsUserRefResolver{Pool: svcPool}), stmts
+}
+
+func requireTakenFields(t *testing.T, err error, code domain.Error, keys ...domain.AttributeKey) {
+	t.Helper()
+	require.ErrorIs(t, err, code)
+	var derr domain.Error
+	require.ErrorAs(t, err, &derr)
+	if len(keys) == 0 {
+		assert.Nil(t, derr.Details)
+		return
+	}
+	assert.Equal(t, domain.UserAttributesDetails{Keys: keys}, derr.Details)
+}
+
+// A uniqueness conflict names the attribute whose value is taken, not the
+// user who holds it. A unique value the user being written holds itself, and
+// a non-unique attribute, are not named.
+func TestUserService_UniquenessConflictNamesTheAttribute(t *testing.T) {
+	t.Parallel()
+	unique := database.NewUniqueError("zitadel_nextgen.user_unique_attributes", "pk", nil)
+
+	t.Run("create", func(t *testing.T) {
+		t.Parallel()
+		svc, stmts := newTakenAttributesFixture(t, map[domain.AttributeKey]string{"email": "user_2"})
+		stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).Return(unique)
+
+		_, err := svc.CreateUser(t.Context(), service.CreateUserInput{
+			ProjectID:  "proj_1",
+			TeamID:     new("team_1"),
+			SchemaURL:  "https://example.test/schema.json",
+			Attributes: map[string]any{"email": "taken@example.com", "username": "alice", "givenName": "Alice"},
+		})
+		requireTakenFields(t, err, domain.ErrUserAttributesConflict(), "email")
+	})
+
+	t.Run("patch", func(t *testing.T) {
+		t.Parallel()
+		svc, stmts := newTakenAttributesFixture(t, map[domain.AttributeKey]string{
+			"email":    "user_1", // the user's own claim
+			"username": "user_2",
+		})
+		stmts.EXPECT().PatchUser(gomock.Any(), gomock.Any()).Return(unique)
+
+		_, err := svc.PatchUser(t.Context(), service.PatchUserInput{
+			ProjectID:  "proj_1",
+			UserID:     "user_1",
+			Attributes: map[string]any{"email": "alice@example.com", "username": "taken"},
+		})
+		requireTakenFields(t, err, domain.ErrUserAttributesConflict(), "username")
+	})
+
+	t.Run("a value freed since stays unnamed", func(t *testing.T) {
+		t.Parallel()
+		svc, stmts := newTakenAttributesFixture(t, nil)
+		stmts.EXPECT().PatchUser(gomock.Any(), gomock.Any()).Return(unique)
+
+		_, err := svc.PatchUser(t.Context(), service.PatchUserInput{
+			ProjectID:  "proj_1",
+			UserID:     "user_1",
+			Attributes: map[string]any{"email": "alice@example.com"},
+		})
+		requireTakenFields(t, err, domain.ErrUserAttributesConflict())
+	})
+}
+
+func preparedCreateUserAction(t *testing.T) (*service.CreateUserAction, *servicemocks.MockAllStatements) {
+	t.Helper()
+	ctrl := gomock.NewController(t)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	schemaStore := domainmock.NewMockJSONSchemaStore(ctrl)
+	schemaStore.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj_1", "https://example.test/schema.json").
+		Return(&domain.JSONSchema{Schema: []byte(takenAttributesSchema)}, nil)
+	action := service.NewCreateUserAction(service.CreateUserInput{
+		ProjectID:  "proj_1",
+		ID:         "user_1",
+		SchemaURL:  "https://example.test/schema.json",
+		Attributes: map[string]any{"email": "taken@example.com"},
+	}, schemaStore)
+	require.NoError(t, action.Prepare(t.Context()))
+	return action, stmts
+}
+
+// Spanner runs the transaction callback again after an abort. The error of
+// the aborted attempt must not outlive it and mask the retry's outcome.
+func TestCreateUserAction_RetriedApplyForgetsTheEarlierError(t *testing.T) {
+	t.Parallel()
+	action, stmts := preparedCreateUserAction(t)
+	gomock.InOrder(
+		stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).Return(database.NewUnavailableError(nil)),
+		stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).Return(nil),
+	)
+	stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil)
+
+	require.Error(t, action.Apply(t.Context(), stmts))
+	require.NoError(t, action.Apply(t.Context(), stmts))
+	assert.NoError(t, action.Err(t.Context(), stmts))
+}
+
+// A lookup that fails does not tell whether an attribute explains the
+// conflict, so a create does not claim that none does.
+func TestCreateUserAction_FailedLookupStaysAnAttributesConflict(t *testing.T) {
+	t.Parallel()
+	action, stmts := preparedCreateUserAction(t)
+	stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).
+		Return(database.NewUniqueError("user_unique_attributes", "pk", nil))
+	stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil)
+	stmts.EXPECT().ListUserAttributes(gomock.Any(), gomock.Any()).Return(nil, database.NewUnavailableError(nil))
+
+	require.Error(t, action.Apply(t.Context(), stmts))
+	err := action.Err(t.Context(), stmts)
+	require.ErrorIs(t, err, domain.ErrUserAttributesConflict())
+	var derr domain.Error
+	require.ErrorAs(t, err, &derr)
+	assert.Nil(t, derr.Details)
+}

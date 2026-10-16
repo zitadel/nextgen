@@ -483,6 +483,9 @@ type UserStatements interface {
 	// attribute key, so a patch keeps the scope an existing claim was created
 	// under. An unknown user reads as an empty map, not an error.
 	GetUserUniqueAttributeScopes(ctx context.Context, projectID, userID string) (map[domain.AttributeKey]string, error)
+	// ListUserAttributes reads stored user attributes, each with its
+	// unique-attributes registry claim when it has one.
+	ListUserAttributes(ctx context.Context, opts *database.ListOptions[domain.UserAttributeField]) (*database.ListResult[*domain.UserAttribute], error)
 	GetUser(ctx context.Context, filter database.Filter[domain.UserField], opts UserQueryOptions) (*domain.User, error)
 	ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], opts UserQueryOptions) (*database.ListResult[*domain.User], error)
 	DeactivateUser(ctx context.Context, projectID, userID string) error

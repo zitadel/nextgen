@@ -13,6 +13,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
 	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
 	v2user "github.com/zitadel/nextgen/internal/storage/user"
+	"github.com/zitadel/nextgen/internal/storage/userattribute"
 )
 
 const (
@@ -66,6 +67,10 @@ WHERE project_id = @p1 AND id IN UNNEST(@p2)`
 WHERE project_id = @p2 AND id = @p3 AND updated_at = @p4`
 
 	selectUserUniqueAttrScopesStmt = `SELECT key, team_id FROM user_unique_attributes WHERE project_id = @p1 AND user_id = @p2`
+
+	userAttributeQuery = `SELECT a.project_id, a.user_id, a.team_id, a.key, TO_JSON_STRING(a.value), ua.team_id, ua.value_hash
+FROM user_attributes a
+LEFT JOIN user_unique_attributes ua ON ua.project_id = a.project_id AND ua.user_id = a.user_id AND ua.key = a.key`
 
 	deleteUserUniqueAttributesStmt = `DELETE FROM user_unique_attributes WHERE project_id = @p1 AND user_id = @p2`
 
@@ -180,6 +185,50 @@ func (us userStatements) GetUserUniqueAttributeScopes(ctx context.Context, proje
 		return nil, err
 	}
 	return scopes, nil
+}
+
+// ListUserAttributes implements [service.UserStatements].
+func (us userStatements) ListUserAttributes(ctx context.Context, opts *database.ListOptions[domain.UserAttributeField]) (*database.ListResult[*domain.UserAttribute], error) {
+	attrs, nextCursor, err := pagination.Page(opts.Pagination, userattribute.Schema, func(limit uint32) ([]*domain.UserAttribute, error) {
+		opts := opts.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileRead(&compiler, userAttributeQuery, opts, userattribute.Schema); err != nil {
+			return nil, err
+		}
+		var attrs []*domain.UserAttribute
+		err := us.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+			var err error
+			attrs, err = collectRows(iter, scanUserAttribute)
+			return err
+		})
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		return attrs, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &database.ListResult[*domain.UserAttribute]{Items: attrs, NextCursor: nextCursor}, nil
+}
+
+func scanUserAttribute(row *spanner.Row) (*domain.UserAttribute, error) {
+	attr := new(domain.UserAttribute)
+	var (
+		key, valueJSON string
+		uniqueTeamID   spanner.NullString
+	)
+	if err := row.Columns(&attr.ProjectID, &attr.UserID, &attr.TeamID, &key, &valueJSON, &uniqueTeamID, &attr.ValueHash); err != nil {
+		return nil, err
+	}
+	attr.Key = domain.AttributeKey(key)
+	if uniqueTeamID.Valid {
+		attr.UniqueTeamID = &uniqueTeamID.StringVal
+	}
+	if err := json.Unmarshal([]byte(valueJSON), &attr.Value); err != nil {
+		return nil, fmt.Errorf("unmarshal attribute %q: %w", attr.Key, err)
+	}
+	return attr, nil
 }
 
 // PatchUser implements [service.UserStatements] as a full rewrite of the

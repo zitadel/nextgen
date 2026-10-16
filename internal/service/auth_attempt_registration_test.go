@@ -16,6 +16,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/service/mocks"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 func passkeyTestOrigins(t *testing.T) []url.URL {
@@ -528,7 +529,8 @@ func TestAuthAttemptService_VerifyProof_PasskeyRegistration(t *testing.T) {
 
 		createUser := mocks.NewMockUserAction(ctrl)
 		createUser.EXPECT().Prepare(gomock.Any()).Return(nil)
-		createUser.EXPECT().Apply(gomock.Any(), gomock.Any()).Return(domain.ErrUserAlreadyExists())
+		createUser.EXPECT().Apply(gomock.Any(), gomock.Any()).Return(database.NewUniqueError("user_unique_attributes", "pk", nil))
+		createUser.EXPECT().Err(gomock.Any(), gomock.Any()).Return(domain.ErrUserAlreadyExists())
 
 		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil)
 		_, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{

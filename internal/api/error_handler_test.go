@@ -446,6 +446,58 @@ func TestOgenErrorHandlerSecurityInternalErrorIs500(t *testing.T) {
 	require.JSONEq(t, `{"code":"internal","message":"An unexpected error occurred."}`, rec.Body.String())
 }
 
+// Attributes failing the user schema keep their own code inside the server,
+// but answer as request validation does: req.invalid with the stable message
+// and the failing field paths, never the validator text.
+func TestErrorResponseUserAttributesInvalidIsRequestInvalid(t *testing.T) {
+	t.Parallel()
+
+	_, validationErr := domain.NewCreateUser(domain.CreateUserParams{
+		ProjectID:  "proj_1",
+		SchemaURL:  "https://example.test/schema.json",
+		Schema:     []byte(`{"type": "object", "required": ["country"], "properties": {"age": {"type": "integer"}, "country": {"type": "string"}}}`),
+		Attributes: map[string]any{"age": "secret-value"},
+	})
+	require.ErrorIs(t, validationErr, domain.ErrUserAttributesInvalid(nil))
+
+	got := errorResponse(userAttributesRequestInvalid(validationErr))
+
+	require.Equal(t, http.StatusBadRequest, got.StatusCode)
+	require.Equal(t, api.ErrorCode(domain.ErrRequestInvalid().Code), got.Response.Code)
+	require.Equal(t, domain.ErrRequestInvalid().Message, got.Response.Message)
+	body, err := got.Response.MarshalJSON()
+	require.NoError(t, err)
+	require.JSONEq(t, `{"code":"req.invalid","message":`+fmt.Sprintf("%q", domain.ErrRequestInvalid().Message)+
+		`,"details":{"details":{"fields":["attributes.age","attributes.country"]}}}`, string(body))
+	require.NotContains(t, string(body), "secret-value")
+
+	// Outside the /users endpoints no request body carries attributes, so a
+	// flow answers the failure as before.
+	flow := errorResponse(validationErr)
+	require.Equal(t, http.StatusBadRequest, flow.StatusCode)
+	require.Equal(t, api.ErrorCode(domain.ErrUserInvalid().Code), flow.Response.Code)
+	require.Equal(t, "user is not valid according to schema", flow.Response.Message)
+	require.False(t, flow.Response.Details.Set)
+}
+
+// The domain names attributes by key; the API names them by their path from
+// the request body, and a failure on the document itself names attributes.
+func TestErrorResponseUserAttributesAreNamedByBodyPath(t *testing.T) {
+	t.Parallel()
+
+	for _, taken := range []domain.Error{domain.ErrUserAlreadyExists(), domain.ErrUserAttributesConflict()} {
+		conflict := errorResponse(taken.WithDetails(domain.UserAttributesDetails{Keys: []domain.AttributeKey{"email"}}))
+		require.Equal(t, http.StatusConflict, conflict.StatusCode)
+		require.Equal(t, api.ErrorCode(taken.Code), conflict.Response.Code)
+		require.JSONEq(t, `{"fields":["attributes.email"]}`, string(conflict.Response.Details.Value["details"]))
+	}
+
+	invalid := errorResponse(userAttributesRequestInvalid(domain.ErrUserAttributesInvalid(nil).
+		WithDetails(domain.UserAttributesDetails{Keys: []domain.AttributeKey{"", "address.zip"}})))
+	require.Equal(t, http.StatusBadRequest, invalid.StatusCode)
+	require.JSONEq(t, `{"fields":["attributes","attributes.address.zip"]}`, string(invalid.Response.Details.Value["details"]))
+}
+
 // A credential IntrospectToken refuses is a 401; an introspection that could
 // not reach the token store is a 500. Answering the outage with 401 would tell
 // every SDK its session is dead, and they clear the session cookie on a 401.
