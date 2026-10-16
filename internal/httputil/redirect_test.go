@@ -182,6 +182,9 @@ func TestParseRedirectTarget_Refuses(t *testing.T) {
 		{"an encoded hash ends the path before dot segments", "https://app.test/.%2F%2Fx%23%2F..%2F..", "empty segment"},
 		{"an encoded question mark after an encoded dot", "https://app.test/%2e%2F%2Fevil.example%3F/../..", "empty segment"},
 		{"resolve, then a backslash reading, then resolve", "https://app.test/a%2Fb%5C%2F../..%5C/evil.example", "empty segment"},
+		{"a decoded question mark ends the path for one reader and not the next", "https://app.test/.;//..;%25253f", "empty segment"},
+		{"a decoded hash ends the path for one reader and not the next", "https://app.test/a/b/..%23/../..//", "empty segment"},
+		{"a parameter-only first segment", "https://app.test/;jsessionid=ABC123/orders", "empty segment"},
 		{"a stray percent sign after a double-encoded slash", "https://app.test/%252F%25zz", "empty segment"},
 	}
 	for _, tt := range tests {

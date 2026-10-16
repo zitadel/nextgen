@@ -39,10 +39,11 @@ const maxPort = 65535
 //   - A path that starts with "//" is a network-path reference: once the scheme
 //     and host are stripped, as a proxy that re-bases a Location header onto its
 //     own host does, it names another host. A proxy or server that then decodes
-//     the path, once or twice, sees "%2F" and "%5C" as slashes. So the path is
-//     followed through every reading, decoding and resolving its dot segments
-//     in any order, however many times, and refused if any of them starts with
-//     "//".
+//     the path sees "%2F" and "%5C" as slashes, and one that drops ";"
+//     parameters, as Tomcat and Spring do, sees "/..;/" as "/../". A decoded
+//     "?" or "#" ends the path for a reader that parses a URL. So the path is
+//     followed through every reading, in any order and however many times,
+//     and refused if any of them starts with "//".
 //
 // Only the scheme, userinfo, host, port and path are policed. The query and
 // fragment are free-form, so a page that keeps state there still round-trips.
@@ -109,22 +110,13 @@ func ParseRedirectTarget(raw string) (*url.URL, error) {
 		return nil, err
 	}
 
-	if len(u.String()) > MaxRedirectTargetLength {
-		return nil, refusal("it is longer than %d bytes once its escapes are written out", MaxRedirectTargetLength)
+	// The path is checked in the form that is stored and later redirected to.
+	path, ok := pathOf(u.String(), u.Scheme)
+	if !ok {
+		return nil, refusal("it is not a URL")
 	}
-
-	// The path is checked as written and as the URL serializes it, because the
-	// serialized form is what a caller stores and later redirects to. After
-	// sanitize the two are the same text; checking both keeps that true if a
-	// parser ever disagrees.
-	for _, form := range []string{target, u.String()} {
-		path, ok := pathOf(form, u.Scheme)
-		if !ok {
-			return nil, refusal("it is not a URL")
-		}
-		if err := checkPath(path); err != nil {
-			return nil, err
-		}
+	if err := checkPath(path); err != nil {
+		return nil, err
 	}
 	return u, nil
 }
@@ -251,8 +243,8 @@ const maxReadings = 64
 // resolving dot segments, reading backslashes as slashes, dropping path
 // parameters and cutting at a query or fragment mark, in any order and any
 // number of times, is tested for a leading "//".
-// Decoding strictly shortens a text and the other two steps never lengthen it,
-// so the walk ends.
+// No step lengthens a text, and a text is never followed twice, so the walk
+// ends; a path that fans out into more than maxReadings texts is refused.
 func checkPath(path string) error {
 	seen := map[string]bool{path: true}
 	pending := []string{path}
@@ -263,7 +255,8 @@ func checkPath(path string) error {
 			return refusal("its path starts with an empty segment, which reads as another host")
 		}
 		decoded := unescapeLeniently(text)
-		steps := []string{decoded, resolveDots(text), strings.ReplaceAll(text, `\`, "/"), dropParameters(text), cutAtQuery(text)}
+		steps := []string{decoded, resolveDots(text), strings.ReplaceAll(text, `\`, "/"), dropParameters(text), cutAtQuery(text),
+			onPath(text, resolveDots), onPath(text, dropParameters)}
 		for _, step := range steps {
 			if seen[step] {
 				continue
@@ -292,6 +285,16 @@ func cutAtQuery(p string) string {
 		return p[:i]
 	}
 	return p
+}
+
+// onPath applies f to the part of p before its first "?" or "#" and keeps the
+// rest as it is: a reader that ends the path at a decoded "?" for one step may
+// treat the same mark as an ordinary character in the next.
+func onPath(p string, f func(string) string) string {
+	if i := strings.IndexAny(p, "?#"); i >= 0 {
+		return f(p[:i]) + p[i:]
+	}
+	return f(p)
 }
 
 // dropParameters removes the ";..." path parameters from every segment of p, so
