@@ -631,8 +631,7 @@ func (s *userService) GetMyUserSchema(ctx context.Context, input GetMyUserInput)
 	return schema, nil
 }
 
-// ownUser reads the caller's own record: identity and project both come from
-// the session, so a self-access operation cannot reach anyone else.
+// ownUser reads the caller's own record.
 func (s *userService) ownUser(ctx context.Context, self domain.Self) (*domain.User, error) {
 	user, err := s.v2Pool.Statements().GetUser(ctx, database.And(
 		database.Equal(database.Col(domain.UserFieldProjectID), self.ProjectID),
