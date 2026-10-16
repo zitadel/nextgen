@@ -51,6 +51,14 @@ func TestParseRedirectTarget_Accepts(t *testing.T) {
 		{"stray percent signs around an escape", "https://app.test/%%41/%4/%41%", "app.test"},
 		{"a stray percent sign in the query is left alone", "https://app.test/x?q=%zz&flow=1", "app.test"},
 		{"a character a Go parser would re-encode", "https://app.test/a%2Fb|c", "app.test"},
+		{"encoded dots between slashes that never reach the host", `https://app.test/%2e%2e//.%2E`, "app.test"},
+		{"parent segments that stay on the path", `https://app.test/..//.%2e/`, "app.test"},
+		{"a dot segment then a parent segment", `https://app.test/.//%2e%2e`, "app.test"},
+		{"encoded dots after two slashes", `https://app.test/%2e//%2e.`, "app.test"},
+		{"an encoded newline in the query", `https://app.test/x?q=a%0Ab`, "app.test"},
+		{"an encoded newline in the fragment", `https://app.test/x#a%0Ab`, "app.test"},
+		{"a query mark in the fragment before a stray percent sign", `https://app.test/#/a?b%zz`, "app.test"},
+		{"a backslash in the fragment", `https://app.test/#\x`, "app.test"},
 		{"an empty port", "https://app.test:/x", "app.test:"},
 	}
 	for _, tt := range tests {
@@ -73,8 +81,9 @@ func TestParseRedirectTarget_Refuses(t *testing.T) {
 		why  string
 	}{
 		{"nothing", "", "empty"},
-		{"too long", "https://app.test/" + strings.Repeat("a", httputil.MaxRedirectTargetLength), "longer than"},
+		{"too long", "https://app.test/" + strings.Repeat("a", httputil.MaxRedirectTargetLength), "too long: over"},
 
+		{"too long once a fragment is escaped", "https://app.test/x#" + strings.Repeat(`\`, 700), "once its escapes"},
 		{"too long once escapes are written out", "https://app.test/" + strings.Repeat("|", 700), "once its escapes"},
 		{"too long once stray percent signs are escaped", "https://app.test/" + strings.Repeat("%", 700), "once its escapes"},
 		{"a relative path", "/login", "scheme"},
@@ -153,6 +162,18 @@ func TestParseRedirectTarget_Refuses(t *testing.T) {
 		{"a slash that appears after three decodes", "https://app.test/%25252Fevil.example", "empty segment"},
 		{"a re-encoded character before encoded slashes", "https://app.test/..%2F%252F..%252F^b", "empty segment"},
 		{"a slash that appears after a decode, a normalization and a decode", "https://app.test/a%252Fb%5C..%5C%252Fevil.example", "empty segment"},
+		{"an encoded dot, then slashes, then an encoded slash", "https://app.test/%2e//..%2F", "empty segment"},
+		{"an uppercase encoded dot, then slashes", "https://app.test/%2E//..%2F", "empty segment"},
+		{"an encoded parent segment, then slashes", "https://app.test/%2e%2e//..%2F", "empty segment"},
+		{"an uppercase encoded parent segment", "https://app.test/%2E%2E//..%2F", "empty segment"},
+		{"a half-encoded parent segment, then slashes", "https://app.test/.%2e//..%2F", "empty segment"},
+		{"the other half-encoded parent segment, then slashes", "https://app.test/%2e.//..%2F", "empty segment"},
+		{"a single dot at the end after two slashes", "https://app.test/.//.", "empty segment"},
+		{"a parent segment at the end after slashes", "https://app.test/.///%2e%2e", "empty segment"},
+		{"two slashes then a parent segment", "https://app.test//..", "empty segment"},
+		{"a resolve, a slash reading and a resolve", "https://app.test/.%255C%252F..%5C/../", "empty segment"},
+		{"a decode, resolves and slash readings in a long chain", "https://app.test/..%5C%2F%2e%2e%5C%2e%2e/.%2e", "empty segment"},
+		{"an encoded slash, backslash and parent segment", "https://app.test/.%2F%5C%2e%2e/", "empty segment"},
 		{"a stray percent sign after a double-encoded slash", "https://app.test/%252F%25zz", "empty segment"},
 	}
 	for _, tt := range tests {
@@ -194,9 +215,19 @@ func TestParseRedirectTarget_KeepsEscapesWhereGoWouldReEncode(t *testing.T) {
 
 	tests := []struct{ name, raw, want string }{
 		{"a path of the longest accepted size", "https://app.test/" + strings.Repeat("a", httputil.MaxRedirectTargetLength-len("https://app.test/")), "https://app.test/" + strings.Repeat("a", httputil.MaxRedirectTargetLength-len("https://app.test/"))},
+		{"a double quote before an encoded slash is escaped", `https://app.test/a%2Fb"c`, `https://app.test/a%2Fb%22c`},
+		{"a less-than sign before an encoded slash is escaped", `https://app.test/a%2Fb<c`, `https://app.test/a%2Fb%3Cc`},
+		{"a greater-than sign before an encoded slash is escaped", `https://app.test/a%2Fb>c`, `https://app.test/a%2Fb%3Ec`},
+		{"a caret before an encoded slash is escaped", `https://app.test/a%2Fb^c`, `https://app.test/a%2Fb%5Ec`},
+		{"a backtick before an encoded slash is escaped", "https://app.test/a%2Fb`c", `https://app.test/a%2Fb%60c`},
+		{"an opening brace before an encoded slash is escaped", `https://app.test/a%2Fb{c`, `https://app.test/a%2Fb%7Bc`},
+		{"a bar before an encoded slash is escaped", `https://app.test/a%2Fb|c`, `https://app.test/a%2Fb%7Cc`},
+		{"a closing brace before an encoded slash is escaped", `https://app.test/a%2Fb}c`, `https://app.test/a%2Fb%7Dc`},
 		{"a bar after an encoded slash", "https://app.test/a%2Fb|c", "https://app.test/a%2Fb%7Cc"},
 		{"a caret with a query", "https://app.test/a%2Fb^c?flow=1", "https://app.test/a%2Fb%5Ec?flow=1"},
 		{"a bar in the fragment", "https://app.test/x#/a%2Fb|c", "https://app.test/x#/a%2Fb%7Cc"},
+		{"a backslash in the fragment", `https://app.test/x#/a%2Fb\c`, "https://app.test/x#/a%2Fb%5Cc"},
+		{"a second hash in the fragment", "https://app.test/x#/a%2Fb#c", "https://app.test/x#/a%2Fb%23c"},
 		{"a stray percent sign in the query", "https://app.test/x?q=100%", "https://app.test/x?q=100%"},
 	}
 	for _, tt := range tests {

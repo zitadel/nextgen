@@ -51,16 +51,16 @@ const maxPort = 65535
 // "%25", and a byte a Go parser would re-encode written as its escape, in the
 // path and fragment; a browser and a server read both the same way. The query
 // is left as written. The path keeps its escapes, nothing is decoded or
-// resolved. The host is only checked
-// for shape, not normalized, so forms a browser rewrites, such as a decimal IP
-// address or a trailing dot, pass. The caller decides which hosts are
-// acceptable, for example by comparing the origin with the request's.
+// resolved. The host is only checked for shape, not normalized, so forms a
+// browser rewrites, such as a decimal IP address or a trailing dot, pass. The
+// caller decides which hosts are acceptable, for example by comparing the
+// origin with the request's.
 func ParseRedirectTarget(raw string) (*url.URL, error) {
 	if raw == "" {
 		return nil, refusal("it is empty")
 	}
 	if len(raw) > MaxRedirectTargetLength {
-		return nil, refusal("it is longer than %d bytes", MaxRedirectTargetLength)
+		return nil, refusal("it is too long: over %d bytes", MaxRedirectTargetLength)
 	}
 	// Printable ASCII only. Every legitimate target is a page URL a browser has
 	// already percent-encoded, and anything else is either ignored by a browser
@@ -113,10 +113,10 @@ func ParseRedirectTarget(raw string) (*url.URL, error) {
 		return nil, refusal("it is longer than %d bytes once its escapes are written out", MaxRedirectTargetLength)
 	}
 
-	// The path is checked as written, and as the URL serializes it, because
-	// that is the text a caller stores and later redirects to. Go re-encodes a
-	// path that holds a character it would write differently, such as '{', and
-	// in doing so turns every "%2F" into a plain slash, so the two can differ.
+	// The path is checked as written and as the URL serializes it, because the
+	// serialized form is what a caller stores and later redirects to. After
+	// sanitize the two are the same text; checking both keeps that true if a
+	// parser ever disagrees.
 	for _, form := range []string{target, u.String()} {
 		path, ok := pathOf(form, u.Scheme)
 		if !ok {
@@ -136,9 +136,10 @@ func refusal(format string, args ...any) error {
 // sanitize writes the path and the fragment of raw so that a Go parser keeps
 // them exactly as written: a '%' that starts no two-digit hex escape becomes
 // "%25", and a byte Go would otherwise re-encode ('"', '<', '>', '^', '`', '{',
-// '|', '}') becomes its escape. Go re-encodes a whole path that holds such a
-// byte, and in doing so turns every "%2F" into a slash, which would change
-// what the URL means. The query is left verbatim, as no parser polices it.
+// '|', '}', and in a fragment also a backslash and a second '#') becomes its
+// escape. Go re-encodes a whole path that holds such a byte, and in doing so
+// turns every "%2F" into a slash, which would change what the URL means. The
+// query is left verbatim, as no parser polices it.
 func sanitize(raw string) string {
 	var b strings.Builder
 	b.Grow(len(raw) + 8)
@@ -148,6 +149,9 @@ func sanitize(raw string) string {
 		switch {
 		case c == '#' && !inFragment:
 			inQuery, inFragment = false, true
+		case c == '#' && inFragment:
+			b.WriteString("%23")
+			continue
 		case c == '?' && !inFragment:
 			inQuery = true
 		}
@@ -158,7 +162,7 @@ func sanitize(raw string) string {
 		switch {
 		case c == '%' && !isEscapeAt(raw, i):
 			b.WriteString("%25")
-		case strings.IndexByte("\"<>^`{|}", c) >= 0:
+		case strings.IndexByte("\"<>^`{|}", c) >= 0 || c == '\\' && inFragment:
 			fmt.Fprintf(&b, "%%%02X", c)
 		default:
 			b.WriteByte(c)
@@ -240,39 +244,39 @@ const maxReadings = 64
 // segment, which reads as another host once the scheme and host are removed.
 //
 // A browser resolves dot segments in the path as written, before anything
-// decodes it, and a server that decodes before it routes may resolve again, and
-// decode again. So every text reachable by decoding and resolving, in any
-// order, is tested as it stands, with its dot segments resolved, with its
-// backslashes read as slashes, and both, and each of those is decoded further. Each decoding strictly shortens the text
-// or leaves it unchanged, so the walk ends.
+// decodes it, and a server that decodes before it routes may resolve again,
+// read a backslash as a slash, and decode again. So every text reachable from
+// the path by decoding, resolving dot segments and reading backslashes as
+// slashes, in any order and any number of times, is tested for a leading "//".
+// Decoding strictly shortens a text and the other two steps never lengthen it,
+// so the walk ends.
 func checkPath(path string) error {
 	seen := map[string]bool{path: true}
 	pending := []string{path}
 	for len(pending) > 0 {
-		var next []string
-		for _, text := range pending {
-			slashed := strings.ReplaceAll(text, `\`, "/")
-			for _, reading := range []string{text, resolveDots(text), slashed, resolveDots(slashed)} {
-				if strings.HasPrefix(reading, "//") || strings.HasPrefix(strings.ReplaceAll(reading, `\`, "/"), "//") {
-					return refusal("its path starts with an empty segment, which reads as another host")
-				}
-				decoded := unescapeLeniently(reading)
-				if decoded == reading || seen[decoded] {
-					continue
-				}
-				for i := 0; i < len(decoded); i++ {
-					if decoded[i] < ' ' || decoded[i] == 0x7f {
+		text := pending[0]
+		pending = pending[1:]
+		if strings.HasPrefix(strings.ReplaceAll(text, `\`, "/"), "//") {
+			return refusal("its path starts with an empty segment, which reads as another host")
+		}
+		decoded := unescapeLeniently(text)
+		for _, step := range []string{decoded, resolveDots(text), strings.ReplaceAll(text, `\`, "/")} {
+			if seen[step] {
+				continue
+			}
+			if step == decoded {
+				for i := 0; i < len(step); i++ {
+					if step[i] < ' ' || step[i] == 0x7f {
 						return refusal("its path decodes to a control character")
 					}
 				}
-				if len(seen) >= maxReadings {
-					return refusal("its path has too many readings to check")
-				}
-				seen[decoded] = true
-				next = append(next, decoded)
 			}
+			if len(seen) >= maxReadings {
+				return refusal("its path has too many readings to check")
+			}
+			seen[step] = true
+			pending = append(pending, step)
 		}
-		pending = next
 	}
 	return nil
 }
