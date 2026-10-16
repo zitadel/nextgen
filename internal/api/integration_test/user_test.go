@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1113,49 +1114,57 @@ func TestListPasskeys(t *testing.T) {
 	})
 }
 
-// TestGetMyUserSchema: a person reads the schema their own record is validated
-// against with nothing but their session — no grant in the project (self-access,
-// like the rest of /users/me).
-func TestGetMyUserSchema(t *testing.T) {
+// TestSelfAccessReads: a person reads their own schema and team roster with
+// nothing but their session — no grant in the project — and anything short of
+// a user-bound session gets the 401 the contract declares.
+func TestSelfAccessReads(t *testing.T) {
 	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	userID := harness.CreateUserWithTeam(t, project.ID)
+	cookie := sessionCookieIn(t, project, userID)
 
 	t.Run("own schema, without a grant", func(t *testing.T) {
 		t.Parallel()
-		_, _, cookie := ownSessionUser(t)
-
 		status, body := consoleCall(t, cookie, http.MethodGet, "/users/me", "")
 		require.Equal(t, http.StatusOK, status, body)
-		var me struct {
+		me := helpers.MustUnmarshal[struct {
 			Schema string `json:"schema"`
-		}
-		require.NoError(t, json.Unmarshal([]byte(body), &me), body)
+		}](t, []byte(body))
 
-		status, body = consoleCall(t, cookie, http.MethodGet, "/users/me/schema", "")
-		require.Equal(t, http.StatusOK, status, body)
-		var schema struct {
+		status, raw := getSelfRaw(t, "/users/me/schema", cookie.Value)
+		require.Equal(t, http.StatusOK, status, string(raw))
+		assert.Equal(t, me.Schema, helpers.MustUnmarshal[struct {
 			ID string `json:"id"`
-		}
-		require.NoError(t, json.Unmarshal([]byte(body), &schema), body)
-		assert.Equal(t, me.Schema, schema.ID)
+		}](t, raw).ID)
 	})
 
-	t.Run("missing session cookie", func(t *testing.T) {
+	t.Run("own teams, without a grant", func(t *testing.T) {
 		t.Parallel()
-		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, harness.EnsureTestServer(t).URL+"/users/me/schema", nil)
-		require.NoError(t, err)
-		resp, err := harness.EnsureHttpClient(t).Do(req)
-		require.NoError(t, err)
-		defer resp.Body.Close()
-		body, err := io.ReadAll(resp.Body)
-		require.NoError(t, err)
-
-		require.Equal(t, http.StatusUnauthorized, resp.StatusCode, string(body))
-		var answer struct {
-			Code string `json:"code"`
-		}
-		require.NoError(t, json.Unmarshal(body, &answer))
-		assert.Equal(t, "auth.unauthorized", answer.Code)
+		status, raw := getSelfRaw(t, "/users/me/teams", cookie.Value)
+		require.Equal(t, http.StatusOK, status, string(raw))
+		assert.Len(t, helpers.MustUnmarshal[api.ListUserTeamsResponse](t, raw).Teams, 1)
 	})
+
+	session := harness.CreateSession(t, project.ID, time.Hour)
+	crypter, err := harness.EnsureKeyService(t).GetProjectCrypter(t.Context(), project.ID, domain.EncryptionKeyPurposeToken)
+	require.NoError(t, err)
+	anonymous, err := session.Token(crypter)
+	require.NoError(t, err)
+
+	for _, path := range []string{"/users/me/schema", "/users/me/teams"} {
+		for name, token := range map[string]string{"anonymous session": anonymous, "no cookie": ""} {
+			t.Run(path+" "+name, func(t *testing.T) {
+				t.Parallel()
+				status, raw := getSelfRaw(t, path, token)
+				assert.Equal(t, http.StatusUnauthorized, status, string(raw))
+				details := helpers.MustUnmarshal[api.ErrorDetails](t, raw)
+				assert.Equal(t, api.ErrorCode("auth.unauthorized"), details.Code)
+				assert.Equal(t, "Missing or invalid session token.", details.Message)
+			})
+		}
+	}
 }
 
 func TestListUserIdentityLinks(t *testing.T) {

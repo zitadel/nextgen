@@ -245,8 +245,15 @@ func TestListMyProjects(t *testing.T) {
 // refuses to send an empty credential.
 func getMyProjectsRaw(t *testing.T, sessionToken string) (int, *api.ErrorDetails) {
 	t.Helper()
-	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet,
-		harness.EnsureTestServer(t).URL+"/users/me/projects", nil)
+	status, raw := getSelfRaw(t, "/users/me/projects", sessionToken)
+	return status, helpers.MustUnmarshal[api.ErrorDetails](t, raw)
+}
+
+// getSelfRaw GETs a self-access path with only the session cookie (none when
+// sessionToken is empty) and returns the status and raw body.
+func getSelfRaw(t *testing.T, path, sessionToken string) (int, []byte) {
+	t.Helper()
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, harness.EnsureTestServer(t).URL+path, nil)
 	require.NoError(t, err)
 	if sessionToken != "" {
 		req.AddCookie(&http.Cookie{Name: "__nextgen_session", Value: sessionToken})
@@ -256,5 +263,5 @@ func getMyProjectsRaw(t *testing.T, sessionToken string) (int, *api.ErrorDetails
 	defer func() { _ = resp.Body.Close() }()
 	raw, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
-	return resp.StatusCode, helpers.MustUnmarshal[api.ErrorDetails](t, raw)
+	return resp.StatusCode, raw
 }

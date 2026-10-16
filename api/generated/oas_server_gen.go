@@ -720,6 +720,13 @@ type Handler interface {
 	//
 	// GET /users/me/projects
 	ListMyProjects(ctx context.Context, params ListMyProjectsParams) (ListMyProjectsRes, error)
+	// ListMyTeams implements listMyTeams operation.
+	//
+	// The signed-in user's own team roster, ordered by team name. Self-access:
+	// the session is the authorization, like the rest of `/users/me`.
+	//
+	// GET /users/me/teams
+	ListMyTeams(ctx context.Context, params ListMyTeamsParams) (ListMyTeamsRes, error)
 	// ListPreviews implements listPreviews operation.
 	//
 	// Lists the project's live previews, newest first by `created_at`. An

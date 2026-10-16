@@ -91,6 +91,7 @@ Users live inside projects. A user in the platform project is a developer/admin;
 /me                             # resolves to the calling user
 /me/memberships                 # every team_membership the caller holds
 /users/me/schema                # the schema the caller's own record is validated against
+/users/me/teams                 # the caller's own team roster
 ```
 
 Create takes an explicit scope; the list derives it from the credential:
