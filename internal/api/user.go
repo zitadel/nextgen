@@ -228,13 +228,8 @@ func (h *Handler) ListUserTeams(ctx context.Context, params api.ListUserTeamsPar
 	if err != nil {
 		return nil, err
 	}
-	// Same gate as the embedded read, or this becomes the way around it: by
-	// scope for a project secret, by project-wide read for a session.
-	reads, err := h.userReadsProject(ctx, projectID)
-	if err != nil {
-		return nil, err
-	}
-	if err := requireMembershipReadUnless(ctx, reads); err != nil {
+	// Same gate as the embedded read, or this becomes the way around it.
+	if err := h.requireMembershipReadIn(ctx, projectID); err != nil {
 		return nil, err
 	}
 
@@ -289,14 +284,8 @@ func (h *Handler) GetUserByID(ctx context.Context, params api.GetUserByIDParams)
 	}
 	var teamID *string
 	if params.TeamID.IsSet() {
-		// team_id answers "is this user an active member of that team", the
-		// membership read POST /users/query gates the same way: by scope for a
-		// project secret, by project-wide read for a session.
-		reads, err := h.userReadsProject(ctx, projectID)
-		if err != nil {
-			return nil, err
-		}
-		if err := requireMembershipReadUnless(ctx, reads); err != nil {
+		// team_id answers "is this user an active member of that team".
+		if err := h.requireMembershipReadIn(ctx, projectID); err != nil {
 			return nil, err
 		}
 		teamID = new(string(params.TeamID.Value))
