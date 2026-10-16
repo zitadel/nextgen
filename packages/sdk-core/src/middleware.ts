@@ -57,29 +57,23 @@ export const INTERNAL_HEADERS: ReadonlySet<string> = new Set(["x-nextgen-auth-to
  * @returns `true` if at least one pattern matches.
  */
 export function matchesRoutes(pathname: string, routes: readonly string[]): boolean {
-  if (routes.length === 0) {
-    return false;
-  }
-  const path = withoutTrailingSlash(pathname);
-  return routes.some((pattern) => {
-    if (pattern.endsWith("*")) {
-      return pathname.startsWith(pattern.slice(0, -1));
+  // A linear scan, not /\/+$/: that regex backtracks quadratically on a long
+  // run of slashes, and the pathname is attacker-controlled on every request.
+  const withoutTrailingSlash = (path: string): string => {
+    let end = path.length;
+    while (end > 1 && path.charCodeAt(end - 1) === 0x2f) {
+      end--;
     }
-    return path === withoutTrailingSlash(pattern);
-  });
-}
+    return path.slice(0, end);
+  };
+  const path = withoutTrailingSlash(pathname);
 
-/**
- * Strips trailing slashes, keeping the root path `/` itself. A linear scan, not
- * `/\/+$/`: that regex backtracks quadratically on a path of many slashes, and
- * the pathname is attacker-controlled on every request.
- */
-function withoutTrailingSlash(path: string): string {
-  let end = path.length;
-  while (end > 1 && path.charCodeAt(end - 1) === 0x2f) {
-    end--;
-  }
-  return path.slice(0, end);
+  return routes.some((route) => {
+    if (route.endsWith("*")) {
+      return pathname.startsWith(route.slice(0, -1));
+    }
+    return path === withoutTrailingSlash(route);
+  });
 }
 
 // ─── Proxy credentials ───────────────────────────────────────────────────────
