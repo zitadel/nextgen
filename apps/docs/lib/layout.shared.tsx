@@ -1,8 +1,8 @@
 import type { BaseLayoutProps } from "fumadocs-ui/layouts/shared";
-import { Component, House } from "lucide-react";
+import { House } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { ZitadelLogo } from "@/components/logo";
+import { Logo } from "@/components/logo";
 
 import { docsRoute, gitConfig } from "./shared";
 
@@ -30,21 +30,22 @@ function hostLink(href: string, icon: ReactNode, text: string) {
 export function baseOptions(): BaseLayoutProps {
   return {
     nav: {
-      // The console's logo lockup, read out as "Zitadel Docs".
+      // The website's header, read out as "Zitadel Docs": its animated logo
+      // at its size, and in place of its Preview label the same pill saying
+      // where you are.
       title: (
         <>
-          <ZitadelLogo role="img" aria-label="Zitadel" className="h-[1.125rem] w-auto" />
-          <span className="font-heading font-normal text-fd-muted-foreground">Docs</span>
+          <Logo id="docs-logo" className="h-6 w-auto" />
+          <span className="rounded-full border border-fd-border px-2.5 py-0.5 font-semibold text-fd-muted-foreground text-xs leading-4">
+            Docs
+          </span>
         </>
       ),
       // The docs' home; on the cloud's host / is the website's start page.
       url: docsRoute,
     },
-    // The website and the storybook, above the pages.
-    links: [
-      hostLink("/", <House />, "Preview home"),
-      hostLink("/storybook/", <Component />, "Components"),
-    ],
+    // The website, above the pages.
+    links: [hostLink("/", <House />, "Preview home")],
     githubUrl: `https://github.com/${gitConfig.user}/${gitConfig.repo}`,
   };
 }
