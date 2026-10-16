@@ -242,18 +242,41 @@ func (h *Handler) ListUserTeams(ctx context.Context, params api.ListUserTeamsPar
 	if err != nil {
 		return nil, err
 	}
+	res := userTeamsResponse(teams)
+	return &res, nil
+}
 
-	res := &api.ListUserTeamsResponse{
-		Teams: make([]api.UserTeam, 0, len(teams.Items)),
+// ListMyTeams is the caller's own roster: self-access, so no resolver check —
+// the session decides whose teams these are.
+func (h *Handler) ListMyTeams(ctx context.Context, params api.ListMyTeamsParams) (api.ListMyTeamsRes, error) {
+	self, err := requireSelf(ctx)
+	if err != nil {
+		return nil, invalidSessionCredential(err)
 	}
+	teams, err := h.userService.ListUserTeams(ctx, service.ListUserTeamsInput{
+		ProjectID: self.ProjectID,
+		UserID:    self.UserID,
+		PageToken: string(params.PageToken.Value),
+		Limit:     int(params.Limit.Value),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &api.ListUserTeamsResponseHeaders{
+		CacheControl: api.NewOptString(sessionStateCacheControl),
+		Response:     userTeamsResponse(teams),
+	}, nil
+}
+
+func userTeamsResponse(teams *service.ListUserTeamsOutput) api.ListUserTeamsResponse {
+	res := api.ListUserTeamsResponse{Teams: make([]api.UserTeam, 0, len(teams.Items))}
 	if teams.NextPageToken != "" {
 		res.NextPageToken = api.NewOptNilPageToken(api.PageToken(teams.NextPageToken))
 	}
 	for _, team := range teams.Items {
 		res.Teams = append(res.Teams, apiUserTeam(*team))
 	}
-
-	return res, nil
+	return res
 }
 
 func (h *Handler) GetUserByID(ctx context.Context, params api.GetUserByIDParams) (api.GetUserByIDRes, error) {
@@ -371,7 +394,7 @@ func (h *Handler) GetMyUser(ctx context.Context) (api.GetMyUserRes, error) {
 func (h *Handler) GetMyUserSchema(ctx context.Context) (api.GetMyUserSchemaRes, error) {
 	self, err := requireSelf(ctx)
 	if err != nil {
-		return nil, err
+		return nil, invalidSessionCredential(err)
 	}
 	schema, err := h.userService.GetMyUserSchema(ctx, service.GetMyUserInput{Self: self})
 	if err != nil {

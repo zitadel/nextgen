@@ -6305,6 +6305,7 @@ func (s *AuthUnauthorized) SetDetails(val OptAuthUnauthorizedDetails) {
 func (*AuthUnauthorized) completeClaimRes()   {}
 func (*AuthUnauthorized) getMyUserSchemaRes() {}
 func (*AuthUnauthorized) listMyProjectsRes()  {}
+func (*AuthUnauthorized) listMyTeamsRes()     {}
 func (*AuthUnauthorized) revokeMySessionRes() {}
 
 // Additional error-specific context.
@@ -17894,6 +17895,7 @@ func (*ErrorDetails) getBrandingByIdRes()      {}
 func (*ErrorDetails) getMyUserRes()            {}
 func (*ErrorDetails) initClaimRes()            {}
 func (*ErrorDetails) listFlowDefinitionsRes()  {}
+func (*ErrorDetails) listMyTeamsRes()          {}
 func (*ErrorDetails) submitFlowStepRes()       {}
 
 // Additional error-specific context.
@@ -34677,6 +34679,186 @@ func (s *ListMyProjectsResponseHeaders) SetResponse(val ListMyProjectsResponse) 
 
 func (*ListMyProjectsResponseHeaders) listMyProjectsRes() {}
 
+// ListMyTeamsErrorResponse represents sum type.
+type ListMyTeamsErrorResponse struct {
+	Type             ListMyTeamsErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	ReqInvalid       ReqInvalid
+	SessTokenInvalid SessTokenInvalid
+	UserNotFound     UserNotFound
+}
+
+// ListMyTeamsErrorResponseType is oneOf type of ListMyTeamsErrorResponse.
+type ListMyTeamsErrorResponseType string
+
+// Possible values for ListMyTeamsErrorResponseType.
+const (
+	AuthUnauthorizedListMyTeamsErrorResponse ListMyTeamsErrorResponseType = "auth.unauthorized"
+	InternalListMyTeamsErrorResponse         ListMyTeamsErrorResponseType = "internal"
+	ReqInvalidListMyTeamsErrorResponse       ListMyTeamsErrorResponseType = "req.invalid"
+	SessTokenInvalidListMyTeamsErrorResponse ListMyTeamsErrorResponseType = "sess.token_invalid"
+	UserNotFoundListMyTeamsErrorResponse     ListMyTeamsErrorResponseType = "user.not_found"
+)
+
+// IsAuthUnauthorized reports whether ListMyTeamsErrorResponse is AuthUnauthorized.
+func (s ListMyTeamsErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedListMyTeamsErrorResponse
+}
+
+// IsInternal reports whether ListMyTeamsErrorResponse is Internal.
+func (s ListMyTeamsErrorResponse) IsInternal() bool {
+	return s.Type == InternalListMyTeamsErrorResponse
+}
+
+// IsReqInvalid reports whether ListMyTeamsErrorResponse is ReqInvalid.
+func (s ListMyTeamsErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListMyTeamsErrorResponse
+}
+
+// IsSessTokenInvalid reports whether ListMyTeamsErrorResponse is SessTokenInvalid.
+func (s ListMyTeamsErrorResponse) IsSessTokenInvalid() bool {
+	return s.Type == SessTokenInvalidListMyTeamsErrorResponse
+}
+
+// IsUserNotFound reports whether ListMyTeamsErrorResponse is UserNotFound.
+func (s ListMyTeamsErrorResponse) IsUserNotFound() bool {
+	return s.Type == UserNotFoundListMyTeamsErrorResponse
+}
+
+// SetAuthUnauthorized sets ListMyTeamsErrorResponse to AuthUnauthorized.
+func (s *ListMyTeamsErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedListMyTeamsErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListMyTeamsErrorResponse is AuthUnauthorized.
+func (s ListMyTeamsErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedListMyTeamsErrorResponse returns new ListMyTeamsErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedListMyTeamsErrorResponse(v AuthUnauthorized) ListMyTeamsErrorResponse {
+	var s ListMyTeamsErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets ListMyTeamsErrorResponse to Internal.
+func (s *ListMyTeamsErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListMyTeamsErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListMyTeamsErrorResponse is Internal.
+func (s ListMyTeamsErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListMyTeamsErrorResponse returns new ListMyTeamsErrorResponse from Internal.
+func NewInternalListMyTeamsErrorResponse(v Internal) ListMyTeamsErrorResponse {
+	var s ListMyTeamsErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets ListMyTeamsErrorResponse to ReqInvalid.
+func (s *ListMyTeamsErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListMyTeamsErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListMyTeamsErrorResponse is ReqInvalid.
+func (s ListMyTeamsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListMyTeamsErrorResponse returns new ListMyTeamsErrorResponse from ReqInvalid.
+func NewReqInvalidListMyTeamsErrorResponse(v ReqInvalid) ListMyTeamsErrorResponse {
+	var s ListMyTeamsErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetSessTokenInvalid sets ListMyTeamsErrorResponse to SessTokenInvalid.
+func (s *ListMyTeamsErrorResponse) SetSessTokenInvalid(v SessTokenInvalid) {
+	s.Type = SessTokenInvalidListMyTeamsErrorResponse
+	s.SessTokenInvalid = v
+}
+
+// GetSessTokenInvalid returns SessTokenInvalid and true boolean if ListMyTeamsErrorResponse is SessTokenInvalid.
+func (s ListMyTeamsErrorResponse) GetSessTokenInvalid() (v SessTokenInvalid, ok bool) {
+	if !s.IsSessTokenInvalid() {
+		return v, false
+	}
+	return s.SessTokenInvalid, true
+}
+
+// NewSessTokenInvalidListMyTeamsErrorResponse returns new ListMyTeamsErrorResponse from SessTokenInvalid.
+func NewSessTokenInvalidListMyTeamsErrorResponse(v SessTokenInvalid) ListMyTeamsErrorResponse {
+	var s ListMyTeamsErrorResponse
+	s.SetSessTokenInvalid(v)
+	return s
+}
+
+// SetUserNotFound sets ListMyTeamsErrorResponse to UserNotFound.
+func (s *ListMyTeamsErrorResponse) SetUserNotFound(v UserNotFound) {
+	s.Type = UserNotFoundListMyTeamsErrorResponse
+	s.UserNotFound = v
+}
+
+// GetUserNotFound returns UserNotFound and true boolean if ListMyTeamsErrorResponse is UserNotFound.
+func (s ListMyTeamsErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
+	if !s.IsUserNotFound() {
+		return v, false
+	}
+	return s.UserNotFound, true
+}
+
+// NewUserNotFoundListMyTeamsErrorResponse returns new ListMyTeamsErrorResponse from UserNotFound.
+func NewUserNotFoundListMyTeamsErrorResponse(v UserNotFound) ListMyTeamsErrorResponse {
+	var s ListMyTeamsErrorResponse
+	s.SetUserNotFound(v)
+	return s
+}
+
+// ListMyTeamsErrorResponseStatusCode wraps ListMyTeamsErrorResponse with StatusCode.
+type ListMyTeamsErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListMyTeamsErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListMyTeamsErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListMyTeamsErrorResponseStatusCode) GetResponse() ListMyTeamsErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListMyTeamsErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListMyTeamsErrorResponseStatusCode) SetResponse(val ListMyTeamsErrorResponse) {
+	s.Response = val
+}
+
+func (*ListMyTeamsErrorResponseStatusCode) listMyTeamsRes() {}
+
 // ListPreviewsErrorResponse represents sum type.
 type ListPreviewsErrorResponse struct {
 	Type                ListPreviewsErrorResponseType // switch on this field
@@ -36140,6 +36322,34 @@ func (s *ListUserTeamsResponse) SetNextPageToken(val OptNilPageToken) {
 }
 
 func (*ListUserTeamsResponse) listUserTeamsRes() {}
+
+// ListUserTeamsResponseHeaders wraps ListUserTeamsResponse with response headers.
+type ListUserTeamsResponseHeaders struct {
+	CacheControl OptString
+	Response     ListUserTeamsResponse
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *ListUserTeamsResponseHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetResponse returns the value of Response.
+func (s *ListUserTeamsResponseHeaders) GetResponse() ListUserTeamsResponse {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *ListUserTeamsResponseHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListUserTeamsResponseHeaders) SetResponse(val ListUserTeamsResponse) {
+	s.Response = val
+}
+
+func (*ListUserTeamsResponseHeaders) listMyTeamsRes() {}
 
 type ListUserTeamsUnauthorized ErrorDetails
 

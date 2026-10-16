@@ -902,6 +902,16 @@ func (UnimplementedHandler) ListMyProjects(ctx context.Context, params ListMyPro
 	return r, ht.ErrNotImplemented
 }
 
+// ListMyTeams implements listMyTeams operation.
+//
+// The signed-in user's own team roster, ordered by team name. Self-access:
+// the session is the authorization, like the rest of `/users/me`.
+//
+// GET /users/me/teams
+func (UnimplementedHandler) ListMyTeams(ctx context.Context, params ListMyTeamsParams) (r ListMyTeamsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListPreviews implements listPreviews operation.
 //
 // Lists the project's live previews, newest first by `created_at`. An

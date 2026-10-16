@@ -237,6 +237,10 @@ type ListMyProjectsRes interface {
 	listMyProjectsRes()
 }
 
+type ListMyTeamsRes interface {
+	listMyTeamsRes()
+}
+
 type ListPreviewsRes interface {
 	listPreviewsRes()
 }
