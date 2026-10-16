@@ -106,8 +106,8 @@ const GRID = "grid gap-x-4.5 gap-y-4 sm:grid-cols-2";
 // An authentication row: a muted label, its value on the right. 4px block
 // padding, and 18px to the rule between rows (the list's `gap-4.5`).
 const ROW = "flex items-center justify-between gap-4 py-1";
-const ROW_LABEL = "text-muted-foreground text-sm font-medium";
-const ROW_VALUE = "text-foreground text-sm";
+const ROW_LABEL = "text-muted-foreground min-w-0 truncate text-sm font-medium";
+const ROW_VALUE = "text-foreground shrink-0 text-sm";
 
 function UserDetail() {
   const { user, schema, passkeys, identityLinks, idps, passwordSetAt } = Route.useLoaderData();
@@ -183,7 +183,7 @@ function UserDetail() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="authentication" className="flex flex-col gap-6">
+        <TabsContent value="authentication">
           <DetailSection title="Authentication">
             <AuthenticationRows
               rows={[
@@ -217,8 +217,8 @@ function AuthenticationRows({ rows }: { rows: AuthenticationRow[] }) {
             </li>
           )}
           <li className={ROW}>
-            <span className={`${ROW_LABEL} min-w-0 truncate`}>{row.label}</span>
-            <span className={`${ROW_VALUE} shrink-0`}>{row.value}</span>
+            <span className={ROW_LABEL}>{row.label}</span>
+            <span className={ROW_VALUE}>{row.value}</span>
           </li>
         </Fragment>
       ))}
@@ -438,7 +438,7 @@ function ProfileField({
       <Input
         id={id}
         name={entry.key}
-        type={readOnly ? "text" : entry.inputType}
+        type={entry.inputType}
         value={value}
         readOnly={readOnly}
         required={entry.required}

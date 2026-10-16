@@ -363,6 +363,7 @@ describe("user detail", () => {
     stub({
       identityLinks: [
         { id: "idplink_1", connection_id: "idp_google", created_at: "2026-07-03T00:00:00Z" },
+        { id: "idplink_2", connection_id: "idp_github", created_at: "2026-07-04T00:00:00Z" },
       ],
     });
     const projects: (string | null)[] = [];
@@ -370,7 +371,10 @@ describe("user detail", () => {
       http.post(IDPS_QUERY_URL, ({ request }) => {
         projects.push(new URL(request.url).searchParams.get("project_id"));
         return HttpResponse.json({
-          idps: [{ id: "idp_google", slug: "google", definition: { display_name: "Google" } }],
+          idps: [
+            { id: "idp_google", slug: "google", definition: { display_name: "Google" } },
+            { id: "idp_github", slug: "github", definition: { display_name: "GitHub" } },
+          ],
         });
       }),
     );
@@ -378,10 +382,14 @@ describe("user detail", () => {
 
     await userEvent.click(await screen.findByRole("tab", { name: "Authentication" }));
     const panel = within(screen.getByRole("tabpanel"));
-    // Passkeys stay their own row; the provider is not folded into them.
+    // Passkeys stay their own row; each provider account is a row of its own
+    // after it, in the order the links are listed.
     expect(panel.getByText("Passkey")).toBeInTheDocument();
-    expect(panel.getByRole("link", { name: "Google" })).toBeInTheDocument();
-    expect(panel.getByText(/^Linked .*2026/)).toBeInTheDocument();
+    const providers = panel.getAllByRole("link").map((link) => link.textContent);
+    expect(providers).toEqual(["Google", "GitHub"]);
+    expect(panel.getAllByText(/^Linked .*2026/)).toHaveLength(2);
+    // With accounts linked, the placeholder row is gone.
+    expect(panel.queryByText("Identity providers")).not.toBeInTheDocument();
     expect(projects).toEqual([TEST_PROJECT_ID]);
   });
 
