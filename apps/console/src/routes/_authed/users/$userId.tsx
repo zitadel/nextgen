@@ -1,6 +1,6 @@
 import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
 import { User, Users } from "lucide-react";
-import { Fragment, useEffect, useId, useMemo, useState } from "react";
+import { Fragment, type ReactNode, useEffect, useId, useMemo, useState } from "react";
 
 import { api } from "@/api/zitadel";
 import { DeleteUserDialog } from "@/components/delete-user-dialog";
@@ -49,8 +49,6 @@ import { userAttributes, userIdentity, userIdentitySecondary, userMetadata } fro
  * and recorded here:
  *
  *   - **Last login** in the header card: no such field anywhere on the user
- *   - the **Password** row: `/users/{user_id}/password` is write-only (`PUT`),
- *     so whether a password is set, and when, cannot be read
  *   - the **`v1 · live`** schema badge: schema versioning is #445
  *   - **unlinking** a provider account: links are written only by a sign-in
  *
@@ -68,7 +66,7 @@ export const Route = createFileRoute("/_authed/users/$userId")({
     // allowed to reject the loader: a failure costs a row, not the screen.
     const projectId = requireProjectScope(deps.project);
     const schemaId = field(user, "schema");
-    const [schema, passkeys, identityLinks] = await Promise.all([
+    const [schema, passkeys, identityLinks, passwordSetAt] = await Promise.all([
       schemaId
         ? api
             // Schema ids are unique per project only, so name the selected one.
@@ -81,6 +79,11 @@ export const Route = createFileRoute("/_authed/users/$userId")({
         .then((result) => result.passkeys)
         .catch(() => undefined),
       fetchUserIdentityLinks(params.userId).catch(() => undefined),
+      // `null`: the user has no password; `undefined`: it could not be read.
+      api
+        .getUserPassword(params.userId)
+        .then((result) => result.set_at ?? null)
+        .catch(() => undefined),
     ]);
 
     // A link names its connection by id; the connections give it a name. Only
@@ -91,7 +94,7 @@ export const Route = createFileRoute("/_authed/users/$userId")({
         ? await fetchAllIdps(projectId).catch(() => null)
         : null;
 
-    return { user, schema, passkeys, identityLinks, idps };
+    return { user, schema, passkeys, identityLinks, idps, passwordSetAt };
   },
   component: UserDetail,
 });
@@ -107,7 +110,7 @@ const ROW_LABEL = "text-muted-foreground text-sm font-medium";
 const ROW_VALUE = "text-foreground text-sm";
 
 function UserDetail() {
-  const { user, schema, passkeys, identityLinks, idps } = Route.useLoaderData();
+  const { user, schema, passkeys, identityLinks, idps, passwordSetAt } = Route.useLoaderData();
   const { userId } = Route.useParams();
   const router = useRouter();
   const attributes = userAttributes(user);
@@ -182,21 +185,13 @@ function UserDetail() {
 
         <TabsContent value="authentication" className="flex flex-col gap-6">
           <DetailSection title="Authentication">
-            {/* Only Passkey is listed: the design's Password row needs a read
-                of the password credential, and `/users/{user_id}/password` is
-                write-only. */}
-            <ul className="flex flex-col gap-4.5">
-              <li className={ROW}>
-                <span className={ROW_LABEL}>Passkey</span>
-                <span className={ROW_VALUE}>
-                  <PasskeyState passkeys={passkeys} />
-                </span>
-              </li>
-            </ul>
-          </DetailSection>
-
-          <DetailSection title="Identity providers">
-            <IdentityLinks links={identityLinks} idps={idps} />
+            <AuthenticationRows
+              rows={[
+                { key: "password", label: "Password", value: passwordState(passwordSetAt) },
+                { key: "passkey", label: "Passkey", value: passkeyState(passkeys) },
+                ...identityLinkRows(identityLinks, idps),
+              ]}
+            />
           </DetailSection>
         </TabsContent>
       </Tabs>
@@ -204,79 +199,96 @@ function UserDetail() {
   );
 }
 
+interface AuthenticationRow {
+  key: string;
+  label: ReactNode;
+  value: ReactNode;
+}
+
+/** The Authentication card's rows: a muted label, its value, a rule between each. */
+function AuthenticationRows({ rows }: { rows: AuthenticationRow[] }) {
+  return (
+    <ul className="flex flex-col gap-4.5">
+      {rows.map((row, index) => (
+        <Fragment key={row.key}>
+          {index > 0 && (
+            <li role="none">
+              <Separator />
+            </li>
+          )}
+          <li className={ROW}>
+            <span className={`${ROW_LABEL} min-w-0 truncate`}>{row.label}</span>
+            <span className={`${ROW_VALUE} shrink-0`}>{row.value}</span>
+          </li>
+        </Fragment>
+      ))}
+    </ul>
+  );
+}
+
+function passwordState(setAt: string | null | undefined): string {
+  if (setAt === undefined) return "Could not be loaded";
+  // When it was set, not "verified": an operator may have set it, and no
+  // check of it is recorded.
+  return setAt === null ? "Not set" : `Set ${formatDateTime(setAt)}`;
+}
+
 /**
- * The Passkey row's value. A passkey is stored once its registration's
- * attestation verifies, so its `created_at` is when it was verified.
+ * A passkey is stored once its registration's attestation verifies, so its
+ * `created_at` is when it was verified.
  */
-function PasskeyState({ passkeys }: { passkeys: { created_at: string }[] | undefined }) {
-  if (passkeys === undefined) return <>Could not be loaded</>;
-  if (passkeys.length === 0) return <>Not set up</>;
+function passkeyState(passkeys: { created_at: string }[] | undefined): string {
+  if (passkeys === undefined) return "Could not be loaded";
+  if (passkeys.length === 0) return "Not set up";
   const latest = passkeys
     .map((passkey) => passkey.created_at)
     .sort()
     .at(-1) as string;
-  if (passkeys.length === 1) return <>Verified {formatDateTime(latest)}</>;
-  return (
-    <>
-      {passkeys.length} registered, last verified {formatDateTime(latest)}
-    </>
-  );
+  return passkeys.length === 1
+    ? `Verified ${formatDateTime(latest)}`
+    : `${passkeys.length} registered, last verified ${formatDateTime(latest)}`;
 }
 
 /**
- * The provider accounts linked to the user, one row each. A link is written
- * when a sign-in through the connection resolves to this user, so these are
- * the providers the user actually signs in with — not the ones the schema
- * merely allows.
+ * One row per provider account linked to the user. A link is written when a
+ * sign-in through the connection resolves to this user, so these are the
+ * providers the user actually signs in with — not the ones the schema merely
+ * allows.
  */
-function IdentityLinks({
-  links,
-  idps,
-}: {
-  links: UserIdentityLink[] | undefined;
-  idps: IdpConnection[] | null;
-}) {
+function identityLinkRows(
+  links: UserIdentityLink[] | undefined,
+  idps: IdpConnection[] | null,
+): AuthenticationRow[] {
   if (!links?.length) {
-    return (
-      <p className={`${ROW_LABEL} py-1`}>
-        {links ? "No identity provider is linked to this user." : "Could not be loaded"}
-      </p>
-    );
+    return [
+      {
+        key: "identity-providers",
+        label: "Identity providers",
+        value: links ? "None linked" : "Could not be loaded",
+      },
+    ];
   }
-
   const byId = new Map((idps ?? []).map((idp) => [idp.id, idp]));
-  return (
-    <ul className="flex flex-col gap-4.5">
-      {links.map((link, index) => {
-        const idp = byId.get(link.connection_id);
-        return (
-          <Fragment key={link.id}>
-            {index > 0 && (
-              <li role="none">
-                <Separator />
-              </li>
-            )}
-            <li className={ROW}>
-              {idp ? (
-                <Link
-                  to="/authentication/idps/$idpId"
-                  params={{ idpId: idp.id }}
-                  className={`${ROW_LABEL} hover:text-foreground hover:underline`}
-                >
-                  {idp.definition.display_name}
-                </Link>
-              ) : (
-                // The connection list may be refused (`idp.read`); the id is
-                // still the honest name for it.
-                <span className={`${ROW_LABEL} truncate font-mono`}>{link.connection_id}</span>
-              )}
-              <span className={`${ROW_VALUE} shrink-0`}>Linked {formatDate(link.created_at)}</span>
-            </li>
-          </Fragment>
-        );
-      })}
-    </ul>
-  );
+  return links.map((link) => {
+    const idp = byId.get(link.connection_id);
+    return {
+      key: link.id,
+      label: idp ? (
+        <Link
+          to="/authentication/idps/$idpId"
+          params={{ idpId: idp.id }}
+          className="hover:text-foreground hover:underline"
+        >
+          {idp.definition.display_name}
+        </Link>
+      ) : (
+        // The connection list may be refused (`idp.read`); the id is still
+        // the honest name for it.
+        <span className="font-mono">{link.connection_id}</span>
+      ),
+      value: `Linked ${formatDate(link.created_at)}`,
+    };
+  });
 }
 
 /**

@@ -48,12 +48,16 @@ function stub({
   passkeysStatus = 200,
   identityLinks = [],
   identityLinksStatus = 200,
+  password = { set_at: "2026-04-28T13:32:00Z" },
+  passwordStatus = 200,
 }: {
   user?: Record<string, unknown>;
   passkeys?: unknown[];
   passkeysStatus?: number;
   identityLinks?: unknown[];
   identityLinksStatus?: number;
+  password?: { set_at?: string };
+  passwordStatus?: number;
 } = {}) {
   server.use(
     http.get(`${USERS_URL}/${USER_ID}`, () => HttpResponse.json(user)),
@@ -73,6 +77,11 @@ function stub({
       identityLinksStatus === 200
         ? HttpResponse.json({ identity_links: identityLinks })
         : new HttpResponse(null, { status: identityLinksStatus }),
+    ),
+    http.get(`${USERS_URL}/${USER_ID}/password`, () =>
+      passwordStatus === 200
+        ? HttpResponse.json(password)
+        : new HttpResponse(null, { status: passwordStatus }),
     ),
   );
 }
@@ -153,6 +162,7 @@ describe("user detail", () => {
       http.get(`${USERS_URL}/${USER_ID}/identity_links`, () =>
         HttpResponse.json({ identity_links: [] }),
       ),
+      http.get(`${USERS_URL}/${USER_ID}/password`, () => HttpResponse.json({})),
     );
     await renderDetail();
 
@@ -281,8 +291,34 @@ describe("user detail", () => {
     expect(
       panel.getByText(`Verified ${formatDateTime("2026-07-01T00:00:00Z")}`),
     ).toBeInTheDocument();
-    // `/users/{user_id}/password` is write-only, so there is no row to fill.
-    expect(panel.queryByText("Password")).not.toBeInTheDocument();
+  });
+
+  it("shows when the password was set, in the same card as the passkey", async () => {
+    stub();
+    await renderDetail();
+
+    await userEvent.click(await screen.findByRole("tab", { name: "Authentication" }));
+    const panel = within(screen.getByRole("tabpanel"));
+    expect(panel.getByText("Password")).toBeInTheDocument();
+    // "Set", not the design's "Verified": the API records when it was set, and
+    // no check of it.
+    expect(panel.getByText(`Set ${formatDateTime("2026-04-28T13:32:00Z")}`)).toBeInTheDocument();
+  });
+
+  it("says when the user has no password", async () => {
+    stub({ password: {} });
+    await renderDetail();
+    await userEvent.click(await screen.findByRole("tab", { name: "Authentication" }));
+    expect(within(screen.getByRole("tabpanel")).getByText("Not set")).toBeInTheDocument();
+  });
+
+  it("keeps the card when the password read fails", async () => {
+    stub({ passwordStatus: 500 });
+    await renderDetail();
+    await userEvent.click(await screen.findByRole("tab", { name: "Authentication" }));
+    const panel = within(screen.getByRole("tabpanel"));
+    expect(panel.getByText("Could not be loaded")).toBeInTheDocument();
+    expect(panel.getByText(/^Verified /)).toBeInTheDocument();
   });
 
   it("counts several passkeys and dates the latest", async () => {
@@ -371,11 +407,9 @@ describe("user detail", () => {
     await renderDetail();
 
     await userEvent.click(await screen.findByRole("tab", { name: "Authentication" }));
-    expect(
-      within(screen.getByRole("tabpanel")).getByText(
-        "No identity provider is linked to this user.",
-      ),
-    ).toBeInTheDocument();
+    const panel = within(screen.getByRole("tabpanel"));
+    expect(panel.getByText("Identity providers")).toBeInTheDocument();
+    expect(panel.getByText("None linked")).toBeInTheDocument();
   });
 
   it("still renders the screen when the identity link list fails", async () => {
