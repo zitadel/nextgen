@@ -90,8 +90,9 @@ func (h *IDPCallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// where it is used, so a target stored before the check was as strict as it
 	// is now can never be redirected to.
 	if _, err := httputil.ParseRedirectTarget(out.ReturnTarget); err != nil {
-		zlog.GetLoggingContext(ctx).Error("sso callback return target refused", slog.Any("error", err))
-		writeIDPCallbackErrorPage(w, http.StatusBadRequest)
+		zlog.GetLoggingContext(ctx).Error("sso callback return target refused",
+			slog.String("return_target", out.ReturnTarget), slog.Any("error", err))
+		writeIDPCallbackErrorPage(w, http.StatusInternalServerError)
 		return
 	}
 	http.Redirect(w, r, out.ReturnTarget, http.StatusSeeOther)

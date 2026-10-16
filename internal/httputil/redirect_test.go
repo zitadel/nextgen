@@ -44,6 +44,13 @@ func TestParseRedirectTarget_Accepts(t *testing.T) {
 		{"a double slash in the fragment", "https://app.test/x#//evil.example", "app.test"},
 		{"an underscore in the host", "https://my_app.test/x", "my_app.test"},
 		{"the highest port", "https://app.test:65535/x", "app.test:65535"},
+		{"the authority followed by a query", "https://app.test?x=1", "app.test"},
+		{"the authority followed by a fragment", "https://app.test#f", "app.test"},
+		{"the authority followed by a query with slashes", "https://app.test?/..//x", "app.test"},
+		{"a semicolon segment is an ordinary segment", "https://app.test/..;/x", "app.test"},
+		{"stray percent signs around an escape", "https://app.test/%%41/%4/%41%", "app.test"},
+		{"a stray percent sign in the query is left alone", "https://app.test/x?q=%zz&flow=1", "app.test"},
+		{"a character a Go parser would re-encode", "https://app.test/a%2Fb|c", "app.test"},
 		{"an empty port", "https://app.test:/x", "app.test:"},
 	}
 	for _, tt := range tests {
@@ -134,6 +141,15 @@ func TestParseRedirectTarget_Refuses(t *testing.T) {
 		{"an encoded newline", "https://app.test/a%0Ab", "control character"},
 		{"an encoded NUL", "https://app.test/%00", "control character"},
 		{"a double-encoded tab", "https://app.test/%2509/x", "control character"},
+		{"an uppercase scheme before two slashes", "HTTPS://app.test//evil", "empty segment"},
+		{"a double-encoded dot segment", "https://app.test/%252e%252e//evil", "empty segment"},
+		{"everything encoded", "https://app.test/a/%2e%2e%2f%2fevil", "empty segment"},
+		{"an encoded carriage return", "https://app.test/a%0Db", "control character"},
+		{"an encoded delete character", "https://app.test/a%7Fb", "control character"},
+		{"a slash that appears after a decode, a resolve and a decode", "https://app.test/.%2f%252F..", "empty segment"},
+		{"another decode, resolve, decode order", "https://app.test/..%2F%255C..%252F", "empty segment"},
+		{"a slash that appears after three decodes", "https://app.test/%25252Fevil.example", "empty segment"},
+		{"a re-encoded character before encoded slashes", "https://app.test/..%2F%252F..%252F^b", "empty segment"},
 		{"a stray percent sign after a double-encoded slash", "https://app.test/%252F%25zz", "empty segment"},
 	}
 	for _, tt := range tests {
@@ -168,4 +184,31 @@ func TestParseRedirectTarget_WritesAStrayPercentSignAsAnEscape(t *testing.T) {
 	u, err := httputil.ParseRedirectTarget("https://app.test/50%off#100%")
 	require.NoError(t, err)
 	assert.Equal(t, "https://app.test/50%25off#100%25", u.String())
+}
+
+func TestParseRedirectTarget_KeepsEscapesWhereGoWouldReEncode(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct{ name, raw, want string }{
+		{"a bar after an encoded slash", "https://app.test/a%2Fb|c", "https://app.test/a%2Fb%7Cc"},
+		{"a caret with a query", "https://app.test/a%2Fb^c?flow=1", "https://app.test/a%2Fb%5Ec?flow=1"},
+		{"a bar in the fragment", "https://app.test/x#/a%2Fb|c", "https://app.test/x#/a%2Fb%7Cc"},
+		{"a stray percent sign in the query", "https://app.test/x?q=100%", "https://app.test/x?q=100%"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			u, err := httputil.ParseRedirectTarget(tt.raw)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, u.String())
+		})
+	}
+}
+
+func TestParseRedirectTarget_RefusesAPathWithTooManyReadings(t *testing.T) {
+	t.Parallel()
+
+	_, err := httputil.ParseRedirectTarget("https://app.test/x%" + strings.Repeat("25", 100) + "2F")
+	require.ErrorIs(t, err, httputil.ErrInvalidRedirectTarget)
 }

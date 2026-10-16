@@ -126,7 +126,7 @@ func TestIDPCallbackHandler(t *testing.T) {
 			name:         "a stored return target that no longer passes the check answers the same page",
 			target:       api.IDPCallbackPath("google") + "?state=proj-1.rand&code=the-code",
 			storedTarget: "https://app.example.com//evil.example/login",
-			wantStatus:   http.StatusBadRequest,
+			wantStatus:   http.StatusInternalServerError,
 			wantIn:       service.FlowSSOCallbackInput{ConnectionSlug: "google", State: "proj-1.rand", Code: "the-code"},
 		},
 		{
