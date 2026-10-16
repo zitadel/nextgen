@@ -43,8 +43,10 @@ export default function Home() {
       <main>
         <section
           aria-labelledby="hero-title"
-          className="hero flex flex-col items-center justify-center overflow-hidden px-6 pt-2 pb-16"
+          className="hero flex flex-col items-center overflow-hidden px-6 pt-2 pb-16"
         >
+          {/* As much air over the content as under it, so it stays centred. */}
+          <div aria-hidden="true" className="flex-1" />
           <Stage>
             <div className="stage-frame">
               <Hero className="stage-glow" />
@@ -93,6 +95,13 @@ export default function Home() {
                 View on GitHub
               </a>
             </div>
+          </div>
+          {/* The air under the content and the padding under that. From
+              laptop width, where the steps sit on a spine (showcase.tsx), the
+              spine begins here, fading in under the buttons, and runs on into
+              the first step's number: a thread down to what comes below. */}
+          <div aria-hidden="true" className="relative w-full flex-1">
+            <div className="spine-teaser absolute top-6 -bottom-16 left-1/2 hidden w-px -translate-x-1/2 bg-[linear-gradient(to_bottom,transparent,#484a57_70%)] lg:block" />
           </div>
         </section>
 

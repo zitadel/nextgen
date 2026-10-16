@@ -4,15 +4,16 @@ import { useState } from "react";
 import { BrowserFrame } from "./browser-frame";
 import { FileCard } from "./file-card";
 import { FileTree } from "./file-tree";
+import { LoginPreview } from "./login-preview";
 import { RowLayout } from "./row-layout";
 import { TerminalCard } from "./terminal-card";
 import type { Session } from "./types";
 
 /**
  * A recorded step: what a command printed, what setup wrote, or the changed
- * files, beside the result when there is one. Whether the picture shows the
- * result is one state: the frame's switch drives it, and the flow's steps
- * follow it.
+ * files, beside the result when there is one, the login's screen, live.
+ * Whether the frame shows the result is one state: its switch drives it, and
+ * the flow's steps follow it.
  */
 export function RecordedRow({ session, index }: { session: Session; index: number }) {
   const [showResult, setShowResult] = useState(true);
@@ -32,11 +33,11 @@ export function RecordedRow({ session, index }: { session: Session; index: numbe
         result && (
           <BrowserFrame
             url={result.url}
-            before={result.before}
-            image={result.image}
             showResult={showResult}
             onToggle={result.before ? setShowResult : undefined}
-          />
+          >
+            <LoginPreview screen={result.screen} before={result.before} showResult={showResult} />
+          </BrowserFrame>
         )
       }
     />

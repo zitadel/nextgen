@@ -19,11 +19,13 @@ function Prose({ text }: { text: string }) {
 }
 
 /**
- * One step of the showcase (zitadel/new-website's TerminalSessionRow). On
- * wide screens the terminal or the files sit on one side and the heading, the
- * line and the result on the other, sides alternating by step, with the
- * step's number on the spine between them (showcase.tsx). On narrower
- * screens: heading, terminal or files, result.
+ * One step of the showcase (zitadel/new-website's TerminalSessionRow). From
+ * laptop width the heading and its line sit on one side, sides alternating by
+ * step, with the step's number on the spine beside them (showcase.tsx); under
+ * them the terminal or the files and the result stand side by side, their
+ * title bars on one line. A step without a result centres its terminal
+ * against the heading instead. Narrower, one column as wide as a card reads
+ * well: heading, terminal or files, result.
  */
 export function RowLayout({
   index,
@@ -39,23 +41,23 @@ export function RowLayout({
   result?: ReactNode;
 }) {
   const artifactLeft = index % 2 === 0;
+  const artifactSide = artifactLeft ? "lg:col-start-1" : "lg:col-start-2";
+  const textSide = artifactLeft ? "lg:col-start-2" : "lg:col-start-1";
   const number = String(index + 1).padStart(2, "0");
   const hue = HUES[index % HUES.length];
 
   return (
-    <li className="relative grid w-full grid-cols-1 gap-6 xl:grid-cols-2 xl:grid-rows-[auto_1fr] xl:items-start xl:gap-x-16 xl:gap-y-6">
+    <li className="relative mx-auto grid w-full max-w-2xl grid-cols-1 gap-6 lg:max-w-none lg:grid-cols-2 lg:grid-rows-[auto_1fr] lg:items-start lg:gap-x-16 lg:gap-y-8">
       <span
         aria-hidden="true"
-        className="absolute top-0 left-1/2 hidden size-10 -translate-x-1/2 items-center justify-center rounded-full border border-border-secondary bg-background font-semibold text-sm text-text-accent leading-5 xl:flex"
+        className="absolute top-0 left-1/2 hidden size-10 -translate-x-1/2 items-center justify-center rounded-full border border-border-secondary bg-background font-semibold text-sm text-text-accent leading-5 lg:flex"
       >
         {number}
       </span>
 
-      <div
-        className={`flex flex-col gap-3 xl:row-start-1 ${artifactLeft ? "xl:col-start-2" : "xl:col-start-1"}`}
-      >
-        <span className="font-semibold text-sm text-text-accent leading-5 xl:hidden">{number}</span>
-        <h3 className="font-heading text-2xl leading-8 tracking-[-0.02em] xl:text-[2rem] xl:leading-10">
+      <div className={`flex flex-col gap-3 lg:row-start-1 ${textSide}`}>
+        <span className="font-semibold text-sm text-text-accent leading-5 lg:hidden">{number}</span>
+        <h3 className="font-heading text-2xl leading-8 tracking-[-0.02em] lg:text-[2rem] lg:leading-10">
           {label}
         </h3>
         <p className="text-text-secondary leading-6">
@@ -64,7 +66,7 @@ export function RowLayout({
       </div>
 
       <div
-        className={`relative isolate min-w-0 xl:row-span-2 xl:row-start-1 xl:self-center ${artifactLeft ? "xl:col-start-1" : "xl:col-start-2"}`}
+        className={`relative isolate min-w-0 ${result ? "lg:row-start-2" : "lg:row-span-2 lg:row-start-1 lg:self-center"} ${artifactSide}`}
       >
         <div
           aria-hidden="true"
@@ -74,13 +76,7 @@ export function RowLayout({
         {artifact}
       </div>
 
-      {result && (
-        <div
-          className={`w-full min-w-0 max-w-[22rem] xl:row-start-2 xl:max-w-none ${artifactLeft ? "xl:col-start-2" : "xl:col-start-1"}`}
-        >
-          {result}
-        </div>
-      )}
+      {result && <div className={`min-w-0 lg:row-start-2 ${textSide}`}>{result}</div>}
     </li>
   );
 }

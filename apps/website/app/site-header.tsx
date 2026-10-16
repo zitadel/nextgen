@@ -13,8 +13,7 @@ function GitHubMark({ className }: { className?: string }) {
   );
 }
 
-// The bar over the page: the logo, the preview's label, and the other apps of
-// the deployment.
+// The bar over the page: the logo, the preview's label, the docs and GitHub.
 export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-border-primary border-b bg-background/80 backdrop-blur-md">
@@ -30,9 +29,6 @@ export function SiteHeader() {
         <nav aria-label="Main" className="-mr-3 flex items-center text-sm">
           <a href={links.docs} className={NAV_LINK}>
             Docs
-          </a>
-          <a href={links.storybook} className={`${NAV_LINK} max-sm:hidden`}>
-            Components
           </a>
           <a href={links.github} aria-label="Zitadel on GitHub" className={NAV_LINK}>
             <GitHubMark className="size-5" />

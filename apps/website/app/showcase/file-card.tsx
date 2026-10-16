@@ -1,7 +1,7 @@
 import { Fragment, type ReactNode } from "react";
 import { LINE_COPY } from "../command-block";
 import { CopyButton } from "../copy-button";
-import { GradientBorder, WindowDots } from "../gradient-border";
+import { GradientBorder, TITLE_BAR, WindowDots } from "../gradient-border";
 import type { Artifact, FileLine } from "./types";
 
 /** Green and red lines on tinted rows. */
@@ -12,6 +12,20 @@ const LINE_CLASSES: Record<FileLine["type"], string> = {
 };
 
 const LINE_MARKS: Record<FileLine["type"], string> = { context: " ", added: "+", removed: "-" };
+
+/**
+ * Lines added or removed together read as one block: only its first line
+ * rounds its top and only its last its bottom, so no seam runs between them.
+ */
+function runCorners(lines: FileLine[], index: number): string {
+  const type = lines[index]?.type;
+  if (!type || type === "context") {
+    return "";
+  }
+  const first = lines[index - 1]?.type !== type;
+  const last = lines[index + 1]?.type !== type;
+  return `${first ? "rounded-t" : ""} ${last ? "rounded-b" : ""}`;
+}
 
 /** The steps of the flow, before or after the change, as pills with arrows. */
 function FlowSteps({ steps, after }: { steps: string[]; after: boolean }) {
@@ -71,7 +85,7 @@ export function FileCard({
 
   return (
     <GradientBorder className="overflow-hidden">
-      <div className="flex items-center gap-3 border-border-secondary border-b py-3 pr-3 pl-5">
+      <div className={`${TITLE_BAR} gap-3 pr-3 pl-5`}>
         <WindowDots />
         <span className="min-w-0 flex-1 truncate font-mono text-text-secondary text-xs leading-4">
           {first?.path}
@@ -87,7 +101,9 @@ export function FileCard({
         <FlowSteps steps={showResult ? graph.after : graph.before} after={showResult} />
       )}
 
-      <div className="px-5 py-4 font-mono text-xs leading-5 md:px-6 md:py-5 md:text-[0.8125rem] md:leading-[1.65]">
+      {/* Whole-pixel line heights: a fraction leaves a hairline between the
+          tinted rows of a block. */}
+      <div className="px-5 py-4 font-mono text-xs leading-5 md:px-6 md:py-5 md:text-[0.8125rem] md:leading-[1.375rem]">
         {artifact.files.map((file, fileIndex) => (
           <div key={file.path} className={fileIndex > 0 ? "mt-4" : undefined}>
             {artifact.files.length > 1 && (
@@ -99,7 +115,7 @@ export function FileCard({
               <div
                 // biome-ignore lint/suspicious/noArrayIndexKey: the lines of a fixed diff, never reordered
                 key={index}
-                className={`-mx-2 flex gap-2 rounded px-2 ${LINE_CLASSES[line.type]}`}
+                className={`-mx-2 flex gap-2 px-2 ${runCorners(file.lines, index)} ${LINE_CLASSES[line.type]}`}
               >
                 <span aria-hidden="true" className="w-3 shrink-0 select-none text-right opacity-70">
                   {LINE_MARKS[line.type]}

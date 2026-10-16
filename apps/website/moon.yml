@@ -3,7 +3,7 @@ language: "typescript"
 layer: "application"
 stack: "frontend"
 dependsOn:
-  # The brand playground renders the atoms of @zitadel/components.
+  # The showcase's login previews render the atoms of @zitadel/components.
   - "components"
 
 workspace:

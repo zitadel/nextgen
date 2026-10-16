@@ -11,7 +11,7 @@ import "./globals.css";
 // this app.
 //
 // Arimo is one variable file, every weight from 400 to 700, declared as such:
-// the page sets text at 400 and 600, the brand playground's card titles at
+// the page sets text at 400 and 600, the login previews' card titles at
 // 500.
 const arimo = localFont({
   src: "./fonts/Arimo-latin.woff2",

@@ -1,6 +1,6 @@
 import { LINE_COPY } from "../command-block";
 import { CopyButton } from "../copy-button";
-import { GradientBorder, WindowDots } from "../gradient-border";
+import { GradientBorder, TITLE_BAR, WindowDots } from "../gradient-border";
 import type { Recording } from "./types";
 
 /**
@@ -12,7 +12,7 @@ import type { Recording } from "./types";
 export function TerminalCard({ recording }: { recording: Recording }) {
   return (
     <GradientBorder className="overflow-hidden">
-      <div className="flex items-center gap-3 border-border-secondary border-b px-5 py-3">
+      <div className={`${TITLE_BAR} gap-3 px-5`}>
         <WindowDots />
         <span className="font-mono text-text-secondary text-xs leading-4">{recording.title}</span>
       </div>

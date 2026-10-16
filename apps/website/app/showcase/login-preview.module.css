@@ -1,15 +1,15 @@
-/* The ground and the light-DOM typography around the atoms in the brand
-   playground (brand-preview.tsx): what <zitadel-login>'s layout chrome
+/* The ground and the light-DOM typography around the atoms in the login
+   previews (login-preview.tsx): what <zitadel-login>'s layout chrome
    (packages/components/src/orchestrator/templates/layout-chrome.css) gives
    the card's title, subtitle, field group, actions and register line, and its
    "Secured with" trustmark. Everything reads the --zl-* properties set on
-   .preview, so the visitor's choices reach every part. */
+   .preview, so the brand row visitor's choices reach every part. */
 
 .preview {
   display: flex;
-  /* As tall as the controls beside it, and never shorter than the card. */
-  flex: 1 1 auto;
-  min-height: 30rem;
+  /* About a one-field card's height, so the frame holds its place while the
+     atoms load. */
+  min-height: 28rem;
   align-items: center;
   justify-content: center;
   padding: 2.5rem 1.25rem;
@@ -19,13 +19,27 @@
   font-family: var(--zl-font-family-sans, inherit);
 }
 
+/* The screens of a step in one place, before under after: the stack takes
+   the taller one's height, and each starts at its top, so the switch adds or
+   removes a field where it would appear. */
 .stack {
-  display: flex;
+  display: grid;
   width: 100%;
   max-width: var(--zl-container-auth-card);
+  align-items: start;
+}
+
+.layer {
+  display: flex;
+  grid-area: 1 / 1;
   flex-direction: column;
   align-items: center;
   gap: 1.25rem;
+  transition: opacity 400ms ease;
+}
+
+.layer[data-shown="false"] {
+  opacity: 0;
 }
 
 .preview :global(.zl-card-title) {

@@ -1,8 +1,38 @@
-import loginAfterFlow from "./login-after-flow.jpg";
-import loginAfterSetup from "./login-after-setup.jpg";
-import registerAfterSchema from "./register-after-schema.jpg";
-import registerBefore from "./register-before.jpg";
-import type { Session } from "./types";
+import type { Screen, Session } from "./types";
+
+// The login's screens the steps show, drawn live from its atoms
+// (login-preview.tsx) in the default template's English copy
+// (packages/components/src/orchestrator/locales/en.ts), with the fields the
+// recorded session's pages had: the sign-in setup serves, the registration
+// form before and after the schema change, and the sign-in after the flow
+// change, which the brand row themes.
+const email = {
+  label: "Email",
+  type: "email",
+  placeholder: "you@example.com",
+  required: true,
+} as const;
+
+const signIn: Screen = {
+  title: "Sign in",
+  subtitle: "Enter your email to continue",
+  fields: [email],
+  action: "Continue",
+  nav: { lead: "Don't have an account? ", link: "Sign up" },
+};
+
+const register: Screen = {
+  title: "Create your account",
+  subtitle: "Enter your details to get started",
+  fields: [email],
+  action: "Continue with password",
+  nav: { lead: "Already have an account? ", link: "Sign in" },
+};
+
+export const signInWithPassword: Screen = {
+  ...signIn,
+  fields: [email, { label: "Password", type: "password", required: true }],
+};
 
 // The showcase's recorded steps, from zitadel/new-website's narrative redesign
 // (its homepage's terminalSection, a session recorded with `script` on
@@ -10,10 +40,10 @@ import type { Session } from "./types";
 // `doctor` first): the first step is what that session's start printed, with
 // the one-time console link masked; the second the files its setup wrote (the
 // rest it summed up as "env, project config, the editable user schema and
-// login flow"); the next two its recorded diffs and command output. The
-// pictures are the scaffolded app's pages at 520px, as that session left
-// them. Re-record rather than edit when the CLI changes (AGENTS.md). The
-// last step, the brand, is live (brand-row.tsx).
+// login flow"); the next two its recorded diffs and command output. The pages
+// beside them are the screens above, as that session's app served them.
+// Re-record rather than edit when the CLI changes (AGENTS.md). The last step,
+// the brand, is live (brand-row.tsx).
 export const sessions: Session[] = [
   {
     label: "Start Zitadel",
@@ -50,10 +80,7 @@ export const sessions: Session[] = [
       ],
       rest: "+ package.json, .env.local, zitadel.json and more",
     },
-    result: {
-      url: "localhost:3000/login",
-      image: { src: loginAfterSetup, alt: "The sign-in card the setup wrote, served by the app" },
-    },
+    result: { url: "localhost:3000/login", screen: signIn },
   },
   {
     label: "Add a field",
@@ -92,8 +119,8 @@ export const sessions: Session[] = [
     },
     result: {
       url: "localhost:3000/register",
-      before: { src: registerBefore, alt: "The registration form before the schema change" },
-      image: { src: registerAfterSchema, alt: "The registration form with the new company field" },
+      before: register,
+      screen: { ...register, fields: [email, { label: "Company" }] },
     },
   },
   {
@@ -127,16 +154,6 @@ export const sessions: Session[] = [
         },
       ],
     },
-    result: {
-      url: "localhost:3000/login",
-      before: {
-        src: loginAfterSetup,
-        alt: "The login before the flow change, asking for the email only",
-      },
-      image: {
-        src: loginAfterFlow,
-        alt: "The sign-in card asking for email and password on one screen",
-      },
-    },
+    result: { url: "localhost:3000/login", before: signIn, screen: signInWithPassword },
   },
 ];

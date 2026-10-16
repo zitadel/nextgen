@@ -37,7 +37,7 @@ in the deployment has installed (`--optimistic-repeat-install`). The console
 and the storybook build with `turbo run build`, which reads and writes the
 team's remote cache as Vercel sets it up; the docs and the website run their
 own `pnpm run build`, the website after `@zitadel/components` has built
-through turbo, since its brand playground renders the package's atoms.
+through turbo, since its showcase renders the package's atoms.
 
 | File | Role |
 |---|---|

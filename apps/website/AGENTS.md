@@ -4,14 +4,15 @@ The hosted cloud's front page at `/`, the preview's front door. It tells the
 story of `zitadel/new-website`'s narrative redesign (the branch
 `claude/zitadel-narrative-redesign-377a49`, its `docs/narrative-ia-proposal.md`):
 the benefit first, then its proof, and nothing else. Under a header to the
-docs, the storybook and GitHub:
+docs and GitHub:
 
 1. The hero: the new website's hero animation in the middle, "Your login in
    one minute." tucked into its faded bottom, one line on what it is, then the
    commands to copy, the skills line for coding agents, and the buttons to the
    quickstart and the repository, all of it on a laptop's first screen, with
-   the top of the first step under it to tease what comes below. Short
-   on purpose: no paragraph, no small print, no line above the headline; the
+   the top of the first step under it to tease what comes below, and from a
+   laptop's width the steps' spine leading down to it from under the buttons.
+   Short on purpose: no paragraph, no small print, no line above the headline; the
    header's Preview label frames the page, and the steps below say the rest.
 2. The showcase (`app/showcase/`), with no title of its own: five numbered
    steps that prove the headline, what the commands do (start Zitadel, add the
@@ -30,7 +31,7 @@ Arimo for text, Azeret Mono for code. `app/globals.css` keeps only the values
 this page uses, under the website's names (`bg-background`, `text-foreground`,
 `accent-strong`), so the website's components move over unchanged. It does not
 use `@zitadel/design-tokens`, the palette of the console, the login and the
-docs; the brand playground's preview is the one place their tokens paint, on
+docs; the showcase's login previews are the one place their tokens paint, on
 the login's own atoms (below).
 
 ## The fonts
@@ -43,7 +44,7 @@ cannot parse, and a local build stalls when the network blips.
 
 - `Arimo-latin.woff2` is Arimo's variable font, every weight from 400 to 700,
   and `layout.tsx` declares it as such, as the docs do: the page sets text at
-  400 and 600, the brand row's card title at 500.
+  400 and 600, the login previews' card titles at 500.
   `AzeretMono-Medium-latin.woff2` is Azeret Mono at 500.
 - Each is the latin subset, byte for byte the file Google Fonts serves
   `next/font/google` (Arimo v36, Azeret Mono v21). A character outside it
@@ -79,7 +80,10 @@ height, change the 33.5rem it reserves for it. The hero takes the screen
 under the header but that top of the first step (`.hero`, `--peek`), its
 content centred in it, so a tall screen surrounds it with air and every
 screen from a laptop's up shows the first step's number, title and the top of
-its card at the fold, with room above them. From the extracted frames:
+its card at the fold, with room above them. In that air, from a laptop's width
+up, the steps' spine (`app/showcase/showcase.tsx`) begins: it fades in under
+the buttons (`.spine-teaser`), is drawn down once they are in, and runs on into
+the first step's number, however tall the screen. From the extracted frames:
 
 ```sh
 ffmpeg -framerate 30 -i %03d.webp -c:v libsvtav1 -crf 34 -preset 4 -pix_fmt yuv420p -f avif hero.avif
@@ -95,9 +99,11 @@ Lottie's shapes, and its motion as CSS keyframes in `app/globals.css` with the
 Lottie's timings and easings. As on the website it plays while the pointer is
 on it and returns to rest when the pointer leaves; here it also stays still
 for reduced motion. It sits in the header, the footer, where it is all there
-is, and the brand row's trustmark, so it never plays on its own, where nothing
-hovers, as the centrepiece of the coming-soon page did. Its `id` keeps each
-copy's SVG ids apart.
+is, and the login previews' trustmarks, so it never plays on its own, where
+nothing hovers, as the centrepiece of the coming-soon page did. Its `id` keeps
+each copy's SVG ids apart. The docs' sidebar shows it too, from a copy
+(`apps/docs/components/logo.tsx`, its motion in `apps/docs/app/global.css`):
+change the copies together.
 
 `public/favicons/` holds the website's favicons,
 `packages/theme/assets/favicons` in `zitadel/new-website`, and
@@ -135,14 +141,24 @@ once against the published CLI before they ship.
 
 ## The showcase
 
-`app/showcase/` holds the five steps under the hero, alternating sides along a
-spine on wide screens, each numbered on it (`showcase.tsx`, `row-layout.tsx`).
+`app/showcase/` holds the five steps under the hero (`showcase.tsx`,
+`row-layout.tsx`). From a laptop's width up (`lg`, 1024 px) they run along a
+spine, each numbered on it: the step's title and line on one side, sides
+alternating by step, and under them the terminal or the files and the result
+side by side, their tops on one line; a step without a result centres its
+terminal against its title instead. Narrower, they stack in one centred column
+as wide as a card reads well: title, terminal or files, result. Every
+window's title bar in it has one height (`TITLE_BAR` in
+`app/gradient-border.tsx`), so two windows side by side start their content on
+one line.
+
 They are `zitadel/new-website`'s narrative rows, ported: a command and what it
 printed (`terminal-card.tsx`), the card of the files setup writes
 (`file-tree.tsx`), the editor card with the diff, the flow's steps and the
 commands that publish the change (`file-card.tsx`), and the browser frame with
-a Before / After switch (`browser-frame.tsx`). A step's title is what you do,
-its line what happens; text between backticks in the line is code.
+a Before / After switch (`browser-frame.tsx`) around the login's page, drawn
+live (`login-preview.tsx`). A step's title is what you do, its line what
+happens; text between backticks in the line is code.
 
 - Steps 1 and 2 explain the hero's commands rather than repeat them: what
   `start` printed, the console link and the local server, and the files
@@ -153,12 +169,20 @@ its line what happens; text between backticks in the line is code.
 - Steps 1 to 4 come from a recorded session (`sessions.ts`), run with `script`
   on 5 October 2026 with @zitadel/cli 1.0.0-alpha.24: what its start printed,
   with the one-time console link masked, the files its setup wrote, its diffs
-  and its command output, and the scaffolded app's pages at 520 px. Re-record
-  rather than edit when the CLI, what it prints, the files setup writes, the
-  flow format or the login's look changes. `login-after-setup.jpg` is also the
-  fourth step's before-picture.
+  and its command output. Re-record rather than edit when the CLI, what it
+  prints, the files setup writes or the flow format changes.
+- The pages beside them are not pictures: `login-preview.tsx` draws each from
+  the atoms of `@zitadel/components`, as the brand row does (below), as the
+  screen `sessions.ts` names for it, the title, the fields, the action and the
+  line under it, in the default template's English copy and with the fields
+  the session's app served. So they are as sharp as the page around them and
+  take the login's look on their own; when its copy or a step's fields change,
+  change the screens.
 - In steps 3 and 4 the frame's switch shows the page before or after the
-  change, and the fourth step's flow steps follow it.
+  change, and the fourth step's flow steps follow it. Both screens stand in
+  one place, the one not shown faded out and inert, so the frame keeps the
+  taller one's height and the switch adds or takes away a field where it
+  sits.
 - No captions or dates on the steps: this is a marketing page, the provenance
   lives here and in `sessions.ts`.
 
@@ -167,13 +191,15 @@ its line what happens; text between backticks in the line is code.
 The fifth step is live (`brand-row.tsx`): the visitor picks a brand colour, the
 corners and a heading face in the editor card's strip; the card's lines show
 the rule an app would set on `<zitadel-login>`, as the docs' "Customize the
-design" page themes it, and `brand-preview.tsx` paints the result on the
-sign-in step as the flow's step leaves it (email and password), built from the
-atoms of `@zitadel/components` (`zl-card`, `zl-field`, `zl-button`) in their
-English copy. Before shows the card without the rule.
+design" page themes it, and `login-preview.tsx` paints the result on the
+fourth step's result, the sign-in step as the flow's step leaves it (email and
+password), built from the atoms of `@zitadel/components` (`zl-card`,
+`zl-field`, `zl-button`) in their English copy. Before shows the card without
+the rule.
 
-- The atoms load, through a dynamic import, only once the row nears the
-  viewport. Nothing submits: there is no server behind them.
+- The atoms load, through one dynamic import for every preview, only once the
+  first preview nears the viewport. Nothing submits: there is no server
+  behind them.
 - An atom reads the `--zl-*` properties from its ancestors, and on its own
   brings none: `brand-tokens.ts` sets the base layer on the preview's wrapper
   from the package's own `tokens` and `cssVars` (every token at its dark
@@ -181,7 +207,7 @@ English copy. Before shows the card without the rule.
   app's login shows (Arimo, not the licensed APK Futural the heading token
   names first), and the visitor's choices over it.
 - The card's title, subtitle, field group, actions and register line are light
-  DOM, styled in `brand-preview.module.css` as the orchestrator's layout chrome
+  DOM, styled in `login-preview.module.css` as the orchestrator's layout chrome
   styles them (`packages/components/src/orchestrator/templates/layout-chrome.css`).
   When that chrome, the default template or its English copy changes, follow
   it.

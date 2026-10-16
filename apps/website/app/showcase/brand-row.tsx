@@ -1,7 +1,6 @@
 "use client";
 
 import { type ReactNode, useState } from "react";
-import { BrandPreview } from "./brand-preview";
 import {
   type BrandChoice,
   brandLines,
@@ -15,17 +14,20 @@ import {
 } from "./brand-tokens";
 import { BrowserFrame } from "./browser-frame";
 import { FileCard } from "./file-card";
+import { LoginPreview } from "./login-preview";
 import { RowLayout } from "./row-layout";
+import { signInWithPassword } from "./sessions";
 
+// Each chip is at least 24px high, the smallest target WCAG 2.2 asks for.
 const CHIP =
-  "cursor-pointer rounded-md border px-2 py-0.5 font-semibold text-[0.6875rem] leading-4 transition-colors";
+  "cursor-pointer rounded-md border px-2.5 py-[3px] font-semibold text-xs leading-4 transition-colors";
 const CHIP_ON = "border-border-secondary bg-surface-black-secondary text-text-primary";
 const CHIP_OFF = "border-transparent text-text-secondary hover:text-text-primary";
 
 function Control({ label, children }: { label: string; children: ReactNode }) {
   return (
     <fieldset className="flex items-center gap-2">
-      <legend className="float-left mr-1 font-semibold text-[0.6875rem] text-text-muted leading-4">
+      <legend className="float-left mr-1 font-semibold text-text-muted text-xs leading-4">
         {label}
       </legend>
       <div className="flex items-center gap-1">{children}</div>
@@ -112,11 +114,11 @@ function Controls({
 }
 
 /**
- * The fourth row, live (zitadel/new-website's BrandPlayground): the visitor
+ * The fifth row, live (zitadel/new-website's BrandPlayground): the visitor
  * picks a brand colour, the corners and a heading face; the stylesheet card
- * rewrites its lines, and the sign-in card in the browser frame, built from
- * the product's own atoms (brand-preview.tsx), takes the look. Before shows
- * the card without the stylesheet.
+ * rewrites its lines, and the sign-in card in the browser frame, the fourth
+ * row's result built from the product's own atoms (login-preview.tsx), takes
+ * the look. Before shows the card without the stylesheet.
  */
 export function BrandRow({ index }: { index: number }) {
   const [choice, setChoice] = useState<BrandChoice>(DEFAULT_CHOICE);
@@ -141,7 +143,7 @@ export function BrandRow({ index }: { index: number }) {
       }
       result={
         <BrowserFrame url="localhost:3000/login" showResult={showResult} onToggle={setShowResult}>
-          <BrandPreview choice={showResult ? choice : undefined} />
+          <LoginPreview screen={signInWithPassword} choice={showResult ? choice : undefined} />
         </BrowserFrame>
       }
     />

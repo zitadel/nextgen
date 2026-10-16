@@ -12,8 +12,9 @@
     "typecheck": {
       "dependsOn": ["build"]
     },
-    // The brand playground (app/brand-preview.tsx) imports the atoms of
-    // @zitadel/components, which Next resolves to the package's dist/.
+    // The showcase's login previews (app/showcase/login-preview.tsx) import
+    // the atoms of @zitadel/components, which Next resolves to the package's
+    // dist/.
     "build": {
       "dependsOn": ["@zitadel/components#build"],
       "outputs": [".next/**", "!.next/cache/**"]

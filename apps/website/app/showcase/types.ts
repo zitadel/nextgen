@@ -1,4 +1,4 @@
-import type { StaticImageData } from "next/image";
+import type { ZlField } from "@zitadel/components/atoms";
 
 /**
  * What setup writes into the app, under `root`: the files that matter, each
@@ -27,10 +27,24 @@ export type Artifact = {
   commands?: { command: string; output?: string }[];
 };
 
-export type Picture = { src: StaticImageData; alt: string };
+/**
+ * A step of the login as the default template renders it, in its English
+ * copy: the title and the line under it, the fields, the action, and the line
+ * under the action with its link.
+ */
+export type Screen = {
+  title: string;
+  subtitle: string;
+  fields: { label: string; type?: ZlField["type"]; placeholder?: string; required?: boolean }[];
+  action: string;
+  nav: { lead: string; link: string };
+};
 
-/** What a row produced, in a browser frame at `url`; with `before`, the frame switches between the two. */
-export type Result = { url: string; before?: Picture; image: Picture };
+/**
+ * What a row produced, the login's `screen` in a browser frame at `url`; with
+ * `before`, the frame switches between the two.
+ */
+export type Result = { url: string; before?: Screen; screen: Screen };
 
 /** A command of the hero and the lines it printed, in a terminal window titled `title`. */
 export type Recording = { title: string; command: string; output: string[] };
