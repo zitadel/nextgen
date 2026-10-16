@@ -602,6 +602,12 @@ type Handler interface {
 	//
 	// GET /users/{user_id}
 	GetUserByID(ctx context.Context, params GetUserByIDParams) (GetUserByIDRes, error)
+	// GetUserPassword implements getUserPassword operation.
+	//
+	// Get user password state.
+	//
+	// GET /users/{user_id}/password
+	GetUserPassword(ctx context.Context, params GetUserPasswordParams) (GetUserPasswordRes, error)
 	// GetVariable implements getVariable operation.
 	//
 	// Reads one variable by name, with its value per kind. A name with no

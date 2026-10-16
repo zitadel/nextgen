@@ -3,6 +3,7 @@ package api_test
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
@@ -109,6 +110,10 @@ var fixedKey = [32]byte{
 	0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
 }
 
+// fixedKeyID is a stored encryption key id in the shape the dialects mint; a
+// presented flow cookie naming any other kid is refused before the key lookup.
+const fixedKeyID = "enc_key_01JAAAAAAAAAAAAAAAAAAAAAAA"
+
 type testServer struct {
 	srv      *httptest.Server
 	crypter  crypto.Crypter
@@ -128,13 +133,24 @@ func newTestServer(t *testing.T, middleware ...func(http.Handler) http.Handler) 
 // sealErr while opening the presented one still works.
 func newTestServerSealing(t *testing.T, sealErr error, middleware ...func(http.Handler) http.Handler) *testServer {
 	t.Helper()
+	return newTestServerKeys(t, nil, sealErr, middleware...)
+}
 
-	crypter := op.NewAES256GCMCrypto(fixedKey, "")
+// newTestServerKeys lets a test make the key lookup for opening a presented
+// cookie fail with openErr, and sealing a new one fail with sealErr.
+func newTestServerKeys(t *testing.T, openErr, sealErr error, middleware ...func(http.Handler) http.Handler) *testServer {
+	t.Helper()
+
+	crypter := op.NewAES256GCMCrypto(fixedKey, fixedKeyID)
 
 	mock := gomock.NewController(t)
 	tokenService := mocks.NewMockTokenService(mock)
 	keyService := mocks.NewMockKeyService(mock)
-	keyService.EXPECT().GetCrypter(gomock.Any(), gomock.Any(), gomock.Any()).Return(crypter, nil).AnyTimes()
+	if openErr != nil {
+		keyService.EXPECT().GetCrypter(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, openErr).AnyTimes()
+	} else {
+		keyService.EXPECT().GetCrypter(gomock.Any(), gomock.Any(), gomock.Any()).Return(crypter, nil).AnyTimes()
+	}
 	if sealErr != nil {
 		keyService.EXPECT().GetProjectCrypter(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, sealErr).AnyTimes()
 	} else {
@@ -259,6 +275,28 @@ func TestSubmitFlowStep_TamperedCookieReturns401(t *testing.T) {
 	}
 }
 
+// A flow cookie whose JWE header names a key no stored key could be is refused
+// as an invalid cookie before the key lookup. The key store here fails every
+// lookup the way Postgres does for a kid with a NUL byte, so a header that
+// reached it would answer 500 instead of 401.
+func TestSubmitFlowStep_MalformedCookieHeaderReturns401(t *testing.T) {
+	ts := newTestServerKeys(t, domain.ErrInternal(errors.New("invalid byte sequence (SQLSTATE 22021)")), nil)
+
+	for _, header := range []string{
+		`{"alg":"A256GCMKW","enc":"A256GCM","kid":"a\u0000b"}`,
+		`{"alg":"A256GCMKW","enc":"A256GCM","kid":"key-1"}`,
+		`{"alg":"dir","enc":"A256GCM","kid":"` + fixedKeyID + `"}`,
+	} {
+		cookie := base64.RawURLEncoding.EncodeToString([]byte(header)) + ".key.iv.ciphertext.tag"
+		resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+			"action": "submit",
+		}, cookie)
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("header %s: status = %d, body = %s", header, resp.StatusCode, body)
+		}
+	}
+}
+
 func TestSubmitFlowStep_StaleCookieReturns401(t *testing.T) {
 	ts := newTestServer(t)
 
@@ -357,6 +395,8 @@ func TestSubmitFlowStep_SSO_BindsTheBrowserAndResealsTheFlowCookie(t *testing.T)
 		middleware []func(http.Handler) http.Handler
 		// returnTarget defaults to the login page on the bare origin.
 		returnTarget string
+		// storedTarget defaults to returnTarget.
+		storedTarget string
 		wantCookie   string
 	}{
 		{
@@ -371,6 +411,15 @@ func TestSubmitFlowStep_SSO_BindsTheBrowserAndResealsTheFlowCookie(t *testing.T)
 			name:         "return_target keeps its fragment",
 			origin:       "https://login.example.com",
 			returnTarget: "https://login.example.com/app#/sign-in?flow=flow_1",
+			wantCookie:   "__Host-_zsso=nonce-1; Path=/; Max-Age=900; HttpOnly; Secure; SameSite=Lax",
+		},
+		{
+			// A stray percent sign is stored as an escape, and an encoded slash
+			// next to a character Go re-encodes stays encoded.
+			name:         "return_target is stored as the browser reads it",
+			origin:       "https://login.example.com",
+			returnTarget: "https://login.example.com/50%off/a%2Fb|c?flow=flow_1#100%",
+			storedTarget: "https://login.example.com/50%25off/a%2Fb%7Cc?flow=flow_1#100%25",
 			wantCookie:   "__Host-_zsso=nonce-1; Path=/; Max-Age=900; HttpOnly; Secure; SameSite=Lax",
 		},
 		{
@@ -405,6 +454,10 @@ func TestSubmitFlowStep_SSO_BindsTheBrowserAndResealsTheFlowCookie(t *testing.T)
 			if returnTarget == "" {
 				returnTarget = bareOrigin + "/login?flow=flow_1"
 			}
+			storedTarget := tt.storedTarget
+			if storedTarget == "" {
+				storedTarget = returnTarget
+			}
 			resp, body := doRequestWithOrigin(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
 				"action":          "sso",
 				"sso_provider_id": "google",
@@ -425,7 +478,7 @@ func TestSubmitFlowStep_SSO_BindsTheBrowserAndResealsTheFlowCookie(t *testing.T)
 			require.Equal(t, "google", *ts.fake.gotSubmitReq.SSOProviderID)
 			require.Equal(t, &domain.FlowSSOReturn{
 				RedirectURI:  bareOrigin + "/__nextgen/idp/google/callback",
-				ReturnTarget: returnTarget,
+				ReturnTarget: storedTarget,
 			}, ts.fake.gotSubmitReq.SSOReturn)
 			var out struct {
 				Step struct {
@@ -516,6 +569,13 @@ func TestSubmitFlowStep_SSO_RejectsAnUnboundReturn(t *testing.T) {
 			// The host is the origin, but no page URL carries userinfo.
 			name: "return_target with userinfo on the origin host",
 			body: map[string]any{"action": "sso", "sso_provider_id": "google", "return_target": "https://evil.example.com@login.example.com/login"},
+		},
+		{
+			// On the origin, but a proxy re-basing the callback's Location
+			// onto its own host reads //evil.example as the host. Every other
+			// way of writing it is covered by httputil.ParseRedirectTarget.
+			name: "return_target path starting with two slashes",
+			body: map[string]any{"action": "sso", "sso_provider_id": "google", "return_target": origin + "//evil.example/login?flow=flow_1"},
 		},
 		{
 			name: "return_target missing",

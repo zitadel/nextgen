@@ -356,6 +356,26 @@ func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordR
 	return &api.SetUserPasswordNoContent{}, nil
 }
 
+func (h *Handler) GetUserPassword(ctx context.Context, params api.GetUserPasswordParams) (api.GetUserPasswordRes, error) {
+	projectID, err := h.requireResourceAccess(ctx, string(params.UserID), userAccess, opRead)
+	if err != nil {
+		return nil, err
+	}
+	setAt, err := h.userService.GetPasswordSetAt(ctx, service.GetPasswordInput{
+		ProjectID: projectID,
+		UserID:    string(params.UserID),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	res := &api.GetUserPasswordResponse{}
+	if setAt != nil {
+		res.SetAt = api.NewOptDateTime(*setAt)
+	}
+	return res, nil
+}
+
 func (h *Handler) GetMyUser(ctx context.Context) (api.GetMyUserRes, error) {
 	sessionToken, ok := sessionTokenFromContext(ctx)
 	if !ok {
