@@ -14,13 +14,20 @@ import { tryLock } from "./start-lock";
  * one, and an empty one reads as a free port.
  */
 export class TcpPorts implements PortProbe {
+  private readonly claimsDir: string;
+
+  /** `claimsDir` is where claims are kept; every `zitadel` on the machine must use the same one. */
+  constructor(claimsDir: string = join(tmpdir(), "zitadel-local-ports")) {
+    this.claimsDir = claimsDir;
+  }
+
   /**
    * Starts that choose a port at the same moment cannot tell it is taken until
    * one of them binds it, so a start claims the port first, with a file every
    * `zitadel` on the machine sees, and keeps the claim until its server answers.
    */
   reserve(port: number): Promise<(() => Promise<void>) | undefined> {
-    return tryLock(join(tmpdir(), "zitadel-local-ports", String(port)));
+    return tryLock(join(this.claimsDir, String(port)));
   }
 
   async isFree(port: number): Promise<boolean> {

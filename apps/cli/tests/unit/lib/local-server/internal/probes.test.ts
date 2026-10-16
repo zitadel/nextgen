@@ -1,4 +1,7 @@
+import { mkdtemp, rm } from "node:fs/promises";
 import { createServer, type Server } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -6,8 +9,12 @@ import { TcpPorts } from "../../../../../src/lib/local-server/internal/probes";
 import { nextPort } from "../../../../helpers/ports";
 
 const servers: Server[] = [];
+const claimDirs: string[] = [];
 
 afterEach(async () => {
+  for (const dir of claimDirs.splice(0)) {
+    await rm(dir, { recursive: true, force: true });
+  }
   for (const server of servers.splice(0)) {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
@@ -25,36 +32,34 @@ function listenOn(host: string | undefined): Promise<number> {
 }
 
 describe("TcpPorts reservations", () => {
-  const port = nextPort();
+  const port = 8080;
+
+  async function claimsDir(): Promise<string> {
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-claims-"));
+    claimDirs.push(dir);
+    return dir;
+  }
 
   it("gives a port to one start at a time", async () => {
-    const ports = new TcpPorts();
-    const release = await ports.reserve(port);
+    const dir = await claimsDir();
+    await new TcpPorts(dir).reserve(port);
 
-    await expect(new TcpPorts().reserve(port)).resolves.toBeUndefined();
-    await release?.();
+    await expect(new TcpPorts(dir).reserve(port)).resolves.toBeUndefined();
   });
 
   it("gives the port out again once it is released", async () => {
-    const ports = new TcpPorts();
+    const ports = new TcpPorts(await claimsDir());
     const release = await ports.reserve(port);
     await release?.();
 
-    const again = await ports.reserve(port);
-
-    expect(again).toBeTypeOf("function");
-    await again?.();
+    await expect(ports.reserve(port)).resolves.toBeTypeOf("function");
   });
 
   it("keeps different ports apart", async () => {
-    const ports = new TcpPorts();
-    const first = await ports.reserve(port);
+    const ports = new TcpPorts(await claimsDir());
+    await ports.reserve(port);
 
-    const second = await ports.reserve(port + 1);
-
-    expect(second).toBeTypeOf("function");
-    await first?.();
-    await second?.();
+    await expect(ports.reserve(port + 1)).resolves.toBeTypeOf("function");
   });
 });
 
