@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"testing"
 	"time"
@@ -18,7 +19,7 @@ func TestDeploymentErrorResponseStatuses(t *testing.T) {
 	}{
 		{domain.ErrDeploymentNotFound(), http.StatusNotFound},
 		{domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}), http.StatusConflict},
-		{domain.ErrDeploymentInvalid("bad", nil), http.StatusBadRequest},
+		{domain.ErrDeploymentInvalid().WithMessage("bad"), http.StatusBadRequest},
 		{domain.ErrDeploymentPermissionDenied(), http.StatusForbidden},
 	}
 	for _, tc := range cases {
@@ -30,21 +31,18 @@ func TestDeploymentErrorResponseStatuses(t *testing.T) {
 }
 
 // The 409 exists so the caller can retry on top of what actually runs, which
-// only works if the conflict's payload survives into the response envelope.
+// only works if details.deployment reaches the caller. Nothing deployed yet
+// is a null deployment rather than a dropped key.
 func TestDeploymentConflictCarriesDetails(t *testing.T) {
-	// Nothing deployed to the origins yet: the payload says so with a null
-	// deployment rather than dropping the key.
-	resp := deploymentErrorResponse(domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}))
-	require.Equal(t, http.StatusConflict, resp.StatusCode)
-	// Producer-attached details ride the legacy details.details slot
-	// (ADR 030).
-	raw, ok := resp.Response.Details.Value["details"]
-	require.True(t, ok, "conflict payload missing from details.details")
-	assert.JSONEq(t, `{"deployment":null}`, string(raw))
+	resp, ok := deploymentConflictResponse(domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}))
+	require.True(t, ok)
+	raw, err := json.Marshal(resp)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"code":"dep.conflict","message":"deployment: the deployment it replaces does not match expected_deployment_id","details":{"deployment":null}}`, string(raw))
 }
 
-// A conflict with a deployment renders it in the wire shape: snake_case keys
-// and string enums.
+// A conflict renders the deployment in the API's shape, kind and status
+// included.
 func TestDeploymentConflictRendersTheDeployment(t *testing.T) {
 	newest := &domain.Deployment{
 		ProjectID:  "proj_1",
@@ -59,15 +57,30 @@ func TestDeploymentConflictRendersTheDeployment(t *testing.T) {
 			DeployedByType: new(domain.EventActorTypeService),
 		},
 	}
-	resp := deploymentErrorResponse(domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{Deployment: newest}))
-	raw, ok := resp.Response.Details.Value["details"]
+	resp, ok := deploymentConflictResponse(domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{Deployment: newest}))
 	require.True(t, ok)
+	raw, err := json.Marshal(resp.DeploymentGuardConflict.Details)
+	require.NoError(t, err)
 	assert.JSONEq(t, `{"deployment":{
-		"id":"dep_1","project_id":"proj_1","release_id":"rel_1",
-		"targets":[{"origin":"https://app.acme.com"}],
+		"id":"dep_1","project_id":"proj_1","release_id":"rel_1","kind":"primary",
+		"targets":[{"origin":"https://app.acme.com"}],"status":"live",
 		"deployed_at":"2026-10-02T14:52:00Z",
-		"metadata":{"reason":"rollback","message":null,"rollback_to":"dep_0","deployed_by":null,"deployed_by_type":"service"}
+		"metadata":{"reason":"rollback","rollback_to":"dep_0","deployed_by_type":"service"}
 	}}`, string(raw))
+}
+
+// Any other error is left to NewError.
+func TestDeploymentConflictResponseIgnoresOtherErrors(t *testing.T) {
+	_, ok := deploymentConflictResponse(domain.ErrDeploymentNotFound())
+	assert.False(t, ok)
+}
+
+// The explanation is the message, so the body matches the contract.
+func TestDeploymentInvalidCarriesItsExplanationAsMessage(t *testing.T) {
+	resp := deploymentErrorResponse(domain.ErrDeploymentInvalid().WithMessage("ttl is only valid for preview URLs"))
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	assert.Equal(t, "ttl is only valid for preview URLs", resp.Response.Message)
+	assert.False(t, resp.Response.Details.Set)
 }
 
 // Pins the deployment resource-flavored answers through the resolver gate,
