@@ -228,8 +228,13 @@ func (h *Handler) ListUserTeams(ctx context.Context, params api.ListUserTeamsPar
 	if err != nil {
 		return nil, err
 	}
-	// Same permission as the embedded read, or this becomes the way around it.
-	if err := requireMembershipRead(ctx); err != nil {
+	// Same gate as the embedded read, or this becomes the way around it: by
+	// scope for a project secret, by project-wide read for a session.
+	reads, err := h.userReadsProject(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+	if err := requireMembershipReadUnless(ctx, reads); err != nil {
 		return nil, err
 	}
 
