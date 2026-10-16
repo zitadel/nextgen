@@ -116,7 +116,7 @@ var _ api.SecurityHandler = (*SecurityHandler)(nil)
 // tell every client its session is dead during an outage, and SDKs clear their
 // session cookie on a 401.
 func introspectionFailure(err error) error {
-	if e, ok := errors.AsType[domain.Error](err); ok && e.Code == internalCode {
+	if errors.Is(err, domain.ErrInternal(nil)) {
 		return err
 	}
 	return ogenerrors.ErrSecurityRequirementIsNotSatisfied
