@@ -138,6 +138,13 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		require.NoError(t, err)
 		require.IsType(t, &api.User{}, got, helpers.MustMarshal(t, got))
 
+		patch := &api.PatchUserRequest{}
+		require.NoError(t, patch.UnmarshalJSON([]byte(`{"attributes":{"nickname":"Patched"}}`)))
+		patched, err := session.PatchUserByID(t.Context(), patch, api.PatchUserByIDParams{UserID: user.ID})
+		require.NoError(t, err)
+		require.IsType(t, &api.User{}, patched, helpers.MustMarshal(t, patched))
+		assert.Equal(t, "Patched", userProp(t, *patched.(*api.User), "nickname"))
+
 		deleted, err := session.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{UserID: user.ID})
 		require.NoError(t, err)
 		require.IsType(t, &api.DeleteUserByIDNoContent{}, deleted, helpers.MustMarshal(t, deleted))
@@ -218,7 +225,14 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, otherSecret, other)
 
-	t.Run("cannot delete another project's user", func(t *testing.T) {
+	t.Run("cannot patch or delete another project's user", func(t *testing.T) {
+		patch := &api.PatchUserRequest{}
+		require.NoError(t, patch.UnmarshalJSON([]byte(`{"attributes":{"nickname":"Patched"}}`)))
+		patched, err := session.PatchUserByID(t.Context(), patch, api.PatchUserByIDParams{UserID: api.UserID(foreignUserID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.PatchUserByIDNotFound{}, patched, helpers.MustMarshal(t, patched))
+		assert.Equal(t, api.ErrorCode("user.not_found"), patched.(*api.PatchUserByIDNotFound).Code)
+
 		resp, err := session.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{UserID: api.UserID(foreignUserID)})
 		require.NoError(t, err)
 		require.IsType(t, &api.DeleteUserByIDNotFound{}, resp, helpers.MustMarshal(t, resp))
