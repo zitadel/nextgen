@@ -153,7 +153,7 @@ the corresponding resource permission.
 |---|---|---|
 | `team.create` | `POST /teams` | |
 | `team.read` | `POST /teams/query`, `GET /teams/{id}`, `POST /users/query` with `expand: ["lifecycle_owner_team"]` | Team resource only. Does **not** imply `team_membership.*` or `user.*`. Required on top of `user.read` to resolve `metadata.lifecycle_owner_team_id` into the team itself — the id alone is served unconditionally. **Drift ([ADR 036](../../adrs/036-api-credential-planes.md)):** granular scopes are not minted yet, so an operator project secret satisfies this interim — preview secrets do not. Tighten when #420 lands. **Sessions ([#1300](https://github.com/zitadel/nextgen/issues/1300)):** a Console session carries no scopes, so on `POST /users/query` alone the resolver answers instead: the session needs `viewer` on the target project, the finest read role the system catalog has ([ADR 054](../../adrs/054-customer-collaboration-grants.md) §5). A partial foothold still lists, but gets 403 on the expansion. The other endpoints in this row keep requiring the scope. |
-| `team.write` | `PATCH /teams/{id}` | Team attributes only. Does **not** imply `team_membership.*`, invitations, or billing. |
+| `team.write` | `PATCH /teams/{id}` | Team attributes only. Does **not** imply `team_membership.*`, invitations, or billing. **Personal team:** the platform user a personal team is created for holds `editor` scoped to that team, so they can read and rename it and nothing else; it stands in for [ADR 054](../../adrs/054-customer-collaboration-grants.md) §2's `team.owner` until that relation is seeded. |
 | `team.delete` | `DELETE /teams/{id}` | Deactivates and tombstones the team, cascading to memberships and lifecycle-owned users (ADR 024). |
 
 ### Users
