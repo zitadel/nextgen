@@ -74,12 +74,28 @@ The CLI requires Node.js 24+.
   Two deliberate deviations worth knowing: `-n` is `--non-interactive` (not
   `--dry-run`, which is long-only), and machine output is `--json` (not
   `--output json`).
+- **Writing a resource's body.** A `create` or `update` takes every field of
+  its body as a flag, nested ones too: a nested field's flag is its dot path
+  joined with `-` (`oidc.client_id` is `--oidc-client-id`), a list is a
+  repeated flag, a boolean takes `--no-<flag>` for `false`, and an open record
+  (`attributes`) takes repeated `key=value` entries. `--set <path>=<value>`
+  (or `<path>:=<json>` for JSON) reaches any field by its dot path, and
+  `--data` / `--file` take the whole document. They combine: the document
+  first, then the field flags, then each `--set`, with objects merging key by
+  key. `resources --json` lists each write's fields with their dot path
+  (`name`), `flag` (`null` when only `--set` reaches it), `kind` and
+  `required`; `--dry-run --json` returns the body that would be sent. For a
+  deeply nested body, writing the document and passing it with `--file -` is
+  often simplest.
 - **Never put secrets on the command line.** A property whose name reads as a
   credential (`password`, `client_secret`, `api_key`, …) is refused anywhere on
-  argv — as an `--attributes` entry and inside an inline `--data` body alike,
-  since argv is visible to other processes and kept in shell history. Send such
-  bodies with `--file <path>` or `--file -` (stdin), which never pass through
-  argv.
+  argv when it holds free-form text — as a field flag, a `--set` or
+  `--attributes` entry, and inside an inline `--data` body alike, since argv is
+  visible to other processes and kept in shell history. Send such bodies with
+  `--file <path>` or `--file -` (stdin), which never pass through argv. A
+  `${{ NAME }}` reference to a project variable is not a secret and may stay on
+  argv (a connection's `client_secret` takes nothing else); write it in single
+  quotes, since inside double quotes the shell reads `${` as its own expansion.
 - **Streams.** Capture stdout and stderr separately when scripting. The machine
   contract is one parseable JSON object on stdout; installer, audit, and
   package-manager progress belongs on stderr.
