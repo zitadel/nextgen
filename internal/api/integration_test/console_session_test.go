@@ -780,3 +780,63 @@ func requireUsersNotFound(t *testing.T, resp api.QueryUsersRes) {
 	assert.Equal(t, http.StatusNotFound, denied.StatusCode)
 	assert.True(t, denied.Response.IsUserNotFound(), helpers.MustMarshal(t, resp))
 }
+
+// TestConsoleSessionReadsUserTeams: GET /users/{id}/teams takes the session
+// the way the membership expansion does (#1300 §4) — viewer on the user's
+// project reads the roster; a team-scoped foothold reads the user but not
+// their memberships; no grant at all does not find the user.
+func TestConsoleSessionReadsUserTeams(t *testing.T) {
+	t.Parallel()
+
+	_, operatorID, cookie := ownSessionUser(t)
+	session, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	session.SetSessionToken(cookie.Value)
+
+	t.Run("viewer on the project reads the roster", func(t *testing.T) {
+		t.Parallel()
+		customer, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+		memberID := harness.CreateUserWithTeam(t, customer.ID)
+		harness.SeedProjectViewer(t, customer.ID, operatorID)
+
+		resp, err := session.ListUserTeams(t.Context(), api.ListUserTeamsParams{UserID: api.UserID(memberID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListUserTeamsResponse{}, resp, helpers.MustMarshal(t, resp))
+		assert.Len(t, resp.(*api.ListUserTeamsResponse).Teams, 1)
+	})
+
+	t.Run("a team-scoped foothold is refused the memberships", func(t *testing.T) {
+		t.Parallel()
+		customer, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+		memberID, teamID := harness.CreateUserOwnedByTeam(t, customer.ID)
+		asgn := &domain.AuthzAssignment{
+			ProjectID:     customer.ID,
+			CatalogID:     domain.SystemCatalogID,
+			PrincipalType: domain.AuthzPrincipalTypeUser,
+			PrincipalID:   operatorID,
+			ObjectType:    "project",
+			Relation:      "viewer",
+		}
+		asgn.ApplyScope(domain.NewTeamAssignmentScope(teamID))
+		require.NoError(t, harness.EnsureServiceDB(t).Statements().CreateAuthzAssignment(t.Context(), asgn))
+
+		resp, err := session.ListUserTeams(t.Context(), api.ListUserTeamsParams{UserID: api.UserID(memberID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListUserTeamsForbidden{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("user.permission_denied"), resp.(*api.ListUserTeamsForbidden).Code)
+	})
+
+	t.Run("no grant does not find the user", func(t *testing.T) {
+		t.Parallel()
+		customer, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+		memberID := harness.CreateUserWithTeam(t, customer.ID)
+
+		resp, err := session.ListUserTeams(t.Context(), api.ListUserTeamsParams{UserID: api.UserID(memberID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListUserTeamsNotFound{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("user.not_found"), resp.(*api.ListUserTeamsNotFound).Code)
+	})
+}
