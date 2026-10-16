@@ -1,6 +1,6 @@
 import { Link, type LinkProps, useMatch, useMatches, useParams } from "@tanstack/react-router";
 import { Box, Boxes, Check, ChevronsUpDown, type LucideIcon, Search, Slash } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -123,25 +123,7 @@ function TeamSwitcher({ projectId, teamId }: { projectId: string; teamId: string
 /** One page of the team switcher's list. */
 const TEAM_PAGE = 25;
 
-/**
- * The projects the signed-in person can act on, from `GET /users/me/projects`
- * (root ADR 053 §6) — their own, and the ones somebody else granted them.
- *
- * Read with the session cookie, so it answers the same on the embedded console
- * as behind the dev proxy. `POST /projects/query` cannot serve this: the server
- * pins it to the calling credential's home project and accepts only a project
- * secret, which left the embedded pill a permanent skeleton.
- *
- * One page is enough: the pill shows the first project and the dropdown is a
- * reference list, not the directory — the Projects screen pages the full set.
- *
- * The read is the one the `_authed` guard makes when it picks a default
- * selection (`listMyProjectsCached`), so a landing asks once for both.
- *
- * Loaded here rather than in the `_authed` loader so the shell paints
- * immediately and a failure degrades to an empty switcher instead of blocking
- * every screen behind it — the chrome is not worth a boundary.
- */
+/** The project pill's options: the person's projects (`useMyProjects`), each a link re-scoping to it. */
 function useProjects(): SwitcherOption[] | undefined {
   const projects = useMyProjects();
   const scopeTo = useScopeTarget();
@@ -181,29 +163,19 @@ function useSelectedOption(
 ): SwitcherOption | undefined {
   const listed = selected ? projects?.find((project) => project.id === selected) : undefined;
   const missing = selected !== undefined && projects !== undefined && listed === undefined;
-  // Names read so far, by project id.
-  const [names, setNames] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    if (!missing || !selected) return;
-    let cancelled = false;
-    void api
-      .getProject(selected)
-      .then((project) => {
-        if (!cancelled) setNames((known) => ({ ...known, [selected]: project.name }));
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setNames(({ [selected]: _refused, ...known }) => known);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [missing, selected]);
+  // Tagged with the id it answers for: a re-read keeps the last answer until
+  // the next lands, and that must not name another project.
+  const read = useAsync(
+    missing && selected
+      ? () => api.getProject(selected).then((project) => ({ id: selected, name: project.name }))
+      : null,
+    undefined,
+    [missing, selected],
+  );
 
   if (listed) return listed;
   if (!missing) return undefined;
-  return { id: selected, label: names[selected] ?? selected };
+  return { id: selected, label: read?.id === selected ? read.name : selected };
 }
 
 function Switcher({

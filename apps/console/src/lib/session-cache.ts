@@ -31,11 +31,6 @@ export interface SessionCached<T> {
 export function sessionCached<T>(load: () => Promise<T>, ttlMs: number): SessionCached<T> {
   let entry: { at: number; value: Promise<T> } | undefined;
   const listeners = new Set<() => void>();
-  caches.add({
-    clear: () => {
-      entry = undefined;
-    },
-  });
   const read = () => {
     if (entry && Date.now() - entry.at < ttlMs) return entry.value;
     const value = load();
@@ -46,7 +41,9 @@ export function sessionCached<T>(load: () => Promise<T>, ttlMs: number): Session
     });
     return value;
   };
-  return Object.assign(read, {
+  const cached = Object.assign(read, {
+    // One path for both callers: dropping it with the session
+    // (clearSessionCaches) re-reads it wherever it is shown, as clear() does.
     clear: () => {
       entry = undefined;
       for (const listener of listeners) listener();
@@ -58,4 +55,6 @@ export function sessionCached<T>(load: () => Promise<T>, ttlMs: number): Session
       };
     },
   });
+  caches.add(cached);
+  return cached;
 }

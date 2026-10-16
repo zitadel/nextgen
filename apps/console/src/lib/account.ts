@@ -2,14 +2,9 @@ import { api } from "@/api/zitadel";
 import { sessionCached } from "./session-cache";
 
 /**
- * The account the signed-in person works in: their team in the sign-in
- * project — on a platform deployment, the platform project's team that owns
- * customer projects (`docs/design/platform/project-team-modeling.md`).
- *
- * No account resource or current-team field exists, so it is the first team
- * on the person's own roster, from the self-access `GET /users/me/teams`: it
- * needs no grant, which a platform user does not hold. `null` when the person
- * is on no team.
+ * The account the signed-in person works in: the first team on their own
+ * roster (`GET /users/me/teams`, no grant needed), `null` when they are on
+ * none. See `docs/design/platform/project-team-modeling.md`.
  */
 export interface AccountTeam {
   id: string;
