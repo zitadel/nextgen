@@ -65,7 +65,6 @@ func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (*C
 
 	failures := &BundleValidationError{}
 	preparedSchemas, schemaByHandle := s.prepareBundleSchemas(input, failures)
-	preparedFlows := s.prepareBundleFlows(ctx, input, schemaByHandle, failures)
 	preparedIDPs := s.prepareBundleIDPs(input, failures)
 	var preparedBranding *domain.Branding
 	if input.Branding != nil {
@@ -85,8 +84,17 @@ func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (*C
 	)
 	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		stmts := tx.Statements()
-		content := domain.ReleaseContent{}
 
+		// Prepare flows on the build transaction so schema/pivoting lookups
+		// share the same stmts as the writes that follow. Collect failures
+		// before any write so a BundleValidationError rolls back cleanly.
+		flowFailures := &BundleValidationError{}
+		preparedFlows := s.prepareBundleFlows(ctx, stmts, input, schemaByHandle, flowFailures)
+		if len(flowFailures.Resources) > 0 {
+			return flowFailures
+		}
+
+		content := domain.ReleaseContent{}
 		for i, prepared := range preparedSchemas {
 			schema, err := s.schemas.resolveOrCreateSchema(
 				ctx, stmts, input.ProjectID,
@@ -105,7 +113,7 @@ func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (*C
 			content.FlowDefinitions = append(content.FlowDefinitions, definition)
 		}
 		for _, idp := range preparedIDPs {
-			connection, err := s.idps.createOrRevise(ctx, stmts, input.ProjectID, idp.slug, idp.document)
+			connection, err := s.idps.resolveOrCreate(ctx, stmts, input.ProjectID, idp.slug, idp.document)
 			if err != nil {
 				return err
 			}
@@ -143,6 +151,9 @@ func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (*C
 		return err
 	})
 	if err != nil {
+		if bundleErr, ok := errors.AsType[*BundleValidationError](err); ok {
+			return nil, bundleErr
+		}
 		if recovered, mapped, mapErr := s.mapReleasePersistError(ctx, input.ProjectID, contentHash, err); mapErr != nil {
 			return nil, mapErr
 		} else if mapped {
@@ -249,12 +260,12 @@ func (s *releaseService) prepareBundleSchemas(
 
 func (s *releaseService) prepareBundleFlows(
 	ctx context.Context,
+	stmts AllStatements,
 	input BuildReleaseInput,
 	bundleSchemas map[string]*domain.JSONSchema,
 	failures *BundleValidationError,
 ) []*domain.FlowDefinition {
 	prepared := make([]*domain.FlowDefinition, 0, len(input.FlowDefinitions))
-	stmts := s.v2Pool.Statements()
 	for _, flow := range input.FlowDefinitions {
 		req := flow.Request
 		req.ProjectID = input.ProjectID

@@ -33,20 +33,21 @@ func (h *Handler) BuildRelease(ctx context.Context, req *api.BuildReleaseRequest
 
 	result, err := h.releaseService.Build(ctx, input)
 	if err != nil {
-		var bundleErr *service.BundleValidationError
-		if errors.As(err, &bundleErr) {
+		if bundleErr, ok := errors.AsType[*service.BundleValidationError](err); ok {
 			return bundleValidationBadRequest(bundleErr), nil
 		}
 		return nil, err
 	}
 
+	// 201 only when this call assembled the release. A re-submitted bundle
+	// answers 200 with the release that already pins the same content.
 	release := toAPIRelease(result.Release)
 	if result.Created {
 		created := api.BuildReleaseCreated(release)
 		return &created, nil
 	}
-	ok := api.BuildReleaseOK(release)
-	return &ok, nil
+	reused := api.BuildReleaseOK(release)
+	return &reused, nil
 }
 
 func requireBuildKindScopes(ctx context.Context, bundle api.ConfigurationBundle) error {

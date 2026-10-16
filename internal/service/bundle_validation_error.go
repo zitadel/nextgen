@@ -34,8 +34,8 @@ func (e *BundleValidationError) Error() string {
 }
 
 func (e *BundleValidationError) add(kind domain.ReleasePointerKind, index int, handle string, err error) {
-	var de domain.Error
-	if !errors.As(err, &de) {
+	de, ok := errors.AsType[domain.Error](err)
+	if !ok {
 		de = domain.ErrReleaseInvalid(err.Error(), err)
 	}
 	e.Resources = append(e.Resources, BundleResourceFailure{

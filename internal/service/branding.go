@@ -104,14 +104,8 @@ func (s *BrandingService) resolveOrCreateBranding(
 	if err != nil {
 		return nil, err
 	}
-	if latest != nil {
-		same, eqErr := domain.BrandingsEqual(prepared, latest)
-		if eqErr != nil {
-			return nil, domain.ErrInternal(eqErr).WithMessage("failed to compare branding documents")
-		}
-		if same {
-			return latest, nil
-		}
+	if latest != nil && prepared.Equal(latest) {
+		return latest, nil
 	}
 	if err := s.createBranding(ctx, stmts, prepared); err != nil {
 		return nil, err

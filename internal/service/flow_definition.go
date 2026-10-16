@@ -152,14 +152,8 @@ func (fd *flowDefinitionService) resolveOrCreateFlow(
 	if err != nil {
 		return nil, err
 	}
-	if latest != nil {
-		same, eqErr := domain.FlowDefinitionsEqual(definition, latest)
-		if eqErr != nil {
-			return nil, domain.ErrInternal(eqErr).WithMessage("failed to compare flow definitions")
-		}
-		if same {
-			return latest, nil
-		}
+	if latest != nil && definition.Equal(latest) {
+		return latest, nil
 	}
 	if err := fd.createFlowDefinition(ctx, stmts, definition); err != nil {
 		return nil, err
