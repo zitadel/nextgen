@@ -6,7 +6,7 @@ Alongside `evaluate`, every policy therefore answers a second query,
 `constraints`: computed from the instance's settings alone, with no request
 context, so it resolves before the user has typed anything.
 
-`policy.Engine.Constraints` returns every active rule keyed by name with the
+`policy.Bound.Constraints` returns every active rule keyed by name with the
 value of its setting:
 
 ```json

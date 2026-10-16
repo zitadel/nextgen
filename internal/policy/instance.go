@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"maps"
 	"math"
 	"slices"
@@ -13,6 +14,10 @@ import (
 // Instance is the developer-authored half of a policy: the settings a
 // project sets for one operation. A setting it omits is off.
 type Instance struct {
+	// Schema is the editor's `$schema` pointer an authored file may carry.
+	// It means nothing to the server and is accepted only so the file can be
+	// parsed as written.
+	Schema    string         `json:"$schema,omitempty"`
 	Kind      string         `json:"kind"`
 	Operation string         `json:"operation"`
 	Config    map[string]any `json:"config"`
@@ -30,6 +35,9 @@ func ParseInstance(data []byte) (*Instance, error) {
 	var inst Instance
 	if err := dec.Decode(&inst); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidInstance, err)
+	}
+	if err := dec.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		return nil, fmt.Errorf("%w: unexpected data after the instance", ErrInvalidInstance)
 	}
 	if inst.Kind != KindPolicy {
 		return nil, fmt.Errorf("%w: kind must be %q, got %q", ErrInvalidInstance, KindPolicy, inst.Kind)
@@ -107,7 +115,9 @@ func toInt64(raw any) (int64, bool) {
 	case int32:
 		return int64(v), true
 	case float64:
-		if v != math.Trunc(v) || v > math.MaxInt64 || v < math.MinInt64 {
+		// float64(math.MaxInt64) rounds up to 2^63, which int64 cannot hold,
+		// so the upper bound is exclusive. -2^63 is exact and fits.
+		if v != math.Trunc(v) || v >= math.MaxInt64 || v < math.MinInt64 {
 			return 0, false
 		}
 		return int64(v), true

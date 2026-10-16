@@ -170,6 +170,13 @@ discriminator that says which template that is.
 - A bound that mirrors a server limit (64 code points, four kept passwords)
   is kept equal to the Go constant by a test. Raising the limit later widens
   what instances may set and breaks none.
+- A server upgrade may add settings and widen bounds, never remove a setting,
+  change its type or narrow a bound: a stored instance is bound against the
+  current template whenever it is resolved, so a narrowed template would make
+  every evaluation of that operation fail. A test checks every template
+  against a record of the settings instances may hold
+  (`internal/policy/testdata/settings_compat.json`); narrowing needs a
+  migration of stored instances first.
 
 ### Policy catalog
 
@@ -191,15 +198,17 @@ the index that names each operation's evaluation point,
 must agree; the index is what a reviewer reads, the files are what the
 server runs.
 
-Adding an operation is four things, and nothing else registers it:
+Adding an operation is five things, and nothing else registers it:
 
 1. a template file under `internal/policy/templates/`, compiled and checked
    at startup by `policy.New()`;
-2. a row in the catalog index naming the template, the settings, the rules,
+2. its settings recorded in `internal/policy/testdata/settings_compat.json`,
+   which keeps later templates from narrowing them;
+3. a row in the catalog index naming the template, the settings, the rules,
    and the evaluating function;
-3. a context builder in Go that derives the values the rules see for that
+4. a context builder in Go that derives the values the rules see for that
    operation, keeping the raw input out;
-4. one gate call in the operation's shared write path, so no API, SDK or
+5. one gate call in the operation's shared write path, so no API, SDK or
    journey can reach the operation without it.
 
 For `auth.factor.password.set` the gate sits in `service.SetPasswordUserAction.Prepare`,
@@ -227,12 +236,15 @@ A policy is evaluated before its operation, synchronously. Existing [wide events
 
 #### Naming an operation
 
-An operation is named after the action part of the event it precedes: the
-event's name without its outcome. Events already read as action plus
-outcome (`user.create.failed`, `auth.check.succeeded`), so the operation is
-the action they share (`user.create`, `auth.check`); where the event carries
-no separate outcome, the names are equal (`auth.factor.password.set`). An
-operation without an event, such as reading a team's resources, takes the
+An operation is named after the action of the event it precedes: the
+event's area and resource, and its verb in the base form. Events name an
+action plus its outcome, either as a separate segment (`user.create.failed`,
+`auth.check.succeeded`) or in the verb's tense (`user.created`,
+`auth.attempt.handed_off`, `auth.factor.passkey.enrolled`); the operation
+drops the outcome and keeps the base verb (`user.create`, `auth.check`,
+`auth.attempt.hand_off`, `auth.factor.passkey.enroll`). Where base form and
+past participle coincide, the names are equal (`auth.factor.password.set`).
+An operation without an event, such as reading a team's resources, takes the
 same `area.resource.verb` grammar, and an event added later follows the
 operation's name.
 

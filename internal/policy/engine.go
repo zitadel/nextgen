@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+
+	"github.com/zitadel/nextgen/internal/maputil"
 )
 
 // Engine holds every compiled template and evaluates instances against
@@ -18,7 +20,7 @@ type compiledTemplate struct {
 	*Template
 	rules       []*compiledRule
 	configRules []*compiledRule
-	leaves      []contextField
+	leaves      map[string]contextField
 }
 
 // Option configures an [Engine].
@@ -27,6 +29,7 @@ type Option func(*options)
 type options struct {
 	limits    Limits
 	templates []*Template
+	replace   bool
 }
 
 // WithLimits overrides [DefaultLimits].
@@ -34,23 +37,27 @@ func WithLimits(l Limits) Option {
 	return func(o *options) { o.limits = l }
 }
 
-// WithTemplates replaces the embedded catalog. Tests use it; the server
-// runs on the embedded templates.
+// WithTemplates replaces the embedded catalog, also with an empty one. Tests
+// use it; the server runs on the embedded templates.
 func WithTemplates(ts ...*Template) Option {
-	return func(o *options) { o.templates = ts }
+	return func(o *options) {
+		o.templates = ts
+		o.replace = true
+	}
 }
 
 // New compiles the catalog. Every rule is type-checked against its
-// template's settings and context and checked against the limits, and every
-// rule must read exactly one setting and carry its name, so a template the
-// server cannot evaluate, or whose violations clients could not key, fails
-// here rather than at the first request.
+// template's settings and context and checked against the limits, every rule
+// must read exactly one setting and carry its name, and every setting must be
+// read by its rule, so a template the server cannot evaluate, or whose
+// violations clients could not key, fails here rather than at the first
+// request.
 func New(opts ...Option) (*Engine, error) {
 	o := options{limits: DefaultLimits}
 	for _, opt := range opts {
 		opt(&o)
 	}
-	if o.templates == nil {
+	if !o.replace {
 		ts, err := embeddedTemplates()
 		if err != nil {
 			return nil, err
@@ -62,7 +69,7 @@ func New(opts ...Option) (*Engine, error) {
 		if _, dup := e.templates[t.Operation]; dup {
 			return nil, fmt.Errorf("policy template %q: duplicate operation", t.Operation)
 		}
-		ct, err := compileTemplate(t, o.limits)
+		ct, err := compileTemplate(t.clone(), o.limits)
 		if err != nil {
 			return nil, fmt.Errorf("policy template %q: %w", t.Operation, err)
 		}
@@ -87,7 +94,10 @@ func compileTemplate(t *Template, limits Limits) (*compiledTemplate, error) {
 	if err != nil {
 		return nil, err
 	}
-	ct := &compiledTemplate{Template: t, leaves: leaves}
+	ct := &compiledTemplate{Template: t, leaves: make(map[string]contextField, len(leaves))}
+	for _, leaf := range leaves {
+		ct.leaves[leaf.path] = leaf
+	}
 	for _, rule := range t.Rules {
 		cr, err := compileRule(env, rule, limits)
 		if err != nil {
@@ -101,7 +111,20 @@ func compileTemplate(t *Template, limits Limits) (*compiledTemplate, error) {
 		if len(cr.reads) != 1 || cr.reads[0] != rule.Name {
 			return nil, fmt.Errorf("rule %q: must read exactly the setting it is named after, reads %v", rule.Name, cr.reads)
 		}
+		// The reference map also names comprehension variables (`m`,
+		// `@result`); only declared context fields are inputs.
+		cr.contextReads = slices.DeleteFunc(cr.contextReads, func(path string) bool {
+			_, declared := ct.leaves[path]
+			return !declared
+		})
 		ct.rules = append(ct.rules, cr)
+	}
+	// The other direction: a setting no rule reads could be set and
+	// published and would do nothing.
+	for name := range t.Config {
+		if !slices.ContainsFunc(ct.rules, func(r *compiledRule) bool { return r.Name == name }) {
+			return nil, fmt.Errorf("setting %q: no rule reads it", name)
+		}
 	}
 	for _, rule := range t.ConfigRules {
 		cr, err := compileRule(configEnv, rule, limits)
@@ -121,13 +144,13 @@ func (e *Engine) Operations() []string {
 	return slices.Sorted(maps.Keys(e.templates))
 }
 
-// Template returns the template for an operation.
+// Template returns a copy of the template for an operation.
 func (e *Engine) Template(operation string) (*Template, error) {
 	ct, err := e.template(operation)
 	if err != nil {
 		return nil, err
 	}
-	return ct.Template, nil
+	return ct.Template.clone(), nil
 }
 
 func (e *Engine) template(operation string) (*compiledTemplate, error) {
@@ -138,38 +161,78 @@ func (e *Engine) template(operation string) (*compiledTemplate, error) {
 	return ct, nil
 }
 
-// ValidateInstance checks an instance against its template: a known
-// operation, known settings, values of the right type within bounds, and
-// every config rule whose settings are all set. This is what publishing an
-// instance and validating a release run. An empty config is valid and
-// switches every rule off.
-func (e *Engine) ValidateInstance(inst *Instance) error {
-	ct, err := e.template(inst.Operation)
+// Bound is an instance checked against its template and ready to evaluate:
+// its settings in canonical types and the rules they switch on. Bind it once
+// when the instance is resolved and evaluate it per request.
+type Bound struct {
+	ct     *compiledTemplate
+	values map[string]any
+	active []*compiledRule
+}
+
+// Bind checks an instance against the operation's template: known settings,
+// values of the right type within bounds, and every config rule whose
+// settings are all set. A nil instance binds to no active rule. Publishing an
+// instance and validating a release run the same check through
+// [Engine.ValidateInstance].
+func (e *Engine) Bind(ctx context.Context, operation string, inst *Instance) (*Bound, error) {
+	ct, err := e.template(operation)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	values, err := settingValues(ct.Template, inst.Config)
+	b := &Bound{ct: ct}
+	if inst == nil {
+		return b, nil
+	}
+	if inst.Operation != operation {
+		return nil, fmt.Errorf("%w: instance is for %q, not %q", ErrInvalidInstance, inst.Operation, operation)
+	}
+	b.values, err = settingValues(ct.Template, inst.Config)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	vars := configActivation(values)
+	vars := configActivation(b.values)
 	var problems []error
 	for _, rule := range ct.configRules {
-		if !rule.active(values) {
+		if !rule.active(b.values) {
 			continue
 		}
-		held, err := rule.eval(context.Background(), vars)
+		held, err := rule.eval(ctx, vars)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if !held {
 			problems = append(problems, fmt.Errorf("config rule %q does not hold", rule.Name))
 		}
 	}
 	if len(problems) > 0 {
-		return fmt.Errorf("%w: %w", ErrInvalidInstance, errors.Join(problems...))
+		return nil, fmt.Errorf("%w: %w", ErrInvalidInstance, errors.Join(problems...))
 	}
-	return nil
+	for _, rule := range ct.rules {
+		if rule.active(b.values) {
+			b.active = append(b.active, rule)
+		}
+	}
+	return b, nil
+}
+
+// ValidateInstance runs [Engine.Bind] for the instance's own operation and
+// keeps only the verdict. An empty config is valid and switches every rule
+// off.
+func (e *Engine) ValidateInstance(ctx context.Context, inst *Instance) error {
+	_, err := e.Bind(ctx, inst.Operation, inst)
+	return err
+}
+
+// Operation is the operation the instance guards.
+func (b *Bound) Operation() string {
+	return b.ct.Operation
+}
+
+// Active reports whether a rule is switched on. A context builder asks it
+// before deriving an expensive field only that rule reads.
+func (b *Bound) Active(rule string) bool {
+	return slices.ContainsFunc(b.active, func(r *compiledRule) bool { return r.Name == rule })
 }
 
 // Decision is the outcome of one evaluation. Allow is false when the
@@ -181,46 +244,46 @@ type Decision struct {
 	Violations map[string]any `json:"violations,omitempty"`
 }
 
-// Evaluate runs every active rule of the instance's operation over its
-// settings and the given context. All active rules run; there is no
-// short-circuit, so a user sees every requirement missed.
+// Evaluate runs every active rule over the settings and the request context.
+// All active rules run; there is no short-circuit, so a user sees every
+// requirement missed.
 //
-// A nil instance, or one setting nothing, has no active rule and allows
-// without reading the context. Otherwise a context that does not match the
-// template's schema is an error, never a silent allow.
-func (e *Engine) Evaluate(ctx context.Context, operation string, inst *Instance, requestContext map[string]any) (Decision, error) {
-	ct, err := e.template(operation)
-	if err != nil {
-		return Decision{}, err
-	}
-	values, err := ct.instanceValues(inst)
-	if err != nil {
-		return Decision{}, err
-	}
-	var active []*compiledRule
-	for _, rule := range ct.rules {
-		if rule.active(values) {
-			active = append(active, rule)
-		}
-	}
-	if len(active) == 0 {
+// Only the context fields an active rule reads are required; with no active
+// rule the context is not read at all. A required field that is missing,
+// nil or mistyped is an error, never a silent allow.
+func (b *Bound) Evaluate(ctx context.Context, requestContext map[string]any) (Decision, error) {
+	if len(b.active) == 0 {
 		return Decision{Allow: true}, nil
 	}
-	vars, err := ct.activation(values, requestContext)
-	if err != nil {
-		return Decision{}, err
+	vars := configActivation(b.values)
+	for _, rule := range b.active {
+		for _, path := range rule.contextReads {
+			if _, done := vars[path]; done {
+				continue
+			}
+			leaf := b.ct.leaves[path]
+			value, ok := maputil.GetNested[any](requestContext, leaf.segments)
+			if !ok {
+				return Decision{}, fmt.Errorf("%w: missing field %q", ErrContextMismatch, path)
+			}
+			typed, err := coerceContext(leaf, value)
+			if err != nil {
+				return Decision{}, fmt.Errorf("%w: %w", ErrContextMismatch, err)
+			}
+			vars[path] = typed
+		}
 	}
 	var violations map[string]any
-	for _, rule := range active {
+	for _, rule := range b.active {
 		held, err := rule.eval(ctx, vars)
 		if err != nil {
 			return Decision{}, err
 		}
 		if !held {
 			if violations == nil {
-				violations = make(map[string]any, len(active))
+				violations = make(map[string]any, len(b.active))
 			}
-			violations[rule.Name] = values[rule.Name]
+			violations[rule.Name] = b.values[rule.Name]
 		}
 	}
 	return Decision{Allow: len(violations) == 0, Violations: violations}, nil
@@ -235,35 +298,13 @@ type Constraints struct {
 	Rules     map[string]any `json:"rules"`
 }
 
-// Constraints computes the projection for an instance, which may be nil.
-func (e *Engine) Constraints(operation string, inst *Instance) (Constraints, error) {
-	ct, err := e.template(operation)
-	if err != nil {
-		return Constraints{}, err
+// Constraints computes the projection.
+func (b *Bound) Constraints() Constraints {
+	out := Constraints{Operation: b.ct.Operation, Rules: make(map[string]any, len(b.active))}
+	for _, rule := range b.active {
+		out.Rules[rule.Name] = b.values[rule.Name]
 	}
-	values, err := ct.instanceValues(inst)
-	if err != nil {
-		return Constraints{}, err
-	}
-	out := Constraints{Operation: operation, Rules: make(map[string]any, len(ct.rules))}
-	for _, rule := range ct.rules {
-		if rule.active(values) {
-			out.Rules[rule.Name] = values[rule.Name]
-		}
-	}
-	return out, nil
-}
-
-// instanceValues returns the instance's settings in canonical types. A nil
-// instance sets nothing.
-func (ct *compiledTemplate) instanceValues(inst *Instance) (map[string]any, error) {
-	if inst == nil {
-		return nil, nil
-	}
-	if inst.Operation != ct.Operation {
-		return nil, fmt.Errorf("%w: instance is for %q, not %q", ErrInvalidInstance, inst.Operation, ct.Operation)
-	}
-	return settingValues(ct.Template, inst.Config)
+	return out
 }
 
 // active reports whether every setting the rule reads is set.
@@ -289,50 +330,11 @@ func (r *compiledRule) eval(ctx context.Context, vars map[string]any) (bool, err
 }
 
 func configActivation(values map[string]any) map[string]any {
-	vars := make(map[string]any, len(values))
+	vars := make(map[string]any, len(values)+2)
 	for name, value := range values {
 		vars[configVariable+"."+name] = value
 	}
 	return vars
-}
-
-// activation flattens the settings and the request context along the
-// template's schema into the dotted variable names the rules were compiled
-// against, rejecting a missing or mistyped field.
-func (ct *compiledTemplate) activation(values map[string]any, requestContext map[string]any) (map[string]any, error) {
-	vars := configActivation(values)
-	for _, leaf := range ct.leaves {
-		value, ok := lookupPath(requestContext, leaf.path)
-		if !ok {
-			return nil, fmt.Errorf("%w: missing field %q", ErrContextMismatch, leaf.path)
-		}
-		typed, err := coerceContext(leaf, value)
-		if err != nil {
-			return nil, fmt.Errorf("%w: %w", ErrContextMismatch, err)
-		}
-		vars[leaf.path] = typed
-	}
-	return vars, nil
-}
-
-func lookupPath(m map[string]any, path string) (any, bool) {
-	var cur any = m
-	start := 0
-	for i := 0; i <= len(path); i++ {
-		if i < len(path) && path[i] != '.' {
-			continue
-		}
-		obj, ok := cur.(map[string]any)
-		if !ok {
-			return nil, false
-		}
-		cur, ok = obj[path[start:i]]
-		if !ok {
-			return nil, false
-		}
-		start = i + 1
-	}
-	return cur, true
 }
 
 // coerceContext checks one context value against its declared type and
@@ -362,23 +364,33 @@ func coerceContext(leaf contextField, value any) (any, error) {
 	case "list<string>":
 		return coerceList[string](leaf, value)
 	case "list<int>":
-		items, err := coerceList[any](leaf, value)
-		if err != nil {
-			return nil, err
-		}
-		out := make([]int64, len(items))
-		for i, item := range items {
-			n, ok := toInt64(item)
-			if !ok {
-				return nil, fmt.Errorf("field %q[%d]: expected int, got %T", leaf.path, i, item)
+		switch v := value.(type) {
+		case []int64:
+			return v, nil
+		case []int:
+			out := make([]int64, len(v))
+			for i, n := range v {
+				out[i] = int64(n)
 			}
-			out[i] = n
+			return out, nil
+		case []any:
+			out := make([]int64, len(v))
+			for i, item := range v {
+				n, ok := toInt64(item)
+				if !ok {
+					return nil, fmt.Errorf("field %q[%d]: expected int, got %T", leaf.path, i, item)
+				}
+				out[i] = n
+			}
+			return out, nil
 		}
-		return out, nil
+		return nil, fmt.Errorf("field %q: expected a list of int, got %T", leaf.path, value)
 	}
 	return nil, fmt.Errorf("field %q: unsupported type %q", leaf.path, leaf.typ)
 }
 
+// coerceList accepts a typed slice or a JSON-decoded one. An untyped nil is
+// not an empty list: a builder that forgot the field fails closed.
 func coerceList[T any](leaf contextField, value any) ([]T, error) {
 	switch v := value.(type) {
 	case []T:
@@ -393,8 +405,6 @@ func coerceList[T any](leaf contextField, value any) ([]T, error) {
 			out[i] = typed
 		}
 		return out, nil
-	case nil:
-		return []T{}, nil
 	}
 	return nil, fmt.Errorf("field %q: expected a list, got %T", leaf.path, value)
 }

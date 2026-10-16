@@ -45,6 +45,9 @@ type compiledRule struct {
 	program cel.Program
 	// reads are the settings the expression references, sorted.
 	reads []string
+	// contextReads are the context fields the expression references, sorted.
+	// Only the fields an active rule reads have to be in the request context.
+	contextReads []string
 }
 
 // newEnv builds the CEL environment for one template: every setting and,
@@ -141,24 +144,37 @@ func compileRule(env *cel.Env, rule Rule, limits Limits) (*compiledRule, error) 
 	if err != nil {
 		return nil, fmt.Errorf("rule %q: build program: %w", rule.Name, err)
 	}
+	reads, contextReads := references(ast)
 	return &compiledRule{
-		Rule:    rule,
-		program: program,
-		reads:   configReads(ast),
+		Rule:         rule,
+		program:      program,
+		reads:        reads,
+		contextReads: contextReads,
 	}, nil
 }
 
-// configReads lists the settings an expression references, from the checked
-// AST's resolved identifiers.
-func configReads(ast *cel.Ast) []string {
-	var out []string
+// references lists the settings and the other identifiers an expression
+// references, from the checked AST's resolved identifiers. The second list
+// can include comprehension variables; the caller keeps the declared context
+// fields.
+func references(ast *cel.Ast) (settings, contextFields []string) {
 	for _, ref := range ast.NativeRep().ReferenceMap() {
-		if name, ok := strings.CutPrefix(ref.Name, configVariable+"."); ok && !slices.Contains(out, name) {
-			out = append(out, name)
+		if ref.Name == "" {
+			continue // a function overload, not a variable
+		}
+		if name, ok := strings.CutPrefix(ref.Name, configVariable+"."); ok {
+			if !slices.Contains(settings, name) {
+				settings = append(settings, name)
+			}
+			continue
+		}
+		if !slices.Contains(contextFields, ref.Name) {
+			contextFields = append(contextFields, ref.Name)
 		}
 	}
-	slices.Sort(out)
-	return out
+	slices.Sort(settings)
+	slices.Sort(contextFields)
+	return settings, contextFields
 }
 
 // sizeEstimator bounds the size of context lists and strings, whose lengths

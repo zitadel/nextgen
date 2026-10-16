@@ -11,11 +11,14 @@
 package policy
 
 import (
+	"bytes"
 	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
+	"maps"
 	"slices"
 	"strings"
 )
@@ -104,8 +107,9 @@ func (c *ContextSchema) UnmarshalJSON(data []byte) error {
 
 // contextField is one leaf of a ContextSchema, addressed by its dotted path.
 type contextField struct {
-	path string
-	typ  string
+	path     string
+	segments []string
+	typ      string
 }
 
 // leaves flattens the schema into dotted paths, sorted for determinism.
@@ -123,7 +127,8 @@ func (c ContextSchema) leaves() ([]contextField, error) {
 					return err
 				}
 			case string:
-				out = append(out, contextField{path: prefix + name, typ: v})
+				path := prefix + name
+				out = append(out, contextField{path: path, segments: strings.Split(path, "."), typ: v})
 			default:
 				return fmt.Errorf("context field %q: unsupported schema value %T", prefix+name, value)
 			}
@@ -137,13 +142,19 @@ func (c ContextSchema) leaves() ([]contextField, error) {
 	return out, nil
 }
 
-// ParseTemplate decodes one template and checks its structure. CEL
-// compilation, and with it the checks that need the expressions, happens in
-// [New].
+// ParseTemplate decodes one template and checks its structure. An unknown
+// key is an error, so a misspelled `config_rules` or a marker the format does
+// not have (`default`, `public`) cannot be silently ignored. CEL compilation,
+// and with it the checks that need the expressions, happens in [New].
 func ParseTemplate(data []byte) (*Template, error) {
 	var t Template
-	if err := json.Unmarshal(data, &t); err != nil {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&t); err != nil {
 		return nil, fmt.Errorf("policy template: %w", err)
+	}
+	if err := dec.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		return nil, errors.New("policy template: unexpected data after the template")
 	}
 	if err := t.validate(); err != nil {
 		return nil, fmt.Errorf("policy template %q: %w", t.Operation, err)
@@ -214,4 +225,34 @@ func embeddedTemplates() ([]*Template, error) {
 		out = append(out, t)
 	}
 	return out, nil
+}
+
+// clone returns a deep copy, so a caller holding the result cannot change
+// the template the engine validates and evaluates against.
+func (t *Template) clone() *Template {
+	out := *t
+	out.Config = make(map[string]Setting, len(t.Config))
+	for name, setting := range t.Config {
+		if setting.Minimum != nil {
+			setting.Minimum = new(*setting.Minimum)
+		}
+		if setting.Maximum != nil {
+			setting.Maximum = new(*setting.Maximum)
+		}
+		out.Config[name] = setting
+	}
+	out.ConfigRules = slices.Clone(t.ConfigRules)
+	out.Rules = slices.Clone(t.Rules)
+	out.Context = t.Context.clone()
+	return &out
+}
+
+func (c ContextSchema) clone() ContextSchema {
+	out := maps.Clone(c)
+	for name, value := range out {
+		if nested, ok := value.(ContextSchema); ok {
+			out[name] = nested.clone()
+		}
+	}
+	return out
 }

@@ -46,7 +46,10 @@ recommendation, no marker.
   (`domain.MaxPasswordLength`), 4 kept passwords is what one save can afford
   to verify (`domain.UserPasswordHistoryDepth`). A test keeps each such bound
   equal to its Go constant, so the two cannot drift. Raising a limit later
-  widens what an instance may set and breaks none; lowering one would.
+  widens what an instance may set and breaks none; lowering one would, so a
+  test holds every template to the record in
+  `internal/policy/testdata/settings_compat.json`: settings may be added and
+  bounds widened, never removed, retyped or narrowed.
 - What the server enforces regardless of any policy stays in the domain. The
   64 cap is checked by `domain.HashPassword` whether or not a policy exists;
   `max_length` only lets a project go lower.
@@ -72,8 +75,12 @@ context, so it can change with the server; it is not a public contract.
 ## `rules`
 
 Each rule is one boolean expression that reads exactly one setting and
-carries that setting's name. `policy.New()` refuses a template where a rule
-reads no setting, reads two, or is named differently.
+carries that setting's name, and every setting is read by its rule.
+`policy.New()` refuses a template where a rule reads no setting, reads two,
+or is named differently, and one with a setting no rule reads, which an
+instance could set to no effect. A template with a key the format does not
+have (a misspelled `config_rules`, a `default`) is refused too, rather than
+the key being ignored.
 
 The rule is what makes the naming worth enforcing: the name is at once the
 setting in the instance, the key of a violation in a denial, the key in
@@ -96,8 +103,9 @@ two rules.
 
 ## Validating an instance
 
-`policy.Engine.ValidateInstance` rejects, with every problem reported at
-once:
+`policy.Engine.Bind` checks an instance and returns it bound, ready to
+evaluate; `policy.Engine.ValidateInstance` runs the same check for publishing
+and release validation. Both reject, with every problem reported at once:
 
 - a setting the template does not declare;
 - a value of the wrong type, or outside the bounds;

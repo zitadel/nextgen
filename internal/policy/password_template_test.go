@@ -48,11 +48,17 @@ func TestPasswordTemplate_BoundsMatchDomain(t *testing.T) {
 		require.NotNil(t, tpl.Config[name].Maximum, name)
 		assert.EqualValues(t, domain.MaxPasswordLength, *tpl.Config[name].Maximum, name)
 	}
+
+	// history_depth counts the current password; UserPasswordHistoryDepth
+	// still counts only the previous ones storage returns. Storage can
+	// therefore supply the current password plus that many, and the template
+	// must not ask for more. Tighten to equality once the constant counts the
+	// current password too.
 	require.NotNil(t, tpl.Config["history_depth"].Maximum)
-	assert.EqualValues(t, domain.UserPasswordHistoryDepth, *tpl.Config["history_depth"].Maximum)
+	assert.LessOrEqual(t, *tpl.Config["history_depth"].Maximum, int64(domain.UserPasswordHistoryDepth)+1)
 }
 
-func TestPasswordSave_Evaluate(t *testing.T) {
+func TestPasswordSet_Evaluate(t *testing.T) {
 	e, err := policy.New()
 	require.NoError(t, err)
 
@@ -86,6 +92,11 @@ func TestPasswordSave_Evaluate(t *testing.T) {
 			name:    "minimum alone does not cap the length",
 			config:  `{"min_length":12}`,
 			context: passwordContext(500),
+		},
+		{
+			name:    "history off needs no history matches",
+			config:  `{"min_length":1}`,
+			context: map[string]any{"candidate": map[string]any{"length": 10}},
 		},
 		{
 			name:           "too long",
@@ -136,7 +147,9 @@ func TestPasswordSave_Evaluate(t *testing.T) {
 			if tt.config != "" {
 				inst = passwordInstance(t, tt.config)
 			}
-			d, err := e.Evaluate(t.Context(), passwordSet, inst, tt.context)
+			b, err := e.Bind(t.Context(), passwordSet, inst)
+			require.NoError(t, err)
+			d, err := b.Evaluate(t.Context(), tt.context)
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantViolations == nil, d.Allow)
 			assert.Equal(t, tt.wantViolations, d.Violations)
@@ -144,23 +157,25 @@ func TestPasswordSave_Evaluate(t *testing.T) {
 	}
 }
 
-func TestPasswordSave_Constraints(t *testing.T) {
+func TestPasswordSet_Constraints(t *testing.T) {
 	e, err := policy.New()
 	require.NoError(t, err)
 
-	none, err := e.Constraints(passwordSet, nil)
+	none, err := e.Bind(t.Context(), passwordSet, nil)
 	require.NoError(t, err)
-	assert.Empty(t, none.Rules)
+	assert.Empty(t, none.Constraints().Rules)
+	assert.False(t, none.Active("history_depth"))
 
-	got, err := e.Constraints(passwordSet, passwordInstance(t, `{"min_length":12,"history_depth":4}`))
+	b, err := e.Bind(t.Context(), passwordSet, passwordInstance(t, `{"min_length":12,"history_depth":4}`))
 	require.NoError(t, err)
 	assert.Equal(t, policy.Constraints{
 		Operation: passwordSet,
 		Rules:     map[string]any{"min_length": int64(12), "history_depth": int64(4)},
-	}, got)
+	}, b.Constraints())
+	assert.True(t, b.Active("history_depth"))
 }
 
-func TestPasswordSave_ValidateInstance(t *testing.T) {
+func TestPasswordSet_ValidateInstance(t *testing.T) {
 	e, err := policy.New()
 	require.NoError(t, err)
 
@@ -173,7 +188,7 @@ func TestPasswordSave_ValidateInstance(t *testing.T) {
 	}
 	for _, config := range valid {
 		t.Run("valid "+config, func(t *testing.T) {
-			require.NoError(t, e.ValidateInstance(passwordInstance(t, config)))
+			require.NoError(t, e.ValidateInstance(t.Context(), passwordInstance(t, config)))
 		})
 	}
 
@@ -190,11 +205,11 @@ func TestPasswordSave_ValidateInstance(t *testing.T) {
 	}
 	for name, config := range invalid {
 		t.Run(name, func(t *testing.T) {
-			require.ErrorIs(t, e.ValidateInstance(passwordInstance(t, config)), policy.ErrInvalidInstance)
+			require.ErrorIs(t, e.ValidateInstance(t.Context(), passwordInstance(t, config)), policy.ErrInvalidInstance)
 		})
 	}
 
-	err = e.ValidateInstance(passwordInstance(t, `{"min_length":0,"max_length":99}`))
+	err = e.ValidateInstance(t.Context(), passwordInstance(t, `{"min_length":0,"max_length":99}`))
 	assert.ErrorContains(t, err, `"min_length"`)
 	assert.ErrorContains(t, err, `"max_length"`)
 }

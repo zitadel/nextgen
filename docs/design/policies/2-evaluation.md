@@ -39,10 +39,13 @@ the rule never sees a hash, let alone a password. A rule referencing a field
 outside the schema fails the type check at startup, which is what makes the
 context schema a contract the server enforces.
 
-Once a rule is active, every field of the schema must be present: a missing
-or mistyped field is an error and the operation fails closed, never a silent
-allow. A builder fills a field no active rule needs cheaply (an empty
-`history_matches` when history is off).
+Only the fields an active rule reads have to be present, and the engine
+knows which, since it reads them from the checked expressions. A required
+field that is missing, nil or mistyped is an error and the operation fails
+closed, never a silent allow. A builder asks the bound instance
+(`policy.Bound.Active`) whether a rule is on before it derives an expensive
+field only that rule reads, so with history off no history hash is
+verified.
 
 Shared envelope fields (`user`, `request`) are added to the context only once
 a rule needs them: every field in the context is an attack surface
