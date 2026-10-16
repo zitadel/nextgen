@@ -55,7 +55,7 @@ type DeploymentConflictDetails struct {
 
 // ErrDeploymentConflict reports a failed expected_deployment_id check.
 func ErrDeploymentConflict(details DeploymentConflictDetails) Error {
-	return newError(PrefixDeployment.ErrorCodePrefix("conflict"), "deployment: the newest deployment to the targets does not match expected_deployment_id", details, nil)
+	return newError(PrefixDeployment.ErrorCodePrefix("conflict"), "deployment: the deployment it replaces does not match expected_deployment_id", details, nil)
 }
 
 // DeploymentMetadata records why the release went live and who did it. A
