@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/ianlancetaylor/jsonschema"
@@ -32,18 +31,17 @@ func ErrUserInvalid() Error {
 
 func ErrUserAttributesInvalid(validationErr error) Error {
 	return newError(PrefixUser.ErrorCodePrefix("attributes_invalid"),
-		"the user's attributes do not satisfy the user schema",
-		UserAttributesDetails{Keys: InvalidAttributeKeys(validationErr)}, validationErr)
+		"the user's attributes do not satisfy the user schema", nil, validationErr)
 }
 
 func IsUserInvalid(err error) bool {
-	return errors.Is(err, ErrUserInvalid()) || errors.Is(err, ErrUserAttributesInvalid(nil))
+	return err != nil && (errors.Is(err, ErrUserInvalid()) || errors.Is(err, ErrUserAttributesInvalid(nil)))
 }
 
 // IsUserAlreadyExists reports whether a user write lost on a value another
 // user holds: a taken unique attribute or an identity already linked.
 func IsUserAlreadyExists(err error) bool {
-	return errors.Is(err, ErrUserAlreadyExists()) || errors.Is(err, ErrUserAttributesConflict())
+	return err != nil && (errors.Is(err, ErrUserAlreadyExists()) || errors.Is(err, ErrUserAttributesConflict()))
 }
 
 // UserAttributesDetails names the attributes an error is about by key, as in
@@ -313,7 +311,8 @@ func validateAndFlattenAttributes(schema []byte, doc map[string]any, emptyMessag
 	}
 	if err := jschema.Validate(doc); err != nil {
 		if jsonschema.IsValidationError(err) {
-			return nil, ErrUserAttributesInvalid(err)
+			return nil, ErrUserAttributesInvalid(err).
+				WithDetails(UserAttributesDetails{Keys: InvalidAttributeKeys(err, doc)})
 		}
 		return nil, ErrUserInvalid().WithParent(err).WithMessage("user is not valid according to schema")
 	}
@@ -333,27 +332,12 @@ func validateAndFlattenAttributes(schema []byte, doc map[string]any, emptyMessag
 }
 
 // InvalidAttributeKeys returns the keys of the attributes a user schema
-// validation failed on, sorted and without duplicates. A failure the
-// validator does not locate in a property is on the document itself, the
-// empty key.
-func InvalidAttributeKeys(err error) []AttributeKey {
+// validation of doc failed on, sorted and without duplicates, as
+// [ValidationErrAttributeKey] names them.
+func InvalidAttributeKeys(err error, doc map[string]any) []AttributeKey {
 	var keys []AttributeKey
 	for _, ve := range ValidationFailures(err) {
-		var key AttributeKey
-		if ve.Loc != nil {
-		segments:
-			for _, segment := range *ve.Loc {
-				keyword, name, _ := strings.Cut(segment, "/")
-				switch keyword {
-				case "properties", "patternProperties", "additionalProperties",
-					"unevaluatedProperties", "propertyNames", "required":
-					key = key.AppendNode(name)
-				case "allOf", "dependentSchemas", "dependencies":
-				default:
-					break segments
-				}
-			}
-		}
+		key, _ := ValidationErrAttributeKey(ve, doc)
 		keys = append(keys, key)
 	}
 	slices.Sort(keys)

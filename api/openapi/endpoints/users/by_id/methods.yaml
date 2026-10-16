@@ -99,8 +99,8 @@ patch:
 
         Merged attributes that fail the target schema answer `req.invalid`,
         the same way a malformed body does and the same way a create does:
-        `details.fields` lists the dotted path of every failing field from
-        the request body, such as `attributes.country` or
+        `details.details.fields` lists the dotted path of every failing field
+        from the request body, such as `attributes.country` or
         `attributes.address.zip`. A field the patch did not touch is named
         too when the merged document fails on it, as after a move to a schema
         that requires it. Only the field names are reported, never the
@@ -132,10 +132,11 @@ patch:
         A patched value is unique and already taken by another user, or
         concurrent writes kept the user changing under the patch; retry.
 
-        A taken value answers `user.attributes_conflict`, with `details.fields`
-        naming the attributes whose value is taken in the same dotted form as
-        a `400`, such as `attributes.email`. The user holding the value is not
-        named. Concurrent writes answer `user.conflict`.
+        A taken value answers `user.attributes_conflict`, with
+        `details.details.fields` naming the attributes whose value is taken in
+        the same dotted form as a `400`, such as `attributes.email`. The user
+        holding the value is not named. Concurrent writes answer
+        `user.conflict`.
       content:
         application/json:
           schema:

@@ -738,10 +738,6 @@ func (s *authAttemptService) resolveIdentifier(ctx context.Context, projectID st
 	return resolveDesignatedUser(ctx, s.stmts.Statements(), projectID, p.LoginName, false, "auth_attempt")
 }
 
-// verify dispatches proof verification to the appropriate secondary port.
-// Returns the checker to persist (always, even on failure), an optional
-// closure with extra writes that must commit atomically with the check
-// success, and any error.
 // verifyTx is the proof-type-specific part of the verify transaction.
 type verifyTx struct {
 	// apply writes inside the transaction, e.g. registration persists the
@@ -752,6 +748,9 @@ type verifyTx struct {
 	actions []UserAction
 }
 
+// verify dispatches proof verification to the appropriate secondary port.
+// Returns the checker to persist (always, even on failure), the optional
+// writes that must commit atomically with the check success, and any error.
 func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAttempt, proof Proof, challengeID string) (domain.AuthChallenge, domain.AuthFactor, *verifyTx, error) {
 	switch p := proof.(type) {
 	case UserProof:

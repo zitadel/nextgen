@@ -609,3 +609,54 @@ func TestUserService_UniquenessConflictNamesTheAttribute(t *testing.T) {
 		requireTakenFields(t, err, domain.ErrUserAttributesConflict())
 	})
 }
+
+func preparedCreateUserAction(t *testing.T) (*service.CreateUserAction, *servicemocks.MockAllStatements) {
+	t.Helper()
+	ctrl := gomock.NewController(t)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	schemaStore := domainmock.NewMockJSONSchemaStore(ctrl)
+	schemaStore.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj_1", "https://example.test/schema.json").
+		Return(&domain.JSONSchema{Schema: []byte(takenAttributesSchema)}, nil)
+	action := service.NewCreateUserAction(service.CreateUserInput{
+		ProjectID:  "proj_1",
+		ID:         "user_1",
+		SchemaURL:  "https://example.test/schema.json",
+		Attributes: map[string]any{"email": "taken@example.com"},
+	}, schemaStore)
+	require.NoError(t, action.Prepare(t.Context()))
+	return action, stmts
+}
+
+// Spanner runs the transaction callback again after an abort. The error of
+// the aborted attempt must not outlive it and mask the retry's outcome.
+func TestCreateUserAction_RetriedApplyForgetsTheEarlierError(t *testing.T) {
+	t.Parallel()
+	action, stmts := preparedCreateUserAction(t)
+	gomock.InOrder(
+		stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).Return(database.NewUnavailableError(nil)),
+		stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).Return(nil),
+	)
+	stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil)
+
+	require.Error(t, action.Apply(t.Context(), stmts))
+	require.NoError(t, action.Apply(t.Context(), stmts))
+	assert.NoError(t, action.Err(t.Context(), stmts))
+}
+
+// A lookup that fails does not tell whether an attribute explains the
+// conflict, so a create does not claim that none does.
+func TestCreateUserAction_FailedLookupStaysAnAttributesConflict(t *testing.T) {
+	t.Parallel()
+	action, stmts := preparedCreateUserAction(t)
+	stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).
+		Return(database.NewUniqueError("user_unique_attributes", "pk", nil))
+	stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil)
+	stmts.EXPECT().ListUserAttributes(gomock.Any(), gomock.Any()).Return(nil, database.NewUnavailableError(nil))
+
+	require.Error(t, action.Apply(t.Context(), stmts))
+	err := action.Err(t.Context(), stmts)
+	require.ErrorIs(t, err, domain.ErrUserAttributesConflict())
+	var derr domain.Error
+	require.ErrorAs(t, err, &derr)
+	assert.Nil(t, derr.Details)
+}

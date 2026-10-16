@@ -166,6 +166,7 @@ const (
 	UserAttributeFieldTeamID
 	UserAttributeFieldKey
 	UserAttributeFieldUniqueTeamID
+	UserAttributeFieldUniqueKey
 	UserAttributeFieldValueHash
 )
 

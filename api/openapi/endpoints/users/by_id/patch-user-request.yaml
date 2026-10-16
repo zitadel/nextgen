@@ -8,7 +8,7 @@ description: |
   key stays untouched, an object merges recursively, `null` deletes the
   attribute, and any other value replaces the stored one. The merged result
   is validated as a whole against the user's schema, so a patch that deletes
-  or invalidates a required property is rejected with `user.invalid`.
+  or invalidates a required property is rejected with `req.invalid`.
 
   `schema` moves the user to another registered schema — the ADR 009 §4
   upgrade mechanism. The request must be self-contained: merged attributes

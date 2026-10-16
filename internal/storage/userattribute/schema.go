@@ -1,6 +1,8 @@
 package userattribute
 
 import (
+	"encoding/base64"
+
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -35,10 +37,51 @@ var Schema = database.NewSchema(map[domain.UserAttributeField]database.FieldBind
 		Coerce:   database.CoerceString,
 		Nullable: true,
 	},
+	domain.UserAttributeFieldUniqueKey: {
+		SQLName:  "ua.key",
+		Accessor: func(a *domain.UserAttribute) any { return uniqueKey(a) },
+		Coerce:   database.CoerceString,
+		Nullable: true,
+	},
 	domain.UserAttributeFieldValueHash: {
 		SQLName:  "ua.value_hash",
-		Accessor: func(a *domain.UserAttribute) any { return a.ValueHash },
-		Coerce:   database.CoerceBytes,
+		Accessor: func(a *domain.UserAttribute) any { return valueHash(a) },
+		Coerce:   coerceValueHash,
 		Nullable: true,
 	},
 })
+
+// uniqueKey is the claim's key, nil when the attribute has no claim.
+func uniqueKey(a *domain.UserAttribute) any {
+	if a.UniqueTeamID == nil {
+		return nil
+	}
+	return string(a.Key)
+}
+
+// valueHash is the claim's value hash, nil when the attribute has no claim.
+func valueHash(a *domain.UserAttribute) any {
+	if a.ValueHash == nil {
+		return nil
+	}
+	return a.ValueHash
+}
+
+// coerceValueHash binds a value hash. A cursor carries it as JSON, which
+// encodes bytes as base64, and a row without a claim as null.
+func coerceValueHash(v any) (any, error) {
+	switch b := v.(type) {
+	case nil:
+		return nil, nil
+	case []byte:
+		return b, nil
+	case string:
+		decoded, err := base64.StdEncoding.DecodeString(b)
+		if err != nil {
+			return nil, database.ErrCoerceExpectedType("base64 value hash", v)
+		}
+		return decoded, nil
+	default:
+		return nil, database.ErrCoerceExpectedType("value hash", v)
+	}
+}

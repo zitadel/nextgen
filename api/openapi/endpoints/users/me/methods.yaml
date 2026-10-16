@@ -58,8 +58,8 @@ patch:
         validation.
 
         Merged attributes that fail the schema answer `req.invalid`, as on
-        `PATCH /users/{user_id}`: `details.fields` lists the dotted path of
-        every failing field from the request body, such as
+        `PATCH /users/{user_id}`: `details.details.fields` lists the dotted
+        path of every failing field from the request body, such as
         `attributes.address.zip`, never the rejected values.
       content:
         application/json:
@@ -82,9 +82,9 @@ patch:
         A patched value is unique and already taken by another user, or
         concurrent writes kept the user changing under the patch; retry.
 
-        A taken value answers `user.attributes_conflict`, with `details.fields`
-        naming the attributes whose value is taken, such as
-        `attributes.email`. The user holding the value is not named.
+        A taken value answers `user.attributes_conflict`, with
+        `details.details.fields` naming the attributes whose value is taken,
+        such as `attributes.email`. The user holding the value is not named.
       content:
         application/json:
           schema:

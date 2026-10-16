@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"time"
 
@@ -700,6 +701,9 @@ func (o *CreateUserAction) Prepare(ctx context.Context) error {
 }
 
 func (o *CreateUserAction) Apply(ctx context.Context, stmts AllStatements) error {
+	// A transaction may run the callback again (Spanner retries an aborted
+	// one), so an error of an earlier attempt must not outlive it.
+	o.err = nil
 	if err := stmts.CreateUser(ctx, o.CreateUser); err != nil {
 		o.err = err
 		return err
@@ -726,8 +730,14 @@ func (o *CreateUserAction) Err(ctx context.Context, stmts AllStatements) error {
 	if unique, ok := errors.AsType[*database.UniqueError](o.err); ok {
 		user := o.CreateUser
 		emitUserCreateFailedBestEffort(ctx, stmts, user.ProjectID, unique)
-		conflictingKeys := listConflictingUniqueAttributes(ctx, stmts,
+		conflictingKeys, err := listConflictingUniqueAttributes(ctx, stmts,
 			user.ProjectID, user.ID, user.Attributes, user.Attributes.RegistryTeamScopes(nil, user.AttributeTeamScope()))
+		if err != nil {
+			// The lookup did not run, so the conflict is not known to be one
+			// no attribute explains. A create's user id is minted, which
+			// leaves the unique attributes as the likely cause.
+			return domain.ErrUserAttributesConflict().WithParent(unique)
+		}
 		if len(conflictingKeys) == 0 {
 			return domain.ErrUserAlreadyExists().WithParent(unique)
 		}
@@ -736,7 +746,10 @@ func (o *CreateUserAction) Err(ctx context.Context, stmts AllStatements) error {
 	return domain.ErrInternal(o.err).WithMessage("failed to create user in the database")
 }
 
-func listConflictingUniqueAttributes(ctx context.Context, stmts UserStatements, projectID, userID string, attrs domain.CreateAttributes, scopes []string) []domain.AttributeKey {
+// listConflictingUniqueAttributes names the unique attributes of attrs whose
+// value a user other than userID holds. A failed lookup is logged and
+// returned.
+func listConflictingUniqueAttributes(ctx context.Context, stmts UserStatements, projectID, userID string, attrs domain.CreateAttributes, scopes []string) ([]domain.AttributeKey, error) {
 	var claims []database.Filter[domain.UserAttributeField]
 	for i, attr := range attrs {
 		if attr.UniqueScope == domain.AttributeUniquenessUnspecified {
@@ -744,12 +757,12 @@ func listConflictingUniqueAttributes(ctx context.Context, stmts UserStatements, 
 		}
 		claims = append(claims, database.And(
 			database.Equal(database.Col(domain.UserAttributeFieldUniqueTeamID), scopes[i]),
-			database.Equal(database.Col(domain.UserAttributeFieldKey), string(attr.Key)),
+			database.Equal(database.Col(domain.UserAttributeFieldUniqueKey), string(attr.Key)),
 			database.Equal(database.Col(domain.UserAttributeFieldValueHash), attr.ValueHash[:]),
 		))
 	}
 	if len(claims) == 0 {
-		return nil
+		return nil, nil
 	}
 	held, lookupErr := stmts.ListUserAttributes(ctx, &database.ListOptions[domain.UserAttributeField]{
 		Filter: database.And(
@@ -758,7 +771,11 @@ func listConflictingUniqueAttributes(ctx context.Context, stmts UserStatements, 
 		),
 	})
 	if lookupErr != nil {
-		return nil
+		getLoggingContext(ctx, "user").WarnContext(ctx, "looking up the taken unique attributes failed",
+			slog.String("project_id", projectID),
+			slog.Any("error", lookupErr),
+		)
+		return nil, lookupErr
 	}
 	var keys []domain.AttributeKey
 	for _, claim := range held.Items {
@@ -767,10 +784,10 @@ func listConflictingUniqueAttributes(ctx context.Context, stmts UserStatements, 
 		}
 	}
 	if len(keys) == 0 {
-		return nil
+		return nil, nil
 	}
 	slices.Sort(keys)
-	return keys
+	return keys, nil
 }
 
 // ---- Patch User ACTION -------------------------------------------------------------
@@ -858,6 +875,9 @@ func (o *PatchUserAction) Prepare(ctx context.Context) error {
 }
 
 func (o *PatchUserAction) Apply(ctx context.Context, stmts AllStatements) error {
+	// A transaction may run the callback again (Spanner retries an aborted
+	// one), so an error of an earlier attempt must not outlive it.
+	o.err = nil
 	err := stmts.PatchUser(ctx, o.patch)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -890,7 +910,7 @@ func (o *PatchUserAction) Err(ctx context.Context, stmts AllStatements) error {
 		return nil
 	}
 	if unique, ok := errors.AsType[*database.UniqueError](o.err); ok {
-		conflictingKeys := listConflictingUniqueAttributes(ctx, stmts,
+		conflictingKeys, _ := listConflictingUniqueAttributes(ctx, stmts,
 			o.patch.ProjectID, o.patch.UserID, o.patch.Attributes, o.patch.RegistryTeamScopes)
 		if len(conflictingKeys) == 0 {
 			return domain.ErrUserAttributesConflict().WithParent(unique)
@@ -932,6 +952,9 @@ func (o *SetPasswordUserAction) Prepare(ctx context.Context) (err error) {
 }
 
 func (o *SetPasswordUserAction) Apply(ctx context.Context, stmts AllStatements) error {
+	// A transaction may run the callback again (Spanner retries an aborted
+	// one), so an error of an earlier attempt must not outlive it.
+	o.err = nil
 	pw := &domain.SetUserPassword{
 		ProjectID:   o.ProjectID,
 		UserID:      o.UserID,
@@ -984,6 +1007,9 @@ func (o *DeleteUserAction) Prepare(_ context.Context) error {
 }
 
 func (o *DeleteUserAction) Apply(ctx context.Context, stmts AllStatements) error {
+	// A transaction may run the callback again (Spanner retries an aborted
+	// one), so an error of an earlier attempt must not outlive it.
+	o.err = nil
 	err := stmts.DeleteUserByID(ctx, o.ProjectID, o.UserID)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {

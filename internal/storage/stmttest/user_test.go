@@ -775,7 +775,7 @@ func TestUserStatements_ListUserAttributes(t *testing.T) {
 			claim := func(teamID string, a domain.CreateAttribute) database.Filter[domain.UserAttributeField] {
 				return database.And(
 					database.Equal(database.Col(domain.UserAttributeFieldUniqueTeamID), teamID),
-					database.Equal(database.Col(domain.UserAttributeFieldKey), string(a.Key)),
+					database.Equal(database.Col(domain.UserAttributeFieldUniqueKey), string(a.Key)),
 					database.Equal(database.Col(domain.UserAttributeFieldValueHash), a.ValueHash[:]),
 				)
 			}

@@ -447,6 +447,11 @@ func TestNewCreateUser_SchemaFailureNamesFields(t *testing.T) {
 			"department": {"type": "string"},
 			"age": {"type": "integer"},
 			"tags": {"type": "array", "items": {"type": "string"}},
+			"addresses": {
+				"type": "array",
+				"items": {"type": "object", "properties": {"zip": {"type": "string", "pattern": "^[0-9]+$"}}}
+			},
+			"labels": {"type": "object", "propertyNames": {"pattern": "^[a-z]+$"}},
 			"address": {
 				"type": "object",
 				"required": ["zip"],
@@ -500,6 +505,24 @@ func TestNewCreateUser_SchemaFailureNamesFields(t *testing.T) {
 			attrs:  map[string]any{"email": "a@example.com", "country": "CH", "department": "x", "tags": []any{"ok", 5}},
 			fields: []string{"tags"},
 		},
+		{
+			name: "property of an array element names the array",
+			attrs: map[string]any{
+				"email": "a@example.com", "country": "CH", "department": "x",
+				"addresses": []any{map[string]any{"zip": "secret-value"}},
+			},
+			fields: []string{"addresses"},
+		},
+		{
+			// The rejected name is the value, so the object holding it is
+			// named.
+			name: "rejected property name names its object",
+			attrs: map[string]any{
+				"email": "a@example.com", "country": "CH", "department": "x",
+				"labels": map[string]any{"secret-value": "x"},
+			},
+			fields: []string{"labels"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -518,5 +541,5 @@ func TestNewCreateUser_SchemaFailureNamesFields(t *testing.T) {
 }
 
 func TestInvalidAttributeKeys(t *testing.T) {
-	assert.Nil(t, domain.InvalidAttributeKeys(errors.New("not a validation error")))
+	assert.Nil(t, domain.InvalidAttributeKeys(errors.New("not a validation error"), nil))
 }

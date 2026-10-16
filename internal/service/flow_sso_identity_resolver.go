@@ -343,15 +343,20 @@ var _ UserAction = (*ssoClaimAction)(nil)
 // ssoLinkAction links the subject to the user created in the same
 // transaction, then binds the attempt with the link id the insert minted.
 type ssoLinkAction struct {
-	noUserActionErr
-
 	subject string
 	bind    domain.FlowSSOBindInput
+
+	// lostRace is the unique violation of a subject another sign-in linked
+	// first, audited by Err after the rollback.
+	lostRace *database.UniqueError
 }
 
 func (a *ssoLinkAction) Prepare(context.Context) error { return nil }
 
 func (a *ssoLinkAction) Apply(ctx context.Context, stmts AllStatements) error {
+	// A transaction may run the callback again (Spanner retries an aborted
+	// one), so an error of an earlier attempt must not outlive it.
+	a.lostRace = nil
 	link := &domain.IDPIdentityLink{
 		ProjectID:    a.bind.ProjectID,
 		ConnectionID: a.bind.ConnectionID,
@@ -359,8 +364,9 @@ func (a *ssoLinkAction) Apply(ctx context.Context, stmts AllStatements) error {
 		UserID:       a.bind.UserID,
 	}
 	if err := stmts.CreateIDPIdentityLink(ctx, link); err != nil {
-		if _, ok := errors.AsType[*database.UniqueError](err); ok {
+		if unique, ok := errors.AsType[*database.UniqueError](err); ok {
 			// Another sign-in linked the subject first.
+			a.lostRace = unique
 			return domain.ErrUserAlreadyExists().WithParent(err)
 		}
 		return fmt.Errorf("create sso user: link identity: %w", err)
@@ -378,6 +384,16 @@ func (a *ssoLinkAction) Apply(ctx context.Context, stmts AllStatements) error {
 	bind := a.bind
 	bind.LinkID = link.ID
 	return bindSSOIdentity(ctx, stmts, bind)
+}
+
+// Err audits the lost race like a create through the user API: the user the
+// sign-in created rolled back with the link.
+func (a *ssoLinkAction) Err(ctx context.Context, stmts AllStatements) error {
+	if a.lostRace == nil {
+		return nil
+	}
+	emitUserCreateFailedBestEffort(ctx, stmts, a.bind.ProjectID, a.lostRace)
+	return domain.ErrUserAlreadyExists().WithParent(a.lostRace)
 }
 
 var _ UserAction = (*ssoLinkAction)(nil)

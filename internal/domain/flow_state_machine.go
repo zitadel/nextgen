@@ -1541,21 +1541,13 @@ func (r *FlowStateMachineRuntime) processSSOCollection(pc *processCtx, resolved 
 		// requires the same way, without the condition, so that one is treated
 		// as required too. anyOf and oneOf report no location, so their
 		// failures stay sso_user_invalid.
-	failures:
 		for _, ve := range ValidationFailures(err) {
 			if ve.Loc == nil || len(*ve.Loc) == 0 || !strings.HasPrefix((*ve.Loc)[len(*ve.Loc)-1], "required/") {
 				continue
 			}
-			var path AttributeKey
-			for _, segment := range *ve.Loc {
-				keyword, name, _ := strings.Cut(segment, "/")
-				switch keyword {
-				case "properties", "required":
-					path = path.AppendNode(name)
-				case "allOf":
-				default:
-					continue failures
-				}
+			path, complete := ValidationErrAttributeKey(ve, attributes)
+			if !complete {
+				continue
 			}
 			if !slices.ContainsFunc(resolved.Fields, func(f FlowField) bool { return f.Name == string(path) }) {
 				return r.renderStepError(pc, resolved, new(FlowStepErrorSSOUserCannotBeCreated))

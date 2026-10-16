@@ -912,6 +912,22 @@ func TestFlowSSOIdentityResolver_CreateLinked_LostRaceEmitsUserCreateFailed(t *t
 	assert.NotNil(t, f.event(domain.EventTypeUserCreateFailed))
 }
 
+// Losing the link race rolls the created user back, so it is audited like a
+// lost create.
+func TestFlowSSOIdentityResolver_CreateLinked_LostLinkRaceEmitsUserCreateFailed(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	f.inTransaction(t)
+	f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil)
+	f.expectCreateUser(nil)
+	f.stmts.EXPECT().CreateIDPIdentityLink(gomock.Any(), gomock.Any()).
+		Return(database.NewUniqueError("idp_identity_links", "uq_idp_identity_links_connection_subject", nil))
+
+	_, err := f.resolver.CreateLinked(t.Context(), createInput())
+	require.ErrorIs(t, err, domain.ErrUserAlreadyExists())
+	assert.NotNil(t, f.event(domain.EventTypeUserCreateFailed))
+}
+
 // A concurrent request on the same attempt settled the parked row first. The
 // claim refuses before the user insert, so the engine reads the attempt again
 // instead of taking the collision path, and no failed creation is audited.

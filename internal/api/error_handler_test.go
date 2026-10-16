@@ -459,7 +459,7 @@ func TestErrorResponseUserAttributesInvalidIsRequestInvalid(t *testing.T) {
 	})
 	require.ErrorIs(t, validationErr, domain.ErrUserAttributesInvalid(nil))
 
-	got := errorResponse(validationErr)
+	got := errorResponse(userAttributesRequestInvalid(validationErr))
 
 	require.Equal(t, http.StatusBadRequest, got.StatusCode)
 	require.Equal(t, api.ErrorCode(domain.ErrRequestInvalid().Code), got.Response.Code)
@@ -469,6 +469,14 @@ func TestErrorResponseUserAttributesInvalidIsRequestInvalid(t *testing.T) {
 	require.JSONEq(t, `{"code":"req.invalid","message":`+fmt.Sprintf("%q", domain.ErrRequestInvalid().Message)+
 		`,"details":{"details":{"fields":["attributes.age","attributes.country"]}}}`, string(body))
 	require.NotContains(t, string(body), "secret-value")
+
+	// Outside the /users endpoints no request body carries attributes, so a
+	// flow answers the failure as before.
+	flow := errorResponse(validationErr)
+	require.Equal(t, http.StatusBadRequest, flow.StatusCode)
+	require.Equal(t, api.ErrorCode(domain.ErrUserInvalid().Code), flow.Response.Code)
+	require.Equal(t, "user is not valid according to schema", flow.Response.Message)
+	require.False(t, flow.Response.Details.Set)
 }
 
 // The domain names attributes by key; the API names them by their path from
@@ -483,8 +491,8 @@ func TestErrorResponseUserAttributesAreNamedByBodyPath(t *testing.T) {
 		require.JSONEq(t, `{"fields":["attributes.email"]}`, string(conflict.Response.Details.Value["details"]))
 	}
 
-	invalid := errorResponse(domain.ErrUserAttributesInvalid(nil).
-		WithDetails(domain.UserAttributesDetails{Keys: []domain.AttributeKey{"", "address.zip"}}))
+	invalid := errorResponse(userAttributesRequestInvalid(domain.ErrUserAttributesInvalid(nil).
+		WithDetails(domain.UserAttributesDetails{Keys: []domain.AttributeKey{"", "address.zip"}})))
 	require.Equal(t, http.StatusBadRequest, invalid.StatusCode)
 	require.JSONEq(t, `{"fields":["attributes","attributes.address.zip"]}`, string(invalid.Response.Details.Value["details"]))
 }

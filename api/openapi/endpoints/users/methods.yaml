@@ -47,8 +47,8 @@ post:
         The provided input was not valid.
 
         Attributes that fail the user schema answer `req.invalid`, the same
-        way a malformed body does: `details.fields` lists the dotted path of
-        every failing field from the request body, such as
+        way a malformed body does: `details.details.fields` lists the dotted
+        path of every failing field from the request body, such as
         `attributes.country` or `attributes.address.zip`. Only the field
         names are reported, never the rejected values.
       content:
@@ -73,10 +73,11 @@ post:
         schema indicates that the email field should be unique across the team,
         only one user can have a given `email` attribute.
 
-        A taken value answers `user.attributes_conflict`, with `details.fields`
-        naming the attributes whose value is taken in the same dotted form as
-        a `400`, such as `attributes.email`. The user holding the value is not
-        named. A conflict no attribute explains answers `user.already_exists`.
+        A taken value answers `user.attributes_conflict`, with
+        `details.details.fields` naming the attributes whose value is taken in
+        the same dotted form as a `400`, such as `attributes.email`. The user
+        holding the value is not named. A conflict no attribute explains
+        answers `user.already_exists`.
       content:
         application/json:
           schema:

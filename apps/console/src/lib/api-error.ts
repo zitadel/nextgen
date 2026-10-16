@@ -14,20 +14,36 @@ import { ApiError } from "@zitadel/api/runtime/fetch";
  * read explicitly. `fallback` covers the case where there is no payload at all —
  * a network failure or a non-JSON response.
  *
- * Attributing a `409` to a specific input is deliberately not attempted:
- * `ErrUserAlreadyExists()` carries no details and ADR 030 records that `details`
- * is never populated today, so the response cannot say which value collided.
- * Guessing from the schema's `x-unique` markers would put console-authored copy
- * under a field the server never named.
+ * When the server names the fields a request failed on (`details.details.fields`,
+ * as a `400 req.invalid` or a taken unique value does), they are appended after
+ * the message: the `req.invalid` message tells the reader to check them. They
+ * are listed as the server named them, minus the `attributes.` prefix of the
+ * request body, and never guessed from the schema's `x-unique` markers.
  */
 export function describeError(cause: unknown, fallback: string): string {
   if (cause instanceof ApiError) {
     const body = cause.body;
     if (body && typeof body === "object") {
       const message = (body as Record<string, unknown>).message;
-      if (typeof message === "string" && message.trim() !== "") return message;
+      if (typeof message === "string" && message.trim() !== "") {
+        const fields = namedFields(body as Record<string, unknown>);
+        return fields.length > 0 ? `${message} (${fields.join(", ")})` : message;
+      }
     }
     return fallback;
   }
   return cause instanceof Error ? cause.message : fallback;
+}
+
+/** The fields an error payload names, from its producer's `details`. */
+function namedFields(body: Record<string, unknown>): string[] {
+  const details = body.details;
+  if (!details || typeof details !== "object") return [];
+  const producer = (details as Record<string, unknown>).details;
+  if (!producer || typeof producer !== "object") return [];
+  const fields = (producer as Record<string, unknown>).fields;
+  if (!Array.isArray(fields)) return [];
+  return fields
+    .filter((field): field is string => typeof field === "string" && field !== "")
+    .map((field) => field.replace(/^attributes\./, ""));
 }
