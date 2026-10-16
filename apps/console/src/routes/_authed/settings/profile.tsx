@@ -70,8 +70,14 @@ function ProfileScreen() {
   // The identifier first — it is who the person is — then the rest in the
   // schema's own (alphabetical) order.
   const all = schema ? schemaFields(schema) : identifierFallback(user as Record<string, unknown>);
-  const fixed = all.filter((entry) => entry.key === identifier);
-  const editable = schema ? all.filter((entry) => entry.key !== identifier) : [];
+  // Editable: anything but the identifier that a text input can round-trip.
+  // Another type (a boolean) shows its value read-only rather than as text it
+  // could never be saved back from.
+  const types = (schema?.properties ?? {}) as Record<string, { type?: unknown }>;
+  const isEditable = (entry: SchemaField) =>
+    entry.key !== identifier && EDITABLE_TYPES.has(String(types[entry.key]?.type));
+  const fixed = all.filter((entry) => !isEditable(entry));
+  const editable = schema ? all.filter(isEditable) : [];
 
   const saved = (entry: SchemaField) =>
     displayValue(attributes[entry.key]) ||
@@ -206,6 +212,8 @@ function ProfileRow({
 }
 
 /** A stored attribute as the input shows it. */
+const EDITABLE_TYPES = new Set(["string", "number", "integer"]);
+
 function displayValue(value: unknown): string {
-  return typeof value === "string" || typeof value === "number" ? String(value) : "";
+  return ["string", "number", "boolean"].includes(typeof value) ? String(value) : "";
 }

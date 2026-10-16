@@ -22,7 +22,8 @@ export const Route = createFileRoute("/_authed/settings/account")({
   staticData: {
     nav: { label: "Account", order: 0, icon: Building2, view: "settings", group: "WORKSPACE" },
   },
-  loader: async () => ({ team: await readAccountTeam() }),
+  // A refused read shows "no account" rather than an error boundary.
+  loader: async () => ({ team: await readAccountTeam().catch(() => null) }),
   component: AccountScreen,
 });
 

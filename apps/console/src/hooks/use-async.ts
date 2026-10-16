@@ -3,9 +3,12 @@ import { type DependencyList, useEffect, useState } from "react";
 import type { SessionCached } from "@/lib/session-cache";
 
 /**
- * A read's answer for a component: `undefined` while it loads, `fallback` if
- * it fails, and never an answer that arrives after `deps` moved on. `null` for
- * `load` skips the read and answers `fallback`.
+ * A read's answer for a component: `undefined` until the first answer,
+ * `fallback` if it fails, and never an answer that arrives after `deps` moved
+ * on. A re-read keeps showing the previous answer until the new one lands, so
+ * a refresh does not flash a loading state; key the component instead where
+ * the old answer would be wrong (another project's teams). `null` for `load`
+ * skips the read and answers `fallback`.
  *
  * For the chrome reads that must not block a screen or raise a boundary — the
  * switchers, the account footer, search — where a failure degrades to an
@@ -24,7 +27,6 @@ export function useAsync<T, F>(
       return;
     }
     let cancelled = false;
-    setValue(undefined);
     load()
       .then((next) => {
         if (!cancelled) setValue(next);

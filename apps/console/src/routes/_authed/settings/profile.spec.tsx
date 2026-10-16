@@ -200,4 +200,31 @@ describe("settings profile, generated from the schema", () => {
     expect(screen.getAllByRole("textbox")).toHaveLength(1);
     expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
   });
+
+  it("shows a boolean read-only, and saves a name beside a required one", async () => {
+    let patched: unknown;
+    server.use(
+      schema({
+        ...PLATFORM_SCHEMA,
+        required: ["email", "terms"],
+        properties: { ...PLATFORM_SCHEMA.properties, terms: { type: "boolean" } },
+      }),
+      http.get(ME_URL, () =>
+        HttpResponse.json(me({ attributes: { email: "maya@example.com", terms: false } })),
+      ),
+      http.patch(ME_URL, async ({ request }) => {
+        patched = await request.json();
+        return HttpResponse.json(me({ attributes: { email: "maya@example.com", terms: false } }));
+      }),
+    );
+    await renderAt("/settings/profile");
+
+    const terms = await screen.findByLabelText("Terms");
+    expect(terms).toBeDisabled();
+    expect(terms).toHaveValue("false");
+
+    await userEvent.type(screen.getByLabelText("Name"), "Maya");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(patched).toEqual({ attributes: { name: "Maya" } }));
+  });
 });

@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
-import { isAccountRead, server } from "@/test/msw";
+import { server } from "@/test/msw";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -34,7 +34,6 @@ function recordQueries(response: (body: Record<string, unknown>) => Response) {
   const bodies: Record<string, unknown>[] = [];
   server.use(
     http.post(USERS_QUERY_URL, async ({ request }) => {
-      if (await isAccountRead(request)) return undefined;
       const body = (await request.json()) as Record<string, unknown>;
       bodies.push(body);
       return response(body);
@@ -54,7 +53,6 @@ describe("users screen", () => {
         HttpResponse.json({ id: "proj_other", name: "Other project" }),
       ),
       http.post(USERS_QUERY_URL, async ({ request }) => {
-        if (await isAccountRead(request)) return undefined;
         projects.push(new URL(request.url).searchParams.get("project_id"));
         const body = (await request.json()) as { page_token?: string };
         return HttpResponse.json(
@@ -452,7 +450,6 @@ describe("users screen", () => {
 
     server.use(
       http.post(USERS_QUERY_URL, async ({ request }) => {
-        if (await isAccountRead(request)) return undefined;
         const { page_token: token } = (await request.json()) as { page_token?: string };
         if (token) {
           await secondPageSent;
