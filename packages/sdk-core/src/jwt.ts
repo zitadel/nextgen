@@ -463,6 +463,19 @@ function resolveVerifyAlgorithm(alg: string): EcdsaParams | Algorithm {
 
 // ─── JWKS fetch ───────────────────────────────────────────────────────────────
 
+/** Resolves to `null` if `promise` has not settled within `timeoutMs`. */
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<null>((resolve) => {
+    timer = setTimeout(() => {
+      resolve(null);
+    }, timeoutMs);
+  });
+  return Promise.race([promise, expired]).finally(() => {
+    clearTimeout(timer);
+  });
+}
+
 /**
  * Fetches the JWKS document at `jwksUri`, coalescing concurrent fetches, and
  * caches it. Returns `null` when the endpoint fails or answers without a key
@@ -474,7 +487,9 @@ function resolveVerifyAlgorithm(alg: string): EcdsaParams | Algorithm {
 function refreshJwks(jwksUri: string, timeoutMs: number): Promise<JwksCacheEntry | null> {
   const pending = jwksInFlight.get(jwksUri);
   if (pending) {
-    return pending;
+    // The fetch in flight runs on the timeout of whoever started it. A caller
+    // that joins it waits no longer than its own.
+    return withTimeout(pending, timeoutMs);
   }
   const attemptedAt = jwksAttemptedAt.get(jwksUri);
   if (attemptedAt !== undefined && Date.now() - attemptedAt < JWKS_MIN_REFRESH_MS) {
