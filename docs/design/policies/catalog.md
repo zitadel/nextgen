@@ -20,4 +20,4 @@ Evaluated before a password is stored, whichever path stores it.
 | Bounds tied to | `domain.MaxPasswordLength` (length bounds equal it); `domain.UserPasswordHistoryDepth` (history bound at most it plus the current password) |
 | Domain guards, not policy | non-empty, at most 64 code points (`domain.HashPassword`) |
 | Gate | `service.SetPasswordUserAction.Prepare`, before the hash: admin API, registration, SSO sign-up. Not wired yet ([#1448](https://github.com/zitadel/nextgen/issues/1448)) |
-| History applies | only when the user sets their own password; no such path exists yet |
+| History applies | target: only when the user sets their own password, modelled with the gate ([#1448](https://github.com/zitadel/nextgen/issues/1448)). Until then an instance with `history_depth` puts it into every call site's constraints, and no self-service path exists yet |
