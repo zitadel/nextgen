@@ -35,8 +35,9 @@ const (
 	DeploymentOriginKindPreview
 )
 
-func ErrDeploymentInvalid(details any, parent error) Error {
-	return newError(PrefixDeployment.ErrorCodePrefix("invalid"), "deployment: invalid", details, parent)
+// ErrDeploymentInvalid refuses a deployment; WithMessage says why.
+func ErrDeploymentInvalid() Error {
+	return newError(PrefixDeployment.ErrorCodePrefix("invalid"), "deployment: invalid", nil, nil)
 }
 
 func ErrDeploymentNotFound() Error {
@@ -121,28 +122,19 @@ func NewestOriginDeployment(deployments []OriginDeployment) *OriginDeployment {
 	return newest
 }
 
-// Unchanged reports whether writing d would change nothing, given what each
-// origin serves: its origins are primary ones that all serve its release from
-// a primary deployment. A deployment to preview URLs is always written,
-// since it renews them.
-func (d *Deployment) Unchanged(serving []OriginDeployment) bool {
-	if d.OriginKind != DeploymentOriginKindPrimary {
-		return false
-	}
-	byOrigin := make(map[string]OriginDeployment, len(serving))
-	for _, s := range serving {
-		byOrigin[s.Origin] = s
-	}
-	for _, target := range d.Targets {
-		if s, ok := byOrigin[target.Origin]; !ok || s.ReleaseID != d.ReleaseID || s.Kind != DeploymentOriginKindPrimary {
-			return false
-		}
-	}
-	return true
+// DeploymentsEqual reports whether candidate repeats current, the project's
+// newest primary deployment: the same release to the same origins, so writing
+// it would change nothing. A deployment to preview URLs never equals one,
+// since writing it renews its previews.
+// TODO(#1781): compare the frozen variable set too.
+func DeploymentsEqual(candidate, current *Deployment) bool {
+	return candidate.OriginKind == DeploymentOriginKindPrimary && current != nil &&
+		current.OriginKind == DeploymentOriginKindPrimary &&
+		current.ReleaseID == candidate.ReleaseID && slices.Equal(current.Origins(), candidate.Origins())
 }
 
 // CheckExpectedDeployment fails with ErrDeploymentConflict unless expected is
-// nil or names current, the newest deployment to the origins.
+// nil or names current, the deployment the write replaces.
 func CheckExpectedDeployment(current *Deployment, expected *string) error {
 	if expected == nil || (current != nil && current.ID == *expected) {
 		return nil
@@ -164,43 +156,45 @@ const (
 	DeploymentFieldOrigin
 	// DeploymentFieldLive filters to the deployments some origin still serves.
 	DeploymentFieldLive
+	DeploymentFieldOriginKind
 )
 
 // NewDeployment validates the record and sorts its origins. The dialect mints
 // the ID and stamps DeployedAt.
 func NewDeployment(projectID, releaseID string, kind DeploymentOriginKind, origins []string, metadata DeploymentMetadata) (*Deployment, error) {
 	if !metadata.Reason.IsADeploymentReason() {
-		return nil, ErrDeploymentInvalid("unknown reason", nil)
+		return nil, ErrDeploymentInvalid().WithMessage("unknown reason")
 	}
 	if !kind.IsADeploymentOriginKind() {
-		return nil, ErrDeploymentInvalid("unknown origin kind", nil)
+		return nil, ErrDeploymentInvalid().WithMessage("unknown origin kind")
 	}
 	if strings.TrimSpace(releaseID) == "" {
-		return nil, ErrDeploymentInvalid("a release_id is required", nil)
+		return nil, ErrDeploymentInvalid().WithMessage("a release_id is required")
 	}
 	if len(origins) == 0 {
-		return nil, ErrDeploymentInvalid("at least one target is required", nil)
+		return nil, ErrDeploymentInvalid().WithMessage("at least one target is required")
 	}
 	for _, origin := range origins {
 		if strings.TrimSpace(origin) == "" {
-			return nil, ErrDeploymentInvalid("an origin is empty", nil)
+			return nil, ErrDeploymentInvalid().WithMessage("an origin is empty")
 		}
 	}
 	sorted := slices.Compact(slices.Sorted(slices.Values(origins)))
 	if len(sorted) > MaxDeploymentTargets {
-		return nil, ErrDeploymentInvalid(fmt.Sprintf("a deployment covers at most %d targets", MaxDeploymentTargets), nil)
+		return nil, ErrDeploymentInvalid().WithMessage(fmt.Sprintf("a deployment covers at most %d targets", MaxDeploymentTargets))
 	}
 	targets := make([]DeploymentTarget, len(sorted))
 	for i, origin := range sorted {
 		targets[i] = DeploymentTarget{Origin: origin}
 	}
 
-	if metadata.Reason == DeploymentReasonRollback {
-		if metadata.RollbackTo == nil || strings.TrimSpace(*metadata.RollbackTo) == "" {
-			return nil, ErrDeploymentInvalid("reason rollback requires rollback_to", nil)
+	if metadata.RollbackTo != nil {
+		if metadata.Reason != DeploymentReasonRollback {
+			return nil, ErrDeploymentInvalid().WithMessage("rollback_to is only valid with reason rollback")
 		}
-	} else if metadata.RollbackTo != nil {
-		return nil, ErrDeploymentInvalid("rollback_to is only valid with reason rollback", nil)
+		if strings.TrimSpace(*metadata.RollbackTo) == "" {
+			return nil, ErrDeploymentInvalid().WithMessage("rollback_to is empty")
+		}
 	}
 
 	return &Deployment{
@@ -210,4 +204,46 @@ func NewDeployment(projectID, releaseID string, kind DeploymentOriginKind, origi
 		Targets:    targets,
 		Metadata:   metadata,
 	}, nil
+}
+
+// DeploymentTargetPrimary is the targets keyword for every primary origin of
+// the project.
+const DeploymentTargetPrimary = "primary"
+
+// ResolveDeploymentTargets resolves deploymentTargets against projectOrigins
+// into the deployment's kind and origins. The primary keyword covers every
+// primary origin, which are deployed as a whole, so naming one is invalid,
+// and primary and preview targets never mix.
+func ResolveDeploymentTargets(projectOrigins []Origin, deploymentTargets []string) (DeploymentOriginKind, []string, error) {
+	var primary []string
+	for _, o := range projectOrigins {
+		if o.Kind == OriginKindPrimary {
+			primary = append(primary, o.Pattern)
+		}
+	}
+
+	keyword := false
+	var previews []string
+	for _, target := range deploymentTargets {
+		switch {
+		case target == DeploymentTargetPrimary:
+			keyword = true
+		case slices.Contains(primary, target):
+			return 0, nil, ErrDeploymentInvalid().WithMessage("deploy primary origins with the primary keyword")
+		default:
+			previews = append(previews, target)
+		}
+	}
+	if keyword && len(previews) > 0 {
+		return 0, nil, ErrDeploymentInvalid().WithMessage("primary origins and preview URLs cannot be mixed")
+	}
+	if len(previews) > 0 {
+		// TODO(#1572): match previews against the project's preview patterns.
+		return 0, nil, ErrNotImplemented()
+	}
+	if len(primary) == 0 {
+		return 0, nil, ErrDeploymentInvalid().WithMessage("the project has no primary origin")
+	}
+	// TODO(#1572): cap primary origins at MaxDeploymentTargets.
+	return DeploymentOriginKindPrimary, primary, nil
 }

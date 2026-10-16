@@ -3,7 +3,10 @@
 package integration_test
 
 import (
+	"encoding/json"
 	"net/http"
+	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,8 +17,227 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-// TestDeploymentsNotImplemented pins the deployment operations to 501 until
-// the deployment service deploys to targets. Each request goes through the
+const (
+	appOrigin     = "https://app.acme.com"
+	wwwOrigin     = "https://www.acme.com"
+	previewOrigin = "https://acme-git-sso-acmeinc.vercel.app"
+)
+
+// deploymentFixture is a project with two primary origins, a preview pattern
+// and one release.
+type deploymentFixture struct {
+	releaseFixture
+	release *api.CreateReleaseCreated
+}
+
+func newDeploymentFixture(t *testing.T) deploymentFixture {
+	t.Helper()
+	fixture := newReleaseFixture(t)
+	for _, origin := range []domain.Origin{
+		{Pattern: appOrigin, Kind: domain.OriginKindPrimary},
+		{Pattern: wwwOrigin, Kind: domain.OriginKindPrimary},
+		{Pattern: "https://*-acmeinc.vercel.app", Kind: domain.OriginKindPreview},
+	} {
+		fixture.addOrigin(t, origin)
+	}
+	created := fixture.create(t, &api.CreateReleaseRequest{Pointers: fixture.pointers()})
+	require.IsType(t, &api.CreateReleaseCreated{}, created, helpers.MustMarshal(t, created))
+	return deploymentFixture{releaseFixture: fixture, release: created.(*api.CreateReleaseCreated)}
+}
+
+func (f releaseFixture) addOrigin(t *testing.T, origin domain.Origin) {
+	t.Helper()
+	_, err := harness.EnsureProjectService(t).AddOrigin(t.Context(), f.project, origin)
+	require.NoError(t, err)
+}
+
+// otherRelease creates a second release with different content.
+func (f deploymentFixture) otherRelease(t *testing.T) api.ReleaseID {
+	t.Helper()
+	other := f.releaseFixture
+	other.brandingID = publishBranding(t, f.client, f.project, `<zl-page-shell>v2 {% mandatory_gates %}</zl-page-shell>`)
+	created := other.create(t, &api.CreateReleaseRequest{Pointers: other.pointers()})
+	require.IsType(t, &api.CreateReleaseCreated{}, created, helpers.MustMarshal(t, created))
+	return created.(*api.CreateReleaseCreated).ID
+}
+
+func (f deploymentFixture) deploy(t *testing.T, releaseID api.ReleaseID) api.CreateDeploymentRes {
+	t.Helper()
+	resp, err := f.client.CreateDeployment(t.Context(), &api.CreateDeploymentRequest{
+		ReleaseID: api.NewOptReleaseID(releaseID),
+		Targets:   api.DeploymentTargetsRequest{"primary"},
+	}, api.CreateDeploymentParams{ProjectID: api.ProjectID(f.project)})
+	require.NoError(t, err)
+	return resp
+}
+
+// postDeployment posts body to /deployments and returns the status and error code,
+// so an error is checked without decoding it into the declared response shape.
+func (f releaseFixture) postDeployment(t *testing.T, body string) (int, string) {
+	t.Helper()
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
+		harness.EnsureTestServer(t).URL+"/deployments?project_id="+url.QueryEscape(f.project),
+		strings.NewReader(body),
+	)
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+f.client.Token())
+
+	resp, err := harness.EnsureHttpClient(t).Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	var parsed struct {
+		Code string `json:"code"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&parsed))
+	return resp.StatusCode, parsed.Code
+}
+
+func origins(targets []api.DeploymentTarget) []string {
+	out := make([]string, len(targets))
+	for i, target := range targets {
+		out[i] = string(target.Origin)
+	}
+	return out
+}
+
+// TestCreateDeployment deploys to primary origins. The subtests share one
+// project and run in order: each builds on what the one before deployed.
+func TestCreateDeployment(t *testing.T) {
+	t.Parallel()
+
+	fixture := newDeploymentFixture(t)
+	releaseID := fixture.release.ID
+
+	resp := fixture.deploy(t, releaseID)
+	require.IsType(t, &api.CreateDeploymentCreated{}, resp, helpers.MustMarshal(t, resp))
+	first := resp.(*api.CreateDeploymentCreated)
+
+	t.Run("primary covers every primary origin", func(t *testing.T) {
+		assert.Equal(t, releaseID, first.ReleaseID)
+		assert.Equal(t, api.DeploymentKindPrimary, first.Kind)
+		assert.Equal(t, api.DeploymentStatusLive, first.Status)
+		assert.Equal(t, []string{appOrigin, wwwOrigin}, origins(first.Targets))
+		assert.Equal(t, api.DeploymentReasonDeploy, first.Metadata.Reason)
+	})
+
+	t.Run("the same release again is a no-op", func(t *testing.T) {
+		resp := fixture.deploy(t, releaseID)
+		require.IsType(t, &api.CreateDeploymentOK{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, first.ID, resp.(*api.CreateDeploymentOK).ID)
+	})
+
+	t.Run("a primary origin added since makes a new deployment", func(t *testing.T) {
+		fixture.addOrigin(t, domain.Origin{Pattern: "https://acme.com", Kind: domain.OriginKindPrimary})
+		resp := fixture.deploy(t, releaseID)
+		require.IsType(t, &api.CreateDeploymentCreated{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, []string{"https://acme.com", appOrigin, wwwOrigin}, origins(resp.(*api.CreateDeploymentCreated).Targets))
+	})
+
+	t.Run("a matching guard deploys", func(t *testing.T) {
+		latest := fixture.deploy(t, releaseID)
+		require.IsType(t, &api.CreateDeploymentOK{}, latest, helpers.MustMarshal(t, latest))
+		resp, err := fixture.client.CreateDeployment(t.Context(), &api.CreateDeploymentRequest{
+			ReleaseID:            api.NewOptReleaseID(fixture.otherRelease(t)),
+			Targets:              api.DeploymentTargetsRequest{"primary"},
+			ExpectedDeploymentID: api.NewOptDeploymentID(latest.(*api.CreateDeploymentOK).ID),
+		}, api.CreateDeploymentParams{ProjectID: api.ProjectID(fixture.project)})
+		require.NoError(t, err)
+		require.IsType(t, &api.CreateDeploymentCreated{}, resp, helpers.MustMarshal(t, resp))
+	})
+
+	t.Run("reason rollback without rollback_to", func(t *testing.T) {
+		resp, err := fixture.client.CreateDeployment(t.Context(), &api.CreateDeploymentRequest{
+			ReleaseID: api.NewOptReleaseID(fixture.otherRelease(t)),
+			Targets:   api.DeploymentTargetsRequest{"primary"},
+			Reason:    api.NewOptDeploymentReason(api.DeploymentReasonRollback),
+		}, api.CreateDeploymentParams{ProjectID: api.ProjectID(fixture.project)})
+		require.NoError(t, err)
+		require.IsType(t, &api.CreateDeploymentCreated{}, resp, helpers.MustMarshal(t, resp))
+		got := resp.(*api.CreateDeploymentCreated)
+		assert.Equal(t, api.DeploymentReasonRollback, got.Metadata.Reason)
+		_, linked := got.Metadata.RollbackTo.Get()
+		assert.False(t, linked, "rollback_to stays null")
+	})
+
+	t.Run("a stale guard conflicts with the deployment it replaces", func(t *testing.T) {
+		status, code := fixture.postDeployment(t, `{"release_id":"`+string(fixture.otherRelease(t))+
+			`","targets":["primary"],"expected_deployment_id":"`+string(first.ID)+`"}`)
+		assert.Equal(t, http.StatusConflict, status)
+		assert.Equal(t, domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code, code)
+
+		resp, err := fixture.client.CreateDeployment(t.Context(), &api.CreateDeploymentRequest{
+			ReleaseID:            api.NewOptReleaseID(releaseID),
+			Targets:              api.DeploymentTargetsRequest{"primary"},
+			ExpectedDeploymentID: api.NewOptDeploymentID(first.ID),
+		}, api.CreateDeploymentParams{ProjectID: api.ProjectID(fixture.project)})
+		require.NoError(t, err)
+		require.IsType(t, &api.DeploymentConflict{}, resp, helpers.MustMarshal(t, resp))
+		replaced := resp.(*api.DeploymentConflict).DeploymentGuardConflict.Details.Deployment
+		require.False(t, replaced.Null)
+		assert.NotEqual(t, first.ID, replaced.Value.ID)
+		assert.Equal(t, api.DeploymentKindPrimary, replaced.Value.Kind)
+		assert.Equal(t, api.DeploymentStatusLive, replaced.Value.Status)
+	})
+
+	for name, tc := range map[string]struct {
+		body       string
+		wantStatus int
+		wantCode   string
+	}{
+		"both release_id and content_hash": {
+			body:       `{"release_id":"` + string(releaseID) + `","content_hash":"` + string(fixture.release.ContentHash) + `","targets":["primary"]}`,
+			wantStatus: http.StatusBadRequest, wantCode: domain.ErrDeploymentInvalid().Code,
+		},
+		"a ttl for primary origins": {
+			body:       `{"release_id":"` + string(releaseID) + `","targets":["primary"],"ttl":"1h"}`,
+			wantStatus: http.StatusBadRequest, wantCode: domain.ErrDeploymentInvalid().Code,
+		},
+		"a ttl for an exact primary origin": {
+			body:       `{"release_id":"` + string(releaseID) + `","targets":["` + appOrigin + `"],"ttl":"1h"}`,
+			wantStatus: http.StatusBadRequest, wantCode: domain.ErrDeploymentInvalid().Code,
+		},
+		"a ttl for mixed targets": {
+			body:       `{"release_id":"` + string(releaseID) + `","targets":["primary","` + previewOrigin + `"],"ttl":"1h"}`,
+			wantStatus: http.StatusBadRequest, wantCode: domain.ErrDeploymentInvalid().Code,
+		},
+		"primary and a preview URL mixed": {
+			body:       `{"release_id":"` + string(releaseID) + `","targets":["primary","` + previewOrigin + `"]}`,
+			wantStatus: http.StatusBadRequest, wantCode: domain.ErrDeploymentInvalid().Code,
+		},
+		"an exact primary origin": {
+			body:       `{"release_id":"` + string(releaseID) + `","targets":["` + appOrigin + `"]}`,
+			wantStatus: http.StatusBadRequest, wantCode: domain.ErrDeploymentInvalid().Code,
+		},
+		// Deploying to preview URLs lands on top of this.
+		"a preview URL": {
+			body:       `{"release_id":"` + string(releaseID) + `","targets":["` + previewOrigin + `"]}`,
+			wantStatus: http.StatusNotImplemented, wantCode: domain.ErrNotImplemented().Code,
+		},
+		"an unknown release": {
+			body:       `{"release_id":"rel_01KX5N7C9D2E7F0N9WD3P2E4YM6","targets":["primary"]}`,
+			wantStatus: http.StatusNotFound, wantCode: domain.ErrReleaseNotFound().Code,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			status, code := fixture.postDeployment(t, tc.body)
+			assert.Equal(t, tc.wantStatus, status)
+			assert.Equal(t, tc.wantCode, code)
+		})
+	}
+
+	t.Run("a project with no primary origin", func(t *testing.T) {
+		bare := newReleaseFixture(t)
+		created := bare.create(t, &api.CreateReleaseRequest{Pointers: bare.pointers()})
+		require.IsType(t, &api.CreateReleaseCreated{}, created, helpers.MustMarshal(t, created))
+		status, code := bare.postDeployment(t, `{"release_id":"`+string(created.(*api.CreateReleaseCreated).ID)+`","targets":["primary"]}`)
+		assert.Equal(t, http.StatusBadRequest, status)
+		assert.Equal(t, domain.ErrDeploymentInvalid().Code, code)
+	})
+}
+
+// TestDeploymentsNotImplemented pins the deployment operations not served
+// yet to 501. Each request goes through the
 // real server, so the new shapes decode and the access check still runs
 // first.
 func TestDeploymentsNotImplemented(t *testing.T) {
@@ -34,17 +256,6 @@ func TestDeploymentsNotImplemented(t *testing.T) {
 		assert.Equal(t, http.StatusNotImplemented, status)
 		assert.Equal(t, domain.ErrNotImplemented().Code, code)
 	}
-
-	t.Run("create by release id", func(t *testing.T) {
-		resp, err := fixture.client.CreateDeployment(t.Context(),
-			&api.CreateDeploymentRequest{
-				ReleaseID: api.NewOptReleaseID(releaseID),
-				Targets:   api.DeploymentTargetsRequest{"primary"},
-			},
-			api.CreateDeploymentParams{ProjectID: project})
-		require.NoError(t, err)
-		expectNotImplemented(t, resp)
-	})
 
 	t.Run("create by content hash", func(t *testing.T) {
 		resp, err := fixture.client.CreateDeployment(t.Context(),

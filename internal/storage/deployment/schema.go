@@ -55,6 +55,11 @@ func NewSchema(deploymentsTable, originsTable, previewsTable string) database.Sc
 			Accessor: func(d *domain.Deployment) any { return d.DeployedAt },
 			Coerce:   database.CoerceTime,
 		},
+		domain.DeploymentFieldOriginKind: {
+			SQLName:  "origin_kind",
+			Accessor: func(d *domain.Deployment) any { return d.OriginKind.String() },
+			Coerce:   database.CoerceString,
+		},
 		domain.DeploymentFieldOrigin: {
 			SQLName:   `EXISTS (` + ownOrigins + ` AND t.origin = `,
 			SQLSuffix: ")",

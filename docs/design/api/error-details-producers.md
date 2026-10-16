@@ -43,5 +43,7 @@ Flow `Fields` value decode failures attach `{field}` only (no parser text, no pa
 | `authz.go` write-miss handlers | opaque string on wrong codes | **Deferred** — intentional authz opacity |
 | `domain/user.go`, `service/user.go` | typed `UserSchemaUnknownDetails`, `CreatedUserDetails` | **Reference** — the unknown schema id and the created user id, both client-actionable |
 | `service/auth_attempt.go` unsupported proof | was string `WithDetails` | **Fixed** — moved to `Message` |
+| `domain/deployment.go` `ErrDeploymentInvalid` | explanation | **Fixed** — callers set it with `WithMessage` |
+| `deployment.go` `deploymentConflictResponse` | typed `{deployment}` | **Reference** — hand-built typed 409, so `details.deployment` is flat and in the API's deployment shape |
 | `service/list.go`, `service/project.go`, `service/team.go` filter/sort strings | string `WithDetails` | **Deferred** — inventory only this PR |
 | crypto / token / signing / encryption `WithDetails` | strings or maps | **Deferred** — often internal; review before promoting to public details |

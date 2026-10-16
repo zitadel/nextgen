@@ -127,6 +127,33 @@ func TestDeploymentStatements_FreshProject(t *testing.T) {
 	})
 }
 
+// NewestOfKindOptions finds the project's newest primary deployment past a
+// newer preview one.
+func TestDeploymentStatements_NewestOfKind(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureReleaseProject(t, d.stmts)
+		rel := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
+		newestPrimary := func() *domain.Deployment {
+			t.Helper()
+			result, err := d.stmts.ListDeployments(unfilteredListCtx(t), deployment.NewestOfKindOptions(projectID, domain.DeploymentOriginKindPrimary))
+			require.NoError(t, err)
+			if len(result.Items) == 0 {
+				return nil
+			}
+			require.Len(t, result.Items, 1)
+			return result.Items[0]
+		}
+
+		assert.Nil(t, newestPrimary())
+		first := deploy(t, d.stmts, projectID, rel.ID, []string{appOrigin, wwwOrigin}, deployArgs{})
+		deploy(t, d.stmts, projectID, rel.ID, []string{gitOrigin}, previewDeploy(time.Hour))
+		assert.Equal(t, first.ID, newestPrimary().ID)
+
+		second := deploy(t, d.stmts, projectID, rel.ID, []string{appOrigin, wwwOrigin}, deployArgs{})
+		assert.Equal(t, second.ID, newestPrimary().ID)
+	})
+}
+
 // GetNewestPerOrigin answers per origin, for the named origins of the project only.
 func TestDeploymentStatements_NewestPerOrigin(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
