@@ -28964,6 +28964,222 @@ type GetUserByIDUnauthorized ErrorDetails
 
 func (*GetUserByIDUnauthorized) getUserByIDRes() {}
 
+// GetUserPasswordErrorResponse represents sum type.
+type GetUserPasswordErrorResponse struct {
+	Type                 GetUserPasswordErrorResponseType // switch on this field
+	AuthUnauthorized     AuthUnauthorized
+	Internal             Internal
+	ReqInvalid           ReqInvalid
+	UserNotFound         UserNotFound
+	UserPermissionDenied UserPermissionDenied
+}
+
+// GetUserPasswordErrorResponseType is oneOf type of GetUserPasswordErrorResponse.
+type GetUserPasswordErrorResponseType string
+
+// Possible values for GetUserPasswordErrorResponseType.
+const (
+	AuthUnauthorizedGetUserPasswordErrorResponse     GetUserPasswordErrorResponseType = "auth.unauthorized"
+	InternalGetUserPasswordErrorResponse             GetUserPasswordErrorResponseType = "internal"
+	ReqInvalidGetUserPasswordErrorResponse           GetUserPasswordErrorResponseType = "req.invalid"
+	UserNotFoundGetUserPasswordErrorResponse         GetUserPasswordErrorResponseType = "user.not_found"
+	UserPermissionDeniedGetUserPasswordErrorResponse GetUserPasswordErrorResponseType = "user.permission_denied"
+)
+
+// IsAuthUnauthorized reports whether GetUserPasswordErrorResponse is AuthUnauthorized.
+func (s GetUserPasswordErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetUserPasswordErrorResponse
+}
+
+// IsInternal reports whether GetUserPasswordErrorResponse is Internal.
+func (s GetUserPasswordErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetUserPasswordErrorResponse
+}
+
+// IsReqInvalid reports whether GetUserPasswordErrorResponse is ReqInvalid.
+func (s GetUserPasswordErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetUserPasswordErrorResponse
+}
+
+// IsUserNotFound reports whether GetUserPasswordErrorResponse is UserNotFound.
+func (s GetUserPasswordErrorResponse) IsUserNotFound() bool {
+	return s.Type == UserNotFoundGetUserPasswordErrorResponse
+}
+
+// IsUserPermissionDenied reports whether GetUserPasswordErrorResponse is UserPermissionDenied.
+func (s GetUserPasswordErrorResponse) IsUserPermissionDenied() bool {
+	return s.Type == UserPermissionDeniedGetUserPasswordErrorResponse
+}
+
+// SetAuthUnauthorized sets GetUserPasswordErrorResponse to AuthUnauthorized.
+func (s *GetUserPasswordErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetUserPasswordErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetUserPasswordErrorResponse is AuthUnauthorized.
+func (s GetUserPasswordErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetUserPasswordErrorResponse returns new GetUserPasswordErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetUserPasswordErrorResponse(v AuthUnauthorized) GetUserPasswordErrorResponse {
+	var s GetUserPasswordErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets GetUserPasswordErrorResponse to Internal.
+func (s *GetUserPasswordErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetUserPasswordErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetUserPasswordErrorResponse is Internal.
+func (s GetUserPasswordErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetUserPasswordErrorResponse returns new GetUserPasswordErrorResponse from Internal.
+func NewInternalGetUserPasswordErrorResponse(v Internal) GetUserPasswordErrorResponse {
+	var s GetUserPasswordErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets GetUserPasswordErrorResponse to ReqInvalid.
+func (s *GetUserPasswordErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetUserPasswordErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetUserPasswordErrorResponse is ReqInvalid.
+func (s GetUserPasswordErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetUserPasswordErrorResponse returns new GetUserPasswordErrorResponse from ReqInvalid.
+func NewReqInvalidGetUserPasswordErrorResponse(v ReqInvalid) GetUserPasswordErrorResponse {
+	var s GetUserPasswordErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUserNotFound sets GetUserPasswordErrorResponse to UserNotFound.
+func (s *GetUserPasswordErrorResponse) SetUserNotFound(v UserNotFound) {
+	s.Type = UserNotFoundGetUserPasswordErrorResponse
+	s.UserNotFound = v
+}
+
+// GetUserNotFound returns UserNotFound and true boolean if GetUserPasswordErrorResponse is UserNotFound.
+func (s GetUserPasswordErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
+	if !s.IsUserNotFound() {
+		return v, false
+	}
+	return s.UserNotFound, true
+}
+
+// NewUserNotFoundGetUserPasswordErrorResponse returns new GetUserPasswordErrorResponse from UserNotFound.
+func NewUserNotFoundGetUserPasswordErrorResponse(v UserNotFound) GetUserPasswordErrorResponse {
+	var s GetUserPasswordErrorResponse
+	s.SetUserNotFound(v)
+	return s
+}
+
+// SetUserPermissionDenied sets GetUserPasswordErrorResponse to UserPermissionDenied.
+func (s *GetUserPasswordErrorResponse) SetUserPermissionDenied(v UserPermissionDenied) {
+	s.Type = UserPermissionDeniedGetUserPasswordErrorResponse
+	s.UserPermissionDenied = v
+}
+
+// GetUserPermissionDenied returns UserPermissionDenied and true boolean if GetUserPasswordErrorResponse is UserPermissionDenied.
+func (s GetUserPasswordErrorResponse) GetUserPermissionDenied() (v UserPermissionDenied, ok bool) {
+	if !s.IsUserPermissionDenied() {
+		return v, false
+	}
+	return s.UserPermissionDenied, true
+}
+
+// NewUserPermissionDeniedGetUserPasswordErrorResponse returns new GetUserPasswordErrorResponse from UserPermissionDenied.
+func NewUserPermissionDeniedGetUserPasswordErrorResponse(v UserPermissionDenied) GetUserPasswordErrorResponse {
+	var s GetUserPasswordErrorResponse
+	s.SetUserPermissionDenied(v)
+	return s
+}
+
+// GetUserPasswordErrorResponseStatusCode wraps GetUserPasswordErrorResponse with StatusCode.
+type GetUserPasswordErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetUserPasswordErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetUserPasswordErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetUserPasswordErrorResponseStatusCode) GetResponse() GetUserPasswordErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetUserPasswordErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetUserPasswordErrorResponseStatusCode) SetResponse(val GetUserPasswordErrorResponse) {
+	s.Response = val
+}
+
+func (*GetUserPasswordErrorResponseStatusCode) getUserPasswordRes() {}
+
+type GetUserPasswordForbidden ErrorDetails
+
+func (*GetUserPasswordForbidden) getUserPasswordRes() {}
+
+type GetUserPasswordInternalServerError ErrorDetails
+
+func (*GetUserPasswordInternalServerError) getUserPasswordRes() {}
+
+type GetUserPasswordNotFound ErrorDetails
+
+func (*GetUserPasswordNotFound) getUserPasswordRes() {}
+
+// Whether the user has a password, and since when. Never the password or its
+// hash.
+// Ref: #
+type GetUserPasswordResponse struct {
+	// When the current password was set. Absent when the user has no password.
+	SetAt OptDateTime `json:"set_at"`
+}
+
+// GetSetAt returns the value of SetAt.
+func (s *GetUserPasswordResponse) GetSetAt() OptDateTime {
+	return s.SetAt
+}
+
+// SetSetAt sets the value of SetAt.
+func (s *GetUserPasswordResponse) SetSetAt(val OptDateTime) {
+	s.SetAt = val
+}
+
+func (*GetUserPasswordResponse) getUserPasswordRes() {}
+
+type GetUserPasswordUnauthorized ErrorDetails
+
+func (*GetUserPasswordUnauthorized) getUserPasswordRes() {}
+
 // GetVariableErrorResponse represents sum type.
 type GetVariableErrorResponse struct {
 	Type                GetVariableErrorResponseType // switch on this field
