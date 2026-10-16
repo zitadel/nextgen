@@ -761,9 +761,10 @@ func TestPatchUserFailedMigration(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	// Every revision shares the object type and the unique username, and
-	// tightens one rule of the first: a property it requires, an enum, or a
-	// uniqueness claim on a property the first leaves free.
+	// Every revision shares the object type and declares the same uniqueness
+	// rules, since #1507 rejects a migration that changes them. Each one
+	// changes a single rule of the first: a property it requires, an enum, or
+	// an optional property it adds.
 	revision := func(t *testing.T, required []string, properties string) string {
 		t.Helper()
 		return harness.CreateUserSchema(t, project, fmt.Sprintf(`{
@@ -777,34 +778,30 @@ func TestPatchUserFailedMigration(t *testing.T) {
 			"required": %s,
 			"properties": {
 				"username": {"type": "string", "x-unique": "project"},
+				"nickname": {"type": "string"},
 				%s
 			}
 		}`, helpers.BuiltinSchemaBaseURL, helpers.MustMarshal(t, required), properties))
 	}
 	initialSchema := revision(t, []string{"username"}, `
-		"nickname": {"type": "string"},
 		"color": {"type": "string"}`)
 	requiresGivenName := revision(t, []string{"username", "givenName"}, `
-		"nickname": {"type": "string"},
 		"color": {"type": "string"},
 		"givenName": {"type": "string"}`)
 	restrictsColor := revision(t, []string{"username"}, `
-		"nickname": {"type": "string"},
 		"color": {"type": "string", "enum": ["red", "blue"]}`)
-	uniqueNickname := revision(t, []string{"username"}, `
-		"nickname": {"type": "string", "x-unique": "project"},
-		"color": {"type": "string"}`)
+	addsLanguage := revision(t, []string{"username"}, `
+		"color": {"type": "string"},
+		"preferredLanguage": {"type": "string"}`)
 
 	users := harness.EnsureUserService(t)
-	createUser := func(t *testing.T, schemaURL string, attributes map[string]any) *domain.User {
+	createUser := func(t *testing.T, attributes map[string]any) (*domain.User, error) {
 		t.Helper()
-		user, err := users.CreateUser(t.Context(), service.CreateUserInput{
+		return users.CreateUser(t.Context(), service.CreateUserInput{
 			ProjectID:  project.ID,
-			SchemaURL:  schemaURL,
+			SchemaURL:  initialSchema,
 			Attributes: attributes,
 		})
-		require.NoError(t, err)
-		return user
 	}
 
 	// stored is what a failed migration must leave alone, read from storage
@@ -832,68 +829,86 @@ func TestPatchUserFailedMigration(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		name string
-		// setup runs before the user under test is created, for state the
-		// migration collides with.
-		setup        func(t *testing.T, suffix string)
+		name         string
 		targetSchema string
-		wantStatus   any
+		// collide has another user claim a username first, and the patch
+		// takes it over in the same request as the move.
+		collide    bool
+		wantStatus any
+		wantCode   string
 	}{
 		{
 			name:         "a required attribute of the target revision is missing",
 			targetSchema: requiresGivenName,
 			wantStatus:   &api.PatchUserByIDBadRequest{},
+			wantCode:     domain.ErrUserInvalid().Code,
 		},
 		{
 			name:         "a value violates a tightened rule",
 			targetSchema: restrictsColor,
 			wantStatus:   &api.PatchUserByIDBadRequest{},
+			wantCode:     domain.ErrUserInvalid().Code,
 		},
 		{
-			name: "a value collides with another user's unique attribute",
-			setup: func(t *testing.T, suffix string) {
-				createUser(t, uniqueNickname, map[string]any{
-					"username": "holder-" + suffix,
-					"nickname": "nick-" + suffix,
-				})
-			},
-			targetSchema: uniqueNickname,
+			name:         "a value collides with another user's unique attribute",
+			targetSchema: addsLanguage,
+			collide:      true,
 			wantStatus:   &api.PatchUserByIDConflict{},
+			wantCode:     domain.ErrUserAlreadyExists().Code,
 		},
 		{
 			name:         "the target schema reference does not exist",
 			targetSchema: "https://example.com/schemas/migration-user-does-not-exist",
 			wantStatus:   &api.PatchUserByIDBadRequest{},
+			wantCode:     domain.ErrUserInvalid().Code,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			suffix := helpers.RandString(8)
-			if tc.setup != nil {
-				tc.setup(t, suffix)
+			taken := "holder-" + suffix
+			if tc.collide {
+				_, err := createUser(t, map[string]any{"username": taken})
+				require.NoError(t, err)
 			}
-			user := createUser(t, initialSchema, map[string]any{
-				"username": "migrant-" + suffix,
+			username := "migrant-" + suffix
+			user, err := createUser(t, map[string]any{
+				"username": username,
 				"nickname": "nick-" + suffix,
 				"color":    "green",
 			})
+			require.NoError(t, err)
 			before := readStored(t, user.ID)
 			require.Contains(t, before.registry, domain.AttributeKey("username"), "the fixture must hold a registry claim")
 
+			body := map[string]any{"schema": tc.targetSchema}
+			if tc.collide {
+				body["attributes"] = map[string]any{"username": taken, "preferredLanguage": "en"}
+			}
 			req := &api.PatchUserRequest{}
-			require.NoError(t, req.UnmarshalJSON([]byte(helpers.MustMarshal(t, map[string]any{
-				"schema": tc.targetSchema,
-			}))))
+			require.NoError(t, req.UnmarshalJSON([]byte(helpers.MustMarshal(t, body))))
 
 			resp, err := client.PatchUserByID(t.Context(), req, api.PatchUserByIDParams{UserID: api.UserID(user.ID)})
 			require.NoError(t, err)
 			require.IsType(t, tc.wantStatus, resp, helpers.MustMarshal(t, resp))
+			switch resp := resp.(type) {
+			case *api.PatchUserByIDBadRequest:
+				assert.Equal(t, tc.wantCode, string(resp.Code))
+			case *api.PatchUserByIDConflict:
+				assert.Equal(t, tc.wantCode, string(resp.Code))
+			}
 
 			after := readStored(t, user.ID)
 			assert.Equal(t, before.schemaURL, after.schemaURL, "schema reference")
 			assert.Equal(t, before.attributes, after.attributes, "attributes")
 			assert.Equal(t, before.registry, after.registry, "unique attribute registry")
 			assert.True(t, before.updatedAt.Equal(after.updatedAt), "updated_at moved from %s to %s", before.updatedAt, after.updatedAt)
+
+			// The registry snapshot holds keys and scopes, not values: the
+			// original username must still be claimed, so a second user
+			// cannot take it.
+			_, err = createUser(t, map[string]any{"username": username})
+			assert.ErrorIs(t, err, domain.ErrUserAlreadyExists(), "the original username must still be claimed")
 		})
 	}
 }
