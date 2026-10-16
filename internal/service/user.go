@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/muhlemmer/gu"
 	"github.com/zitadel/nextgen/internal/audit"
@@ -87,6 +88,11 @@ type ListPasskeysInput struct {
 	Limit     int
 }
 
+type GetPasswordInput struct {
+	ProjectID string
+	UserID    string
+}
+
 type ListIdentityLinksInput struct {
 	ProjectID string
 	UserID    string
@@ -134,6 +140,9 @@ type UserService interface {
 	GetUserByID(ctx context.Context, input GetUserInput) (*domain.User, error)
 	PatchUser(ctx context.Context, input PatchUserInput) (*domain.User, error)
 	SetPassword(ctx context.Context, input SetPasswordInput) (err error)
+	// GetPasswordSetAt reports when the user's current password was set, or
+	// nil when the user has none.
+	GetPasswordSetAt(ctx context.Context, input GetPasswordInput) (*time.Time, error)
 	GetMyUser(ctx context.Context, input GetMyUserInput) (*domain.User, error)
 	GetMyUserSchema(ctx context.Context, input GetMyUserInput) (*domain.JSONSchema, error)
 	PatchMyUser(ctx context.Context, input PatchMyUserInput) (*domain.User, error)
@@ -652,6 +661,24 @@ func (s *userService) SetPassword(ctx context.Context, input SetPasswordInput) (
 
 	action := NewSetUserPasswordAction(input, s.hashers)
 	return s.ApplyActions(ctx, action)
+}
+
+func (s *userService) GetPasswordSetAt(ctx context.Context, input GetPasswordInput) (_ *time.Time, err error) {
+	ctx, end := startSpan(ctx, "UserService.GetPasswordSetAt")
+	defer end(&err)
+
+	password, err := s.v2Pool.Statements().GetUserPassword(ctx, database.And(
+		database.Equal(database.Col(domain.UserPasswordFieldProjectID), input.ProjectID),
+		database.Equal(database.Col(domain.UserPasswordFieldUserID), input.UserID),
+	))
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+		// No password is an answer only for a user that exists.
+		return nil, s.requireUser(ctx, input.ProjectID, input.UserID)
+	}
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to get user password from database")
+	}
+	return &password.CreatedAt, nil
 }
 
 func (s *userService) GetMyUser(ctx context.Context, input GetMyUserInput) (_ *domain.User, err error) {

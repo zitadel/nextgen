@@ -759,6 +759,15 @@ func (UnimplementedHandler) GetUserByID(ctx context.Context, params GetUserByIDP
 	return r, ht.ErrNotImplemented
 }
 
+// GetUserPassword implements getUserPassword operation.
+//
+// Get user password state.
+//
+// GET /users/{user_id}/password
+func (UnimplementedHandler) GetUserPassword(ctx context.Context, params GetUserPasswordParams) (r GetUserPasswordRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetVariable implements getVariable operation.
 //
 // Reads one variable by name, with its value per kind. A name with no
