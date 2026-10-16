@@ -82,6 +82,24 @@ function withoutTrailingSlash(path: string): string {
   return path.slice(0, end);
 }
 
+// ─── Proxy credentials ───────────────────────────────────────────────────────
+
+/**
+ * Whether a proxied call may carry the confidential project secret.
+ *
+ * ADR 036: the browser flow needs the secret only for the handoff exchange
+ * (`POST /sessions/exchange`). Stamping it onto every proxied operation would
+ * turn the app's public `/__nextgen/*` boundary into an open relay carrying
+ * project-level authority for any anonymous caller.
+ *
+ * @param method   - The proxied request's HTTP method.
+ * @param pathname - The path after the proxy prefix, e.g. `/sessions/exchange`.
+ * @returns `true` only for the handoff exchange.
+ */
+export function requiresProjectSecret(method: string, pathname: string): boolean {
+  return method.toUpperCase() === "POST" && pathname === "/sessions/exchange";
+}
+
 // ─── Response header filtering ───────────────────────────────────────────────
 
 /**

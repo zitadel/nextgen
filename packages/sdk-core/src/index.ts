@@ -10,6 +10,7 @@ export {
   INTERNAL_HEADERS,
   matchesRoutes,
   filterResponseHeaders,
+  requiresProjectSecret,
 } from "./middleware.js";
 export {
   verifyJwt,
