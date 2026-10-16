@@ -1,5 +1,5 @@
 import { ZitadelError } from "../../errors";
-import { jsonValue, setAt, typedValue } from "./document";
+import { jsonValue, refuseProtoKey, setAt, typedValue } from "./document";
 import type { BodyField } from "./fields";
 import type { Json } from "./types";
 import { nodeAt, unwrap, type ZodLike } from "./zod";
@@ -74,6 +74,7 @@ export const readAssignment = (
   if (path.some((segment) => segment === "")) {
     throw new ZitadelError("E_VALIDATION", `Invalid --set path "${name}"`, { hint: USAGE });
   }
+  refuseProtoKey(path, `--set ${name}`);
   const located = document === undefined ? { node: undefined, open: true } : nodeAt(document, path);
   if (!located) {
     const paths = knownPaths(fields, path[0] ?? "");

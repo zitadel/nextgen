@@ -59,6 +59,36 @@ export const mergeDocuments = (base: unknown, overlay: unknown): unknown => {
   );
 };
 
+/**
+ * A refusal for a path or key that names `__proto__`. That name reads as an
+ * object's prototype rather than as one of its keys, and the schema check
+ * drops a value set under it without a word, so it is refused where it is
+ * typed. `label` is how the caller spelled the entry (`--set attributes.x`).
+ */
+export const refuseProtoKey = (segments: readonly string[], label: string): void => {
+  if (segments.includes("__proto__")) {
+    throw new ZitadelError("E_VALIDATION", `${label} names __proto__, which no body can carry`, {
+      hint: "__proto__ is read as an object's prototype rather than as a key, so a value set there would be dropped.",
+    });
+  }
+};
+
+/**
+ * A number as a person writes one: digits, an optional minus and, where the
+ * number need not be whole, a fraction (`3`, `-12`, `1.5`). `Number()` alone
+ * would also read `0x10` as 16, `1e3` as 1000 and `" 12 "` as 12, which a
+ * field typed as a number should not get by surprise; `:=` takes any JSON
+ * number. The integer rule is the one oclif's own integer flag applies.
+ */
+const INTEGER = /^-?\d+$/;
+const DECIMAL = /^-?\d+(?:\.\d+)?$/;
+
+/** The finite number `text` spells in decimal notation, or `undefined` when it spells none. */
+export const decimalValue = (text: string, integer: boolean): number | undefined => {
+  const value = (integer ? INTEGER : DECIMAL).test(text) ? Number(text) : Number.NaN;
+  return Number.isFinite(value) ? value : undefined;
+};
+
 /** Whether a schema accepts the text itself, so no reading of it is needed. */
 const takesText = (schema: ZodLike | undefined): boolean =>
   ["string", "enum", "any", "unknown", undefined].includes(unwrap(schema)?.def?.type);
@@ -79,10 +109,9 @@ const scalarFrom = (schema: ZodLike | undefined, text: string, label: string): u
   switch (type?.def?.type) {
     case "number": {
       const integer = isInteger(type);
-      const value = Number(text);
-      return text.trim() !== "" && Number.isFinite(value) && (!integer || Number.isInteger(value))
-        ? value
-        : misfit(label, text, integer ? "an integer" : "a number");
+      return (
+        decimalValue(text, integer) ?? misfit(label, text, integer ? "an integer" : "a number")
+      );
     }
     case "boolean":
       return text === "true"
@@ -113,8 +142,10 @@ const scalarFrom = (schema: ZodLike | undefined, text: string, label: string): u
  * schema declares the type, nothing is guessed: a field typed as a number or a
  * boolean reads the text as one (`pkce_enabled=false` is the boolean), and a
  * field that accepts a string, or that the schema says nothing about, keeps
- * the text, so `postcode=02139` survives (ADR 071 §3). A value that does not
- * fit is refused, pointing at the JSON form.
+ * the text, so `postcode=02139` survives (ADR 071 §3) and on a `string | null`
+ * field `null` is the text "null" (`:=null` is the null). A number is read in
+ * decimal notation only. A value that does not fit is refused, pointing at the
+ * JSON form.
  */
 export const typedValue = (schema: ZodLike | undefined, text: string, label: string): unknown => {
   const value = scalarFrom(schema, text, label);

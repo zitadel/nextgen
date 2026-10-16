@@ -1022,7 +1022,9 @@ RAW BODY FLAGS
   --file=<value>    Read the body from a JSON file; `-` reads stdin. Field flags
                     and --set apply over it.
   --set=<value>...  Set one field by its dot path: path=value, or path:=json for
-                    JSON. Repeatable; applied after the field flags, in order.
+                    JSON. Repeatable; applied after the field flags, in order. A
+                    key that contains a dot is set through its parent: --set
+                    'parent:={"a.b":"x"}'.
 
 OPTIONAL FIELD FLAGS
   --expires-at=<value>  Optional expiry.
@@ -1286,7 +1288,9 @@ RAW BODY FLAGS
   --file=<value>    Read the body from a JSON file; `-` reads stdin. Field flags
                     and --set apply over it.
   --set=<value>...  Set one field by its dot path: path=value, or path:=json for
-                    JSON. Repeatable; applied after the field flags, in order.
+                    JSON. Repeatable; applied after the field flags, in order. A
+                    key that contains a dot is set through its parent: --set
+                    'parent:={"a.b":"x"}'.
 
 REQUIRED FIELD FLAGS
   --display-name=<value>  (required) Shown to the user on the sign-in button.
@@ -1662,7 +1666,9 @@ RAW BODY FLAGS
   --file=<value>    Read the body from a JSON file; `-` reads stdin. Field flags
                     and --set apply over it.
   --set=<value>...  Set one field by its dot path: path=value, or path:=json for
-                    JSON. Repeatable; applied after the field flags, in order.
+                    JSON. Repeatable; applied after the field flags, in order. A
+                    key that contains a dot is set through its parent: --set
+                    'parent:={"a.b":"x"}'.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -2334,7 +2340,9 @@ RAW BODY FLAGS
   --file=<value>    Read the body from a JSON file; `-` reads stdin. Field flags
                     and --set apply over it.
   --set=<value>...  Set one field by its dot path: path=value, or path:=json for
-                    JSON. Repeatable; applied after the field flags, in order.
+                    JSON. Repeatable; applied after the field flags, in order. A
+                    key that contains a dot is set through its parent: --set
+                    'parent:={"a.b":"x"}'.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -2540,7 +2548,9 @@ RAW BODY FLAGS
   --file=<value>    Read the body from a JSON file; `-` reads stdin. Field flags
                     and --set apply over it.
   --set=<value>...  Set one field by its dot path: path=value, or path:=json for
-                    JSON. Repeatable; applied after the field flags, in order.
+                    JSON. Repeatable; applied after the field flags, in order. A
+                    key that contains a dot is set through its parent: --set
+                    'parent:={"a.b":"x"}'.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -2628,7 +2638,9 @@ RAW BODY FLAGS
   --file=<value>    Read the body from a JSON file; `-` reads stdin. Field flags
                     and --set apply over it.
   --set=<value>...  Set one field by its dot path: path=value, or path:=json for
-                    JSON. Repeatable; applied after the field flags, in order.
+                    JSON. Repeatable; applied after the field flags, in order. A
+                    key that contains a dot is set through its parent: --set
+                    'parent:={"a.b":"x"}'.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -2843,7 +2855,9 @@ RAW BODY FLAGS
   --file=<value>    Read the body from a JSON file; `-` reads stdin. Field flags
                     and --set apply over it.
   --set=<value>...  Set one field by its dot path: path=value, or path:=json for
-                    JSON. Repeatable; applied after the field flags, in order.
+                    JSON. Repeatable; applied after the field flags, in order. A
+                    key that contains a dot is set through its parent: --set
+                    'parent:={"a.b":"x"}'.
 
 GLOBAL FLAGS
   --json  Format output as json.

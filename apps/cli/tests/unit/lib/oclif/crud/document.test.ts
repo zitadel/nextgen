@@ -34,6 +34,15 @@ describe("mergeDocuments", () => {
     ).toEqual({ attributes: { phone: null } });
   });
 
+  it("lets a null replace a whole object, keeping the keys beside it", () => {
+    expect(
+      mergeDocuments(
+        { slug: "acme", oidc: { issuer: "https://sso.acme.example", client_id: "acme" } },
+        { oidc: null },
+      ),
+    ).toEqual({ slug: "acme", oidc: null });
+  });
+
   it("lets an object replace a scalar, and the other way round", () => {
     expect(mergeDocuments({ a: "x" }, { a: { b: 1 } })).toEqual({ a: { b: 1 } });
     expect(mergeDocuments({ a: { b: 1 } }, { a: "x" })).toEqual({ a: "x" });
@@ -80,6 +89,39 @@ describe("typedValue", () => {
     expect(typedValue(as(z.int()), "3", "--set time")).toBe(3);
     expect(typedValue(as(z.boolean().default(true)), "false", "--set pkce")).toBe(false);
     expect(typedValue(as(z.union([z.null(), z.int()])), "4", "--set n")).toBe(4);
+  });
+
+  it.each(["3", "-12", "007"])("reads the integer %j in decimal notation", (text) => {
+    expect(typedValue(as(z.int()), text, "--set n")).toBe(Number(text));
+  });
+
+  it.each(["0x10", "1e3", " 12 ", "+5", "3.0", "", "Infinity", "9".repeat(400)])(
+    "refuses %j for an integer rather than reading it another way",
+    (text) => {
+      expect(() => typedValue(as(z.int()), text, "--set n")).toThrowError(
+        expect.objectContaining({ message: `--set n expects an integer, got "${text}"` }),
+      );
+    },
+  );
+
+  it.each([
+    ["1.5", 1.5],
+    ["-0.25", -0.25],
+    ["2", 2],
+  ])("reads the number %j in decimal notation", (text, value) => {
+    expect(typedValue(as(z.number()), text, "--set ratio")).toBe(value);
+  });
+
+  it.each(["0x10", "1e3", ".5", "5.", "1_000", "NaN"])("refuses %j for a number", (text) => {
+    expect(() => typedValue(as(z.number()), text, "--set ratio")).toThrowError(
+      expect.objectContaining({ message: `--set ratio expects a number, got "${text}"` }),
+    );
+  });
+
+  it("keeps `null` as text where the field takes a string or null; `:=null` is the null", () => {
+    expect(typedValue(as(z.string().nullable()), "null", "--set x")).toBe("null");
+    expect(typedValue(as(z.union([z.string(), z.null()])), "null", "--set x")).toBe("null");
+    expect(jsonValue("null", "--set x")).toBeNull();
   });
 
   it("refuses text that does not fit, offering the JSON form", () => {

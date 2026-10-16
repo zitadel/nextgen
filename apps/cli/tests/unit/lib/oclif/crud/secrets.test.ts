@@ -28,19 +28,89 @@ describe("isSecretKey", () => {
     },
   );
 
-  it.each(["passwordless", "tokenizer", "email", "display_name"])(
+  it.each(["passwordless", "tokenizer", "email", "display_name", "revocationEndpoint"])(
     "does not read %s as one",
     (key) => {
       expect(isSecretKey(key)).toBe(false);
     },
   );
 
-  it.each(["token_endpoint", "token_url", "secret_uri", "revocationEndpoint"])(
-    "reads %s as the name of an address, not of a credential",
+  it.each(["token_endpoint", "token_url", "secret_uri"])(
+    "reads %s as one too: only a value that is an address lets it through",
     (key) => {
-      expect(isSecretKey(key)).toBe(false);
+      expect(isSecretKey(key)).toBe(true);
     },
   );
+});
+
+describe("a credential-named key, by what it holds", () => {
+  const schema = z.object({
+    client_secret: z.string(),
+    token_lifetime: z.int(),
+    token_endpoint_auth_method: z.enum(["client_secret_basic", "client_secret_post"]),
+  }) as unknown as ZodLike;
+
+  it.each([
+    ["a reference", { client_secret: "${{ ACME_CLIENT_SECRET }}" }],
+    ["a number the schema declares", { token_lifetime: 3600 }],
+    ["one of an enum's values", { token_endpoint_auth_method: "client_secret_post" }],
+  ])("takes %s for no credential", (_, body) => {
+    expect(findCredential(body, { schema, references })).toBeUndefined();
+  });
+
+  it.each([
+    ["free text", "client_secret", { client_secret: "hunter2" }],
+    ["a number where the schema declares text", "client_secret", { client_secret: 12345678 }],
+    [
+      "text that is none of an enum's values",
+      "token_endpoint_auth_method",
+      { token_endpoint_auth_method: "hunter2" },
+    ],
+  ])("finds %s", (_, key, body) => {
+    expect(findCredential(body, { schema, references })).toEqual({ key, path: key });
+  });
+});
+
+describe("the name of an address", () => {
+  it.each([
+    "https://sso.acme.example/oauth/token",
+    "https://sso.acme.example/oauth/token?tenant=acme",
+    "http://localhost:8080/token",
+  ])("takes the bare URL %s for no credential", (url) => {
+    expect(findCredential({ oidc: { token_endpoint: url } })).toBeUndefined();
+    expect(findCredential({ secret_url: url })).toBeUndefined();
+  });
+
+  it.each([
+    ["free text", "hunter2"],
+    ["a URL with user info", "https://acme:hunter2@sso.acme.example/token"],
+    ["a URL with a credential in its query", "https://sso.acme.example/cb?access_token=abc"],
+    ["a URL with no host", "mailto:ops@acme.example"],
+  ])("still finds %s under it", (_, value) => {
+    expect(findCredential({ secret_url: value })).toEqual({
+      key: "secret_url",
+      path: "secret_url",
+    });
+  });
+
+  it("takes a URL with a reference inside it, which the platform substitutes", () => {
+    // The endpoint fields take no whitespace, so a reference in one is
+    // written without the spaces, and the URL reads as one.
+    expect(
+      findCredential({
+        oidc: { token_endpoint: "https://${{ENVIRONMENT}}.sso.acme.example/token" },
+      }),
+    ).toBeUndefined();
+  });
+
+  it("is masked in a preview unless it holds a bare URL", () => {
+    expect(
+      redactCredentials({
+        secret_url: "hunter2",
+        token_endpoint: "https://sso.acme.example/token",
+      }),
+    ).toEqual({ secret_url: "«redacted»", token_endpoint: "https://sso.acme.example/token" });
+  });
 });
 
 describe("findCredential", () => {

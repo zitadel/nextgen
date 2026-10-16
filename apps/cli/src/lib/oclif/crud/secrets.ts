@@ -24,30 +24,52 @@ const SECRET_COMPOUNDS = ["apikey", "privatekey", "accesskey", "secretkey"];
 
 /**
  * Last words that make a credential-sounding name the name of an address:
- * `token_endpoint` is where a token is fetched, not a token, and a URL is no
- * credential.
+ * `token_endpoint` is where a token is fetched, not a token. The name alone
+ * proves nothing about the value, though — `secret_url` may hold the secret
+ * itself — so only a value that is an address passes ({@link isBareAddress}).
  */
 const ADDRESS_WORDS = new Set(["endpoint", "url", "uri"]);
 
-/**
- * Whether a property name reads as a credential. Splits snake_case,
- * kebab-case and camelCase alike, so `client_secret`, `api-key` and
- * `userToken` all match while `passwordless` — one word that merely starts the
- * same way — does not, and neither does `token_endpoint`, which names an
- * address.
- */
-export const isSecretKey = (key: string): boolean => {
-  const words = key
+/** A name's words, whether it is spelled in snake_case, kebab-case or camelCase. */
+const wordsOf = (key: string): readonly string[] =>
+  key
     .replaceAll(/([a-z0-9])([A-Z])/g, "$1 $2")
     .split(/[^a-zA-Z0-9]+/)
     .filter(Boolean)
     .map((word) => word.toLowerCase());
-  if (ADDRESS_WORDS.has(words.at(-1) ?? "")) {
-    return false;
-  }
+
+/**
+ * Whether a property name reads as a credential, so `client_secret`, `api-key`
+ * and `userToken` all match while `passwordless` — one word that merely starts
+ * the same way — does not. `token_endpoint` matches too: what lets its URL
+ * through is the value, not the name.
+ */
+export const isSecretKey = (key: string): boolean => {
+  const words = wordsOf(key);
   return (
     words.some((word) => SECRET_WORDS.has(word)) ||
     SECRET_COMPOUNDS.some((compound) => words.join("").includes(compound))
+  );
+};
+
+/** Whether a name ends in a word that names an address (`token_endpoint`, `jwks_uri`). */
+const isAddressKey = (key: string): boolean => ADDRESS_WORDS.has(wordsOf(key).at(-1) ?? "");
+
+/**
+ * Whether a value is an address and nothing more: a URL with a host that
+ * carries no credential of its own — no user info (`https://user:pass@…`) and
+ * no query parameter named like one (`?access_token=…`).
+ */
+const isBareAddress = (value: unknown): boolean => {
+  if (typeof value !== "string" || !URL.canParse(value)) {
+    return false;
+  }
+  const url = new URL(value);
+  return (
+    url.host !== "" &&
+    url.username === "" &&
+    url.password === "" &&
+    ![...url.searchParams.keys()].some(isSecretKey)
   );
 };
 
@@ -141,18 +163,23 @@ const childOf = (schema: ZodLike | undefined, key: string): ZodLike | undefined 
 
 /**
  * Whether one leaf is a credential: it sits under a credential-named key (its
- * own or an ancestor's) and is free-form. A boolean or `null` never is, and
- * neither is a reference or a value the schema fixes (ADR 071 §7).
+ * own or an ancestor's, `key`) and is free-form. A boolean or `null` never is,
+ * and neither is a reference, a value the schema fixes, or a bare URL under
+ * the name of an address (ADR 071 §7).
  */
 const isCredentialLeaf = (
   value: unknown,
   schema: ZodLike | undefined,
   context: CredentialContext,
+  key: string,
 ): boolean => {
   if (typeof value === "boolean" || value === null || value === undefined) {
     return false;
   }
   if (typeof value === "string" && context.references?.matches(value)) {
+    return false;
+  }
+  if (isAddressKey(key) && isBareAddress(value)) {
     return false;
   }
   return !fixedByTheSchema(schema, value);
@@ -200,7 +227,7 @@ export const findCredential = (
   context: CredentialContext = {},
 ): Credential | undefined => {
   for (const { leaf, key, path, schema } of guardedLeaves(value, context.schema, undefined, [])) {
-    if (isCredentialLeaf(leaf, schema, context)) {
+    if (isCredentialLeaf(leaf, schema, context, key)) {
       return { key, path: path.join(".") };
     }
   }
@@ -232,5 +259,7 @@ export const redactCredentials = (
       ]),
     );
   }
-  return under !== undefined && isCredentialLeaf(value, schema, context) ? "«redacted»" : value;
+  return under !== undefined && isCredentialLeaf(value, schema, context, under)
+    ? "«redacted»"
+    : value;
 };

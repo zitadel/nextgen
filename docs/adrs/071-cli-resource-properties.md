@@ -225,9 +225,13 @@ way, against the request schema, before any request. An unknown path is
 refused, and the error lists the paths that exist. Below an open record any key
 is accepted (`attributes.<anything>`), while a misspelled declared segment
 (`oidc.isuer`) is caught. A key that itself contains a dot is set through its
-parent, as JSON: `--set 'claim_mapping:={"a.b":"c"}'`. There is no index or
-append syntax, so an array is set whole with `:=`. Brackets need quoting in
-zsh, and an index into a list the caller has not seen is a guess.
+parent, as JSON: `--set 'claim_mapping:={"a.b":"c"}'`; objects merge key by
+key, so the parent's other keys stay. There is no index or append syntax, so
+an array is set whole with `:=`. Brackets need quoting in zsh, and an index
+into a list the caller has not seen is a guess. A segment named `__proto__` is
+refused, in a path and in a record entry alike: the schema check reads it as an
+object's prototype rather than as a key, so a value set there would vanish
+without a word.
 
 **`=` takes the type the schema declares.** ADR 064 §6 made `key=value` always a
 string, because the CLI could not know a field's type, and guessing turns a
@@ -237,7 +241,11 @@ CLI is no longer guessing:
 - `--set oidc.pkce_enabled=false` sends the boolean `false`.
 - `age=42` sends a number when the user schema declares `age` an integer (§5).
 - Where the schema allows a string, or says nothing, `=` stays a string, so
-  `postcode=02139` survives.
+  `postcode=02139` survives, and on a `string | null` field `=null` is the
+  string `"null"`; `:=null` is `null`.
+- A number is read in decimal notation only (`3`, `-12`, `1.5`), the rule
+  oclif's own integer flag applies. `0x10`, `1e3` and `" 12 "` are refused
+  rather than read as 16, 1000 and 12; `:=` takes any JSON number.
 - A value that does not parse as the declared type is refused, and the error
   offers the `:=` form.
 
@@ -373,10 +381,13 @@ entries.
   `oidc.id_token_mapping`, `oidc.token_endpoint_auth_method` and the whole of
   `password_hash`, whose leaves are enum values and numbers. A number under
   `attributes.password` is still refused: nothing declares what it is.
-- **The name of an address is not a credential's name.** `token_endpoint` is
-  where a token is fetched. A key whose last word is `endpoint`, `url` or `uri`
-  names an address, and a URL is no credential, so `--oidc-token-endpoint`
-  takes one.
+- **An address under a credential's name is not a credential.**
+  `token_endpoint` is where a token is fetched. Under a key whose last word is
+  `endpoint`, `url` or `uri`, a URL with a host that carries no credential of
+  its own (no user info, no query parameter named like one) passes, so
+  `--oidc-token-endpoint` takes one. The name alone proves nothing: any other
+  value under such a key is judged like the rest, so `secret_url` holding the
+  secret itself is refused and redacted.
 
 A secret's value still never travels as an argument. It comes from a prompt or
 stdin, and is published as a variable (§4, `variables set`). Help and examples
@@ -516,7 +527,7 @@ The parts are independent, and the first unblocks `idp create --data` on its
 own. Steps 1–3 ship with this ADR:
 
 1. §7, and the merge rule of §1. The guard and the redaction stop at
-   references, booleans, values the schema fixes and address names, and a flag
+   references, booleans, values the schema fixes and endpoint URLs, and a flag
    over a file merges.
 2. The document root, the nested flags and discovery (§1, §2, §9).
 3. `--set` and the typed `=` (§3).

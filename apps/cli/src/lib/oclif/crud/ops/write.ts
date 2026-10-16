@@ -57,7 +57,7 @@ const rawBodyFlags = {
   }),
   set: Flags.string({
     description:
-      "Set one field by its dot path: path=value, or path:=json for JSON. Repeatable; applied after the field flags, in order.",
+      'Set one field by its dot path: path=value, or path:=json for JSON. Repeatable; applied after the field flags, in order. A key that contains a dot is set through its parent: --set \'parent:={"a.b":"x"}\'.',
     multiple: true,
     helpGroup: "RAW BODY",
   }),

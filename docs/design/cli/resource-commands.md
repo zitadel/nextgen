@@ -304,7 +304,10 @@ request schema before any request: an unknown one is refused, naming the fields
 near it, and any key is accepted below an open record
 (`attributes.address.city`). `=` gives the value the type the schema declares
 at the path, so `--set oidc.pkce_enabled=false` is the boolean, while a path the
-schema types as a string keeps the text. A list or an object takes `:=`.
+schema types as a string keeps the text. A number is read in decimal notation
+only, so `0x10` is refused rather than read as 16. A list or an object takes
+`:=`, and a key with a dot in it is set through its parent:
+`--set 'claim_mapping:={"a.b":"c"}'`.
 
 ```sh
 zitadel idps create --file acme-sso.json --set oidc.pkce_enabled=false
@@ -331,8 +334,10 @@ the CLI runs. So free-form text under a property whose name reads as a secret
 flag, from a `--set` or `--attributes` entry, and anywhere inside an inline
 `--data` body. The refusal points at the two routes that never touch argv:
 `--file <path>` and `--file -`. Names that merely start the same way, such as
-`passwordless`, are unaffected, and so are names of an address
-(`token_endpoint`). A value that cannot be a credential passes too: a boolean,
+`passwordless`, are unaffected, and so is a URL under the name of an address
+(`token_endpoint`) as long as it carries no credential of its own; any other
+value there, `secret_url` holding the secret, is still refused. A value that
+cannot be a credential passes too: a boolean,
 a value the schema fixes (an enum value, or a number where it declares one), and
 a `${{ NAME }}` reference to a project variable, the only form a connection's
 `client_secret` accepts. Write a reference in single quotes, since inside

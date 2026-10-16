@@ -1,7 +1,7 @@
 import { Flags, type Interfaces } from "@oclif/core";
 
 import { ZitadelError } from "../../errors";
-import { jsonValue, setAt, typedValue } from "./document";
+import { decimalValue, jsonValue, refuseProtoKey, setAt, typedValue } from "./document";
 import type { Json, Schema } from "./types";
 import {
   defaultOf,
@@ -265,11 +265,14 @@ export const describeBody = (
   return settleFlags(leavesOf(document, [], true, undefined), new Set(options.reserved ?? []));
 };
 
-/** A float flag; oclif's own number flag only takes integers. */
+/**
+ * A float flag; oclif's own number flag only takes integers. It reads decimal
+ * notation, as `--set` does, so `0x10` is refused rather than read as 16.
+ */
 const numberFlag = Flags.custom<number>({
   parse: async (input) => {
-    const value = Number(input);
-    if (input.trim() === "" || !Number.isFinite(value)) {
+    const value = decimalValue(input, false);
+    if (value === undefined) {
       throw new Error(`Expected a number but received: ${input}`);
     }
     return value;
@@ -380,6 +383,7 @@ const parsePair = (
   const plain = raw.indexOf("=");
   if (json > 0 && json === plain - 1) {
     const key = raw.slice(0, json);
+    refuseProtoKey([key], `--${flag} ${key}`);
     return [key, jsonValue(raw.slice(json + 2), `--${flag} ${key}`)];
   }
   if (plain <= 0) {
@@ -388,6 +392,7 @@ const parsePair = (
     });
   }
   const key = raw.slice(0, plain);
+  refuseProtoKey([key], `--${flag} ${key}`);
   return [key, typedValue(values, raw.slice(plain + 1), `--${flag} ${key}`)];
 };
 

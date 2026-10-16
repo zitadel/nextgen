@@ -210,6 +210,19 @@ describe("bodyFieldFlags", () => {
     const flags = flagsOf(z.object({ data: z.string(), name: z.string() }));
     expect(Object.keys(flags)).toEqual(["name"]);
   });
+
+  it("reads a number flag in decimal notation, as --set does", async () => {
+    const flag = bodyFieldFlags(describeBody(z.object({ ratio: z.number() }))).ratio as unknown as {
+      parse: (input: string) => Promise<number>;
+    };
+    await expect(flag.parse("1.5")).resolves.toBe(1.5);
+    await expect(flag.parse("-2")).resolves.toBe(-2);
+    for (const input of ["0x10", "1e3", " 12 ", ""]) {
+      await expect(flag.parse(input)).rejects.toThrowError(
+        `Expected a number but received: ${input}`,
+      );
+    }
+  });
 });
 
 describe("bodyFromFlags", () => {
@@ -319,6 +332,19 @@ describe("bodyFromFlags", () => {
       attributes: { note: "a=b" },
     });
   });
+
+  it.each(["__proto__=x", '__proto__:={"polluted":true}'])(
+    "refuses the record key in %s, which the schema check would drop",
+    (entry) => {
+      expect(() => bodyFromFlags(userFields, { attributes: [entry] })).toThrowError(
+        expect.objectContaining({
+          code: "E_VALIDATION",
+          message: "--attributes __proto__ names __proto__, which no body can carry",
+        }),
+      );
+      expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    },
+  );
 
   it("rejects a malformed pair with an actionable error", () => {
     expect(() => bodyFromFlags(userFields, { attributes: ["nonsense"] })).toThrowError(
