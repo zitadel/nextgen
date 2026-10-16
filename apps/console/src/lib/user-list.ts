@@ -76,20 +76,24 @@ export async function columnsForUsers(
   users: Record<string, unknown>[],
 ): Promise<SchemaField[]> {
   const schemaIds = [...new Set(users.map((user) => field(user, "schema")).filter(isPresent))];
-  const loaded = new Map<string, UserSchema>();
-  await Promise.all(
+  const fetched = await Promise.all(
     schemaIds.map(async (id) => {
       try {
-        loaded.set(
-          id,
-          (await api.getSchemaById(id, { project_id: projectId })).schema as UserSchema,
-        );
+        return (await api.getSchemaById(id, { project_id: projectId })).schema as UserSchema;
       } catch {
         // One unreadable schema costs its columns, not the screen. Its users
         // still render from the fallback below.
+        return undefined;
       }
     }),
   );
+  // Keyed in the users' first-seen order, not in the order the reads finish:
+  // columns follow the map, and a race would reshuffle them on every load.
+  const loaded = new Map<string, UserSchema>();
+  schemaIds.forEach((id, index) => {
+    const schema = fetched[index];
+    if (schema) loaded.set(id, schema);
+  });
   return columnsFor(users, loaded);
 }
 
