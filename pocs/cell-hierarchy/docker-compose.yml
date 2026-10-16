@@ -1,0 +1,124 @@
+x-cell: &cell
+  build: .
+  entrypoint: ["/usr/local/bin/cell"]
+  restart: unless-stopped
+  volumes:
+    - cell-data:/data
+
+services:
+  platform:
+    <<: *cell
+    environment:
+      CELL_URL: http://platform:8100
+      CELL_LABEL: platform
+      LISTEN_ADDR: :8100
+      DATA_DIR: /data/platform
+      IS_PARENT: "true"
+    ports:
+      - "8100:8100"
+
+  eu:
+    <<: *cell
+    environment:
+      CELL_URL: http://eu:8101
+      CELL_LABEL: eu
+      LISTEN_ADDR: :8101
+      DATA_DIR: /data/eu
+      IS_PARENT: "true"
+    ports:
+      - "8101:8101"
+
+  eu-1:
+    <<: *cell
+    environment:
+      CELL_URL: http://eu-1:8102
+      CELL_LABEL: eu-1
+      LISTEN_ADDR: :8102
+      DATA_DIR: /data/eu-1
+      IS_PARENT: "false"
+    ports:
+      - "8102:8102"
+
+  eu-2:
+    <<: *cell
+    environment:
+      CELL_URL: http://eu-2:8103
+      CELL_LABEL: eu-2
+      LISTEN_ADDR: :8103
+      DATA_DIR: /data/eu-2
+      IS_PARENT: "false"
+    ports:
+      - "8103:8103"
+
+  us:
+    <<: *cell
+    environment:
+      CELL_URL: http://us:8104
+      CELL_LABEL: us
+      LISTEN_ADDR: :8104
+      DATA_DIR: /data/us
+      IS_PARENT: "false"
+    ports:
+      - "8104:8104"
+
+  aus:
+    <<: *cell
+    environment:
+      CELL_URL: http://aus:8105
+      CELL_LABEL: aus
+      LISTEN_ADDR: :8105
+      DATA_DIR: /data/aus
+      IS_PARENT: "false"
+    ports:
+      - "8105:8105"
+
+  spare:
+    <<: *cell
+    environment:
+      CELL_URL: http://spare:8106
+      CELL_LABEL: spare
+      LISTEN_ADDR: :8106
+      DATA_DIR: /data/spare
+      IS_PARENT: "false"
+    ports:
+      - "8106:8106"
+
+  bootstrap:
+    <<: *cell
+    entrypoint: ["/bin/bash", "/usr/local/bin/bootstrap-joins.sh"]
+    depends_on:
+      - platform
+      - eu
+      - eu-1
+      - eu-2
+      - us
+      - aus
+    restart: "no"
+
+  ui:
+    <<: *cell
+    entrypoint: ["/usr/local/bin/ui"]
+    environment:
+      LISTEN_ADDR: :3000
+      CELLS: >-
+        platform=http://platform:8100,
+        eu=http://eu:8101,
+        eu-1=http://eu-1:8102,
+        eu-2=http://eu-2:8103,
+        us=http://us:8104,
+        aus=http://aus:8105,
+        spare=http://spare:8106
+    ports:
+      - "3000:3000"
+    depends_on:
+      - platform
+      - eu
+      - eu-1
+      - eu-2
+      - us
+      - aus
+      - spare
+      - bootstrap
+
+volumes:
+  cell-data:
