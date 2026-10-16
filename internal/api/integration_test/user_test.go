@@ -633,18 +633,11 @@ func TestPatchUser(t *testing.T) {
 		require.NoError(t, err)
 		return user
 	}
-	patchReq := func(t *testing.T, body map[string]any) *api.PatchUserRequest {
-		t.Helper()
-		req := &api.PatchUserRequest{}
-		require.NoError(t, req.UnmarshalJSON([]byte(helpers.MustMarshal(t, body))))
-		return req
-	}
-
 	t.Run("ok", func(t *testing.T) {
 		t.Parallel()
 		user := createUser(t, "testpatchuser.ok@example.com")
 
-		resp, err := client.PatchUserByID(t.Context(), patchReq(t, map[string]any{
+		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
 			"attributes": map[string]any{
 				"email":    "testpatchuser.ok.patched@example.com",
 				"nickname": "Patched",
@@ -663,13 +656,13 @@ func TestPatchUser(t *testing.T) {
 		user := createUser(t, "testpatchuser.null@example.com")
 		params := api.PatchUserByIDParams{UserID: api.UserID(user.ID)}
 
-		resp, err := client.PatchUserByID(t.Context(), patchReq(t, map[string]any{
+		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
 			"attributes": map[string]any{"nickname": "Ephemeral"},
 		}), params)
 		require.NoError(t, err)
 		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
 
-		resp, err = client.PatchUserByID(t.Context(), patchReq(t, map[string]any{
+		resp, err = client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
 			"attributes": map[string]any{"nickname": nil},
 		}), params)
 		require.NoError(t, err)
@@ -682,7 +675,7 @@ func TestPatchUser(t *testing.T) {
 		t.Parallel()
 		user := createUser(t, "testpatchuser.invalid@example.com")
 
-		resp, err := client.PatchUserByID(t.Context(), patchReq(t, map[string]any{
+		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
 			"attributes": map[string]any{"email": 5},
 		}), api.PatchUserByIDParams{UserID: api.UserID(user.ID)})
 		require.NoError(t, err)
@@ -693,7 +686,7 @@ func TestPatchUser(t *testing.T) {
 		t.Parallel()
 		user := createUser(t, "testpatchuser.unknownschema@example.com")
 
-		resp, err := client.PatchUserByID(t.Context(), patchReq(t, map[string]any{
+		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
 			"schema": "https://example.com/schemas/does-not-exist",
 		}), api.PatchUserByIDParams{UserID: api.UserID(user.ID)})
 		require.NoError(t, err)
@@ -705,7 +698,7 @@ func TestPatchUser(t *testing.T) {
 		createUser(t, "testpatchuser.taken@example.com")
 		userB := createUser(t, "testpatchuser.claimant@example.com")
 
-		resp, err := client.PatchUserByID(t.Context(), patchReq(t, map[string]any{
+		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
 			"attributes": map[string]any{"email": "testpatchuser.taken@example.com"},
 		}), api.PatchUserByIDParams{UserID: api.UserID(userB.ID)})
 		require.NoError(t, err)
@@ -715,7 +708,7 @@ func TestPatchUser(t *testing.T) {
 	t.Run("unknown user", func(t *testing.T) {
 		t.Parallel()
 
-		resp, err := client.PatchUserByID(t.Context(), patchReq(t, map[string]any{
+		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
 			"attributes": map[string]any{"nickname": "Nobody"},
 		}), api.PatchUserByIDParams{UserID: api.UserID("user_does-not-exist")})
 		require.NoError(t, err)
@@ -741,6 +734,15 @@ func TestPatchUser(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode, string(body))
 	})
+}
+
+// patchUserRequest builds a PATCH /users/{user_id} body from a plain map, so a
+// test can send JSON null to delete an attribute.
+func patchUserRequest(t *testing.T, body map[string]any) *api.PatchUserRequest {
+	t.Helper()
+	req := &api.PatchUserRequest{}
+	require.NoError(t, req.UnmarshalJSON([]byte(helpers.MustMarshal(t, body))))
+	return req
 }
 
 func TestPatchMyUser(t *testing.T) {
