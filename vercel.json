@@ -4,7 +4,12 @@
     "server": {
       "root": ".",
       "framework": "go",
-      "buildCommand": "sh apps/cloud/build.sh"
+      "buildCommand": "sh apps/cloud/build.sh",
+      "functions": {
+        "main.go": {
+          "regions": ["cdg1"]
+        }
+      }
     },
     "console": {
       "root": "apps/console",
