@@ -29,6 +29,13 @@ func TestParseRedirectTarget_Accepts(t *testing.T) {
 		{"an encoded percent sign at the end", "https://app.test/discount/100%25", "app.test"},
 		{"an encoded percent sign before letters", "https://app.test/a%25zz", "app.test"},
 		{"only an encoded percent sign", "https://app.test/%25", "app.test"},
+		{"a percent sign that starts no escape in the path", "https://app.test/50%off", "app.test"},
+		{"two letters after a percent sign in the path", "https://app.test/%zz", "app.test"},
+		{"a lone percent sign as the path", "https://app.test/%", "app.test"},
+		{"a percent sign at the end of a fragment", "https://app.test/#100%", "app.test"},
+		{"a percent sign before letters in a fragment", "https://app.test/#/a%zz", "app.test"},
+		{"a lone percent sign in a fragment", "https://app.test/#%", "app.test"},
+		{"a percent sign and one digit in a fragment", "https://app.test/a?b#c%2", "app.test"},
 		{"a parent segment that stays on the path", "https://app.test/a/../b", "app.test"},
 		{"a dot segment at the end", "https://app.test/a/.", "app.test"},
 		{"a parent segment that returns to the root", "https://app.test/app/../", "app.test"},
@@ -69,7 +76,6 @@ func TestParseRedirectTarget_Refuses(t *testing.T) {
 		{"ftp", "ftp://app.test/x", "scheme"},
 		{"an opaque URL", "https:evil.example", "no host"},
 		{"no host", "https:///x", "no host"},
-		{"unparseable", "https://app.test/%zz", "not a URL"},
 		{"a bracketed host that is not an IP", "https://[evil]/x", "not a URL"},
 		{"a port and no host", "https://:80/x", "no host"},
 
@@ -107,17 +113,28 @@ func TestParseRedirectTarget_Refuses(t *testing.T) {
 		{"a half-encoded parent segment", "https://app.test/app/.%2e//evil.example", "empty segment"},
 		{"the other half-encoded parent segment", "https://app.test/app/%2e.//evil.example", "empty segment"},
 
-		{"an encoded slash first", "https://app.test/%2Fevil.example", "decodes"},
-		{"an encoded backslash first", "https://app.test/%5Cevil.example", "decodes"},
-		{"a lowercase encoded backslash", "https://app.test/%5cevil.example", "decodes"},
-		{"a double-encoded slash", "https://app.test/%252Fevil.example", "decodes"},
-		{"a double-encoded backslash", "https://app.test/%255Cevil.example", "decodes"},
+		{"an encoded slash first", "https://app.test/%2Fevil.example", "empty segment"},
+		{"an encoded backslash first", "https://app.test/%5Cevil.example", "empty segment"},
+		{"a lowercase encoded backslash", "https://app.test/%5cevil.example", "empty segment"},
+		{"a double-encoded slash", "https://app.test/%252Fevil.example", "empty segment"},
+		{"a double-encoded backslash", "https://app.test/%255Cevil.example", "empty segment"},
+		{"an encoded slash that survives a parent segment", "https://app.test/a%2Fb/../%2Fevil.example", "empty segment"},
+		{"an encoded backslash that survives a parent segment", "https://app.test/a%5Cb/../%5Cevil.example", "empty segment"},
+		{"a double-encoded slash that survives a parent segment", "https://app.test/a%252Fb/../%252Fevil.example", "empty segment"},
+		{"several encoded slashes before parent segments", "https://app.test/x%2Fy%2Fz/../../%2Fevil.example", "empty segment"},
+		{"an encoded slash followed by encoded parent segments", "https://app.test/%2Fevil.example%2F..%2F..%2F", "empty segment"},
+		{"an encoded slash then parent segments with a literal slash", "https://app.test/%2Fevil.example/..%2F..%2F", "empty segment"},
+		{"encoded backslashes and parent segments", "https://app.test/%5Cevil.example%5C..%5C..%5C", "empty segment"},
+		{"an encoded slash then a parent segment", "https://app.test/%2F..", "empty segment"},
+		{"an encoded slash then an encoded parent segment", "https://app.test/%2F%2e%2e/", "empty segment"},
+		{"a character Go re-encodes before encoded slashes", "https://app.test/{%2F%2F/../%2Fevil.example", "empty segment"},
+		{"two slashes with odd characters after them", `https://app.test//%2e.%2f":80`, "empty segment"},
+		{"an encoded slash with a parent segment after it", "https://app.test/%2Fx/../y", "empty segment"},
 		{"an encoded tab", "https://app.test/%09/evil.example", "control character"},
 		{"an encoded newline", "https://app.test/a%0Ab", "control character"},
 		{"an encoded NUL", "https://app.test/%00", "control character"},
 		{"a double-encoded tab", "https://app.test/%2509/x", "control character"},
-		{"a stray percent sign after a double-encoded slash", "https://app.test/%252F%25zz", "decodes"},
-		{"an invalid escape", "https://app.test/%", "not a URL"},
+		{"a stray percent sign after a double-encoded slash", "https://app.test/%252F%25zz", "empty segment"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -143,4 +160,12 @@ func TestParseRedirectTarget_ReturnsTheTargetAsWritten(t *testing.T) {
 	assert.Equal(t, "/step", u.Fragment)
 	// Only the scheme is folded, as the URL standard does.
 	assert.Equal(t, "https", u.Scheme)
+}
+
+func TestParseRedirectTarget_WritesAStrayPercentSignAsAnEscape(t *testing.T) {
+	t.Parallel()
+
+	u, err := httputil.ParseRedirectTarget("https://app.test/50%off#100%")
+	require.NoError(t, err)
+	assert.Equal(t, "https://app.test/50%25off#100%25", u.String())
 }

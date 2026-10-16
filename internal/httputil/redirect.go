@@ -33,21 +33,24 @@ const maxPort = 65535
 //     slash, so "/<TAB>/evil.example" and "/\evil.example" both become
 //     "//evil.example". Any byte outside printable ASCII is refused, and so is a
 //     backslash in the authority or path.
-//   - A browser treats "%2e" as a dot, so "/%2e%2e//evil.example" removes a
-//     segment and leaves "//evil.example". Dot segments are resolved, encoded
-//     ones included, before the result is checked.
+//   - A browser treats "%2e" as a dot, and resolves dot segments in the path
+//     as written, before anything decodes it, so "/%2e%2e//evil.example"
+//     removes a segment and leaves "//evil.example".
 //   - A path that starts with "//" is a network-path reference: once the scheme
 //     and host are stripped, as a proxy that re-bases a Location header onto its
-//     own host does, it names another host. A path whose percent-decoded form
-//     (decoded up to twice, for a server that decodes before it routes) starts
-//     that way is refused too.
+//     own host does, it names another host. A proxy or server that then decodes
+//     the path, once or twice, sees "%2F" and "%5C" as slashes. So the path is
+//     followed through every reading, with and without its dot segments
+//     resolved and decoded up to twice, and refused if any of them starts with
+//     "//".
 //
 // Only the scheme, userinfo, host, port and path are policed. The query and
 // fragment are free-form, so a page that keeps state there still round-trips.
 //
-// The result is parsed from raw as given: its path keeps its escapes as
-// written, nothing is decoded or rewritten. The host is only checked for
-// shape, not normalized, so forms a browser rewrites, such as a decimal IP
+// The result is parsed from raw, with a '%' that starts no escape written as
+// "%25", which a browser and a server read the same way. Its path keeps its
+// escapes as written, nothing is decoded or resolved. The host is only checked
+// for shape, not normalized, so forms a browser rewrites, such as a decimal IP
 // address or a trailing dot, pass. The caller decides which hosts are
 // acceptable, for example by comparing the origin with the request's.
 func ParseRedirectTarget(raw string) (*url.URL, error) {
@@ -78,7 +81,11 @@ func ParseRedirectTarget(raw string) (*url.URL, error) {
 		return nil, refusal("its authority or path contains a backslash")
 	}
 
-	u, err := url.Parse(raw)
+	// A browser leaves a '%' that starts no escape as it is, and a Go parser
+	// refuses it. Writing it as "%25" says the same thing to both.
+	target := escapeStrayPercents(raw)
+
+	u, err := url.Parse(target)
 	if err != nil {
 		return nil, refusal("it is not a URL")
 	}
@@ -95,14 +102,51 @@ func ParseRedirectTarget(raw string) (*url.URL, error) {
 		return nil, err
 	}
 
-	if err := checkPath(u.EscapedPath()); err != nil {
-		return nil, err
+	// The path is checked as written, and as the URL serializes it, because
+	// that is the text a caller stores and later redirects to. Go re-encodes a
+	// path that holds a character it would write differently, such as '{', and
+	// in doing so turns every "%2F" into a plain slash, so the two can differ.
+	for _, form := range []string{target, u.String()} {
+		path, ok := pathOf(form, u.Scheme)
+		if !ok {
+			return nil, refusal("it is not a URL")
+		}
+		if err := checkPath(path); err != nil {
+			return nil, err
+		}
 	}
 	return u, nil
 }
 
 func refusal(format string, args ...any) error {
 	return fmt.Errorf("%w: %s", ErrInvalidRedirectTarget, fmt.Sprintf(format, args...))
+}
+
+// escapeStrayPercents writes every '%' that does not start a two-digit hex
+// escape as "%25".
+func escapeStrayPercents(s string) string {
+	if !strings.Contains(s, "%") {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s) + 4)
+	for i := 0; i < len(s); i++ {
+		if s[i] == '%' && !isEscapeAt(s, i) {
+			b.WriteString("%25")
+			continue
+		}
+		b.WriteByte(s[i])
+	}
+	return b.String()
+}
+
+func isEscapeAt(s string, i int) bool {
+	if i+2 >= len(s) {
+		return false
+	}
+	_, hi := unhex(s[i+1])
+	_, lo := unhex(s[i+2])
+	return hi && lo
 }
 
 // checkHost accepts an ASCII host name, an IPv4 address or an unzoned IPv6
@@ -139,71 +183,65 @@ func checkHost(u *url.URL) error {
 	return nil
 }
 
-// checkPath refuses a path that reads as the start of another host. escaped is
-// the path as written, with its percent-escapes intact.
-func checkPath(escaped string) error {
-	if readsAsAuthority(escaped) {
-		return refusal("its path starts with an empty segment, which reads as another host")
+// pathOf returns the path of an absolute URL exactly as it is written in s:
+// what follows the authority, up to the query or fragment. It is empty when
+// the URL has none. scheme is the URL's lowercase scheme; s may spell it in
+// any case.
+func pathOf(s, scheme string) (string, bool) {
+	prefix := len(scheme) + len("://")
+	if len(s) < prefix || !strings.EqualFold(s[:len(scheme)], scheme) || s[len(scheme):prefix] != "://" {
+		return "", false
 	}
-	// A server that decodes a path before routing it, or a proxy that does, sees
-	// the decoded form. Once for %2F and %5C, twice for their double encodings.
-	// A '%' that does not start an escape stays as it is, as a lenient decoder
-	// leaves it, so a path such as /100%25 (a literal percent sign) is not
-	// mistaken for a malformed one.
-	decoded := escaped
-	for pass := 0; pass < 2; pass++ {
-		decoded = unescapeLeniently(decoded)
-		for i := 0; i < len(decoded); i++ {
-			if decoded[i] < ' ' || decoded[i] == 0x7f {
-				return refusal("its path decodes to a control character")
+	rest := s[prefix:]
+	start := strings.IndexAny(rest, "/?#")
+	if start < 0 || rest[start] != '/' {
+		return "", true
+	}
+	rest = rest[start:]
+	if end := strings.IndexAny(rest, "?#"); end >= 0 {
+		rest = rest[:end]
+	}
+	return rest, true
+}
+
+// checkPath refuses a path that any reader would take to start with an empty
+// segment, which reads as another host once the scheme and host are removed.
+//
+// There are two things to follow. A browser resolves dot segments in the path
+// as written, before anything decodes it, so what a proxy takes out of the
+// Location header is the resolved path. A server that decodes before it routes
+// may resolve again afterwards. So both the path as written and the path with
+// its dot segments resolved are followed through up to two decodings, which
+// covers "%2F" and "%5C" and their double encodings, and at every step the
+// text is tested as it stands and with its dot segments resolved, a backslash
+// being read as a slash once decoded.
+func checkPath(path string) error {
+	for _, start := range []string{path, resolveDots(path)} {
+		current := start
+		for decodings := 0; decodings <= 2; decodings++ {
+			if decodings > 0 {
+				current = unescapeLeniently(current)
+				for i := 0; i < len(current); i++ {
+					if current[i] < ' ' || current[i] == 0x7f {
+						return refusal("its path decodes to a control character")
+					}
+				}
 			}
-		}
-		if readsAsAuthority(strings.ReplaceAll(decoded, `\`, "/")) {
-			return refusal("its path decodes to one that starts with an empty segment, which reads as another host")
+			text := strings.ReplaceAll(current, `\`, "/")
+			if strings.HasPrefix(text, "//") || strings.HasPrefix(resolveDots(text), "//") {
+				return refusal("its path starts with an empty segment, which reads as another host")
+			}
 		}
 	}
 	return nil
 }
 
-// unescapeLeniently decodes every valid %XX escape in s and leaves any other
-// '%' alone. url.PathUnescape fails the whole string on one bad escape, which
-// would let a stray '%' hide a later %2F from the check.
-func unescapeLeniently(s string) string {
-	var b strings.Builder
-	b.Grow(len(s))
-	for i := 0; i < len(s); i++ {
-		if s[i] == '%' && i+2 < len(s) {
-			hi, okHi := unhex(s[i+1])
-			lo, okLo := unhex(s[i+2])
-			if okHi && okLo {
-				b.WriteByte(hi<<4 | lo)
-				i += 2
-				continue
-			}
-		}
-		b.WriteByte(s[i])
-	}
-	return b.String()
-}
-
-func unhex(c byte) (byte, bool) {
-	switch {
-	case c >= '0' && c <= '9':
-		return c - '0', true
-	case c >= 'a' && c <= 'f':
-		return c - 'a' + 10, true
-	case c >= 'A' && c <= 'F':
-		return c - 'A' + 10, true
-	}
-	return 0, false
-}
-
-// readsAsAuthority reports whether p, once a browser has resolved its dot
-// segments, starts with "//". p is either escaped or already decoded, and a
-// "%2e" counts as a dot in both.
-func readsAsAuthority(p string) bool {
+// resolveDots removes the dot segments from p the way the URL standard does:
+// "." and ".." in any mix of literal and percent-encoded dots, in any case. A
+// p that does not start with a slash is returned unchanged.
+func resolveDots(p string) string {
 	if !strings.HasPrefix(p, "/") {
-		return false
+		return p
 	}
 	segments := strings.Split(p[1:], "/")
 	resolved := make([]string, 0, len(segments))
@@ -225,7 +263,7 @@ func readsAsAuthority(p string) bool {
 			resolved = append(resolved, segment)
 		}
 	}
-	return len(resolved) > 1 && resolved[0] == ""
+	return "/" + strings.Join(resolved, "/")
 }
 
 type dotKind int
@@ -247,4 +285,36 @@ func dotSegment(segment string) dotKind {
 	default:
 		return notDot
 	}
+}
+
+// unescapeLeniently decodes every valid %XX escape in s and leaves any other
+// '%' alone, as a lenient decoder does. url.PathUnescape fails the whole string
+// on one bad escape, which would let a stray '%' hide a later %2F from the
+// check.
+func unescapeLeniently(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	for i := 0; i < len(s); i++ {
+		if s[i] == '%' && isEscapeAt(s, i) {
+			hi, _ := unhex(s[i+1])
+			lo, _ := unhex(s[i+2])
+			b.WriteByte(hi<<4 | lo)
+			i += 2
+			continue
+		}
+		b.WriteByte(s[i])
+	}
+	return b.String()
+}
+
+func unhex(c byte) (byte, bool) {
+	switch {
+	case c >= '0' && c <= '9':
+		return c - '0', true
+	case c >= 'a' && c <= 'f':
+		return c - 'a' + 10, true
+	case c >= 'A' && c <= 'F':
+		return c - 'A' + 10, true
+	}
+	return 0, false
 }
