@@ -2,7 +2,7 @@ import { spinner } from "@clack/prompts";
 
 import type { Parsed } from "@zitadel/config/idp";
 
-import { detectHealthyLocalServer } from "../../../lib/local-server/runtime";
+import { LocalServer } from "../../../lib/local-server/server";
 import { DEFAULT_SERVER } from "../../../lib/server";
 import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
 
@@ -14,7 +14,7 @@ const CUSTOM = "__custom__";
  * local server we detected, or a custom URL.
  *
  * Before asking, it looks for a healthy local Zitadel server the same way the
- * rest of the CLI does (`detectHealthyLocalServer`: the runtime metadata that
+ * rest of the CLI does (`LocalServer.detectUrl`: the runtime metadata that
  * `zitadel start` wrote to `.zitadel/local/runtime.json`, falling back to a
  * `/healthz` probe on the default localhost port). A detected server becomes
  * an extra option in the choice list *and* the preselected answer — a user
@@ -80,14 +80,14 @@ export class ServerPrompt implements SetupPrompt {
 }
 
 /**
- * Wraps {@link detectHealthyLocalServer} in a spinner: the unhealthy paths
+ * Wraps {@link LocalServer.detectUrl} in a spinner: the unhealthy paths
  * block on up to two 1.5s `/healthz` probes, long enough that the wizard
  * should say what it is doing.
  */
 async function detectLocalServer(cwd: string): Promise<string | undefined> {
   const s = spinner();
   s.start("Checking for a local Zitadel server");
-  const detected = await detectHealthyLocalServer(cwd);
+  const detected = await LocalServer.detectUrl(cwd);
   s.stop(
     detected ? `Found local Zitadel server at ${detected}.` : "No local Zitadel server detected.",
   );

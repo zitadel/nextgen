@@ -144,9 +144,27 @@ describe("operation statics", () => {
     }
   });
 
-  it("leads the create examples with the required fields", () => {
+  it("leads the create and update examples with the required fields", () => {
     expect(CreateOperation.describe(definition(create)).examples[0]).toBe(
       "<%= config.bin %> teams create --name <name> --json",
+    );
+    expect(UpdateOperation.describe(definition(update)).examples[0]).toBe(
+      "<%= config.bin %> teams update <id> --name <name> --json",
+    );
+  });
+
+  it("names the --file example as one shell word for a multi-word resource", () => {
+    const idps = <Spec>(spec: Spec): OperationDefinition<Ctx, Spec> => ({
+      ...definition(spec),
+      topic: "idps",
+      resource: { ...resource, singular: "identity provider connection" },
+    });
+
+    expect(CreateOperation.describe(idps(create)).examples).toContain(
+      "<%= config.bin %> idps create --file ./identity-provider-connection.json",
+    );
+    expect(UpdateOperation.describe(idps(update)).examples).toContain(
+      "<%= config.bin %> idps update <id> --file ./identity-provider-connection.json",
     );
   });
 

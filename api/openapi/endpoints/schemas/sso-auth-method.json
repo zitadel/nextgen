@@ -22,7 +22,6 @@
         "maxLength": 64,
         "examples": [
           "google",
-          "github",
           "corp_idp"
         ]
       },

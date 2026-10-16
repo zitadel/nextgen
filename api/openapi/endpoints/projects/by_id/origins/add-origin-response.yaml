@@ -1,0 +1,12 @@
+type: object
+required:
+  - pattern
+  - kind
+properties:
+  pattern:
+    type: string
+  kind:
+    type: string
+    enum:
+      - primary
+      - preview

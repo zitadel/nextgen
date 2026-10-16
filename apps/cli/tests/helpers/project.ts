@@ -1,3 +1,4 @@
+import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -6,6 +7,9 @@ import { Readable } from "node:stream";
 
 import { expect } from "vitest";
 
+import { aFakeServerBinary, trackLocalServerDir, type ServerShape } from "./local-server";
+import { cliPackageRoot } from "./oclif-build";
+import { nextPort } from "./ports";
 import { parseJson, runCliForTest } from "./run-cli";
 
 const SCHEMA_FILE = ".zitadel/schemas/default-human-user.json";
@@ -31,6 +35,7 @@ export interface Envelope<T = Record<string, unknown>> {
   readonly message?: string;
   readonly hint?: string;
   readonly next_commands?: string[];
+  readonly warnings?: string[];
   readonly cli_version?: string;
   readonly command?: string;
   readonly source?: string;
@@ -128,35 +133,6 @@ interface PackageJson {
 }
 
 /**
- * A port from this worker's own block, because a bind-then-close probe races
- * the other vitest workers: a reserved port gets taken as an outbound source
- * port before the CLI binds it.
- *
- * The band sits below every platform's ephemeral range — macOS allocates from
- * 49152 and Linux from 32768 — so a reserved port cannot be taken as an
- * outbound source port by another worker's traffic before the CLI binds it.
- * It also stays clear of the repository's other deferred-bind reservations,
- * 22000-23999 for the journey runner and 24000-31999 for embedded Postgres,
- * which hand out ports before their processes bind just as this does, and of
- * the fixed ports the other suites pin above 18000.
- *
- * Indexed by `VITEST_POOL_ID`, the reusable 1-based pool slot.
- * `VITEST_WORKER_ID` is a unique worker identity that keeps climbing as files
- * spawn workers, so indexing by it walks the block past 65535 and hands the
- * CLI a port that cannot exist. The modulo bounds it either way.
- */
-const PORT_FIRST = 16_000;
-const PORT_LAST = 18_000;
-const PORT_BLOCK = 200;
-const PORT_BLOCKS = Math.floor((PORT_LAST - PORT_FIRST) / PORT_BLOCK);
-const POOL_SLOT = Math.max(1, Number(process.env.VITEST_POOL_ID ?? 1));
-const PORT_BASE = PORT_FIRST + ((POOL_SLOT - 1) % PORT_BLOCKS) * PORT_BLOCK;
-let portOffset = 0;
-function nextPort(): number {
-  return PORT_BASE + (portOffset++ % PORT_BLOCK);
-}
-
-/**
  * Files the developer commits and hand-edits.
  *
  * A spec reads one only where the committed content is itself the behaviour —
@@ -207,7 +183,7 @@ export type CustomConnection = {
   scopes?: string;
 };
 
-/** The flags describing a connection, under `--` for `sso enable` or `--sso-` for `setup`. */
+/** The flags describing a connection, under `--` for `auth-method sso enable` or `--sso-` for `setup`. */
 function customFlags(connection: CustomConnection, prefix: string): string[] {
   return [
     `${prefix}slug`,
@@ -265,10 +241,14 @@ export class ScaffoldedApp {
     );
   }
 
-  /** `sso enable` without `--json`, for a spec asserting what the developer reads. */
+  /**
+   * `auth-method sso enable` without `--json`, for a spec asserting what the
+   * developer reads.
+   */
   enableSsoRendered(provider: string, credentials: Credentials): Promise<CliResult> {
     return this.pipingStdin(credentials.secret, () =>
       this.cli([
+        "auth-method",
         "sso",
         "enable",
         "--non-interactive",
@@ -283,6 +263,7 @@ export class ScaffoldedApp {
   enableSso(provider: string, credentials: Credentials): Promise<CliResult> {
     return this.pipingSecret(credentials.secret, () =>
       this.cli([
+        "auth-method",
         "sso",
         "enable",
         "--non-interactive",
@@ -295,7 +276,61 @@ export class ScaffoldedApp {
     );
   }
 
-  /** `sso enable` for a connection the developer describes, secret piped as a script would. */
+  /** `auth-method password|passkey enable`. */
+  enableMethod(method: "password" | "passkey", extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli(["auth-method", method, "enable", "--non-interactive", "--json", ...extraArgs]);
+  }
+
+  /** `auth-method password|passkey disable`. */
+  disableMethod(method: "password" | "passkey", extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli([
+      "auth-method",
+      method,
+      "disable",
+      "--non-interactive",
+      "--json",
+      ...extraArgs,
+    ]);
+  }
+
+  /**
+   * `auth-method password|passkey enable` without `--json`, for what the
+   * developer reads.
+   */
+  enableMethodRendered(method: "password" | "passkey"): Promise<CliResult> {
+    return this.cli(["auth-method", method, "enable", "--non-interactive"]);
+  }
+
+  /**
+   * `auth-method password|passkey disable` without `--json`, for what the
+   * developer reads.
+   */
+  disableMethodRendered(method: "password" | "passkey"): Promise<CliResult> {
+    return this.cli(["auth-method", method, "disable", "--non-interactive"]);
+  }
+
+  /**
+   * `auth-method sso disable` without `--json`, for what the developer reads.
+   */
+  disableSsoRendered(provider: string): Promise<CliResult> {
+    return this.cli(["auth-method", "sso", "disable", "--non-interactive", "--provider", provider]);
+  }
+
+  /** `auth-method sso disable`. */
+  disableSso(provider: string, extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli([
+      "auth-method",
+      "sso",
+      "disable",
+      "--non-interactive",
+      "--json",
+      "--provider",
+      provider,
+      ...extraArgs,
+    ]);
+  }
+
+  /** `auth-method sso enable` for a connection the developer describes, secret piped as a script would. */
   enableCustomSso(connection: CustomConnection, credentials: Credentials): Promise<CliResult> {
     return this.enableSsoWith(
       [
@@ -309,10 +344,10 @@ export class ScaffoldedApp {
     );
   }
 
-  /** `sso enable` with exactly these flags, for a spec asserting how it refuses. */
+  /** `auth-method sso enable` with exactly these flags, for a spec asserting how it refuses. */
   enableSsoWith(args: string[], secret = "a-client-secret"): Promise<CliResult> {
     return this.pipingSecret(secret, () =>
-      this.cli(["sso", "enable", "--non-interactive", "--json", ...args]),
+      this.cli(["auth-method", "sso", "enable", "--non-interactive", "--json", ...args]),
     );
   }
 
@@ -342,6 +377,87 @@ export class ScaffoldedApp {
       PATH: `${docker.binDir}:${process.env.PATH ?? ""}`,
       DOCKER_LOG: docker.logPath,
     });
+  }
+
+  /**
+   * Starts this app's local server from a stand-in for the server binary, on a
+   * port from this worker unless one is named.
+   */
+  async startLocalServer({
+    shape = "plain",
+    port = nextPort(),
+  }: {
+    shape?: ServerShape;
+    port?: number;
+  } = {}): Promise<CliResult> {
+    trackLocalServerDir(this.path);
+    return this.cli(["start", "--port", String(port), "--json"], {
+      ZITADEL_SERVER_BINARY: await aFakeServerBinary(shape),
+    });
+  }
+
+  /** Starts the server again without naming a port, so the one the directory had is used. */
+  async restartLocalServer(): Promise<CliResult> {
+    trackLocalServerDir(this.path);
+    return this.cli(["start", "--json"], {
+      ZITADEL_SERVER_BINARY: await aFakeServerBinary("plain"),
+    });
+  }
+
+  /**
+   * Two starts racing in this app's directory, each its own process: the
+   * in-process runner captures output globally, so two runs at once in it
+   * would garble each other's.
+   */
+  async startLocalServerTwiceAtOnce(): Promise<CliResult[]> {
+    trackLocalServerDir(this.path);
+    const env = { ...process.env, ZITADEL_SERVER_BINARY: await aFakeServerBinary("plain") };
+    const port = String(nextPort());
+    const results = await Promise.all(
+      [0, 1].map(
+        () =>
+          new Promise<CliResult>((resolve) => {
+            execFile(
+              process.execPath,
+              [
+                join(cliPackageRoot, "bin/run.js"),
+                ...["start", "--cwd", this.path, "--server", MOCK_SERVER_URL],
+                ...["--port", port, "--json"],
+              ],
+              { env },
+              (error, stdout, stderr) =>
+                resolve({
+                  exitCode: typeof error?.code === "number" ? error.code : 0,
+                  stdout,
+                  stderr,
+                }),
+            );
+          }),
+      ),
+    );
+    return results;
+  }
+
+  /** The port a start reported its server on. */
+  localPortOf(result: CliResult): number {
+    return this.envelopeOf<{ runtime: { port: number } }>(result).data.runtime.port;
+  }
+
+  /** The process a start reported its server as. */
+  localPidOf(result: CliResult): number {
+    return this.envelopeOf<{ runtime: { pid: number } }>(result).data.runtime.pid;
+  }
+
+  /** Leaves this directory with a record of its local server that cannot be read. */
+  async corruptLocalServerRecord(): Promise<void> {
+    await mkdir(join(this.path, ".zitadel/local"), { recursive: true });
+    await writeFile(join(this.path, ".zitadel/local/runtime.json"), "{not json");
+  }
+
+  /** The lifecycle `status` reports for the local server. */
+  async localServerLifecycle(): Promise<string> {
+    const status = await this.cli(["status", "--json"]);
+    return this.envelopeOf<{ server: { lifecycle: string } }>(status).data.server.lifecycle;
   }
 
   status(extraArgs: string[] = []): Promise<CliResult> {
@@ -632,6 +748,7 @@ export class ScaffoldedApp {
         project_id: projectId,
         project_secret: "sk",
         preview_secret: "sk",
+        primary_origins: [],
         preview_origins: [],
         created_at: "2026-01-01T00:00:00.000Z",
       }),

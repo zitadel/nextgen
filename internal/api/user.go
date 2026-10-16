@@ -186,6 +186,39 @@ func (h *Handler) ListUserPasskeys(ctx context.Context, params api.ListUserPassk
 	return res, nil
 }
 
+func (h *Handler) ListUserIdentityLinks(ctx context.Context, params api.ListUserIdentityLinksParams) (api.ListUserIdentityLinksRes, error) {
+	projectID, err := h.requireResourceAccess(ctx, string(params.UserID), userAccess, opRead)
+	if err != nil {
+		return nil, err
+	}
+
+	links, nextPage, err := h.userService.ListIdentityLinks(ctx, service.ListIdentityLinksInput{
+		ProjectID: projectID,
+		UserID:    string(params.UserID),
+		PageToken: string(params.PageToken.Value),
+		Limit:     int(params.Limit.Value),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	res := &api.ListUserIdentityLinksResponse{
+		IdentityLinks: make([]api.UserIdentityLink, len(links)),
+	}
+	if nextPage != "" {
+		res.NextPageToken = api.NewOptNilPageToken(api.PageToken(nextPage))
+	}
+	for i, link := range links {
+		res.IdentityLinks[i] = api.UserIdentityLink{
+			ID:           link.ID,
+			ConnectionID: link.ConnectionID,
+			CreatedAt:    link.CreatedAt,
+		}
+	}
+
+	return res, nil
+}
+
 // ListUserTeams serves the user's team roster — the N:N membership list, one
 // page at a time, each entry carrying the team's name so a client renders the
 // page without resolving ids one by one. Lifecycle ownership is a different
