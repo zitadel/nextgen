@@ -10,9 +10,9 @@ import { describe, expect, it } from "vitest";
 // api/openapi/endpoints/schemas/, the example connection files and the
 // scaffolded flow from docs/design/idp/schemas/, and runs the accept/reject
 // matrix the docs claim was "mechanically verified". The docs lean on these
-// results for security-relevant rules (verified_claims value classes,
-// protocol arms, scope requirements), so the receipt must be checkable from
-// the repo.
+// results for security-relevant rules (verified_claims value classes, the
+// single oidc protocol, scope requirements), so the receipt must be checkable
+// from the repo.
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../../../..");
 const readme = readFileSync(join(repoRoot, "docs/design/idp/README.md"), "utf8");
@@ -36,7 +36,6 @@ const loadJson = (dir: string, name: string) =>
   JSON.parse(readFileSync(join(dir, name), "utf8")) as Record<string, unknown>;
 const connectionSchema = loadJson(metaSchemaDir, "idp-connection.json");
 const googleExample = loadJson(schemasDir, "google.json");
-const githubExample = loadJson(schemasDir, "github.json");
 const ssoAuthMethodSchema = loadJson(metaSchemaDir, "sso-auth-method.json");
 
 const ajv = () => new Ajv2020({ strict: false, validateFormats: false });
@@ -50,6 +49,7 @@ const oidcBlock = {
   client_secret: "${{ S }}",
   scopes: ["openid"],
 };
+// The block the removed `oauth2` protocol took, kept to prove it is refused.
 const oauth2Block = {
   authorization_endpoint: "https://a",
   token_endpoint: "https://t",
@@ -58,13 +58,11 @@ const oauth2Block = {
   client_secret: "${{ S }}",
 };
 const oidc = { ...root, protocol: "oidc", oidc: oidcBlock };
-const oauth2 = { ...root, protocol: "oauth2", subject_claim: "id", oauth2: oauth2Block };
 
 /** The accept/reject matrix the docs reference. One row per documented rule. */
 const connectionCases: ReadonlyArray<[string, object, boolean]> = [
   // baselines
   ["oidc via discovery", oidc, true],
-  ["oauth2 with explicit endpoints", oauth2, true],
   ["scaffolded $schema editor pointer", { ...oidc, $schema: "../meta/idp-connection.json" }, true],
   [
     "legacy OIDC with manual endpoint overrides",
@@ -84,20 +82,19 @@ const connectionCases: ReadonlyArray<[string, object, boolean]> = [
   // protocol arms
   ["missing protocol entirely", { ...root, oidc: oidcBlock }, false],
   ["oidc without its block", { ...root, protocol: "oidc" }, false],
+  [
+    "oauth2 protocol rejected (removed; oidc is the only protocol)",
+    { ...root, protocol: "oauth2", subject_claim: "id", oauth2: oauth2Block },
+    false,
+  ],
+  ["oauth2 protocol with an oidc block", { ...oidc, protocol: "oauth2" }, false],
   ["oidc carrying an oauth2 block", { ...oidc, oauth2: oauth2Block }, false],
-  ["oauth2 carrying an oidc block", { ...oauth2, oidc: oidcBlock }, false],
   ["issuer at root (flat shape)", { ...oidc, issuer: "https://a" }, false],
   [
     "oidc missing issuer",
     { ...root, protocol: "oidc", oidc: { ...oidcBlock, issuer: undefined } },
     false,
   ],
-  [
-    "oauth2 missing an endpoint",
-    { ...oauth2, oauth2: { ...oauth2Block, token_endpoint: undefined } },
-    false,
-  ],
-  ["oauth2 without subject_claim", { ...root, protocol: "oauth2", oauth2: oauth2Block }, false],
   // credentials
   [
     "oidc missing client_id",
@@ -197,9 +194,10 @@ const connectionCases: ReadonlyArray<[string, object, boolean]> = [
   [
     "static param reserved (redirect_uri)",
     {
-      ...oauth2,
-      oauth2: {
-        ...oauth2Block,
+      ...root,
+      protocol: "oidc",
+      oidc: {
+        ...oidcBlock,
         static_authorize_parameters: { redirect_uri: "https://evil.example" },
       },
     },
@@ -217,8 +215,9 @@ const connectionCases: ReadonlyArray<[string, object, boolean]> = [
   [
     "static param client_assertion",
     {
-      ...oauth2,
-      oauth2: { ...oauth2Block, static_authorize_parameters: { client_assertion: "eyJhbGc" } },
+      ...root,
+      protocol: "oidc",
+      oidc: { ...oidcBlock, static_authorize_parameters: { client_assertion: "eyJhbGc" } },
     },
     false,
   ],
@@ -293,7 +292,7 @@ const connectionCases: ReadonlyArray<[string, object, boolean]> = [
   ],
   [
     "http token_endpoint rejected",
-    { ...oauth2, oauth2: { ...oauth2Block, token_endpoint: "http://t.example" } },
+    { ...root, protocol: "oidc", oidc: { ...oidcBlock, token_endpoint: "http://t.example" } },
     false,
   ],
   // scopes
@@ -308,38 +307,13 @@ const connectionCases: ReadonlyArray<[string, object, boolean]> = [
     { ...root, protocol: "oidc", oidc: { ...oidcBlock, scopes: ["profile"] } },
     false,
   ],
-  // strategy contract projections
+  // supplementary_fetch strategies left with the oauth2 protocol
   [
-    "github strategy with user:email",
-    {
-      ...oauth2,
-      oauth2: {
-        ...oauth2Block,
-        scopes: ["user:email"],
-        supplementary_fetch: "github_primary_email",
-      },
-    },
-    true,
-  ],
-  [
-    "github strategy without user:email",
-    { ...oauth2, oauth2: { ...oauth2Block, supplementary_fetch: "github_primary_email" } },
-    false,
-  ],
-  [
-    "strategy on oidc (field absent from the block)",
+    "supplementary_fetch on oidc (field absent from the block)",
     {
       ...root,
       protocol: "oidc",
       oidc: { ...oidcBlock, supplementary_fetch: "github_primary_email" },
-    },
-    false,
-  ],
-  [
-    "unknown strategy name (closed enum)",
-    {
-      ...oauth2,
-      oauth2: { ...oauth2Block, scopes: ["user:email"], supplementary_fetch: "future_thing" },
     },
     false,
   ],
@@ -379,24 +353,16 @@ const connectionCases: ReadonlyArray<[string, object, boolean]> = [
     { ...oidc, provisioning: { default_schema: "user-human" } },
     false,
   ],
-  [
-    "$supplementary_fetch coverage on the GitHub shape",
-    {
-      ...oauth2,
-      verified_claims: { email: "$supplementary_fetch" },
-      oauth2: {
-        ...oauth2Block,
-        scopes: ["user:email"],
-        supplementary_fetch: "github_primary_email",
-      },
-    },
-    true,
-  ],
   // verified_claims value classes
   [
     "verified_claims literal true accepted (Entra trust)",
     { ...oidc, verified_claims: { email: true } },
     true,
+  ],
+  [
+    "verified_claims $supplementary_fetch pointer rejected (removed)",
+    { ...oidc, verified_claims: { email: "$supplementary_fetch" } },
+    false,
   ],
   ["verified_claims false rejected", { ...oidc, verified_claims: { email: false } }, false],
   ["verified_claims number rejected", { ...oidc, verified_claims: { email: 42 } }, false],
@@ -443,9 +409,8 @@ describe("idp connection schema (docs/design/idp/1-resource-model.md)", () => {
     expect(validateConnection(JSON.parse(JSON.stringify(doc)))).toBe(expected);
   });
 
-  it("accepts both scaffolded example files verbatim", () => {
+  it("accepts the scaffolded example file verbatim", () => {
     expect(validateConnection(googleExample)).toBe(true);
-    expect(validateConnection(githubExample)).toBe(true);
   });
 });
 
@@ -641,50 +606,47 @@ describe("forward compatibility (1-resource-model.md · Forward compatibility)",
         { required: string[]; properties: Record<string, unknown>; allOf?: unknown[] }
       >;
     };
-    for (const block of ["oidc", "oauth2"]) {
-      const b = extended.properties[block]!;
-      b.required = b.required.filter((r) => r !== "client_secret");
-      b.properties.secret_strategy = {
-        type: "string",
-        enum: ["static", "apple_jwt"],
-        default: "static",
-      };
-      b.properties.response_mode = {
-        type: "string",
-        enum: ["query", "form_post"],
-        default: "query",
-      };
-      b.properties.secret_params = {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          team_id: { type: "string" },
-          key_id: { type: "string" },
-          private_key_env: { type: "string", pattern: "^[A-Za-z_][A-Za-z0-9_]*$" },
+    const b = extended.properties.oidc!;
+    b.required = b.required.filter((r) => r !== "client_secret");
+    b.properties.secret_strategy = {
+      type: "string",
+      enum: ["static", "apple_jwt"],
+      default: "static",
+    };
+    b.properties.response_mode = {
+      type: "string",
+      enum: ["query", "form_post"],
+      default: "query",
+    };
+    b.properties.secret_params = {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        team_id: { type: "string" },
+        key_id: { type: "string" },
+        private_key_env: { type: "string", pattern: "^[A-Za-z_][A-Za-z0-9_]*$" },
+      },
+    };
+    b.allOf = [
+      ...(b.allOf ?? []),
+      {
+        if: {
+          properties: { secret_strategy: { const: "apple_jwt" } },
+          required: ["secret_strategy"],
         },
-      };
-      b.allOf = [
-        ...(b.allOf ?? []),
-        {
-          if: {
-            properties: { secret_strategy: { const: "apple_jwt" } },
-            required: ["secret_strategy"],
-          },
-          // biome-ignore lint/suspicious/noThenProperty: JSON Schema if/then/else keyword, not a thenable
-          then: {
-            required: ["secret_params"],
-            properties: { secret_params: { required: ["team_id", "key_id", "private_key_env"] } },
-          },
-          else: { required: ["client_secret"] },
+        // biome-ignore lint/suspicious/noThenProperty: JSON Schema if/then/else keyword, not a thenable
+        then: {
+          required: ["secret_params"],
+          properties: { secret_params: { required: ["team_id", "key_id", "private_key_env"] } },
         },
-      ];
-    }
+        else: { required: ["client_secret"] },
+      },
+    ];
     const provisioning = extended.properties.provisioning!;
     provisioning.properties.is_auto_update = { type: "boolean", default: false };
     (provisioning.properties.creation as { enum: string[] }).enum.push("auto_only");
     const validateExtended = ajv().compile(extended);
     expect(validateExtended(googleExample)).toBe(true);
-    expect(validateExtended(githubExample)).toBe(true);
     expect(
       validateExtended({
         ...oidc,
@@ -800,7 +762,7 @@ describe("provider catalog (4-cli-provider-setup.md · The Provider Catalog)", (
       display_name: string;
       template: string;
       protocol_block: {
-        protocol: "oidc" | "oauth2";
+        protocol: "oidc";
         subject_claim: string;
         verified_claims: Record<string, unknown>;
       } & Record<string, unknown>;
@@ -831,13 +793,13 @@ describe("provider catalog (4-cli-provider-setup.md · The Provider Catalog)", (
     };
   };
 
-  it.each<[string, Record<string, unknown>]>([
-    ["google", googleExample],
-    ["github", githubExample],
-  ])("entry %s scaffolds the example connection verbatim", (key, example) => {
-    const { $schema: _, ...expected } = example;
-    const protocol = catalog[key]!.protocol_block.protocol;
-    const clientId = (expected[protocol] as Record<string, unknown>).client_id as string;
-    expect(scaffold(key, clientId)).toEqual(expected);
-  });
+  it.each<[string, Record<string, unknown>]>([["google", googleExample]])(
+    "entry %s scaffolds the example connection verbatim",
+    (key, example) => {
+      const { $schema: _, ...expected } = example;
+      const protocol = catalog[key]!.protocol_block.protocol;
+      const clientId = (expected[protocol] as Record<string, unknown>).client_id as string;
+      expect(scaffold(key, clientId)).toEqual(expected);
+    },
+  );
 });

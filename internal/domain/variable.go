@@ -17,6 +17,15 @@ const MaxVariableStringLength = 1 << 14 // 16k
 // never send back. Keep the two in step.
 const MaxVariableNameLength = 255
 
+// MaxVariableSetBytes caps the encoded variables of one kind in a project. A
+// deployment freezes them as one JSON cell, and a Spanner cell holds at most
+// 10 MiB (Postgres JSONB and SQLite TEXT allow far more). The cap sits below
+// the cell: Spanner normalizes the JSON it stores, so the column is not byte
+// for byte what Go marshals, and the headroom is what guarantees a freeze can
+// never fail on variables a write admitted. It is enforced on write, per kind,
+// over the bytes a freeze would store (ADR 069).
+const MaxVariableSetBytes = 9 << 20
+
 func ErrVariableNotFound() Error {
 	return newError(PrefixVariable.ErrorCodePrefix("not_found"), "variable: not found", nil, nil)
 }
@@ -40,6 +49,13 @@ func ErrNoVariableOwnerProjectID() Error {
 
 func ErrVariablePermissionDenied() Error {
 	return newError(PrefixVariable.ErrorCodePrefix("permission_denied"), "variable: permission denied", nil, nil)
+}
+
+// ErrVariableLimitExceeded refuses a write after which the variables of one
+// kind would not fit in the cell a deployment freezes them into. The details
+// name the kind, the size the write would have reached and the limit.
+func ErrVariableLimitExceeded() Error {
+	return newError(PrefixVariable.ErrorCodePrefix("limit_exceeded"), "the variables of this kind would not fit in one deployment", nil, nil)
 }
 
 func ErrFailedToDecryptVariable(parent error) Error {

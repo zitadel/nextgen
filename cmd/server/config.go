@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -30,6 +31,15 @@ type Config struct {
 	// HTTPClient configures the hardened egress client used for every fetch
 	// of a URL a platform user can inject (see the egress-policy ADR).
 	HTTPClient httputil.ClientConfig `mapstructure:"httpclient"`
+	// Origins configures write validation for project origin patterns.
+	Origins OriginsConfig `mapstructure:"origins"`
+}
+
+// OriginsConfig is the instance-level origins policy. SharedHosts maps a shared
+// host suffix to a full-hostname allow regexp. YAML values are strings; the
+// config decode hook compiles them into *regexp.Regexp.
+type OriginsConfig struct {
+	SharedHosts map[string]*regexp.Regexp `mapstructure:"shared_hosts"`
 }
 
 // EventsConfig configures audit event retention and deployment export sinks.

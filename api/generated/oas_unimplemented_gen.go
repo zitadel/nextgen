@@ -13,6 +13,18 @@ type UnimplementedHandler struct{}
 
 var _ Handler = UnimplementedHandler{}
 
+// AddOrigin implements addOrigin operation.
+//
+// Adds one `{pattern, kind}` to the project's origins. A primary pattern
+// must be an exact URL (no wildcard). Preview patterns may include a single
+// DNS-label wildcard. Adding a pattern that already exists with the same
+// kind is idempotent and answers 201 with the stored origin.
+//
+// POST /projects/{project_id}/origins
+func (UnimplementedHandler) AddOrigin(ctx context.Context, req *ProjectOrigin, params AddOriginParams) (r AddOriginRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // BeginUserPasskeyRegistration implements beginUserPasskeyRegistration operation.
 //
 // Starts a WebAuthn registration ceremony for the user and returns the
@@ -235,17 +247,25 @@ func (UnimplementedHandler) CreateHandoff(ctx context.Context, params CreateHand
 // `id`, so identity links that reference the connection keep resolving while
 // releases and auth attempts stay pinned to the revision they captured.
 // Identity fields are fixed for the life of the connection and a revision
-// that changes one is rejected: `protocol`, `subject_claim`, and the
-// endpoints that name the authority (`issuer` for OIDC, `token_endpoint`
-// and `userinfo_endpoint` for OAuth 2.0). Their values decide which provider
+// that changes one is rejected: `protocol`, `subject_claim`, and `issuer`,
+// the field that names the authority. Their values decide which provider
 // account a stored subject belongs to, so changing one would silently
 // repoint existing identities at a different provider.
-// `subject_claim` is optional for OIDC and required for OAuth 2.0. For an
-// OIDC connection, `sub` is used as the default value. If a revision updates
-// `subject_claim` to a different value than the one set during creation, the
-// request is rejected.
+// `subject_claim` is optional, and `sub` is used as the default value. If a
+// revision updates `subject_claim` to a different value than the one set
+// during creation, the request is rejected.
+// OIDC is the only protocol.
 // The document is validated against the `idp-connection.json` schema before
-// anything is stored.
+// anything is stored. The rules the engine applies when it starts a sign-in
+// then run on the document, so a connection that could never start one is
+// refused here instead with `idp.endpoints_partial`: the OIDC block sets an
+// endpoint without the others. It either sets no endpoint, and discovery
+// fills them, or sets `authorization_endpoint`, `token_endpoint`, `jwks_uri`,
+// and `userinfo_endpoint`. `userinfo_endpoint` may be left out when
+// `id_token_mapping` is on, but setting it alone still counts as setting an
+// endpoint. The details list the missing endpoints.
+// A refused document stores nothing, and on a revise the current revision
+// stays unchanged.
 //
 // POST /idps
 func (UnimplementedHandler) CreateIdp(ctx context.Context, req *CreateIdpRequest, params CreateIdpParams) (r CreateIdpRes, _ error) {
@@ -388,8 +408,9 @@ func (UnimplementedHandler) DeleteUserByID(ctx context.Context, params DeleteUse
 
 // DeleteVariable implements deleteVariable operation.
 //
-// Removes the project's variable under this name. Deleting a name the
-// project does not hold answers `var.not_found`.
+// Removes a variable for the requested kind, or for both kinds without
+// `kind`. A name with no value for that kind answers `var.not_found`.
+// Existing deployments keep the values they froze.
 //
 // DELETE /variables/{variable_name}
 func (UnimplementedHandler) DeleteVariable(ctx context.Context, params DeleteVariableParams) (r DeleteVariableRes, _ error) {
@@ -494,6 +515,17 @@ func (UnimplementedHandler) GetClaimWindow(ctx context.Context, params GetClaimW
 //
 // GET /deployments/{deployment_id}
 func (UnimplementedHandler) GetDeploymentById(ctx context.Context, params GetDeploymentByIdParams) (r GetDeploymentByIdRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetDeploymentVariables implements getDeploymentVariables operation.
+//
+// Returns the variable values the deployment froze when it was made. Later
+// changes to the project's variables do not affect them. A secret reads
+// back as `{"secret": true}`.
+//
+// GET /deployments/{deployment_id}/variables
+func (UnimplementedHandler) GetDeploymentVariables(ctx context.Context, params GetDeploymentVariablesParams) (r GetDeploymentVariablesRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -714,9 +746,9 @@ func (UnimplementedHandler) GetUserByID(ctx context.Context, params GetUserByIDP
 
 // GetVariable implements getVariable operation.
 //
-// Reads one of the project's variables by name. A name the project has not
-// entered answers `var.not_found`. A secret is found but not disclosed: the
-// response is `{"secret": true}`.
+// Reads one variable by name, with its value per kind. A name with no
+// value for the requested kind answers `var.not_found`. A secret reads
+// back as `{"secret": true}`.
 //
 // GET /variables/{variable_name}
 func (UnimplementedHandler) GetVariable(ctx context.Context, params GetVariableParams) (r GetVariableRes, _ error) {
@@ -725,7 +757,8 @@ func (UnimplementedHandler) GetVariable(ctx context.Context, params GetVariableP
 
 // GetVariables implements getVariables operation.
 //
-// Returns the project's variables, keyed by name.
+// Returns the project's variables, keyed by name, each with its value per
+// kind. With `kind`, only that kind's values are returned.
 // Secret values are not returned. A secret appears as `{"secret": true}`,
 // which says a value is held without disclosing it.
 //
@@ -889,6 +922,16 @@ func (UnimplementedHandler) ListSchemas(ctx context.Context, params ListSchemasP
 	return r, ht.ErrNotImplemented
 }
 
+// ListUserIdentityLinks implements listUserIdentityLinks operation.
+//
+// The identity provider accounts a sign-in linked to the user, oldest first.
+// The provider's subject and claims are never returned.
+//
+// GET /users/{user_id}/identity_links
+func (UnimplementedHandler) ListUserIdentityLinks(ctx context.Context, params ListUserIdentityLinksParams) (r ListUserIdentityLinksRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListUserPasskeys implements listUserPasskeys operation.
 //
 // List user passkeys.
@@ -1017,6 +1060,18 @@ func (UnimplementedHandler) QueryTeams(ctx context.Context, req *QueryTeamsReque
 //
 // POST /users/query
 func (UnimplementedHandler) QueryUsers(ctx context.Context, req *QueryUsersRequest, params QueryUsersParams) (r QueryUsersRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// RemoveOrigin implements removeOrigin operation.
+//
+// Removes one pattern from the project's origins. Requests from URLs only
+// that pattern admitted are refused from then on; live previews and
+// deployment history are untouched. Removing a pattern that is already
+// absent is idempotent and answers 204.
+//
+// POST /projects/{project_id}/origins/remove
+func (UnimplementedHandler) RemoveOrigin(ctx context.Context, req *RemoveOriginReq, params RemoveOriginParams) (r RemoveOriginRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -1184,8 +1239,13 @@ func (UnimplementedHandler) UpdateTeam(ctx context.Context, req *UpdateTeamReque
 
 // UpdateVariables implements updateVariables operation.
 //
-// Enters, replaces and removes the project's variables. Names not in the
-// body are untouched.
+// Enters, replaces and removes the project's variables for the requested
+// kind. Names not in the body are untouched. Existing deployments keep the
+// values they froze.
+// Without `kind`, a plain value is written for both kinds. A secret is
+// written for `primary` only and removes the name's `preview` value, so a
+// preview never keeps a plaintext copy; set a preview secret with
+// `kind=preview`. `null` removes the name from both.
 // A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
 // stores the value encrypted under the project's active `secret` key, after
 // which it can be referenced but not read back. `null` removes the name

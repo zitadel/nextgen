@@ -200,10 +200,10 @@ moon run storybook:build
 moon run storybook:test
 ```
 
-`storybook:test` (and any `--project browser` Vitest run) launches real Chromium
-and pre-bundles the workspace from source, so the **first** run is slow
-(60–120s+) while later runs are fast on a warm `node_modules/.vite` cache — it is
-not hung. Don't pipe it through `tail` (buffers until EOF) and don't kill-and-
-retry without first clearing strays (`pkill -f vitest; pkill -f chrome-headless-shell`),
-or the next run stalls on `Port … is in use`. See
+`storybook:test` launches real Chromium and re-bundles its dependencies, the
+generated API client among them, on every start (`optimizeDeps.force` in
+`vitest.config.ts`), so a local run starts as cold as a CI run. Don't pipe it
+through `tail` (buffers until EOF) and don't kill-and-retry without first
+clearing strays (`pkill -f vitest; pkill -f chrome-headless-shell`), or the next
+run stalls on `Port … is in use`. See
 [`packages/components/AGENTS.md`](../../packages/components/AGENTS.md#the-browser-project-hangs--it-doesnt-its-cold-start).

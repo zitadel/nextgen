@@ -190,6 +190,11 @@ tasks:
       - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
+      # Read by the cloud launcher's tests (apps/cloud/launcher), which hold
+      # the deployment's configuration together. Scoped to test: nothing the
+      # server compiles reads them.
+      - "/vercel.json"
+      - "/apps/cloud/build.sh"
     options:
       runFromWorkspaceRoot: true
 
@@ -233,10 +238,13 @@ tasks:
       # See the -count=1 note above: moon's own cache would skip the process
       # before go's cache mattered.
       cache: false
-      # Invoked explicitly by the CI "Run Go integration tests (postgres)" step.
-      # runInCI must be true, otherwise moon hides the task from `moon run` in CI
-      # ("No tasks found"). `moon ci --downstream deep` also runs it when it is
-      # affected, as a dependent of the UI builds.
+      # ci.yml's graph step (`moon ci --downstream deep`) runs it whenever it is
+      # affected, as a dependent of the UI builds. The "Run Go integration tests
+      # (postgres)" step runs it only when the graph did not, as when ci-mode
+      # forces a full run for a workflow-only edit, which no lane lists as
+      # input.
+      # runInCI must be true for both: moon ci leaves out a task that is not,
+      # and `moon run` in CI refuses one ("No tasks found").
       runInCI: true
 
   test-spanner:
@@ -336,10 +344,9 @@ tasks:
       # See the -count=1 note above: moon's own cache would skip the process
       # before go's cache mattered.
       cache: false
-      # Invoked explicitly by the CI "Run Go integration tests (sqlite)" step.
-      # runInCI must be true, otherwise moon hides the task from `moon run` in CI
-      # ("No tasks found"). `moon ci --downstream deep` also runs it when it is
-      # affected, as a dependent of the UI builds.
+      # Runs in CI as test-postgres does: in ci.yml's graph step when it is
+      # affected, and in the "Run Go integration tests (sqlite)" step only when
+      # the graph did not run it.
       runInCI: true
 
   build:

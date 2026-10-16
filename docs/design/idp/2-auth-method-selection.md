@@ -4,7 +4,7 @@
 > **Area:** 2 of 4 (see [`README.md`](README.md))
 
 This document defines how a user schema declares which external identity
-providers (like Google or GitHub) its users are permitted to sign in with, and
+providers (like Google or a company's own OIDC provider) its users are permitted to sign in with, and
 how that configuration is wired into the login flow.
 
 ## The Three-Way Linkage
@@ -89,7 +89,7 @@ A hand-edited field is never overwritten; the journey reports it instead
 "x-auth-methods": {
   "passkey":  { "enabled": true },
   "password": { "enabled": true },
-  "sso":      { "enabled": true, "providers": ["github"] }
+  "sso":      { "enabled": true, "providers": ["corp_idp"] }
 }
 ```
 
@@ -197,7 +197,7 @@ Same split as `user-property.json` / `property-name.json`.
 The `providers` array is required and non-empty when SSO is enabled.
 
 - **Avoiding the "Absent-Means-All" Footgun:** If an omitted array defaulted to
-  "allow all," adding a new GitHub connection for one specific schema would
+  "allow all," adding a new company SSO connection for one specific schema would
   silently activate it across *every* schema where `sso.enabled: true`.
   This directly violates the rule that simply creating a provider connection
   does not make it universally available.

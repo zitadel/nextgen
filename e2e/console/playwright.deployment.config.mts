@@ -2,24 +2,24 @@ import { defineConfig, devices } from "@playwright/test";
 
 /**
  * The hosted cloud's console on a deployment (src-deployment/), which
- * CONSOLE_DEPLOYMENT_URL names: how the repo-root vercel.json routes the
- * console's paths, and the console signed out, down to the login widget's
- * first step. It signs nobody in and holds no credential but Vercel's:
+ * CLOUD_URL names: how the repo-root vercel.json routes the console's paths,
+ * and the console signed out, down to the login widget's first step. It signs
+ * nobody in and holds no credential but Vercel's:
  * VERCEL_AUTOMATION_BYPASS_SECRET opens the deployment's protection
- * (docs/runbooks/cloud.md, "Deployment checks"), and
+ * (docs/runbooks/cloud.md, "Deployment checks"); the production domain needs
+ * none. `pnpm check:cloud` runs it beside every other deployment suite, and
  * .github/workflows/deployment-checks.yml runs it for every deployment.
  *
  * There is no local server: the lane checks what Vercel built and routed,
  * which the embedded lane cannot see.
  */
-const deployment = process.env.CONSOLE_DEPLOYMENT_URL;
+const deployment = process.env.CLOUD_URL;
 if (!deployment) {
-  throw new Error("CONSOLE_DEPLOYMENT_URL names the deployment to test");
+  throw new Error("CLOUD_URL names the deployment to test");
 }
 const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
 // GitHub Actions (deployment-checks.yml): annotations on the check that name
-// the failing test and its assertion. CI itself is unset there, for moon's
-// sake, so GitHub is recognised by this.
+// the failing test and its assertion.
 const onGitHub = !!process.env.GITHUB_RUN_ID;
 
 export default defineConfig({

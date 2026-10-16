@@ -43,9 +43,6 @@ type CallbackRequest struct {
 	// ClientSecret is the resolved value of the connection's reference,
 	// for this call only.
 	ClientSecret string
-	// SupplementaryFetch is the strategy the connection selects, or nil.
-	// The registry that resolves a name to one is #1029.
-	SupplementaryFetch SupplementaryFetch
 }
 
 // ExternalIdentity is what a completed callback yields: the resolved
@@ -68,32 +65,9 @@ type ExternalIdentity struct {
 	RevisionID string
 }
 
-// SupplementaryFetch is the supplementary_fetch strategy slot: a provider
-// specific call after claims extraction whose result overwrites same-named
-// claims and vouches for the ones it verifies. The subject claim is the
-// exception: the verified token keeps it.
-type SupplementaryFetch func(ctx context.Context, in StrategyInput) (StrategyResult, error)
-
-// StrategyInput is what a strategy runs with.
-type StrategyInput struct {
-	Connection  Connection
-	AccessToken string
-	TokenType   string
-	// HTTPClient is the egress client; every strategy URL is tenant-served.
-	HTTPClient *http.Client
-}
-
-// StrategyResult is what a strategy emits. Both maps are keyed by provider
-// claim name. An empty result is not a failure: the strategy emits nothing
-// and the extracted claims stand, unverified.
-type StrategyResult struct {
-	Claims   map[string]any
-	Verified map[string]bool
-}
-
 // Callback completes the ceremony for one attempt: exchanges the code,
-// verifies the id_token, extracts claims, coerces the subject, runs the
-// strategy, and evaluates verification. The provider's tokens are dropped
+// verifies the id_token, extracts claims, coerces the subject, and evaluates
+// verification. The provider's tokens are dropped
 // when it returns.
 func (c *OIDCClient) Callback(ctx context.Context, req CallbackRequest) (ExternalIdentity, error) {
 	if req.Code == "" {
@@ -104,9 +78,6 @@ func (c *OIDCClient) Callback(ctx context.Context, req CallbackRequest) (Externa
 	}
 	if req.RevisionID != c.conn.RevisionID {
 		return ExternalIdentity{}, domain.ErrInternal(errors.New("callback: client revision differs from the one in the authorize request"))
-	}
-	if err := requireStrategy(c.conn, req.SupplementaryFetch); err != nil {
-		return ExternalIdentity{}, err
 	}
 	token, err := c.exchange(ctx, req.Code, req.PKCEVerifier, req.ClientSecret)
 	if err != nil {
@@ -120,38 +91,16 @@ func (c *OIDCClient) Callback(ctx context.Context, req CallbackRequest) (Externa
 	if err != nil {
 		return ExternalIdentity{}, err
 	}
-	// The subject is read before the strategy runs, so it comes from the
-	// verified id_token or the userinfo checked against it. A strategy
-	// emitting the subject claim changes the claim, never the identity.
+	// The subject comes from the verified id_token or the userinfo checked
+	// against it.
 	subject, err := coerceSubject(c.conn.SubjectClaim, claims)
 	if err != nil {
 		return ExternalIdentity{}, err
 	}
-	var strategy StrategyResult
-	if req.SupplementaryFetch != nil {
-		strategy, err = req.SupplementaryFetch(ctx, StrategyInput{
-			Connection:  c.conn,
-			AccessToken: token.AccessToken,
-			TokenType:   token.Type(),
-			HTTPClient:  c.party.HttpClient(),
-		})
-		if err != nil {
-			return ExternalIdentity{}, domain.ErrIDPSupplementaryFetchFailed(err)
-		}
-		// The strategy is the authority for the claims it emits, except the
-		// subject: the identity keys on the verified value, so a property
-		// mapped to the subject claim must carry that same value.
-		for claim, value := range strategy.Claims {
-			if claim == c.conn.SubjectClaim {
-				continue
-			}
-			claims[claim] = value
-		}
-	}
 	return ExternalIdentity{
 		Subject:    subject,
 		Claims:     mapClaims(c.conn.ClaimMapping, claims),
-		Verified:   evaluateVerified(c.conn, claims, strategy),
+		Verified:   evaluateVerified(c.conn, claims),
 		RevisionID: c.conn.RevisionID,
 	}, nil
 }
@@ -304,22 +253,6 @@ func (c *OIDCClient) extractClaims(ctx context.Context, token *oauth2.Token, idT
 	return claims, nil
 }
 
-// requireStrategy fails when a verified_claims entry points at the strategy
-// and none is passed. ParseConnection refuses such an entry on an oidc
-// connection, so this guards a connection built by hand and the oauth2
-// path (#1066).
-func requireStrategy(conn Connection, strategy SupplementaryFetch) error {
-	if strategy != nil {
-		return nil
-	}
-	for property, source := range conn.VerifiedClaims {
-		if source.Kind == VerifyByStrategy {
-			return domain.ErrInternal(fmt.Errorf("callback: %s is verified by the strategy, but none is passed", property))
-		}
-	}
-	return nil
-}
-
 // mapClaims keys the provider claims by user-schema property. A property
 // whose claim is absent is left out.
 func mapClaims(claimMapping map[string]string, claims map[string]any) map[string]any {
@@ -333,7 +266,7 @@ func mapClaims(claimMapping map[string]string, claims map[string]any) map[string
 }
 
 // evaluateVerified applies each verified_claims entry.
-func evaluateVerified(conn Connection, claims map[string]any, strategy StrategyResult) map[string]bool {
+func evaluateVerified(conn Connection, claims map[string]any) map[string]bool {
 	verified := make(map[string]bool, len(conn.VerifiedClaims))
 	for property, source := range conn.VerifiedClaims {
 		// Verification is about a value. Without one there is nothing
@@ -345,17 +278,12 @@ func evaluateVerified(conn Connection, claims map[string]any, strategy StrategyR
 		}
 		switch source.Kind {
 		case VerifyByTrust:
-			// Trust covers the value as it stands, including one the
-			// strategy replaced: the strategy is the authority for the
-			// claims it emits.
+			// Trust covers the value as it stands.
 			verified[property] = true
 		case VerifyByClaim:
 			// The boolean true or the string "true"; anything else,
 			// including an absent claim, is unverified.
 			verified[property] = claims[source.Claim] == true || claims[source.Claim] == "true"
-		case VerifyByStrategy:
-			// The strategy reports by provider claim name.
-			verified[property] = strategy.Verified[claim]
 		}
 	}
 	return verified

@@ -128,7 +128,7 @@ After claim, the same sub-journey runs behind the Sign-in methods journey.
 A provider the catalog does not list is not an entry in it.
 The developer describes the connection instead, and the same sub-journey
 announces, collects credentials, scaffolds and writes it
-(`sso enable --provider custom`, and the "another OpenID Connect provider"
+(`auth-method sso enable --provider custom`, and the "another OpenID Connect provider"
 option in `zitadel setup`, `--sso custom`).
 
 | Input | Rule |
@@ -159,7 +159,7 @@ What is different from a catalog provider:
 * **Credential variables follow the slug**: `ACME_SSO_CLIENT_ID` and
   `ACME_SSO_CLIENT_SECRET` for `acme-sso`, exactly as for a catalog provider.
 * **`setup` takes one custom connection.** The wizard offers the option once;
-  further connections are added with `sso enable`.
+  further connections are added with `auth-method sso enable`.
 
 ## Callback URIs
 
@@ -203,21 +203,22 @@ preview       excluded: declared by issuer_pattern, not an exact issuer
 Following Area 1's principle that
 ["vendor knowledge is data"](1-resource-model.md#vendor-knowledge-is-data), the
 catalog is bundled in `packages/config`, so scaffolding works offline.
-Epic 851 includes two entries: `google` and `github`.
+Epic 851 includes one entry: `google`.
+GitHub speaks OAuth 2.0 only, and OIDC is the only connection protocol, so
+GitHub has no entry ([area 1](1-resource-model.md#vendor-knowledge-is-data)).
 [`schemas/catalog.json`](schemas/catalog.json) is an example of the full table.
 
 The values below are the vendor knowledge; how a connection is composed from
 them is not. `packages/config/src/idp/` therefore holds one class per provider
 over a shared `IdpProvider` interface, rather than a JSON table the callers
-interpret: GitHub speaks OAuth2 rather than OIDC, emits no family name, and
-needs a second request to read an email at all, and a table would push each of
-those differences into a branch in shared code. Adding a provider is a class
+interpret: a table would push each vendor's differences into a branch in shared
+code. Adding a provider is a class
 and a line in the registry.
 
 Not in the table:
 
 - `client_id` is prompted.
-- The default slug is the entry's key (`google`, `github`).
+- The default slug is the entry's key (`google`).
 - The client-secret variable name is derived from the slug (e.g.,
   `GOOGLE_CLIENT_SECRET`); the connection references it as
   `"client_secret": "${{ GOOGLE_CLIENT_SECRET }}"`.
@@ -233,7 +234,7 @@ discovery at runtime, and the server validates every deploy.
 
 | Field | Purpose & Usage |
 | :--- | :--- |
-| **Protocol Block**<br>*(endpoints/issuer, `static_authorize_parameters`, `token_endpoint_auth_method`, scopes, `supplementary_fetch`, `verified_claims` defaults)* | Populates the connection file from Area 1's test-verified examples. The prompted `client_id` is filled in; `claim_mapping` is derived from the claim table (next row). |
+| **Protocol Block**<br>*(endpoints/issuer, `static_authorize_parameters`, `token_endpoint_auth_method`, scopes, `verified_claims` defaults)* | Populates the connection file from Area 1's test-verified examples. The prompted `client_id` is filled in; `claim_mapping` is derived from the claim table (next row). |
 | **Claim Table**<br>*(schema property name → provider claim name)* | Authored per provider, like the rest of the catalog entry, not derived: each row pairs a schema property name with the provider's documented claim, cross-checked against zitadel/zitadel's provider packages. At scaffold the rows whose key the active schema defines become the connection's `claim_mapping`. |
 | **Display Name & `template`** | Written to the connection file as `display_name` and `template`, shown in CLI console output. The engine copies them onto the rendered step ([area 2](2-auth-method-selection.md#rendering-from-the-connection)); the flow definition carries only the slug. |
 | **Console URL & Docs URL** | Surfaced during the announce step and within error envelopes. |
@@ -242,11 +243,9 @@ discovery at runtime, and the server validates every deploy.
 ### Mapping Defaults
 
 The default slug matches the catalog key.
-For the default schema, `email` is mapped across both providers; use-case
-properties (`givenName`, `familyName`) are added whenever present in both the
-target schema and the provider's claim table (GitHub has no `familyName` source,
-and its `givenName` maps to the full-name `name` claim; see area 1's
-claim-mapping caveat).
+For the default schema, `email` is mapped; use-case properties (`givenName`,
+`familyName`) are added whenever present in both the target schema and the
+provider's claim table.
 Properties the claim table does not know stay unmapped.
 The setup summary names the schema's required properties that got no mapping, so
 the tenant can add rows or accept that the collection step asks for them.
@@ -270,8 +269,8 @@ one when it differs per environment
 The same revision is promoted to every environment unchanged; each environment
 fills the references with its own values.
 Vendor policy decides which values differ.
-A GitHub OAuth App accepts one callback URL, so GitHub needs one app per origin
-and a `${{ GITHUB_CLIENT_ID }}` per environment.
+A provider whose client accepts one callback URL needs one app per origin and a
+`${{ <SLUG>_CLIENT_ID }}` per environment.
 A Google client accepts several redirect URIs, so one literal client id serves
 every environment.
 
@@ -288,8 +287,8 @@ resolving `${{ NAME }}` in the client id.
   `${{ GOOGLE_CLIENT_ID }}`, from prompt or flag.
   References reach the engine unresolved and are resolved per environment (area
   1's syntax).
-- **Flags:** Provider-specific flags (e.g., `--google-client-id`,
-  `--github-client-id`) skip the interactive prompts.
+- **Flags:** Provider-specific flags (e.g., `--google-client-id`) skip
+  the interactive prompts.
 - **Stubbing:** Referenced environment variable names are automatically stubbed
   into `.env.example`.
 
@@ -371,9 +370,8 @@ without duplicating connections across re-runs.
 ### Scan & Match Logic
 
 * **Identity-Based Scan:** Scans `.zitadel/idps/*.json` matching on `template`
-  (equal to catalog key) or protocol block endpoints (`issuer` equal to
-  `https://accounts.google.com` or `authorization_endpoint` equal to
-  `https://github.com/login/oauth/authorize`).
+  (equal to catalog key) or the protocol block's `issuer` (equal to
+  `https://accounts.google.com`).
   Endpoints take precedence if `template` conflicts.
 * **Single Hit (Reuse):** Displays slug and `client_id` for interactive
   confirmation.
@@ -430,7 +428,7 @@ either preset, once the providers and the routes it writes are set aside. A
 hand-edited one, including one whose provider routes were pointed elsewhere, is
 left alone and reported, as for every other generated step.
 A password step that is exactly the shipped one reads as unedited, so a button the
-developer removed on purpose comes back on the next `sso enable`; nothing in the file
+developer removed on purpose comes back on the next `auth-method sso enable`; nothing in the file
 distinguishes that from a project enabled before the step offered providers.
 Showing only the providers linked to the identified user, or skipping the step
 for a user without a password, would tell anyone who types an email which
@@ -571,8 +569,8 @@ never presented as proof that sign-in works.
   per-provider flag names with Area 2 generator recomposition, fixing the
   contract (Client IDs supplied by flag, secrets strictly excluded from argv).
 * **Prefilled Console Deep-Links:** Evaluating prefilled query params (name,
-  homepage, callback URL) for provider consoles (supported by GitHub,
-  unsupported by Google).
+  homepage, callback URL) for provider consoles (unsupported by
+  Google).
 * **`scaffoldedFrom` Provenance:** Pending Area 1's specification for recording
   provenance data on generated connection resources.
 * **Secret Rotation UX:** Defining explicit rotation workflows. Replacing a

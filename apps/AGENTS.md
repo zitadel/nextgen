@@ -10,8 +10,8 @@ The output is `dist` either because the app's build writes there (e.g.
 `storybook`, whose `build` script passes `--output-dir dist`) or because its
 framework preset already defaults there. Keep it `dist` — do not introduce
 per-app output names (`storybook-static`, `build`, `out`, …). The hosted cloud's
-`storybook` service (repo-root [`vercel.json`](../vercel.json)) moves the build
-to `dist/storybook/`, the path it serves it at, and still serves `dist`. The
+`storybook` service (repo-root [`vercel.json`](../vercel.json)) serves `dist`
+at `/storybook/`: a rewrite of the service maps that path onto the build. The
 global `dist` rule in [`.gitignore`](../.gitignore) already covers it, so no
 per-app ignore entry is needed.
 
@@ -22,8 +22,11 @@ Four apps are **exceptions**, for reasons that are not a style choice:
   ([`internal/staticui/console/embed.go`](../internal/staticui/console/embed.go)).
   The output path is dictated by the embed, not by this convention. The
   hosted cloud's `console` service (repo-root [`vercel.json`](../vercel.json))
-  builds it for `/console/` (`CONSOLE_BASE_PATH`), copies that build to
-  `dist/console/` and serves `dist`.
+  builds it for `/console/` (`CONSOLE_BASE_PATH`) and serves that tree as its
+  output directory, a rewrite of the service mapping `/console/` onto it.
+  The cloud's `server` service builds in the same checkout, so its function
+  is compiled with `-tags noconsole` ([`apps/cloud/build.sh`](cloud/build.sh))
+  and does not embed that tree as well.
 - **`docs`** and **`website`** are Next.js apps, deployed only as the hosted
   cloud's `docs` and `website` services: Next builds into `.next/`, which
   Vercel's Next.js preset reads, so there is no output directory to set.
