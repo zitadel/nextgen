@@ -3,20 +3,9 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * The one page wrapper every console screen renders in — lists, resource
- * details, configuration panels, settings and System alike — so every screen
- * starts the same distance under the top bar and the shell's <main> stays
- * padding-free.
- *
- * | Region      | Value                                              |
- * | ----------- | -------------------------------------------------- |
- * | Page top    | 20px at `lg`, 16px below                            |
- * | Page gutter | 16px; 24px from `sm` for a configuration panel      |
- * | Page bottom | 32px                                                |
- *
- * `inset="panel"` is the schema / login-flow / IdP composition, whose single
- * panel card the design insets by 24px on the sides. Only the sides differ: the
- * top is the same for every screen, which is the point of the component.
+ * The one page wrapper every console screen renders in, so every screen starts
+ * the same distance under the top bar. Its geometry, and `inset="panel"` for
+ * the configuration-panel screens, are in `docs/styling.md` ("Page wrapper").
  *
  * Do not write Tailwind's built-in centring utility name (the "c" word) anywhere
  * in scanned source, even in a comment: its extractor would emit that utility,

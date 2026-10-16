@@ -100,10 +100,12 @@ function ThemeRow() {
  * Footer account entry: the signed-in person over the account they work in,
  * opening the account dropdown to the right of the sidebar (Console ADR 0003).
  *
- * The person is the session's user-ref (display → identifier → user id, ADR
- * 058). The account is their team in the sign-in project (`lib/account.ts`),
- * renamed under Settings → Account. It shows the current account only — there
- * is nothing to switch to while a person's account is the one team.
+ * The footer names the person by identifier (their email) and the dropdown
+ * header by name, as the design draws them, so the footer stays the stable
+ * sign-in identity whether or not a name is set (identifier → display → user
+ * id here, the reverse of ADR 058's rendering order on purpose). The account
+ * is their team in the sign-in project (`lib/account.ts`); only the current
+ * one is shown.
  *
  * The design draws a plan badge (`Pro`) beside the account; it is left out
  * until billing (#667) can say which plan an account is on. `Documentation` and

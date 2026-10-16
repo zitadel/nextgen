@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { api } from "@/api/zitadel";
 import { invalidateSessionCache } from "@/auth/session";
 import { useSubmit } from "@/hooks/use-submit";
-import { field } from "@/lib/record";
+import { displayValue, field } from "@/lib/record";
 import { type SchemaField, attributeValue, schemaFields } from "@/lib/schema";
 import { readOwnUserSchema } from "@/lib/user-schema";
 import { userAttributes } from "@/lib/user";
@@ -80,7 +80,7 @@ function ProfileScreen() {
   const editable = schema ? all.filter(isEditable) : [];
 
   const saved = (entry: SchemaField) =>
-    displayValue(attributes[entry.key]) ||
+    (displayValue(attributes, entry.key) ?? "") ||
     // Unread schema: the record's resolved identifier stands in for the attribute.
     (!schema && entry.key === identifier
       ? (field(user as Record<string, unknown>, "identifier") ?? "")
@@ -211,9 +211,5 @@ function ProfileRow({
   );
 }
 
-/** A stored attribute as the input shows it. */
+/** The property types a text input can show and save back unchanged. */
 const EDITABLE_TYPES = new Set(["string", "number", "integer"]);
-
-function displayValue(value: unknown): string {
-  return ["string", "number", "boolean"].includes(typeof value) ? String(value) : "";
-}
