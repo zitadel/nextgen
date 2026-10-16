@@ -13,7 +13,7 @@ import (
 )
 
 func (h *Handler) CreateProject(ctx context.Context, req *api.CreateProjectRequest) (api.CreateProjectRes, error) {
-	project, err := h.projectService.Create(ctx, req.Name, req.PreviewOrigins, req.SeedDefaults.Or(true))
+	project, err := h.projectService.Create(ctx, req.Name, apiOriginsToDomain(req.Origins), req.SeedDefaults.Or(true))
 	if err != nil {
 		return nil, err
 	}
@@ -31,12 +31,12 @@ func (h *Handler) CreateProject(ctx context.Context, req *api.CreateProjectReque
 	}
 
 	return &api.CreateProjectResponse{
-		ID:             project.ID,
-		Name:           project.Name,
-		ProjectSecret:  projectSecret,
-		PreviewSecret:  previewSecret,
-		PreviewOrigins: project.PreviewOrigins,
-		CreatedAt:      project.CreatedAt,
+		ID:            project.ID,
+		Name:          project.Name,
+		ProjectSecret: projectSecret,
+		PreviewSecret: previewSecret,
+		Origins:       domainOriginsToAPI(project.Origins),
+		CreatedAt:     project.CreatedAt,
 	}, nil
 }
 
@@ -148,7 +148,67 @@ func (h *Handler) ListMyProjects(ctx context.Context, params api.ListMyProjectsP
 	}, nil
 }
 
+// AddOrigin stores one origin pattern on the project.
+func (h *Handler) AddOrigin(ctx context.Context, req *api.ProjectOrigin, params api.AddOriginParams) (api.AddOriginRes, error) {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), originAccess, opWrite); err != nil {
+		return nil, err
+	}
+	origin, err := h.projectService.AddOrigin(ctx, string(params.ProjectID), domain.Origin{
+		Pattern: req.Pattern,
+		Kind:    domain.OriginKind(req.Kind),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &api.AddOriginResponse{
+		Pattern: origin.Pattern,
+		Kind:    api.AddOriginResponseKind(origin.Kind),
+	}, nil
+}
+
+// RemoveOrigin deletes one origin pattern. opDelete maps to the project.admin
+// relation, matching other delete-shaped management ops.
+func (h *Handler) RemoveOrigin(ctx context.Context, req *api.RemoveOriginReq, params api.RemoveOriginParams) (api.RemoveOriginRes, error) {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), originAccess, opDelete); err != nil {
+		return nil, err
+	}
+	if err := h.projectService.RemoveOrigin(ctx, string(params.ProjectID), req.Pattern); err != nil {
+		return nil, err
+	}
+	return &api.RemoveOriginNoContent{}, nil
+}
+
 // ------------------ Converters ---------------
+
+func apiOriginsToDomain(in []api.ProjectOrigin) []domain.Origin {
+	if in == nil {
+		return nil
+	}
+	out := make([]domain.Origin, len(in))
+	for i, o := range in {
+		out[i] = domain.Origin{
+			Pattern: o.Pattern,
+			Kind:    domain.OriginKind(o.Kind),
+		}
+	}
+	return out
+}
+
+// domainOriginsToAPI converts domain origins onto the wire. A nil domain slice
+// becomes an empty array so required response fields stay present.
+func domainOriginsToAPI(in []domain.Origin) []api.ProjectOrigin {
+	if in == nil {
+		return []api.ProjectOrigin{}
+	}
+	out := make([]api.ProjectOrigin, len(in))
+	for i, o := range in {
+		out[i] = api.ProjectOrigin{
+			Pattern: o.Pattern,
+			Kind:    api.ProjectOriginKind(o.Kind),
+		}
+	}
+	return out
+}
 
 // passwordHashPolicyToDomain converts a hashing method off the wire. Explicit
 // null is the instruction to stop choosing one, and reaches the domain as a nil
@@ -245,12 +305,12 @@ func mapQueryProjectsToService(projectID string, req *api.QueryProjectsRequest) 
 // every item in queryProjects answer with it.
 func projectResponse(project *domain.Project) *api.ProjectResponse {
 	return &api.ProjectResponse{
-		ID:             project.ID,
-		Name:           project.Name,
-		PreviewOrigins: project.PreviewOrigins,
-		PasswordHash:   passwordHashPolicyResponse(project.PasswordHashPolicy),
-		CreatedAt:      project.CreatedAt,
-		UpdatedAt:      project.UpdatedAt,
+		ID:           project.ID,
+		Name:         project.Name,
+		Origins:      domainOriginsToAPI(project.Origins),
+		PasswordHash: passwordHashPolicyResponse(project.PasswordHashPolicy),
+		CreatedAt:    project.CreatedAt,
+		UpdatedAt:    project.UpdatedAt,
 	}
 }
 
@@ -273,6 +333,22 @@ func projectErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		// Gone like an expired challenge, but under its own code: a new
 		// challenge fixes claim_expired, nothing fixes a closed window.
 		return errorResponseWithStatusCode(http.StatusGone, err)
+	default:
+		return internalErrorResponse(err)
+	}
+}
+
+func originErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
+	switch err.Code {
+	case domain.ErrOriginNotFound().Code:
+		return errorResponseWithStatusCode(http.StatusNotFound, err)
+	case domain.ErrOriginPermissionDenied().Code:
+		return errorResponseWithStatusCode(http.StatusForbidden, err)
+	case domain.ErrOriginInvalid().Code, domain.ErrOriginPrimaryNotExact().Code,
+		domain.ErrOriginUnbounded().Code:
+		return errorResponseWithStatusCode(http.StatusBadRequest, err)
+	case domain.ErrOriginKindConflict().Code:
+		return errorResponseWithStatusCode(http.StatusConflict, err)
 	default:
 		return internalErrorResponse(err)
 	}

@@ -4,8 +4,8 @@ import { constants } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-import { ZitadelError } from "../errors";
-import { isObject, parseJsonObject } from "../json";
+import { isErrno, ZitadelError } from "../errors";
+import { parseJsonObject } from "../json";
 import { EMPTY_SUMMARY, type EnvSummary, isEnvSummary } from "./env-vars";
 
 export const LOCAL_SERVER_IMAGE_NAME = "ghcr.io/zitadel/nextgen";
@@ -247,6 +247,19 @@ export async function readNearestRuntimeMetadata(
   return dir && runtime ? { dir, runtime } : undefined;
 }
 
+/**
+ * The runtime record when it can be read, `undefined` when it is missing or
+ * malformed. For commands that only want a hint from it (the port a directory
+ * had) before they report a malformed record themselves, with the fix.
+ */
+export async function peekRuntimeMetadata(cwd: string): Promise<RuntimeMetadata | undefined> {
+  try {
+    return await readRuntimeMetadata(cwd);
+  } catch {
+    return undefined;
+  }
+}
+
 export async function readRuntimeMetadata(cwd: string): Promise<RuntimeMetadata | undefined> {
   const paths = localRuntimePaths(cwd);
   let raw: string;
@@ -291,55 +304,17 @@ export async function checkLocalServerHealth(
 }
 
 /**
- * Best-effort local-server detection for optional UI (the setup wizard's
- * server choice). Same sources as {@link resolveLocalServer} — the runtime
- * metadata written by `zitadel start` in this directory or a parent, then the
- * default localhost URL — but
- * never throws: a malformed `runtime.json` or an unhealthy server yields
- * `undefined` (doctor owns diagnosing those states), and an unhealthy
- * metadata URL still falls back to the default-port probe so a server
- * started from a different directory is found.
+ * The error for a directory with no running server of its own. With a
+ * `serverUrl` there is a record whose server is not running; without one there
+ * is no record in the directory or a parent. The hint offers `--server` for the
+ * case where someone really does mean another directory's server, since
+ * nothing falls back to one on its own.
  */
-export async function detectHealthyLocalServer(cwd: string): Promise<string | undefined> {
-  let runtime: RuntimeMetadata | undefined;
-  try {
-    runtime = (await readNearestRuntimeMetadata(cwd))?.runtime;
-  } catch {
-    runtime = undefined;
-  }
-  if (runtime && (await checkLocalServerHealth(runtime.server_url))) {
-    return runtime.server_url;
-  }
-  const alreadyProbedDefault = runtime?.server_url === DEFAULT_LOCAL_SERVER_URL;
-  if (!alreadyProbedDefault && (await checkLocalServerHealth(DEFAULT_LOCAL_SERVER_URL))) {
-    return DEFAULT_LOCAL_SERVER_URL;
-  }
-  return undefined;
-}
-
-export async function resolveLocalServer(cwd: string): Promise<string> {
-  const nearest = await readNearestRuntimeMetadata(cwd);
-  if (nearest) {
-    const { server_url } = nearest.runtime;
-    if (await checkLocalServerHealth(server_url)) {
-      return server_url;
-    }
-    // This directory's own metadata is authoritative. A parent's can outlive
-    // its server (`stop` keeps it), so it does not rule out the default one.
-    if (nearest.dir === cwd || server_url === DEFAULT_LOCAL_SERVER_URL) {
-      throw localServerNotRunning(server_url);
-    }
-  }
-
-  if (await checkLocalServerHealth(DEFAULT_LOCAL_SERVER_URL)) {
-    return DEFAULT_LOCAL_SERVER_URL;
-  }
-  throw localServerNotRunning(DEFAULT_LOCAL_SERVER_URL);
-}
-
-export function localServerNotRunning(serverUrl: string): ZitadelError {
+export function localServerNotRunning(serverUrl?: string): ZitadelError {
   return new ZitadelError("E_LOCAL_SERVER_NOT_RUNNING", "Local Zitadel server is not running", {
-    hint: `No healthy local server responded at ${serverUrl}.`,
+    hint: serverUrl
+      ? `No healthy local server responded at ${serverUrl}.`
+      : "No local server has been started in this directory or a parent. Run `zitadel start`, or name a server another directory started with --server <url>.",
     nextCommands: ["zitadel start"],
     details: { server_url: serverUrl },
   });
@@ -429,11 +404,6 @@ function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetada
   };
 }
 
-export async function assertWritableDirectory(path: string): Promise<void> {
-  await mkdir(path, { recursive: true, mode: 0o700 });
-  await access(path, constants.W_OK);
-}
-
 async function nearestExistingDirectory(path: string): Promise<string> {
   let current = path;
   while (true) {
@@ -454,15 +424,6 @@ async function nearestExistingDirectory(path: string): Promise<string> {
       current = parent;
     }
   }
-}
-
-function isErrno(error: unknown, code: string): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: unknown }).code === code
-  );
 }
 
 export function runtimeSummary(metadata: RuntimeMetadata | undefined): Record<string, unknown> {
@@ -494,10 +455,6 @@ export function runtimeSummary(metadata: RuntimeMetadata | undefined): Record<st
     container_id: metadata.container_id,
     image: metadata.image,
   };
-}
-
-export function isRuntimeObject(value: unknown): value is RuntimeMetadata {
-  return isObject(value) && value.schema_version === 1;
 }
 
 function isValidPort(value: number): boolean {

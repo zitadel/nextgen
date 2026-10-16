@@ -88,6 +88,9 @@ describe("landing routes", () => {
       http.get("http://localhost/api/users/usr_1/passkeys", () =>
         HttpResponse.json({ passkeys: [] }),
       ),
+      http.get("http://localhost/api/users/usr_1/identity_links", () =>
+        HttpResponse.json({ identity_links: [] }),
+      ),
       http.get("http://localhost/api/schemas/sch_1", () =>
         HttpResponse.json({ id: "sch_1", schema: { properties: {} }, metadata: {} }),
       ),

@@ -261,7 +261,12 @@ export abstract class AbstractRulePatcher implements Patcher {
           project_id: ctx.project.id,
           project_secret: ctx.project.project_secret,
           preview_secret: ctx.project.preview_secret,
-          preview_origins: ctx.project.preview_origins,
+          primary_origins: ctx.project.origins
+            .filter((origin) => origin.kind === "primary")
+            .map((origin) => origin.pattern),
+          preview_origins: ctx.project.origins
+            .filter((origin) => origin.kind === "preview")
+            .map((origin) => origin.pattern),
           created_at: ctx.project.created_at,
         })}\n`,
       },
@@ -350,11 +355,14 @@ async function readTextIfExists(path: string): Promise<string | undefined> {
 /** Builds the `zitadel.json` body persisted at the project root. */
 function projectConfig(ctx: PatchContext): Record<string, unknown> {
   const environments: Record<string, unknown> = { development: { issuer: ctx.issuer } };
-  if (ctx.project.preview_origins.length > 0) {
-    // preview_origins are already full origins (scheme://host[:port]); don't
+  const previewPatterns = ctx.project.origins
+    .filter((origin) => origin.kind === "preview")
+    .map((origin) => origin.pattern);
+  if (previewPatterns.length > 0) {
+    // Preview patterns are already full origins (scheme://host[:port]); don't
     // prepend a scheme or it doubles up (https://http://localhost:3000).
     environments.preview = {
-      issuer_pattern: [...ctx.project.preview_origins],
+      issuer_pattern: [...previewPatterns],
     };
   }
   return {

@@ -13,7 +13,7 @@ secret-handling caveat live in [`README.md`](README.md).
   ([`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md)), console
   served by the Vite dev server through its (credential-free) API proxy; each
   test's user is granted access through the API and signs in with its
-  session cookie (`src-real/support.ts`). Playwright workers share the
+  session cookie (`signIn` in `support/sign-in.ts`). Playwright workers share the
   instance and seed a fresh user per test.
 - `moon run e2e:console-embedded` — **embedded production-path coverage**:
   the built Go binary serves the console, hosted login, and API from one
@@ -26,19 +26,19 @@ secret-handling caveat live in [`README.md`](README.md).
   that project on its own (the operator's only grant, as `?project=`), so the
   screens run in a project other than the one the console signs into.
 - `moon run e2e:console-deployment` — **hosted-cloud deployment
-  coverage**: no server of its own; it checks a deployment that
-  `CONSOLE_DEPLOYMENT_URL` names, where the console is a Vercel service at
-  `/console/` beside the server. It pins the routing (`/console/runtime.json`
-  to the server, the old `/ui/console` links redirected) and the signed-out
-  sign-in screen down to the login widget's first step. It holds no
-  credential but `VERCEL_AUTOMATION_BYPASS_SECRET`, so it records no traces
-  and writes no HTML report.
+  coverage**: no server of its own; it checks a deployment that `CLOUD_URL`
+  names, where the console is a Vercel service at `/console/` beside the
+  server. It pins the routing (`/console/runtime.json` to the server, the old
+  `/ui/console` links redirected) and the signed-out sign-in screen down to
+  the login widget's first step. It holds no credential but
+  `VERCEL_AUTOMATION_BYPASS_SECRET`, so it records no traces and writes no
+  HTML report. `pnpm check:cloud` runs it beside the docs' deployment suite.
 
 Console screens act on the selected project (`?project=`, see
 [`apps/console/AGENTS.md`](../../apps/console/AGENTS.md)). The guard only ever selects
 a project the signed-in person holds a grant on: their only project, else
 none. `console-real` grants each signed-in user the harness project (`signIn` in
-`src-real/support.ts`), so it is selected there; a user with no grant lands on
+`support/sign-in.ts`), so it is selected there; a user with no grant lands on
 Projects with nothing selected. The project the console signs into comes from
 the instance's `/console/runtime.json` in every lane; no lane pins it. A spec
 that navigates by URL either lets the guard fill it in or names it, and asserts
@@ -51,6 +51,16 @@ runs in its own e2e step whenever one of them is affected (they carry
 (`runInCI: false`): `deployment-checks.yml` runs it against every cloud
 deployment. The `@zitadel/testing` interaction is documented in
 [`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md).
+
+## Shared helpers
+
+`support/` holds what more than one spec uses: the console sign-in (`sign-in.ts`,
+grant then login), the API arrangements on the typed client (`api.ts`), screen
+helpers (`screens.ts`), the runtime-document stubs (`runtime.ts`) and the
+console copy the specs assert on (`copy.ts`). Two of them have importers with
+less in reach: `runtime.ts` imports only `@playwright/test`, because the smoke
+lane builds no test kit, and `copy.ts` imports nothing, because the journey's
+claim suite reads it (the journey lanes list it as an input).
 
 ## Hard rules
 

@@ -105,7 +105,7 @@ const action = (name: string) =>
   `testid:zitadel-action-${name}-link|css:zl-button[action="${name}"]|` +
   `${ROOT}>>[data-action="${name}"]`;
 const field = (name: string, label: string) =>
-  `testid:zitadel-input-${name}|testid:zitadel-field-${name}>>input|${ROOT}>>label:${label}`;
+  `testid:zitadel-input-${name}|testid:zitadel-field-${name}>>input|${ROOT}>>role:textbox:${label}`;
 
 const EMAIL = field("email", "/email/i");
 const PASSWORD = field("password", "/password/i");

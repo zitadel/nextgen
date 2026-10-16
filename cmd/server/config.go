@@ -2,8 +2,11 @@ package server
 
 import (
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
+	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -28,6 +31,15 @@ type Config struct {
 	// HTTPClient configures the hardened egress client used for every fetch
 	// of a URL a platform user can inject (see the egress-policy ADR).
 	HTTPClient httputil.ClientConfig `mapstructure:"httpclient"`
+	// Origins configures write validation for project origin patterns.
+	Origins OriginsConfig `mapstructure:"origins"`
+}
+
+// OriginsConfig is the instance-level origins policy. SharedHosts maps a shared
+// host suffix to a full-hostname allow regexp. YAML values are strings; the
+// config decode hook compiles them into *regexp.Regexp.
+type OriginsConfig struct {
+	SharedHosts map[string]*regexp.Regexp `mapstructure:"shared_hosts"`
 }
 
 // EventsConfig configures audit event retention and deployment export sinks.
@@ -100,6 +112,7 @@ func (c PlatformConfig) ProvisioningProjectID() string {
 
 func (c Config) Validate() error {
 	for _, validate := range []func() error{
+		c.Server.Validate,
 		c.Session.Validate,
 		c.Platform.Validate,
 		c.HTTPClient.Validate,
@@ -157,6 +170,28 @@ type ServerConfig struct {
 	// stays on schema.builtin_public_base, which is an identifier namespace,
 	// not an address.
 	PublicBase string `mapstructure:"public_base"`
+}
+
+func (c ServerConfig) Validate() error {
+	// ensure there are no path collisions between idp callbacks and console/login paths
+	for _, ui := range []struct {
+		enabled bool
+		key     string
+		path    string
+	}{
+		{c.ConsoleEnabled, "server.console_path", c.ConsolePath},
+		{c.LoginEnabled, "server.login_path", c.LoginPath},
+	} {
+		if !ui.enabled {
+			continue
+		}
+		for _, prefix := range api.IDPCallbackPathPrefixes() {
+			if ui.path == prefix || strings.HasPrefix(ui.path, prefix+"/") {
+				return fmt.Errorf("%s %q must not be %s or under it: the path is reserved for the sign-in provider callback", ui.key, ui.path, prefix)
+			}
+		}
+	}
+	return nil
 }
 
 // KeysConfig sizes the in-process key caches. Both are read-through and hold

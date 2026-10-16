@@ -1,6 +1,7 @@
 import { expect, registerWithPassword, test } from "@zitadel/testing/playwright";
 
-import { expectNoErrorBoundary } from "../src-real/support";
+import { withErrorBody } from "../support/api";
+import { expectNoErrorBoundary } from "../support/screens";
 
 /**
  * A platform operator in the embedded console (#1300): signed up through the
@@ -15,35 +16,27 @@ import { expectNoErrorBoundary } from "../src-real/support";
  * error state, and that the project is writable from its settings page.
  */
 
-const password = "Platform-Operator-Passw0rd!";
-
 test("a platform operator reaches every management screen without an error", async ({
   page,
   zitadel,
   seed,
 }) => {
-  const operator = seed.identity().email;
+  const operator = seed.identity();
 
   await page.goto("/ui/console/");
-  await registerWithPassword(page, { email: operator, password });
+  await registerWithPassword(page, operator);
   await page.waitForURL((url) => !url.pathname.endsWith("/login"));
   await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
 
   // Admin on the customer project, by email: the operator lives in the
   // platform project, which is where a grant resolves an identifier (#1192).
   // Written with the project's secret from the test process, never the page.
-  const response = await fetch(
-    `${zitadel.handle.baseUrl}/grants?project_id=${zitadel.handle.projectId}`,
-    {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${zitadel.handle.projectSecret}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({ user: { identifier: operator }, relation: "admin" }),
-    },
+  await withErrorBody(
+    zitadel.api.createGrant(
+      { user: { identifier: operator.email }, relation: "admin" },
+      { project_id: zitadel.handle.projectId },
+    ),
   );
-  expect(response.ok, await response.text()).toBe(true);
 
   const selected = new RegExp(`[?&]project=${zitadel.handle.projectId}(&|$)`);
   for (const [path, heading] of [

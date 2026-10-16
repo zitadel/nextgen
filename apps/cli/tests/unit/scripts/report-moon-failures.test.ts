@@ -1,7 +1,7 @@
 import { mkdtemp, mkdir, writeFile, readFile, utimes } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 type Failure = { name: string; status: string; detail: string };
 
@@ -163,12 +163,22 @@ describe("report-moon-failures", () => {
     await writeFile(join(cacheDir, "ciReport.json"), JSON.stringify(failedRunTaskReport()));
     const summaryPath = join(root, "summary.md");
 
-    const result = await reportMoonFailures({ cacheDir, summaryPath });
-    expect(result).toEqual({
-      failedCount: 1,
-      skipped: false,
-      path: join(cacheDir, "ciReport.json"),
-    });
+    // Captured, not printed: CI replays a failed task's output, and GitHub
+    // turns a `::error` line in it into an annotation for a task that ran fine.
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    try {
+      const result = await reportMoonFailures({ cacheDir, summaryPath });
+      expect(result).toEqual({
+        failedCount: 1,
+        skipped: false,
+        path: join(cacheDir, "ciReport.json"),
+      });
+      expect(log).toHaveBeenCalledWith(
+        "::error title=Moon task failed::server:format failed (exit 1)",
+      );
+    } finally {
+      log.mockRestore();
+    }
 
     const summary = await readFile(summaryPath, "utf8");
     expect(summary).toContain("## Failed Moon tasks");

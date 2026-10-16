@@ -2,15 +2,15 @@ get:
   operationId: getVariable
   summary: Get a variable
   description: |
-    Reads one of the project's variables by name. A name the project has not
-    entered answers `var.not_found`. A secret is found but not disclosed: the
-    response is `{"secret": true}`.
+    Reads one variable by name, with its value per kind. A name with no
+    value for the requested kind answers `var.not_found`. A secret reads
+    back as `{"secret": true}`.
   tags:
     - Variables
   parameters:
     - $ref: ../../../components/parameters/project-id.yaml
     - $ref: ../../../components/parameters/variable-name.yaml
-    - $ref: ../../../components/parameters/environment-name-query.yaml
+    - $ref: ../../../components/parameters/variable-kind.yaml
   security:
     - oauth2:
         - variable.read
@@ -20,7 +20,7 @@ get:
       content:
         application/json:
           schema:
-            $ref: ../variable.yaml
+            $ref: ../variable-by-kind.yaml
     default:
       $ref: getVariable-error-response.yaml
 
@@ -28,14 +28,15 @@ delete:
   operationId: deleteVariable
   summary: Delete a variable
   description: |
-    Removes the project's variable under this name. Deleting a name the
-    project does not hold answers `var.not_found`.
+    Removes a variable for the requested kind, or for both kinds without
+    `kind`. A name with no value for that kind answers `var.not_found`.
+    Existing deployments keep the values they froze.
   tags:
     - Variables
   parameters:
     - $ref: ../../../components/parameters/project-id.yaml
     - $ref: ../../../components/parameters/variable-name.yaml
-    - $ref: ../../../components/parameters/environment-name-query.yaml
+    - $ref: ../../../components/parameters/variable-kind.yaml
   security:
     - oauth2:
         - variable.write

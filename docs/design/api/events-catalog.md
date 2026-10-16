@@ -45,7 +45,8 @@ same TX (shared `request_id`).
 
 | Resource | Allowlisted in payload | Intentionally omitted |
 |----------|------------------------|------------------------|
-| **Project** | `name`, `preview_origins` (full array as stored) | Secrets, key material |
+| **Project** | `name`, `origins` (full array as stored) | Secrets, key material |
+| **Origin** | `pattern`, `kind` | — |
 | **Team** | `name` | — |
 | **Flow definition** | `name`, `status`, `user_schema`, `purposes`, `audience` | Full `steps` graph |
 | **Branding** | `layout`, `logo_url`, `font_url`, `hero_url` | `liquid_template` |
@@ -56,11 +57,12 @@ same TX (shared `request_id`).
 | **Token** | `scopes[]` | Token string / JWE |
 | **Auth check** | `check_id`, `check_type`, `auth_attempt_id` | Challenge/proof JSON |
 | **Auth factor** | `user_id`, `factor_id` | Hash, public key material, challenges |
+| **Variable** | `kind` (the rest of the row key beside `entity_id`); `secret` on set | `name` (it is `entity_id`); the value, plain or as ciphertext |
 
-`PATCH /projects/{id}` today only renames (`name`). `preview_origins` is set
-on **create** only. Create emits both fields; update emits `name` when
-renamed. If origins become patchable later, the update delta includes the
-**full new** `preview_origins` array (whole-array replace).
+`PATCH /projects/{id}` today only renames (`name`). Origins are set on
+**create** and changed only through add/remove (`origin.added` /
+`origin.removed`), never through `patchProject`. Create emits `name` and
+`origins`; update emits `name` when renamed.
 
 ### SIEM join path
 
@@ -103,9 +105,11 @@ tracked below.
 
 | Statement / operation | `event_type` | `category` | `entity_type` | Payload properties |
 |----------------------|--------------|------------|---------------|--------------------|
-| `CreateProject` | `project.created` | `entity` | `project` | `name`, `preview_origins[]` |
+| `CreateProject` | `project.created` | `entity` | `project` | `name`, `origins[]` |
 | `UpdateProject` | `project.updated` | `entity` | `project` | delta: `name` (when renamed) |
 | `DeleteProjectByID` (when a row was deleted) | `project.deleted` | `entity` | `project` | _(empty)_ |
+| `AddOrigin` | `origin.added` | `entity` | `origin` | `pattern`, `kind` |
+| `RemoveOrigin` | `origin.removed` | `entity` | `origin` | `pattern`, `kind` |
 | `CreateUser` | `user.created` | `entity` | `user` | `schema_id`, `attribute_keys[]`, `attributes` (`x-audit` values only) |
 | Unique violation on create | `user.create.failed` | `entity` | `user` | `key_name` |
 | `PatchUser` (attribute patch) | `user.updated` | `entity` | `user` | `attribute_keys[]`, `attributes` (`x-audit` values only) |
@@ -122,8 +126,8 @@ tracked below.
 | `HandoffAuthAttempt` | `auth.attempt.handed_off` | `auth` | `auth_attempt` | _(empty; `session_id` column set)_ |
 | Challenge failed | `auth.check.failed` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id` |
 | Challenge succeeded | `auth.check.succeeded` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id` |
-| SSO authorization failed (the provider's error response, `access_denied` included, or a callback with no code) | `auth.sso.authorization.failed` | `auth` | `check` | `check_id`, `check_type` (`SSOCallback`), `auth_attempt_id` |
-| SSO exchange failed (token exchange, `id_token` or userinfo validation, configuration, or a server-side failure after a code arrived) | `auth.sso.exchange.failed` | `auth` | `check` | `check_id`, `check_type` (`SSOCallback`), `auth_attempt_id` |
+| SSO authorization failed (the provider's error response, `access_denied` included, or a callback with no code, including one refused because its path names another connection than the state pins or its `iss` is not the connection's issuer) | `auth.sso.authorization.failed` | `auth` | `check` | `check_id`, `check_type` (`SSOCallback`), `auth_attempt_id` |
+| SSO exchange failed (token exchange, `id_token` or userinfo validation, configuration, or a server-side failure after a code arrived, including a callback refused before the exchange because its path names another connection than the state pins or its `iss` is not the connection's issuer) | `auth.sso.exchange.failed` | `auth` | `check` | `check_id`, `check_type` (`SSOCallback`), `auth_attempt_id` |
 | SSO exchange succeeded (`SetSSOCallbackResult`; not a sign-in: the identity may still match no account) | `auth.sso.exchange.succeeded` | `auth` | `check` | `check_id`, `check_type` (`SSOCallback`), `auth_attempt_id` |
 | Direct factor recorded (no challenge/proof cycle: sign-up establishing user+password/user factors, discoverable assertion pinning the resolved user, SSO bind recording the user and SSO factors) | `auth.check.succeeded` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id` |
 | Flow definition create | `flowdef.created` | `admin` | `flow_definition` | `name`, `status`, `user_schema`, `purposes`, `audience` |
@@ -134,6 +138,8 @@ tracked below.
 | IDPConnectionService revise (existing slug) | `idp.updated` | `admin` | `idp_connection` | `revision_id`; delta: `display_name`, `template` (when changed) |
 | `CreateIDPIdentityLink` (SSO sign-in creates the user and links the provider account, same TX) | `idp.identity_link.created` | `entity` | `idp_identity_link` | `connection_id`, `user_id` (secondary; never the provider subject or claims) |
 | DeploymentService create (deploy and rollback alike; one event per deployment, whatever the number of targets) | `deployment.created` | `admin` | `deployment` | `release_id`, `targets`, `reason`, `message`, `rollback_to` |
+| VariableService set (one event per row written; entering and replacing are the same event, since the value is the only difference and it never appears; a value written for both kinds is two rows) | `variable.set` | `entity` | `variable` | `kind` (with `entity_id`, the row key), `secret` |
+| VariableService delete, a `null` in a patch, or a secret patched without a kind clearing its preview value (one event per row actually removed; a name the project did not hold emits nothing) | `variable.removed` | `entity` | `variable` | `kind` (no `secret`: a removal learns nothing about the row) |
 | Project create seed `CreateAuthzAssignment` (sk_proj) | `authz.granted` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | GrantService create (`CreateAuthzAssignment` for user/team on project.viewer, editor, or admin) | `authz.granted` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | GrantService revoke (`RevokeAuthzAssignment`) | `authz.revoked` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
