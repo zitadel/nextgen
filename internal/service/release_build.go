@@ -74,7 +74,9 @@ func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (*C
 			failures.add(domain.ReleasePointerKindBranding, 0, domain.ReleaseBrandingHandle, err)
 		}
 	}
-	if len(failures.Resources) > 0 {
+	// Pure prepares finished. When the bundle has no flows, there is nothing
+	// left that needs stmts — surface those failures without opening a tx.
+	if len(input.FlowDefinitions) == 0 && len(failures.Resources) > 0 {
 		return nil, failures
 	}
 
@@ -86,12 +88,12 @@ func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (*C
 		stmts := tx.Statements()
 
 		// Prepare flows on the build transaction so schema/pivoting lookups
-		// share the same stmts as the writes that follow. Collect failures
-		// before any write so a BundleValidationError rolls back cleanly.
-		flowFailures := &BundleValidationError{}
-		preparedFlows := s.prepareBundleFlows(ctx, stmts, input, schemaByHandle, flowFailures)
-		if len(flowFailures.Resources) > 0 {
-			return flowFailures
+		// share the same stmts as the writes that follow. Append into the
+		// same failures bag as the pure prepares above so every bad resource
+		// is reported at once; return before any write so the tx rolls back.
+		preparedFlows := s.prepareBundleFlows(ctx, stmts, input, schemaByHandle, failures)
+		if len(failures.Resources) > 0 {
+			return failures
 		}
 
 		content := domain.ReleaseContent{}
