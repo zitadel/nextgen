@@ -148,6 +148,9 @@ func (c ContextSchema) leaves() ([]contextField, error) {
 // not have (`default`, `public`) cannot be silently ignored. CEL compilation,
 // and with it the checks that need the expressions, happens in [New].
 func ParseTemplate(data []byte) (*Template, error) {
+	if err := rejectDuplicateKeys(data); err != nil {
+		return nil, fmt.Errorf("policy template: %w", err)
+	}
 	var t Template
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()

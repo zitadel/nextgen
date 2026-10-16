@@ -5,11 +5,34 @@ import (
 	"os"
 	"testing"
 
+	"cel.dev/cel-go/cel"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/policy"
 )
+
+// normalizedExpression parses a CEL expression and prints it back, so
+// whitespace and redundant parentheses do not count as a change.
+func normalizedExpression(t *testing.T, expr string) string {
+	t.Helper()
+	env, err := cel.NewEnv()
+	require.NoError(t, err)
+	parsed, iss := env.Parse(expr)
+	require.NoError(t, iss.Err(), expr)
+	out, err := cel.AstToString(parsed)
+	require.NoError(t, err, expr)
+	return out
+}
+
+func TestNormalizedExpression(t *testing.T) {
+	assert.Equal(t,
+		normalizedExpression(t, "config.min_length <= config.max_length"),
+		normalizedExpression(t, "(config.min_length)  <=\n config.max_length"))
+	assert.NotEqual(t,
+		normalizedExpression(t, "config.min_length <= config.max_length"),
+		normalizedExpression(t, "config.min_length < config.max_length"))
+}
 
 // compatRecord is what stored instances may depend on, per operation.
 type compatRecord struct {
@@ -60,7 +83,8 @@ func TestTemplates_StayCompatible(t *testing.T) {
 		for _, rule := range tpl.ConfigRules {
 			was, ok := record.ConfigRules[rule.Name]
 			if assert.True(t, ok, "%s: config rule %q is new and may reject stored instances", operation, rule.Name) {
-				assert.Equal(t, was, rule.Expression, "%s: config rule %q changed and may reject stored instances", operation, rule.Name)
+				assert.Equal(t, normalizedExpression(t, was), normalizedExpression(t, rule.Expression),
+					"%s: config rule %q changed and may reject stored instances", operation, rule.Name)
 			}
 		}
 	}

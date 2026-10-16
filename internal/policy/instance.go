@@ -25,6 +25,9 @@ const KindPolicy = "policy"
 // ParseInstance decodes an instance document. Config values are checked
 // against the template by [Engine.ValidateInstance].
 func ParseInstance(data []byte) (*Instance, error) {
+	if err := rejectDuplicateKeys(data); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrInvalidInstance, err)
+	}
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
 	dec.UseNumber()

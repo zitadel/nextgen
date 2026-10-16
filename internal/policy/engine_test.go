@@ -164,6 +164,22 @@ func TestParseTemplate_RejectsStructure(t *testing.T) {
 	}
 }
 
+func TestParseTemplate_RejectsDuplicateKeys(t *testing.T) {
+	doc := strings.Replace(testTemplate, `"maximum": 10 },
+    "max"`, `"maximum": 10, "maximum": 3 },
+    "max"`, 1)
+	require.NotEqual(t, testTemplate, doc)
+	_, err := policy.ParseTemplate([]byte(doc))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `duplicate key "maximum"`)
+}
+
+func TestParseInstance_DuplicateKeysInNestedValues(t *testing.T) {
+	// Same key in different objects, and inside arrays, is fine.
+	_, err := policy.ParseInstance([]byte(`{"kind":"policy","operation":"test.op","config":{"a":{"x":1},"b":{"x":[{"x":1},{"x":2}]}}}`))
+	require.NoError(t, err)
+}
+
 func TestParseTemplate_RejectsTrailingData(t *testing.T) {
 	_, err := policy.ParseTemplate([]byte(testTemplate + " {}"))
 	require.Error(t, err)
@@ -306,11 +322,13 @@ func TestParseInstance(t *testing.T) {
 	require.NoError(t, testEngine(t).ValidateInstance(t.Context(), decimal), "2.0 and 1e1 are integers")
 
 	for name, doc := range map[string]string{
-		"unknown field":     `{"kind":"policy","operation":"test.op","config":{},"audience":{}}`,
-		"wrong kind":        `{"kind":"branding","operation":"test.op","config":{}}`,
-		"missing operation": `{"kind":"policy","config":{}}`,
-		"not json":          `{`,
-		"trailing data":     `{"kind":"policy","operation":"test.op","config":{}} {"config":{"min":1}}`,
+		"unknown field":      `{"kind":"policy","operation":"test.op","config":{},"audience":{}}`,
+		"wrong kind":         `{"kind":"branding","operation":"test.op","config":{}}`,
+		"missing operation":  `{"kind":"policy","config":{}}`,
+		"not json":           `{`,
+		"trailing data":      `{"kind":"policy","operation":"test.op","config":{}} {"config":{"min":1}}`,
+		"duplicate setting":  `{"kind":"policy","operation":"test.op","config":{"min":5,"min":2}}`,
+		"duplicate envelope": `{"kind":"policy","operation":"test.op","operation":"other.op","config":{}}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := policy.ParseInstance([]byte(doc))
