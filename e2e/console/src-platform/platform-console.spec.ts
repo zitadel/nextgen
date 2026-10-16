@@ -137,6 +137,8 @@ test("a platform operator renames their account", async ({ page, seed }) => {
   await page.goto("/ui/console/");
   await registerWithPassword(page, operator);
   await page.waitForURL((url) => !url.pathname.endsWith("/login"));
+  // The landing redirect must settle first, or it interrupts the next goto.
+  await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
 
   await page.goto("/ui/console/settings/account");
   const field = page.getByLabel("Account name");
