@@ -126,3 +126,25 @@ test("a platform operator adds their name from the account menu", async ({ page,
   await expect(page.getByRole("menu").getByText("Ada Lovelace")).toBeVisible();
   await expect(page.getByRole("menuitem", { name: /Add your name/ })).toHaveCount(0);
 });
+
+/**
+ * Settings → Account renames the operator's account: the personal team created
+ * for them at sign-up (#1890 grants them its rename), shown in the footer.
+ */
+test("a platform operator renames their account", async ({ page, seed }) => {
+  const operator = seed.identity();
+
+  await page.goto("/ui/console/");
+  await registerWithPassword(page, operator);
+  await page.waitForURL((url) => !url.pathname.endsWith("/login"));
+
+  await page.goto("/ui/console/settings/account");
+  const field = page.getByLabel("Account name");
+  await field.fill("Acme Platform");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expectNoErrorBoundary(page);
+
+  await expect(page.getByRole("button", { name: `Account: ${operator.email}` })).toContainText(
+    "Acme Platform",
+  );
+});
