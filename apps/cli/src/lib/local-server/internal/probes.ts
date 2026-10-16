@@ -19,10 +19,20 @@ import { tryLock } from "./start-lock";
  */
 export class TcpPorts implements PortProbe {
   private readonly claimsDir: string;
+  private readonly network: Network;
 
-  /** `claimsDir` is where claims are kept; every `zitadel` on the machine must use the same one. */
-  constructor(claimsDir: string = join(tmpdir(), "zitadel-local-ports")) {
+  /**
+   * `claimsDir` is where claims are kept; every `zitadel` on the machine must use
+   * the same one. `network` is how the machine is asked about a port, and is only
+   * replaced in tests, so the logic that combines the answers can be tested
+   * without depending on which ports happen to be in use.
+   */
+  constructor(
+    claimsDir: string = join(tmpdir(), "zitadel-local-ports"),
+    network: Network = realNetwork,
+  ) {
     this.claimsDir = claimsDir;
+    this.network = network;
   }
 
   /**
@@ -39,27 +49,37 @@ export class TcpPorts implements PortProbe {
 
   /** Whether nothing holds the port. Says nothing about another start that has claimed it: see {@link reserve}. */
   async isFree(port: number): Promise<boolean> {
-    if (await this.answers(port)) {
+    if (await this.network.answers(port)) {
       return false;
     }
-    return this.canBind(port);
+    return this.network.canBind(port);
   }
+}
 
-  private answers(port: number): Promise<boolean> {
+/** What the machine can be asked about a port. */
+export interface Network {
+  /** Whether something accepts a connection on the port, on either loopback address. */
+  answers(port: number): Promise<boolean>;
+  /** Whether the port can be bound on every interface. */
+  canBind(port: number): Promise<boolean>;
+}
+
+/** The real thing: sockets. */
+const realNetwork: Network = {
+  answers(port) {
     const hosts = ["127.0.0.1", "::1"];
     return Promise.all(hosts.map((host) => connects(host, port))).then((results) =>
       results.some(Boolean),
     );
-  }
-
-  private canBind(port: number): Promise<boolean> {
+  },
+  canBind(port) {
     return new Promise((resolve) => {
       const probe = createServer();
       probe.once("error", () => resolve(false));
       probe.listen({ port, exclusive: true }, () => probe.close(() => resolve(true)));
     });
-  }
-}
+  },
+};
 
 /** Whether something accepts a connection on the port. A refusal, an error or silence is "no". */
 function connects(host: string, port: number): Promise<boolean> {

@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { buildSummary } from "../../../../src/commands/setup/index";
 import { LocalServer } from "../../../../src/lib/local-server/server";
+import { aBinaryRecord } from "../../../helpers/runtime-record";
 import {
   localRuntimePaths,
   writeRuntimeMetadata,
@@ -1111,18 +1112,14 @@ function runtimeFor(cwd: string, serverUrl: string): RuntimeMetadata {
 
 /** A binary runtime as `start` records it, running `serverVersion`. */
 function binaryRuntimeFor(cwd: string, serverUrl: string, serverVersion: string): RuntimeMetadata {
-  return {
-    schema_version: 1,
-    backend: "binary",
+  return aBinaryRecord({
     pid: process.pid,
     command: process.execPath,
     log_path: localRuntimePaths(cwd).logFile,
-    server_package: "@zitadel/server",
     server_version: serverVersion,
     port: Number(new URL(serverUrl).port),
     server_url: serverUrl,
     data_dir: localRuntimePaths(cwd).dataDir,
-    created_at: "2026-06-09T00:00:00.000Z",
     cli_version: serverVersion,
-  };
+  });
 }

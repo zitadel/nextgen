@@ -6,6 +6,8 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { BinaryLauncher } from "../../../../../src/lib/local-server/internal/binary-launcher";
+import { launched } from "../../../../../src/lib/local-server/internal/lifecycle";
+import { aBinaryRecord } from "../../../../helpers/runtime-record";
 
 const resolver = vi.hoisted(() => ({ missing: false }));
 
@@ -158,7 +160,7 @@ describe("local server binary helpers", () => {
       ["-e", "setTimeout(() => undefined, 30000)", `${"x".repeat(120)}/nextgen`],
       { stdio: "ignore" },
     );
-    const record = { pid: child.pid ?? 0, command: "/opt/zitadel/nextgen --migrate" } as never;
+    const record = aBinaryRecord({ pid: child.pid ?? 0 });
 
     try {
       await expect(
@@ -193,10 +195,10 @@ describe("local server binary helpers", () => {
     const real = await vi.importActual<typeof import("node:child_process")>("node:child_process");
     const child = real.spawn("sleep", ["30"], { stdio: "ignore" });
     const launcher = new BinaryLauncher({ cliVersion: "0.0.0-test", dataDir: "/d", logPath: "/l" });
-    const record = { pid: child.pid ?? 0, command: "/opt/zitadel/nextgen --migrate" } as never;
+    const record = aBinaryRecord({ pid: child.pid ?? 0 });
 
     try {
-      await expect(launcher.isAlive(record, { fresh: true })).resolves.toBe(true);
+      await expect(launcher.isLaunchedAlive(launched(record))).resolves.toBe(true);
       await expect(launcher.isAlive(record)).resolves.toBe(false);
     } finally {
       child.kill("SIGKILL");
@@ -207,7 +209,7 @@ describe("local server binary helpers", () => {
     const real = () => vi.importActual<typeof import("node:child_process")>("node:child_process");
     const launcher = new BinaryLauncher({ cliVersion: "0.0.0-test", dataDir: "/d", logPath: "/l" });
     const recordFor = (pid: number, dataDir: string) =>
-      ({ pid, command: "/bin/sleep 30", data_dir: dataDir }) as never;
+      aBinaryRecord({ pid, command: "/bin/sleep 30", data_dir: dataDir });
 
     async function aServerOf(dataDir: string) {
       const child = (await real()).spawn("sleep", ["30"], {

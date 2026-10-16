@@ -6,10 +6,10 @@ import { basename, dirname } from "node:path";
 
 import { resolveServerBinary, serverBinaryPath } from "@zitadel/server/binary";
 
-import { ZitadelError } from "../../errors";
+import { ZitadelError, isErrno } from "../../errors";
 import { EMPTY_ENV, type ResolvedEnv, envSummary } from "../env-vars";
 import type { BinaryRuntimeMetadata } from "../runtime";
-import type { Launcher } from "./lifecycle";
+import { type Launched, type Launcher, launched } from "./lifecycle";
 
 export const SERVER_NPM_PACKAGE = "@zitadel/server";
 const COMMAND_ENV = "ZITADEL_SERVER_BINARY";
@@ -81,7 +81,10 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
    * reads a server that is no longer running. Project variables reach it through
    * its environment, never its arguments, so they do not show up in `ps`.
    */
-  async launch(target: { port: number; serverUrl: string }): Promise<BinaryRuntimeMetadata> {
+  async launch(target: {
+    port: number;
+    serverUrl: string;
+  }): Promise<Launched<BinaryRuntimeMetadata>> {
     const { spec } = this;
     const command = BinaryLauncher.available(() => BinaryLauncher.command());
     const env = spec.env ?? EMPTY_ENV;
@@ -112,7 +115,7 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
         stdio: ["ignore", log.fd, log.fd],
       });
       const pid = await spawned(child, command.command);
-      return {
+      return launched<BinaryRuntimeMetadata>({
         schema_version: 1,
         backend: "binary",
         pid,
@@ -126,24 +129,32 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
         created_at: new Date().toISOString(),
         cli_version: spec.cliVersion,
         env: envSummary(env),
-      };
+      });
     } finally {
       await log.close();
     }
   }
 
   /**
-   * Whether the recorded server is alive. A record is checked for identity (see
-   * {@link BinaryLauncher.isRecordRunning}); a `fresh` one, which `launch` has just
-   * returned, is not, because `ps` shows a just-spawned process under its parent's
-   * name until it has exec'd and would wrongly be read as someone else's.
+   * Whether the recorded server is alive, checked for identity: see
+   * {@link BinaryLauncher.isRecordRunning}.
    */
-  async isAlive(record: BinaryRuntimeMetadata, options?: { fresh?: boolean }): Promise<boolean> {
-    // `ps` shows a process that was just spawned under its parent's name until
-    // it has exec'd, so a launch that has only just returned is not asked who it is.
-    return options?.fresh
-      ? BinaryLauncher.isRunning(record.pid)
-      : BinaryLauncher.isRecordRunning(record);
+  isAlive(record: BinaryRuntimeMetadata): Promise<boolean> {
+    return BinaryLauncher.isRecordRunning(record);
+  }
+
+  /**
+   * Whether a server that was just launched is alive. Not checked for identity:
+   * `ps` shows a just-spawned process under its parent's name until it has
+   * exec'd, and would wrongly read it as someone else's.
+   */
+  async isLaunchedAlive(server: Launched<BinaryRuntimeMetadata>): Promise<boolean> {
+    return BinaryLauncher.isRunning(server.pid);
+  }
+
+  /** The pid and log file, which is where to look when a start fails. */
+  describe(record: BinaryRuntimeMetadata): Readonly<Record<string, unknown>> {
+    return { runtime: "binary", pid: record.pid, log_path: record.log_path };
   }
 
   /**
@@ -468,15 +479,6 @@ async function fileSize(path: string): Promise<number> {
     }
     throw error;
   }
-}
-
-function isErrno(error: unknown, code: string): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: unknown }).code === code
-  );
 }
 
 /**

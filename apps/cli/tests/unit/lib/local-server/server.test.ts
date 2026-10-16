@@ -11,8 +11,6 @@ import { DockerLauncher } from "../../../../src/lib/local-server/internal/docker
 import {
   LOCAL_DATA_DIR,
   LOCAL_RUNTIME_FILE,
-  type BinaryRuntimeMetadata,
-  type DockerRuntimeMetadata,
   writeRuntimeMetadata,
 } from "../../../../src/lib/local-server/runtime";
 import { LocalServer } from "../../../../src/lib/local-server/server";
@@ -22,6 +20,7 @@ import {
   useLocalServers,
 } from "../../../helpers/local-server";
 import { nextPort } from "../../../helpers/ports";
+import { aBinaryRecord, aDockerRecord } from "../../../helpers/runtime-record";
 
 const dirs: string[] = [];
 const children: ChildProcess[] = [];
@@ -60,21 +59,15 @@ async function directoryWithAGoneServer(): Promise<string> {
 async function directoryRecording(pid: number, command: string): Promise<string> {
   const cwd = await directory();
   await mkdir(join(cwd, LOCAL_DATA_DIR), { recursive: true });
-  const record: BinaryRuntimeMetadata = {
-    schema_version: 1,
-    backend: "binary",
-    pid,
-    command,
-    log_path: join(cwd, "server.log"),
-    server_package: "@zitadel/server",
-    server_version: "1.0.0",
-    port: 8099,
-    server_url: "http://localhost:8099",
-    data_dir: join(cwd, LOCAL_DATA_DIR),
-    created_at: "2026-01-01T00:00:00.000Z",
-    cli_version: "1.0.0",
-  };
-  await writeRuntimeMetadata(cwd, record);
+  await writeRuntimeMetadata(
+    cwd,
+    aBinaryRecord({
+      pid,
+      command,
+      log_path: join(cwd, "server.log"),
+      data_dir: join(cwd, LOCAL_DATA_DIR),
+    }),
+  );
   return cwd;
 }
 
@@ -305,19 +298,14 @@ describe("LocalServer", () => {
 
     async function directoryRecordingContainer(port: number): Promise<string> {
       const cwd = await directory();
-      const record: DockerRuntimeMetadata = {
-        schema_version: 1,
-        backend: "docker",
-        container_name: "zitadel-server-abc",
-        container_id: "abc",
-        image: "ghcr.io/zitadel/nextgen:latest",
-        port,
-        server_url: `http://localhost:${port}`,
-        data_dir: join(cwd, LOCAL_DATA_DIR),
-        created_at: "2026-01-01T00:00:00.000Z",
-        cli_version: "1.0.0",
-      };
-      await writeRuntimeMetadata(cwd, record);
+      await writeRuntimeMetadata(
+        cwd,
+        aDockerRecord({
+          port,
+          server_url: `http://localhost:${port}`,
+          data_dir: join(cwd, LOCAL_DATA_DIR),
+        }),
+      );
       return cwd;
     }
 
@@ -353,14 +341,6 @@ describe("LocalServer", () => {
 
       trackLocalServer(runtime.backend === "binary" ? runtime.pid : 0);
       expect(runtime.port).toBe(port);
-    });
-  });
-
-  describe("start", () => {
-    it("refuses the Docker backend without an image", async () => {
-      await expect(
-        at(await directory()).start({ backend: "docker", env: { values: {}, injected: [] } }),
-      ).rejects.toMatchObject({ code: "E_VALIDATION" });
     });
   });
 });

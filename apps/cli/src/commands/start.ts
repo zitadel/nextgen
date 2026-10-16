@@ -110,7 +110,9 @@ export default class Start extends BaseCommand {
     const { runtime, alreadyRunning } = await LocalServer.at(this.meta.cwd, {
       cliVersion: this.meta.cliVersion,
     }).start(
-      { backend: runtimeBackend, image, env, userFile: local?.userFile },
+      runtimeBackend === "docker"
+        ? { backend: "docker", image, env, userFile: local?.userFile }
+        : { backend: "binary", env, userFile: local?.userFile },
       { port: requestedPort },
     );
     // The envelope's `source` named the port guessed before one was chosen; an

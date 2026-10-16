@@ -19,8 +19,6 @@ import { withStartLock } from "./internal/start-lock";
 import { RuntimeFileStore } from "./internal/store";
 import { discoverManagedRuntimeProcesses, type ManagedRuntimeProcess } from "./processes";
 import {
-  type BinaryRuntimeMetadata,
-  type DockerRuntimeMetadata,
   type RuntimeBackend,
   type RuntimeMetadata,
   checkLocalServerHealth,
@@ -34,16 +32,22 @@ import {
   removeRuntimeMetadata,
 } from "./runtime";
 
-/** What to run when starting: everything a server needs that the directory does not already say. */
-export type RunConfig = Readonly<{
-  backend: RuntimeBackend;
-  /** The Docker image, for the Docker backend. */
-  image?: string;
+/** What every backend needs to start: what the directory does not already say. */
+type CommonRunConfig = Readonly<{
   /** Project variables for the server's environment. */
   env: ResolvedEnv;
   /** Bootstrap user document for the local admin. */
   userFile?: string;
 }>;
+
+/**
+ * What to run when starting. A Docker server needs an image and a process does
+ * not, so the two are separate shapes: a Docker config without an image cannot
+ * be written, instead of failing when it is used.
+ */
+export type RunConfig =
+  | (CommonRunConfig & Readonly<{ backend: "binary" }>)
+  | (CommonRunConfig & Readonly<{ backend: "docker"; image: string }>);
 
 /**
  * Where a directory's server stands. `missing`: the directory never started one
@@ -306,7 +310,7 @@ export class LocalServer {
         if (existing?.backend === "docker") {
           await DockerLauncher.remove(existing.container_name);
         }
-        return await this.run<BinaryRuntimeMetadata>(
+        return await this.run(
           "binary",
           new BinaryLauncher({
             cliVersion: this.cliVersion,
@@ -323,15 +327,12 @@ export class LocalServer {
         );
       }
 
-      const image = config.image;
-      if (image === undefined) {
-        throw new ZitadelError("E_VALIDATION", "The Docker backend needs an image", {});
-      }
+      const { image } = config;
       await assertDockerAvailable(this.cliVersion);
       if (existing?.backend === "binary") {
         await BinaryLauncher.stopRecord(existing);
       }
-      return await this.run<DockerRuntimeMetadata>(
+      return await this.run(
         "docker",
         new DockerLauncher({
           cliVersion: this.cliVersion,
@@ -472,14 +473,16 @@ export class LocalServer {
    * record the other backend wrote reads as "nothing here": the other backend's
    * server is handled explicitly by {@link startLocked}, never by accident.
    */
-  private async run<R extends RuntimeMetadata>(
-    backend: R["backend"],
-    launcher: Launcher<R>,
-    options: LifecycleOptions<R>,
+  private async run<B extends RuntimeBackend>(
+    backend: B,
+    launcher: Launcher<Extract<RuntimeMetadata, { backend: B }>>,
+    options: LifecycleOptions<Extract<RuntimeMetadata, { backend: B }>>,
   ): Promise<{ runtime: RuntimeMetadata; alreadyRunning: boolean }> {
-    const { record, alreadyRunning } = await new Lifecycle<R>(
+    const { record, alreadyRunning } = await new Lifecycle<
+      Extract<RuntimeMetadata, { backend: B }>
+    >(
       {
-        store: new RuntimeFileStore<R>(this.cwd, backend),
+        store: new RuntimeFileStore(this.cwd, backend),
         launcher,
         ports: new TcpPorts(),
         health: new HttpHealth(),

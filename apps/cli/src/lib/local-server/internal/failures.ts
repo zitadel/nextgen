@@ -2,7 +2,7 @@ import { ZitadelError, toZitadelError } from "../../errors";
 import { publicCliCommand } from "../../public-cli";
 import { listenersForPort, type TcpListener } from "../../prober/ports";
 import { dockerRuntimeGuidance, dockerUnavailableMessage } from "../docker-guidance";
-import { DEFAULT_LOCAL_SERVER_PORT, localServerUrl, type RuntimeMetadata } from "../runtime";
+import { DEFAULT_LOCAL_SERVER_PORT, localServerUrl } from "../runtime";
 import { DockerLauncher } from "./docker-launcher";
 import {
   NoFreePortError,
@@ -86,11 +86,7 @@ function dockerUnavailableError(error: unknown, cliVersion: string): ZitadelErro
  */
 export async function startFailure(error: unknown, cliVersion: string): Promise<unknown> {
   if (error instanceof ServerStartError) {
-    const record = error.record as RuntimeMetadata;
-    const details =
-      record.backend === "docker"
-        ? { runtime: "docker", container_name: record.container_name }
-        : { runtime: "binary", pid: record.pid, log_path: record.log_path };
+    const { record, details } = error;
     const reported =
       error.reason === "exited"
         ? serverExitedError(record.server_url, cliVersion, details, error.logTail)

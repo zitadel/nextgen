@@ -1,7 +1,7 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-import { ZitadelError } from "../../errors";
+import { ZitadelError, isErrno } from "../../errors";
 import { type Clock, realClock } from "./clock";
 
 type LockOptions = Readonly<{
@@ -48,7 +48,7 @@ export async function tryLock(lockFile: string): Promise<(() => Promise<void>) |
       await writeFile(lockFile, String(process.pid), { flag: "wx", mode: 0o600 });
       return () => rm(lockFile, { force: true });
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
+      if (!isErrno(error, "EEXIST")) {
         throw error;
       }
     }
@@ -102,6 +102,6 @@ function isAlive(pid: number): boolean {
     process.kill(pid, 0);
     return true;
   } catch (error) {
-    return (error as NodeJS.ErrnoException).code === "EPERM";
+    return isErrno(error, "EPERM");
   }
 }

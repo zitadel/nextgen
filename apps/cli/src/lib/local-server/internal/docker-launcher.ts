@@ -14,7 +14,7 @@ import {
   type ContainerIdentity,
   type DockerRuntimeMetadata,
 } from "../runtime";
-import type { Launcher, StopOutcome } from "./lifecycle";
+import { type Launched, type Launcher, type StopOutcome, launched } from "./lifecycle";
 
 export type DockerResult = {
   status: number;
@@ -65,7 +65,10 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
    * stopped) and is removed first. If `docker run` fails, whatever it may have
    * created is removed too, so a failed start leaves nothing behind.
    */
-  async launch(target: { port: number; serverUrl: string }): Promise<DockerRuntimeMetadata> {
+  async launch(target: {
+    port: number;
+    serverUrl: string;
+  }): Promise<Launched<DockerRuntimeMetadata>> {
     const { spec } = this;
     // A leftover of an earlier start (a record that was lost, a container that
     // stopped) is removed before the name is taken again.
@@ -84,16 +87,18 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
       await DockerLauncher.remove(spec.containerName).catch(() => false);
       throw error;
     }
-    return DockerLauncher.metadata({
-      cwdDataDir: spec.dataDir,
-      cliVersion: spec.cliVersion,
-      containerName: spec.containerName,
-      containerId: result.stdout.trim(),
-      image: spec.image,
-      port: target.port,
-      serverUrl: target.serverUrl,
-      env: envSummary(env),
-    });
+    return launched(
+      DockerLauncher.metadata({
+        cwdDataDir: spec.dataDir,
+        cliVersion: spec.cliVersion,
+        containerName: spec.containerName,
+        containerId: result.stdout.trim(),
+        image: spec.image,
+        port: target.port,
+        serverUrl: target.serverUrl,
+        env: envSummary(env),
+      }),
+    );
   }
 
   /**
@@ -102,6 +107,16 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
    */
   async isAlive(record: DockerRuntimeMetadata): Promise<boolean> {
     return (await DockerLauncher.inspect(record.container_name)).running;
+  }
+
+  /** A container just started is asked the same question as a recorded one: its name cannot be another's. */
+  isLaunchedAlive(server: Launched<DockerRuntimeMetadata>): Promise<boolean> {
+    return this.isAlive(server);
+  }
+
+  /** The container, which is where to look when a start fails. */
+  describe(record: DockerRuntimeMetadata): Readonly<Record<string, unknown>> {
+    return { runtime: "docker", container_name: record.container_name };
   }
 
   /**

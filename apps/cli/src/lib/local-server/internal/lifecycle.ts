@@ -46,6 +46,22 @@ export type StopOutcome = Readonly<{
   signal?: NodeJS.Signals;
 }>;
 
+declare const launchedBrand: unique symbol;
+
+/**
+ * A record that `launch` has just returned, as opposed to one read back from
+ * disk. The two are asked different questions about whether they are alive (see
+ * {@link Launcher.isAlive} and {@link Launcher.isLaunchedAlive}), and the type
+ * keeps them apart: only a launcher can make one, so a recorded server can never
+ * be passed where a just-launched one is expected.
+ */
+export type Launched<R extends ServerRecord> = R & { readonly [launchedBrand]: true };
+
+/** Marks a record as just launched. Only launchers call this, from `launch`. */
+export function launched<R extends ServerRecord>(record: R): Launched<R> {
+  return record as Launched<R>;
+}
+
 /**
  * Runs the server. The binary and Docker runtimes are two implementations; the
  * lifecycle treats a record as opaque beyond its port and URL, so a new way of
@@ -53,19 +69,27 @@ export type StopOutcome = Readonly<{
  */
 export interface Launcher<R extends ServerRecord> {
   /** Starts a server on the port and returns the record that identifies it. It need not be ready. */
-  launch(spec: { port: number; serverUrl: string }): Promise<R>;
+  launch(spec: { port: number; serverUrl: string }): Promise<Launched<R>>;
   /**
-   * Whether what a record names still exists, answering or not.
-   *
-   * For a recorded server this must check identity, not just existence: pids
-   * are reused, and after a reboot the recorded one can be any program. A
-   * `fresh` record is one `launch` has just returned, and skips that check on
-   * purpose: there is nothing older it could be confused with, and on Linux the
-   * process list still shows a just-spawned process under its parent's name
-   * until it has exec'd, so asking would wrongly say "not ours" (this took down
-   * every journey lane once).
+   * Whether the server a record read back from disk names still exists,
+   * answering or not. This must check identity, not just existence: pids are
+   * reused, and after a reboot the recorded one can be any program.
    */
-  isAlive(record: R, options?: { fresh?: boolean }): Promise<boolean>;
+  isAlive(record: R): Promise<boolean>;
+  /**
+   * Whether a server that `launch` has just returned still exists. It does not
+   * check identity, on purpose: there is nothing older it could be confused
+   * with, and on Linux the process list still shows a just-spawned process under
+   * its parent's name until it has exec'd, so asking would wrongly say "not ours"
+   * (this took down every journey lane once).
+   */
+  isLaunchedAlive(server: Launched<R>): Promise<boolean>;
+  /**
+   * What identifies the server in an error about it (its pid and log file, or its
+   * container). The launcher owns this because only it knows what a record holds,
+   * which keeps the error mapping from needing to know the backends.
+   */
+  describe(record: R): Readonly<Record<string, unknown>>;
   /** Stops it, `stale` when there was nothing left to stop. */
   terminate(record: R): Promise<StopOutcome>;
   /** The end of its own log, for explaining a failed start; read before it is cleaned up. */
@@ -172,8 +196,16 @@ export class ServerStartError<R extends ServerRecord> extends Error {
   readonly record: R;
   readonly cleanup: StopOutcome;
   readonly logTail: string | undefined;
+  /** What identifies the server, from {@link Launcher.describe}. */
+  readonly details: Readonly<Record<string, unknown>>;
 
-  constructor(reason: "exited" | "timeout", record: R, cleanup: StopOutcome, logTail?: string) {
+  constructor(
+    reason: "exited" | "timeout",
+    record: R,
+    cleanup: StopOutcome,
+    details: Readonly<Record<string, unknown>>,
+    logTail?: string,
+  ) {
     super(
       reason === "exited"
         ? "The server exited before it became healthy"
@@ -183,6 +215,7 @@ export class ServerStartError<R extends ServerRecord> extends Error {
     this.record = record;
     this.cleanup = cleanup;
     this.logTail = logTail;
+    this.details = details;
   }
 }
 
@@ -296,7 +329,7 @@ export class Lifecycle<R extends ServerRecord> {
   }
 
   /** Launches on the port and waits until it is ready; throws {@link ServerStartError} if it does not become so. */
-  private async launchAndWait(port: number): Promise<R> {
+  private async launchAndWait(port: number): Promise<Launched<R>> {
     const record = await this.deps.launcher.launch({ port, serverUrl: serverUrlFor(port) });
     await this.waitUntilReady(record);
     return record;
@@ -342,17 +375,17 @@ export class Lifecycle<R extends ServerRecord> {
    * It polls, because a starting server gives no event to wait on; the clock is
    * injected so that tests do not wait in real time.
    */
-  private async waitUntilReady(record: R): Promise<void> {
+  private async waitUntilReady(record: Launched<R>): Promise<void> {
     const timeout = this.options.startTimeoutMs ?? 90_000;
     const interval = this.options.pollIntervalMs ?? 1000;
     const clock = this.options.clock ?? realClock;
     const started = clock.now();
     while (clock.now() - started < timeout) {
-      if (!(await this.deps.launcher.isAlive(record, { fresh: true }))) {
+      if (!(await this.deps.launcher.isLaunchedAlive(record))) {
         throw await this.startFailure("exited", record);
       }
       if (await this.deps.health.isHealthy(record.server_url)) {
-        if (!(await this.deps.launcher.isAlive(record, { fresh: true }))) {
+        if (!(await this.deps.launcher.isLaunchedAlive(record))) {
           throw await this.startFailure("exited", record);
         }
         return;
@@ -373,6 +406,7 @@ export class Lifecycle<R extends ServerRecord> {
       reason,
       record,
       await this.deps.launcher.terminate(record),
+      this.deps.launcher.describe(record),
       logTail,
     );
   }

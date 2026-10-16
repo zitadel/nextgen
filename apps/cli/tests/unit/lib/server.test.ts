@@ -5,8 +5,9 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { localRuntimePaths, type RuntimeMetadata } from "../../../src/lib/local-server/runtime";
+import { localRuntimePaths } from "../../../src/lib/local-server/runtime";
 import { DEFAULT_SERVER, resolveServer } from "../../../src/lib/server";
+import { aBinaryRecord } from "../../helpers/runtime-record";
 
 let dir: string;
 let servers: Server[] = [];
@@ -123,22 +124,21 @@ describe("resolveServer", () => {
 
 async function writeLocalRuntime(serverUrl: string): Promise<void> {
   const paths = localRuntimePaths(dir);
-  const metadata: RuntimeMetadata = {
-    schema_version: 1,
-    backend: "binary",
-    pid: process.pid,
-    command: process.execPath,
-    log_path: paths.logFile,
-    server_package: "@zitadel/server",
-    server_version: "0.0.0-test",
-    port: Number(new URL(serverUrl).port),
-    server_url: serverUrl,
-    data_dir: paths.dataDir,
-    created_at: "2026-06-09T00:00:00.000Z",
-    cli_version: "0.0.0-test",
-  };
   await mkdir(paths.runtimeDir, { recursive: true });
-  await writeFile(paths.runtimeFile, JSON.stringify(metadata), "utf8");
+  await writeFile(
+    paths.runtimeFile,
+    JSON.stringify(
+      aBinaryRecord({
+        pid: process.pid,
+        command: process.execPath,
+        log_path: paths.logFile,
+        port: Number(new URL(serverUrl).port),
+        server_url: serverUrl,
+        data_dir: paths.dataDir,
+      }),
+    ),
+    "utf8",
+  );
 }
 
 async function startHealthServer(): Promise<string> {

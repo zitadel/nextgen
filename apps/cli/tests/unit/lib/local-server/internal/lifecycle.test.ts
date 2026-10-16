@@ -5,6 +5,7 @@ import { ManualClock } from "../../../../helpers/clock";
 import {
   claimFreePort,
   Lifecycle,
+  launched,
   NoFreePortError,
   PortInUseError,
   ServerStartError,
@@ -27,7 +28,8 @@ class World {
   /** Origins that answer /healthz, whoever answers them. */
   healthy = new Set<string>();
   launched: number[] = [];
-  aliveAsked: boolean[] = [];
+  /** The recorded servers whose identity was asked about. */
+  identityChecked: number[] = [];
   terminated: number[] = [];
   nextPid = 100;
   /** What `launch` does to the world, to model a process that dies or never answers. */
@@ -52,12 +54,14 @@ class World {
       const record = { pid: this.nextPid++, port, server_url: serverUrl };
       this.launched.push(port);
       this.onLaunch(record, this);
-      return record;
+      return launched(record);
     },
-    isAlive: async (record, options) => {
-      this.aliveAsked.push(options?.fresh === true);
+    isAlive: async (record) => {
+      this.identityChecked.push(record.pid);
       return this.alive.has(record.pid);
     },
+    isLaunchedAlive: async (server) => this.alive.has(server.pid),
+    describe: (record) => ({ runtime: "fake", pid: record.pid }),
     logTail: async () => {
       if (this.logsGone) {
         throw new Error("no such container");
@@ -407,12 +411,21 @@ describe("Lifecycle", () => {
       expect(record.port).toBe(8085);
     });
 
-    it("does not ask whether a server it has just launched is still the same one", async () => {
+    it("does not ask who a server it has just launched is", async () => {
       const world = new World();
 
       await world.server().start();
 
-      expect(world.aliveAsked.every(Boolean)).toBe(true);
+      expect(world.identityChecked).toEqual([]);
+    });
+
+    it("tells a failed start what identifies the server", async () => {
+      const world = new World();
+      world.onLaunch = () => undefined;
+
+      await expect(world.server().start()).rejects.toMatchObject({
+        details: { runtime: "fake", pid: 100 },
+      });
     });
 
     it("fails with a timeout when the process lives but never answers", async () => {

@@ -6,7 +6,6 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { TcpPorts } from "../../../../../src/lib/local-server/internal/probes";
-import { nextPort } from "../../../../helpers/ports";
 
 const servers: Server[] = [];
 const claimDirs: string[] = [];
@@ -64,8 +63,24 @@ describe("TcpPorts reservations", () => {
 });
 
 describe("TcpPorts", () => {
-  it("reports a port nothing holds as free", async () => {
-    await expect(new TcpPorts().isFree(nextPort())).resolves.toBe(true);
+  describe("given what the machine says about a port", () => {
+    const portsOf = (answers: boolean, canBind: boolean) =>
+      new TcpPorts(undefined, {
+        answers: async () => answers,
+        canBind: async () => canBind,
+      });
+
+    it("is free when nothing answers and it can be bound", async () => {
+      await expect(portsOf(false, true).isFree(8080)).resolves.toBe(true);
+    });
+
+    it("is taken when something answers on it", async () => {
+      await expect(portsOf(true, true).isFree(8080)).resolves.toBe(false);
+    });
+
+    it("is taken when it cannot be bound", async () => {
+      await expect(portsOf(false, false).isFree(8080)).resolves.toBe(false);
+    });
   });
 
   it("reports a port held on all interfaces as taken", async () => {

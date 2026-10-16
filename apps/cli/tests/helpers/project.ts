@@ -7,7 +7,7 @@ import { Readable } from "node:stream";
 
 import { expect } from "vitest";
 
-import { aFakeServerBinary, trackLocalServer, type ServerShape } from "./local-server";
+import { aFakeServerBinary, trackLocalServerDir, type ServerShape } from "./local-server";
 import { cliPackageRoot } from "./oclif-build";
 import { nextPort } from "./ports";
 import { parseJson, runCliForTest } from "./run-cli";
@@ -390,20 +390,18 @@ export class ScaffoldedApp {
     shape?: ServerShape;
     port?: number;
   } = {}): Promise<CliResult> {
-    const result = await this.cli(["start", "--port", String(port), "--json"], {
+    trackLocalServerDir(this.path);
+    return this.cli(["start", "--port", String(port), "--json"], {
       ZITADEL_SERVER_BINARY: await aFakeServerBinary(shape),
     });
-    this.trackStarted(result);
-    return result;
   }
 
   /** Starts the server again without naming a port, so the one the directory had is used. */
   async restartLocalServer(): Promise<CliResult> {
-    const result = await this.cli(["start", "--json"], {
+    trackLocalServerDir(this.path);
+    return this.cli(["start", "--json"], {
       ZITADEL_SERVER_BINARY: await aFakeServerBinary("plain"),
     });
-    this.trackStarted(result);
-    return result;
   }
 
   /**
@@ -412,6 +410,7 @@ export class ScaffoldedApp {
    * would garble each other's.
    */
   async startLocalServerTwiceAtOnce(): Promise<CliResult[]> {
+    trackLocalServerDir(this.path);
     const env = { ...process.env, ZITADEL_SERVER_BINARY: await aFakeServerBinary("plain") };
     const port = String(nextPort());
     const results = await Promise.all(
@@ -436,9 +435,6 @@ export class ScaffoldedApp {
           }),
       ),
     );
-    for (const result of results) {
-      this.trackStarted(result);
-    }
     return results;
   }
 
@@ -462,12 +458,6 @@ export class ScaffoldedApp {
   async localServerLifecycle(): Promise<string> {
     const status = await this.cli(["status", "--json"]);
     return this.envelopeOf<{ server: { lifecycle: string } }>(status).data.server.lifecycle;
-  }
-
-  private trackStarted(result: CliResult): void {
-    if (result.exitCode === 0) {
-      trackLocalServer(this.localPidOf(result));
-    }
   }
 
   status(extraArgs: string[] = []): Promise<CliResult> {
