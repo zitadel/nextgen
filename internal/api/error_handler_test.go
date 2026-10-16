@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
@@ -495,5 +496,73 @@ func TestOgenErrorHandlerIntrospectionFailure(t *testing.T) {
 			require.Equal(t, tc.wantStatus, rec.Code)
 			require.JSONEq(t, tc.wantBody, rec.Body.String())
 		})
+	}
+}
+
+// A credential whose JWE header names a key the server could never have
+// sealed with is refused as a credential (401), never looked up. The key store
+// here fails every lookup the way Postgres does for a kid with a NUL byte
+// (SQLSTATE 22021), so a header that reached the lookup would answer 500 and
+// let an anonymous request make every authenticated endpoint report an outage.
+func TestOgenErrorHandlerMalformedCredentialHeader(t *testing.T) {
+	t.Parallel()
+
+	const (
+		internal          = `{"code":"internal","message":"An unexpected error occurred."}`
+		sessionRefused    = `{"code":"auth.unauthorized","message":"Missing or invalid session token."}`
+		credentialRefused = `{"code":"auth.unauthorized","message":"The request lacks valid authentication credentials."}`
+		mintedKid         = "enc_key_01JAAAAAAAAAAAAAAAAAAAAAAA"
+	)
+
+	for _, tc := range []struct {
+		name       string
+		header     string
+		wantStatus int
+	}{
+		{"nul byte in kid", `{"alg":"A256GCMKW","enc":"A256GCM","kid":"a\u0000b"}`, http.StatusUnauthorized},
+		{"invalid utf-8 in kid", "{\"alg\":\"A256GCMKW\",\"enc\":\"A256GCM\",\"kid\":\"enc_key_\xff\xfe\"}", http.StatusUnauthorized},
+		{"over-long kid", `{"alg":"A256GCMKW","enc":"A256GCM","kid":"enc_key_` + strings.Repeat("A", 4096) + `"}`, http.StatusUnauthorized},
+		{"unknown kid format", `{"alg":"A256GCMKW","enc":"A256GCM","kid":"key-1"}`, http.StatusUnauthorized},
+		{"unsupported enc", `{"alg":"A256GCMKW","enc":"A128CBC-HS256","kid":"` + mintedKid + `"}`, http.StatusUnauthorized},
+		{"unsupported alg", `{"alg":"dir","enc":"A256GCM","kid":"` + mintedKid + `"}`, http.StatusUnauthorized},
+		{"well-formed header, key store down", `{"alg":"A256GCMKW","enc":"A256GCM","kid":"` + mintedKid + `"}`, http.StatusInternalServerError},
+	} {
+		credential := base64.RawURLEncoding.EncodeToString([]byte(tc.header)) + ".key.iv.ciphertext.tag"
+
+		for _, scheme := range []struct {
+			name    string
+			path    string
+			bearer  bool
+			refused string
+		}{
+			{"session me", "/sessions/me", false, sessionRefused},
+			{"bearer", "/teams/team_1", true, credentialRefused},
+		} {
+			t.Run(scheme.name+", "+tc.name, func(t *testing.T) {
+				t.Parallel()
+				mock := gomock.NewController(t)
+				keys := mocks.NewMockKeyService(mock)
+				keys.EXPECT().GetCrypter(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil, domain.ErrInternal(errors.New("invalid byte sequence for encoding \"UTF8\": 0x00 (SQLSTATE 22021)"))).
+					AnyTimes()
+				srv := newErrorHandlerTestServer(t, service.NewTokenService(keys, nil))
+
+				req := httptest.NewRequest(http.MethodGet, scheme.path, nil)
+				if scheme.bearer {
+					req.Header.Set("Authorization", "Bearer "+credential)
+				} else {
+					req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: credential})
+				}
+				rec := httptest.NewRecorder()
+				srv.ServeHTTP(rec, req)
+
+				want := scheme.refused
+				if tc.wantStatus == http.StatusInternalServerError {
+					want = internal
+				}
+				require.Equal(t, tc.wantStatus, rec.Code)
+				require.JSONEq(t, want, rec.Body.String())
+			})
+		}
 	}
 }

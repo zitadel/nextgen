@@ -296,7 +296,7 @@ func (h *Handler) openState(ctx context.Context, raw string) (*domain.FlowState,
 		return nil, domain.ErrFlowCookieInvalid()
 	}
 
-	header, err := domain.DecodeJWEHeader(raw)
+	header, err := domain.DecodeStoredKeyJWEHeader(raw)
 	if err != nil {
 		return nil, domain.ErrFlowCookieInvalid()
 	}
