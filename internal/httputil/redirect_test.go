@@ -75,6 +75,8 @@ func TestParseRedirectTarget_Refuses(t *testing.T) {
 		{"nothing", "", "empty"},
 		{"too long", "https://app.test/" + strings.Repeat("a", httputil.MaxRedirectTargetLength), "longer than"},
 
+		{"too long once escapes are written out", "https://app.test/" + strings.Repeat("|", 700), "once its escapes"},
+		{"too long once stray percent signs are escaped", "https://app.test/" + strings.Repeat("%", 700), "once its escapes"},
 		{"a relative path", "/login", "scheme"},
 		{"a scheme-relative URL", "//app.test/x", "scheme"},
 		{"no scheme", "app.test/login", "scheme"},
@@ -150,6 +152,7 @@ func TestParseRedirectTarget_Refuses(t *testing.T) {
 		{"another decode, resolve, decode order", "https://app.test/..%2F%255C..%252F", "empty segment"},
 		{"a slash that appears after three decodes", "https://app.test/%25252Fevil.example", "empty segment"},
 		{"a re-encoded character before encoded slashes", "https://app.test/..%2F%252F..%252F^b", "empty segment"},
+		{"a slash that appears after a decode, a normalization and a decode", "https://app.test/a%252Fb%5C..%5C%252Fevil.example", "empty segment"},
 		{"a stray percent sign after a double-encoded slash", "https://app.test/%252F%25zz", "empty segment"},
 	}
 	for _, tt := range tests {
@@ -190,6 +193,7 @@ func TestParseRedirectTarget_KeepsEscapesWhereGoWouldReEncode(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct{ name, raw, want string }{
+		{"a path of the longest accepted size", "https://app.test/" + strings.Repeat("a", httputil.MaxRedirectTargetLength-len("https://app.test/")), "https://app.test/" + strings.Repeat("a", httputil.MaxRedirectTargetLength-len("https://app.test/"))},
 		{"a bar after an encoded slash", "https://app.test/a%2Fb|c", "https://app.test/a%2Fb%7Cc"},
 		{"a caret with a query", "https://app.test/a%2Fb^c?flow=1", "https://app.test/a%2Fb%5Ec?flow=1"},
 		{"a bar in the fragment", "https://app.test/x#/a%2Fb|c", "https://app.test/x#/a%2Fb%7Cc"},

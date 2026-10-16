@@ -86,6 +86,11 @@ func ParseRedirectTarget(raw string) (*url.URL, error) {
 	// A browser leaves a '%' that starts no escape as it is, and a Go parser
 	// refuses it. Writing it as "%25" says the same thing to both.
 	target := sanitize(raw)
+	// Sanitizing can lengthen the target, and it is the sanitized form that is
+	// stored and checked again later, so the limit holds for that form too.
+	if len(target) > MaxRedirectTargetLength {
+		return nil, refusal("it is longer than %d bytes once its escapes are written out", MaxRedirectTargetLength)
+	}
 
 	u, err := url.Parse(target)
 	if err != nil {
@@ -102,6 +107,10 @@ func ParseRedirectTarget(raw string) (*url.URL, error) {
 	}
 	if err := checkHost(u); err != nil {
 		return nil, err
+	}
+
+	if len(u.String()) > MaxRedirectTargetLength {
+		return nil, refusal("it is longer than %d bytes once its escapes are written out", MaxRedirectTargetLength)
 	}
 
 	// The path is checked as written, and as the URL serializes it, because
@@ -233,8 +242,8 @@ const maxReadings = 64
 // A browser resolves dot segments in the path as written, before anything
 // decodes it, and a server that decodes before it routes may resolve again, and
 // decode again. So every text reachable by decoding and resolving, in any
-// order, is tested as it stands and with its dot segments resolved, a backslash
-// being read as a slash once decoded. Each decoding strictly shortens the text
+// order, is tested as it stands, with its dot segments resolved, with its
+// backslashes read as slashes, and both, and each of those is decoded further. Each decoding strictly shortens the text
 // or leaves it unchanged, so the walk ends.
 func checkPath(path string) error {
 	seen := map[string]bool{path: true}
@@ -242,9 +251,9 @@ func checkPath(path string) error {
 	for len(pending) > 0 {
 		var next []string
 		for _, text := range pending {
-			for _, reading := range []string{text, resolveDots(text)} {
-				slashed := strings.ReplaceAll(reading, `\`, "/")
-				if strings.HasPrefix(slashed, "//") || strings.HasPrefix(resolveDots(slashed), "//") {
+			slashed := strings.ReplaceAll(text, `\`, "/")
+			for _, reading := range []string{text, resolveDots(text), slashed, resolveDots(slashed)} {
+				if strings.HasPrefix(reading, "//") || strings.HasPrefix(strings.ReplaceAll(reading, `\`, "/"), "//") {
 					return refusal("its path starts with an empty segment, which reads as another host")
 				}
 				decoded := unescapeLeniently(reading)
