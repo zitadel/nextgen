@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
+import { formatDateTime } from "@/lib/date";
 import { TEST_PROJECT_ID, scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
 
@@ -155,21 +156,60 @@ describe("user detail", () => {
     );
     await renderDetail();
 
-    expect(await screen.findByLabelText("Headcount")).toHaveValue("42");
-    // `false` is a value, not an absence — it must not render as empty.
+    // An integer property edits through a number input.
+    expect(await screen.findByLabelText("Headcount")).toHaveValue(42);
+    // `false` is a value, not an absence — it must not render as empty. No text
+    // control writes a boolean, so it stays read-only.
     expect(screen.getByLabelText("Verified")).toHaveValue("false");
+    expect(screen.getByLabelText("Verified")).toHaveAttribute("readonly");
   });
 
-  it("renders the profile read-only", async () => {
-    // There is no update endpoint (#693). An editable field with no Save would
-    // promise an edit the console cannot make, so the fields are inert and the
-    // design's Save is absent rather than disabled.
+  it("saves only the changed attributes, and keeps Save disabled until one changes", async () => {
     stub();
+    const bodies: unknown[] = [];
+    server.use(
+      http.patch(`${USERS_URL}/${USER_ID}`, async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json({});
+      }),
+    );
     await renderDetail();
 
-    expect(await screen.findByLabelText("Company name")).toHaveAttribute("readonly");
-    expect(screen.getByLabelText("Email")).toHaveAttribute("readonly");
-    expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
+    const save = await screen.findByRole("button", { name: "Save" });
+    expect(save).toBeDisabled();
+
+    const company = screen.getByLabelText("Company name");
+    await userEvent.clear(company);
+    await userEvent.type(company, "Sea Industries");
+    expect(save).toBeEnabled();
+    await userEvent.click(save);
+
+    // The patch merges key by key, so the untouched email is not resent.
+    await waitFor(() =>
+      expect(bodies).toEqual([{ attributes: { companyName: "Sea Industries" } }]),
+    );
+  });
+
+  it("deletes a cleared optional attribute and refuses to clear a required one", async () => {
+    stub();
+    const bodies: unknown[] = [];
+    server.use(
+      http.patch(`${USERS_URL}/${USER_ID}`, async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json({});
+      }),
+    );
+    await renderDetail();
+
+    const save = await screen.findByRole("button", { name: "Save" });
+    await userEvent.clear(screen.getByLabelText("Email"));
+    expect(save).toBeDisabled();
+    await userEvent.type(screen.getByLabelText("Email"), "maya@acme.com");
+
+    // `""` would fail a `format`; `null` is the patch's delete.
+    await userEvent.clear(screen.getByLabelText("Company name"));
+    await userEvent.click(save);
+    await waitFor(() => expect(bodies).toEqual([{ attributes: { companyName: null } }]));
   });
 
   it("shows the status and created date the server stamped", async () => {
@@ -232,7 +272,20 @@ describe("user detail", () => {
     expect(screen.queryByText(/Last sign-in/i)).not.toBeInTheDocument();
   });
 
-  it("reports the real passkey count on the Authentication tab", async () => {
+  it("shows when the passkey was verified on the Authentication tab", async () => {
+    stub();
+    await renderDetail();
+
+    await userEvent.click(await screen.findByRole("tab", { name: "Authentication" }));
+    const panel = within(screen.getByRole("tabpanel"));
+    expect(
+      panel.getByText(`Verified ${formatDateTime("2026-07-01T00:00:00Z")}`),
+    ).toBeInTheDocument();
+    // `/users/{user_id}/password` is write-only, so there is no row to fill.
+    expect(panel.queryByText("Password")).not.toBeInTheDocument();
+  });
+
+  it("counts several passkeys and dates the latest", async () => {
     stub({
       passkeys: [
         { id: "pk_1", name: "MacBook", created_at: "2026-07-01T00:00:00Z" },
@@ -242,9 +295,19 @@ describe("user detail", () => {
     await renderDetail();
 
     await userEvent.click(await screen.findByRole("tab", { name: "Authentication" }));
-    const panel = within(screen.getByRole("tabpanel"));
-    expect(panel.getByText("2 registered")).toBeInTheDocument();
-    expect(panel.getByText("Enabled")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("tabpanel")).getByText(
+        `2 registered, last verified ${formatDateTime("2026-07-02T00:00:00Z")}`,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("says when no passkey is set up", async () => {
+    stub({ passkeys: [] });
+    await renderDetail();
+
+    await userEvent.click(await screen.findByRole("tab", { name: "Authentication" }));
+    expect(within(screen.getByRole("tabpanel")).getByText("Not set up")).toBeInTheDocument();
   });
 
   it("still renders the screen when the passkey list fails", async () => {
@@ -323,7 +386,7 @@ describe("user detail", () => {
     const panel = within(screen.getByRole("tabpanel"));
     expect(panel.getByText("Could not be loaded")).toBeInTheDocument();
     // The passkey row is unaffected.
-    expect(panel.getByText("1 registered")).toBeInTheDocument();
+    expect(panel.getByText(/^Verified /)).toBeInTheDocument();
   });
 
   it("offers delete, and returns to the list once it succeeds", async () => {

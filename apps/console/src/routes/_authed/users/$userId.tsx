@@ -1,6 +1,6 @@
 import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
-import { Key, type LucideIcon, Shield, User, UserRoundCog } from "lucide-react";
-import { useId } from "react";
+import { User, Users } from "lucide-react";
+import { Fragment, useEffect, useId, useMemo, useState } from "react";
 
 import { api } from "@/api/zitadel";
 import { DeleteUserDialog } from "@/components/delete-user-dialog";
@@ -10,18 +10,19 @@ import {
   DETAIL_CARD,
   DetailHeader,
   DetailPage,
-  ICON_PLATE,
+  DetailSection,
+  PanelTitle,
 } from "@/components/detail-page";
+import { FormError } from "@/components/form-error";
 import { StatusBadge } from "@/components/status-badge";
-import { EYEBROW } from "@/components/typography";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatDate } from "@/lib/date";
+import { useSubmit } from "@/hooks/use-submit";
+import { formatDate, formatDateTime } from "@/lib/date";
 import {
   type IdpConnection,
   type UserIdentityLink,
@@ -30,21 +31,27 @@ import {
 } from "@/lib/idp";
 import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { displayValue, field } from "@/lib/record";
-import { type UserSchema, schemaDisplayName, schemaFields } from "@/lib/schema";
+import {
+  type SchemaField,
+  type UserSchema,
+  attributeValue,
+  schemaDisplayName,
+  schemaFields,
+  schemaProperties,
+} from "@/lib/schema";
 import { userAttributes, userIdentity, userIdentitySecondary, userMetadata } from "@/lib/user";
 
 /**
  * User detail — the overview and authentication tabs.
  *
- * Much of the design cannot be built yet, and what is missing is *data*, not
+ * Some of the design cannot be built yet, and what is missing is *data*, not
  * markup. Rather than render labels with nothing behind them, each is left out
  * and recorded here:
  *
- *   - **Last sign-in**: no such field anywhere on the user
- *   - **Save** on the profile form: no `PATCH`/`PUT /users/{user_id}` (#693), so
- *     the fields render read-only rather than offering an edit that cannot land
+ *   - **Last login** in the header card: no such field anywhere on the user
+ *   - the **Password** row: `/users/{user_id}/password` is write-only (`PUT`),
+ *     so whether a password is set, and when, cannot be read
  *   - the **`v1 · live`** schema badge: schema versioning is #445
- *   - the **Password** row's "last changed": no timestamp is exposed
  *   - **unlinking** a provider account: links are written only by a sign-in
  *
  * The design's "Project permissions" block is not pending — it has been removed
@@ -91,18 +98,13 @@ export const Route = createFileRoute("/_authed/users/$userId")({
 
 // Long utility strings live as named constants so Tailwind's scanner sees the
 // full literal (it never sees a concatenated fragment).
-// The panel body is 24px in from the card edge and 20px down, with 16px between
-// the header, the divider and the content.
-const CARD_HEAD = "flex items-center gap-3 px-6 pt-5 pb-4";
-// 18px between fields on both axes.
-const GRID = "grid gap-4.5 px-6 pt-4 pb-5 sm:grid-cols-2";
-const ROW = "flex items-center justify-between gap-4 px-6 pt-4 pb-5";
-// A row's secondary text: counts, dates, and the states that stand in for them.
-const ROW_NOTE = "text-muted-foreground text-[13px] leading-[22px]";
-// The divider sits inside the body padding rather than spanning the card, and
-// `w-full` is applied by an orientation variant that out-specifies a plain
-// utility — so the override has to carry the same variant.
-const PANEL_RULE = "mx-6 w-auto data-[orientation=horizontal]:w-auto";
+// 18px between columns, 16px between rows of fields.
+const GRID = "grid gap-x-4.5 gap-y-4 sm:grid-cols-2";
+// An authentication row: a muted label, its value on the right. 4px block
+// padding, and 18px to the rule between rows (the list's `gap-4.5`).
+const ROW = "flex items-center justify-between gap-4 py-1";
+const ROW_LABEL = "text-muted-foreground text-sm font-medium";
+const ROW_VALUE = "text-foreground text-sm";
 
 function UserDetail() {
   const { user, schema, passkeys, identityLinks, idps } = Route.useLoaderData();
@@ -112,7 +114,6 @@ function UserDetail() {
   // The server-resolved identity chain (ADR 058): display → identifier → id.
   const name = userIdentity(user) ?? userId;
   const secondary = userIdentitySecondary(user);
-  const fields = schema ? schemaFields(schema) : [];
   const metadata = userMetadata(user);
   const schemaName = schema ? schemaDisplayName(schema, "Unknown") : "Unknown";
 
@@ -144,26 +145,14 @@ function UserDetail() {
           <TabsTrigger value="authentication">Authentication</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="flex flex-col gap-4">
-          <Card className={DETAIL_CARD}>
-            <CardHead icon={UserRoundCog} eyebrow="User schema" title={schemaName} />
-            <Separator className={PANEL_RULE} />
-            {fields.length === 0 ? (
-              <p className="text-muted-foreground px-6 py-5 text-sm">
-                This user&rsquo;s schema could not be read, so its attributes cannot be labelled.
-              </p>
-            ) : (
-              <div className={GRID}>
-                {fields.map((entry) => (
-                  <ProfileField
-                    key={entry.key}
-                    label={entry.label}
-                    value={displayValue(attributes, entry.key) ?? ""}
-                  />
-                ))}
-              </div>
-            )}
-          </Card>
+        <TabsContent value="overview" className="flex flex-col gap-6">
+          <ProfileCard
+            userId={userId}
+            schema={schema}
+            schemaName={schemaName}
+            attributes={attributes}
+            onSaved={() => router.invalidate()}
+          />
 
           <Card className={DETAIL_CARD}>
             <CardContent className="flex flex-col gap-4 px-5 py-4.5 sm:flex-row sm:items-center sm:justify-between">
@@ -191,38 +180,46 @@ function UserDetail() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="authentication" className="flex flex-col gap-4">
-          <Card className={DETAIL_CARD}>
-            {/* Key glyph, as the design names it. */}
-            <CardHead icon={Key} eyebrow="Authentication" title={schemaName} />
-            <Separator className={PANEL_RULE} />
-            {/* Only Passkey is listed. The design's Password row shows a "last
-                changed" date the API does not expose, and its `Set` pill would
-                be a claim the console cannot check. */}
-            <div className={ROW}>
-              <span className="text-foreground text-sm font-medium">Passkey</span>
-              {passkeys === undefined ? (
-                <span className={ROW_NOTE}>Could not be loaded</span>
-              ) : (
-                <div className="flex items-center gap-3">
-                  <span className={ROW_NOTE}>{passkeys.length} registered</span>
-                  {/* The design's only badge here is `Enabled`.
-                      With nothing registered the count already says so, and a
-                      second capsule reading `None` restates it. */}
-                  {passkeys.length > 0 && <Badge variant="secondary">Enabled</Badge>}
-                </div>
-              )}
-            </div>
-          </Card>
+        <TabsContent value="authentication" className="flex flex-col gap-6">
+          <DetailSection title="Authentication">
+            {/* Only Passkey is listed: the design's Password row needs a read
+                of the password credential, and `/users/{user_id}/password` is
+                write-only. */}
+            <ul className="flex flex-col gap-4.5">
+              <li className={ROW}>
+                <span className={ROW_LABEL}>Passkey</span>
+                <span className={ROW_VALUE}>
+                  <PasskeyState passkeys={passkeys} />
+                </span>
+              </li>
+            </ul>
+          </DetailSection>
 
-          <Card className={DETAIL_CARD}>
-            <CardHead icon={Shield} eyebrow="Identity providers" title="Linked accounts" />
-            <Separator className={PANEL_RULE} />
+          <DetailSection title="Identity providers">
             <IdentityLinks links={identityLinks} idps={idps} />
-          </Card>
+          </DetailSection>
         </TabsContent>
       </Tabs>
     </DetailPage>
+  );
+}
+
+/**
+ * The Passkey row's value. A passkey is stored once its registration's
+ * attestation verifies, so its `created_at` is when it was verified.
+ */
+function PasskeyState({ passkeys }: { passkeys: { created_at: string }[] | undefined }) {
+  if (passkeys === undefined) return <>Could not be loaded</>;
+  if (passkeys.length === 0) return <>Not set up</>;
+  const latest = passkeys
+    .map((passkey) => passkey.created_at)
+    .sort()
+    .at(-1) as string;
+  if (passkeys.length === 1) return <>Verified {formatDateTime(latest)}</>;
+  return (
+    <>
+      {passkeys.length} registered, last verified {formatDateTime(latest)}
+    </>
   );
 }
 
@@ -241,7 +238,7 @@ function IdentityLinks({
 }) {
   if (!links?.length) {
     return (
-      <p className={`${ROW_NOTE} px-6 pt-4 pb-5`}>
+      <p className={`${ROW_LABEL} py-1`}>
         {links ? "No identity provider is linked to this user." : "Could not be loaded"}
       </p>
     );
@@ -249,28 +246,33 @@ function IdentityLinks({
 
   const byId = new Map((idps ?? []).map((idp) => [idp.id, idp]));
   return (
-    <ul className="flex flex-col">
-      {links.map((link) => {
+    <ul className="flex flex-col gap-4.5">
+      {links.map((link, index) => {
         const idp = byId.get(link.connection_id);
         return (
-          <li key={link.id} className={ROW}>
-            {idp ? (
-              <Link
-                to="/authentication/idps/$idpId"
-                params={{ idpId: idp.id }}
-                className="text-foreground text-sm font-medium hover:underline"
-              >
-                {idp.definition.display_name}
-              </Link>
-            ) : (
-              // The connection list may be refused (`idp.read`); the id is
-              // still the honest name for it.
-              <span className="text-foreground truncate font-mono text-sm">
-                {link.connection_id}
-              </span>
+          <Fragment key={link.id}>
+            {index > 0 && (
+              <li role="none">
+                <Separator />
+              </li>
             )}
-            <span className={`${ROW_NOTE} shrink-0`}>Linked {formatDate(link.created_at)}</span>
-          </li>
+            <li className={ROW}>
+              {idp ? (
+                <Link
+                  to="/authentication/idps/$idpId"
+                  params={{ idpId: idp.id }}
+                  className={`${ROW_LABEL} hover:text-foreground hover:underline`}
+                >
+                  {idp.definition.display_name}
+                </Link>
+              ) : (
+                // The connection list may be refused (`idp.read`); the id is
+                // still the honest name for it.
+                <span className={`${ROW_LABEL} truncate font-mono`}>{link.connection_id}</span>
+              )}
+              <span className={`${ROW_VALUE} shrink-0`}>Linked {formatDate(link.created_at)}</span>
+            </li>
+          </Fragment>
         );
       })}
     </ul>
@@ -278,43 +280,159 @@ function IdentityLinks({
 }
 
 /**
- * One attribute of the profile.
- *
- * Read-only until `PATCH /users/{user_id}` exists (#693): an editable field with
- * no Save promises more than a plain one.
+ * The profile: the user's attributes as its schema labels them, saved with
+ * `PATCH /users/{user_id}`. The drafts follow the loaded user: a save re-runs
+ * the loader, and they reset to what was stored.
  */
-function ProfileField({ label, value }: { label: string; value: string }) {
+function ProfileCard({
+  userId,
+  schema,
+  schemaName,
+  attributes,
+  onSaved,
+}: {
+  userId: string;
+  schema: UserSchema | undefined;
+  schemaName: string;
+  attributes: Record<string, unknown>;
+  onSaved: () => Promise<void>;
+}) {
+  const fields = useMemo(() => (schema ? schemaFields(schema) : []), [schema]);
+  // A text input can only write a string or, through `number`, a number. A
+  // boolean or array property has no control here that writes its type, so it
+  // stays read-only rather than storing `"false"`.
+  const readOnlyKeys = useMemo(
+    () =>
+      new Set(
+        (schema ? schemaProperties(schema) : [])
+          .filter((property) => property.type === "Boolean" || property.type === "Array")
+          .map((property) => property.key),
+      ),
+    [schema],
+  );
+  const stored = useMemo(
+    () =>
+      Object.fromEntries(
+        fields.map((entry) => [entry.key, displayValue(attributes, entry.key) ?? ""]),
+      ),
+    [fields, attributes],
+  );
+  const [values, setValues] = useState(stored);
+  const save = useSubmit(async () => {
+    await api.patchUserByID(userId, { attributes: patchOf(fields, stored, values) });
+    await onSaved();
+  }, "Could not save the user.");
+  const { clearError } = save;
+
+  useEffect(() => {
+    setValues(stored);
+    clearError();
+  }, [stored, clearError]);
+
+  const dirty = fields.some((entry) => values[entry.key] !== stored[entry.key]);
+  const missingRequired = fields.some(
+    (entry) => entry.required && !readOnlyKeys.has(entry.key) && !values[entry.key]?.trim(),
+  );
+
+  return (
+    <Card className={DETAIL_CARD}>
+      <CardContent className="flex flex-col gap-4 px-6 py-5">
+        {/* The design's `Users` glyph, beside the schema the user follows. */}
+        <PanelTitle as="h2" icon={Users} title={schemaName} />
+        <Separator />
+        {fields.length === 0 ? (
+          <p className="text-muted-foreground text-sm">
+            This user&rsquo;s schema could not be read, so its attributes cannot be labelled.
+          </p>
+        ) : (
+          <form
+            className="flex flex-col gap-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void save.run();
+            }}
+          >
+            <div className={GRID}>
+              {fields.map((entry) => (
+                <ProfileField
+                  key={entry.key}
+                  entry={entry}
+                  value={values[entry.key] ?? ""}
+                  readOnly={readOnlyKeys.has(entry.key)}
+                  onChange={(value) => setValues((current) => ({ ...current, [entry.key]: value }))}
+                />
+              ))}
+            </div>
+            <FormError message={save.error} />
+            <div className="flex justify-end">
+              {/* Secondary, small: the resting Save is the secondary fill, which
+                  `disabled:opacity-50` dims — as `RenameCard`'s. Full width on
+                  a phone, as the design's mobile frame draws it. */}
+              <Button
+                type="submit"
+                variant="secondary"
+                size="sm"
+                className="gap-1 px-2.5 text-xs max-sm:w-full"
+                disabled={!dirty || missingRequired}
+                loading={save.pending}
+              >
+                Save
+              </Button>
+            </div>
+          </form>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * The attributes a save changes, and only those. A cleared field is sent as
+ * `null` rather than `""`, which would fail a `format` such as `email`.
+ */
+function patchOf(
+  fields: SchemaField[],
+  stored: Record<string, string>,
+  values: Record<string, string>,
+): Record<string, unknown> {
+  const patch: Record<string, unknown> = {};
+  for (const entry of fields) {
+    if (values[entry.key] === stored[entry.key]) continue;
+    const value = values[entry.key]?.trim() ?? "";
+    patch[entry.key] = value === "" ? null : attributeValue(entry, value);
+  }
+  return patch;
+}
+
+/** One attribute of the profile. */
+function ProfileField({
+  entry,
+  value,
+  readOnly,
+  onChange,
+}: {
+  entry: SchemaField;
+  value: string;
+  readOnly: boolean;
+  onChange: (value: string) => void;
+}) {
   const id = useId();
 
   return (
     <Field>
       <FieldLabel htmlFor={id} className="text-foreground">
-        {label}
+        {entry.label}
       </FieldLabel>
-      <Input id={id} readOnly value={value} />
+      <Input
+        id={id}
+        name={entry.key}
+        type={readOnly ? "text" : entry.inputType}
+        value={value}
+        readOnly={readOnly}
+        required={entry.required}
+        placeholder={entry.placeholder}
+        onChange={(event) => onChange(event.target.value)}
+      />
     </Field>
-  );
-}
-
-/** A body card's head: the icon tile beside an eyebrow and a title. */
-function CardHead({
-  icon: Icon,
-  eyebrow,
-  title,
-}: {
-  icon: LucideIcon;
-  eyebrow: string;
-  title: string;
-}) {
-  return (
-    <div className={CARD_HEAD}>
-      <span className={ICON_PLATE} aria-hidden>
-        <Icon className="size-4.5" />
-      </span>
-      <div className="flex flex-col">
-        <span className={EYEBROW}>{eyebrow}</span>
-        <span className="text-foreground text-base leading-6">{title}</span>
-      </div>
-    </div>
   );
 }

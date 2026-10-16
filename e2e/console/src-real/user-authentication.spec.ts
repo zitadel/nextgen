@@ -27,7 +27,7 @@ test("reads a user's passkeys and linked accounts on the session", async ({
 
   await page.getByRole("tab", { name: "Authentication" }).click();
   const panel = page.getByRole("tabpanel");
-  await expect(panel.getByText("0 registered")).toBeVisible();
+  await expect(panel.getByText("Not set up")).toBeVisible();
   // A seeded user has signed in through no provider; the link list itself is
   // what has to come back.
   await expect(panel.getByText("No identity provider is linked to this user.")).toBeVisible();

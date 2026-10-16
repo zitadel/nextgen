@@ -19,3 +19,21 @@ export function formatDate(value: string): string {
     year: "numeric",
   });
 }
+
+/**
+ * `2026-04-28T15:32:00Z` → `28 Apr 2026, 15:32` in the viewer's locale and
+ * time zone — {@link formatDate} with the time of day.
+ *
+ * Same fallback: an unparseable value renders as it arrived.
+ */
+export function formatDateTime(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
