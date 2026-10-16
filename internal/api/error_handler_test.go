@@ -63,7 +63,7 @@ func TestOgenErrorHandlerInvalidSessionCookie(t *testing.T) {
 	t.Parallel()
 	mock := gomock.NewController(t)
 	tokenService := mocks.NewMockTokenService(mock)
-	tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, errors.New("bad token"))
+	tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, domain.ErrInvalidToken())
 
 	srv := newErrorHandlerTestServer(t, tokenService)
 
@@ -178,7 +178,7 @@ func TestOgenErrorHandlerGrantSecurityStaysCredentialNeutral(t *testing.T) {
 				t.Parallel()
 				mock := gomock.NewController(t)
 				tokenService := mocks.NewMockTokenService(mock)
-				tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, errors.New("bad token"))
+				tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, domain.ErrInvalidToken())
 				srv := newErrorHandlerTestServer(t, tokenService)
 
 				tc.req.Header.Set("Content-Type", "application/json")
@@ -214,7 +214,7 @@ func TestOgenErrorHandlerQueryUsersSecurityStaysCredentialNeutral(t *testing.T) 
 		t.Parallel()
 		mock := gomock.NewController(t)
 		tokenService := mocks.NewMockTokenService(mock)
-		tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, errors.New("bad token"))
+		tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, domain.ErrInvalidToken())
 		srv := newErrorHandlerTestServer(t, tokenService)
 
 		req := httptest.NewRequest(http.MethodPost, "/users/query", strings.NewReader(`{}`))
@@ -294,7 +294,7 @@ func TestOgenErrorHandlerDualSchemeInvalidCookieStaysCredentialNeutral(t *testin
 			t.Parallel()
 			mock := gomock.NewController(t)
 			tokenService := mocks.NewMockTokenService(mock)
-			tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, errors.New("bad token"))
+			tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, domain.ErrInvalidToken())
 			srv := newErrorHandlerTestServer(t, tokenService)
 
 			req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
@@ -443,4 +443,57 @@ func TestOgenErrorHandlerSecurityInternalErrorIs500(t *testing.T) {
 
 	require.Equal(t, http.StatusInternalServerError, rec.Code)
 	require.JSONEq(t, `{"code":"internal","message":"An unexpected error occurred."}`, rec.Body.String())
+}
+
+// A credential IntrospectToken refuses is a 401; an introspection that could
+// not reach the token store is a 500. Answering the outage with 401 would tell
+// every SDK its session is dead, and they clear the session cookie on a 401.
+func TestOgenErrorHandlerIntrospectionFailure(t *testing.T) {
+	t.Parallel()
+
+	const (
+		internal          = `{"code":"internal","message":"An unexpected error occurred."}`
+		sessionRefused    = `{"code":"auth.unauthorized","message":"Missing or invalid session token."}`
+		credentialRefused = `{"code":"auth.unauthorized","message":"The request lacks valid authentication credentials."}`
+	)
+	storeDown := domain.ErrInternal(errors.New("connection refused")).WithMessage("failed to read token record")
+
+	for _, tc := range []struct {
+		name       string
+		method     string
+		path       string
+		bearer     bool
+		err        error
+		wantStatus int
+		wantBody   string
+	}{
+		{"session me, token store down", http.MethodGet, "/sessions/me", false, storeDown, http.StatusInternalServerError, internal},
+		{"session me, revoked token", http.MethodGet, "/sessions/me", false, domain.ErrTokenRevoked(), http.StatusUnauthorized, sessionRefused},
+		{"session me, invalid token", http.MethodGet, "/sessions/me", false, domain.ErrInvalidToken(), http.StatusUnauthorized, sessionRefused},
+		{"user me, token store down", http.MethodGet, "/users/me", false, storeDown, http.StatusInternalServerError, internal},
+		{"dual-scheme cookie, token store down", http.MethodGet, "/teams/team_1", false, storeDown, http.StatusInternalServerError, internal},
+		{"dual-scheme cookie, revoked token", http.MethodGet, "/teams/team_1", false, domain.ErrTokenRevoked(), http.StatusUnauthorized, credentialRefused},
+		{"bearer, token store down", http.MethodGet, "/teams/team_1", true, storeDown, http.StatusInternalServerError, internal},
+		{"bearer, revoked token", http.MethodGet, "/teams/team_1", true, domain.ErrTokenRevoked(), http.StatusUnauthorized, credentialRefused},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			mock := gomock.NewController(t)
+			tokenService := mocks.NewMockTokenService(mock)
+			tokenService.EXPECT().IntrospectToken(gomock.Any(), "credential").Return(nil, tc.err)
+			srv := newErrorHandlerTestServer(t, tokenService)
+
+			req := httptest.NewRequest(tc.method, tc.path, nil)
+			if tc.bearer {
+				req.Header.Set("Authorization", "Bearer credential")
+			} else {
+				req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "credential"})
+			}
+			rec := httptest.NewRecorder()
+			srv.ServeHTTP(rec, req)
+
+			require.Equal(t, tc.wantStatus, rec.Code)
+			require.JSONEq(t, tc.wantBody, rec.Body.String())
+		})
+	}
 }

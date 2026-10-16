@@ -27,6 +27,44 @@ project and the catalog tables are the usual cases. A project created over HTTP
 is another: the handler is cached for the whole run, so it holds the unwrapped
 service, and the test calls `Harness.CleanupProject` for what it created.
 
+## Errors
+
+Services and storage return `domain.Error` values. Each carries a `Code`, and
+`domain.Error` implements `Is` by code, so it matches through any wrapping.
+
+Ask "is this that error?" with `errors.Is`:
+
+```go
+if errors.Is(err, domain.ErrAuthAttemptNotFound()) { ... }
+```
+
+Do not pull the error apart with `errors.As` and compare `e.Code` by hand for
+that. Reach for `errors.As` only when you need a field from the error, and for a
+code switch only where you map codes to statuses, as `errorResponse` does.
+
+An error nobody classified is a fault on our side, so it ends up a 500.
+`errorResponse` does this by default. Keep that property in any layer that
+turns a service error into something else.
+
+So when a layer turns a service error into a refusal (401, 403 and the like),
+refuse only the errors that mean "no" and pass everything else on as internal:
+
+```go
+if errors.Is(err, domain.ErrTokenRevoked()) { // an answer that means "no"
+    return ErrDenied
+}
+if errors.Is(err, domain.ErrInternal(nil)) {
+    return err
+}
+return domain.ErrInternal(err) // we could not decide: the caller answers 500
+```
+
+Anything else means the layer could not decide, usually because a dependency
+such as the database failed, so the credential was never judged. Reporting that
+as a refusal tells clients their session is dead, and the SDKs clear their
+cookie on a 401, so an outage would sign every user out. `introspectionFailure`
+in `internal/api/security.go` follows this.
+
 ## Format before push
 
 Before `git push` of Go changes under this tree, run

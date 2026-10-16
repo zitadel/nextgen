@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net"
 	"net/http"
 	"net/url"
@@ -34,7 +35,7 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 
 	payload, err := s.tokenService.IntrospectToken(ctx, t.Token)
 	if err != nil {
-		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		return nil, introspectionFailure(err)
 	}
 	if !payload.Type.IsProjectSecret() {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
@@ -74,7 +75,7 @@ func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName
 	}
 	token, err := s.tokenService.IntrospectToken(ctx, t.APIKey)
 	if err != nil {
-		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		return nil, introspectionFailure(err)
 	}
 	err = domain.ValidateSessionToken(token)
 	if err != nil {
@@ -106,6 +107,27 @@ func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName
 }
 
 var _ api.SecurityHandler = (*SecurityHandler)(nil)
+
+// introspectionFailure decides what a failed IntrospectToken means for the
+// request. Only a credential the server judged and rejected (malformed,
+// undecryptable, naming an unknown key, expired or revoked) is an unsatisfied
+// requirement: 401. Anything else means the server could not tell (the token
+// store or key store failed), so it becomes an internal error and the error
+// handler answers 500. Collapsing it into a 401 would tell every client its
+// session is dead during an outage, and SDKs clear their session cookie on a
+// 401.
+func introspectionFailure(err error) error {
+	if errors.Is(err, domain.ErrInvalidToken()) ||
+		errors.Is(err, domain.ErrInvalidTokenIdentifiers()) ||
+		errors.Is(err, domain.ErrTokenRevoked()) ||
+		errors.Is(err, domain.ErrEncryptionKeyNotFound()) {
+		return ogenerrors.ErrSecurityRequirementIsNotSatisfied
+	}
+	if errors.Is(err, domain.ErrInternal(nil)) {
+		return err
+	}
+	return domain.ErrInternal(err)
+}
 
 // sessionCookieOperations is the session-only 401 rewrite allowlist.
 // Dual-scheme ops stay off it so a bad Bearer is not a missing-session message.
