@@ -75,7 +75,7 @@ func (s *releaseService) Create(ctx context.Context, input CreateReleaseInput) (
 	}
 
 	actor, _ := audit.ActorFromContext(ctx)
-	entity, err := domain.NewRelease(input.ProjectID, content.Pointers(), domain.ReleaseMetadata{
+	entity, err := domain.NewRelease(input.ProjectID, content, domain.ReleaseMetadata{
 		Message:       input.Message,
 		GitSHA:        input.GitSHA,
 		GitDirty:      input.GitDirty,
@@ -83,9 +83,6 @@ func (s *releaseService) Create(ctx context.Context, input CreateReleaseInput) (
 		CreatedByType: actor.ActorType,
 	})
 	if err != nil {
-		return nil, err
-	}
-	if err := domain.ValidateRelease(content); err != nil {
 		return nil, err
 	}
 
@@ -98,6 +95,9 @@ func (s *releaseService) Create(ctx context.Context, input CreateReleaseInput) (
 	}
 	if existing != nil {
 		return &CreateReleaseOutput{Release: existing}, nil
+	}
+	if err := domain.ValidateRelease(content); err != nil {
+		return nil, err
 	}
 
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
@@ -192,12 +192,6 @@ func (s *releaseService) loadContent(ctx context.Context, projectID string, requ
 			schema, err := stmts.GetJSONSchemaByID(ctx, projectID, pointer.RevisionID)
 			if err != nil {
 				return content, mapRevisionLookupError(err, pointer)
-			}
-			// A schema registered by URL whose document was never parsed declares
-			// no objectType, so nothing says which resource it is a revision of.
-			if schema.ObjectType == nil || *schema.ObjectType == "" {
-				return content, domain.ErrReleaseRevisionUnpinnable(
-					fmt.Sprintf("schema %q declares no objectType", pointer.RevisionID))
 			}
 			content.Schemas = append(content.Schemas, schema)
 

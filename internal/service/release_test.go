@@ -286,6 +286,9 @@ func TestReleaseServiceCreateRejectsSchemaWithoutObjectType(t *testing.T) {
 func TestReleaseServiceCreateRejectsMissingUserSchema(t *testing.T) {
 	svc, statements := newMockedReleaseService(t)
 	expectHandleReads(statements)
+	statements.EXPECT().
+		GetReleaseByContentHash(gomock.Any(), "proj_1", gomock.Any()).
+		Return(nil, new(database.NoRowFoundError))
 
 	_, err := svc.Create(t.Context(), service.CreateReleaseInput{
 		ProjectID: "proj_1",
@@ -295,6 +298,24 @@ func TestReleaseServiceCreateRejectsMissingUserSchema(t *testing.T) {
 		},
 	})
 	assert.ErrorIs(t, err, domain.ErrReleaseUnresolvedReference())
+}
+
+// A set already released answers with that release; validation is skipped.
+func TestReleaseServiceCreateReturnsExistingWithoutValidating(t *testing.T) {
+	svc, statements := newMockedReleaseService(t)
+	expectHandleReads(statements)
+	existing := &domain.Release{ProjectID: "proj_1", ID: "rel_existing"}
+	statements.EXPECT().
+		GetReleaseByContentHash(gomock.Any(), "proj_1", gomock.Any()).
+		Return(existing, nil)
+
+	result, err := svc.Create(t.Context(), service.CreateReleaseInput{
+		ProjectID: "proj_1",
+		Pointers:  []service.CreateReleasePointer{{Kind: domain.ReleasePointerKindFlowDefinition, RevisionID: "flowdef_1"}},
+	})
+	require.NoError(t, err)
+	assert.Same(t, existing, result.Release)
+	assert.False(t, result.Created)
 }
 
 func TestReleaseServiceCreateReferencesIDPConnection(t *testing.T) {
@@ -333,6 +354,9 @@ func TestReleaseServiceCreateRejectsUnknownIDPRevision(t *testing.T) {
 func TestReleaseServiceCreateRejectsFlowNotFittingItsSchema(t *testing.T) {
 	svc, statements := newMockedReleaseService(t)
 	expectHandleReads(statements)
+	statements.EXPECT().
+		GetReleaseByContentHash(gomock.Any(), "proj_1", gomock.Any()).
+		Return(nil, new(database.NoRowFoundError))
 
 	_, err := svc.Create(t.Context(), service.CreateReleaseInput{
 		ProjectID: "proj_1",

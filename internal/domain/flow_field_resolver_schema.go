@@ -529,8 +529,12 @@ func (x xAuthMethodsReader) IsEnabled(method string) bool {
 	return enabled
 }
 
-// SSOProviders returns the IDP connection slugs under `sso.providers`.
+// SSOProviders returns the IDP connection slugs under `sso.providers`, or
+// none when SSO is not enabled.
 func (x xAuthMethodsReader) SSOProviders() []string {
+	if !x.IsEnabled("sso") {
+		return nil
+	}
 	methods, _ := x.raw.V.(map[string]any)
 	sso, _ := methods["sso"].(map[string]any)
 	providers, _ := sso["providers"].([]any)
