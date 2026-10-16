@@ -4,6 +4,13 @@ import { dirname, join } from "node:path";
 
 const require = createRequire(import.meta.url);
 
+/**
+ * The platforms the server binary is published for, and the package that holds
+ * each. This is the one list in the repository of which platform maps to which
+ * package: the wrapper and the CLI both resolve the binary from here, and tests
+ * check it against this package's `optionalDependencies` and the release
+ * manifest so the three cannot drift apart.
+ */
 export const supportedPlatforms = [
   { platform: "darwin", arch: "arm64", packageName: "@zitadel/server-darwin-arm64" },
   { platform: "darwin", arch: "x64", packageName: "@zitadel/server-darwin-x64" },
@@ -12,6 +19,7 @@ export const supportedPlatforms = [
   { platform: "win32", arch: "x64", packageName: "@zitadel/server-win32-x64" },
 ];
 
+/** The package that holds the server binary for a platform. Throws where there is none. */
 export function platformPackageName(platform = process.platform, arch = process.arch) {
   const match = supportedPlatforms.find((candidate) => {
     return candidate.platform === platform && candidate.arch === arch;
@@ -60,6 +68,10 @@ export function resolveServerBinary(platform = process.platform, arch = process.
   return binaryPath;
 }
 
+/**
+ * Makes the binary executable. Packing a tarball can drop the executable bit, so
+ * it is restored here rather than trusted. Windows has no such bit.
+ */
 export function ensureExecutable(binaryPath, platform = process.platform) {
   if (platform === "win32") {
     return;

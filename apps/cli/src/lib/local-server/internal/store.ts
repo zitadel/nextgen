@@ -2,9 +2,10 @@ import { type RuntimeMetadata, readRuntimeMetadata, writeRuntimeMetadata } from 
 import type { ServerStore } from "./lifecycle";
 
 /**
- * The folder's `.zitadel/local/runtime.json`, seen as the record of one backend.
- * A record the other backend wrote reads as nothing here: that server is not
- * this launcher's to manage.
+ * The directory's `.zitadel/local/runtime.json`, seen as the record of one
+ * backend. A record the other backend wrote reads as nothing here: that server
+ * is not this launcher's to manage, and `LocalServer` handles a backend switch
+ * explicitly instead of by one backend mistaking the other's record for its own.
  */
 export class RuntimeFileStore<R extends RuntimeMetadata> implements ServerStore<R> {
   private readonly cwd: string;

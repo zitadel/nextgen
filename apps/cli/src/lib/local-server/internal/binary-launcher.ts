@@ -52,6 +52,16 @@ export type ServerCommand = Readonly<{
  * binary comes from `@zitadel/server`, which owns the list of platforms; the CLI
  * starts it directly, not through that package's wrapper script, so the pid it
  * records is the pid that holds the port.
+ *
+ * The pid in a record is not proof of anything on its own, and most of this
+ * class is about that. Pids are reused (after a reboot the recorded one can be
+ * any program), every directory's server runs the same program, and a launcher
+ * that was killed can leave the server running without the process the record
+ * names. So "is this record's server running" asks three things: some process
+ * in the recorded group is alive, it runs the server program, and it serves
+ * *this record's* data directory, which is what tells one directory's server
+ * from another's. Stopping applies the same test first, so a stale record can
+ * never signal an unrelated program.
  */
 export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
   private readonly spec: BinaryLaunchSpec;
@@ -60,6 +70,17 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     this.spec = spec;
   }
 
+  /**
+   * Starts the server as a detached process and returns the record that identifies it.
+   *
+   * The binary is started directly, not through `@zitadel/server`'s wrapper script:
+   * the pid recorded is then the pid that holds the port, so stopping it stops the
+   * server and a wrapper that dies cannot leave the server running unrecorded.
+   * It is detached (its own process group and session) so it outlives this CLI
+   * invocation, and its output goes to the log file, which is how `zitadel logs`
+   * reads a server that is no longer running. Project variables reach it through
+   * its environment, never its arguments, so they do not show up in `ps`.
+   */
   async launch(target: { port: number; serverUrl: string }): Promise<BinaryRuntimeMetadata> {
     const { spec } = this;
     const command = BinaryLauncher.available(() => BinaryLauncher.command());
@@ -111,6 +132,12 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     }
   }
 
+  /**
+   * Whether the recorded server is alive. A record is checked for identity (see
+   * {@link BinaryLauncher.isRecordRunning}); a `fresh` one, which `launch` has just
+   * returned, is not, because `ps` shows a just-spawned process under its parent's
+   * name until it has exec'd and would wrongly be read as someone else's.
+   */
   async isAlive(record: BinaryRuntimeMetadata, options?: { fresh?: boolean }): Promise<boolean> {
     // `ps` shows a process that was just spawned under its parent's name until
     // it has exec'd, so a launch that has only just returned is not asked who it is.
@@ -119,10 +146,16 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
       : BinaryLauncher.isRecordRunning(record);
   }
 
+  /**
+   * Stops the recorded server, leaving alone a pid that no longer belongs to it.
+   */
   terminate(record: BinaryRuntimeMetadata): Promise<StopBinaryRuntimeResult> {
     return BinaryLauncher.stopRecord(record);
   }
 
+  /**
+   * The end of the server's log file, for explaining a failed start.
+   */
   logTail(record: BinaryRuntimeMetadata, lines: number): Promise<string> {
     return BinaryLauncher.readLogs(record.log_path, lines);
   }
@@ -223,6 +256,10 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     }
   }
 
+  /**
+   * Whether a process with this pid exists. It says nothing about whose it is:
+   * use {@link BinaryLauncher.isRecordRunning} for a recorded server.
+   */
   static isPidRunning(pid: number): boolean {
     try {
       process.kill(pid, 0);
@@ -256,6 +293,11 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     return { pid, status: "failed", target: term.target, signal: "SIGKILL" };
   }
 
+  /**
+   * The last `tail` lines of a server's log file, or an empty string if it has
+   * none yet. Read from the file, not the process, so a stopped server's log is
+   * still there.
+   */
   static async readLogs(logPath: string, tail: number): Promise<string> {
     let content = "";
     try {
@@ -273,6 +315,11 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     return selected.length === 0 ? "" : `${selected}${hasTrailingNewline ? "\n" : ""}`;
   }
 
+  /**
+   * Writes the last `tail` lines to the terminal and then each line as it is
+   * appended, until interrupted. The file is polled by size: it is appended to by
+   * another process, and there is no event to wait on that works on every platform.
+   */
   static async followLogs(logPath: string, tail: number): Promise<void> {
     process.stdout.write(await BinaryLauncher.readLogs(logPath, tail));
     let offset = await fileSize(logPath);
@@ -363,6 +410,9 @@ async function servesDataDir(pid: number, dataDir: string): Promise<boolean> {
   );
 }
 
+/**
+ * Runs `ps` and returns its output, rejecting where `ps` is missing or fails.
+ */
 function ps(args: string[]): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     execFile(
@@ -429,6 +479,9 @@ function isErrno(error: unknown, code: string): boolean {
   );
 }
 
+/**
+ * Signals one process. `false` when there is no such process, which is an answer, not an error.
+ */
 function signalProcess(pid: number, signal: NodeJS.Signals): boolean {
   try {
     process.kill(pid, signal);
@@ -441,6 +494,12 @@ function signalProcess(pid: number, signal: NodeJS.Signals): boolean {
   }
 }
 
+/**
+ * Signals the whole process group the server was started in, falling back to the
+ * process itself where there is no such group (Windows). The group, not the pid,
+ * is what finds a server whose launcher died: a group lives as long as any
+ * member does.
+ */
 function signalRuntime(
   pid: number,
   signal: NodeJS.Signals,
@@ -458,6 +517,10 @@ function signalRuntime(
   return { sent: signalProcess(pid, signal), target: "process" };
 }
 
+/**
+ * Waits for a stopped server to be gone. It polls: the server is not this
+ * process's child, so there is no exit event to wait on.
+ */
 async function waitForExit(pid: number, timeoutMs: number): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -477,6 +540,9 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolveDelay) => setTimeout(resolveDelay, ms));
 }
 
+/**
+ * The server applies schema migrations only when asked, and a local server must.
+ */
 function withMigrateFlag(args: string[]): string[] {
   return args.includes(MIGRATE_FLAG) ? args : [...args, MIGRATE_FLAG];
 }

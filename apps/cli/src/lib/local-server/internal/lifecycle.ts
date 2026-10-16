@@ -1,3 +1,15 @@
+/**
+ * The lifecycle of one directory's server, written against interfaces so it
+ * can be tested with no processes, sockets, files or real time.
+ *
+ * This is the layer below `LocalServer` (the public class) and above the
+ * launchers (`BinaryLauncher`, `DockerLauncher`). It decides what to do (reuse
+ * the running server, restart it, which port to take, when a start has failed);
+ * the launchers know how to run and stop a server; the probes and the store
+ * know about the machine. Keep it that way: if this file starts to know how a
+ * process is spawned or how a port is probed, the tests that make it cheap to
+ * change stop being able to cover it.
+ */
 import { DEFAULT_LOCAL_SERVER_PORT } from "../runtime";
 import { type Clock, realClock } from "./clock";
 
@@ -10,12 +22,23 @@ export type ServerRecord = Readonly<{
   server_url: string;
 }>;
 
-/** Where a folder keeps its record of the server it started. */
+/**
+ * Where a directory keeps its record of the server it started (in practice
+ * `.zitadel/local/runtime.json`). The record is what ties a directory to its own
+ * server, so everything that must not reach another directory's server starts
+ * from it.
+ */
 export interface ServerStore<R extends ServerRecord> {
   read(): Promise<R | undefined>;
   write(record: R): Promise<void>;
 }
 
+/**
+ * What stopping did. `stale` means there was nothing left to stop (the process
+ * was already gone, or its pid had become another program and was left alone);
+ * it is not a failure, so stopping twice is safe. `failed` means it was still
+ * running after being signalled.
+ */
 export type StopOutcome = Readonly<{
   pid?: number;
   status: "failed" | "stale" | "stopped";
@@ -23,13 +46,24 @@ export type StopOutcome = Readonly<{
   signal?: NodeJS.Signals;
 }>;
 
-/** Runs the server. The binary and Docker runtimes are two implementations. */
+/**
+ * Runs the server. The binary and Docker runtimes are two implementations; the
+ * lifecycle treats a record as opaque beyond its port and URL, so a new way of
+ * running a server needs a launcher and a record type, not changes here.
+ */
 export interface Launcher<R extends ServerRecord> {
+  /** Starts a server on the port and returns the record that identifies it. It need not be ready. */
   launch(spec: { port: number; serverUrl: string }): Promise<R>;
   /**
-   * Whether what a record names still exists, answering or not. A `fresh` record
-   * is one `launch` has just returned, which needs no check that it is still the
-   * same server: there is nothing older it could have been confused with.
+   * Whether what a record names still exists, answering or not.
+   *
+   * For a recorded server this must check identity, not just existence: pids
+   * are reused, and after a reboot the recorded one can be any program. A
+   * `fresh` record is one `launch` has just returned, and skips that check on
+   * purpose: there is nothing older it could be confused with, and on Linux the
+   * process list still shows a just-spawned process under its parent's name
+   * until it has exec'd, so asking would wrongly say "not ours" (this took down
+   * every journey lane once).
    */
   isAlive(record: R, options?: { fresh?: boolean }): Promise<boolean>;
   /** Stops it, `stale` when there was nothing left to stop. */
@@ -38,7 +72,12 @@ export interface Launcher<R extends ServerRecord> {
   logTail?(record: R, lines: number): Promise<string | undefined>;
 }
 
+/**
+ * What is known about ports. `isFree` says whether the port can be used right
+ * now; `reserve` is what keeps two starts from choosing the same free port.
+ */
 export interface PortProbe {
+  /** Whether nothing holds the port: it can neither be connected to nor bound. */
   isFree(port: number): Promise<boolean>;
   /**
    * Claims a port for one start until the returned function releases it, so that
@@ -48,27 +87,45 @@ export interface PortProbe {
   reserve(port: number): Promise<(() => Promise<void>) | undefined>;
 }
 
+/**
+ * Whether something answers as a healthy Zitadel at a URL. It cannot tell whose
+ * server it is, which is why a launcher's identity check always comes with it.
+ */
 export interface HealthProbe {
   isHealthy(serverUrl: string): Promise<boolean>;
 }
 
+/**
+ * `stopped`: no record. `running`: the recorded server is alive and answering.
+ * `dead`: a record whose server is gone, or alive but not answering; either way
+ * the next start clears it.
+ */
 export type ServerState<R extends ServerRecord> =
   | { kind: "stopped" }
   | { kind: "running"; record: R }
   | { kind: "dead"; record: R };
 
 export type LifecycleOptions<R extends ServerRecord> = Readonly<{
-  /** The port to use. Absent, the folder keeps the port it had, or takes the first free one. */
+  /**
+   * A port that was asked for. It is taken as asked or refused, never replaced:
+   * a server somewhere the caller did not look for it is worse than an error.
+   * Absent, the directory keeps the port it had, or takes the first free one.
+   */
   port?: number;
-  /** The port a folder without a record tries first. */
+  /** The port a directory without a record tries first (8080 by default). */
   firstPort?: number;
-  /** The port the folder's server had under another backend, which it keeps when it can. */
+  /**
+   * The port the directory's server had under the other backend. A backend
+   * switch keeps it when it can, because the app's configuration names it.
+   */
   previousPort?: number;
-  /** A running server is kept only when this holds; otherwise it is restarted. */
+  /** A running server is kept only when this holds (right version, right image); otherwise it is restarted. */
   reusable?: (record: R) => boolean;
-  /** How long to wait for the new server to answer. */
+  /** How long to wait for a new server to answer before giving up on it. */
   startTimeoutMs?: number;
+  /** How often to ask whether it answers. Waiting for a server has no event to wait on, so it polls. */
   pollIntervalMs?: number;
+  /** Time. Tests pass one they move by hand, so none of them waits in real time. */
   clock?: Clock;
 }>;
 
@@ -79,9 +136,12 @@ export type LifecycleDeps<R extends ServerRecord> = Readonly<{
   health: HealthProbe;
 }>;
 
+/** How many ports above the first are tried before giving up. */
 const PORT_SEARCH_RANGE = 100;
+/** How many times a start that lost a race for its port tries the next one. */
 const PORT_RACE_RETRIES = 3;
 
+/** Every port in the search range was taken. */
 export class NoFreePortError extends Error {
   readonly firstPort: number;
 
@@ -91,6 +151,7 @@ export class NoFreePortError extends Error {
   }
 }
 
+/** A port that was explicitly asked for is held, so the start is refused rather than moved. */
 export class PortInUseError extends Error {
   readonly port: number;
 
@@ -100,6 +161,12 @@ export class PortInUseError extends Error {
   }
 }
 
+/**
+ * A server was launched but did not become ready. `cleanup` says what stopping
+ * it did, `logTail` is what it logged: the lifecycle reads the log before
+ * cleaning up because cleaning up a container removes its log, which is the
+ * only explanation of why it failed.
+ */
 export class ServerStartError<R extends ServerRecord> extends Error {
   readonly reason: "exited" | "timeout";
   readonly record: R;
@@ -119,6 +186,7 @@ export class ServerStartError<R extends ServerRecord> extends Error {
   }
 }
 
+/** A server that had to be stopped (to restart or move it) was still running afterwards. */
 export class ServerStopError<R extends ServerRecord> extends Error {
   readonly record: R;
   readonly outcome: StopOutcome;
@@ -131,9 +199,12 @@ export class ServerStopError<R extends ServerRecord> extends Error {
 }
 
 /**
- * One server for one folder: it starts, reports on and stops the server whose
- * record the folder's store holds. Everything it touches arrives through its
+ * One server for one directory: it starts, reports on and stops the server whose
+ * record the directory's store holds. Everything it touches arrives through its
  * dependencies, so the lifecycle is testable without processes or sockets.
+ *
+ * It does not lock. Two starts in one directory are serialised by the caller
+ * (see `withStartLock`), because only the caller knows what "one directory" is.
  */
 export class Lifecycle<R extends ServerRecord> {
   private readonly deps: LifecycleDeps<R>;
@@ -145,8 +216,9 @@ export class Lifecycle<R extends ServerRecord> {
   }
 
   /**
-   * `running` needs both a live server and a healthy answer at its URL; a
-   * recorded server that is gone, or one that does not answer, is `dead`.
+   * `running` needs both a live server (by identity, not by pid alone) and a
+   * healthy answer at its URL. A healthy answer by itself proves nothing: after
+   * a directory's server stops, another directory's can take its port.
    */
   async state(): Promise<ServerState<R>> {
     const record = await this.deps.store.read();
@@ -159,6 +231,15 @@ export class Lifecycle<R extends ServerRecord> {
       : { kind: "dead", record };
   }
 
+  /**
+   * Makes sure the directory has a running server and returns its record.
+   *
+   * If the recorded server is running and acceptable (`reusable`, and on the
+   * requested port if one was), it is kept. Otherwise whatever is recorded is
+   * stopped, a port is claimed, and a new server is launched and waited for.
+   * The record is written only once the server answers, so a failed start never
+   * leaves a record that looks like a running server.
+   */
   async start(): Promise<{ record: R; alreadyRunning: boolean }> {
     const state = await this.state();
     const requested = this.options.port;
@@ -172,10 +253,9 @@ export class Lifecycle<R extends ServerRecord> {
     }
 
     const previous = state.kind === "stopped" ? undefined : state.record;
-    // A port that was asked for is taken as asked, or refused: moving to another
-    // one would start a server where the caller did not look for it. A port
-    // other than the running server's own is checked before that server is
-    // touched, so a refused move leaves it running.
+    // A port other than the running server's own is checked before that server
+    // is touched, so a refused move leaves it running. Its own port cannot be
+    // checked yet: it is held by the server about to be stopped.
     if (requested !== undefined && requested !== previous?.port) {
       await this.assertFree(requested);
     }
@@ -195,9 +275,10 @@ export class Lifecycle<R extends ServerRecord> {
         await this.deps.store.write(record);
         return { record, alreadyRunning: false };
       } catch (error) {
-        // Someone else took the port between choosing it and binding it. The
+        // Someone else took the port between claiming it and binding it (a
+        // process outside our claims, or a Docker publish that failed). The
         // choice was automatic, so the next port is tried. A server that failed
-        // with its port still free crashed, and says so.
+        // with its port still free crashed, and says so instead of being retried.
         if (
           requested === undefined &&
           attempt < PORT_RACE_RETRIES &&
@@ -214,13 +295,18 @@ export class Lifecycle<R extends ServerRecord> {
     }
   }
 
+  /** Launches on the port and waits until it is ready; throws {@link ServerStartError} if it does not become so. */
   private async launchAndWait(port: number): Promise<R> {
     const record = await this.deps.launcher.launch({ port, serverUrl: serverUrlFor(port) });
     await this.waitUntilReady(record);
     return record;
   }
 
-  /** Stops the recorded server. `not-running` when nothing was recorded or nothing was left. */
+  /**
+   * Stops the recorded server. `not-running` when nothing was recorded or
+   * nothing was left, which is not an error: stopping twice is safe. The record
+   * stays, so the directory keeps its port for the next start.
+   */
   async stop(): Promise<{ result: "stopped" | "not-running"; record?: R }> {
     const record = await this.deps.store.read();
     if (!record) {
@@ -230,12 +316,14 @@ export class Lifecycle<R extends ServerRecord> {
     return { result: outcome.status === "stopped" ? "stopped" : "not-running", record };
   }
 
+  /** Refuses a port that is held. Used before anything is torn down, so a refusal changes nothing. */
   private async assertFree(port: number): Promise<void> {
     if (!(await this.deps.ports.isFree(port))) {
       throw new PortInUseError(port);
     }
   }
 
+  /** Stops a server, and treats one that will not stop as an error, because starting over it would fight it for its port and data. */
   private async terminate(record: R): Promise<StopOutcome> {
     const outcome = await this.deps.launcher.terminate(record);
     if (outcome.status === "failed") {
@@ -245,9 +333,14 @@ export class Lifecycle<R extends ServerRecord> {
   }
 
   /**
-   * Ready means the process is alive and answering, and still alive once it
-   * has answered: a process that lost the race for its port dies right after
-   * binding fails, while the server that holds the port keeps answering.
+   * Ready means the server is alive and answering, and still alive once it has
+   * answered. The second check is for a launch that lost a race for its port: it
+   * dies right after failing to bind while the other server holding the port
+   * keeps answering, so "something answered" is not "we are ready". Port claims
+   * make this rare; this is the backstop.
+   *
+   * It polls, because a starting server gives no event to wait on; the clock is
+   * injected so that tests do not wait in real time.
    */
   private async waitUntilReady(record: R): Promise<void> {
     const timeout = this.options.startTimeoutMs ?? 90_000;
@@ -269,6 +362,7 @@ export class Lifecycle<R extends ServerRecord> {
     throw await this.startFailure("timeout", record);
   }
 
+  /** Builds the failure for a server that did not become ready, reading its log before cleaning it up. */
   private async startFailure(
     reason: "exited" | "timeout",
     record: R,

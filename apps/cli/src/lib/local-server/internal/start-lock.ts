@@ -32,7 +32,15 @@ export async function withStartLock<T>(
   }
 }
 
-/** Takes the lock without waiting. `undefined` when a live start has it. */
+/**
+ * Takes the lock without waiting. `undefined` when a live start has it.
+ *
+ * The file is created exclusively, so only one process can create it. If it
+ * exists, its owner is asked whether it is still alive: a lock left by a start
+ * that crashed must not block every later one, so a dead owner's lock is taken
+ * over. The same lock, in a folder shared by the machine, is what claims a port
+ * (see `TcpPorts.reserve`).
+ */
 export async function tryLock(lockFile: string): Promise<(() => Promise<void>) | undefined> {
   await mkdir(dirname(lockFile), { recursive: true, mode: 0o700 });
   for (;;) {
@@ -75,7 +83,11 @@ async function acquireLock(lockFile: string, options: LockOptions): Promise<() =
   }
 }
 
-/** The pid in the lock, or `undefined` while it is being written or when it is unreadable. */
+/**
+ * The pid in the lock, or `undefined` while it is being written or when it is
+ * unreadable. An unreadable lock counts as held: it is most likely a start that
+ * has created the file and not yet written its pid.
+ */
 async function readOwner(lockFile: string): Promise<number | undefined> {
   try {
     const pid = Number.parseInt(await readFile(lockFile, "utf8"), 10);

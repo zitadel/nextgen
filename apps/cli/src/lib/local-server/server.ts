@@ -45,6 +45,14 @@ export type RunConfig = Readonly<{
   userFile?: string;
 }>;
 
+/**
+ * Where a directory's server stands. `missing`: the directory never started one
+ * (no record). `stopped`: there is a record but what it names is not running.
+ * `unhealthy`: it is running but does not answer. `running`: both. Whether
+ * something answers at the recorded URL is not enough on its own, because
+ * another directory's server may have taken the port since; see
+ * {@link LocalServer.resolveUrl}.
+ */
 export type ServerStatus = Readonly<{
   lifecycle: "missing" | "running" | "unhealthy" | "stopped";
   runtime: RuntimeMetadata | undefined;
@@ -67,6 +75,11 @@ export type StopReport = Readonly<{
   outcome?: StopBinaryRuntimeResult;
 }>;
 
+/**
+ * The outcome of {@link LocalServer.stopAll}. `supported: false` where the
+ * process list cannot be read (Windows, or no `ps`), so callers can say so
+ * instead of reporting that nothing was running.
+ */
 export type SweepResult = Readonly<
   | { supported: false; error?: string }
   | {
@@ -79,10 +92,22 @@ export type SweepResult = Readonly<
 >;
 
 /**
- * The local server of one directory. A directory has at most one, running as a
- * process or as a container, and `.zitadel/local/runtime.json` records which. It
- * is the only way the commands start, stop, inspect or read the logs of it: how
- * a server is run, which port it gets and how it is stopped stay behind it.
+ * The local server of one directory, and the only door to it.
+ *
+ * The rule this class keeps: every directory runs its own server, on its own
+ * port, with its own data and its own admin credential, and the CLI only talks
+ * to the server that directory's own `.zitadel/local/runtime.json` names. What
+ * this replaced (issue #1863) was a second directory silently attaching to the
+ * first one's server on port 8080 and signing in with a password that server
+ * never imported. So nothing here falls back to a default port, and a recorded
+ * URL is never trusted on its own: see {@link LocalServer.resolveUrl}.
+ *
+ * A directory has at most one server, a process (`binary`) or a container
+ * (`docker`), and the record says which. The commands call this class and
+ * nothing under `internal/`. How a server is launched, which port it gets, how
+ * it is stopped and how it is told apart from another directory's all live
+ * there. When behaviour is missing, add it here and to a launcher, not to a
+ * command, or the commands drift apart again.
  */
 export class LocalServer {
   private readonly cwd: string;
@@ -93,34 +118,54 @@ export class LocalServer {
     this.cliVersion = cliVersion;
   }
 
+  /**
+   * The server of a directory. `cliVersion` is only used to word the commands
+   * that errors suggest, so they name the CLI release the user is running.
+   */
   static at(cwd: string, options: { cliVersion: string }): LocalServer {
     return new LocalServer(cwd, options.cliVersion);
   }
 
-  /** The server version this CLI ships, for comparing with a running server's. */
+  /**
+   * The server version this CLI ships. A server another CLI release started
+   * serves that release's API, so `start` and `setup` compare it with a running
+   * server's before reusing it. `undefined` when it cannot be read.
+   */
   static bundledVersion(): string | undefined {
     return BinaryLauncher.bundledVersion();
   }
 
-  /** The bundled server version, or the error that says how to repair the install. */
+  /**
+   * The bundled server version, or the error that says how to repair the
+   * install. For `doctor`, which must report a broken install, not crash on it.
+   */
   static assertBinaryAvailable(): string {
     return BinaryLauncher.assertAvailable();
   }
 
+  /** Whether the Docker daemon answers, for `doctor` and for failing a Docker start early. */
   static dockerReachable(): Promise<DockerResult> {
     return DockerLauncher.available();
   }
 
+  /** Where an image can be had from, so `doctor` can warn before a start has to pull it. */
   static imageAvailable(image: string): Promise<"local" | "remote"> {
     return DockerLauncher.imageAvailable(image);
   }
 
   /**
    * The URL of the server the nearest `zitadel start` record names, when that
-   * server is the one running and answering. A URL alone is not enough: after a
-   * directory's server stops, another directory's can take its port, and a
-   * credential sent there would be sent to the wrong server. There is no
-   * fallback to a default port for the same reason.
+   * server is the one running and answering.
+   *
+   * A URL alone is not enough. After a directory's server stops, another
+   * directory's can take its port, and then "something answers at the recorded
+   * URL" is true of the wrong server: the console would send this directory's
+   * admin password there and `setup` would create projects in someone else's
+   * data. So the record's own process or container must be the one running.
+   * There is no fallback to a default port, for the same reason.
+   *
+   * The record is looked up from `cwd` upwards because `start` may have run in a
+   * parent of the app directory.
    */
   static async resolveUrl(cwd: string): Promise<string> {
     const nearest = await readNearestRuntimeMetadata(cwd);
@@ -146,6 +191,7 @@ export class LocalServer {
     }
   }
 
+  /** Whether the server a record names is running (see the identity checks in the launchers) and answering. */
   private static async isServing(runtime: RuntimeMetadata): Promise<boolean> {
     const alive =
       runtime.backend === "binary"
@@ -155,7 +201,12 @@ export class LocalServer {
     return alive && (await checkLocalServerHealth(runtime.server_url));
   }
 
-  /** Stops every CLI-managed server process on the machine, whichever directory started it. */
+  /**
+   * Stops every CLI-managed server process on the machine, whichever directory
+   * started it. It is the way out when a record is lost or wrong and `stop`
+   * cannot find the server: the processes are found by their command lines, not
+   * by any directory's record.
+   */
   static async stopAll(): Promise<SweepResult> {
     const discovery = await discoverManagedRuntimeProcesses();
     if (!discovery.supported) {
@@ -179,10 +230,23 @@ export class LocalServer {
   }
 
   /**
-   * Starts the directory's server, or finds it already running. A running one
-   * is kept only when it is the version (binary) or image (Docker) asked for. The
-   * directory keeps the port it had, takes the first free one otherwise, and an
-   * explicit `port` is taken as asked or refused.
+   * Starts the directory's server, or finds it already running.
+   *
+   * A running server is kept only if it is what was asked for: the server
+   * version this CLI ships (binary) or the same image (Docker). Otherwise it is
+   * restarted on the same data.
+   *
+   * Port rules, each there for a reason. The directory keeps the port it had,
+   * because the URLs `setup` wrote into the app's configuration name it. With no
+   * record it takes the first free port from 8080, so a second directory never
+   * competes for the first one's. A port passed as `options.port` is taken as
+   * asked or refused, never moved, because a server where the caller did not
+   * look for it is worse than an error. Whether a port is free is decided by
+   * claiming it, not by listing sockets: see `TcpPorts`.
+   *
+   * Starts are serialised per directory by a lock, so two at once cannot run two
+   * servers over one data directory; the second finds the first's. Failures are
+   * mapped to the errors the commands report in `internal/failures.ts`.
    */
   async start(
     config: RunConfig,
@@ -195,6 +259,14 @@ export class LocalServer {
     );
   }
 
+  /**
+   * The body of {@link start}, run while holding the directory's start lock.
+   * Switching backends (container to process, or back) stops the other
+   * backend's server to make way, but never for a port that cannot be had: a
+   * refused move must leave the working server running, so the destination
+   * port is checked before anything is torn down. The port the directory had is
+   * carried over (`previousPort`) so a backend switch does not change its URLs.
+   */
   private async startLocked(
     config: RunConfig,
     options: { port?: number },
@@ -217,7 +289,9 @@ export class LocalServer {
         // A server another CLI release started serves that release's API, and
         // `setup` against it fails halfway, after the project exists. So a
         // running server is reused only when it is the version this CLI ships;
-        // the Docker backend compares the image for the same reason.
+        // the Docker backend compares the image for the same reason. `version` is
+        // `undefined` only when the package cannot be read, and then any running
+        // server is kept: there is nothing to compare with.
         const version = BinaryLauncher.bundledVersion();
         if (
           existing?.backend === "binary" &&
@@ -279,7 +353,13 @@ export class LocalServer {
     }
   }
 
-  /** Where the directory's server stands: whether it is recorded, alive and answering. */
+  /**
+   * Where the directory's server stands. It never throws for a server that is
+   * down, a missing record or an unreachable Docker (that is the answer, and the
+   * `docker` part says why), because `status` and `doctor` exist to report those
+   * states. "Running" for a process means its recorded pid still belongs to the
+   * server that was started, not merely that some process has that pid.
+   */
   async status(): Promise<ServerStatus> {
     const runtime = await readRuntimeMetadata(this.cwd);
     let container: Awaited<ReturnType<typeof DockerLauncher.inspect>> | undefined;
@@ -308,12 +388,21 @@ export class LocalServer {
     };
   }
 
-  /** Stops the directory's server and keeps its data. */
+  /**
+   * Stops the directory's server and keeps its data. Idempotent: with nothing
+   * recorded, or a recorded server that is already gone, it reports that
+   * nothing was stopped instead of failing, so scripts can run it twice.
+   */
   async stop(): Promise<StopReport> {
     return this.halt();
   }
 
-  /** Stops the directory's server and deletes its data and its record. */
+  /**
+   * Stops the directory's server and deletes its data and its record. The
+   * server is stopped first so its database is not deleted from under it. The
+   * local admin credential is kept: deleting it would leave a start that cannot
+   * sign in, because the server only imports the admin once.
+   */
   async reset(): Promise<StopReport> {
     const report = await this.halt();
     await removeLocalData(this.cwd);
@@ -321,7 +410,12 @@ export class LocalServer {
     return report;
   }
 
-  /** The end of the server's log, or the whole of it followed until interrupted. */
+  /**
+   * The end of the server's log, or, with `follow`, the log streamed until
+   * interrupted (then `logs` is empty: it was written to the terminal as it
+   * came). The log is read by the record, so it works for a server that has
+   * stopped, which is when the log is most wanted.
+   */
   async logs(options: {
     tail: number;
     follow?: boolean;
@@ -348,6 +442,13 @@ export class LocalServer {
     return { runtime, logs };
   }
 
+  /**
+   * Stops what the record names. For a process, the whole process group is
+   * signalled and a pid that is no longer the server is left alone (see
+   * `BinaryLauncher.stopRecord`). For a container, or with no record at all, the
+   * container named for this directory is removed if there is one: a start that
+   * failed halfway can leave a container behind with no record of it.
+   */
   private async halt(): Promise<StopReport> {
     const runtime = await readRuntimeMetadata(this.cwd);
     if (runtime?.backend === "binary") {
@@ -366,6 +467,11 @@ export class LocalServer {
     return { runtime, stopped: removed };
   }
 
+  /**
+   * Runs the lifecycle for one backend. The store is typed to that backend so a
+   * record the other backend wrote reads as "nothing here": the other backend's
+   * server is handled explicitly by {@link startLocked}, never by accident.
+   */
   private async run<R extends RuntimeMetadata>(
     backend: R["backend"],
     launcher: Launcher<R>,

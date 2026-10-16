@@ -303,6 +303,13 @@ export async function checkLocalServerHealth(
   }
 }
 
+/**
+ * The error for a directory with no running server of its own. With a
+ * `serverUrl` there is a record whose server is not running; without one there
+ * is no record in the directory or a parent. The hint offers `--server` for the
+ * case where someone really does mean another directory's server, since
+ * nothing falls back to one on its own.
+ */
 export function localServerNotRunning(serverUrl?: string): ZitadelError {
   return new ZitadelError("E_LOCAL_SERVER_NOT_RUNNING", "Local Zitadel server is not running", {
     hint: serverUrl

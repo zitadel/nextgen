@@ -47,7 +47,8 @@ export type DockerRunSpec = DockerLaunchSpec & Readonly<{ port: number }>;
  * Everything about running the server in a container: the `docker run` it
  * starts, whether the container is alive, how it is stopped and removed, and its
  * logs. The container is named for the directory, so whatever holds that name is
- * this directory's.
+ * this directory's. That is why a container needs no identity check of the kind a
+ * pid does: another directory's server cannot be running under this name.
  */
 export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
   private readonly spec: DockerLaunchSpec;
@@ -56,6 +57,14 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
     this.spec = spec;
   }
 
+  /**
+   * Starts the container on the chosen port and returns the record that identifies it.
+   *
+   * The container is named for the directory, so a container with that name is
+   * this directory's own leftover (a record that was lost, a container that
+   * stopped) and is removed first. If `docker run` fails, whatever it may have
+   * created is removed too, so a failed start leaves nothing behind.
+   */
   async launch(target: { port: number; serverUrl: string }): Promise<DockerRuntimeMetadata> {
     const { spec } = this;
     // A leftover of an earlier start (a record that was lost, a container that
@@ -87,18 +96,34 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
     });
   }
 
+  /**
+   * Whether the container is running. The container name is per directory, so
+   * unlike a pid it cannot have been reused by another directory's server.
+   */
   async isAlive(record: DockerRuntimeMetadata): Promise<boolean> {
     return (await DockerLauncher.inspect(record.container_name)).running;
   }
 
+  /**
+   * The end of the container's log, read before a failed start removes the container.
+   */
   logTail(record: DockerRuntimeMetadata, lines: number): Promise<string> {
     return DockerLauncher.readLogs(record.container_name, lines);
   }
 
+  /**
+   * Stops and removes the container; `stale` when it was already gone.
+   */
   async terminate(record: DockerRuntimeMetadata): Promise<StopOutcome> {
     return { status: (await DockerLauncher.remove(record.container_name)) ? "stopped" : "stale" };
   }
 
+  /**
+   * The `docker run` arguments. The container's port is published on loopback
+   * only, so a local server is not reachable from the network. Project variables
+   * are passed as bare `--env NAME` so Docker copies them from the client's
+   * environment and no value appears in the argument list.
+   */
   static runArgs(spec: DockerRunSpec, envNames: readonly string[] = []): string[] {
     const args = [
       "run",
@@ -152,6 +177,9 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
     return args;
   }
 
+  /**
+   * Builds the record of a container that was started.
+   */
   static metadata(input: {
     cwdDataDir: string;
     cliVersion: string;
@@ -177,6 +205,9 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
     };
   }
 
+  /**
+   * Whether the Docker daemon answers, as `docker version`'s result.
+   */
   static available(): Promise<DockerResult> {
     return runDocker(["version", "--format", "{{.Server.Version}}"]);
   }
@@ -200,6 +231,10 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
     throw dockerError(`Inspect Docker image ${image}`, args, result);
   }
 
+  /**
+   * What Docker says about a container: whether it exists, is running, and which
+   * image it runs. Absent containers are an answer (`exists: false`), not an error.
+   */
   static async inspect(containerName: string): Promise<{
     exists: boolean;
     running: boolean;
@@ -232,6 +267,11 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
     return true;
   }
 
+  /**
+   * The last `tail` lines of the container's log. `docker logs` replays the
+   * container's two streams separately, and the server logs to stderr, so both
+   * are returned; reading stdout alone gave an empty log.
+   */
   static async readLogs(containerName: string, tail: number): Promise<string> {
     const result = await requireDocker(
       ["logs", "--tail", String(tail), containerName],
@@ -241,10 +281,18 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
     return result.stdout + result.stderr;
   }
 
+  /**
+   * Streams the container's log to the terminal until interrupted.
+   */
   static async followLogs(containerName: string, tail: number): Promise<void> {
     await streamDocker(["logs", "--tail", String(tail), "--follow", containerName]);
   }
 
+  /**
+   * The user the container runs as, so files it writes into the mounted data
+   * directory belong to the developer and not to root. Empty where there are no
+   * user ids (Windows).
+   */
   static currentUser(): { uid?: number; gid?: number } {
     const getuid = process.getuid;
     const getgid = process.getgid;
@@ -257,6 +305,9 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
   }
 }
 
+/**
+ * Runs `docker` and collects its output; the exit status is part of the result, not an exception.
+ */
 async function runDocker(
   args: string[],
   env: Readonly<Record<string, string>> = {},
@@ -283,6 +334,9 @@ async function runDocker(
   });
 }
 
+/**
+ * Runs `docker` with its output going straight to the terminal.
+ */
 async function streamDocker(args: string[]): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const child = spawn("docker", args, {
@@ -300,6 +354,9 @@ async function streamDocker(args: string[]): Promise<void> {
   });
 }
 
+/**
+ * Runs `docker` and turns a failure into an error that says what was being done and how to check Docker.
+ */
 async function requireDocker(
   args: string[],
   action: string,
@@ -317,6 +374,9 @@ async function requireDocker(
   return result;
 }
 
+/**
+ * Whether the image is already on this machine.
+ */
 async function imageExists(image: string): Promise<boolean> {
   let result: DockerResult;
   const args = ["image", "inspect", image];
@@ -328,6 +388,9 @@ async function imageExists(image: string): Promise<boolean> {
   return result.status === 0;
 }
 
+/**
+ * Makes sure the image is on this machine, pulling it only if it is not.
+ */
 async function ensureImage(image: string): Promise<"local" | "pulled"> {
   if (await imageExists(image)) {
     return "local";
@@ -336,6 +399,9 @@ async function ensureImage(image: string): Promise<"local" | "pulled"> {
   return "pulled";
 }
 
+/**
+ * Wraps a failed `docker` call, keeping its command and stderr for whoever is debugging.
+ */
 function dockerError(action: string, args: string[], cause: unknown): ZitadelError {
   const details =
     cause && typeof cause === "object" && "stderr" in cause

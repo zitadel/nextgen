@@ -12,6 +12,17 @@ import {
   type StopOutcome,
 } from "./lifecycle";
 
+/**
+ * Failures of a start, as the errors the commands report. The lifecycle throws
+ * typed errors that know nothing about wording, hints or suggested commands;
+ * this is where they become the messages a person or an agent acts on, so a
+ * message can be changed without touching the lifecycle.
+ */
+
+/**
+ * A failed start whose cleanup also failed: the server may still be running
+ * with nothing recording it, so the error says how to find and stop it.
+ */
 function startupCleanupFailedError(
   error: unknown,
   stopResult: StopOutcome,
@@ -41,6 +52,10 @@ function startupCleanupFailedError(
   );
 }
 
+/**
+ * Fails early, with the guidance for starting Docker, when the daemon does not
+ * answer: better than a start that fails halfway with a raw `docker` error.
+ */
 export async function assertDockerAvailable(cliVersion: string): Promise<void> {
   let result: Awaited<ReturnType<typeof DockerLauncher.available>>;
   try {
@@ -53,6 +68,7 @@ export async function assertDockerAvailable(cliVersion: string): Promise<void> {
   }
 }
 
+/** The error for a Docker daemon that is missing or not running. */
 function dockerUnavailableError(error: unknown, cliVersion: string): ZitadelError {
   const advice = dockerRuntimeGuidance("start", cliVersion);
   return new ZitadelError("E_VALIDATION", "Docker is not reachable", {
@@ -62,7 +78,12 @@ function dockerUnavailableError(error: unknown, cliVersion: string): ZitadelErro
   });
 }
 
-/** Turns what the lifecycle threw into the error the command reports. */
+/**
+ * Turns what the lifecycle threw into the error the command reports; anything it
+ * does not recognise is returned unchanged for the caller to throw. A start that
+ * failed to become ready also carries what cleaning it up did, so a server that
+ * could not be stopped is reported as such and not as a plain start failure.
+ */
 export async function startFailure(error: unknown, cliVersion: string): Promise<unknown> {
   if (error instanceof ServerStartError) {
     const record = error.record as RuntimeMetadata;
@@ -111,6 +132,12 @@ export async function startFailure(error: unknown, cliVersion: string): Promise<
   return error;
 }
 
+/**
+ * A port that was asked for, or every port tried, is held. `listeners` (who
+ * holds it, from `lsof`) is only for the message: whether the port is held was
+ * decided elsewhere, because a failed `lsof` reads as "nobody", and a message
+ * may be wrong where a decision must not be.
+ */
 function portInUseError(
   port: number,
   serverUrl: string,
@@ -128,6 +155,11 @@ function portInUseError(
   });
 }
 
+/**
+ * A server that started and then exited before answering. `logTail` was read
+ * before the failed start was cleaned up, because for a container cleaning up
+ * removes the log, which is the only explanation of why it exited.
+ */
 function serverExitedError(
   serverUrl: string,
   cliVersion: string,
@@ -148,6 +180,7 @@ function serverExitedError(
   );
 }
 
+/** Removes repeats while keeping order, for suggested commands. */
 function unique(values: string[]): string[] {
   return [...new Set(values)];
 }

@@ -113,6 +113,8 @@ export default class Start extends BaseCommand {
       { backend: runtimeBackend, image, env, userFile: local?.userFile },
       { port: requestedPort },
     );
+    // The envelope's `source` named the port guessed before one was chosen; an
+    // agent that follows it would target a different server than the one started.
     this.meta = { ...this.meta, source: runtime.server_url };
     return this.emit({
       status: "ok",

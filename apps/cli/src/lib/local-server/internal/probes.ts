@@ -11,7 +11,11 @@ import { tryLock } from "./start-lock";
  * misses a server bound to one loopback address, which a wildcard bind can sit
  * beside, and connecting alone misses a socket that listens but does not accept
  * yet. `lsof` is not used: a listing that fails or times out reads as an empty
- * one, and an empty one reads as a free port.
+ * one, and an empty one reads as a free port, which is how a start once decided
+ * a taken port was free and then accepted another directory's server as its own.
+ *
+ * Whether a port is free and whether it is *claimed* are separate questions:
+ * `isFree` looks at the machine, {@link TcpPorts.reserve} coordinates starts.
  */
 export class TcpPorts implements PortProbe {
   private readonly claimsDir: string;
@@ -23,13 +27,17 @@ export class TcpPorts implements PortProbe {
 
   /**
    * Starts that choose a port at the same moment cannot tell it is taken until
-   * one of them binds it, so a start claims the port first, with a file every
-   * `zitadel` on the machine sees, and keeps the claim until its server answers.
+   * one of them binds it, and a server takes seconds to bind: the loser used to
+   * start, see the winner's server answer on its port, and report itself ready.
+   * So a start claims the port first, with a file every `zitadel` on the machine
+   * sees, and keeps the claim until its server answers. A claim whose owner is
+   * gone is taken over.
    */
   reserve(port: number): Promise<(() => Promise<void>) | undefined> {
     return tryLock(join(this.claimsDir, String(port)));
   }
 
+  /** Whether nothing holds the port. Says nothing about another start that has claimed it: see {@link reserve}. */
   async isFree(port: number): Promise<boolean> {
     if (await this.answers(port)) {
       return false;
@@ -53,6 +61,7 @@ export class TcpPorts implements PortProbe {
   }
 }
 
+/** Whether something accepts a connection on the port. A refusal, an error or silence is "no". */
 function connects(host: string, port: number): Promise<boolean> {
   return new Promise((resolve) => {
     const socket = createConnection({ host, port, timeout: 500 });
@@ -68,6 +77,10 @@ function connects(host: string, port: number): Promise<boolean> {
   });
 }
 
+/**
+ * Asks the server's own health endpoint. It only says that *a* Zitadel answers
+ * at the URL; which one is the launcher's identity check's job.
+ */
 export class HttpHealth implements HealthProbe {
   isHealthy(serverUrl: string): Promise<boolean> {
     return checkLocalServerHealth(serverUrl, 1000);
