@@ -174,6 +174,9 @@ func TestParseRedirectTarget_Refuses(t *testing.T) {
 		{"a resolve, a slash reading and a resolve", "https://app.test/.%255C%252F..%5C/../", "empty segment"},
 		{"a decode, resolves and slash readings in a long chain", "https://app.test/..%5C%2F%2e%2e%5C%2e%2e/.%2e", "empty segment"},
 		{"an encoded slash, backslash and parent segment", "https://app.test/.%2F%5C%2e%2e/", "empty segment"},
+		{"a parameter-bearing parent segment before two slashes", "https://app.test/a/..;//evil.example", "empty segment"},
+		{"an encoded parent segment with an encoded semicolon", "https://app.test/a/%2e%2e%3b//evil", "empty segment"},
+		{"a parameter on a segment before two slashes", "https://app.test/a/..;x=1/..//evil", "empty segment"},
 		{"a stray percent sign after a double-encoded slash", "https://app.test/%252F%25zz", "empty segment"},
 	}
 	for _, tt := range tests {

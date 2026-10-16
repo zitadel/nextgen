@@ -245,9 +245,11 @@ const maxReadings = 64
 //
 // A browser resolves dot segments in the path as written, before anything
 // decodes it, and a server that decodes before it routes may resolve again,
-// read a backslash as a slash, and decode again. So every text reachable from
-// the path by decoding, resolving dot segments and reading backslashes as
-// slashes, in any order and any number of times, is tested for a leading "//".
+// read a backslash as a slash, drop ";" path parameters as a Tomcat or Spring
+// layer does, and decode again. So every text reachable from the path by
+// decoding, resolving dot segments, reading backslashes as slashes and dropping
+// path parameters, in any order and any number of times, is tested for a
+// leading "//".
 // Decoding strictly shortens a text and the other two steps never lengthen it,
 // so the walk ends.
 func checkPath(path string) error {
@@ -260,7 +262,8 @@ func checkPath(path string) error {
 			return refusal("its path starts with an empty segment, which reads as another host")
 		}
 		decoded := unescapeLeniently(text)
-		for _, step := range []string{decoded, resolveDots(text), strings.ReplaceAll(text, `\`, "/")} {
+		steps := []string{decoded, resolveDots(text), strings.ReplaceAll(text, `\`, "/"), dropParameters(text)}
+		for _, step := range steps {
 			if seen[step] {
 				continue
 			}
@@ -279,6 +282,21 @@ func checkPath(path string) error {
 		}
 	}
 	return nil
+}
+
+// dropParameters removes the ";..." path parameters from every segment of p, so
+// "/a/..;/x" reads as "/a/../x".
+func dropParameters(p string) string {
+	if !strings.Contains(p, ";") {
+		return p
+	}
+	segments := strings.Split(p, "/")
+	for i, segment := range segments {
+		if j := strings.IndexByte(segment, ';'); j >= 0 {
+			segments[i] = segment[:j]
+		}
+	}
+	return strings.Join(segments, "/")
 }
 
 // resolveDots removes the dot segments from p the way the URL standard does:
