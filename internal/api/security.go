@@ -212,13 +212,16 @@ func sessionTokenFromContext(ctx context.Context) (*domain.Token, bool) {
 	return v, ok && v != nil
 }
 
-// requireSelf is the check every self-access operation (`/me`) runs: who the
-// verified session belongs to (domain.SelfFromSession). The session is the
-// authorization, so no resolver check follows; the operation acts on that
-// user, in that project, and nothing else.
+// requireSelf resolves the caller of a self-access operation (`/me`). A
+// refusal answers like a missing session, so it never tells a caller that its
+// cookie is genuine but its user is gone (#553).
 func requireSelf(ctx context.Context) (domain.Self, error) {
 	token, _ := sessionTokenFromContext(ctx)
-	return domain.SelfFromSession(token, time.Now())
+	self, err := domain.SelfFromSession(token, time.Now())
+	if err != nil {
+		return domain.Self{}, invalidSessionCredential(err)
+	}
+	return self, nil
 }
 
 type contextKey struct{}

@@ -228,13 +228,8 @@ func (h *Handler) ListUserTeams(ctx context.Context, params api.ListUserTeamsPar
 	if err != nil {
 		return nil, err
 	}
-	// Same gate as the embedded read, or this becomes the way around it: by
-	// scope for a project secret, by project-wide read for a session.
-	reads, err := h.userReadsProject(ctx, projectID)
-	if err != nil {
-		return nil, err
-	}
-	if err := requireMembershipReadUnless(ctx, reads); err != nil {
+	// Same gate as the embedded read, or this becomes the way around it.
+	if err := h.requireMembershipReadIn(ctx, projectID); err != nil {
 		return nil, err
 	}
 
@@ -251,12 +246,10 @@ func (h *Handler) ListUserTeams(ctx context.Context, params api.ListUserTeamsPar
 	return &res, nil
 }
 
-// ListMyTeams is the caller's own roster: self-access, so no resolver check —
-// the session decides whose teams these are.
 func (h *Handler) ListMyTeams(ctx context.Context, params api.ListMyTeamsParams) (api.ListMyTeamsRes, error) {
 	self, err := requireSelf(ctx)
 	if err != nil {
-		return nil, invalidSessionCredential(err)
+		return nil, err
 	}
 	teams, err := h.userService.ListUserTeams(ctx, service.ListUserTeamsInput{
 		ProjectID: self.ProjectID,
@@ -291,14 +284,8 @@ func (h *Handler) GetUserByID(ctx context.Context, params api.GetUserByIDParams)
 	}
 	var teamID *string
 	if params.TeamID.IsSet() {
-		// team_id answers "is this user an active member of that team", the
-		// membership read POST /users/query gates the same way: by scope for a
-		// project secret, by project-wide read for a session.
-		reads, err := h.userReadsProject(ctx, projectID)
-		if err != nil {
-			return nil, err
-		}
-		if err := requireMembershipReadUnless(ctx, reads); err != nil {
+		// team_id answers "is this user an active member of that team".
+		if err := h.requireMembershipReadIn(ctx, projectID); err != nil {
 			return nil, err
 		}
 		teamID = new(string(params.TeamID.Value))
@@ -399,7 +386,7 @@ func (h *Handler) GetMyUser(ctx context.Context) (api.GetMyUserRes, error) {
 func (h *Handler) GetMyUserSchema(ctx context.Context) (api.GetMyUserSchemaRes, error) {
 	self, err := requireSelf(ctx)
 	if err != nil {
-		return nil, invalidSessionCredential(err)
+		return nil, err
 	}
 	schema, err := h.userService.GetMyUserSchema(ctx, service.GetMyUserInput{Self: self})
 	if err != nil {

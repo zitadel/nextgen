@@ -669,9 +669,7 @@ func (UnimplementedHandler) GetMyUser(ctx context.Context) (r GetMyUserRes, _ er
 
 // GetMyUserSchema implements getMyUserSchema operation.
 //
-// The schema the signed-in user's own record is validated against — the
-// document `PATCH /users/me` validates against. Self-access: the session is
-// the authorization, like the rest of `/users/me`.
+// The schema the signed-in user's own record is validated against.
 //
 // GET /users/me/schema
 func (UnimplementedHandler) GetMyUserSchema(ctx context.Context) (r GetMyUserSchemaRes, _ error) {
@@ -904,8 +902,7 @@ func (UnimplementedHandler) ListMyProjects(ctx context.Context, params ListMyPro
 
 // ListMyTeams implements listMyTeams operation.
 //
-// The signed-in user's own team roster, ordered by team name. Self-access:
-// the session is the authorization, like the rest of `/users/me`.
+// The signed-in user's own team roster, ordered by team name.
 //
 // GET /users/me/teams
 func (UnimplementedHandler) ListMyTeams(ctx context.Context, params ListMyTeamsParams) (r ListMyTeamsRes, _ error) {

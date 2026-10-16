@@ -561,9 +561,7 @@ type Invoker interface {
 	GetMyUser(ctx context.Context) (GetMyUserRes, error)
 	// GetMyUserSchema invokes getMyUserSchema operation.
 	//
-	// The schema the signed-in user's own record is validated against — the
-	// document `PATCH /users/me` validates against. Self-access: the session is
-	// the authorization, like the rest of `/users/me`.
+	// The schema the signed-in user's own record is validated against.
 	//
 	// GET /users/me/schema
 	GetMyUserSchema(ctx context.Context) (GetMyUserSchemaRes, error)
@@ -742,8 +740,7 @@ type Invoker interface {
 	ListMyProjects(ctx context.Context, params ListMyProjectsParams) (ListMyProjectsRes, error)
 	// ListMyTeams invokes listMyTeams operation.
 	//
-	// The signed-in user's own team roster, ordered by team name. Self-access:
-	// the session is the authorization, like the rest of `/users/me`.
+	// The signed-in user's own team roster, ordered by team name.
 	//
 	// GET /users/me/teams
 	ListMyTeams(ctx context.Context, params ListMyTeamsParams) (ListMyTeamsRes, error)
@@ -6894,9 +6891,7 @@ func (c *Client) sendGetMyUser(ctx context.Context) (res GetMyUserRes, err error
 
 // GetMyUserSchema invokes getMyUserSchema operation.
 //
-// The schema the signed-in user's own record is validated against — the
-// document `PATCH /users/me` validates against. Self-access: the session is
-// the authorization, like the rest of `/users/me`.
+// The schema the signed-in user's own record is validated against.
 //
 // GET /users/me/schema
 func (c *Client) GetMyUserSchema(ctx context.Context) (GetMyUserSchemaRes, error) {
@@ -10021,8 +10016,7 @@ func (c *Client) sendListMyProjects(ctx context.Context, params ListMyProjectsPa
 
 // ListMyTeams invokes listMyTeams operation.
 //
-// The signed-in user's own team roster, ordered by team name. Self-access:
-// the session is the authorization, like the rest of `/users/me`.
+// The signed-in user's own team roster, ordered by team name.
 //
 // GET /users/me/teams
 func (c *Client) ListMyTeams(ctx context.Context, params ListMyTeamsParams) (ListMyTeamsRes, error) {

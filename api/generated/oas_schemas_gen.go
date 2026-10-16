@@ -27791,7 +27791,6 @@ type GetMyUserErrorResponse struct {
 	AuthUnauthorized AuthUnauthorized
 	Internal         Internal
 	ReqInvalid       ReqInvalid
-	SessTokenInvalid SessTokenInvalid
 	UserNotFound     UserNotFound
 }
 
@@ -27803,7 +27802,6 @@ const (
 	AuthUnauthorizedGetMyUserErrorResponse GetMyUserErrorResponseType = "auth.unauthorized"
 	InternalGetMyUserErrorResponse         GetMyUserErrorResponseType = "internal"
 	ReqInvalidGetMyUserErrorResponse       GetMyUserErrorResponseType = "req.invalid"
-	SessTokenInvalidGetMyUserErrorResponse GetMyUserErrorResponseType = "sess.token_invalid"
 	UserNotFoundGetMyUserErrorResponse     GetMyUserErrorResponseType = "user.not_found"
 )
 
@@ -27818,11 +27816,6 @@ func (s GetMyUserErrorResponse) IsInternal() bool { return s.Type == InternalGet
 // IsReqInvalid reports whether GetMyUserErrorResponse is ReqInvalid.
 func (s GetMyUserErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidGetMyUserErrorResponse
-}
-
-// IsSessTokenInvalid reports whether GetMyUserErrorResponse is SessTokenInvalid.
-func (s GetMyUserErrorResponse) IsSessTokenInvalid() bool {
-	return s.Type == SessTokenInvalidGetMyUserErrorResponse
 }
 
 // IsUserNotFound reports whether GetMyUserErrorResponse is UserNotFound.
@@ -27893,27 +27886,6 @@ func NewReqInvalidGetMyUserErrorResponse(v ReqInvalid) GetMyUserErrorResponse {
 	return s
 }
 
-// SetSessTokenInvalid sets GetMyUserErrorResponse to SessTokenInvalid.
-func (s *GetMyUserErrorResponse) SetSessTokenInvalid(v SessTokenInvalid) {
-	s.Type = SessTokenInvalidGetMyUserErrorResponse
-	s.SessTokenInvalid = v
-}
-
-// GetSessTokenInvalid returns SessTokenInvalid and true boolean if GetMyUserErrorResponse is SessTokenInvalid.
-func (s GetMyUserErrorResponse) GetSessTokenInvalid() (v SessTokenInvalid, ok bool) {
-	if !s.IsSessTokenInvalid() {
-		return v, false
-	}
-	return s.SessTokenInvalid, true
-}
-
-// NewSessTokenInvalidGetMyUserErrorResponse returns new GetMyUserErrorResponse from SessTokenInvalid.
-func NewSessTokenInvalidGetMyUserErrorResponse(v SessTokenInvalid) GetMyUserErrorResponse {
-	var s GetMyUserErrorResponse
-	s.SetSessTokenInvalid(v)
-	return s
-}
-
 // SetUserNotFound sets GetMyUserErrorResponse to UserNotFound.
 func (s *GetMyUserErrorResponse) SetUserNotFound(v UserNotFound) {
 	s.Type = UserNotFoundGetMyUserErrorResponse
@@ -27969,7 +27941,6 @@ type GetMyUserSchemaErrorResponse struct {
 	AuthUnauthorized AuthUnauthorized
 	Internal         Internal
 	ReqInvalid       ReqInvalid
-	SessTokenInvalid SessTokenInvalid
 	UserNotFound     UserNotFound
 }
 
@@ -27981,7 +27952,6 @@ const (
 	AuthUnauthorizedGetMyUserSchemaErrorResponse GetMyUserSchemaErrorResponseType = "auth.unauthorized"
 	InternalGetMyUserSchemaErrorResponse         GetMyUserSchemaErrorResponseType = "internal"
 	ReqInvalidGetMyUserSchemaErrorResponse       GetMyUserSchemaErrorResponseType = "req.invalid"
-	SessTokenInvalidGetMyUserSchemaErrorResponse GetMyUserSchemaErrorResponseType = "sess.token_invalid"
 	UserNotFoundGetMyUserSchemaErrorResponse     GetMyUserSchemaErrorResponseType = "user.not_found"
 )
 
@@ -27998,11 +27968,6 @@ func (s GetMyUserSchemaErrorResponse) IsInternal() bool {
 // IsReqInvalid reports whether GetMyUserSchemaErrorResponse is ReqInvalid.
 func (s GetMyUserSchemaErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidGetMyUserSchemaErrorResponse
-}
-
-// IsSessTokenInvalid reports whether GetMyUserSchemaErrorResponse is SessTokenInvalid.
-func (s GetMyUserSchemaErrorResponse) IsSessTokenInvalid() bool {
-	return s.Type == SessTokenInvalidGetMyUserSchemaErrorResponse
 }
 
 // IsUserNotFound reports whether GetMyUserSchemaErrorResponse is UserNotFound.
@@ -28070,27 +28035,6 @@ func (s GetMyUserSchemaErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidGetMyUserSchemaErrorResponse(v ReqInvalid) GetMyUserSchemaErrorResponse {
 	var s GetMyUserSchemaErrorResponse
 	s.SetReqInvalid(v)
-	return s
-}
-
-// SetSessTokenInvalid sets GetMyUserSchemaErrorResponse to SessTokenInvalid.
-func (s *GetMyUserSchemaErrorResponse) SetSessTokenInvalid(v SessTokenInvalid) {
-	s.Type = SessTokenInvalidGetMyUserSchemaErrorResponse
-	s.SessTokenInvalid = v
-}
-
-// GetSessTokenInvalid returns SessTokenInvalid and true boolean if GetMyUserSchemaErrorResponse is SessTokenInvalid.
-func (s GetMyUserSchemaErrorResponse) GetSessTokenInvalid() (v SessTokenInvalid, ok bool) {
-	if !s.IsSessTokenInvalid() {
-		return v, false
-	}
-	return s.SessTokenInvalid, true
-}
-
-// NewSessTokenInvalidGetMyUserSchemaErrorResponse returns new GetMyUserSchemaErrorResponse from SessTokenInvalid.
-func NewSessTokenInvalidGetMyUserSchemaErrorResponse(v SessTokenInvalid) GetMyUserSchemaErrorResponse {
-	var s GetMyUserSchemaErrorResponse
-	s.SetSessTokenInvalid(v)
 	return s
 }
 
@@ -34685,7 +34629,6 @@ type ListMyTeamsErrorResponse struct {
 	AuthUnauthorized AuthUnauthorized
 	Internal         Internal
 	ReqInvalid       ReqInvalid
-	SessTokenInvalid SessTokenInvalid
 	UserNotFound     UserNotFound
 }
 
@@ -34697,7 +34640,6 @@ const (
 	AuthUnauthorizedListMyTeamsErrorResponse ListMyTeamsErrorResponseType = "auth.unauthorized"
 	InternalListMyTeamsErrorResponse         ListMyTeamsErrorResponseType = "internal"
 	ReqInvalidListMyTeamsErrorResponse       ListMyTeamsErrorResponseType = "req.invalid"
-	SessTokenInvalidListMyTeamsErrorResponse ListMyTeamsErrorResponseType = "sess.token_invalid"
 	UserNotFoundListMyTeamsErrorResponse     ListMyTeamsErrorResponseType = "user.not_found"
 )
 
@@ -34714,11 +34656,6 @@ func (s ListMyTeamsErrorResponse) IsInternal() bool {
 // IsReqInvalid reports whether ListMyTeamsErrorResponse is ReqInvalid.
 func (s ListMyTeamsErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidListMyTeamsErrorResponse
-}
-
-// IsSessTokenInvalid reports whether ListMyTeamsErrorResponse is SessTokenInvalid.
-func (s ListMyTeamsErrorResponse) IsSessTokenInvalid() bool {
-	return s.Type == SessTokenInvalidListMyTeamsErrorResponse
 }
 
 // IsUserNotFound reports whether ListMyTeamsErrorResponse is UserNotFound.
@@ -34786,27 +34723,6 @@ func (s ListMyTeamsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidListMyTeamsErrorResponse(v ReqInvalid) ListMyTeamsErrorResponse {
 	var s ListMyTeamsErrorResponse
 	s.SetReqInvalid(v)
-	return s
-}
-
-// SetSessTokenInvalid sets ListMyTeamsErrorResponse to SessTokenInvalid.
-func (s *ListMyTeamsErrorResponse) SetSessTokenInvalid(v SessTokenInvalid) {
-	s.Type = SessTokenInvalidListMyTeamsErrorResponse
-	s.SessTokenInvalid = v
-}
-
-// GetSessTokenInvalid returns SessTokenInvalid and true boolean if ListMyTeamsErrorResponse is SessTokenInvalid.
-func (s ListMyTeamsErrorResponse) GetSessTokenInvalid() (v SessTokenInvalid, ok bool) {
-	if !s.IsSessTokenInvalid() {
-		return v, false
-	}
-	return s.SessTokenInvalid, true
-}
-
-// NewSessTokenInvalidListMyTeamsErrorResponse returns new ListMyTeamsErrorResponse from SessTokenInvalid.
-func NewSessTokenInvalidListMyTeamsErrorResponse(v SessTokenInvalid) ListMyTeamsErrorResponse {
-	var s ListMyTeamsErrorResponse
-	s.SetSessTokenInvalid(v)
 	return s
 }
 
@@ -49523,52 +49439,6 @@ func (o OptSessTokenCreationFailedDetails) Or(d SessTokenCreationFailedDetails) 
 	return d
 }
 
-// NewOptSessTokenInvalidDetails returns new OptSessTokenInvalidDetails with value set to v.
-func NewOptSessTokenInvalidDetails(v SessTokenInvalidDetails) OptSessTokenInvalidDetails {
-	return OptSessTokenInvalidDetails{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptSessTokenInvalidDetails is optional SessTokenInvalidDetails.
-type OptSessTokenInvalidDetails struct {
-	Value SessTokenInvalidDetails
-	Set   bool
-}
-
-// IsSet returns true if OptSessTokenInvalidDetails was set.
-func (o OptSessTokenInvalidDetails) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptSessTokenInvalidDetails) Reset() {
-	var v SessTokenInvalidDetails
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptSessTokenInvalidDetails) SetTo(v SessTokenInvalidDetails) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptSessTokenInvalidDetails) Get() (v SessTokenInvalidDetails, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptSessTokenInvalidDetails) Or(d SessTokenInvalidDetails) SessTokenInvalidDetails {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptSessionDeletedEventDelegationType returns new OptSessionDeletedEventDelegationType with value set to v.
 func NewOptSessionDeletedEventDelegationType(v SessionDeletedEventDelegationType) OptSessionDeletedEventDelegationType {
 	return OptSessionDeletedEventDelegationType{
@@ -53708,7 +53578,6 @@ type PatchMyUserErrorResponse struct {
 	EvtInvalid        EvtInvalid
 	Internal          Internal
 	ReqInvalid        ReqInvalid
-	SessTokenInvalid  SessTokenInvalid
 	UserAlreadyExists UserAlreadyExists
 	UserConflict      UserConflict
 	UserInvalid       UserInvalid
@@ -53725,7 +53594,6 @@ const (
 	EvtInvalidPatchMyUserErrorResponse        PatchMyUserErrorResponseType = "evt.invalid"
 	InternalPatchMyUserErrorResponse          PatchMyUserErrorResponseType = "internal"
 	ReqInvalidPatchMyUserErrorResponse        PatchMyUserErrorResponseType = "req.invalid"
-	SessTokenInvalidPatchMyUserErrorResponse  PatchMyUserErrorResponseType = "sess.token_invalid"
 	UserAlreadyExistsPatchMyUserErrorResponse PatchMyUserErrorResponseType = "user.already_exists"
 	UserConflictPatchMyUserErrorResponse      PatchMyUserErrorResponseType = "user.conflict"
 	UserInvalidPatchMyUserErrorResponse       PatchMyUserErrorResponseType = "user.invalid"
@@ -53755,11 +53623,6 @@ func (s PatchMyUserErrorResponse) IsInternal() bool {
 // IsReqInvalid reports whether PatchMyUserErrorResponse is ReqInvalid.
 func (s PatchMyUserErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidPatchMyUserErrorResponse
-}
-
-// IsSessTokenInvalid reports whether PatchMyUserErrorResponse is SessTokenInvalid.
-func (s PatchMyUserErrorResponse) IsSessTokenInvalid() bool {
-	return s.Type == SessTokenInvalidPatchMyUserErrorResponse
 }
 
 // IsUserAlreadyExists reports whether PatchMyUserErrorResponse is UserAlreadyExists.
@@ -53884,27 +53747,6 @@ func (s PatchMyUserErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidPatchMyUserErrorResponse(v ReqInvalid) PatchMyUserErrorResponse {
 	var s PatchMyUserErrorResponse
 	s.SetReqInvalid(v)
-	return s
-}
-
-// SetSessTokenInvalid sets PatchMyUserErrorResponse to SessTokenInvalid.
-func (s *PatchMyUserErrorResponse) SetSessTokenInvalid(v SessTokenInvalid) {
-	s.Type = SessTokenInvalidPatchMyUserErrorResponse
-	s.SessTokenInvalid = v
-}
-
-// GetSessTokenInvalid returns SessTokenInvalid and true boolean if PatchMyUserErrorResponse is SessTokenInvalid.
-func (s PatchMyUserErrorResponse) GetSessTokenInvalid() (v SessTokenInvalid, ok bool) {
-	if !s.IsSessTokenInvalid() {
-		return v, false
-	}
-	return s.SessTokenInvalid, true
-}
-
-// NewSessTokenInvalidPatchMyUserErrorResponse returns new PatchMyUserErrorResponse from SessTokenInvalid.
-func NewSessTokenInvalidPatchMyUserErrorResponse(v SessTokenInvalid) PatchMyUserErrorResponse {
-	var s PatchMyUserErrorResponse
-	s.SetSessTokenInvalid(v)
 	return s
 }
 
@@ -64589,59 +64431,6 @@ func (s *SessTokenCreationFailed) SetDetails(val OptSessTokenCreationFailedDetai
 type SessTokenCreationFailedDetails map[string]jx.Raw
 
 func (s *SessTokenCreationFailedDetails) init() SessTokenCreationFailedDetails {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
-// Merged schema.
-// Ref: #
-type SessTokenInvalid struct {
-	// Merged property.
-	Code string `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Additional error-specific context.
-	Details OptSessTokenInvalidDetails `json:"details"`
-}
-
-// GetCode returns the value of Code.
-func (s *SessTokenInvalid) GetCode() string {
-	return s.Code
-}
-
-// GetMessage returns the value of Message.
-func (s *SessTokenInvalid) GetMessage() string {
-	return s.Message
-}
-
-// GetDetails returns the value of Details.
-func (s *SessTokenInvalid) GetDetails() OptSessTokenInvalidDetails {
-	return s.Details
-}
-
-// SetCode sets the value of Code.
-func (s *SessTokenInvalid) SetCode(val string) {
-	s.Code = val
-}
-
-// SetMessage sets the value of Message.
-func (s *SessTokenInvalid) SetMessage(val string) {
-	s.Message = val
-}
-
-// SetDetails sets the value of Details.
-func (s *SessTokenInvalid) SetDetails(val OptSessTokenInvalidDetails) {
-	s.Details = val
-}
-
-// Additional error-specific context.
-type SessTokenInvalidDetails map[string]jx.Raw
-
-func (s *SessTokenInvalidDetails) init() SessTokenInvalidDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
