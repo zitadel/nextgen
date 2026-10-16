@@ -9,6 +9,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -83,6 +84,14 @@ func (h *IDPCallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			zlog.GetLoggingContext(ctx).Error("sso callback processing failed", slog.Any("error", err))
 		}
 		writeIDPCallbackErrorPage(w, http.StatusInternalServerError)
+		return
+	}
+	// The target was checked when the sign-in started. It is checked again
+	// where it is used, so a target stored before the check was as strict as it
+	// is now can never be redirected to.
+	if _, err := httputil.ParseRedirectTarget(out.ReturnTarget); err != nil {
+		zlog.GetLoggingContext(ctx).Error("sso callback return target refused", slog.Any("error", err))
+		writeIDPCallbackErrorPage(w, http.StatusBadRequest)
 		return
 	}
 	http.Redirect(w, r, out.ReturnTarget, http.StatusSeeOther)

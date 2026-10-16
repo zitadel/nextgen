@@ -45,8 +45,11 @@ const maxPort = 65535
 // Only the scheme, userinfo, host, port and path are policed. The query and
 // fragment are free-form, so a page that keeps state there still round-trips.
 //
-// The result is parsed from raw as given. The caller still decides which hosts
-// are acceptable, for example by comparing the origin with the request's.
+// The result is parsed from raw as given: its path keeps its escapes as
+// written, nothing is decoded or rewritten. The host is only checked for
+// shape, not normalized, so forms a browser rewrites, such as a decimal IP
+// address or a trailing dot, pass. The caller decides which hosts are
+// acceptable, for example by comparing the origin with the request's.
 func ParseRedirectTarget(raw string) (*url.URL, error) {
 	if raw == "" {
 		return nil, refusal("it is empty")
@@ -144,13 +147,12 @@ func checkPath(escaped string) error {
 	}
 	// A server that decodes a path before routing it, or a proxy that does, sees
 	// the decoded form. Once for %2F and %5C, twice for their double encodings.
+	// A '%' that does not start an escape stays as it is, as a lenient decoder
+	// leaves it, so a path such as /100%25 (a literal percent sign) is not
+	// mistaken for a malformed one.
 	decoded := escaped
 	for pass := 0; pass < 2; pass++ {
-		next, err := url.PathUnescape(decoded)
-		if err != nil {
-			return refusal("its path has an invalid percent-escape")
-		}
-		decoded = next
+		decoded = unescapeLeniently(decoded)
 		for i := 0; i < len(decoded); i++ {
 			if decoded[i] < ' ' || decoded[i] == 0x7f {
 				return refusal("its path decodes to a control character")
@@ -161,6 +163,39 @@ func checkPath(escaped string) error {
 		}
 	}
 	return nil
+}
+
+// unescapeLeniently decodes every valid %XX escape in s and leaves any other
+// '%' alone. url.PathUnescape fails the whole string on one bad escape, which
+// would let a stray '%' hide a later %2F from the check.
+func unescapeLeniently(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	for i := 0; i < len(s); i++ {
+		if s[i] == '%' && i+2 < len(s) {
+			hi, okHi := unhex(s[i+1])
+			lo, okLo := unhex(s[i+2])
+			if okHi && okLo {
+				b.WriteByte(hi<<4 | lo)
+				i += 2
+				continue
+			}
+		}
+		b.WriteByte(s[i])
+	}
+	return b.String()
+}
+
+func unhex(c byte) (byte, bool) {
+	switch {
+	case c >= '0' && c <= '9':
+		return c - '0', true
+	case c >= 'a' && c <= 'f':
+		return c - 'a' + 10, true
+	case c >= 'A' && c <= 'F':
+		return c - 'A' + 10, true
+	}
+	return 0, false
 }
 
 // readsAsAuthority reports whether p, once a browser has resolved its dot

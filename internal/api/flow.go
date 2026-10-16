@@ -194,7 +194,7 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 		// decides whether a caller-supplied URL is safe to send a browser to.
 		returnTarget, err := httputil.ParseRedirectTarget(rawTarget)
 		if err != nil {
-			return nil, domain.ErrRequestInvalid().WithMessage(fmt.Sprintf("return_target %q: %v", rawTarget, err))
+			return nil, domain.ErrRequestInvalid().WithMessage(fmt.Sprintf("return_target %q is %v", rawTarget, err))
 		}
 		// The target is a page on the origin that sent this request. The
 		// scheme and host are always set once it parses, so a relative target

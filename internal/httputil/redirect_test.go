@@ -26,6 +26,9 @@ func TestParseRedirectTarget_Accepts(t *testing.T) {
 		{"an IPv6 literal with a port", "https://[::1]:8443/x", "[::1]:8443"},
 		{"a double slash deeper in the path", "https://app.test/app//login", "app.test"},
 		{"an encoded slash inside a segment", "https://app.test/a%2Fb", "app.test"},
+		{"an encoded percent sign at the end", "https://app.test/discount/100%25", "app.test"},
+		{"an encoded percent sign before letters", "https://app.test/a%25zz", "app.test"},
+		{"only an encoded percent sign", "https://app.test/%25", "app.test"},
 		{"a parent segment that stays on the path", "https://app.test/a/../b", "app.test"},
 		{"a dot segment at the end", "https://app.test/a/.", "app.test"},
 		{"a parent segment that returns to the root", "https://app.test/app/../", "app.test"},
@@ -67,6 +70,8 @@ func TestParseRedirectTarget_Refuses(t *testing.T) {
 		{"an opaque URL", "https:evil.example", "no host"},
 		{"no host", "https:///x", "no host"},
 		{"unparseable", "https://app.test/%zz", "not a URL"},
+		{"a bracketed host that is not an IP", "https://[evil]/x", "not a URL"},
+		{"a port and no host", "https://:80/x", "no host"},
 
 		{"userinfo", "https://user@app.test/x", "userinfo"},
 		{"the origin as userinfo", "https://app.test@evil.example/x", "userinfo"},
@@ -110,6 +115,8 @@ func TestParseRedirectTarget_Refuses(t *testing.T) {
 		{"an encoded tab", "https://app.test/%09/evil.example", "control character"},
 		{"an encoded newline", "https://app.test/a%0Ab", "control character"},
 		{"an encoded NUL", "https://app.test/%00", "control character"},
+		{"a double-encoded tab", "https://app.test/%2509/x", "control character"},
+		{"a stray percent sign after a double-encoded slash", "https://app.test/%252F%25zz", "decodes"},
 		{"an invalid escape", "https://app.test/%", "not a URL"},
 	}
 	for _, tt := range tests {
@@ -124,11 +131,16 @@ func TestParseRedirectTarget_Refuses(t *testing.T) {
 	}
 }
 
-func TestParseRedirectTarget_KeepsTheTargetAsGiven(t *testing.T) {
+func TestParseRedirectTarget_ReturnsTheTargetAsWritten(t *testing.T) {
 	t.Parallel()
 
-	const raw = "https://app.test/login/?flow=f1&next=%2Fprofile#/step"
-	u, err := httputil.ParseRedirectTarget(raw)
+	u, err := httputil.ParseRedirectTarget("HTTPS://app.test/a%2Fb/%2e%2e/c?next=%2Fprofile#/step")
 	require.NoError(t, err)
-	assert.Equal(t, raw, u.String())
+	// Nothing in the path or the query is decoded or resolved: a caller that
+	// stores the target stores what the page sent.
+	assert.Equal(t, "/a%2Fb/%2e%2e/c", u.EscapedPath())
+	assert.Equal(t, "next=%2Fprofile", u.RawQuery)
+	assert.Equal(t, "/step", u.Fragment)
+	// Only the scheme is folded, as the URL standard does.
+	assert.Equal(t, "https", u.Scheme)
 }
