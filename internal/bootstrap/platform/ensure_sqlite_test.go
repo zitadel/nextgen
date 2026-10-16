@@ -61,7 +61,7 @@ func newTestProjects(t *testing.T, pool *service.DB) (service.ProjectService, se
 	require.NoError(t, err)
 
 	keys := service.NewKeyService(pool, *masterKeys, crypters, signingKeys)
-	return service.NewProjectService(pool, testSchemaBase, schemaValidator, keys, hashers), keys
+	return service.NewProjectService(pool, testSchemaBase, schemaValidator, keys, hashers, domain.DefaultSharedHosts), keys
 }
 
 // TestEnsureSQLiteIdempotent proves the DB-backed idempotency the issue

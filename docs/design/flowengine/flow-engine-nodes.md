@@ -242,7 +242,7 @@ The backend emits `text_key` on every element that has human-readable text:
 | Element | Property | Example key |
 |---|---|---|
 | Step title | `step.texts.title_key` | `login.title` |
-| Step description | `step.texts.description_key` | `login.description` |
+| Step description | `step.texts.description_key` | `login.description` (`login.description.sso` when the step offers sign-in providers; clients fall back to the plain key) |
 | Field label | `field.text_key` | `login.field.email` |
 | Action label | `action.text_key` | `login.action.submit` |
 

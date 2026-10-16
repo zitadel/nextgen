@@ -16,6 +16,7 @@ type queryExecutor interface {
 
 type statements struct {
 	projectStatements
+	originStatements
 	flowDefinitionStatements
 	cryptoKeyStatements
 	jsonSchemaStatements
@@ -56,6 +57,7 @@ func (s statements) IsStatements() {}
 func newStatements(client queryExecutor) statements {
 	return statements{
 		projectStatements:             newProjectStatements(client),
+		originStatements:              newOriginStatements(client),
 		flowDefinitionStatements:      newFlowDefinitionStatements(client),
 		cryptoKeyStatements:           newCryptoKeyStatements(client),
 		jsonSchemaStatements:          newJSONSchemaStatements(client),

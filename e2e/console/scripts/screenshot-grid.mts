@@ -29,7 +29,7 @@ import { join, resolve } from "node:path";
 
 import { type Browser, type Page, chromium, errors } from "@playwright/test";
 
-import { completeLogin } from "../src-real/login";
+import { completeLogin } from "../support/sign-in";
 
 const origin = process.env.CONSOLE_DEV_ORIGIN ?? "http://localhost:5174";
 const user = {
@@ -88,7 +88,7 @@ const SCREENS: Screen[] = [
 ];
 
 /**
- * Signs in (the e2e suites' own login, `src-real/login.ts`) and returns the
+ * Signs in (the e2e suites' own login, `support/sign-in.ts`) and returns the
  * project the console selected, which every screen is captured in.
  */
 async function signIn(page: Page): Promise<string> {
