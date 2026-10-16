@@ -1,6 +1,8 @@
 import { useRouter, useSearch } from "@tanstack/react-router";
 
 import { api } from "@/api/zitadel";
+import { useAsync } from "@/hooks/use-async";
+
 import { sessionCached } from "./session-cache";
 
 /**
@@ -37,6 +39,19 @@ export interface ProjectScopeSearch {
  * Projects screen pages the list itself and does not use this.
  */
 export const listMyProjectsCached = sessionCached(() => api.listMyProjects(), 15_000);
+
+/**
+ * The person's projects for chrome (the switcher, search): `undefined` while
+ * loading, `[]` when there are none or the read failed — never a boundary.
+ */
+export function useMyProjects(): { id: string; name: string }[] | undefined {
+  return useAsync(
+    () =>
+      listMyProjectsCached().then((page) => page.projects.map(({ id, name }) => ({ id, name }))),
+    [],
+    [],
+  );
+}
 
 /** `validateSearch` for the `_authed` layout: an id, or nothing. */
 export function validateProjectScopeSearch(search: Record<string, unknown>): ProjectScopeSearch {

@@ -15,46 +15,26 @@ import { api } from "@/api/zitadel";
 import { invalidateSessionCache } from "@/auth/session";
 import { useSubmit } from "@/hooks/use-submit";
 import { field } from "@/lib/record";
-import { type SchemaField, type UserSchema, schemaFields } from "@/lib/schema";
+import { type SchemaField, attributeValue, schemaFields } from "@/lib/schema";
+import { readOwnUserSchema } from "@/lib/user-schema";
 import { userAttributes } from "@/lib/user";
 
 /**
- * Settings → Profile: the signed-in person's own account, built from their
- * user schema the way Add user builds its form (`schemaFields`) — a row per
- * property, so the platform project's `name` (`PlatformHumanUserSchema`)
- * appears because the schema declares it, and a schema with more fields shows
- * those too.
- *
- * The identifier (`x-identifier` — the email in the shipped schemas) is read-only (design
- * decision D16): claiming asks for nothing but an email address, and it cannot
- * be changed. Every other property is editable through `PATCH /users/me`, which
- * validates the merged result against the same schema. A schema with nothing
- * but the identifier leaves nothing to save, so the screen has no Save.
- *
- * Nothing here names a property: the rows, labels and input types come from
- * the schema, and the read-only row from its `x-identifier`. When the schema
- * cannot be read, the screen shows the record's own identifier alone rather
- * than guessing at fields the server might refuse.
- *
- * Composes the detail shell (`detail-page.tsx`) rather than measuring its own
- * layout; the title stands alone because a settings screen has no icon tile
- * and no id card.
+ * Settings → Profile, generated from the person's own user schema as Add user
+ * is (`schemaFields`): a row per property, nothing named in code. The schema's
+ * `x-identifier` is read-only (D16); the rest saves through `PATCH /users/me`.
+ * Without a readable schema, the record's own identifier shows alone.
  */
 export const Route = createFileRoute("/_authed/settings/profile")({
   staticData: {
     nav: { label: "Profile", order: 0, icon: CircleUserRound, view: "settings", group: "ACCOUNT" },
   },
   loader: async () => {
-    const user = await api.getMyUser();
-    const schemaId = field(user, "schema");
-    // Read without a project id: it resolves in the session's own project, the
-    // one the person's user lives in.
-    const schema = schemaId
-      ? await api
-          .getSchemaById(schemaId)
-          .then((value) => value.schema as UserSchema)
-          .catch(() => undefined)
-      : undefined;
+    // A failed schema read leaves the identifier alone (below), never a boundary.
+    const [user, schema] = await Promise.all([
+      api.getMyUser(),
+      readOwnUserSchema().catch(() => undefined),
+    ]);
     return { user, schema };
   },
   component: ProfileScreen,
@@ -113,7 +93,7 @@ function ProfileScreen() {
       const value = (values[entry.key] ?? "").trim();
       // Cleared means deleted (`null`), not an empty string — which would fail
       // a `format` and reads as a value rather than its absence.
-      patch[entry.key] = value === "" ? null : typed(entry, value);
+      patch[entry.key] = value === "" ? null : attributeValue(entry, value);
     }
     await api.patchMyUser({ attributes: patch });
     // The account menu renders the session's `display`; drop the cached
@@ -228,15 +208,4 @@ function ProfileRow({
 /** A stored attribute as the input shows it. */
 function displayValue(value: unknown): string {
   return typeof value === "string" || typeof value === "number" ? String(value) : "";
-}
-
-/**
- * An input's string as the schema types it: a `number` property is validated
- * against a JSON number, so `"42"` is sent as `42`. A value that will not
- * parse goes through untouched so the server explains why (as in Add user).
- */
-function typed(entry: SchemaField, value: string): unknown {
-  if (entry.inputType !== "number") return value;
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : value;
 }

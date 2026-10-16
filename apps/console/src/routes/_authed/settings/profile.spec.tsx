@@ -15,7 +15,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
 });
 
 const ME_URL = "http://localhost/api/users/me";
-const SCHEMA_URL = "*/api/schemas/schema_1";
+const SCHEMA_URL = "*/api/users/me/schema";
 
 /** The shipped default: email only, nothing designated for display. */
 const DEFAULT_SCHEMA = {

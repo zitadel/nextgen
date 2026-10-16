@@ -59,7 +59,7 @@ export function AppShell({
 
   return (
     <SidebarProvider defaultOpen={readSidebarOpen()}>
-      <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} userId={user?.userId} />
+      <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
       <AppSidebar user={user} onSignOut={onSignOut} />
       {/* `min-w-0` because the inset is a flex item, and a flex item's default
           `min-width: auto` makes it grow to fit its widest content instead of
