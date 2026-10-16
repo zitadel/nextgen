@@ -16,6 +16,7 @@ import (
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -189,27 +190,17 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 		}
 		// Parsed here, not by the generated decoder: a request-URI parse
 		// leaves a fragment in the path, and a hash-routed page needs it
-		// back as a fragment.
-		returnTarget, err := url.Parse(rawTarget)
+		// back as a fragment. ParseRedirectTarget is the one place that
+		// decides whether a caller-supplied URL is safe to send a browser to.
+		returnTarget, err := httputil.ParseRedirectTarget(rawTarget)
 		if err != nil {
-			return nil, domain.ErrRequestInvalid().WithMessage(fmt.Sprintf("return_target %q is not a URL", rawTarget))
+			return nil, domain.ErrRequestInvalid().WithMessage(fmt.Sprintf("return_target %q: %v", rawTarget, err))
 		}
-		// No page URL carries userinfo; it is only ever a way to dress a
-		// foreign host up as the origin.
-		if returnTarget.User != nil {
-			return nil, domain.ErrRequestInvalid().WithMessage("return_target must not carry userinfo")
-		}
-		// A relative or scheme-less target fails here too: its origin lacks
-		// a scheme or a host, which the request origin always has.
+		// The target is a page on the origin that sent this request. The
+		// scheme and host are always set once it parses, so a relative target
+		// never gets this far.
 		if !strings.EqualFold(returnTarget.Scheme+"://"+returnTarget.Host, requestOrigin) {
 			return nil, domain.ErrRequestInvalid().WithMessage(fmt.Sprintf("return_target %q is not on the request origin %q", rawTarget, requestOrigin))
-		}
-		// The origin matches, but a path that starts with an empty segment
-		// reads as an authority once it is put back together without its
-		// origin, as a proxy re-basing the callback's Location onto its own
-		// host does: https://app.test//evil.example lands on evil.example.
-		if pathReadsAsAuthority(returnTarget.Path) {
-			return nil, domain.ErrRequestInvalid().WithMessage(fmt.Sprintf("return_target %q has a path that starts with %q", rawTarget, "//"))
 		}
 		// The engine refuses a missing provider or one the step does not
 		// offer, so the URI is never issued for a slug outside the flow.
@@ -801,28 +792,4 @@ func parseURI(s string) (url.URL, error) {
 		return url.URL{}, err
 	}
 	return *u, nil
-}
-
-// pathReadsAsAuthority reports whether a URL path, as a browser resolves it,
-// starts with "//". An http(s) URL reads a backslash as a slash, and "." and
-// ".." segments are removed, so "/\host" and "/.//host" count as well as
-// "//host".
-func pathReadsAsAuthority(p string) bool {
-	segments := strings.Split(strings.ReplaceAll(p, `\`, "/"), "/")
-	if len(segments) < 3 || segments[0] != "" {
-		return false
-	}
-	resolved := []string{""}
-	for _, segment := range segments[1:] {
-		switch segment {
-		case ".":
-		case "..":
-			if len(resolved) > 1 {
-				resolved = resolved[:len(resolved)-1]
-			}
-		default:
-			resolved = append(resolved, segment)
-		}
-	}
-	return len(resolved) > 2 && resolved[1] == ""
 }

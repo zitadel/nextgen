@@ -528,27 +528,11 @@ func TestSubmitFlowStep_SSO_RejectsAnUnboundReturn(t *testing.T) {
 		},
 		{
 			// On the origin, but a proxy re-basing the callback's Location
-			// onto its own host reads //evil.example as the host.
+			// onto its own host reads //evil.example as the host. Every other
+			// way of writing it is covered by httputil.ParseRedirectTarget.
 			name:        "return_target path starting with two slashes",
 			body:        map[string]any{"action": "sso", "sso_provider_id": "google", "return_target": origin + "//evil.example/login?flow=flow_1"},
-			wantMessage: "has a path that starts with",
-		},
-		{
-			// A browser reads the backslash as a slash.
-			name:        "return_target path starting with a slash and a backslash",
-			body:        map[string]any{"action": "sso", "sso_provider_id": "google", "return_target": origin + `/\evil.example/login`},
-			wantMessage: "has a path that starts with",
-		},
-		{
-			// The dot segment is removed, which leaves //evil.example.
-			name:        "return_target path with a dot segment before two slashes",
-			body:        map[string]any{"action": "sso", "sso_provider_id": "google", "return_target": origin + "/.//evil.example/login"},
-			wantMessage: "has a path that starts with",
-		},
-		{
-			name:        "return_target path with a parent segment before two slashes",
-			body:        map[string]any{"action": "sso", "sso_provider_id": "google", "return_target": origin + "/app/..//evil.example/login"},
-			wantMessage: "has a path that starts with",
+			wantMessage: "not a valid redirect target",
 		},
 		{
 			name: "return_target missing",
