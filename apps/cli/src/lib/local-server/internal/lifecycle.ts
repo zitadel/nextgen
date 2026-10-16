@@ -162,6 +162,12 @@ export type LifecycleDeps<R extends ServerRecord> = Readonly<{
 
 /** How many ports above the first are tried before giving up. */
 const PORT_SEARCH_RANGE = 100;
+/**
+ * How many times a server that is alive is asked whether it answers before it is
+ * called dead. One slow answer (a busy machine, a migration) must not make a
+ * start stop a working server.
+ */
+const HEALTH_ATTEMPTS = 3;
 /** How many times a start that lost a race for its port tries the next one. */
 const PORT_RACE_RETRIES = 3;
 
@@ -259,9 +265,23 @@ export class Lifecycle<R extends ServerRecord> {
       return { kind: "stopped" };
     }
     const alive = await this.deps.launcher.isAlive(record);
-    return alive && (await this.deps.health.isHealthy(record.server_url))
+    return alive && (await this.answers(record.server_url))
       ? { kind: "running", record }
       : { kind: "dead", record };
+  }
+
+  /** Whether a server that is alive answers, asking up to {@link HEALTH_ATTEMPTS} times. */
+  private async answers(serverUrl: string): Promise<boolean> {
+    const clock = this.options.clock ?? realClock;
+    for (let attempt = 1; attempt <= HEALTH_ATTEMPTS; attempt++) {
+      if (await this.deps.health.isHealthy(serverUrl)) {
+        return true;
+      }
+      if (attempt < HEALTH_ATTEMPTS) {
+        await clock.wait(this.options.pollIntervalMs ?? 1000);
+      }
+    }
+    return false;
   }
 
   /**

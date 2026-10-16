@@ -137,6 +137,43 @@ describe("Lifecycle", () => {
       await expect(world.server().state()).resolves.toMatchObject({ kind: "dead" });
     });
 
+    it("is running when the recorded process misses one answer and then gives one", async () => {
+      const world = new World();
+      world.record = { pid: 7, port: 8080, server_url: "http://localhost:8080" };
+      world.alive.add(7);
+      const answers = [false, false, true];
+      world.health.isHealthy = async () => answers.shift() ?? false;
+
+      await expect(world.server().state()).resolves.toMatchObject({ kind: "running" });
+    });
+
+    it("does not stop a server that is alive and slow to answer", async () => {
+      const world = new World();
+      world.record = { pid: 7, port: 8080, server_url: "http://localhost:8080" };
+      world.alive.add(7);
+      const answers = [false, true];
+      world.health.isHealthy = async () => answers.shift() ?? false;
+
+      const result = await world.server().start();
+
+      expect(result.alreadyRunning).toBe(true);
+      expect(world.terminated).toEqual([]);
+    });
+
+    it("does not ask a process that is gone whether it answers", async () => {
+      const world = new World();
+      world.record = { pid: 7, port: 8080, server_url: "http://localhost:8080" };
+      let asked = 0;
+      world.health.isHealthy = async () => {
+        asked++;
+        return true;
+      };
+
+      await world.server().state();
+
+      expect(asked).toBe(0);
+    });
+
     it("is dead when the recorded process is alive but does not answer", async () => {
       const world = new World();
       world.record = { pid: 7, port: 8080, server_url: "http://localhost:8080" };
