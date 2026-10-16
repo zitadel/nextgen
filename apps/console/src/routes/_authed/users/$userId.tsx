@@ -35,6 +35,7 @@ import {
   type SchemaField,
   type UserSchema,
   attributeValue,
+  inputAttributes,
   schemaDisplayName,
   schemaFields,
   schemaProperties,
@@ -108,6 +109,9 @@ const GRID = "grid gap-x-4.5 gap-y-4 sm:grid-cols-2";
 const ROW = "flex items-center justify-between gap-4 py-1";
 const ROW_LABEL = "text-muted-foreground min-w-0 truncate text-sm font-medium";
 const ROW_VALUE = "text-foreground shrink-0 text-sm";
+// `schemaProperties` type labels a text or number input can write; "—" is an
+// untyped property, which accepts a string.
+const TEXT_WRITABLE_TYPES = new Set(["String", "Number", "Integer", "—"]);
 
 function UserDetail() {
   const { user, schema, passkeys, identityLinks, idps, passwordSetAt } = Route.useLoaderData();
@@ -310,14 +314,15 @@ function ProfileCard({
   onSaved: () => Promise<void>;
 }) {
   const fields = useMemo(() => (schema ? schemaFields(schema) : []), [schema]);
-  // A text input can only write a string or, through `number`, a number. A
-  // boolean or array property has no control here that writes its type, so it
-  // stays read-only rather than storing `"false"`.
+  // A text input writes a string, or through `number` a number, so only a
+  // property of exactly one of those types (or none) is editable. Anything
+  // else — a boolean, an array, a union such as `["boolean", "null"]` — stays
+  // read-only rather than storing `"true"` where the schema wants `true`.
   const readOnlyKeys = useMemo(
     () =>
       new Set(
         (schema ? schemaProperties(schema) : [])
-          .filter((property) => property.type === "Boolean" || property.type === "Array")
+          .filter((property) => !TEXT_WRITABLE_TYPES.has(property.type))
           .map((property) => property.key),
       ),
     [schema],
@@ -438,7 +443,7 @@ function ProfileField({
       <Input
         id={id}
         name={entry.key}
-        type={entry.inputType}
+        {...inputAttributes(entry)}
         value={value}
         readOnly={readOnly}
         required={entry.required}

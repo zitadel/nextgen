@@ -141,7 +141,7 @@ describe("user detail", () => {
           schema: "sch_business",
           identifier: "maya@acme.com",
           identifier_property: "email",
-          attributes: { email: "maya@acme.com", headcount: 42, verified: false },
+          attributes: { email: "maya@acme.com", headcount: 42, verified: false, active: true },
         }),
       ),
       http.get(`${SCHEMAS_URL}/sch_business`, () =>
@@ -153,6 +153,7 @@ describe("user detail", () => {
               email: { type: "string", format: "email" },
               headcount: { type: "integer", title: "Headcount" },
               verified: { type: "boolean", title: "Verified" },
+              active: { type: ["boolean", "null"], title: "Active" },
             },
           },
           metadata: { created_at: "2026-07-01T00:00:00Z" },
@@ -168,10 +169,14 @@ describe("user detail", () => {
 
     // An integer property edits through a number input.
     expect(await screen.findByLabelText("Headcount")).toHaveValue(42);
+    // `step="any"`: a fraction must not fail the input's own validation.
+    expect(screen.getByLabelText("Headcount")).toHaveAttribute("step", "any");
     // `false` is a value, not an absence — it must not render as empty. No text
     // control writes a boolean, so it stays read-only.
     expect(screen.getByLabelText("Verified")).toHaveValue("false");
     expect(screen.getByLabelText("Verified")).toHaveAttribute("readonly");
+    // A union is no different: a text input would write `"true"`.
+    expect(screen.getByLabelText("Active")).toHaveAttribute("readonly");
   });
 
   it("saves only the changed attributes, and keeps Save disabled until one changes", async () => {

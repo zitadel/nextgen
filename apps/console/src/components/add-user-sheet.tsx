@@ -19,6 +19,7 @@ import { useRequiredProjectScope } from "@/lib/project-scope";
 import {
   attributeValue,
   fetchAllSchemas,
+  inputAttributes,
   type SchemaField,
   schemaDisplayName,
   schemaFieldSummary,
@@ -235,7 +236,7 @@ function SchemaInput({
       <Input
         id={id}
         name={field.key}
-        type={field.inputType}
+        {...inputAttributes(field)}
         required={field.required}
         placeholder={field.placeholder}
         value={value}
