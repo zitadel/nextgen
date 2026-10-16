@@ -63,7 +63,7 @@ Delete runtime data:
 npx @zitadel/cli@alpha reset --force
 ```
 
-The runtime listens on `http://localhost:8080` by default. Choose another port when needed:
+Each directory runs its own server. The first one listens on `http://localhost:8080`, the next directory you start gets `8081`, and so on, and a directory keeps its port when you stop and start it again. `start` prints the URLs, and the port is recorded in `.zitadel/local/runtime.json`. Choose a port yourself when needed:
 
 ```sh
 npx @zitadel/cli@alpha start --port 8081

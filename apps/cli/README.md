@@ -739,7 +739,8 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --fix               Repair missing files and stale managed wiring.
       --image=<value>     Container image to check.
-      --port=<value>      [default: 8080] Local HTTP port.
+      --port=<value>      Local HTTP port to check. Defaults to the port this
+                          directory's server uses.
       --runtime=<option>  Local runtime backend.
                           <options: binary|docker>
       --[no-]telemetry    Send anonymous usage analytics. Disable with
@@ -1253,7 +1254,7 @@ DESCRIPTION
 EXAMPLES
   $ zitadel idps create --data '{...}' --json
 
-  $ zitadel idps create --file ./identity provider connection.json
+  $ zitadel idps create --file ./identity-provider-connection.json
 ```
 
 ## `zitadel idps get ID`
@@ -2108,7 +2109,8 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --image=<value>     Container image to run.
-      --port=<value>      [default: 8080] Local HTTP port.
+      --port=<value>      Local HTTP port. By default this directory keeps the
+                          port it had, or takes the first free one from 8080.
       --runtime=<option>  Local runtime backend.
                           <options: binary|docker>
       --[no-]telemetry    Send anonymous usage analytics. Disable with
@@ -2461,7 +2463,7 @@ ALIASES
 
 ## `zitadel users create`
 
-Create an user.
+Create a user.
 
 ```
 USAGE
@@ -2497,7 +2499,7 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Create an user.
+  Create a user.
 
 EXAMPLES
   $ zitadel users create --schema <schema> --attributes <key>=<value> --json
@@ -2509,7 +2511,7 @@ EXAMPLES
 
 ## `zitadel users delete ID`
 
-Delete an user by id.
+Delete a user by id.
 
 ```
 USAGE
@@ -2538,7 +2540,7 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Delete an user by id.
+  Delete a user by id.
 
 EXAMPLES
   $ zitadel users delete <id> --force --json
@@ -2670,7 +2672,7 @@ EXAMPLES
 
 ## `zitadel users update ID`
 
-Update an user by id.
+Update a user by id.
 
 ```
 USAGE
@@ -2707,7 +2709,7 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Update an user by id.
+  Update a user by id.
 
 EXAMPLES
   $ zitadel users update <id> --data '{...}' --json
