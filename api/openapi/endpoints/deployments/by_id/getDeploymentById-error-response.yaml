@@ -8,7 +8,7 @@ content:
         - $ref: '../../../components/schemas/errors/dep-not_found.yaml'
         - $ref: '../../../components/schemas/errors/dep-permission_denied.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
-        - $ref: '../../../components/schemas/errors/not_implemented.yaml'
+        - $ref: '../../../components/schemas/errors/proj-not_found.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
       discriminator:
         propertyName: code
@@ -17,7 +17,7 @@ content:
           dep.not_found: '../../../components/schemas/errors/dep-not_found.yaml'
           dep.permission_denied: '../../../components/schemas/errors/dep-permission_denied.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
-          not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
+          proj.not_found: '../../../components/schemas/errors/proj-not_found.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
     examples:
       auth.unauthorized:
@@ -40,11 +40,11 @@ content:
         value:
           code: internal
           message: 'An unexpected error occurred.'
-      not_implemented:
-        summary: not_implemented
+      proj.not_found:
+        summary: proj.not_found
         value:
-          code: not_implemented
-          message: 'This feature is not implemented yet.'
+          code: proj.not_found
+          message: 'project not found'
       req.invalid:
         summary: req.invalid
         value:

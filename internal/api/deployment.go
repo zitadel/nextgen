@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"slices"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -71,7 +72,12 @@ func (h *Handler) GetDeploymentById(ctx context.Context, params api.GetDeploymen
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), deploymentAccess, opRead); err != nil {
 		return nil, err
 	}
-	return nil, domain.ErrNotImplemented()
+	entity, live, err := h.deploymentService.Read(ctx, string(params.ProjectID), string(params.DeploymentID))
+	if err != nil {
+		return nil, err
+	}
+	resp := toAPIDeployment(entity, toAPIDeploymentStatus(live))
+	return &resp, nil
 }
 
 func (h *Handler) GetDeploymentVariables(ctx context.Context, params api.GetDeploymentVariablesParams) (api.GetDeploymentVariablesRes, error) {
@@ -89,14 +95,39 @@ func (h *Handler) ListDeployments(ctx context.Context, params api.ListDeployment
 	if err != nil {
 		return nil, err
 	}
-	for _, expand := range params.Expand {
-		if expand == api.DeploymentExpandRelease {
-			if err := requireReleaseRead(ctx); err != nil {
-				return nil, err
-			}
+	includeReleases := slices.Contains(params.Expand, api.DeploymentExpandRelease)
+	if includeReleases {
+		if err := requireReleaseRead(ctx); err != nil {
+			return nil, err
 		}
 	}
-	return nil, domain.ErrNotImplemented()
+
+	input := service.ListDeploymentsInput{
+		ProjectID:       string(params.ProjectID),
+		Live:            params.Live.Value,
+		IncludeReleases: includeReleases,
+		PageToken:       string(params.PageToken.Value),
+		Limit:           int(params.Limit.Value),
+	}
+	if origin, ok := params.Origin.Get(); ok {
+		input.Origin = new(string(origin))
+	}
+	result, err := h.deploymentService.List(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := api.ListDeploymentsResponse{Deployments: make([]api.Deployment, len(result.Items))}
+	for i, entity := range result.Items {
+		resp.Deployments[i] = toAPIDeployment(entity, toAPIDeploymentStatus(result.Live[entity.ID]))
+		if release, ok := result.ReleasesByID[entity.ReleaseID]; ok {
+			resp.Deployments[i].Release = api.NewOptRelease(toAPIRelease(release))
+		}
+	}
+	if result.NextPageToken != "" {
+		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(result.NextPageToken))
+	}
+	return &resp, nil
 }
 
 // The preview operations answer 501 like the deployment ones: a preview
@@ -151,6 +182,13 @@ func deploymentErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	default:
 		return internalErrorResponse(err)
 	}
+}
+
+func toAPIDeploymentStatus(live bool) api.DeploymentStatus {
+	if live {
+		return api.DeploymentStatusLive
+	}
+	return api.DeploymentStatusInactive
 }
 
 // toAPIDeployment converts a deployment.

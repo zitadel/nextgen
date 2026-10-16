@@ -249,6 +249,123 @@ func TestCreateDeployment(t *testing.T) {
 	})
 }
 
+// TestDeploymentReads deploys two releases to primary and reads them back:
+// only the newer one is live, and the live view follows the project's
+// primary origins.
+func TestDeploymentReads(t *testing.T) {
+	t.Parallel()
+
+	fixture := newDeploymentFixture(t)
+	project := api.ProjectID(fixture.project)
+
+	firstResp := fixture.deploy(t, fixture.release.ID)
+	require.IsType(t, &api.CreateDeploymentCreated{}, firstResp, helpers.MustMarshal(t, firstResp))
+	first := firstResp.(*api.CreateDeploymentCreated)
+	secondRelease := fixture.otherRelease(t)
+	secondResp := fixture.deploy(t, secondRelease)
+	require.IsType(t, &api.CreateDeploymentCreated{}, secondResp, helpers.MustMarshal(t, secondResp))
+	second := secondResp.(*api.CreateDeploymentCreated)
+
+	get := func(t *testing.T, id api.DeploymentID) *api.Deployment {
+		t.Helper()
+		resp, err := fixture.client.GetDeploymentById(t.Context(), api.GetDeploymentByIdParams{ProjectID: project, DeploymentID: id})
+		require.NoError(t, err)
+		require.IsType(t, &api.Deployment{}, resp, helpers.MustMarshal(t, resp))
+		return resp.(*api.Deployment)
+	}
+	list := func(t *testing.T, params api.ListDeploymentsParams) []api.Deployment {
+		t.Helper()
+		params.ProjectID = project
+		resp, err := fixture.client.ListDeployments(t.Context(), params)
+		require.NoError(t, err)
+		require.IsType(t, &api.ListDeploymentsResponse{}, resp, helpers.MustMarshal(t, resp))
+		return resp.(*api.ListDeploymentsResponse).Deployments
+	}
+	ids := func(deployments []api.Deployment) []api.DeploymentID {
+		out := make([]api.DeploymentID, len(deployments))
+		for i, d := range deployments {
+			out[i] = d.ID
+		}
+		return out
+	}
+
+	t.Run("get carries kind and status", func(t *testing.T) {
+		older := get(t, first.ID)
+		assert.Equal(t, api.DeploymentKindPrimary, older.Kind)
+		assert.Equal(t, api.DeploymentStatusInactive, older.Status)
+		assert.Equal(t, []string{appOrigin, wwwOrigin}, origins(older.Targets))
+		assert.False(t, older.Release.Set)
+
+		newer := get(t, second.ID)
+		assert.Equal(t, api.DeploymentStatusLive, newer.Status)
+		assert.Equal(t, secondRelease, newer.ReleaseID)
+	})
+
+	t.Run("get an unknown id", func(t *testing.T) {
+		resp, err := fixture.client.GetDeploymentById(t.Context(), api.GetDeploymentByIdParams{
+			ProjectID: project, DeploymentID: "dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",
+		})
+		require.NoError(t, err)
+		status, code, _, ok := errorResponseParts(t, resp)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		assert.Equal(t, http.StatusNotFound, status)
+		assert.Equal(t, domain.ErrDeploymentNotFound().Code, code)
+	})
+
+	t.Run("the history, newest first, with each status", func(t *testing.T) {
+		got := list(t, api.ListDeploymentsParams{})
+		assert.Equal(t, []api.DeploymentID{second.ID, first.ID}, ids(got))
+		assert.Equal(t, api.DeploymentStatusLive, got[0].Status)
+		assert.Equal(t, api.DeploymentStatusInactive, got[1].Status)
+	})
+
+	t.Run("the history of one origin", func(t *testing.T) {
+		assert.Equal(t, []api.DeploymentID{second.ID, first.ID}, ids(list(t, api.ListDeploymentsParams{Origin: api.NewOptOrigin(wwwOrigin)})))
+	})
+
+	t.Run("the live view is the newest primary deployment", func(t *testing.T) {
+		got := list(t, api.ListDeploymentsParams{Live: api.NewOptBool(true)})
+		assert.Equal(t, []api.DeploymentID{second.ID}, ids(got))
+		assert.Equal(t, api.DeploymentStatusLive, got[0].Status)
+	})
+
+	t.Run("embeds the release", func(t *testing.T) {
+		got := list(t, api.ListDeploymentsParams{Expand: []api.DeploymentExpand{api.DeploymentExpandRelease}})
+		require.Len(t, got, 2)
+		require.True(t, got[0].Release.Set)
+		assert.Equal(t, secondRelease, got[0].Release.Value.ID)
+	})
+
+	// Runs last: it adds a primary origin to the project.
+	t.Run("a primary origin added since serves nothing", func(t *testing.T) {
+		const added = "https://acme.com"
+		fixture.addOrigin(t, domain.Origin{Pattern: added, Kind: domain.OriginKindPrimary})
+		assert.Empty(t, list(t, api.ListDeploymentsParams{Origin: api.NewOptOrigin(added), Live: api.NewOptBool(true)}))
+		assert.Equal(t, []api.DeploymentID{second.ID},
+			ids(list(t, api.ListDeploymentsParams{Origin: api.NewOptOrigin(appOrigin), Live: api.NewOptBool(true)})))
+	})
+
+	t.Run("a removed primary origin drops out of the live view", func(t *testing.T) {
+		require.NoError(t, harness.EnsureProjectService(t).RemoveOrigin(t.Context(), fixture.project, wwwOrigin))
+		got := list(t, api.ListDeploymentsParams{Live: api.NewOptBool(true)})
+		require.Len(t, got, 1)
+		assert.Equal(t, []string{appOrigin}, origins(got[0].Targets))
+		assert.Equal(t, []string{appOrigin, wwwOrigin}, origins(get(t, second.ID).Targets), "the record keeps its origins")
+	})
+
+	t.Run("a live page of one ends at the primary deployment when nothing follows", func(t *testing.T) {
+		resp, err := fixture.client.ListDeployments(t.Context(), api.ListDeploymentsParams{
+			ProjectID: project, Live: api.NewOptBool(true), Limit: api.NewOptLimit(1),
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListDeploymentsResponse{}, resp, helpers.MustMarshal(t, resp))
+		page := resp.(*api.ListDeploymentsResponse)
+		assert.Equal(t, []api.DeploymentID{second.ID}, ids(page.Deployments))
+		_, more := page.NextPageToken.Get()
+		assert.False(t, more)
+	})
+}
+
 // TestDeploymentsNotImplemented pins the deployment operations not served
 // yet to 501. Each request goes through the
 // real server, so the new shapes decode and the access check still runs
@@ -298,25 +415,6 @@ func TestDeploymentsNotImplemented(t *testing.T) {
 		resp, err := fixture.client.GetDeploymentVariables(t.Context(), api.GetDeploymentVariablesParams{
 			ProjectID:    project,
 			DeploymentID: "dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",
-		})
-		require.NoError(t, err)
-		expectNotImplemented(t, resp)
-	})
-
-	t.Run("get", func(t *testing.T) {
-		resp, err := fixture.client.GetDeploymentById(t.Context(), api.GetDeploymentByIdParams{
-			ProjectID:    project,
-			DeploymentID: "dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",
-		})
-		require.NoError(t, err)
-		expectNotImplemented(t, resp)
-	})
-
-	t.Run("list the live view of one origin", func(t *testing.T) {
-		resp, err := fixture.client.ListDeployments(t.Context(), api.ListDeploymentsParams{
-			ProjectID: project,
-			Origin:    api.NewOptOrigin("https://app.acme.com"),
-			Live:      api.NewOptBool(true),
 		})
 		require.NoError(t, err)
 		expectNotImplemented(t, resp)
