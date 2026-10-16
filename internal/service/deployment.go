@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"errors"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/audit"
@@ -51,6 +53,8 @@ type ListDeploymentsInput struct {
 	ProjectID string
 	// Origin narrows the list to one origin's history.
 	Origin *string
+	// Live lists what is served now instead of the history.
+	Live bool
 	// IncludeReleases embeds the release each deployment made live (ADR 059).
 	IncludeReleases bool
 	PageToken       string
@@ -62,7 +66,9 @@ type ListDeploymentsOutput struct {
 	// ReleasesByID holds the releases the listed deployments point at, keyed
 	// by id, when IncludeReleases asked for them. Nil otherwise: the caller
 	// distinguishes "did not ask" from "none found".
-	ReleasesByID  map[string]*domain.Release
+	ReleasesByID map[string]*domain.Release
+	// Live holds the ids of the listed deployments that are live now.
+	Live          map[string]bool
 	NextPageToken string
 }
 
@@ -178,11 +184,8 @@ func servedBy(ctx context.Context, stmts AllStatements, entity *domain.Deploymen
 		return nil, nil, err
 	}
 	if entity.OriginKind == domain.DeploymentOriginKindPrimary {
-		newest, err := stmts.ListDeployments(WithAuthzListUnrestricted(ctx), deployment.NewestOfKindOptions(entity.ProjectID, domain.DeploymentOriginKindPrimary))
-		if err != nil || len(newest.Items) == 0 {
-			return read, nil, err
-		}
-		return read, newest.Items[0], nil
+		current, err := newestPrimary(ctx, stmts, entity.ProjectID)
+		return read, current, err
 	}
 	newest := domain.NewestOriginDeployment(read)
 	if newest == nil {
@@ -291,17 +294,32 @@ func (s *DeploymentService) List(ctx context.Context, input ListDeploymentsInput
 	ctx, end := startSpan(ctx, "DeploymentService.List")
 	defer end(&err)
 
-	opts := deployment.ListOptions(input.ProjectID, input.Origin, uint32(normalizeLimit(input.Limit)))
-	opts.Pagination.Cursor = []byte(input.PageToken)
-
-	result, err := s.v2Pool.Statements().ListDeployments(ctx, opts)
+	var result *database.ListResult[*domain.Deployment]
+	if input.Live {
+		result, err = s.listLive(ctx, input)
+	} else {
+		opts := deployment.ListOptions(input.ProjectID, input.Origin, uint32(normalizeLimit(input.Limit)))
+		opts.Pagination.Cursor = []byte(input.PageToken)
+		result, err = s.v2Pool.Statements().ListDeployments(ctx, opts)
+	}
 	if err != nil {
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return nil, de
+		}
 		return nil, mapListError(err, "failed to list deployments")
 	}
 
 	output := &ListDeploymentsOutput{
 		Items:         result.Items,
 		NextPageToken: string(result.NextCursor),
+	}
+	if input.Live {
+		output.Live = make(map[string]bool, len(result.Items))
+		for _, entity := range result.Items {
+			output.Live[entity.ID] = true
+		}
+	} else if output.Live, err = s.liveIDs(ctx, input.ProjectID, result.Items); err != nil {
+		return nil, err
 	}
 	if input.IncludeReleases {
 		releases, err := s.releasesFor(ctx, input.ProjectID, result.Items)
@@ -334,4 +352,204 @@ func (s *DeploymentService) releasesFor(ctx context.Context, projectID string, i
 		byID[release.ID] = release
 	}
 	return byID, nil
+}
+
+// Read gets a deployment and whether it is live now.
+func (s *DeploymentService) Read(ctx context.Context, projectID, id string) (_ *domain.Deployment, _ bool, err error) {
+	ctx, end := startSpan(ctx, "DeploymentService.Read")
+	defer end(&err)
+
+	entity, err := s.Get(ctx, projectID, id)
+	if err != nil {
+		return nil, false, err
+	}
+	live, err := s.liveIDs(ctx, projectID, []*domain.Deployment{entity})
+	if err != nil {
+		return nil, false, err
+	}
+	return entity, live[entity.ID], nil
+}
+
+// liveIDs reports which of items are live: a primary deployment while it is
+// the project's newest primary deployment and covers a primary origin, a
+// preview one while one of its URLs still serves it.
+func (s *DeploymentService) liveIDs(ctx context.Context, projectID string, items []*domain.Deployment) (map[string]bool, error) {
+	stmts := s.v2Pool.Statements()
+	live := make(map[string]bool, len(items))
+	var previews []string
+	hasPrimary := false
+	for _, entity := range items {
+		if entity.OriginKind == domain.DeploymentOriginKindPreview {
+			previews = append(previews, entity.ID)
+		} else {
+			hasPrimary = true
+		}
+	}
+	if hasPrimary {
+		origins, err := s.projectOrigins(ctx, projectID)
+		if err != nil {
+			return nil, err
+		}
+		newest, err := s.livePrimary(ctx, projectID, domain.PrimaryOrigins(origins))
+		if err != nil {
+			return nil, domain.ErrInternal(err).WithMessage("failed to read the newest primary deployment")
+		}
+		if newest != nil {
+			live[newest.ID] = true
+		}
+	}
+	if len(previews) > 0 {
+		result, err := stmts.ListLiveDeployments(WithAuthzListUnrestricted(ctx), time.Now(), &database.ListOptions[domain.DeploymentField]{
+			Filter:     deployment.ByIDs(projectID, previews),
+			Pagination: database.Page[domain.DeploymentField]{Limit: uint32(len(previews)), OrderBy: deployment.NewestFirst()},
+		})
+		if err != nil {
+			return nil, domain.ErrInternal(err).WithMessage("failed to read the live deployments")
+		}
+		for _, entity := range result.Items {
+			live[entity.ID] = true
+		}
+	}
+	return live, nil
+}
+
+// listLive is the live view: the project's newest primary deployment first,
+// narrowed to the origins that are still primary origins, then the newest
+// deployment to each live preview URL, newest first.
+func (s *DeploymentService) listLive(ctx context.Context, input ListDeploymentsInput) (*database.ListResult[*domain.Deployment], error) {
+	origins, err := s.projectOrigins(ctx, input.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	if input.Origin != nil {
+		served, err := s.servedAt(ctx, input.ProjectID, domain.PrimaryOrigins(origins), *input.Origin)
+		if err != nil || served == nil {
+			return &database.ListResult[*domain.Deployment]{}, err
+		}
+		return &database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{served}}, nil
+	}
+
+	// A later page's token is livePreviewsToken and the preview cursor.
+	cursor, later := strings.CutPrefix(input.PageToken, livePreviewsToken)
+	if input.PageToken != "" && !later {
+		return nil, database.ErrInvalidCursor()
+	}
+	limit := uint32(normalizeLimit(input.Limit))
+	var items []*domain.Deployment
+	if !later {
+		primary, err := s.livePrimary(ctx, input.ProjectID, domain.PrimaryOrigins(origins))
+		if err == nil {
+			primary, err = s.visibleTo(ctx, primary)
+		}
+		if err != nil {
+			return nil, err
+		}
+		if primary != nil {
+			items = append(items, primary)
+			limit--
+		}
+	}
+	// A page holding only the primary deployment still looks for one preview,
+	// to know whether a later page exists.
+	opts := deployment.LiveListOptions(input.ProjectID, nil, max(limit, 1))
+	opts.Filter = database.And(opts.Filter,
+		database.Equal(database.Col(domain.DeploymentFieldOriginKind), domain.DeploymentOriginKindPreview.String()))
+	opts.Pagination.Cursor = []byte(cursor)
+	result, err := s.v2Pool.Statements().ListLiveDeployments(ctx, time.Now(), opts)
+	if err != nil {
+		return nil, err
+	}
+	if limit == 0 {
+		next := []byte(nil)
+		if len(result.Items) > 0 {
+			next = []byte(livePreviewsToken)
+		}
+		return &database.ListResult[*domain.Deployment]{Items: items, NextCursor: next}, nil
+	}
+	result.Items = append(items, result.Items...)
+	if len(result.NextCursor) > 0 {
+		result.NextCursor = append([]byte(livePreviewsToken), result.NextCursor...)
+	}
+	return result, nil
+}
+
+// servedAt is the deployment origin serves, nil for none: for a primary
+// origin the newest primary deployment when it covers it, for a preview URL
+// its newest preview deployment while the preview is live.
+func (s *DeploymentService) servedAt(ctx context.Context, projectID string, primaryOrigins []string, origin string) (*domain.Deployment, error) {
+	if slices.Contains(primaryOrigins, origin) {
+		served, err := s.livePrimary(ctx, projectID, []string{origin})
+		if err != nil {
+			return nil, err
+		}
+		return s.visibleTo(ctx, served)
+	}
+	served, err := s.v2Pool.Statements().GetLiveDeployment(ctx, projectID, origin, time.Now())
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+		return nil, nil
+	}
+	// A primary row on an origin that is no longer primary serves nothing.
+	if err != nil || served.OriginKind != domain.DeploymentOriginKindPreview {
+		return nil, err
+	}
+	return s.visibleTo(ctx, served)
+}
+
+// visibleTo returns entity when the caller's list filter admits it, nil
+// otherwise. A caller with project-wide access carries no filter.
+func (s *DeploymentService) visibleTo(ctx context.Context, entity *domain.Deployment) (*domain.Deployment, error) {
+	if entity == nil {
+		return nil, nil
+	}
+	if _, filtered := AuthzListFilterFromContext(ctx); !filtered {
+		return entity, nil
+	}
+	result, err := s.v2Pool.Statements().ListDeployments(ctx, &database.ListOptions[domain.DeploymentField]{
+		Filter:     deployment.ByIDs(entity.ProjectID, []string{entity.ID}),
+		Pagination: database.Page[domain.DeploymentField]{Limit: 1, OrderBy: deployment.NewestFirst()},
+	})
+	if err != nil || len(result.Items) == 0 {
+		return nil, err
+	}
+	return entity, nil
+}
+
+// livePrimary is the project's newest primary deployment narrowed to origins,
+// nil when there is none or it covers none of them.
+func (s *DeploymentService) livePrimary(ctx context.Context, projectID string, origins []string) (*domain.Deployment, error) {
+	newest, err := newestPrimary(ctx, s.v2Pool.Statements(), projectID)
+	if err != nil {
+		return nil, err
+	}
+	return narrowed(newest, origins), nil
+}
+
+// livePreviewsToken prefixes the page token of a later live-view page, which
+// lists previews only.
+const livePreviewsToken = "p"
+
+// narrowed copies the deployment with only the targets still in origins, nil
+// when none is.
+func narrowed(entity *domain.Deployment, origins []string) *domain.Deployment {
+	if entity == nil {
+		return nil
+	}
+	out := *entity
+	out.Targets = slices.DeleteFunc(slices.Clone(entity.Targets), func(t domain.DeploymentTarget) bool {
+		return !slices.Contains(origins, t.Origin)
+	})
+	if len(out.Targets) == 0 {
+		return nil
+	}
+	return &out
+}
+
+// newestPrimary is the project's newest primary deployment, nil when none.
+// It is a lookup, not the caller's list, so it reads unfiltered.
+func newestPrimary(ctx context.Context, stmts DeploymentStatements, projectID string) (*domain.Deployment, error) {
+	result, err := stmts.ListDeployments(WithAuthzListUnrestricted(ctx), deployment.NewestOfKindOptions(projectID, domain.DeploymentOriginKindPrimary))
+	if err != nil || len(result.Items) == 0 {
+		return nil, err
+	}
+	return result.Items[0], nil
 }
