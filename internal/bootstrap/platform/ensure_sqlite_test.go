@@ -5,7 +5,6 @@ package platform
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -131,11 +130,7 @@ func TestEnsureSQLiteSeedsAUsableProject(t *testing.T) {
 
 	// The platform variant, not the default (its shape is pinned in
 	// platform_schema_test.go).
-	var doc struct {
-		XDisplay []string `json:"x-display"`
-	}
-	require.NoError(t, json.Unmarshal(userSchema.Schema, &doc))
-	assert.Equal(t, []string{schemas.PlatformDisplayNameProperty}, doc.XDisplay)
+	assert.Equal(t, []string{schemas.PlatformDisplayNameProperty}, domain.DesignatedDisplay(userSchema.Schema))
 
 	// The login flows the registration walks through. Their ids are minted at
 	// insert, so this counts them against the same defaults the seeding builds
