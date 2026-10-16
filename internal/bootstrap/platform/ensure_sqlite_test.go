@@ -129,18 +129,13 @@ func TestEnsureSQLiteSeedsAUsableProject(t *testing.T) {
 	userSchema, err := pool.Statements().GetJSONSchemaByID(ctx, projectID, schemas.DefaultHumanUserSchemaURL(testSchemaBase))
 	require.NoError(t, err, "a project with no user schema cannot register anyone")
 
-	// The platform variant: an optional name, designated for display, so the
-	// people operating Zitadel can name themselves. Email stays the only
-	// required attribute, so registration asks for nothing more.
+	// The platform variant, not the default (its shape is pinned in
+	// platform_schema_test.go).
 	var doc struct {
-		Required   []string                  `json:"required"`
-		XDisplay   []string                  `json:"x-display"`
-		Properties map[string]map[string]any `json:"properties"`
+		XDisplay []string `json:"x-display"`
 	}
 	require.NoError(t, json.Unmarshal(userSchema.Schema, &doc))
 	assert.Equal(t, []string{schemas.PlatformDisplayNameProperty}, doc.XDisplay)
-	assert.Equal(t, "string", doc.Properties[schemas.PlatformDisplayNameProperty]["type"])
-	assert.Equal(t, []string{"email"}, doc.Required)
 
 	// The login flows the registration walks through. Their ids are minted at
 	// insert, so this counts them against the same defaults the seeding builds

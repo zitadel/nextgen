@@ -13,11 +13,8 @@ import (
 
 const testBase = "https://example.com/api/schemas"
 
-// The platform schema is seeded into a project at startup, so a document the
-// server would refuse would stop the platform bootstrap. It has to pass the
-// same meta-schema and designation checks any uploaded schema does — `x-display`
-// naming a property that does not exist is exactly the kind of mistake those
-// catch.
+// Seeded at startup, so a document the server refuses would stop the
+// platform bootstrap: it passes the same checks as an uploaded schema.
 func TestPlatformHumanUserSchemaIsValid(t *testing.T) {
 	validator, err := domain.NewSchemaValidator(testBase)
 	require.NoError(t, err)
@@ -27,8 +24,7 @@ func TestPlatformHumanUserSchemaIsValid(t *testing.T) {
 	require.NoError(t, validator.ValidateAgainstMetaSchema(doc))
 }
 
-// It is the default plus an optional name, nothing else: the same `$id` the
-// admin seed documents point at, and email still the only required attribute.
+// The default plus an optional name, nothing else.
 func TestPlatformHumanUserSchemaExtendsTheDefault(t *testing.T) {
 	var platform, base map[string]any
 	doc, err := schemas.PlatformHumanUserSchema(testBase)

@@ -204,8 +204,6 @@ func (s *projectService) create(ctx context.Context, project *domain.Project, se
 
 func (s *projectService) createDefaultUserSchemas(ctx context.Context, stmts AllStatements, projectID string) (*domain.JSONSchema, error) {
 	schemabs := schemas.DefaultHumanUserSchema(s.serverURL)
-	// The platform project's users operate Zitadel itself, and get an optional
-	// display name on top of the default; every other project keeps the default.
 	if projectID == domain.PlatformProjectID {
 		var err error
 		if schemabs, err = schemas.PlatformHumanUserSchema(s.serverURL); err != nil {
