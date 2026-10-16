@@ -8,12 +8,16 @@ Next.js middleware and helpers for Nextgen Auth.
 pnpm add @zitadel/sdk-next@alpha
 ```
 
+Requires Next.js 15.2.3 or later. Earlier 15.x releases skip middleware for a
+request that sends an `x-middleware-subrequest` header (CVE-2025-29927), which
+would let any request past `protectedRoutes`.
+
 ## Entry points
 
 | Import                         | Runs in                          | Provides                                         |
 | ------------------------------ | -------------------------------- | ------------------------------------------------ |
 | `@zitadel/sdk-next/middleware` | Edge middleware                  | `nextgenMiddleware`, `createProxy`               |
-| `@zitadel/sdk-next/server`     | Server Components, Route Handlers | `auth()`, `NextgenProvider`                      |
+| `@zitadel/sdk-next/server`     | Server Components, Route Handlers | `auth()`, `getClientAuth()`, `NextgenProvider`   |
 | `@zitadel/sdk-next/react`      | Client Components                | `useAuth()`, `AuthContextProvider`               |
 | `@zitadel/sdk-next/session`    | Client Components                | `getSession()`                                   |
 | `@zitadel/sdk-next/client`     | Client boundary                  | Web-component registration, `configureZitadel()` |
@@ -61,10 +65,19 @@ import { auth } from "@zitadel/sdk-next/server";
 
 export default async function Page() {
   const session = await auth();
-  if (!session.isAuthenticated) return <p>Not signed in</p>;
+  if (!session.isAuthenticated) {
+    // The session could not be checked: an outage, not a sign-out.
+    if (session.reason === "unavailable") return <p>Try again shortly</p>;
+    return <p>Not signed in</p>;
+  }
   return <p>Hello {session.session.display ?? session.session.identifier}</p>;
 }
 ```
+
+When Zitadel cannot be asked about the session (unreachable, too slow or
+failing), `auth()` returns `{ isAuthenticated: false, reason: "unavailable" }`
+and the session cookie is kept. Answer a retryable error there, not a
+redirect to the login page.
 
 `auth()` reads the token the middleware tunnelled into the request headers
 and **verifies it before trusting it** — JWTs cryptographically via JWKS,
@@ -82,7 +95,17 @@ follow:
 
 `session.token` is the raw session token, available server-side for calling
 upstream APIs. Never forward it into client components yourself —
-`NextgenProvider` strips it for you (next section).
+`NextgenProvider` strips it for you (next section). Never return `auth()`'s
+result from a server action either, since Next.js sends that to the browser:
+return `getClientAuth()` (from `@zitadel/sdk-next/server`), the same state
+without the token.
+
+A client can send the `x-nextgen-auth-state` header the middleware uses to
+report a session it could not check. On routes the `matcher` covers, the
+middleware always overwrites it; on a route outside it, a client sending
+`unavailable` makes `auth()` report `reason: "unavailable"` for that request
+only. It cannot sign anyone in, but cover every route that calls `auth()` with
+the `matcher` to rule it out.
 
 ### 3. Reading auth in a Client Component
 
@@ -106,7 +129,8 @@ export default async function RootLayout({ children }) {
 
 `NextgenProvider` converts the `auth()` result to the client-safe shape
 **before** it crosses the server→client boundary: client components receive
-`userId` / `email` / `name`, and the raw session token never enters the RSC
+`userId` / `identifier` / `identifierProperty` / `display`, and the raw
+session token never enters the RSC
 flight payload, where any script on the page could read it.
 
 That strip only protects you while it runs on the server, which is why
@@ -173,7 +197,8 @@ A rejected `getSession()` means the state is *unknown* (broken proxy, network,
 5xx) — render a neutral or error state, never the signed-out CTAs.
 
 A `200` with a non-empty `user_id` resolves to
-`{ isAuthenticated: true, session: { userId, email, name } }` (client-safe —
+`{ isAuthenticated: true, session: { userId, identifier, identifierProperty, display } }`
+(client-safe —
 no token); the canonical `401/auth.unauthorized`,
 `404/sess.not_found`, and anonymous sessions resolve to signed out. The request
 and response are both marked no-store. Any other response — including malformed
@@ -246,13 +271,14 @@ There is no `api-base` attribute — the element reads the global handle from
 | `proxyPath`         | `string`             | `"/__nextgen"`           | Path prefix proxied to the auth backend. Sign-in with an external provider currently requires the default: the provider returns to `/__nextgen/idp/{slug}/callback` |
 | `protectedRoutes`   | `string[]`           | `[]`                     | Paths requiring a valid session. Trailing `*` matches sub-paths                                                            |
 | `ignoredRoutes`     | `string[]`           | `[]`                     | Paths skipped entirely — no JWT check, no tunnelling. Useful for webhooks or health checks. Trailing `*` matches sub-paths |
-| `loginPath`         | `string`             | `"/login"`               | Where to redirect unauthenticated users                                                                                    |
+| `loginPath`         | `string`             | `"/login"`               | Where to redirect unauthenticated users. Setup fails if `protectedRoutes` matches it and `ignoredRoutes` does not                                                                                    |
 | `allowedAlgorithms` | `string[]`           | `["RS256", "ES256"]`     | JWT `alg` values to accept. Tokens with any other algorithm are rejected before JWKS is fetched                            |
 | `allowedTokenTypes` | `string[]`           | `["JWT", "at+JWT"]`      | Accepted `typ` header values (case-insensitive). Set to `[]` to disable this check                                         |
 | `clockSkewMs`       | `number`             | `5000`                   | Clock skew tolerance in ms for `exp`, `nbf`, `iat`                                                                         |
 | `jwksTimeoutMs`     | `number`             | `5000`                   | Timeout in ms for JWKS endpoint requests. Token is rejected if the fetch exceeds this window                               |
-| `opaqueTokenTimeoutMs` | `number`          | `5000`                   | Timeout in ms for opaque (non-JWT) session validation via `GET /sessions/me`. Also accepted by `auth()`                    |
-| `proxyTimeoutMs`    | `number`             | `5000`                   | Timeout in ms for upstream proxy requests; requests exceeding it abort with a network error                                |
+| `opaqueTokenTimeoutMs` | `number`          | `5000`                   | Timeout in ms for opaque (non-JWT) session validation via `GET /sessions/me`. Also accepted by `auth()`. Only Zitadel's `401 auth.unauthorized` or `404 sess.not_found` clears the cookie; a timeout, network error, `5xx` or a gateway's `401`/`404` keeps it, reports `reason: "unavailable"` and answers a protected route `503` |
+| `proxyTimeoutMs`    | `number`             | `5000`                   | Timeout in ms for upstream proxy requests. A request exceeding it is answered `504`; an unreachable backend `502`, both with a `{ code, message }` body |
+| `projectSecret`     | `string`             | `ZITADEL_PROJECT_SECRET` env | Project secret, sent as the bearer on the `POST /sessions/exchange` handoff only (server-only). Also accepted by `createProxy` |
 | `jwtKey`            | `string`             | unset                    | Reserved for future use — local PEM public key for offline JWT verification                                                |
 | `audience`          | `string \| string[]` | not validated            | Expected `aud` claim value(s). When omitted, audience is not checked                                                       |
 

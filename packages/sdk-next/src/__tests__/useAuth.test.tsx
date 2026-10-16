@@ -116,6 +116,22 @@ describe("NextgenProvider input shapes", () => {
     });
   }
 
+  // An outage is not a sign-out: a client guard must be able to tell them apart.
+  it.each([
+    ["an auth() result", { isAuthenticated: false, session: null, reason: "unavailable" } as const],
+    [
+      "a client-safe result",
+      { isAuthenticated: false, session: null, reason: "unavailable" } satisfies ClientAuthResult,
+    ],
+  ])("keeps reason: unavailable from %s", (_label, session) => {
+    const { result } = renderWith(session);
+    expect(result.current).toEqual({
+      isAuthenticated: false,
+      session: null,
+      reason: "unavailable",
+    });
+  });
+
   it("treats null as signed out", () => {
     const { result } = renderWith(null);
     expect(result.current).toEqual({ isAuthenticated: false, session: null });

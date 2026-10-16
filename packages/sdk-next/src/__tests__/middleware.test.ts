@@ -1,14 +1,37 @@
+// Next's middleware adapter reads `globalThis.AsyncLocalStorage` when its
+// modules load, as the edge runtime provides it; set it before any import.
+await vi.hoisted(async () => {
+  const { AsyncLocalStorage } = await import("node:async_hooks");
+  (globalThis as { AsyncLocalStorage?: unknown }).AsyncLocalStorage ??= AsyncLocalStorage;
+});
+
 import { NextRequest } from "next/server";
 import { generateKeyPairSync, createSign } from "node:crypto";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-import { nextgenMiddleware } from "../middleware";
+import { createProxy, nextgenMiddleware } from "../middleware";
 import { clearJwksCache } from "@zitadel/sdk-core/jwt";
+import { clearSessionCheckBackoff } from "@zitadel/sdk-core/middleware";
+import {
+  DEAD,
+  JWE_SESSION_TOKEN,
+  OFF_ORIGIN_LOCATIONS,
+  OUTAGES,
+  PROXY_FAILURES,
+  exchangeAnswer,
+} from "./outages";
 
-// The JWKS cache is module-level and per issuer: start every case from a cold
-// cache, so each one fetches the keys its own mock publishes.
+// The JWKS cache and the session-check backoff are module-level and per
+// issuer: start every case cold, so each one asks its own mock, and keep the
+// expected outage warnings out of the output.
 beforeEach(() => {
   clearJwksCache();
+  clearSessionCheckBackoff();
+  vi.spyOn(console, "warn").mockImplementation(() => undefined);
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", {
@@ -64,6 +87,32 @@ function nextKid(): string {
 function mockJwks(kid: string): ReturnType<typeof vi.fn> {
   const jwks = { keys: [{ ...publicKeyJwk, kid, alg: "RS256", use: "sig" }] };
   return vi.fn().mockResolvedValue(new Response(JSON.stringify(jwks), { status: 200 }));
+}
+
+/**
+ * Runs `handler` the way production does: through Next's own middleware
+ * `adapter()`, which post-processes the response (it relativises a same-host
+ * `Location`, for one).
+ */
+async function throughNextAdapter(
+  url: string,
+  handler: (req: NextRequest) => Promise<Response>,
+): Promise<Response> {
+  const { adapter } = (await import("next/dist/server/web/adapter.js")) as unknown as {
+    adapter: (params: unknown) => Promise<{ response: Response }>;
+  };
+  const result = await adapter({
+    handler,
+    page: "/middleware",
+    request: {
+      headers: {},
+      method: "GET",
+      url,
+      nextConfig: {},
+      signal: new AbortController().signal,
+    },
+  });
+  return result.response;
 }
 
 describe("nextgenMiddleware", () => {
@@ -512,6 +561,34 @@ describe("nextgenMiddleware", () => {
       expect((capturedHeaders as Headers).get("authorization")).toBe("Bearer caller-key");
     });
 
+    it("keeps the session token out of the exchange body the browser reads", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => exchangeAnswer()),
+      );
+
+      const res = await nextgenMiddleware(
+        new NextRequest("http://localhost:3000/__nextgen/sessions/exchange", { method: "POST" }),
+        { url: "http://localhost:4000" },
+      );
+
+      expect(await res.text()).not.toContain(JWE_SESSION_TOKEN);
+    });
+
+    it("still sets the session cookie from the exchange", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => exchangeAnswer()),
+      );
+
+      const res = await nextgenMiddleware(
+        new NextRequest("http://localhost:3000/__nextgen/sessions/exchange", { method: "POST" }),
+        { url: "http://localhost:4000" },
+      );
+
+      expect(res.headers.getSetCookie()).toEqual(exchangeAnswer().headers.getSetCookie());
+    });
+
     it("preserves the upstream session cache policy", async () => {
       vi.stubGlobal(
         "fetch",
@@ -557,6 +634,45 @@ describe("nextgenMiddleware", () => {
     });
   });
 
+  describe("proxy: redirects whose path starts with //", () => {
+    it.each(OFF_ORIGIN_LOCATIONS)("keeps %s on this app", async (location) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(null, { status: 303, headers: { location } })),
+      );
+
+      const res = await nextgenMiddleware(
+        new NextRequest("http://localhost:3000/__nextgen/idp/google/callback"),
+        { url: "http://localhost:4000" },
+      );
+
+      expect(new URL(res.headers.get("location") ?? "", "http://unset.invalid").origin).toBe(
+        "http://localhost:3000",
+      );
+    });
+  });
+
+  // Next's own adapter wraps middleware in production and rewrites a same-host
+  // Location to the path alone, so a path starting with `//` would reach the
+  // browser as protocol-relative.
+  describe("proxy: redirects through Next's middleware adapter", () => {
+    it.each(OFF_ORIGIN_LOCATIONS)("keeps %s on this app", async (location) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(null, { status: 303, headers: { location } })),
+      );
+
+      const res = await throughNextAdapter(
+        "https://app.test/__nextgen/idp/google/callback",
+        (req) => nextgenMiddleware(req, { url: "http://localhost:4000" }),
+      );
+
+      expect(new URL(res.headers.get("location") ?? "", "https://app.test/__nextgen/").origin).toBe(
+        "https://app.test",
+      );
+    });
+  });
+
   describe("tunnel: client header injection prevention (P-1)", () => {
     it("does not preserve client-injected x-middleware-override-headers", async () => {
       const req = new NextRequest("http://localhost:3000/", {
@@ -598,6 +714,23 @@ describe("nextgenMiddleware", () => {
         }),
       ).rejects.toThrow(/loginPath must be a relative path/i);
     });
+
+    // A dot-segment path that resolves to `//evil.example` would leave the app
+    // once Next's adapter cuts the origin off the redirect.
+    it.each(["/x/../..//evil.example/login", "/.%2E//evil.example/login"])(
+      "refuses loginPath %j before a redirect goes out through Next's adapter",
+      async (loginPath) => {
+        await expect(
+          throughNextAdapter("https://app.test/dashboard", (req) =>
+            nextgenMiddleware(req, {
+              url: "http://localhost:4000",
+              protectedRoutes: ["/dashboard"],
+              loginPath,
+            }),
+          ),
+        ).rejects.toThrow(/loginPath must be a relative path/i);
+      },
+    );
 
     it("accepts a relative loginPath and redirects correctly", async () => {
       const req = makeRequest("http://localhost:3000/admin");
@@ -786,5 +919,390 @@ describe("nextgenMiddleware", () => {
       expect(tunnelled).toBe("");
       expect(tunnelled).not.toBe("forged-session-token");
     });
+  });
+});
+
+/** The session token the middleware tunnelled to server components. */
+function tunnelled(res: Response): string | null {
+  return res.headers.get("x-middleware-request-x-nextgen-auth-token");
+}
+
+/** The `__nextgen*` cookies a response clears. */
+function cleared(res: Response): string[] {
+  return res.headers
+    .getSetCookie()
+    .filter((cookie) => /^__nextgen[^=]*=;/.test(cookie))
+    .map((cookie) => cookie.slice(0, cookie.indexOf("=")));
+}
+
+// The backend issues opaque session tokens; the middleware asks /sessions/me.
+describe("opaque session cookie", () => {
+  const COOKIE = "__nextgen_session=opaque-session-token";
+  const OPTIONS = {
+    url: "http://localhost:4000",
+    protectedRoutes: ["/admin"],
+    loginPath: "/login",
+  };
+
+  function sessionsMe(response: Response): void {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => response),
+    );
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("checks a cookie shaped like the backend's own with the backend, not the JWKS", async () => {
+    const backend = vi.fn(async (_url: string) =>
+      Response.json({ session_id: "s1", user_id: "u1" }),
+    );
+    vi.stubGlobal("fetch", backend);
+
+    const res = await nextgenMiddleware(
+      makeRequest("http://localhost:3000/admin", `__nextgen_session=${JWE_SESSION_TOKEN}`),
+      OPTIONS,
+    );
+
+    expect([tunnelled(res), backend.mock.calls.map(([url]) => String(url))]).toEqual([
+      JWE_SESSION_TOKEN,
+      ["http://localhost:4000/sessions/me"],
+    ]);
+  });
+
+  it("asks a client to retry a protected route when the backoff ends", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(new TypeError("fetch failed"))),
+    );
+
+    const res = await nextgenMiddleware(
+      makeRequest("http://localhost:3000/admin", COOKIE),
+      OPTIONS,
+    );
+
+    expect(res.headers.get("retry-after")).toBe("15");
+  });
+
+  it("tunnels a live session that names a user to server components", async () => {
+    sessionsMe(Response.json({ session_id: "s1", user_id: "u1" }));
+
+    const res = await nextgenMiddleware(
+      makeRequest("http://localhost:3000/admin", COOKIE),
+      OPTIONS,
+    );
+
+    expect([res.status, tunnelled(res)]).toEqual([200, "opaque-session-token"]);
+  });
+
+  // CreateSession sets the cookie before any factor is verified: an abandoned
+  // sign-in must not open protected routes.
+  it("redirects an anonymous session on a protected route to login", async () => {
+    sessionsMe(Response.json({ session_id: "s1" }));
+
+    const res = await nextgenMiddleware(
+      makeRequest("http://localhost:3000/admin", COOKIE),
+      OPTIONS,
+    );
+
+    expect([res.status, res.headers.get("location")]).toEqual([
+      302,
+      "http://localhost:3000/login?next=%2Fadmin",
+    ]);
+  });
+
+  it("keeps an anonymous session's cookie, since its sign-in may still complete", async () => {
+    sessionsMe(Response.json({ session_id: "s1" }));
+
+    const res = await nextgenMiddleware(
+      makeRequest("http://localhost:3000/admin", COOKIE),
+      OPTIONS,
+    );
+
+    expect(cleared(res)).toEqual([]);
+  });
+
+  it("does not tunnel an anonymous session on a public page", async () => {
+    sessionsMe(Response.json({ session_id: "s1" }));
+
+    const res = await nextgenMiddleware(makeRequest("http://localhost:3000/", COOKIE), OPTIONS);
+
+    expect([res.status, tunnelled(res), cleared(res)]).toEqual([200, "", []]);
+  });
+
+  it("clears a dead session cookie on a public page", async () => {
+    sessionsMe(DEAD[0]?.[1]() ?? new Response());
+
+    const res = await nextgenMiddleware(makeRequest("http://localhost:3000/", COOKIE), OPTIONS);
+
+    expect(cleared(res)).toEqual(["__nextgen_session"]);
+  });
+
+  it.each(DEAD)("clears the cookie and redirects on a protected route for %s", async (_l, res) => {
+    sessionsMe(res());
+
+    const response = await nextgenMiddleware(
+      makeRequest("http://localhost:3000/admin", COOKIE),
+      OPTIONS,
+    );
+
+    expect([response.status, cleared(response)]).toEqual([302, ["__nextgen_session"]]);
+  });
+
+  // A backend outage is not a sign-out: the cookie must survive it.
+  it.each(OUTAGES)("keeps the cookie on a public page for %s", async (_l, fail) => {
+    vi.stubGlobal("fetch", vi.fn(fail));
+
+    const res = await nextgenMiddleware(makeRequest("http://localhost:3000/", COOKIE), OPTIONS);
+
+    expect([res.status, tunnelled(res), res.headers.getSetCookie()]).toEqual([200, "", []]);
+  });
+
+  it.each(OUTAGES)("tells auth() the session is unavailable for %s", async (_l, fail) => {
+    vi.stubGlobal("fetch", vi.fn(fail));
+
+    const res = await nextgenMiddleware(makeRequest("http://localhost:3000/", COOKIE), OPTIONS);
+
+    expect(res.headers.get("x-middleware-request-x-nextgen-auth-state")).toBe("unavailable");
+  });
+
+  it("does not report a dead session as unavailable", async () => {
+    sessionsMe(DEAD[0]?.[1]() ?? new Response());
+
+    const res = await nextgenMiddleware(makeRequest("http://localhost:3000/", COOKIE), OPTIONS);
+
+    expect(res.headers.get("x-middleware-request-x-nextgen-auth-state")).toBe("");
+  });
+
+  it("overwrites a client-sent auth state on a request without a session", async () => {
+    const res = await nextgenMiddleware(
+      new NextRequest("http://localhost:3000/", {
+        headers: { "x-nextgen-auth-state": "unavailable" },
+      }),
+      OPTIONS,
+    );
+
+    expect(res.headers.get("x-middleware-request-x-nextgen-auth-state")).toBe("");
+  });
+
+  it("asks the backend once for several requests during an outage", async () => {
+    const backend = vi.fn((): Promise<Response> => Promise.reject(new TypeError("fetch failed")));
+    vi.stubGlobal("fetch", backend);
+
+    for (let i = 0; i < 3; i++) {
+      await nextgenMiddleware(makeRequest("http://localhost:3000/", COOKIE), OPTIONS);
+    }
+
+    expect(backend).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(OUTAGES)("answers a protected route 503 for %s", async (_l, fail) => {
+    vi.stubGlobal("fetch", vi.fn(fail));
+
+    const res = await nextgenMiddleware(
+      makeRequest("http://localhost:3000/admin", COOKIE),
+      OPTIONS,
+    );
+
+    expect([res.status, res.headers.get("location"), res.headers.getSetCookie()]).toEqual([
+      503,
+      null,
+      [],
+    ]);
+  });
+
+  // Next percent-decodes cookies: `x%0Ay` reaches the middleware as a newline,
+  // which fetch refuses to send. It must not read as an outage.
+  it("clears a malformed session cookie on a protected route without asking the backend", async () => {
+    const backend = vi.fn(async () => Response.json({ session_id: "s1", user_id: "u1" }));
+    vi.stubGlobal("fetch", backend);
+
+    const res = await nextgenMiddleware(
+      makeRequest("http://localhost:3000/admin", "__nextgen_session=x%0Ay"),
+      OPTIONS,
+    );
+
+    expect([res.status, cleared(res), backend.mock.calls]).toEqual([
+      302,
+      ["__nextgen_session"],
+      [],
+    ]);
+  });
+
+  it("keeps signing in a live session after a malformed cookie and a 500", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: RequestInit) =>
+        new Headers(init.headers).get("cookie") === COOKIE
+          ? Response.json({ session_id: "s1", user_id: "u1" })
+          : new Response(null, { status: 500 }),
+      ),
+    );
+    for (const cookie of ["__nextgen_session=x%0Ay", "__nextgen_session=poison"]) {
+      await nextgenMiddleware(makeRequest("http://localhost:3000/admin", cookie), OPTIONS);
+    }
+
+    const res = await nextgenMiddleware(
+      makeRequest("http://localhost:3000/admin", COOKIE),
+      OPTIONS,
+    );
+
+    expect([res.status, tunnelled(res)]).toEqual([200, "opaque-session-token"]);
+  });
+});
+
+// A JWKS that cannot be fetched on a cold cache says nothing about a JWT.
+describe("JWT session during a JWKS outage", () => {
+  const OPTIONS = { url: "http://localhost:4000", protectedRoutes: ["/admin"] };
+
+  function jwtCookie(): string {
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    return `__nextgen_session=${makeJwt({ sub: "u1", iss: OPTIONS.url, exp }, nextKid())}`;
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(new TypeError("fetch failed"))),
+    );
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("answers a protected route 503 and keeps the cookie", async () => {
+    const res = await nextgenMiddleware(
+      makeRequest("http://localhost:3000/admin", jwtCookie()),
+      OPTIONS,
+    );
+
+    expect([res.status, res.headers.getSetCookie()]).toEqual([503, []]);
+  });
+
+  it("tells auth() the session is unavailable on a public route, keeping the cookie", async () => {
+    const res = await nextgenMiddleware(
+      makeRequest("http://localhost:3000/", jwtCookie()),
+      OPTIONS,
+    );
+
+    expect([
+      res.headers.get("x-middleware-request-x-nextgen-auth-state"),
+      res.headers.getSetCookie(),
+    ]).toEqual(["unavailable", []]);
+  });
+});
+
+describe("proxy upstream failure", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it.each(PROXY_FAILURES)("answers %s with %i", async (_l, status, code, fail) => {
+    vi.stubGlobal("fetch", vi.fn(fail));
+
+    const res = await nextgenMiddleware(makeRequest("http://localhost:3000/__nextgen/v1/flow"), {
+      url: "http://localhost:4000",
+    });
+
+    expect([res.status, await res.json()]).toEqual([status, { code, message: expect.any(String) }]);
+  });
+});
+
+// An app that reads its secret from a secrets manager at runtime passes it in.
+describe("project secret sources", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it.each([
+    ["the option", "sk_option", "sk_env", "Bearer sk_option"],
+    ["ZITADEL_PROJECT_SECRET", undefined, "sk_env", "Bearer sk_env"],
+    ["nothing", undefined, undefined, null],
+  ])("sends the exchange bearer from %s", async (_l, option, env, expected) => {
+    vi.stubEnv("ZITADEL_PROJECT_SECRET", env);
+    const upstream = vi.fn(async (_url: string, _init: RequestInit) =>
+      Response.json({ session_id: "s1" }),
+    );
+    vi.stubGlobal("fetch", upstream);
+
+    await nextgenMiddleware(
+      new NextRequest("http://localhost:3000/__nextgen/sessions/exchange", { method: "POST" }),
+      { url: "http://localhost:4000", projectSecret: option },
+    );
+
+    expect(new Headers(upstream.mock.calls[0]?.[1].headers).get("authorization")).toBe(expected);
+  });
+
+  it("passes the project secret through createProxy", async () => {
+    const upstream = vi.fn(async (_url: string, _init: RequestInit) =>
+      Response.json({ session_id: "s1" }),
+    );
+    vi.stubGlobal("fetch", upstream);
+    const proxy = createProxy(
+      { projectId: "p1", url: "http://localhost:4000", proxyPath: "/__nextgen" } as Parameters<
+        typeof createProxy
+      >[0],
+      { projectSecret: "sk_option" },
+    );
+
+    await proxy(
+      new NextRequest("http://localhost:3000/__nextgen/sessions/exchange", { method: "POST" }),
+    );
+
+    expect(new Headers(upstream.mock.calls[0]?.[1].headers).get("authorization")).toBe(
+      "Bearer sk_option",
+    );
+  });
+});
+
+describe("createProxy", () => {
+  // A bad loginPath must fail once at setup, not answer every request with a 500.
+  it.each(["https://evil.test/x", "//evil.test", "/\\evil.test", "/\t/evil.test"])(
+    "throws at setup on loginPath %j",
+    (loginPath) => {
+      expect(() =>
+        createProxy(
+          { url: "http://localhost:4000", proxyPath: "/__nextgen" } as Parameters<
+            typeof createProxy
+          >[0],
+          { loginPath },
+        ),
+      ).toThrow(/loginPath must be a relative path/);
+    },
+  );
+
+  // protectedRoutes may match the login page when the `matcher` keeps the
+  // middleware off it, which the SDK cannot see: such a setup must keep working.
+  it("serves a matched route when protectedRoutes also match the loginPath", async () => {
+    const proxy = createProxy(
+      { url: "http://localhost:4000", proxyPath: "/__nextgen" } as Parameters<
+        typeof createProxy
+      >[0],
+      { loginPath: "/login", protectedRoutes: ["/*"] },
+    );
+
+    const res = await proxy(makeRequest("http://localhost:3000/profile"));
+
+    expect([res.status, vi.mocked(console.warn).mock.calls]).toEqual([302, []]);
+  });
+});
+
+describe("nextgenMiddleware with protectedRoutes matching the loginPath", () => {
+  it("answers every request instead of throwing, and does not warn", async () => {
+    const options = { url: "http://localhost:4000", loginPath: "/login", protectedRoutes: ["/*"] };
+
+    const statuses = [];
+    for (let i = 0; i < 3; i++) {
+      statuses.push(
+        (await nextgenMiddleware(makeRequest("http://localhost:3000/a"), options)).status,
+      );
+    }
+
+    expect([statuses, vi.mocked(console.warn).mock.calls]).toEqual([[302, 302, 302], []]);
   });
 });

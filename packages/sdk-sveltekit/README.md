@@ -70,14 +70,30 @@ export {};
 
 ```ts
 import { getAuth } from '@zitadel/sdk-sveltekit/server';
-import { redirect } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
 
 export const load = (event) => {
   const auth = getAuth(event);
-  if (!auth.isAuthenticated) throw redirect(302, '/login');
+  if (!auth.isAuthenticated) {
+    // Zitadel could not be asked: an outage, not a sign-out.
+    if (auth.reason === 'unavailable') error(503, 'Try again shortly');
+    redirect(302, '/login');
+  }
   // Forward only client-safe fields to the page — never the raw token.
   return { identifier: auth.session.identifier };
 };
+```
+
+`getAuth(event)` carries the raw session token (`session.token`), which Zitadel
+sets as an HttpOnly cookie so no script can read it. Never return it from a
+`load`: SvelteKit sends load data to the browser. To hand the whole auth state
+to the page, return `getClientAuth(event)`, the same state without the token:
+
+```ts
+// src/routes/+layout.server.ts
+import { getClientAuth } from '@zitadel/sdk-sveltekit/server';
+
+export const load = (event) => ({ auth: getClientAuth(event) });
 ```
 
 `protectedRoutes` guards full page loads (a direct visit or a reload): the hook
@@ -94,12 +110,17 @@ before the page renders either way:
 
 ```ts
 // src/routes/profile/+page.server.ts
-import { redirect } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
 import { getAuth } from '@zitadel/sdk-sveltekit/server';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = (event) => {
-  if (!getAuth(event).isAuthenticated) throw redirect(303, '/login');
+  const auth = getAuth(event);
+  if (!auth.isAuthenticated) {
+    // Zitadel could not be asked: an outage, not a sign-out.
+    if (auth.reason === 'unavailable') error(503, 'Try again shortly');
+    redirect(303, '/login');
+  }
 };
 ```
 
@@ -169,20 +190,22 @@ work-email copy for a business audience.
 | `proxyPath`         | `string`             | `"/__nextgen"`       | Path prefix proxied to the auth backend                                                        |
 | `protectedRoutes`   | `string[]`           | `[]`                 | Paths requiring a valid session. Trailing `*` matches sub-paths                                |
 | `ignoredRoutes`     | `string[]`           | `[]`                 | Paths skipped entirely — no JWT check. Trailing `*` matches sub-paths                          |
-| `loginPath`         | `string`             | `"/login"`           | Where to redirect unauthenticated users                                                        |
+| `loginPath`         | `string`             | `"/login"`           | Where to redirect unauthenticated users. Setup fails if `protectedRoutes` matches it and `ignoredRoutes` does not                                                        |
 | `allowedAlgorithms` | `string[]`           | `["RS256", "ES256"]` | JWT `alg` values to accept. Other algorithms are rejected before JWKS is fetched               |
 | `allowedTokenTypes` | `string[]`           | `["JWT", "at+JWT"]`  | Accepted `typ` header values (case-insensitive). Set to `[]` to disable this check             |
 | `clockSkewMs`       | `number`             | `5000`               | Clock skew tolerance in ms for `exp`, `nbf`, `iat`                                              |
 | `jwksTimeoutMs`     | `number`             | `5000`               | Timeout in ms for JWKS endpoint requests                                                        |
-| `proxyTimeoutMs`    | `number`             | `5000`               | Timeout in ms for upstream proxy requests                                                       |
+| `proxyTimeoutMs`    | `number`             | `5000`               | Timeout in ms for upstream proxy requests. A request exceeding it is answered `504`; an unreachable backend `502`, both with a `{ code, message }` body |
 | `audience`          | `string \| string[]` | not validated        | Expected `aud` claim value(s). When omitted, audience is not checked                           |
+
+Only Zitadel's own answer that the session is gone, a `401` with the code `auth.unauthorized` or a `404` with `sess.not_found`, clears the session cookie. If the Zitadel server times out, is unreachable, answers `5xx`, or something in front of it (a gateway, a wrong `url`) answers a `401`/`404` page of its own, the cookie is kept: public pages render signed out with `getAuth()` reporting `reason: "unavailable"`, and a protected route is answered `503` with `retry-after`. Guard your own loaders the same way (see above). When Zitadel cannot be reached (a network error, a timeout, or a `502`, `503` or `504`), the SDK logs it once and does not ask again for 15 seconds, and while one check has gone a second without an answer, other requests do not wait for it, so a hanging server does not slow every request. Any other failure holds for that request only. A session cookie that cannot be a Zitadel token (characters a token never has, or far too long) is treated as signed out without asking Zitadel.
 
 ## How JWT verification works
 
 1. Bearer token from `Authorization` header is checked first; `__nextgen_session` cookie is the fallback
 2. Tokens with an `alg` not in `allowedAlgorithms` (`RS256`, `ES256` by default) are rejected before any JWKS fetch
 3. Tokens with a `typ` not in `allowedTokenTypes` are rejected immediately
-4. The public key is fetched from `{url}/auth/keys` (JWKS) via the Web Crypto API, cached for 5 minutes per `kid`
+4. The public key is fetched from `{url}/auth/keys` (JWKS) via the Web Crypto API. The issuer's whole JWKS document is cached for 5 minutes; a token naming a `kid` the cached document lacks refreshes it, at most once every 30 seconds
 5. The signature is verified **before** any claim checks
 6. `iss` must be present and must equal `url`
 7. `exp` must be present and in the future (with `clockSkewMs` tolerance); `nbf` and `iat` are validated when present

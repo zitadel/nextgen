@@ -2,28 +2,54 @@ export type {
   NextgenSession,
   AuthState,
   UnauthState,
+  UnauthReason,
   AuthResult,
   NextgenMiddlewareOptions,
+  ClientSession,
+  ClientAuthState,
+  ClientAuthResult,
 } from "./middleware.js";
 export {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
   matchesRoutes,
+  assertLoginPath,
+  warnIfLoginPathProtected,
+  toClientAuth,
+  isWellFormedSessionToken,
+  MAX_SESSION_TOKEN_LENGTH,
   filterResponseHeaders,
   requiresProjectSecret,
+  redactExchangeBody,
+  EXCHANGE_CREDENTIAL_FIELDS,
+  readSessionAnswer,
   validateOpaqueSessionToken,
+  SESSION_CHECK_BACKOFF_MS,
+  clearSessionCheckBackoff,
+  parseCookieHeader,
+  clearCookie,
+  sessionUnavailableResponse,
+  SESSION_UNAVAILABLE_RETRY_AFTER_S,
+  proxyFailureResponse,
 } from "./middleware.js";
-export type { OpaqueSession } from "./middleware.js";
+export type {
+  OpaqueSession,
+  OpaqueSessionCheck,
+  SessionAnswer,
+  LoginPathRoutes,
+} from "./middleware.js";
 export {
   verifyJwt,
+  checkJwt,
   decodeJwt,
   isJwtShaped,
   base64UrlDecode,
   JWKS_TTL_MS,
   JWKS_MIN_REFRESH_MS,
+  JWKS_FAILURE_BACKOFF_MS,
   clearJwksCache,
 } from "./jwt.js";
-export type { JwtPayload, JwtHeader, DecodedJwt, VerifyJwtOptions } from "./jwt.js";
+export type { JwtPayload, JwtHeader, DecodedJwt, VerifyJwtOptions, JwtCheck } from "./jwt.js";
 
 export type ZitadelEnvironment = "development" | "preview" | "production";
 

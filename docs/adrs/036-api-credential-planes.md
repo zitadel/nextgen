@@ -3,7 +3,9 @@
 > **Status:** Proposed
 > **Date:** 2026-07-17
 > **Amended:** 2026-08-03 — credential exposure contracts; server-originated
-> me-ops; SSR session validation at the render layer
+> me-ops; SSR session validation at the render layer. 2026-10-08 — one
+> publishable key per project; allow-all is the absence of a pattern.
+> 2026-10-14 — an unanswered session check is not a sign-out
 >
 > **Proposed amendment — [ADR 053 §5](053-cross-project-principals.md#5-first-party-human-sessions-may-call-the-operator-plane):**
 > if ADR 053 is accepted, the operator plane no longer always authenticates
@@ -175,7 +177,11 @@ browser-readable content.** OIDC access and refresh tokens keep their
 contracts in ADR 037. Wired enforcement today: `@zitadel/sdk-nuxt` strips the
 token before seeding its SSR payload; `@zitadel/sdk-next`'s `NextgenProvider`
 converts to the client-safe shape on the server and is `server-only`, so a
-client-side wrapper cannot move the boundary above the strip. A demo-next
+client-side wrapper cannot move the boundary above the strip. The handoff
+exchange's answer carries the session token in its body as well as in the
+cookie, so every SDK proxy relays it through sdk-core's `redactExchangeBody`,
+which drops `session_token` and keeps the status, the `Set-Cookie` and the
+other fields: the widget reads only the cookie. A demo-next
 e2e assertion additionally checks the raw token appears nowhere in a
 rendered response (PR #718) — today that lane is opt-in, not CI enforcement;
 promoting it into the CI-run e2e lane is remaining work below. Exposure
@@ -297,3 +303,71 @@ no environments ([ADR 068](068-project-is-the-data-boundary.md)), so:
   decide is withdrawn.
 
 Design: [origins](https://github.com/zitadel/nextgen/pull/1427) in the spike behind #1389.
+
+## Amendment (2026-10-14): an unanswered session check is not a sign-out
+
+The server-originated `getMySession` read above has three outcomes, not two,
+and every server SDK (`sdk-next`, `sdk-nuxt`, `sdk-sveltekit`,
+`sdk-solid-start`, `sdk-qwik-city`, `sdk-tanstack-start`) handles them through
+sdk-core's `validateOpaqueSessionToken`:
+
+- **Live**: a `2xx` whose body is the session JSON, which always names its
+  `session_id`. A session that names no user is live but anonymous: not signed
+  in, and its cookie stays.
+- **Dead**: the backend's own error envelope saying the token names no
+  session — `401` with `code: "auth.unauthorized"` or `404` with
+  `code: "sess.not_found"`. These are the only answers that sign out: the SDK
+  clears the `__nextgen*` cookies and a protected route redirects to the login
+  page. A `401` or `404` without that code (a gateway's HTML page, a wrong base
+  URL, a WAF) is not the backend speaking and counts as unknown, the same rule
+  the client `getSession()` already applies. A cookie value that cannot be a
+  token the backend minted (a compact JWE is base64url segments and dots; a
+  percent-decoded newline, a space, non-ASCII or an over-long value is not) is
+  dead without asking the backend, so attacker-chosen bytes never reach the
+  request and can never read as an outage.
+- **Unknown**: a network error, a timeout (`opaqueTokenTimeoutMs`), a `5xx`, an
+  unreadable body, a `200` that is not the session JSON, an unrecognised
+  `401`/`404`, or any other answer. The request is treated as signed out with
+  `reason: "unavailable"` on the auth result, so an app's own guard can answer
+  a retryable error instead of redirecting; the cookies stay; and a protected
+  route answers a retryable `503` instead of the login redirect. Clearing the
+  cookie here would sign every user out whenever the backend restarts or slows
+  down.
+
+An unknown outcome affects only the request that saw it, with one exception:
+a failure to reach the backend at all (a network error, a timeout, or a `502`,
+`503` or `504`) starts a per-backend backoff (`SESSION_CHECK_BACKOFF_MS`,
+15 seconds, longer than the default timeout). It is logged once, and for the
+window every session check against that backend answers unknown without asking
+it. A slow answer within `opaqueTokenTimeoutMs` is an answer, not an outage:
+every request waits for its own, because failing fast on elapsed time alone
+would turn a cold start or a busy database into `503`s for every signed-in
+user while the backend is healthy. So a hanging backend is probed by the
+requests that arrive before its first check times out, then not again for the
+window; a protected route's `503` carries the seconds left in it as
+`retry-after`. Any other unknown answer, a `500` included, never starts
+the backoff, because a request can provoke it with its own token: if it did,
+one anonymous request per window would make every signed-in user's session
+unavailable. Those answers are logged at most once per window. The backoff is
+per process or isolate (each serverless instance, edge
+isolate and worker has its own, and so do Next.js's edge middleware and its
+Node `auth()`).
+
+The guarantee is therefore exactly as strong as the backend's answers: the SDK
+signs a user out only when the backend reports the session dead. A backend that
+reports an internal failure as `401 auth.unauthorized` (for example, a session
+check whose token-record read fails while the database is down) still signs
+users out. [#1815](https://github.com/zitadel/nextgen/pull/1815) makes the
+backend answer such failures with a `5xx` instead (`introspectionFailure` in
+`internal/api/security.go`). A `5xx` must never be something a request can
+provoke with input it chooses, such as a malformed token header that reaches
+the database; that is why the SDKs back off only on unreachability, not on a
+`500`, and why the backend must reject such tokens as `401` before any lookup.
+
+The same rule covers the proxy and the JWKS: a proxied call the backend does
+not answer is a `502` (unreachable) or `504` (`proxyTimeoutMs`) with an
+`{ code, message }` body. A failed JWKS refresh (a `5xx` included) keeps
+verifying against the keys already cached; with no keys cached, a JWT cannot be
+checked and is unknown (`reason: "unavailable"`, cookie kept, a protected route
+`503`), never a sign-out. Either way the failure is logged once and the JWKS is
+not fetched again for `JWKS_FAILURE_BACKOFF_MS`.

@@ -1,13 +1,17 @@
 import "server-only";
 
-import type { GetMySession200 } from "@zitadel/api/generated/model";
-
+import { toClientAuth, validateOpaqueSessionToken } from "@zitadel/sdk-core/middleware";
 import { headers } from "next/headers";
 import { cache } from "react";
 
-import type { AuthResult, ClientSession, NextgenMiddlewareOptions } from "./types.js";
+import type {
+  AuthResult,
+  ClientAuthResult,
+  ClientSession,
+  NextgenMiddlewareOptions,
+} from "./types.js";
 
-import { isJwtShaped, verifyJwt } from "./lib/jwt.js";
+import { checkJwt, isJwtShaped } from "./lib/jwt.js";
 
 /**
  * Options for {@link auth}.
@@ -31,62 +35,42 @@ export type AuthOptions = Pick<
 
 /**
  * Validates an opaque (non-JWT) session token against the backend's
- * `GET /sessions/me` and returns the client-safe identity, or `null` when the
+ * `GET /sessions/me` (sdk-core's {@link validateOpaqueSessionToken}, shared by
+ * every server SDK) and returns the client-safe identity, or `null` when the
  * backend does not confirm a signed-in user.
  *
  * Wrapped in React's `cache()` so that many components calling `auth()` in
  * the same render pass share a single backend round-trip. Arguments are
  * primitives on purpose — `cache()` memoises by argument identity.
  *
- * Fail-closed: network errors, timeouts, and unexpected statuses all resolve
- * to `null` (signed out). Unexpected failures are logged so a broken proxy or
- * unreachable backend is distinguishable from a genuinely missing session.
+ * Fail-closed: a dead session (401/404) and an anonymous one (no user yet) are
+ * signed out. So is a backend that cannot answer — a network error, a timeout
+ * or a 5xx — which sdk-core logs, so a broken proxy or unreachable backend is
+ * distinguishable from a genuinely missing session; that outcome is returned
+ * as `"unavailable"` so `auth()` can say so. `auth()` never clears the cookie,
+ * so the session survives the outage.
  */
 const validateOpaqueSession = cache(
-  async (token: string, issuerUrl: string, timeoutMs: number): Promise<ClientSession | null> => {
-    try {
-      const res = await fetch(`${issuerUrl}/sessions/me`, {
-        method: "GET",
-        headers: { accept: "application/json", cookie: `__nextgen_session=${token}` },
-        signal: AbortSignal.timeout(timeoutMs),
-      });
-
-      // 401 = no/invalid session token, 404 = session gone (revoked/expired):
-      // both are the server's definitive "not signed in".
-      if (res.status === 401 || res.status === 404) {
-        return null;
-      }
-
-      if (!res.ok) {
-        console.warn(
-          `[nextgen] auth(): session validation failed with HTTP ${res.status} from ` +
-            `${issuerUrl}/sessions/me — treating as signed out. If this persists, the ` +
-            `backend URL is likely misconfigured (ZITADEL_URL or the \`url\` option).`,
-        );
-        return null;
-      }
-
-      const session = (await res.json()) as GetMySession200;
-
-      // An anonymous session (no verified user factor yet) has no user_id —
-      // for server-rendered UI that is "not signed in".
-      if (!session.user_id) {
-        return null;
-      }
-
-      return {
-        userId: session.user_id,
-        identifier: session.user?.identifier ?? null,
-        identifierProperty: session.user?.identifier_property ?? null,
-        display: session.user?.display ?? null,
-      };
-    } catch {
-      console.warn(
-        `[nextgen] auth(): could not reach ${issuerUrl}/sessions/me to validate the ` +
-          `session token — treating as signed out.`,
-      );
+  async (
+    token: string,
+    issuerUrl: string,
+    timeoutMs: number,
+  ): Promise<ClientSession | "unavailable" | null> => {
+    const check = await validateOpaqueSessionToken(token, issuerUrl, timeoutMs);
+    if (check.status === "unknown") {
+      return "unavailable";
+    }
+    // An anonymous session (no verified user factor yet) has no user id —
+    // for server-rendered UI that is "not signed in".
+    if (check.status === "dead" || !check.session.userId) {
       return null;
     }
+    return {
+      userId: check.session.userId,
+      identifier: check.session.identifier,
+      identifierProperty: check.session.identifierProperty,
+      display: check.session.display,
+    };
   },
 );
 
@@ -103,13 +87,22 @@ const validateOpaqueSession = cache(
  *   not add a backend round-trip after the first call.
  * - **Opaque encrypted tokens** are validated against the backend's
  *   `GET /sessions/me`, which also supplies the user's identity (`userId`,
- *   `email`, `name`). The lookup is deduplicated per render pass via React
- *   `cache()`.
+ *   `identifier`, `display`). The lookup is deduplicated per render pass via
+ *   React `cache()`.
  *
- * The header alone is never proof of anything: on routes the middleware
- * `matcher` does not cover, the middleware cannot neutralise a forged
- * client-supplied header, so `auth()` re-verifies every value it reads.
- * A header value that fails verification is treated as signed out.
+ * The token header alone is never proof of a session: on routes the
+ * middleware `matcher` does not cover, the middleware cannot neutralise a
+ * forged client-supplied header, so `auth()` re-verifies every token it reads.
+ * A token that fails verification is treated as signed out.
+ *
+ * The state header (`x-nextgen-auth-state`), by which the middleware reports a
+ * session it could not check, is trusted only on routes the middleware covers,
+ * where it always overwrites it. On a route outside the `matcher`, a client can
+ * send `x-nextgen-auth-state: unavailable` itself and `auth()` then reports
+ * `reason: "unavailable"` for that request. That can only make the sender's own
+ * request look like an outage (a `503` from your guard, without the
+ * middleware's warning in the log); it never signs anyone in. Cover every route
+ * that calls `auth()` with the `matcher` to rule it out.
  *
  * **Matcher precondition (read this):** the middleware only tunnels the
  * session token on routes covered by its `matcher`. On uncovered routes the
@@ -134,10 +127,18 @@ const validateOpaqueSession = cache(
  *
  * export default async function Page() {
  *   const session = await auth();
- *   if (!session.isAuthenticated) return <p>Not signed in</p>;
+ *   if (!session.isAuthenticated) {
+ *     // The session could not be checked: an outage, not a sign-out.
+ *     if (session.reason === "unavailable") return <p>Try again shortly</p>;
+ *     return <p>Not signed in</p>;
+ *   }
  *   return <p>Hello {session.session.userId}</p>;
  * }
  * ```
+ *
+ * When the backend cannot be asked (unreachable, too slow or failing), the
+ * result is `{ isAuthenticated: false, reason: "unavailable" }` and the cookie
+ * is kept: answer a retryable error rather than redirecting to the login page.
  *
  * @param options - Optional verification settings; see {@link AuthOptions}.
  * @returns The current {@link AuthResult}. `session.token` is the raw session
@@ -149,7 +150,11 @@ export async function auth(options: AuthOptions = {}): Promise<AuthResult> {
   const token = headerStore.get("x-nextgen-auth-token");
 
   if (!token) {
-    return { isAuthenticated: false, session: null };
+    // The middleware could not check the session (the backend is unreachable,
+    // slow or failing); it kept the cookie and says so on this header.
+    return headerStore.get("x-nextgen-auth-state") === "unavailable"
+      ? { isAuthenticated: false, session: null, reason: "unavailable" }
+      : { isAuthenticated: false, session: null };
   }
 
   const {
@@ -163,7 +168,7 @@ export async function auth(options: AuthOptions = {}): Promise<AuthResult> {
   } = options;
 
   if (isJwtShaped(token)) {
-    const payload = await verifyJwt(token, {
+    const jwt = await checkJwt(token, {
       issuerUrl: url,
       allowedAlgorithms,
       clockSkewMs,
@@ -171,6 +176,12 @@ export async function auth(options: AuthOptions = {}): Promise<AuthResult> {
       allowedTokenTypes,
       jwksTimeoutMs,
     });
+    if (jwt.status === "unavailable") {
+      // This runtime cannot fetch the JWKS and has no keys cached: the token
+      // may well be good, so this is an outage, not a sign-out.
+      return { isAuthenticated: false, session: null, reason: "unavailable" };
+    }
+    const payload = jwt.status === "valid" ? jwt.payload : null;
 
     if (payload?.sub) {
       return {
@@ -201,9 +212,35 @@ export async function auth(options: AuthOptions = {}): Promise<AuthResult> {
   }
 
   const session = await validateOpaqueSession(token, url, opaqueTokenTimeoutMs);
+  if (session === "unavailable") {
+    return { isAuthenticated: false, session: null, reason: "unavailable" };
+  }
   if (session) {
     return { isAuthenticated: true, session: { ...session, token } };
   }
 
   return { isAuthenticated: false, session: null };
+}
+
+/**
+ * The auth state of {@link auth} without the session token: safe to return
+ * from a server action or to pass as a prop to a client component, both of
+ * which Next.js serialises to the browser. The backend sets the token as an
+ * HttpOnly cookie, and returning it would hand it to any script on the page.
+ *
+ * ```ts
+ * "use server";
+ * import { getClientAuth } from "@zitadel/sdk-next/server";
+ *
+ * export async function whoAmI() {
+ *   return getClientAuth();
+ * }
+ * ```
+ *
+ * @param options - Optional verification settings; see {@link AuthOptions}.
+ * @returns The current {@link ClientAuthResult}, with `reason` when the session
+ *   could not be checked.
+ */
+export async function getClientAuth(options: AuthOptions = {}): Promise<ClientAuthResult> {
+  return toClientAuth(await auth(options));
 }

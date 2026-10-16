@@ -73,7 +73,7 @@ const auth = useAuth();
 </template>
 ```
 
-The returned state intentionally omits the raw JWT — use `getAuth(event)` in
+The returned state intentionally omits the raw session token — use `getAuth(event)` in
 a server route when you need the token to call upstream APIs:
 
 ```ts
@@ -81,10 +81,19 @@ import { getAuth } from '@zitadel/sdk-nuxt/server';
 
 export default defineEventHandler((event) => {
   const auth = getAuth(event);
-  if (!auth.isAuthenticated) throw createError({ statusCode: 401 });
+  if (!auth.isAuthenticated) {
+    // Zitadel could not be asked: an outage, not a sign-out.
+    if (auth.reason === 'unavailable') throw createError({ statusCode: 503 });
+    throw createError({ statusCode: 401 });
+  }
   return { userId: auth.session.userId };
 });
 ```
+
+Never return `getAuth(event)` itself from a route the browser calls: it carries
+the session token, which Zitadel sets as an HttpOnly cookie so no script can
+read it. Return `getClientAuth(event)` instead, the same state without the
+token.
 
 ### Login page
 
@@ -188,13 +197,14 @@ Both surfaces take these options: the module under `nextgen` in
 | `proxyPath`         | `string`             | `"/__nextgen"`           | Path prefix proxied to the auth backend. Sign-in with an external provider currently requires the default: the provider returns to `/__nextgen/idp/{slug}/callback` |
 | `protectedRoutes`   | `string[]`           | `[]`                     | Paths requiring a valid session. Trailing `*` matches sub-paths                                                            |
 | `ignoredRoutes`     | `string[]`           | `[]`                     | Paths skipped entirely — no JWT check, no tunnelling. Useful for webhooks or health checks. Trailing `*` matches sub-paths |
-| `loginPath`         | `string`             | `"/login"`               | Where to redirect unauthenticated users                                                                                    |
+| `loginPath`         | `string`             | `"/login"`               | Where to redirect unauthenticated users. Setup fails if `protectedRoutes` matches it and `ignoredRoutes` does not                                                                                    |
 | `allowedAlgorithms` | `string[]`           | `["RS256", "ES256"]`     | JWT `alg` values to accept. Tokens with any other algorithm are rejected before JWKS is fetched                            |
 | `allowedTokenTypes` | `string[]`           | `["JWT", "at+JWT"]`      | Accepted `typ` header values (case-insensitive). Set to `[]` to disable this check                                         |
 | `clockSkewMs`       | `number`             | `5000`                   | Clock skew tolerance in ms for `exp`, `nbf`, `iat`                                                                         |
 | `jwksTimeoutMs`     | `number`             | `5000`                   | Timeout in ms for JWKS endpoint requests. Token is rejected if the fetch exceeds this window                               |
-| `opaqueTokenTimeoutMs` | `number`          | `5000`                   | Timeout in ms for opaque (non-JWT) session validation via `GET /sessions/me`                                               |
-| `proxyTimeoutMs`    | `number`             | `5000`                   | Timeout in ms for upstream proxy requests; requests exceeding it abort with a network error                                |
+| `opaqueTokenTimeoutMs` | `number`          | `5000`                   | Timeout in ms for opaque (non-JWT) session validation via `GET /sessions/me`. Only Zitadel's `401 auth.unauthorized` or `404 sess.not_found` clears the cookie; a timeout, network error, `5xx` or a gateway's `401`/`404` keeps it, reports `reason: "unavailable"` and answers a protected route `503` |
+| `proxyTimeoutMs`    | `number`             | `5000`                   | Timeout in ms for upstream proxy requests. A request exceeding it is answered `504`; an unreachable backend `502`, both with a `{ code, message }` body |
+| `projectSecret`     | `string`             | `runtimeConfig.nextgen.projectSecret`, else `ZITADEL_PROJECT_SECRET` env | Project secret, sent as the bearer on the `POST /sessions/exchange` handoff only (server-only). Middleware argument only: the module reads `ZITADEL_PROJECT_SECRET` itself (see the table above), never from `nuxt.config.ts` |
 | `audience`          | `string \| string[]` | not validated            | Expected `aud` claim value(s). When omitted, audience is not checked                                                       |
 
 ## How JWT verification works

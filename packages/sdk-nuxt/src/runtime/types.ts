@@ -8,11 +8,12 @@ export type {
   NextgenSession,
   AuthState,
   UnauthState,
+  UnauthReason,
   AuthResult,
   NextgenMiddlewareOptions,
   // Client-safe auth shapes (token intentionally absent — it must not be
   // serialised into the Nuxt SSR payload where third-party scripts can read
-  // it; use getAuth server-side when the raw JWT is needed). Defined in
+  // it; use getAuth server-side when the raw token is needed). Defined in
   // sdk-core so sdk-next's getSession() returns the identical shape.
   ClientSession,
   ClientAuthState,

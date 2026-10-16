@@ -1,4 +1,9 @@
-export { handleNextgenRequest, createNextgenRequestMiddleware, getAuth } from "./server.js";
+export {
+  handleNextgenRequest,
+  createNextgenRequestMiddleware,
+  getAuth,
+  getClientAuth,
+} from "./server.js";
 export type {
   NextgenRequestDecision,
   NextgenRequestOptions,
@@ -10,5 +15,10 @@ export type {
   NextgenMiddlewareOptions,
   AuthResult,
   NextgenSession,
+  AuthState,
+  UnauthState,
+  UnauthReason,
+  ClientSession,
+  ClientAuthState,
   ClientAuthResult,
 } from "./types.js";

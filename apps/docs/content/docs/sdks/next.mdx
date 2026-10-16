@@ -94,7 +94,11 @@ import { auth } from "@zitadel/sdk-next";
 
 export default async function Page() {
   const session = await auth();
-  if (!session.isAuthenticated) return <p>Not signed in</p>;
+  if (!session.isAuthenticated) {
+    // Zitadel could not be asked: an outage, not a sign-out.
+    if (session.reason === "unavailable") return <p>Try again shortly</p>;
+    return <p>Not signed in</p>;
+  }
 
   const { display, identifier, userId } = session.session;
   return <p>Hello {display ?? identifier ?? userId}</p>;

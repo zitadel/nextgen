@@ -1,16 +1,27 @@
 import type { RequestEvent } from "@sveltejs/kit";
-import type { AuthResult, NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
+import type {
+  AuthResult,
+  ClientAuthResult,
+  NextgenMiddlewareOptions,
+} from "@zitadel/sdk-core/middleware";
 
 import {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
+  assertLoginPath,
+  clearCookie,
   filterResponseHeaders,
   matchesRoutes,
+  proxyFailureResponse,
+  redactExchangeBody,
   requiresProjectSecret,
+  sessionUnavailableResponse,
+  toClientAuth,
   validateOpaqueSessionToken,
+  warnIfLoginPathProtected,
 } from "@zitadel/sdk-core/middleware";
 
-import { verifyJwt, base64UrlDecode } from "./lib/jwt";
+import { checkJwt, isJwtShaped } from "./lib/jwt";
 
 /**
  * `process` is undefined in some edge/serverless runtimes; read env defensively
@@ -141,13 +152,20 @@ async function proxyRequest(
     upstreamHeaders.set("authorization", `Bearer ${projectSecret}`);
   }
 
-  const upstream = await fetch(target, {
-    method,
-    headers: upstreamHeaders,
-    body,
-    redirect: "manual",
-    signal: AbortSignal.timeout(proxyTimeoutMs),
-  });
+  let upstream: Response;
+  try {
+    upstream = await fetch(target, {
+      method,
+      headers: upstreamHeaders,
+      body,
+      redirect: "manual",
+      signal: AbortSignal.timeout(proxyTimeoutMs),
+    });
+  } catch (error) {
+    // The backend is down or too slow: a 502/504 in the API's error envelope,
+    // not the framework's HTML 500 page.
+    return proxyFailureResponse(error);
+  }
 
   // The app's own request URL: the origin a proxied redirect may name, and the
   // base a relative one resolves against (the IdP callback's 303 needs it).
@@ -158,38 +176,13 @@ async function proxyRequest(
     responseHeaders.append("set-cookie", cookie);
   }
 
-  return new Response(upstream.body, {
+  // The exchange's answer echoes the HttpOnly session token; the browser
+  // gets the cookie, never the token in a script-readable body (ADR 036).
+  const browserBody = await redactExchangeBody(method, suffix, upstream, responseHeaders);
+  return new Response(browserBody, {
     status: upstream.status,
     headers: responseHeaders,
   });
-}
-
-const DECODER = new TextDecoder();
-
-/**
- * Returns `true` when `token` looks structurally like a signed JWT (JWS) —
- * NOT an encrypted token (JWE).
- *
- * JWS compact: 3 dot-separated segments; header has `alg` but NOT `enc`.
- * JWE compact: 5 dot-separated segments; header has BOTH `alg` and `enc`.
- *
- * Our backend issues JWE tokens (AES-256-GCM via go-jose `A256GCMKW/A256GCM`),
- * whose compact form is `header.encrypted_key.iv.ciphertext.tag`. The header
- * decodes to JSON with `"alg":"A256GCMKW","enc":"A256GCM"`. Checking for the
- * absence of `enc` correctly identifies signed JWTs without false-positives on
- * JWE tokens.
- *
- * This is a structural check only — not a security check.
- */
-function isJwtShaped(token: string): boolean {
-  const parts = token.split(".");
-  if (parts.length < 3 || !parts[0]) return false;
-  try {
-    const header = JSON.parse(DECODER.decode(base64UrlDecode(parts[0]))) as Record<string, unknown>;
-    return typeof header?.alg === "string" && !("enc" in header);
-  } catch {
-    return false;
-  }
 }
 
 /**
@@ -209,19 +202,11 @@ interface AuthHandlerOptions {
 }
 
 /**
- * Builds a `Set-Cookie` header value that clears `name` on the root path.
- * Used to evict stale `__nextgen*` cookies when a session token is present
- * but no longer valid.
- */
-function clearCookie(name: string): string {
-  return `${name}=; Path=/; Max-Age=0`;
-}
-
-/**
  * Verifies the session token, writes the auth result to `event.locals`, and
  * either continues the request (`resolve`) or redirects to the login page on a
  * protected route with no valid session. Stale `__nextgen*` cookies are cleared
- * when the token is present but invalid.
+ * when the backend says the token is dead; when the backend cannot be asked,
+ * they stay and a protected route answers `503`.
  *
  * @param event   - The current SvelteKit request event.
  * @param resolve - The downstream resolver from the `handle` hook.
@@ -266,8 +251,8 @@ async function handleAuth(
   // cookies; when both are present the caller clearly intended the Bearer token.
   const token = bearerToken ?? cookieToken;
 
-  const payload = token
-    ? await verifyJwt(token, {
+  const jwt = token
+    ? await checkJwt(token, {
         issuerUrl: url,
         allowedAlgorithms,
         clockSkewMs,
@@ -276,6 +261,7 @@ async function handleAuth(
         jwksTimeoutMs,
       })
     : null;
+  const payload = jwt?.status === "valid" ? jwt.payload : null;
 
   if (payload && token && payload.sub) {
     event.locals.nextgenAuth = {
@@ -295,32 +281,45 @@ async function handleAuth(
   // Only fall back to /sessions/me validation when the token is definitively
   // not a JWT (non-JSON segments). A token with a valid JWT structure that
   // failed verification (bad sig, wrong typ/alg) must be rejected.
-  let liveAnonymousSession = false;
+  // A JWT whose keys cannot be fetched (the JWKS is down and nothing is
+  // cached) may well be good: an outage, not a sign-out.
+  let unavailable = jwt?.status === "unavailable";
+  let keepCookies = false;
   if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
-    const opaque = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
-    // A session without a user is anonymous: its sign-in has not verified a
-    // factor yet. It is not signed in, but it is live — keep its cookie.
-    if (opaque?.userId) {
+    const check = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
+    if (check.status === "live" && check.session.userId) {
       event.locals.nextgenAuth = {
         isAuthenticated: true,
         session: {
-          userId: opaque.userId,
-          identifier: opaque.identifier,
-          identifierProperty: opaque.identifierProperty,
-          display: opaque.display,
+          userId: check.session.userId,
+          identifier: check.session.identifier,
+          identifierProperty: check.session.identifierProperty,
+          display: check.session.display,
           token: cookieToken,
         },
       };
       return resolve(event);
     }
-    liveAnonymousSession = opaque !== null;
+    // A session without a user is anonymous: its sign-in has not verified a
+    // factor yet. It is not signed in, but it is live — keep its cookie.
+    keepCookies = check.status === "live";
+    unavailable ||= check.status === "unknown";
+  }
+  if (unavailable) {
+    // The backend could not be asked. The session may be live, so its cookie
+    // survives the outage; a protected route is retryable, not a sign-in.
+    event.locals.nextgenAuth = { isAuthenticated: false, session: null, reason: "unavailable" };
+    if (matchesRoutes(pathname, protectedRoutes)) {
+      return sessionUnavailableResponse(url);
+    }
+    return resolve(event);
   }
 
   event.locals.nextgenAuth = { isAuthenticated: false, session: null };
 
   // Dead credentials are cleared so the browser stops replaying them; a live
   // anonymous session's cookie stays, since its sign-in may still complete.
-  const staleCookies = liveAnonymousSession
+  const staleCookies = keepCookies
     ? []
     : event.cookies
         .getAll()
@@ -393,16 +392,9 @@ export function createNextgenHandle(
     projectSecret = PROCESS_ENV.ZITADEL_PROJECT_SECRET,
   } = options;
 
-  // Guard against open-redirect: loginPath must be a relative path. An absolute
-  // URL (e.g. "https://evil.com/phish") or a protocol-relative URL
-  // (e.g. "//evil.com") would redirect the browser to an external host.
-  if (!loginPath.startsWith("/") || loginPath.startsWith("//")) {
-    throw new Error(
-      `[nextgen] loginPath must be a relative path starting with a single "/". ` +
-        `Received: "${loginPath}". Using an absolute or protocol-relative URL ` +
-        `would allow open-redirect attacks.`,
-    );
-  }
+  // Guard against open-redirect: loginPath must be a path on this app.
+  assertLoginPath(loginPath);
+  warnIfLoginPathProtected(loginPath, { protectedRoutes, ignoredRoutes });
 
   return async ({ event, resolve }) => {
     const { pathname } = event.url;
@@ -444,7 +436,11 @@ export function createNextgenHandle(
  *
  * export const load = (event) => {
  *   const auth = getAuth(event);
- *   if (!auth.isAuthenticated) throw redirect(302, "/login");
+ *   if (!auth.isAuthenticated) {
+ *     // Zitadel could not be asked: an outage, not a sign-out.
+ *     if (auth.reason === "unavailable") error(503, "Try again shortly");
+ *     redirect(302, "/login");
+ *   }
  *   return { userId: auth.session.userId };
  * };
  * ```
@@ -454,4 +450,23 @@ export function createNextgenHandle(
  */
 export function getAuth(event: RequestEvent): AuthResult {
   return event.locals.nextgenAuth ?? { isAuthenticated: false, session: null };
+}
+
+/**
+ * The auth state of {@link getAuth} without the session token: safe to return
+ * from a `load` function, whose data SvelteKit serialises into the page. The
+ * backend sets the token as an HttpOnly cookie; returning {@link getAuth}'s
+ * result would hand it to any script on the page.
+ *
+ * ```ts
+ * // src/routes/+layout.server.ts
+ * export const load = (event) => ({ auth: getClientAuth(event) });
+ * ```
+ *
+ * @param event - The current SvelteKit request event.
+ * @returns The current {@link ClientAuthResult}, with `reason` when the
+ *   session could not be checked.
+ */
+export function getClientAuth(event: RequestEvent): ClientAuthResult {
+  return toClientAuth(getAuth(event));
 }

@@ -9,17 +9,33 @@
 
 import { generateKeyPairSync, createSign } from "node:crypto";
 import type { createMiddleware } from "@solidjs/start/middleware";
-import { describe, it, expect, expectTypeOf, vi, beforeEach } from "vitest";
+import { describe, it, expect, expectTypeOf, vi, beforeEach, afterEach } from "vitest";
 
 import type { SolidFetchEvent } from "../middleware";
 
-import { createNextgenMiddleware } from "../middleware";
+import { createNextgenMiddleware, getClientAuth } from "../middleware";
 import { clearJwksCache } from "@zitadel/sdk-core/jwt";
+import { clearSessionCheckBackoff } from "@zitadel/sdk-core/middleware";
+import {
+  DEAD,
+  JWE_SESSION_TOKEN,
+  OFF_ORIGIN_LOCATIONS,
+  OUTAGES,
+  PROXY_FAILURES,
+  exchangeAnswer,
+} from "./outages";
 
-// The JWKS cache is module-level and per issuer: start every case from a cold
-// cache, so each one fetches the keys its own mock publishes.
+// The JWKS cache and the session-check backoff are module-level and per
+// issuer: start every case cold, so each one asks its own mock, and keep the
+// expected outage warnings out of the output.
 beforeEach(() => {
   clearJwksCache();
+  clearSessionCheckBackoff();
+  vi.spyOn(console, "warn").mockImplementation(() => undefined);
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 function base64url(buf: Buffer): string {
@@ -259,11 +275,48 @@ describe("createNextgenMiddleware (SolidStart)", () => {
   });
 
   describe("loginPath validation", () => {
+    // A visitor without a session would be redirected from /login to /login forever.
+    it("warns at setup when protectedRoutes match the loginPath", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+      createNextgenMiddleware({
+        url: "http://localhost:4000",
+        loginPath: "/solid-login",
+        protectedRoutes: ["/*"],
+      });
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('loginPath "/solid-login" is matched by protectedRoutes'),
+      );
+    });
+
+    it("does not warn when ignoredRoutes exempt the loginPath from protectedRoutes", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+      createNextgenMiddleware({
+        url: "http://localhost:4000",
+        loginPath: "/login",
+        protectedRoutes: ["/*"],
+        ignoredRoutes: ["/login"],
+      });
+
+      expect(warn).not.toHaveBeenCalled();
+    });
+
     it("throws on an absolute loginPath", () => {
       expect(() =>
         createNextgenMiddleware({ url: "http://localhost:4000", loginPath: "https://evil.test/x" }),
       ).toThrow(/loginPath must be a relative path/i);
     });
+
+    it.each(["/\\evil.test/x", "/\t/evil.test/x"])(
+      "throws on loginPath %j, which a URL parser reads as another host",
+      (loginPath) => {
+        expect(() => createNextgenMiddleware({ url: "http://localhost:4000", loginPath })).toThrow(
+          /loginPath must be a relative path/i,
+        );
+      },
+    );
 
     it("throws on a protocol-relative loginPath", () => {
       expect(() =>
@@ -326,6 +379,50 @@ describe("createNextgenMiddleware (SolidStart)", () => {
       );
 
       expect(res?.headers.get("location")).toBe(expected);
+    });
+
+    it.each(OFF_ORIGIN_LOCATIONS)("keeps %s on this app", async (location) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(null, { status: 303, headers: { location } })),
+      );
+
+      const res = await onRequest(
+        createNextgenMiddleware({ url: "http://localhost:4000" }),
+        makeEvent("http://localhost:3000/__nextgen/idp/callback?code=x"),
+      );
+
+      expect(new URL(res?.headers.get("location") ?? "", "http://unset.invalid").hostname).toBe(
+        "localhost",
+      );
+    });
+
+    it("keeps the session token out of the exchange body the browser reads", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => exchangeAnswer()),
+      );
+
+      const res = await onRequest(
+        createNextgenMiddleware({ url: "http://localhost:4000" }),
+        makeEvent("http://localhost:3000/__nextgen/sessions/exchange", { method: "POST" }),
+      );
+
+      expect(await res?.text()).not.toContain(JWE_SESSION_TOKEN);
+    });
+
+    it("still sets the session cookie from the exchange", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => exchangeAnswer()),
+      );
+
+      const res = await onRequest(
+        createNextgenMiddleware({ url: "http://localhost:4000" }),
+        makeEvent("http://localhost:3000/__nextgen/sessions/exchange", { method: "POST" }),
+      );
+
+      expect(res?.headers.getSetCookie()).toEqual(exchangeAnswer().headers.getSetCookie());
     });
 
     function captureUpstreamHeaders(): () => Headers | undefined {
@@ -476,9 +573,41 @@ describe("opaque session cookie", () => {
     });
   }
 
+  it("checks a cookie shaped like the backend's own with the backend, not the JWKS", async () => {
+    const backend = vi.fn(async (_url: string) =>
+      Response.json({ session_id: "s1", user_id: "u1" }),
+    );
+    vi.stubGlobal("fetch", backend);
+    const event = makeEvent("http://localhost:3000/admin", {
+      cookie: `__nextgen_session=${JWE_SESSION_TOKEN}`,
+    });
+
+    await onRequest(protectedMiddleware(), event);
+
+    expect([
+      event.locals.nextgenAuth?.isAuthenticated,
+      backend.mock.calls.map(([url]) => String(url)),
+    ]).toEqual([true, ["http://localhost:4000/sessions/me"]]);
+  });
+
+  it("asks a client to retry a protected route when the backoff ends", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(new TypeError("fetch failed"))),
+    );
+
+    const res = await onRequest(
+      protectedMiddleware(),
+      makeEvent("http://localhost:3000/admin", { cookie: COOKIE }),
+    );
+
+    expect(res?.headers.get("retry-after")).toBe("15");
+  });
+
   it("signs in a live session that names a user, with the user's details", async () => {
     sessionsMe(
       Response.json({
+        session_id: "s1",
         user_id: "u1",
         user: { identifier: "ada@example.com", identifier_property: "email", display: "Ada" },
       }),
@@ -496,7 +625,7 @@ describe("opaque session cookie", () => {
   // CreateSession sets the cookie before any factor is verified: an abandoned
   // sign-in must not open protected routes.
   it("redirects an anonymous session on a protected route to login", async () => {
-    sessionsMe(Response.json({}));
+    sessionsMe(Response.json({ session_id: "s1" }));
 
     const res = await onRequest(
       protectedMiddleware(),
@@ -507,7 +636,7 @@ describe("opaque session cookie", () => {
   });
 
   it("keeps an anonymous session's cookie, since its sign-in may still complete", async () => {
-    sessionsMe(Response.json({}));
+    sessionsMe(Response.json({ session_id: "s1" }));
 
     const res = await onRequest(
       protectedMiddleware(),
@@ -518,7 +647,7 @@ describe("opaque session cookie", () => {
   });
 
   it("clears a dead session cookie on a public page", async () => {
-    sessionsMe(new Response(null, { status: 401 }));
+    sessionsMe(Response.json({ code: "auth.unauthorized", message: "gone" }, { status: 401 }));
     const event = {
       ...makeEvent("http://localhost:3000/", { cookie: COOKIE }),
       response: { headers: new Headers() },
@@ -527,5 +656,168 @@ describe("opaque session cookie", () => {
     await onRequest(protectedMiddleware(), event);
 
     expect(event.response.headers.get("set-cookie")).toContain("__nextgen_session=;");
+  });
+
+  it.each(DEAD)("clears the cookie and redirects on a protected route for %s", async (_l, res) => {
+    sessionsMe(res());
+
+    const response = await onRequest(
+      protectedMiddleware(),
+      makeEvent("http://localhost:3000/admin", { cookie: COOKIE }),
+    );
+
+    expect([response?.status, response?.headers.getSetCookie()]).toEqual([
+      302,
+      ["__nextgen_session=; Path=/; Max-Age=0"],
+    ]);
+  });
+
+  // A backend outage is not a sign-out: the cookie must survive it.
+  it.each(OUTAGES)("keeps the cookie on a public page for %s", async (_l, fail) => {
+    vi.stubGlobal("fetch", vi.fn(fail));
+    const event = {
+      ...makeEvent("http://localhost:3000/", { cookie: COOKIE }),
+      response: { headers: new Headers() },
+    };
+
+    const response = await onRequest(protectedMiddleware(), event);
+
+    expect([response, event.response.headers.getSetCookie(), event.locals.nextgenAuth]).toEqual([
+      undefined,
+      [],
+      { isAuthenticated: false, session: null, reason: "unavailable" },
+    ]);
+  });
+
+  it.each(OUTAGES)("answers a protected route 503 for %s", async (_l, fail) => {
+    vi.stubGlobal("fetch", vi.fn(fail));
+
+    const response = await onRequest(
+      protectedMiddleware(),
+      makeEvent("http://localhost:3000/admin", { cookie: COOKIE }),
+    );
+
+    expect([
+      response?.status,
+      response?.headers.get("location"),
+      response?.headers.getSetCookie(),
+    ]).toEqual([503, null, []]);
+  });
+
+  // A cookie the backend cannot have minted must not reach it, or read as an outage.
+  it("clears a malformed session cookie on a protected route without asking the backend", async () => {
+    const backend = vi.fn(async () => Response.json({ session_id: "s1", user_id: "u1" }));
+    vi.stubGlobal("fetch", backend);
+
+    const response = await onRequest(
+      protectedMiddleware(),
+      makeEvent("http://localhost:3000/admin", { cookie: "__nextgen_session=x%0Ay" }),
+    );
+
+    expect([response?.status, response?.headers.getSetCookie(), backend.mock.calls]).toEqual([
+      302,
+      ["__nextgen_session=; Path=/; Max-Age=0"],
+      [],
+    ]);
+  });
+
+  it("keeps signing in a live session after a malformed cookie and a 500", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: RequestInit) =>
+        new Headers(init.headers).get("cookie") === COOKIE
+          ? Response.json({ session_id: "s1", user_id: "u1" })
+          : new Response(null, { status: 500 }),
+      ),
+    );
+    for (const cookie of ["__nextgen_session=x%0Ay", "__nextgen_session=poison"]) {
+      await onRequest(protectedMiddleware(), makeEvent("http://localhost:3000/admin", { cookie }));
+    }
+    const event = makeEvent("http://localhost:3000/admin", { cookie: COOKIE });
+
+    await onRequest(protectedMiddleware(), event);
+
+    expect(event.locals.nextgenAuth).toMatchObject({ isAuthenticated: true });
+  });
+});
+
+// A JWKS that cannot be fetched on a cold cache says nothing about a JWT.
+describe("JWT session during a JWKS outage", () => {
+  function jwtCookie(): string {
+    const token = makeJwt({ sub: "u1", iss: "http://localhost:4000", exp: ts(3600) }, nextKid());
+    return `__nextgen_session=${token}`;
+  }
+
+  function protectedMiddleware() {
+    return createNextgenMiddleware({ url: "http://localhost:4000", protectedRoutes: ["/admin"] });
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(new TypeError("fetch failed"))),
+    );
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+  });
+
+  it("answers a protected route 503 and keeps the cookie", async () => {
+    const response = await onRequest(
+      protectedMiddleware(),
+      makeEvent("http://localhost:3000/admin", { cookie: jwtCookie() }),
+    );
+
+    expect([response?.status, response?.headers.getSetCookie()]).toEqual([503, []]);
+  });
+
+  it("continues a public route as unavailable, keeping the cookie", async () => {
+    const event = {
+      ...makeEvent("http://localhost:3000/", { cookie: jwtCookie() }),
+      response: { headers: new Headers() },
+    };
+
+    const response = await onRequest(protectedMiddleware(), event);
+
+    expect([response, event.response.headers.getSetCookie(), event.locals.nextgenAuth]).toEqual([
+      undefined,
+      [],
+      { isAuthenticated: false, session: null, reason: "unavailable" },
+    ]);
+  });
+});
+
+describe("getClientAuth", () => {
+  it("drops the session token from the server-side auth", () => {
+    const event = makeEvent("http://localhost:3000/");
+    event.locals.nextgenAuth = {
+      isAuthenticated: true,
+      session: {
+        userId: "u1",
+        identifier: null,
+        identifierProperty: null,
+        display: "Ada",
+        token: "t",
+      },
+    };
+
+    expect(getClientAuth(event)).toEqual({
+      isAuthenticated: true,
+      session: { userId: "u1", identifier: null, identifierProperty: null, display: "Ada" },
+    });
+  });
+});
+
+describe("proxy upstream failure", () => {
+  it.each(PROXY_FAILURES)("answers %s with %i", async (_l, status, code, fail) => {
+    vi.stubGlobal("fetch", vi.fn(fail));
+
+    const response = await onRequest(
+      createNextgenMiddleware({ url: "http://localhost:4000" }),
+      makeEvent("http://localhost:3000/__nextgen/v1/flow"),
+    );
+
+    expect([response?.status, await response?.json()]).toEqual([
+      status,
+      { code, message: expect.any(String) },
+    ]);
   });
 });

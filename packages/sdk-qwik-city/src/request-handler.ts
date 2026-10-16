@@ -1,15 +1,25 @@
-import type { AuthResult, NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
+import type {
+  AuthResult,
+  ClientAuthResult,
+  NextgenMiddlewareOptions,
+} from "@zitadel/sdk-core/middleware";
 
 import {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
+  assertLoginPath,
   filterResponseHeaders,
   matchesRoutes,
+  parseCookieHeader,
+  proxyFailureResponse,
+  redactExchangeBody,
   requiresProjectSecret,
+  sessionUnavailableResponse,
+  toClientAuth,
   validateOpaqueSessionToken,
 } from "@zitadel/sdk-core/middleware";
 
-import { verifyJwt, base64UrlDecode } from "./lib/jwt";
+import { checkJwt, isJwtShaped } from "./lib/jwt";
 
 /**
  * `process` is undefined in some edge/serverless runtimes; read env defensively
@@ -53,20 +63,6 @@ export interface QwikRequestEvent {
    * that exercise only the auth path need not stub it.
    */
   readonly env?: { get(key: string): string | undefined };
-}
-
-/** Parses a `Cookie` request header into a name→value map. */
-function parseCookieHeader(header: string | null): Map<string, string> {
-  const jar = new Map<string, string>();
-  if (!header) return jar;
-  for (const part of header.split(";")) {
-    const idx = part.indexOf("=");
-    if (idx === -1) continue;
-    const name = part.slice(0, idx).trim();
-    const value = part.slice(idx + 1).trim();
-    if (name) jar.set(name, value);
-  }
-  return jar;
 }
 
 /**
@@ -135,13 +131,20 @@ async function proxyResponse(
     upstreamHeaders.set("authorization", `Bearer ${projectSecret}`);
   }
 
-  const upstream = await fetch(target, {
-    method,
-    headers: upstreamHeaders,
-    body,
-    redirect: "manual",
-    signal: AbortSignal.timeout(proxyTimeoutMs),
-  });
+  let upstream: Response;
+  try {
+    upstream = await fetch(target, {
+      method,
+      headers: upstreamHeaders,
+      body,
+      redirect: "manual",
+      signal: AbortSignal.timeout(proxyTimeoutMs),
+    });
+  } catch (error) {
+    // The backend is down or too slow: a 502/504 in the API's error envelope,
+    // not the framework's HTML 500 page.
+    return proxyFailureResponse(error);
+  }
 
   // The app's own request URL: the origin a proxied redirect may name, and the
   // base a relative one resolves against (the IdP callback's 303 needs it).
@@ -151,27 +154,13 @@ async function proxyResponse(
     responseHeaders.append("set-cookie", cookie);
   }
 
-  return new Response(upstream.body, {
+  // The exchange's answer echoes the HttpOnly session token; the browser
+  // gets the cookie, never the token in a script-readable body (ADR 036).
+  const browserBody = await redactExchangeBody(method, suffix, upstream, responseHeaders);
+  return new Response(browserBody, {
     status: upstream.status,
     headers: responseHeaders,
   });
-}
-
-const DECODER = new TextDecoder();
-
-/**
- * Returns `true` when `token` looks structurally like a signed JWT (JWS) — NOT
- * an encrypted token (JWE). A structural check only, not a security check.
- */
-function isJwtShaped(token: string): boolean {
-  const parts = token.split(".");
-  if (parts.length < 3 || !parts[0]) return false;
-  try {
-    const header = JSON.parse(DECODER.decode(base64UrlDecode(parts[0]))) as Record<string, unknown>;
-    return typeof header?.alg === "string" && !("enc" in header);
-  } catch {
-    return false;
-  }
 }
 
 /** Key under which the auth result is stored on `ev.sharedMap`. */
@@ -190,9 +179,26 @@ interface AuthHandlerOptions {
 }
 
 /**
+ * Removes any client-supplied `x-nextgen-auth-token` from the inbound request,
+ * so server code reading raw headers cannot observe an attacker-controlled
+ * value; `getAuth(ev)` is canonical. Request headers may be immutable on some
+ * adapters, so the delete is guarded.
+ */
+function stripAuthTokenHeader(ev: QwikRequestEvent): void {
+  try {
+    ev.request.headers.delete("x-nextgen-auth-token");
+  } catch {
+    // Immutable headers on this adapter — nothing to strip beyond what the
+    // proxy path already drops via INTERNAL_HEADERS before forwarding.
+  }
+}
+
+/**
  * Verifies the session token and writes the auth result to `ev.sharedMap`. On a
- * protected route with no valid session it clears stale `__nextgen*` cookies and
- * throws `ev.redirect(...)` to send the browser to the login page.
+ * protected route with no valid session it throws `ev.redirect(...)` to send the
+ * browser to the login page. Stale `__nextgen*` cookies are cleared when the
+ * backend says the token is dead; when the backend cannot be asked, they stay
+ * and a protected route answers `503`.
  */
 async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promise<void> {
   const {
@@ -208,6 +214,8 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
   } = opts;
   const { pathname } = ev.url;
 
+  stripAuthTokenHeader(ev);
+
   const cookies = parseCookieHeader(ev.request.headers.get("cookie"));
   const authHeader = ev.request.headers.get("authorization");
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
@@ -216,8 +224,8 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
   // Bearer token takes explicit precedence over the session cookie.
   const token = bearerToken ?? cookieToken;
 
-  const payload = token
-    ? await verifyJwt(token, {
+  const jwt = token
+    ? await checkJwt(token, {
         issuerUrl: url,
         allowedAlgorithms,
         clockSkewMs,
@@ -226,6 +234,7 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
         jwksTimeoutMs,
       })
     : null;
+  const payload = jwt?.status === "valid" ? jwt.payload : null;
 
   if (payload && token && payload.sub) {
     ev.sharedMap.set(SHARED_MAP_KEY, {
@@ -241,25 +250,42 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
     return;
   }
 
-  let liveAnonymousSession = false;
+  // A JWT whose keys cannot be fetched (the JWKS is down and nothing is
+  // cached) may well be good: an outage, not a sign-out.
+  let unavailable = jwt?.status === "unavailable";
+  let keepCookies = false;
   if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
-    const opaque = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
-    // A session without a user is anonymous: its sign-in has not verified a
-    // factor yet. It is not signed in, but it is live — keep its cookie.
-    if (opaque?.userId) {
+    const check = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
+    if (check.status === "live" && check.session.userId) {
       ev.sharedMap.set(SHARED_MAP_KEY, {
         isAuthenticated: true,
         session: {
-          userId: opaque.userId,
-          identifier: opaque.identifier,
-          identifierProperty: opaque.identifierProperty,
-          display: opaque.display,
+          userId: check.session.userId,
+          identifier: check.session.identifier,
+          identifierProperty: check.session.identifierProperty,
+          display: check.session.display,
           token: cookieToken,
         },
       } satisfies AuthResult);
       return;
     }
-    liveAnonymousSession = opaque !== null;
+    // A session without a user is anonymous: its sign-in has not verified a
+    // factor yet. It is not signed in, but it is live — keep its cookie.
+    keepCookies = check.status === "live";
+    unavailable ||= check.status === "unknown";
+  }
+  if (unavailable) {
+    // The backend could not be asked. The session may be live, so its cookie
+    // survives the outage; a protected route is retryable, not a sign-in.
+    ev.sharedMap.set(SHARED_MAP_KEY, {
+      isAuthenticated: false,
+      session: null,
+      reason: "unavailable",
+    } satisfies AuthResult);
+    if (matchesRoutes(pathname, protectedRoutes)) {
+      ev.send(sessionUnavailableResponse(url));
+    }
+    return;
   }
 
   ev.sharedMap.set(SHARED_MAP_KEY, {
@@ -271,7 +297,7 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
   // browser stops replaying them (each replay costs a backend session check);
   // a live anonymous session's cookie stays, since its sign-in may complete.
   // Qwik applies the deletion to whichever response goes out.
-  if (!liveAnonymousSession) {
+  if (!keepCookies) {
     for (const name of Object.keys(ev.cookie.getAll())) {
       if (name.startsWith("__nextgen")) {
         ev.cookie.delete(name, { path: "/" });
@@ -328,14 +354,10 @@ export function createNextgenOnRequest(
     projectSecret: projectSecretOption,
   } = options;
 
-  // Guard against open-redirect: loginPath must be a relative path.
-  if (!loginPath.startsWith("/") || loginPath.startsWith("//")) {
-    throw new Error(
-      `[nextgen] loginPath must be a relative path starting with a single "/". ` +
-        `Received: "${loginPath}". Using an absolute or protocol-relative URL ` +
-        `would allow open-redirect attacks.`,
-    );
-  }
+  // Guard against open-redirect: loginPath must be a path on this app.
+  assertLoginPath(loginPath);
+  // No check of loginPath against protectedRoutes: exported from a nested
+  // layout, this handler never sees the login page, and it cannot tell.
 
   return async (ev: QwikRequestEvent): Promise<void> => {
     const { pathname } = ev.url;
@@ -353,6 +375,7 @@ export function createNextgenOnRequest(
       PROCESS_ENV.ZITADEL_PROJECT_SECRET;
 
     if (matchesRoutes(pathname, ignoredRoutes)) {
+      stripAuthTokenHeader(ev);
       return;
     }
 
@@ -384,7 +407,11 @@ export function createNextgenOnRequest(
  *
  * export const useUser = routeLoader$((ev) => {
  *   const auth = getAuth(ev);
- *   if (!auth.isAuthenticated) throw ev.redirect(302, "/login");
+ *   if (!auth.isAuthenticated) {
+ *     // Zitadel could not be asked: an outage, not a sign-out.
+ *     if (auth.reason === "unavailable") throw ev.error(503, "Try again shortly");
+ *     throw ev.redirect(302, "/login");
+ *   }
  *   return auth.session.userId;
  * });
  * ```
@@ -399,4 +426,18 @@ export function getAuth(ev: { sharedMap: Map<string, unknown> }): AuthResult {
       session: null,
     }
   );
+}
+
+/**
+ * The auth state of {@link getAuth} without the session token: safe to return
+ * from a `routeLoader$` or `server$`, whose results Qwik serialises into the
+ * page. The backend sets the token as an HttpOnly cookie; returning
+ * {@link getAuth}'s result would hand it to any script on the page.
+ *
+ * @param ev - The current Qwik City request event.
+ * @returns The current {@link ClientAuthResult}, with `reason` when the
+ *   session could not be checked.
+ */
+export function getClientAuth(ev: { sharedMap: Map<string, unknown> }): ClientAuthResult {
+  return toClientAuth(getAuth(ev));
 }

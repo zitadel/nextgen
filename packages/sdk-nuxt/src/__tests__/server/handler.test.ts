@@ -13,6 +13,7 @@ const UNSET_BY_NITRO = {
   jwksTimeoutMs: "",
   proxyTimeoutMs: "",
   opaqueTokenTimeoutMs: "",
+  projectSecret: "",
 };
 
 /**
@@ -98,6 +99,22 @@ describe("module server handler", () => {
 
     expect(res.status).toBe(200);
   });
+
+  it("sends the project secret the module stored on the handoff exchange", async () => {
+    const upstream = vi.fn(async (_url: string, _init: RequestInit) =>
+      Response.json({ session_id: "s1" }),
+    );
+    vi.stubGlobal("fetch", upstream);
+    const handle = await moduleHandler({ url: "http://zitadel.test", projectSecret: "sk_module" });
+
+    await handle(
+      new Request("http://localhost:3000/__nextgen/sessions/exchange", { method: "POST" }),
+    );
+
+    expect(new Headers(upstream.mock.calls[0]?.[1].headers).get("authorization")).toBe(
+      "Bearer sk_module",
+    );
+  });
 });
 
 describe("middlewareOptions", () => {
@@ -116,6 +133,7 @@ describe("middlewareOptions", () => {
         jwksTimeoutMs: 2000,
         proxyTimeoutMs: 3000,
         opaqueTokenTimeoutMs: 4000,
+        projectSecret: "sk_module",
       }),
     ).toEqual({
       url: "http://zitadel.test",
@@ -130,6 +148,7 @@ describe("middlewareOptions", () => {
       jwksTimeoutMs: 2000,
       proxyTimeoutMs: 3000,
       opaqueTokenTimeoutMs: 4000,
+      projectSecret: "sk_module",
     });
   });
 

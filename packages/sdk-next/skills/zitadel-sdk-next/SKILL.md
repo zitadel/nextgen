@@ -30,7 +30,10 @@ the app is bespoke and you are integrating by hand.
 pnpm add @zitadel/sdk-next@alpha
 ```
 
-Peer deps the package expects: `next >=15`, `react >=18`, `react-dom >=18`.
+Peer deps the package expects: `next >=15.2.3`, `react >=18`, `react-dom >=18`.
+Next.js 15.0.0 to 15.2.2 skip middleware for a request that sends an
+`x-middleware-subrequest` header (CVE-2025-29927), which would bypass
+`protectedRoutes`; do not install a version below 15.2.3.
 TypeScript `>=5.0` (the SDK consumer floor; the package is built against a
 newer TypeScript, but that does not raise the floor for your project).
 
@@ -42,7 +45,7 @@ where the code runs, not the root, from client modules:
 | Import                         | Runs in                           | Provides                           |
 | ------------------------------ | --------------------------------- | ---------------------------------- |
 | `@zitadel/sdk-next/middleware` | Edge middleware                   | `nextgenMiddleware`, `createProxy` |
-| `@zitadel/sdk-next/server`     | Server Components, Route Handlers | `auth()`, `NextgenProvider`        |
+| `@zitadel/sdk-next/server`     | Server Components, Route Handlers | `auth()`, `getClientAuth()`, `NextgenProvider` |
 | `@zitadel/sdk-next/react`      | Client Components                 | `useAuth()`, `AuthContextProvider` |
 | `@zitadel/sdk-next/session`    | Client Components                 | `getSession()`                     |
 | `@zitadel/sdk-next/client`     | Client boundary                   | `configureZitadel()`, web components |
@@ -121,7 +124,8 @@ Confirm names against those before writing code.
 
 - **Never import the package root from a `"use client"` module.** The root
   re-exports the server-only `auth()`; pulling it into a client graph fails the
-  build. Client code imports from `/react` or `/session` only.
+  build. Client code imports from `/react`, `/session` or `/client` (for
+  `configureZitadel()`) only.
 - **`NextgenProvider` is server-only** and must not be re-exported through a
   `"use client"` `providers.tsx` wrapper — that would leak the unstripped token
   into the RSC flight payload. To seed from client state, use
@@ -133,7 +137,9 @@ Confirm names against those before writing code.
   unmatched public page always looks signed out — use `getSession()` there.
 - **A rejected `getSession()` means *unknown*, not signed out** (broken proxy /
   network / 5xx). Render a neutral or error state, never the signed-out CTA.
-- **Config handles:** `ZITADEL_URL` (backend, server-side) and
-  `NEXT_PUBLIC_ZITADEL_PROJECT_ID` (passed to `configureZitadel`). If the
+- **Config handles:** `ZITADEL_URL` (backend, server-side),
+  `ZITADEL_PROJECT_SECRET` (server-only, sent on the sign-in handoff; without
+  it sign-in cannot finish) and `NEXT_PUBLIC_ZITADEL_PROJECT_ID` (passed to
+  `configureZitadel`). If the
   middleware runs with custom verification options, pass the same ones to
   `auth()` so both layers accept the same tokens.

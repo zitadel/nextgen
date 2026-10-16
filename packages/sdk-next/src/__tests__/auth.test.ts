@@ -110,13 +110,49 @@ beforeEach(() => {
   vi.resetModules();
 });
 
-afterEach(() => {
+afterEach(async () => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
+  const { clearSessionCheckBackoff } = await import("@zitadel/sdk-core/middleware");
+  clearSessionCheckBackoff();
 });
 
 describe("auth()", () => {
+  it("reports an unavailable session when the middleware could not check it", async () => {
+    mockHeadersMap.set("x-nextgen-auth-token", "");
+    mockHeadersMap.set("x-nextgen-auth-state", "unavailable");
+
+    const auth = await importAuth();
+
+    expect(await auth({ url: ISSUER })).toEqual({
+      isAuthenticated: false,
+      session: null,
+      reason: "unavailable",
+    });
+  });
+
+  it("does not report a session as unavailable without the middleware saying so", async () => {
+    mockHeadersMap.set("x-nextgen-auth-token", "");
+
+    const auth = await importAuth();
+
+    expect(await auth({ url: ISSUER })).toEqual({ isAuthenticated: false, session: null });
+  });
+
+  it("reports a gateway's HTML 401 as unavailable, not signed out", async () => {
+    routeFetch(nextKid(), () => new Response("<html>401</html>", { status: 401 }));
+    mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
+
+    const auth = await importAuth();
+
+    expect(await auth({ url: ISSUER })).toEqual({
+      isAuthenticated: false,
+      session: null,
+      reason: "unavailable",
+    });
+  });
+
   it("returns unauthenticated when the x-nextgen-auth-token header is absent", async () => {
     const auth = await importAuth();
     expect(await auth({ url: ISSUER })).toEqual({ isAuthenticated: false, session: null });
@@ -217,7 +253,9 @@ describe("auth()", () => {
   // ── Opaque path: backend validation, not blind trust ─────────────────
 
   it("rejects a random opaque header value the backend does not know", async () => {
-    routeFetch(nextKid(), () => jsonResponse({ error: "unauthenticated" }, 401));
+    routeFetch(nextKid(), () =>
+      jsonResponse({ code: "auth.unauthorized", message: "unauthenticated" }, 401),
+    );
     mockHeadersMap.set("x-nextgen-auth-token", "attacker-supplied-junk");
 
     const auth = await importAuth();
@@ -268,6 +306,19 @@ describe("auth()", () => {
     });
   });
 
+  // A UI renders `display ?? identifier`: an empty display must read as absent.
+  it("reads an empty display or identifier from the backend as null", async () => {
+    routeFetch(nextKid(), () =>
+      jsonResponse({ session_id: "s1", user_id: "user-1", user: { identifier: "", display: "" } }),
+    );
+    mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
+
+    const auth = await importAuth();
+    expect(await auth({ url: ISSUER })).toMatchObject({
+      session: { identifier: null, display: null },
+    });
+  });
+
   it("treats an anonymous session (no user_id) as signed out", async () => {
     routeFetch(nextKid(), () =>
       jsonResponse({ session_id: "sess-2", project_id: "proj-1", state: "active" }),
@@ -283,8 +334,14 @@ describe("auth()", () => {
     mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
 
     const auth = await importAuth();
-    expect(await auth({ url: ISSUER })).toEqual({ isAuthenticated: false, session: null });
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("HTTP 500"));
+    expect(await auth({ url: ISSUER })).toEqual({
+      isAuthenticated: false,
+      session: null,
+      reason: "unavailable",
+    });
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining("could not check the session"),
+    );
   });
 
   it("fails closed and warns when the backend is unreachable", async () => {
@@ -292,8 +349,14 @@ describe("auth()", () => {
     mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
 
     const auth = await importAuth();
-    expect(await auth({ url: ISSUER })).toEqual({ isAuthenticated: false, session: null });
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("could not reach"));
+    expect(await auth({ url: ISSUER })).toEqual({
+      isAuthenticated: false,
+      session: null,
+      reason: "unavailable",
+    });
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining("could not check the session"),
+    );
   });
 
   it("aborts opaque validation after opaqueTokenTimeoutMs and fails closed", async () => {
@@ -312,8 +375,10 @@ describe("auth()", () => {
     const auth = await importAuth();
     const result = await auth({ url: ISSUER, opaqueTokenTimeoutMs: 5 });
 
-    expect(result).toEqual({ isAuthenticated: false, session: null });
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("could not reach"));
+    expect(result).toEqual({ isAuthenticated: false, session: null, reason: "unavailable" });
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining("could not check the session"),
+    );
   });
 
   it("falls back to the ZITADEL_URL environment variable for the backend URL", async () => {
@@ -333,5 +398,55 @@ describe("auth()", () => {
 
     expect(result.isAuthenticated).toBe(true);
     expect(fetchMock).toHaveBeenCalledWith(`${ISSUER}/sessions/me`, expect.anything());
+  });
+
+  // This runtime has its own JWKS cache: a cold one during a JWKS outage says
+  // nothing about the token.
+  it("reports a JWT as unavailable when the JWKS cannot be fetched and nothing is cached", async () => {
+    fetchMock.mockImplementation(() => Promise.reject(new TypeError("fetch failed")));
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mockHeadersMap.set(
+      "x-nextgen-auth-token",
+      makeSignedJwt({ sub: "user-1", iss: ISSUER, exp: ts(3600) }, nextKid()),
+    );
+
+    const auth = await importAuth();
+
+    expect(await auth({ url: ISSUER })).toEqual({
+      isAuthenticated: false,
+      session: null,
+      reason: "unavailable",
+    });
+  });
+});
+
+describe("getClientAuth()", () => {
+  it("returns the signed-in state without the session token", async () => {
+    const kid = nextKid();
+    routeFetch(kid, () => jsonResponse({}, 404));
+    mockHeadersMap.set(
+      "x-nextgen-auth-token",
+      makeSignedJwt({ sub: "user-1", email: "a@b.c", iss: ISSUER, exp: ts(3600) }, kid),
+    );
+
+    const { getClientAuth } = await import("../auth.js");
+
+    expect(await getClientAuth({ url: ISSUER })).toEqual({
+      isAuthenticated: true,
+      session: { userId: "user-1", identifier: "a@b.c", identifierProperty: null, display: null },
+    });
+  });
+
+  it("keeps the reason a session could not be checked", async () => {
+    mockHeadersMap.set("x-nextgen-auth-token", "");
+    mockHeadersMap.set("x-nextgen-auth-state", "unavailable");
+
+    const { getClientAuth } = await import("../auth.js");
+
+    expect(await getClientAuth({ url: ISSUER })).toEqual({
+      isAuthenticated: false,
+      session: null,
+      reason: "unavailable",
+    });
   });
 });

@@ -13,7 +13,11 @@ export { useZitadelProject } from "./runtime/composables/useZitadelProject.js";
 export type {
   NextgenMiddlewareOptions,
   AuthResult,
-  ClientAuthResult,
-  ClientAuthState,
+  NextgenSession,
+  AuthState,
+  UnauthState,
+  UnauthReason,
   ClientSession,
+  ClientAuthState,
+  ClientAuthResult,
 } from "./runtime/types.js";

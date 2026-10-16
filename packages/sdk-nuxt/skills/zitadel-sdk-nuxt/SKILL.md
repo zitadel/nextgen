@@ -92,7 +92,7 @@ nothing, and the session card goes to its `post-sign-out-url` unless that is
 the page it is on. The README has the details.
 
 Read auth state in any component via the auto-imported `useAuth()` (it omits the
-raw JWT by design). When you need the token to call upstream APIs, use
+raw session token by design). When you need the token to call upstream APIs, use
 `getAuth(event)` from `@zitadel/sdk-nuxt/server` inside a server route:
 
 ```ts
@@ -100,7 +100,11 @@ import { getAuth } from '@zitadel/sdk-nuxt/server';
 
 export default defineEventHandler((event) => {
   const auth = getAuth(event);
-  if (!auth.isAuthenticated) throw createError({ statusCode: 401 });
+  if (!auth.isAuthenticated) {
+    // Zitadel could not be asked: an outage, not a sign-out.
+    if (auth.reason === 'unavailable') throw createError({ statusCode: 503 });
+    throw createError({ statusCode: 401 });
+  }
   return { userId: auth.session.userId };
 });
 ```
@@ -135,5 +139,6 @@ component attributes against the installed version rather than assuming.
   the server proxy and the widgets together, but a provider returns the browser
   to `/__nextgen/idp/{slug}/callback`, which is proxied only under the default
   prefix.
-- **`useAuth()` never carries the JWT.** It is omitted so the token is not
-  serialized into the SSR payload; use `getAuth(event)` server-side for it.
+- **`useAuth()` never carries the session token.** It is omitted so the token
+  is not serialized into the SSR payload; use `getAuth(event)` server-side for
+  it.

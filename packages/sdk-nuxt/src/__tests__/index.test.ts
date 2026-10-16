@@ -1,5 +1,7 @@
 import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
+
+import type { AuthState, NextgenSession, UnauthState } from "../index";
 
 import * as entry from "../index";
 import { businessLocales } from "../index";
@@ -13,5 +15,12 @@ describe("package entry", () => {
   // ships to the browser: server middleware and element classes stay off it.
   it("exports only the client-safe surface", () => {
     expect(Object.keys(entry).sort()).toEqual(["businessLocales", "useZitadelProject"]);
+  });
+
+  // The same auth types every other server SDK exports, so a server route can
+  // type `auth.session` without rebuilding them.
+  it("exports the session and auth state types", () => {
+    expectTypeOf<AuthState["session"]>().toEqualTypeOf<NextgenSession>();
+    expectTypeOf<UnauthState["session"]>().toEqualTypeOf<null>();
   });
 });

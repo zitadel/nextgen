@@ -29,7 +29,9 @@ function finiteNumber(value: unknown): number | undefined {
  * as unset, and the middleware's own default applies: passed through, `""`
  * would make every timeout zero and reject every token for audience `""`.
  */
-export function middlewareOptions(nextgen: Record<string, unknown> = {}): NextgenMiddlewareOptions {
+export function middlewareOptions(
+  nextgen: Record<string, unknown> = {},
+): NextgenMiddlewareOptions & { projectSecret?: string } {
   return {
     url:
       nonEmptyString(nextgen.url) ?? nonEmptyString(nextgen.issuerUrl) ?? "http://localhost:8080",
@@ -44,6 +46,7 @@ export function middlewareOptions(nextgen: Record<string, unknown> = {}): Nextge
     jwksTimeoutMs: finiteNumber(nextgen.jwksTimeoutMs),
     proxyTimeoutMs: finiteNumber(nextgen.proxyTimeoutMs),
     opaqueTokenTimeoutMs: finiteNumber(nextgen.opaqueTokenTimeoutMs),
+    projectSecret: nonEmptyString(nextgen.projectSecret),
   };
 }
 
