@@ -54,6 +54,7 @@ const (
 	GetSessionOperation                    OperationName = "GetSession"
 	GetTeamOperation                       OperationName = "GetTeam"
 	GetUserByIDOperation                   OperationName = "GetUserByID"
+	GetUserPasswordOperation               OperationName = "GetUserPassword"
 	GetVariableOperation                   OperationName = "GetVariable"
 	GetVariablesOperation                  OperationName = "GetVariables"
 	InitClaimOperation                     OperationName = "InitClaim"

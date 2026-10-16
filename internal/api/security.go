@@ -161,6 +161,7 @@ var userBoundSessionOperations = map[api.OperationName]bool{
 	api.CreateUserOperation:            true,
 	api.GetUserByIDOperation:           true,
 	api.ListUserPasskeysOperation:      true,
+	api.GetUserPasswordOperation:       true,
 	api.ListUserIdentityLinksOperation: true,
 	api.DeleteUserByIDOperation:        true,
 	api.PatchUserByIDOperation:         true,

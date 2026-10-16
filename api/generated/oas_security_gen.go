@@ -64,6 +64,7 @@ var operationRolesNextgenSession = map[string][]string{
 	GetSchemaByIdOperation:         []string{},
 	GetTeamOperation:               []string{},
 	GetUserByIDOperation:           []string{},
+	GetUserPasswordOperation:       []string{},
 	ListBrandingOperation:          []string{},
 	ListFlowDefinitionsOperation:   []string{},
 	ListMyProjectsOperation:        []string{},
@@ -214,6 +215,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 		"team.read",
 	},
 	GetUserByIDOperation: []string{
+		"user.read",
+	},
+	GetUserPasswordOperation: []string{
 		"user.read",
 	},
 	GetVariableOperation: []string{
