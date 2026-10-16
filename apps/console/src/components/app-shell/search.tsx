@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
-import { api } from "@/api/zitadel";
 import {
   Command,
   CommandEmpty,
@@ -20,8 +19,10 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { useAccountTeam } from "@/lib/account";
-import { listMyProjectsCached, useProjectScope } from "@/lib/project-scope";
+import { useAsync, useSessionCached } from "@/hooks/use-async";
+import { readAccountTeam } from "@/lib/account";
+import { useMyProjects, useProjectScope } from "@/lib/project-scope";
+import { queryActiveTeams } from "@/lib/teams";
 import { cn } from "@/lib/utils";
 
 import type { NavIcon } from "./icons";
@@ -33,13 +34,9 @@ import { useNavItems } from "./use-nav-items";
  * project, your profile. Searching *inside* a list stays in that list's own
  * toolbar; this is navigation, not a results page.
  *
- * Groups follow the navigation proposal, top to bottom: pages in the selected
- * project, the account, teams, projects, you. Teams are read from the server
- * by name (`POST /teams/query`, `name contains`) once something is typed, so a
- * project with many teams is searched in full rather than one page of it.
- * Projects come from the switcher's own read (`GET /users/me/projects`).
- *
- * Users are not offered: `POST /users/query` filters by id, schema, status and
+ * Groups, top to bottom: pages in the selected project, the account, teams
+ * (matched on the server, so a project with many is searched in full),
+ * projects, you. Users are not offered: `POST /users/query` filters by id, schema, status and
  * team only — there is no email or name filter to search with.
  */
 export function SearchTrigger({ onOpen }: { onOpen: () => void }) {
@@ -87,18 +84,24 @@ interface Result {
 export function SearchDialog({
   open,
   onOpenChange,
-  userId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  userId?: string;
 }) {
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
   const projectId = useProjectScope();
-  const projects = useProjectNames(open);
-  const teams = useTeamMatches(open ? query : "", projectId);
-  const account = useAccountTeam(userId);
+  const projects = useMyProjects();
+  const account = useSessionCached(readAccountTeam, null);
+  // One request per pause in typing, not per keystroke.
+  const typed = useDebounced(open ? query.trim() : "", TYPING_PAUSE_MS);
+  const teams = useAsync(
+    typed && projectId
+      ? () => queryActiveTeams(projectId, { nameContains: typed, limit: TEAM_RESULTS })
+      : null,
+    [],
+    [typed, projectId],
+  );
   const pages = useNavItems();
 
   // A fresh palette each time it opens.
@@ -233,69 +236,17 @@ export function SearchDialog({
   );
 }
 
-/** The projects the switcher lists, read once the palette opens. */
-function useProjectNames(open: boolean): { id: string; name: string }[] | undefined {
-  const [projects, setProjects] = useState<{ id: string; name: string }[] | undefined>();
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    listMyProjectsCached()
-      .then((page) => {
-        if (!cancelled) setProjects(page.projects.map(({ id, name }) => ({ id, name })));
-      })
-      .catch(() => {
-        if (!cancelled) setProjects([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [open]);
-  return projects;
-}
-
-/** One request per pause in typing, not per keystroke. */
 const TYPING_PAUSE_MS = 200;
 const TEAM_RESULTS = 8;
 
-/** The selected project's active teams whose name contains the query. */
-function useTeamMatches(
-  query: string,
-  projectId: string | undefined,
-): { id: string; name: string }[] | undefined {
-  const [teams, setTeams] = useState<{ id: string; name: string }[] | undefined>();
-  const q = query.trim();
-
+/** `value`, once it has stopped changing for `ms`. */
+function useDebounced<T>(value: T, ms: number): T {
+  const [settled, setSettled] = useState(value);
   useEffect(() => {
-    setTeams(undefined);
-    if (!q || !projectId) return;
-    let cancelled = false;
-    const timer = setTimeout(() => {
-      api
-        .queryTeams(
-          {
-            limit: TEAM_RESULTS,
-            filter: [
-              { field: "name", operation: "contains", value: q },
-              { field: "status", operation: "equals", value: "active" },
-            ],
-          },
-          { project_id: projectId },
-        )
-        .then((page) => {
-          if (!cancelled) setTeams(page.teams.map(({ id, name }) => ({ id, name })));
-        })
-        .catch(() => {
-          // A refused read leaves the group out; the other groups still answer.
-          if (!cancelled) setTeams([]);
-        });
-    }, TYPING_PAUSE_MS);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [q, projectId]);
-
-  return teams;
+    const timer = setTimeout(() => setSettled(value), ms);
+    return () => clearTimeout(timer);
+  }, [value, ms]);
+  return settled;
 }
 
 function Kbd({ children, className }: { children: ReactNode; className?: string }) {

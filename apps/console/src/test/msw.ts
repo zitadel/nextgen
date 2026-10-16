@@ -38,6 +38,18 @@ const shellHandlers = [
   http.get("*/api/users/me/projects", () =>
     HttpResponse.json({ projects: [{ id: TEST_PROJECT_ID, name: "Test project" }] }),
   ),
+  // The signed-in person's own schema (Profile, and the footer's "Add your
+  // name"): the shipped default, email only, nothing designated for display.
+  http.get("*/api/users/me/schema", () =>
+    HttpResponse.json({
+      id: "https://example.test/default-human-user.json",
+      schema: {
+        "x-identifier": "email",
+        required: ["email"],
+        properties: { email: { type: "string", format: "email" } },
+      },
+    }),
+  ),
   http.post("*/api/users/query", async ({ request }) => {
     // Only the footer's own read. A screen's user list is the spec's to mock,
     // and falls through to an unhandled error.

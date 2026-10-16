@@ -7,8 +7,7 @@ import { PAGE_TITLE_ROW } from "@/components/typography";
 import { RenameCard } from "@/components/rename-card";
 
 import { api } from "@/api/zitadel";
-import { fetchSession } from "@/auth/session";
-import { readAccountTeam, refreshAccountTeam } from "@/lib/account";
+import { readAccountTeam } from "@/lib/account";
 
 /**
  * Settings → Account: the name of the account the signed-in person works in —
@@ -23,11 +22,7 @@ export const Route = createFileRoute("/_authed/settings/account")({
   staticData: {
     nav: { label: "Account", order: 0, icon: Building2, view: "settings", group: "WORKSPACE" },
   },
-  loader: async () => {
-    // The `_authed` guard has just confirmed the session, so this is its cache.
-    const userId = (await fetchSession())?.user_id;
-    return { team: userId ? await readAccountTeam(userId) : null };
-  },
+  loader: async () => ({ team: await readAccountTeam() }),
   component: AccountScreen,
 });
 
@@ -48,7 +43,8 @@ function AccountScreen() {
             value={team.name}
             onSave={async (name) => {
               await api.updateTeam(team.id, { name });
-              refreshAccountTeam();
+              // Re-read here and in the sidebar footer, which shows the name.
+              readAccountTeam.clear();
               await router.invalidate();
             }}
             errorFallback="Could not save the account name."

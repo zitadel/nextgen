@@ -95,3 +95,34 @@ test("a platform operator reaches every management screen without an error", asy
   await expect(page.getByRole("heading", { name: renamed, exact: true })).toBeVisible();
   await expectNoErrorBoundary(page);
 });
+
+/**
+ * A platform operator names themselves (#1801, #1802): the platform project's
+ * user schema designates an optional `name` for display, Profile is generated
+ * from the operator's own schema — read through the self-access
+ * `GET /users/me/schema`, since they hold no grant in the platform project —
+ * and once saved the account menu shows the name over the email.
+ */
+test("a platform operator adds their name from the account menu", async ({ page, seed }) => {
+  const operator = seed.identity().email;
+
+  await page.goto("/ui/console/");
+  await registerWithPassword(page, { email: operator, password });
+  await page.waitForURL((url) => !url.pathname.endsWith("/login"));
+
+  const account = page.getByRole("button", { name: `Account: ${operator}` });
+  await account.click();
+  await page.getByRole("menuitem", { name: /Add your name/ }).click();
+
+  await expect(page).toHaveURL(/\/settings\/profile/);
+  await expect(page.getByLabel("Email", { exact: true })).toBeDisabled();
+  const name = page.getByLabel("Name", { exact: true });
+  await expect(name).toBeFocused();
+  await name.fill("Ada Lovelace");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expectNoErrorBoundary(page);
+
+  await account.click();
+  await expect(page.getByRole("menu").getByText("Ada Lovelace")).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: /Add your name/ })).toHaveCount(0);
+});

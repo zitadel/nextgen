@@ -12,8 +12,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAccountTeam } from "@/lib/account";
-import { useOwnDisplayNameProperty } from "@/lib/display-name";
+import { useSessionCached } from "@/hooks/use-async";
+import { readAccountTeam } from "@/lib/account";
+import { displayNameProperty, readOwnUserSchema } from "@/lib/user-schema";
 import { type ThemePreference, useTheme } from "@/theme";
 
 /** Route prefix that puts the shell into its Settings view. */
@@ -112,10 +113,12 @@ function ThemeRow() {
 export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => void }) {
   const primary = user?.identifier ?? user?.display ?? user?.userId ?? "Signed in";
   const name = user?.display ?? primary;
-  const account = useAccountTeam(user?.userId);
+  const account = useSessionCached(readAccountTeam, null);
   // Asked only while there is no name: once `display` is set there is nothing
   // to prompt for.
-  const nameProperty = useOwnDisplayNameProperty(!user?.display);
+  const nameProperty = displayNameProperty(
+    useSessionCached(readOwnUserSchema, undefined, !user?.display),
+  );
 
   return (
     <SidebarMenuItem>

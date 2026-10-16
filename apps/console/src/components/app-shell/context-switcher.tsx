@@ -7,8 +7,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 import { api } from "@/api/zitadel";
+import { queryActiveTeams } from "@/lib/teams";
+import { useAsync } from "@/hooks/use-async";
 import {
-  listMyProjectsCached,
+  useMyProjects,
   useProjectScope,
   useSelectProjectTarget,
   withoutTrailingSlash,
@@ -88,68 +90,32 @@ export function ContextSwitcher() {
  * the list is a way across, `All teams` is the directory.
  */
 function TeamSwitcher({ projectId, teamId }: { projectId: string; teamId: string }) {
-  const [teams, setTeams] = useState<SwitcherOption[] | undefined>(undefined);
-
-  useEffect(() => {
-    let cancelled = false;
-    setTeams(undefined);
-    void api
-      .queryTeams(
-        { limit: TEAM_PAGE, filter: [{ field: "status", operation: "equals", value: "active" }] },
-        { project_id: projectId },
-      )
-      .then((page) => {
-        if (cancelled) return;
-        setTeams(
-          page.teams.map((team) => ({
-            id: team.id,
-            label: team.name,
-            link: { to: "/teams/$teamId", params: { teamId: team.id } },
-          })),
-        );
-      })
-      .catch(() => {
-        if (!cancelled) setTeams([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId]);
-
+  const teams = useAsync(() => queryActiveTeams(projectId, { limit: TEAM_PAGE }), [], [projectId]);
   const listed = teams?.find((team) => team.id === teamId);
-  // `null` once that read has been refused: the pill then says nothing rather
-  // than an id.
-  const [openName, setOpenName] = useState<string | null | undefined>(undefined);
-
-  // A deactivated team, or one past the first page, is named by its own read.
-  useEffect(() => {
-    if (teams === undefined || listed) return;
-    let cancelled = false;
-    setOpenName(undefined);
-    void api
-      .getTeam(teamId)
-      .then((team) => {
-        if (!cancelled) setOpenName(team.name);
-      })
-      .catch(() => {
-        if (!cancelled) setOpenName(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [teams, listed, teamId]);
-
-  const label = listed?.label ?? openName ?? undefined;
-  // Still loading until the open team has a name, or its read has answered.
+  // A deactivated team, or one past the first page, is named by its own read;
+  // `null` once refused, so the pill says nothing rather than an id.
+  const openName = useAsync(
+    teams === undefined || listed ? null : () => api.getTeam(teamId).then((team) => team.name),
+    null,
+    [teams, listed, teamId],
+  );
   const resolved = teams !== undefined && (listed !== undefined || openName !== undefined);
 
   return (
     <Switcher
       icon={Box}
       heading="Teams"
-      label={label}
+      label={listed?.name ?? openName ?? undefined}
       currentId={teamId}
-      options={resolved ? teams : undefined}
+      options={
+        resolved
+          ? teams.map((team) => ({
+              id: team.id,
+              label: team.name,
+              link: { to: "/teams/$teamId", params: { teamId: team.id } },
+            }))
+          : undefined
+      }
       emptyLabel="No teams"
       ariaLabel="Switch team"
       footer={{ label: "All teams", link: { to: "/teams" } }}
@@ -181,25 +147,9 @@ const TEAM_PAGE = 25;
  * every screen behind it — the chrome is not worth a boundary.
  */
 function useProjects(): SwitcherOption[] | undefined {
-  const [projects, setProjects] = useState<{ id: string; label: string }[] | undefined>(undefined);
+  const projects = useMyProjects();
   const scopeTo = useScopeTarget();
-
-  useEffect(() => {
-    let cancelled = false;
-    void listMyProjectsCached()
-      .then((result) => {
-        if (cancelled) return;
-        setProjects(result.projects.map((project) => ({ id: project.id, label: project.name })));
-      })
-      .catch(() => {
-        if (!cancelled) setProjects([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return projects?.map((project) => ({ ...project, link: scopeTo(project.id) }));
+  return projects?.map(({ id, name }) => ({ id, label: name, link: scopeTo(id) }));
 }
 
 /**
