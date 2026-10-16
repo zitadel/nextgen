@@ -35,6 +35,18 @@ type CreateDeploymentOutput struct {
 	Created    bool
 }
 
+// DeployInput carries the targets as the request gives them.
+type DeployInput struct {
+	// HasTTL reports a ttl in the request, which only a preview deploy takes.
+	HasTTL               bool
+	ProjectID            string
+	ReleaseID            string
+	Targets              []string
+	Reason               domain.DeploymentReason
+	Message              *string
+	ExpectedDeploymentID *string
+}
+
 type ListDeploymentsInput struct {
 	ProjectID string
 	// Origin narrows the list to one origin's history.
@@ -86,7 +98,7 @@ func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentIn
 		return nil, err
 	}
 	if entity.OriginKind == domain.DeploymentOriginKindPreview && input.PreviewTTL <= 0 {
-		return nil, domain.ErrDeploymentInvalid("a deployment to preview URLs needs a ttl", nil)
+		return nil, domain.ErrDeploymentInvalid().WithMessage("a deployment to preview URLs needs a ttl")
 	}
 
 	for attempt := 1; ; attempt++ {
@@ -107,8 +119,47 @@ func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentIn
 	}
 }
 
-// conflict answers a deploy that lost the optimistic lock with the newest
-// deployment to its origins.
+// Deploy resolves the targets against the project's origins, then creates
+// the deployment.
+func (s *DeploymentService) Deploy(ctx context.Context, input DeployInput) (_ *CreateDeploymentOutput, err error) {
+	ctx, end := startSpan(ctx, "DeploymentService.Deploy")
+	defer end(&err)
+
+	origins, err := s.projectOrigins(ctx, input.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	kind, resolved, err := domain.ResolveDeploymentTargets(origins, input.Targets)
+	if err != nil {
+		return nil, err
+	}
+	if input.HasTTL && kind == domain.DeploymentOriginKindPrimary {
+		return nil, domain.ErrDeploymentInvalid().WithMessage("ttl is only valid for preview URLs")
+	}
+	return s.Create(ctx, CreateDeploymentInput{
+		ProjectID:            input.ProjectID,
+		ReleaseID:            input.ReleaseID,
+		OriginKind:           kind,
+		Origins:              resolved,
+		Reason:               input.Reason,
+		Message:              input.Message,
+		ExpectedDeploymentID: input.ExpectedDeploymentID,
+	})
+}
+
+func (s *DeploymentService) projectOrigins(ctx context.Context, projectID string) ([]domain.Origin, error) {
+	project, err := s.v2Pool.Statements().GetProjectByID(ctx, projectID)
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return nil, domain.ErrProjectNotFound()
+		}
+		return nil, domain.ErrInternal(err).WithMessage("failed to get project from database")
+	}
+	return project.Origins, nil
+}
+
+// conflict answers a deploy that lost the optimistic lock with the deployment
+// it would have replaced.
 func (s *DeploymentService) conflict(ctx context.Context, entity *domain.Deployment) error {
 	_, current, err := servedBy(ctx, s.v2Pool.Statements(), entity)
 	if err != nil {
@@ -117,12 +168,21 @@ func (s *DeploymentService) conflict(ctx context.Context, entity *domain.Deploym
 	return domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{Deployment: current})
 }
 
-// servedBy reads what entity's origins serve, and the newest deployment to
-// them, nil when nothing was deployed there.
+// servedBy reads what entity's origins hold, for the optimistic lock, and the
+// deployment entity replaces: the project's newest primary deployment, or the
+// newest deployment to its preview URLs. nil when there is none.
+// TODO(#1572): lock primary deploys per project.
 func servedBy(ctx context.Context, stmts AllStatements, entity *domain.Deployment) ([]domain.OriginDeployment, *domain.Deployment, error) {
 	read, err := stmts.GetNewestPerOrigin(ctx, entity.ProjectID, entity.Origins())
 	if err != nil {
 		return nil, nil, err
+	}
+	if entity.OriginKind == domain.DeploymentOriginKindPrimary {
+		newest, err := stmts.ListDeployments(WithAuthzListUnrestricted(ctx), deployment.NewestOfKindOptions(entity.ProjectID, domain.DeploymentOriginKindPrimary))
+		if err != nil || len(newest.Items) == 0 {
+			return read, nil, err
+		}
+		return read, newest.Items[0], nil
 	}
 	newest := domain.NewestOriginDeployment(read)
 	if newest == nil {
@@ -151,7 +211,7 @@ func (s *DeploymentService) create(ctx context.Context, entity *domain.Deploymen
 		if err := domain.CheckExpectedDeployment(current, input.ExpectedDeploymentID); err != nil {
 			return err
 		}
-		if entity.Unchanged(read) {
+		if domain.DeploymentsEqual(entity, current) {
 			output = &CreateDeploymentOutput{Deployment: current}
 			return nil
 		}
@@ -166,6 +226,7 @@ func (s *DeploymentService) create(ctx context.Context, entity *domain.Deploymen
 			}
 			return err
 		}
+		// TODO(#1781): freeze the deployment's variables here, in this transaction.
 		if written.OriginKind == domain.DeploymentOriginKindPreview {
 			if err := stmts.UpsertPreviews(ctx, written.ProjectID, written.Origins(),
 				written.DeployedAt.Add(input.PreviewTTL), written.DeployedAt); err != nil {
