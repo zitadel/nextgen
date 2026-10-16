@@ -4,7 +4,7 @@ import { constants } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-import { ZitadelError } from "../errors";
+import { isErrno, ZitadelError } from "../errors";
 import { parseJsonObject } from "../json";
 import { EMPTY_SUMMARY, type EnvSummary, isEnvSummary } from "./env-vars";
 
@@ -424,15 +424,6 @@ async function nearestExistingDirectory(path: string): Promise<string> {
       current = parent;
     }
   }
-}
-
-function isErrno(error: unknown, code: string): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: unknown }).code === code
-  );
 }
 
 export function runtimeSummary(metadata: RuntimeMetadata | undefined): Record<string, unknown> {
