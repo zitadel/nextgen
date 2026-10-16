@@ -6,10 +6,12 @@ package integration_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -741,6 +743,159 @@ func TestPatchUser(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode, string(body))
 	})
+}
+
+// TestPatchUserFailedMigration pins the guarantee #1507 makes: a patch that
+// moves a user to another schema and fails changes neither the user's
+// attributes nor its schema reference. Three of the failures are decided in
+// Prepare, before the write transaction; the unique collision is decided by
+// the registry insert inside it, after the old rows were already deleted, so
+// it is the case that would leak a partial write.
+func TestPatchUserFailedMigration(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	// Every revision shares the object type and the unique username, and
+	// tightens one rule of the first: a property it requires, an enum, or a
+	// uniqueness claim on a property the first leaves free.
+	revision := func(t *testing.T, required []string, properties string) string {
+		t.Helper()
+		return harness.CreateUserSchema(t, project, fmt.Sprintf(`{
+			"title": "MigrationUser",
+			"$schema": "https://json-schema.org/draft/2020-12/schema",
+			"metaSchema": "%s/user-schema.json",
+			"kind": "user-schema",
+			"objectType": "migration-user",
+			"type": "object",
+			"x-auth-methods": {"passkey": {"enabled": true}},
+			"required": %s,
+			"properties": {
+				"username": {"type": "string", "x-unique": "project"},
+				%s
+			}
+		}`, helpers.BuiltinSchemaBaseURL, helpers.MustMarshal(t, required), properties))
+	}
+	initialSchema := revision(t, []string{"username"}, `
+		"nickname": {"type": "string"},
+		"color": {"type": "string"}`)
+	requiresGivenName := revision(t, []string{"username", "givenName"}, `
+		"nickname": {"type": "string"},
+		"color": {"type": "string"},
+		"givenName": {"type": "string"}`)
+	restrictsColor := revision(t, []string{"username"}, `
+		"nickname": {"type": "string"},
+		"color": {"type": "string", "enum": ["red", "blue"]}`)
+	uniqueNickname := revision(t, []string{"username"}, `
+		"nickname": {"type": "string", "x-unique": "project"},
+		"color": {"type": "string"}`)
+
+	users := harness.EnsureUserService(t)
+	createUser := func(t *testing.T, schemaURL string, attributes map[string]any) *domain.User {
+		t.Helper()
+		user, err := users.CreateUser(t.Context(), service.CreateUserInput{
+			ProjectID:  project.ID,
+			SchemaURL:  schemaURL,
+			Attributes: attributes,
+		})
+		require.NoError(t, err)
+		return user
+	}
+
+	// stored is what a failed migration must leave alone, read from storage
+	// rather than from the response.
+	type stored struct {
+		schemaURL  string
+		attributes map[string]any
+		updatedAt  time.Time
+		registry   map[domain.AttributeKey]string
+	}
+	readStored := func(t *testing.T, userID string) stored {
+		t.Helper()
+		user, err := users.GetUserByID(t.Context(), service.GetUserInput{ProjectID: project.ID, UserID: userID})
+		require.NoError(t, err)
+		attributes, err := user.Attributes.ToMap()
+		require.NoError(t, err)
+		registry, err := harness.EnsureServiceDB(t).Statements().GetUserUniqueAttributeScopes(t.Context(), project.ID, userID)
+		require.NoError(t, err)
+		return stored{
+			schemaURL:  user.SchemaURL,
+			attributes: attributes,
+			updatedAt:  user.Metadata.UpdatedAt,
+			registry:   registry,
+		}
+	}
+
+	for _, tc := range []struct {
+		name string
+		// setup runs before the user under test is created, for state the
+		// migration collides with.
+		setup        func(t *testing.T, suffix string)
+		targetSchema string
+		wantStatus   any
+	}{
+		{
+			name:         "a required attribute of the target revision is missing",
+			targetSchema: requiresGivenName,
+			wantStatus:   &api.PatchUserByIDBadRequest{},
+		},
+		{
+			name:         "a value violates a tightened rule",
+			targetSchema: restrictsColor,
+			wantStatus:   &api.PatchUserByIDBadRequest{},
+		},
+		{
+			name: "a value collides with another user's unique attribute",
+			setup: func(t *testing.T, suffix string) {
+				createUser(t, uniqueNickname, map[string]any{
+					"username": "holder-" + suffix,
+					"nickname": "nick-" + suffix,
+				})
+			},
+			targetSchema: uniqueNickname,
+			wantStatus:   &api.PatchUserByIDConflict{},
+		},
+		{
+			name:         "the target schema reference does not exist",
+			targetSchema: "https://example.com/schemas/migration-user-does-not-exist",
+			wantStatus:   &api.PatchUserByIDBadRequest{},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			suffix := helpers.RandString(8)
+			if tc.setup != nil {
+				tc.setup(t, suffix)
+			}
+			user := createUser(t, initialSchema, map[string]any{
+				"username": "migrant-" + suffix,
+				"nickname": "nick-" + suffix,
+				"color":    "green",
+			})
+			before := readStored(t, user.ID)
+			require.Contains(t, before.registry, domain.AttributeKey("username"), "the fixture must hold a registry claim")
+
+			req := &api.PatchUserRequest{}
+			require.NoError(t, req.UnmarshalJSON([]byte(helpers.MustMarshal(t, map[string]any{
+				"schema": tc.targetSchema,
+			}))))
+
+			resp, err := client.PatchUserByID(t.Context(), req, api.PatchUserByIDParams{UserID: api.UserID(user.ID)})
+			require.NoError(t, err)
+			require.IsType(t, tc.wantStatus, resp, helpers.MustMarshal(t, resp))
+
+			after := readStored(t, user.ID)
+			assert.Equal(t, before.schemaURL, after.schemaURL, "schema reference")
+			assert.Equal(t, before.attributes, after.attributes, "attributes")
+			assert.Equal(t, before.registry, after.registry, "unique attribute registry")
+			assert.True(t, before.updatedAt.Equal(after.updatedAt), "updated_at moved from %s to %s", before.updatedAt, after.updatedAt)
+		})
+	}
 }
 
 func TestPatchMyUser(t *testing.T) {
