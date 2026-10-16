@@ -1,7 +1,12 @@
 {
   "auth.factor.password.set": {
-    "min_length": { "type": "integer", "minimum": 1, "maximum": 64 },
-    "max_length": { "type": "integer", "minimum": 1, "maximum": 64 },
-    "history_depth": { "type": "integer", "minimum": 1, "maximum": 4 }
+    "settings": {
+      "min_length": { "type": "integer", "minimum": 1, "maximum": 64 },
+      "max_length": { "type": "integer", "minimum": 1, "maximum": 64 },
+      "history_depth": { "type": "integer", "minimum": 1, "maximum": 4 }
+    },
+    "config_rules": {
+      "min_length_not_above_max_length": "config.min_length <= config.max_length"
+    }
   }
 }

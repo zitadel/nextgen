@@ -10,6 +10,9 @@ var (
 	// template: an unknown setting, a value of the wrong type or outside the
 	// bounds, or a failed config rule.
 	ErrInvalidInstance = errors.New("policy: invalid instance")
+	// ErrUnbound is returned when a [Bound] was not made by [Engine.Bind].
+	// Evaluating it fails rather than allowing everything.
+	ErrUnbound = errors.New("policy: instance is not bound")
 	// ErrContextMismatch is returned when the request context does not match
 	// the template's context schema. Evaluation fails closed.
 	ErrContextMismatch = errors.New("policy: request context does not match the schema")

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 
 	"github.com/zitadel/nextgen/internal/maputil"
 )
@@ -164,10 +165,15 @@ func (e *Engine) template(operation string) (*compiledTemplate, error) {
 // Bound is an instance checked against its template and ready to evaluate:
 // its settings in canonical types and the rules they switch on. Bind it once
 // when the instance is resolved and evaluate it per request.
+//
+// Only [Engine.Bind] makes a usable Bound: the zero value, or a nil one, is
+// refused by [Bound.Evaluate] and [Bound.Constraints] rather than read as
+// "no rule is active", which would allow everything.
 type Bound struct {
-	ct     *compiledTemplate
-	values map[string]any
-	active []*compiledRule
+	ct         *compiledTemplate
+	values     map[string]any
+	configVars map[string]any
+	active     []*compiledRule
 }
 
 // Bind checks an instance against the operation's template: known settings,
@@ -180,7 +186,7 @@ func (e *Engine) Bind(ctx context.Context, operation string, inst *Instance) (*B
 	if err != nil {
 		return nil, err
 	}
-	b := &Bound{ct: ct}
+	b := &Bound{ct: ct, configVars: map[string]any{}}
 	if inst == nil {
 		return b, nil
 	}
@@ -191,13 +197,13 @@ func (e *Engine) Bind(ctx context.Context, operation string, inst *Instance) (*B
 	if err != nil {
 		return nil, err
 	}
-	vars := configActivation(b.values)
+	b.configVars = configActivation(b.values)
 	var problems []error
 	for _, rule := range ct.configRules {
 		if !rule.active(b.values) {
 			continue
 		}
-		held, err := rule.eval(ctx, vars)
+		held, err := rule.eval(ctx, b.configVars)
 		if err != nil {
 			return nil, err
 		}
@@ -224,15 +230,23 @@ func (e *Engine) ValidateInstance(ctx context.Context, inst *Instance) error {
 	return err
 }
 
-// Operation is the operation the instance guards.
+func (b *Bound) bound() bool {
+	return b != nil && b.ct != nil
+}
+
+// Operation is the operation the instance guards, empty for an unbound
+// value.
 func (b *Bound) Operation() string {
+	if !b.bound() {
+		return ""
+	}
 	return b.ct.Operation
 }
 
 // Active reports whether a rule is switched on. A context builder asks it
 // before deriving an expensive field only that rule reads.
 func (b *Bound) Active(rule string) bool {
-	return slices.ContainsFunc(b.active, func(r *compiledRule) bool { return r.Name == rule })
+	return b.bound() && slices.ContainsFunc(b.active, func(r *compiledRule) bool { return r.Name == rule })
 }
 
 // Decision is the outcome of one evaluation. Allow is false when the
@@ -252,19 +266,22 @@ type Decision struct {
 // rule the context is not read at all. A required field that is missing,
 // nil or mistyped is an error, never a silent allow.
 func (b *Bound) Evaluate(ctx context.Context, requestContext map[string]any) (Decision, error) {
+	if !b.bound() {
+		return Decision{}, ErrUnbound
+	}
 	if len(b.active) == 0 {
 		return Decision{Allow: true}, nil
 	}
-	vars := configActivation(b.values)
+	vars := maps.Clone(b.configVars)
 	for _, rule := range b.active {
 		for _, path := range rule.contextReads {
 			if _, done := vars[path]; done {
 				continue
 			}
 			leaf := b.ct.leaves[path]
-			value, ok := maputil.GetNested[any](requestContext, leaf.segments)
-			if !ok {
-				return Decision{}, fmt.Errorf("%w: missing field %q", ErrContextMismatch, path)
+			value, err := lookupLeaf(requestContext, leaf)
+			if err != nil {
+				return Decision{}, err
 			}
 			typed, err := coerceContext(leaf, value)
 			if err != nil {
@@ -299,12 +316,37 @@ type Constraints struct {
 }
 
 // Constraints computes the projection.
-func (b *Bound) Constraints() Constraints {
+func (b *Bound) Constraints() (Constraints, error) {
+	if !b.bound() {
+		return Constraints{}, ErrUnbound
+	}
 	out := Constraints{Operation: b.ct.Operation, Rules: make(map[string]any, len(b.active))}
 	for _, rule := range b.active {
 		out.Rules[rule.Name] = b.values[rule.Name]
 	}
-	return out
+	return out, nil
+}
+
+// lookupLeaf reads one context field. When the field is absent it says
+// whether the field or an object on its path is missing, or whether a value
+// on the path is not an object (a typed Go map such as map[string]int is
+// not one), so a broken builder is easy to find.
+func lookupLeaf(requestContext map[string]any, leaf contextField) (any, error) {
+	if value, ok := maputil.GetNested[any](requestContext, leaf.segments); ok {
+		return value, nil
+	}
+	var cur any = requestContext
+	for i, segment := range leaf.segments {
+		obj, ok := cur.(map[string]any)
+		if !ok {
+			parent := strings.Join(leaf.segments[:i], ".")
+			return nil, fmt.Errorf("%w: field %q is not an object, got %T", ErrContextMismatch, parent, cur)
+		}
+		if cur, ok = obj[segment]; !ok || cur == nil {
+			return nil, fmt.Errorf("%w: missing field %q", ErrContextMismatch, strings.Join(leaf.segments[:i+1], "."))
+		}
+	}
+	return nil, fmt.Errorf("%w: missing field %q", ErrContextMismatch, leaf.path)
 }
 
 // active reports whether every setting the rule reads is set.

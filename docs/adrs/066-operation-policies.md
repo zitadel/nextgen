@@ -118,8 +118,9 @@ validated. `context` is the schema of the derived values the rules receive
 (the raw input stays out of it), and doubles as the CEL type environment.
 `rules` is a list of named boolean expressions. Each reads exactly one
 setting and carries its name, so the name is at once the rule, the setting,
-the key of a violation and the key of a constraint; the server refuses to
-start on a template that breaks this. How a template is validated is in
+the key of a violation and the key of a constraint; `policy.New()` refuses
+a template that breaks this, and so does server startup once the gate wires
+the engine in. How a template is validated is in
 [Template](../design/policies/1-template.md).
 
 A template is not release content: templates ship with the server and evolve with it,
@@ -170,13 +171,14 @@ discriminator that says which template that is.
 - A bound that mirrors a server limit (64 code points, four kept passwords)
   is kept equal to the Go constant by a test. Raising the limit later widens
   what instances may set and breaks none.
-- A server upgrade may add settings and widen bounds, never remove a setting,
-  change its type or narrow a bound: a stored instance is bound against the
-  current template whenever it is resolved, so a narrowed template would make
-  every evaluation of that operation fail. A test checks every template
-  against a record of the settings instances may hold
-  (`internal/policy/testdata/settings_compat.json`); narrowing needs a
-  migration of stored instances first.
+- A server upgrade may add settings, widen bounds and drop config rules,
+  never remove a setting, change its type, narrow a bound, or add or change a
+  config rule: a stored instance is bound against the current template
+  whenever it is resolved, so a template that rejects more would make every
+  evaluation of that operation fail. A test checks every template against a
+  record of the settings instances may hold and the config rules they were
+  checked against (`internal/policy/testdata/settings_compat.json`); anything
+  stricter needs a migration of stored instances first.
 
 ### Policy catalog
 
@@ -202,8 +204,9 @@ Adding an operation is five things, and nothing else registers it:
 
 1. a template file under `internal/policy/templates/`, compiled and checked
    at startup by `policy.New()`;
-2. its settings recorded in `internal/policy/testdata/settings_compat.json`,
-   which keeps later templates from narrowing them;
+2. its settings and config rules recorded in
+   `internal/policy/testdata/settings_compat.json`, which keeps later
+   templates from rejecting stored instances;
 3. a row in the catalog index naming the template, the settings, the rules,
    and the evaluating function;
 4. a context builder in Go that derives the values the rules see for that
@@ -480,7 +483,7 @@ Duplication across operations. A control relevant at two operations is configure
 
 Long expressions in JSON. A rule list invites the temptation of one long expression. Mitigated by the caps (length, cost, `bool` result) and by the rule that a violation names one requirement.
 
-Expression language drift. cel-go gains features per release. Mitigated by the minimal environment: a rule uses the standard library and two extensions, and every template is compiled and checked when the server starts.
+Expression language drift. cel-go gains features per release. Mitigated by the minimal environment: a rule uses the standard library and two extensions, and every template is compiled and checked by `policy.New()`, which runs at server start once the gate is wired in.
 
 ## Design documents
 

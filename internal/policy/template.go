@@ -19,6 +19,7 @@ import (
 	"io"
 	"io/fs"
 	"maps"
+	"regexp"
 	"slices"
 	"strings"
 )
@@ -167,8 +168,8 @@ func (t *Template) validate() error {
 		return errors.New("operation is required")
 	}
 	for name, setting := range t.Config {
-		if name == "" || strings.Contains(name, ".") {
-			return fmt.Errorf("setting %q: names must be non-empty and cannot contain dots", name)
+		if !publicName.MatchString(name) {
+			return fmt.Errorf("setting %q: names must be snake_case", name)
 		}
 		switch setting.Type {
 		case SettingTypeInteger, SettingTypeBoolean, SettingTypeString:
@@ -191,6 +192,9 @@ func (t *Template) validate() error {
 			if rule.Name == "" {
 				return fmt.Errorf("rule %d: name is required", i)
 			}
+			if !publicName.MatchString(rule.Name) {
+				return fmt.Errorf("rule %q: names must be snake_case", rule.Name)
+			}
 			if _, dup := seen[rule.Name]; dup {
 				return fmt.Errorf("rule %q: duplicate name", rule.Name)
 			}
@@ -200,11 +204,27 @@ func (t *Template) validate() error {
 			}
 		}
 	}
-	if _, err := t.Context.leaves(); err != nil {
+	leaves, err := t.Context.leaves()
+	if err != nil {
 		return err
+	}
+	for _, leaf := range leaves {
+		if !slices.Contains(contextTypes, leaf.typ) {
+			return fmt.Errorf("context field %q: unsupported type %q, want one of %v", leaf.path, leaf.typ, contextTypes)
+		}
 	}
 	return nil
 }
+
+// publicName is the shape of a setting or rule name. Both reach clients as
+// keys of violations and constraints and as the suffix of login text keys,
+// so they follow the wire's snake_case.
+var publicName = regexp.MustCompile(`^[a-z][a-z0-9]*(_[a-z0-9]+)*$`)
+
+// contextTypes are the context field types the engine can both declare to
+// CEL and coerce a request value into. CEL would accept more (nested lists),
+// which would then fail every evaluation; they are refused here instead.
+var contextTypes = []string{"int", "bool", "string", "list<int>", "list<bool>", "list<string>"}
 
 // embeddedTemplates parses every template shipped with the server.
 func embeddedTemplates() ([]*Template, error) {

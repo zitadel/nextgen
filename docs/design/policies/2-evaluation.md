@@ -90,8 +90,10 @@ server start for every rule in every template, the last on every evaluation:
   aborts past a budget. The rule also runs under the request's context
   deadline.
 
-A template that fails a startup check stops the server before it serves
-traffic, so a bad rule never reaches a running system. The values live in
+A template that fails one of these checks fails `policy.New()`, and the
+server calls it at startup once the gate is wired in, so a bad rule never
+reaches a running system. Until then the package's tests compile the
+embedded catalog. The values live in
 `policy.DefaultLimits` and are sized for a handful of scalar comparisons per
 rule. Kubernetes enforces the same pair (a static per-expression limit and a
 per-request runtime budget); OpenFGA caps condition cost the same way.

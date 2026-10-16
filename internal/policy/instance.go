@@ -14,10 +14,6 @@ import (
 // Instance is the developer-authored half of a policy: the settings a
 // project sets for one operation. A setting it omits is off.
 type Instance struct {
-	// Schema is the editor's `$schema` pointer an authored file may carry.
-	// It means nothing to the server and is accepted only so the file can be
-	// parsed as written.
-	Schema    string         `json:"$schema,omitempty"`
 	Kind      string         `json:"kind"`
 	Operation string         `json:"operation"`
 	Config    map[string]any `json:"config"`
@@ -32,13 +28,20 @@ func ParseInstance(data []byte) (*Instance, error) {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
 	dec.UseNumber()
-	var inst Instance
-	if err := dec.Decode(&inst); err != nil {
+	// An authored file may carry the editor's `$schema` pointer. It is
+	// accepted so the file parses as written and dropped here, so it never
+	// travels further as part of the instance.
+	var doc struct {
+		Schema string `json:"$schema"`
+		Instance
+	}
+	if err := dec.Decode(&doc); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidInstance, err)
 	}
 	if err := dec.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
 		return nil, fmt.Errorf("%w: unexpected data after the instance", ErrInvalidInstance)
 	}
+	inst := doc.Instance
 	if inst.Kind != KindPolicy {
 		return nil, fmt.Errorf("%w: kind must be %q, got %q", ErrInvalidInstance, KindPolicy, inst.Kind)
 	}
@@ -122,8 +125,16 @@ func toInt64(raw any) (int64, bool) {
 		}
 		return int64(v), true
 	case json.Number:
-		n, err := v.Int64()
-		return n, err == nil
+		// "12" parses directly; "12.0" and "1.2e1" are the same integer
+		// and must be accepted as a float64 decoder would accept them.
+		if n, err := v.Int64(); err == nil {
+			return n, true
+		}
+		f, err := v.Float64()
+		if err != nil {
+			return 0, false
+		}
+		return toInt64(f)
 	}
 	return 0, false
 }

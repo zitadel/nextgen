@@ -48,8 +48,9 @@ recommendation, no marker.
   equal to its Go constant, so the two cannot drift. Raising a limit later
   widens what an instance may set and breaks none; lowering one would, so a
   test holds every template to the record in
-  `internal/policy/testdata/settings_compat.json`: settings may be added and
-  bounds widened, never removed, retyped or narrowed.
+  `internal/policy/testdata/settings_compat.json`: settings may be added,
+  bounds widened and config rules dropped, never a setting removed, retyped
+  or narrowed, nor a config rule added or changed.
 - What the server enforces regardless of any policy stays in the domain. The
   64 cap is checked by `domain.HashPassword` whether or not a policy exists;
   `max_length` only lets a project go lower.
@@ -68,7 +69,7 @@ runs. A config rule must read at least one setting.
 The schema of what the rules receive: derived values computed in Go for this
 one evaluation, with the raw input kept out. It is also the CEL type
 environment the rules are checked against, so a rule referencing an
-undeclared field fails at server start. The context builder per operation is
+undeclared field fails `policy.New()`. The context builder per operation is
 described in [Evaluation](2-evaluation.md). Only Zitadel's templates read the
 context, so it can change with the server; it is not a public contract.
 
@@ -86,8 +87,14 @@ The rule is what makes the naming worth enforcing: the name is at once the
 setting in the instance, the key of a violation in a denial, the key in
 `constraints`, and the suffix of the login text key
 (`error.x-auth-methods#password_min_length`). One name, four places, nothing
-to keep in step. Rule names are therefore public API: snake_case, and never
-renamed once published; a change in meaning is a new rule.
+to keep in step. Rule names are therefore public API: snake_case (checked
+when the template is parsed), and never renamed once published; a change in
+meaning is a new rule.
+
+Context fields take one of `int`, `bool`, `string`, `list<int>`,
+`list<bool>`, `list<string>`. CEL could declare more, but the engine could
+not fill them from a request, so a template that uses another type is
+refused instead of failing every evaluation.
 
 A rule is active when its setting is set. `history_depth` shows why the rule
 reads the setting even though Go applies the depth when building
@@ -97,7 +104,7 @@ than the depth asks for.
 
 Rules are atomic by construction: an expression must type-check to `bool`,
 stays under a length cap, and its statically estimated cost stays under a
-limit, all checked when the server starts
+limit, all checked by `policy.New()`
 ([Evaluation](2-evaluation.md#limits)). A rule that needs more than that is
 two rules.
 

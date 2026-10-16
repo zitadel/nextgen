@@ -1,6 +1,7 @@
 package policy_test
 
 import (
+	"encoding/json"
 	"math"
 	"strings"
 	"testing"
@@ -144,6 +145,9 @@ func TestParseTemplate_RejectsStructure(t *testing.T) {
     "max"`, `"minimum": 11, "maximum": 10 },
     "max"`}, "minimum 11 is above maximum 10"},
 		{"unsupported type", [2]string{`"max": { "type": "integer"`, `"max": { "type": "number"`}, "unsupported type"},
+		{"setting not snake_case", [2]string{`"max": { "type"`, `"maxValue": { "type"`}, "names must be snake_case"},
+		{"rule not snake_case", [2]string{`{ "name": "min_not_above_max"`, `{ "name": "Min-Not-Above"`}, "names must be snake_case"},
+		{"context type CEL accepts but the engine cannot coerce", [2]string{`"counts": "list<int>"`, `"counts": "list<list<int>>"`}, "unsupported type"},
 		{"misspelled top-level key", [2]string{`"config_rules"`, `"config_rule"`}, "unknown field"},
 		{"marker the format does not have", [2]string{`"minimum": 1, "maximum": 10 },
     "max"`, `"minimum": 1, "maximum": 10, "default": 5 },
@@ -206,6 +210,20 @@ func TestBind_InstanceForAnotherOperation(t *testing.T) {
 	require.ErrorIs(t, err, policy.ErrInvalidInstance)
 }
 
+func TestBound_UnboundFailsClosed(t *testing.T) {
+	var zero policy.Bound
+	_, err := zero.Evaluate(t.Context(), nil)
+	require.ErrorIs(t, err, policy.ErrUnbound)
+	_, err = zero.Constraints()
+	require.ErrorIs(t, err, policy.ErrUnbound)
+	assert.False(t, zero.Active("min"))
+	assert.Empty(t, zero.Operation())
+
+	var none *policy.Bound
+	_, err = none.Evaluate(t.Context(), nil)
+	require.ErrorIs(t, err, policy.ErrUnbound)
+}
+
 func TestBound_ActiveAndOnlyActiveFieldsRequired(t *testing.T) {
 	e := testEngine(t)
 	b := bindTest(t, e, map[string]any{"min": 2})
@@ -241,6 +259,20 @@ func TestBound_Evaluate_ContextMismatchFailsClosed(t *testing.T) {
 	}
 }
 
+func TestBound_Evaluate_NamesTheBrokenPath(t *testing.T) {
+	e, err := policy.New()
+	require.NoError(t, err)
+	b, err := e.Bind(t.Context(), "auth.factor.password.set", &policy.Instance{Kind: policy.KindPolicy, Operation: "auth.factor.password.set", Config: map[string]any{"min_length": 3}})
+	require.NoError(t, err)
+
+	_, err = b.Evaluate(t.Context(), map[string]any{"candidate": map[string]int{"length": 9}})
+	require.ErrorIs(t, err, policy.ErrContextMismatch)
+	assert.ErrorContains(t, err, `field "candidate" is not an object`)
+
+	_, err = b.Evaluate(t.Context(), map[string]any{})
+	assert.ErrorContains(t, err, `missing field "candidate"`)
+}
+
 func TestBound_Evaluate_ListOfIntShapes(t *testing.T) {
 	e := testEngine(t)
 	b := bindTest(t, e, map[string]any{"max": 5})
@@ -265,7 +297,13 @@ func TestParseInstance(t *testing.T) {
 
 	withSchema, err := policy.ParseInstance([]byte(`{"$schema":"../meta/policy.json","kind":"policy","operation":"test.op","config":{}}`))
 	require.NoError(t, err, "an authored file carries an editor $schema pointer")
-	assert.Equal(t, "../meta/policy.json", withSchema.Schema)
+	out, err := json.Marshal(withSchema)
+	require.NoError(t, err)
+	assert.NotContains(t, string(out), "$schema", "the editor pointer must not travel with the instance")
+
+	decimal, err := policy.ParseInstance([]byte(`{"kind":"policy","operation":"test.op","config":{"min":2.0,"max":1e1}}`))
+	require.NoError(t, err)
+	require.NoError(t, testEngine(t).ValidateInstance(t.Context(), decimal), "2.0 and 1e1 are integers")
 
 	for name, doc := range map[string]string{
 		"unknown field":     `{"kind":"policy","operation":"test.op","config":{},"audience":{}}`,

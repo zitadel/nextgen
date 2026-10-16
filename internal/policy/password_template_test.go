@@ -163,15 +163,19 @@ func TestPasswordSet_Constraints(t *testing.T) {
 
 	none, err := e.Bind(t.Context(), passwordSet, nil)
 	require.NoError(t, err)
-	assert.Empty(t, none.Constraints().Rules)
+	noneConstraints, err := none.Constraints()
+	require.NoError(t, err)
+	assert.Empty(t, noneConstraints.Rules)
 	assert.False(t, none.Active("history_depth"))
 
 	b, err := e.Bind(t.Context(), passwordSet, passwordInstance(t, `{"min_length":12,"history_depth":4}`))
 	require.NoError(t, err)
+	got, err := b.Constraints()
+	require.NoError(t, err)
 	assert.Equal(t, policy.Constraints{
 		Operation: passwordSet,
 		Rules:     map[string]any{"min_length": int64(12), "history_depth": int64(4)},
-	}, b.Constraints())
+	}, got)
 	assert.True(t, b.Active("history_depth"))
 }
 
