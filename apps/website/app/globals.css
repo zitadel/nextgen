@@ -9,9 +9,12 @@
   --color-text-primary: #f4f4f6;
   --color-text-secondary: #bfbfcf;
   --color-text-muted: #82829c;
+  --color-text-accent: #bba5e4;
   --color-border-primary: #252528;
+  --color-border-secondary: #484a57;
   --color-surface-black-secondary: #252528;
   --color-accent-strong: #bd2514;
+  --color-success: #33a779;
 
   /* layout.tsx sets --font-arimo, --font-apk-futural and --font-azeret-mono
      on <html>. */
@@ -20,37 +23,43 @@
   --font-mono: var(--font-azeret-mono), ui-monospace, monospace;
 }
 
-/* How the stage and the commands under it move in. */
+/* How the stage, the headline and the commands under it move in, and how
+   much of the first step the first screen shows under the hero: its number,
+   its title and the top of its card, to tease what comes below. */
 :root {
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --peek: 3.5rem;
 }
 
-/* The centerpiece (page.tsx): the website's hero animation, its own light
-   spilling around it, leaning toward the pointer (stage.tsx sets --tilt-x and
-   --tilt-y, from -0.5 to 0.5). */
+/* The centerpiece of the hero (page.tsx): the website's hero animation, its
+   own light spilling around it, leaning toward the pointer (stage.tsx sets
+   --tilt-x and --tilt-y, from -0.5 to 0.5), the headline under it and the
+   commands under that. */
 @layer components {
+  /* The hero takes the first screen under the header (h-16 and its border)
+     but the peek: on a tall screen the extra height surrounds it, and the
+     first step shows just its top at the fold instead of crowding under the
+     buttons. */
+  .hero {
+    min-height: calc(100svh - 4rem - 1px - var(--peek));
+  }
+
   .stage {
     --tilt-x: 0;
     --tilt-y: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
-    /* As wide as the column, 44rem, and the height beside the logo, the
-       caption and the commands allow, but never so small that the animation
-       is lost: a phone held sideways scrolls instead. */
-    width: min(100%, 44rem, max(18rem, calc((100dvh - 19rem) * 550 / 448)));
-  }
-
-  /* Over the animation's dark top, a little nearer than it, like the caption. */
-  .stage-logo {
-    position: relative;
-    z-index: 1;
-    height: 1.75rem;
-    width: auto;
-    /* A share of the stage's width, so of the frame's height too. */
-    margin-bottom: -3%;
-    translate: calc(var(--tilt-x) * 1rem) calc(var(--tilt-y) * 0.75rem);
-    transition: translate 900ms var(--ease);
+    /* At most 40rem wide, and as high as the screen leaves beside the header,
+       the headline, the line, the commands, the buttons and the air under
+       them (33.5rem), and the peek, so all of them fit a laptop's first
+       screen; never so small that the animation is lost: a short screen
+       scrolls instead. */
+    width: min(
+      100%,
+      40rem,
+      max(15rem, calc((100svh - 33.5rem - var(--peek)) * 550 / 448))
+    );
   }
 
   .stage-frame {
@@ -87,21 +96,24 @@
     translate: calc(var(--tilt-x) * -3rem) calc(var(--tilt-y) * -2rem);
   }
 
-  /* Tucked into the animation's faded bottom, lit by it from below. */
+  /* The headline, tucked into the animation's faded bottom and lit by it
+     from below. As wide as its words, not the stage: on one line wherever
+     the screen has room, centred under the animation. */
   .stage-caption {
+    position: relative;
+    width: max-content;
+    max-width: calc(100vw - 3rem);
     margin-top: -2.5rem;
     font-family: var(--font-heading);
-    font-size: clamp(2.75rem, 9vw, 5rem);
-    line-height: 1.1;
+    font-size: clamp(2.25rem, 6vw, 4rem);
+    line-height: 1.05;
     letter-spacing: -0.025em;
     text-align: center;
-    /* One line even while its letters gather (caption-in), so nothing below
-       it moves. */
-    white-space: nowrap;
+    text-wrap: balance;
     background: linear-gradient(
       180deg,
-      var(--color-foreground) 35%,
-      var(--color-accent-strong) 150%
+      var(--color-foreground) 45%,
+      var(--color-accent-strong) 160%
     );
     background-clip: text;
     color: transparent;
@@ -115,17 +127,26 @@
     }
 
     .stage-caption {
-      animation: caption-in 2s var(--ease) 0.2s both;
+      animation: caption-in 1.4s var(--ease) 0.15s both;
     }
 
-    /* The commands under the caption (page.tsx), once the words are in. */
+    /* The line, the commands and the buttons (page.tsx), soon after: they
+       are what a visitor came to copy. */
     .teaser {
-      animation: teaser-in 1.2s var(--ease) 1s both;
+      animation: teaser-in 1s var(--ease) 0.35s both;
+    }
+
+    /* The start of the steps' spine under the buttons (page.tsx), drawn down
+       toward the first step once they are in. */
+    .spine-teaser {
+      transform-origin: top;
+      animation: spine-in 1.2s var(--ease) 1.1s both;
     }
   }
 
-  /* The logo (logo.tsx) moves as on the website: while the pointer is on it,
-     back at rest when it leaves, and on its own where nothing hovers. */
+  /* The logo (logo.tsx) moves as on the website while the pointer is on it,
+     and is back at rest when it leaves. In the header and the footer it never
+     moves on its own. */
   .logo-icon {
     transform-box: view-box;
     transform-origin: 63px 63px;
@@ -139,20 +160,11 @@
     .logo:hover .logo-letter {
       animation: logo-roll 5s infinite both;
     }
-
-    @media (hover: none) {
-      .logo .logo-icon {
-        animation: logo-spin 5s infinite;
-      }
-
-      .logo .logo-letter {
-        animation: logo-roll 5s infinite both;
-      }
-    }
   }
 }
 
-/* The doors appear, then the words gather. */
+/* The doors appear, the words come into focus, and the commands rise into
+   place under them. */
 @keyframes stage-in {
   from {
     opacity: 0;
@@ -163,7 +175,7 @@
 @keyframes caption-in {
   from {
     opacity: 0;
-    letter-spacing: 0.4em;
+    filter: blur(0.5rem);
   }
 }
 
@@ -171,6 +183,12 @@
   from {
     opacity: 0;
     translate: 0 0.75rem;
+  }
+}
+
+@keyframes spine-in {
+  from {
+    scale: 1 0;
   }
 }
 

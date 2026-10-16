@@ -67,6 +67,18 @@ So the template's root routes live under `/docs` here:
 - The favicons are the one exception: `app/layout.tsx` links the cloud's, which
   the website serves at `/favicons/`
   ([`apps/website/AGENTS.md`](../website/AGENTS.md#the-logo-and-the-favicons)).
+- The sidebar's title is the website's header: its animated logo
+  (`components/logo.tsx`, a copy of `apps/website/app/logo.tsx`, with its
+  motion in `app/global.css`) and, in place of the website's Preview label, a
+  Docs pill in the same style (`lib/layout.shared.tsx`). Change the copies
+  together. The logo plays while the pointer is on it or its link, as on the
+  website, and never on its own.
+- The sidebar links the website at `/` above the pages
+  (`lib/layout.shared.tsx`); the storybook goes unlinked, as in the website's
+  header. The website is a deployment of its own, so the link is a plain
+  `<a>`: a custom item, styled as the layout's own items. A link item would go
+  through `next/link`, which prefetches from this app and routes there in it,
+  or, marked external, opens a new tab.
 
 ## Content
 

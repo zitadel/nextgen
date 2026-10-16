@@ -15,7 +15,7 @@ deployment as five [services](https://vercel.com/docs/services):
 | `console` | `apps/console` | the console SPA, built for `/console/` with Vercel Web Analytics and Speed Insights | `/console/*` |
 | `storybook` | `apps/storybook` | the component workbench, a static build | `/storybook/*` |
 | `docs` | `apps/docs` | the docs site, Fumadocs on Next.js, with Vercel Web Analytics and Speed Insights | `/docs`, `/docs/*` |
-| `website` | `apps/website` | the coming-soon page, on Next.js, with Vercel Web Analytics and Speed Insights | `/`, `/_next/*`, `/favicon.ico`, `/favicons/*` |
+| `website` | `apps/website` | the front page, on Next.js, with Vercel Web Analytics and Speed Insights | `/`, `/llms.txt`, `/_next/*`, `/favicon.ico`, `/favicons/*` |
 
 The console is served on the same origin, so the session cookie and CSRF work
 unchanged, but at `/console/` rather than a self-hosted server's
@@ -36,7 +36,8 @@ stays under its 1.5 GB limit, and pnpm skips it once a service built earlier
 in the deployment has installed (`--optimistic-repeat-install`). The console
 and the storybook build with `turbo run build`, which reads and writes the
 team's remote cache as Vercel sets it up; the docs and the website run their
-own `pnpm run build`.
+own `pnpm run build`, the website after `@zitadel/components` has built
+through turbo, since its showcase renders the package's atoms.
 
 | File | Role |
 |---|---|

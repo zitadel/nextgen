@@ -17,6 +17,7 @@
   "dependencies": {
     "@vercel/analytics": "catalog:",
     "@vercel/speed-insights": "catalog:",
+    "@zitadel/components": "workspace:*",
     "next": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:"
