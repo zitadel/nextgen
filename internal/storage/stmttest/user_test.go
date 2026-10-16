@@ -716,3 +716,86 @@ func TestUserStatements_GetUser_UniqueTeamIDFiltersRegistryRows(t *testing.T) {
 		assert.Equal(t, owner.ID, got.ID)
 	})
 }
+
+// Attributes list by any of their fields, joined to their registry claim.
+// A non-unique attribute has no claim, and a claim under another team scope
+// does not match.
+func TestUserStatements_ListUserAttributes(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+		attr := func(key domain.AttributeKey, value any, scope domain.AttributeUniqueness) domain.CreateAttribute {
+			a, err := domain.NewCreateAttribute(key, value, scope)
+			require.NoError(t, err)
+			return *a
+		}
+		username := attr("username", "alice", domain.AttributeUniquenessProject)
+		phone := attr("phone", "+41000000000", domain.AttributeUniquenessProject)
+		email := attr("email", "self@example.com", domain.AttributeUniquenessProject)
+
+		require.NoError(t, d.stmts.CreateUser(t.Context(), &domain.CreateUser{
+			ProjectID:  projectID,
+			SchemaURL:  schemaURL,
+			ID:         "user_attrs_self",
+			Attributes: domain.CreateAttributes{email},
+		}))
+		require.NoError(t, d.stmts.CreateUser(t.Context(), &domain.CreateUser{
+			ProjectID: projectID,
+			SchemaURL: schemaURL,
+			ID:        "user_attrs_other",
+			Attributes: domain.CreateAttributes{
+				username,
+				phone,
+				attr("nickname", "ally", domain.AttributeUniquenessUnspecified),
+			},
+		}))
+
+		projectScope := ""
+		byKey := database.OrderBy[domain.UserAttributeField]{
+			Columns:   []database.Column[domain.UserAttributeField]{database.Col(domain.UserAttributeFieldKey)},
+			Direction: database.OrderAsc,
+		}
+
+		t.Run("by user", func(t *testing.T) {
+			got, err := d.stmts.ListUserAttributes(t.Context(), &database.ListOptions[domain.UserAttributeField]{
+				Filter: database.And(
+					database.Equal(database.Col(domain.UserAttributeFieldProjectID), projectID),
+					database.Equal(database.Col(domain.UserAttributeFieldUserID), "user_attrs_other"),
+				),
+				Pagination: database.Page[domain.UserAttributeField]{OrderBy: byKey},
+			})
+			require.NoError(t, err)
+			assert.Equal(t, []*domain.UserAttribute{
+				{ProjectID: projectID, UserID: "user_attrs_other", Key: "nickname", Value: "ally"},
+				{ProjectID: projectID, UserID: "user_attrs_other", Key: "phone", Value: "+41000000000", UniqueTeamID: &projectScope, ValueHash: phone.ValueHash[:]},
+				{ProjectID: projectID, UserID: "user_attrs_other", Key: "username", Value: "alice", UniqueTeamID: &projectScope, ValueHash: username.ValueHash[:]},
+			}, got.Items)
+		})
+
+		t.Run("by claim", func(t *testing.T) {
+			claim := func(teamID string, a domain.CreateAttribute) database.Filter[domain.UserAttributeField] {
+				return database.And(
+					database.Equal(database.Col(domain.UserAttributeFieldUniqueTeamID), teamID),
+					database.Equal(database.Col(domain.UserAttributeFieldKey), string(a.Key)),
+					database.Equal(database.Col(domain.UserAttributeFieldValueHash), a.ValueHash[:]),
+				)
+			}
+			got, err := d.stmts.ListUserAttributes(t.Context(), &database.ListOptions[domain.UserAttributeField]{
+				Filter: database.And(
+					database.Equal(database.Col(domain.UserAttributeFieldProjectID), projectID),
+					database.Or(
+						claim("", username),
+						claim("", email),
+						claim("team_attrs", phone),
+						claim("", attr("login", "free", domain.AttributeUniquenessProject)),
+					),
+				),
+				Pagination: database.Page[domain.UserAttributeField]{OrderBy: byKey},
+			})
+			require.NoError(t, err)
+			assert.Equal(t, []*domain.UserAttribute{
+				{ProjectID: projectID, UserID: "user_attrs_self", Key: "email", Value: "self@example.com", UniqueTeamID: &projectScope, ValueHash: email.ValueHash[:]},
+				{ProjectID: projectID, UserID: "user_attrs_other", Key: "username", Value: "alice", UniqueTeamID: &projectScope, ValueHash: username.ValueHash[:]},
+			}, got.Items)
+		})
+	})
+}

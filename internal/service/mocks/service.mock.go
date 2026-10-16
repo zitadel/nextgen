@@ -5277,6 +5277,45 @@ func (c *MockAllStatementsListTokensCall) DoAndReturn(f func(context.Context, *d
 	return c
 }
 
+// ListUserAttributes mocks base method.
+func (m *MockAllStatements) ListUserAttributes(ctx context.Context, opts *database.ListOptions[domain.UserAttributeField]) (*database.ListResult[*domain.UserAttribute], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListUserAttributes", ctx, opts)
+	ret0, _ := ret[0].(*database.ListResult[*domain.UserAttribute])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListUserAttributes indicates an expected call of ListUserAttributes.
+func (mr *MockAllStatementsMockRecorder) ListUserAttributes(ctx, opts any) *MockAllStatementsListUserAttributesCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListUserAttributes", reflect.TypeOf((*MockAllStatements)(nil).ListUserAttributes), ctx, opts)
+	return &MockAllStatementsListUserAttributesCall{Call: call}
+}
+
+// MockAllStatementsListUserAttributesCall wrap *gomock.Call
+type MockAllStatementsListUserAttributesCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsListUserAttributesCall) Return(arg0 *database.ListResult[*domain.UserAttribute], arg1 error) *MockAllStatementsListUserAttributesCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsListUserAttributesCall) Do(f func(context.Context, *database.ListOptions[domain.UserAttributeField]) (*database.ListResult[*domain.UserAttribute], error)) *MockAllStatementsListUserAttributesCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsListUserAttributesCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.UserAttributeField]) (*database.ListResult[*domain.UserAttribute], error)) *MockAllStatementsListUserAttributesCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ListUserPasskeys mocks base method.
 func (m *MockAllStatements) ListUserPasskeys(ctx context.Context, filter *database.ListOptions[domain.UserPasskeyField]) (*database.ListResult[*domain.UserPasskey], error) {
 	m.ctrl.T.Helper()
@@ -9755,6 +9794,45 @@ func (c *MockUserStatementsIsStatementsCall) Do(f func()) *MockUserStatementsIsS
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockUserStatementsIsStatementsCall) DoAndReturn(f func()) *MockUserStatementsIsStatementsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ListUserAttributes mocks base method.
+func (m *MockUserStatements) ListUserAttributes(ctx context.Context, opts *database.ListOptions[domain.UserAttributeField]) (*database.ListResult[*domain.UserAttribute], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListUserAttributes", ctx, opts)
+	ret0, _ := ret[0].(*database.ListResult[*domain.UserAttribute])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListUserAttributes indicates an expected call of ListUserAttributes.
+func (mr *MockUserStatementsMockRecorder) ListUserAttributes(ctx, opts any) *MockUserStatementsListUserAttributesCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListUserAttributes", reflect.TypeOf((*MockUserStatements)(nil).ListUserAttributes), ctx, opts)
+	return &MockUserStatementsListUserAttributesCall{Call: call}
+}
+
+// MockUserStatementsListUserAttributesCall wrap *gomock.Call
+type MockUserStatementsListUserAttributesCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockUserStatementsListUserAttributesCall) Return(arg0 *database.ListResult[*domain.UserAttribute], arg1 error) *MockUserStatementsListUserAttributesCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockUserStatementsListUserAttributesCall) Do(f func(context.Context, *database.ListOptions[domain.UserAttributeField]) (*database.ListResult[*domain.UserAttribute], error)) *MockUserStatementsListUserAttributesCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockUserStatementsListUserAttributesCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.UserAttributeField]) (*database.ListResult[*domain.UserAttribute], error)) *MockUserStatementsListUserAttributesCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -15360,6 +15438,44 @@ func (c *MockUserActionApplyCall) Do(f func(context.Context, service.AllStatemen
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockUserActionApplyCall) DoAndReturn(f func(context.Context, service.AllStatements) error) *MockUserActionApplyCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// Err mocks base method.
+func (m *MockUserAction) Err(ctx context.Context, stmts service.AllStatements) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Err", ctx, stmts)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Err indicates an expected call of Err.
+func (mr *MockUserActionMockRecorder) Err(ctx, stmts any) *MockUserActionErrCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Err", reflect.TypeOf((*MockUserAction)(nil).Err), ctx, stmts)
+	return &MockUserActionErrCall{Call: call}
+}
+
+// MockUserActionErrCall wrap *gomock.Call
+type MockUserActionErrCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockUserActionErrCall) Return(arg0 error) *MockUserActionErrCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockUserActionErrCall) Do(f func(context.Context, service.AllStatements) error) *MockUserActionErrCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockUserActionErrCall) DoAndReturn(f func(context.Context, service.AllStatements) error) *MockUserActionErrCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

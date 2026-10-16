@@ -658,7 +658,7 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 		Subject:       parked.Subject,
 		Attributes:    attributes,
 	})
-	if errors.Is(err, ErrUserAlreadyExists()) {
+	if IsUserAlreadyExists(err) {
 		// Another flow took a unique value since the probe (a request on this
 		// attempt loses on the parked row instead): whoever took a probed
 		// attribute is bound, and anything else falls back to collection.
@@ -667,7 +667,7 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 		}
 		return FlowImplicitOutcomeSSOUserNotFound, nil
 	}
-	if errors.Is(err, ErrUserInvalid()) {
+	if IsUserInvalid(err) {
 		// A claim the user may edit fails the schema (too long, bad format):
 		// collect it so the user can fix it.
 		return FlowImplicitOutcomeSSOUserNotFound, nil
@@ -1524,7 +1524,7 @@ func (r *FlowStateMachineRuntime) processSSOCollection(pc *processCtx, resolved 
 		Password:      state.CollectedData.AuthMethods.Password,
 	})
 	switch {
-	case errors.Is(err, ErrUserAlreadyExists()):
+	case IsUserAlreadyExists(err):
 		// Another flow took a unique value since the probe: whoever took it
 		// is bound.
 		bound, err := r.bindSSOCollision(pc.ctx, state, step, collected, probe, attributes)
@@ -1534,7 +1534,7 @@ func (r *FlowStateMachineRuntime) processSSOCollection(pc *processCtx, resolved 
 		return r.renderStepError(pc, resolved, new(FlowStepErrorUserAlreadyExists))
 	case errors.Is(err, ErrSSOStateInvalid()):
 		return r.resolveStaleSSOSubmit(pc, resolved, loadInput)
-	case errors.Is(err, ErrUserInvalid()):
+	case IsUserInvalid(err):
 		// RequiredPaths does not see a property that allOf or a reference
 		// requires. The schema library locates it by keyword, as in
 		// properties/account allOf/0 required/id. It reports a property a then
@@ -1944,7 +1944,7 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 				state.IssuedAt = r.now()
 				return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
 			}
-			if errors.Is(err, ErrUserAlreadyExists()) {
+			if IsUserAlreadyExists(err) {
 				// A unique attribute of the provisional user is taken: route
 				// like the identifier dispatch does. That path pins the
 				// existing user on the attempt before routing — and the

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/audit"
@@ -35,7 +36,12 @@ type CreateUserInput struct {
 type UserAction interface {
 	Prepare(ctx context.Context) error
 	Apply(ctx context.Context, stmts AllStatements) error
+	Err(ctx context.Context, stmts AllStatements) error
 }
+
+type noUserActionErr struct{}
+
+func (noUserActionErr) Err(context.Context, AllStatements) error { return nil }
 
 type SetPasswordInput struct {
 	ProjectID string
@@ -186,6 +192,14 @@ func (s *userService) ApplyActions(ctx context.Context, actions ...UserAction) (
 		return nil
 	})
 	if err != nil {
+		// An error the failed action recorded takes precedence: the
+		// transaction stops at the first failing action, so at most one did.
+		for _, action := range actions {
+			if actionErr := action.Err(ctx, s.v2Pool.Statements()); actionErr != nil {
+				err = actionErr
+				break
+			}
+		}
 		if de, ok := errors.AsType[domain.Error](err); ok {
 			return de
 		}
@@ -194,18 +208,11 @@ func (s *userService) ApplyActions(ctx context.Context, actions ...UserAction) (
 	return nil
 }
 
-func emitUserCreateFailedBestEffort(ctx context.Context, pool StatementPool, action *CreateUserAction, applyErr error) {
-	var unique *database.UniqueError
-	if !errors.As(applyErr, &unique) {
-		return
-	}
-	if action == nil || action.CreateUser == nil {
-		return
-	}
-	_ = audit.Emit(ctx, pool.Statements(), audit.EmitSpec{
+func emitUserCreateFailedBestEffort(ctx context.Context, stmts AllStatements, projectID string, unique *database.UniqueError) {
+	_ = audit.Emit(ctx, stmts, audit.EmitSpec{
 		Type:       domain.EventTypeUserCreateFailed,
 		Category:   domain.EventCategoryEntity,
-		ProjectID:  action.ProjectID,
+		ProjectID:  projectID,
 		EntityType: "user",
 		Payload:    domain.UserCreateFailedPayload{KeyName: unique.Constraint()},
 	})
@@ -214,7 +221,6 @@ func emitUserCreateFailedBestEffort(ctx context.Context, pool StatementPool, act
 func (s *userService) CreateUser(ctx context.Context, input CreateUserInput) (_ *domain.User, err error) {
 	action := NewCreateUserAction(input, s.schemaStore)
 	if err := s.ApplyActions(ctx, action); err != nil {
-		emitUserCreateFailedBestEffort(ctx, s.v2Pool, action, err)
 		return nil, err
 	}
 
@@ -648,6 +654,8 @@ type CreateUserAction struct {
 	CreateUser *domain.CreateUser
 	// schemaJSON is the user schema document used at create time for x-audit value filtering.
 	schemaJSON []byte
+
+	err error
 }
 
 func NewCreateUserAction(input CreateUserInput, schemaStore domain.JSONSchemaStore) *CreateUserAction {
@@ -692,7 +700,8 @@ func (o *CreateUserAction) Prepare(ctx context.Context) error {
 }
 
 func (o *CreateUserAction) Apply(ctx context.Context, stmts AllStatements) error {
-	if err := applyCreateUser(ctx, stmts, o.CreateUser); err != nil {
+	if err := stmts.CreateUser(ctx, o.CreateUser); err != nil {
+		o.err = err
 		return err
 	}
 	attrKeys, attrValues := audit.UserAttributeAuditFields(o.Attributes, o.schemaJSON)
@@ -710,15 +719,58 @@ func (o *CreateUserAction) Apply(ctx context.Context, stmts AllStatements) error
 	})
 }
 
-func applyCreateUser(ctx context.Context, stmts UserStatements, user *domain.CreateUser) error {
-	err := stmts.CreateUser(ctx, user)
-	if err != nil {
-		if _, ok := errors.AsType[*database.UniqueError](err); ok {
-			return domain.ErrUserAlreadyExists().WithParent(err)
-		}
-		return domain.ErrInternal(err).WithMessage("failed to create user in the database")
+func (o *CreateUserAction) Err(ctx context.Context, stmts AllStatements) error {
+	if o.err == nil {
+		return nil
 	}
-	return nil
+	if unique, ok := errors.AsType[*database.UniqueError](o.err); ok {
+		user := o.CreateUser
+		emitUserCreateFailedBestEffort(ctx, stmts, user.ProjectID, unique)
+		conflictingKeys := listConflictingUniqueAttributes(ctx, stmts,
+			user.ProjectID, user.ID, user.Attributes, user.Attributes.RegistryTeamScopes(nil, user.AttributeTeamScope()))
+		if len(conflictingKeys) == 0 {
+			return domain.ErrUserAlreadyExists().WithParent(unique)
+		}
+		return domain.ErrUserAttributesConflict().WithParent(unique).WithDetails(domain.UserAttributesDetails{Keys: conflictingKeys})
+	}
+	return domain.ErrInternal(o.err).WithMessage("failed to create user in the database")
+}
+
+func listConflictingUniqueAttributes(ctx context.Context, stmts UserStatements, projectID, userID string, attrs domain.CreateAttributes, scopes []string) []domain.AttributeKey {
+	var claims []database.Filter[domain.UserAttributeField]
+	for i, attr := range attrs {
+		if attr.UniqueScope == domain.AttributeUniquenessUnspecified {
+			continue
+		}
+		claims = append(claims, database.And(
+			database.Equal(database.Col(domain.UserAttributeFieldUniqueTeamID), scopes[i]),
+			database.Equal(database.Col(domain.UserAttributeFieldKey), string(attr.Key)),
+			database.Equal(database.Col(domain.UserAttributeFieldValueHash), attr.ValueHash[:]),
+		))
+	}
+	if len(claims) == 0 {
+		return nil
+	}
+	held, lookupErr := stmts.ListUserAttributes(ctx, &database.ListOptions[domain.UserAttributeField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.UserAttributeFieldProjectID), projectID),
+			database.Or(claims...),
+		),
+	})
+	if lookupErr != nil {
+		return nil
+	}
+	var keys []domain.AttributeKey
+	for _, claim := range held.Items {
+		if claim.UserID != userID {
+			keys = append(keys, claim.Key)
+		}
+	}
+	if len(keys) == 0 {
+		return nil
+	}
+	slices.Sort(keys)
+	return keys
 }
 
 // ---- Patch User ACTION -------------------------------------------------------------
@@ -738,6 +790,8 @@ type PatchUserAction struct {
 	// merge was computed against (or the user disappeared mid-flight). The
 	// service retries the whole action from a fresh read.
 	stale bool
+
+	err error
 }
 
 func NewPatchUserAction(input PatchUserInput, pool StatementPool, schemaStore domain.JSONSchemaStore) *PatchUserAction {
@@ -814,10 +868,8 @@ func (o *PatchUserAction) Apply(ctx context.Context, stmts AllStatements) error 
 			o.stale = true
 			return domain.ErrUserConflict()
 		}
-		if _, ok := errors.AsType[*database.UniqueError](err); ok {
-			return domain.ErrUserAlreadyExists().WithParent(err)
-		}
-		return domain.ErrInternal(err).WithMessage("failed to patch user in the database")
+		o.err = err
+		return err
 	}
 	attrKeys, attrValues := audit.UserAttributeAuditFields(o.Attributes, o.schemaJSON)
 	return audit.Emit(ctx, stmts, audit.EmitSpec{
@@ -833,6 +885,21 @@ func (o *PatchUserAction) Apply(ctx context.Context, stmts AllStatements) error 
 	})
 }
 
+func (o *PatchUserAction) Err(ctx context.Context, stmts AllStatements) error {
+	if o.err == nil {
+		return nil
+	}
+	if unique, ok := errors.AsType[*database.UniqueError](o.err); ok {
+		conflictingKeys := listConflictingUniqueAttributes(ctx, stmts,
+			o.patch.ProjectID, o.patch.UserID, o.patch.Attributes, o.patch.RegistryTeamScopes)
+		if len(conflictingKeys) == 0 {
+			return domain.ErrUserAttributesConflict().WithParent(unique)
+		}
+		return domain.ErrUserAttributesConflict().WithParent(unique).WithDetails(domain.UserAttributesDetails{Keys: conflictingKeys})
+	}
+	return domain.ErrInternal(o.err).WithMessage("failed to patch user in the database")
+}
+
 // ---- Set Password ACTION -------------------------------------------------------------
 
 type SetPasswordUserAction struct {
@@ -841,6 +908,7 @@ type SetPasswordUserAction struct {
 	hashers ProjectHasherResolver
 
 	hash string
+	err  error
 }
 
 func NewSetUserPasswordAction(input SetPasswordInput, hashers ProjectHasherResolver) *SetPasswordUserAction {
@@ -871,10 +939,8 @@ func (o *SetPasswordUserAction) Apply(ctx context.Context, stmts AllStatements) 
 	}
 	err := stmts.SetUserPassword(ctx, pw)
 	if err != nil {
-		if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
-			return domain.ErrUserNotFound()
-		}
-		return domain.ErrInternal(err).WithMessage("failed to set password")
+		o.err = err
+		return err
 	}
 	return audit.Emit(ctx, stmts, audit.EmitSpec{
 		Type:       domain.EventTypeAuthFactorPasswordSet,
@@ -889,10 +955,22 @@ func (o *SetPasswordUserAction) Apply(ctx context.Context, stmts AllStatements) 
 	})
 }
 
+func (o *SetPasswordUserAction) Err(context.Context, AllStatements) error {
+	if o.err == nil {
+		return nil
+	}
+	if _, ok := errors.AsType[*database.ForeignKeyError](o.err); ok {
+		return domain.ErrUserNotFound()
+	}
+	return domain.ErrInternal(o.err).WithMessage("failed to set password")
+}
+
 // ---- Delete ACTION -------------------------------------------------------------
 
 type DeleteUserAction struct {
 	DeleteUserInput
+
+	err error
 }
 
 func NewDeleteUserAction(input DeleteUserInput) *DeleteUserAction {
@@ -911,7 +989,8 @@ func (o *DeleteUserAction) Apply(ctx context.Context, stmts AllStatements) error
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil
 		}
-		return domain.ErrInternal(err).WithMessage("failed to delete user")
+		o.err = err
+		return err
 	}
 	return audit.Emit(ctx, stmts, audit.EmitSpec{
 		Type:       domain.EventTypeUserDeleted,
@@ -920,6 +999,13 @@ func (o *DeleteUserAction) Apply(ctx context.Context, stmts AllStatements) error
 		EntityType: "user",
 		EntityID:   o.UserID,
 	})
+}
+
+func (o *DeleteUserAction) Err(context.Context, AllStatements) error {
+	if o.err == nil {
+		return nil
+	}
+	return domain.ErrInternal(o.err).WithMessage("failed to delete user")
 }
 
 // validSessionToken reports whether the token is present and not expired.

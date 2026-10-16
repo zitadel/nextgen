@@ -13,6 +13,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
 	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
 	v2user "github.com/zitadel/nextgen/internal/storage/user"
+	"github.com/zitadel/nextgen/internal/storage/userattribute"
 )
 
 const (
@@ -78,6 +79,10 @@ WHERE project_id = $2 AND id = $3 AND updated_at = $4
 SELECT key, team_id FROM zitadel_nextgen.user_unique_attributes
 WHERE project_id = $1 AND user_id = $2
 `
+
+	userAttributeQuery = `SELECT a.project_id, a.user_id, a.team_id, a.key, a.value, ua.team_id, ua.value_hash
+FROM zitadel_nextgen.user_attributes a
+LEFT JOIN zitadel_nextgen.user_unique_attributes ua ON ua.project_id = a.project_id AND ua.user_id = a.user_id AND ua.key = a.key`
 
 	deleteUserUniqueAttributesStmt = `
 DELETE FROM zitadel_nextgen.user_unique_attributes
@@ -333,6 +338,42 @@ func (us userStatements) GetUserUniqueAttributeScopes(ctx context.Context, proje
 		return nil, wrapError(err)
 	}
 	return scopes, nil
+}
+
+// ListUserAttributes implements [service.UserStatements].
+func (us userStatements) ListUserAttributes(ctx context.Context, opts *database.ListOptions[domain.UserAttributeField]) (*database.ListResult[*domain.UserAttribute], error) {
+	attrs, nextCursor, err := pagination.Page(opts.Pagination, userattribute.Schema, func(limit uint32) ([]*domain.UserAttribute, error) {
+		opts := opts.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileRead(&compiler, userAttributeQuery, opts, userattribute.Schema); err != nil {
+			return nil, err
+		}
+		rows, err := us.client.Query(ctx, compiler.String(), compiler.args...)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		attrs, err := pgx.CollectRows(rows, scanUserAttribute)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		return attrs, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &database.ListResult[*domain.UserAttribute]{Items: attrs, NextCursor: nextCursor}, nil
+}
+
+func scanUserAttribute(row pgx.CollectableRow) (*domain.UserAttribute, error) {
+	attr := new(domain.UserAttribute)
+	var value []byte
+	if err := row.Scan(&attr.ProjectID, &attr.UserID, &attr.TeamID, &attr.Key, &value, &attr.UniqueTeamID, &attr.ValueHash); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(value, &attr.Value); err != nil {
+		return nil, fmt.Errorf("unmarshal attribute %q: %w", attr.Key, err)
+	}
+	return attr, nil
 }
 
 // GetUser implements [service.UserStatements].

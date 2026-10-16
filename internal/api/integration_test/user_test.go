@@ -277,7 +277,10 @@ func TestCreateUser(t *testing.T) {
 
 			resp, err = client.CreateUser(t.Context(), user, params)
 			assert.NoError(t, err)
-			assert.IsType(t, &api.CreateUserConflict{}, resp, helpers.MustMarshal(t, resp))
+			require.IsType(t, &api.CreateUserConflict{}, resp, helpers.MustMarshal(t, resp))
+			conflict := resp.(*api.CreateUserConflict)
+			assert.Equal(t, api.ErrorCode(domain.ErrUserAttributesConflict().Code), conflict.Code)
+			assert.JSONEq(t, `{"fields":["attributes.email"]}`, string(conflict.Details.Value["details"]))
 		})
 	})
 }
@@ -686,7 +689,12 @@ func TestPatchUser(t *testing.T) {
 			"attributes": map[string]any{"email": 5},
 		}), api.PatchUserByIDParams{UserID: api.UserID(user.ID)})
 		require.NoError(t, err)
-		assert.IsType(t, &api.PatchUserByIDBadRequest{}, resp, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.PatchUserByIDBadRequest{}, resp, helpers.MustMarshal(t, resp))
+		// Answered like request validation: the field is named, its value is not.
+		invalid := resp.(*api.PatchUserByIDBadRequest)
+		assert.Equal(t, api.ErrorCode(domain.ErrRequestInvalid().Code), invalid.Code)
+		assert.Equal(t, domain.ErrRequestInvalid().Message, invalid.Message)
+		assert.JSONEq(t, `{"fields":["attributes.email"]}`, string(invalid.Details.Value["details"]))
 	})
 
 	t.Run("an unknown schema pointer is refused", func(t *testing.T) {
@@ -709,7 +717,11 @@ func TestPatchUser(t *testing.T) {
 			"attributes": map[string]any{"email": "testpatchuser.taken@example.com"},
 		}), api.PatchUserByIDParams{UserID: api.UserID(userB.ID)})
 		require.NoError(t, err)
-		assert.IsType(t, &api.PatchUserByIDConflict{}, resp, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.PatchUserByIDConflict{}, resp, helpers.MustMarshal(t, resp))
+		// The taken attribute is named, the user holding it is not.
+		conflict := resp.(*api.PatchUserByIDConflict)
+		assert.Equal(t, api.ErrorCode(domain.ErrUserAttributesConflict().Code), conflict.Code)
+		assert.JSONEq(t, `{"fields":["attributes.email"]}`, string(conflict.Details.Value["details"]))
 	})
 
 	t.Run("unknown user", func(t *testing.T) {

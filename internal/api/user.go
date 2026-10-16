@@ -482,9 +482,17 @@ func userErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		domain.ErrUserPasswordEmpty().Code,
 		domain.ErrUserPasswordTooLong().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
+	case domain.ErrUserAttributesInvalid(nil).Code:
+		// Answered like request validation: the client gets one shape for
+		// "fix these fields", whether ogen or the user schema refused them.
+		return errorResponseWithStatusCode(http.StatusBadRequest,
+			domain.ErrRequestInvalid().WithParent(err).WithDetails(userAttributeFieldPaths(err.Details)))
 	case domain.ErrUserNotFound().Code:
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
-	case domain.ErrUserAlreadyExists().Code:
+	case domain.ErrUserAlreadyExists().Code, domain.ErrUserAttributesConflict().Code:
+		if _, ok := err.Details.(domain.UserAttributesDetails); ok {
+			err = err.WithDetails(userAttributeFieldPaths(err.Details))
+		}
 		return errorResponseWithStatusCode(http.StatusConflict, err)
 	case domain.ErrUserConflict().Code:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
@@ -493,4 +501,19 @@ func userErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	default:
 		return internalErrorResponse(err)
 	}
+}
+
+// userAttributeFieldPaths names the attributes in details by their path from
+// the request body, which carries them under attributes.
+func userAttributeFieldPaths(details any) domain.InvalidFieldPathsDetails {
+	attrs, _ := details.(domain.UserAttributesDetails)
+	fields := make([]string, 0, len(attrs.Keys))
+	for _, key := range attrs.Keys {
+		path := domain.AttributeKey("attributes")
+		if key != "" {
+			path = path.AppendNode(string(key))
+		}
+		fields = append(fields, string(path))
+	}
+	return domain.InvalidFieldPathsDetails{Fields: fields}
 }

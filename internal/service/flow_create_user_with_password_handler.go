@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -75,7 +74,7 @@ func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domai
 
 	err = h.userService.ApplyActions(ctx, createUserAction, setPasswordAction, recordFactorsAction)
 	if err != nil {
-		if derr, ok := errors.AsType[domain.Error](err); ok && derr.Code == domain.ErrUserAlreadyExists().Code {
+		if domain.IsUserAlreadyExists(err) {
 			return domain.FlowOnSuccessResult{StepError: new(domain.FlowStepErrorUserAlreadyExists)}, nil
 		}
 		return domain.FlowOnSuccessResult{}, err
@@ -91,6 +90,8 @@ func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domai
 // part of a user-mutation transaction, emitting the same auth.check.succeeded
 // events a challenge/proof cycle would.
 type recordAttemptFactorsAction struct {
+	noUserActionErr
+
 	projectID string
 	attemptID string
 	factors   []domain.AuthFactor

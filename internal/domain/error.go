@@ -135,3 +135,7 @@ func ErrRequestInvalid() Error {
 type RequestInvalidFieldDetails struct {
 	Field string `json:"field"`
 }
+
+type InvalidFieldPathsDetails struct {
+	Fields []string `json:"fields"`
+}

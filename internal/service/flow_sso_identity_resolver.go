@@ -278,7 +278,7 @@ func bindSSOIdentity(ctx context.Context, stmts AllStatements, in domain.FlowSSO
 
 // CreateLinked creates the user, links the subject to it and binds the
 // attempt, all in one transaction. A unique attribute or the subject already
-// taken returns ErrUserAlreadyExists.
+// taken returns an error [domain.IsUserAlreadyExists] matches.
 func (r *FlowSSOIdentityResolver) CreateLinked(ctx context.Context, in domain.FlowSSOCreateInput) (string, error) {
 	userID, err := r.db.Statements().NewManagedID(string(domain.PrefixUser))
 	if err != nil {
@@ -306,9 +306,7 @@ func (r *FlowSSOIdentityResolver) CreateLinked(ctx context.Context, in domain.Fl
 	}
 	actions = append(actions, &ssoLinkAction{subject: in.Subject, bind: bind})
 	if err := r.users.ApplyActions(ctx, actions...); err != nil {
-		// Audited like a create through the user API.
-		emitUserCreateFailedBestEffort(ctx, r.db, createUser, err)
-		if errors.Is(err, domain.ErrUserInvalid()) {
+		if domain.IsUserInvalid(err) {
 			// The validator's messages quote the values, so only where they
 			// failed is logged.
 			var locations []string
@@ -329,6 +327,8 @@ func (r *FlowSSOIdentityResolver) CreateLinked(ctx context.Context, in domain.Fl
 // ssoClaimAction deletes the exact parked row at the start of the creation
 // transaction.
 type ssoClaimAction struct {
+	noUserActionErr
+
 	bind domain.FlowSSOBindInput
 }
 
@@ -343,6 +343,8 @@ var _ UserAction = (*ssoClaimAction)(nil)
 // ssoLinkAction links the subject to the user created in the same
 // transaction, then binds the attempt with the link id the insert minted.
 type ssoLinkAction struct {
+	noUserActionErr
+
 	subject string
 	bind    domain.FlowSSOBindInput
 }
