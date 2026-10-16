@@ -16,6 +16,14 @@
   "bin": {
     "zitadel-server": "./bin/zitadel-server.js"
   },
+  "exports": {
+    "./binary": {
+      "types": "./bin/binary.d.ts",
+      "default": "./bin/binary.js"
+    },
+    "./bin/zitadel-server.js": "./bin/zitadel-server.js",
+    "./package.json": "./package.json"
+  },
   "files": [
     "bin"
   ],
