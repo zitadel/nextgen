@@ -1,4 +1,4 @@
-import { Link, type LinkProps, useMatches, useParams } from "@tanstack/react-router";
+import { Link, type LinkProps, useMatch, useMatches, useParams } from "@tanstack/react-router";
 import { Box, Boxes, Check, ChevronsUpDown, type LucideIcon, Search, Slash } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 
@@ -77,7 +77,8 @@ export function ContextSwitcher() {
       {teamId && selected && (
         <>
           <Slash aria-hidden className="size-3.5 shrink-0 -rotate-[20deg] text-border" />
-          <TeamSwitcher projectId={selected} teamId={teamId} />
+          {/* Keyed: another project's teams must not show while this one's load. */}
+          <TeamSwitcher key={selected} projectId={selected} teamId={teamId} />
         </>
       )}
     </nav>
@@ -90,32 +91,27 @@ export function ContextSwitcher() {
  * the list is a way across, `All teams` is the directory.
  */
 function TeamSwitcher({ projectId, teamId }: { projectId: string; teamId: string }) {
-  const teams = useAsync(() => queryActiveTeams(projectId, { limit: TEAM_PAGE }), [], [projectId]);
-  const listed = teams?.find((team) => team.id === teamId);
-  // A deactivated team, or one past the first page, is named by its own read;
-  // `null` once refused, so the pill says nothing rather than an id.
-  const openName = useAsync(
-    teams === undefined || listed ? null : () => api.getTeam(teamId).then((team) => team.name),
-    null,
-    [teams, listed, teamId],
+  // The open team as its page loaded it. The page's loader re-runs after a
+  // rename (`router.invalidate()`), so the label follows, and the list is
+  // re-read with it.
+  const openTeam = useMatch({ from: "/_authed/teams/$teamId", shouldThrow: false });
+  const teams = useAsync(
+    () => queryActiveTeams(projectId, { limit: TEAM_PAGE }),
+    [],
+    [projectId, openTeam?.updatedAt],
   );
-  const resolved = teams !== undefined && (listed !== undefined || openName !== undefined);
 
   return (
     <Switcher
       icon={Box}
       heading="Teams"
-      label={listed?.name ?? openName ?? undefined}
+      label={openTeam?.loaderData?.name}
       currentId={teamId}
-      options={
-        resolved
-          ? teams.map((team) => ({
-              id: team.id,
-              label: team.name,
-              link: { to: "/teams/$teamId", params: { teamId: team.id } },
-            }))
-          : undefined
-      }
+      options={teams?.map((team) => ({
+        id: team.id,
+        label: team.name,
+        link: { to: "/teams/$teamId", params: { teamId: team.id } },
+      }))}
       emptyLabel="No teams"
       ariaLabel="Switch team"
       footer={{ label: "All teams", link: { to: "/teams" } }}

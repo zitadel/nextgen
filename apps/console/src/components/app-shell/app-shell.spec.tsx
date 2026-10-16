@@ -223,11 +223,7 @@ describe("sidebar chrome", () => {
   });
 
   it("shows the person alone when they are on no team", async () => {
-    server.use(
-      http.post("*/api/users/query", () =>
-        HttpResponse.json({ users: [{ id: "user_test", teams: [] }] }),
-      ),
-    );
+    server.use(http.get("*/api/users/me/teams", () => HttpResponse.json({ teams: [] })));
     renderShell();
     await userEvent.click(await screen.findByRole("button", { name: /^Account:/ }));
     expect(await screen.findByRole("menuitem", { name: "Profile" })).toBeInTheDocument();

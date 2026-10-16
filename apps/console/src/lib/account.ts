@@ -1,5 +1,4 @@
 import { api } from "@/api/zitadel";
-import { fetchSession } from "@/auth/session";
 import { sessionCached } from "./session-cache";
 
 /**
@@ -8,10 +7,9 @@ import { sessionCached } from "./session-cache";
  * customer projects (`docs/design/platform/project-team-modeling.md`).
  *
  * No account resource or current-team field exists, so it is the first team
- * on the person's roster, read through `POST /users/query` with
- * `expand: ["teams"]` (`GET /users/{id}/teams` refuses a session). Without a
- * project id, so it addresses the same project `PATCH /teams/{id}` renames it
- * in. `null` when the person is on no team.
+ * on the person's own roster, from the self-access `GET /users/me/teams`: it
+ * needs no grant, which a platform user does not hold. `null` when the person
+ * is on no team.
  */
 export interface AccountTeam {
   id: string;
@@ -19,13 +17,6 @@ export interface AccountTeam {
 }
 
 export const readAccountTeam = sessionCached(async (): Promise<AccountTeam | null> => {
-  const userId = (await fetchSession())?.user_id;
-  if (!userId) return null;
-  const page = await api.queryUsers({
-    limit: 1,
-    filter: [{ field: "id", operation: "equals", value: userId }],
-    expand: ["teams"],
-  });
-  const team = page.users[0]?.teams?.[0];
+  const team = (await api.listMyTeams({ limit: 1 })).teams[0];
   return team ? { id: team.id, name: team.name } : null;
 }, 5 * 60_000);

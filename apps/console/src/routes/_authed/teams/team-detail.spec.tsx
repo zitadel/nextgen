@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -106,5 +106,28 @@ describe("team detail", () => {
 
     // `name` is the only property `PATCH /teams/{team_id}` accepts.
     expect(patched).toEqual([{ name: "Acme Group" }]);
+  });
+
+  it("renames the team in the top bar's switcher too", async () => {
+    let name = "Acme Web";
+    server.use(
+      http.get(TEAM_URL, () => HttpResponse.json(team({ name }))),
+      http.post("*/api/teams/query", () => HttpResponse.json({ teams: [team({ name })] })),
+      http.patch(TEAM_URL, async ({ request }) => {
+        name = ((await request.json()) as { name: string }).name;
+        return HttpResponse.json(team({ name }));
+      }),
+    );
+    await renderDetail();
+
+    const switcher = await screen.findByRole("button", { name: "Switch team" });
+    await waitFor(() => expect(switcher).toHaveTextContent("Acme Web"));
+
+    const field = await screen.findByLabelText("Tenant name");
+    await userEvent.clear(field);
+    await userEvent.type(field, "Acme Group");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(switcher).toHaveTextContent("Acme Group"));
   });
 });

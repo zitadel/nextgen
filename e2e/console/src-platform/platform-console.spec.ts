@@ -104,13 +104,13 @@ test("a platform operator reaches every management screen without an error", asy
  * and once saved the account menu shows the name over the email.
  */
 test("a platform operator adds their name from the account menu", async ({ page, seed }) => {
-  const operator = seed.identity().email;
+  const operator = seed.identity();
 
   await page.goto("/ui/console/");
-  await registerWithPassword(page, { email: operator, password });
+  await registerWithPassword(page, operator);
   await page.waitForURL((url) => !url.pathname.endsWith("/login"));
 
-  const account = page.getByRole("button", { name: `Account: ${operator}` });
+  const account = page.getByRole("button", { name: `Account: ${operator.email}` });
   await account.click();
   await page.getByRole("menuitem", { name: /Add your name/ }).click();
 
