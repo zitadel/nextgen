@@ -7,7 +7,9 @@ import { expectNoErrorBoundary, signIn } from "./support";
  *
  * The unit spec stubs `GET /users/me`. This proves the signed-in person's own
  * record reaches the screen through the session cookie alone: the email shown
- * is the one the seeded user signed in with.
+ * is the one the seeded user signed in with. The screen is generated from the
+ * person's own user schema, so the row carries the schema's label (`Email`),
+ * and it is read-only because it is the schema's `x-identifier`.
  */
 
 test("shows the signed-in person's email, read-only", async ({ page, zitadel, seed }) => {
@@ -19,7 +21,7 @@ test("shows the signed-in person's email, read-only", async ({ page, zitadel, se
   await expect(page).toHaveURL(/\/settings\/profile/);
   await expect(page.getByRole("heading", { name: "Profile", exact: true })).toBeVisible();
 
-  const email = page.getByLabel("Email address");
+  const email = page.getByLabel("Email", { exact: true });
   await expect(email).toHaveValue(user.email);
   await expect(email).toBeDisabled();
 
