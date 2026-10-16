@@ -2,8 +2,20 @@
 
 The engine ([`internal/policy`](../../../internal/policy/)) evaluates one
 resolved instance against one request context and returns a decision. It is
-stateless: it never fetches its own inputs. Every rule runs, so a denial lists
-every requirement the request missed.
+stateless: it never fetches its own inputs. Every active rule runs, so a
+denial lists every requirement the request missed.
+
+## Active rules
+
+A rule is active when the setting it reads is set in the instance. With no
+instance, or an empty `config`, no rule is active: `Evaluate` allows without
+reading the context, so a caller with nothing to enforce pays for nothing.
+Otherwise every active rule runs and the decision maps each failed rule to the
+value of its setting:
+
+```json
+{ "allow": false, "violations": { "min_length": 12, "history_depth": 4 } }
+```
 
 ## The context schema
 
@@ -12,7 +24,7 @@ The template's `config` says what a developer may configure. Its
 environment.
 
 ```json
-// user.password.save — context, Zitadel-defined, versioned with the server
+// auth.factor.password.set — context, Zitadel-defined, versioned with the server
 {
   "candidate": {
     "length": "int"
@@ -22,11 +34,15 @@ environment.
 ```
 
 Every field is a derived value. `history_matches[i]` says whether the
-candidate matched the i-th most recent previous password; the rule never sees
-a hash, let alone a password. A rule referencing a field outside the schema
-fails the type check at startup, which is what makes the context schema a
-contract the server enforces. The blocklist rule adds
-`candidate.in_blocklist` when it lands with #898.
+candidate matched the i-th most recent kept password, the current one first;
+the rule never sees a hash, let alone a password. A rule referencing a field
+outside the schema fails the type check at startup, which is what makes the
+context schema a contract the server enforces.
+
+Once a rule is active, every field of the schema must be present: a missing
+or mistyped field is an error and the operation fails closed, never a silent
+allow. A builder fills a field no active rule needs cheaply (an empty
+`history_matches` when history is off).
 
 Shared envelope fields (`user`, `request`) are added to the context only once
 a rule needs them: every field in the context is an attack surface
@@ -35,7 +51,7 @@ for a decision log.
 ## The context builder
 
 Each operation has one Go function that derives the context, listed per
-operation in the [catalog](catalog.md). For `user.password.save` it is
+operation in the [catalog](catalog.md). For `auth.factor.password.set` it is
 `service.PasswordPolicy.buildContext`, and it is where #898's password
 handling lives:
 
@@ -43,10 +59,14 @@ handling lives:
   (`domain.NormalizePassword`, applied on hashing and verification too);
 - `candidate.length` counts Unicode code points, not bytes;
 - `history_matches` costs one slow hash verification per entry (argon2id per
-  ADR 029), which is why `history_depth` is capped at 4. Today the current
-  password is the only entry: it counts as soon as history is on. The history
-  table that keeps older passwords, prunes beyond the depth and is deleted
-  with the user is pending under #898.
+  ADR 029), which is why `history_depth` is capped at 4. Depth N counts the
+  current password: the candidate is compared with the current password and
+  the N-1 before it, so a project asking for 4 matches PCI DSS 8.3.7's "any of
+  the last four". Storage keeps every replaced password (#1363). History is
+  checked only when the user sets their own password; an administrator
+  setting it, and a new user, have none to compare with, and an
+  administrator learning that a guess matches an old password would be an
+  oracle on the user's previous passwords.
 
 ## Limits
 
