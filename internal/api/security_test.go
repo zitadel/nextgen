@@ -30,7 +30,17 @@ var rejectedCredentialErrors = []struct {
 	{name: "invalid token", err: domain.ErrInvalidToken()},
 	{name: "revoked or expired token", err: domain.ErrTokenRevoked()},
 	{name: "unknown encryption key", err: domain.ErrEncryptionKeyNotFound()},
-	{name: "unclassified error", err: errors.New("bad token")},
+	{name: "mismatched token identifiers", err: domain.ErrInvalidTokenIdentifiers()},
+}
+
+// undecidedErrors are IntrospectToken failures that say nothing about the
+// credential, so the security handlers pass them on as internal.
+var undecidedErrors = []struct {
+	name string
+	err  error
+}{
+	{name: "key decryption failure", err: domain.ErrDecryptionFailed(errors.New("bad master key"))},
+	{name: "unclassified error", err: errors.New("connection refused")},
 }
 
 func TestHandleOAuth2(t *testing.T) {
@@ -110,17 +120,20 @@ func TestHandleOAuth2(t *testing.T) {
 		require.ErrorIs(t, err, ogenerrors.ErrSecurityRequirementIsNotSatisfied)
 	})
 
-	t.Run("introspect error is an unsatisfied requirement", func(t *testing.T) {
-		t.Parallel()
+	for _, tc := range undecidedErrors {
+		t.Run(tc.name+" is an internal error", func(t *testing.T) {
+			t.Parallel()
 
-		mock := gomock.NewController(t)
-		tokenService := mocks.NewMockTokenService(mock)
-		tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, errors.New("bad token"))
+			mock := gomock.NewController(t)
+			tokenService := mocks.NewMockTokenService(mock)
+			tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-bearer").Return(nil, tc.err)
 
-		handler := NewSecurityHandler(tokenService)
-		_, err := handler.HandleOAuth2(t.Context(), api.GetProjectOperation, api.OAuth2{Token: "garbage"})
-		require.ErrorIs(t, err, ogenerrors.ErrSecurityRequirementIsNotSatisfied)
-	})
+			handler := NewSecurityHandler(tokenService)
+			_, err := handler.HandleOAuth2(t.Context(), api.GetProjectOperation, api.OAuth2{Token: "raw-bearer"})
+			require.NotErrorIs(t, err, ogenerrors.ErrSecurityRequirementIsNotSatisfied)
+			require.ErrorIs(t, err, domain.ErrInternal(nil))
+		})
+	}
 
 	for _, tc := range rejectedCredentialErrors {
 		t.Run(tc.name+" is an unsatisfied requirement", func(t *testing.T) {
@@ -315,17 +328,20 @@ func TestHandleNextgenSession(t *testing.T) {
 		}
 	})
 
-	t.Run("invalid token is an unsatisfied requirement", func(t *testing.T) {
-		t.Parallel()
+	for _, tc := range undecidedErrors {
+		t.Run(tc.name+" is an internal error", func(t *testing.T) {
+			t.Parallel()
 
-		mock := gomock.NewController(t)
-		tokenService := mocks.NewMockTokenService(mock)
-		tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, errors.New("bad token"))
+			mock := gomock.NewController(t)
+			tokenService := mocks.NewMockTokenService(mock)
+			tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, tc.err)
 
-		handler := NewSecurityHandler(tokenService)
-		_, err := handler.HandleNextgenSession(safeRequestContext(t), api.GetMySessionOperation, api.NextgenSession{APIKey: "garbage"})
-		require.ErrorIs(t, err, ogenerrors.ErrSecurityRequirementIsNotSatisfied)
-	})
+			handler := NewSecurityHandler(tokenService)
+			_, err := handler.HandleNextgenSession(safeRequestContext(t), api.GetMySessionOperation, api.NextgenSession{APIKey: "garbage"})
+			require.NotErrorIs(t, err, ogenerrors.ErrSecurityRequirementIsNotSatisfied)
+			require.ErrorIs(t, err, domain.ErrInternal(nil))
+		})
+	}
 
 	for _, tc := range rejectedCredentialErrors {
 		t.Run(tc.name+" is an unsatisfied requirement", func(t *testing.T) {
