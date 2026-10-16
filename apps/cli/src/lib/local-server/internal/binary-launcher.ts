@@ -90,14 +90,11 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
         },
         stdio: ["ignore", log.fd, log.fd],
       });
-      child.unref();
-      if (!child.pid) {
-        throw new Error("server process did not expose a pid");
-      }
+      const pid = await spawned(child, command.command);
       return {
         schema_version: 1,
         backend: "binary",
-        pid: child.pid,
+        pid,
         command: [command.command, ...args].join(" "),
         log_path: spec.logPath,
         server_package: command.serverPackage,
@@ -324,7 +321,9 @@ async function ownsProcess(record: BinaryRuntimeMetadata): Promise<boolean> {
   const programs = [started, SERVER_PROGRAM];
   let listing: string;
   try {
-    listing = await ps(["-axo", "pid=,pgid=,command="]);
+    // `ww`: without it `ps` cuts the command column to `COLUMNS` (which tools
+    // such as pnpm and moon export), and the server's long path is cut before its name.
+    listing = await ps(["axww", "-o", "pid=,pgid=,command="]);
   } catch {
     return true;
   }
@@ -373,6 +372,33 @@ function ps(args: string[]): Promise<string> {
       (error, stdout) => (error ? reject(error) : resolve(stdout)),
     );
   });
+}
+
+/**
+ * Waits for a spawned server to exist, and detaches it. A binary that cannot be
+ * run (missing, not executable) is reported by an `error` event, not thrown: left
+ * unhandled it crashes the CLI with a stack trace, so it is awaited here and
+ * turned into an error that says what to do.
+ */
+async function spawned(child: ReturnType<typeof spawn>, command: string): Promise<number> {
+  try {
+    const pid = await new Promise<number>((resolve, reject) => {
+      child.once("error", reject);
+      child.once("spawn", () =>
+        child.pid ? resolve(child.pid) : reject(new Error("server process did not expose a pid")),
+      );
+    });
+    // Anything it reports from here on, such as a failed signal, is not the start's to raise.
+    child.on("error", () => undefined);
+    child.unref();
+    return pid;
+  } catch (error) {
+    throw new ZitadelError("E_VALIDATION", "The Zitadel server could not be started", {
+      hint: "Check that the server binary exists and can be run, or reinstall @zitadel/cli.",
+      nextCommands: ["npm install @zitadel/cli@alpha"],
+      details: { command, message: errorMessage(error) },
+    });
+  }
 }
 
 function resolveServerPackageManifest(): string {

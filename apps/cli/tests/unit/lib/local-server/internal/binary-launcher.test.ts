@@ -21,7 +21,13 @@ vi.mock("@zitadel/server/binary", () => ({
 
 vi.mock("node:child_process", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:child_process")>();
-  return { ...actual, spawn: vi.fn(() => ({ pid: 4242, unref: () => undefined })) };
+  const { EventEmitter } = await import("node:events");
+  const child = () => {
+    const spawned = Object.assign(new EventEmitter(), { pid: 4242, unref: () => undefined });
+    queueMicrotask(() => spawned.emit("spawn"));
+    return spawned;
+  };
+  return { ...actual, spawn: vi.fn(child) };
 });
 
 describe("local server binary helpers", () => {
@@ -120,6 +126,49 @@ describe("local server binary helpers", () => {
     const [command, args] = vi.mocked(spawn).mock.calls[0] as unknown as [string, string[]];
     expect(command).toBe("/resolved/by/server-package/nextgen");
     expect(args).toEqual(["--migrate"]);
+  });
+
+  it("reports a server binary that cannot be run instead of crashing", async () => {
+    const { EventEmitter } = await import("node:events");
+    vi.mocked(spawn).mockImplementationOnce((() => {
+      const failing = Object.assign(new EventEmitter(), { pid: undefined, unref: () => undefined });
+      queueMicrotask(() => failing.emit("error", new Error("spawn /x/nextgen EACCES")));
+      return failing;
+    }) as never);
+    vi.stubEnv("ZITADEL_SERVER_BINARY", "/x/nextgen");
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-binary-test-"));
+
+    const launching = new BinaryLauncher({
+      cliVersion: "0.0.0-test",
+      dataDir: join(dir, "data"),
+      logPath: join(dir, "logs", "server.log"),
+    }).launch({ port: 8091, serverUrl: "http://localhost:8091" });
+
+    await expect(launching).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      hint: expect.stringContaining("exists and can be run"),
+    });
+  });
+
+  it("recognises its server when the process list cuts long commands short", async () => {
+    vi.stubEnv("COLUMNS", "40");
+    const real = await vi.importActual<typeof import("node:child_process")>("node:child_process");
+    const child = real.spawn(
+      process.execPath,
+      ["-e", "setTimeout(() => undefined, 30000)", `${"x".repeat(120)}/nextgen`],
+      { stdio: "ignore" },
+    );
+    const record = { pid: child.pid ?? 0, command: "/opt/zitadel/nextgen --migrate" } as never;
+
+    try {
+      await expect(
+        new BinaryLauncher({ cliVersion: "0.0.0-test", dataDir: "/d", logPath: "/l" }).isAlive(
+          record,
+        ),
+      ).resolves.toBe(true);
+    } finally {
+      child.kill("SIGKILL");
+    }
   });
 
   it("says how to repair the install when the server binary cannot be found", async () => {
