@@ -74,3 +74,21 @@ That task is check-only (`gofmt -l` on tracked `*.go`); it does not rewrite.
 On failure, run `gofmt -w` on the listed paths, then re-run
 `moon run server:format` until it passes. Do not push while it fails —
 `server:format` is part of `ci / full-pr`.
+
+## Redirect targets
+
+A URL the server sends a browser to, or stores to send one to later, comes from
+a caller until proven otherwise. Parse it with `httputil.ParseRedirectTarget` and
+nothing else: do not call `url.Parse` and check the pieces by hand, because a
+browser and a Go parser read the same string differently, and an open redirect
+lives in that gap (a backslash is a slash to a browser, `%2e` is a dot, a tab is
+dropped, and a path starting with `//` names another host once the scheme and
+host are stripped).
+
+`ParseRedirectTarget` decides whether the URL is safe to send a browser to. The
+caller still decides which hosts it accepts, for example by comparing the origin
+with the request's.
+
+When a new way around the check turns up, add the input to the table in
+`internal/httputil/redirect_test.go` and fix the function. Do not add a second
+check at the call site.

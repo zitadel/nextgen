@@ -16,6 +16,7 @@ import (
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -189,18 +190,15 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 		}
 		// Parsed here, not by the generated decoder: a request-URI parse
 		// leaves a fragment in the path, and a hash-routed page needs it
-		// back as a fragment.
-		returnTarget, err := url.Parse(rawTarget)
+		// back as a fragment. ParseRedirectTarget is the one place that
+		// decides whether a caller-supplied URL is safe to send a browser to.
+		returnTarget, err := httputil.ParseRedirectTarget(rawTarget)
 		if err != nil {
-			return nil, domain.ErrRequestInvalid().WithMessage(fmt.Sprintf("return_target %q is not a URL", rawTarget))
+			return nil, domain.ErrRequestInvalid().WithMessage(fmt.Sprintf("return_target %q is %v", rawTarget, err))
 		}
-		// No page URL carries userinfo; it is only ever a way to dress a
-		// foreign host up as the origin.
-		if returnTarget.User != nil {
-			return nil, domain.ErrRequestInvalid().WithMessage("return_target must not carry userinfo")
-		}
-		// A relative or scheme-less target fails here too: its origin lacks
-		// a scheme or a host, which the request origin always has.
+		// The target is a page on the origin that sent this request. The
+		// scheme and host are always set once it parses, so a relative target
+		// never gets this far.
 		if !strings.EqualFold(returnTarget.Scheme+"://"+returnTarget.Host, requestOrigin) {
 			return nil, domain.ErrRequestInvalid().WithMessage(fmt.Sprintf("return_target %q is not on the request origin %q", rawTarget, requestOrigin))
 		}

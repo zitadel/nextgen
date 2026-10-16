@@ -357,6 +357,8 @@ func TestSubmitFlowStep_SSO_BindsTheBrowserAndResealsTheFlowCookie(t *testing.T)
 		middleware []func(http.Handler) http.Handler
 		// returnTarget defaults to the login page on the bare origin.
 		returnTarget string
+		// storedTarget defaults to returnTarget.
+		storedTarget string
 		wantCookie   string
 	}{
 		{
@@ -371,6 +373,15 @@ func TestSubmitFlowStep_SSO_BindsTheBrowserAndResealsTheFlowCookie(t *testing.T)
 			name:         "return_target keeps its fragment",
 			origin:       "https://login.example.com",
 			returnTarget: "https://login.example.com/app#/sign-in?flow=flow_1",
+			wantCookie:   "__Host-_zsso=nonce-1; Path=/; Max-Age=900; HttpOnly; Secure; SameSite=Lax",
+		},
+		{
+			// A stray percent sign is stored as an escape, and an encoded slash
+			// next to a character Go re-encodes stays encoded.
+			name:         "return_target is stored as the browser reads it",
+			origin:       "https://login.example.com",
+			returnTarget: "https://login.example.com/50%off/a%2Fb|c?flow=flow_1#100%",
+			storedTarget: "https://login.example.com/50%25off/a%2Fb%7Cc?flow=flow_1#100%25",
 			wantCookie:   "__Host-_zsso=nonce-1; Path=/; Max-Age=900; HttpOnly; Secure; SameSite=Lax",
 		},
 		{
@@ -405,6 +416,10 @@ func TestSubmitFlowStep_SSO_BindsTheBrowserAndResealsTheFlowCookie(t *testing.T)
 			if returnTarget == "" {
 				returnTarget = bareOrigin + "/login?flow=flow_1"
 			}
+			storedTarget := tt.storedTarget
+			if storedTarget == "" {
+				storedTarget = returnTarget
+			}
 			resp, body := doRequestWithOrigin(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
 				"action":          "sso",
 				"sso_provider_id": "google",
@@ -425,7 +440,7 @@ func TestSubmitFlowStep_SSO_BindsTheBrowserAndResealsTheFlowCookie(t *testing.T)
 			require.Equal(t, "google", *ts.fake.gotSubmitReq.SSOProviderID)
 			require.Equal(t, &domain.FlowSSOReturn{
 				RedirectURI:  bareOrigin + "/__nextgen/idp/google/callback",
-				ReturnTarget: returnTarget,
+				ReturnTarget: storedTarget,
 			}, ts.fake.gotSubmitReq.SSOReturn)
 			var out struct {
 				Step struct {
@@ -516,6 +531,13 @@ func TestSubmitFlowStep_SSO_RejectsAnUnboundReturn(t *testing.T) {
 			// The host is the origin, but no page URL carries userinfo.
 			name: "return_target with userinfo on the origin host",
 			body: map[string]any{"action": "sso", "sso_provider_id": "google", "return_target": "https://evil.example.com@login.example.com/login"},
+		},
+		{
+			// On the origin, but a proxy re-basing the callback's Location
+			// onto its own host reads //evil.example as the host. Every other
+			// way of writing it is covered by httputil.ParseRedirectTarget.
+			name: "return_target path starting with two slashes",
+			body: map[string]any{"action": "sso", "sso_provider_id": "google", "return_target": origin + "//evil.example/login?flow=flow_1"},
 		},
 		{
 			name: "return_target missing",
