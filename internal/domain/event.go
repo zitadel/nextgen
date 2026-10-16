@@ -96,6 +96,9 @@ const (
 	EventTypeOriginAdded   EventType = "origin.added"
 	EventTypeOriginRemoved EventType = "origin.removed"
 
+	EventTypeVariableSet     EventType = "variable.set"
+	EventTypeVariableRemoved EventType = "variable.removed"
+
 	EventTypeAuthzGranted EventType = "authz.granted"
 	EventTypeAuthzRevoked EventType = "authz.revoked"
 
