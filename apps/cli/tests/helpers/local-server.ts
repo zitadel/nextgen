@@ -6,10 +6,11 @@ import { afterEach } from "vitest";
 
 /**
  * How the stand-in for the server binary is built. `plain` is the server
- * itself. `wrapped` is a launcher that starts the server as its own child, the
- * shape in which killing the launcher leaves the server running.
+ * itself. `orphaned` is a launcher that starts the server as its own child and
+ * exits at once, which leaves the server running with nothing to answer for the
+ * pid the CLI recorded, as when a launcher is killed.
  */
-export type ServerShape = "plain" | "wrapped";
+export type ServerShape = "plain" | "orphaned";
 
 const PLAIN_SERVER = `#!/usr/bin/env node
 const http = require("node:http");
@@ -38,7 +39,6 @@ export async function aFakeServerBinary(shape: ServerShape): Promise<string> {
     launcher,
     `#!/usr/bin/env node
 require("node:child_process").spawn(${JSON.stringify(server)}, [], { stdio: "ignore", env: process.env });
-setInterval(() => undefined, 1 << 30);
 `,
   );
   await chmod(launcher, 0o755);

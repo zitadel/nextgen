@@ -88,6 +88,18 @@ describe("start", () => {
         expect(app.localPortOf(again)).toBe(app.localPortOf(first));
       });
 
+      it("names the server it started as its source, even when it had to move", async () => {
+        const app = await aSetUpApp();
+        const first = await app.startLocalServer();
+        await app.run(["stop", "--json"]);
+        const holder = await aSetUpApp();
+        await holder.startLocalServer({ port: app.localPortOf(first) });
+
+        const again = await app.restartLocalServer();
+
+        expect(app.envelopeOf(again).source).toBe(`http://localhost:${app.localPortOf(again)}`);
+      });
+
       it("refuses a port another directory's server holds", async () => {
         const owner = await aSetUpApp();
         const held = await owner.startLocalServer();

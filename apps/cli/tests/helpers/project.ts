@@ -9,6 +9,7 @@ import { expect } from "vitest";
 
 import { aFakeServerBinary, trackLocalServer, type ServerShape } from "./local-server";
 import { cliPackageRoot } from "./oclif-build";
+import { nextPort } from "./ports";
 import { parseJson, runCliForTest } from "./run-cli";
 
 const SCHEMA_FILE = ".zitadel/schemas/default-human-user.json";
@@ -129,35 +130,6 @@ export interface FlowDocument {
 
 interface PackageJson {
   dependencies: Record<string, string>;
-}
-
-/**
- * A port from this worker's own block, because a bind-then-close probe races
- * the other vitest workers: a reserved port gets taken as an outbound source
- * port before the CLI binds it.
- *
- * The band sits below every platform's ephemeral range — macOS allocates from
- * 49152 and Linux from 32768 — so a reserved port cannot be taken as an
- * outbound source port by another worker's traffic before the CLI binds it.
- * It also stays clear of the repository's other deferred-bind reservations,
- * 22000-23999 for the journey runner and 24000-31999 for embedded Postgres,
- * which hand out ports before their processes bind just as this does, and of
- * the fixed ports the other suites pin above 18000.
- *
- * Indexed by `VITEST_POOL_ID`, the reusable 1-based pool slot.
- * `VITEST_WORKER_ID` is a unique worker identity that keeps climbing as files
- * spawn workers, so indexing by it walks the block past 65535 and hands the
- * CLI a port that cannot exist. The modulo bounds it either way.
- */
-const PORT_FIRST = 16_000;
-const PORT_LAST = 18_000;
-const PORT_BLOCK = 200;
-const PORT_BLOCKS = Math.floor((PORT_LAST - PORT_FIRST) / PORT_BLOCK);
-const POOL_SLOT = Math.max(1, Number(process.env.VITEST_POOL_ID ?? 1));
-const PORT_BASE = PORT_FIRST + ((POOL_SLOT - 1) % PORT_BLOCKS) * PORT_BLOCK;
-let portOffset = 0;
-function nextPort(): number {
-  return PORT_BASE + (portOffset++ % PORT_BLOCK);
 }
 
 /**
@@ -478,15 +450,6 @@ export class ScaffoldedApp {
   /** The process a start reported its server as. */
   localPidOf(result: CliResult): number {
     return this.envelopeOf<{ runtime: { pid: number } }>(result).data.runtime.pid;
-  }
-
-  /** Kills the recorded server process and leaves whatever it started running, as when a launcher is killed. */
-  async orphanLocalServer(): Promise<void> {
-    const status = await this.cli(["status", "--json"]);
-    const pid = this.envelopeOf<{ server: { process: { pid: number } } }>(status).data.server
-      .process.pid;
-    process.kill(pid, "SIGKILL");
-    await waitUntilGone(pid);
   }
 
   /** Leaves this directory with a record of its local server that cannot be read. */
@@ -1005,17 +968,6 @@ export async function aSetUpApp(extraArgs: string[] = []): Promise<ScaffoldedApp
   const result = await app.setup(extraArgs);
   expect(result, "arranging setup should have succeeded").toSucceed();
   return app;
-}
-
-async function waitUntilGone(pid: number): Promise<void> {
-  for (let attempt = 0; attempt < 100; attempt++) {
-    try {
-      process.kill(pid, 0);
-    } catch {
-      return;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 20));
-  }
 }
 
 /** A fake `npm` on PATH that records its invocation instead of installing. */

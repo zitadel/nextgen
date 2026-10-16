@@ -113,6 +113,7 @@ export default class Start extends BaseCommand {
       { backend: runtimeBackend, image, env, userFile: local?.userFile },
       { port: requestedPort },
     );
+    this.meta = { ...this.meta, source: runtime.server_url };
     return this.emit({
       status: "ok",
       data: readyData(

@@ -140,6 +140,71 @@ describe("local server binary helpers", () => {
     resolver.missing = false;
   });
 
+  it("trusts a launch that has only just returned, whatever the process list calls it", async () => {
+    const real = await vi.importActual<typeof import("node:child_process")>("node:child_process");
+    const child = real.spawn("sleep", ["30"], { stdio: "ignore" });
+    const launcher = new BinaryLauncher({ cliVersion: "0.0.0-test", dataDir: "/d", logPath: "/l" });
+    const record = { pid: child.pid ?? 0, command: "/opt/zitadel/nextgen --migrate" } as never;
+
+    try {
+      await expect(launcher.isAlive(record, { fresh: true })).resolves.toBe(true);
+      await expect(launcher.isAlive(record)).resolves.toBe(false);
+    } finally {
+      child.kill("SIGKILL");
+    }
+  });
+
+  describe("telling one directory's server from another's", () => {
+    const real = () => vi.importActual<typeof import("node:child_process")>("node:child_process");
+    const launcher = new BinaryLauncher({ cliVersion: "0.0.0-test", dataDir: "/d", logPath: "/l" });
+    const recordFor = (pid: number, dataDir: string) =>
+      ({ pid, command: "/bin/sleep 30", data_dir: dataDir }) as never;
+
+    async function aServerOf(dataDir: string) {
+      const child = (await real()).spawn("sleep", ["30"], {
+        stdio: "ignore",
+        env: { ...process.env, NEXTGEN_SERVER_DATA_DIR: dataDir },
+      });
+      return child;
+    }
+
+    it("accepts the process that serves the record's data directory", async () => {
+      const child = await aServerOf("/projects/a/.zitadel/local/nextgen-data");
+
+      try {
+        await expect(
+          launcher.isAlive(recordFor(child.pid ?? 0, "/projects/a/.zitadel/local/nextgen-data")),
+        ).resolves.toBe(true);
+      } finally {
+        child.kill("SIGKILL");
+      }
+    });
+
+    it("refuses the process that serves another directory's data", async () => {
+      const child = await aServerOf("/projects/b/.zitadel/local/nextgen-data");
+
+      try {
+        await expect(
+          launcher.isAlive(recordFor(child.pid ?? 0, "/projects/a/.zitadel/local/nextgen-data")),
+        ).resolves.toBe(false);
+      } finally {
+        child.kill("SIGKILL");
+      }
+    });
+
+    it("does not take a data directory that only starts like the record's for the same one", async () => {
+      const child = await aServerOf("/projects/a/.zitadel/local/nextgen-data-old");
+
+      try {
+        await expect(
+          launcher.isAlive(recordFor(child.pid ?? 0, "/projects/a/.zitadel/local/nextgen-data")),
+        ).resolves.toBe(false);
+      } finally {
+        child.kill("SIGKILL");
+      }
+    });
+  });
+
   it("signals the process group even when its leader is already dead", async () => {
     let groupAlive = true;
     const kill = vi

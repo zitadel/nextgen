@@ -4,7 +4,8 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { withStartLock } from "../../../../../src/lib/local-server/internal/start-lock";
+import { tryLock, withStartLock } from "../../../../../src/lib/local-server/internal/start-lock";
+import { ManualClock } from "../../../../helpers/clock";
 
 const dirs: string[] = [];
 
@@ -19,6 +20,37 @@ async function lockPath(): Promise<string> {
   dirs.push(dir);
   return join(dir, "local", "start.lock");
 }
+
+describe("tryLock", () => {
+  it("takes a lock nobody has", async () => {
+    const lock = await lockPath();
+
+    await expect(tryLock(lock)).resolves.toBeTypeOf("function");
+  });
+
+  it("does not take a lock a live start has, and does not wait for it", async () => {
+    const lock = await lockPath();
+    await tryLock(lock);
+
+    await expect(tryLock(lock)).resolves.toBeUndefined();
+  });
+
+  it("takes the lock again once it is released", async () => {
+    const lock = await lockPath();
+    const release = await tryLock(lock);
+    await release?.();
+
+    await expect(tryLock(lock)).resolves.toBeTypeOf("function");
+  });
+
+  it("takes over a lock whose owner is gone", async () => {
+    const lock = await lockPath();
+    await tryLock(lock);
+    await writeFile(lock, "2147483000");
+
+    await expect(tryLock(lock)).resolves.toBeTypeOf("function");
+  });
+});
 
 describe("withStartLock", () => {
   it("runs the work and removes the lock", async () => {
@@ -49,26 +81,35 @@ describe("withStartLock", () => {
     });
   });
 
-  it("lets only one of two starts at a time do its work", async () => {
+  it("makes a second start wait until the first has finished", async () => {
     const lock = await lockPath();
     const events: string[] = [];
-    const start = (name: string) =>
-      withStartLock(
-        lock,
-        async () => {
-          events.push(`${name} begins`);
-          await new Promise((resolve) => setTimeout(resolve, 60));
-          events.push(`${name} ends`);
-        },
-        { pollMs: 5 },
-      );
+    let begun!: () => void;
+    const firstHasBegun = new Promise<void>((resolve) => {
+      begun = resolve;
+    });
+    let finish!: () => void;
+    const firstMayFinish = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const first = withStartLock(lock, async () => {
+      events.push("first begins");
+      begun();
+      await firstMayFinish;
+      events.push("first ends");
+    });
+    await firstHasBegun;
 
-    await Promise.all([start("a"), start("b")]);
+    const second = withStartLock(
+      lock,
+      async () => {
+        events.push("second begins");
+      },
+      { clock: new ManualClock(finish) },
+    );
+    await Promise.all([first, second]);
 
-    const [firstBegin, firstEnd, secondBegin, secondEnd] = events;
-    expect(firstBegin?.replace(" begins", "")).toBe(firstEnd?.replace(" ends", ""));
-    expect(secondBegin?.replace(" begins", "")).toBe(secondEnd?.replace(" ends", ""));
-    expect(events).toHaveLength(4);
+    expect(events).toEqual(["first begins", "first ends", "second begins"]);
   });
 
   it("takes over a lock whose owner is gone", async () => {
@@ -76,19 +117,20 @@ describe("withStartLock", () => {
     await withStartLock(lock, async () => undefined);
     await writeFile(lock, "2147483000");
 
-    await expect(withStartLock(lock, async () => "taken", { pollMs: 5 })).resolves.toBe("taken");
+    await expect(withStartLock(lock, async () => "taken")).resolves.toBe("taken");
   });
 
   it("gives up with a way out when a live start never finishes", async () => {
     const lock = await lockPath();
+    const release = await tryLock(lock);
 
-    await withStartLock(lock, async () => {
-      await expect(
-        withStartLock(lock, async () => undefined, { timeoutMs: 30, pollMs: 5 }),
-      ).rejects.toMatchObject({
-        code: "E_CONFLICT",
-        hint: expect.stringContaining(lock),
-      });
-    });
+    await expect(
+      withStartLock(lock, async () => undefined, {
+        timeoutMs: 100,
+        pollMs: 10,
+        clock: new ManualClock(),
+      }),
+    ).rejects.toMatchObject({ code: "E_CONFLICT", hint: expect.stringContaining(lock) });
+    await release?.();
   });
 });

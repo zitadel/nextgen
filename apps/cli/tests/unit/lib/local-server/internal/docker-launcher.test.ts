@@ -237,6 +237,17 @@ describe("DockerLauncher", () => {
       expect(calls.map((call) => call.args[0])).toEqual(expect.arrayContaining(["stop", "rm"]));
     });
 
+    it("removes the container a failed run may have created, and reports the failure", async () => {
+      const calls = fakeDocker({ runFails: true });
+
+      await expect(
+        launcher().launch({ port: 8090, serverUrl: "http://localhost:8090" }),
+      ).rejects.toMatchObject({ code: "E_VALIDATION" });
+
+      const verbs = calls.map((call) => call.args[0]);
+      expect(verbs.lastIndexOf("inspect")).toBeGreaterThan(verbs.indexOf("run"));
+    });
+
     it("says whether it removed a container", async () => {
       fakeDocker({ existing: { running: true } });
       await expect(DockerLauncher.remove("zitadel-server-test")).resolves.toBe(true);
@@ -269,7 +280,10 @@ describe("DockerLauncher", () => {
 type DockerCall = { command: string; args: string[]; env: NodeJS.ProcessEnv };
 
 /** Answers each `docker` the code spawns from a script, and records what it was asked. */
-function fakeDocker(options: { existing?: { running: boolean } }): DockerCall[] {
+function fakeDocker(options: {
+  existing?: { running: boolean };
+  runFails?: boolean;
+}): DockerCall[] {
   const calls: DockerCall[] = [];
   vi.mocked(spawn).mockImplementation(((
     command: string,
@@ -292,7 +306,9 @@ function fakeDocker(options: { existing?: { running: boolean } }): DockerCall[] 
       return fakeDockerProcess("");
     }
     if (verb === "run") {
-      return fakeDockerProcess("cid-1\n");
+      return options.runFails
+        ? fakeDockerProcess("", 125, "port is already allocated")
+        : fakeDockerProcess("cid-1\n");
     }
     if (verb === "logs") {
       return fakeDockerProcess("", 0, "level=INFO msg=listening\n");

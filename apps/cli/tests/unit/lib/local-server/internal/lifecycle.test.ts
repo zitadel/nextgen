@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import { ManualClock } from "../../../../helpers/clock";
+
 import {
-  chooseFreePort,
+  claimFreePort,
   Lifecycle,
   NoFreePortError,
   PortInUseError,
@@ -25,6 +27,7 @@ class World {
   /** Origins that answer /healthz, whoever answers them. */
   healthy = new Set<string>();
   launched: number[] = [];
+  aliveAsked: boolean[] = [];
   terminated: number[] = [];
   nextPid = 100;
   /** What `launch` does to the world, to model a process that dies or never answers. */
@@ -51,7 +54,10 @@ class World {
       this.onLaunch(record, this);
       return record;
     },
-    isAlive: async (record) => this.alive.has(record.pid),
+    isAlive: async (record, options) => {
+      this.aliveAsked.push(options?.fresh === true);
+      return this.alive.has(record.pid);
+    },
     logTail: async () => {
       if (this.logsGone) {
         throw new Error("no such container");
@@ -69,13 +75,29 @@ class World {
     },
   };
 
-  ports: PortProbe = { isFree: async (port) => !this.takenPorts.has(port) };
+  /** Ports another start has claimed but not yet bound. */
+  reservedPorts = new Set<number>();
+  released: number[] = [];
+
+  ports: PortProbe = {
+    isFree: async (port) => !this.takenPorts.has(port),
+    reserve: async (port) => {
+      if (this.reservedPorts.has(port)) {
+        return undefined;
+      }
+      this.reservedPorts.add(port);
+      return async () => {
+        this.reservedPorts.delete(port);
+        this.released.push(port);
+      };
+    },
+  };
   health: HealthProbe = { isHealthy: async (url) => this.healthy.has(url) };
 
   server(options: ConstructorParameters<typeof Lifecycle<Fake>>[1] = {}) {
     return new Lifecycle<Fake>(
       { store: this.store, launcher: this.launcher, ports: this.ports, health: this.health },
-      { startTimeoutMs: 30, pollIntervalMs: 5, ...options },
+      { startTimeoutMs: 30, pollIntervalMs: 5, clock: new ManualClock(), ...options },
     );
   }
 }
@@ -316,6 +338,83 @@ describe("Lifecycle", () => {
       });
     });
 
+    it("skips a port another start has claimed but not yet bound", async () => {
+      const world = new World();
+      world.reservedPorts.add(8080);
+
+      const { record } = await world.server().start();
+
+      expect(record.port).toBe(8081);
+    });
+
+    it("refuses a port that was asked for when another start has claimed it", async () => {
+      const world = new World();
+      world.reservedPorts.add(9000);
+
+      await expect(world.server({ port: 9000 }).start()).rejects.toBeInstanceOf(PortInUseError);
+    });
+
+    it("lets go of its port claim once the server answers", async () => {
+      const world = new World();
+
+      await world.server().start();
+
+      expect(world.released).toEqual([8080]);
+    });
+
+    it("lets go of its port claim when the start fails", async () => {
+      const world = new World();
+      world.onLaunch = () => undefined;
+
+      await world
+        .server()
+        .start()
+        .catch(() => undefined);
+
+      expect(world.released).toEqual([8080]);
+    });
+
+    it("takes the next port when the launch itself fails because the port was taken", async () => {
+      const world = new World();
+      const launch = world.launcher.launch;
+      world.launcher.launch = async (spec) => {
+        if (spec.port === 8080) {
+          world.takenPorts.add(8080);
+          throw new Error("port is already allocated");
+        }
+        return launch(spec);
+      };
+
+      const { record } = await world.server().start();
+
+      expect(record.port).toBe(8081);
+    });
+
+    it("does not retry a launch that failed for another reason", async () => {
+      const world = new World();
+      world.launcher.launch = async () => {
+        throw new Error("no such image");
+      };
+
+      await expect(world.server().start()).rejects.toThrow("no such image");
+    });
+
+    it("keeps the port the folder had under another backend", async () => {
+      const world = new World();
+
+      const { record } = await world.server({ previousPort: 8085 }).start();
+
+      expect(record.port).toBe(8085);
+    });
+
+    it("does not ask whether a server it has just launched is still the same one", async () => {
+      const world = new World();
+
+      await world.server().start();
+
+      expect(world.aliveAsked.every(Boolean)).toBe(true);
+    });
+
     it("fails with a timeout when the process lives but never answers", async () => {
       const world = new World();
       world.onLaunch = (record, w) => w.alive.add(record.pid);
@@ -356,7 +455,7 @@ describe("Lifecycle", () => {
 
     it("fails when no port in range is free", async () => {
       const world = new World();
-      world.ports = { isFree: async () => false };
+      world.ports = { isFree: async () => false, reserve: async () => async () => undefined };
 
       await expect(world.server().start()).rejects.toBeInstanceOf(NoFreePortError);
     });
@@ -407,25 +506,35 @@ describe("Lifecycle", () => {
   });
 });
 
-describe("chooseFreePort", () => {
+describe("claimFreePort", () => {
+  const open = (): PortProbe => ({
+    isFree: async () => true,
+    reserve: async () => async () => undefined,
+  });
+
   it("prefers the port it is given when it is free", async () => {
-    await expect(chooseFreePort({ isFree: async () => true }, 9100)).resolves.toBe(9100);
+    await expect(claimFreePort(open(), undefined, 9100)).resolves.toMatchObject({ port: 9100 });
   });
 
   it("starts from 8080 without a preference", async () => {
-    await expect(chooseFreePort({ isFree: async () => true })).resolves.toBe(8080);
+    await expect(claimFreePort(open())).resolves.toMatchObject({ port: 8080 });
+  });
+
+  it("takes a port that was asked for as it is", async () => {
+    await expect(claimFreePort(open(), 9200, 9100)).resolves.toMatchObject({ port: 9200 });
   });
 
   it("gives up after a hundred ports", async () => {
     const tried: number[] = [];
-    const ports = {
-      isFree: async (port: number) => {
+    const ports: PortProbe = {
+      isFree: async (port) => {
         tried.push(port);
         return false;
       },
+      reserve: async () => async () => undefined,
     };
 
-    await expect(chooseFreePort(ports, 8080)).rejects.toBeInstanceOf(NoFreePortError);
+    await expect(claimFreePort(ports, undefined, 8080)).rejects.toBeInstanceOf(NoFreePortError);
     expect(tried).toHaveLength(100);
   });
 });

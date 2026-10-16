@@ -1,6 +1,5 @@
-import { setTimeout as sleep } from "node:timers/promises";
-
 import { DEFAULT_LOCAL_SERVER_PORT } from "../runtime";
+import { type Clock, realClock } from "./clock";
 
 /**
  * What the lifecycle needs to know about a running server, whatever started it.
@@ -27,8 +26,12 @@ export type StopOutcome = Readonly<{
 /** Runs the server. The binary and Docker runtimes are two implementations. */
 export interface Launcher<R extends ServerRecord> {
   launch(spec: { port: number; serverUrl: string }): Promise<R>;
-  /** Whether what `launch` started still exists, answering or not. */
-  isAlive(record: R): Promise<boolean>;
+  /**
+   * Whether what a record names still exists, answering or not. A `fresh` record
+   * is one `launch` has just returned, which needs no check that it is still the
+   * same server: there is nothing older it could have been confused with.
+   */
+  isAlive(record: R, options?: { fresh?: boolean }): Promise<boolean>;
   /** Stops it, `stale` when there was nothing left to stop. */
   terminate(record: R): Promise<StopOutcome>;
   /** The end of its own log, for explaining a failed start; read before it is cleaned up. */
@@ -37,6 +40,12 @@ export interface Launcher<R extends ServerRecord> {
 
 export interface PortProbe {
   isFree(port: number): Promise<boolean>;
+  /**
+   * Claims a port for one start until the returned function releases it, so that
+   * two starts that choose at the same moment cannot choose the same port.
+   * `undefined` when another start already has it.
+   */
+  reserve(port: number): Promise<(() => Promise<void>) | undefined>;
 }
 
 export interface HealthProbe {
@@ -53,11 +62,14 @@ export type LifecycleOptions<R extends ServerRecord> = Readonly<{
   port?: number;
   /** The port a folder without a record tries first. */
   firstPort?: number;
+  /** The port the folder's server had under another backend, which it keeps when it can. */
+  previousPort?: number;
   /** A running server is kept only when this holds; otherwise it is restarted. */
   reusable?: (record: R) => boolean;
   /** How long to wait for the new server to answer. */
   startTimeoutMs?: number;
   pollIntervalMs?: number;
+  clock?: Clock;
 }>;
 
 export type LifecycleDeps<R extends ServerRecord> = Readonly<{
@@ -170,34 +182,42 @@ export class Lifecycle<R extends ServerRecord> {
     if (previous) {
       await this.terminate(previous);
     }
-    if (requested !== undefined) {
-      await this.assertFree(requested);
-    }
-    let preferred = previous?.port;
+    let preferred = previous?.port ?? this.options.previousPort;
     for (let attempt = 0; ; attempt++) {
-      const port = requested ?? (await this.choosePort(preferred));
-      const record = await this.deps.launcher.launch({ port, serverUrl: serverUrlFor(port) });
+      const claim = await claimFreePort(
+        this.deps.ports,
+        requested,
+        preferred,
+        this.options.firstPort,
+      );
       try {
-        await this.waitUntilReady(record);
+        const record = await this.launchAndWait(claim.port);
+        await this.deps.store.write(record);
+        return { record, alreadyRunning: false };
       } catch (error) {
-        // Two directories that choose the same free port at the same moment: the
-        // loser exits because the winner holds the port now. It tries the next
-        // one. A server that exits with its port still free crashed, and says so.
+        // Someone else took the port between choosing it and binding it. The
+        // choice was automatic, so the next port is tried. A server that failed
+        // with its port still free crashed, and says so.
         if (
           requested === undefined &&
           attempt < PORT_RACE_RETRIES &&
-          error instanceof ServerStartError &&
-          error.reason === "exited" &&
-          !(await this.deps.ports.isFree(port))
+          (error instanceof ServerStartError ? error.reason === "exited" : true) &&
+          !(await this.deps.ports.isFree(claim.port))
         ) {
-          preferred = port + 1;
+          preferred = claim.port + 1;
           continue;
         }
         throw error;
+      } finally {
+        await claim.release();
       }
-      await this.deps.store.write(record);
-      return { record, alreadyRunning: false };
     }
+  }
+
+  private async launchAndWait(port: number): Promise<R> {
+    const record = await this.deps.launcher.launch({ port, serverUrl: serverUrlFor(port) });
+    await this.waitUntilReady(record);
+    return record;
   }
 
   /** Stops the recorded server. `not-running` when nothing was recorded or nothing was left. */
@@ -208,15 +228,6 @@ export class Lifecycle<R extends ServerRecord> {
     }
     const outcome = await this.terminate(record);
     return { result: outcome.status === "stopped" ? "stopped" : "not-running", record };
-  }
-
-  /**
-   * The folder's own port when it is free, so URLs written into the app's
-   * configuration stay valid across restarts, and otherwise the first free port
-   * above it. A port someone else holds is skipped, never shared.
-   */
-  choosePort(preferred?: number): Promise<number> {
-    return chooseFreePort(this.deps.ports, preferred, this.options.firstPort);
   }
 
   private async assertFree(port: number): Promise<void> {
@@ -241,18 +252,19 @@ export class Lifecycle<R extends ServerRecord> {
   private async waitUntilReady(record: R): Promise<void> {
     const timeout = this.options.startTimeoutMs ?? 90_000;
     const interval = this.options.pollIntervalMs ?? 1000;
-    const started = Date.now();
-    while (Date.now() - started < timeout) {
-      if (!(await this.deps.launcher.isAlive(record))) {
+    const clock = this.options.clock ?? realClock;
+    const started = clock.now();
+    while (clock.now() - started < timeout) {
+      if (!(await this.deps.launcher.isAlive(record, { fresh: true }))) {
         throw await this.startFailure("exited", record);
       }
       if (await this.deps.health.isHealthy(record.server_url)) {
-        if (!(await this.deps.launcher.isAlive(record))) {
+        if (!(await this.deps.launcher.isAlive(record, { fresh: true }))) {
           throw await this.startFailure("exited", record);
         }
         return;
       }
-      await sleep(interval);
+      await clock.wait(interval);
     }
     throw await this.startFailure("timeout", record);
   }
@@ -272,16 +284,34 @@ export class Lifecycle<R extends ServerRecord> {
   }
 }
 
-/** `preferred` when free, else the first free port above it; `firstPort` (8080) when there is no preference. */
-export async function chooseFreePort(
+export type PortClaim = Readonly<{ port: number; release: () => Promise<void> }>;
+
+/**
+ * Claims the port a start will use. A port that was asked for is taken as asked
+ * or refused. Otherwise the folder's own port, when it is free, so that URLs
+ * written into the app's configuration stay valid across restarts, and else the
+ * first free port above it: a port someone else holds is skipped, never shared.
+ */
+export async function claimFreePort(
   ports: PortProbe,
+  requested?: number,
   preferred?: number,
   firstPort: number = DEFAULT_LOCAL_SERVER_PORT,
-): Promise<number> {
+): Promise<PortClaim> {
+  if (requested !== undefined) {
+    const release = (await ports.isFree(requested)) ? await ports.reserve(requested) : undefined;
+    if (!release) {
+      throw new PortInUseError(requested);
+    }
+    return { port: requested, release };
+  }
   const first = preferred ?? firstPort;
   for (let port = first; port < first + PORT_SEARCH_RANGE; port++) {
     if (await ports.isFree(port)) {
-      return port;
+      const release = await ports.reserve(port);
+      if (release) {
+        return { port, release };
+      }
     }
   }
   throw new NoFreePortError(first);

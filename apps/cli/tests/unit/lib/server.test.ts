@@ -125,10 +125,12 @@ async function writeLocalRuntime(serverUrl: string): Promise<void> {
   const paths = localRuntimePaths(dir);
   const metadata: RuntimeMetadata = {
     schema_version: 1,
-    backend: "docker",
-    container_name: "zitadel-server-test",
-    container_id: "container-1",
-    image: "ghcr.io/zitadel/nextgen:test",
+    backend: "binary",
+    pid: process.pid,
+    command: process.execPath,
+    log_path: paths.logFile,
+    server_package: "@zitadel/server",
+    server_version: "0.0.0-test",
     port: Number(new URL(serverUrl).port),
     server_url: serverUrl,
     data_dir: paths.dataDir,

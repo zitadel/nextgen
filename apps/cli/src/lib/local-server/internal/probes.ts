@@ -1,7 +1,10 @@
 import { createConnection, createServer } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { checkLocalServerHealth } from "../runtime";
 import type { HealthProbe, PortProbe } from "./lifecycle";
+import { tryLock } from "./start-lock";
 
 /**
  * A port is free when it can be bound and nothing answers on it. Binding alone
@@ -11,6 +14,15 @@ import type { HealthProbe, PortProbe } from "./lifecycle";
  * one, and an empty one reads as a free port.
  */
 export class TcpPorts implements PortProbe {
+  /**
+   * Starts that choose a port at the same moment cannot tell it is taken until
+   * one of them binds it, so a start claims the port first, with a file every
+   * `zitadel` on the machine sees, and keeps the claim until its server answers.
+   */
+  reserve(port: number): Promise<(() => Promise<void>) | undefined> {
+    return tryLock(join(tmpdir(), "zitadel-local-ports", String(port)));
+  }
+
   async isFree(port: number): Promise<boolean> {
     if (await this.answers(port)) {
       return false;

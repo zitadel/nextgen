@@ -114,8 +114,12 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     }
   }
 
-  isAlive(record: BinaryRuntimeMetadata): Promise<boolean> {
-    return BinaryLauncher.isRecordRunning(record);
+  async isAlive(record: BinaryRuntimeMetadata, options?: { fresh?: boolean }): Promise<boolean> {
+    // `ps` shows a process that was just spawned under its parent's name until
+    // it has exec'd, so a launch that has only just returned is not asked who it is.
+    return options?.fresh
+      ? BinaryLauncher.isRunning(record.pid)
+      : BinaryLauncher.isRecordRunning(record);
   }
 
   terminate(record: BinaryRuntimeMetadata): Promise<StopBinaryRuntimeResult> {
@@ -301,11 +305,13 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
 }
 
 /**
- * Whether the recorded pid still belongs to the server that was started: the
- * process, or one left in the group it led, runs the program that was started
- * or the server itself, which is what a launcher that died leaves behind. When the
- * process list cannot be read (no `ps`, Windows) the pid is trusted, as it was
- * before.
+ * Whether the recorded pid still belongs to the server that was started. The
+ * process, or one left in the group it led, must run the program that was
+ * started or the server itself (which is what a launcher that died leaves
+ * behind), and must be serving this record's data directory: every directory's
+ * server runs the same program, so the data directory in its environment is
+ * what tells them apart. Where the process list or a process's environment
+ * cannot be read (no `ps`, Windows) the pid is trusted, as it was before.
  */
 async function ownsProcess(record: BinaryRuntimeMetadata): Promise<boolean> {
   if (process.platform === "win32") {
@@ -318,23 +324,53 @@ async function ownsProcess(record: BinaryRuntimeMetadata): Promise<boolean> {
   const programs = [started, SERVER_PROGRAM];
   let listing: string;
   try {
-    listing = await new Promise<string>((resolve, reject) => {
-      execFile(
-        "ps",
-        ["-axo", "pid=,pgid=,command="],
-        { timeout: 3000, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 },
-        (error, stdout) => (error ? reject(error) : resolve(stdout)),
-      );
-    });
+    listing = await ps(["-axo", "pid=,pgid=,command="]);
   } catch {
     return true;
   }
-  return listing.split(/\r?\n/).some((line) => {
+  const candidates = listing.split(/\r?\n/).flatMap((line) => {
     const match = line.trim().match(/^(\d+)\s+(\d+)\s+(.*)$/);
-    return (
-      match !== null &&
-      (Number(match[1]) === record.pid || Number(match[2]) === record.pid) &&
-      programs.some((program) => (match[3] ?? "").includes(program))
+    const named = match !== null && programs.some((program) => (match[3] ?? "").includes(program));
+    const ours =
+      match !== null && (Number(match[1]) === record.pid || Number(match[2]) === record.pid);
+    return named && ours ? [Number(match[1])] : [];
+  });
+  for (const pid of candidates) {
+    if (await servesDataDir(pid, record.data_dir)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+const DATA_DIR_VARIABLE = "NEXTGEN_SERVER_DATA_DIR=";
+
+/** Whether a process serves a data directory, or its environment does not say. */
+async function servesDataDir(pid: number, dataDir: string): Promise<boolean> {
+  let command: string;
+  try {
+    command = await ps(["eww", "-p", String(pid), "-o", "command="]);
+  } catch {
+    return true;
+  }
+  const at = command.indexOf(DATA_DIR_VARIABLE);
+  if (at === -1) {
+    return true;
+  }
+  const rest = command.slice(at + DATA_DIR_VARIABLE.length);
+  return (
+    rest.startsWith(dataDir) &&
+    (rest.length === dataDir.length || /\s/.test(rest[dataDir.length] ?? ""))
+  );
+}
+
+function ps(args: string[]): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    execFile(
+      "ps",
+      args,
+      { timeout: 3000, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 },
+      (error, stdout) => (error ? reject(error) : resolve(stdout)),
     );
   });
 }

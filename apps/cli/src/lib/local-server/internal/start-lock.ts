@@ -1,13 +1,14 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import { setTimeout as sleep } from "node:timers/promises";
 
 import { ZitadelError } from "../../errors";
+import { type Clock, realClock } from "./clock";
 
 type LockOptions = Readonly<{
   /** How long to wait for another start to finish. */
   timeoutMs?: number;
   pollMs?: number;
+  clock?: Clock;
 }>;
 
 /**
@@ -23,42 +24,54 @@ export async function withStartLock<T>(
   work: () => Promise<T>,
   options: LockOptions = {},
 ): Promise<T> {
-  await acquire(lockFile, options.timeoutMs ?? 120_000, options.pollMs ?? 200);
+  const release = await acquireLock(lockFile, options);
   try {
     return await work();
   } finally {
-    await rm(lockFile, { force: true });
+    await release();
   }
 }
 
-async function acquire(lockFile: string, timeoutMs: number, pollMs: number): Promise<void> {
+/** Takes the lock without waiting. `undefined` when a live start has it. */
+export async function tryLock(lockFile: string): Promise<(() => Promise<void>) | undefined> {
   await mkdir(dirname(lockFile), { recursive: true, mode: 0o700 });
-  const deadline = Date.now() + timeoutMs;
   for (;;) {
     try {
       await writeFile(lockFile, String(process.pid), { flag: "wx", mode: 0o600 });
-      return;
+      return () => rm(lockFile, { force: true });
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
         throw error;
       }
     }
     const owner = await readOwner(lockFile);
-    if (owner !== undefined && !isAlive(owner)) {
-      await rm(lockFile, { force: true });
-      continue;
+    if (owner === undefined || isAlive(owner)) {
+      return undefined;
     }
-    if (Date.now() >= deadline) {
+    await rm(lockFile, { force: true });
+  }
+}
+
+async function acquireLock(lockFile: string, options: LockOptions): Promise<() => Promise<void>> {
+  const clock = options.clock ?? realClock;
+  const deadline = clock.now() + (options.timeoutMs ?? 120_000);
+  const pollMs = options.pollMs ?? 200;
+  for (;;) {
+    const release = await tryLock(lockFile);
+    if (release) {
+      return release;
+    }
+    if (clock.now() >= deadline) {
       throw new ZitadelError(
         "E_CONFLICT",
         "Another `zitadel start` is still running in this directory",
         {
           hint: `Wait for it to finish, or delete ${lockFile} if no start is running.`,
-          details: { lock_file: lockFile, owner_pid: owner },
+          details: { lock_file: lockFile, owner_pid: await readOwner(lockFile) },
         },
       );
     }
-    await sleep(pollMs);
+    await clock.wait(pollMs);
   }
 }
 

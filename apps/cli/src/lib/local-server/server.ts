@@ -8,7 +8,12 @@ import type { ResolvedEnv } from "./env-vars";
 import { assertDockerAvailable, startFailure } from "./internal/failures";
 import { BinaryLauncher, type StopBinaryRuntimeResult } from "./internal/binary-launcher";
 import { DockerLauncher, type DockerResult } from "./internal/docker-launcher";
-import { Lifecycle, type Launcher, type LifecycleOptions } from "./internal/lifecycle";
+import {
+  Lifecycle,
+  PortInUseError,
+  type Launcher,
+  type LifecycleOptions,
+} from "./internal/lifecycle";
 import { HttpHealth, TcpPorts } from "./internal/probes";
 import { withStartLock } from "./internal/start-lock";
 import { RuntimeFileStore } from "./internal/store";
@@ -22,6 +27,8 @@ import {
   ensureContainerIdentity,
   localContainerName,
   localRuntimePaths,
+  localServerNotRunning,
+  readNearestRuntimeMetadata,
   readRuntimeMetadata,
   removeLocalData,
   removeRuntimeMetadata,
@@ -108,6 +115,46 @@ export class LocalServer {
     return DockerLauncher.imageAvailable(image);
   }
 
+  /**
+   * The URL of the server the nearest `zitadel start` record names, when that
+   * server is the one running and answering. A URL alone is not enough: after a
+   * directory's server stops, another directory's can take its port, and a
+   * credential sent there would be sent to the wrong server. There is no
+   * fallback to a default port for the same reason.
+   */
+  static async resolveUrl(cwd: string): Promise<string> {
+    const nearest = await readNearestRuntimeMetadata(cwd);
+    if (!nearest) {
+      throw localServerNotRunning();
+    }
+    if (await LocalServer.isServing(nearest.runtime)) {
+      return nearest.runtime.server_url;
+    }
+    throw localServerNotRunning(nearest.runtime.server_url);
+  }
+
+  /**
+   * {@link resolveUrl} for optional UI such as the setup wizard's server
+   * choice: it never throws, and a malformed record or a server that is not
+   * running yields `undefined` (`doctor` owns diagnosing those states).
+   */
+  static async detectUrl(cwd: string): Promise<string | undefined> {
+    try {
+      return await LocalServer.resolveUrl(cwd);
+    } catch {
+      return undefined;
+    }
+  }
+
+  private static async isServing(runtime: RuntimeMetadata): Promise<boolean> {
+    const alive =
+      runtime.backend === "binary"
+        ? await BinaryLauncher.isRecordRunning(runtime)
+        : (await DockerLauncher.inspect(runtime.container_name).catch(() => undefined))?.running ===
+          true;
+    return alive && (await checkLocalServerHealth(runtime.server_url));
+  }
+
   /** Stops every CLI-managed server process on the machine, whichever directory started it. */
   static async stopAll(): Promise<SweepResult> {
     const discovery = await discoverManagedRuntimeProcesses();
@@ -154,7 +201,18 @@ export class LocalServer {
   ): Promise<{ runtime: RuntimeMetadata; alreadyRunning: boolean }> {
     const existing = await readRuntimeMetadata(this.cwd);
     const paths = localRuntimePaths(this.cwd);
+    // The server another backend left. It is stopped to make way for this one,
+    // but not for a port that cannot be had: a refused move leaves it running.
+    const other = existing && existing.backend !== config.backend ? existing : undefined;
     try {
+      if (
+        other &&
+        options.port !== undefined &&
+        options.port !== other.port &&
+        !(await new TcpPorts().isFree(options.port))
+      ) {
+        throw new PortInUseError(options.port);
+      }
       if (config.backend === "binary") {
         // A server another CLI release started serves that release's API, and
         // `setup` against it fails halfway, after the project exists. So a
@@ -185,6 +243,7 @@ export class LocalServer {
           }),
           {
             port: options.port,
+            previousPort: other?.port,
             reusable: (record) => version === undefined || record.server_version === version,
           },
         );
@@ -209,7 +268,11 @@ export class LocalServer {
           env: config.env,
           userFile: config.userFile,
         }),
-        { port: options.port, reusable: (record) => record.image === image },
+        {
+          port: options.port,
+          previousPort: other?.port,
+          reusable: (record) => record.image === image,
+        },
       );
     } catch (error) {
       throw await startFailure(error, this.cliVersion);

@@ -16,7 +16,6 @@ import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
-  localContainerName,
   localRuntimePaths,
   writeRuntimeMetadata,
   type RuntimeMetadata,
@@ -474,13 +473,16 @@ async function startClaimServer(claimUrl = "http://localhost/claim/ch_localstub"
   return `http://localhost:${String(address.port)}`;
 }
 
+/** A runtime record of a server that is running: this process, answering at `serverUrl`. */
 function runtimeFor(cwd: string, serverUrl: string): RuntimeMetadata {
   return {
     schema_version: 1,
-    backend: "docker",
-    container_name: localContainerName(cwd),
-    container_id: "container-test-id",
-    image: "ghcr.io/zitadel/nextgen:test",
+    backend: "binary",
+    pid: process.pid,
+    command: process.execPath,
+    log_path: localRuntimePaths(cwd).logFile,
+    server_package: "@zitadel/server",
+    server_version: "0.0.0-test",
     port: Number(new URL(serverUrl).port),
     server_url: serverUrl,
     data_dir: localRuntimePaths(cwd).dataDir,

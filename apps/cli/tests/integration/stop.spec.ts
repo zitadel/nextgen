@@ -63,8 +63,7 @@ describe("stop", () => {
 
       it("stops a server whose recorded process has died", async () => {
         const app = await aSetUpApp();
-        await app.startLocalServer({ shape: "wrapped" });
-        await app.orphanLocalServer();
+        await app.startLocalServer({ shape: "orphaned" });
 
         await app.run(["stop", "--json"]);
 

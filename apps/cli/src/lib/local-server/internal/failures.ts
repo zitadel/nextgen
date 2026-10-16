@@ -79,7 +79,11 @@ export async function startFailure(error: unknown, cliVersion: string): Promise<
               publicCliCommand("logs", cliVersion),
               publicCliCommand("reset --force", cliVersion),
             ],
-            details: { ...details, server_url: record.server_url },
+            details: {
+              ...details,
+              server_url: record.server_url,
+              ...(error.logTail ? { log_tail: error.logTail } : {}),
+            },
           });
     return error.cleanup.status === "failed"
       ? startupCleanupFailedError(reported, error.cleanup, cliVersion)

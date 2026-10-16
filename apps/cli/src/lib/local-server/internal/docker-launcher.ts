@@ -63,11 +63,18 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
     await DockerLauncher.remove(spec.containerName);
     await ensureImage(spec.image);
     const env = spec.env ?? EMPTY_ENV;
-    const result = await requireDocker(
-      DockerLauncher.runArgs({ ...spec, port: target.port }, env.injected),
-      "Start local Zitadel container",
-      env.values,
-    );
+    let result: DockerResult;
+    try {
+      result = await requireDocker(
+        DockerLauncher.runArgs({ ...spec, port: target.port }, env.injected),
+        "Start local Zitadel container",
+        env.values,
+      );
+    } catch (error) {
+      // A run that failed after the container was created leaves it behind.
+      await DockerLauncher.remove(spec.containerName).catch(() => false);
+      throw error;
+    }
     return DockerLauncher.metadata({
       cwdDataDir: spec.dataDir,
       cliVersion: spec.cliVersion,
