@@ -177,6 +177,16 @@ func TestParseTemplate_RejectsDuplicateKeys(t *testing.T) {
 	assert.Contains(t, err.Error(), `duplicate key "maximum"`)
 }
 
+func TestParseTemplate_RejectsUnicodeCaseVariantKeys(t *testing.T) {
+	// "rule\u017f" (long s) folds to "rules" in encoding/json without being
+	// its lower case; it must count as a duplicate, not override the rules.
+	doc := strings.Replace(testTemplate, `"rules": [`, `"rule\u017f": [], "rules": [`, 1)
+	require.NotEqual(t, testTemplate, doc)
+	_, err := policy.ParseTemplate([]byte(doc))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate key")
+}
+
 func TestParseInstance_DuplicateKeysInNestedValues(t *testing.T) {
 	// Same key in different objects, and inside arrays, is fine.
 	_, err := policy.ParseInstance([]byte(`{"kind":"policy","operation":"test.op","config":{"a":{"x":1},"b":{"x":[{"x":1},{"x":2}]}}}`))

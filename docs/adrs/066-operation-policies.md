@@ -336,9 +336,13 @@ needs a misbehaving policy out of the way publishes a revision with an empty
 
 ### End to end: a user enters their password during sign-up (via flow-engine)
 
-The intended flow once the gate and the flow field are wired. A new user has
-no password history, so only the length rules apply here; history joins the
-same sequence on a self-service change.
+The intended flow once the gate and the flow field are wired, for an
+instance that sets `min_length: 12`. A new user has no password history, so
+history belongs to a self-service change, not to sign-up. The engine cannot
+tell the two apart yet: an instance that also sets `history_depth` puts it
+into the sign-up constraints too, and the sign-up context has to carry an
+empty `history_matches`. Modelling "self-service only" in the template is the
+gate's job ([#1448](https://github.com/zitadel/nextgen/issues/1448)).
 
 ```mermaid
 sequenceDiagram

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"maps"
 	"math"
 	"slices"
@@ -32,7 +31,8 @@ func ParseInstance(data []byte) (*Instance, error) {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidInstance, err)
 	}
 	// encoding/json matches field names without case; the envelope is
-	// spelled exactly as documented or rejected.
+	// spelled exactly as documented or rejected. json.Unmarshal also rejects
+	// data after the object.
 	var envelope map[string]json.RawMessage
 	if err := json.Unmarshal(data, &envelope); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidInstance, err)
@@ -55,9 +55,6 @@ func ParseInstance(data []byte) (*Instance, error) {
 	var inst Instance
 	if err := dec.Decode(&inst); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidInstance, err)
-	}
-	if err := dec.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
-		return nil, fmt.Errorf("%w: unexpected data after the instance", ErrInvalidInstance)
 	}
 	if inst.Kind != KindPolicy {
 		return nil, fmt.Errorf("%w: kind must be %q, got %q", ErrInvalidInstance, KindPolicy, inst.Kind)

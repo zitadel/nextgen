@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"unicode"
 )
 
 // rejectDuplicateKeys fails when any object in the document repeats a key.
@@ -62,7 +63,7 @@ func rejectDuplicateKeys(data []byte) error {
 				continue
 			}
 			key, _ := tok.(string)
-			folded := strings.ToLower(key)
+			folded := foldKey(key)
 			if _, dup := top.keys[folded]; dup {
 				return fmt.Errorf("duplicate key %q", key)
 			}
@@ -70,4 +71,21 @@ func rejectDuplicateKeys(data []byte) error {
 			top.expectKey = false
 		}
 	}
+}
+
+// foldKey maps a key to one representative per Unicode case-folding orbit,
+// the same equivalence encoding/json uses to match field names. ToLower is
+// not enough: the long s (U+017F) and the Kelvin sign (U+212A) fold to "s"
+// and "k" without being their lower case.
+func foldKey(key string) string {
+	var b strings.Builder
+	b.Grow(len(key))
+	for _, r := range key {
+		least := r
+		for f := unicode.SimpleFold(r); f != r; f = unicode.SimpleFold(f) {
+			least = min(least, f)
+		}
+		b.WriteRune(least)
+	}
+	return b.String()
 }
