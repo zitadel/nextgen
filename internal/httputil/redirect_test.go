@@ -59,6 +59,7 @@ func TestParseRedirectTarget_Accepts(t *testing.T) {
 		{"an encoded newline in the fragment", `https://app.test/x#a%0Ab`, "app.test"},
 		{"a query mark in the fragment before a stray percent sign", `https://app.test/#/a?b%zz`, "app.test"},
 		{"a backslash in the fragment", `https://app.test/#\x`, "app.test"},
+		{"an encoded question mark in an honest path", "https://app.test/a%3Fb/c", "app.test"},
 		{"an empty port", "https://app.test:/x", "app.test:"},
 	}
 	for _, tt := range tests {
@@ -177,6 +178,10 @@ func TestParseRedirectTarget_Refuses(t *testing.T) {
 		{"a parameter-bearing parent segment before two slashes", "https://app.test/a/..;//evil.example", "empty segment"},
 		{"an encoded parent segment with an encoded semicolon", "https://app.test/a/%2e%2e%3b//evil", "empty segment"},
 		{"a parameter on a segment before two slashes", "https://app.test/a/..;x=1/..//evil", "empty segment"},
+		{"an encoded question mark ends the path before dot segments", "https://app.test/.%2F%2Fevil.example%3F%2F..%2F..", "empty segment"},
+		{"an encoded hash ends the path before dot segments", "https://app.test/.%2F%2Fx%23%2F..%2F..", "empty segment"},
+		{"an encoded question mark after an encoded dot", "https://app.test/%2e%2F%2Fevil.example%3F/../..", "empty segment"},
+		{"resolve, then a backslash reading, then resolve", "https://app.test/a%2Fb%5C%2F../..%5C/evil.example", "empty segment"},
 		{"a stray percent sign after a double-encoded slash", "https://app.test/%252F%25zz", "empty segment"},
 	}
 	for _, tt := range tests {

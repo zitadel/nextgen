@@ -246,10 +246,11 @@ const maxReadings = 64
 // A browser resolves dot segments in the path as written, before anything
 // decodes it, and a server that decodes before it routes may resolve again,
 // read a backslash as a slash, drop ";" path parameters as a Tomcat or Spring
-// layer does, and decode again. So every text reachable from the path by
-// decoding, resolving dot segments, reading backslashes as slashes and dropping
-// path parameters, in any order and any number of times, is tested for a
-// leading "//".
+// layer does, treat a "?" or "#" that decoding produced as the end of the path,
+// and decode again. So every text reachable from the path by decoding,
+// resolving dot segments, reading backslashes as slashes, dropping path
+// parameters and cutting at a query or fragment mark, in any order and any
+// number of times, is tested for a leading "//".
 // Decoding strictly shortens a text and the other two steps never lengthen it,
 // so the walk ends.
 func checkPath(path string) error {
@@ -262,7 +263,7 @@ func checkPath(path string) error {
 			return refusal("its path starts with an empty segment, which reads as another host")
 		}
 		decoded := unescapeLeniently(text)
-		steps := []string{decoded, resolveDots(text), strings.ReplaceAll(text, `\`, "/"), dropParameters(text)}
+		steps := []string{decoded, resolveDots(text), strings.ReplaceAll(text, `\`, "/"), dropParameters(text), cutAtQuery(text)}
 		for _, step := range steps {
 			if seen[step] {
 				continue
@@ -282,6 +283,15 @@ func checkPath(path string) error {
 		}
 	}
 	return nil
+}
+
+// cutAtQuery returns p up to its first "?" or "#", which is where a reader that
+// parses a URL out of a decoded text ends the path.
+func cutAtQuery(p string) string {
+	if i := strings.IndexAny(p, "?#"); i >= 0 {
+		return p[:i]
+	}
+	return p
 }
 
 // dropParameters removes the ";..." path parameters from every segment of p, so
