@@ -121,10 +121,15 @@ func TestPasswordSet_Evaluate(t *testing.T) {
 			context: passwordContext(10, false, false, false, false),
 		},
 		{
-			name:           "more entries than the depth is a builder bug and denies",
-			config:         `{"history_depth":1}`,
-			context:        passwordContext(10, false, false),
-			wantViolations: map[string]any{"history_depth": int64(1)},
+			name:    "only the newest depth entries count",
+			config:  `{"history_depth":2}`,
+			context: passwordContext(10, false, false, true, true),
+		},
+		{
+			name:           "a match within the depth denies when more entries are sent",
+			config:         `{"history_depth":2}`,
+			context:        passwordContext(10, false, true, false),
+			wantViolations: map[string]any{"history_depth": int64(2)},
 		},
 		{
 			name:           "every active rule reports, no short-circuit",

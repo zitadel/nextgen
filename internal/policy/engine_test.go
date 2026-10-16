@@ -1,6 +1,7 @@
 package policy_test
 
 import (
+	"context"
 	"encoding/json"
 	"math"
 	"strings"
@@ -138,7 +139,9 @@ func TestParseTemplate_RejectsStructure(t *testing.T) {
 		replace [2]string
 		wantErr string
 	}{
-		{"missing operation", [2]string{`"operation": "test.op"`, `"operation": ""`}, "operation is required"},
+		{"missing operation", [2]string{`"operation": "test.op"`, `"operation": ""`}, "area.resource.verb"},
+		{"operation without a dot", [2]string{`"operation": "test.op"`, `"operation": "testop"`}, "area.resource.verb"},
+		{"operation not snake_case", [2]string{`"operation": "test.op"`, `"operation": "Test.Op"`}, "area.resource.verb"},
 		{"duplicate rule name", [2]string{`{ "name": "max", "expression"`, `{ "name": "min", "expression"`}, "duplicate name"},
 		{"bounds on a boolean", [2]string{`"max": { "type": "integer"`, `"max": { "type": "boolean"`}, "bounds only apply to integers"},
 		{"minimum above maximum", [2]string{`"minimum": 1, "maximum": 10 },
@@ -224,6 +227,40 @@ func TestBind_InstanceForAnotherOperation(t *testing.T) {
 	e := testEngine(t)
 	_, err := e.Bind(t.Context(), "test.op", &policy.Instance{Kind: policy.KindPolicy, Operation: "other.op"})
 	require.ErrorIs(t, err, policy.ErrInvalidInstance)
+}
+
+func TestValidateInstance_Nil(t *testing.T) {
+	require.ErrorIs(t, testEngine(t).ValidateInstance(t.Context(), nil), policy.ErrInvalidInstance)
+}
+
+func TestBind_NilConfigIsNotEmpty(t *testing.T) {
+	_, err := testEngine(t).Bind(t.Context(), "test.op", &policy.Instance{Kind: policy.KindPolicy, Operation: "test.op"})
+	require.ErrorIs(t, err, policy.ErrInvalidInstance)
+}
+
+func TestBound_Evaluate_RuntimeCostLimit(t *testing.T) {
+	// The estimate assumes lists of 2, so the rule compiles; a request with
+	// a long list then runs past the runtime budget and fails, never allows.
+	e, err := policy.New(
+		policy.WithTemplates(mustTemplate(t, testTemplate)),
+		policy.WithLimits(policy.Limits{MaxExpressionLength: 256, MaxEstimatedCost: 1_000, MaxRuntimeCost: 50, MaxListSize: 2}),
+	)
+	require.NoError(t, err)
+	b := bindTest(t, e, map[string]any{"max": 5})
+
+	_, err = b.Evaluate(t.Context(), map[string]any{"value": 3, "counts": make([]int64, 1_000)})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cost limit")
+}
+
+func TestBound_Evaluate_StopsOnCancelledContext(t *testing.T) {
+	b := bindTest(t, testEngine(t), map[string]any{"max": 5})
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	_, err := b.Evaluate(ctx, map[string]any{"value": 3, "counts": make([]int64, 1_000)})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "context canceled")
 }
 
 func TestBind_WrongKind(t *testing.T) {
@@ -339,6 +376,8 @@ func TestParseInstance(t *testing.T) {
 		"duplicate envelope":      `{"kind":"policy","operation":"test.op","operation":"other.op","config":{}}`,
 		"case variant of a field": `{"kind":"policy","operation":"test.op","config":{"min":5},"Config":{}}`,
 		"field in another case":   `{"KIND":"policy","operation":"test.op","config":{}}`,
+		"missing config":          `{"kind":"policy","operation":"test.op"}`,
+		"null config":             `{"kind":"policy","operation":"test.op","config":null}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := policy.ParseInstance([]byte(doc))

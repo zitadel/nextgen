@@ -28,12 +28,15 @@ type Limits struct {
 }
 
 // DefaultLimits are sized for a handful of scalar comparisons per rule. The
-// password rules estimate well under a tenth of the cost cap.
-var DefaultLimits = Limits{
-	MaxExpressionLength: 256,
-	MaxEstimatedCost:    10_000,
-	MaxRuntimeCost:      10_000,
-	MaxListSize:         64,
+// password rules estimate well under a tenth of the cost cap. A function
+// rather than a variable, so no importer can change them for everyone.
+func DefaultLimits() Limits {
+	return Limits{
+		MaxExpressionLength: 256,
+		MaxEstimatedCost:    10_000,
+		MaxRuntimeCost:      10_000,
+		MaxListSize:         64,
+	}
 }
 
 // configVariable is the CEL namespace settings are exposed under.
@@ -56,8 +59,11 @@ type compiledRule struct {
 // plus the strings and lists extensions.
 func newEnv(t *Template, leaves []contextField, configOnly bool) (*cel.Env, error) {
 	opts := []cel.EnvOption{
-		ext.Strings(),
-		ext.Lists(),
+		// Pinned, so a cel-go upgrade cannot add functions to the rule
+		// environment unnoticed: strings v5 and lists v3 are the first
+		// versions with cost estimates for their functions.
+		ext.Strings(ext.StringsVersion(5)),
+		ext.Lists(ext.ListsVersion(3)),
 	}
 	for name, setting := range t.Config {
 		typ, err := settingCELType(setting.Type)

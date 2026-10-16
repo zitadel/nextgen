@@ -42,23 +42,23 @@ func ParseInstance(data []byte) (*Instance, error) {
 			return nil, fmt.Errorf("%w: unknown field %q, want one of %v", ErrInvalidInstance, key, instanceKeys)
 		}
 	}
-	dec := json.NewDecoder(bytes.NewReader(data))
-	dec.DisallowUnknownFields()
-	dec.UseNumber()
-	// An authored file may carry the editor's `$schema` pointer. It is
-	// accepted so the file parses as written and dropped here, so it never
-	// travels further as part of the instance.
-	var doc struct {
-		Schema string `json:"$schema"`
-		Instance
+	// A missing or null config is not "no rules": a merge that dropped the
+	// block would switch the policy off without a word. Only an explicit {}
+	// does that.
+	if raw, ok := envelope["config"]; !ok || bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return nil, fmt.Errorf("%w: config is required; use {} to switch every rule off", ErrInvalidInstance)
 	}
-	if err := dec.Decode(&doc); err != nil {
+	// The envelope keys are checked above, so the decode needs no
+	// unknown-field check; an editor `$schema` pointer is simply not kept.
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+	var inst Instance
+	if err := dec.Decode(&inst); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidInstance, err)
 	}
 	if err := dec.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
 		return nil, fmt.Errorf("%w: unexpected data after the instance", ErrInvalidInstance)
 	}
-	inst := doc.Instance
 	if inst.Kind != KindPolicy {
 		return nil, fmt.Errorf("%w: kind must be %q, got %q", ErrInvalidInstance, KindPolicy, inst.Kind)
 	}

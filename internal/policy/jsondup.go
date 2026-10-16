@@ -9,11 +9,12 @@ import (
 	"strings"
 )
 
-// rejectDuplicateKeys fails when any object in the document repeats a key,
-// compared without case. encoding/json keeps the last of duplicates
-// silently and matches struct fields without case, so a merge leftover such
-// as `"min_length": 15, "min_length": 8`, or `"config": {...}` followed by
-// `"Config": {}`, would otherwise weaken the policy without a word.
+// rejectDuplicateKeys fails when any object in the document repeats a key.
+// encoding/json keeps the last of duplicates silently, so a merge leftover
+// such as `"min_length": 15, "min_length": 8` would otherwise weaken the
+// policy without a word. Keys are compared without case because
+// encoding/json also matches struct fields without case: in a template,
+// `"maximum": 10, "Maximum": 3` both land on Setting.Maximum.
 func rejectDuplicateKeys(data []byte) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()

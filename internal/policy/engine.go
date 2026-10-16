@@ -54,7 +54,7 @@ func WithTemplates(ts ...*Template) Option {
 // violations clients could not key, fails here rather than at the first
 // request.
 func New(opts ...Option) (*Engine, error) {
-	o := options{limits: DefaultLimits}
+	o := options{limits: DefaultLimits()}
 	for _, opt := range opts {
 		opt(&o)
 	}
@@ -196,6 +196,9 @@ func (e *Engine) Bind(ctx context.Context, operation string, inst *Instance) (*B
 	if inst.Operation != operation {
 		return nil, fmt.Errorf("%w: instance is for %q, not %q", ErrInvalidInstance, inst.Operation, operation)
 	}
+	if inst.Config == nil {
+		return nil, fmt.Errorf("%w: config is required; use {} to switch every rule off", ErrInvalidInstance)
+	}
 	b.values, err = settingValues(ct.Template, inst.Config)
 	if err != nil {
 		return nil, err
@@ -229,6 +232,9 @@ func (e *Engine) Bind(ctx context.Context, operation string, inst *Instance) (*B
 // keeps only the verdict. An empty config is valid and switches every rule
 // off.
 func (e *Engine) ValidateInstance(ctx context.Context, inst *Instance) error {
+	if inst == nil {
+		return fmt.Errorf("%w: no instance", ErrInvalidInstance)
+	}
 	_, err := e.Bind(ctx, inst.Operation, inst)
 	return err
 }

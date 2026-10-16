@@ -167,8 +167,8 @@ func ParseTemplate(data []byte) (*Template, error) {
 }
 
 func (t *Template) validate() error {
-	if t.Operation == "" {
-		return errors.New("operation is required")
+	if !operationName.MatchString(t.Operation) {
+		return fmt.Errorf("operation %q: must be dotted snake_case segments, area.resource.verb", t.Operation)
 	}
 	for name, setting := range t.Config {
 		if !publicName.MatchString(name) {
@@ -219,6 +219,12 @@ func (t *Template) validate() error {
 	return nil
 }
 
+// operationName is the shape of an operation: dot-separated snake_case
+// segments named after the event it precedes (`auth.check`,
+// `auth.factor.password.set`). It is the instance file name and the wire
+// discriminator.
+var operationName = regexp.MustCompile(`^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$`)
+
 // publicName is the shape of a setting or rule name. Both reach clients as
 // keys of violations and constraints and as the suffix of login text keys,
 // so they follow the wire's snake_case.
@@ -244,6 +250,11 @@ func embeddedTemplates() ([]*Template, error) {
 		t, err := ParseTemplate(data)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", entry.Name(), err)
+		}
+		// The catalog index and the instance file name both rely on the
+		// file being named after its operation.
+		if want := t.Operation + ".json"; entry.Name() != want {
+			return nil, fmt.Errorf("%s: declares operation %q, so the file must be named %s", entry.Name(), t.Operation, want)
 		}
 		out = append(out, t)
 	}

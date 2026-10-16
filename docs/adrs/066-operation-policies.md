@@ -106,7 +106,7 @@ One template per operation, defined by Zitadel and versioned with the server.
   "rules": [
     { "name": "min_length",    "expression": "candidate.length >= config.min_length" },
     { "name": "max_length",    "expression": "candidate.length <= config.max_length" },
-    { "name": "history_depth", "expression": "size(history_matches) <= config.history_depth && !history_matches.exists(m, m)" }
+    { "name": "history_depth", "expression": "!history_matches.slice(0, size(history_matches) < config.history_depth ? size(history_matches) : config.history_depth).exists(m, m)" }
   ]
 }
 ```
@@ -157,20 +157,25 @@ discriminator that says which template that is.
   template does not declare, a value of the wrong type or outside the
   bounds, and a failed config rule are rejected.
 - A setting the instance omits is off, and so is the rule that reads it. The
-  example above therefore enforces a minimum length of 12 and no reuse of the
-  last four passwords, and no maximum beyond the domain's own cap. An empty
-  `config` switches the policy off; a project with no instance has none.
+  example above therefore enforces a minimum length of 12, no reuse of the
+  last four passwords when users change their own password (history applies
+  only to self-service changes, see the [catalog](../design/policies/catalog.md)),
+  and no maximum beyond the domain's own cap. An empty
+  `config` switches the policy off; a missing or `null` one is rejected, so a
+  lost block cannot do it silently. A project with no instance has none.
 - The wire schema of the instance is a discriminated union on `operation`:
   one branch per catalogued operation, each with the `config` object that
   operation's template declares (its settings and bounds, no others).
   The union is what the OpenAPI component publishes, what the generated client
   types carry, and what the `policy.json` editor meta-schema is derived from,
   so an editor completes `min_length` for `auth.factor.password.set` and rejects a
-  key that operation does not have. A test keeps every branch in parity with
-  its template.
-- A bound that mirrors a server limit (64 code points, four kept passwords)
-  is kept equal to the Go constant by a test. Raising the limit later widens
-  what instances may set and breaks none.
+  key that operation does not have. A test will keep every branch in parity
+  with its template once the wire schema exists (the resource PR).
+- A bound that mirrors a server limit is tied to the Go constant by a test:
+  the length bounds equal `domain.MaxPasswordLength` (64 code points), and
+  the history bound (four passwords, the current one included) may not
+  exceed what storage returns. Raising a limit later widens what instances
+  may set and breaks none.
 - A server upgrade may add settings, widen bounds and drop config rules,
   never remove a setting, change its type, narrow a bound, or add or change a
   config rule: a stored instance is bound against the current template
@@ -202,29 +207,33 @@ server runs.
 
 Adding an operation is five things, and nothing else registers it:
 
-1. a template file under `internal/policy/templates/`, compiled and checked
-   at startup by `policy.New()`;
+1. a template file under `internal/policy/templates/`, named after its
+   operation and compiled and checked by `policy.New()` (at server start,
+   once the gate wires the engine in);
 2. its settings and config rules recorded in
    `internal/policy/testdata/settings_compat.json`, which keeps later
    templates from rejecting stored instances;
 3. a row in the catalog index naming the template, the settings, the rules,
-   and the evaluating function;
+   the context builder and the gate;
 4. a context builder in Go that derives the values the rules see for that
    operation, keeping the raw input out;
 5. one gate call in the operation's shared write path, so no API, SDK or
    journey can reach the operation without it.
 
-For `auth.factor.password.set` the gate sits in `service.SetPasswordUserAction.Prepare`,
-the single function every password set goes through (admin API, registration
-and SSO sign-up alike), before the password is hashed, so a rejected password
-costs neither a hash nor a transaction. Instances are resolved as the newest
-stored revision of the project's instance for the operation, and no instance
-means no active rule. That is a stand-in: ADR 035 says an environment sees
-only what its active release pins, so resolution moves to the release's
-pinned policy revision once release-pinned reads exist (scope table in
-[`docs/design/policies/`](../design/policies/README.md)). The
-[catalog index](../design/policies/catalog.md) names the functions once they
-land.
+For `auth.factor.password.set` the gate will sit in
+`service.SetPasswordUserAction.Prepare`, the single function every password
+set goes through (admin API, registration and SSO sign-up alike), before the
+password is hashed, so a rejected password costs neither a hash nor a
+transaction. History is only checked where the user sets their own password;
+the other paths have no history to compare with, or must not learn it.
+Instances will be resolved as the newest stored revision of the project's
+instance for the operation, and no instance means no active rule. That is a
+stand-in: ADR 035 says an environment sees only what its active release pins,
+so resolution moves to the release's pinned policy revision once
+release-pinned reads exist (scope table in
+[`docs/design/policies/`](../design/policies/README.md)). None of this is
+wired yet; the [catalog index](../design/policies/catalog.md) names the
+functions as they land.
 
 ### Policy evaluation trigger (relation to domain events)
 
@@ -317,8 +326,8 @@ not changes to how a rule is written.
 #### Evaluation errors
 
 A rule cannot fail at runtime in the ways a program can: expressions are
-type-checked against the context schema and cost-bounded before the server
-serves traffic, and CEL has no I/O, no recursion and no unbounded loops. What
+type-checked against the context schema and cost-bounded by `policy.New()`,
+which the server will run at startup, and CEL has no I/O, no recursion and no unbounded loops. What
 remains is Go failing to build the context (a storage error while loading
 password history), which is an ordinary service error: the operation fails,
 closed. There is no per-operation failure posture to declare. An operator who
@@ -326,6 +335,10 @@ needs a misbehaving policy out of the way publishes a revision with an empty
 `config`.
 
 ### End to end: a user enters their password during sign-up (via flow-engine)
+
+The intended flow once the gate and the flow field are wired. A new user has
+no password history, so only the length rules apply here; history joins the
+same sequence on a self-service change.
 
 ```mermaid
 sequenceDiagram
@@ -337,12 +350,12 @@ sequenceDiagram
     participant DB as Storage
 
     F->>P: constraints(operation, instance)
-    P-->>F: {min_length: 12, history_depth: 4}
+    P-->>F: {min_length: 12}
     F-->>C: render step carrying those constraints
     C->>F: submit password
     F->>F: re-check constraints<br>(normal payload validation<br>no full-policy evaluation)
     F->>S: SetPasswordUserAction
-    S->>S: build context<br>(length, VerifyHash per history entry)
+    S->>S: build context<br>(code-point length of the NFC-normalized candidate)
     S->>P: evaluate(instance, context)
     P-->>S: decision
     alt deny
@@ -354,12 +367,12 @@ sequenceDiagram
     end
 ```
 
-1. Render. Flow-engine fills `FlowFieldValidation` from the `constraints` projection (`service.PasswordPolicy.FieldValidation`). The client can perform frontend validation.
+1. Render. Flow-engine fills `FlowFieldValidation` from the `constraints` projection ([#1449](https://github.com/zitadel/nextgen/issues/1449)). The client can perform frontend validation.
 2. Submit. The client posts the new password as the reserved field `x-auth-methods#password`.
 3. Validation. Flow-engine backend payload validation re-checks constraints.
 4. Domain operation. The flow engine calls `SetPasswordUserAction`. This is the guarded operation.
 5. Prepare context. Per-operation Go code derives the context (see [Evaluation](../design/policies/2-evaluation.md)).
-6. Evaluate. Every rule runs over config plus context.
+6. Evaluate. Every active rule runs over config plus context.
 7. Return the error, or proceed with the operation.
 
 ### The rule language: CEL

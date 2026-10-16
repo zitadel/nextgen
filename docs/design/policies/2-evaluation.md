@@ -55,8 +55,8 @@ for a decision log.
 
 Each operation has one Go function that derives the context, listed per
 operation in the [catalog](catalog.md). For `auth.factor.password.set` it is
-`service.PasswordPolicy.buildContext`, and it is where #898's password
-handling lives:
+not built yet ([#1448](https://github.com/zitadel/nextgen/issues/1448)); it is
+where #898's password handling will live:
 
 - the candidate is NFC-normalized before anything else
   (`domain.NormalizePassword`, applied on hashing and verification too);
@@ -65,7 +65,11 @@ handling lives:
   ADR 029), which is why `history_depth` is capped at 4. Depth N counts the
   current password: the candidate is compared with the current password and
   the N-1 before it, so a project asking for 4 matches PCI DSS 8.3.7's "any of
-  the last four". Storage keeps every replaced password (#1363). History is
+  the last four". Storage keeps every replaced password (#1363). The builder
+  hands over the kept passwords newest first, current one first, and may
+  hand over more than the depth: the rule only looks at the first N entries,
+  so a builder that sends too many cannot deny a password that matches none
+  of the last N. History is
   checked only when the user sets their own password; an administrator
   setting it, and a new user, have none to compare with, and an
   administrator learning that a guess matches an old password would be an
@@ -94,7 +98,7 @@ A template that fails one of these checks fails `policy.New()`, and the
 server calls it at startup once the gate is wired in, so a bad rule never
 reaches a running system. Until then the package's tests compile the
 embedded catalog. The values live in
-`policy.DefaultLimits` and are sized for a handful of scalar comparisons per
+`policy.DefaultLimits()` and are sized for a handful of scalar comparisons per
 rule. Kubernetes enforces the same pair (a static per-expression limit and a
 per-request runtime budget); OpenFGA caps condition cost the same way.
 

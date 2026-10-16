@@ -26,7 +26,7 @@ all hold, as far as they are active, for the operation to proceed.
   "rules": [
     { "name": "min_length",    "expression": "candidate.length >= config.min_length" },
     { "name": "max_length",    "expression": "candidate.length <= config.max_length" },
-    { "name": "history_depth", "expression": "size(history_matches) <= config.history_depth && !history_matches.exists(m, m)" }
+    { "name": "history_depth", "expression": "!history_matches.slice(0, size(history_matches) < config.history_depth ? size(history_matches) : config.history_depth).exists(m, m)" }
   ]
 }
 ```
@@ -43,9 +43,11 @@ recommendation, no marker.
   instance can be scaffolded by the CLI and skipped.
 - Bounds are technical. A bound exists only where the server cannot go
   further: 64 code points is the domain's password cap
-  (`domain.MaxPasswordLength`), 4 kept passwords is what one save can afford
-  to verify (`domain.UserPasswordHistoryDepth`). A test keeps each such bound
-  equal to its Go constant, so the two cannot drift. Raising a limit later
+  (`domain.MaxPasswordLength`), and 4 passwords, the current one included,
+  is what one save can afford to verify. A test ties each bound to its Go
+  constant: the length bounds equal `domain.MaxPasswordLength`, and the
+  history bound may not exceed the current password plus the
+  `domain.UserPasswordHistoryDepth` kept ones storage returns. Raising a limit later
   widens what an instance may set and breaks none; lowering one would, so a
   test holds every template to the record in
   `internal/policy/testdata/settings_compat.json`: settings may be added,
@@ -96,11 +98,10 @@ Context fields take one of `int`, `bool`, `string`, `list<int>`,
 not fill them from a request, so a template that uses another type is
 refused instead of failing every evaluation.
 
-A rule is active when its setting is set. `history_depth` shows why the rule
-reads the setting even though Go applies the depth when building
-`history_matches`: without the reference the rule would read no setting.
-Its first clause also checks that the builder did not hand over more entries
-than the depth asks for.
+A rule is active when its setting is set. `history_depth` reads its setting
+to take the newest N entries of `history_matches`, so the builder may hand
+over every kept password it has and the rule still compares only the last N.
+Extra entries are ignored, never counted against the user.
 
 Rules are atomic by construction: an expression must type-check to `bool`,
 stays under a length cap, and its statically estimated cost stays under a
@@ -114,6 +115,8 @@ two rules.
 evaluate; `policy.Engine.ValidateInstance` runs the same check for publishing
 and release validation. Both reject, with every problem reported at once:
 
+- a missing or `null` `config` (only an explicit `{}` switches every rule
+  off), or a `kind` other than `policy`;
 - a setting the template does not declare;
 - a value of the wrong type, or outside the bounds;
 - a config rule that does not hold.
@@ -122,6 +125,6 @@ and release validation. Both reject, with every problem reported at once:
 
 The template is meant to be published read-only (`GET /policies/catalog`, not
 built yet), so the console, the CLI and the `constraints` endpoint render
-from the same source. Until then the CLI reads the settings from the
-operation-typed wire schema, which a test keeps in parity with the template
-([catalog](catalog.md)).
+from the same source. Until then the CLI is meant to read the settings from
+the operation-typed wire schema, which a test will keep in parity with the
+template once the resource PR adds it ([catalog](catalog.md)).
