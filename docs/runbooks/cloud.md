@@ -24,7 +24,7 @@ One Vercel deployment, five [services](https://vercel.com/docs/services):
 
 | Service | Built by | Serves |
 |---|---|---|
-| `server` | Go preset; `apps/cloud/build.sh` builds the login UI the server embeds (with turbo), compiles `apps/cloud/launcher`, then migrates | every path except the console's, the storybook's, the docs' and the website's, including `/console/runtime.json` and the login UI at `/ui/login/` |
+| `server` | Go preset; `apps/cloud/build.sh` builds the login UI the server embeds (with turbo), compiles `apps/cloud/launcher` without the console (`-tags noconsole`), then migrates | every path except the console's, the storybook's, the docs' and the website's, including `/console/runtime.json` and the login UI at `/ui/login/` |
 | `console` | Vite; `turbo run build` with `CONSOLE_BASE_PATH=/console/` and `CONSOLE_VERCEL_INSIGHTS=1`, so it reports Vercel Web Analytics and Speed Insights; the service serves the build where it lands, `internal/staticui/console/dist` | `/console/*` (bare `/console` redirects to the slash form; `/ui/console` and `/ui/console/*` redirect here with a 307) |
 | `storybook` | Storybook; `turbo run build` | `/storybook/*` (bare `/storybook` redirects to the slash form) |
 | `docs` | Next.js; `apps/docs`' own `pnpm run build`, without a task runner: moon cannot archive the symlinks Vercel's Next.js adapter writes, and turbo could never reuse a build, whose cache key holds the deployment's ID under Skew Protection | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
@@ -34,10 +34,12 @@ The console lives on the same origin, at `/console/` rather than a
 self-hosted server's `/ui/console/`. The server's own console is switched
 off and its console path set to `/console`, so the console links it derives
 (claim, dashboard) point there; the session cookie and CSRF protection work
-as in a self-hosted install. The server's `/console/runtime.json` lies
-under the console's path, so its rewrite comes first in `vercel.json`, and a
-launcher test holds the mount, the build's base and the console path
-together.
+as in a self-hosted install. The function does not carry the console either:
+the console service's build lands in the server's embed directory of the
+same checkout, so `build.sh` compiles the launcher with `-tags noconsole`.
+The server's `/console/runtime.json` lies under the console's path, so its
+rewrite comes first in `vercel.json`, and a launcher test holds the mount,
+the build's base and the console path together.
 
 The storybook, the login surface's component workbench, is deployed only
 here. Its orchestrator stories mock the API in the browser with a service
@@ -395,7 +397,16 @@ project and imports the root admin.
   pnpm compares the lockfile with the one that `node_modules` was installed
   from and installs when they differ. Go would keep each rebuild's compiled
   packages for five days, so `build.sh` drops those no build used in the
-  last two hours. Each build log ends with the cache's size:
+  last two hours. A new Go version starts the Go caches over: when the
+  toolchain Vercel picks from `go.mod`'s `toolchain` line differs from the
+  restored one, its Go builder downloads it and deletes
+  `.vercel/cache/golang`, module cache included. The next build of each
+  branch then downloads every module and compiles the server from nothing:
+  the Go step took 74 s after
+  [zitadel/nextgen#1845](https://github.com/zitadel/nextgen/pull/1845)
+  instead of the usual 7–27 s. A new compiler could not reuse the old build
+  cache anyway; the deletion costs only the module downloads, a few seconds.
+  Each build log ends with the cache's size:
   `Uploading build cache [...]`.
 
 ## Later: read replicas in other regions

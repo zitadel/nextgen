@@ -11,7 +11,7 @@ deployment as five [services](https://vercel.com/docs/services):
 
 | Service | Root | What it is | Paths |
 |---|---|---|---|
-| `server` | `.` | the Go server on Vercel's Go preset, login UI embedded, console off | everything else, including `/console/runtime.json` |
+| `server` | `.` | the Go server on Vercel's Go preset, login UI embedded, console off and left out of the build (`-tags noconsole`) | everything else, including `/console/runtime.json` |
 | `console` | `apps/console` | the console SPA, built for `/console/` with Vercel Web Analytics and Speed Insights | `/console/*` |
 | `storybook` | `apps/storybook` | the component workbench, a static build | `/storybook/*` |
 | `docs` | `apps/docs` | the docs site, Fumadocs on Next.js, with Vercel Web Analytics and Speed Insights | `/docs`, `/docs/*` |
