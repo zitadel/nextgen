@@ -1,34 +1,10 @@
 title: CreateDeploymentBadRequest
-description: |
-  The deployment cannot be made. `code` says why: `dep.invalid` for a
-  request the operation never accepts, such as both or neither of
-  `release_id` and `content_hash`, or `dep.variables_missing` when the
-  release references variables the project holds no value for. Only
-  `dep.variables_missing` carries `details`, naming the deployment's kind
-  and every missing name.
-allOf:
-  - $ref: ../../components/error-details.yaml
-  - type: object
-    properties:
-      details:
-        type: object
-        required:
-          - kind
-          - names
-        properties:
-          kind:
-            type: string
-            enum:
-              - primary
-              - preview
-            description: |
-              Whether the deployment targets primary origins or preview URLs:
-              the kind whose variable values it would freeze.
-          names:
-            type: array
-            minItems: 1
-            description: |
-              Every variable the release references with no value stored for
-              that kind, sorted.
-            items:
-              type: string
+description: The deployment cannot be made, told apart by `code`.
+oneOf:
+  - $ref: ../../components/schemas/errors/dep-invalid.yaml
+  - $ref: deployment-variables-missing.yaml
+discriminator:
+  propertyName: code
+  mapping:
+    dep.invalid: ../../components/schemas/errors/dep-invalid.yaml
+    dep.variables_missing: deployment-variables-missing.yaml
