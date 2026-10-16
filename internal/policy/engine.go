@@ -190,6 +190,9 @@ func (e *Engine) Bind(ctx context.Context, operation string, inst *Instance) (*B
 	if inst == nil {
 		return b, nil
 	}
+	if inst.Kind != KindPolicy {
+		return nil, fmt.Errorf("%w: kind must be %q, got %q", ErrInvalidInstance, KindPolicy, inst.Kind)
+	}
 	if inst.Operation != operation {
 		return nil, fmt.Errorf("%w: instance is for %q, not %q", ErrInvalidInstance, inst.Operation, operation)
 	}

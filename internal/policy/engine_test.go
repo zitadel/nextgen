@@ -226,6 +226,14 @@ func TestBind_InstanceForAnotherOperation(t *testing.T) {
 	require.ErrorIs(t, err, policy.ErrInvalidInstance)
 }
 
+func TestBind_WrongKind(t *testing.T) {
+	e := testEngine(t)
+	for _, kind := range []string{"", "branding"} {
+		_, err := e.Bind(t.Context(), "test.op", &policy.Instance{Kind: kind, Operation: "test.op"})
+		require.ErrorIs(t, err, policy.ErrInvalidInstance, "kind %q", kind)
+	}
+}
+
 func TestBound_UnboundFailsClosed(t *testing.T) {
 	var zero policy.Bound
 	_, err := zero.Evaluate(t.Context(), nil)
@@ -322,13 +330,15 @@ func TestParseInstance(t *testing.T) {
 	require.NoError(t, testEngine(t).ValidateInstance(t.Context(), decimal), "2.0 and 1e1 are integers")
 
 	for name, doc := range map[string]string{
-		"unknown field":      `{"kind":"policy","operation":"test.op","config":{},"audience":{}}`,
-		"wrong kind":         `{"kind":"branding","operation":"test.op","config":{}}`,
-		"missing operation":  `{"kind":"policy","config":{}}`,
-		"not json":           `{`,
-		"trailing data":      `{"kind":"policy","operation":"test.op","config":{}} {"config":{"min":1}}`,
-		"duplicate setting":  `{"kind":"policy","operation":"test.op","config":{"min":5,"min":2}}`,
-		"duplicate envelope": `{"kind":"policy","operation":"test.op","operation":"other.op","config":{}}`,
+		"unknown field":           `{"kind":"policy","operation":"test.op","config":{},"audience":{}}`,
+		"wrong kind":              `{"kind":"branding","operation":"test.op","config":{}}`,
+		"missing operation":       `{"kind":"policy","config":{}}`,
+		"not json":                `{`,
+		"trailing data":           `{"kind":"policy","operation":"test.op","config":{}} {"config":{"min":1}}`,
+		"duplicate setting":       `{"kind":"policy","operation":"test.op","config":{"min":5,"min":2}}`,
+		"duplicate envelope":      `{"kind":"policy","operation":"test.op","operation":"other.op","config":{}}`,
+		"case variant of a field": `{"kind":"policy","operation":"test.op","config":{"min":5},"Config":{}}`,
+		"field in another case":   `{"KIND":"policy","operation":"test.op","config":{}}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := policy.ParseInstance([]byte(doc))

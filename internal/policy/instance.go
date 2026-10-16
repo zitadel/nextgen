@@ -22,11 +22,25 @@ type Instance struct {
 // KindPolicy is the `kind` every instance carries.
 const KindPolicy = "policy"
 
+// instanceKeys are the top-level keys an instance document may have.
+var instanceKeys = []string{"$schema", "kind", "operation", "config"}
+
 // ParseInstance decodes an instance document. Config values are checked
 // against the template by [Engine.ValidateInstance].
 func ParseInstance(data []byte) (*Instance, error) {
 	if err := rejectDuplicateKeys(data); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidInstance, err)
+	}
+	// encoding/json matches field names without case; the envelope is
+	// spelled exactly as documented or rejected.
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal(data, &envelope); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrInvalidInstance, err)
+	}
+	for key := range envelope {
+		if !slices.Contains(instanceKeys, key) {
+			return nil, fmt.Errorf("%w: unknown field %q, want one of %v", ErrInvalidInstance, key, instanceKeys)
+		}
 	}
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()

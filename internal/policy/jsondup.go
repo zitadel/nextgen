@@ -6,12 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 )
 
-// rejectDuplicateKeys fails when any object in the document repeats a key.
-// encoding/json keeps the last of duplicates silently, so a merge leftover
-// such as `"min_length": 15, "min_length": 8` would otherwise bind 8 and
-// weaken the policy without a word.
+// rejectDuplicateKeys fails when any object in the document repeats a key,
+// compared without case. encoding/json keeps the last of duplicates
+// silently and matches struct fields without case, so a merge leftover such
+// as `"min_length": 15, "min_length": 8`, or `"config": {...}` followed by
+// `"Config": {}`, would otherwise weaken the policy without a word.
 func rejectDuplicateKeys(data []byte) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()
@@ -59,10 +61,11 @@ func rejectDuplicateKeys(data []byte) error {
 				continue
 			}
 			key, _ := tok.(string)
-			if _, dup := top.keys[key]; dup {
+			folded := strings.ToLower(key)
+			if _, dup := top.keys[folded]; dup {
 				return fmt.Errorf("duplicate key %q", key)
 			}
-			top.keys[key] = struct{}{}
+			top.keys[folded] = struct{}{}
 			top.expectKey = false
 		}
 	}
