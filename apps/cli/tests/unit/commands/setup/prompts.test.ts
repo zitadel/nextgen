@@ -26,9 +26,9 @@ vi.mock("@clack/prompts", () => ({
 // choice wiring, not the runtime-metadata/health probing (which has its own
 // tests under tests/unit/lib/local-server/). Spread the original module so
 // unrelated exports (used transitively via lib/server) stay intact.
-vi.mock("../../../../src/lib/local-server/runtime", async (importOriginal) => ({
+vi.mock("../../../../src/lib/local-server/server", async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  detectHealthyLocalServer: vi.fn(),
+  LocalServer: { detectUrl: vi.fn() },
 }));
 
 import { confirm, isCancel, multiselect, note, password, select, text } from "@clack/prompts";
@@ -43,7 +43,7 @@ import {
 
 import { type Asker, input } from "../../../../src/lib/input";
 import { takeReportedWarnings } from "../../../../src/lib/warnings";
-import { detectHealthyLocalServer } from "../../../../src/lib/local-server/runtime";
+import { LocalServer } from "../../../../src/lib/local-server/server";
 
 import {
   askCustomSettings,
@@ -86,7 +86,7 @@ beforeEach(() => {
   vi.mocked(isCancel).mockReturnValue(false);
   // Default: no local Zitadel server running. Each ServerPrompt test that
   // exercises the detection path overrides via mockResolvedValueOnce.
-  vi.mocked(detectHealthyLocalServer).mockResolvedValue(undefined);
+  vi.mocked(LocalServer.detectUrl).mockResolvedValue(undefined);
 });
 
 /**
@@ -175,12 +175,12 @@ describe("ServerPrompt", () => {
 
   it("offers and preselects the detected local Zitadel server", async () => {
     // `zitadel start` ran here: runtime metadata + /healthz say localhost:8080.
-    vi.mocked(detectHealthyLocalServer).mockResolvedValueOnce("http://localhost:8080");
+    vi.mocked(LocalServer.detectUrl).mockResolvedValueOnce("http://localhost:8080");
     vi.mocked(select).mockResolvedValueOnce("http://localhost:8080" as never);
 
     const out = await new ServerPrompt().ask(baseAnswers(), ctx);
 
-    expect(detectHealthyLocalServer).toHaveBeenCalledWith(ctx.cwd);
+    expect(LocalServer.detectUrl).toHaveBeenCalledWith(ctx.cwd);
     expect(out.server).toBe("http://localhost:8080");
     // The text prompt must not fire when the user picks the detected server.
     expect(text).not.toHaveBeenCalled();
@@ -196,7 +196,7 @@ describe("ServerPrompt", () => {
   });
 
   it("offers only Cloud and Custom when no local server is detected", async () => {
-    // Default mock (detectHealthyLocalServer → undefined) already simulates
+    // Default mock (LocalServer.detectUrl → undefined) already simulates
     // this; assert explicitly that no detected URL leaks into the options.
     vi.mocked(select).mockResolvedValueOnce("https://api.zitadel.cloud" as never);
 
@@ -218,7 +218,7 @@ describe("ServerPrompt", () => {
     });
 
     expect(out).toEqual(answers);
-    expect(detectHealthyLocalServer).not.toHaveBeenCalled();
+    expect(LocalServer.detectUrl).not.toHaveBeenCalled();
     expect(select).not.toHaveBeenCalled();
   });
 });

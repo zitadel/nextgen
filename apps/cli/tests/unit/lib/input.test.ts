@@ -275,15 +275,17 @@ describe("input", () => {
 
     it("offers the command to run again as the next command", async () => {
       await expect(
-        input({ ...typed(), retry: "zitadel sso enable --client-id <id>" }, scripted),
-      ).rejects.toMatchObject({ nextCommands: ["zitadel sso enable --client-id <id>"] });
+        input({ ...typed(), retry: "zitadel auth-method sso enable --client-id <id>" }, scripted),
+      ).rejects.toMatchObject({
+        nextCommands: ["zitadel auth-method sso enable --client-id <id>"],
+      });
     });
 
     it("quotes the command to run again in the hint as an example", async () => {
       await expect(
-        input({ ...typed(), retry: "zitadel sso enable --client-id <id>" }, scripted),
+        input({ ...typed(), retry: "zitadel auth-method sso enable --client-id <id>" }, scripted),
       ).rejects.toMatchObject({
-        hint: "For example: zitadel sso enable --client-id <id>",
+        hint: "For example: zitadel auth-method sso enable --client-id <id>",
       });
     });
 

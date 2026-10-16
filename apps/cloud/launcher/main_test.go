@@ -273,6 +273,10 @@ func TestVercelJSONServesTheConsoleAtConsolePath(t *testing.T) {
 	var config struct {
 		Services map[string]struct {
 			BuildCommand string `json:"buildCommand"`
+			Rewrites     []struct {
+				Source      string `json:"source"`
+				Destination string `json:"destination"`
+			} `json:"rewrites"`
 		} `json:"services"`
 		Rewrites []struct {
 			Source      string          `json:"source"`
@@ -281,9 +285,13 @@ func TestVercelJSONServesTheConsoleAtConsolePath(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(raw, &config))
 
-	build := config.Services["console"].BuildCommand
-	assert.Contains(t, build, "CONSOLE_BASE_PATH="+consolePath+"/ ", "the base the console is built for")
-	assert.Contains(t, build, "apps/console/dist"+consolePath+"/", "where the console service serves the build from")
+	console := config.Services["console"]
+	assert.Contains(t, console.BuildCommand, "CONSOLE_BASE_PATH="+consolePath+"/ ", "the base the console is built for")
+	// The service receives the request's full path; its first rewrite maps
+	// the mount onto the build's own root.
+	require.NotEmpty(t, console.Rewrites)
+	assert.Equal(t, consolePath+"/:path(.*)? → /:path", console.Rewrites[0].Source+" → "+console.Rewrites[0].Destination,
+		"where the console service serves the build from")
 
 	// The first matching rewrite wins, and the server's runtime document
 	// (cmd/server/console_runtime.go) lies under the console's mount.
@@ -298,6 +306,22 @@ func TestVercelJSONServesTheConsoleAtConsolePath(t *testing.T) {
 		}
 	}
 	assert.Equal(t, []string{"/console/runtime.json → server", consolePath + "/(.*) → console"}, routes)
+}
+
+// The console service builds into the server's embed directory in the same
+// checkout, so the function is compiled without it; a plain build would
+// carry the console whenever that service built first.
+func TestBuildScriptLeavesTheConsoleOut(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "build.sh"))
+	require.NoError(t, err)
+	var builds []string
+	for _, line := range strings.Split(string(raw), "\n") {
+		if strings.Contains(line, "go build") && !strings.HasPrefix(strings.TrimSpace(line), "#") {
+			builds = append(builds, line)
+		}
+	}
+	require.Len(t, builds, 1, "build.sh compiles the function once")
+	assert.Contains(t, builds[0], "-tags noconsole")
 }
 
 func TestPrepareServerKeepsExplicitDefaults(t *testing.T) {

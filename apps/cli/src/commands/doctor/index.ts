@@ -3,8 +3,6 @@ import consola from "consola";
 
 import { claimAction, claimCommand, claimWindowClosedAction } from "../../lib/claim-state";
 import { ZitadelError } from "../../lib/errors";
-import { assertServerPackageAvailable } from "../../lib/local-server/binary";
-import { dockerAvailable, imageAvailable } from "../../lib/local-server/docker";
 import {
   dockerRuntimeGuidance,
   dockerUnavailableMessage,
@@ -19,12 +17,15 @@ import {
   checkLocalServerHealth,
   defaultLocalServerImageForCliVersion,
   localServerUrl,
+  peekRuntimeMetadata,
   readRuntimeMetadata,
   type RuntimeBackend,
   type RuntimeMetadata,
 } from "../../lib/local-server/runtime";
+import { LocalServer } from "../../lib/local-server/server";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { createOrca } from "../../lib/orca";
+import { resolveCwd } from "../../lib/paths";
 import { hasZitadelConfig } from "../../lib/project";
 import { listenersForPort } from "../../lib/prober/ports";
 import { publicCliCommand } from "../../lib/public-cli";
@@ -60,7 +61,9 @@ export default class Doctor extends BaseCommand {
   static override flags = {
     fix: Flags.boolean({ description: "Repair missing files and stale managed wiring." }),
     image: nonBlankString({ description: "Container image to check." }),
-    port: Flags.integer({ description: "Local HTTP port.", default: DEFAULT_LOCAL_SERVER_PORT }),
+    port: Flags.integer({
+      description: "Local HTTP port to check. Defaults to the port this directory's server uses.",
+    }),
     runtime: Flags.string({
       description: "Local runtime backend.",
       options: ["binary", "docker"],
@@ -69,7 +72,10 @@ export default class Doctor extends BaseCommand {
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Doctor);
-    const port = flags.port ?? DEFAULT_LOCAL_SERVER_PORT;
+    const recorded = await peekRuntimeMetadata(
+      resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined),
+    );
+    const port = flags.port ?? recorded?.port ?? DEFAULT_LOCAL_SERVER_PORT;
     await this.toMeta(flags, { resolveServer: false, source: localServerUrl(port) });
     const { cwd, dryRun } = this.meta;
     const existingRuntime = await readRuntimeMetadata(cwd);
@@ -315,7 +321,7 @@ async function runLocalRuntimeChecks(
   if (runtimeBackend === "binary") {
     return [
       await check("server-binary", "Server npm package is available", async () => {
-        const version = await assertServerPackageAvailable();
+        const version = LocalServer.assertBinaryAvailable();
         return `@zitadel/server ${version} is available`;
       }),
       await check(
@@ -341,9 +347,9 @@ async function runLocalRuntimeChecks(
     "docker-cli",
     "Docker is reachable",
     async () => {
-      let result: Awaited<ReturnType<typeof dockerAvailable>>;
+      let result: Awaited<ReturnType<typeof LocalServer.dockerReachable>>;
       try {
-        result = await dockerAvailable();
+        result = await LocalServer.dockerReachable();
       } catch (error) {
         throw new Error(dockerUnavailableMessage(error), { cause: error });
       }
@@ -362,7 +368,7 @@ async function runLocalRuntimeChecks(
           `Image ${image} is available`,
           async () => {
             try {
-              const source = await imageAvailable(image);
+              const source = await LocalServer.imageAvailable(image);
               return source === "local"
                 ? `Image ${image} is available locally`
                 : `Image ${image} is available from the registry`;

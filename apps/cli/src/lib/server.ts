@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { ZitadelError } from "./errors";
-import { resolveLocalServer } from "./local-server/runtime";
+import { LocalServer } from "./local-server/server";
 import { parseJsonObject } from "./json";
 
 /**
@@ -59,7 +59,7 @@ export async function resolveServer(input: ResolveServerInput): Promise<Resolved
 
 async function validate(cwd: string, resolved: ResolvedServer): Promise<ResolvedServer> {
   if (resolved.value === "local") {
-    return { value: await resolveLocalServer(cwd), origin: "local" };
+    return { value: await LocalServer.resolveUrl(cwd), origin: "local" };
   }
 
   try {

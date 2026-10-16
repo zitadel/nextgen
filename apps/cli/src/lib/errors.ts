@@ -123,14 +123,25 @@ export function toZitadelError(error: unknown): ZitadelError {
     // repeat them: `idp.field_immutable` says only "the field is fixed for the
     // life of the connection", which leaves the reader to guess which of a
     // connection document's fields it meant. Promoting them to the hint puts
-    // the answer where the failure is read, not only in `--json`.
-    const fields = rejectedFields(error.body);
-    return new ZitadelError(code, apiErrorMessage(error), {
+    // the answer where the failure is read, not only in `--json`. The same
+    // goes for what a refusal says is missing: `idp.endpoints_partial` names
+    // the endpoints a connection left out only in `missing`.
+    const fields = listedInDetails(error.body, "fields");
+    const missing = listedInDetails(error.body, "missing");
+    const hint = [
       ...(fields.length > 0
-        ? {
-            hint: `The server rejected ${fields.length === 1 ? "this field" : "these fields"}: ${fields.join(", ")}.`,
-          }
-        : {}),
+        ? [
+            `The server rejected ${fields.length === 1 ? "this field" : "these fields"}: ${fields.join(", ")}.`,
+          ]
+        : []),
+      ...(missing.length > 0
+        ? [
+            `The server reports ${missing.length === 1 ? "this endpoint" : "these endpoints"} missing: ${missing.join(", ")}.`,
+          ]
+        : []),
+    ].join(" ");
+    return new ZitadelError(code, apiErrorMessage(error), {
+      ...(hint !== "" ? { hint } : {}),
       details,
     });
   }
@@ -188,22 +199,23 @@ export function toZitadelError(error: unknown): ZitadelError {
  * a real Zitadel platform API rather than an arbitrary HTTP server.
  */
 /**
- * The dotted field paths a platform error envelope blames, if any.
+ * The names a platform error envelope lists under `key`, if any: the dotted
+ * field paths it blames (`fields`), or what it reports missing (`missing`).
  *
  * The envelope nests them under `details`, and the server wraps its own
- * `details` map in the response's `details` field, so the paths arrive at
- * `body.details.details.fields`. Both depths are read: the extra wrapper is
+ * `details` map in the response's `details` field, so the names arrive at
+ * `body.details.details.<key>`. Both depths are read: the extra wrapper is
  * the serialiser's doing rather than part of the contract, and a reader that
  * insisted on it would go silent the day it goes away.
  */
-function rejectedFields(body: unknown): string[] {
+function listedInDetails(body: unknown, key: "fields" | "missing"): string[] {
   const seen = new Set<string>();
   let node: unknown = body;
   for (let depth = 0; depth < 4 && isObject(node); depth += 1) {
-    const fields = (node as { fields?: unknown }).fields;
-    if (Array.isArray(fields)) {
-      for (const field of fields) {
-        if (typeof field === "string" && field !== "") seen.add(field);
+    const listed = (node as Record<string, unknown>)[key];
+    if (Array.isArray(listed)) {
+      for (const name of listed) {
+        if (typeof name === "string" && name !== "") seen.add(name);
       }
     }
     node = (node as { details?: unknown }).details;

@@ -190,6 +190,11 @@ tasks:
       - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
+      # Read by the cloud launcher's tests (apps/cloud/launcher), which hold
+      # the deployment's configuration together. Scoped to test: nothing the
+      # server compiles reads them.
+      - "/vercel.json"
+      - "/apps/cloud/build.sh"
     options:
       runFromWorkspaceRoot: true
 

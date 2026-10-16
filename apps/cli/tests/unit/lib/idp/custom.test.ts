@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ZitadelError } from "../../../../src/lib/errors";
-import SsoEnable from "../../../../src/commands/sso/enable";
+import AuthMethodSsoEnable from "../../../../src/commands/auth-method/sso/enable";
 import Setup from "../../../../src/commands/setup";
 import {
   checkGivenCustomFlags,
@@ -196,8 +196,8 @@ describe("the flag keys and the names built from them", () => {
     );
   });
 
-  it("defines every enable key as a flag of sso enable", () => {
-    expect(Object.keys(SsoEnable.flags)).toEqual(
+  it("defines every enable key as a flag of auth-method sso enable", () => {
+    expect(Object.keys(AuthMethodSsoEnable.flags)).toEqual(
       expect.arrayContaining(Object.values(ENABLE_FLAG_KEYS)),
     );
   });
@@ -296,7 +296,7 @@ describe("customExample", () => {
     expect(customExample(ENABLE_FLAG_NAMES)).not.toContain("--scopes");
   });
 
-  it("is what sso enable shows as its examples", () => {
-    expect(SsoEnable.examples.join("\n")).toContain(customExample(ENABLE_FLAG_NAMES));
+  it("is what auth-method sso enable shows as its examples", () => {
+    expect(AuthMethodSsoEnable.examples.join("\n")).toContain(customExample(ENABLE_FLAG_NAMES));
   });
 });
