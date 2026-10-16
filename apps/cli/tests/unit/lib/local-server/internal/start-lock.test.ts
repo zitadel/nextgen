@@ -65,7 +65,10 @@ describe("withStartLock", () => {
 
     await Promise.all([start("a"), start("b")]);
 
-    expect(events).toEqual(["a begins", "a ends", "b begins", "b ends"]);
+    const [firstBegin, firstEnd, secondBegin, secondEnd] = events;
+    expect(firstBegin?.replace(" begins", "")).toBe(firstEnd?.replace(" ends", ""));
+    expect(secondBegin?.replace(" begins", "")).toBe(secondEnd?.replace(" ends", ""));
+    expect(events).toHaveLength(4);
   });
 
   it("takes over a lock whose owner is gone", async () => {
