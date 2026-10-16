@@ -220,6 +220,27 @@ describe("verifyJwt JWKS refresh failures", () => {
   });
 });
 
+describe("verifyJwt JWKS timeout", () => {
+  it("does not make a caller that joins a shared fetch wait longer than its own timeout", async () => {
+    const issuer = freshIssuer();
+    let release: (res: Response) => void = () => {};
+    const slow = new Promise<Response>((resolve) => {
+      release = resolve;
+    });
+    vi.stubGlobal("fetch", vi.fn().mockReturnValue(slow));
+    const token = sign(issuer, "k1", "RS256", rsa.privateKey);
+
+    const patient = verifyJwt(token, { ...opts(issuer), jwksTimeoutMs: 5_000 });
+    const impatient = await verifyJwt(token, { ...opts(issuer), jwksTimeoutMs: 20 });
+    release(
+      new Response(JSON.stringify({ keys: [jwk(rsa.publicKey, { kid: "k1", alg: "RS256" })] })),
+    );
+
+    expect(impatient).toBeNull();
+    expect(await patient).not.toBeNull();
+  });
+});
+
 describe("clearJwksCache", () => {
   it("is not undone by a fetch that was already in flight", async () => {
     const issuer = freshIssuer();
