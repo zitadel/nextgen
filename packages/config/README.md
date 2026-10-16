@@ -27,5 +27,3 @@ edit it (`defaults/README-schemas.md`, `README-flows.md`,
 `README-branding.md` in this package become those files). Those files are
 yours to edit; `zitadel plan` / `zitadel apply` reconcile them with the
 server, and edits publish new revisions rather than mutating state in place.
-
-<!-- ci-check: trigger config tests -->
