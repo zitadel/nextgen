@@ -1,7 +1,13 @@
 import { createSign, generateKeyPairSync, type KeyObject } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { JWKS_MIN_REFRESH_MS, JWKS_TTL_MS, verifyJwt, type VerifyJwtOptions } from "./jwt.js";
+import {
+  JWKS_MIN_REFRESH_MS,
+  JWKS_TTL_MS,
+  clearJwksCache,
+  verifyJwt,
+  type VerifyJwtOptions,
+} from "./jwt.js";
 
 const rsa = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const ec = generateKeyPairSync("ec", { namedCurve: "P-256" });
@@ -162,5 +168,94 @@ describe("verifyJwt key selection", () => {
     expect(
       await verifyJwt(sign(issuer, undefined, "RS256", rsa.privateKey), opts(issuer)),
     ).not.toBeNull();
+  });
+});
+
+describe("verifyJwt JWKS refresh failures", () => {
+  function failJwks() {
+    const fetchMock = vi.fn(async () => new Response("down", { status: 503 }));
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  it("does not retry a failing endpoint on every request from a cold cache", async () => {
+    const issuer = freshIssuer();
+    const fetchMock = failJwks();
+    const start = Date.now();
+    const token = sign(issuer, "k1", "RS256", rsa.privateKey);
+
+    expect(await verifyJwt(token, opts(issuer))).toBeNull();
+    expect(await verifyJwt(token, opts(issuer))).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    vi.spyOn(Date, "now").mockReturnValue(start + JWKS_MIN_REFRESH_MS + 1_000);
+    expect(await verifyJwt(sign(issuer, "k1", "RS256", rsa.privateKey), opts(issuer))).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry a failing refresh on every unknown kid once the document is old", async () => {
+    const issuer = freshIssuer();
+    serveJwks(() => [jwk(rsa.publicKey, { kid: "k1", alg: "RS256" })]);
+    const start = Date.now();
+    await verifyJwt(sign(issuer, "k1", "RS256", rsa.privateKey), opts(issuer));
+    vi.spyOn(Date, "now").mockReturnValue(start + JWKS_MIN_REFRESH_MS + 1_000);
+    const fetchMock = failJwks();
+
+    for (let i = 0; i < 3; i++) {
+      await verifyJwt(sign(issuer, `made-up-${i}`, "RS256", rsa.privateKey), opts(issuer));
+    }
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops trusting an expired document when its refresh fails", async () => {
+    const issuer = freshIssuer();
+    serveJwks(() => [jwk(rsa.publicKey, { kid: "k1", alg: "RS256" })]);
+    const start = Date.now();
+    await verifyJwt(sign(issuer, "k1", "RS256", rsa.privateKey), opts(issuer));
+    vi.spyOn(Date, "now").mockReturnValue(start + JWKS_TTL_MS + 1_000);
+    failJwks();
+
+    expect(await verifyJwt(sign(issuer, "k1", "RS256", rsa.privateKey), opts(issuer))).toBeNull();
+  });
+});
+
+describe("clearJwksCache", () => {
+  it("is not undone by a fetch that was already in flight", async () => {
+    const issuer = freshIssuer();
+    const compromised = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    let release: (res: Response) => void = () => {};
+    const slow = new Promise<Response>((resolve) => {
+      release = resolve;
+    });
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(slow)
+      .mockImplementation(
+        async () =>
+          new Response(JSON.stringify({ keys: [jwk(rsa.publicKey, { kid: "k1", alg: "RS256" })] })),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const before = verifyJwt(sign(issuer, "k1", "RS256", compromised.privateKey), opts(issuer));
+    clearJwksCache();
+    expect(
+      await verifyJwt(sign(issuer, "k1", "RS256", rsa.privateKey), opts(issuer)),
+    ).not.toBeNull();
+    release(
+      new Response(
+        JSON.stringify({ keys: [jwk(compromised.publicKey, { kid: "k1", alg: "RS256" })] }),
+      ),
+    );
+    await before;
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(
+      await verifyJwt(sign(issuer, "k1", "RS256", compromised.privateKey), opts(issuer)),
+    ).toBeNull();
+    expect(
+      await verifyJwt(sign(issuer, "k1", "RS256", rsa.privateKey), opts(issuer)),
+    ).not.toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
