@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import { ZitadelError, isErrno } from "../../errors";
@@ -45,7 +45,7 @@ export async function tryLock(lockFile: string): Promise<(() => Promise<void>) |
   await mkdir(dirname(lockFile), { recursive: true, mode: 0o700 });
   for (;;) {
     try {
-      await writeFile(lockFile, String(process.pid), { flag: "wx", mode: 0o600 });
+      await createOwned(lockFile);
       return async () => {
         // Only the owner's own lock is removed, so a release that comes after
         // someone else has taken the lock over cannot remove theirs.
@@ -59,9 +59,38 @@ export async function tryLock(lockFile: string): Promise<(() => Promise<void>) |
       }
     }
     const owner = await readOwner(lockFile);
-    if (owner === undefined || isAlive(owner) || !(await clearStale(lockFile, owner))) {
+    const abandoned = owner === undefined ? await isUnwritten(lockFile) : !isAlive(owner);
+    if (!abandoned || !(await clearStale(lockFile, owner))) {
       return undefined;
     }
+  }
+}
+
+/** Creates the file exclusively and writes the owner into it; a file that could not be written is not left behind empty. */
+async function createOwned(file: string): Promise<void> {
+  try {
+    await writeFile(file, String(process.pid), { flag: "wx", mode: 0o600 });
+  } catch (error) {
+    if (!isErrno(error, "EEXIST")) {
+      await rm(file, { force: true });
+    }
+    throw error;
+  }
+}
+
+/** How long a lock may stay without an owner in it before it is taken to be abandoned: far longer than writing a pid takes. */
+export const UNWRITTEN_LOCK_MS = 10_000;
+
+/**
+ * Whether a lock with no readable owner has been that way for a while. It is
+ * normally a start that has created the file and not yet written its pid, and
+ * is left alone; one that stays so is a start that died between the two.
+ */
+async function isUnwritten(lockFile: string): Promise<boolean> {
+  try {
+    return Date.now() - (await stat(lockFile)).mtimeMs > UNWRITTEN_LOCK_MS;
+  } catch {
+    return false;
   }
 }
 
@@ -73,16 +102,19 @@ export async function tryLock(lockFile: string): Promise<(() => Promise<void>) |
  * read again once it is held: if the lock has a different owner by then, it is
  * not the stale one and stays. `false` when another start is clearing it.
  */
-async function clearStale(lockFile: string, staleOwner: number): Promise<boolean> {
+export async function clearStale(
+  lockFile: string,
+  staleOwner: number | undefined,
+): Promise<boolean> {
   const guardFile = `${lockFile}.clearing`;
   try {
-    await writeFile(guardFile, String(process.pid), { flag: "wx", mode: 0o600 });
+    await createOwned(guardFile);
   } catch (error) {
     if (!isErrno(error, "EEXIST")) {
       throw error;
     }
     const clearing = await readOwner(guardFile);
-    if (clearing !== undefined && !isAlive(clearing)) {
+    if (clearing === undefined ? await isUnwritten(guardFile) : !isAlive(clearing)) {
       await rm(guardFile, { force: true });
     }
     return false;

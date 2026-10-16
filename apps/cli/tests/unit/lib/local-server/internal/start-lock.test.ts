@@ -1,10 +1,15 @@
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { tryLock, withStartLock } from "../../../../../src/lib/local-server/internal/start-lock";
+import {
+  clearStale,
+  tryLock,
+  UNWRITTEN_LOCK_MS,
+  withStartLock,
+} from "../../../../../src/lib/local-server/internal/start-lock";
 import { ManualClock } from "../../../../helpers/clock";
 
 const dirs: string[] = [];
@@ -81,6 +86,68 @@ describe("tryLock when two starts find the same dead owner", () => {
     await tryLock(lock);
 
     await expect(stat(`${lock}.clearing`)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+});
+
+describe("clearStale", () => {
+  it("leaves a lock that has another owner by the time it is cleared", async () => {
+    const lock = await lockPath();
+    await tryLock(lock);
+
+    await clearStale(lock, 2147483000);
+
+    await expect(readFile(lock, "utf8")).resolves.toBe(String(process.pid));
+  });
+
+  it("removes a lock that still has the stale owner", async () => {
+    const lock = await lockPath();
+    await tryLock(lock);
+    await writeFile(lock, "2147483000");
+
+    await clearStale(lock, 2147483000);
+
+    await expect(stat(lock)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("does nothing while another start is clearing", async () => {
+    const lock = await lockPath();
+    await tryLock(lock);
+    await writeFile(lock, "2147483000");
+    await writeFile(`${lock}.clearing`, String(process.pid));
+
+    await expect(clearStale(lock, 2147483000)).resolves.toBe(false);
+    await expect(readFile(lock, "utf8")).resolves.toBe("2147483000");
+  });
+
+  it("clears the way of a start that died while clearing", async () => {
+    const lock = await lockPath();
+    await tryLock(lock);
+    await writeFile(`${lock}.clearing`, "2147483000");
+
+    await clearStale(lock, 2147483000);
+
+    await expect(stat(`${lock}.clearing`)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+});
+
+describe("a lock with no owner in it", () => {
+  async function emptyLock(ageMs: number): Promise<string> {
+    const lock = await lockPath();
+    await tryLock(lock);
+    await writeFile(lock, "");
+    const then = new Date(Date.now() - ageMs);
+    await utimes(lock, then, then);
+    return lock;
+  }
+
+  it("is left alone when it is new, because its start may be about to write its pid", async () => {
+    await expect(tryLock(await emptyLock(0))).resolves.toBeUndefined();
+  });
+
+  it("is taken over once it has stayed empty, because its start died before writing", async () => {
+    await expect(tryLock(await emptyLock(UNWRITTEN_LOCK_MS + 1000))).resolves.toBeTypeOf(
+      "function",
+    );
   });
 });
 

@@ -97,6 +97,8 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
       ]);
       const child = spawn(command.command, args, {
         detached: true,
+        // On Windows a detached process otherwise opens a console window.
+        windowsHide: true,
         env: {
           ...process.env,
           // Declared project variables ride the child's environment, never argv.

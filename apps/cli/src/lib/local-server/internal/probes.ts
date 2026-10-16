@@ -1,10 +1,22 @@
 import { createConnection, createServer } from "node:net";
-import { tmpdir, userInfo } from "node:os";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { checkLocalServerHealth } from "../runtime";
 import type { HealthProbe, PortProbe } from "./lifecycle";
 import { tryLock } from "./start-lock";
+
+/**
+ * The folder port claims are kept in: the user's own, named by uid. The uid is
+ * used rather than the account name because the name is looked up in the
+ * password database and throws where the uid has no entry (a container run as an
+ * arbitrary user), and may hold characters a folder name cannot. Where there is
+ * no uid (Windows), the temp directory is already the user's own.
+ */
+export function defaultClaimsDir(): string {
+  const uid = process.getuid?.();
+  return join(tmpdir(), uid === undefined ? "zitadel-local-ports" : `zitadel-local-ports-${uid}`);
+}
 
 /**
  * A port is free when it can be bound and nothing answers on it. Binding alone
@@ -31,10 +43,7 @@ export class TcpPorts implements PortProbe {
    * replaced in tests, so the logic that combines the answers can be tested
    * without depending on which ports happen to be in use.
    */
-  constructor(
-    claimsDir: string = join(tmpdir(), `zitadel-local-ports-${userInfo().username}`),
-    network: Network = realNetwork,
-  ) {
+  constructor(claimsDir: string = defaultClaimsDir(), network: Network = realNetwork) {
     this.claimsDir = claimsDir;
     this.network = network;
   }

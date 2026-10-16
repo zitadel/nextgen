@@ -284,7 +284,7 @@ describe("Lifecycle", () => {
 
       expect(error).toBeInstanceOf(ServerStartError);
       expect(error).toMatchObject({ reason: "exited" });
-      expect(world.record).toBeUndefined();
+      await expect(world.server().state()).resolves.toMatchObject({ kind: "dead" });
     });
 
     it("takes the next port when another start won the same port at the same moment", async () => {
@@ -474,7 +474,69 @@ describe("Lifecycle", () => {
         .catch((e: unknown) => e);
 
       expect(error).toMatchObject({ reason: "timeout" });
-      expect(world.record).toBeUndefined();
+      await expect(world.server().state()).resolves.toMatchObject({ kind: "dead" });
+    });
+
+    it("records the server as soon as it is launched, so an interrupted start can still be stopped", async () => {
+      const world = new World();
+      let recordedWhileBooting: unknown;
+      world.onLaunch = (record, w) => {
+        w.alive.add(record.pid);
+        w.health.isHealthy = async () => {
+          recordedWhileBooting = w.record;
+          return true;
+        };
+      };
+
+      await world.server().start();
+
+      expect(recordedWhileBooting).toMatchObject({ pid: 100, port: 8080 });
+    });
+
+    it("stops the server when checking on it throws", async () => {
+      const world = new World();
+      world.onLaunch = (record, w) => {
+        w.alive.add(record.pid);
+        w.health.isHealthy = async () => {
+          throw new Error("probe failed");
+        };
+      };
+
+      await expect(world.server().start()).rejects.toThrow("probe failed");
+
+      expect(world.terminated).toEqual([100]);
+    });
+
+    it("keeps the reason a start failed when stopping the server fails too", async () => {
+      const world = new World();
+      world.onLaunch = (record, w) => w.alive.add(record.pid);
+      world.launcher.terminate = async () => {
+        throw new Error("docker daemon is gone");
+      };
+
+      await expect(world.server().start()).rejects.toMatchObject({
+        reason: "timeout",
+        cleanup: { status: "failed" },
+      });
+    });
+
+    it("keeps the write error when stopping the server fails too", async () => {
+      const world = new World();
+      world.writeError = new Error("read-only file system");
+      world.launcher.terminate = async () => {
+        throw new Error("docker daemon is gone");
+      };
+
+      await expect(world.server().start()).rejects.toBeInstanceOf(ServerStopError);
+    });
+
+    it("does not let a claim that cannot be removed hide a successful start", async () => {
+      const world = new World();
+      world.ports.reserve = async () => async () => {
+        throw new Error("EBUSY");
+      };
+
+      await expect(world.server().start()).resolves.toMatchObject({ alreadyRunning: false });
     });
 
     it("stops the process it launched when it never became ready", async () => {

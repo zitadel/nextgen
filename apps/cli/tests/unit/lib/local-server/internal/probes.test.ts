@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { TcpPorts } from "../../../../../src/lib/local-server/internal/probes";
+import { defaultClaimsDir, TcpPorts } from "../../../../../src/lib/local-server/internal/probes";
 
 const servers: Server[] = [];
 const claimDirs: string[] = [];
@@ -29,6 +29,24 @@ function listenOn(host: string | undefined): Promise<number> {
     });
   });
 }
+
+describe("defaultClaimsDir", () => {
+  it("is inside the temp directory, so a claim never lands in a project", () => {
+    expect(defaultClaimsDir().startsWith(tmpdir())).toBe(true);
+  });
+
+  it("is the same on every call, so every start of one user finds the same claims", () => {
+    expect(defaultClaimsDir()).toBe(defaultClaimsDir());
+  });
+
+  it("is named by uid rather than account name, which can be missing or unsafe", () => {
+    const uid = process.getuid?.();
+
+    expect(defaultClaimsDir().endsWith(uid === undefined ? "zitadel-local-ports" : `-${uid}`)).toBe(
+      true,
+    );
+  });
+});
 
 describe("TcpPorts reservations", () => {
   const port = 8080;

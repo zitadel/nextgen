@@ -270,8 +270,10 @@ export class Lifecycle<R extends ServerRecord> {
    * If the recorded server is running and acceptable (`reusable`, and on the
    * requested port if one was), it is kept. Otherwise whatever is recorded is
    * stopped, a port is claimed, and a new server is launched and waited for.
-   * The record is written only once the server answers, so a failed start never
-   * leaves a record that looks like a running server.
+   * The record is written as soon as the server is launched (see {@link save}),
+   * so an interrupted start leaves a server that can be found and stopped. A
+   * failed start stops its server, so what it leaves reads as `dead`, never as
+   * a running server.
    */
   async start(): Promise<{ record: R; alreadyRunning: boolean }> {
     const state = await this.state();
@@ -315,6 +317,7 @@ export class Lifecycle<R extends ServerRecord> {
           if (
             requested === undefined &&
             attempt < PORT_RACE_RETRIES &&
+            !(error instanceof ServerStopError) &&
             (error instanceof ServerStartError ? error.reason === "exited" : true) &&
             !(await this.deps.ports.isFree(claim.port))
           ) {
@@ -323,26 +326,32 @@ export class Lifecycle<R extends ServerRecord> {
           }
           throw error;
         }
-        await this.save(record);
         return { record, alreadyRunning: false };
       } finally {
-        await claim.release();
+        // A claim that cannot be removed is a file whose owner is gone, which
+        // the next start takes over; it must not hide how this start ended.
+        await claim.release().catch(() => undefined);
       }
     }
   }
 
   /**
-   * Records a server that is ready. If the record cannot be written, the server
-   * is stopped rather than left running unrecorded, where nothing could stop it
-   * and the next start would run a second one over its data. This is outside the
-   * port retry above on purpose: the server itself holds the port, so a retry
-   * would launch another beside it.
+   * Records a server the moment it is launched, before it is ready. A server
+   * that is launched and not recorded cannot be stopped by anything, and the
+   * next start would run a second one over its data: this is what happens when
+   * the CLI is interrupted or killed while the server boots. A record of a
+   * server that is not ready reads as `dead`, which the next start stops and
+   * replaces, and a failed start stops its server (see {@link startFailure}).
+   *
+   * If the record cannot be written, the server is stopped instead of being left
+   * unrecorded. That failure is not retried on another port: the server itself
+   * holds this one, so a retry would launch another beside it.
    */
   private async save(record: Launched<R>): Promise<void> {
     try {
       await this.deps.store.write(record);
     } catch (error) {
-      const outcome = await this.deps.launcher.terminate(record);
+      const outcome = await this.terminateQuietly(record);
       if (outcome.status === "failed") {
         throw new ServerStopError(record, outcome);
       }
@@ -350,10 +359,29 @@ export class Lifecycle<R extends ServerRecord> {
     }
   }
 
+  /** Stops a server on a path that is already failing, where a second error would hide the first. */
+  private async terminateQuietly(record: R): Promise<StopOutcome> {
+    try {
+      return await this.deps.launcher.terminate(record);
+    } catch {
+      return { status: "failed" };
+    }
+  }
+
   /** Launches on the port and waits until it is ready; throws {@link ServerStartError} if it does not become so. */
   private async launchAndWait(port: number): Promise<Launched<R>> {
     const record = await this.deps.launcher.launch({ port, serverUrl: serverUrlFor(port) });
-    await this.waitUntilReady(record);
+    await this.save(record);
+    try {
+      await this.waitUntilReady(record);
+    } catch (error) {
+      if (!(error instanceof ServerStartError)) {
+        // Something other than the server failing (a probe that threw): the
+        // server is still running and must not be left behind.
+        await this.terminateQuietly(record);
+      }
+      throw error;
+    }
     return record;
   }
 
@@ -427,7 +455,7 @@ export class Lifecycle<R extends ServerRecord> {
     return new ServerStartError(
       reason,
       record,
-      await this.deps.launcher.terminate(record),
+      await this.terminateQuietly(record),
       this.deps.launcher.describe(record),
       logTail,
     );
