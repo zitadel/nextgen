@@ -1,6 +1,9 @@
 package domain
 
 import (
+	"maps"
+	"reflect"
+	"slices"
 	"strings"
 	"time"
 )
@@ -155,6 +158,22 @@ func NewFlowDefinition(
 		Audience:      audience,
 		Steps:         steps,
 	}, nil
+}
+
+// Equal reports whether d and other carry the same author-facing content.
+// Identity fields (project, revision id, timestamps) and SchemaVersion are
+// ignored — they are server-owned and not part of a reuse decision.
+func (d *FlowDefinition) Equal(other *FlowDefinition) bool {
+	if d == nil || other == nil {
+		return d == other
+	}
+	return d.Name == other.Name &&
+		d.Status == other.Status &&
+		d.UserSchema == other.UserSchema &&
+		maps.Equal(d.Purposes, other.Purposes) &&
+		slices.Equal(d.Audience.AppIDs, other.Audience.AppIDs) &&
+		slices.Equal(d.Audience.TeamIDs, other.Audience.TeamIDs) &&
+		reflect.DeepEqual(d.Steps, other.Steps)
 }
 
 // InitialStepFor returns the entry-point step name for purpose, or

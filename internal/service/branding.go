@@ -38,36 +38,12 @@ func NewBrandingService(v2Pool *DB) *BrandingService {
 
 // Create validates and publishes a new branding revision.
 func (s *BrandingService) Create(ctx context.Context, input CreateBrandingInput) (*domain.Branding, error) {
-	entity, err := domain.NewBranding(
-		input.ProjectID,
-		input.Layout,
-		input.LiquidTemplate,
-		input.LogoURL,
-		input.HeroURL,
-		input.Theme,
-		input.Typography,
-		input.Shape,
-	)
+	entity, err := prepareBranding(input)
 	if err != nil {
 		return nil, err
 	}
 	if err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		if err := tx.Statements().CreateBranding(ctx, entity); err != nil {
-			return err
-		}
-		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
-			Type:       domain.EventTypeBrandingCreated,
-			Category:   domain.EventCategoryAdmin,
-			ProjectID:  entity.ProjectID,
-			EntityType: "branding",
-			EntityID:   entity.ID,
-			Payload: domain.BrandingPayload{
-				Layout:  entity.Layout,
-				LogoURL: entity.LogoURL,
-				FontURL: entity.Typography.FontURL,
-				HeroURL: entity.HeroURL,
-			},
-		})
+		return s.createBranding(ctx, tx.Statements(), entity)
 	}); err != nil {
 		// The only integrity constraint reachable from user input is the FK to
 		// projects (the ULID primary key cannot realistically collide), so a
@@ -81,6 +57,71 @@ func (s *BrandingService) Create(ctx context.Context, input CreateBrandingInput)
 		return nil, domain.ErrInternal(err).WithMessage("failed to create branding revision in database")
 	}
 	return entity, nil
+}
+
+func prepareBranding(input CreateBrandingInput) (*domain.Branding, error) {
+	return domain.NewBranding(
+		input.ProjectID,
+		input.Layout,
+		input.LiquidTemplate,
+		input.LogoURL,
+		input.HeroURL,
+		input.Theme,
+		input.Typography,
+		input.Shape,
+	)
+}
+
+// createBranding inserts a prepared branding revision and emits its event on stmts.
+func (s *BrandingService) createBranding(ctx context.Context, stmts AllStatements, entity *domain.Branding) error {
+	if err := stmts.CreateBranding(ctx, entity); err != nil {
+		return err
+	}
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeBrandingCreated,
+		Category:   domain.EventCategoryAdmin,
+		ProjectID:  entity.ProjectID,
+		EntityType: "branding",
+		EntityID:   entity.ID,
+		Payload: domain.BrandingPayload{
+			Layout:  entity.Layout,
+			LogoURL: entity.LogoURL,
+			FontURL: entity.Typography.FontURL,
+			HeroURL: entity.HeroURL,
+		},
+	})
+}
+
+// resolveOrCreateBranding reuses the project's newest branding when content
+// matches, otherwise inserts the prepared revision.
+func (s *BrandingService) resolveOrCreateBranding(
+	ctx context.Context,
+	stmts AllStatements,
+	projectID string,
+	prepared *domain.Branding,
+) (*domain.Branding, error) {
+	latest, err := latestBranding(ctx, stmts, projectID)
+	if err != nil {
+		return nil, err
+	}
+	if latest != nil && prepared.Equal(latest) {
+		return latest, nil
+	}
+	if err := s.createBranding(ctx, stmts, prepared); err != nil {
+		return nil, err
+	}
+	return prepared, nil
+}
+
+func latestBranding(ctx context.Context, stmts AllStatements, projectID string) (*domain.Branding, error) {
+	result, err := stmts.ListBrandings(WithAuthzListUnrestricted(ctx), branding.ListOptions(projectID, 1))
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to list branding")
+	}
+	if len(result.Items) == 0 {
+		return nil, nil
+	}
+	return result.Items[0], nil
 }
 
 // Get returns a single revision by id.
