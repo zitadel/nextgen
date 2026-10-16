@@ -115,7 +115,7 @@ func (h *Handler) QueryProjects(ctx context.Context, req *api.QueryProjectsReque
 func (h *Handler) ListMyProjects(ctx context.Context, params api.ListMyProjectsParams) (api.ListMyProjectsRes, error) {
 	self, err := requireSelf(ctx)
 	if err != nil {
-		return nil, invalidSessionCredential(err)
+		return nil, err
 	}
 
 	listed, err := h.projectService.ListAuthorized(ctx, service.ListAuthorizedProjectsRequest{

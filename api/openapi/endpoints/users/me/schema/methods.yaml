@@ -1,10 +1,7 @@
 get:
   operationId: getMyUserSchema
   summary: Get my user schema
-  description: |
-    The schema the signed-in user's own record is validated against — the
-    document `PATCH /users/me` validates against. Self-access: the session is
-    the authorization, like the rest of `/users/me`.
+  description: The schema the signed-in user's own record is validated against.
   tags:
     - Users
   security:

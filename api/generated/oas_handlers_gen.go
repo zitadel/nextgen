@@ -8084,9 +8084,7 @@ func (s *Server) handleGetMyUserRequest(args [0]string, argsEscaped bool, w http
 
 // handleGetMyUserSchemaRequest handles getMyUserSchema operation.
 //
-// The schema the signed-in user's own record is validated against — the
-// document `PATCH /users/me` validates against. Self-access: the session is
-// the authorization, like the rest of `/users/me`.
+// The schema the signed-in user's own record is validated against.
 //
 // GET /users/me/schema
 func (s *Server) handleGetMyUserSchemaRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -11720,8 +11718,7 @@ func (s *Server) handleListMyProjectsRequest(args [0]string, argsEscaped bool, w
 
 // handleListMyTeamsRequest handles listMyTeams operation.
 //
-// The signed-in user's own team roster, ordered by team name. Self-access:
-// the session is the authorization, like the rest of `/users/me`.
+// The signed-in user's own team roster, ordered by team name.
 //
 // GET /users/me/teams
 func (s *Server) handleListMyTeamsRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {

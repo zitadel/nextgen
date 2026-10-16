@@ -1,9 +1,7 @@
 get:
   operationId: listMyTeams
   summary: List the teams I belong to
-  description: |
-    The signed-in user's own team roster, ordered by team name. Self-access:
-    the session is the authorization, like the rest of `/users/me`.
+  description: The signed-in user's own team roster, ordered by team name.
   tags:
     - Users
   security:

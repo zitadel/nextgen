@@ -246,12 +246,10 @@ func (h *Handler) ListUserTeams(ctx context.Context, params api.ListUserTeamsPar
 	return &res, nil
 }
 
-// ListMyTeams is the caller's own roster: self-access, so no resolver check —
-// the session decides whose teams these are.
 func (h *Handler) ListMyTeams(ctx context.Context, params api.ListMyTeamsParams) (api.ListMyTeamsRes, error) {
 	self, err := requireSelf(ctx)
 	if err != nil {
-		return nil, invalidSessionCredential(err)
+		return nil, err
 	}
 	teams, err := h.userService.ListUserTeams(ctx, service.ListUserTeamsInput{
 		ProjectID: self.ProjectID,
@@ -394,7 +392,7 @@ func (h *Handler) GetMyUser(ctx context.Context) (api.GetMyUserRes, error) {
 func (h *Handler) GetMyUserSchema(ctx context.Context) (api.GetMyUserSchemaRes, error) {
 	self, err := requireSelf(ctx)
 	if err != nil {
-		return nil, invalidSessionCredential(err)
+		return nil, err
 	}
 	schema, err := h.userService.GetMyUserSchema(ctx, service.GetMyUserInput{Self: self})
 	if err != nil {

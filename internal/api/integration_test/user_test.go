@@ -1114,37 +1114,35 @@ func TestListPasskeys(t *testing.T) {
 	})
 }
 
-// TestSelfAccessReads: a person reads their own schema and team roster with
-// nothing but their session — no grant in the project — and anything short of
-// a user-bound session gets the 401 the contract declares.
+// TestSelfAccessReads: a person reads their own schema and roster with only
+// their session, and anything short of a user-bound session gets the 401 the
+// contract declares.
 func TestSelfAccessReads(t *testing.T) {
 	t.Parallel()
 
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	userID := harness.CreateUserWithTeam(t, project.ID)
+	userID, teamID := harness.CreateUserOwnedByTeam(t, project.ID)
 	cookie := sessionCookieIn(t, project, userID)
 
 	t.Run("own schema, without a grant", func(t *testing.T) {
 		t.Parallel()
-		status, body := consoleCall(t, cookie, http.MethodGet, "/users/me", "")
+		status, body := cookieRequest(t, cookie, http.MethodGet, "/users/me", "", nil)
 		require.Equal(t, http.StatusOK, status, body)
-		me := helpers.MustUnmarshal[struct {
-			Schema string `json:"schema"`
-		}](t, []byte(body))
+		me := helpers.MustUnmarshal[api.User](t, []byte(body))
 
-		status, raw := getSelfRaw(t, "/users/me/schema", cookie.Value)
-		require.Equal(t, http.StatusOK, status, string(raw))
-		assert.Equal(t, me.Schema, helpers.MustUnmarshal[struct {
-			ID string `json:"id"`
-		}](t, raw).ID)
+		status, body = cookieRequest(t, cookie, http.MethodGet, "/users/me/schema", "", nil)
+		require.Equal(t, http.StatusOK, status, body)
+		assert.Equal(t, me.Schema, helpers.MustUnmarshal[api.Schema](t, []byte(body)).ID)
 	})
 
 	t.Run("own teams, without a grant", func(t *testing.T) {
 		t.Parallel()
-		status, raw := getSelfRaw(t, "/users/me/teams", cookie.Value)
-		require.Equal(t, http.StatusOK, status, string(raw))
-		assert.Len(t, helpers.MustUnmarshal[api.ListUserTeamsResponse](t, raw).Teams, 1)
+		status, body := cookieRequest(t, cookie, http.MethodGet, "/users/me/teams", "", nil)
+		require.Equal(t, http.StatusOK, status, body)
+		teams := helpers.MustUnmarshal[api.ListUserTeamsResponse](t, []byte(body)).Teams
+		require.Len(t, teams, 1)
+		assert.Equal(t, teamID, string(teams[0].ID))
 	})
 
 	session := harness.CreateSession(t, project.ID, time.Hour)
@@ -1153,13 +1151,16 @@ func TestSelfAccessReads(t *testing.T) {
 	anonymous, err := session.Token(crypter)
 	require.NoError(t, err)
 
-	for _, path := range []string{"/users/me/schema", "/users/me/teams"} {
-		for name, token := range map[string]string{"anonymous session": anonymous, "no cookie": ""} {
+	for _, path := range []string{"/users/me", "/users/me/schema", "/users/me/teams"} {
+		for name, cookie := range map[string]*http.Cookie{
+			"anonymous session": {Name: "__nextgen_session", Value: anonymous},
+			"no cookie":         nil,
+		} {
 			t.Run(path+" "+name, func(t *testing.T) {
 				t.Parallel()
-				status, raw := getSelfRaw(t, path, token)
-				assert.Equal(t, http.StatusUnauthorized, status, string(raw))
-				details := helpers.MustUnmarshal[api.ErrorDetails](t, raw)
+				status, body := cookieRequest(t, cookie, http.MethodGet, path, "", nil)
+				assert.Equal(t, http.StatusUnauthorized, status, body)
+				details := helpers.MustUnmarshal[api.ErrorDetails](t, []byte(body))
 				assert.Equal(t, api.ErrorCode("auth.unauthorized"), details.Code)
 				assert.Equal(t, "Missing or invalid session token.", details.Message)
 			})
