@@ -21,6 +21,7 @@ import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSubmit } from "@/hooks/use-submit";
 import { formatDate, formatDateTime } from "@/lib/date";
 import {
@@ -354,8 +355,18 @@ function ProfileCard({
   return (
     <Card className={DETAIL_CARD}>
       <CardContent className="flex flex-col gap-4 px-6 py-5">
-        {/* The design's `Users` glyph, beside the schema the user follows. */}
-        <PanelTitle as="h2" icon={Users} title={schemaName} />
+        {/* The design's `Users` glyph, beside the schema the user follows. The
+            design drops the "User schema" eyebrow, so the hover says what the
+            name is; the trigger is focusable so a keyboard reaches it too. */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            {/* biome-ignore lint/a11y/noNoninteractiveTabindex: a tooltip's trigger has to take focus for the hint to reach keyboard users */}
+            <div className="w-fit rounded-md" tabIndex={0}>
+              <PanelTitle as="h2" icon={Users} title={schemaName} />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>User schema</TooltipContent>
+        </Tooltip>
         <Separator />
         {fields.length === 0 ? (
           <p className="text-muted-foreground text-sm">
