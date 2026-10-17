@@ -220,6 +220,12 @@ func (s *projectService) create(ctx context.Context, project *domain.Project, se
 
 func (s *projectService) createDefaultUserSchemas(ctx context.Context, stmts AllStatements, projectID string) (*domain.JSONSchema, error) {
 	schemabs := schemas.DefaultHumanUserSchema(s.serverURL)
+	if projectID == domain.PlatformProjectID {
+		var err error
+		if schemabs, err = schemas.PlatformHumanUserSchema(s.serverURL); err != nil {
+			return nil, domain.ErrInternal(err).WithMessage("failed to build platform user schema")
+		}
+	}
 	schema, err := domain.NewJSONSchema(projectID, schemabs)
 	if err != nil {
 		return nil, err
