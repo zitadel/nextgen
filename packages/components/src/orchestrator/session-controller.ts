@@ -40,15 +40,14 @@ function isNoSession(error: unknown): boolean {
 
 /**
  * Whether a `GET /sessions/me` 200 carries the session JSON, which always has
- * its `session_id`. Anything else (an SPA host's `index.html` served for an
- * unrewritten proxy path) did not come from the backend.
+ * a non-empty `session_id`. Anything else (an SPA host's `index.html` served
+ * for an unrewritten proxy path, a proxy's `{}`, an empty id) did not come
+ * from the backend. The server SDKs reject the same bodies.
  */
 function isSessionBody(body: unknown): body is SessionIdentity {
-  return (
-    typeof body === "object" &&
-    body !== null &&
-    typeof (body as { session_id?: unknown }).session_id === "string"
-  );
+  if (typeof body !== "object" || body === null) return false;
+  const id = (body as { session_id?: unknown }).session_id;
+  return typeof id === "string" && id !== "";
 }
 
 export interface SessionControllerOptions {
