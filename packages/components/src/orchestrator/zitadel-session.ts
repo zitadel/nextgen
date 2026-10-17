@@ -14,11 +14,14 @@ import "../atoms/index.js";
 const LEAVE_LOOP_WINDOW_MS = 10_000;
 const LEAVE_STORAGE_KEY = "zitadel-session:no-session-leave";
 
-interface LastLeave {
+interface Leave {
   readonly from: string;
   readonly to: string;
   readonly at: number;
 }
+
+// Enough for a loop through several cards, bounded so storage cannot grow.
+const LEAVE_HISTORY_LIMIT = 10;
 
 /**
  * A page's identity for the same-page and loop checks: origin, path without
@@ -39,26 +42,30 @@ function samePage(a: URL, b: URL): boolean {
 
 // Storage can be missing or throw (privacy modes, sandboxed frames); the
 // guard is then off and the card navigates as before.
-function readLastLeave(): LastLeave | undefined {
+function readLeaves(): Leave[] {
   try {
     const raw = window.sessionStorage.getItem(LEAVE_STORAGE_KEY);
-    if (!raw) return undefined;
+    if (!raw) return [];
     const value: unknown = JSON.parse(raw);
-    if (typeof value !== "object" || value === null) return undefined;
-    const { from, to, at } = value as Record<string, unknown>;
-    return typeof from === "string" && typeof to === "string" && typeof at === "number"
-      ? { from, to, at }
-      : undefined;
+    if (!Array.isArray(value)) return [];
+    return value.filter(
+      (entry): entry is Leave =>
+        typeof entry === "object" &&
+        entry !== null &&
+        typeof (entry as Leave).from === "string" &&
+        typeof (entry as Leave).to === "string" &&
+        typeof (entry as Leave).at === "number",
+    );
   } catch {
-    return undefined;
+    return [];
   }
 }
 
-function writeLastLeave(value: LastLeave): void {
+function writeLeaves(value: readonly Leave[]): void {
   try {
     window.sessionStorage.setItem(LEAVE_STORAGE_KEY, JSON.stringify(value));
   } catch {
-    // See readLastLeave.
+    // See readLeaves.
   }
 }
 
@@ -205,7 +212,9 @@ export class ZitadelSession extends ZitadelSurface {
     let target: URL;
     try {
       here = new URL(window.location.href);
-      target = new URL(this.postSignOutUrl, here);
+      // `location.assign()` resolves a relative URL against the document base
+      // (a `<base href>`), not the page's own URL, so the check must too.
+      target = new URL(this.postSignOutUrl, document.baseURI);
     } catch {
       return;
     }
@@ -213,11 +222,11 @@ export class ZitadelSession extends ZitadelSurface {
     const from = pageKey(here);
     const to = pageKey(target);
     const now = Date.now();
-    const last = readLastLeave();
-    if (last && last.from === from && last.to === to && now - last.at < LEAVE_LOOP_WINDOW_MS) {
-      return;
-    }
-    writeLastLeave({ from, to, at: now });
+    // Every recent hop is kept, not just the last: cards on two pages that send
+    // visitors to each other would otherwise overwrite one another's record.
+    const recent = readLeaves().filter((entry) => now - entry.at < LEAVE_LOOP_WINDOW_MS);
+    if (recent.some((entry) => entry.from === from && entry.to === to)) return;
+    writeLeaves([...recent, { from, to, at: now }].slice(-LEAVE_HISTORY_LIMIT));
     this.leave();
   }
 
