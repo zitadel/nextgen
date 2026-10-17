@@ -771,6 +771,14 @@ export class ZitadelLogin extends ZitadelSurface {
   /** Config changed while a start was in flight; re-check once it settles. */
   private restartPending = false;
 
+  /**
+   * Set when the current flow is one the page resumed (`resume-flow-id` or
+   * `?flow=`) rather than one this element created. That flow is already
+   * progressed server-side and a late `purpose` or `flow-name` cannot change
+   * it, so late config never replaces it.
+   */
+  private resumed = false;
+
   private flowConfigKey(): string {
     // Keyed on the project `resolveApi` actually picks, not on the channel that
     // supplied it: a different project still counts as a change, but the same
@@ -799,25 +807,40 @@ export class ZitadelLogin extends ZitadelSurface {
    * throw their progress away.
    */
   private restartForLateConfig(): void {
-    if (this.startedWith === undefined || this.submitted || this.preview) return;
-    if (this.flowConfigKey() === this.startedWith) return;
+    if (!this.lateConfigPending()) return;
     if (this.loading) {
       this.restartPending = true;
       return;
     }
     // Deferred like the first start: this runs from `updated`, where changing
     // reactive state (`formValues`, then `loading`) would schedule a
-    // change-in-update.
+    // change-in-update. The guards are checked again when it runs: another
+    // change can queue a second start meanwhile, and two starts in flight would
+    // race their responses.
     queueMicrotask(() => {
+      if (!this.lateConfigPending()) return;
+      if (this.loading) {
+        this.restartPending = true;
+        return;
+      }
       this.formValues = {};
       void this.startFlow();
     });
+  }
+
+  /** Whether flow-defining config changed since the current flow started, and may still restart it. */
+  private lateConfigPending(): boolean {
+    if (this.startedWith === undefined || this.submitted || this.preview || this.resumed) {
+      return false;
+    }
+    return this.flowConfigKey() !== this.startedWith;
   }
 
   private async startFlow(): Promise<void> {
     this.loading = true;
     this.startupError = null;
     this.startedWith = this.flowConfigKey();
+    this.resumed = false;
     try {
       // Resolve inside the try so a missing configuration surfaces through
       // `handleTransportError` (rendered as `startupError`) rather than as an
@@ -828,6 +851,7 @@ export class ZitadelLogin extends ZitadelSurface {
       if (resumeId) {
         try {
           wire = await getCurrentStep(api, resumeId);
+          this.resumed = true;
         } catch (error) {
           // A handle can outlive its flow: the cookie window closed during
           // the external sign-in, so the browser no longer sends the
