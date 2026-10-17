@@ -220,6 +220,29 @@ describe("AngularPatcher.plan", () => {
     expect(proxyConfigEdit()(chosen)).toBe(chosen);
   });
 
+  it.each(["// }", 'note: "}",', "note: `}`,", "// {"])(
+    "keeps a managed proxy whose response handling follows %s",
+    (decoy) => {
+      const chosen = unredactedProxyConf().replace(
+        "    onProxyReq: setBearer,\n",
+        `    ${decoy}\n    selfHandleResponse: false,\n    onProxyReq: setBearer,\n`,
+      );
+
+      expect(proxyConfigEdit()(chosen)).toBe(chosen);
+    },
+  );
+
+  it("redacts only the /__nextgen entry when an earlier sibling copies the generated wiring", () => {
+    const edit = proxyConfigEdit();
+    const sibling = (source: string) =>
+      source.replace(
+        "module.exports = {\n",
+        'module.exports = {\n  "/api": {\n    target: server,\n    onProxyReq: setBearer,\n    configure: (proxy) => proxy.on("proxyReq", setBearer),\n  },\n',
+      );
+
+    expect(edit(sibling(unredactedProxyConf()))).toBe(sibling(edit(undefined)));
+  });
+
   it("keeps a managed proxy that hooks the proxy's responses itself", () => {
     const hooked = unredactedProxyConf().replace(
       "    onProxyReq: setBearer,\n",

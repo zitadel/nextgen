@@ -1,14 +1,17 @@
+import { parseModule } from "magicast";
+
 import { MANAGED_MARKER } from "../../../../paths";
 import type { PatchContext } from "../../types";
 import { PROXY_PATH } from "../proxy";
 import {
+  type AstNode,
   assertNoUnreviewedProjectSecretProxy,
   EXCHANGE_REDACTION_MARKER,
   EXCHANGE_REDACTION_ZLIB,
-  entryText,
-  hasResponseHook,
   exchangeRedactionFunctions,
+  hasResponseHook,
   PROXY_CREDENTIAL_POLICY_MARKER,
+  proxyEntryRange,
   upgradeExchangeRedaction,
 } from "../proxy-credential-policy";
 
@@ -223,33 +226,95 @@ const REDACTING_WIRING = `    selfHandleResponse: true,
       proxy.on("proxyRes", relayResponse);
     },`;
 
-/** The key of the managed `/__nextgen` entry in `module.exports`. */
-const MANAGED_ENTRY_KEY = new RegExp(`["']${PROXY_PATH}["']\\s*:\\s*\\{`);
+/** The slice of a parsed node {@link managedEntryRange} walks to `module.exports`. */
+interface ExportsNode extends AstNode {
+  name?: string;
+  body?: ExportsNode[];
+  program?: ExportsNode;
+  expression?: ExportsNode;
+  left?: ExportsNode;
+  object?: ExportsNode;
+  property?: ExportsNode;
+  right?: AstNode;
+}
+
+/**
+ * The span of the managed `"/__nextgen"` property of the object literal
+ * assigned to `module.exports`, found in the parsed file, or `undefined` when
+ * the file is not shaped like that. Every check and rewrite of the entry stays
+ * inside this span, so a sibling proxy that copies the generated wiring, or a
+ * comment or string holding braces, is never mistaken for it.
+ */
+function managedEntryRange(source: string): { start: number; end: number } | undefined {
+  let ast: ExportsNode;
+  try {
+    ast = parseModule(source).$ast as ExportsNode;
+  } catch {
+    return undefined;
+  }
+  const statements = ast.program?.body ?? ast.body ?? [];
+  for (const statement of statements) {
+    const assignment = statement.expression;
+    const target = assignment?.left;
+    if (
+      assignment?.type === "AssignmentExpression" &&
+      target?.type === "MemberExpression" &&
+      target.object?.name === "module" &&
+      target.property?.name === "exports"
+    ) {
+      return proxyEntryRange(source, assignment.right);
+    }
+  }
+  return undefined;
+}
+
+/** Rewrites the managed entry's own text with `edit`, leaving the rest of the file as it is. */
+function editManagedEntry(source: string, edit: (entry: string) => string): string {
+  const range = managedEntryRange(source);
+  if (range === undefined) {
+    return source;
+  }
+  return (
+    source.slice(0, range.start) +
+    edit(source.slice(range.start, range.end)) +
+    source.slice(range.end)
+  );
+}
 
 /**
  * Adds the session-token redaction to the managed proxy written before it
  * existed. Only the exact generated bearer hook and wiring qualify, and both
  * change together: a response handler without `selfHandleResponse`, or the
- * reverse, would break every proxied call. A file that already chose its own
- * `selfHandleResponse` is left alone.
+ * reverse, would break every proxied call. A file whose managed entry already
+ * chose its own `selfHandleResponse`, or hooks the responses itself, is left
+ * alone.
  */
 function redactExchange(source: string): string {
-  const entry = MANAGED_ENTRY_KEY.exec(source);
+  const range = managedEntryRange(source);
   if (
-    entry === null ||
+    range === undefined ||
     source.includes(EXCHANGE_REDACTION_MARKER) ||
-    // Only the managed entry's own choice counts: a sibling proxy may set it.
-    /\bselfHandleResponse\b/.test(entryText(source, entry.index)) ||
-    // A hook of the project's own would run after the headers were sent.
-    hasResponseHook(entryText(source, entry.index)) ||
-    !source.includes(EXCHANGE_ONLY_BEARER) ||
-    !source.includes(UNREDACTED_WIRING)
+    !source.includes(EXCHANGE_ONLY_BEARER)
   ) {
     return source;
   }
-  return source
-    .replace(EXCHANGE_ONLY_BEARER, `${EXCHANGE_ONLY_BEARER}\n\n${EXCHANGE_REDACTION}`)
-    .replace(UNREDACTED_WIRING, REDACTING_WIRING);
+  const entry = source.slice(range.start, range.end);
+  if (
+    /\bselfHandleResponse\b/.test(entry) ||
+    // A hook of the project's own would run after the headers were sent.
+    hasResponseHook(entry) ||
+    !entry.includes(UNREDACTED_WIRING)
+  ) {
+    return source;
+  }
+  const wired =
+    source.slice(0, range.start) +
+    entry.replace(UNREDACTED_WIRING, () => REDACTING_WIRING) +
+    source.slice(range.end);
+  return wired.replace(
+    EXCHANGE_ONLY_BEARER,
+    () => `${EXCHANGE_ONLY_BEARER}\n\n${EXCHANGE_REDACTION}`,
+  );
 }
 
 /**
@@ -266,12 +331,13 @@ const ORIGIN_FORWARDING_ENTRY = `    target: server,
     xfwd: true,
 `;
 
-/** Upgrades the exact host-keeping entry, unless the file already chose its own `xfwd`. */
+/** Upgrades the exact host-keeping entry, unless it already chose its own `xfwd`. */
 function forwardAppOrigin(source: string): string {
-  if (/\bxfwd\s*:/.test(source)) {
-    return source;
-  }
-  return source.replace(HOST_KEEPING_ENTRY, ORIGIN_FORWARDING_ENTRY);
+  return editManagedEntry(source, (entry) =>
+    /\bxfwd\s*:/.test(entry)
+      ? entry
+      : entry.replace(HOST_KEEPING_ENTRY, () => ORIGIN_FORWARDING_ENTRY),
+  );
 }
 
 /** Moves a managed proxy's generated parts onto their current shapes. */

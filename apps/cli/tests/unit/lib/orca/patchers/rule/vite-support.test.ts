@@ -218,6 +218,32 @@ export default defineConfig({
     expect(edit(chosen)).toBe(chosen);
   });
 
+  it.each(["// }", 'note: "}",', "note: `}`,", "// {"])(
+    "keeps a generated entry whose response handling follows %s",
+    (decoy) => {
+      const chosen = UNREDACTED_CONFIG.replace(
+        "xfwd: true,",
+        `xfwd: true,\n        ${decoy}\n        selfHandleResponse: false,`,
+      );
+
+      expect(edit(chosen)).toBe(chosen);
+    },
+  );
+
+  it("redacts only the /__nextgen entry when an earlier sibling copies the generated listener", () => {
+    const listener =
+      /^ {10}proxy\.on\("proxyReq", \(proxyReq\) => \{\n[\s\S]*?\n {10}\}\);$/m.exec(
+        UNREDACTED_CONFIG,
+      )?.[0] ?? "";
+    const sibling = `"/api": {\n        target: "http://localhost:9",\n        configure: (proxy) => {\n${listener}\n        },\n      },\n      `;
+    const insert = (source: string) =>
+      source.replace('proxy: {\n      "/__nextgen"', `proxy: {\n      ${sibling}"/__nextgen"`);
+    const current = viteProxyEdit(5173, "https://zitadel.example.com")(BARE_CONFIG);
+
+    expect(listener).toContain("proxyReq.setHeader");
+    expect(edit(insert(UNREDACTED_CONFIG))).toBe(insert(current));
+  });
+
   it("adds the redaction when a sibling proxy chose its own response handling", () => {
     const current = viteProxyEdit(5173, "https://zitadel.example.com")(BARE_CONFIG);
     const sibling = UNREDACTED_CONFIG.replace(

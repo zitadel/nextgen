@@ -286,28 +286,72 @@ export function upgradeExchangeRedaction(
   });
 }
 
+/** A position in a parsed file, as the parser reports it: a 1-based line and a column. */
+interface AstPosition {
+  line: number;
+  column: number;
+}
+
+/** The slice of a parsed (babel) node the entry lookup reads. */
+export interface AstNode {
+  type?: string;
+  loc?: { start?: AstPosition; end?: AstPosition };
+  properties?: AstNode[];
+  key?: { type?: string; value?: unknown };
+  value?: AstNode;
+}
+
 /**
- * The text of the object literal that follows the key found at `keyIndex`,
- * braces balanced. An unbalanced remainder yields the rest of the source, so a
- * check for a user-set option errs towards leaving the file alone.
+ * The offset in `source` of a parser position. The parser reads the file with
+ * its line endings normalised, so its own offsets drift by a byte for every
+ * CRLF before the position; line and column do not.
  */
-export function entryText(source: string, keyIndex: number): string {
-  const open = source.indexOf("{", keyIndex);
-  if (open === -1) {
-    return source.slice(keyIndex);
-  }
-  let depth = 0;
-  for (let index = open; index < source.length; index += 1) {
-    if (source[index] === "{") {
-      depth += 1;
-    } else if (source[index] === "}") {
-      depth -= 1;
-      if (depth === 0) {
-        return source.slice(open, index + 1);
-      }
+function offsetOf(source: string, position: AstPosition): number {
+  let offset = 0;
+  for (let line = 1; line < position.line; line += 1) {
+    const next = source.indexOf("\n", offset);
+    if (next === -1) {
+      return source.length;
     }
+    offset = next + 1;
   }
-  return source.slice(open);
+  return offset + position.column;
+}
+
+/** The span of a parsed node in `source`, or `undefined` when it carries no position. */
+export function nodeRange(
+  source: string,
+  node: AstNode | undefined,
+): { start: number; end: number } | undefined {
+  if (!node?.loc?.start || !node.loc.end) {
+    return undefined;
+  }
+  return { start: offsetOf(source, node.loc.start), end: offsetOf(source, node.loc.end) };
+}
+
+/**
+ * The span of the `"/__nextgen": { ... }` property of a parsed proxy table
+ * (key, any comment between key and value, and the object literal), or
+ * `undefined` when the table has no such property with an object literal as
+ * its value. Every check and rewrite of the generated entry stays inside this
+ * span, so a sibling proxy, a comment or a string can never be mistaken for it.
+ */
+export function proxyEntryRange(
+  source: string,
+  table: AstNode | undefined,
+): { start: number; end: number } | undefined {
+  if (table?.type !== "ObjectExpression") {
+    return undefined;
+  }
+  const property = table.properties?.find(
+    (candidate) =>
+      candidate.type === "ObjectProperty" &&
+      candidate.key?.type === "StringLiteral" &&
+      candidate.key.value === PROXY_PATH &&
+      candidate.value?.type === "ObjectExpression",
+  );
+  const range = nodeRange(source, property);
+  return range !== undefined && range.end > range.start ? range : undefined;
 }
 
 /**

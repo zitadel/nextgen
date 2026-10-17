@@ -4,13 +4,14 @@ import { configCandidates } from "./config-paths";
 import type { FileOp } from "./file-writer/types";
 import { PROXY_PATH } from "./proxy";
 import {
+  type AstNode,
   assertNoUnreviewedProjectSecretProxy,
   EXCHANGE_REDACTION_MARKER,
   EXCHANGE_REDACTION_ZLIB,
-  entryText,
   exchangeRedactionFunctions,
   hasResponseHook,
   PROXY_CREDENTIAL_POLICY_MARKER,
+  proxyEntryRange,
   upgradeExchangeRedaction,
 } from "./proxy-credential-policy";
 import {
@@ -177,21 +178,20 @@ const GENERATED_ENTRY_HEAD =
  * every proxied call — so an entry changed by hand, or one that already made
  * its own `selfHandleResponse` choice, is left alone.
  */
-function redactExchange(source: string, typed: boolean): string {
-  const head = GENERATED_ENTRY_HEAD.exec(source);
+function redactExchange(entry: string, typed: boolean): string {
+  const head = GENERATED_ENTRY_HEAD.exec(entry);
   if (
-    !source.includes(PROXY_CREDENTIAL_POLICY_MARKER) ||
-    source.includes(EXCHANGE_REDACTION_MARKER) ||
+    !entry.includes(PROXY_CREDENTIAL_POLICY_MARKER) ||
+    entry.includes(EXCHANGE_REDACTION_MARKER) ||
     head === null ||
-    // Only the Zitadel entry's own choice counts: a sibling proxy may set it.
-    /\bselfHandleResponse\b/.test(entryText(source, head.index)) ||
+    /\bselfHandleResponse\b/.test(entry) ||
     // A hook of the project's own would run after the headers were sent.
-    hasResponseHook(entryText(source, head.index)) ||
-    !EXCHANGE_ONLY_LISTENER.test(source)
+    hasResponseHook(entry) ||
+    !EXCHANGE_ONLY_LISTENER.test(entry)
   ) {
-    return source;
+    return entry;
   }
-  return source
+  return entry
     .replace(
       GENERATED_ENTRY_HEAD,
       (_head, head: string, eol: string, indent: string) =>
@@ -203,57 +203,25 @@ function redactExchange(source: string, typed: boolean): string {
     });
 }
 
-/** A position in a parsed file, as the parser reports it: a 1-based line and a column. */
-interface AstPosition {
-  line: number;
-  column: number;
-}
-
 /**
- * The offset in `source` of a parser position. The parser reads the file with
- * its line endings normalised, so its own offsets drift by a byte for every
- * CRLF before the position; line and column do not.
- */
-function offsetOf(source: string, position: AstPosition): number {
-  let offset = 0;
-  for (let line = 1; line < position.line; line += 1) {
-    const next = source.indexOf("\n", offset);
-    if (next === -1) {
-      return source.length;
-    }
-    offset = next + 1;
-  }
-  return offset + position.column;
-}
-
-/**
- * The span of the config's `server.proxy` object literal, or `undefined` when
+ * The parsed `server.proxy` object literal of the config, or `undefined` when
  * the config has none that can be read as one.
  */
-function proxyTableRange(
+function proxyTableNode(
   config: ReturnType<typeof resolveDefaultExportObject>,
-  source: string,
-): { start: number; end: number } | undefined {
+): AstNode | undefined {
   const server = (config as Record<string, unknown>).server as Record<string, unknown> | undefined;
-  const table = server?.proxy as
-    | { $ast?: { type?: string; loc?: { start?: AstPosition; end?: AstPosition } } }
-    | undefined;
-  const node = table?.$ast;
-  if (node?.type !== "ObjectExpression" || !node.loc?.start || !node.loc.end) {
-    return undefined;
-  }
-  const start = offsetOf(source, node.loc.start);
-  const end = offsetOf(source, node.loc.end);
-  return source[start] === "{" && source[end - 1] === "}" ? { start, end } : undefined;
+  const table = server?.proxy as { $ast?: AstNode } | undefined;
+  return table?.$ast;
 }
 
 /**
- * Moves the generated `/__nextgen` entry in the dev server's proxy table onto
- * its current shape: the bearer listener, the origin forwarding and the
- * session-token redaction.
+ * Moves the generated `/__nextgen` property of the dev server's proxy table
+ * onto its current shape: the bearer listener, the origin forwarding and the
+ * session-token redaction. `entry` is that property's text alone.
  */
-function migrateProxyTable(table: string, typed: boolean): string {
-  let migrated = table;
+function migrateProxyEntry(entry: string, typed: boolean): string {
+  let migrated = entry;
   if (isLegacyManagedProxy(migrated)) {
     // Replace only the generated bearer listener. User changes elsewhere in
     // the proxy entry (target, rewrite, TLS options, comments) remain intact.
@@ -299,17 +267,24 @@ export function viteProxyEdit(
     const typed = path !== undefined && /\.[cm]?ts$/.test(path);
     const label = "the Vite config (vite.config.*)";
     let workingSource = source;
-    // Only the dev server's own proxy table is migrated. `preview.proxy` or
-    // any other config object may hold copies of the entry; those are not the
-    // ones the dev server runs, and a marker in one must not hide the other.
+    // Only the `/__nextgen` property of the dev server's own proxy table,
+    // located in the parsed config, is migrated. `preview.proxy`, a sibling
+    // proxy or any other config object may hold copies of the entry; those are
+    // not the one the dev server runs, and a marker in one must not hide it.
     const original = parseConfigModule(source, label);
-    const table = proxyTableRange(resolveDefaultExportObject(original, label), source ?? "");
-    let devTable: string | undefined;
-    if (source !== undefined && table !== undefined) {
-      devTable = migrateProxyTable(source.slice(table.start, table.end), typed);
-      workingSource = source.slice(0, table.start) + devTable + source.slice(table.end);
+    const entry =
+      source === undefined
+        ? undefined
+        : proxyEntryRange(source, proxyTableNode(resolveDefaultExportObject(original, label)));
+    let devEntry: string | undefined;
+    let legacyEntry = false;
+    if (source !== undefined && entry !== undefined) {
+      const written = source.slice(entry.start, entry.end);
+      legacyEntry = isLegacyManagedProxy(written);
+      devEntry = migrateProxyEntry(written, typed);
+      workingSource = source.slice(0, entry.start) + devEntry + source.slice(entry.end);
     }
-    if (source !== undefined && !isLegacyManagedProxy(source.slice(table?.start, table?.end))) {
+    if (source !== undefined && !legacyEntry) {
       assertNoUnreviewedProjectSecretProxy(source, label);
     }
 
@@ -328,7 +303,7 @@ export function viteProxyEdit(
     const proxyConfig = ensureEditableObject(serverConfig, "proxy");
     const redacting =
       proxyConfig[PROXY_PATH] === undefined ||
-      devTable?.includes(EXCHANGE_REDACTION_MARKER) === true;
+      devEntry?.includes(EXCHANGE_REDACTION_MARKER) === true;
     if (proxyConfig[PROXY_PATH] === undefined) {
       proxyConfig[PROXY_PATH] = builders.raw(proxyEntryCode(server, typed));
       changed = true;
