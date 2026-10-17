@@ -61,6 +61,7 @@ function bindLoginConfig(el: ZitadelLoginElement, props: ZitadelLoginProps): voi
   setProp(el, "purpose", props.purpose ?? "login");
   setProp(el, "flowName", props.flowName);
   setProp(el, "postSignInUrl", props.postSignInUrl);
+  setProp(el, "resumeFlowId", props.resumeFlowId);
   setProp(el, "variant", props.variant);
   setProp(el, "theme", props.theme);
   setProp(el, "suppressHeader", props.suppressHeader);

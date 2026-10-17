@@ -31,6 +31,8 @@ The Angular SDK exposes standalone components that wrap the shared Zitadel auth 
     ```sh
     yarn add @zitadel/sdk-angular@alpha
     ```
+
+    `<zitadel-auth-login>` also takes `resumeFlowId`, an existing flow to resume instead of starting a new one; unset, `null` or `""` falls back to the `flow` query parameter.
   </Tab>
 </Tabs>
 

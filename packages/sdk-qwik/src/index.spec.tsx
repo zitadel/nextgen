@@ -80,6 +80,12 @@ describe("ZitadelLogin", () => {
     expect(el!.proxyPath).toBe("/__nextgen");
   });
 
+  it("forwards resumeFlowId to the widget", async () => {
+    const host = await renderWidget(<ZitadelLogin project={project} resumeFlowId="flow_123" />);
+    const el = host.querySelector<ZitadelLoginElement>("zitadel-login");
+    expect(el!.resumeFlowId).toBe("flow_123");
+  });
+
   it("forwards locales and lang to the widget", async () => {
     const locales = { en: { "identifier.title": "Welcome back" } };
     const host = await renderWidget(<ZitadelLogin project={project} locales={locales} lang="de" />);
