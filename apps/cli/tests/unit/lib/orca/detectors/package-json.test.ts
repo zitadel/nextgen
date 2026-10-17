@@ -151,6 +151,22 @@ describe("dependencySpecProvablyBelow", () => {
     );
   });
 
+  it("passes a range whose strict bounds still admit a prerelease of the floor", () => {
+    expect(
+      dependencySpecProvablyBelow(pkg(">15.2.3-canary.1 <15.2.3"), "next", "15.2.3"),
+    ).toBeUndefined();
+    expect(
+      dependencySpecProvablyBelow(pkg(">=14 <15.2.3-canary.5"), "next", "15.2.3"),
+    ).toBeUndefined();
+  });
+
+  it("rejects a range naming a prerelease of the floor that it cannot admit", () => {
+    expect(
+      dependencySpecProvablyBelow(pkg(">15.2.3-canary.1 <15.2.3-canary.1"), "next", "15.2.3"),
+    ).toBe(">15.2.3-canary.1 <15.2.3-canary.1");
+    expect(dependencySpecProvablyBelow(pkg("<15"), "next", "15.2.3")).toBe("<15");
+  });
+
   it("passes ranges that also admit the floor or newer", () => {
     expect(dependencySpecProvablyBelow(pkg("^15.0.0"), "next", "15.2.3")).toBeUndefined();
     expect(dependencySpecProvablyBelow(pkg("15.2.3"), "next", "15.2.3")).toBeUndefined();

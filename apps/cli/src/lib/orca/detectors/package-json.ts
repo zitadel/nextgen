@@ -89,28 +89,26 @@ export function dependencySpecProvablyBelow(
 }
 
 /**
- * Whether `spec` explicitly admits a prerelease whose base version is at or
- * above the floor (`15.3.0-canary.1`, `16.0.0-rc.1`, `15.0.0-rc.0` for a 15
- * floor). npm resolves prereleases only for a range that spells one out, so
- * only a comparator naming one can install it, and only if the range accepts
- * that very version.
+ * Whether `spec` admits a prerelease whose base version is at or above the
+ * floor (`15.3.0-canary.1`, `16.0.0-rc.1`, `15.0.0-rc.0` for a 15 floor).
+ * npm resolves a prerelease only for a comparator set that spells out a
+ * prerelease of the same base version, so each such comparator names a base to
+ * probe; the set admits one when it overlaps that base's prerelease window,
+ * `[base-0, base)`. That holds for strict bounds too: `>15.2.3-canary.1
+ * <15.2.3` admits `15.2.3-canary.2` though neither endpoint does.
  */
 function declaresPrereleaseAtOrAbove(spec: string, floor: semver.SemVer): boolean {
-  return new semver.Range(spec).set.some((comparators) =>
-    comparators.some(({ semver: version, operator }) => {
-      // semver rewrites `<15.2.3` to `<15.2.3-0`; that is no declared prerelease.
-      if (
-        version.prerelease.length === 0 ||
-        (operator === "<" && version.prerelease.join(".") === "0")
-      ) {
-        return false;
-      }
+  return new semver.Range(spec).set.some((comparators) => {
+    const range = comparators.map((comparator) => comparator.value).join(" ");
+    return comparators.some(({ semver: version }) => {
       const base = `${version.major}.${version.minor}.${version.patch}`;
       return (
-        semver.gte(base, floor) && semver.satisfies(version, spec, { includePrerelease: true })
+        version.prerelease.length > 0 &&
+        semver.gte(base, floor) &&
+        semver.intersects(range, `>=${base}-0 <${base}`, { includePrerelease: true })
       );
-    }),
-  );
+    });
+  });
 }
 
 /**
