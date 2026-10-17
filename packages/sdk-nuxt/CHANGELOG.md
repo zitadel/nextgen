@@ -1,5 +1,45 @@
 # @zitadel/sdk-nuxt
 
+## 1.0.0-alpha.26
+
+### Minor Changes
+
+- [#1630](https://github.com/zitadel/nextgen/pull/1630) [`3949dab`](https://github.com/zitadel/nextgen/commit/3949daba71747aa6590ef6d454df482329f3322b) Thanks [@peintnermax](https://github.com/peintnermax)! - feat: password fields in `<zitadel-login>` now have a show/hide button, as
+  NIST SP 800-63B recommends. It is on by default; set `suppress-password-toggle`
+  on the element (a `suppressPasswordToggle` prop on every framework wrapper) to
+  hide it. The setting belongs to the embedding page and is not stored with the
+  branding.
+
+  The button replaces the clear button on password fields, so the field shows
+  one icon. It sits in the tab order right after the input, so keyboard users
+  can reach it, while a pointer click keeps focus in the field. A revealed
+  field opts out of spellcheck and autocorrect, and it is hidden again on
+  submit, form reset and step change. The widget applies the setting to its
+  fields directly, so it also holds for ejected templates; it is not a
+  `<zl-field>` attribute.
+
+  `@zitadel/testing`: the flow helpers' label fallback (`flowField` with a
+  `label`, used by `loginWithPassword` and `registerWithPassword`) now matches
+  the field by its textbox role, so the toggle's "Show password" name never
+  competes with the password field.
+
+### Patch Changes
+
+- [#1633](https://github.com/zitadel/nextgen/pull/1633) [`290dfe6`](https://github.com/zitadel/nextgen/commit/290dfe6f1c9b45d592e42703573a6acd5b16fa2a) Thanks [@wim07101993](https://github.com/wim07101993)! - Each sign-in provider connection now has its own callback route, `GET /__nextgen/idp/{slug}/callback`, also served as `/idp/{slug}/callback` for a scaffolded app's SDK proxy. The authorize request and the token exchange send it as `redirect_uri`. The shared `/__nextgen/idp/callback` route is removed. This is a breaking change: if you registered it at a provider, register the connection's own URI instead, for example `http://localhost:3000/__nextgen/idp/google/callback`, or sign-in with that provider fails. `zitadel sso enable --provider <slug>` prints it. The route defends against the IdP mix-up attack (RFC 9700 §4.4): a callback whose path names another connection than the one the sign-in started with is refused before any code exchange, the step the sign-in started from shows `error.sso_failed`, and the events stream records `auth.sso.exchange.failed`, or `auth.sso.authorization.failed` when no code arrived. When the provider sends the RFC 9207 `iss` parameter, the callback also refuses a value that is not the connection's issuer, the same way. A response without `iss` is not refused, even from a provider that advertises it. The SDK `proxyPath` docs name the new route.
+
+- [#1900](https://github.com/zitadel/nextgen/pull/1900) [`a76143e`](https://github.com/zitadel/nextgen/commit/a76143ef82829d098a30de40542f1c9bffb8eb99) Thanks [@mridang](https://github.com/mridang)! - JWT verification now caches each issuer's whole JWKS document instead of one key per `kid`. A token naming a `kid` the cached keys lack refreshes them — how a rotated key is picked up — at most once every 30 seconds, and concurrent misses share one fetch; previously any token with a made-up `kid` cost a JWKS request, an unauthenticated way to load the backend on every request. An EC key that names no `alg` now verifies (its curve decides the algorithm), and a token whose `alg` cannot fit the key is rejected quietly instead of logging an error. `clearJwksCache()` drops the cached keys, for example after a key compromise. An expired key set is never used when its refresh fails, a failed fetch counts toward the 30 second throttle so a failing endpoint is not retried on every request, and `clearJwksCache()` also discards fetches that were already in flight.
+
+- [#1901](https://github.com/zitadel/nextgen/pull/1901) [`4a5578b`](https://github.com/zitadel/nextgen/commit/4a5578bf825132c047f37d124d616a3a4f9e9da9) Thanks [@mridang](https://github.com/mridang)! - `protectedRoutes` and `ignoredRoutes` entries now match with or without a trailing slash, so `/profile/` can no longer bypass `protectedRoutes: ["/profile"]`.
+
+- [#1759](https://github.com/zitadel/nextgen/pull/1759) [`30cec27`](https://github.com/zitadel/nextgen/commit/30cec278dd443a3a2139807e9ce7d9b196a1f521) Thanks [@fforootd](https://github.com/fforootd)! - The Nuxt module now reads `ZITADEL_URL` and `NUXT_PUBLIC_ZITADEL_PROJECT_ID` from `.env.local` when the environment does not set them, as it already did `ZITADEL_PROJECT_SECRET`, so a changed `.env.local` takes effect even though Nuxt itself loads only `.env`; a value in `nuxt.config.ts` still wins. Every fallback for the backend URL is now `http://localhost:8080`, where `zitadel start` runs the local server.
+
+- [#1759](https://github.com/zitadel/nextgen/pull/1759) [`30cec27`](https://github.com/zitadel/nextgen/commit/30cec278dd443a3a2139807e9ce7d9b196a1f521) Thanks [@fforootd](https://github.com/fforootd)! - Every option under `nextgen` in `nuxt.config.ts` now reaches the server middleware. The Nuxt module used to pass on only `url`, `loginPath`, and `protectedRoutes`: a custom `proxyPath` moved the widgets but not the server proxy, so sign-in failed, and `audience`, `ignoredRoutes`, `allowedAlgorithms`, `allowedTokenTypes`, `clockSkewMs`, and the timeouts had no effect. A built server can also set `audience`, `ignoredRoutes`, and the others from `NUXT_NEXTGEN_<OPTION>`, a list as JSON. If your `nextgen` block sets any of these options, check their values: they now apply.
+
+- Updated dependencies [[`17f56de`](https://github.com/zitadel/nextgen/commit/17f56de60ea40128898b6142d93a22c6fc6f2acd), [`717ae39`](https://github.com/zitadel/nextgen/commit/717ae39f47a1f27383e0f4e09d2d32125d5d8f57), [`c3e8fa4`](https://github.com/zitadel/nextgen/commit/c3e8fa47306d9f286d07303fea977e3f6d910d7d), [`b4886f9`](https://github.com/zitadel/nextgen/commit/b4886f98de362ef6e80cb5e49a38e97daa2288b0), [`290dfe6`](https://github.com/zitadel/nextgen/commit/290dfe6f1c9b45d592e42703573a6acd5b16fa2a), [`4a4132f`](https://github.com/zitadel/nextgen/commit/4a4132fd2dc13f3a833a7aa0ab1dd35ef9b8fd6b), [`a76143e`](https://github.com/zitadel/nextgen/commit/a76143ef82829d098a30de40542f1c9bffb8eb99), [`cba30e6`](https://github.com/zitadel/nextgen/commit/cba30e6df9d61cf399c9d3f7288d21e97c63dd88), [`3949dab`](https://github.com/zitadel/nextgen/commit/3949daba71747aa6590ef6d454df482329f3322b), [`7fbd942`](https://github.com/zitadel/nextgen/commit/7fbd942580560ccab74d3fdd19b3e1eb6d922ee7), [`4a5578b`](https://github.com/zitadel/nextgen/commit/4a5578bf825132c047f37d124d616a3a4f9e9da9), [`44abdb8`](https://github.com/zitadel/nextgen/commit/44abdb8e827ce34d7aae8d620d43904b3142baf9), [`40c35c8`](https://github.com/zitadel/nextgen/commit/40c35c8f49e4e967ff701cf510b6cc6a4e776fc8), [`36fbcb4`](https://github.com/zitadel/nextgen/commit/36fbcb4e5383a0d6764efc44e9ac6da4e5c8d596), [`b3b0b28`](https://github.com/zitadel/nextgen/commit/b3b0b2888f0e64a4805f373a9835d8dc853add84), [`c205f49`](https://github.com/zitadel/nextgen/commit/c205f49fa0c6c0ea44407da6776cdb6e5dcfdfc9), [`13042d8`](https://github.com/zitadel/nextgen/commit/13042d8957738091ac428f28c7191f9b2e912697), [`c095aa3`](https://github.com/zitadel/nextgen/commit/c095aa334f77b5b59b6f72baae22703cd7c5369d), [`8182584`](https://github.com/zitadel/nextgen/commit/8182584001fe2115851022e8f92e696db52ee8be), [`3301e90`](https://github.com/zitadel/nextgen/commit/3301e90778a633b6d900a8ca427944f9e0b996d8)]:
+  - @zitadel/api@1.0.0-alpha.26
+  - @zitadel/components@1.0.0-alpha.26
+  - @zitadel/sdk-core@1.0.0-alpha.26
+
 ## 1.0.0-alpha.25
 
 ### Minor Changes
