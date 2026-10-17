@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, realpath } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
 import semver from "semver";
@@ -67,9 +67,9 @@ export function dependencySpecProvablyBelowMajor(
  * range with no overlap with `>=minimum-0`. Everything unprovable returns
  * `undefined` — protocol specs (`file:`, `link:`, `workspace:`, git URLs),
  * dist-tags (`latest`, `canary`), absent deps, and ranges that also admit a
- * compliant version (`>=14`, `14 || 16`, `^15.0.0` for `15.2.3`). The floor
- * comparator includes prereleases so a `15.0.0-rc` user is not rejected by
- * the 15 floor.
+ * compliant version (`>=14`, `14 || 16`, `^15.0.0` for `15.2.3`). A range
+ * that explicitly names a prerelease of the floor (`15.0.0-rc.0` for the 15
+ * floor) is not rejected; ranges like `<15.2.3` resolve no prerelease of it.
  */
 export function dependencySpecProvablyBelow(
   pkg: PackageJson,
@@ -81,8 +81,29 @@ export function dependencySpecProvablyBelow(
   if (!spec || !floor || semver.validRange(spec) === null) {
     return undefined;
   }
-  const atOrAboveFloor = `>=${floor.version}-0`;
-  return semver.intersects(spec, atOrAboveFloor, { includePrerelease: true }) ? undefined : spec;
+  if (semver.intersects(spec, `>=${floor.version}`)) {
+    return undefined;
+  }
+  return declaresFloorPrerelease(spec, floor) ? undefined : spec;
+}
+
+/**
+ * Whether `spec` names a prerelease of the floor's own version (`15.0.0-rc.0`
+ * for a 15 floor). npm resolves prereleases only for a range that spells one
+ * out on the same version, so only then can a prerelease of the floor install.
+ */
+function declaresFloorPrerelease(spec: string, floor: semver.SemVer): boolean {
+  return new semver.Range(spec).set.some((comparators) =>
+    comparators.some(
+      ({ semver: version, operator }) =>
+        // semver rewrites `<15.2.3` to `<15.2.3-0`; that is no declared prerelease.
+        !(operator === "<" && version.prerelease.join(".") === "0") &&
+        version.prerelease.length > 0 &&
+        version.major === floor.major &&
+        version.minor === floor.minor &&
+        version.patch === floor.patch,
+    ),
+  );
 }
 
 /**
@@ -92,7 +113,7 @@ export function dependencySpecProvablyBelow(
  * when nothing is installed there, or the file names no valid version.
  */
 export async function installedVersion(cwd: string, name: string): Promise<string | undefined> {
-  let dir = resolve(cwd);
+  let dir = await realpath(resolve(cwd)).catch(() => resolve(cwd));
   for (;;) {
     const contents = await readFile(join(dir, "node_modules", name, "package.json"), "utf8").catch(
       () => undefined,

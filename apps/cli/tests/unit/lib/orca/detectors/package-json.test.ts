@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -129,6 +129,14 @@ describe("dependencySpecProvablyBelow", () => {
     expect(dependencySpecProvablyBelow(pkg("~15.1.0"), "next", "15.2.3")).toBe("~15.1.0");
   });
 
+  it("rejects an upper bound at the floor, which resolves no prerelease of it", () => {
+    expect(dependencySpecProvablyBelow(pkg("<15.2.3"), "next", "15.2.3")).toBe("<15.2.3");
+  });
+
+  it("passes a range that explicitly names a prerelease of the floor", () => {
+    expect(dependencySpecProvablyBelow(pkg("15.2.3-canary.1"), "next", "15.2.3")).toBeUndefined();
+  });
+
   it("passes ranges that also admit the floor or newer", () => {
     expect(dependencySpecProvablyBelow(pkg("^15.0.0"), "next", "15.2.3")).toBeUndefined();
     expect(dependencySpecProvablyBelow(pkg("15.2.3"), "next", "15.2.3")).toBeUndefined();
@@ -159,6 +167,17 @@ describe("installedVersion", () => {
     await install(dir, "next", JSON.stringify({ name: "next", version: "15.1.7" }));
 
     expect(await installedVersion(app, "next")).toBe("15.1.7");
+  });
+
+  it("walks the real parents of a symlinked app directory", async () => {
+    const workspace = join(dir, "workspace");
+    const app = join(workspace, "apps", "web");
+    await mkdir(app, { recursive: true });
+    await install(workspace, "next", JSON.stringify({ name: "next", version: "15.2.2" }));
+    const link = join(dir, "link");
+    await symlink(app, link);
+
+    expect(await installedVersion(link, "next")).toBe("15.2.2");
   });
 
   it("prefers the app's own install over a hoisted one", async () => {
