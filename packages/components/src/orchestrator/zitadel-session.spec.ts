@@ -406,6 +406,78 @@ describe("<zitadel-session>", () => {
     expect(errors).toHaveLength(1);
   });
 
+  it.each(UNREADABLE_SESSIONS)(
+    "reports status 200 in zitadel-session-error for %s",
+    async (_, answer) => {
+      sessionAnswer = answer;
+      const errors: CustomEvent[] = [];
+      host.addEventListener("zitadel-session-error", (e) => errors.push(e as CustomEvent));
+      await flush(mount());
+      expect(errors[0]?.detail).toMatchObject({ status: 200, phase: "load" });
+    },
+  );
+
+  it("shows no error once a retry after being put back succeeds", async () => {
+    let requests = 0;
+    let answer: () => void = () => undefined;
+    server.use(
+      http.get(`${API_BASE}/sessions/me`, async () => {
+        requests += 1;
+        if (requests === 1) {
+          await new Promise<void>((resolve) => {
+            answer = resolve;
+          });
+          return HttpResponse.json(
+            { code: "internal", message: "Internal error" },
+            { status: 500 },
+          );
+        }
+        return HttpResponse.json(sessionBody(currentEmail, currentUserId));
+      }),
+    );
+    const element = mount();
+    await flush(element);
+    element.remove();
+    answer();
+    await flush(element);
+
+    host.appendChild(element);
+    await flush(element);
+
+    expect(requests).toBe(2);
+    expect(element.shadowRoot?.querySelector(".error")).toBeNull();
+    expect(shadowQuery<HTMLElement>(element, ".identity").textContent?.trim()).toBe(currentEmail);
+  });
+
+  it("reports a sign-out failure it missed while removed, once put back", async () => {
+    const element = mount();
+    await flush(element);
+    let release: () => void = () => undefined;
+    server.use(
+      http.delete(`${API_BASE}/sessions/me`, async () => {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        return HttpResponse.json({ code: "internal", message: "Internal error" }, { status: 500 });
+      }),
+    );
+    const errors: CustomEvent[] = [];
+    element.addEventListener("zitadel-session-error", (e) => errors.push(e as CustomEvent));
+
+    activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
+    await new Promise((resolve) => setTimeout(resolve, 16));
+    element.remove();
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 32));
+    expect(errors).toHaveLength(0);
+
+    host.appendChild(element);
+    await flush(element);
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.detail).toMatchObject({ phase: "signout", status: 500, code: "internal" });
+  });
+
   it("suppress-header visually hides the heading but keeps it accessible", async () => {
     currentEmail = "alice@acme.com";
     const element = mount("<zitadel-session suppress-header></zitadel-session>");

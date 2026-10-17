@@ -62,11 +62,20 @@ export interface SessionErrorDetail {
   readonly phase: "load" | "signout";
 }
 
+/**
+ * A `GET /sessions/me` that answered 200 with something that is not a session.
+ * A response did come back, so the event carries its status.
+ */
+class NotASessionError extends Error {
+  readonly status = 200;
+}
+
 function sessionErrorDetail(
   error: unknown,
   message: string,
   phase: SessionErrorDetail["phase"],
 ): SessionErrorDetail {
+  if (error instanceof NotASessionError) return { status: error.status, message, phase };
   if (!(error instanceof ApiError)) return { message, phase };
   const code = apiErrorCode(error);
   return code === undefined
@@ -108,6 +117,10 @@ export class SessionController implements ReactiveController {
   // or after a framework assigns `project` post-mount.
   private identityRequested = false;
 
+  // A sign-out failure that settled while the host was detached: it could not
+  // reach the page's listeners, so it is reported once the host is back.
+  private missedSignOutFailure: SessionErrorDetail | undefined;
+
   private readonly host: ReactiveControllerHost & HTMLElement;
   private readonly resolve: () => Api;
   private readonly options: SessionControllerOptions;
@@ -128,6 +141,11 @@ export class SessionController implements ReactiveController {
   }
 
   hostConnected(): void {
+    const missed = this.missedSignOutFailure;
+    if (missed) {
+      this.missedSignOutFailure = undefined;
+      emit(this.host, "zitadel-session-error", missed);
+    }
     this.maybeLoadIdentity();
   }
 
@@ -167,11 +185,14 @@ export class SessionController implements ReactiveController {
         this.errorMessage = message || "Sign-out failed. Please try again.";
         this.loading = false;
         this.host.requestUpdate();
-        emit(
-          this.host,
-          "zitadel-session-error",
-          sessionErrorDetail(error, this.errorMessage, "signout"),
-        );
+        const failure = sessionErrorDetail(error, this.errorMessage, "signout");
+        if (this.host.isConnected) {
+          emit(this.host, "zitadel-session-error", failure);
+        } else {
+          // Removed while the request was in flight: the host no longer speaks
+          // for the page, so it reports this when it is put back.
+          this.missedSignOutFailure = failure;
+        }
         return false;
       }
     }
@@ -204,7 +225,7 @@ export class SessionController implements ReactiveController {
     try {
       const session: unknown = await getSession(api);
       if (!isSessionBody(session)) {
-        throw new Error("Could not load the session: the response is not a session.");
+        throw new NotASessionError("Could not load the session: the response is not a session.");
       }
       this.display = session.user?.display ?? "";
       this.identifier = session.user?.identifier ?? "";
@@ -230,8 +251,10 @@ export class SessionController implements ReactiveController {
       } else {
         // A host removed while the request was in flight reports nothing: it
         // no longer speaks for the page. Put back, it asks again and reports
-        // that answer instead.
+        // that answer instead, and the failure it discards must not outlive a
+        // retry that succeeds.
         this.identityRequested = false;
+        this.errorMessage = "";
       }
     }
     if (missing && this.host.isConnected) this.options.onSessionMissing?.();

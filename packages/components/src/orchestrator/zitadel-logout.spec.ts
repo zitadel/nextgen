@@ -271,6 +271,86 @@ describe("<zitadel-logout>", () => {
     expect(errors).toHaveLength(1);
   });
 
+  it.each(UNREADABLE_SESSIONS)(
+    "reports status 200 in zitadel-session-error for %s",
+    async (_, answer) => {
+      sessionAnswer = answer;
+      const errors: CustomEvent[] = [];
+      host.addEventListener("zitadel-session-error", (event) => errors.push(event as CustomEvent));
+      await flush(mount());
+      expect(errors[0]?.detail).toMatchObject({ status: 200, phase: "load" });
+    },
+  );
+
+  it("shows no error once a retry after being put back succeeds", async () => {
+    currentName = "Alice Liddell";
+    currentEmail = "alice@acme.com";
+    let requests = 0;
+    let answer: () => void = () => undefined;
+    server.use(
+      http.get(`${API_BASE}/sessions/me`, async () => {
+        requests += 1;
+        if (requests === 1) {
+          await new Promise<void>((resolve) => {
+            answer = resolve;
+          });
+          return HttpResponse.json(
+            { code: "internal", message: "Internal error" },
+            { status: 500 },
+          );
+        }
+        return HttpResponse.json(sessionBody(currentName, currentEmail, currentUserId));
+      }),
+    );
+    const element = mount();
+    await flush(element);
+    element.remove();
+    answer();
+    await flush(element);
+
+    host.appendChild(element);
+    await flush(element);
+    shadowQuery<HTMLButtonElement>(element, ".trigger").click();
+    await element.updateComplete;
+
+    expect(requests).toBe(2);
+    expect(element.shadowRoot?.querySelector(".error-bar")).toBeNull();
+    expect(shadowQuery<HTMLElement>(element, ".preview-name").textContent?.trim()).toBe(
+      "Alice Liddell",
+    );
+  });
+
+  it("reports a sign-out failure it missed while removed, once put back", async () => {
+    const element = mount();
+    await flush(element);
+    let release: () => void = () => undefined;
+    server.use(
+      http.delete(`${API_BASE}/sessions/me`, async () => {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        return HttpResponse.json({ code: "internal", message: "Internal error" }, { status: 500 });
+      }),
+    );
+    const errors: CustomEvent[] = [];
+    element.addEventListener("zitadel-session-error", (e) => errors.push(e as CustomEvent));
+
+    shadowQuery<HTMLButtonElement>(element, ".trigger").click();
+    await element.updateComplete;
+    shadowQuery<HTMLButtonElement>(element, ".signout-btn").click();
+    await new Promise((resolve) => setTimeout(resolve, 16));
+    element.remove();
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 32));
+    expect(errors).toHaveLength(0);
+
+    host.appendChild(element);
+    await flush(element);
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.detail).toMatchObject({ phase: "signout", status: 500, code: "internal" });
+  });
+
   it("substitutes template tokens and wires data-action='logout' triggers", async () => {
     currentName = "Bob Builder";
     currentEmail = "bob@example.com";
