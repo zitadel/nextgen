@@ -1,0 +1,44 @@
+{{define "tree"}}
+<div class="panel">
+  <div class="muted">Updated {{.Now}}</div>
+  {{if .Tree}}
+  <ul class="tree root">
+    {{range .Tree}}{{template "node" .}}{{end}}
+  </ul>
+  {{else}}
+  <p class="muted">No rooted cells reachable.</p>
+  {{end}}
+</div>
+<div class="panel">
+  <h2 style="font-size:1rem;margin:0 0 0.5rem">Unjoined</h2>
+  {{if .Unjoined}}
+  <ul class="tree root">
+    {{range .Unjoined}}{{template "node" .}}{{end}}
+  </ul>
+  {{else}}
+  <p class="muted">None</p>
+  {{end}}
+</div>
+{{end}}
+
+{{define "node"}}
+<li class="node">
+  {{if not .Reachable}}
+    <span class="dot down"></span>
+  {{else if .Alive}}
+    <span class="dot"></span>
+  {{else}}
+    <span class="dot stale"></span>
+  {{end}}
+  <a href="/cells/{{.Label}}" style="color:inherit;text-decoration:none;font-weight:600">{{.Label}}</a>
+  {{if .IsParent}}<span class="badge parent">parent</span>{{end}}
+  <span class="badge">{{.Status}}</span>
+  <div><code>{{.URL}}</code></div>
+  {{if .Error}}<div class="muted">{{.Error}}</div>{{end}}
+  {{if .Children}}
+  <ul class="tree">
+    {{range .Children}}{{template "node" .}}{{end}}
+  </ul>
+  {{end}}
+</li>
+{{end}}
