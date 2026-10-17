@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1111,6 +1112,60 @@ func TestListPasskeys(t *testing.T) {
 		require.NoError(t, err)
 		assert.IsType(t, &api.ListUserPasskeysNotFound{}, resp, helpers.MustMarshal(t, resp))
 	})
+}
+
+// TestSelfAccessReads: a person reads their own schema and roster with only
+// their session, and anything short of a user-bound session gets the 401 the
+// contract declares.
+func TestSelfAccessReads(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	userID, teamID := harness.CreateUserOwnedByTeam(t, project.ID)
+	cookie := sessionCookieIn(t, project, userID)
+
+	t.Run("own schema, without a grant", func(t *testing.T) {
+		t.Parallel()
+		status, body := cookieRequest(t, cookie, http.MethodGet, "/users/me", "", nil)
+		require.Equal(t, http.StatusOK, status, body)
+		me := helpers.MustUnmarshal[api.User](t, []byte(body))
+
+		status, body = cookieRequest(t, cookie, http.MethodGet, "/users/me/schema", "", nil)
+		require.Equal(t, http.StatusOK, status, body)
+		assert.Equal(t, me.Schema, helpers.MustUnmarshal[api.Schema](t, []byte(body)).ID)
+	})
+
+	t.Run("own teams, without a grant", func(t *testing.T) {
+		t.Parallel()
+		status, body := cookieRequest(t, cookie, http.MethodGet, "/users/me/teams", "", nil)
+		require.Equal(t, http.StatusOK, status, body)
+		teams := helpers.MustUnmarshal[api.ListUserTeamsResponse](t, []byte(body)).Teams
+		require.Len(t, teams, 1)
+		assert.Equal(t, teamID, string(teams[0].ID))
+	})
+
+	session := harness.CreateSession(t, project.ID, time.Hour)
+	crypter, err := harness.EnsureKeyService(t).GetProjectCrypter(t.Context(), project.ID, domain.EncryptionKeyPurposeToken)
+	require.NoError(t, err)
+	anonymous, err := session.Token(crypter)
+	require.NoError(t, err)
+
+	for _, path := range []string{"/users/me", "/users/me/schema", "/users/me/teams"} {
+		for name, cookie := range map[string]*http.Cookie{
+			"anonymous session": {Name: "__nextgen_session", Value: anonymous},
+			"no cookie":         nil,
+		} {
+			t.Run(path+" "+name, func(t *testing.T) {
+				t.Parallel()
+				status, body := cookieRequest(t, cookie, http.MethodGet, path, "", nil)
+				assert.Equal(t, http.StatusUnauthorized, status, body)
+				details := helpers.MustUnmarshal[api.ErrorDetails](t, []byte(body))
+				assert.Equal(t, api.ErrorCode("auth.unauthorized"), details.Code)
+				assert.Equal(t, "Missing or invalid session token.", details.Message)
+			})
+		}
+	}
 }
 
 func TestListUserIdentityLinks(t *testing.T) {

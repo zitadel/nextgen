@@ -165,6 +165,10 @@ type GetMyUserRes interface {
 	getMyUserRes()
 }
 
+type GetMyUserSchemaRes interface {
+	getMyUserSchemaRes()
+}
+
 type GetProjectRes interface {
 	getProjectRes()
 }
@@ -231,6 +235,10 @@ type ListIdpRevisionsRes interface {
 
 type ListMyProjectsRes interface {
 	listMyProjectsRes()
+}
+
+type ListMyTeamsRes interface {
+	listMyTeamsRes()
 }
 
 type ListPreviewsRes interface {

@@ -532,6 +532,12 @@ type Handler interface {
 	//
 	// GET /users/me
 	GetMyUser(ctx context.Context) (GetMyUserRes, error)
+	// GetMyUserSchema implements getMyUserSchema operation.
+	//
+	// The schema the signed-in user's own record is validated against.
+	//
+	// GET /users/me/schema
+	GetMyUserSchema(ctx context.Context) (GetMyUserSchemaRes, error)
 	// GetProject implements getProject operation.
 	//
 	// Returns the current state of a project.
@@ -705,6 +711,12 @@ type Handler interface {
 	//
 	// GET /users/me/projects
 	ListMyProjects(ctx context.Context, params ListMyProjectsParams) (ListMyProjectsRes, error)
+	// ListMyTeams implements listMyTeams operation.
+	//
+	// The signed-in user's own team roster, ordered by team name.
+	//
+	// GET /users/me/teams
+	ListMyTeams(ctx context.Context, params ListMyTeamsParams) (ListMyTeamsRes, error)
 	// ListPreviews implements listPreviews operation.
 	//
 	// Lists the project's live previews, newest first by `created_at`. An
