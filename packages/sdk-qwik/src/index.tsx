@@ -98,6 +98,42 @@ function eventDetail<T>(event: Event): T {
 }
 
 /**
+ * Forwards the `zitadel-signout` and `zitadel-session-error` events of a session
+ * widget to the consumer's QRL callbacks. Called from the `ref` callback, so the
+ * listeners exist before the widget can start loading: the widget reports an
+ * early request failure once and never replays it, and the `document-ready`
+ * task runs a turn later. Handlers read the callbacks from `props` when the
+ * event fires, so a changed callback needs no re-registration. A prior
+ * registration on the same element is removed first (no duplicate listeners),
+ * and the returned disposer removes this one.
+ */
+const sessionForwarders = new WeakMap<Element, () => void>();
+
+function forwardSessionEvents(
+  el: Element,
+  props: {
+    onSignout$?: QRL<(detail: never) => void>;
+    onSessionError$?: QRL<(detail: never) => void>;
+  },
+): () => void {
+  sessionForwarders.get(el)?.();
+  const onSignout = (event: Event): void => void props.onSignout$?.(eventDetail<never>(event));
+  const onSessionError = (event: Event): void =>
+    void props.onSessionError$?.(eventDetail<never>(event));
+  el.addEventListener("zitadel-signout", onSignout);
+  el.addEventListener("zitadel-session-error", onSessionError);
+  const dispose = (): void => {
+    el.removeEventListener("zitadel-signout", onSignout);
+    el.removeEventListener("zitadel-session-error", onSessionError);
+    if (sessionForwarders.get(el) === dispose) {
+      sessionForwarders.delete(el);
+    }
+  };
+  sessionForwarders.set(el, dispose);
+  return dispose;
+}
+
+/**
  * Wraps each plain-callback handler from the shared SPA contract in a Qwik
  * {@link QRL} and suffixes the prop name with `$`, so the Qwik prop set is
  * derived from `@zitadel/sdk-core` and can never drift from the events the
@@ -210,28 +246,30 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
   const host = useSignal<ZitadelLogoutElement>();
   // biome-ignore lint/correctness/noQwikUseVisibleTask: wrapping a web component needs an imperative mount task to set DOM properties and wire native listeners Qwik's declarative APIs cannot express.
   useVisibleTask$(
-    ({ track, cleanup }) => {
+    ({ track }) => {
       const el = track(() => host.value);
       if (!el) {
         return;
       }
       track(() => ({ ...props }));
       bindLogoutConfig(el, props);
-      const onSignout = (event: Event): void => void props.onSignout$?.(eventDetail(event));
-      const onSessionError = (event: Event): void =>
-        void props.onSessionError$?.(eventDetail(event));
-      el.addEventListener("zitadel-signout", onSignout);
-      el.addEventListener("zitadel-session-error", onSessionError);
-      cleanup(() => {
-        el.removeEventListener("zitadel-signout", onSignout);
-        el.removeEventListener("zitadel-session-error", onSessionError);
-      });
+    },
+    { strategy: "document-ready" },
+  );
+  // biome-ignore lint/correctness/noQwikUseVisibleTask: removes the listeners the `ref` callback registered once the component unmounts.
+  useVisibleTask$(
+    ({ track, cleanup }) => {
+      const el = track(() => host.value);
+      if (el) {
+        cleanup(() => sessionForwarders.get(el)?.());
+      }
     },
     { strategy: "document-ready" },
   );
   return (
     <zitadel-logout
       ref={(el) => {
+        forwardSessionEvents(el, props);
         host.value = el;
         if (props.ref) {
           props.ref.value = el;
@@ -270,28 +308,30 @@ export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
   const host = useSignal<ZitadelSessionElement>();
   // biome-ignore lint/correctness/noQwikUseVisibleTask: wrapping a web component needs an imperative mount task to set DOM properties and wire native listeners Qwik's declarative APIs cannot express.
   useVisibleTask$(
-    ({ track, cleanup }) => {
+    ({ track }) => {
       const el = track(() => host.value);
       if (!el) {
         return;
       }
       track(() => ({ ...props }));
       bindSessionConfig(el, props);
-      const onSignout = (event: Event): void => void props.onSignout$?.(eventDetail(event));
-      const onSessionError = (event: Event): void =>
-        void props.onSessionError$?.(eventDetail(event));
-      el.addEventListener("zitadel-signout", onSignout);
-      el.addEventListener("zitadel-session-error", onSessionError);
-      cleanup(() => {
-        el.removeEventListener("zitadel-signout", onSignout);
-        el.removeEventListener("zitadel-session-error", onSessionError);
-      });
+    },
+    { strategy: "document-ready" },
+  );
+  // biome-ignore lint/correctness/noQwikUseVisibleTask: removes the listeners the `ref` callback registered once the component unmounts.
+  useVisibleTask$(
+    ({ track, cleanup }) => {
+      const el = track(() => host.value);
+      if (el) {
+        cleanup(() => sessionForwarders.get(el)?.());
+      }
     },
     { strategy: "document-ready" },
   );
   return (
     <zitadel-session
       ref={(el) => {
+        forwardSessionEvents(el, props);
         host.value = el;
         if (props.ref) {
           props.ref.value = el;
