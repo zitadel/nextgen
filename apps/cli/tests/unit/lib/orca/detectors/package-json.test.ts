@@ -94,8 +94,11 @@ describe("dependencySpecProvablyBelowMajor", () => {
     }
   });
 
-  it("passes prereleases of the floor major", () => {
+  it("passes prereleases of the floor major and newer", () => {
     expect(dependencySpecProvablyBelowMajor(spec("15.0.0-rc.0"), "next", 15)).toBeUndefined();
+    expect(
+      dependencySpecProvablyBelowMajor({ dependencies: { react: "19.0.0-rc.1" } }, "react", 18),
+    ).toBeUndefined();
   });
 
   it("passes unprovable specs: protocols, dist-tags, git URLs, absence", () => {
@@ -135,6 +138,17 @@ describe("dependencySpecProvablyBelow", () => {
 
   it("passes a range that explicitly names a prerelease of the floor", () => {
     expect(dependencySpecProvablyBelow(pkg("15.2.3-canary.1"), "next", "15.2.3")).toBeUndefined();
+  });
+
+  it("passes a pinned prerelease newer than the floor", () => {
+    expect(dependencySpecProvablyBelow(pkg("15.3.0-canary.1"), "next", "15.2.3")).toBeUndefined();
+    expect(dependencySpecProvablyBelow(pkg("16.0.0-rc.1"), "next", "15.2.3")).toBeUndefined();
+  });
+
+  it("rejects a pinned prerelease of a version below the floor", () => {
+    expect(dependencySpecProvablyBelow(pkg("15.2.2-canary.1"), "next", "15.2.3")).toBe(
+      "15.2.2-canary.1",
+    );
   });
 
   it("passes ranges that also admit the floor or newer", () => {

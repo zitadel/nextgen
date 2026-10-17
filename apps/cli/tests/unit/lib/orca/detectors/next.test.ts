@@ -199,6 +199,15 @@ describe("NextDetector", () => {
     },
   );
 
+  it.each(["15.3.0-canary.1", "16.0.0-rc.1"])(
+    "accepts the pinned prerelease %s, newer than the floor",
+    async (version) => {
+      await mkdir(join(dir, "app"));
+      await writeNextPackageJson({ dependencies: { next: version } });
+      expect(await detector.detect(dir)).toMatchObject({ id: "next" });
+    },
+  );
+
   it("lets an unparseable next version through the floor", async () => {
     // "latest" carries no provable major; blocking on it would be hostile.
     await writeNextPackageJson({ dependencies: { next: "latest" } });

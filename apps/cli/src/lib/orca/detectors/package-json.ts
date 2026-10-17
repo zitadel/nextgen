@@ -68,8 +68,9 @@ export function dependencySpecProvablyBelowMajor(
  * `undefined` — protocol specs (`file:`, `link:`, `workspace:`, git URLs),
  * dist-tags (`latest`, `canary`), absent deps, and ranges that also admit a
  * compliant version (`>=14`, `14 || 16`, `^15.0.0` for `15.2.3`). A range
- * that explicitly names a prerelease of the floor (`15.0.0-rc.0` for the 15
- * floor) is not rejected; ranges like `<15.2.3` resolve no prerelease of it.
+ * that explicitly names a prerelease at or above the floor (`15.0.0-rc.0`,
+ * `16.0.0-rc.1` for the 15 floor) is not rejected; ranges like `<15.2.3`
+ * resolve no prerelease of it.
  */
 export function dependencySpecProvablyBelow(
   pkg: PackageJson,
@@ -84,25 +85,31 @@ export function dependencySpecProvablyBelow(
   if (semver.intersects(spec, `>=${floor.version}`)) {
     return undefined;
   }
-  return declaresFloorPrerelease(spec, floor) ? undefined : spec;
+  return declaresPrereleaseAtOrAbove(spec, floor) ? undefined : spec;
 }
 
 /**
- * Whether `spec` names a prerelease of the floor's own version (`15.0.0-rc.0`
- * for a 15 floor). npm resolves prereleases only for a range that spells one
- * out on the same version, so only then can a prerelease of the floor install.
+ * Whether `spec` explicitly admits a prerelease whose base version is at or
+ * above the floor (`15.3.0-canary.1`, `16.0.0-rc.1`, `15.0.0-rc.0` for a 15
+ * floor). npm resolves prereleases only for a range that spells one out, so
+ * only a comparator naming one can install it, and only if the range accepts
+ * that very version.
  */
-function declaresFloorPrerelease(spec: string, floor: semver.SemVer): boolean {
+function declaresPrereleaseAtOrAbove(spec: string, floor: semver.SemVer): boolean {
   return new semver.Range(spec).set.some((comparators) =>
-    comparators.some(
-      ({ semver: version, operator }) =>
-        // semver rewrites `<15.2.3` to `<15.2.3-0`; that is no declared prerelease.
-        !(operator === "<" && version.prerelease.join(".") === "0") &&
-        version.prerelease.length > 0 &&
-        version.major === floor.major &&
-        version.minor === floor.minor &&
-        version.patch === floor.patch,
-    ),
+    comparators.some(({ semver: version, operator }) => {
+      // semver rewrites `<15.2.3` to `<15.2.3-0`; that is no declared prerelease.
+      if (
+        version.prerelease.length === 0 ||
+        (operator === "<" && version.prerelease.join(".") === "0")
+      ) {
+        return false;
+      }
+      const base = `${version.major}.${version.minor}.${version.patch}`;
+      return (
+        semver.gte(base, floor) && semver.satisfies(version, spec, { includePrerelease: true })
+      );
+    }),
   );
 }
 
