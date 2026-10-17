@@ -385,6 +385,58 @@ describe("scaffold - add-dep", () => {
     expect(parsed.devDependencies.typescript).toBe("5.0.0");
   });
 
+  // A package in both sections is never intended; Qwik's starter vite.config.ts
+  // throws on start when it sees one.
+  it.each([
+    [true, "dependencies", "devDependencies"],
+    [false, "devDependencies", "dependencies"],
+  ] as const)(
+    "with dev=%s, moves an entry out of %s into %s instead of duplicating it",
+    async (dev, from, to) => {
+      await writeFile(
+        join(dir, "package.json"),
+        JSON.stringify({ name: "demo", [from]: { "@zitadel/sdk-qwik": "^1.0.0", other: "1.0.0" } }),
+      );
+
+      await scaffold(plan({ kind: "add-dep", name: "@zitadel/sdk-qwik", version: "alpha", dev }), {
+        cwd: dir,
+        dryRun: false,
+        force: false,
+      });
+
+      const parsed = JSON.parse(await readFile(join(dir, "package.json"), "utf8")) as Record<
+        string,
+        Record<string, string>
+      >;
+      expect({ from: parsed[from], to: parsed[to] }).toEqual({
+        from: { other: "1.0.0" },
+        to: { "@zitadel/sdk-qwik": "alpha" },
+      });
+    },
+  );
+
+  it("moves an entry already at the requested version that sits in the other section", async () => {
+    await writeFile(
+      join(dir, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { "@zitadel/sdk-qwik": "alpha" },
+        devDependencies: { "@zitadel/sdk-qwik": "alpha" },
+      }),
+    );
+
+    await scaffold(
+      plan({ kind: "add-dep", name: "@zitadel/sdk-qwik", version: "alpha", dev: true }),
+      { cwd: dir, dryRun: false, force: false },
+    );
+
+    const parsed = JSON.parse(await readFile(join(dir, "package.json"), "utf8")) as Record<
+      string,
+      Record<string, string>
+    >;
+    expect(parsed.dependencies).toEqual({});
+  });
+
   it("skips when the dependency is already at the requested version", async () => {
     await writeFile(
       join(dir, "package.json"),

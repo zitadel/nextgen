@@ -387,6 +387,66 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
     expect(json.hint).toContain(json.next_commands?.[0]);
   });
 
+  // `zitadel start` tells developers to run setup in the directory it ran in,
+  // or one inside it; doctor must check that server, not the default port.
+  describe("in an app inside the directory a local server was started in", () => {
+    async function appUnderStartedServer(): Promise<{ app: string; port: number }> {
+      const parent = await mkdtemp(join(tmpdir(), "zitadel-doctor-parent-"));
+      tempDirs.push(parent);
+      const serverUrl = await startHealthServer();
+      const port = Number(new URL(serverUrl).port);
+      await mkdir(join(parent, ".zitadel/local"), { recursive: true });
+      await writeFile(
+        join(parent, ".zitadel/local/runtime.json"),
+        JSON.stringify({
+          schema_version: 1,
+          backend: "binary",
+          port,
+          server_url: serverUrl,
+          data_dir: join(parent, ".zitadel/local/nextgen-data"),
+          created_at: new Date().toISOString(),
+          cli_version: "0.0.0",
+          pid: 999_999,
+          command: "zitadel-server",
+          log_path: join(parent, ".zitadel/local/server.log"),
+          server_package: "@zitadel/server",
+          server_version: "0.0.0",
+        }),
+      );
+      const app = join(parent, "app");
+      await mkdir(app);
+      return { app, port };
+    }
+
+    async function doctorWithoutPort(cwd: string) {
+      const fake = await fakeDocker();
+      return runCliForTest(
+        ["doctor", "--cwd", cwd, "--json", "--server", "https://api.zitadel.cloud"],
+        { PATH: `${fake.binDir}:${process.env.PATH ?? ""}`, DOCKER_LOG: fake.logPath },
+      );
+    }
+
+    it("checks that server's port", async () => {
+      const { app, port } = await appUnderStartedServer();
+
+      const res = await doctorWithoutPort(app);
+
+      expect((parseJson(res.stdout) as { data: { port: number } }).data.port).toBe(port);
+    });
+
+    it("reports that server healthy", async () => {
+      const { app } = await appUnderStartedServer();
+
+      const res = await doctorWithoutPort(app);
+
+      const checks = (parseJson(res.stdout) as { data: { checks: Check[] } }).data.checks;
+      expect(checks.find((check) => check.name === "runtime")).toMatchObject({
+        status: "pass",
+        message: expect.stringContaining("is healthy"),
+      });
+    });
+  });
+
   it("fails the project-match check when secret and config disagree", async () => {
     const cwd = await makeHealthyProject();
     await writeFile(

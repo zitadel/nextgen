@@ -5,7 +5,7 @@ Next.js middleware and helpers for Nextgen Auth.
 ## Installation
 
 ```bash
-pnpm add @zitadel/sdk-next
+pnpm add @zitadel/sdk-next@alpha
 ```
 
 ## Entry points

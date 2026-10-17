@@ -171,3 +171,35 @@ describe("businessLocales", () => {
     expect(businessLocales).toBe(componentsBusinessLocales);
   });
 });
+
+// Assigning `undefined` to a custom-element property overwrites its default,
+// so an unset prop must leave the element's own default in place.
+describe("unset props keep the element's defaults", () => {
+  it.each([
+    ["heading", "Signed in as"],
+    ["variant", "widget"],
+    ["theme", ""],
+    ["suppressHeader", false],
+  ] as const)("ZitadelSession keeps the default %s", (prop, expected) => {
+    const { container } = render(ZitadelSession, { props: { project } });
+
+    expect(container.querySelector<ZitadelSessionElement>("zitadel-session")![prop]).toBe(expected);
+  });
+
+  it.each([
+    ["variant", "widget"],
+    ["theme", ""],
+    ["suppressHeader", false],
+    ["lang", ""],
+  ] as const)("ZitadelLogin keeps the default %s", (prop, expected) => {
+    const { container } = render(ZitadelLogin, { props: { project } });
+
+    expect(container.querySelector<ZitadelLoginElement>("zitadel-login")![prop]).toBe(expected);
+  });
+
+  it("ZitadelLogout keeps the default theme", () => {
+    const { container } = render(ZitadelLogout, { props: { project } });
+
+    expect(container.querySelector<ZitadelLogoutElement>("zitadel-logout")!.theme).toBe("");
+  });
+});

@@ -1,0 +1,115 @@
+---
+title: SvelteKit SDK
+description: A server hook and helpers for SvelteKit applications.
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { File, Files } from "fumadocs-ui/components/files";
+import { Step, Steps } from "fumadocs-ui/components/steps";
+import { Tab, Tabs } from "fumadocs-ui/components/tabs";
+
+The SvelteKit SDK is a `handle` hook that proxies and verifies sessions on the server. The login and logout widgets come from the [Svelte SDK](/docs/sdks/svelte).
+
+<Callout title="Generated setup" type="info">
+  The CLI writes `src/hooks.server.ts` and the auth pages, and writes the backend URL, the project secret, and the project id to `.env.local`. It works on SvelteKit 2 and 3.
+</Callout>
+
+## Install
+
+<Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
+  <Tab>
+    ```sh
+    pnpm add @zitadel/sdk-sveltekit@alpha @zitadel/sdk-svelte@alpha
+    ```
+  </Tab>
+  <Tab>
+    ```sh
+    npm install @zitadel/sdk-sveltekit@alpha @zitadel/sdk-svelte@alpha
+    ```
+  </Tab>
+  <Tab>
+    ```sh
+    yarn add @zitadel/sdk-sveltekit@alpha @zitadel/sdk-svelte@alpha
+    ```
+  </Tab>
+</Tabs>
+
+## Setup
+
+<Tabs items={["CLI generated", "Manual"]}>
+  <Tab>
+    The CLI adds the server hook, the pages, environment files, and both SDK packages.
+
+    <Files>
+      <File name="src/hooks.server.ts" />
+      <File name="src/routes/+layout.svelte" />
+      <File name="src/routes/+page.svelte" />
+      <File name="src/routes/login/+page.svelte" />
+      <File name="src/routes/register/+page.svelte" />
+      <File name="src/routes/profile/+page.svelte" />
+      <File name=".env.local" />
+      <File name=".env.example" />
+      <File name="package.json" />
+    </Files>
+
+    Every setup also writes `zitadel.json` and the `.zitadel/` folder, adds its entries to `.gitignore`, and adds managed sections to `AGENTS.md` and `README.md`.
+  </Tab>
+  <Tab>
+    Create `src/hooks.server.ts`. Read the config from `process.env` rather than SvelteKit's `$env` modules, whose import paths moved between SvelteKit 2 and 3. SvelteKit does not put `.env` files on `process.env`, so load `.env.local` yourself in development:
+
+    ```ts
+    import { createNextgenHandle } from "@zitadel/sdk-sveltekit/server";
+
+    try {
+      process.loadEnvFile?.(".env.local");
+    } catch {
+      // .env.local is optional; the platform provides the variables in production.
+    }
+
+    export const handle = createNextgenHandle({
+      protectedRoutes: ["/profile"],
+      loginPath: "/login",
+    });
+    ```
+
+    Render the widget on the client only. Its config (`project` and the rest) is set as element properties, which server-rendered markup cannot carry; `onMount` never runs during server rendering, so the widget is created in the browser with its config already in place:
+
+    ```svelte
+    <script lang="ts">
+      import { onMount } from "svelte";
+      import { ZitadelLogin, configureZitadel } from "@zitadel/sdk-svelte";
+
+      const project = configureZitadel({ projectId: "<project id>", proxyPath: "/__nextgen" });
+
+      let mounted = $state(false);
+      onMount(() => {
+        mounted = true;
+      });
+    </script>
+
+    {#if mounted}
+      <ZitadelLogin {project} purpose="login" postSignInUrl="/profile" />
+    {/if}
+    ```
+  </Tab>
+</Tabs>
+
+## Runtime model
+
+<Steps>
+  <Step>The hook proxies same-origin `/__nextgen/*` requests to the backend, attaching the project secret only to the session handoff.</Step>
+  <Step>It verifies the session token and puts the result on `event.locals.nextgenAuth`; read it with `getAuth(event)` in a load function or endpoint.</Step>
+  <Step>It redirects unauthenticated requests for `protectedRoutes` to `loginPath`.</Step>
+</Steps>
+
+## Verify
+
+- Start the app with `npm run dev`. Setup already wrote the URL, the secret, and the project id to `.env.local`.
+- Visit `/login` and register a user.
+- Confirm `/profile` shows signed-in state.
+- Log out and confirm `/profile` redirects to `/login`.
+
+## See also
+
+- [SDK proxy](/docs/concepts/sdk-proxy) — why `/__nextgen/*` must be same-origin and which call carries the project secret.
+- [`@zitadel/sdk-sveltekit` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-sveltekit) and the [CLI SvelteKit patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/sveltekit).

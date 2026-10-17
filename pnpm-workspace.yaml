@@ -32,6 +32,10 @@ catalog:
   '@oclif/plugin-version': ^2.2.46
   '@oclif/plugin-which': ^3.2.55
   "@playwright/test": ^1.60.0
+  # rc.3 (2026-10-13) is younger than the one-day minimumReleaseAge; one entry
+  # so sdk-qwik and sdk-qwik-city build and test against the same Qwik.
+  "@qwik.dev/core": ^2.0.0-rc.2
+  "@qwik.dev/router": ^2.0.0-rc.2
   # Exact: the OpenAPI lint gate, the casing-rule tests and the docs bundle all
   # call the library the Redocly CLI is built on, so they must agree.
   "@redocly/openapi-core": 2.31.5

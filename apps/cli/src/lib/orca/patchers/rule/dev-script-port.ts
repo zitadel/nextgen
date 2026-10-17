@@ -3,6 +3,18 @@ import { isObject, parseJsonObject, setTopLevelJsonKey } from "../../../json";
 import { extractPort, portFromIssuer, withDevPort } from "../../detectors/port";
 import type { FileOp } from "./file-writer/types";
 
+/** Options for {@link devScriptPortEdit}. */
+export interface DevScriptPortOptions {
+  /**
+   * Also pass `--strictPort`, for a Vite dev server. `vite dev --port N`
+   * silently serves the next free port when N is taken, landing on an origin
+   * the project does not allow; with `--strictPort` it exits instead.
+   */
+  readonly strictPort?: boolean;
+}
+
+const STRICT_PORT_FLAG = /(?:^|\s)--strictPort(?:\s|=|$)/;
+
 /**
  * Pins the `dev` script to the port setup registered as the project's origin.
  *
@@ -36,7 +48,10 @@ import type { FileOp } from "./file-writer/types";
  * someone edits the script to 4000. An issuer that names no port yields no
  * expectation and the op becomes a no-op.
  */
-export function devScriptPortEdit(issuer: string): (source: string | undefined) => string {
+export function devScriptPortEdit(
+  issuer: string,
+  options: DevScriptPortOptions = {},
+): (source: string | undefined) => string {
   return (source) => {
     if (source === undefined) {
       throw new ZitadelError("E_VALIDATION", "package.json is required to pin the dev port", {
@@ -53,14 +68,16 @@ export function devScriptPortEdit(issuer: string): (source: string | undefined) 
     if (typeof dev !== "string" || dev.trim() === "") {
       return source;
     }
-    if (extractPort(dev) === devPort) {
+    const needsStrict = options.strictPort === true && !STRICT_PORT_FLAG.test(dev);
+    if (extractPort(dev) === devPort && !needsStrict) {
       return source;
     }
+    const pinned = withDevPort(dev, devPort);
     // package.json is user-owned: splice only the scripts value; every byte
     // outside it stays untouched.
     return setTopLevelJsonKey(source, "package.json", "scripts", {
       ...scripts,
-      dev: withDevPort(dev, devPort),
+      dev: needsStrict ? `${pinned.trimEnd()} --strictPort` : pinned,
     });
   };
 }
@@ -73,11 +90,11 @@ export function devScriptPortEdit(issuer: string): (source: string | undefined) 
  * moves it without touching the file, so a hard failure here would promise a
  * guarantee the check cannot make.
  */
-export function devScriptPortOp(issuer: string): FileOp {
+export function devScriptPortOp(issuer: string, options: DevScriptPortOptions = {}): FileOp {
   return {
     kind: "edit",
     path: "package.json",
-    edit: devScriptPortEdit(issuer),
+    edit: devScriptPortEdit(issuer, options),
     wiring: "convenience",
   };
 }
