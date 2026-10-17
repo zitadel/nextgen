@@ -78,6 +78,7 @@ patch:
   security:
     - oauth2:
         - user.write
+    - nextgenSession: []
   requestBody:
     description: The changes to merge into the user.
     required: true

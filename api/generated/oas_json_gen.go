@@ -79016,6 +79016,22 @@ func (s PatchUserByIDErrorResponse) Encode(e *jx.Encoder) {
 
 func (s PatchUserByIDErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
+	case AuthCsrfInvalidPatchUserByIDErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.csrf_invalid")
+		{
+			s := s.AuthCsrfInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case AuthUnauthorizedPatchUserByIDErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.unauthorized")
@@ -79186,6 +79202,9 @@ func (s *PatchUserByIDErrorResponse) Decode(d *jx.Decoder) error {
 					return err
 				}
 				switch typ {
+				case "auth.csrf_invalid":
+					s.Type = AuthCsrfInvalidPatchUserByIDErrorResponse
+					found = true
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedPatchUserByIDErrorResponse
 					found = true
@@ -79227,6 +79246,10 @@ func (s *PatchUserByIDErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
+	case AuthCsrfInvalidPatchUserByIDErrorResponse:
+		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
+			return err
+		}
 	case AuthUnauthorizedPatchUserByIDErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
