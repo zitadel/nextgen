@@ -12,6 +12,7 @@ import {
   ensureLocalState,
   localContainerName,
   localRuntimePaths,
+  readNearestRuntimeMetadata,
   readRuntimeMetadata,
   removeLocalData,
   writeRuntimeMetadata,
@@ -166,6 +167,31 @@ describe("findUpward", () => {
 
     await expect(findUpward(app, LOCAL_RUNTIME_FILE, home)).resolves.toBeUndefined();
     await expect(findUpward(app, LOCAL_RUNTIME_FILE, cwd)).resolves.toBe(cwd);
+  });
+});
+
+describe("readNearestRuntimeMetadata", () => {
+  async function malformedRecordAt(dir: string): Promise<void> {
+    await mkdir(join(dir, ".zitadel/local"), { recursive: true });
+    await writeFile(join(dir, LOCAL_RUNTIME_FILE), JSON.stringify({ backend: "nope" }));
+  }
+
+  it("recovers a malformed record in a parent where it is", async () => {
+    await malformedRecordAt(cwd);
+    const app = join(cwd, "my-app");
+    await mkdir(app);
+
+    await expect(readNearestRuntimeMetadata(app)).rejects.toMatchObject({
+      nextCommands: [`zitadel reset --force --cwd ${cwd}`, `zitadel start --cwd ${cwd}`],
+    });
+  });
+
+  it("recovers a malformed record in the working directory without naming it", async () => {
+    await malformedRecordAt(cwd);
+
+    await expect(readNearestRuntimeMetadata(cwd)).rejects.toMatchObject({
+      nextCommands: ["zitadel reset --force", "zitadel start"],
+    });
   });
 });
 

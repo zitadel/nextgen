@@ -10,6 +10,7 @@ import { expect } from "vitest";
 import { aFakeServerBinary, trackLocalServerDir, type ServerShape } from "./local-server";
 import { cliPackageRoot } from "./oclif-build";
 import { nextPort } from "./ports";
+import { aBinaryRecord } from "./runtime-record";
 import { parseJson, runCliForTest } from "./run-cli";
 
 const SCHEMA_FILE = ".zitadel/schemas/default-human-user.json";
@@ -377,6 +378,41 @@ export class ScaffoldedApp {
       PATH: `${docker.binDir}:${process.env.PATH ?? ""}`,
       DOCKER_LOG: docker.logPath,
     });
+  }
+
+  /** An app in a directory inside this one, the way a developer nests one under `start`. */
+  async appInside(name: string): Promise<ScaffoldedApp> {
+    await mkdir(join(this.path, name), { recursive: true });
+    return new ScaffoldedApp(join(this.path, name));
+  }
+
+  /** Runs `doctor` without naming a port, so it checks the one this directory's server uses. */
+  async doctorAtItsServer(): Promise<CliResult> {
+    const docker = await fakeDocker();
+    return this.cli(["doctor", "--json"], {
+      PATH: `${docker.binDir}:${process.env.PATH ?? ""}`,
+      DOCKER_LOG: docker.logPath,
+    });
+  }
+
+  /** The port a `doctor` run reported it checked. */
+  doctoredPortOf(result: CliResult): number {
+    return this.envelopeOf<{ port: number }>(result).data.port;
+  }
+
+  /** Leaves this directory with the record of a local server that is not running. */
+  async writeStoppedServerRecord(): Promise<void> {
+    await mkdir(join(this.path, ".zitadel/local"), { recursive: true });
+    await writeFile(
+      join(this.path, ".zitadel/local/runtime.json"),
+      JSON.stringify(aBinaryRecord({ port: nextPort() })),
+    );
+  }
+
+  /** Leaves this directory with a record of its local server that is JSON but not a record. */
+  async writeMalformedServerRecord(): Promise<void> {
+    await mkdir(join(this.path, ".zitadel/local"), { recursive: true });
+    await writeFile(join(this.path, ".zitadel/local/runtime.json"), JSON.stringify({ x: 1 }));
   }
 
   /**

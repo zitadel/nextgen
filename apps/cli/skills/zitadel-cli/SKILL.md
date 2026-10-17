@@ -305,11 +305,13 @@ replaces a file at a path setup writes, but not the app's root component or
 request boundary at another path.
 
 The app may also live in a subdirectory of the one `start` ran in: `setup`,
-`console` and `--server local` read `.zitadel/local/` from the working
+`console`, `--server local` and `doctor` read `.zitadel/local/` from the working
 directory or the nearest parent that has it (up to the home directory), so
-`mkdir my-app && cd my-app` after `start` works too. `stop`, `reset`, `logs`,
-`status` and `doctor` read only the working directory's `.zitadel/local/`, so
-run them where `start` ran. On a local
+`mkdir my-app && cd my-app` after `start` works too; `doctor` checks that
+server and its port, and when that server is unhealthy it suggests `start` and
+`reset --force` with `--cwd` set to the directory that holds it. `stop`,
+`reset`, `logs` and `status` read only the working directory's
+`.zitadel/local/`, so run them where `start` ran. On a local
 server that hosts the platform project, `setup` attaches the project to the
 local admin's team and ends `data.next_commands` with `console`; when it finds
 no local admin for that server on the way up, it says so in the envelope's

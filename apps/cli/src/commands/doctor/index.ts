@@ -27,7 +27,7 @@ import { createOrca } from "../../lib/orca";
 import { resolveCwd } from "../../lib/paths";
 import { hasZitadelConfig } from "../../lib/project";
 import { listenersForPort } from "../../lib/prober/ports";
-import { publicCliCommand } from "../../lib/public-cli";
+import { publicCliCommand, shellQuotedPath } from "../../lib/public-cli";
 import { SANITY_CHECKS, type CheckContext, type CheckOutcome } from "./checks";
 
 const LOCAL_RUNTIME_CHECK_NAMES = new Set([
@@ -155,7 +155,13 @@ export default class Doctor extends BaseCommand {
     };
 
     if (failed.length > 0) {
-      const advice = failureAdvice(failed, image, port, this.meta.cliVersion);
+      const advice = failureAdvice(
+        failed,
+        image,
+        port,
+        this.meta.cliVersion,
+        nearest !== undefined && nearest.dir !== cwd ? nearest.dir : undefined,
+      );
       // A check that failed with a typed CLI error advertises its own
       // category (e.g. the framework floor's E_UNSUPPORTED_PROJECT_SHAPE) —
       // surface that instead of the generic validation class so agents can
@@ -183,8 +189,10 @@ function failureAdvice(
   image: string,
   port: number,
   cliVersion: string,
+  runtimeDir?: string,
 ): { hint: string; nextCommands: string[] } {
   const failedNames = new Set(failed.map((check) => check.name));
+  const at = runtimeDir === undefined ? "" : ` --cwd ${shellQuotedPath(runtimeDir)}`;
 
   if (failedNames.has("server-binary")) {
     return {
@@ -235,9 +243,11 @@ function failureAdvice(
   if (failedNames.has("runtime")) {
     return {
       hint: "Existing local runtime metadata was found, but the local Zitadel server is not healthy. Start it again or reset stale local data.",
+      // `start` and `reset` act on their working directory, so a runtime found
+      // in a parent is named explicitly.
       nextCommands: [
-        publicCliCommand("start", cliVersion),
-        publicCliCommand("reset --force", cliVersion),
+        publicCliCommand(`start${at}`, cliVersion),
+        publicCliCommand(`reset --force${at}`, cliVersion),
       ],
     };
   }

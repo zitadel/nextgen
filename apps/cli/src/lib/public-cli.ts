@@ -50,6 +50,14 @@ export function optionArgs(option: string, value: string): string[] {
   return value.startsWith("-") ? [`${option}=${value}`] : [option, value];
 }
 
+/**
+ * A path as one argument of a suggested command for a POSIX shell: as written
+ * when it is a portable word, single-quoted otherwise.
+ */
+export function shellQuotedPath(value: string): string {
+  return isPortableShellWord(value) ? value : `'${value.replaceAll("'", "'\\''")}'`;
+}
+
 export function publicCliCommand(args: string, cliVersion: string): string {
   const prefix = `npx ${CLI_PACKAGE_NAME}@${npmSelectorForCliVersion(cliVersion)}`;
   return args.length > 0 ? `${prefix} ${args}` : prefix;

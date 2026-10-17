@@ -5,6 +5,7 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 import { isErrno, ZitadelError } from "../errors";
+import { shellQuotedPath } from "../public-cli";
 import { parseJsonObject } from "../json";
 import { EMPTY_SUMMARY, type EnvSummary, isEnvSummary } from "./env-vars";
 
@@ -243,8 +244,18 @@ export async function readNearestRuntimeMetadata(
   cwd: string,
 ): Promise<{ dir: string; runtime: RuntimeMetadata } | undefined> {
   const dir = await findUpward(cwd, LOCAL_RUNTIME_FILE);
-  const runtime = dir ? await readRuntimeMetadata(dir) : undefined;
-  return dir && runtime ? { dir, runtime } : undefined;
+  if (!dir) {
+    return undefined;
+  }
+  let runtime: RuntimeMetadata | undefined;
+  try {
+    runtime = await readRuntimeMetadata(dir);
+  } catch (error) {
+    // A record in a parent is recovered where it is: the bare commands would
+    // act on the working directory instead.
+    throw dir === cwd ? error : retargetMalformedRuntime(error, dir);
+  }
+  return runtime ? { dir, runtime } : undefined;
 }
 
 /**
@@ -488,5 +499,18 @@ function malformedRuntime(input: Record<string, unknown>): ZitadelError {
     hint: "Run `zitadel reset --force`, then `zitadel start`.",
     nextCommands: ["zitadel reset --force", "zitadel start"],
     details: input,
+  });
+}
+
+/** The malformed-record error again, with its recovery aimed at `dir`. */
+function retargetMalformedRuntime(error: unknown, dir: string): unknown {
+  if (!(error instanceof ZitadelError) || error.message !== `${LOCAL_RUNTIME_FILE} is malformed`) {
+    return error;
+  }
+  const at = `--cwd ${shellQuotedPath(dir)}`;
+  return new ZitadelError(error.code, error.message, {
+    hint: `Run \`zitadel reset --force ${at}\`, then \`zitadel start ${at}\`.`,
+    nextCommands: [`zitadel reset --force ${at}`, `zitadel start ${at}`],
+    details: error.details,
   });
 }

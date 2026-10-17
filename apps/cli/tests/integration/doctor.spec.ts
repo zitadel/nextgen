@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import { useLocalServers } from "../helpers/local-server";
 import { usePlatformMock } from "../helpers/platform";
 import { aSetUpApp, type ScaffoldedApp } from "../helpers/project";
 
 const platform = usePlatformMock();
+useLocalServers();
 
 /** Downgrades the app below the version the CLI supports. */
 function downgradeTheFramework(app: ScaffoldedApp): Promise<void> {
@@ -104,6 +106,72 @@ describe("doctor", () => {
         await app.doctor(["--fix"]);
 
         expect((await before.changes()).removed).toEqual([]);
+      });
+    });
+  });
+
+  describe("in an app inside the directory a local server was started in", () => {
+    it("checks that server's port", async () => {
+      const parent = await aSetUpApp();
+      const started = await parent.startLocalServer();
+      const app = await parent.appInside("my-app");
+
+      const result = await app.doctorAtItsServer();
+
+      expect(app.doctoredPortOf(result)).toBe(parent.localPortOf(started));
+    });
+
+    it("finds that server healthy", async () => {
+      const parent = await aSetUpApp();
+      await parent.startLocalServer();
+      const app = await parent.appInside("my-app");
+
+      const result = await app.doctorAtItsServer();
+
+      expect(result).toSucceed();
+    });
+
+    describe("that is not running", () => {
+      it("fails", async () => {
+        const parent = await aSetUpApp();
+        await parent.writeStoppedServerRecord();
+        const app = await parent.appInside("my-app");
+
+        const result = await app.doctorAtItsServer();
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it("starts it again where it was started", async () => {
+        const parent = await aSetUpApp();
+        await parent.writeStoppedServerRecord();
+        const app = await parent.appInside("my-app");
+
+        const result = await app.doctorAtItsServer();
+
+        expect(result).toSuggest(`start --cwd ${parent.path}`);
+      });
+
+      it("resets it where it was started", async () => {
+        const parent = await aSetUpApp();
+        await parent.writeStoppedServerRecord();
+        const app = await parent.appInside("my-app");
+
+        const result = await app.doctorAtItsServer();
+
+        expect(result).toSuggest(`reset --force --cwd ${parent.path}`);
+      });
+    });
+
+    describe("whose record is malformed", () => {
+      it("resets it where it was started", async () => {
+        const parent = await aSetUpApp();
+        await parent.writeMalformedServerRecord();
+        const app = await parent.appInside("my-app");
+
+        const result = await app.doctorAtItsServer();
+
+        expect(result).toSuggest(`reset --force --cwd ${parent.path}`);
       });
     });
   });

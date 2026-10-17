@@ -9,6 +9,7 @@ import {
   optionArgs,
   portableCommands,
   publicCliCommand,
+  shellQuotedPath,
 } from "../../../src/lib/public-cli";
 
 describe("public CLI command formatting", () => {
@@ -163,5 +164,19 @@ describe("optionArgs", () => {
 
   it("joins a value that starts with a dash to its option", () => {
     expect(optionArgs("--schema", "--force")).toEqual(["--schema=--force"]);
+  });
+});
+
+describe("shellQuotedPath", () => {
+  it("leaves a portable path as written", () => {
+    expect(shellQuotedPath("/home/dev/my-app")).toBe("/home/dev/my-app");
+  });
+
+  it("single-quotes a path with a space", () => {
+    expect(shellQuotedPath("/home/dev/my app")).toBe("'/home/dev/my app'");
+  });
+
+  it("closes the quote around a quote in the path", () => {
+    expect(shellQuotedPath("/home/it's")).toBe("'/home/it'\\''s'");
   });
 });
