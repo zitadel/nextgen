@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/dialect/sqlite/migration"
@@ -13,12 +14,18 @@ import (
 type Pool struct {
 	sqlDB      *sql.DB
 	isMigrated bool
+	// unregisterStats stops the pool connection gauge from reading sqlDB.
+	unregisterStats func()
 	statements
 }
 
 func newPool(sqlDB *sql.DB) *Pool {
 	return &Pool{
-		sqlDB:      sqlDB,
+		sqlDB: sqlDB,
+		unregisterStats: metrics.Default().RegisterPool(metrics.DialectSQLite, func() metrics.PoolStats {
+			stats := sqlDB.Stats()
+			return metrics.PoolStats{InUse: stats.InUse, Idle: stats.Idle}
+		}),
 		statements: newStatements(db{sqlDB: sqlDB}),
 	}
 }
@@ -32,6 +39,7 @@ func (p *Pool) Transaction(ctx context.Context, fn func(ctx context.Context, tx 
 
 // Close implements [database.Pool].
 func (p *Pool) Close(_ context.Context) error {
+	p.unregisterStats()
 	return p.sqlDB.Close()
 }
 

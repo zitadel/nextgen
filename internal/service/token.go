@@ -11,6 +11,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -134,7 +135,17 @@ func tokenUserID(tok *domain.Token) *string {
 	return &uid
 }
 
+// IntrospectToken validates a bearer credential. It is on the path of every
+// authenticated request, so how long it takes, and how often it refuses, are
+// the first things a load result is read against.
 func (s *tokenService) IntrospectToken(ctx context.Context, token string) (*domain.Token, error) {
+	start := time.Now()
+	payload, err := s.introspectToken(ctx, token)
+	metrics.Default().RecordCredentialValidation(ctx, credentialResult(err), time.Since(start))
+	return payload, err
+}
+
+func (s *tokenService) introspectToken(ctx context.Context, token string) (*domain.Token, error) {
 	payload, err := domain.ParseAndValidateToken(ctx, token,
 		func(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (op.Decrypter, error) {
 			return s.keys.GetCrypter(ctx, keyID, algorithm)
@@ -158,13 +169,17 @@ func (s *tokenService) IntrospectToken(ctx context.Context, token string) (*doma
 	record, err := s.v2Pool.Statements().GetTokenByID(ctx, payload.ProjectID, payload.TokenID)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			metrics.Default().RecordRevocationCheck(ctx, metrics.RevocationRevoked)
 			return nil, domain.ErrTokenRevoked()
 		}
+		metrics.Default().RecordRevocationCheck(ctx, metrics.RevocationError)
 		return nil, domain.ErrInternal(err).WithMessage("failed to read token record")
 	}
 	if !record.Active(time.Now()) {
+		metrics.Default().RecordRevocationCheck(ctx, metrics.RevocationRevoked)
 		return nil, domain.ErrTokenRevoked()
 	}
+	metrics.Default().RecordRevocationCheck(ctx, metrics.RevocationActive)
 
 	return payload, nil
 }

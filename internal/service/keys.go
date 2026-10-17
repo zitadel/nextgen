@@ -3,11 +3,13 @@ package service
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/zitadel/nextgen/internal/cache"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/oidc/v3/pkg/op"
 )
@@ -151,9 +153,11 @@ func (s *keyService) getCrypterOfKey(ctx context.Context, key *domain.Encryption
 	// and the one Add below. Returning early from either would leave that key
 	// uncached, and the master key arm is the expensive one -- unwrapping under
 	// it is the RSA private-key operation this cache exists to avoid.
+	start := time.Now()
+	kekKind := metrics.KEKProject
 	var kek crypto.Crypter
 	if masterKey := s.masterKeys.GetByKeyID(jweHeader.KeyID); masterKey != nil {
-		kek = masterKey
+		kek, kekKind = masterKey, metrics.KEKMaster
 	} else {
 		// A database read and a recursion, both of which the cache above spares
 		// every caller after the first.
@@ -168,6 +172,9 @@ func (s *keyService) getCrypterOfKey(ctx context.Context, key *domain.Encryption
 	if err != nil {
 		return nil, err
 	}
+	// Only a resolution that produced a crypter is timed: a failed one says
+	// nothing about what the cache is saving.
+	metrics.Default().RecordKeyChainResolution(ctx, kekKind, time.Since(start))
 
 	s.crypterCache.Add(CrypterCacheKey{KeyID: key.ID, Algorithm: key.Algorithm}, crypter)
 	return crypter, nil
