@@ -25,8 +25,16 @@ import "../atoms/zl-icon.js";
  * It renders an avatar trigger with a dropdown that exposes a "Sign out"
  * action, and calls the typed `revokeMySession` operation in `@zitadel/api`
  * (`DELETE /sessions/me`). The server clears the session cookie via
- * `Set-Cookie: Max-Age=0`; on success the element fires `zitadel-signout`
- * and optionally navigates to `post-sign-out-url`.
+ * `Set-Cookie: Max-Age=0`; on success (the backend's no-session answer counts,
+ * the session is already gone) the element fires `zitadel-signout` and
+ * optionally navigates to `post-sign-out-url`.
+ *
+ * When `GET /sessions/me` gets the backend's no-session answer (`401
+ * auth.unauthorized` or `404 sess.not_found`) the visitor has no session: the
+ * element renders nothing (no avatar, no projected template) and does not
+ * navigate, since the menu sits in an app's own chrome, often on public pages.
+ * A network error, a 5xx or a gateway's 401 or 404 keeps the control and shows
+ * the error.
  *
  * ## Template-slot mode
  *
@@ -201,7 +209,7 @@ export class ZitadelLogout extends ZitadelConfigured {
   private readonly session = new SessionController(
     this,
     () => resolveApi(this.project, this.projectAttrs, "<zitadel-logout>").api,
-    () => this.projectTemplate(),
+    { onIdentitySettled: () => this.projectTemplate() },
   );
 
   override connectedCallback(): void {
@@ -257,6 +265,13 @@ export class ZitadelLogout extends ZitadelConfigured {
    */
   private projectTemplate(): void {
     if (!this.templateMode || !this.pendingTemplate) return;
+    if (this.session.state === "signed-out") {
+      // Nobody to name or sign out: drop the control instead of filling it
+      // with blanks.
+      this.projectedContainer?.remove();
+      this.projectedContainer = null;
+      return;
+    }
 
     const clone = this.pendingTemplate.content.cloneNode(true) as DocumentFragment;
     fillTemplateTokens(clone, this.session.display, this.session.identifier, this.initial);
@@ -291,7 +306,9 @@ export class ZitadelLogout extends ZitadelConfigured {
 
   private toggleOpen(): void {
     this.open = !this.open;
-    this.session.clearError();
+    // Cleared on close, not on open: a failed identity load must still show
+    // when the menu first opens, while a failed sign-out does not linger.
+    if (!this.open) this.session.clearError();
   }
 
   /** Signs out, closes the menu, then optionally navigates to `postSignOutUrl`. */
@@ -311,6 +328,9 @@ export class ZitadelLogout extends ZitadelConfigured {
   }
 
   override render() {
+    // No session at load: an avatar menu that signs out nobody has nothing to
+    // offer.
+    if (this.session.state === "signed-out") return nothing;
     if (this.templateMode) {
       // Rendering happens into the light DOM via `projectTemplate`. The
       // shadow root stays empty so the projected markup is the only thing
