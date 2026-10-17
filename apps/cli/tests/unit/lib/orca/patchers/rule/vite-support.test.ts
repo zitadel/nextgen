@@ -285,6 +285,18 @@ export default defineConfig({
     expect(edit(hooked)).toBe(hooked);
   });
 
+  it.each(["cookieDomainRewrite", "cookiePathRewrite"])(
+    "keeps a generated entry that rewrites the cookies it relays with %s",
+    (option) => {
+      const rewriting = UNREDACTED_CONFIG.replace(
+        "xfwd: true,",
+        `xfwd: true,\n        ${option}: "",`,
+      );
+
+      expect(edit(rewriting)).toBe(rewriting);
+    },
+  );
+
   it("keeps the config's own zlib import and adds the redaction's under its own name", () => {
     const own = 'import zlib from "zlib";\n';
 
@@ -575,14 +587,32 @@ describe("the generated proxy, run by Vite against a remote https server", () =>
     expect(await response.json()).toEqual(EXCHANGE_BODY);
   });
 
-  it("relays an exchange answer that is not JSON as it came", async () => {
+  it("answers 502 to a successful exchange answer that is not JSON", async () => {
     const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG));
 
     const response = await fetch(`${origin}/__nextgen/sessions/exchange?as=text`, {
       method: "POST",
     });
 
+    expect(response.status).toBe(502);
+  });
+
+  it("relays an error answer to the exchange that is not JSON as it came", async () => {
+    const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG));
+
+    const response = await fetch(`${origin}/__nextgen/sessions/exchange?as=text&status=503`, {
+      method: "POST",
+    });
+
     expect(await response.text()).toBe("ok");
+  });
+
+  it("keeps the session token out of an exchange body that starts with a byte order mark", async () => {
+    const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG));
+
+    const response = await fetch(`${origin}/__nextgen/sessions/exchange?bom`, { method: "POST" });
+
+    expect(await response.json()).toEqual({ session: EXCHANGE_BODY.session });
   });
 
   it("relays every other call's body as the server sent it", async () => {

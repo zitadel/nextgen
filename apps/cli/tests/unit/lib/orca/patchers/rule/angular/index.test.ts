@@ -252,6 +252,18 @@ describe("AngularPatcher.plan", () => {
     expect(proxyConfigEdit()(hooked)).toBe(hooked);
   });
 
+  it.each(["cookieDomainRewrite", "cookiePathRewrite"])(
+    "keeps a managed proxy that rewrites the cookies it relays with %s",
+    (option) => {
+      const rewriting = unredactedProxyConf().replace(
+        "    onProxyReq: setBearer,\n",
+        `    ${option}: "",\n    onProxyReq: setBearer,\n`,
+      );
+
+      expect(proxyConfigEdit()(rewriting)).toBe(rewriting);
+    },
+  );
+
   it("adds the redaction to a managed proxy written with CRLF line endings", () => {
     const edit = proxyConfigEdit();
 
@@ -519,14 +531,32 @@ describe("the generated proxy.conf.cjs, run by Vite against a remote https serve
     expect(await response.json()).toEqual(EXCHANGE_BODY);
   });
 
-  it("relays an exchange answer that is not JSON as it came", async () => {
+  it("answers 502 to a successful exchange answer that is not JSON", async () => {
     const { origin } = await serve(proxyConfigEdit()(undefined));
 
     const response = await fetch(`${origin}/__nextgen/sessions/exchange?as=text`, {
       method: "POST",
     });
 
+    expect(response.status).toBe(502);
+  });
+
+  it("relays an error answer to the exchange that is not JSON as it came", async () => {
+    const { origin } = await serve(proxyConfigEdit()(undefined));
+
+    const response = await fetch(`${origin}/__nextgen/sessions/exchange?as=text&status=503`, {
+      method: "POST",
+    });
+
     expect(await response.text()).toBe("ok");
+  });
+
+  it("keeps the session token out of an exchange body that starts with a byte order mark", async () => {
+    const { origin } = await serve(proxyConfigEdit()(undefined));
+
+    const response = await fetch(`${origin}/__nextgen/sessions/exchange?bom`, { method: "POST" });
+
+    expect(await response.json()).toEqual({ session: EXCHANGE_BODY.session });
   });
 
   it("relays every other call's body as the server sent it", async () => {

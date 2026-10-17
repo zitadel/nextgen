@@ -41,13 +41,14 @@ export interface ReceivedRequest {
  * is answered `200`, so a test sees what the server was sent rather than how it
  * would have handled it: a `/sessions/*` path with the session exchange's
  * {@link EXCHANGE_BODY} and {@link SESSION_COOKIE} (plain text when the query
- * has `as=text`), anything else with `ok`.
+ * has `as=text`, with the status of `status=<code>` if given), anything else
+ * with `ok`.
  *
  * A `/sessions/*` query can make that answer misbehave the way an intermediary
  * might, whatever the request asked for: `encoding=gzip` or `encoding=br`
  * compresses it, `encoding=garbled` labels as `gzip` bytes that are neither
  * gzip nor JSON but still carry the token, and `abort` drops the connection
- * halfway through the body.
+ * halfway through the body, and `bom` puts a UTF-8 byte order mark before it.
  */
 export interface RemoteServer {
   /** `https://zitadel.test:<port>`. */
@@ -101,7 +102,8 @@ export function useRemoteServer(): RemoteServer {
         } else if (req.url?.startsWith("/sessions/") && !req.url.includes("as=text")) {
           answerSession(new URL(req.url, url).searchParams, res);
         } else {
-          res.writeHead(200, { "content-type": "text/plain" });
+          const status = new URL(req.url ?? "/", url).searchParams.get("status");
+          res.writeHead(Number(status ?? 200), { "content-type": "text/plain" });
           res.end("ok");
         }
       },
@@ -130,8 +132,9 @@ export function useRemoteServer(): RemoteServer {
 function answerSession(query: URLSearchParams, res: ServerResponse): void {
   const plain = Buffer.from(JSON.stringify(EXCHANGE_BODY));
   const encoding = query.get("encoding");
-  const body =
-    encoding === "gzip"
+  const body = query.has("bom")
+    ? Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), plain])
+    : encoding === "gzip"
       ? gzipSync(plain)
       : encoding === "br"
         ? brotliCompressSync(plain)

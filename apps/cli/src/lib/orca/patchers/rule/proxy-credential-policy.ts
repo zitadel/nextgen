@@ -92,8 +92,10 @@ export const EXCHANGE_REDACTION_ZLIB = "zitadelZlib";
  * A backend, or an intermediary in front of it, may compress the answer anyway,
  * so a `gzip`, `deflate` or `br` body is decoded before it is read. One that
  * cannot be decoded is never relayed — the browser would decode it and see the
- * token — and is answered `502` instead. A decoded body that is not a JSON
- * object, or carries no credential field, goes out as it came. Every other
+ * token — and is answered `502` instead, as is a successful answer that is not
+ * JSON at all: a reader more lenient than the proxy might still find the token
+ * in it. A JSON body that is not an object, or carries no credential field, and
+ * an error answer that is not JSON, go out as they came. Every other
  * response streams through untouched. When the backend drops the connection
  * mid-answer, the browser's connection is closed too rather than left waiting.
  *
@@ -174,7 +176,8 @@ function relayResponse(
     delete headers["content-encoding"];
     delete headers["transfer-encoding"];
     try {
-      const json = JSON.parse(body.toString("utf8"));
+      // A byte order mark is no part of the JSON, and a browser reads past it.
+      const json = JSON.parse(body.toString("utf8").replace(/^\\uFEFF/, ""));
       const found = EXCHANGE_CREDENTIAL_FIELDS.filter((field) => Object.hasOwn(Object(json), field));
       if (found.length > 0 && !Array.isArray(json)) {
         for (const field of found) {
@@ -183,7 +186,15 @@ function relayResponse(
         body = Buffer.from(JSON.stringify(json));
       }
     } catch {
-      // Not JSON: an error page, say. It carries no session token.
+      const status = proxyRes.statusCode ?? 502;
+      if (status >= 200 && status < 300) {
+        // A successful exchange is JSON. One the proxy cannot read may still
+        // hold the token for a reader that can, so it is never relayed.
+        res.writeHead(502, { "content-type": "text/plain; charset=utf-8" });
+        res.end("The session exchange answer could not be read.");
+        return;
+      }
+      // An error page, say. It carries no session token.
     }
     headers["content-length"] = String(body.length);
     res.writeHead(proxyRes.statusCode ?? 502, headers);
@@ -356,12 +367,13 @@ export function proxyEntryRange(
 
 /**
  * Whether an entry's text hooks the proxy's responses itself (`proxyRes`,
- * `onProxyRes`). The redaction takes over writing every response, so a hook
- * of the project's own would run against headers already sent; such an entry
- * is left as it is. The CLI's generated entries before the redaction had none.
+ * `onProxyRes`), or rewrites the cookies it relays (`cookieDomainRewrite`,
+ * `cookiePathRewrite`). The redaction takes over writing every response, so a
+ * hook would run against headers already sent and the proxy's own cookie
+ * rewriting would no longer apply; such an entry is left as it is. The CLI's generated entries before the redaction had none.
  */
 export function hasResponseHook(entry: string): boolean {
-  return /proxyRes/i.test(entry);
+  return /proxyRes|cookie(?:Domain|Path)Rewrite/i.test(entry);
 }
 
 function indented(code: string, indent: string): string {
