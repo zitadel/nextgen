@@ -2606,6 +2606,27 @@ describe("<zitadel-login> config that arrives after upgrade", () => {
     expect(createFlows()).toHaveLength(1);
   });
 
+  it("does not restart when an attribute changes under a project handle that outranks it", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const element = await mount(host);
+
+    element.projectId = "ignored-project";
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(createFlows()).toHaveLength(1);
+  });
+
+  it("does not restart when the global handle is assigned as the project", async () => {
+    const element = await mountFromAttributes();
+    const handle = configureZitadel({ proxyPath: API_BASE, projectId: "demo-project" });
+
+    element.project = handle;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(createFlows()).toHaveLength(1);
+  });
+
   it("restarts when a project handle names a different project than its attributes", async () => {
     const element = await mountFromAttributes();
 
