@@ -311,6 +311,60 @@ the command a red check's summary names. A new suite is a turbo task that
 `check:cloud` lists, a job in `deployment-checks.yml` and a status in
 `production-checks.yml`'s `SUITES`.
 
+## Running the cloud locally
+
+`pnpm run cloud` (`moon run workspace:cloud`) runs this deployment at
+http://localhost:3000: `vercel dev -L` over `vercel.json`, every service behind
+the deployment's own routes on one origin, the server on SQLite. No Vercel
+account, link or secret is involved, and Go need not be installed: Vercel's Go
+builder downloads the version `go.mod` names. `CLOUD_DEV_PORT` moves the port;
+`CLOUD_DEV_DEBUG=1` shows why a service did not start, which `vercel dev` logs
+only at debug level.
+
+[`scripts/run-cloud.mjs`](../../scripts/run-cloud.mjs) builds what the
+services read from disk (the login UI the server embeds, the packages the
+console's and storybook's builds import, the docs' generated sources), mints a
+throwaway master key and root admin under `.zitadel/local/cloud/` on the first
+run, and starts `vercel dev`. Sign in to `/console/` with the login in
+`.zitadel/local/cloud/admin.json`. The SQLite database lives beside it, so a
+restart keeps its state; deleting the directory starts over.
+
+`vercel dev` reads `vercel.json` and nothing else (it ignores
+`--local-config`), so what it needs lives there, in fields a deployment does
+not use:
+
+- The `server` service's `entrypoint` names `apps/cloud/launcher`. In dev,
+  Vercel's Go builder builds that package and starts it on `$PORT`; a
+  deployment runs `build.sh`, which compiles the same package, and the
+  builder takes the build command's binary instead. Without
+  `CLOUD_DATABASE_URL` and outside a deployment, the launcher serves from
+  SQLite and migrates it at startup.
+- The `console` and `storybook` services' `devCommand` builds them and serves
+  the build behind the same service rewrites a deployment serves it behind.
+  Their dev servers cannot sit behind those rewrites, so their live loops stay
+  `moon run console:dev-real` and `moon run storybook:dev`. `NODE_ENV` is set
+  because `vercel dev` runs dev commands under `development`, which makes
+  `vite build` a development build.
+- The console's fallback to its `index.html` leaves `assets/` out. `vercel dev`
+  cannot see a service's files, so a fallback for every path would answer the
+  console's scripts with the page. A deployment answers a missing asset with a
+  404 instead of the page.
+
+The docs and the website run `next dev`. `.vercelignore` keeps `vercel dev`
+from watching what no deployment is built from, the desktop app's worktrees
+among them, and keeps a CLI deployment from uploading it.
+
+Where it differs from a deployment:
+
+- `vercel dev` drops a redirect's query, so an old
+  `/ui/console/claim?challenge_id=…` link arrives without its challenge; open
+  `/console/claim?…` instead.
+- `CLOUD_URL=http://localhost:3000 pnpm check:cloud` runs the deployment
+  checks against it. Two fail by design: the redirect's query above, and the
+  docs' assets, which `next dev` serves without the deployment's immutable
+  caching.
+- Services is a beta of the Vercel CLI; the script pins the CLI it drives.
+
 ## Rotating the master key
 
 The server re-wraps every project key to the current master key at startup
