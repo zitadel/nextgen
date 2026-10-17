@@ -310,6 +310,16 @@ export function entryText(source: string, keyIndex: number): string {
   return source.slice(open);
 }
 
+/**
+ * Whether an entry's text hooks the proxy's responses itself (`proxyRes`,
+ * `onProxyRes`). The redaction takes over writing every response, so a hook
+ * of the project's own would run against headers already sent; such an entry
+ * is left as it is. The CLI's generated entries before the redaction had none.
+ */
+export function hasResponseHook(entry: string): boolean {
+  return /proxyRes/i.test(entry);
+}
+
 function indented(code: string, indent: string): string {
   return code
     .split("\n")

@@ -6,6 +6,7 @@ import {
   EXCHANGE_REDACTION_MARKER,
   EXCHANGE_REDACTION_ZLIB,
   entryText,
+  hasResponseHook,
   exchangeRedactionFunctions,
   PROXY_CREDENTIAL_POLICY_MARKER,
   upgradeExchangeRedaction,
@@ -239,6 +240,8 @@ function redactExchange(source: string): string {
     source.includes(EXCHANGE_REDACTION_MARKER) ||
     // Only the managed entry's own choice counts: a sibling proxy may set it.
     /\bselfHandleResponse\b/.test(entryText(source, entry.index)) ||
+    // A hook of the project's own would run after the headers were sent.
+    hasResponseHook(entryText(source, entry.index)) ||
     !source.includes(EXCHANGE_ONLY_BEARER) ||
     !source.includes(UNREDACTED_WIRING)
   ) {

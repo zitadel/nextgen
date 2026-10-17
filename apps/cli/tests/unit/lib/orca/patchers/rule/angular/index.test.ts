@@ -220,6 +220,15 @@ describe("AngularPatcher.plan", () => {
     expect(proxyConfigEdit()(chosen)).toBe(chosen);
   });
 
+  it("keeps a managed proxy that hooks the proxy's responses itself", () => {
+    const hooked = unredactedProxyConf().replace(
+      "    onProxyReq: setBearer,\n",
+      '    onProxyRes: (proxyRes) => delete proxyRes.headers["set-cookie"],\n    onProxyReq: setBearer,\n',
+    );
+
+    expect(proxyConfigEdit()(hooked)).toBe(hooked);
+  });
+
   it("adds the redaction to a managed proxy written with CRLF line endings", () => {
     const edit = proxyConfigEdit();
 

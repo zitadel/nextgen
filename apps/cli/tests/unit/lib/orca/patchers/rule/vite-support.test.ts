@@ -235,6 +235,30 @@ export default defineConfig({
     );
   });
 
+  it("redacts the dev server's entry when a preview copy of the old entry comes first", () => {
+    const entry = /"\/__nextgen": [\s\S]*?\n {6}\}\n/.exec(UNREDACTED_CONFIG)?.[0] ?? "";
+    const preview = `  preview: {\n    proxy: {\n      ${entry}    },\n  },\n`;
+    const both = UNREDACTED_CONFIG.replace("  server: {", `${preview}  server: {`);
+
+    const [previewPart = "", serverPart = ""] = edit(both).split("  server: {");
+
+    expect(previewPart.slice(previewPart.indexOf("  preview: {"))).toBe(
+      both.slice(both.indexOf("  preview: {"), both.indexOf("  server: {")),
+    );
+    expect(serverPart).toContain("selfHandleResponse: true,");
+    expect(serverPart).toContain("zitadel:proxy:exchange-redaction:v2");
+    expect(edit(both)).toMatch(/^import zitadelZlib from "node:zlib";$/m);
+  });
+
+  it("keeps a generated entry that hooks the proxy's responses itself", () => {
+    const hooked = UNREDACTED_CONFIG.replace(
+      "        configure: (proxy) => {",
+      '        configure: (proxy) => {\n          proxy.on("proxyRes", (proxyRes) => { delete proxyRes.headers["set-cookie"]; });',
+    );
+
+    expect(edit(hooked)).toBe(hooked);
+  });
+
   it("keeps the config's own zlib import and adds the redaction's under its own name", () => {
     const own = 'import zlib from "zlib";\n';
 
