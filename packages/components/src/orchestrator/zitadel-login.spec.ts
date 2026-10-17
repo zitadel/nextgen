@@ -2456,6 +2456,7 @@ describe("<zitadel-login> resume-flow-id", () => {
     document.body.appendChild(host);
     const element = await mount(host);
     element.resumeFlowId = "flow_123";
+    expect(element.resumeFlowId).toBe("flow_123");
 
     element.resumeFlowId = value;
 

@@ -77,7 +77,7 @@ export class ZitadelLoginComponent {
   @Input() purpose: CreateFlowBodyPurpose = "login";
   @Input() flowName?: string;
   @Input() postSignInUrl?: string;
-  @Input() resumeFlowId?: string;
+  @Input() resumeFlowId?: string | null;
   @Input() locales?: Record<string, Partial<Record<string, string>>>;
   @Input() lang?: string;
   @Input() variant?: "widget" | "page";

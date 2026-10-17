@@ -69,6 +69,14 @@ describe("ZitadelLogin", () => {
     expect(el!.resumeFlowId).toBe("flow_123");
   });
 
+  it("reads a null resumeFlowId as no handle", () => {
+    const { container } = render(ZitadelLogin, {
+      props: { project, resumeFlowId: null },
+    });
+    const el = container.querySelector<ZitadelLoginElement>("zitadel-login");
+    expect(el!.resumeFlowId).toBe("");
+  });
+
   it("forwards locales and lang to the widget", () => {
     const locales = { en: { "identifier.title": "Welcome back" } };
     const { container } = render(ZitadelLogin, {

@@ -14,6 +14,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { PasswordToggleHarness } from "./__tests__/password-toggle-harness";
+import { ResumeFlowIdHarness } from "./__tests__/resume-flow-id-harness";
 import { businessLocales, ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
@@ -84,6 +85,12 @@ describe("ZitadelLogin", () => {
     const host = await renderWidget(<ZitadelLogin project={project} resumeFlowId="flow_123" />);
     const el = host.querySelector<ZitadelLoginElement>("zitadel-login");
     expect(el!.resumeFlowId).toBe("flow_123");
+  });
+
+  it("reads a null resumeFlowId as no handle", async () => {
+    const host = await renderWidget(<ZitadelLogin project={project} resumeFlowId={null} />);
+    const el = host.querySelector<ZitadelLoginElement>("zitadel-login");
+    expect(el!.resumeFlowId).toBe("");
   });
 
   it("forwards locales and lang to the widget", async () => {
@@ -250,5 +257,17 @@ describe("ZitadelLogin suppressPasswordToggle", () => {
     await expect.poll(() => window.__unsetSuppressPasswordToggle).toBeTypeOf("function");
     window.__unsetSuppressPasswordToggle!();
     await expect.poll(() => el().suppressPasswordToggle).toBe(false);
+  });
+});
+
+describe("ZitadelLogin resumeFlowId", () => {
+  it("drops the handle when the prop goes from a value back to unset", async () => {
+    const host = await renderWidget(<ResumeFlowIdHarness />);
+    const el = () => host.querySelector<ZitadelLoginElement>("zitadel-login")!;
+    await expect.poll(() => el().resumeFlowId).toBe("flow_123");
+
+    await expect.poll(() => window.__unsetResumeFlowId).toBeTypeOf("function");
+    window.__unsetResumeFlowId!();
+    await expect.poll(() => el().resumeFlowId).toBe("");
   });
 });

@@ -46,7 +46,7 @@ export default defineComponent({
       default: "login",
     },
     postSignInUrl: { type: String, default: undefined },
-    resumeFlowId: { type: String, default: undefined },
+    resumeFlowId: { type: String as PropType<string | null>, default: undefined },
     locales: {
       type: Object as PropType<Record<string, Partial<Record<string, string>>>>,
       default: undefined,
