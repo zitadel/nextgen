@@ -81,7 +81,7 @@ The SolidStart SDK is request middleware that proxies and verifies sessions on t
     });
     ```
 
-    Load the widget with `clientOnly`. It registers custom elements when imported, which throws during server rendering, so a top-level import in a route renders an empty page:
+    Load the widget with `clientOnly`. Importing `@zitadel/sdk-solid` in a route is safe during server rendering (the package ships a `solid` export condition that SolidStart compiles for the server), but the widget's `project` handle is set as an element property, which server-rendered markup cannot carry. `clientOnly` creates the widget in the browser with its config already in place:
 
     ```tsx
     import { clientOnly } from "@solidjs/start";
@@ -101,6 +101,9 @@ The SolidStart SDK is request middleware that proxies and verifies sessions on t
       );
     }
     ```
+
+    `ZitadelLogin` takes the callbacks `onFlowStep`, `onFlowInput`, `onFlowComplete`, `onFlowRedirect` and `onFlowError`; `ZitadelLogout` and `ZitadelSession` take `onSignout`, `onSessionMissing` when there is no session as the widget loads (the session card then goes to its `postSignOutUrl`), and `onSessionError` when loading the session or signing out fails some other way. Each receives the event detail. The signed-in card for a profile page is `ZitadelSession`, loaded the same way (`m.ZitadelSession`).
+
   </Tab>
 </Tabs>
 

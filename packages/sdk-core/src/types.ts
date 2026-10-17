@@ -59,6 +59,32 @@ export interface ZitadelSignoutDetail {
   readonly identifier: string;
 }
 
+/**
+ * Payload of the `zitadel-session-missing` event: the widget asked for the
+ * session and got the backend's no-session answer (a `401` with
+ * `auth.unauthorized`, a `404` with `sess.not_found`, or a session that names
+ * no user). A gateway's 401 or 404 without that code is not one; it fires
+ * `zitadel-session-error`. Empty for now; an object so fields can be added
+ * without breaking handlers.
+ */
+export type ZitadelSessionMissingDetail = Readonly<Record<never, never>>;
+
+/**
+ * Payload of the `zitadel-session-error` event: loading the identity
+ * (`phase: "load"`) or signing out (`phase: "signout"`) failed with something
+ * other than the backend's no-session answer, such as a 5xx, a network error,
+ * a gateway's page or a body that is not a session. The session may well be
+ * fine, so the widget keeps its surface and shows `message`. `status` is set
+ * when a response came back, and `code` when it carried the backend's error
+ * code.
+ */
+export interface ZitadelSessionErrorDetail {
+  readonly status?: number;
+  readonly code?: string;
+  readonly message: string;
+  readonly phase: "load" | "signout";
+}
+
 /* ───────────────────────────  SPA widget contract  ───────────────────────
  * Single source of truth shared by every SPA SDK (react, vue, angular, solid,
  * svelte, qwik). The event maps below declare which widget events exist and
@@ -81,15 +107,20 @@ export interface ZitadelLoginEventMap {
 /** Events emitted by `<zitadel-logout>`, keyed to their detail payload. */
 export interface ZitadelLogoutEventMap {
   "zitadel-signout": ZitadelSignoutDetail;
+  "zitadel-session-missing": ZitadelSessionMissingDetail;
+  "zitadel-session-error": ZitadelSessionErrorDetail;
 }
 
 /**
  * Events emitted by `<zitadel-session>`, keyed to their detail payload.
  * `zitadel-signout` reuses {@link ZitadelSignoutDetail} so the post-sign-in
- * card and the avatar menu speak the same sign-out contract.
+ * card and the avatar menu speak the same sign-out contract, and both report a
+ * visitor without a session through `zitadel-session-missing`.
  */
 export interface ZitadelSessionEventMap {
   "zitadel-signout": ZitadelSignoutDetail;
+  "zitadel-session-missing": ZitadelSessionMissingDetail;
+  "zitadel-session-error": ZitadelSessionErrorDetail;
 }
 
 /**
@@ -106,14 +137,18 @@ export const ZITADEL_LOGIN_EVENT_HANDLERS = {
   "zitadel-flow-error": "onFlowError",
 } as const satisfies Record<keyof ZitadelLoginEventMap, `on${string}`>;
 
-/** Maps the `<zitadel-logout>` event to the callback prop the SDKs expose. */
+/** Maps the `<zitadel-logout>` events to the callback props the SDKs expose. */
 export const ZITADEL_LOGOUT_EVENT_HANDLERS = {
   "zitadel-signout": "onSignout",
+  "zitadel-session-missing": "onSessionMissing",
+  "zitadel-session-error": "onSessionError",
 } as const satisfies Record<keyof ZitadelLogoutEventMap, `on${string}`>;
 
-/** Maps the `<zitadel-session>` event to the callback prop the SDKs expose. */
+/** Maps the `<zitadel-session>` events to the callback props the SDKs expose. */
 export const ZITADEL_SESSION_EVENT_HANDLERS = {
   "zitadel-signout": "onSignout",
+  "zitadel-session-missing": "onSessionMissing",
+  "zitadel-session-error": "onSessionError",
 } as const satisfies Record<keyof ZitadelSessionEventMap, `on${string}`>;
 
 /** Runtime list of `<zitadel-login>` event names (drives wiring + drift tests). */
@@ -176,6 +211,13 @@ export interface ZitadelLoginConfig {
   readonly flowName?: string;
   /** Where to navigate after a completed sign-in. */
   readonly postSignInUrl?: string;
+  /**
+   * An existing flow's id to resume instead of starting a new flow, for
+   * example one kept across a reload. Unset falls back to the `flow` query
+   * parameter a provider callback brings back; an id that no longer resolves
+   * starts a new flow.
+   */
+  readonly resumeFlowId?: string;
   /**
    * Copy overrides merged over the builtin locale dictionaries, keyed by
    * primary language subtag. Each dictionary may be partial — the widget

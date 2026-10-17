@@ -1,9 +1,14 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import '@zitadel/components';
   import type { ZitadelLogout as ZitadelLogoutElement } from '@zitadel/components';
 
-  import type { ZitadelLogoutProps, ZitadelSignoutDetail } from './types';
-  import { assignGiven } from './given';
+  import type {
+    ZitadelLogoutProps,
+    ZitadelSessionErrorDetail,
+    ZitadelSessionMissingDetail,
+    ZitadelSignoutDetail,
+  } from './types';
 
   let {
     project,
@@ -12,7 +17,10 @@
     postSignOutUrl,
     theme,
     onSignout,
-  }: ZitadelLogoutProps = $props();
+    onSessionMissing,
+    onSessionError,
+    children,
+  }: ZitadelLogoutProps & { children?: Snippet } = $props();
 
   let el: ZitadelLogoutElement | undefined = $state();
 
@@ -25,14 +33,6 @@
     return el;
   }
 
-  // Props the element has defaults for are assigned only when given; a
-  // binding would assign `undefined` and overwrite the default.
-  $effect(() => {
-    if (el) {
-      assignGiven(el, { theme });
-    }
-  });
-
   $effect(() => {
     const node = el;
     if (!node) {
@@ -40,9 +40,17 @@
     }
     const signout = (event: Event): void =>
       onSignout?.((event as CustomEvent<ZitadelSignoutDetail>).detail);
+    const sessionMissing = (event: Event): void =>
+      onSessionMissing?.((event as CustomEvent<ZitadelSessionMissingDetail>).detail);
+    const sessionError = (event: Event): void =>
+      onSessionError?.((event as CustomEvent<ZitadelSessionErrorDetail>).detail);
     node.addEventListener('zitadel-signout', signout);
+    node.addEventListener('zitadel-session-missing', sessionMissing);
+    node.addEventListener('zitadel-session-error', sessionError);
     return () => {
       node.removeEventListener('zitadel-signout', signout);
+      node.removeEventListener('zitadel-session-missing', sessionMissing);
+      node.removeEventListener('zitadel-session-error', sessionError);
     };
   });
 </script>
@@ -53,4 +61,8 @@
   project-id={projectId}
   proxy-path={proxyPath}
   post-sign-out-url={postSignOutUrl}
-></zitadel-logout>
+  {theme}
+>
+  <!-- A `<template>` child becomes the element's custom sign-out control. -->
+  {@render children?.()}
+</zitadel-logout>

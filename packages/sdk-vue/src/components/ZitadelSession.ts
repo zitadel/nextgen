@@ -1,6 +1,10 @@
 import type { ZitadelProject } from "@zitadel/api/config";
 import type { ZitadelSession as ZitadelSessionElement } from "@zitadel/components";
-import type { ZitadelSignoutDetail } from "@zitadel/sdk-core/types";
+import type {
+  ZitadelSessionErrorDetail,
+  ZitadelSessionMissingDetail,
+  ZitadelSignoutDetail,
+} from "@zitadel/sdk-core/types";
 
 import { defineComponent, h, type PropType, ref, toRaw } from "vue";
 import "@zitadel/components";
@@ -10,7 +14,9 @@ import "@zitadel/components";
  * "signed in as" card. See {@link ZitadelLogin} for the rendering strategy.
  * Supply the SDK handle from `configureZitadel(...)` as `:project`, or the
  * discrete `:project-id` / `:proxy-path` the widget reads instead. The widget's
- * `zitadel-signout` event is re-emitted with its detail as `signout`.
+ * `zitadel-signout` event is re-emitted with its detail as `signout`,
+ * `zitadel-session-missing` as `sessionMissing`, and `zitadel-session-error` as
+ * `sessionError`. It takes no slot content: `<zitadel-session>` has no slot.
  *
  * A Vue `ref` on this component resolves to the component *instance*; the
  * rendered `<zitadel-session>` DOM node is exposed as `element`.
@@ -28,27 +34,37 @@ export default defineComponent({
     theme: { type: String as PropType<"light" | "dark" | "auto">, default: undefined },
     suppressHeader: { type: Boolean, default: undefined },
   },
-  emits: ["signout"],
+  emits: ["signout", "sessionMissing", "sessionError"],
   setup(props, { emit, expose }) {
     const element = ref<ZitadelSessionElement | null>(null);
     expose({ element });
 
     return () =>
-      h("zitadel-session", {
-        ref: element,
-        // Hand the Lit element the raw SDK handle, not Vue's reactive proxy.
-        project: toRaw(props.project),
-        projectId: props.projectId,
-        proxyPath: props.proxyPath,
-        "post-sign-out-url": props.postSignOutUrl,
-        heading: props.heading,
-        "logout-label": props.logoutLabel,
-        variant: props.variant,
-        theme: props.theme,
-        suppressHeader: props.suppressHeader,
-        onZitadelSignout: (event: CustomEvent<ZitadelSignoutDetail>) => {
-          emit("signout", event.detail);
+      h(
+        "zitadel-session",
+        {
+          ref: element,
+          // Hand the Lit element the raw SDK handle, not Vue's reactive proxy.
+          project: toRaw(props.project),
+          projectId: props.projectId,
+          proxyPath: props.proxyPath,
+          "post-sign-out-url": props.postSignOutUrl,
+          heading: props.heading,
+          "logout-label": props.logoutLabel,
+          variant: props.variant,
+          theme: props.theme,
+          suppressHeader: props.suppressHeader,
+          onZitadelSignout: (event: CustomEvent<ZitadelSignoutDetail>) => {
+            emit("signout", event.detail);
+          },
+          onZitadelSessionMissing: (event: CustomEvent<ZitadelSessionMissingDetail>) => {
+            emit("sessionMissing", event.detail);
+          },
+          onZitadelSessionError: (event: CustomEvent<ZitadelSessionErrorDetail>) => {
+            emit("sessionError", event.detail);
+          },
         },
-      });
+        // No slot content: `<zitadel-session>` has no slot to show it in.
+      );
   },
 });

@@ -13,6 +13,11 @@ export default defineConfig({
     },
     rollupOptions: {
       external: [/^@zitadel\//, /^react($|\/)/, /^react-dom($|\/)/, /^@lit\/react($|\/)/],
+      // Every export is a hook-using client component. Without the directive a
+      // Next App Router server component importing it crashes in React's
+      // `react-server` build; the bundler drops source-level directives, so it
+      // goes on as a banner.
+      output: { banner: '"use client";' },
     },
   },
   plugins: [

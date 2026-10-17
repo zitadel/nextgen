@@ -12,12 +12,14 @@ import {
   ZITADEL_LOGOUT_EVENT_HANDLERS,
   ZITADEL_SESSION_EVENT_HANDLERS,
 } from "@zitadel/sdk-core/types";
+import { type Component, createRawSnippet } from "svelte";
 import { describe, expect, it, vi } from "vitest";
 
 import { businessLocales } from "./lib/index";
 import ZitadelLogin from "./lib/ZitadelLogin.svelte";
 import ZitadelLogout from "./lib/ZitadelLogout.svelte";
 import ZitadelSession from "./lib/ZitadelSession.svelte";
+import LogoutTemplate from "./__tests__/LogoutTemplate.svelte";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 
@@ -172,34 +174,117 @@ describe("businessLocales", () => {
   });
 });
 
-// Assigning `undefined` to a custom-element property overwrites its default,
-// so an unset prop must leave the element's own default in place.
-describe("unset props keep the element's defaults", () => {
-  it.each([
-    ["heading", "Signed in as"],
-    ["variant", "widget"],
-    ["theme", ""],
-    ["suppressHeader", false],
-  ] as const)("ZitadelSession keeps the default %s", (prop, expected) => {
-    const { container } = render(ZitadelSession, { props: { project } });
+// The element's own defaults, which the wrappers must leave in place when a
+// prop is unset and restore when a prop is cleared.
+const LOGIN_DEFAULTS = {
+  purpose: "login",
+  variant: "widget",
+  theme: "",
+  lang: "",
+  suppressHeader: false,
+  resumeFlowId: "",
+} as const;
+const LOGIN_VALUES = {
+  purpose: "register",
+  variant: "page",
+  theme: "light",
+  lang: "de",
+  suppressHeader: true,
+  resumeFlowId: "flow_123",
+} as const;
+const SESSION_DEFAULTS = {
+  heading: "Signed in as",
+  logoutLabel: "Sign out",
+  variant: "widget",
+  theme: "",
+  suppressHeader: false,
+} as const;
+const SESSION_VALUES = {
+  heading: "Welcome",
+  logoutLabel: "Leave",
+  variant: "page",
+  theme: "dark",
+  suppressHeader: true,
+} as const;
 
-    expect(container.querySelector<ZitadelSessionElement>("zitadel-session")![prop]).toBe(expected);
+describe.each([
+  ["ZitadelLogin", "zitadel-login", ZitadelLogin, LOGIN_DEFAULTS, LOGIN_VALUES],
+  ["ZitadelSession", "zitadel-session", ZitadelSession, SESSION_DEFAULTS, SESSION_VALUES],
+  ["ZitadelLogout", "zitadel-logout", ZitadelLogout, { theme: "" }, { theme: "dark" }],
+] as const)("%s element defaults", (_name, tag, component, defaults, values) => {
+  const prop = (el: Element, key: string) => (el as unknown as Record<string, unknown>)[key];
+  const Component = component as unknown as Component<Record<string, unknown>>;
+
+  it.each(Object.entries(defaults))("keeps %s at its default when unset", (key, fallback) => {
+    const { container } = render(Component, { props: { project } });
+    expect(prop(container.querySelector(tag)!, key)).toBe(fallback);
   });
 
-  it.each([
-    ["variant", "widget"],
-    ["theme", ""],
-    ["suppressHeader", false],
-    ["lang", ""],
-  ] as const)("ZitadelLogin keeps the default %s", (prop, expected) => {
-    const { container } = render(ZitadelLogin, { props: { project } });
+  it.each(Object.entries(defaults))(
+    "restores %s to its default when cleared",
+    async (key, fallback) => {
+      const given = (values as Record<string, unknown>)[key];
+      const { container, rerender } = render(Component, { props: { project, [key]: given } });
+      expect(prop(container.querySelector(tag)!, key)).toBe(given);
 
-    expect(container.querySelector<ZitadelLoginElement>("zitadel-login")![prop]).toBe(expected);
+      await rerender({ [key]: undefined });
+
+      expect(prop(container.querySelector(tag)!, key)).toBe(fallback);
+    },
+  );
+});
+
+describe("ZitadelSession children", () => {
+  // `<zitadel-session>` has no slot, so content passed in would never render.
+  it("puts no children into the element", () => {
+    const children = createRawSnippet(() => ({ render: () => "<span>extra</span>" }));
+    const { container } = render(ZitadelSession as unknown as Component<Record<string, unknown>>, {
+      props: { project, children },
+    });
+    expect(container.querySelector("zitadel-session")?.childElementCount).toBe(0);
   });
+});
 
-  it("ZitadelLogout keeps the default theme", () => {
-    const { container } = render(ZitadelLogout, { props: { project } });
+describe.each([
+  ["ZitadelLogout", "zitadel-logout", ZitadelLogout],
+  ["ZitadelLogin", "zitadel-login", ZitadelLogin],
+] as const)("%s children", (_name, tag, component) => {
+  it("renders children into the element's light DOM", () => {
+    const children = createRawSnippet(() => ({
+      render: () => '<span slot="attribution-trailing">extra</span>',
+    }));
+    const { container } = render(component as unknown as Component<Record<string, unknown>>, {
+      props: { project, children },
+    });
+    expect(container.querySelector(`${tag} > span[slot="attribution-trailing"]`)).not.toBeNull();
+  });
+});
 
-    expect(container.querySelector<ZitadelLogoutElement>("zitadel-logout")!.theme).toBe("");
+describe("ZitadelLogout template children", () => {
+  it("projects a <template> child as the sign-out control", async () => {
+    const children = createRawSnippet(() => ({
+      render: () => '<template><button data-action="logout">Bye</button></template>',
+    }));
+    const { container } = render(ZitadelLogout, { props: { project, children } });
+    const el = container.querySelector<ZitadelLogoutElement>("zitadel-logout")!;
+    await el.updateComplete;
+    expect(el.querySelector("span [data-action='logout']")?.textContent).toBe("Bye");
+  });
+});
+
+/** The text a `<template>` carries, wherever the renderer put its children. */
+function templateText(host: Element): string {
+  const template = host.querySelector("template");
+  return `${template?.content.textContent ?? ""}${template?.textContent ?? ""}`;
+}
+
+describe("ZitadelLogout template placeholders", () => {
+  // Svelte reads `{{display}}` as an expression; `{'{{display}}'}` is the
+  // escape the README documents, so the element receives the placeholder.
+  it("reach the element verbatim from a string expression", () => {
+    const { container } = render(LogoutTemplate, { props: { project } });
+    expect(templateText(container.querySelector("zitadel-logout")!)).toContain(
+      "Sign out {{display}}",
+    );
   });
 });

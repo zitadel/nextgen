@@ -11,14 +11,17 @@ import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
 import { zitadelTrustmarkInnerHtml } from "../internal/attribution-markup.js";
 import type { Liquid, Template } from "liquidjs";
 import { css, html, LitElement, nothing, type PropertyValues } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { property, state } from "lit/decorators.js";
 
 import "../atoms/index.js";
 import type { ZlFieldInputDetail, ZlSubmitDetail } from "../atoms/index.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 
+import { onConfigChange } from "../internal/config-change.js";
+import { defineOnce } from "../internal/define-once.js";
 import { emit } from "../internal/emit.js";
 import { escapeHtml } from "../internal/escape-html.js";
+import { orDefault } from "../internal/or-default.js";
 import {
   exchangeSession,
   getCurrentStep,
@@ -34,7 +37,7 @@ import { stampExportparts } from "./exportparts.js";
 import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
 import { en, builtinLocales, mergeLocale, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
-import { resolveApi } from "./resolve-api.js";
+import { resolveApi, resolveProject } from "./resolve-api.js";
 import { createSanitiser } from "./sanitiser.js";
 import { ZitadelSurface } from "./surface.js";
 import type { FlowError, FlowIdentity, LiquidContext } from "./template-context.js";
@@ -162,7 +165,7 @@ function apiErrorCode(error: unknown): string {
     : "";
 }
 
-@customElement("zitadel-login")
+@defineOnce("zitadel-login")
 export class ZitadelLogin extends ZitadelSurface {
   static override shadowRootOptions: ShadowRootInit = {
     ...LitElement.shadowRootOptions,
@@ -185,7 +188,19 @@ export class ZitadelLogin extends ZitadelSurface {
   // variant-specific behavior on top of the shared surface polarity: `page`
   // focuses the first field on load, `widget` never steals focus.
 
-  @property({ type: String }) accessor purpose: CreateFlowBodyPurpose = "login";
+  /**
+   * What the flow is for (`login`, `register`, …). Unset, `null` or `""` mean
+   * `login`: the server requires a purpose, so a framework clearing the prop
+   * must not start a flow without one.
+   */
+  @property({ type: String })
+  get purpose(): CreateFlowBodyPurpose {
+    return this.#purpose;
+  }
+  set purpose(value: CreateFlowBodyPurpose | null | undefined | "") {
+    this.#purpose = orDefault(value, "login");
+  }
+  #purpose: CreateFlowBodyPurpose = "login";
 
   /**
    * Name of the flow definition to run, matching the `name` in its flow
@@ -214,8 +229,16 @@ export class ZitadelLogin extends ZitadelSurface {
    * Leaving it empty falls back to the `flow` query parameter, which is how a
    * provider callback hands the flow back (see {@link flowIdFromLocation}), so
    * a host page needs no code of its own for external sign-in to finish.
+   * Unset, `null` or `""` all mean "no handle".
    */
-  @property({ type: String, attribute: "resume-flow-id" }) accessor resumeFlowId = "";
+  @property({ type: String, attribute: "resume-flow-id" })
+  get resumeFlowId(): string {
+    return this.#resumeFlowId;
+  }
+  set resumeFlowId(value: string | null | undefined) {
+    this.#resumeFlowId = orDefault(value, "");
+  }
+  #resumeFlowId = "";
 
   /**
    * Hide the show/hide button on password fields. The button is shown by
@@ -274,7 +297,14 @@ export class ZitadelLogin extends ZitadelSurface {
    * to a built-in locale dictionary. Falls back to auto-detection from
    * `document.documentElement.lang` or `navigator.language` when empty.
    */
-  @property({ type: String }) override accessor lang = "";
+  @property({ type: String })
+  override get lang(): string {
+    return this.#lang;
+  }
+  override set lang(value: string | null | undefined) {
+    this.#lang = orDefault(value, "");
+  }
+  #lang = "";
 
   /**
    * Custom locale dictionaries keyed by language code. Entries may be
@@ -403,11 +433,18 @@ export class ZitadelLogin extends ZitadelSurface {
     return root;
   }
 
+  /** Unsubscribes from late `configureZitadel()` calls; set while connected. */
+  private unsubscribeConfig: (() => void) | undefined;
+
   override connectedCallback(): void {
     super.connectedCallback();
     if (typeof window !== "undefined") {
       window.addEventListener("popstate", this.handlePopState);
     }
+    // A global config that arrives after the first start changes no property,
+    // so `updated` never sees it; without this the "requires a configured
+    // project" error would stay until some unrelated prop changed.
+    this.unsubscribeConfig = onConfigChange(() => this.restartForLateConfig());
   }
 
   override disconnectedCallback(): void {
@@ -415,6 +452,8 @@ export class ZitadelLogin extends ZitadelSurface {
     if (typeof window !== "undefined") {
       window.removeEventListener("popstate", this.handlePopState);
     }
+    this.unsubscribeConfig?.();
+    this.unsubscribeConfig = undefined;
   }
 
   /**
@@ -772,18 +811,24 @@ export class ZitadelLogin extends ZitadelSurface {
   private restartPending = false;
 
   private flowConfigKey(): string {
-    const handle = this.project;
-    return JSON.stringify([
-      handle?.projectId,
-      handle?.proxyPath,
-      handle?.url,
-      handle?.publishableKey,
-      this.projectId,
-      this.proxyPath,
-      this.url,
-      this.purpose,
-      this.flowName,
-    ]);
+    // Keyed on the project `resolveApi` actually picks, not on the channel that
+    // supplied it: a late `configureZitadel()` or a new handle still counts as a
+    // change, but the same project arriving as attributes first and as a
+    // `project` handle or global config later (what a server-rendered Qwik
+    // widget does) does not start a second flow.
+    const resolved = resolveProject(this.project, this.projectAttrs);
+    // Every unset spelling (`undefined`, `null`, `""`) is the same config, so
+    // a framework re-binding an empty prop does not restart an untouched flow.
+    return JSON.stringify(
+      [
+        resolved?.projectId,
+        resolved?.proxyPath,
+        resolved?.url,
+        resolved?.publishableKey,
+        this.purpose,
+        this.flowName,
+      ].map((value) => value || ""),
+    );
   }
 
   /**

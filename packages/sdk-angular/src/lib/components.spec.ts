@@ -4,7 +4,9 @@ import type {
   ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
 
+import { Component, CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
 import { render } from "@testing-library/angular";
+import { _resetConfigForTesting } from "@zitadel/api/config";
 import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
@@ -13,12 +15,46 @@ import {
 } from "@zitadel/sdk-core/types";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { businessLocales } from "../public-api";
+import { businessLocales, configureZitadel, getZitadelConfig } from "../public-api";
 import { ZitadelLoginComponent } from "./zitadel-login.component";
 import { ZitadelLogoutComponent } from "./zitadel-logout.component";
 import { ZitadelSessionComponent } from "./zitadel-session.component";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
+
+@Component({
+  standalone: true,
+  imports: [ZitadelLogoutComponent],
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
+  template: `<zitadel-auth-logout [project]="project"
+    ><template ngNonBindable
+      ><b>{{initial}}</b><button data-action="logout">Bye</button></template
+    ></zitadel-auth-logout
+  >`,
+})
+class LogoutWithTemplate {
+  project = project;
+}
+
+@Component({
+  standalone: true,
+  imports: [ZitadelLoginComponent],
+  template: `<zitadel-auth-login [project]="project"
+    ><span slot="attribution-trailing">Ours</span></zitadel-auth-login
+  >`,
+})
+class LoginWithAttribution {
+  project = project;
+}
+
+@Component({
+  standalone: true,
+  imports: [ZitadelSessionComponent],
+  template: `<zitadel-auth-session [project]="project"><span>extra</span></zitadel-auth-session>`,
+})
+class SessionWithContent {
+  project = project;
+}
 
 // `'zitadel-flow-step'` → `'flowStep'`: the camelCased `@Output()` name Angular
 // exposes for the event (the `zitadel-` prefix dropped, the rest camelCased).
@@ -41,8 +77,66 @@ const outputOf = (instance: object, event: string): SubscribableOutput => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  _resetConfigForTesting();
   document.body.innerHTML = "";
 });
+
+const locales = { en: { "identifier.title": "Welcome back" } };
+
+// One row per input: the value the wrapper is given and the element property
+// it must land on (`project` and `locales` are compared by identity).
+const loginInputs: ReadonlyArray<readonly [string, unknown]> = [
+  ["purpose", "register"],
+  ["flowName", "passkey-only"],
+  ["postSignInUrl", "/home"],
+  ["resumeFlowId", "flow_123"],
+  ["variant", "page"],
+  ["theme", "light"],
+  ["suppressHeader", true],
+  ["lang", "de"],
+  ["locales", locales],
+  ["projectId", "proj-other"],
+  ["proxyPath", "/__other"],
+];
+
+const logoutInputs: ReadonlyArray<readonly [string, unknown]> = [
+  ["postSignOutUrl", "/bye"],
+  ["theme", "dark"],
+];
+
+const sessionInputs: ReadonlyArray<readonly [string, unknown]> = [
+  ["postSignOutUrl", "/bye"],
+  ["heading", "Welcome"],
+  ["logoutLabel", "Leave"],
+  ["variant", "page"],
+  ["theme", "light"],
+  ["suppressHeader", true],
+];
+
+// The element defaults a wrapper must leave in place when an input is unset,
+// and restore when a set input is cleared.
+const loginDefaults: ReadonlyArray<readonly [string, unknown, unknown]> = [
+  ["purpose", "register", "login"],
+  ["variant", "page", "widget"],
+  ["theme", "light", ""],
+  ["lang", "de", ""],
+  ["suppressHeader", true, false],
+  ["resumeFlowId", "flow_123", ""],
+];
+
+const logoutDefaults: ReadonlyArray<readonly [string, unknown, unknown]> = [["theme", "dark", ""]];
+
+const sessionDefaults: ReadonlyArray<readonly [string, unknown, unknown]> = [
+  ["heading", "Welcome", "Signed in as"],
+  ["logoutLabel", "Leave", "Sign out"],
+  ["variant", "page", "widget"],
+  ["theme", "light", ""],
+  ["suppressHeader", true, false],
+];
+
+// Reads a property off the rendered custom element by name.
+const propOf = (el: Element | null, name: string): unknown =>
+  (el as unknown as Record<string, unknown> | null)?.[name];
 
 describe("ZitadelLogin", () => {
   it("binds the project handle as a property", async () => {
@@ -63,14 +157,28 @@ describe("ZitadelLogin", () => {
     expect(el!.proxyPath).toBe("/__nextgen");
   });
 
-  it("forwards locales and lang to the widget", async () => {
-    const locales = { en: { "identifier.title": "Welcome back" } };
-    const { container } = await render(ZitadelLoginComponent, {
-      inputs: { project, locales, lang: "de" },
-    });
+  it("records the configureZitadel() handle as the global config", () => {
+    const handle = configureZitadel({ projectId: "proj-test", proxyPath: "/__nextgen" });
+    expect(getZitadelConfig()).toBe(handle);
+  });
+
+  it("keeps the publishable key on the configureZitadel() handle", () => {
+    const handle = configureZitadel({ projectId: "proj-test", publishableKey: "pk_test" });
+    expect(handle.publishableKey).toBe("pk_test");
+  });
+
+  it("starts from the configureZitadel() handle when no [project] is bound", async () => {
+    configureZitadel({ projectId: "proj-test", proxyPath: "/__nextgen" });
+    const { container } = await render(ZitadelLoginComponent);
     const el = container.querySelector<ZitadelLoginElement>("zitadel-login");
-    expect(el!.locales).toBe(locales);
-    expect(el!.lang).toBe("de");
+    await el!.updateComplete;
+    expect(el!.shadowRoot!.textContent).not.toContain("requires a configured project");
+  });
+
+  it("projects its content into the element", async () => {
+    const { container } = await render(LoginWithAttribution);
+    const el = container.querySelector("zitadel-login");
+    expect(el!.querySelector('[slot="attribution-trailing"]')?.textContent).toBe("Ours");
   });
 
   it.each(Object.keys(ZITADEL_LOGIN_EVENT_HANDLERS))(
@@ -87,6 +195,27 @@ describe("ZitadelLogin", () => {
       expect(spy).toHaveBeenCalledWith(detail);
     },
   );
+
+  it.each(loginInputs)("forwards %s to the element", async (name, value) => {
+    const { container } = await render(ZitadelLoginComponent, {
+      inputs: { project, [name]: value },
+    });
+    expect(propOf(container.querySelector("zitadel-login"), name)).toBe(value);
+  });
+
+  it.each(loginDefaults)("keeps the %s default when unset", async (name, _set, fallback) => {
+    const { container } = await render(ZitadelLoginComponent, { inputs: { project } });
+    expect(propOf(container.querySelector("zitadel-login"), name)).toBe(fallback);
+  });
+
+  it.each(loginDefaults)("restores the %s default when cleared", async (name, value, fallback) => {
+    const { fixture, container } = await render(ZitadelLoginComponent, {
+      inputs: { project, [name]: value },
+    });
+    fixture.componentRef.setInput(name, undefined);
+    fixture.detectChanges();
+    expect(propOf(container.querySelector("zitadel-login"), name)).toBe(fallback);
+  });
 
   it("exposes the underlying element via the element getter", async () => {
     const { fixture, container } = await render(ZitadelLoginComponent, {
@@ -135,6 +264,27 @@ describe("ZitadelLogout", () => {
     },
   );
 
+  it.each(logoutInputs)("forwards %s to the element", async (name, value) => {
+    const { container } = await render(ZitadelLogoutComponent, {
+      inputs: { project, [name]: value },
+    });
+    expect(propOf(container.querySelector("zitadel-logout"), name)).toBe(value);
+  });
+
+  it.each(logoutDefaults)("keeps the %s default when unset", async (name, _set, fallback) => {
+    const { container } = await render(ZitadelLogoutComponent, { inputs: { project } });
+    expect(propOf(container.querySelector("zitadel-logout"), name)).toBe(fallback);
+  });
+
+  it.each(logoutDefaults)("restores the %s default when cleared", async (name, value, fallback) => {
+    const { fixture, container } = await render(ZitadelLogoutComponent, {
+      inputs: { project, [name]: value },
+    });
+    fixture.componentRef.setInput(name, undefined);
+    fixture.detectChanges();
+    expect(propOf(container.querySelector("zitadel-logout"), name)).toBe(fallback);
+  });
+
   it("exposes the underlying element via the element getter", async () => {
     const { fixture, container } = await render(ZitadelLogoutComponent, {
       inputs: { project },
@@ -148,7 +298,33 @@ describe("ZitadelLogout", () => {
   });
 });
 
+describe("ZitadelLogout template mode", () => {
+  it("receives the projected <template> child", async () => {
+    const { container } = await render(LogoutWithTemplate);
+    const el = container.querySelector("zitadel-logout");
+    expect(el!.querySelector("template")).not.toBeNull();
+  });
+
+  it("renders the projected template into its light DOM", async () => {
+    const { container } = await render(LogoutWithTemplate);
+    const el = container.querySelector("zitadel-logout");
+    expect(el!.querySelector("span [data-action='logout']")?.textContent).toBe("Bye");
+  });
+
+  it("leaves the template placeholders for the element to fill", async () => {
+    const { container } = await render(LogoutWithTemplate);
+    const el = container.querySelector("zitadel-logout");
+    expect(el!.querySelector("span b")?.textContent).toBe("?");
+  });
+});
+
 describe("ZitadelSession", () => {
+  // `<zitadel-session>` has no slot, so projected content would never render.
+  it("projects no content into the element", async () => {
+    const { container } = await render(SessionWithContent);
+    expect(container.querySelector("zitadel-session")?.childElementCount).toBe(0);
+  });
+
   it("binds the project handle as a property", async () => {
     const { container } = await render(ZitadelSessionComponent, {
       inputs: { project },
@@ -189,6 +365,30 @@ describe("ZitadelSession", () => {
       const detail = { probe: eventName };
       el?.dispatchEvent(new CustomEvent(eventName, { detail }));
       expect(spy).toHaveBeenCalledWith(detail);
+    },
+  );
+
+  it.each(sessionInputs)("forwards %s to the element", async (name, value) => {
+    const { container } = await render(ZitadelSessionComponent, {
+      inputs: { project, [name]: value },
+    });
+    expect(propOf(container.querySelector("zitadel-session"), name)).toBe(value);
+  });
+
+  it.each(sessionDefaults)("keeps the %s default when unset", async (name, _set, fallback) => {
+    const { container } = await render(ZitadelSessionComponent, { inputs: { project } });
+    expect(propOf(container.querySelector("zitadel-session"), name)).toBe(fallback);
+  });
+
+  it.each(sessionDefaults)(
+    "restores the %s default when cleared",
+    async (name, value, fallback) => {
+      const { fixture, container } = await render(ZitadelSessionComponent, {
+        inputs: { project, [name]: value },
+      });
+      fixture.componentRef.setInput(name, undefined);
+      fixture.detectChanges();
+      expect(propOf(container.querySelector("zitadel-session"), name)).toBe(fallback);
     },
   );
 

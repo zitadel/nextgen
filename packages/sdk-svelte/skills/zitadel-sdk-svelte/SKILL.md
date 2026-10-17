@@ -30,7 +30,7 @@ npx @zitadel/cli@alpha setup --framework svelte --non-interactive --json
 ## Install
 
 ```sh
-npm install @zitadel/sdk-svelte
+npm install @zitadel/sdk-svelte@alpha
 ```
 
 Requires Svelte `^5.0.0` (peer dependency) and TypeScript `>= 5.0` — the
@@ -38,21 +38,31 @@ published types use `export type *`.
 
 ## Integrate
 
-The widgets are **browser** components. In SvelteKit, mount them in a
-`+page.svelte` (they render client-side). The minimal pattern, from the README:
+The widgets are **browser** components: the package ships client-compiled
+Svelte, so server rendering them fails. In a Vite SPA, render them directly. In
+SvelteKit, where a `+page.svelte` also renders on the server, mount them after
+`onMount`:
 
 ```svelte
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { ZitadelLogin, ZitadelLogout, configureZitadel } from '@zitadel/sdk-svelte';
 
   const project = configureZitadel({
     projectId: import.meta.env.VITE_ZITADEL_PROJECT_ID,
     proxyPath: '/__nextgen',
   });
+
+  let mounted = $state(false);
+  onMount(() => {
+    mounted = true;
+  });
 </script>
 
-<ZitadelLogin {project} purpose="login" postSignInUrl="/" />
-<ZitadelLogout {project} postSignOutUrl="/login" />
+{#if mounted}
+  <ZitadelLogin {project} purpose="login" postSignInUrl="/" />
+  <ZitadelLogout {project} postSignOutUrl="/login" />
+{/if}
 ```
 
 - **Configure once** with `configureZitadel({ projectId, proxyPath })` and pass
@@ -64,8 +74,13 @@ The widgets are **browser** components. In SvelteKit, mount them in a
 - **Post URLs.** `postSignInUrl` (on `ZitadelLogin`) and `postSignOutUrl` (on
   `ZitadelLogout`) are where the browser lands after each flow.
 - **Session card.** `<ZitadelSession {project} />` renders the signed-in user.
-- **Flow callbacks** are optional props: `onFlowStep`, `onFlowInput`,
-  `onFlowComplete`, `onFlowRedirect`, `onFlowError` (and `onSignout` on logout).
+- **No session.** When the visitor has no session, the session widgets render nothing and call
+  `onSessionMissing`; the session card also goes to its `postSignOutUrl` (unless that is the page it
+  is on), so point it at the login page. Any other failure (a 5xx, a network
+  error) keeps the widget, shows the error and calls `onSessionError`.
+- **Event callbacks** are optional `on…` props (for example `onFlowComplete`
+  on the login, `onSignout` on logout and the session card); the README and the
+  types list them all.
 
 ## Read these, don't guess
 
@@ -92,5 +107,5 @@ The public exports are `ZitadelLogin`, `ZitadelLogout`, `ZitadelSession`,
 - **`proxyPath` must reach the backend.** A same-origin path needs a proxy in
   front of your app; without one, point `proxyPath` at the backend origin
   directly (dev only, cross-origin).
-- **Browser-only.** The components render the auth UI client-side; do not expect
-  them to run during SvelteKit SSR.
+- **Browser-only.** The components render the auth UI client-side; under
+  SvelteKit, gate them behind `onMount` as shown above.

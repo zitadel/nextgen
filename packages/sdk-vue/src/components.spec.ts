@@ -60,6 +60,15 @@ describe("ZitadelLogin", () => {
     expect(el!.proxyPath).toBe("/__nextgen");
   });
 
+  it("declares resumeFlowId as a prop and forwards it to the widget", () => {
+    const { container } = render(ZitadelLogin, {
+      props: { project, resumeFlowId: "flow_123" },
+    });
+    const el = container.querySelector<ZitadelLoginElement>("zitadel-login");
+    expect(Object.keys(ZitadelLogin.props)).toContain("resumeFlowId");
+    expect(el!.resumeFlowId).toBe("flow_123");
+  });
+
   it("forwards locales and lang to the widget", () => {
     const locales = { en: { "identifier.title": "Welcome back" } };
     const { container } = render(ZitadelLogin, {
@@ -187,5 +196,129 @@ describe("ZitadelSession", () => {
 describe("businessLocales", () => {
   it("re-exports the business copy overlay from @zitadel/components", () => {
     expect(businessLocales).toBe(componentsBusinessLocales);
+  });
+});
+
+// The element's own defaults, which the wrappers must leave in place when a
+// prop is unset and restore when a prop is cleared.
+const LOGIN_DEFAULTS = {
+  purpose: "login",
+  variant: "widget",
+  theme: "",
+  lang: "",
+  suppressHeader: false,
+  resumeFlowId: "",
+} as const;
+const LOGIN_VALUES = {
+  purpose: "register",
+  variant: "page",
+  theme: "light",
+  lang: "de",
+  suppressHeader: true,
+  resumeFlowId: "flow_123",
+} as const;
+const SESSION_DEFAULTS = {
+  heading: "Signed in as",
+  logoutLabel: "Sign out",
+  variant: "widget",
+  theme: "",
+  suppressHeader: false,
+} as const;
+const SESSION_VALUES = {
+  heading: "Welcome",
+  logoutLabel: "Leave",
+  variant: "page",
+  theme: "dark",
+  suppressHeader: true,
+} as const;
+
+describe.each([
+  ["ZitadelLogin", "zitadel-login", ZitadelLogin, LOGIN_DEFAULTS, LOGIN_VALUES],
+  ["ZitadelSession", "zitadel-session", ZitadelSession, SESSION_DEFAULTS, SESSION_VALUES],
+  ["ZitadelLogout", "zitadel-logout", ZitadelLogout, { theme: "" }, { theme: "dark" }],
+] as const)("%s element defaults", (_name, tag, component, defaults, values) => {
+  const prop = (el: Element, key: string) => (el as unknown as Record<string, unknown>)[key];
+
+  it.each(Object.entries(defaults))("keeps %s at its default when unset", (key, fallback) => {
+    const { container } = render(component, { props: { project } });
+    expect(prop(container.querySelector(tag)!, key)).toBe(fallback);
+  });
+
+  it.each(Object.entries(defaults))(
+    "restores %s to its default when cleared",
+    async (key, fallback) => {
+      const given = (values as Record<string, unknown>)[key];
+      const { container, rerender } = render(component, { props: { project, [key]: given } });
+      expect(prop(container.querySelector(tag)!, key)).toBe(given);
+
+      await rerender({ project, [key]: undefined });
+
+      expect(prop(container.querySelector(tag)!, key)).toBe(fallback);
+    },
+  );
+});
+
+describe("ZitadelSession slot content", () => {
+  // `<zitadel-session>` has no slot, so content passed in would never render.
+  it("puts no slot content into the element", () => {
+    const { container } = render(ZitadelSession, {
+      props: { project },
+      slots: { default: () => h("span", "extra") },
+    });
+    expect(container.querySelector("zitadel-session")?.childElementCount).toBe(0);
+  });
+});
+
+describe.each([
+  ["ZitadelLogout", "zitadel-logout", ZitadelLogout],
+  ["ZitadelLogin", "zitadel-login", ZitadelLogin],
+] as const)("%s slot content", (_name, tag, component) => {
+  it("renders the default slot into the element's light DOM", () => {
+    const { container } = render(component, {
+      props: { project },
+      slots: { default: () => h("span", { slot: "attribution-trailing" }, "extra") },
+    });
+    expect(container.querySelector(`${tag} > span[slot="attribution-trailing"]`)).not.toBeNull();
+  });
+});
+
+describe("ZitadelLogout template slot", () => {
+  it("projects a <template> child as the sign-out control", async () => {
+    const { container } = render(ZitadelLogout, {
+      props: { project },
+      slots: {
+        default: () => h("template", [h("button", { "data-action": "logout" }, "Bye")]),
+      },
+    });
+    const el = container.querySelector<ZitadelLogoutElement>("zitadel-logout")!;
+    await el.updateComplete;
+    expect(el.querySelector("span [data-action='logout']")?.textContent).toBe("Bye");
+  });
+});
+
+/** The text a `<template>` carries, wherever the renderer put its children. */
+function templateText(host: Element): string {
+  const template = host.querySelector("template");
+  return `${template?.content.textContent ?? ""}${template?.textContent ?? ""}`;
+}
+
+describe("ZitadelLogout template placeholders", () => {
+  // Vue claims `{{display}}` as its own interpolation; `v-pre` is the escape
+  // the README documents, so the element receives the literal placeholder.
+  it("reach the element verbatim from a v-pre template", () => {
+    const { container } = render(
+      defineComponent({
+        components: { ZitadelLogout },
+        setup: () => ({ project }),
+        template: `
+          <ZitadelLogout :project="project">
+            <template v-pre><button data-action="logout">Sign out {{display}}</button></template>
+          </ZitadelLogout>
+        `,
+      }),
+    );
+    expect(templateText(container.querySelector("zitadel-logout")!)).toContain(
+      "Sign out {{display}}",
+    );
   });
 });

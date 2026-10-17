@@ -1,6 +1,12 @@
 import type { ElementRef } from "@angular/core";
+import type { ZitadelProject } from "@zitadel/api/config";
 import type { ZitadelLogout as ZitadelLogoutElement } from "@zitadel/components";
-import type { ZitadelSignoutDetail } from "@zitadel/sdk-core/types";
+import type {
+  ZitadelSessionErrorDetail,
+  ZitadelSessionMissingDetail,
+  ZitadelSignoutDetail,
+  ZitadelLogoutConfig,
+} from "@zitadel/sdk-core/types";
 
 import {
   Component,
@@ -11,16 +17,19 @@ import {
   ViewChild,
 } from "@angular/core";
 
-import type { ZitadelProject } from "./config";
-
 import "@zitadel/components";
 
 /**
  * Angular wrapper for the `<zitadel-logout>` Lit web component. See
  * {@link ZitadelLoginComponent} for the strategy. The widget's
  * `zitadel-signout` event is re-emitted with its detail as the `signout`
- * output. The underlying `<zitadel-logout>` custom element is exposed via the
+ * output, `zitadel-session-missing` as `sessionMissing`, and `zitadel-session-error` as
+ * `sessionError`. The underlying `<zitadel-logout>` custom element is exposed via the
  * {@link element} getter (the Angular analogue of React's `forwardRef`).
+ *
+ * Content placed inside the wrapper is projected into the element, so a
+ * `<template>` child switches it to template mode (the consumer's own markup,
+ * with a `data-action="logout"` trigger, instead of the avatar menu).
  *
  * ```html
  * <zitadel-auth-logout [project]="project" postSignOutUrl="/login"
@@ -34,20 +43,24 @@ import "@zitadel/components";
   template: `<zitadel-logout
     #el
     [project]="project"
-    [projectId]="projectId"
-    [proxyPath]="proxyPath"
+    [attr.project-id]="projectId"
+    [attr.proxy-path]="proxyPath"
     [attr.post-sign-out-url]="postSignOutUrl"
-    [attr.theme]="theme ?? null"
+    [attr.theme]="theme"
     (zitadel-signout)="onSignout($event)"
-  ></zitadel-logout>`,
+    (zitadel-session-missing)="onSessionMissing($event)"
+    (zitadel-session-error)="onSessionError($event)"
+  ><ng-content /></zitadel-logout>`,
 })
-export class ZitadelLogoutComponent {
+export class ZitadelLogoutComponent implements ZitadelLogoutConfig {
   @Input() project?: ZitadelProject;
   @Input() projectId?: string;
   @Input() proxyPath?: string;
   @Input() postSignOutUrl?: string;
   @Input() theme?: "light" | "dark" | "auto";
   @Output() signout = new EventEmitter<ZitadelSignoutDetail>();
+  @Output() sessionMissing = new EventEmitter<ZitadelSessionMissingDetail>();
+  @Output() sessionError = new EventEmitter<ZitadelSessionErrorDetail>();
 
   @ViewChild("el") private elementRef?: ElementRef<ZitadelLogoutElement>;
 
@@ -58,5 +71,13 @@ export class ZitadelLogoutComponent {
 
   onSignout(event: Event): void {
     this.signout.emit((event as CustomEvent<ZitadelSignoutDetail>).detail);
+  }
+
+  onSessionMissing(event: Event): void {
+    this.sessionMissing.emit((event as CustomEvent<ZitadelSessionMissingDetail>).detail);
+  }
+
+  onSessionError(event: Event): void {
+    this.sessionError.emit((event as CustomEvent<ZitadelSessionErrorDetail>).detail);
   }
 }

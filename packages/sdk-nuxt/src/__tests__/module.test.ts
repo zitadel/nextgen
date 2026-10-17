@@ -1,5 +1,5 @@
 import type { Nuxt } from "@nuxt/schema";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -40,18 +40,58 @@ async function install(
     nextgen?: Record<string, unknown>;
     publicRuntimeConfig?: Record<string, unknown>;
     envLocal?: string;
+    vue?: { compilerOptions?: { isCustomElement?: (tag: string) => boolean } };
   } = {},
 ): Promise<ModuleRuntimeConfig> {
+  return (await installNuxt(app)).runtimeConfig;
+}
+
+/** Installs the module and returns the Nuxt options it changed. */
+async function installNuxt(app: Parameters<typeof install>[0] = {}): Promise<{
+  runtimeConfig: ModuleRuntimeConfig;
+  vue: { compilerOptions: { isCustomElement: (tag: string) => boolean } };
+}> {
   if (app.envLocal !== undefined) {
     writeFileSync(join(rootDir, ".env.local"), app.envLocal);
   }
   const runtimeConfig = { public: { ...app.publicRuntimeConfig } };
-  const nuxt = { options: { rootDir, nextgen: app.nextgen ?? {}, runtimeConfig } };
+  const nuxt = { options: { rootDir, nextgen: app.nextgen ?? {}, runtimeConfig, vue: app.vue } };
   await nextgenModule({}, nuxt as unknown as Nuxt);
-  return runtimeConfig as unknown as ModuleRuntimeConfig;
+  return nuxt.options as unknown as Awaited<ReturnType<typeof installNuxt>>;
 }
 
 describe("@zitadel/sdk-nuxt module", () => {
+  it.each(["zitadel-login", "zitadel-logout", "zitadel-session"])(
+    "tells Vue that <%s> is a custom element",
+    async (tag) => {
+      const { vue } = await installNuxt();
+
+      expect(vue.compilerOptions.isCustomElement(tag)).toBe(true);
+    },
+  );
+
+  it("leaves other tags to Vue's component resolution", async () => {
+    const { vue } = await installNuxt();
+
+    expect(vue.compilerOptions.isCustomElement("my-widget")).toBe(false);
+  });
+
+  // `components/ZitadelHeader.vue` written in kebab case in a template.
+  it("leaves an app's own zitadel-prefixed component to Vue", async () => {
+    const { vue } = await installNuxt();
+
+    expect(vue.compilerOptions.isCustomElement("zitadel-header")).toBe(false);
+  });
+
+  it("keeps the app's own isCustomElement predicate", async () => {
+    const { vue } = await installNuxt({
+      vue: { compilerOptions: { isCustomElement: (tag) => tag.startsWith("ion-") } },
+    });
+
+    expect(vue.compilerOptions.isCustomElement("ion-button")).toBe(true);
+    expect(vue.compilerOptions.isCustomElement("zitadel-login")).toBe(true);
+  });
+
   it("hands a custom proxyPath to the server middleware and to the widgets", async () => {
     const runtime = await install({ nextgen: { proxyPath: "/auth" } });
 
@@ -155,4 +195,28 @@ describe("@zitadel/sdk-nuxt module", () => {
     expect(runtime.public.zitadelProjectId).toBe("proj #1");
     expect(runtime.nextgen.projectSecret).toBe("sk_#1");
   });
+});
+
+// The module auto-imports `runtime/composables` from the published dist, so a
+// composable the build leaves out is an undefined global in every app page
+// (`useZitadelProject is not defined`). `sdk-nuxt:test` runs after the build.
+describe("auto-imported composables", () => {
+  const source = join(import.meta.dirname, "../runtime/composables");
+  const built = join(import.meta.dirname, "../../dist/runtime/composables");
+
+  it.each(readdirSync(source).filter((file) => file.endsWith(".ts")))(
+    "ships %s in the built composables directory",
+    (file) => {
+      expect(existsSync(join(built, file.replace(/\.ts$/, ".js")))).toBe(true);
+    },
+  );
+
+  // Nuxt types each auto-import as `typeof import("<dist>/…/useAuth")`; without
+  // a declaration beside the `.js`, apps get `any`.
+  it.each(readdirSync(source).filter((file) => file.endsWith(".ts")))(
+    "ships a declaration for %s in the built composables directory",
+    (file) => {
+      expect(existsSync(join(built, file.replace(/\.ts$/, ".d.ts")))).toBe(true);
+    },
+  );
 });

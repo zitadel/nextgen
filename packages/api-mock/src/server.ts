@@ -105,6 +105,15 @@ function lookupSession(req: express.Request): SessionLookup {
   }
   return { status: "active", token, session };
 }
+
+/**
+ * The Go server's answer to a session-only operation whose cookie names no
+ * live session: `auth.unauthorized` with `sessionUnauthorizedMessage`
+ * (`internal/api/security.go`).
+ */
+function noSessionBody() {
+  return errorBody("auth.unauthorized", "Missing or invalid session token.");
+}
 /**
  * A session's CSRF token (ADR 053 §5), served by GET /sessions/me/csrf and
  * checked on claim/complete. Derived from the session cookie exactly as the Go
@@ -361,22 +370,20 @@ export function createMockApp(options: { issuer: string }): express.Express {
   });
 
   // GET /sessions/me — validate opaque session cookie and return session data.
-  // Mirrors the Go server's GetMySession handler.
+  // Mirrors the Go server's GetMySession handler: a missing cookie, one that
+  // names no live token (revoked, or never issued) and an expired one all get
+  // the same `401 auth.unauthorized` verdict (`invalidSessionCredential` and
+  // the nextgenSession security handler in internal/api), which the SDKs and
+  // widgets read as "no session".
   app.get("/sessions/me", (req: express.Request, res: express.Response) => {
+    // Both the session and the 401 are session state: neither may be stored.
+    res.setHeader("Cache-Control", "private, no-store");
     const found = lookupSession(req);
-    switch (found.status) {
-      case "missing":
-        res.status(401).json(errorBody("unauthenticated", "no session cookie"));
-        return;
-      case "unknown":
-        res.status(401).json(errorBody("unauthenticated", "invalid or expired session"));
-        return;
-      case "expired":
-        res.status(401).json(errorBody("unauthenticated", "session expired"));
-        return;
-      case "active":
-        res.json(found.session);
+    if (found.status !== "active") {
+      res.status(401).json(noSessionBody());
+      return;
     }
+    res.json(found.session);
   });
 
   // GET /sessions/me/csrf — the session's CSRF token (ADR 053 §5). Mirrors
@@ -386,29 +393,23 @@ export function createMockApp(options: { issuer: string }): express.Express {
     res.setHeader("Cache-Control", "private, no-store");
     const found = lookupSession(req);
     if (found.status !== "active") {
-      res.status(401).json(errorBody("auth.unauthorized", "Missing or invalid session token."));
+      res.status(401).json(noSessionBody());
       return;
     }
     res.json({ csrf_token: csrfTokenFor(found.token) });
   });
 
   // DELETE /sessions/me — revoke the current session (logout). Mirrors the
-  // Go server's revokeMySession handler and the SDK proxy's logout call.
+  // Go server's revokeMySession handler and the SDK proxy's logout call: a
+  // cookie that names no live, unexpired session is refused the way GET is,
+  // with `401 auth.unauthorized`.
   app.delete("/sessions/me", (req: express.Request, res: express.Response) => {
     const found = lookupSession(req);
-    switch (found.status) {
-      case "missing":
-        res.status(401).json(errorBody("unauthenticated", "no session cookie"));
-        return;
-      case "unknown":
-        res.status(404).json(errorBody("session_not_found", "session not found"));
-        return;
-      case "expired":
-        res.status(409).json(errorBody("session_revoked", "session already revoked or expired"));
-        return;
-      case "active":
-        sessionStore.delete(found.token);
+    if (found.status !== "active") {
+      res.status(401).json(noSessionBody());
+      return;
     }
+    sessionStore.delete(found.token);
     res.setHeader("Set-Cookie", [
       `__nextgen_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
       `__nextgen_display=; Path=/; SameSite=Lax; Max-Age=0`,

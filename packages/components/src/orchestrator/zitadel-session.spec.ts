@@ -1,9 +1,16 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 
+import {
+  NO_SESSION,
+  OUTAGES,
+  UNREADABLE_SESSIONS,
+  sessionNotFound,
+  unauthorized,
+} from "./__tests__/session-answers.js";
 import "./zitadel-session.js";
 import type { ZitadelSession } from "./zitadel-session.js";
 
@@ -13,6 +20,7 @@ import type { ZitadelSession } from "./zitadel-session.js";
  * are covered here.
  */
 const API_BASE = "https://session.test.invalid";
+const OTHER_BASE = "https://other-session.test.invalid";
 const deleteLog: { url: string; method: string; credentials: string }[] = [];
 
 function sessionBody(identifier: string, userId: string) {
@@ -37,14 +45,12 @@ function sessionBody(identifier: string, userId: string) {
 
 let currentEmail = "alice@acme.com";
 let currentUserId = "user_test";
-let sessionStatus = 200;
+// Replaces the signed-in answer to `GET /sessions/me` when set.
+let sessionAnswer: (() => Response) | undefined;
 
-const getHandler = http.get(`${API_BASE}/sessions/me`, () => {
-  if (sessionStatus !== 200) {
-    return new HttpResponse(null, { status: sessionStatus });
-  }
-  return HttpResponse.json(sessionBody(currentEmail, currentUserId));
-});
+const getHandler = http.get(`${API_BASE}/sessions/me`, () =>
+  sessionAnswer ? sessionAnswer() : HttpResponse.json(sessionBody(currentEmail, currentUserId)),
+);
 
 const deleteHandler = http.delete(`${API_BASE}/sessions/me`, ({ request }) => {
   deleteLog.push({
@@ -55,7 +61,11 @@ const deleteHandler = http.delete(`${API_BASE}/sessions/me`, ({ request }) => {
   return new HttpResponse(null, { status: 204 });
 });
 
-const server = setupServer(getHandler, deleteHandler);
+const otherHandler = http.get(`${OTHER_BASE}/sessions/me`, () =>
+  HttpResponse.json(sessionBody("bob@other.com", "user_other")),
+);
+
+const server = setupServer(getHandler, deleteHandler, otherHandler);
 
 beforeAll(() => {
   configureZitadel({ proxyPath: API_BASE, projectId: "test" });
@@ -66,8 +76,10 @@ afterEach(() => {
   deleteLog.length = 0;
   currentEmail = "alice@acme.com";
   currentUserId = "user_test";
-  sessionStatus = 200;
-  server.resetHandlers(getHandler, deleteHandler);
+  sessionAnswer = undefined;
+  server.resetHandlers(getHandler, deleteHandler, otherHandler);
+  window.sessionStorage.clear();
+  vi.restoreAllMocks();
 });
 
 afterAll(() => {
@@ -87,12 +99,15 @@ function activate(button: Element): void {
   button.dispatchEvent(new CustomEvent("zl-submit", { bubbles: true, composed: true }));
 }
 
-/** Replaces `window.location` with a stub recording `assign()` calls. */
-function stubLocation(): { current: string } {
+/**
+ * Replaces `window.location` with a stub recording `assign()` calls, on
+ * `href` when given.
+ */
+function stubLocation(href = window.location.href): { current: string } {
   const record = { current: "" };
   Object.defineProperty(window, "location", {
     configurable: true,
-    value: { ...window.location, assign: (url: string) => (record.current = url) },
+    value: { ...window.location, href, assign: (url: string) => (record.current = url) },
     writable: true,
   });
   return record;
@@ -139,12 +154,297 @@ describe("<zitadel-session>", () => {
     expect(shadowQuery<HTMLElement>(element, ".identity").textContent?.trim()).toBe("user_01ABC");
   });
 
-  it("omits the identity line when the session request is unauthenticated", async () => {
-    sessionStatus = 401;
+  it.each(NO_SESSION)("renders nothing when the session request answers %s", async (_, answer) => {
+    sessionAnswer = answer;
     const element = mount();
     await flush(element);
-    expect(element.shadowRoot?.querySelector(".identity")).toBeNull();
+    expect(element.shadowRoot?.querySelector(".title")).toBeNull();
+    expect(element.shadowRoot?.querySelector('[data-testid="zitadel-session-logout"]')).toBeNull();
   });
+
+  it("renders nothing and fires zitadel-session-missing for an anonymous session", async () => {
+    const anonymous: Record<string, unknown> = {
+      ...sessionBody("", ""),
+      state: "building",
+      user_id: null,
+    };
+    delete anonymous.user;
+    sessionAnswer = () => HttpResponse.json(anonymous);
+    const missing: Event[] = [];
+    host.addEventListener("zitadel-session-missing", (e) => missing.push(e));
+    const element = mount();
+    await flush(element);
+    expect(element.shadowRoot?.querySelector(".title")).toBeNull();
+    expect(missing).toHaveLength(1);
+  });
+
+  it("fires zitadel-session-missing, not zitadel-signout, when there is no session", async () => {
+    sessionAnswer = unauthorized;
+    const missing: CustomEvent[] = [];
+    const signouts: Event[] = [];
+    host.addEventListener("zitadel-session-missing", (e) => missing.push(e as CustomEvent));
+    host.addEventListener("zitadel-signout", (e) => signouts.push(e));
+    const element = mount();
+    await flush(element);
+    expect(missing).toHaveLength(1);
+    expect(missing[0]?.bubbles && missing[0]?.composed).toBe(true);
+    expect(signouts).toHaveLength(0);
+  });
+
+  it("navigates to post-sign-out-url when there is no session", async () => {
+    sessionAnswer = sessionNotFound;
+    const loc = stubLocation();
+    const element = mount(
+      '<zitadel-session post-sign-out-url="https://app.test/login"></zitadel-session>',
+    );
+    await flush(element);
+    expect(loc.current).toBe("https://app.test/login");
+  });
+
+  it.each([
+    "/account?tab=me",
+    "https://app.test/account?tab=me",
+    "account?tab=me",
+    "/account?tab=me#top",
+  ])("renders nothing and stays when post-sign-out-url %j is the page it is on", async (url) => {
+    sessionAnswer = unauthorized;
+    const loc = stubLocation("https://app.test/account?tab=me");
+    const missing: Event[] = [];
+    host.addEventListener("zitadel-session-missing", (e) => missing.push(e));
+    const element = mount(`<zitadel-session post-sign-out-url="${url}"></zitadel-session>`);
+    await flush(element);
+    expect(missing).toHaveLength(1);
+    expect(loc.current).toBe("");
+    expect(element.shadowRoot?.querySelector(".title")).toBeNull();
+  });
+
+  it.each([
+    ["https://app.test/account/", "/account"],
+    ["https://app.test/account", "/account/"],
+    ["https://app.test/", ""],
+    ["https://app.test/account?b=2&a=1", "/account?a=1&b=2"],
+  ])("renders nothing and stays on %s when post-sign-out-url is %j", async (href, url) => {
+    sessionAnswer = unauthorized;
+    const loc = stubLocation(href);
+    const missing: Event[] = [];
+    host.addEventListener("zitadel-session-missing", (e) => missing.push(e));
+    const element = mount(`<zitadel-session post-sign-out-url="${url || "/"}"></zitadel-session>`);
+    await flush(element);
+    expect(missing).toHaveLength(1);
+    expect(loc.current).toBe("");
+  });
+
+  /** Mounts the card on `href` as a fresh page load would, and returns where it went. */
+  async function loadPage(href: string, url: string): Promise<string> {
+    host.innerHTML = "";
+    const loc = stubLocation(href);
+    const element = mount(`<zitadel-session post-sign-out-url="${url}"></zitadel-session>`);
+    await flush(element);
+    return loc.current;
+  }
+
+  it("does not navigate again when the target sends the visitor straight back", async () => {
+    sessionAnswer = unauthorized;
+    const missing: Event[] = [];
+    host.addEventListener("zitadel-session-missing", (e) => missing.push(e));
+    expect(await loadPage("https://app.test/account", "/")).toBe("/");
+    // `/` redirected back to `/account`: the reloaded page must stay put.
+    expect(await loadPage("https://app.test/account", "/")).toBe("");
+    expect(missing).toHaveLength(2);
+    expect(host.querySelector("zitadel-session")?.shadowRoot?.querySelector(".title")).toBeNull();
+  });
+
+  it("navigates again once the loop window has passed", async () => {
+    sessionAnswer = unauthorized;
+    const now = Date.now();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(now);
+    expect(await loadPage("https://app.test/account", "/")).toBe("/");
+    clock.mockReturnValue(now + 10_001);
+    expect(await loadPage("https://app.test/account", "/")).toBe("/");
+  });
+
+  it("navigates from another page within the loop window", async () => {
+    sessionAnswer = unauthorized;
+    expect(await loadPage("https://app.test/account", "/")).toBe("/");
+    expect(await loadPage("https://app.test/settings", "/")).toBe("/");
+  });
+
+  it("navigates when session storage is unavailable", async () => {
+    sessionAnswer = unauthorized;
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("denied");
+    });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("denied");
+    });
+    expect(await loadPage("https://app.test/account", "/")).toBe("/");
+  });
+
+  it.each([
+    ["/account", "/account"],
+    ["https://other.test/account?tab=me", "https://other.test/account?tab=me"],
+  ])("navigates when post-sign-out-url %j is another page", async (url, expected) => {
+    sessionAnswer = unauthorized;
+    const loc = stubLocation("https://app.test/account?tab=me");
+    const element = mount(`<zitadel-session post-sign-out-url="${url}"></zitadel-session>`);
+    await flush(element);
+    expect(loc.current).toBe(expected);
+  });
+
+  it("neither announces nor navigates once removed before the answer arrives", async () => {
+    let answer: () => void = () => undefined;
+    server.use(
+      http.get(`${API_BASE}/sessions/me`, async () => {
+        await new Promise<void>((resolve) => {
+          answer = resolve;
+        });
+        return unauthorized();
+      }),
+    );
+    const loc = stubLocation();
+    const missing: Event[] = [];
+    const element = mount(
+      '<zitadel-session post-sign-out-url="https://app.test/login"></zitadel-session>',
+    );
+    element.addEventListener("zitadel-session-missing", (e) => missing.push(e));
+    await flush(element);
+
+    element.remove();
+    answer();
+    await flush(element);
+
+    expect(missing).toHaveLength(0);
+    expect(loc.current).toBe("");
+  });
+
+  it("reports a load failure it missed while removed, once put back", async () => {
+    let requests = 0;
+    let answer: () => void = () => undefined;
+    server.use(
+      http.get(`${API_BASE}/sessions/me`, async () => {
+        requests += 1;
+        if (requests === 1) {
+          await new Promise<void>((resolve) => {
+            answer = resolve;
+          });
+        }
+        return HttpResponse.json({ code: "internal", message: "Internal error" }, { status: 500 });
+      }),
+    );
+    const errors: Event[] = [];
+    const element = mount("<zitadel-session></zitadel-session>");
+    element.addEventListener("zitadel-session-error", (e) => errors.push(e));
+    await flush(element);
+    element.remove();
+    answer();
+    await flush(element);
+    expect(errors).toHaveLength(0);
+
+    host.appendChild(element);
+    await flush(element);
+
+    expect(requests).toBe(2);
+    expect(errors).toHaveLength(1);
+  });
+
+  it("asks again once put back after the answer it missed, then announces and navigates", async () => {
+    let requests = 0;
+    let answer: () => void = () => undefined;
+    server.use(
+      http.get(`${API_BASE}/sessions/me`, async () => {
+        requests += 1;
+        if (requests === 1) {
+          await new Promise<void>((resolve) => {
+            answer = resolve;
+          });
+        }
+        return unauthorized();
+      }),
+    );
+    const loc = stubLocation();
+    const missing: Event[] = [];
+    const element = mount(
+      '<zitadel-session post-sign-out-url="https://app.test/login"></zitadel-session>',
+    );
+    element.addEventListener("zitadel-session-missing", (e) => missing.push(e));
+    await flush(element);
+    element.remove();
+    answer();
+    await flush(element);
+    expect(requests).toBe(1);
+
+    host.appendChild(element);
+    await flush(element);
+
+    expect(requests).toBe(2);
+    expect(missing).toHaveLength(1);
+    expect(loc.current).toBe("https://app.test/login");
+  });
+
+  it.each([...OUTAGES, ...UNREADABLE_SESSIONS])(
+    "keeps the card and shows the error, without announcing or navigating, for %s",
+    async (_, answer) => {
+      sessionAnswer = answer;
+      const loc = stubLocation();
+      const missing: Event[] = [];
+      host.addEventListener("zitadel-session-missing", (e) => missing.push(e));
+      const element = mount(
+        '<zitadel-session post-sign-out-url="https://app.test/login"></zitadel-session>',
+      );
+      await flush(element);
+      expect(shadowQuery<HTMLElement>(element, ".title").textContent?.trim()).toBe("Signed in as");
+      expect(
+        shadowQuery<HTMLElement>(element, ".error").textContent?.trim().length,
+      ).toBeGreaterThan(0);
+      expect(missing).toHaveLength(0);
+      expect(loc.current).toBe("");
+    },
+  );
+
+  it.each([...OUTAGES, ...UNREADABLE_SESSIONS])(
+    "fires zitadel-session-error with phase load for %s",
+    async (_, answer) => {
+      sessionAnswer = answer;
+      const errors: CustomEvent[] = [];
+      host.addEventListener("zitadel-session-error", (e) => errors.push(e as CustomEvent));
+      const element = mount();
+      await flush(element);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]?.bubbles && errors[0]?.composed).toBe(true);
+      expect(errors[0]?.detail).toMatchObject({
+        phase: "load",
+        message: shadowQuery<HTMLElement>(element, ".error").textContent?.trim(),
+      });
+    },
+  );
+
+  it("reports the status and the backend's code in zitadel-session-error", async () => {
+    sessionAnswer = () =>
+      HttpResponse.json({ code: "internal", message: "Internal error" }, { status: 500 });
+    const errors: CustomEvent[] = [];
+    host.addEventListener("zitadel-session-error", (e) => errors.push(e as CustomEvent));
+    await flush(mount());
+    expect(errors[0]?.detail).toMatchObject({ status: 500, code: "internal", phase: "load" });
+  });
+
+  it("reports a network error in zitadel-session-error without a status", async () => {
+    sessionAnswer = () => HttpResponse.error();
+    const errors: CustomEvent[] = [];
+    host.addEventListener("zitadel-session-error", (e) => errors.push(e as CustomEvent));
+    await flush(mount());
+    expect(errors[0]?.detail).not.toHaveProperty("status");
+  });
+
+  it.each(NO_SESSION)(
+    "fires no zitadel-session-error when the request answers %s",
+    async (_, a) => {
+      sessionAnswer = a;
+      const errors: Event[] = [];
+      host.addEventListener("zitadel-session-error", (e) => errors.push(e));
+      await flush(mount());
+      expect(errors).toHaveLength(0);
+    },
+  );
 
   it("suppress-header visually hides the heading but keeps it accessible", async () => {
     currentEmail = "alice@acme.com";
@@ -236,20 +536,282 @@ describe("<zitadel-session>", () => {
     }
   });
 
-  it("surfaces a network error inline without redirecting", async () => {
-    const loc = stubLocation();
+  it.each(NO_SESSION)(
+    "treats %s from the sign-out request as signed out and navigates",
+    async (_, answer) => {
+      const loc = stubLocation();
+      const element = mount();
+      element.postSignOutUrl = "https://app.test/login";
+      await flush(element);
+      server.use(http.delete(`${API_BASE}/sessions/me`, answer));
+      const events: CustomEvent[] = [];
+      element.addEventListener("zitadel-signout", (e) => events.push(e as CustomEvent));
+
+      activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
+      await new Promise((resolve) => setTimeout(resolve, 32));
+
+      expect(events).toHaveLength(1);
+      expect(loc.current).toBe("https://app.test/login");
+      expect(element.shadowRoot?.querySelector(".error")).toBeNull();
+    },
+  );
+
+  it.each(OUTAGES)(
+    "shows the error and neither signs out nor navigates when sign-out gets %s",
+    async (_, answer) => {
+      const loc = stubLocation();
+      const element = mount();
+      element.postSignOutUrl = "https://app.test/login";
+      await flush(element);
+      server.use(http.delete(`${API_BASE}/sessions/me`, answer));
+      const events: Event[] = [];
+      element.addEventListener("zitadel-signout", (e) => events.push(e));
+
+      activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
+      await new Promise((resolve) => setTimeout(resolve, 32));
+      await element.updateComplete;
+
+      expect(
+        shadowQuery<HTMLElement>(element, ".error").textContent?.trim().length,
+      ).toBeGreaterThan(0);
+      expect(events).toHaveLength(0);
+      expect(loc.current).toBe("");
+    },
+  );
+
+  it.each(OUTAGES)(
+    "fires zitadel-session-error with phase signout when sign-out gets %s",
+    async (_, answer) => {
+      const element = mount();
+      await flush(element);
+      server.use(http.delete(`${API_BASE}/sessions/me`, answer));
+      const errors: CustomEvent[] = [];
+      element.addEventListener("zitadel-session-error", (e) => errors.push(e as CustomEvent));
+
+      activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
+      await new Promise((resolve) => setTimeout(resolve, 32));
+      await element.updateComplete;
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]?.detail).toMatchObject({
+        phase: "signout",
+        message: shadowQuery<HTMLElement>(element, ".error").textContent?.trim(),
+      });
+    },
+  );
+
+  it.each(NO_SESSION)("fires no zitadel-session-error when sign-out gets %s", async (_, answer) => {
     const element = mount();
-    element.postSignOutUrl = "https://app.test/login";
     await flush(element);
-    server.use(http.delete(`${API_BASE}/sessions/me`, () => HttpResponse.error()));
+    server.use(http.delete(`${API_BASE}/sessions/me`, answer));
+    const errors: Event[] = [];
+    element.addEventListener("zitadel-session-error", (e) => errors.push(e));
 
     activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
     await new Promise((resolve) => setTimeout(resolve, 32));
+
+    expect(errors).toHaveLength(0);
+  });
+});
+
+describe("<zitadel-session> defaults for unset props", () => {
+  let host: HTMLDivElement;
+
+  beforeAll(() => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    host.innerHTML = "";
+  });
+
+  const DEFAULTS = [
+    ["heading", "Signed in as"],
+    ["logoutLabel", "Sign out"],
+    ["variant", "widget"],
+    ["theme", ""],
+    ["suppressHeader", false],
+  ] as const;
+
+  const UNSET = [undefined, null, ""] as const;
+
+  const CASES = DEFAULTS.flatMap(([prop, fallback]) =>
+    UNSET.map((value): [(typeof DEFAULTS)[number][0], unknown, unknown] => [prop, value, fallback]),
+  );
+
+  it.each(CASES)("reads %s assigned %j as its default %j", async (prop, value, fallback) => {
+    const element = document.createElement("zitadel-session") as ZitadelSession;
+    (element as unknown as Record<string, unknown>)[prop] = value;
+    host.appendChild(element);
+    await element.updateComplete;
+    expect(element[prop]).toBe(fallback);
+  });
+
+  it.each(UNSET)("paints the default heading and label when both are %j", async (value) => {
+    const element = document.createElement("zitadel-session") as ZitadelSession;
+    element.heading = value as string;
+    element.logoutLabel = value as string;
+    host.appendChild(element);
+    await flush(element);
+    expect(shadowQuery<HTMLElement>(element, ".title").textContent?.trim()).toBe("Signed in as");
+    expect(
+      shadowQuery<HTMLElement>(
+        element,
+        'zl-button[data-testid="zitadel-session-logout"]',
+      ).getAttribute("label"),
+    ).toBe("Sign out");
+  });
+
+  it("restores the defaults when a set value is cleared", async () => {
+    const element = document.createElement("zitadel-session") as ZitadelSession;
+    element.heading = "Welcome";
+    element.logoutLabel = "Leave";
+    host.appendChild(element);
+    await flush(element);
+
+    element.heading = undefined as unknown as string;
+    element.logoutLabel = undefined as unknown as string;
     await element.updateComplete;
 
-    expect(shadowQuery<HTMLElement>(element, ".error").textContent?.trim().length).toBeGreaterThan(
-      0,
+    expect(shadowQuery<HTMLElement>(element, ".title").textContent?.trim()).toBe("Signed in as");
+    expect(
+      shadowQuery<HTMLElement>(
+        element,
+        'zl-button[data-testid="zitadel-session-logout"]',
+      ).getAttribute("label"),
+    ).toBe("Sign out");
+  });
+
+  it.each([
+    ["heading", "heading", "Welcome", "Signed in as"],
+    ["logout-label", "logoutLabel", "Leave", "Sign out"],
+    ["variant", "variant", "page", "widget"],
+    ["theme", "theme", "light", ""],
+  ] as const)(
+    "restores %s to its default when the attribute is removed",
+    async (attribute, prop, value, fallback) => {
+      host.innerHTML = `<zitadel-session ${attribute}="${value}"></zitadel-session>`;
+      const element = host.querySelector("zitadel-session") as ZitadelSession;
+      await element.updateComplete;
+      expect(element[prop]).toBe(value);
+
+      element.removeAttribute(attribute);
+      await element.updateComplete;
+
+      expect(element[prop]).toBe(fallback);
+    },
+  );
+});
+
+describe("<zitadel-session> identity lifecycle", () => {
+  let host: HTMLDivElement;
+
+  beforeAll(() => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    host.innerHTML = "";
+  });
+
+  function mount(markup = "<zitadel-session></zitadel-session>"): ZitadelSession {
+    host.innerHTML = markup;
+    return host.querySelector("zitadel-session") as ZitadelSession;
+  }
+
+  it("renders nothing after signing out without a post-sign-out-url", async () => {
+    const element = mount();
+    await flush(element);
+
+    activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
+    await flush(element);
+
+    expect(element.shadowRoot?.querySelector(".title")).toBeNull();
+    expect(element.shadowRoot?.querySelector('[data-testid="zitadel-session-logout"]')).toBeNull();
+  });
+
+  it("ignores an identity response that arrives after signing out", async () => {
+    let answer: () => void = () => undefined;
+    server.use(
+      http.get(`${API_BASE}/sessions/me`, async () => {
+        await new Promise<void>((resolve) => {
+          answer = resolve;
+        });
+        return HttpResponse.json(sessionBody("alice@acme.com", "user_test"));
+      }),
     );
-    expect(loc.current).toBe("");
+    const element = mount();
+    await element.updateComplete;
+
+    activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
+    await flush(element);
+    answer();
+    await flush(element);
+
+    expect(element.shadowRoot?.querySelector(".identity")).toBeNull();
+    expect(element.shadowRoot?.querySelector(".title")).toBeNull();
+  });
+
+  it("still reports the signed-out identity in zitadel-signout", async () => {
+    const element = mount();
+    await flush(element);
+    const events: CustomEvent[] = [];
+    element.addEventListener("zitadel-signout", (e) => events.push(e as CustomEvent));
+
+    activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
+    await flush(element);
+
+    expect(events[0]?.detail).toEqual({ display: "", identifier: "alice@acme.com" });
+  });
+
+  it("refetches the identity when the project changes", async () => {
+    const element = mount();
+    await flush(element);
+
+    element.project = { projectId: "other", proxyPath: OTHER_BASE };
+    await flush(element);
+
+    expect(shadowQuery<HTMLElement>(element, ".identity").textContent?.trim()).toBe(
+      "bob@other.com",
+    );
+  });
+
+  it("does not refetch when a framework re-assigns an equal project", async () => {
+    let fetches = 0;
+    server.use(
+      http.get(`${OTHER_BASE}/sessions/me`, () => {
+        fetches += 1;
+        return HttpResponse.json(sessionBody("bob@other.com", "user_other"));
+      }),
+    );
+    const element = mount();
+    element.project = { projectId: "other", proxyPath: OTHER_BASE };
+    await flush(element);
+
+    element.project = { projectId: "other", proxyPath: OTHER_BASE };
+    await flush(element);
+
+    expect(fetches).toBe(1);
+  });
+
+  it("loads the identity once configureZitadel() runs after mount", async () => {
+    _resetConfigForTesting();
+    try {
+      const element = mount();
+      await flush(element);
+      expect(element.shadowRoot?.querySelector(".identity")).toBeNull();
+
+      configureZitadel({ proxyPath: API_BASE, projectId: "test" });
+      await flush(element);
+
+      expect(shadowQuery<HTMLElement>(element, ".identity").textContent?.trim()).toBe(
+        "alice@acme.com",
+      );
+    } finally {
+      _resetConfigForTesting();
+      configureZitadel({ proxyPath: API_BASE, projectId: "test" });
+    }
   });
 });

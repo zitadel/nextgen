@@ -154,7 +154,9 @@ way:
 
 The widgets' events surface as optional callbacks: `onFlowStep`, `onFlowInput`,
 `onFlowComplete`, `onFlowRedirect` and `onFlowError` on `ZitadelLogin`, and
-`onSignout` on `ZitadelLogout` and `ZitadelSession`. Pass
+`onSignout`, `onSessionMissing` (no session when the widget loads) and
+`onSessionError` (loading the session or signing out failed some other way) on
+`ZitadelLogout` and `ZitadelSession`. Pass
 `locales={businessLocales}` (exported from `@zitadel/sdk-svelte`) to show
 work-email copy for a business audience.
 

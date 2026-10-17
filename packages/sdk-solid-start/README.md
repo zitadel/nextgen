@@ -131,9 +131,9 @@ pnpm add @zitadel/sdk-solid@alpha
 
 Load it with SolidStart's `clientOnly`, so the widget is created in the browser
 with its config in place: its config is set as element properties, which
-server-rendered markup cannot carry. `clientOnly` also keeps
-`@zitadel/sdk-solid`, which registers the custom elements when its module is
-imported, out of the server render:
+server-rendered markup cannot carry. (`@zitadel/sdk-solid` itself is safe to
+import during server rendering: it ships a `solid` export condition that
+SolidStart compiles for the server.)
 
 ```tsx
 import { clientOnly } from '@solidjs/start';
@@ -180,7 +180,9 @@ export default function Profile() {
 
 The widgets' events surface as optional callbacks: `onFlowStep`, `onFlowInput`,
 `onFlowComplete`, `onFlowRedirect` and `onFlowError` on `ZitadelLogin`, and
-`onSignout` on `ZitadelLogout` and `ZitadelSession`. To show work-email copy for
+`onSignout`, `onSessionMissing` (no session when the widget loads) and
+`onSessionError` (loading the session or signing out failed some other way) on
+`ZitadelLogout` and `ZitadelSession`. To show work-email copy for
 a business audience, pass `locales={businessLocales}`; both come from
 `@zitadel/sdk-solid`, so wrap the widget inside the `clientOnly` loader:
 

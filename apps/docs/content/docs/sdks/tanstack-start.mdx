@@ -112,7 +112,7 @@ The TanStack Start SDK is a global request middleware that proxies and verifies 
     });
     ```
 
-    `ZitadelLogin` takes the callbacks `onFlowStep`, `onFlowInput`, `onFlowComplete`, `onFlowRedirect` and `onFlowError`; `ZitadelLogout` and `ZitadelSession` take `onSignout`. Each receives the event detail. The signed-in card for a profile page is `ZitadelSession`, as above.
+    `ZitadelLogin` takes the callbacks `onFlowStep`, `onFlowInput`, `onFlowComplete`, `onFlowRedirect` and `onFlowError`; `ZitadelLogout` and `ZitadelSession` take `onSignout`, `onSessionMissing` when there is no session as the widget loads (the session card then goes to its `postSignOutUrl`), and `onSessionError` when loading the session or signing out fails some other way. Each receives the event detail. The signed-in card for a profile page is `ZitadelSession`, as above.
   </Tab>
 </Tabs>
 

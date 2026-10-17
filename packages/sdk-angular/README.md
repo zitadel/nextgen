@@ -32,6 +32,59 @@ export class LoginPage {
 
 The signed-in session card is `<zitadel-auth-session>` (exported as `ZitadelSessionComponent`).
 
+### Configuration
+
+`configureZitadel`, `getApi`, `getZitadelConfig` and the `ZitadelConfig` / `ZitadelProject`
+types are re-exported from `@zitadel/api/config`, the same module every Zitadel SPA SDK uses.
+`configureZitadel(...)` returns the project handle and also records it as the app-wide
+config, so a component rendered without `[project]` falls back to it. It accepts an optional
+`publishableKey`, which `getApi(project)` sends as the bearer on direct API calls.
+
+### Inputs and outputs
+
+Each component's inputs mirror the shared `ZitadelLoginConfig` / `ZitadelLogoutConfig` /
+`ZitadelSessionConfig` types. An input you leave unset, or clear back to `undefined`, keeps
+the widget's own default (e.g. `purpose` is `"login"`). `<zitadel-auth-login>` also takes
+`resumeFlowId`, an existing flow to resume instead of starting a new one; unset, `null` or `""`
+falls back to the `flow` query parameter.
+
+| Component                | Outputs (each emits the event detail)                                |
+| ------------------------ | -------------------------------------------------------------------- |
+| `<zitadel-auth-login>`   | `flowStep`, `flowInput`, `flowComplete`, `flowRedirect`, `flowError` |
+| `<zitadel-auth-logout>`  | `signout`, `sessionMissing`, `sessionError`                          |
+| `<zitadel-auth-session>` | `signout`, `sessionMissing`, `sessionError`                          |
+
+`sessionMissing` fires when the visitor has no session: the widget renders nothing, and the
+session card goes to its `postSignOutUrl` when one is set, unless that URL is the page it is on.
+`sessionError` fires when loading the session (`phase: "load"`) or signing out
+(`phase: "signout"`) fails some other way, such as a 5xx or a network error: the widget keeps
+its surface and shows the error, and the detail carries `message` and, when a response came
+back, its `status` and `code`.
+
+```html
+<zitadel-auth-login [project]="project" (flowComplete)="onComplete($event)"
+  (flowError)="onError($event)" />
+```
+
+### Projected content
+
+Content placed inside a component is projected into the underlying element (for example
+`<zitadel-auth-login>`'s `attribution-trailing` slot). `<zitadel-auth-session>` projects
+nothing: its element has no slot to show content in. A `<template>`
+inside `<zitadel-auth-logout>` replaces the avatar menu with your own markup: `{{display}}`,
+`{{identifier}}` and `{{initial}}` are filled in, and any element with `data-action="logout"`
+signs the user out. Mark the `<template>` `ngNonBindable` so Angular leaves the
+`{{…}}` placeholders for the element to fill:
+
+```html
+<zitadel-auth-logout [project]="project" postSignOutUrl="/login">
+  <template ngNonBindable>
+    <span>{{display}}</span>
+    <button data-action="logout">Sign out</button>
+  </template>
+</zitadel-auth-logout>
+```
+
 > The wrapper uses the selector `zitadel-auth-login` (not `zitadel-login`) because
 > the latter is the underlying custom element the component renders internally.
 

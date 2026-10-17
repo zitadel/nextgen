@@ -35,7 +35,7 @@ for the form-association / accessibility decisions baked into every input atom.
 ## Install
 
 ```sh
-corepack pnpm add @zitadel/components
+corepack pnpm add @zitadel/components@alpha
 ```
 
 `lit`, `liquidjs`, `dompurify`, and `lucide` are runtime dependencies and are intentionally
@@ -269,12 +269,18 @@ renders the bundled `default.liquid`. Tracked as a follow-up.
 | `purpose` | `'login' \| 'register' \| 'reset_password' \| string` | Which flow purpose to drive |
 | `flowName` / `flow-name` | `string` | Run the flow definition with this `name` instead of the project default |
 | `project` | `ZitadelProject` | SDK handle from `configureZitadel()`. Object property (not an attribute). When unset, the element falls back to the global handle from `getZitadelConfig()` |
+| `projectId` / `project-id` | `string` | Project id, for a page with no JavaScript config. Read only when neither `project` nor a global handle is set |
+| `proxyPath` / `proxy-path` | `string` | Same-origin API prefix that goes with `project-id`; defaults to `/__nextgen` |
+| `url` | `string` | Backend URL that goes with `project-id` (server-side use; the browser calls `proxy-path`) |
+| `suppressHeader` / `suppress-header` | `boolean` | Visually hide the step heading (kept for assistive technology), for a host that renders its own |
 | `lang` | `string` | BCP 47 tag (e.g. `"de"`, `"en-US"`). Resolves to a built-in dictionary; falls back to `<html lang>` / `navigator.language` |
 | `locales` | `Record<string, Locale>` | Custom locale dictionaries keyed by language code; spread over the built-in dictionary so partial overrides work |
 | `postSignInUrl` / `post-sign-in-url` | `string` | After `complete: "show"`, exchange the `handoff_token` for a session cookie and navigate here |
-| `resumeFlowId` / `resume-flow-id` | `string` | Resume an existing flow handle instead of starting fresh |
+| `resumeFlowId` / `resume-flow-id` | `string` | Resume an existing flow handle instead of starting fresh. Unset, `null` or `""` fall back to the `flow` query parameter. Every SDK's login wrapper takes it as `resumeFlowId` |
 | `previewState` / `preview-state` | `'default' \| 'validation_error' \| 'submission_error' \| 'loading' \| 'success'` | Preview mode for operator surfaces such as the console's branding screen. The flow still starts, so the step is the one the project serves; the element then shows it in this state and submits nothing. Only the purpose's entry step can be previewed. `LOGIN_PREVIEW_STATES` lists the values, and `loginPreviewStatesFor(step)` the ones that show a served step differently from `default`; any other value runs the flow for real |
 | `previewSuccessStep` / `preview-success-step` | `string` | The terminal step the `success` preview paints, for a flow definition that names it differently from the default flow's `done` |
+
+The two preview properties are for an operator surface, so only `@zitadel/sdk-react`'s `ZitadelLogin` (and TanStack Start's, which re-exports it) takes them as props. Elsewhere, set them on the element through the wrapper's element handle.
 
 Events: `zitadel-flow-input`, `zitadel-flow-step`, `zitadel-flow-complete`,
 `zitadel-flow-error`, `zitadel-flow-redirect`. `zitadel-flow-step` fires for
@@ -306,10 +312,101 @@ the SDK handle, and clears the session. Uses the same token adoption as
 | Property | Type | Notes |
 | --- | --- | --- |
 | `project` | `ZitadelProject` | SDK handle from `configureZitadel()`. Object property; falls back to the global handle from `getZitadelConfig()` |
+| `projectId` / `project-id` | `string` | Project id, for a page with no JavaScript config. Read only when neither `project` nor a global handle is set |
+| `proxyPath` / `proxy-path` | `string` | Same-origin API prefix that goes with `project-id`; defaults to `/__nextgen` |
+| `url` | `string` | Backend URL that goes with `project-id` (server-side use; the browser calls `proxy-path`) |
 | `postSignOutUrl` / `post-sign-out-url` | `string` | Navigate here after sign-out |
+| `theme` | `'light' \| 'dark' \| 'auto'` | Colour mode. Unset follows the visitor's preference (`auto`) |
 
 Supports a light-DOM `<template>` slot for a fully custom menu; default UI is
-the avatar trigger + dropdown.
+the avatar trigger + dropdown. In the template, `{{display}}`, `{{identifier}}`
+and `{{initial}}` are filled with the signed-in identity, and any element with
+`data-action="logout"` signs out. A framework that compiles `{{…}}` itself
+needs an escape: Vue `v-pre`, Angular `ngNonBindable`, Svelte `{'{{display}}'}`,
+JSX (React, Solid, Qwik) a string literal `{"{{display}}"}`.
+
+Events (both bubble and are composed):
+
+- `zitadel-signout` (detail `{ display, identifier }`, the identity just signed
+  out) after a sign-out. A sign-out the backend answers with "no session"
+  counts: the session is already gone. The element then navigates to
+  `post-sign-out-url`, or, without one, renders nothing. Any other failure
+  shows the error in the menu, fires nothing and stays put.
+- `zitadel-session-missing` (detail `{}`) when the backend answers that there
+  is no session, or names no user. The element renders nothing (no avatar, no
+  projected template) and stays on the page: the menu sits in an app's own
+  chrome. Anything else is not "signed out": the control stays and the menu
+  shows the error.
+- `zitadel-session-error` (detail `{ status?, code?, message, phase }`) when
+  loading the identity (`phase: "load"`) or signing out (`phase: "signout"`)
+  fails with anything other than the backend's no-session answer: a 5xx, a
+  network error, a gateway's page, a body that is not a session. `message` is
+  the text the element shows; `status` is set when a response came back and
+  `code` when it carried the backend's error code. Use it to tell an outage
+  from a visitor without a session, or to end your own "signing out" state.
+
+"No session" means the backend's own answer: `401` with the
+`auth.unauthorized` code or `404` with `sess.not_found`. A gateway, WAF or
+ingress answers 401 and 404 too, without that code, and an SPA host may answer
+a 200 with its `index.html`; those, a network error, a 403, a 429 and a 5xx all
+leave the session as it is and show the error, the same way the server SDKs
+answer 503 instead of sending a signed-in user to the login page.
+
+### `<zitadel-session>`
+
+The signed-in card: "Signed in as {identity}" with a **Sign out** button, built
+from the same atoms as `<zitadel-login>`. Reads the identity from `getMySession`
+and signs out through `revokeMySession`, like `<zitadel-logout>`.
+
+| Property | Type | Notes |
+| --- | --- | --- |
+| `project` | `ZitadelProject` | SDK handle from `configureZitadel()`. Object property; falls back to the global handle from `getZitadelConfig()` |
+| `projectId` / `project-id` | `string` | Project id, for a page with no JavaScript config. Read only when neither `project` nor a global handle is set |
+| `proxyPath` / `proxy-path` | `string` | Same-origin API prefix that goes with `project-id`; defaults to `/__nextgen` |
+| `url` | `string` | Backend URL that goes with `project-id` (server-side use; the browser calls `proxy-path`) |
+| `postSignOutUrl` / `post-sign-out-url` | `string` | Navigate here after sign-out, and when the visitor has no session unless it is the card's own page |
+| `heading` | `string` | Card title; unset shows "Signed in as" |
+| `logoutLabel` / `logout-label` | `string` | Button label; unset shows "Sign out" |
+| `variant` | `'widget' \| 'page'` | As on `<zitadel-login>`: `widget` (default) is content-sized and transparent, `page` claims the viewport |
+| `theme` | `'light' \| 'dark' \| 'auto'` | Colour mode; unset resolves from the variant (`dark` for `page`, `auto` for `widget`) |
+| `suppressHeader` / `suppress-header` | `boolean` | Visually hide the heading (kept for assistive technology) |
+
+Events (both bubble and are composed):
+
+- `zitadel-signout` (detail `{ display, identifier }`, the identity just signed
+  out) after a sign-out. A sign-out the backend answers with "no session"
+  counts: the session is already gone. The card then navigates to
+  `post-sign-out-url`, or, without one, renders nothing. Any other failure
+  shows the error, fires nothing and stays put.
+- `zitadel-session-missing` (detail `{}`) when the backend answers that there
+  is no session, or names no user, so a page reached without a session never
+  shows "Signed in as" for nobody. The card navigates to `post-sign-out-url`
+  when one is set and otherwise renders nothing. Anything else is not "signed
+  out": the card stays and shows the error. "No session" is decided as for
+  `<zitadel-logout>` above.
+- `zitadel-session-error` (detail `{ status?, code?, message, phase }`) for any
+  other failure of the identity request or the sign-out, as on
+  `<zitadel-logout>`.
+
+The card never redirects to the page it is on. When `post-sign-out-url`
+resolves to the current page (same origin, path with or without a trailing
+slash, and query parameters in any order; the fragment is ignored), a visit
+without a session renders nothing instead of navigating, so a page that shows
+the card and is also its sign-out target (`/account` with
+`post-sign-out-url="/account"`, or `/account/` once the host adds the slash)
+does not reload itself forever. A sign-out on that page still navigates there,
+which reloads it once.
+
+The card also does not repeat a no-session navigation from the same page to
+the same target within ten seconds (remembered in `sessionStorage`). When the
+target sends the visitor straight back, for example `post-sign-out-url="/"`
+where `/` redirects to the card's page, the second visit renders nothing and
+only fires `zitadel-session-missing`.
+
+The framework wrappers surface these as `onSignout` / `onSessionMissing` /
+`onSessionError`, except Vue and Angular, which emit `signout` /
+`sessionMissing` / `sessionError`, and Qwik, which takes `onSignout$` /
+`onSessionMissing$` / `onSessionError$`.
 
 ### `<zl-field>`
 

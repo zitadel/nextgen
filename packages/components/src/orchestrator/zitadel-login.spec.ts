@@ -2454,6 +2454,12 @@ describe("<zitadel-login preview-state> repaint", () => {
 // (Qwik resumes markup without re-running refs; React sets properties in a
 // layout effect after hydration). Config that arrives late must still apply.
 describe("<zitadel-login> config that arrives after upgrade", () => {
+  // A late `configureZitadel()` reaches every connected login, so one left
+  // over from an earlier case would start a flow of its own.
+  afterEach(() => {
+    for (const element of document.querySelectorAll("zitadel-login")) element.remove();
+  });
+
   function createFlows(): unknown[] {
     return mock
       .getCaptured()
@@ -2538,4 +2544,165 @@ describe("<zitadel-login> config that arrives after upgrade", () => {
 
     expect(createFlows()).toHaveLength(1);
   });
+
+  /** A login configured only through its attributes, rendered to its first step. */
+  async function mountFromAttributes(): Promise<ZitadelLogin> {
+    _resetConfigForTesting();
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.setAttribute("project-id", "demo-project");
+    element.setAttribute("proxy-path", API_BASE);
+    host.appendChild(element);
+    await waitFor(() => element.shadowRoot?.querySelector('zl-field[name="email"]'));
+    return element;
+  }
+
+  // A server-rendered Qwik widget boots from its attributes and is handed the
+  // same project as a handle once it resumes.
+  it("does not restart when a project handle names the project its attributes did", async () => {
+    const element = await mountFromAttributes();
+
+    element.project = { projectId: "demo-project", proxyPath: API_BASE };
+    element.projectId = undefined as unknown as string;
+    element.proxyPath = undefined as unknown as string;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(createFlows()).toHaveLength(1);
+  });
+
+  it("does not restart when configureZitadel() names the project its attributes did", async () => {
+    await mountFromAttributes();
+
+    configureZitadel({ proxyPath: API_BASE, projectId: "demo-project" });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(createFlows()).toHaveLength(1);
+  });
+
+  it("restarts when a project handle names a different project than its attributes", async () => {
+    const element = await mountFromAttributes();
+
+    element.project = { projectId: "other-project", proxyPath: API_BASE };
+
+    await waitFor(() => createFlows().length === 2);
+    expect(createFlows()[1]).toEqual({ purpose: "login", project_id: "other-project" });
+  });
+
+  it("starts a flow once configureZitadel() announces a project after an unconfigured start", async () => {
+    _resetConfigForTesting();
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    host.appendChild(element);
+    await waitFor(() => element.shadowRoot?.querySelector("zl-alert"));
+
+    configureZitadel({ proxyPath: API_BASE, projectId: "demo-project" });
+
+    await waitFor(() => element.shadowRoot?.querySelector('zl-field[name="email"]'));
+    expect(createFlows()).toEqual([{ purpose: "login", project_id: "demo-project" }]);
+  });
+
+  it("stops listening for late config once disconnected", async () => {
+    _resetConfigForTesting();
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    host.appendChild(element);
+    await waitFor(() => element.shadowRoot?.querySelector("zl-alert"));
+    element.remove();
+
+    configureZitadel({ proxyPath: API_BASE, projectId: "demo-project" });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(createFlows()).toHaveLength(0);
+  });
+
+  it.each([
+    ["projectId", undefined],
+    ["proxyPath", null],
+    ["url", undefined],
+    ["flowName", null],
+  ] as const)("does not restart when an unset %s is re-bound as %j", async (prop, value) => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const element = await mount(host);
+
+    (element as unknown as Record<string, unknown>)[prop] = value;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(createFlows()).toHaveLength(1);
+  });
+});
+
+describe("<zitadel-login> defaults for unset props", () => {
+  function createFlows(): unknown[] {
+    return mock
+      .getCaptured()
+      .filter((entry) => entry.kind === "createFlow")
+      .map((entry) => (entry as { body: unknown }).body);
+  }
+
+  const DEFAULTS = [
+    ["purpose", "login"],
+    ["variant", "widget"],
+    ["theme", ""],
+    ["lang", ""],
+    ["suppressHeader", false],
+    ["resumeFlowId", ""],
+  ] as const;
+
+  const UNSET = [undefined, null, ""] as const;
+
+  const CASES = DEFAULTS.flatMap(([prop, fallback]) =>
+    UNSET.map((value): [(typeof DEFAULTS)[number][0], unknown, unknown] => [prop, value, fallback]),
+  );
+
+  it.each(CASES)("reads %s assigned %j as its default %j", (prop, value, fallback) => {
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    (element as unknown as Record<string, unknown>)[prop] = value;
+    expect(element[prop]).toBe(fallback);
+  });
+
+  it.each(UNSET)("starts a login flow when purpose is %j", async (value) => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.project = testProject;
+    element.purpose = value as ZitadelLogin["purpose"];
+    host.appendChild(element);
+
+    await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+    expect(createFlows()).toEqual([{ purpose: "login", project_id: "demo-project" }]);
+  });
+
+  it("restarts with the login purpose when a set purpose attribute is removed", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.project = testProject;
+    element.setAttribute("purpose", "register");
+    host.appendChild(element);
+    await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+
+    element.removeAttribute("purpose");
+
+    await waitFor(() => createFlows().length === 2);
+    expect(createFlows()[1]).toEqual({ purpose: "login", project_id: "demo-project" });
+  });
+
+  it.each([
+    ["variant", "variant", "page", "widget"],
+    ["theme", "theme", "light", ""],
+    ["lang", "lang", "de", ""],
+    ["suppress-header", "suppressHeader", "", false],
+  ] as const)(
+    "restores %s to its default when the attribute is removed",
+    (attribute, prop, value, fallback) => {
+      const element = document.createElement("zitadel-login") as ZitadelLogin;
+      element.setAttribute(attribute, value);
+      element.removeAttribute(attribute);
+      expect(element[prop]).toBe(fallback);
+    },
+  );
 });

@@ -1,6 +1,6 @@
 /**
- * Re-exports the `<zitadel-login>` and `<zitadel-logout>` Lit web components
- * for use in Next.js apps.
+ * Re-exports the `<zitadel-login>`, `<zitadel-logout>` and `<zitadel-session>`
+ * Lit web components for use in Next.js apps.
  *
  * Import this inside a `"use client"` boundary (e.g. a dynamic import
  * with `{ ssr: false }`) to register the custom elements with the

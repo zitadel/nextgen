@@ -1,4 +1,5 @@
 import type { ElementRef } from "@angular/core";
+import type { ZitadelProject } from "@zitadel/api/config";
 import type { ZitadelLogin as ZitadelLoginElement } from "@zitadel/components";
 import type {
   CreateFlowBodyPurpose,
@@ -7,6 +8,7 @@ import type {
   ZitadelFlowErrorDetail,
   ZitadelFlowInputDetail,
   ZitadelFlowStepDetail,
+  ZitadelLoginConfig,
 } from "@zitadel/sdk-core/types";
 
 import {
@@ -18,21 +20,22 @@ import {
   ViewChild,
 } from "@angular/core";
 
-import type { ZitadelProject } from "./config";
-
-// Registers <zitadel-login> / <zitadel-logout> with the browser.
+// Registers <zitadel-login>, <zitadel-logout> and <zitadel-session> with the browser.
 import "@zitadel/components";
 
 /**
  * Angular wrapper for the `<zitadel-login>` Lit web component.
  *
  * Uses a distinct selector (`zitadel-auth-login`) and renders the real custom
- * element in its template under `CUSTOM_ELEMENTS_SCHEMA`. The `project` handle
- * (from `configureZitadel(...)`) is bound as a DOM **property** via `[project]`,
- * as are the discrete `projectId` / `proxyPath` the element reads when no handle
- * is supplied; `purpose` / `post-sign-in-url` are bound as attributes the Lit
- * element reads. The widget's `zitadel-*` events are re-emitted with their
- * detail as the `flowStep` / `flowInput` / `flowComplete` / `flowError` outputs.
+ * element in its template under `CUSTOM_ELEMENTS_SCHEMA`. Object and boolean
+ * inputs (`project`, `locales`, `suppressHeader`) are bound as DOM
+ * **properties**; string inputs are bound as the element's attributes, so an
+ * input that is never set leaves the element untouched and one that is cleared
+ * removes the attribute, which the element reads as "use the default". Content
+ * placed inside the wrapper is projected into the element (e.g. its
+ * `attribution-trailing` slot). The widget's `zitadel-*` events are re-emitted
+ * with their detail as the `flowStep` / `flowInput` / `flowComplete` /
+ * `flowRedirect` / `flowError` outputs.
  *
  * The underlying `<zitadel-login>` custom element is exposed via the
  * {@link element} getter so a consumer holding the component (e.g. via
@@ -51,31 +54,33 @@ import "@zitadel/components";
   template: `<zitadel-login
     #el
     [project]="project"
-    [projectId]="projectId"
-    [proxyPath]="proxyPath"
     [locales]="locales"
-    [lang]="lang"
+    [suppressHeader]="suppressHeader"
+    [attr.project-id]="projectId"
+    [attr.proxy-path]="proxyPath"
+    [attr.lang]="lang"
     [attr.purpose]="purpose"
     [attr.flow-name]="flowName"
     [attr.post-sign-in-url]="postSignInUrl"
-    [attr.variant]="variant ?? null"
-    [attr.theme]="theme ?? null"
-    [suppressHeader]="suppressHeader"
+    [attr.resume-flow-id]="resumeFlowId"
+    [attr.variant]="variant"
+    [attr.theme]="theme"
     [suppressPasswordToggle]="suppressPasswordToggle"
     (zitadel-flow-step)="onFlowStep($event)"
     (zitadel-flow-input)="onFlowInput($event)"
     (zitadel-flow-complete)="onFlowComplete($event)"
     (zitadel-flow-redirect)="onFlowRedirect($event)"
     (zitadel-flow-error)="onFlowError($event)"
-  ></zitadel-login>`,
+  ><ng-content /></zitadel-login>`,
 })
-export class ZitadelLoginComponent {
+export class ZitadelLoginComponent implements ZitadelLoginConfig {
   @Input() project?: ZitadelProject;
   @Input() projectId?: string;
   @Input() proxyPath?: string;
-  @Input() purpose: CreateFlowBodyPurpose = "login";
+  @Input() purpose?: CreateFlowBodyPurpose;
   @Input() flowName?: string;
   @Input() postSignInUrl?: string;
+  @Input() resumeFlowId?: string;
   @Input() locales?: Record<string, Partial<Record<string, string>>>;
   @Input() lang?: string;
   @Input() variant?: "widget" | "page";

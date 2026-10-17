@@ -108,3 +108,76 @@ describe("<zitadel-logout> open/close (chromium)", () => {
     expect(init.credentials).toBe("include");
   });
 });
+
+describe("<zitadel-logout> template mode (chromium)", () => {
+  let host: HTMLDivElement;
+
+  beforeEach(() => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    host.remove();
+  });
+
+  it("renders the projected template where the user can see and click it", async () => {
+    host.innerHTML = `
+      <zitadel-logout>
+        <template><button data-action="logout">Sign out</button></template>
+      </zitadel-logout>
+    `;
+    const element = host.querySelector("zitadel-logout") as ZitadelLogout;
+    await element.updateComplete;
+    const button = await waitFor(() =>
+      element.querySelector<HTMLButtonElement>("button[data-action='logout']"),
+    );
+
+    const rect = button.getBoundingClientRect();
+    expect(button.checkVisibility()).toBe(true);
+    expect(rect.width).toBeGreaterThan(0);
+    expect(rect.height).toBeGreaterThan(0);
+  });
+});
+
+describe("<zitadel-logout> without a session (chromium)", () => {
+  let host: HTMLDivElement;
+  let originalFetch: typeof fetch;
+
+  beforeEach(() => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+    originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async () =>
+      Response.json(
+        { code: "auth.unauthorized", message: "Missing or invalid session token." },
+        { status: 401 },
+      ),
+    ) as unknown as typeof fetch;
+  });
+
+  afterEach(() => {
+    host.remove();
+    globalThis.fetch = originalFetch;
+  });
+
+  it("shows no avatar and no projected template", async () => {
+    let missing = 0;
+    host.addEventListener("zitadel-session-missing", () => {
+      missing += 1;
+    });
+    host.innerHTML = `
+      <zitadel-logout></zitadel-logout>
+      <zitadel-logout>
+        <template><button data-action="logout">Sign out</button></template>
+      </zitadel-logout>
+    `;
+    const [avatar, templated] = host.querySelectorAll("zitadel-logout");
+    await waitFor(() => missing === 2);
+    await (avatar as ZitadelLogout).updateComplete;
+
+    expect(avatar?.shadowRoot?.querySelector(".trigger")).toBeNull();
+    expect(avatar?.getBoundingClientRect().width).toBe(0);
+    expect(templated?.querySelector("button[data-action='logout']")).toBeNull();
+  });
+});

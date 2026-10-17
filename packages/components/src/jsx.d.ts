@@ -13,6 +13,13 @@
  * tsconfig programs (React's types are not installed here); the
  * `jsx-declarations.spec.ts` drift guard keeps the entries aligned with the
  * classes' reactive properties, and the demo apps typecheck the chain.
+ *
+ * React 19 assigns a prop as a DOM property only on the client. Server
+ * rendering writes attributes, so `project`, `locales` and camelCase
+ * `suppressHeader` are lost in SSR markup (and hydration does not assign
+ * them); render the raw elements client-only, or use the kebab-case
+ * attributes and a global `configureZitadel()` there. The `@zitadel/sdk-react`
+ * wrappers bind everything as properties on React 18 and 19.
  */
 import type React from "react";
 import type { ZitadelLogin, ZitadelLogout, ZitadelSession } from "@zitadel/components";

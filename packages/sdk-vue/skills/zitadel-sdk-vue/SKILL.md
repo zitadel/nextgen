@@ -35,7 +35,7 @@ a partial integration, or customizing what the CLI produced).
 ## Install
 
 ```sh
-npm install @zitadel/sdk-vue
+npm install @zitadel/sdk-vue@alpha
 ```
 
 Requires Vue ≥ 3 (peer dependency) and TypeScript ≥ 5.0 (the published types use
@@ -72,6 +72,10 @@ Logout and the signed-in session card take the same `:project` handle:
 - `purpose` on `ZitadelLogin` is `"login"` by default (also accepts the other
   flow purposes, e.g. registration).
 - `postSignInUrl` / `postSignOutUrl` are where the browser lands after the flow.
+- **No session.** When the visitor has no session, the session widgets render nothing and emit
+  `sessionMissing` (`@session-missing`); the session card also goes to its `postSignOutUrl` (unless that is the page it
+  is on), so point it at the login page. Any other failure (a 5xx, a network
+  error) keeps the widget, shows the error and emits `sessionError` (`@session-error`).
 - The widgets call `${proxyPath}/…` **same-origin** (default `/__nextgen`), so
   your host must proxy that path to the Zitadel backend. For local development
   you can instead point `proxyPath` straight at the backend cross-origin, e.g.

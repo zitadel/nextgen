@@ -1,11 +1,13 @@
 import { css, html, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { property, state } from "lit/decorators.js";
 
 import { applyBaseTokens, applyBrandingTokens } from "./branding-to-tokens.js";
 import { resolveApi } from "./resolve-api.js";
 import { SessionController } from "./session-controller.js";
 import { ZitadelConfigured, stampTheme } from "./surface.js";
 import { ThemeController, type ThemeMode } from "./theme-controller.js";
+import { defineOnce } from "../internal/define-once.js";
+import { orDefault } from "../internal/or-default.js";
 import { baseHostStyles, focusVisibleStyles, t } from "../styles/index.js";
 
 import "../atoms/zl-icon.js";
@@ -17,16 +19,25 @@ import "../atoms/zl-icon.js";
  * Reads the user's identity from the typed `getMySession` operation
  * (`GET /sessions/me`, credentialed) — the same source as `<zitadel-session>`,
  * so both signed-in surfaces stay consistent and work against the real backend.
- * The avatar/preview show `name`, then `email`, then the always-present
- * `user_id`. NOTE: the current server response includes only the `user_id`, so
- * the avatar falls back to the id until the backend returns a human-readable
- * `name`/`email`.
+ * The avatar and the preview name the user by `user.display`, then
+ * `user.identifier` (the login identifier), then `user_id`, the first that is
+ * set; the preview adds the identifier under a display name.
  *
  * It renders an avatar trigger with a dropdown that exposes a "Sign out"
  * action, and calls the typed `revokeMySession` operation in `@zitadel/api`
  * (`DELETE /sessions/me`). The server clears the session cookie via
- * `Set-Cookie: Max-Age=0`; on success the element fires `zitadel-signout`
- * and optionally navigates to `post-sign-out-url`.
+ * `Set-Cookie: Max-Age=0`; on success (the backend's `401 auth.unauthorized`
+ * or `404 sess.not_found` counts, the session is already gone) the element
+ * fires `zitadel-signout` and navigates to `post-sign-out-url`, or without one
+ * renders nothing. Any other failure shows the error and signs nobody out.
+ *
+ * When `GET /sessions/me` answers `401 auth.unauthorized` or
+ * `404 sess.not_found`, or names no user, the visitor has no session: the
+ * element fires `zitadel-session-missing` and renders nothing (no avatar, no
+ * projected template). It does not navigate: the menu sits in an app's own
+ * chrome, often on public pages. Anything else (a network error, a 5xx, a
+ * gateway's 401 or 404 without the backend's code, a 200 that is not a
+ * session) keeps the control and shows the error.
  *
  * ## Template-slot mode
  *
@@ -40,7 +51,7 @@ import "../atoms/zl-icon.js";
  * Default styles consume the `--zl-*` design tokens so tenant branding
  * applies automatically.
  */
-@customElement("zitadel-logout")
+@defineOnce("zitadel-logout")
 export class ZitadelLogout extends ZitadelConfigured {
   static override styles = [
     baseHostStyles,
@@ -179,12 +190,19 @@ export class ZitadelLogout extends ZitadelConfigured {
    * rather than forcing the dark login surface. Set it explicitly when the
    * surrounding app surface is fixed: `<zitadel-logout theme="dark">`.
    */
-  @property({ type: String }) accessor theme: "" | ThemeMode = "";
+  @property({ type: String })
+  get theme(): "" | ThemeMode {
+    return this.#theme;
+  }
+  set theme(value: ThemeMode | null | undefined | "") {
+    this.#theme = orDefault(value, "");
+  }
+  #theme: "" | ThemeMode = "";
 
   @state() private accessor open = false;
 
-  // Set once in `connectedCallback` based on whether a `<template>` child is
-  // present. Not reactive — switching modes mid-life would require re-running
+  // Set once, on connect or before the first render, based on whether a
+  // `<template>` child is present. Not reactive — switching modes mid-life would require re-running
   // light-DOM mutation, which we don't support.
   private templateMode = false;
 
@@ -197,24 +215,17 @@ export class ZitadelLogout extends ZitadelConfigured {
 
   private readonly themeController = new ThemeController(this);
 
-  // Re-projects once identity settles so template-mode markup shows it.
+  // Re-projects whenever identity changes so template-mode markup shows it.
   private readonly session = new SessionController(
     this,
-    () => resolveApi(this.project, this.projectAttrs, "<zitadel-logout>").api,
-    () => this.projectTemplate(),
+    () => resolveApi(this.project, this.projectAttrs, "<zitadel-logout>"),
+    { onIdentityChanged: () => this.projectTemplate() },
   );
 
   override connectedCallback(): void {
     super.connectedCallback();
 
-    const tmpl = this.querySelector("template");
-    if (tmpl instanceof HTMLTemplateElement) {
-      this.templateMode = true;
-      this.pendingTemplate = tmpl;
-      // Project immediately so the logout control renders even before (or
-      // without) a resolvable config; it is re-projected once identity loads.
-      this.projectTemplate();
-    }
+    this.adoptTemplate();
 
     document.addEventListener("click", this.handleDocumentClick);
     document.addEventListener("keydown", this.handleDocumentKeydown);
@@ -226,7 +237,26 @@ export class ZitadelLogout extends ZitadelConfigured {
     document.removeEventListener("keydown", this.handleDocumentKeydown);
   }
 
+  /**
+   * Switches to template mode when a `<template>` child is present. Checked on
+   * connect and again before the first render: some frameworks (Qwik's client
+   * renderer) insert the host first and append its children in the same task,
+   * so the template only shows up after `connectedCallback`.
+   */
+  private adoptTemplate(): void {
+    if (this.templateMode) return;
+    const tmpl = this.querySelector("template");
+    if (tmpl instanceof HTMLTemplateElement) {
+      this.templateMode = true;
+      this.pendingTemplate = tmpl;
+      // Project immediately so the logout control renders even before (or
+      // without) a resolvable config; it is re-projected once identity loads.
+      this.projectTemplate();
+    }
+  }
+
   override willUpdate(): void {
+    if (!this.hasUpdated) this.adoptTemplate();
     // No branding payload reaches this element (yet); the empty overrides
     // call keeps the token pipeline identical to the other orchestrator
     // surfaces so a future branding input only has to change the argument.
@@ -257,8 +287,15 @@ export class ZitadelLogout extends ZitadelConfigured {
    */
   private projectTemplate(): void {
     if (!this.templateMode || !this.pendingTemplate) return;
+    if (this.session.state === "signed-out") {
+      // Nobody to name or sign out: drop the control instead of filling it
+      // with blanks.
+      this.projectedContainer?.remove();
+      this.projectedContainer = null;
+      return;
+    }
 
-    const clone = this.pendingTemplate.content.cloneNode(true) as DocumentFragment;
+    const clone = templateMarkup(this.pendingTemplate);
     fillTemplateTokens(clone, this.session.display, this.session.identifier, this.initial);
 
     const container = document.createElement("span");
@@ -291,7 +328,9 @@ export class ZitadelLogout extends ZitadelConfigured {
 
   private toggleOpen(): void {
     this.open = !this.open;
-    this.session.clearError();
+    // Cleared on close, not on open: a failed identity load must still show
+    // when the menu first opens, while a failed sign-out does not linger.
+    if (!this.open) this.session.clearError();
   }
 
   /** Signs out, closes the menu, then optionally navigates to `postSignOutUrl`. */
@@ -302,7 +341,11 @@ export class ZitadelLogout extends ZitadelConfigured {
     if (!(await this.session.signOut(closeMenu))) return;
     if (this.postSignOutUrl && typeof window !== "undefined") {
       window.location.href = this.postSignOutUrl;
+      return;
     }
+    // Staying on the page: the avatar (or the projected template) goes away
+    // with the session it signed out.
+    this.session.clearIdentity();
   }
 
   private handleSignOutClick(event: Event): void {
@@ -311,11 +354,14 @@ export class ZitadelLogout extends ZitadelConfigured {
   }
 
   override render() {
+    // No session (none at load, or signed out in place): an avatar menu that
+    // signs out nobody has nothing to offer.
+    if (this.session.state === "signed-out") return nothing;
     if (this.templateMode) {
-      // Rendering happens into the light DOM via `projectTemplate`. The
-      // shadow root stays empty so the projected markup is the only thing
-      // the user sees.
-      return nothing;
+      // The markup lives in the light DOM (see `projectTemplate`), and light
+      // children of a shadow host only render when assigned to a slot, so
+      // the shadow root is just the slot that shows them.
+      return html`<slot></slot>`;
     }
 
     return html`
@@ -389,6 +435,20 @@ export class ZitadelLogout extends ZitadelConfigured {
       }
     `;
   }
+}
+
+/**
+ * A copy of the template's markup. Parsed HTML puts it in `content`, but a
+ * framework that builds the `<template>` with DOM calls (React, Solid, …)
+ * appends the children to the element itself, where `content` never sees them.
+ */
+function templateMarkup(template: HTMLTemplateElement): DocumentFragment {
+  if (template.content.childNodes.length > 0 || template.childNodes.length === 0) {
+    return template.content.cloneNode(true) as DocumentFragment;
+  }
+  const fragment = document.createDocumentFragment();
+  for (const node of template.childNodes) fragment.appendChild(node.cloneNode(true));
+  return fragment;
 }
 
 /**

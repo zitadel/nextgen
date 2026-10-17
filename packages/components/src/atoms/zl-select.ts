@@ -1,11 +1,12 @@
 import { html, nothing, type PropertyValues } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
+import { property, query, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { ifDefined } from "lit/directives/if-defined.js";
 import { live } from "lit/directives/live.js";
 
 import selectStyles from "./zl-select.css?inline";
 
+import { defineOnce } from "../internal/define-once.js";
 import { emit } from "../internal/emit.js";
 import { FormAtom } from "../internal/form-atom.js";
 import { parseJsonAttribute } from "../internal/json-attribute.js";
@@ -43,7 +44,7 @@ export type ZlSelectChangeDetail = { name: string; value: string };
  * uses the native `<select>` and its native popup. Both paths converge on
  * `value`, emit `zl-change`, and mirror `internals.setFormValue()`.
  */
-@customElement("zl-select")
+@defineOnce("zl-select")
 export class ZlSelect extends FormAtom {
   static override styles = [baseHostStyles, ...surfaceStyles(sharedStyles, selectStyles)];
 

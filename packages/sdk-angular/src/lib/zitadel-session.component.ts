@@ -1,6 +1,12 @@
 import type { ElementRef } from "@angular/core";
+import type { ZitadelProject } from "@zitadel/api/config";
 import type { ZitadelSession as ZitadelSessionElement } from "@zitadel/components";
-import type { ZitadelSignoutDetail } from "@zitadel/sdk-core/types";
+import type {
+  ZitadelSessionErrorDetail,
+  ZitadelSessionMissingDetail,
+  ZitadelSignoutDetail,
+  ZitadelSessionConfig,
+} from "@zitadel/sdk-core/types";
 
 import {
   Component,
@@ -11,15 +17,14 @@ import {
   ViewChild,
 } from "@angular/core";
 
-import type { ZitadelProject } from "./config";
-
 import "@zitadel/components";
 
 /**
  * Angular wrapper for the `<zitadel-session>` Lit web component — the
  * post-sign-in "signed in as" card. See {@link ZitadelLoginComponent} for the
  * strategy. The widget's `zitadel-signout` event is re-emitted with its detail
- * as the `signout` output. The underlying `<zitadel-session>` custom element is
+ * as the `signout` output, `zitadel-session-missing` as `sessionMissing`, and `zitadel-session-error` as
+ * `sessionError`. The underlying `<zitadel-session>` custom element is
  * exposed via the {@link element} getter.
  *
  * ```html
@@ -34,18 +39,20 @@ import "@zitadel/components";
   template: `<zitadel-session
     #el
     [project]="project"
-    [projectId]="projectId"
-    [proxyPath]="proxyPath"
+    [attr.project-id]="projectId"
+    [attr.proxy-path]="proxyPath"
     [attr.post-sign-out-url]="postSignOutUrl"
     [attr.heading]="heading"
     [attr.logout-label]="logoutLabel"
-    [attr.variant]="variant ?? null"
-    [attr.theme]="theme ?? null"
+    [attr.variant]="variant"
+    [attr.theme]="theme"
     [suppressHeader]="suppressHeader"
     (zitadel-signout)="onSignout($event)"
+    (zitadel-session-missing)="onSessionMissing($event)"
+    (zitadel-session-error)="onSessionError($event)"
   ></zitadel-session>`,
 })
-export class ZitadelSessionComponent {
+export class ZitadelSessionComponent implements ZitadelSessionConfig {
   @Input() project?: ZitadelProject;
   @Input() projectId?: string;
   @Input() proxyPath?: string;
@@ -56,6 +63,8 @@ export class ZitadelSessionComponent {
   @Input() theme?: "light" | "dark" | "auto";
   @Input() suppressHeader?: boolean;
   @Output() signout = new EventEmitter<ZitadelSignoutDetail>();
+  @Output() sessionMissing = new EventEmitter<ZitadelSessionMissingDetail>();
+  @Output() sessionError = new EventEmitter<ZitadelSessionErrorDetail>();
 
   @ViewChild("el") private elementRef?: ElementRef<ZitadelSessionElement>;
 
@@ -66,5 +75,13 @@ export class ZitadelSessionComponent {
 
   onSignout(event: Event): void {
     this.signout.emit((event as CustomEvent<ZitadelSignoutDetail>).detail);
+  }
+
+  onSessionMissing(event: Event): void {
+    this.sessionMissing.emit((event as CustomEvent<ZitadelSessionMissingDetail>).detail);
+  }
+
+  onSessionError(event: Event): void {
+    this.sessionError.emit((event as CustomEvent<ZitadelSessionErrorDetail>).detail);
   }
 }

@@ -45,7 +45,6 @@ The Nuxt SDK registers server middleware and plugins so Nuxt pages can read Zita
       <File name="app/pages/register.vue" />
       <File name="app/pages/profile.vue" />
       <File name="app/plugins/zitadel-components.client.ts" />
-      <File name="app/plugins/auth.server.ts" />
       <File name="nuxt.config.ts" />
       <File name=".env.local" />
       <File name=".env.example" />
@@ -94,6 +93,18 @@ The Nuxt SDK registers server middleware and plugins so Nuxt pages can read Zita
   <Step>Validate the session token and attach auth state to the request event.</Step>
   <Step>Copy the auth state into Nuxt state during server rendering, so pages read it with `useAuth()`.</Step>
 </Steps>
+
+## Session widgets
+
+The profile page renders `<zitadel-session>` and app chrome can render `<zitadel-logout>`, each inside `<ClientOnly>` and bound to `useZitadelProject()`. Nuxt templates use the raw elements, so listen to their events as written: `@zitadel-signout` after a sign-out, and `@zitadel-session-missing` when the widget finds no session as it loads. Without a session both widgets render nothing, and the card goes to its `post-sign-out-url` (`/login` in the generated profile page) unless that URL is the page it is on. A failure that is not the backend saying "no session", such as a gateway's error page or a 5xx, keeps the widget, shows the error and fires `@zitadel-session-error` (detail `{ status?, code?, message, phase }`).
+
+```vue
+<zitadel-session
+  :project="project"
+  post-sign-out-url="/login"
+  @zitadel-session-missing="onSessionMissing"
+/>
+```
 
 ## Verify
 
