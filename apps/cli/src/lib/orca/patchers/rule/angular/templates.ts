@@ -3,7 +3,11 @@ import type { PatchContext } from "../../types";
 import { PROXY_PATH } from "../proxy";
 import {
   assertNoUnreviewedProjectSecretProxy,
+  EXCHANGE_REDACTION_MARKER,
+  EXCHANGE_REDACTION_ZLIB,
+  exchangeRedactionFunctions,
   PROXY_CREDENTIAL_POLICY_MARKER,
+  upgradeExchangeRedaction,
 } from "../proxy-credential-policy";
 
 /**
@@ -118,7 +122,9 @@ export function appTemplateHtml(ctx: PatchContext): string {
  * dev server uses. Like the Vite proxy (`vite-support.ts`), it addresses the
  * backend by its own name (`changeOrigin`), which a remote https server
  * requires, and forwards the app's origin in `X-Forwarded-Host` and
- * `X-Forwarded-Proto` (`xfwd`).
+ * `X-Forwarded-Proto` (`xfwd`). Like the Vite proxy, it writes every response
+ * itself (`selfHandleResponse`), so it can drop the HttpOnly session token from
+ * the exchange's body before the browser sees it.
  */
 export function proxyConfTemplate(): string {
   return `${MANAGED_MARKER}
@@ -151,6 +157,8 @@ const bearer = \`Bearer \${secret}\`;
 
 ${EXCHANGE_ONLY_BEARER}
 
+${EXCHANGE_REDACTION}
+
 function stripPrefix(path) {
   return path.replace(/^\\${PROXY_PATH}/, "").replace(/^(?!\\/)/, "/");
 }
@@ -162,8 +170,7 @@ module.exports = {
     xfwd: true,
     pathRewrite: stripPrefix,
     rewrite: stripPrefix,
-    onProxyReq: setBearer,
-    configure: (proxy) => proxy.on("proxyReq", setBearer),
+${REDACTING_WIRING}
   },
 };
 `;
@@ -184,6 +191,56 @@ function setBearer(proxyReq) {
     proxyReq.setHeader("authorization", bearer);
   }
 }`;
+
+/** The redaction functions and the `node:zlib` decoders they call. */
+function exchangeRedaction(indent: string): string {
+  return `${indent}const ${EXCHANGE_REDACTION_ZLIB} = require("node:zlib");
+
+${exchangeRedactionFunctions(indent)}`;
+}
+
+const EXCHANGE_REDACTION = exchangeRedaction("");
+
+/** The listener wiring emitted before the session-token redaction existed. */
+const UNREDACTED_WIRING = `    onProxyReq: setBearer,
+    configure: (proxy) => proxy.on("proxyReq", setBearer),`;
+
+/**
+ * The listener wiring with the redaction: the proxy writes every response
+ * itself, in the http-proxy-middleware form and the Vite form alike.
+ */
+const REDACTING_WIRING = `    selfHandleResponse: true,
+    onProxyReq: (proxyReq) => {
+      setBearer(proxyReq);
+      requestPlainExchange(proxyReq);
+    },
+    onProxyRes: relayResponse,
+    configure: (proxy) => {
+      proxy.on("proxyReq", setBearer);
+      proxy.on("proxyReq", requestPlainExchange);
+      proxy.on("proxyRes", relayResponse);
+    },`;
+
+/**
+ * Adds the session-token redaction to the managed proxy written before it
+ * existed. Only the exact generated bearer hook and wiring qualify, and both
+ * change together: a response handler without `selfHandleResponse`, or the
+ * reverse, would break every proxied call. A file that already chose its own
+ * `selfHandleResponse` is left alone.
+ */
+function redactExchange(source: string): string {
+  if (
+    source.includes(EXCHANGE_REDACTION_MARKER) ||
+    /\bselfHandleResponse\b/.test(source) ||
+    !source.includes(EXCHANGE_ONLY_BEARER) ||
+    !source.includes(UNREDACTED_WIRING)
+  ) {
+    return source;
+  }
+  return source
+    .replace(EXCHANGE_ONLY_BEARER, `${EXCHANGE_ONLY_BEARER}\n\n${EXCHANGE_REDACTION}`)
+    .replace(UNREDACTED_WIRING, REDACTING_WIRING);
+}
 
 /**
  * The managed entry as emitted before it forwarded the app's origin, and what
@@ -207,9 +264,16 @@ function forwardAppOrigin(source: string): string {
   return source.replace(HOST_KEEPING_ENTRY, ORIGIN_FORWARDING_ENTRY);
 }
 
+/** Moves a managed proxy's generated parts onto their current shapes. */
+function upgradeManaged(source: string): string {
+  return redactExchange(forwardAppOrigin(upgradeExchangeRedaction(source, exchangeRedaction)));
+}
+
 /**
  * Creates the managed Angular proxy and upgrades the exact shapes earlier CLIs
- * emitted: the insecure unconditional bearer hook and the host-keeping entry.
+ * emitted: the insecure unconditional bearer hook, the host-keeping entry, the
+ * wiring that relayed the session token to the browser, and the redaction that
+ * relayed a compressed exchange answer unread.
  * Other edits are preserved; a safe custom proxy is left untouched, while an
  * unrecognized proxy that may still over-forward the project secret is
  * surfaced for manual review.
@@ -220,9 +284,9 @@ export function proxyConfEdit(): (source: string | undefined) => string {
       return proxyConfTemplate();
     }
     if (source.includes(MANAGED_MARKER) && source.includes(LEGACY_UNCONDITIONAL_BEARER)) {
-      return forwardAppOrigin(source.replace(LEGACY_UNCONDITIONAL_BEARER, EXCHANGE_ONLY_BEARER));
+      return upgradeManaged(source.replace(LEGACY_UNCONDITIONAL_BEARER, EXCHANGE_ONLY_BEARER));
     }
     assertNoUnreviewedProjectSecretProxy(source, "proxy.conf.cjs");
-    return source.includes(MANAGED_MARKER) ? forwardAppOrigin(source) : source;
+    return source.includes(MANAGED_MARKER) ? upgradeManaged(source) : source;
   };
 }
