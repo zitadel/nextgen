@@ -8,6 +8,7 @@
     "doctor": "node scripts/doctor.mjs",
     "cli": "node scripts/run-cli.mjs",
     "server": "node scripts/run-server.mjs",
+    "cloud": "node scripts/run-cloud.mjs",
     "docs": "moon run docs:dev",
     "check": "node scripts/check.mjs",
     "check:cloud": "turbo run e2e-deployment console-deployment --continue",
