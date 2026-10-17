@@ -20,6 +20,7 @@ get:
   security:
     - oauth2:
         - release.read
+    - nextgenSession: []
   parameters:
     - $ref: ../../../components/parameters/project-id.yaml
     - $ref: ../../../components/parameters/release-id.yaml

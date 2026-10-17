@@ -101,6 +101,30 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		require.IsType(t, &api.IdpResponse{}, got, helpers.MustMarshal(t, got))
 	})
 
+	t.Run("releases", func(t *testing.T) {
+		t.Parallel()
+		// Releases are built with the secret only; the session reads them.
+		// There is no release delete, so the release lives in a project of
+		// this test's own and goes with it.
+		owned, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+		harness.SeedProjectAdmin(t, owned.ID, claimerID)
+		ownedID := api.ProjectID(owned.ID)
+		secret, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		harness.SetProjectSecretOnApiClient(t, secret, owned)
+		created := seedRelease(t, secret, owned.ID)
+
+		listed, err := session.ListReleases(t.Context(), api.ListReleasesParams{ProjectID: ownedID})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListReleasesResponse{}, listed, helpers.MustMarshal(t, listed))
+		require.Contains(t, releaseIDs(listed.(*api.ListReleasesResponse).Releases), created.ID)
+
+		got, err := session.GetReleaseById(t.Context(), api.GetReleaseByIdParams{ProjectID: ownedID, ReleaseID: created.ID})
+		require.NoError(t, err)
+		require.IsType(t, &api.Release{}, got, helpers.MustMarshal(t, got))
+	})
+
 	t.Run("teams", func(t *testing.T) {
 		t.Parallel()
 		created, err := session.CreateTeam(t.Context(), &api.CreateTeamRequest{Name: helpers.TeamName()},
@@ -245,6 +269,26 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 		got := stranger.get(t, connection.ID)
 		require.IsType(t, &api.GetIdpByIdNotFound{}, got, helpers.MustMarshal(t, got))
 		assert.Equal(t, notFound, got.(*api.GetIdpByIdNotFound).Code)
+	})
+
+	t.Run("cannot list or read another project's releases", func(t *testing.T) {
+		created := seedRelease(t, otherSecret, other.ID)
+
+		listed, err := session.ListReleases(t.Context(), api.ListReleasesParams{ProjectID: otherID})
+		require.NoError(t, err)
+		status, code, _, ok := errorResponseParts(t, listed)
+		require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, listed))
+		assert.Equal(t, http.StatusNotFound, status)
+		// Both reads are filtered by the caller's projects and answer as an
+		// unknown release does: no existence oracle on the project either.
+		assert.Equal(t, domain.ErrReleaseNotFound().Code, code)
+
+		got, err := session.GetReleaseById(t.Context(), api.GetReleaseByIdParams{ProjectID: otherID, ReleaseID: created.ID})
+		require.NoError(t, err)
+		status, code, _, ok = errorResponseParts(t, got)
+		require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, got))
+		assert.Equal(t, http.StatusNotFound, status)
+		assert.Equal(t, domain.ErrReleaseNotFound().Code, code)
 	})
 
 	t.Run("cannot read another project's schema", func(t *testing.T) {
@@ -479,6 +523,19 @@ func TestConsoleSessionReadsTargetProjectByID(t *testing.T) {
 		require.Contains(t, idpIDs(read.queryOK(t, &api.QueryIdpsRequest{}).Idps), created.ID)
 		got := read.get(t, created.ID)
 		require.IsType(t, &api.IdpResponse{}, got, helpers.MustMarshal(t, got))
+	})
+
+	t.Run("release", func(t *testing.T) {
+		t.Parallel()
+		created := seedRelease(t, customerSecret, customer.ID)
+
+		listed, err := session.ListReleases(t.Context(), api.ListReleasesParams{ProjectID: customerProjectID})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListReleasesResponse{}, listed, helpers.MustMarshal(t, listed))
+		require.Contains(t, releaseIDs(listed.(*api.ListReleasesResponse).Releases), created.ID)
+		got, err := session.GetReleaseById(t.Context(), api.GetReleaseByIdParams{ProjectID: customerProjectID, ReleaseID: created.ID})
+		require.NoError(t, err)
+		require.IsType(t, &api.Release{}, got, helpers.MustMarshal(t, got))
 	})
 
 	t.Run("without a grant the resource is not found", func(t *testing.T) {
@@ -779,4 +836,30 @@ func requireUsersNotFound(t *testing.T, resp api.QueryUsersRes) {
 	denied := resp.(*api.QueryUsersErrorResponseStatusCode)
 	assert.Equal(t, http.StatusNotFound, denied.StatusCode)
 	assert.True(t, denied.Response.IsUserNotFound(), helpers.MustMarshal(t, resp))
+}
+
+// seedRelease builds a release pinning the project's seeded flow definition,
+// through the project secret: that is the only principal the build accepts.
+func seedRelease(t *testing.T, secret *helpers.ApiClient, projectID string) api.Release {
+	t.Helper()
+	flows, err := secret.ListFlowDefinitions(t.Context(), api.ListFlowDefinitionsParams{ProjectID: api.ProjectID(projectID)})
+	require.NoError(t, err)
+	require.IsType(t, &api.FlowDefinitionListResponse{}, flows, helpers.MustMarshal(t, flows))
+	definitions := flows.(*api.FlowDefinitionListResponse).FlowDefinitions
+	require.NotEmpty(t, definitions)
+
+	resp, err := secret.CreateRelease(t.Context(), &api.CreateReleaseRequest{
+		Pointers: []api.CreateReleasePointer{{Kind: api.ReleasePointerKindFlowDefinition, RevisionID: definitions[0].ID}},
+	}, api.CreateReleaseParams{ProjectID: api.ProjectID(projectID)})
+	require.NoError(t, err)
+	require.IsType(t, &api.CreateReleaseCreated{}, resp, helpers.MustMarshal(t, resp))
+	return api.Release(*resp.(*api.CreateReleaseCreated))
+}
+
+func releaseIDs(releases []api.ReleaseSummary) []api.ReleaseID {
+	ids := make([]api.ReleaseID, 0, len(releases))
+	for _, release := range releases {
+		ids = append(ids, release.ID)
+	}
+	return ids
 }
