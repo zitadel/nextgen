@@ -20,7 +20,7 @@ export function npmSelectorForCliVersion(cliVersion: string): string {
  * between them, so a value that needs quoting is not put in a suggested
  * command at all; callers hand it over as an argument list instead.
  */
-function isPortableShellWord(value: string): boolean {
+export function isPortableShellWord(value: string): boolean {
   // `/` is included so a POSIX-style --cwd path can be suggested as written.
   return /^[A-Za-z0-9_./-]+$/.test(value);
 }
@@ -48,14 +48,6 @@ export function portableCommands(argLists: readonly string[][], cliVersion: stri
  */
 export function optionArgs(option: string, value: string): string[] {
   return value.startsWith("-") ? [`${option}=${value}`] : [option, value];
-}
-
-/**
- * A path as one argument of a suggested command for a POSIX shell: as written
- * when it is a portable word, single-quoted otherwise.
- */
-export function shellQuotedPath(value: string): string {
-  return isPortableShellWord(value) ? value : `'${value.replaceAll("'", "'\\''")}'`;
 }
 
 export function publicCliCommand(args: string, cliVersion: string): string {

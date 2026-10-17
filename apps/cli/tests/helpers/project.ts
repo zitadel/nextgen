@@ -400,6 +400,14 @@ export class ScaffoldedApp {
     return this.envelopeOf<{ port: number }>(result).data.port;
   }
 
+  /** The argument lists a failed `doctor` run offered as recovery, for an agent to run as they are. */
+  suggestedArgsOf(result: CliResult): string[][] {
+    const { details } = this.envelopeOf<Record<string, unknown>>(result) as unknown as {
+      details?: { suggested_args?: string[][] };
+    };
+    return details?.suggested_args ?? [];
+  }
+
   /** Leaves this directory with the record of a local server that is not running. */
   async writeStoppedServerRecord(): Promise<void> {
     await mkdir(join(this.path, ".zitadel/local"), { recursive: true });

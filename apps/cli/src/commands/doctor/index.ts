@@ -27,7 +27,7 @@ import { createOrca } from "../../lib/orca";
 import { resolveCwd } from "../../lib/paths";
 import { hasZitadelConfig } from "../../lib/project";
 import { listenersForPort } from "../../lib/prober/ports";
-import { publicCliCommand, shellQuotedPath } from "../../lib/public-cli";
+import { portableCommands, publicCliCommand } from "../../lib/public-cli";
 import { SANITY_CHECKS, type CheckContext, type CheckOutcome } from "./checks";
 
 const LOCAL_RUNTIME_CHECK_NAMES = new Set([
@@ -172,7 +172,10 @@ export default class Doctor extends BaseCommand {
       throw new ZitadelError(code, "Zitadel doctor found issues", {
         hint: advice.hint,
         nextCommands: advice.nextCommands,
-        details: data,
+        details:
+          advice.suggestedArgs === undefined
+            ? data
+            : { ...data, suggested_args: advice.suggestedArgs },
       });
     }
 
@@ -184,15 +187,14 @@ export default class Doctor extends BaseCommand {
   }
 }
 
-function failureAdvice(
+export function failureAdvice(
   failed: CheckOutcome[],
   image: string,
   port: number,
   cliVersion: string,
   runtimeDir?: string,
-): { hint: string; nextCommands: string[] } {
+): { hint: string; nextCommands: string[]; suggestedArgs?: string[][] } {
   const failedNames = new Set(failed.map((check) => check.name));
-  const at = runtimeDir === undefined ? "" : ` --cwd ${shellQuotedPath(runtimeDir)}`;
 
   if (failedNames.has("server-binary")) {
     return {
@@ -241,14 +243,25 @@ function failureAdvice(
   }
 
   if (failedNames.has("runtime")) {
+    // `start` and `reset` act on their working directory, so a runtime found
+    // in a parent is named explicitly. The directory comes from the file
+    // system and quoting differs between POSIX shells, PowerShell and cmd.exe,
+    // so a path that needs quoting leaves the strings out and the argument
+    // lists in `details.suggested_args` carry the recovery.
+    const at = runtimeDir === undefined ? [] : ["--cwd", runtimeDir];
+    const suggestedArgs = [
+      ["start", ...at],
+      ["reset", "--force", ...at],
+    ];
+    const nextCommands = portableCommands(suggestedArgs, cliVersion);
     return {
-      hint: "Existing local runtime metadata was found, but the local Zitadel server is not healthy. Start it again or reset stale local data.",
-      // `start` and `reset` act on their working directory, so a runtime found
-      // in a parent is named explicitly.
-      nextCommands: [
-        publicCliCommand(`start${at}`, cliVersion),
-        publicCliCommand(`reset --force${at}`, cliVersion),
-      ],
+      hint:
+        "Existing local runtime metadata was found, but the local Zitadel server is not healthy. Start it again or reset stale local data." +
+        (nextCommands.length === 0
+          ? " The runtime is in a directory that needs shell quoting, so details.suggested_args holds the exact arguments."
+          : ""),
+      nextCommands,
+      suggestedArgs,
     };
   }
 

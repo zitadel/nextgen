@@ -174,5 +174,71 @@ describe("doctor", () => {
         expect(result).toSuggest(`reset --force --cwd ${parent.path}`);
       });
     });
+
+    describe("in a directory whose path needs shell quoting", () => {
+      async function parentNamed(name: string): Promise<ScaffoldedApp> {
+        const outer = await aSetUpApp();
+        return outer.appInside(name);
+      }
+
+      it.each(["my app", "it's"])(
+        "hands over where to start it again as arguments (%s)",
+        async (name) => {
+          const parent = await parentNamed(name);
+          await parent.writeStoppedServerRecord();
+          const app = await parent.appInside("my-app");
+
+          const result = await app.doctorAtItsServer();
+
+          expect(app.suggestedArgsOf(result)).toContainEqual(["start", "--cwd", parent.path]);
+        },
+      );
+
+      it.each(["my app", "it's"])(
+        "hands over where to reset it as arguments (%s)",
+        async (name) => {
+          const parent = await parentNamed(name);
+          await parent.writeStoppedServerRecord();
+          const app = await parent.appInside("my-app");
+
+          const result = await app.doctorAtItsServer();
+
+          expect(app.suggestedArgsOf(result)).toContainEqual([
+            "reset",
+            "--force",
+            "--cwd",
+            parent.path,
+          ]);
+        },
+      );
+
+      it.each(["my app", "it's"])(
+        "hands over where to reset a malformed record as arguments (%s)",
+        async (name) => {
+          const parent = await parentNamed(name);
+          await parent.writeMalformedServerRecord();
+          const app = await parent.appInside("my-app");
+
+          const result = await app.doctorAtItsServer();
+
+          expect(app.suggestedArgsOf(result)).toContainEqual([
+            "reset",
+            "--force",
+            "--cwd",
+            parent.path,
+          ]);
+        },
+      );
+
+      it("suggests no command string a shell would split", async () => {
+        const parent = await parentNamed("my app");
+        await parent.writeStoppedServerRecord();
+        const app = await parent.appInside("my-app");
+
+        const result = await app.doctorAtItsServer();
+
+        expect(result).not.toSuggest("--cwd");
+      });
+    });
   });
 });

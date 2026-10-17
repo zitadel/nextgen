@@ -5,7 +5,7 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 import { isErrno, ZitadelError } from "../errors";
-import { shellQuotedPath } from "../public-cli";
+import { isPortableShellWord } from "../public-cli";
 import { parseJsonObject } from "../json";
 import { EMPTY_SUMMARY, type EnvSummary, isEnvSummary } from "./env-vars";
 
@@ -502,15 +502,28 @@ function malformedRuntime(input: Record<string, unknown>): ZitadelError {
   });
 }
 
-/** The malformed-record error again, with its recovery aimed at `dir`. */
-function retargetMalformedRuntime(error: unknown, dir: string): unknown {
+/**
+ * The malformed-record error again, with its recovery aimed at `dir`. The
+ * commands are written out only when `dir` can sit in them unquoted on every
+ * shell (POSIX, PowerShell, cmd.exe quote differently); otherwise the
+ * arguments are handed over as `details.suggested_args`, which no shell reads.
+ */
+export function retargetMalformedRuntime(error: unknown, dir: string): unknown {
   if (!(error instanceof ZitadelError) || error.message !== `${LOCAL_RUNTIME_FILE} is malformed`) {
     return error;
   }
-  const at = `--cwd ${shellQuotedPath(dir)}`;
+  const suggestedArgs = [
+    ["reset", "--force", "--cwd", dir],
+    ["start", "--cwd", dir],
+  ];
+  const portable = suggestedArgs.every((args) => args.every(isPortableShellWord));
+  const [reset, start] = suggestedArgs.map((args) => `zitadel ${args.join(" ")}`);
   return new ZitadelError(error.code, error.message, {
-    hint: `Run \`zitadel reset --force ${at}\`, then \`zitadel start ${at}\`.`,
-    nextCommands: [`zitadel reset --force ${at}`, `zitadel start ${at}`],
-    details: error.details,
+    hint: portable
+      ? `Run \`${reset}\`, then \`${start}\`.`
+      : `Run \`zitadel reset --force\`, then \`zitadel start\`, each with --cwd ${dir} ` +
+        "(details.suggested_args holds the exact arguments).",
+    ...(portable ? { nextCommands: [reset, start] } : {}),
+    details: { ...(error.details as Record<string, unknown>), suggested_args: suggestedArgs },
   });
 }
