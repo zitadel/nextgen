@@ -512,12 +512,12 @@ export function retargetMalformedRuntime(error: unknown, dir: string): unknown {
   if (!(error instanceof ZitadelError) || error.message !== `${LOCAL_RUNTIME_FILE} is malformed`) {
     return error;
   }
-  const suggestedArgs = [
-    ["reset", "--force", "--cwd", dir],
-    ["start", "--cwd", dir],
-  ];
+  const resetArgs = ["reset", "--force", "--cwd", dir];
+  const startArgs = ["start", "--cwd", dir];
+  const suggestedArgs = [resetArgs, startArgs];
   const portable = suggestedArgs.every((args) => args.every(isPortableShellWord));
-  const [reset, start] = suggestedArgs.map((args) => `zitadel ${args.join(" ")}`);
+  const reset = `zitadel ${resetArgs.join(" ")}`;
+  const start = `zitadel ${startArgs.join(" ")}`;
   return new ZitadelError(error.code, error.message, {
     hint: portable
       ? `Run \`${reset}\`, then \`${start}\`.`
