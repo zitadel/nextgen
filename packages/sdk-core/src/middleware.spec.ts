@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { filterResponseHeaders, matchesRoutes } from "./middleware.js";
+import { HOP_BY_HOP, filterResponseHeaders, matchesRoutes } from "./middleware.js";
 
 /** The upstream response headers for one proxied call. */
 function upstream(entries: Record<string, string>): Headers {
@@ -133,5 +133,11 @@ describe("matchesRoutes", () => {
 
     expect(matchesRoutes(pathname, ["/profile"])).toBe(false);
     expect(performance.now() - started).toBeLessThan(250);
+  });
+});
+
+describe("HOP_BY_HOP", () => {
+  it("includes content-length, so a re-sent body gets the length the fetch implementation computes", () => {
+    expect(HOP_BY_HOP.has("content-length")).toBe(true);
   });
 });
