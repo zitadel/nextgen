@@ -2528,6 +2528,47 @@ describe("<zitadel-login> config that arrives after upgrade", () => {
     expect(createFlows()).toHaveLength(1);
   });
 
+  it("starts one flow when a second change lands while a restart is queued", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.project = testProject;
+    // A host changing another input from the first step's event, right as the
+    // settled start schedules the restart a late purpose asked for.
+    element.addEventListener(
+      "zitadel-flow-step",
+      () => {
+        element.flowName = "other";
+      },
+      { once: true },
+    );
+    host.appendChild(element);
+    await element.updateComplete;
+    await Promise.resolve();
+    element.purpose = "register";
+
+    await waitFor(() => createFlows().length >= 2);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(createFlows()).toHaveLength(2);
+  });
+
+  it("keeps a resumed flow when a purpose arrives late", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.project = testProject;
+    element.resumeFlowId = "flow_resumed";
+    host.appendChild(element);
+    await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+
+    element.purpose = "register";
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const fetches = mock.getCaptured().filter((entry) => entry.kind === "getFlowStep");
+    expect(fetches).toHaveLength(1);
+    expect(createFlows()).toHaveLength(0);
+  });
+
   it("does not restart when a framework re-assigns an equal project handle", async () => {
     const host = document.createElement("div");
     document.body.appendChild(host);
