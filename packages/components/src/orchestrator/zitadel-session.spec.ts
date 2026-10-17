@@ -98,8 +98,9 @@ function activate(button: Element): void {
  * Replaces `window.location` with a stub recording `assign()` calls, on
  * `href` when given.
  */
-function stubLocation(href = window.location.href): { current: string } {
+function stubLocation(href = window.location.href, base = href): { current: string } {
   const record = { current: "" };
+  Object.defineProperty(document, "baseURI", { configurable: true, value: base });
   Object.defineProperty(window, "location", {
     configurable: true,
     value: { ...window.location, href, assign: (url: string) => (record.current = url) },
@@ -244,6 +245,51 @@ describe("<zitadel-session>", () => {
     sessionAnswer = unauthorized;
     expect(await loadPage("https://app.test/account", "/")).toBe("/");
     expect(await loadPage("https://app.test/settings", "/")).toBe("/");
+  });
+
+  it("blocks every hop of a loop between two cards that send visitors to each other", async () => {
+    sessionAnswer = unauthorized;
+    expect(await loadPage("https://app.test/account", "/settings")).toBe("/settings");
+    expect(await loadPage("https://app.test/settings", "/account")).toBe("/account");
+    expect(await loadPage("https://app.test/account", "/settings")).toBe("");
+    expect(await loadPage("https://app.test/settings", "/account")).toBe("");
+  });
+
+  it("forgets a hop once the loop window has passed while remembering the others", async () => {
+    sessionAnswer = unauthorized;
+    const now = Date.now();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(now);
+    expect(await loadPage("https://app.test/account", "/settings")).toBe("/settings");
+    clock.mockReturnValue(now + 5_000);
+    expect(await loadPage("https://app.test/settings", "/account")).toBe("/account");
+    clock.mockReturnValue(now + 10_001);
+    expect(await loadPage("https://app.test/account", "/settings")).toBe("/settings");
+    expect(await loadPage("https://app.test/settings", "/account")).toBe("");
+  });
+
+  it("keeps only a bounded number of remembered hops", async () => {
+    sessionAnswer = unauthorized;
+    for (let i = 0; i < 40; i += 1) await loadPage(`https://app.test/p${i}`, "/");
+    const stored = JSON.parse(
+      window.sessionStorage.getItem("zitadel-session:no-session-leave") ?? "[]",
+    );
+    expect(stored.length).toBeLessThanOrEqual(10);
+  });
+
+  it("resolves a relative post-sign-out-url against the document base, as navigation does", async () => {
+    sessionAnswer = unauthorized;
+    const loc = stubLocation("https://app.test/app/account", "https://app.test/");
+    const element = mount(`<zitadel-session post-sign-out-url="account"></zitadel-session>`);
+    await flush(element);
+    expect(loc.current).toBe("account");
+  });
+
+  it("stays when a relative post-sign-out-url resolves to the page itself through the document base", async () => {
+    sessionAnswer = unauthorized;
+    const loc = stubLocation("https://app.test/x/account", "https://app.test/");
+    const element = mount(`<zitadel-session post-sign-out-url="x/account"></zitadel-session>`);
+    await flush(element);
+    expect(loc.current).toBe("");
   });
 
   it("navigates when session storage is unavailable", async () => {
