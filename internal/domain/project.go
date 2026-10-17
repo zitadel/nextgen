@@ -32,6 +32,12 @@ func ErrProjectNotFound() Error {
 	return newError(PrefixProject.ErrorCodePrefix("not_found"), "project not found", nil, nil)
 }
 
+// ErrProjectOriginNotAllowed names a deployment target that is neither a
+// primary origin of the project nor a URL one of its preview patterns admits.
+func ErrProjectOriginNotAllowed(origin string) Error {
+	return newError(PrefixProject.ErrorCodePrefix("origin_not_allowed"), "project: origin not allowed", map[string]string{"origin": origin}, nil)
+}
+
 func ErrProjectPermissionDenied() Error {
 	return newError(PrefixProject.ErrorCodePrefix("permission_denied"), "the project management API requires the project secret", nil, nil)
 }

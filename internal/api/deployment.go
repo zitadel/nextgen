@@ -23,9 +23,12 @@ func (h *Handler) CreateDeployment(ctx context.Context, req *api.CreateDeploymen
 		ReleaseID: string(req.ReleaseID.Value),
 		Targets:   req.Targets,
 	}
-	// Deploying to preview URLs lands on top of this.
-	if req.TTL.Set {
-		return nil, domain.ErrNotImplemented()
+	if ttl, ok := req.TTL.Get(); ok {
+		parsed, err := domain.ParsePreviewTTL(string(ttl))
+		if err != nil {
+			return nil, err
+		}
+		input.TTL = &parsed
 	}
 	if reason, ok := req.Reason.Get(); ok {
 		parsed, err := domain.DeploymentReasonString(string(reason))
@@ -45,7 +48,7 @@ func (h *Handler) CreateDeployment(ctx context.Context, req *api.CreateDeploymen
 	if err != nil {
 		return nil, err
 	}
-	resp := toAPIDeployment(result.Deployment)
+	resp := toAPIDeploymentWritten(result)
 	if result.Created {
 		return (*api.CreateDeploymentCreated)(&resp), nil
 	}
@@ -141,6 +144,18 @@ func deploymentErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	default:
 		return internalErrorResponse(err)
 	}
+}
+
+// toAPIDeploymentWritten converts a create result; every target of a written
+// preview deployment carries the expiry it set.
+func toAPIDeploymentWritten(result *service.CreateDeploymentOutput) api.Deployment {
+	resp := toAPIDeployment(result.Deployment)
+	if result.PreviewExpiresAt != nil {
+		for i := range resp.Targets {
+			resp.Targets[i].ExpiresAt = api.NewOptDateTime(*result.PreviewExpiresAt)
+		}
+	}
+	return resp
 }
 
 // toAPIDeployment converts a deployment.

@@ -16,7 +16,6 @@ import (
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/service"
 )
 
 const (
@@ -149,14 +148,17 @@ func TestCreateDeployment(t *testing.T) {
 			body:       `{"content_hash":"` + string(fixture.release.ContentHash) + `","targets":["primary"]}`,
 			wantStatus: http.StatusNotImplemented, wantCode: domain.ErrNotImplemented().Code,
 		},
-		// Deploying to preview URLs lands on top of this.
-		"a preview URL": {
-			body:       `{"release_id":"` + string(releaseID) + `","targets":["` + previewOrigin + `"]}`,
-			wantStatus: http.StatusNotImplemented, wantCode: domain.ErrNotImplemented().Code,
-		},
-		"a ttl": {
+		"a ttl for primary origins": {
 			body:       `{"release_id":"` + string(releaseID) + `","targets":["primary"],"ttl":"1h"}`,
-			wantStatus: http.StatusNotImplemented, wantCode: domain.ErrNotImplemented().Code,
+			wantStatus: http.StatusBadRequest, wantCode: domain.ErrDeploymentInvalid(nil, nil).Code,
+		},
+		"primary and preview mixed": {
+			body:       `{"release_id":"` + string(releaseID) + `","targets":["primary","` + previewOrigin + `"]}`,
+			wantStatus: http.StatusBadRequest, wantCode: domain.ErrDeploymentInvalid(nil, nil).Code,
+		},
+		"an origin the project does not allow": {
+			body:       `{"release_id":"` + string(releaseID) + `","targets":["https://evil.example"]}`,
+			wantStatus: http.StatusForbidden, wantCode: domain.ErrProjectOriginNotAllowed("").Code,
 		},
 		"an unknown release": {
 			body:       `{"release_id":"rel_01KX5N7C9D2E7F0N9WD3P2E4YM6","targets":["primary"]}`,
@@ -171,25 +173,31 @@ func TestCreateDeployment(t *testing.T) {
 	}
 }
 
-// TestPreviews seeds previews through the deployment service, since a
-// deployment to preview URLs over HTTP still answers 501, then lists and
-// removes them.
 func TestPreviews(t *testing.T) {
 	t.Parallel()
 
 	fixture := newDeploymentFixture(t)
 	project := api.ProjectID(fixture.project)
-	origins := []string{previewOrigin, otherPreview}
 
-	_, err := service.NewDeploymentService(harness.EnsureServiceDB(t)).Create(t.Context(), service.CreateDeploymentInput{
-		ProjectID:  fixture.project,
-		ReleaseID:  string(fixture.release.ID),
-		OriginKind: domain.DeploymentOriginKindPreview,
-		Origins:    origins,
-		Reason:     domain.DeploymentReasonDeploy,
-		PreviewTTL: 168 * time.Hour,
+	before := time.Now()
+	deployed := fixture.created(t, &api.CreateDeploymentRequest{
+		ReleaseID: api.NewOptReleaseID(fixture.release.ID),
+		Targets:   api.DeploymentTargetsRequest{previewOrigin, otherPreview},
+		TTL:       api.NewOptPreviewTTL("168h"),
 	})
-	require.NoError(t, err)
+	require.Len(t, deployed.Targets, 2)
+	for _, target := range deployed.Targets {
+		require.True(t, target.ExpiresAt.Set)
+		assert.WithinDuration(t, before.Add(168*time.Hour), target.ExpiresAt.Value, time.Minute)
+	}
+
+	t.Run("a deploy to the same URLs always writes", func(t *testing.T) {
+		again := fixture.created(t, &api.CreateDeploymentRequest{
+			ReleaseID: api.NewOptReleaseID(fixture.release.ID),
+			Targets:   api.DeploymentTargetsRequest{previewOrigin, otherPreview},
+		})
+		assert.NotEqual(t, deployed.ID, again.ID)
+	})
 
 	list := func(t *testing.T) []string {
 		t.Helper()
@@ -212,14 +220,16 @@ func TestPreviews(t *testing.T) {
 		require.IsType(t, &api.RemovePreviewNoContent{}, resp, helpers.MustMarshal(t, resp))
 	}
 
-	assert.ElementsMatch(t, origins, list(t))
+	t.Run("list and remove", func(t *testing.T) {
+		assert.ElementsMatch(t, []string{previewOrigin, otherPreview}, list(t))
 
-	remove(t, origins[0])
-	assert.Equal(t, origins[1:], list(t))
+		remove(t, previewOrigin)
+		assert.Equal(t, []string{otherPreview}, list(t))
 
-	// Again, with nothing left to remove.
-	remove(t, origins[0])
-	assert.Equal(t, origins[1:], list(t))
+		// Again, with nothing left to remove.
+		remove(t, previewOrigin)
+		assert.Equal(t, []string{otherPreview}, list(t))
+	})
 }
 
 // TestDeploymentsNotImplemented pins the reads, rollback and the frozen-
