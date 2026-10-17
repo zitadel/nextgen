@@ -1,8 +1,6 @@
 title: DeploymentGuardConflict
 type: object
-description: |
-  `expected_deployment_id` did not match: another deployment reached the
-  targets first.
+description: '`expected_deployment_id` is not the deployment this write replaces.'
 required:
   - code
   - message
@@ -21,9 +19,8 @@ properties:
     properties:
       deployment:
         description: |
-          The actual newest deployment to the targets, to inspect before
-          retrying with its id as `expected_deployment_id`. Null when nothing
-          has been deployed to any of the targets yet.
+          The deployment this write replaces, null when there is none. Retry
+          with its id as `expected_deployment_id`.
         oneOf:
           - $ref: deployment.yaml
           - type: 'null'
