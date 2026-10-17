@@ -33,12 +33,12 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { run } from "./dev-process.mjs";
+import { run, runCapture } from "./dev-process.mjs";
 import { runnerCommand } from "./task-runner.mjs";
 
 // Pinned: Services is a beta, and what `vercel dev` does with it changes from
-// one major to the next.
-const VERCEL_CLI = "vercel@64.4.0";
+// one major to the next. A `vercel` on PATH of the same major is used instead.
+const VERCEL_CLI_VERSION = "64.4.0";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const port = process.env.CLOUD_DEV_PORT || "3000";
@@ -68,23 +68,47 @@ try {
   };
   console.log(`[cloud] ${origin}/ (website), /docs, /console/, /storybook/, /ui/login/`);
   console.log(`[cloud] root admin: ${join(localDir, "admin.json")}`);
+  const vercel = await vercelCli();
+  console.log(`[cloud] Vercel CLI ${vercel.version} (${vercel.source})`);
   // CLOUD_DEV_DEBUG=1: why a service did not start, which `vercel dev` logs
   // only at debug level.
   const debug = process.env.CLOUD_DEV_DEBUG === "1" ? ["--debug"] : [];
-  await runGroup("npx", ["--yes", VERCEL_CLI, "dev", "-L", "--yes", "--listen", port, ...debug], {
-    cwd: repoRoot,
-    env,
-  });
+  await runGroup(
+    vercel.command,
+    [...vercel.args, "dev", "-L", "--yes", "--listen", port, ...debug],
+    { cwd: repoRoot, env },
+  );
 } catch (error) {
   console.error(`[cloud] ${error.message}`);
   process.exit(Number.isInteger(error.code) ? error.code : 1);
 }
 
 /**
+ * The Vercel CLI to drive: the `vercel` on PATH when it is the pinned major,
+ * else the pinned version through npx.
+ */
+async function vercelCli() {
+  const installed = await runCapture("vercel", ["--version"], { cwd: repoRoot }).then(
+    ({ stdout }) => stdout.trim().split("\n").pop() ?? "",
+    () => "",
+  );
+  if (installed.split(".")[0] === VERCEL_CLI_VERSION.split(".")[0]) {
+    return { command: "vercel", args: [], version: installed, source: "on PATH" };
+  }
+  return {
+    command: "npx",
+    args: ["--yes", `vercel@${VERCEL_CLI_VERSION}`],
+    version: VERCEL_CLI_VERSION,
+    source: installed ? `npx; vercel ${installed} on PATH is another major` : "npx",
+  };
+}
+
+/**
  * Runs `vercel dev` as a process group of its own and passes this script's
  * signals to the whole group. npx does not pass a signal on to the CLI it
- * starts, so stopping this script alone would leave the CLI holding the port
- * and .vercel/dev.lock, and the next run would refuse to start.
+ * starts, and the CLI's services outlive it either way, so stopping this
+ * script alone would leave them holding the port and .vercel/dev.lock, and
+ * the next run would refuse to start.
  *
  * stdin is not passed on. `vercel dev` asks nothing (--yes), and where stdin
  * is a socket that closes, as under the desktop app's preview, every process

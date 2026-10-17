@@ -363,7 +363,10 @@ Where it differs from a deployment:
   checks against it. Two fail by design: the redirect's query above, and the
   docs' assets, which `next dev` serves without the deployment's immutable
   caching.
-- Services is a beta of the Vercel CLI; the script pins the CLI it drives.
+- Services is a beta of the Vercel CLI, and `vercel dev` changes from one
+  major to the next. The script drives a `vercel` on `PATH` of the major it
+  pins and otherwise runs the pinned version through npx; its first lines say
+  which.
 
 ## Rotating the master key
 
