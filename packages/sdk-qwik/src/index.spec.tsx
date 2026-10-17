@@ -11,9 +11,10 @@ import {
   ZITADEL_LOGOUT_EVENT_HANDLERS,
   ZITADEL_SESSION_EVENT_HANDLERS,
 } from "@zitadel/sdk-core/types";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { PasswordToggleHarness } from "./__tests__/password-toggle-harness";
+import { SessionHeadingHarness } from "./__tests__/session-heading-harness";
 import { businessLocales, ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
@@ -330,5 +331,41 @@ describe("ZitadelLogin suppressPasswordToggle", () => {
     await expect.poll(() => window.__unsetSuppressPasswordToggle).toBeTypeOf("function");
     window.__unsetSuppressPasswordToggle!();
     await expect.poll(() => el().suppressPasswordToggle).toBe(false);
+  });
+});
+
+describe("ZitadelSession heading and logoutLabel", () => {
+  it("returns to the widget defaults when the props go from a string back to unset", async () => {
+    const host = await renderWidget(<SessionHeadingHarness />);
+    const el = () => host.querySelector<ZitadelSessionElement>("zitadel-session")!;
+    await expect.poll(() => el().heading).toBe("Hi");
+    expect(el().logoutLabel).toBe("Hi");
+
+    await expect.poll(() => window.__unsetSessionLabels).toBeTypeOf("function");
+    window.__unsetSessionLabels!();
+    await expect.poll(() => el().heading).toBe("Signed in as");
+    expect(el().logoutLabel).toBe("Sign out");
+  });
+});
+
+describe("resumed server markup", () => {
+  it("starts a register flow from the attributes alone, before any binder runs", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    // What Qwik Router sends and then resumes: attributes only, no `ref` binder
+    // and no property handle (see index.server.spec.tsx for the server HTML).
+    host.innerHTML =
+      '<zitadel-login project-id="proj-test" proxy-path="/__resumed" purpose="register"></zitadel-login>';
+
+    await expect
+      .poll(() => fetchSpy.mock.calls.find(([input]) => String(input).includes("/__resumed")))
+      .toBeDefined();
+    const [input, init] = fetchSpy.mock.calls.find(([i]) => String(i).includes("/__resumed"))!;
+    expect(String(input)).toContain("/__resumed/");
+    expect(JSON.parse(String(init?.body))).toEqual({
+      purpose: "register",
+      project_id: "proj-test",
+    });
   });
 });

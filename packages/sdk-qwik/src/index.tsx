@@ -67,6 +67,15 @@ function setProp<E extends Element, K extends keyof E>(
  */
 type Attrs = Record<string, string | undefined>;
 
+/**
+ * The session card's own defaults. They are emitted explicitly when the
+ * override is unset: omitting the attribute makes Lit reset the String property
+ * to `null` (blank text), and `setProp` skips `undefined`, so a string-to-unset
+ * change would otherwise leave the heading or sign-out label empty.
+ */
+const DEFAULT_HEADING = "Signed in as";
+const DEFAULT_LOGOUT_LABEL = "Sign out";
+
 function projectAttrs(props: {
   readonly project?: ZitadelProject;
   readonly projectId?: string;
@@ -76,6 +85,10 @@ function projectAttrs(props: {
     "project-id": props.project?.projectId ?? props.projectId,
     "proxy-path": props.project?.proxyPath ?? props.proxyPath,
     url: props.project?.url,
+    // Browser-safe by construction (ADR 036), so it can ride in server markup.
+    // Without it a resumed widget would start its first flow, or run an SSO
+    // handoff exchange, with no bearer before the property handle is restored.
+    "publishable-key": props.project?.publishableKey,
   };
 }
 
@@ -109,8 +122,8 @@ function sessionAttrs(props: ZitadelSessionProps): Attrs {
   return {
     ...projectAttrs(props),
     "post-sign-out-url": props.postSignOutUrl,
-    heading: props.heading,
-    "logout-label": props.logoutLabel,
+    heading: props.heading ?? DEFAULT_HEADING,
+    "logout-label": props.logoutLabel ?? DEFAULT_LOGOUT_LABEL,
     variant: props.variant,
     theme: props.theme,
     "suppress-header": flag(props.suppressHeader),
@@ -150,8 +163,8 @@ function bindSessionConfig(el: ZitadelSessionElement, props: ZitadelSessionProps
   setProp(el, "projectId", props.projectId);
   setProp(el, "proxyPath", props.proxyPath);
   setProp(el, "postSignOutUrl", props.postSignOutUrl);
-  setProp(el, "heading", props.heading);
-  setProp(el, "logoutLabel", props.logoutLabel);
+  setProp(el, "heading", props.heading ?? DEFAULT_HEADING);
+  setProp(el, "logoutLabel", props.logoutLabel ?? DEFAULT_LOGOUT_LABEL);
   setProp(el, "variant", props.variant);
   setProp(el, "theme", props.theme);
   setProp(el, "suppressHeader", props.suppressHeader);

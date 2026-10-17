@@ -207,6 +207,23 @@ describe("<zitadel-login> against the typed Flow API", () => {
     });
   });
 
+  it("sends the publishable-key attribute as the bearer on the first request", async () => {
+    _resetConfigForTesting();
+    const bearers: (string | null)[] = [];
+    server.events.on("request:start", ({ request }) => {
+      bearers.push(request.headers.get("authorization"));
+    });
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.setAttribute("project-id", "demo-project");
+    element.setAttribute("proxy-path", API_BASE);
+    element.setAttribute("publishable-key", "pk_test_123");
+    host.appendChild(element);
+    await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+    server.events.removeAllListeners();
+
+    expect(bearers[0]).toBe("Bearer pk_test_123");
+  });
+
   it("prefers the project property over the project-id attribute", async () => {
     const element = document.createElement("zitadel-login") as ZitadelLogin;
     element.project = testProject; // projectId "demo-project"
