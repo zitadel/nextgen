@@ -4,6 +4,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import { createNextgenMiddleware } from "../../runtime/server/middleware";
 import { setRuntimeConfig } from "../stubs/nuxt-imports";
+import { clearJwksCache } from "@zitadel/sdk-core/jwt";
+
+// The JWKS cache is module-level and per issuer: start every case from a cold
+// cache, so each one fetches the keys its own mock publishes.
+beforeEach(() => {
+  clearJwksCache();
+});
 
 function base64url(buf: Buffer): string {
   return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
