@@ -235,6 +235,24 @@ export default defineConfig({
     );
   });
 
+  it("keeps the config's own zlib import and adds the redaction's under its own name", () => {
+    const own = 'import zlib from "zlib";\n';
+
+    const out = edit(own + BARE_CONFIG);
+
+    expect(out.match(/^import zlib from "zlib";$/gm)).toHaveLength(1);
+    expect(out.match(/^import \w+ from "node:zlib";$/gm)).toHaveLength(1);
+    expect(out).not.toMatch(/^import zlib from "node:zlib";$/m);
+  });
+
+  it("adds the redaction beside a config's own zlib import to an entry written without it", () => {
+    const out = edit(`import zlib from "zlib";\n${UNREDACTED_CONFIG}`);
+
+    const names = [...out.matchAll(/^import (?:\{[^}]*\}|\w+) from/gm)].map((m) => m[0]);
+    expect(new Set(names).size).toBe(names.length);
+    expect(out).toContain("selfHandleResponse: true,");
+  });
+
   it("emits helpers a TypeScript config can typecheck under noImplicitAny", async () => {
     const dir = await mkdtemp(join(tmpdir(), "zitadel-typed-"));
     try {

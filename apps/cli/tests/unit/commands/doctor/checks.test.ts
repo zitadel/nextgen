@@ -752,7 +752,7 @@ describe("ManagedFilesCheck", () => {
     const proxyPath = join(cwd, "proxy.conf.cjs");
     const unredacted = proxyConfTemplate()
       .replace(
-        /\n\nconst zlib = require\("node:zlib"\);\n\n\/\* zitadel:proxy:exchange-redaction:v2 \*\/[\s\S]*?(?=\n\nfunction stripPrefix)/,
+        /\n\nconst zitadelZlib = require\("node:zlib"\);\n\n\/\* zitadel:proxy:exchange-redaction:v2 \*\/[\s\S]*?(?=\n\nfunction stripPrefix)/,
         "",
       )
       .replace(

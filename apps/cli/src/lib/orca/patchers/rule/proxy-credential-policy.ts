@@ -75,7 +75,7 @@ export const EXCHANGE_REDACTION_MARKER = "zitadel:proxy:exchange-redaction:v2";
  * exchange answer, so the file around it imports (Vite) or requires (Angular)
  * the module under this name.
  */
-export const EXCHANGE_REDACTION_ZLIB = "zlib";
+export const EXCHANGE_REDACTION_ZLIB = "zitadelZlib";
 
 /**
  * The functions a generated dev proxy uses to keep the session token out of

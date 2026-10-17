@@ -57,7 +57,7 @@ const CURRENT_REDACTION =
 
 /** The `node:zlib` import (Vite) or require (Angular) the current redaction needs. */
 const ZLIB_BINDING =
-  /^(?:import zlib from "node:zlib";\n\n?|const zlib = require\("node:zlib"\);\n\n)/m;
+  /^(?:import zitadelZlib from "node:zlib";\n\n?|const zitadelZlib = require\("node:zlib"\);\n\n)/m;
 
 /**
  * A dev proxy the CLI generates now, as an earlier CLI wrote it: the first
