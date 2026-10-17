@@ -457,7 +457,6 @@ export function ssoConflictStep(input: StepFixtureInput): CreateFlow201 {
         text_key: "sso-conflict.field.password",
         autocomplete: "current-password",
         required: true,
-        validation: { min_length: 8 },
       },
     ],
     actions: [
