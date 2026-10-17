@@ -22,7 +22,6 @@ properties:
     example: Inter, ui-sans-serif, sans-serif
   font_url:
     type: string
-    format: uri
     maxLength: 2048
     description: |
       Stylesheet that loads `font_family` — a Google Fonts CSS URL, for

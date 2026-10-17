@@ -45,3 +45,47 @@ rules:
     assertions:
       notPattern: /[a-z][A-Z]/
     severity: error
+
+  # ogen turns `format: uri` into url.URL and drops pattern/minLength/maxLength
+  # on the field (its "validator cannot be applied" warning), so the limit is
+  # never enforced. Leave the format off, or the constraint. One rule per
+  # keyword because `where` cannot test a list of properties.
+  rule/wire-uri-format-no-pattern:
+    subject:
+      type: Schema
+      property: format
+    where:
+      - subject:
+          type: Schema
+          property: pattern
+        assertions:
+          defined: true
+    assertions:
+      notPattern: /^uri$/
+    severity: error
+  rule/wire-uri-format-no-minlength:
+    subject:
+      type: Schema
+      property: format
+    where:
+      - subject:
+          type: Schema
+          property: minLength
+        assertions:
+          defined: true
+    assertions:
+      notPattern: /^uri$/
+    severity: error
+  rule/wire-uri-format-no-maxlength:
+    subject:
+      type: Schema
+      property: format
+    where:
+      - subject:
+          type: Schema
+          property: maxLength
+        assertions:
+          defined: true
+    assertions:
+      notPattern: /^uri$/
+    severity: error

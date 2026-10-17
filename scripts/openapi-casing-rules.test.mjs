@@ -42,6 +42,12 @@ test("every casing violation in the fixture is reported", async () => {
   }
 });
 
+test("a constrained format: uri is reported", async () => {
+  // ogen drops the constraint on a url.URL field, so it must not be written.
+  const problems = await wireProblems("violations.yaml");
+  assert.ok(problems.some((p) => p.ruleId.startsWith("rule/wire-uri-format-no-")));
+});
+
 test("camelCase past the first word is reported", async () => {
   // Regression guard for the anchored /^[a-z][a-z0-9]*[A-Z]/ these rules
   // shipped with: it cannot cross an underscore, so both values below passed.

@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"net/http"
-	"net/url"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -19,8 +18,8 @@ func (h *Handler) CreateBranding(ctx context.Context, req *api.Branding, params 
 		ProjectID:      string(params.ProjectID),
 		Layout:         string(req.Layout.Value),
 		LiquidTemplate: req.LiquidTemplate.Value,
-		LogoURL:        optURIString(req.LogoURL),
-		HeroURL:        optURIString(req.HeroURL),
+		LogoURL:        req.LogoURL.Value,
+		HeroURL:        req.HeroURL.Value,
 		Theme:          brandingThemeFromAPI(req.Theme),
 		Typography:     brandingTypographyFromAPI(req.Typography),
 		Shape:          brandingShapeFromAPI(req.Shape),
@@ -115,8 +114,8 @@ func toAPIBranding(b *domain.Branding) api.Branding {
 	if b.LiquidTemplate != "" {
 		out.LiquidTemplate = api.NewOptString(b.LiquidTemplate)
 	}
-	out.LogoURL = optURI(b.LogoURL)
-	out.HeroURL = optURI(b.HeroURL)
+	out.LogoURL = optAPIString(b.LogoURL)
+	out.HeroURL = optAPIString(b.HeroURL)
 	if theme, ok := toAPIBrandingTheme(b.Theme); ok {
 		out.Theme = api.NewOptBrandingTheme(theme)
 	}
@@ -150,7 +149,7 @@ func toAPIBrandingThemeSide(side *domain.BrandingThemeSide) (api.BrandingThemeSi
 	if side == nil {
 		return api.BrandingThemeSide{}, false
 	}
-	out := api.BrandingThemeSide{LogoURL: optURI(side.LogoURL)}
+	out := api.BrandingThemeSide{LogoURL: optAPIString(side.LogoURL)}
 	if palette, ok := toAPIBrandingPalette(side.Palette); ok {
 		out.Palette = api.NewOptBrandingPalette(palette)
 	}
@@ -180,7 +179,7 @@ func toAPIBrandingPalette(palette *domain.BrandingPalette) (api.BrandingPalette,
 func toAPIBrandingTypography(typography domain.BrandingTypography) (api.BrandingTypography, bool) {
 	out := api.BrandingTypography{
 		FontFamily: optAPIString(typography.FontFamily),
-		FontURL:    optURI(typography.FontURL),
+		FontURL:    optAPIString(typography.FontURL),
 	}
 	if typography.Scale != 0 {
 		out.Scale = api.NewOptFloat64(typography.Scale)
@@ -222,7 +221,7 @@ func brandingThemeSideFromAPI(side api.OptBrandingThemeSide) *domain.BrandingThe
 		return nil
 	}
 	return &domain.BrandingThemeSide{
-		LogoURL: optURIString(side.Value.LogoURL),
+		LogoURL: side.Value.LogoURL.Value,
 		Palette: brandingPaletteFromAPI(side.Value.Palette),
 	}
 }
@@ -253,7 +252,7 @@ func brandingTypographyFromAPI(typography api.OptBrandingTypography) domain.Bran
 	}
 	return domain.BrandingTypography{
 		FontFamily: typography.Value.FontFamily.Value,
-		FontURL:    optURIString(typography.Value.FontURL),
+		FontURL:    typography.Value.FontURL.Value,
 		Scale:      typography.Value.Scale.Value,
 	}
 }
@@ -276,17 +275,6 @@ func brandingShapeFromAPI(shape api.OptBrandingShape) domain.BrandingShape {
 	return out
 }
 
-func optURI(raw string) api.OptURI {
-	if raw == "" {
-		return api.OptURI{}
-	}
-	u, err := url.Parse(raw)
-	if err != nil {
-		return api.OptURI{}
-	}
-	return api.NewOptURI(*u)
-}
-
 func optBrandingColor(value string) api.OptBrandingColor {
 	if value == "" {
 		return api.OptBrandingColor{}
@@ -299,13 +287,6 @@ func optAPIString(value string) api.OptString {
 		return api.OptString{}
 	}
 	return api.NewOptString(value)
-}
-
-func optURIString(u api.OptURI) string {
-	if !u.Set {
-		return ""
-	}
-	return u.Value.String()
 }
 
 func brandingErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {

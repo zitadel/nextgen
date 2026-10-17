@@ -44,7 +44,7 @@ func TestBrandingAppearanceRoundTrip(t *testing.T) {
 	require.Equal(t, in.Theme, brandingThemeFromAPI(out.Theme))
 	require.Equal(t, in.Typography, brandingTypographyFromAPI(out.Typography))
 	require.Equal(t, in.Shape, brandingShapeFromAPI(out.Shape))
-	require.Equal(t, in.Typography.FontURL, optURIString(out.Typography.Value.FontURL))
+	require.Equal(t, in.Typography.FontURL, out.Typography.Value.FontURL.Value)
 }
 
 func TestBrandingRadiusPresetRoundTrip(t *testing.T) {
