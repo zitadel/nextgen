@@ -14,7 +14,6 @@ import {
   ResourceHeadCell,
   ResourceHeaderRow,
   ResourceMenuHead,
-  ResourcePage,
   ResourceRow,
   ResourceTitle,
   RowMenu,
@@ -32,6 +31,7 @@ import {
 import type { SchemaField } from "@/lib/schema";
 import type { UserTeam } from "@/lib/user";
 import { columnsForUsers, fetchUsers, toUserRow } from "@/lib/user-list";
+import { Page } from "@/components/layout";
 
 export const Route = createFileRoute("/_authed/users/")({
   // `User`, not `Users`: the single-person glyph. The plural two-person one
@@ -106,7 +106,7 @@ function UsersScreen() {
   );
 
   return (
-    <ResourcePage>
+    <Page>
       {/* No search beside the title: it is out of the page headers until there
           is a console-wide solution (D19). */}
       <ResourceTitle
@@ -204,7 +204,7 @@ function UsersScreen() {
       </div>
       {/* Full width and `secondary`, 24px under the table, not a centred pill. */}
       <LoadMore paging={paging} />
-    </ResourcePage>
+    </Page>
   );
 }
 

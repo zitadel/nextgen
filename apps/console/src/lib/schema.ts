@@ -50,6 +50,18 @@ export interface SchemaField {
 }
 
 /**
+ * An input's string as the property's type wants it: JSON Schema validates a
+ * `number`/`integer` property against a JSON number, so `"42"` goes as `42`. A
+ * value that will not parse goes through untouched, so the server explains why
+ * rather than it becoming `NaN` — which `JSON.stringify` turns into `null`.
+ */
+export function attributeValue(entry: SchemaField, value: string): unknown {
+  if (entry.inputType !== "number") return value;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : value;
+}
+
+/**
  * Human-readable schema name for the picker.
  *
  * Schemas carry no dedicated name field: `title` is the authored document

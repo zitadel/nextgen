@@ -20,13 +20,12 @@ import {
   SidebarProvider,
   SidebarRail,
   SidebarTrigger,
-  useSidebar,
 } from "@/components/ui/sidebar";
 import type { NavGroup } from "@/nav";
 
 import { ContextSwitcher } from "./context-switcher";
 import { ZitadelLogo } from "./icons";
-import { ThemeToggle } from "./theme-toggle";
+import { SearchDialog, SearchTrigger, useSearchShortcut } from "./search";
 import { useNavItems } from "./use-nav-items";
 import { SETTINGS_PATH, type ShellUser, UserMenuItem } from "./user-menu";
 
@@ -35,10 +34,10 @@ export type { ShellUser };
 /**
  * Console shell built on shadcn's `Sidebar` block. `collapsible="icon"` gives
  * the 256px → icon-rail collapse with tooltips, ⌘/Ctrl+B, mobile off-canvas, and
- * rail — all from the component. The context bar (sidebar trigger, project
- * switcher, theme toggle) sits at the top of the content column in the portal
- * view, and is absent from the Settings view, which the design draws without
- * one. Colours come from `@zitadel/design-tokens` via the shadcn utility names;
+ * rail — all from the component. The sidebar's header carries the logo and the
+ * collapse toggle; the context bar (project and team switchers, search)
+ * sits at the top of the content column in the portal view, and is absent from
+ * the Settings view, which the design draws without one. Colours come from `@zitadel/design-tokens` via the shadcn utility names;
  * the sidebar surface uses `background` per the design (see `ui/sidebar.tsx`).
  */
 export function AppShell({
@@ -54,9 +53,13 @@ export function AppShell({
 }) {
   const matchRoute = useMatchRoute();
   const inSettings = !!matchRoute({ to: SETTINGS_PATH, fuzzy: true });
+  // The palette is the shell's, not the bar's: ⌘K opens it in the Settings
+  // view too, which draws no bar.
+  const [searchOpen, setSearchOpen] = useSearchShortcut();
 
   return (
     <SidebarProvider defaultOpen={readSidebarOpen()}>
+      <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
       <AppSidebar user={user} onSignOut={onSignOut} />
       {/* `min-w-0` because the inset is a flex item, and a flex item's default
           `min-width: auto` makes it grow to fit its widest content instead of
@@ -66,9 +69,8 @@ export function AppShell({
       <SidebarInset className="min-w-0">
         {/* No context bar in the Settings view: the settings design draws none,
             and the switcher it carries is a *project* control that says nothing
-            about an account screen. The sidebar's own header keeps a trigger, so
-            collapsing still works without it. */}
-        {!inSettings && <ContextBar />}
+            about an account screen. */}
+        {!inSettings && <ContextBar onSearch={() => setSearchOpen(true)} />}
         {children}
       </SidebarInset>
     </SidebarProvider>
@@ -83,13 +85,16 @@ function readSidebarOpen(): boolean {
 }
 
 /**
- * The collapsed rail's 44px header band. The rail owns the collapse toggle —
- * the context bar hides its own while collapsed, so the two never compete.
+ * The sidebar's top band: the logo with the collapse toggle beside it, 56px
+ * tall and ruled underneath so it reads as one band with the top bar. In the
+ * icon rail the logo goes and the toggle centres — there is no room for both,
+ * and the toggle is what brings the logo back.
  */
-const RAIL_HEADER = "hidden h-11 items-center justify-center group-data-[collapsible=icon]:flex";
+const BRAND_HEADER =
+  "h-14 shrink-0 flex-row items-center justify-between border-b border-border py-0 pr-3 pl-6 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0";
 
-/** Both header buttons are 28px square in the rail, per the design. */
-const RAIL_BUTTON = "size-7!";
+/** The design's `Sidebar / Header Button`: 28px square around a 16px glyph. */
+const HEADER_BUTTON = "size-7! text-sidebar-foreground";
 
 /**
  * The back row is a full-width 32px row while extended and a 28px square in the
@@ -97,10 +102,10 @@ const RAIL_BUTTON = "size-7!";
  */
 const BACK_BUTTON = "group-data-[collapsible=icon]:size-7!";
 
-// The rule under the header sits inside its 48px, so the bottom inset gives
+// The rule under the back row sits inside its 48px, so the bottom inset gives
 // up the pixel the rule takes.
 const SETTINGS_HEADER =
-  "border-b border-border pb-[calc(--spacing(2)-1px)] group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:p-0";
+  "border-b border-border pb-[calc(--spacing(2)-1px)] group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-0";
 
 /**
  * The sidebar has two views and the **route** decides which is showing:
@@ -109,7 +114,7 @@ const SETTINGS_HEADER =
  * what lets a settings URL survive a refresh, and it keeps the shell consistent
  * with ADR 0001's route-driven nav.
  *
- * Both views collapse to the same 48px icon rail.
+ * Both views share the brand header and collapse to the same 48px icon rail.
  */
 function AppSidebar({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => void }) {
   const matchRoute = useMatchRoute();
@@ -117,7 +122,8 @@ function AppSidebar({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => v
 
   return (
     <Sidebar collapsible="icon">
-      {inSettings ? <SettingsHeader /> : <PortalHeader />}
+      <BrandHeader />
+      {inSettings && <SettingsHeader />}
 
       <SidebarContent>{inSettings ? <SettingsNav /> : <PortalNav />}</SidebarContent>
 
@@ -140,20 +146,18 @@ function AppSidebar({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => v
   );
 }
 
-/** Portal header: the full logo lockup, replaced by the toggle in the rail. */
-function PortalHeader() {
+/** Logo lockup and the collapse toggle; the toggle alone in the rail. */
+function BrandHeader() {
   return (
-    <SidebarHeader className="px-4 py-6 group-data-[collapsible=icon]:p-0">
-      <div className={RAIL_HEADER}>
-        <SidebarTrigger className={RAIL_BUTTON} />
-      </div>
+    <SidebarHeader className={BRAND_HEADER}>
       <Link
         to="/"
         aria-label="Home"
         className="inline-flex items-center text-sidebar-foreground group-data-[collapsible=icon]:hidden"
       >
-        <ZitadelLogo aria-hidden />
+        <ZitadelLogo aria-hidden className="h-[21px] w-[89px]" />
       </Link>
+      <SidebarTrigger className={HEADER_BUTTON} />
     </SidebarHeader>
   );
 }
@@ -170,13 +174,10 @@ function PortalHeader() {
 function SettingsHeader() {
   return (
     <SidebarHeader className={SETTINGS_HEADER}>
-      <div className={RAIL_HEADER}>
-        <SidebarTrigger className={RAIL_BUTTON} />
-      </div>
       {/* One row, restyled per state — rendering a separate rail copy would put
           two "Back to dashboard" links in the accessibility tree at once, with only
           CSS deciding which one is real. */}
-      <SidebarMenu className="group-data-[collapsible=icon]:h-11 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center">
+      <SidebarMenu className="group-data-[collapsible=icon]:items-center">
         <SidebarMenuItem>
           <SidebarMenuButton asChild tooltip="Back to dashboard" className={BACK_BUTTON}>
             <Link to="/">
@@ -212,7 +213,7 @@ function SettingsNav() {
         return (
           <SidebarGroup key={group} role="navigation" aria-label={group}>
             <SidebarGroupLabel>{group}</SidebarGroupLabel>
-            <SidebarMenu className="gap-0 group-data-[collapsible=icon]:gap-1">
+            <SidebarMenu className={NAV_MENU}>
               {rows.map((item) => {
                 const Icon = item.nav.icon;
                 const label = item.nav.label;
@@ -242,6 +243,9 @@ function SettingsNav() {
   );
 }
 
+/** Both navs: a 2px gap between rows, widened to the rail's 4px when collapsed. */
+const NAV_MENU = "gap-0.5 group-data-[collapsible=icon]:gap-1";
+
 /** Heading order in the Settings nav, top to bottom, as the design draws it. */
 const SETTINGS_GROUPS: NavGroup[] = ["ACCOUNT", "WORKSPACE"];
 
@@ -251,8 +255,8 @@ function PortalNav() {
   const matchRoute = useMatchRoute();
 
   return (
-    <SidebarGroup role="navigation" aria-label="Primary" className="py-0">
-      <SidebarMenu className="gap-0 group-data-[collapsible=icon]:gap-1">
+    <SidebarGroup role="navigation" aria-label="Primary" className="pt-4 pb-0">
+      <SidebarMenu className={NAV_MENU}>
         {items.map((item) => {
           const Icon = item.nav.icon;
           const label = item.nav.label;
@@ -308,22 +312,21 @@ function PortalNav() {
   );
 }
 
-function ContextBar() {
-  // While the sidebar is collapsed the rail carries the toggle in its header,
-  // per the design. Rendering this one as well would put two on screen.
-  const { state } = useSidebar();
-
+/**
+ * The top bar: the project switcher (and the team switcher on a team's page)
+ * on the left, search on the right. 56px and ruled underneath, level with the
+ * sidebar's brand header. The collapse toggle lives in the sidebar and the
+ * theme in the account menu, so the bar carries neither.
+ */
+function ContextBar({ onSearch }: { onSearch: () => void }) {
   return (
-    // 64px tall with its content centred, per the navbar every screen draws.
-    <div className="sticky top-0 z-10 flex items-start justify-between gap-4 bg-background px-2 py-3 md:items-center md:px-4">
-      <div className="flex min-w-0 flex-1 flex-col gap-2 md:flex-row md:items-center">
-        {/* Desktop only — mobile keeps the persistent icon rail. */}
-        {state === "expanded" && (
-          <SidebarTrigger className="hidden text-foreground md:inline-flex" />
-        )}
-        <ContextSwitcher />
+    <div className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border bg-background px-2 md:px-4">
+      <ContextSwitcher />
+      {/* Hidden on phones, as in the proposal: ⌘K still opens it, and the bar
+          needs the width for the switchers. */}
+      <div className="hidden w-75 justify-end sm:flex">
+        <SearchTrigger onOpen={onSearch} />
       </div>
-      <ThemeToggle />
     </div>
   );
 }

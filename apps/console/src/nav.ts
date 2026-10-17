@@ -16,7 +16,8 @@ export type NavView = "portal" | "settings";
 
 /**
  * A heading in the Settings nav. The design groups its rows under `ACCOUNT`
- * (the signed-in person) and `WORKSPACE` (the project everyone shares).
+ * (the signed-in person) and `WORKSPACE` (what they share with their team — the
+ * account, `lib/account.ts`).
  *
  * A heading renders only when a route claims it, so a group never advertises a
  * section with nothing under it.

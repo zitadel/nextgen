@@ -1,6 +1,9 @@
 /** A screen's title: the 24/24 display face. */
 export const PAGE_TITLE = "text-foreground font-serif text-2xl leading-6 tracking-tight";
 
+/** The row every screen's title sits in (`docs/styling.md`, "Page wrapper"). */
+export const PAGE_TITLE_ROW = "flex min-h-9 items-center justify-between gap-3";
+
 /** The overline face: display, uppercase 12/16 with 0.72px tracking. Colour is the caller's. */
 export const OVERLINE = "font-serif text-xs leading-4 tracking-[0.72px] uppercase";
 

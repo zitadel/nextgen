@@ -19,15 +19,19 @@ export function clearSessionCaches(): void {
   for (const cache of caches) cache.clear();
 }
 
+/** A cached read: call it to read, `clear()` to drop the answer and re-read wherever it is shown. */
+export interface SessionCached<T> {
+  (): Promise<T>;
+  clear(): void;
+  /** Called after `clear()`, so a component showing the answer can read it again. */
+  subscribe(listener: () => void): () => void;
+}
+
 /** A read shared by its callers for `ttlMs`. */
-export function sessionCached<T>(load: () => Promise<T>, ttlMs: number): () => Promise<T> {
+export function sessionCached<T>(load: () => Promise<T>, ttlMs: number): SessionCached<T> {
   let entry: { at: number; value: Promise<T> } | undefined;
-  caches.add({
-    clear: () => {
-      entry = undefined;
-    },
-  });
-  return () => {
+  const listeners = new Set<() => void>();
+  const read = () => {
     if (entry && Date.now() - entry.at < ttlMs) return entry.value;
     const value = load();
     const current = { at: Date.now(), value };
@@ -37,4 +41,20 @@ export function sessionCached<T>(load: () => Promise<T>, ttlMs: number): () => P
     });
     return value;
   };
+  const cached = Object.assign(read, {
+    // One path for both callers: dropping it with the session
+    // (clearSessionCaches) re-reads it wherever it is shown, as clear() does.
+    clear: () => {
+      entry = undefined;
+      for (const listener of listeners) listener();
+    },
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  });
+  caches.add(cached);
+  return cached;
 }

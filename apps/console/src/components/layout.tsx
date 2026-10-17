@@ -1,19 +1,28 @@
 import type { ReactNode } from "react";
 
+import { cn } from "@/lib/utils";
+
 /**
- * Page wrapper: centres content, applies the horizontal margin (24px at lg,
- * 32px at 2xl) and vertical rhythm. Every routed page
- * renders inside one so the shell's <main> stays padding-free.
+ * The one page wrapper every console screen renders in, so every screen starts
+ * the same distance under the top bar. Its geometry, and `inset="panel"` for
+ * the configuration-panel screens, are in `docs/styling.md` ("Page wrapper").
  *
  * Do not write Tailwind's built-in centring utility name (the "c" word) anywhere
  * in scanned source, even in a comment: its extractor would emit that utility,
  * whose max-width tiers reference the var()-based --zl-breakpoint-* tokens inside
- * an @media condition, which lightningcss cannot minify and the build fails. This
- * app uses explicit max-w-* + the grid below instead.
+ * an @media condition, which lightningcss cannot minify and the build fails.
  */
-export function Page({ children }: { children: ReactNode }) {
-  return <div className="mx-auto w-full max-w-[120rem] px-6 py-8 2xl:px-8">{children}</div>;
+export function Page({
+  children,
+  inset = "default",
+}: {
+  children: ReactNode;
+  inset?: "default" | "panel";
+}) {
+  return <div className={cn(PAGE, inset === "panel" && "sm:px-6")}>{children}</div>;
 }
+
+const PAGE = "px-4 pt-4 pb-8 lg:pt-5";
 
 /** The fixed column every settings screen renders in, centred in the main area. */
 export function SettingsColumn({ children }: { children: ReactNode }) {
@@ -34,15 +43,3 @@ export function ContentGrid({
 }) {
   return <div className={`grid grid-cols-1 gap-6 md:grid-cols-12 ${className}`}>{children}</div>;
 }
-
-/**
- * The page wrapper for a configuration detail screen — the ones that render a
- * single panel card rather than a title row over a table.
- *
- * The design insets that panel by 24px on every side, and by 16px on the sides
- * in its narrow variant. Shared because the schema and login-flow screens are
- * the same composition. Resource detail screens (users, teams, projects)
- * are a different composition: a title row over cards, drawn by `DetailPage`
- * and `DetailHeader` in `detail-page.tsx`.
- */
-export const DETAIL_PANEL_PAGE = "px-4 py-6 sm:px-6";

@@ -95,3 +95,58 @@ test("a platform operator reaches every management screen without an error", asy
   await expect(page.getByRole("heading", { name: renamed, exact: true })).toBeVisible();
   await expectNoErrorBoundary(page);
 });
+
+/**
+ * A platform operator names themselves (#1801, #1802): the platform project's
+ * user schema designates an optional `name` for display, Profile is generated
+ * from the operator's own schema — read through the self-access
+ * `GET /users/me/schema`, since they hold no grant in the platform project —
+ * and once saved the account menu shows the name over the email.
+ */
+test("a platform operator adds their name from the account menu", async ({ page, seed }) => {
+  const operator = seed.identity();
+
+  await page.goto("/ui/console/");
+  await registerWithPassword(page, operator);
+  await page.waitForURL((url) => !url.pathname.endsWith("/login"));
+
+  const account = page.getByRole("button", { name: `Account: ${operator.email}` });
+  await account.click();
+  await page.getByRole("menuitem", { name: /Add your name/ }).click();
+
+  await expect(page).toHaveURL(/\/settings\/profile/);
+  await expect(page.getByLabel("Email", { exact: true })).toBeDisabled();
+  const name = page.getByLabel("Name", { exact: true });
+  await expect(name).toBeFocused();
+  await name.fill("Ada Lovelace");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expectNoErrorBoundary(page);
+
+  await account.click();
+  await expect(page.getByRole("menu").getByText("Ada Lovelace")).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: /Add your name/ })).toHaveCount(0);
+});
+
+/**
+ * Settings → Account renames the operator's account: the personal team created
+ * for them at sign-up (#1890 grants them its rename), shown in the footer.
+ */
+test("a platform operator renames their account", async ({ page, seed }) => {
+  const operator = seed.identity();
+
+  await page.goto("/ui/console/");
+  await registerWithPassword(page, operator);
+  await page.waitForURL((url) => !url.pathname.endsWith("/login"));
+  // The landing redirect must settle first, or it interrupts the next goto.
+  await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
+
+  await page.goto("/ui/console/settings/account");
+  const field = page.getByLabel("Account name");
+  await field.fill("Acme Platform");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expectNoErrorBoundary(page);
+
+  await expect(page.getByRole("button", { name: `Account: ${operator.email}` })).toContainText(
+    "Acme Platform",
+  );
+});
