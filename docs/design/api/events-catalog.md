@@ -110,6 +110,7 @@ tracked below.
 | `DeleteProjectByID` (when a row was deleted) | `project.deleted` | `entity` | `project` | _(empty)_ |
 | `AddOrigin` | `origin.added` | `entity` | `origin` | `pattern`, `kind` |
 | `RemoveOrigin` | `origin.removed` | `entity` | `origin` | `pattern`, `kind` |
+| `RemovePreview` (when a row was deleted) | `preview.removed` | `entity` | `preview` | `origin` |
 | `CreateUser` | `user.created` | `entity` | `user` | `schema_id`, `attribute_keys[]`, `attributes` (`x-audit` values only) |
 | Unique violation on create | `user.create.failed` | `entity` | `user` | `key_name` |
 | `PatchUser` (attribute patch) | `user.updated` | `entity` | `user` | `attribute_keys[]`, `attributes` (`x-audit` values only) |
@@ -185,5 +186,6 @@ Types planned but not yet emitted by a live producer. Follow-up issues:
 | `team.membership.updated` | [#879](https://github.com/zitadel/nextgen/issues/879) membership + claim CompleteClaim path — join ids + status |
 | `claim.challenge_created` / `claim.completed` | [#880](https://github.com/zitadel/nextgen/issues/880) claim lifecycle emitters |
 | `session.expired` | [#881](https://github.com/zitadel/nextgen/issues/881) session reaper |
+| `preview.expired` | [#1573](https://github.com/zitadel/nextgen/issues/1573) preview expiry sweep |
 | `schema.deleted` | [#882](https://github.com/zitadel/nextgen/issues/882) schema delete API |
 | `auth.factor.password.removed` / TOTP enroll+remove / passkey remove / recovery enroll+remove | [#884](https://github.com/zitadel/nextgen/issues/884) factor remove + TOTP/recovery APIs — same `AuthFactorPayload` rules |

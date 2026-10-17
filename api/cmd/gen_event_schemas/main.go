@@ -77,6 +77,8 @@ var payloadByEventType = map[string]string{
 	"variable.set":     "variable-set-payload.yaml",
 	"variable.removed": "variable-removed-payload.yaml",
 
+	"preview.removed": "preview-payload.yaml",
+
 	"authz.granted": "authz-granted-payload.yaml",
 	"authz.revoked": "authz-granted-payload.yaml",
 
