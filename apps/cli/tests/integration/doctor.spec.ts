@@ -12,6 +12,14 @@ function downgradeTheFramework(app: ScaffoldedApp): Promise<void> {
   });
 }
 
+/** Leaves a range the floor accepts, with a release below the floor installed under it. */
+async function installAnOldFrameworkUnderARange(app: ScaffoldedApp): Promise<void> {
+  await app.editPackageJson((pkg) => {
+    pkg.dependencies.next = "^15.0.0";
+  });
+  await app.hasInstalled("next", "15.2.2");
+}
+
 describe("doctor", () => {
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
@@ -73,7 +81,25 @@ describe("doctor", () => {
 
         const result = await app.doctor();
 
-        expect(result).toHintAt("Upgrade the app to Next 15+");
+        expect(result).toHintAt("Upgrade the app to Next.js 15.2.3 or later");
+      });
+
+      it("reports an installed framework version below the floor", async () => {
+        const app = await aSetUpApp();
+        await installAnOldFrameworkUnderARange(app);
+
+        const result = await app.doctor();
+
+        expect(result).toFailWith("E_UNSUPPORTED_PROJECT_SHAPE");
+      });
+
+      it("points an installed framework version below the floor at the upgrade", async () => {
+        const app = await aSetUpApp();
+        await installAnOldFrameworkUnderARange(app);
+
+        const result = await app.doctor();
+
+        expect(result).toHintAt("Upgrade the app to Next.js 15.2.3 or later");
       });
 
       it("does not offer a repair it cannot make", async () => {
