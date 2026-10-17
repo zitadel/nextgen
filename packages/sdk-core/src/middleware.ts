@@ -40,21 +40,32 @@ export const INTERNAL_HEADERS: ReadonlySet<string> = new Set(["x-nextgen-auth-to
  * Returns `true` when `pathname` matches at least one entry in `routes`.
  *
  * An entry ending with `*` matches any path that starts with the prefix
- * before the `*`. All other entries require an exact match.
+ * before the `*`. All other entries match exactly, ignoring a trailing slash
+ * on either side: `/profile` and `/profile/` name the same route, and several
+ * frameworks (Qwik Router by default) serve the slashed form as canonical. An
+ * exact compare would let `/profile/` past a `protectedRoutes: ["/profile"]`.
  *
  * @param pathname - The URL pathname to test.
  * @param routes   - The list of route patterns to match against.
  * @returns `true` if at least one pattern matches.
  */
 export function matchesRoutes(pathname: string, routes: readonly string[]): boolean {
-  if (routes.length === 0) {
-    return false;
-  }
-  return routes.some((pattern) => {
-    if (pattern.endsWith("*")) {
-      return pathname.startsWith(pattern.slice(0, -1));
+  // A linear scan, not /\/+$/: that regex backtracks quadratically on a long
+  // run of slashes, and the pathname is attacker-controlled on every request.
+  const withoutTrailingSlash = (path: string): string => {
+    let end = path.length;
+    while (end > 1 && path.charCodeAt(end - 1) === 0x2f) {
+      end--;
     }
-    return pathname === pattern;
+    return path.slice(0, end);
+  };
+  const path = withoutTrailingSlash(pathname);
+
+  return routes.some((route) => {
+    if (route.endsWith("*")) {
+      return pathname.startsWith(route.slice(0, -1));
+    }
+    return path === withoutTrailingSlash(route);
   });
 }
 
