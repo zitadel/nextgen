@@ -1,6 +1,6 @@
 import type { ZitadelProject } from "@zitadel/api/config";
 import type { ZitadelSession as ZitadelSessionElement } from "@zitadel/components";
-import type { ZitadelSignoutDetail } from "@zitadel/sdk-core/types";
+import type { ZitadelSessionErrorDetail, ZitadelSignoutDetail } from "@zitadel/sdk-core/types";
 
 import { defineComponent, h, type PropType, ref, toRaw } from "vue";
 import "@zitadel/components";
@@ -10,7 +10,8 @@ import "@zitadel/components";
  * "signed in as" card. See {@link ZitadelLogin} for the rendering strategy.
  * Supply the SDK handle from `configureZitadel(...)` as `:project`, or the
  * discrete `:project-id` / `:proxy-path` the widget reads instead. The widget's
- * `zitadel-signout` event is re-emitted with its detail as `signout`.
+ * `zitadel-signout` event is re-emitted with its detail as `signout`, and
+ * `zitadel-session-error` as `sessionError`.
  *
  * A Vue `ref` on this component resolves to the component *instance*; the
  * rendered `<zitadel-session>` DOM node is exposed as `element`.
@@ -28,7 +29,7 @@ export default defineComponent({
     theme: { type: String as PropType<"light" | "dark" | "auto">, default: undefined },
     suppressHeader: { type: Boolean, default: undefined },
   },
-  emits: ["signout"],
+  emits: ["signout", "sessionError"],
   setup(props, { emit, expose }) {
     const element = ref<ZitadelSessionElement | null>(null);
     expose({ element });
@@ -48,6 +49,9 @@ export default defineComponent({
         suppressHeader: props.suppressHeader,
         onZitadelSignout: (event: CustomEvent<ZitadelSignoutDetail>) => {
           emit("signout", event.detail);
+        },
+        onZitadelSessionError: (event: CustomEvent<ZitadelSessionErrorDetail>) => {
+          emit("sessionError", event.detail);
         },
       });
   },

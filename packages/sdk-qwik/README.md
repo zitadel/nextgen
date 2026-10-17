@@ -26,6 +26,8 @@ export default component$(() => {
 
 The signed-in session card is `<ZitadelSession project={project} />` (exported as `ZitadelSession`).
 
+Both take an optional `onSessionError$` callback, called when loading the session or signing out fails with something other than the backend's no-session answer (a 5xx, a network error, a gateway's page). The detail is `{ status?, code?, message, phase }`, with `phase` set to `"load"` or `"signout"`.
+
 The widget's flow events are surfaced as optional QRL callbacks:
 `onFlowStep$`, `onFlowInput$`, `onFlowComplete$`, and `onFlowError$`.
 

@@ -311,6 +311,17 @@ the SDK handle, and clears the session. Uses the same token adoption as
 Supports a light-DOM `<template>` slot for a fully custom menu; default UI is
 the avatar trigger + dropdown.
 
+Events (both bubble and are composed): `zitadel-session-error` (detail
+`{ status?, code?, message, phase }`) when loading the identity
+(`phase: "load"`) or signing out (`phase: "signout"`) fails with anything other
+than the backend's no-session answer: a 5xx, a network error, a gateway's page,
+a body that is not a session. `message` is the text the element shows; `status`
+is set when a response came back and `code` when it carried the backend's error
+code. Use it to tell an outage from a visitor without a session, or to end your
+own "signing out" state. The framework wrappers surface it as `onSessionError`,
+except Vue and Angular, which emit `sessionError`, and Qwik, which takes
+`onSessionError$`.
+
 When the backend answers that there is no session (or names no user) the
 element renders nothing (no avatar, no projected template) and stays on the
 page: the menu sits in an app's own chrome. A sign-out the backend answers with
@@ -336,7 +347,8 @@ When the backend answers that there is no session (decided as for
 `<zitadel-logout>` above), so a page reached without a session never shows
 "Signed in as" for nobody, the card navigates to `post-sign-out-url` when one is
 set and otherwise renders nothing. Anything else is not "signed out": the card
-stays and shows the error.
+stays and shows the error, and fires `zitadel-session-error` as on
+`<zitadel-logout>`.
 
 The card never redirects to the page it is on. When `post-sign-out-url`
 resolves to the current page (same origin, path with or without a trailing

@@ -203,7 +203,8 @@ export type ZitadelLogoutProps = ZitadelLogoutConfig &
  * {@link ZitadelProject} handle (or the discrete project id / proxy path) and
  * surface config as DOM properties (see {@link setProp}) — applied at mount in
  * the `ref` callback and re-applied reactively by the `useVisibleTask$` — and
- * forwards the widget's `zitadel-signout` event as an optional callback.
+ * forwards the widget's `zitadel-signout` and `zitadel-session-error` events as
+ * optional callbacks.
  */
 export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
   const host = useSignal<ZitadelLogoutElement>();
@@ -217,9 +218,13 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
       track(() => ({ ...props }));
       bindLogoutConfig(el, props);
       const onSignout = (event: Event): void => void props.onSignout$?.(eventDetail(event));
+      const onSessionError = (event: Event): void =>
+        void props.onSessionError$?.(eventDetail(event));
       el.addEventListener("zitadel-signout", onSignout);
+      el.addEventListener("zitadel-session-error", onSessionError);
       cleanup(() => {
         el.removeEventListener("zitadel-signout", onSignout);
+        el.removeEventListener("zitadel-session-error", onSessionError);
       });
     },
     { strategy: "document-ready" },
@@ -259,7 +264,7 @@ export type ZitadelSessionProps = ZitadelSessionConfig &
  * the discrete project id / proxy path) and surface config as DOM properties
  * (see {@link setProp}) — applied at mount in the `ref` callback and re-applied
  * reactively by the `useVisibleTask$` — and forwards the widget's
- * `zitadel-signout` event as an optional callback.
+ * `zitadel-signout` and `zitadel-session-error` events as optional callbacks.
  */
 export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
   const host = useSignal<ZitadelSessionElement>();
@@ -273,9 +278,13 @@ export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
       track(() => ({ ...props }));
       bindSessionConfig(el, props);
       const onSignout = (event: Event): void => void props.onSignout$?.(eventDetail(event));
+      const onSessionError = (event: Event): void =>
+        void props.onSessionError$?.(eventDetail(event));
       el.addEventListener("zitadel-signout", onSignout);
+      el.addEventListener("zitadel-session-error", onSessionError);
       cleanup(() => {
         el.removeEventListener("zitadel-signout", onSignout);
+        el.removeEventListener("zitadel-session-error", onSessionError);
       });
     },
     { strategy: "document-ready" },

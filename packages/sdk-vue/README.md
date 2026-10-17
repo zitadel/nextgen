@@ -27,6 +27,8 @@ const project = configureZitadel({
 
 The signed-in session card is `<ZitadelSession :project="project" />` (exported as `ZitadelSession`).
 
+Both emit `sessionError` when loading the session or signing out fails with something other than the backend's no-session answer (a 5xx, a network error, a gateway's page). The detail is `{ status?, code?, message, phase }`, with `phase` set to `"load"` or `"signout"`.
+
 ## Proxying to the backend (deployment)
 
 The widgets call `${proxyPath}/…` same-origin (default `/__nextgen`). In

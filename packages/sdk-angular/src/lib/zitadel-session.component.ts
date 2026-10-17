@@ -1,6 +1,6 @@
 import type { ElementRef } from "@angular/core";
 import type { ZitadelSession as ZitadelSessionElement } from "@zitadel/components";
-import type { ZitadelSignoutDetail } from "@zitadel/sdk-core/types";
+import type { ZitadelSessionErrorDetail, ZitadelSignoutDetail } from "@zitadel/sdk-core/types";
 
 import {
   Component,
@@ -19,7 +19,7 @@ import "@zitadel/components";
  * Angular wrapper for the `<zitadel-session>` Lit web component — the
  * post-sign-in "signed in as" card. See {@link ZitadelLoginComponent} for the
  * strategy. The widget's `zitadel-signout` event is re-emitted with its detail
- * as the `signout` output. The underlying `<zitadel-session>` custom element is
+ * as the `signout` output, and `zitadel-session-error` as `sessionError`. The underlying `<zitadel-session>` custom element is
  * exposed via the {@link element} getter.
  *
  * ```html
@@ -43,6 +43,7 @@ import "@zitadel/components";
     [attr.theme]="theme ?? null"
     [suppressHeader]="suppressHeader"
     (zitadel-signout)="onSignout($event)"
+    (zitadel-session-error)="onSessionError($event)"
   ></zitadel-session>`,
 })
 export class ZitadelSessionComponent {
@@ -56,6 +57,7 @@ export class ZitadelSessionComponent {
   @Input() theme?: "light" | "dark" | "auto";
   @Input() suppressHeader?: boolean;
   @Output() signout = new EventEmitter<ZitadelSignoutDetail>();
+  @Output() sessionError = new EventEmitter<ZitadelSessionErrorDetail>();
 
   @ViewChild("el") private elementRef?: ElementRef<ZitadelSessionElement>;
 
@@ -66,5 +68,9 @@ export class ZitadelSessionComponent {
 
   onSignout(event: Event): void {
     this.signout.emit((event as CustomEvent<ZitadelSignoutDetail>).detail);
+  }
+
+  onSessionError(event: Event): void {
+    this.sessionError.emit((event as CustomEvent<ZitadelSessionErrorDetail>).detail);
   }
 }

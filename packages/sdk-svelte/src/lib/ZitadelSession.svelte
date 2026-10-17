@@ -2,7 +2,7 @@
   import '@zitadel/components';
   import type { ZitadelSession as ZitadelSessionElement } from '@zitadel/components';
 
-  import type { ZitadelSessionProps, ZitadelSignoutDetail } from './types';
+  import type { ZitadelSessionProps, ZitadelSessionErrorDetail, ZitadelSignoutDetail } from './types';
 
   let {
     project,
@@ -15,6 +15,7 @@
     theme,
     suppressHeader,
     onSignout,
+    onSessionError,
   }: ZitadelSessionProps = $props();
 
   let el: ZitadelSessionElement | undefined = $state();
@@ -35,9 +36,13 @@
     }
     const onSignoutEvent = (event: Event): void =>
       onSignout?.((event as CustomEvent<ZitadelSignoutDetail>).detail);
+    const sessionError = (event: Event): void =>
+      onSessionError?.((event as CustomEvent<ZitadelSessionErrorDetail>).detail);
     node.addEventListener('zitadel-signout', onSignoutEvent);
+    node.addEventListener('zitadel-session-error', sessionError);
     return () => {
       node.removeEventListener('zitadel-signout', onSignoutEvent);
+      node.removeEventListener('zitadel-session-error', sessionError);
     };
   });
 </script>
