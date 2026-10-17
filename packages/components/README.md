@@ -319,6 +319,33 @@ the SDK handle, and clears the session. Uses the same token adoption as
 Supports a light-DOM `<template>` slot for a fully custom menu; default UI is
 the avatar trigger + dropdown.
 
+When the backend answers that there is no session (or names no user) the
+element renders nothing (no avatar, no projected template) and stays on the
+page: the menu sits in an app's own chrome. A sign-out the backend answers with
+"no session" counts as done, since the session is already gone. "No session"
+means the backend's own answer: `401` with the `auth.unauthorized` code or
+`404` with `sess.not_found`. A gateway, WAF or ingress answers 401 and 404 too,
+without that code, and an SPA host may answer a 200 with its `index.html`;
+those, a network error, a 403, a 429 and a 5xx all leave the session as it is
+and show the error in the menu, the same way the server SDKs answer 503
+instead of sending a signed-in user to the login page.
+
+### `<zitadel-session>`
+
+The signed-in card: "Signed in as {identity}" with a **Sign out** button, built
+from the same atoms as `<zitadel-login>`. Reads the identity from `getMySession`
+and signs out through `revokeMySession`, like `<zitadel-logout>`.
+
+| Property | Type | Notes |
+| --- | --- | --- |
+| `postSignOutUrl` / `post-sign-out-url` | `string` | Navigate here after sign-out, and when the visitor has no session |
+
+When the backend answers that there is no session (decided as for
+`<zitadel-logout>` above), so a page reached without a session never shows
+"Signed in as" for nobody, the card navigates to `post-sign-out-url` when one is
+set and otherwise renders nothing. Anything else is not "signed out": the card
+stays and shows the error.
+
 ### `<zl-field>`
 
 Form-associated input. Participates in the parent `<form>`, supports validity

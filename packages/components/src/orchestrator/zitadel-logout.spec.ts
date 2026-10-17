@@ -4,6 +4,12 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 
+import {
+  NO_SESSION,
+  OUTAGES,
+  UNREADABLE_SESSIONS,
+  unauthorized,
+} from "./__tests__/session-answers.js";
 import "./zitadel-logout.js";
 import type { ZitadelLogout } from "./zitadel-logout.js";
 
@@ -42,14 +48,14 @@ function sessionBody(display: string, identifier: string, userId: string) {
 let currentName = "";
 let currentEmail = "";
 let currentUserId = "user_test";
-let sessionStatus = 200;
+// Replaces the signed-in answer to `GET /sessions/me` when set.
+let sessionAnswer: (() => Response) | undefined;
 
-const meHandler = http.get(`${API_BASE}/sessions/me`, () => {
-  if (sessionStatus !== 200) {
-    return new HttpResponse(null, { status: sessionStatus });
-  }
-  return HttpResponse.json(sessionBody(currentName, currentEmail, currentUserId));
-});
+const meHandler = http.get(`${API_BASE}/sessions/me`, () =>
+  sessionAnswer
+    ? sessionAnswer()
+    : HttpResponse.json(sessionBody(currentName, currentEmail, currentUserId)),
+);
 
 const okHandler = http.delete(`${API_BASE}/sessions/me`, ({ request }) => {
   requestLog.push({
@@ -72,7 +78,7 @@ afterEach(() => {
   currentName = "";
   currentEmail = "";
   currentUserId = "user_test";
-  sessionStatus = 200;
+  sessionAnswer = undefined;
   server.resetHandlers(meHandler, okHandler);
 });
 
@@ -159,13 +165,51 @@ describe("<zitadel-logout>", () => {
     expect(trigger.textContent?.trim()).toBe("U");
   });
 
-  it("falls back to a placeholder initial when there is no active session", async () => {
-    sessionStatus = 401;
+  it.each(NO_SESSION)("renders nothing when the session request answers %s", async (_, answer) => {
+    sessionAnswer = answer;
     const element = mount();
     await flush(element);
-    const trigger = shadowQuery<HTMLButtonElement>(element, ".trigger");
-    expect(trigger.textContent?.trim()).toBe("?");
+    expect(element.shadowRoot?.querySelector(".trigger")).toBeNull();
   });
+
+  it("stays on the page when there is no active session", async () => {
+    sessionAnswer = unauthorized;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...window.location, href: "" },
+      writable: true,
+    });
+    const element = mount(
+      '<zitadel-logout post-sign-out-url="https://app.test/done"></zitadel-logout>',
+    );
+    await flush(element);
+    expect(window.location.href).toBe("");
+  });
+
+  it("removes a projected template when there is no active session", async () => {
+    sessionAnswer = unauthorized;
+    const element = mount(`
+      <zitadel-logout>
+        <template><button data-action="logout">Bye {{display}}</button></template>
+      </zitadel-logout>
+    `);
+    await flush(element);
+    expect(element.querySelector("button[data-action='logout']")).toBeNull();
+  });
+
+  it.each([...OUTAGES, ...UNREADABLE_SESSIONS])(
+    "keeps the avatar and shows the error for %s",
+    async (_, answer) => {
+      sessionAnswer = answer;
+      const element = mount();
+      await flush(element);
+      shadowQuery<HTMLButtonElement>(element, ".trigger").click();
+      await element.updateComplete;
+      expect(
+        shadowQuery<HTMLElement>(element, ".error-bar").textContent?.trim().length,
+      ).toBeGreaterThan(0);
+    },
+  );
 
   it("substitutes template tokens and wires data-action='logout' triggers", async () => {
     currentName = "Bob Builder";
@@ -314,6 +358,59 @@ describe("<zitadel-logout>", () => {
     const errorBar = shadowQuery<HTMLElement>(element, ".error-bar");
     expect(errorBar.textContent?.trim().length).toBeGreaterThan(0);
   });
+
+  it.each(NO_SESSION)(
+    "treats %s from the sign-out request as signed out and navigates",
+    async (_, answer) => {
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        value: { ...window.location, href: "" },
+        writable: true,
+      });
+      const element = mount();
+      element.postSignOutUrl = "https://app.test/done";
+      await flush(element);
+      server.use(http.delete(`${API_BASE}/sessions/me`, answer));
+      const events: Event[] = [];
+      element.addEventListener("zitadel-signout", (event) => events.push(event));
+
+      shadowQuery<HTMLButtonElement>(element, ".trigger").click();
+      await element.updateComplete;
+      shadowQuery<HTMLButtonElement>(element, ".signout-btn").click();
+      await new Promise((resolve) => setTimeout(resolve, 32));
+
+      expect(events).toHaveLength(1);
+      expect(window.location.href).toBe("https://app.test/done");
+    },
+  );
+
+  it.each(OUTAGES)(
+    "shows the error and neither signs out nor navigates when sign-out gets %s",
+    async (_, answer) => {
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        value: { ...window.location, href: "" },
+        writable: true,
+      });
+      const element = mount();
+      element.postSignOutUrl = "https://app.test/done";
+      await flush(element);
+      server.use(http.delete(`${API_BASE}/sessions/me`, answer));
+      const events: Event[] = [];
+      element.addEventListener("zitadel-signout", (event) => events.push(event));
+
+      shadowQuery<HTMLButtonElement>(element, ".trigger").click();
+      await element.updateComplete;
+      shadowQuery<HTMLButtonElement>(element, ".signout-btn").click();
+      await new Promise((resolve) => setTimeout(resolve, 32));
+      await element.updateComplete;
+
+      const errorBar = shadowQuery<HTMLElement>(element, ".error-bar");
+      expect(errorBar.textContent?.trim().length).toBeGreaterThan(0);
+      expect(events).toHaveLength(0);
+      expect(window.location.href).toBe("");
+    },
+  );
 });
 
 describe("<zitadel-logout> unset public properties", () => {

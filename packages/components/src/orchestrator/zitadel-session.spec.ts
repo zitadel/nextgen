@@ -4,6 +4,13 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 
+import {
+  NO_SESSION,
+  OUTAGES,
+  UNREADABLE_SESSIONS,
+  sessionNotFound,
+  unauthorized,
+} from "./__tests__/session-answers.js";
 import "./zitadel-session.js";
 import type { ZitadelSession } from "./zitadel-session.js";
 
@@ -37,14 +44,12 @@ function sessionBody(identifier: string, userId: string) {
 
 let currentEmail = "alice@acme.com";
 let currentUserId = "user_test";
-let sessionStatus = 200;
+// Replaces the signed-in answer to `GET /sessions/me` when set.
+let sessionAnswer: (() => Response) | undefined;
 
-const getHandler = http.get(`${API_BASE}/sessions/me`, () => {
-  if (sessionStatus !== 200) {
-    return new HttpResponse(null, { status: sessionStatus });
-  }
-  return HttpResponse.json(sessionBody(currentEmail, currentUserId));
-});
+const getHandler = http.get(`${API_BASE}/sessions/me`, () =>
+  sessionAnswer ? sessionAnswer() : HttpResponse.json(sessionBody(currentEmail, currentUserId)),
+);
 
 const deleteHandler = http.delete(`${API_BASE}/sessions/me`, ({ request }) => {
   deleteLog.push({
@@ -66,7 +71,7 @@ afterEach(() => {
   deleteLog.length = 0;
   currentEmail = "alice@acme.com";
   currentUserId = "user_test";
-  sessionStatus = 200;
+  sessionAnswer = undefined;
   server.resetHandlers(getHandler, deleteHandler);
 });
 
@@ -139,12 +144,60 @@ describe("<zitadel-session>", () => {
     expect(shadowQuery<HTMLElement>(element, ".identity").textContent?.trim()).toBe("user_01ABC");
   });
 
-  it("omits the identity line when the session request is unauthenticated", async () => {
-    sessionStatus = 401;
+  it.each(NO_SESSION)("renders nothing when the session request answers %s", async (_, answer) => {
+    sessionAnswer = answer;
     const element = mount();
     await flush(element);
-    expect(element.shadowRoot?.querySelector(".identity")).toBeNull();
+    expect(element.shadowRoot?.querySelector(".title")).toBeNull();
+    expect(element.shadowRoot?.querySelector('[data-testid="zitadel-session-logout"]')).toBeNull();
   });
+
+  it("renders nothing for an anonymous session", async () => {
+    const anonymous: Record<string, unknown> = {
+      ...sessionBody("", ""),
+      state: "building",
+      user_id: null,
+    };
+    delete anonymous.user;
+    sessionAnswer = () => HttpResponse.json(anonymous);
+    const element = mount();
+    await flush(element);
+    expect(element.shadowRoot?.querySelector(".title")).toBeNull();
+  });
+
+  it("navigates to post-sign-out-url when there is no session", async () => {
+    sessionAnswer = sessionNotFound;
+    const loc = stubLocation();
+    const element = mount(
+      '<zitadel-session post-sign-out-url="https://app.test/login"></zitadel-session>',
+    );
+    await flush(element);
+    expect(loc.current).toBe("https://app.test/login");
+  });
+
+  it("does not navigate when there is no session and no post-sign-out-url", async () => {
+    sessionAnswer = unauthorized;
+    const loc = stubLocation();
+    await flush(mount());
+    expect(loc.current).toBe("");
+  });
+
+  it.each([...OUTAGES, ...UNREADABLE_SESSIONS])(
+    "keeps the card and shows the error, without navigating, for %s",
+    async (_, answer) => {
+      sessionAnswer = answer;
+      const loc = stubLocation();
+      const element = mount(
+        '<zitadel-session post-sign-out-url="https://app.test/login"></zitadel-session>',
+      );
+      await flush(element);
+      expect(shadowQuery<HTMLElement>(element, ".title").textContent?.trim()).toBe("Signed in as");
+      expect(
+        shadowQuery<HTMLElement>(element, ".error").textContent?.trim().length,
+      ).toBeGreaterThan(0);
+      expect(loc.current).toBe("");
+    },
+  );
 
   it("suppress-header visually hides the heading but keeps it accessible", async () => {
     currentEmail = "alice@acme.com";
@@ -252,6 +305,49 @@ describe("<zitadel-session>", () => {
     );
     expect(loc.current).toBe("");
   });
+
+  it.each(NO_SESSION)(
+    "treats %s from the sign-out request as signed out and navigates",
+    async (_, answer) => {
+      const loc = stubLocation();
+      const element = mount();
+      element.postSignOutUrl = "https://app.test/login";
+      await flush(element);
+      server.use(http.delete(`${API_BASE}/sessions/me`, answer));
+      const events: CustomEvent[] = [];
+      element.addEventListener("zitadel-signout", (e) => events.push(e as CustomEvent));
+
+      activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
+      await new Promise((resolve) => setTimeout(resolve, 32));
+
+      expect(events).toHaveLength(1);
+      expect(loc.current).toBe("https://app.test/login");
+      expect(element.shadowRoot?.querySelector(".error")).toBeNull();
+    },
+  );
+
+  it.each(OUTAGES)(
+    "shows the error and neither signs out nor navigates when sign-out gets %s",
+    async (_, answer) => {
+      const loc = stubLocation();
+      const element = mount();
+      element.postSignOutUrl = "https://app.test/login";
+      await flush(element);
+      server.use(http.delete(`${API_BASE}/sessions/me`, answer));
+      const events: Event[] = [];
+      element.addEventListener("zitadel-signout", (e) => events.push(e));
+
+      activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
+      await new Promise((resolve) => setTimeout(resolve, 32));
+      await element.updateComplete;
+
+      expect(
+        shadowQuery<HTMLElement>(element, ".error").textContent?.trim().length,
+      ).toBeGreaterThan(0);
+      expect(events).toHaveLength(0);
+      expect(loc.current).toBe("");
+    },
+  );
 });
 
 describe("<zitadel-session> unset public properties", () => {
