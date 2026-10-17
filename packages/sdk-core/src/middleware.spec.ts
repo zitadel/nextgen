@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  HOP_BY_HOP,
   filterResponseHeaders,
   matchesRoutes,
   requiresProjectSecret,
@@ -138,6 +139,12 @@ describe("matchesRoutes", () => {
 
     expect(matchesRoutes(pathname, ["/profile"])).toBe(false);
     expect(performance.now() - started).toBeLessThan(250);
+  });
+});
+
+describe("HOP_BY_HOP", () => {
+  it("includes content-length, so a re-sent body gets the length the fetch implementation computes", () => {
+    expect(HOP_BY_HOP.has("content-length")).toBe(true);
   });
 });
 

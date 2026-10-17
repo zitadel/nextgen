@@ -264,12 +264,28 @@ const jwksCache = new Map<string, JwksCacheEntry>();
 const jwksInFlight = new Map<string, Promise<JwksCacheEntry | null>>();
 
 /**
+ * When each URI was last fetched, successfully or not. The refresh throttle
+ * counts from here, not from the last document, so a failing endpoint is not
+ * retried on every request.
+ */
+const jwksAttemptedAt = new Map<string, number>();
+
+/**
+ * Bumped by {@link clearJwksCache}. A fetch that started before a clear must not
+ * write its answer into the cache or the in-flight table afterwards.
+ */
+let jwksGeneration = 0;
+
+/**
  * Forgets every cached JWKS document, so the next verification fetches the key
  * set anew. Use it to drop a compromised key at once instead of waiting out
  * {@link JWKS_TTL_MS}, and in tests that publish different keys per case.
  */
 export function clearJwksCache(): void {
+  jwksGeneration++;
   jwksCache.clear();
+  jwksInFlight.clear();
+  jwksAttemptedAt.clear();
 }
 
 const DECODER = new TextDecoder();
@@ -447,37 +463,65 @@ function resolveVerifyAlgorithm(alg: string): EcdsaParams | Algorithm {
 
 // ─── JWKS fetch ───────────────────────────────────────────────────────────────
 
+/** Resolves to `null` if `promise` has not settled within `timeoutMs`. */
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<null>((resolve) => {
+    timer = setTimeout(() => {
+      resolve(null);
+    }, timeoutMs);
+  });
+  return Promise.race([promise, expired]).finally(() => {
+    clearTimeout(timer);
+  });
+}
+
 /**
  * Fetches the JWKS document at `jwksUri`, coalescing concurrent fetches, and
  * caches it. Returns `null` when the endpoint fails or answers without a key
- * set; a failure leaves any previously cached document in place.
+ * set, and also, without fetching, when the URI was fetched less than
+ * {@link JWKS_MIN_REFRESH_MS} ago: a failed fetch counts, so a failing endpoint
+ * is not retried on every request. A failure leaves any previously cached
+ * document in place, but {@link resolveJwk} does not use it once it has expired.
  */
 function refreshJwks(jwksUri: string, timeoutMs: number): Promise<JwksCacheEntry | null> {
   const pending = jwksInFlight.get(jwksUri);
   if (pending) {
-    return pending;
+    // The fetch in flight runs on the timeout of whoever started it. A caller
+    // that joins it waits no longer than its own.
+    return withTimeout(pending, timeoutMs);
   }
-  const request = (async () => {
-    try {
-      const res = await fetch(jwksUri, { signal: AbortSignal.timeout(timeoutMs) });
-      if (!res.ok) {
-        return null;
-      }
-      const json = (await res.json()) as { keys?: unknown };
-      if (!Array.isArray(json.keys)) {
-        return null;
-      }
-      const entry: JwksCacheEntry = {
-        keys: json.keys as Jwk[],
-        fetchedAt: Date.now(),
-        imported: new Map(),
-      };
+  const attemptedAt = jwksAttemptedAt.get(jwksUri);
+  if (attemptedAt !== undefined && Date.now() - attemptedAt < JWKS_MIN_REFRESH_MS) {
+    return Promise.resolve(null);
+  }
+  const generation = jwksGeneration;
+  jwksAttemptedAt.set(jwksUri, Date.now());
+  const request: Promise<JwksCacheEntry | null> = (async () => {
+    const res = await fetch(jwksUri, { signal: AbortSignal.timeout(timeoutMs) });
+    if (!res.ok) {
+      return null;
+    }
+    const json = (await res.json()) as { keys?: unknown };
+    if (!Array.isArray(json.keys)) {
+      return null;
+    }
+    const entry: JwksCacheEntry = {
+      keys: json.keys as Jwk[],
+      fetchedAt: Date.now(),
+      imported: new Map(),
+    };
+    if (generation === jwksGeneration) {
       jwksCache.set(jwksUri, entry);
-      return entry;
-    } finally {
+    }
+    return entry;
+  })().finally(() => {
+    // Only the request that is still the registered one is removed: a clear can
+    // have replaced it with a newer fetch that must stay shared.
+    if (jwksInFlight.get(jwksUri) === request) {
       jwksInFlight.delete(jwksUri);
     }
-  })();
+  });
   jwksInFlight.set(jwksUri, request);
   return request;
 }
@@ -494,8 +538,9 @@ function findKey(entry: JwksCacheEntry, kid: string | undefined): Jwk | undefine
  * The JWKS document is cached for {@link JWKS_TTL_MS}. A `kid` the cached
  * document lacks refreshes it — a rotated key — but no sooner than
  * {@link JWKS_MIN_REFRESH_MS} after the last fetch, so tokens with made-up
- * `kid` values are answered from the cache. Returns `null` when no key fits:
- * the endpoint failed, no key has that `kid`, or the key cannot verify `alg`.
+ * `kid` values are answered from the cache. An expired document is never used
+ * when its refresh fails. Returns `null` when no key fits: the endpoint failed,
+ * no key has that `kid`, or the key cannot verify `alg`.
  *
  * @param jwksUri - Full URL of the JWKS endpoint.
  * @param kid     - The `kid` header value from the JWT, or `undefined`.
@@ -510,7 +555,10 @@ async function resolveJwk(
   const now = Date.now();
   let entry = jwksCache.get(jwksUri);
   if (!entry || now - entry.fetchedAt >= JWKS_TTL_MS) {
-    entry = (await refreshJwks(jwksUri, timeoutMs)) ?? entry;
+    // An expired document is never used: a key the issuer has removed, or one
+    // that was compromised, must stop verifying once the TTL has passed even if
+    // the endpoint is down.
+    entry = (await refreshJwks(jwksUri, timeoutMs)) ?? undefined;
   }
   if (!entry) {
     return null;
