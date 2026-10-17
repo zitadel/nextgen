@@ -73,6 +73,12 @@ func TestResolveDeploymentTargets(t *testing.T) {
 	})
 }
 
+func TestCheckPrimaryOrigins(t *testing.T) {
+	require.NoError(t, CheckPrimaryOrigins(projectOrigins, []string{"https://app.acme.com"}))
+	err := CheckPrimaryOrigins(projectOrigins, []string{"https://app.acme.com", "https://acme-git-sso-acmeinc.vercel.app"})
+	assert.Equal(t, ErrProjectOriginNotAllowed("").Code, err.(Error).Code)
+}
+
 func TestParsePreviewTTL(t *testing.T) {
 	for ttl, want := range map[string]time.Duration{
 		"30m":  30 * time.Minute,

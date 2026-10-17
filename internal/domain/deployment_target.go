@@ -84,6 +84,17 @@ func ResolveDeploymentTargets(origins []Origin, targets []string) (DeploymentOri
 	return DeploymentOriginKindPrimary, resolved, nil
 }
 
+// CheckPrimaryOrigins fails on the first of targets that is not a primary
+// origin of the project.
+func CheckPrimaryOrigins(origins []Origin, targets []string) error {
+	for _, target := range targets {
+		if kind, ok := originKind(origins, target); !ok || kind != DeploymentOriginKindPrimary {
+			return ErrProjectOriginNotAllowed(target)
+		}
+	}
+	return nil
+}
+
 // originKind classifies an exact origin: a primary origin first, then a URL
 // a preview pattern admits. A preview URL is never a loopback origin.
 func originKind(origins []Origin, origin string) (DeploymentOriginKind, bool) {

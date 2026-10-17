@@ -320,6 +320,42 @@ func TestDeploymentServiceDeployRejects(t *testing.T) {
 	})
 }
 
+func TestDeploymentServiceRollback(t *testing.T) {
+	t.Run("re-deploys the release to its targets", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		previous := servingDeployment("rel_1")
+		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", previous.ID).Return(previous, nil)
+		expectProjectOrigins(statements, appPrimary)
+		expectInsert(statements, expectServing(statements, servingDeployment("rel_0")))
+
+		result, err := svc.Rollback(t.Context(), service.RollbackDeploymentInput{ProjectID: "proj_1", DeploymentID: previous.ID})
+		require.NoError(t, err)
+		assert.True(t, result.Created)
+		assert.Equal(t, domain.DeploymentReasonRollback, result.Deployment.Metadata.Reason)
+		assert.Equal(t, previous.ID, *result.Deployment.Metadata.RollbackTo)
+	})
+
+	t.Run("a preview deployment", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		previous := servingDeployment("rel_1")
+		previous.OriginKind = domain.DeploymentOriginKindPreview
+		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", previous.ID).Return(previous, nil)
+
+		_, err := svc.Rollback(t.Context(), service.RollbackDeploymentInput{ProjectID: "proj_1", DeploymentID: previous.ID})
+		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid(nil, nil).Code)
+	})
+
+	t.Run("a target no longer primary", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		previous := servingDeployment("rel_1")
+		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", previous.ID).Return(previous, nil)
+		expectProjectOrigins(statements)
+
+		_, err := svc.Rollback(t.Context(), service.RollbackDeploymentInput{ProjectID: "proj_1", DeploymentID: previous.ID})
+		assertServiceDomainCode(t, err, domain.ErrProjectOriginNotAllowed("").Code)
+	})
+}
+
 func TestDeploymentServiceCreateErrorMapping(t *testing.T) {
 	t.Run("release missing", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)

@@ -96296,6 +96296,38 @@ func (s RollbackDeploymentErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case DepConflictRollbackDeploymentErrorResponse:
+		e.FieldStart("code")
+		e.Str("dep.conflict")
+		{
+			s := s.DepConflict
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case DepInvalidRollbackDeploymentErrorResponse:
+		e.FieldStart("code")
+		e.Str("dep.invalid")
+		{
+			s := s.DepInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case DepNotFoundRollbackDeploymentErrorResponse:
 		e.FieldStart("code")
 		e.Str("dep.not_found")
@@ -96344,6 +96376,22 @@ func (s RollbackDeploymentErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case EvtInvalidRollbackDeploymentErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalRollbackDeploymentErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
@@ -96360,11 +96408,43 @@ func (s RollbackDeploymentErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case NotImplementedRollbackDeploymentErrorResponse:
+	case ProjNotFoundRollbackDeploymentErrorResponse:
 		e.FieldStart("code")
-		e.Str("not_implemented")
+		e.Str("proj.not_found")
 		{
-			s := s.NotImplemented
+			s := s.ProjNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjOriginNotAllowedRollbackDeploymentErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.origin_not_allowed")
+		{
+			s := s.ProjOriginNotAllowed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelNotFoundRollbackDeploymentErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.not_found")
+		{
+			s := s.RelNotFound
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -96421,6 +96501,12 @@ func (s *RollbackDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedRollbackDeploymentErrorResponse
 					found = true
+				case "dep.conflict":
+					s.Type = DepConflictRollbackDeploymentErrorResponse
+					found = true
+				case "dep.invalid":
+					s.Type = DepInvalidRollbackDeploymentErrorResponse
+					found = true
 				case "dep.not_found":
 					s.Type = DepNotFoundRollbackDeploymentErrorResponse
 					found = true
@@ -96430,11 +96516,20 @@ func (s *RollbackDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 				case "env.project_not_found":
 					s.Type = EnvProjectNotFoundRollbackDeploymentErrorResponse
 					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidRollbackDeploymentErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalRollbackDeploymentErrorResponse
 					found = true
-				case "not_implemented":
-					s.Type = NotImplementedRollbackDeploymentErrorResponse
+				case "proj.not_found":
+					s.Type = ProjNotFoundRollbackDeploymentErrorResponse
+					found = true
+				case "proj.origin_not_allowed":
+					s.Type = ProjOriginNotAllowedRollbackDeploymentErrorResponse
+					found = true
+				case "rel.not_found":
+					s.Type = RelNotFoundRollbackDeploymentErrorResponse
 					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidRollbackDeploymentErrorResponse
@@ -96457,6 +96552,14 @@ func (s *RollbackDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
+	case DepConflictRollbackDeploymentErrorResponse:
+		if err := s.DepConflict.Decode(d); err != nil {
+			return err
+		}
+	case DepInvalidRollbackDeploymentErrorResponse:
+		if err := s.DepInvalid.Decode(d); err != nil {
+			return err
+		}
 	case DepNotFoundRollbackDeploymentErrorResponse:
 		if err := s.DepNotFound.Decode(d); err != nil {
 			return err
@@ -96469,12 +96572,24 @@ func (s *RollbackDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.EnvProjectNotFound.Decode(d); err != nil {
 			return err
 		}
+	case EvtInvalidRollbackDeploymentErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
+			return err
+		}
 	case InternalRollbackDeploymentErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
-	case NotImplementedRollbackDeploymentErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
+	case ProjNotFoundRollbackDeploymentErrorResponse:
+		if err := s.ProjNotFound.Decode(d); err != nil {
+			return err
+		}
+	case ProjOriginNotAllowedRollbackDeploymentErrorResponse:
+		if err := s.ProjOriginNotAllowed.Decode(d); err != nil {
+			return err
+		}
+	case RelNotFoundRollbackDeploymentErrorResponse:
+		if err := s.RelNotFound.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidRollbackDeploymentErrorResponse:
