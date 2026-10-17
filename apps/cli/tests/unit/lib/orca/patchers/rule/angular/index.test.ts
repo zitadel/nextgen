@@ -220,6 +220,25 @@ describe("AngularPatcher.plan", () => {
     expect(proxyConfigEdit()(chosen)).toBe(chosen);
   });
 
+  it("adds the redaction to a managed proxy written with CRLF line endings", () => {
+    const edit = proxyConfigEdit();
+
+    const out = edit(unredactedProxyConf().replace(/\n/g, "\r\n"));
+
+    expect(out).toBe(edit(undefined).replace(/\n/g, "\r\n"));
+  });
+
+  it("adds the redaction when a sibling proxy chose its own response handling", () => {
+    const edit = proxyConfigEdit();
+    const sibling = (source: string) =>
+      source.replace(
+        /\n\};\n$/,
+        '\n  "/api": { target: server, selfHandleResponse: false },\n};\n',
+      );
+
+    expect(edit(sibling(unredactedProxyConf()))).toBe(sibling(edit(undefined)));
+  });
+
   it("leaves an unmanaged proxy without the redaction alone", () => {
     const custom = unredactedProxyConf().replace(`${MANAGED_MARKER}\n`, "");
 

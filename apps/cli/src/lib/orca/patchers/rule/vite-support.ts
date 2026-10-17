@@ -7,6 +7,7 @@ import {
   assertNoUnreviewedProjectSecretProxy,
   EXCHANGE_REDACTION_MARKER,
   EXCHANGE_REDACTION_ZLIB,
+  entryText,
   exchangeRedactionFunctions,
   PROXY_CREDENTIAL_POLICY_MARKER,
   upgradeExchangeRedaction,
@@ -41,7 +42,7 @@ import {
  * the proxy handles responses itself (`selfHandleResponse`) and drops the token
  * from that one body; see {@link exchangeRedactionFunctions}.
  */
-function proxyEntryCode(server: string): string {
+function proxyEntryCode(server: string, typed: boolean): string {
   return `/* ${PROXY_CREDENTIAL_POLICY_MARKER} */ {
   target: ${JSON.stringify(server)},
   selfHandleResponse: true,
@@ -64,7 +65,7 @@ function proxyEntryCode(server: string): string {
         proxyReq.setHeader("authorization", bearer);
       }
     });
-${exchangeRedactionCode("    ")}
+${exchangeRedactionCode("    ", typed)}
   },
 }`;
 }
@@ -73,8 +74,8 @@ ${exchangeRedactionCode("    ")}
  * The redaction functions of {@link exchangeRedactionFunctions} and the two
  * listeners that use them, as statements inside the entry's `configure`.
  */
-function exchangeRedactionCode(indent: string): string {
-  return `${exchangeRedactionFunctions(indent)}
+function exchangeRedactionCode(indent: string, typed: boolean): string {
+  return `${exchangeRedactionFunctions(indent, typed)}
 ${indent}proxy.on("proxyReq", requestPlainExchange);
 ${indent}proxy.on("proxyRes", relayResponse);`;
 }
@@ -175,12 +176,14 @@ const GENERATED_ENTRY_HEAD =
  * every proxied call — so an entry changed by hand, or one that already made
  * its own `selfHandleResponse` choice, is left alone.
  */
-function redactExchange(source: string): string {
+function redactExchange(source: string, typed: boolean): string {
+  const head = GENERATED_ENTRY_HEAD.exec(source);
   if (
     !source.includes(PROXY_CREDENTIAL_POLICY_MARKER) ||
     source.includes(EXCHANGE_REDACTION_MARKER) ||
-    /\bselfHandleResponse\b/.test(source) ||
-    !GENERATED_ENTRY_HEAD.test(source) ||
+    head === null ||
+    // Only the Zitadel entry's own choice counts: a sibling proxy may set it.
+    /\bselfHandleResponse\b/.test(entryText(source, head.index)) ||
     !EXCHANGE_ONLY_LISTENER.test(source)
   ) {
     return source;
@@ -193,7 +196,7 @@ function redactExchange(source: string): string {
     )
     .replace(EXCHANGE_ONLY_LISTENER, (listener: string, indent: string) => {
       const eol = listener.includes("\r\n") ? "\r\n" : "\n";
-      return `${listener}${eol}${exchangeRedactionCode(indent).replace(/\n/g, eol)}`;
+      return `${listener}${eol}${exchangeRedactionCode(indent, typed).replace(/\n/g, eol)}`;
     });
 }
 
@@ -222,8 +225,9 @@ const REDACTION_IMPORTS = [
 export function viteProxyEdit(
   devPort: number,
   server: string,
-): (source: string | undefined) => string {
-  return (source) => {
+): (source: string | undefined, path?: string) => string {
+  return (source, path) => {
+    const typed = path !== undefined && /\.[cm]?ts$/.test(path);
     const label = "the Vite config (vite.config.*)";
     let workingSource = source;
     if (workingSource !== undefined && isLegacyManagedProxy(workingSource)) {
@@ -238,7 +242,12 @@ export function viteProxyEdit(
     }
     if (workingSource !== undefined) {
       workingSource = redactExchange(
-        forwardAppOrigin(upgradeExchangeRedaction(workingSource, exchangeRedactionFunctions)),
+        forwardAppOrigin(
+          upgradeExchangeRedaction(workingSource, (indent) =>
+            exchangeRedactionFunctions(indent, typed),
+          ),
+        ),
+        typed,
       );
     }
 
@@ -259,7 +268,7 @@ export function viteProxyEdit(
       proxyConfig[PROXY_PATH] === undefined ||
       workingSource?.includes(EXCHANGE_REDACTION_MARKER) === true;
     if (proxyConfig[PROXY_PATH] === undefined) {
-      proxyConfig[PROXY_PATH] = builders.raw(proxyEntryCode(server));
+      proxyConfig[PROXY_PATH] = builders.raw(proxyEntryCode(server, typed));
       changed = true;
     }
     for (const imp of redacting ? [...PROXY_IMPORTS, ...REDACTION_IMPORTS] : PROXY_IMPORTS) {

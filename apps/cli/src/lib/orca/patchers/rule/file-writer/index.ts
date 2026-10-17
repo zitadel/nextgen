@@ -123,7 +123,7 @@ async function applyOp(
 async function editFile(
   cwd: string,
   pathOrPaths: string | ReadonlyArray<string>,
-  edit: (source: string | undefined) => string,
+  edit: (source: string | undefined, path?: string) => string,
   dryRun: boolean,
   result: ScaffoldAccumulator,
 ): Promise<void> {
@@ -151,7 +151,7 @@ async function editFile(
       break;
     }
   }
-  const next = edit(source);
+  const next = edit(source, path);
   if (next === source) {
     result.filesSkipped.push(path);
     return;

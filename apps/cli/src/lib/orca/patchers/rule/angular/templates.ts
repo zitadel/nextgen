@@ -5,6 +5,7 @@ import {
   assertNoUnreviewedProjectSecretProxy,
   EXCHANGE_REDACTION_MARKER,
   EXCHANGE_REDACTION_ZLIB,
+  entryText,
   exchangeRedactionFunctions,
   PROXY_CREDENTIAL_POLICY_MARKER,
   upgradeExchangeRedaction,
@@ -221,6 +222,9 @@ const REDACTING_WIRING = `    selfHandleResponse: true,
       proxy.on("proxyRes", relayResponse);
     },`;
 
+/** The key of the managed `/__nextgen` entry in `module.exports`. */
+const MANAGED_ENTRY_KEY = new RegExp(`["']${PROXY_PATH}["']\\s*:\\s*\\{`);
+
 /**
  * Adds the session-token redaction to the managed proxy written before it
  * existed. Only the exact generated bearer hook and wiring qualify, and both
@@ -229,9 +233,12 @@ const REDACTING_WIRING = `    selfHandleResponse: true,
  * `selfHandleResponse` is left alone.
  */
 function redactExchange(source: string): string {
+  const entry = MANAGED_ENTRY_KEY.exec(source);
   if (
+    entry === null ||
     source.includes(EXCHANGE_REDACTION_MARKER) ||
-    /\bselfHandleResponse\b/.test(source) ||
+    // Only the managed entry's own choice counts: a sibling proxy may set it.
+    /\bselfHandleResponse\b/.test(entryText(source, entry.index)) ||
     !source.includes(EXCHANGE_ONLY_BEARER) ||
     !source.includes(UNREDACTED_WIRING)
   ) {
@@ -269,6 +276,14 @@ function upgradeManaged(source: string): string {
   return redactExchange(forwardAppOrigin(upgradeExchangeRedaction(source, exchangeRedaction)));
 }
 
+function upgradeLf(source: string): string {
+  if (source.includes(MANAGED_MARKER) && source.includes(LEGACY_UNCONDITIONAL_BEARER)) {
+    return upgradeManaged(source.replace(LEGACY_UNCONDITIONAL_BEARER, EXCHANGE_ONLY_BEARER));
+  }
+  assertNoUnreviewedProjectSecretProxy(source, "proxy.conf.cjs");
+  return source.includes(MANAGED_MARKER) ? upgradeManaged(source) : source;
+}
+
 /**
  * Creates the managed Angular proxy and upgrades the exact shapes earlier CLIs
  * emitted: the insecure unconditional bearer hook, the host-keeping entry, the
@@ -283,10 +298,14 @@ export function proxyConfEdit(): (source: string | undefined) => string {
     if (source === undefined) {
       return proxyConfTemplate();
     }
-    if (source.includes(MANAGED_MARKER) && source.includes(LEGACY_UNCONDITIONAL_BEARER)) {
-      return upgradeManaged(source.replace(LEGACY_UNCONDITIONAL_BEARER, EXCHANGE_ONLY_BEARER));
+    // The generated fragments are matched with LF newlines, so a CRLF file is
+    // upgraded as LF and written back with its own line endings.
+    const crlf = source.includes("\r\n");
+    const lf = crlf ? source.replace(/\r\n/g, "\n") : source;
+    const next = upgradeLf(lf);
+    if (next === lf) {
+      return source;
     }
-    assertNoUnreviewedProjectSecretProxy(source, "proxy.conf.cjs");
-    return source.includes(MANAGED_MARKER) ? upgradeManaged(source) : source;
+    return crlf ? next.replace(/\n/g, "\r\n") : next;
   };
 }

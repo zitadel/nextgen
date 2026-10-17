@@ -102,37 +102,38 @@ export const EXCHANGE_REDACTION_ZLIB = "zlib";
  * `@zitadel/sdk-core/middleware`; it is inlined because a scaffolded app does
  * not depend on sdk-core.
  */
-export function exchangeRedactionFunctions(indent: string): string {
+export function exchangeRedactionFunctions(indent: string, typed = false): string {
+  const ty = (annotation: string): string => (typed ? annotation : "");
   return indented(
     `/* ${EXCHANGE_REDACTION_MARKER} */
 // The exchange answers with the session token the backend also sets as an
 // HttpOnly cookie. The browser gets the cookie only. The field list mirrors
 // EXCHANGE_CREDENTIAL_FIELDS in @zitadel/sdk-core/middleware.
 const EXCHANGE_CREDENTIAL_FIELDS = ["session_token"];
-const EXCHANGE_DECODERS = {
+const EXCHANGE_DECODERS${ty(": Record<string, (body: Buffer) => Buffer>")} = {
   br: ${EXCHANGE_REDACTION_ZLIB}.brotliDecompressSync,
   deflate: ${EXCHANGE_REDACTION_ZLIB}.inflateSync,
   gzip: ${EXCHANGE_REDACTION_ZLIB}.gunzipSync,
   "x-gzip": ${EXCHANGE_REDACTION_ZLIB}.gunzipSync,
 };
 
-function isExchange(method, url) {
+function isExchange(method${ty(": string | undefined")}, url${ty(": string | undefined")})${ty(": boolean")} {
   const pathname = new URL(url ?? "/", "http://zitadel.local").pathname;
   return method === "POST" && pathname.endsWith("/sessions/exchange");
 }
 
-function requestPlainExchange(proxyReq) {
+function requestPlainExchange(proxyReq${ty(': import("node:http").ClientRequest')})${ty(": void")} {
   if (isExchange(proxyReq.method, proxyReq.path)) {
     proxyReq.setHeader("accept-encoding", "identity");
   }
 }
 
-function decodeExchange(body, contentEncoding) {
+function decodeExchange(body${ty(": Buffer")}, contentEncoding${ty(": string | string[] | undefined")})${ty(": Buffer")} {
   const codings = String(contentEncoding ?? "")
     .split(",")
     .map((coding) => coding.trim().toLowerCase())
     .filter((coding) => coding !== "" && coding !== "identity");
-  return codings.reduceRight((decoded, coding) => {
+  return codings.reduceRight((decoded${ty(": Buffer")}, coding) => {
     if (!Object.hasOwn(EXCHANGE_DECODERS, coding)) {
       throw new Error(\`unsupported content-encoding \${coding}\`);
     }
@@ -140,7 +141,11 @@ function decodeExchange(body, contentEncoding) {
   }, body);
 }
 
-function relayResponse(proxyRes, req, res) {
+function relayResponse(
+  proxyRes${ty(': import("node:http").IncomingMessage')},
+  req${ty(': import("node:http").IncomingMessage')},
+  res${ty(': import("node:http").ServerResponse')},
+)${ty(": void")} {
   const abandon = () => res.destroy();
   proxyRes.on("error", abandon);
   proxyRes.on("aborted", abandon);
@@ -149,14 +154,14 @@ function relayResponse(proxyRes, req, res) {
     proxyRes.pipe(res);
     return;
   }
-  const chunks = [];
-  proxyRes.on("data", (chunk) => chunks.push(chunk));
+  const chunks${ty(": Buffer[]")} = [];
+  proxyRes.on("data", (chunk${ty(": Buffer")}) => chunks.push(chunk));
   proxyRes.on("end", () => {
     if (res.destroyed) {
       return;
     }
     const headers = { ...proxyRes.headers };
-    let body;
+    let body${ty(": Buffer")};
     try {
       body = decodeExchange(Buffer.concat(chunks), headers["content-encoding"]);
     } catch {
@@ -279,6 +284,30 @@ export function upgradeExchangeRedaction(
     const eol = legacy.includes("\r\n") ? "\r\n" : "\n";
     return current(indent).replace(/\n/g, eol);
   });
+}
+
+/**
+ * The text of the object literal that follows the key found at `keyIndex`,
+ * braces balanced. An unbalanced remainder yields the rest of the source, so a
+ * check for a user-set option errs towards leaving the file alone.
+ */
+export function entryText(source: string, keyIndex: number): string {
+  const open = source.indexOf("{", keyIndex);
+  if (open === -1) {
+    return source.slice(keyIndex);
+  }
+  let depth = 0;
+  for (let index = open; index < source.length; index += 1) {
+    if (source[index] === "{") {
+      depth += 1;
+    } else if (source[index] === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return source.slice(open, index + 1);
+      }
+    }
+  }
+  return source.slice(open);
 }
 
 function indented(code: string, indent: string): string {

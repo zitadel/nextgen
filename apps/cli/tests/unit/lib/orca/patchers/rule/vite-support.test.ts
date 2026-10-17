@@ -1,3 +1,8 @@
+import { mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import ts from "typescript";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { viteProxyEdit } from "../../../../../../src/lib/orca/patchers/rule/vite-support";
@@ -211,6 +216,57 @@ export default defineConfig({
     );
 
     expect(edit(chosen)).toBe(chosen);
+  });
+
+  it("adds the redaction when a sibling proxy chose its own response handling", () => {
+    const current = viteProxyEdit(5173, "https://zitadel.example.com")(BARE_CONFIG);
+    const sibling = UNREDACTED_CONFIG.replace(
+      'proxy: {\n      "/__nextgen"',
+      'proxy: {\n      "/api": { target: "http://localhost:9", selfHandleResponse: true },\n      "/__nextgen"',
+    );
+
+    const out = edit(sibling);
+
+    expect(out).toBe(
+      current.replace(
+        'proxy: {\n      "/__nextgen"',
+        'proxy: {\n      "/api": { target: "http://localhost:9", selfHandleResponse: true },\n      "/__nextgen"',
+      ),
+    );
+  });
+
+  it("emits helpers a TypeScript config can typecheck under noImplicitAny", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-typed-"));
+    try {
+      await symlink(join(process.cwd(), "node_modules"), join(dir, "node_modules"), "dir");
+      const file = join(dir, "vite.config.ts");
+      await writeFile(file, edit(BARE_CONFIG, file));
+      const program = ts.createProgram([file], {
+        noEmit: true,
+        strict: true,
+        noImplicitAny: true,
+        skipLibCheck: true,
+        esModuleInterop: true,
+        module: ts.ModuleKind.ESNext,
+        moduleResolution: ts.ModuleResolutionKind.Bundler,
+        target: ts.ScriptTarget.ES2023,
+        lib: ["lib.es2023.d.ts"],
+        types: ["node"],
+      });
+
+      const messages = ts
+        .getPreEmitDiagnostics(program)
+        .filter((diagnostic) => diagnostic.file?.fileName === file)
+        .map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"));
+
+      expect(messages).toEqual([]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps the helpers plain JavaScript for a config that is not TypeScript", () => {
+    expect(edit(BARE_CONFIG, "vite.config.js")).toContain("function isExchange(method, url) {");
   });
 
   it("leaves a generated entry whose bearer listener was changed by hand alone", () => {

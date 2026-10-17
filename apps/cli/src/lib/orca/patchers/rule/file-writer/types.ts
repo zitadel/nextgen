@@ -67,7 +67,7 @@ export type FileOp =
        */
       readonly kind: "edit";
       readonly path: string | ReadonlyArray<string>;
-      readonly edit: (source: string | undefined) => string;
+      readonly edit: (source: string | undefined, path?: string) => string;
       readonly overwrites?: true;
       /**
        * Marks a merging edit as managed *wiring* the doctor managed-files

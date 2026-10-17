@@ -143,7 +143,7 @@ export abstract class AbstractRulePatcher implements Patcher {
         statuses.push({
           path,
           wiring: op.wiring,
-          state: op.edit(source) === source ? "applied" : "detached",
+          state: op.edit(source, path) === source ? "applied" : "detached",
         });
       } catch (error) {
         statuses.push({
