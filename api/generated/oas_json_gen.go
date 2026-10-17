@@ -46716,22 +46716,6 @@ func (s GetDeploymentByIdErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case NotImplementedGetDeploymentByIdErrorResponse:
-		e.FieldStart("code")
-		e.Str("not_implemented")
-		{
-			s := s.NotImplemented
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
 	case ReqInvalidGetDeploymentByIdErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -46786,9 +46770,6 @@ func (s *GetDeploymentByIdErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalGetDeploymentByIdErrorResponse
 					found = true
-				case "not_implemented":
-					s.Type = NotImplementedGetDeploymentByIdErrorResponse
-					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetDeploymentByIdErrorResponse
 					found = true
@@ -46820,10 +46801,6 @@ func (s *GetDeploymentByIdErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case InternalGetDeploymentByIdErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
-			return err
-		}
-	case NotImplementedGetDeploymentByIdErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidGetDeploymentByIdErrorResponse:
@@ -59095,22 +59072,6 @@ func (s ListDeploymentsErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case NotImplementedListDeploymentsErrorResponse:
-		e.FieldStart("code")
-		e.Str("not_implemented")
-		{
-			s := s.NotImplemented
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
 	case ReqInvalidListDeploymentsErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -59165,9 +59126,6 @@ func (s *ListDeploymentsErrorResponse) Decode(d *jx.Decoder) error {
 				case "internal":
 					s.Type = InternalListDeploymentsErrorResponse
 					found = true
-				case "not_implemented":
-					s.Type = NotImplementedListDeploymentsErrorResponse
-					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidListDeploymentsErrorResponse
 					found = true
@@ -59199,10 +59157,6 @@ func (s *ListDeploymentsErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case InternalListDeploymentsErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
-			return err
-		}
-	case NotImplementedListDeploymentsErrorResponse:
-		if err := s.NotImplemented.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidListDeploymentsErrorResponse:

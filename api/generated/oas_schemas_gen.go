@@ -25639,7 +25639,6 @@ type GetDeploymentByIdErrorResponse struct {
 	DepNotFound         DepNotFound
 	DepPermissionDenied DepPermissionDenied
 	Internal            Internal
-	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
 }
 
@@ -25652,7 +25651,6 @@ const (
 	DepNotFoundGetDeploymentByIdErrorResponse         GetDeploymentByIdErrorResponseType = "dep.not_found"
 	DepPermissionDeniedGetDeploymentByIdErrorResponse GetDeploymentByIdErrorResponseType = "dep.permission_denied"
 	InternalGetDeploymentByIdErrorResponse            GetDeploymentByIdErrorResponseType = "internal"
-	NotImplementedGetDeploymentByIdErrorResponse      GetDeploymentByIdErrorResponseType = "not_implemented"
 	ReqInvalidGetDeploymentByIdErrorResponse          GetDeploymentByIdErrorResponseType = "req.invalid"
 )
 
@@ -25674,11 +25672,6 @@ func (s GetDeploymentByIdErrorResponse) IsDepPermissionDenied() bool {
 // IsInternal reports whether GetDeploymentByIdErrorResponse is Internal.
 func (s GetDeploymentByIdErrorResponse) IsInternal() bool {
 	return s.Type == InternalGetDeploymentByIdErrorResponse
-}
-
-// IsNotImplemented reports whether GetDeploymentByIdErrorResponse is NotImplemented.
-func (s GetDeploymentByIdErrorResponse) IsNotImplemented() bool {
-	return s.Type == NotImplementedGetDeploymentByIdErrorResponse
 }
 
 // IsReqInvalid reports whether GetDeploymentByIdErrorResponse is ReqInvalid.
@@ -25767,27 +25760,6 @@ func (s GetDeploymentByIdErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalGetDeploymentByIdErrorResponse(v Internal) GetDeploymentByIdErrorResponse {
 	var s GetDeploymentByIdErrorResponse
 	s.SetInternal(v)
-	return s
-}
-
-// SetNotImplemented sets GetDeploymentByIdErrorResponse to NotImplemented.
-func (s *GetDeploymentByIdErrorResponse) SetNotImplemented(v NotImplemented) {
-	s.Type = NotImplementedGetDeploymentByIdErrorResponse
-	s.NotImplemented = v
-}
-
-// GetNotImplemented returns NotImplemented and true boolean if GetDeploymentByIdErrorResponse is NotImplemented.
-func (s GetDeploymentByIdErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
-	if !s.IsNotImplemented() {
-		return v, false
-	}
-	return s.NotImplemented, true
-}
-
-// NewNotImplementedGetDeploymentByIdErrorResponse returns new GetDeploymentByIdErrorResponse from NotImplemented.
-func NewNotImplementedGetDeploymentByIdErrorResponse(v NotImplemented) GetDeploymentByIdErrorResponse {
-	var s GetDeploymentByIdErrorResponse
-	s.SetNotImplemented(v)
 	return s
 }
 
@@ -33480,7 +33452,6 @@ type ListDeploymentsErrorResponse struct {
 	DepNotFound         DepNotFound
 	DepPermissionDenied DepPermissionDenied
 	Internal            Internal
-	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
 }
 
@@ -33493,7 +33464,6 @@ const (
 	DepNotFoundListDeploymentsErrorResponse         ListDeploymentsErrorResponseType = "dep.not_found"
 	DepPermissionDeniedListDeploymentsErrorResponse ListDeploymentsErrorResponseType = "dep.permission_denied"
 	InternalListDeploymentsErrorResponse            ListDeploymentsErrorResponseType = "internal"
-	NotImplementedListDeploymentsErrorResponse      ListDeploymentsErrorResponseType = "not_implemented"
 	ReqInvalidListDeploymentsErrorResponse          ListDeploymentsErrorResponseType = "req.invalid"
 )
 
@@ -33515,11 +33485,6 @@ func (s ListDeploymentsErrorResponse) IsDepPermissionDenied() bool {
 // IsInternal reports whether ListDeploymentsErrorResponse is Internal.
 func (s ListDeploymentsErrorResponse) IsInternal() bool {
 	return s.Type == InternalListDeploymentsErrorResponse
-}
-
-// IsNotImplemented reports whether ListDeploymentsErrorResponse is NotImplemented.
-func (s ListDeploymentsErrorResponse) IsNotImplemented() bool {
-	return s.Type == NotImplementedListDeploymentsErrorResponse
 }
 
 // IsReqInvalid reports whether ListDeploymentsErrorResponse is ReqInvalid.
@@ -33608,27 +33573,6 @@ func (s ListDeploymentsErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalListDeploymentsErrorResponse(v Internal) ListDeploymentsErrorResponse {
 	var s ListDeploymentsErrorResponse
 	s.SetInternal(v)
-	return s
-}
-
-// SetNotImplemented sets ListDeploymentsErrorResponse to NotImplemented.
-func (s *ListDeploymentsErrorResponse) SetNotImplemented(v NotImplemented) {
-	s.Type = NotImplementedListDeploymentsErrorResponse
-	s.NotImplemented = v
-}
-
-// GetNotImplemented returns NotImplemented and true boolean if ListDeploymentsErrorResponse is NotImplemented.
-func (s ListDeploymentsErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
-	if !s.IsNotImplemented() {
-		return v, false
-	}
-	return s.NotImplemented, true
-}
-
-// NewNotImplementedListDeploymentsErrorResponse returns new ListDeploymentsErrorResponse from NotImplemented.
-func NewNotImplementedListDeploymentsErrorResponse(v NotImplemented) ListDeploymentsErrorResponse {
-	var s ListDeploymentsErrorResponse
-	s.SetNotImplemented(v)
 	return s
 }
 
