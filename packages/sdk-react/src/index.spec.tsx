@@ -7,7 +7,8 @@ import type {
   ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
 
-import { render } from "@testing-library/react";
+import { render, waitFor } from "@testing-library/react";
+import { _resetConfigForTesting, configureZitadel } from "@zitadel/api/config";
 import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
@@ -18,7 +19,9 @@ import {
   type ZitadelSessionConfig,
 } from "@zitadel/sdk-core/types";
 import * as React from "react";
-import { describe, expect, it, vi } from "vitest";
+import { hydrateRoot } from "react-dom/client";
+import { renderToString } from "react-dom/server";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { businessLocales, ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
 
@@ -170,6 +173,236 @@ describe("ZitadelSession", () => {
     const { container } = render(<ZitadelSession ref={ref} project={project} />);
     expect(ref.current).toBe(container.querySelector("zitadel-session"));
     expect(ref.current?.tagName.toLowerCase()).toBe("zitadel-session");
+  });
+});
+
+/** The attributes of the first `<tag>` in server-rendered HTML. */
+function serverAttributes(tag: string, node: React.ReactElement): Record<string, string> {
+  const html = renderToString(node);
+  const open = new RegExp(`<${tag}(\\s[^>]*)?>`).exec(html);
+  expect(open, `<${tag}> missing from server HTML`).not.toBeNull();
+  return Object.fromEntries(
+    [...(open?.[1] ?? "").matchAll(/([a-z][\w-]*)(?:="([^"]*)")?/g)].map((m) => [m[1], m[2] ?? ""]),
+  );
+}
+
+describe("server-rendered widget config", () => {
+  const handle = { projectId: "proj-test", proxyPath: "/__nextgen", url: "http://auth.test" };
+
+  it("puts the login flow config into the server markup", () => {
+    expect(
+      serverAttributes(
+        "zitadel-login",
+        <ZitadelLogin project={handle} purpose="register" flowName="signup" />,
+      ),
+    ).toMatchObject({
+      purpose: "register",
+      "flow-name": "signup",
+      "project-id": "proj-test",
+      "proxy-path": "/__nextgen",
+      url: "http://auth.test",
+    });
+  });
+
+  it("puts the resume handle into the login markup, and omits an unset one", () => {
+    expect(
+      serverAttributes("zitadel-login", <ZitadelLogin projectId="p1" resumeFlowId="flow_123" />),
+    ).toMatchObject({ "resume-flow-id": "flow_123" });
+    expect(serverAttributes("zitadel-login", <ZitadelLogin projectId="p1" />)).not.toHaveProperty(
+      "resume-flow-id",
+    );
+    expect(
+      serverAttributes("zitadel-login", <ZitadelLogin projectId="p1" resumeFlowId="" />),
+    ).not.toHaveProperty("resume-flow-id");
+  });
+
+  it("puts the post-sign-in URL into the login markup, and omits an unset one", () => {
+    expect(
+      serverAttributes("zitadel-login", <ZitadelLogin projectId="p1" postSignInUrl="/home" />),
+    ).toMatchObject({ "post-sign-in-url": "/home" });
+    expect(serverAttributes("zitadel-login", <ZitadelLogin projectId="p1" />)).not.toHaveProperty(
+      "post-sign-in-url",
+    );
+  });
+
+  it("puts the discrete project props into the login markup", () => {
+    expect(
+      serverAttributes("zitadel-login", <ZitadelLogin projectId="p1" proxyPath="/px" />),
+    ).toMatchObject({ purpose: "login", "project-id": "p1", "proxy-path": "/px" });
+  });
+
+  it.each([
+    ["zitadel-session", (p: object) => <ZitadelSession {...p} />],
+    ["zitadel-logout", (p: object) => <ZitadelLogout {...p} />],
+  ])("leaves a keyed project handle out of the %s markup", (tag, widget) => {
+    const attributes = serverAttributes(
+      tag,
+      widget({ project: { ...handle, publishableKey: "pk_test_123" }, projectId: "other" }),
+    );
+    expect(attributes).not.toHaveProperty("project-id");
+    expect(attributes).not.toHaveProperty("proxy-path");
+    expect(attributes).not.toHaveProperty("url");
+  });
+
+  it("puts the session config into the server markup", () => {
+    expect(
+      serverAttributes(
+        "zitadel-session",
+        <ZitadelSession project={handle} postSignOutUrl="/bye" />,
+      ),
+    ).toMatchObject({
+      "project-id": "proj-test",
+      "proxy-path": "/__nextgen",
+      url: "http://auth.test",
+      "post-sign-out-url": "/bye",
+    });
+  });
+
+  it("puts the logout config into the server markup", () => {
+    expect(
+      serverAttributes("zitadel-logout", <ZitadelLogout project={handle} postSignOutUrl="/bye" />),
+    ).toMatchObject({
+      "project-id": "proj-test",
+      "proxy-path": "/__nextgen",
+      url: "http://auth.test",
+      "post-sign-out-url": "/bye",
+    });
+  });
+});
+
+describe("hydrating a server-rendered login", () => {
+  afterEach(() => {
+    _resetConfigForTesting();
+    vi.restoreAllMocks();
+  });
+
+  it("starts its first flow with the purpose the server rendered", async () => {
+    const globalProject = configureZitadel({
+      projectId: "proj-global",
+      proxyPath: "https://flow.test.invalid",
+    });
+    const fetched = vi.spyOn(globalThis, "fetch");
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    host.innerHTML = renderToString(<ZitadelLogin project={globalProject} purpose="register" />);
+
+    hydrateRoot(host, <ZitadelLogin project={globalProject} purpose="register" />);
+
+    await waitFor(() => expect(fetched).toHaveBeenCalled());
+    const bodies = await Promise.all(
+      fetched.mock.calls.map(async ([input, init]) =>
+        JSON.parse(
+          String(init?.body ?? (input instanceof Request ? await input.clone().text() : "null")),
+        ),
+      ),
+    );
+    const created = bodies.filter((body) => body?.project_id);
+    expect(created[0]).toMatchObject({ purpose: "register" });
+    host.remove();
+  });
+
+  it("loads the supplied flow on its first request instead of creating one", async () => {
+    const globalProject = configureZitadel({
+      projectId: "proj-global",
+      proxyPath: "https://flow.test.invalid",
+    });
+    const fetched = vi.spyOn(globalThis, "fetch");
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const login = <ZitadelLogin project={globalProject} resumeFlowId="flow_123" />;
+    host.innerHTML = renderToString(login);
+
+    hydrateRoot(host, login);
+
+    await waitFor(() => expect(fetched).toHaveBeenCalled());
+    const first = new Request(fetched.mock.calls[0]![0], fetched.mock.calls[0]![1]);
+    expect(first.method).toBe("GET");
+    expect(first.url).toContain("flow_123");
+    host.remove();
+  });
+});
+
+describe("a login resumed to completion before it hydrates", () => {
+  afterEach(() => {
+    _resetConfigForTesting();
+    vi.restoreAllMocks();
+  });
+
+  it("exchanges the handoff and navigates to the server-rendered post-sign-in URL", async () => {
+    const globalProject = configureZitadel({
+      projectId: "proj-global",
+      proxyPath: "https://flow.test.invalid",
+    });
+    const exchanged: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const request = new Request(input, init);
+      if (request.method === "GET") {
+        return Response.json({
+          flow_id: "flow_123",
+          step: { name: "done", complete: "show" },
+          handoff_token: "handoff-token",
+        });
+      }
+      exchanged.push(await request.text());
+      return Response.json({});
+    });
+    const assign = vi.fn();
+    const { location } = window;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...location, assign },
+    });
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    try {
+      const login = (
+        <ZitadelLogin project={globalProject} resumeFlowId="flow_123" postSignInUrl="/home" />
+      );
+      // The element upgrades from the server markup and finishes the flow
+      // before React has hydrated anything.
+      host.innerHTML = renderToString(login);
+      await waitFor(() => expect(assign).toHaveBeenCalledWith("/home"));
+      expect(exchanged).toHaveLength(1);
+      expect(exchanged[0]).toContain("handoff-token");
+
+      hydrateRoot(host, login);
+    } finally {
+      Object.defineProperty(window, "location", { configurable: true, value: location });
+      host.remove();
+    }
+  });
+});
+
+describe("a login with a keyed project handle", () => {
+  const keyed = {
+    projectId: "proj-keyed",
+    proxyPath: "https://flow.test.invalid",
+    publishableKey: "pk_test_123",
+  };
+
+  afterEach(() => {
+    _resetConfigForTesting();
+    vi.restoreAllMocks();
+  });
+
+  it("renders no element on the server", () => {
+    expect(renderToString(<ZitadelLogin project={keyed} />)).toBe("");
+  });
+
+  it("starts its first flow once, with the bearer, after mounting", async () => {
+    const fetched = vi.spyOn(globalThis, "fetch");
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    hydrateRoot(host, <ZitadelLogin project={keyed} />);
+
+    await waitFor(() => expect(host.querySelector("zitadel-login")).not.toBeNull());
+    expect(host.querySelector<ZitadelLoginElement>("zitadel-login")!.project).toBe(keyed);
+    await waitFor(() => expect(fetched).toHaveBeenCalled());
+    expect(fetched).toHaveBeenCalledTimes(1);
+    const [input, init] = fetched.mock.calls[0]!;
+    const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : {}));
+    expect(headers.get("authorization")).toBe("Bearer pk_test_123");
+    host.remove();
   });
 });
 
