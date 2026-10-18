@@ -58,6 +58,7 @@ import "@zitadel/components";
     [attr.purpose]="purpose"
     [attr.flow-name]="flowName"
     [attr.post-sign-in-url]="postSignInUrl"
+    [attr.resume-flow-id]="resumeFlowId"
     [attr.variant]="variant ?? null"
     [attr.theme]="theme ?? null"
     [suppressHeader]="suppressHeader"
@@ -76,6 +77,7 @@ export class ZitadelLoginComponent {
   @Input() purpose: CreateFlowBodyPurpose = "login";
   @Input() flowName?: string;
   @Input() postSignInUrl?: string;
+  @Input() resumeFlowId?: string | null;
   @Input() locales?: Record<string, Partial<Record<string, string>>>;
   @Input() lang?: string;
   @Input() variant?: "widget" | "page";
