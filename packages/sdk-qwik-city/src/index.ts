@@ -6,5 +6,7 @@ export type {
   NextgenMiddlewareOptions,
   AuthResult,
   NextgenSession,
+  AuthState,
+  UnauthState,
   ClientAuthResult,
 } from "./types.js";
