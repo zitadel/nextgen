@@ -1,6 +1,7 @@
 import { hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
 import type { Detector, FrameworkFacts } from "./types";
+import { enforceVersionFloor } from "./version-floor";
 
 /**
  * Detects a Vite + Vue single-page app: depends on `vue` and `vite` but NOT
@@ -11,6 +12,7 @@ export class VueDetector implements Detector {
   readonly framework = "vue";
   readonly displayName = "Vue";
   readonly versionPackage = "vue";
+  readonly versionFloor = "3.2";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
     const pkg = await readPackageJson(cwd).catch(() => undefined);
@@ -22,6 +24,8 @@ export class VueDetector implements Detector {
     ) {
       return null;
     }
+
+    await enforceVersionFloor(this, pkg, cwd);
 
     const devPort = await detectDevPort(cwd, pkg);
     return { id: "vue", appDir: "src", devPort, url: issuerFromPort(devPort) };

@@ -685,6 +685,15 @@ export class ScaffoldedApp {
     return writeFile(join(this.path, relativePath), contents);
   }
 
+  /** Leaves `version` of `name` in the app's `node_modules`, as its lockfile installed it. */
+  async hasInstalled(name: string, version: string): Promise<void> {
+    await mkdir(join(this.path, "node_modules", name), { recursive: true });
+    await this.writeProjectFile(
+      `node_modules/${name}/package.json`,
+      JSON.stringify({ name, version }),
+    );
+  }
+
   deleteProjectFile(relativePath: string): Promise<void> {
     return rm(join(this.path, relativePath));
   }

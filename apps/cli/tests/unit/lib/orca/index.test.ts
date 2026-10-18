@@ -211,6 +211,7 @@ describe("Orca.scaffold", () => {
     framework: "fake",
     displayName: "Fake",
     versionPackage: "fake",
+    versionFloor: "1",
     async detect(cwd) {
       try {
         await readFile(join(cwd, "package.json"), "utf8");
