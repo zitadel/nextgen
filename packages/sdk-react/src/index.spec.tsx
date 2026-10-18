@@ -204,6 +204,18 @@ describe("server-rendered widget config", () => {
     });
   });
 
+  it("puts the resume handle into the login markup, and omits an unset one", () => {
+    expect(
+      serverAttributes("zitadel-login", <ZitadelLogin projectId="p1" resumeFlowId="flow_123" />),
+    ).toMatchObject({ "resume-flow-id": "flow_123" });
+    expect(serverAttributes("zitadel-login", <ZitadelLogin projectId="p1" />)).not.toHaveProperty(
+      "resume-flow-id",
+    );
+    expect(
+      serverAttributes("zitadel-login", <ZitadelLogin projectId="p1" resumeFlowId="" />),
+    ).not.toHaveProperty("resume-flow-id");
+  });
+
   it("puts the discrete project props into the login markup", () => {
     expect(
       serverAttributes("zitadel-login", <ZitadelLogin projectId="p1" proxyPath="/px" />),
@@ -277,6 +289,26 @@ describe("hydrating a server-rendered login", () => {
     );
     const created = bodies.filter((body) => body?.project_id);
     expect(created[0]).toMatchObject({ purpose: "register" });
+    host.remove();
+  });
+
+  it("loads the supplied flow on its first request instead of creating one", async () => {
+    const globalProject = configureZitadel({
+      projectId: "proj-global",
+      proxyPath: "https://flow.test.invalid",
+    });
+    const fetched = vi.spyOn(globalThis, "fetch");
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const login = <ZitadelLogin project={globalProject} resumeFlowId="flow_123" />;
+    host.innerHTML = renderToString(login);
+
+    hydrateRoot(host, login);
+
+    await waitFor(() => expect(fetched).toHaveBeenCalled());
+    const first = new Request(fetched.mock.calls[0]![0], fetched.mock.calls[0]![1]);
+    expect(first.method).toBe("GET");
+    expect(first.url).toContain("flow_123");
     host.remove();
   });
 });
