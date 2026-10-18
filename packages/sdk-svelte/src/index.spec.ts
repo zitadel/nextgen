@@ -40,6 +40,22 @@ describe("ZitadelLogin", () => {
     expect(el!.proxyPath).toBe("/__nextgen");
   });
 
+  it("forwards resumeFlowId to the widget", () => {
+    const { container } = render(ZitadelLogin, {
+      props: { project, resumeFlowId: "flow_123" },
+    });
+    const el = container.querySelector<ZitadelLoginElement>("zitadel-login");
+    expect(el!.resumeFlowId).toBe("flow_123");
+  });
+
+  it("reads a null resumeFlowId as no handle", () => {
+    const { container } = render(ZitadelLogin, {
+      props: { project, resumeFlowId: null },
+    });
+    const el = container.querySelector<ZitadelLoginElement>("zitadel-login");
+    expect(el!.resumeFlowId).toBe("");
+  });
+
   it("forwards locales and lang to the widget", () => {
     const locales = { en: { "identifier.title": "Welcome back" } };
     const { container } = render(ZitadelLogin, {
@@ -177,6 +193,7 @@ describe("businessLocales", () => {
 describe("unset props keep the element's defaults", () => {
   it.each([
     ["heading", "Signed in as"],
+    ["logoutLabel", "Sign out"],
     ["variant", "widget"],
     ["theme", ""],
     ["suppressHeader", false],
@@ -191,6 +208,7 @@ describe("unset props keep the element's defaults", () => {
     ["theme", ""],
     ["suppressHeader", false],
     ["lang", ""],
+    ["suppressPasswordToggle", false],
   ] as const)("ZitadelLogin keeps the default %s", (prop, expected) => {
     const { container } = render(ZitadelLogin, { props: { project } });
 
@@ -201,5 +219,49 @@ describe("unset props keep the element's defaults", () => {
     const { container } = render(ZitadelLogout, { props: { project } });
 
     expect(container.querySelector<ZitadelLogoutElement>("zitadel-logout")!.theme).toBe("");
+  });
+});
+
+describe("props that become unset restore the element's defaults", () => {
+  it.each([
+    ["heading", "Custom", "Signed in as"],
+    ["logoutLabel", "Leave", "Sign out"],
+    ["variant", "page", "widget"],
+    ["theme", "light", ""],
+    ["suppressHeader", true, false],
+  ] as const)("ZitadelSession restores the default %s", async (prop, given, expected) => {
+    const { container, rerender } = render(ZitadelSession, { props: { project, [prop]: given } });
+    const el = container.querySelector<ZitadelSessionElement>("zitadel-session")!;
+    expect(el[prop]).toBe(given);
+
+    await rerender({ [prop]: undefined });
+
+    expect(el[prop]).toBe(expected);
+  });
+
+  it.each([
+    ["variant", "page", "widget"],
+    ["theme", "light", ""],
+    ["suppressHeader", true, false],
+    ["lang", "de", ""],
+    ["suppressPasswordToggle", true, false],
+  ] as const)("ZitadelLogin restores the default %s", async (prop, given, expected) => {
+    const { container, rerender } = render(ZitadelLogin, { props: { project, [prop]: given } });
+    const el = container.querySelector<ZitadelLoginElement>("zitadel-login")!;
+    expect(el[prop]).toBe(given);
+
+    await rerender({ [prop]: undefined });
+
+    expect(el[prop]).toBe(expected);
+  });
+
+  it("ZitadelLogout restores the default theme", async () => {
+    const { container, rerender } = render(ZitadelLogout, { props: { project, theme: "light" } });
+    const el = container.querySelector<ZitadelLogoutElement>("zitadel-logout")!;
+    expect(el.theme).toBe("light");
+
+    await rerender({ theme: undefined });
+
+    expect(el.theme).toBe("");
   });
 });

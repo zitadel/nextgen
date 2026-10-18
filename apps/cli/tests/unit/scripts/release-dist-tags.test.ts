@@ -110,12 +110,12 @@ describe("release dist-tags preflight", () => {
     const capture = npmView({ "@zitadel/sdk-react": ["0.0.0", "1.0.0-alpha.25"] });
 
     const blockers = await distTags.findPublishBlockers(
-      [localPackage("@zitadel/sdk-react"), localPackage("@zitadel/sdk-sveltekit")],
+      [localPackage("@zitadel/sdk-react"), localPackage("@zitadel/sdk-svelte")],
       tag,
       { capture },
     );
 
-    expect(blockers.unpublished.map((pkg) => pkg.name)).toEqual(["@zitadel/sdk-sveltekit"]);
+    expect(blockers.unpublished.map((pkg) => pkg.name)).toEqual(["@zitadel/sdk-svelte"]);
   });
 
   it("checks prerelease-only packages only in pre mode", async () => {
@@ -177,14 +177,14 @@ describe("release dist-tags preflight", () => {
 
   it("tells the maintainer to bootstrap and add a trusted publisher for a never-published package", () => {
     const message = distTags.publishBlockersMessage(
-      { unpublished: [localPackage("@zitadel/sdk-sveltekit")], prereleaseOnly: [] },
+      { unpublished: [localPackage("@zitadel/sdk-svelte")], prereleaseOnly: [] },
       "alpha",
     );
 
-    expect(message).toContain("@zitadel/sdk-sveltekit has never been published to npm");
-    expect(message).toContain('"@zitadel/sdk-sveltekit" "MIT" "@zitadel/sdk-sveltekit@alpha"');
+    expect(message).toContain("@zitadel/sdk-svelte has never been published to npm");
+    expect(message).toContain('"@zitadel/sdk-svelte" "MIT" "@zitadel/sdk-svelte@alpha"');
     expect(message).toContain(
-      "add a trusted publisher for @zitadel/sdk-sveltekit on npmjs.com (package Settings → Trusted Publishing: GitHub Actions, repository zitadel/nextgen, workflow release-publish.yml)",
+      "add a trusted publisher for @zitadel/sdk-svelte on npmjs.com (package Settings → Trusted Publishing: GitHub Actions, repository zitadel/nextgen, workflow release-publish.yml)",
     );
     expect(message).toContain(".changeset/README.md");
   });
@@ -209,6 +209,25 @@ describe("release dist-tags preflight", () => {
     await expect(distTags.readLocalPackages(root, ["packages/no-license"])).rejects.toThrow(
       "has no license",
     );
+  });
+
+  it("skips a private package", async () => {
+    const root = await mkdtemp(join(tmpdir(), "release-dist-tags-"));
+    tempDirs.push(root);
+    await mkdir(join(root, "packages/internal"), { recursive: true });
+    await writeFile(
+      join(root, "packages/internal/package.json"),
+      JSON.stringify({ name: "@zitadel/internal", version: "0.0.0", private: true }),
+    );
+    await mkdir(join(root, "packages/sdk-solid"), { recursive: true });
+    await writeFile(
+      join(root, "packages/sdk-solid/package.json"),
+      JSON.stringify({ name: "@zitadel/sdk-solid", version: "1.0.0-alpha.26", license: "MIT" }),
+    );
+
+    expect(
+      await distTags.readLocalPackages(root, ["packages/internal", "packages/sdk-solid"]),
+    ).toEqual([localPackage("@zitadel/sdk-solid")]);
   });
 
   it("reads the prerelease tag only in pre mode", async () => {

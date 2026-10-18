@@ -20,6 +20,8 @@ import type { Detector, FrameworkFacts } from "./types";
  */
 export class QwikCityDetector implements Detector {
   readonly framework = "qwik-city";
+  readonly displayName = "Qwik City";
+  readonly versionPackage = "@qwik.dev/router";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
     const pkg = await readPackageJson(cwd).catch(() => undefined);

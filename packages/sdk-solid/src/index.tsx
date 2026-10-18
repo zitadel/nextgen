@@ -109,6 +109,7 @@ export function ZitadelLogin(
       purpose={props.purpose ?? "login"}
       flow-name={props.flowName}
       post-sign-in-url={props.postSignInUrl}
+      resume-flow-id={props.resumeFlowId}
       variant={props.variant}
       theme={props.theme}
       prop:suppressHeader={props.suppressHeader}

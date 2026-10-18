@@ -11,13 +11,15 @@ import type { Detector, FrameworkFacts } from "./types";
  */
 export class SvelteDetector implements Detector {
   readonly framework = "svelte";
+  readonly displayName = "Svelte";
+  readonly versionPackage = "svelte";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
     const pkg = await readPackageJson(cwd).catch(() => undefined);
     if (
       !pkg ||
       hasDependency(pkg, "@sveltejs/kit") ||
-      !hasDependency(pkg, "svelte") ||
+      !hasDependency(pkg, this.versionPackage) ||
       !hasDependency(pkg, "vite")
     ) {
       return null;

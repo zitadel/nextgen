@@ -17,6 +17,8 @@ import type { Detector, FrameworkFacts } from "./types";
  */
 export class TanStackStartDetector implements Detector {
   readonly framework = "tanstack-start";
+  readonly displayName = "TanStack Start";
+  readonly versionPackage = "@tanstack/react-start";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
     const pkg = await readPackageJson(cwd).catch(() => undefined);

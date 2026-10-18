@@ -20,6 +20,8 @@ import type { Detector, FrameworkFacts } from "./types";
  */
 export class ReactDetector implements Detector {
   readonly framework = "react";
+  readonly displayName = "React";
+  readonly versionPackage = "react";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
     const pkg = await readPackageJson(cwd).catch(() => undefined);
@@ -27,7 +29,7 @@ export class ReactDetector implements Detector {
       !pkg ||
       hasDependency(pkg, "next") ||
       hasDependency(pkg, "@tanstack/react-start") ||
-      !hasDependency(pkg, "react") ||
+      !hasDependency(pkg, this.versionPackage) ||
       !hasDependency(pkg, "vite")
     ) {
       return null;
@@ -37,7 +39,7 @@ export class ReactDetector implements Detector {
     // target React 18+. Enforced here so setup and doctor share one loud
     // gate; only a spec that provably cannot resolve to 18+ is rejected —
     // protocol specs and dist-tags pass.
-    const belowFloor = dependencySpecProvablyBelowMajor(pkg, "react", 18);
+    const belowFloor = dependencySpecProvablyBelowMajor(pkg, this.versionPackage, 18);
     if (belowFloor !== undefined) {
       throw new ZitadelError(
         "E_UNSUPPORTED_PROJECT_SHAPE",
@@ -47,7 +49,7 @@ export class ReactDetector implements Detector {
     }
 
     const devPort = await detectDevPort(cwd, pkg);
-    const versionMajor = dependencyVersionMajor(pkg, "react");
+    const versionMajor = dependencyVersionMajor(pkg, this.versionPackage);
     return {
       id: "react",
       appDir: "src",
