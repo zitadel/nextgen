@@ -22,6 +22,15 @@ function pageKey(url: URL): string {
   return `${url.origin}${path}?${params.toString()}`;
 }
 
+/** Parses a URL, or returns `undefined` when `value` is not one. */
+function parseUrl(value: string, base?: string): URL | undefined {
+  try {
+    return new URL(value, base);
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * `<zitadel-session>` — the "signed in" card.
  *
@@ -154,33 +163,44 @@ export class ZitadelSession extends ZitadelSurface {
   }
 
   /**
-   * The no-session navigation to `postSignOutUrl`, skipped when that URL is
+   * The no-session navigation to `postSignOutUrl`. It is skipped when that URL is
    * this page, or when the visitor was sent here from this page or from that URL
-   * (the browser keeps the original referrer across redirects): the host or the
-   * server sent the visitor back here, and navigating again would reload the two
-   * pages forever.
+   * (the browser keeps the original referrer across redirects): navigating again
+   * would reload the two pages forever.
    */
   private leaveWithoutSession(): void {
-    if (!this.postSignOutUrl || typeof window === "undefined") return;
-    let here: URL;
-    let target: URL;
-    try {
-      here = new URL(window.location.href);
+    if (this.postSignOutUrl && typeof window !== "undefined") {
       // `location.assign()` resolves a relative URL against the document base
       // (a `<base href>`), not the page's own URL, so the check must too.
-      target = new URL(this.postSignOutUrl, document.baseURI);
-    } catch {
-      return;
+      const target = parseUrl(this.postSignOutUrl, document.baseURI);
+      const here = parseUrl(window.location.href);
+
+      if (target !== undefined && here !== undefined) {
+        // An empty or unreadable referrer proves nothing about where the visitor was.
+        const referrer = document.referrer === "" ? undefined : parseUrl(document.referrer);
+
+        const targetKey = pageKey(target);
+        const hereKey = pageKey(here);
+        const referrerKey = referrer === undefined ? undefined : pageKey(referrer);
+
+        if (targetKey === hereKey) {
+          // Stay: the sign-out page is this page, so navigating would reload it forever.
+        } else if (referrerKey === hereKey) {
+          // Stay: the visitor was sent here from this page, so a redirect brought
+          // them straight back and another hop would loop.
+        } else if (referrerKey === targetKey) {
+          // Stay: the visitor was sent here from the sign-out page, which redirected
+          // back to this page, so another hop would loop.
+        } else {
+          // The visitor arrived from somewhere else, so this is a normal sign-out.
+          this.leave();
+        }
+      } else {
+        // Stay: a URL the browser cannot read is one it cannot navigate to either.
+      }
+    } else {
+      // Stay: there is no sign-out page to go to, or no browser to navigate in.
     }
-    let came = "";
-    try {
-      if (document.referrer) came = pageKey(new URL(document.referrer));
-    } catch {
-      // An unreadable referrer proves nothing, so the card navigates as before.
-    }
-    const from = pageKey(here);
-    if (from === pageKey(target) || came === from || came === pageKey(target)) return;
-    this.leave();
   }
 
   override willUpdate(): void {
