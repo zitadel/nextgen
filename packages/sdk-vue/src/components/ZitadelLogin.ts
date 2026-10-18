@@ -15,6 +15,7 @@ import { defineComponent, h, type PropType, ref, toRaw } from "vue";
 // patches it — which means Vue binds `project` as a DOM *property* (not a
 // stringified attribute).
 import "@zitadel/components";
+import { useGivenProps } from "./given";
 
 /**
  * Vue wrapper for the `<zitadel-login>` Lit web component.
@@ -64,26 +65,30 @@ export default defineComponent({
     const element = ref<ZitadelLoginElement | null>(null);
     expose({ element });
 
+    const given = useGivenProps("zitadel-login", element);
+
     return () =>
       h("zitadel-login", {
         ref: element,
-        // Hand the Lit element the raw SDK handle, not Vue's reactive proxy:
-        // the widget does identity checks on it (and `render` from test-utils
-        // would otherwise pass a wrapped clone).
-        project: toRaw(props.project),
-        projectId: props.projectId,
-        proxyPath: props.proxyPath,
-        purpose: props.purpose,
-        "post-sign-in-url": props.postSignInUrl,
-        // Same raw-unwrap rationale as `project`: hand the widget the plain
-        // dictionaries, not Vue's reactive proxy.
-        locales: props.locales === undefined ? undefined : toRaw(props.locales),
-        lang: props.lang,
-        "flow-name": props.flowName,
-        variant: props.variant,
-        theme: props.theme,
-        suppressHeader: props.suppressHeader,
-        suppressPasswordToggle: props.suppressPasswordToggle,
+        ...given({
+          // Hand the Lit element the raw SDK handle, not Vue's reactive proxy:
+          // the widget does identity checks on it (and `render` from test-utils
+          // would otherwise pass a wrapped clone).
+          project: toRaw(props.project),
+          projectId: props.projectId,
+          proxyPath: props.proxyPath,
+          purpose: props.purpose,
+          "post-sign-in-url": props.postSignInUrl,
+          // Same raw-unwrap rationale as `project`: hand the widget the plain
+          // dictionaries, not Vue's reactive proxy.
+          locales: props.locales === undefined ? undefined : toRaw(props.locales),
+          lang: props.lang,
+          "flow-name": props.flowName,
+          variant: props.variant,
+          theme: props.theme,
+          suppressHeader: props.suppressHeader,
+          suppressPasswordToggle: props.suppressPasswordToggle,
+        }),
         onZitadelFlowStep: (event: CustomEvent<ZitadelFlowStepDetail>) => {
           emit("flowStep", event.detail);
         },

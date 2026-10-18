@@ -4,6 +4,7 @@ import type { ZitadelSignoutDetail } from "@zitadel/sdk-core/types";
 
 import { defineComponent, h, type PropType, ref, toRaw } from "vue";
 import "@zitadel/components";
+import { useGivenProps } from "./given";
 
 /**
  * Vue wrapper for the `<zitadel-session>` Lit web component — the post-sign-in
@@ -33,19 +34,23 @@ export default defineComponent({
     const element = ref<ZitadelSessionElement | null>(null);
     expose({ element });
 
+    const given = useGivenProps("zitadel-session", element);
+
     return () =>
       h("zitadel-session", {
         ref: element,
-        // Hand the Lit element the raw SDK handle, not Vue's reactive proxy.
-        project: toRaw(props.project),
-        projectId: props.projectId,
-        proxyPath: props.proxyPath,
-        "post-sign-out-url": props.postSignOutUrl,
-        heading: props.heading,
-        "logout-label": props.logoutLabel,
-        variant: props.variant,
-        theme: props.theme,
-        suppressHeader: props.suppressHeader,
+        ...given({
+          // Hand the Lit element the raw SDK handle, not Vue's reactive proxy.
+          project: toRaw(props.project),
+          projectId: props.projectId,
+          proxyPath: props.proxyPath,
+          "post-sign-out-url": props.postSignOutUrl,
+          heading: props.heading,
+          "logout-label": props.logoutLabel,
+          variant: props.variant,
+          theme: props.theme,
+          suppressHeader: props.suppressHeader,
+        }),
         onZitadelSignout: (event: CustomEvent<ZitadelSignoutDetail>) => {
           emit("signout", event.detail);
         },
