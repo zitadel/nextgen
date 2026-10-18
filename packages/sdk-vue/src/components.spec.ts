@@ -77,6 +77,16 @@ describe("ZitadelLogin", () => {
     expect(el.getAttribute("url")).toBe("https://auth.example.com");
   });
 
+  it("prefers the project handle over conflicting discrete props in the server markup", async () => {
+    const el = await serverRender(ZitadelLogin, {
+      project: handle,
+      projectId: "proj-other",
+      proxyPath: "/__other",
+    });
+    expect(el.getAttribute("project-id")).toBe("proj-handle");
+    expect(el.getAttribute("proxy-path")).toBe("/__handle");
+  });
+
   it("keeps the properties the client render assigns", () => {
     const { container } = render(ZitadelLogin, { props: { project: handle } });
     const el = container.querySelector<HTMLElement & { project: unknown }>("zitadel-login");
@@ -153,6 +163,16 @@ describe("ZitadelLogout", () => {
     expect(el.getAttribute("url")).toBe("https://auth.example.com");
   });
 
+  it("prefers the project handle over conflicting discrete props in the server markup", async () => {
+    const el = await serverRender(ZitadelLogout, {
+      project: handle,
+      projectId: "proj-other",
+      proxyPath: "/__other",
+    });
+    expect(el.getAttribute("project-id")).toBe("proj-handle");
+    expect(el.getAttribute("proxy-path")).toBe("/__handle");
+  });
+
   it("keeps the properties the client render assigns", () => {
     const { container } = render(ZitadelLogout, { props: { project: handle } });
     const el = container.querySelector<HTMLElement & { project: unknown }>("zitadel-logout");
@@ -214,6 +234,16 @@ describe("ZitadelSession", () => {
     expect(el.getAttribute("project-id")).toBe("proj-handle");
     expect(el.getAttribute("proxy-path")).toBe("/__handle");
     expect(el.getAttribute("url")).toBe("https://auth.example.com");
+  });
+
+  it("prefers the project handle over conflicting discrete props in the server markup", async () => {
+    const el = await serverRender(ZitadelSession, {
+      project: handle,
+      projectId: "proj-other",
+      proxyPath: "/__other",
+    });
+    expect(el.getAttribute("project-id")).toBe("proj-handle");
+    expect(el.getAttribute("proxy-path")).toBe("/__handle");
   });
 
   it("keeps the properties the client render assigns", () => {

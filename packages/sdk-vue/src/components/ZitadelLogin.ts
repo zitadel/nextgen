@@ -76,10 +76,11 @@ export default defineComponent({
         // Kebab-case attributes are what the element reads at upgrade, and the
         // only form a server-rendered page carries (the camelCase keys below
         // render as `projectid=`-style names the element never reads). The
-        // handle's fields are mirrored so a page that passes only `project`
-        // is still configured before hydration.
-        "project-id": props.projectId ?? props.project?.projectId,
-        "proxy-path": props.proxyPath ?? props.project?.proxyPath,
+        // handle's fields are mirrored, and win over the discrete props as they
+        // do in the widget's `resolveApi`, so a page that passes only `project`
+        // is configured before hydration and both channels agree.
+        "project-id": props.project?.projectId ?? props.projectId,
+        "proxy-path": props.project?.proxyPath ?? props.proxyPath,
         url: props.project?.url,
         projectId: props.projectId,
         proxyPath: props.proxyPath,
