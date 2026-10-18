@@ -13,7 +13,6 @@ import {
 } from "@zitadel/components";
 import * as React from "react";
 
-import { assignGiven } from "./given";
 import type {
   ZitadelFlowCompleteDetail,
   ZitadelFlowRedirectDetail,
@@ -33,34 +32,6 @@ export * from "./types";
 // Re-exported so scaffolded apps can wire the business copy overlay without a
 // direct @zitadel/components dependency (strict package managers reject those).
 export { businessLocales } from "@zitadel/components";
-
-/**
- * `useLayoutEffect` warns on every server render in React 18 (the peer range is
- * `>=18`), and `@lit/react` guards its own layout effects for the same reason.
- * Effects never run on the server, so `useEffect` is a safe stand-in there.
- */
-const useIsomorphicLayoutEffect =
-  typeof window === "undefined" ? React.useEffect : React.useLayoutEffect;
-
-/**
- * Returns the ref to put on the widget element and assigns `props` to it after
- * every render. `@lit/react` would write `undefined` onto the element for a
- * prop that is unset, so the props the element has defaults for are kept away
- * from it and assigned here only when given.
- */
-function useGiven<E extends HTMLElement>(
-  forwardedRef: React.ForwardedRef<E>,
-  props: Record<string, unknown>,
-): React.RefObject<E | null> {
-  const element = React.useRef<E | null>(null);
-  React.useImperativeHandle(forwardedRef, () => element.current as E);
-  useIsomorphicLayoutEffect(() => {
-    if (element.current) {
-      assignGiven(element.current, props);
-    }
-  });
-  return element;
-}
 
 /**
  * React components for the Zitadel auth widgets.
@@ -151,11 +122,6 @@ export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginRe
     {
       purpose,
       resumeFlowId,
-      lang,
-      variant,
-      theme,
-      suppressHeader,
-      suppressPasswordToggle,
       onFlowStep,
       onFlowInput,
       onFlowComplete,
@@ -165,19 +131,10 @@ export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginRe
     },
     ref,
   ) {
-    // Props the element has defaults for are assigned only when given; a
-    // binding would assign `undefined` and overwrite the default.
-    const elementRef = useGiven(ref, {
-      lang,
-      variant,
-      theme,
-      suppressHeader,
-      suppressPasswordToggle,
-    });
     return (
       <ZitadelLoginElementReact
         {...props}
-        ref={elementRef}
+        ref={ref}
         purpose={purpose ?? "login"}
         resumeFlowId={resumeFlowId ?? ""}
         onZitadelFlowStep={onFlowStep && ((event) => onFlowStep(event.detail))}
@@ -202,14 +159,11 @@ ZitadelLogin.displayName = "ZitadelLogin";
  * so consumers can imperatively access the upgraded web component.
  */
 export const ZitadelLogout = React.forwardRef<ZitadelLogoutElement, ZitadelLogoutProps>(
-  function ZitadelLogout({ onSignout, theme, ...props }, ref) {
-    // Props the element has defaults for are assigned only when given; a
-    // binding would assign `undefined` and overwrite the default.
-    const elementRef = useGiven(ref, { theme });
+  function ZitadelLogout({ onSignout, ...props }, ref) {
     return (
       <ZitadelLogoutElementReact
         {...props}
-        ref={elementRef}
+        ref={ref}
         onZitadelSignout={onSignout && ((event) => onSignout(event.detail))}
       />
     );
@@ -227,17 +181,11 @@ ZitadelLogout.displayName = "ZitadelLogout";
  * A forwarded `ref` resolves to the underlying `<zitadel-session>` DOM element.
  */
 export const ZitadelSession = React.forwardRef<ZitadelSessionElement, ZitadelSessionProps>(
-  function ZitadelSession(
-    { onSignout, heading, logoutLabel, variant, theme, suppressHeader, ...props },
-    ref,
-  ) {
-    // Props the element has defaults for are assigned only when given; a
-    // binding would assign `undefined` and overwrite the default.
-    const elementRef = useGiven(ref, { heading, logoutLabel, variant, theme, suppressHeader });
+  function ZitadelSession({ onSignout, ...props }, ref) {
     return (
       <ZitadelSessionElementReact
         {...props}
-        ref={elementRef}
+        ref={ref}
         onZitadelSignout={onSignout && ((event) => onSignout(event.detail))}
       />
     );
