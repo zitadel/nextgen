@@ -39,6 +39,14 @@ export { businessLocales } from "@zitadel/components";
 const pristine = new WeakMap<object, Record<string, unknown>>();
 
 /**
+ * `useLayoutEffect` warns on every server render in React 18 (the peer range is
+ * `>=18`), and `@lit/react` guards its own layout effects for the same reason.
+ * Effects never run on the server, so `useEffect` is a safe stand-in there.
+ */
+const useIsomorphicLayoutEffect =
+  typeof window === "undefined" ? React.useEffect : React.useLayoutEffect;
+
+/**
  * `@lit/react` writes `undefined` onto the element when a prop is dropped (or
  * passed as `undefined`), which overwrites the element's own default: a
  * `heading` that went back to unset left the session card with an empty title.
@@ -51,7 +59,7 @@ function useRestoreUnsetDefaults<E extends HTMLElement>(
 ): React.RefCallback<E> {
   const element = React.useRef<E | null>(null);
 
-  React.useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     const target = element.current as Record<string, unknown> | null;
     if (!target) return;
     let defaults = pristine.get(elementClass);

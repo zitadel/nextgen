@@ -6,6 +6,7 @@ import type {
 } from "@zitadel/components";
 
 import { render } from "@testing-library/react";
+import * as components from "@zitadel/components";
 import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
@@ -241,5 +242,49 @@ describe("props that become unset restore the element's defaults", () => {
     rerender(<ZitadelLogout project={project} theme={undefined} />);
 
     expect(el.theme).toBe("");
+  });
+});
+
+// React 18 warns "useLayoutEffect does nothing on the server" for every layout
+// effect that runs under `renderToString`. The installed React 19 no longer
+// warns, so this only fails on 18 (the peer range starts there). `@lit/react`
+// is replaced by a plain forwardRef so only this package's own hook can warn (the
+// already-registered components are reused so the elements are not defined twice),
+// and `window` is hidden because the guard is decided when the module loads.
+describe("server rendering", () => {
+  it("renders the three wrappers without a layout-effect warning", async () => {
+    vi.resetModules();
+    vi.doMock("@lit/react", () => ({
+      createComponent: ({ react, tagName }: { react: typeof React; tagName: string }) =>
+        react.forwardRef((_props: object, ref: React.ForwardedRef<HTMLElement>) =>
+          react.createElement(tagName, { ref }),
+        ),
+    }));
+    vi.doMock("@zitadel/components", () => components);
+    vi.stubGlobal("window", undefined);
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const server = await import("react-dom/server");
+      const ssr = await import("react");
+      const sdk = await import("./index");
+
+      const html = server.renderToString(
+        ssr.createElement(
+          ssr.Fragment,
+          null,
+          ssr.createElement(sdk.ZitadelLogin, { project }),
+          ssr.createElement(sdk.ZitadelLogout, { project }),
+          ssr.createElement(sdk.ZitadelSession, { project }),
+        ),
+      );
+
+      expect(html).toContain("zitadel-session");
+      expect(errors).not.toHaveBeenCalled();
+    } finally {
+      errors.mockRestore();
+      vi.unstubAllGlobals();
+      vi.doUnmock("@lit/react");
+      vi.doUnmock("@zitadel/components");
+    }
   });
 });
