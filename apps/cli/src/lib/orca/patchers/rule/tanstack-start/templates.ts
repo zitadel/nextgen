@@ -159,8 +159,13 @@ const projectId = import.meta.env.VITE_ZITADEL_PROJECT_ID ?? "";
 
 const project = configureZitadel({ projectId, proxyPath: "${PROXY_PATH}" });
 
-// Runs on the server on every navigation, client-side ones included.
-const fetchAuth = createServerFn().handler(({ context }) => getAuth(context));
+// Runs on the server on every navigation, client-side ones included. Its
+// return value is sent to the browser, so it returns only client-safe fields:
+// getAuth's session carries the raw session credential, which must stay on the server.
+const fetchAuth = createServerFn().handler(({ context }) => {
+  const { isAuthenticated, session } = getAuth(context);
+  return { isAuthenticated, userId: session?.userId ?? null };
+});
 
 export const Route = createFileRoute("/profile")({
   beforeLoad: async () => {
