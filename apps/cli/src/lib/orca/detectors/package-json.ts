@@ -37,7 +37,7 @@ export function hasDependency(pkg: PackageJson, name: string): boolean {
  * Best-effort major version of a declared dependency: the first number in the
  * spec. A heuristic for scaffold decisions (e.g. which Next request-boundary
  * convention to emit), NOT for support gating — range semantics like `<16`
- * are beyond it. Floors use {@link dependencySpecProvablyBelowMajor}.
+ * are beyond it. Floors use {@link dependencySpecProvablyBelow}.
  */
 export function dependencyVersionMajor(pkg: PackageJson, name: string): number | undefined {
   const spec = pkg.dependencies?.[name] ?? pkg.devDependencies?.[name];
@@ -46,19 +46,6 @@ export function dependencyVersionMajor(pkg: PackageJson, name: string): number |
   }
   const match = spec.match(/\d+/);
   return match ? Number(match[0]) : undefined;
-}
-
-/**
- * Returns the declared spec for `name` when that spec provably cannot resolve
- * to `floorMajor` or newer. Shorthand for {@link dependencySpecProvablyBelow}
- * with a whole-major floor.
- */
-export function dependencySpecProvablyBelowMajor(
-  pkg: PackageJson,
-  name: string,
-  floorMajor: number,
-): string | undefined {
-  return dependencySpecProvablyBelow(pkg, name, String(floorMajor));
 }
 
 /**

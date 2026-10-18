@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
 import type { Detector, FrameworkFacts } from "./types";
+import { enforceVersionFloor } from "./version-floor";
 
 /**
  * Detects a Nuxt project by its `nuxt` dependency. Like Next.js, Nuxt proxies
@@ -19,12 +20,15 @@ export class NuxtDetector implements Detector {
   readonly framework = "nuxt";
   readonly displayName = "Nuxt";
   readonly versionPackage = "nuxt";
+  readonly versionFloor = "4";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
     const pkg = await readPackageJson(cwd).catch(() => undefined);
     if (!pkg || !hasDependency(pkg, this.versionPackage)) {
       return null;
     }
+
+    await enforceVersionFloor(this, pkg, cwd);
 
     const appDir = (await dirExists(join(cwd, "app"))) ? "app" : ".";
     const devPort = await detectDevPort(cwd, pkg);

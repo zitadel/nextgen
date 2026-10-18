@@ -1,6 +1,7 @@
 import { hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
 import type { Detector, FrameworkFacts } from "./types";
+import { enforceVersionFloor } from "./version-floor";
 
 /**
  * Detects a Vite + Qwik 2 single-page app: depends on `@qwik.dev/core` and
@@ -14,6 +15,7 @@ export class QwikDetector implements Detector {
   readonly framework = "qwik";
   readonly displayName = "Qwik";
   readonly versionPackage = "@qwik.dev/core";
+  readonly versionFloor = "2";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
     const pkg = await readPackageJson(cwd).catch(() => undefined);
@@ -25,6 +27,8 @@ export class QwikDetector implements Detector {
     ) {
       return null;
     }
+
+    await enforceVersionFloor(this, pkg, cwd);
 
     const devPort = await detectDevPort(cwd, pkg);
     return { id: "qwik", appDir: "src", devPort, url: issuerFromPort(devPort) };

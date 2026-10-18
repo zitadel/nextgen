@@ -37,9 +37,12 @@ which still points at an early `0.0.0` build. Use an exact `1.0.0-alpha.N`
 selector in agent scripts and bug reports for reproducibility.
 The CLI requires Node.js 24+.
 
-A Vite + Svelte app must be on Svelte 5 or newer. `setup` and `doctor` refuse a
-Svelte 4 app with `E_UNSUPPORTED_PROJECT_SHAPE` (exit 3) before changing
-anything; upgrade the app to Svelte 5 and rerun rather than retrying.
+The app's framework must be at or above a minimum version: Next.js 15.2.3,
+React 18, Vue 3, Nuxt 4, Angular 17, Solid 1.6, Svelte 5, Qwik 2. Newer major
+versions are not refused. `setup` and `doctor` refuse an app below its minimum,
+by declared range or installed release, with `E_UNSUPPORTED_PROJECT_SHAPE`
+(exit 3) before changing anything; the message names the minimum and the hint
+says to upgrade, so upgrade the app and rerun rather than retrying.
 
 ## Using the CLI
 

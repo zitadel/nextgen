@@ -25,41 +25,53 @@ This ADR records the floors and the enforcement point.
 
 ## Decision
 
-- **Floors:** Next.js **15.2.3+** (App Router, as before), React **18+**
-  (both 18 and 19 are supported; templates that need React-19-only behavior
-  must degrade safely on 18, as the ref-assigned copy overlay does) and Svelte
-  **5+** (`SvelteDetector`; `@zitadel/sdk-svelte` peers `svelte ^5.0.0` and is
-  written with runes, so a Svelte 4 app can neither install nor compile it).
-  The Next floor is a patch release, not the major: 15.0.0 to 15.2.2 skip
-  middleware for a request that sends `x-middleware-subrequest`
-  (CVE-2025-29927), which bypasses the generated `protectedRoutes`.
-- **Enforcement lives in the framework detectors** (`NextDetector`,
-  `ReactDetector`, `SvelteDetector`): a detected framework below its floor throws
-  `E_UNSUPPORTED_PROJECT_SHAPE` (exit 3) with the floor in the message and an
-  upgrade hint. Detection is the shared gate, so `setup` refuses before any
-  mutation and `doctor`'s framework check fails with the same message on an
-  app that was scaffolded earlier and later downgraded (or scaffolded before
-  the floor existed). The existing error code is reused deliberately: a
-  below-floor version is the same family as "Pages Router not supported",
-  and agents already branch on it.
+- **Floors:** every framework the CLI detects declares one, as a plain
+  semver string: Next.js **15.2.3**, React **18**, Vue **3**, Nuxt **4**,
+  Angular **17** (`@angular/core`), Solid **1.6** (`solid-js`), Svelte **5**
+  and Qwik **2** (`@qwik.dev/core`). Both 18 and 19 are supported for React;
+  templates that need React-19-only behavior must degrade safely on 18, as the
+  ref-assigned copy overlay does. The Next floor is a patch release, not the
+  major: 15.0.0 to 15.2.2 skip middleware for a request that sends
+  `x-middleware-subrequest` (CVE-2025-29927), which bypasses the generated
+  `protectedRoutes`. Svelte 5 is required because `@zitadel/sdk-svelte` is
+  written with runes, so a Svelte 4 app can neither install nor compile it.
+- **Each detector declares its floor; one function enforces it.** The
+  `Detector` interface carries `versionPackage` (the npm package the version is
+  read from) and `versionFloor` (the minimum, with an optional
+  `versionFloorNote` appended to the upgrade hint). Every detector calls
+  `enforceVersionFloor` (`apps/cli/src/lib/orca/detectors/version-floor.ts`)
+  from `detect` once it recognises the project; no detector carries its own
+  checking logic and there is no separate floor table. A detected framework
+  below its floor throws `E_UNSUPPORTED_PROJECT_SHAPE` (exit 3) with the floor in
+  the message and an upgrade hint. Detection is the shared gate, so `setup`
+  refuses before any mutation and `doctor`'s framework check fails with the
+  same message on an app that was scaffolded earlier and later downgraded (or
+  scaffolded before the floor existed). The existing error code is reused
+  deliberately: a below-floor version is the same family as "Pages Router not
+  supported", and agents already branch on it.
 - **Only provable violations reject.** The gate evaluates the declared spec
   with semver range semantics: it rejects only when the range cannot resolve
-  to the floor or newer (`^14.2.0`, `<15` and `15.2.2` reject; `>=14`,
+  to the floor or newer (`^14.2.0`, `<15` and `15.2.2` reject for Next; `>=14`,
   `14 || 16` and `^15.0.0` pass because a supported version satisfies them).
-  Next.js is also judged by what is installed: when
-  `node_modules/next/package.json` resolves from the app root, a release below
-  the floor rejects even under an accepting range, because the lockfile may
-  still hold 15.2.2. With nothing installed, the spec is the only gate. Specs that
-  carry no provable version at all — protocol specs (`file:`, `link:`,
-  `workspace:`, git URLs) and dist-tags (`latest`, `canary`) — always pass;
-  blocking on them would be hostile guessing. Prereleases of the floor major
-  count as at-floor.
-- **Peer ranges follow the floor:** `@zitadel/sdk-next` declares `next >=15`
-  (its `react >=18` was already correct) and `@zitadel/sdk-svelte` declares
-  `svelte ^5.0.0`. The gate checks the floor only, not the SDK's upper bound;
-  widening the SDK peer is how a newer major gets supported. Other frameworks
-  currently declare no floor; adding one later means extending its detector the same way and
-  amending this ADR.
+  Every framework is also judged by what is installed: when
+  `node_modules/<package>/package.json` resolves from the app root, a release
+  below the floor rejects even under an accepting range, because the lockfile
+  may still hold one. With nothing installed, the spec is the only gate. Specs
+  that carry no provable version at all, protocol specs (`file:`, `link:`,
+  `workspace:`, git URLs) and dist-tags (`latest`, `canary`), always pass;
+  blocking on them would be hostile guessing. A prerelease of the floor counts
+  as at-floor. There is no ceiling: a newer major is never refused here.
+- **Peer ranges follow the floor, and a test keeps them aligned.** Each SDK
+  package's peer range for the framework starts at the same major as the
+  detector's floor (`next >=15`, `nuxt >=4`, `react >=18`, `vue >=3`,
+  `@angular/core >=17`, `solid-js >=1.6`, `svelte ^5.0.0`,
+  `@qwik.dev/core ^2.0.0-beta.45`). The registry's mirror test reads each
+  `packages/sdk-<framework>/package.json` and fails if the floor's major differs
+  from the peer minimum's, or the floor does not satisfy the peer range (Next's
+  patch floor may sit above the peer minimum). The gate checks the floor only,
+  not the SDK's upper bound; widening the SDK peer is how a newer major gets
+  supported. Raising a floor means changing the detector's `versionFloor` and the
+  SDK peer together, and amending this ADR.
 
 ## Consequences
 
