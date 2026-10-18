@@ -8,11 +8,10 @@ import { baseTest } from "../../vitest.shared.mjs";
  *
  * - `dom` (jsdom): the wrappers compiled for the browser, as a client-only
  *   Solid app runs them.
- * - `ssr` (node): `*.ssr.spec.tsx` imports the package through its own
- *   `exports` map, so `vite-plugin-solid({ ssr: true })` resolves the `solid`
- *   condition (the preserved-JSX `dist/index.jsx`) and compiles it for the
- *   server, the way a SolidStart app does. Needs `build` first (moon/turbo
- *   `test` depend on it).
+ * - `ssr` (node): `*.ssr.spec.tsx` imports the component source (`./index`)
+ *   and `vite-plugin-solid({ ssr: true })` compiles it for the server. It
+ *   checks the markup the components write, not the published package
+ *   entry, which this config leaves unchanged.
  */
 export default defineConfig({
   cacheDir: ".vitest",
