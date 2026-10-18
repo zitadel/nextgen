@@ -15,4 +15,5 @@ export type {
   UnauthState,
   NextgenSession,
   ClientAuthResult,
+  NextgenMiddlewareOptions,
 } from "./types.js";

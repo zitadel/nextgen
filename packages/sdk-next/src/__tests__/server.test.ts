@@ -1,6 +1,13 @@
 import { describe, expectTypeOf, it } from "vitest";
 
-import type { AuthResult, AuthState, NextgenSession, UnauthState } from "../server";
+import type {
+  AuthOptions,
+  AuthResult,
+  AuthState,
+  NextgenMiddlewareOptions,
+  NextgenSession,
+  UnauthState,
+} from "../server";
 
 import { auth } from "../server";
 
@@ -11,5 +18,6 @@ describe("server entry", () => {
     expectTypeOf(auth).returns.resolves.toEqualTypeOf<AuthResult>();
     expectTypeOf<AuthState["session"]>().toEqualTypeOf<NextgenSession>();
     expectTypeOf<UnauthState["session"]>().toEqualTypeOf<null>();
+    expectTypeOf<AuthOptions["audience"]>().toEqualTypeOf<NextgenMiddlewareOptions["audience"]>();
   });
 });
