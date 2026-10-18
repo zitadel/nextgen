@@ -130,6 +130,8 @@ function loginAttrs(props: ZitadelLoginProps): Attrs {
     purpose: props.purpose ?? "login",
     "flow-name": props.flowName,
     "post-sign-in-url": props.postSignInUrl,
+    // Without it a resumed widget would boot with no handle and start a new flow.
+    "resume-flow-id": props.resumeFlowId ?? undefined,
     variant: props.variant,
     theme: props.theme,
     "suppress-header": flag(props.suppressHeader),
@@ -166,6 +168,9 @@ function bindLoginConfig(el: ZitadelLoginElement, props: ZitadelLoginProps): voi
   setProp(el, "purpose", props.purpose ?? "login");
   setProp(el, "flowName", props.flowName);
   setProp(el, "postSignInUrl", props.postSignInUrl);
+  // A concrete string, not the raw prop: `setProp` skips `undefined`, so
+  // going from a handle back to unset would otherwise keep the old handle.
+  setProp(el, "resumeFlowId", props.resumeFlowId ?? "");
   setProp(el, "variant", props.variant);
   setProp(el, "theme", props.theme);
   setProp(el, "suppressHeader", props.suppressHeader);

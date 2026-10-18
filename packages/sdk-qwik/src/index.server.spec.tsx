@@ -37,6 +37,11 @@ describe("server-rendered widget config", () => {
         postSignInUrl="/profile"
         flowName="signup"
         suppressHeader
+        suppressPasswordToggle
+        resumeFlowId="flow_123"
+        variant="page"
+        theme="dark"
+        lang="de"
       />,
     );
 
@@ -49,13 +54,35 @@ describe("server-rendered widget config", () => {
       "post-sign-in-url": "/profile",
       "flow-name": "signup",
       "suppress-header": "",
+      "suppress-password-toggle": "",
+      "resume-flow-id": "flow_123",
+      variant: "page",
+      theme: "dark",
+      lang: "de",
     });
+  });
+
+  it("omits the resume handle and the flags when they are unset", async () => {
+    const attrs = await serverAttributes("zitadel-login", <ZitadelLogin project={project} />);
+
+    expect(attrs).not.toHaveProperty("resume-flow-id");
+    expect(attrs).not.toHaveProperty("suppress-header");
+    expect(attrs).not.toHaveProperty("suppress-password-toggle");
+  });
+
+  it("omits a null resume handle", async () => {
+    const attrs = await serverAttributes(
+      "zitadel-login",
+      <ZitadelLogin project={project} resumeFlowId={null} />,
+    );
+
+    expect(attrs).not.toHaveProperty("resume-flow-id");
   });
 
   it("emits the logout config in the server HTML", async () => {
     const attrs = await serverAttributes(
       "zitadel-logout",
-      <ZitadelLogout project={project} postSignOutUrl="/login" />,
+      <ZitadelLogout project={project} postSignOutUrl="/login" theme="dark" />,
     );
 
     expect(attrs).toMatchObject({
@@ -63,13 +90,22 @@ describe("server-rendered widget config", () => {
       "proxy-path": "/__nextgen",
       "publishable-key": "pk_test_123",
       "post-sign-out-url": "/login",
+      theme: "dark",
     });
   });
 
   it("emits the session config in the server HTML", async () => {
     const attrs = await serverAttributes(
       "zitadel-session",
-      <ZitadelSession project={project} postSignOutUrl="/login" heading="Hi" logoutLabel="Leave" />,
+      <ZitadelSession
+        project={project}
+        postSignOutUrl="/login"
+        heading="Hi"
+        logoutLabel="Leave"
+        variant="page"
+        theme="light"
+        suppressHeader
+      />,
     );
 
     expect(attrs).toMatchObject({
@@ -79,6 +115,9 @@ describe("server-rendered widget config", () => {
       "post-sign-out-url": "/login",
       heading: "Hi",
       "logout-label": "Leave",
+      variant: "page",
+      theme: "light",
+      "suppress-header": "",
     });
   });
 

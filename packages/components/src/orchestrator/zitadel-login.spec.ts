@@ -2466,3 +2466,29 @@ describe("<zitadel-login preview-state> repaint", () => {
     control.remove();
   });
 });
+
+describe("<zitadel-login> resume-flow-id", () => {
+  it.each([undefined, null, ""])("reads %j as no handle", async (value) => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const element = await mount(host);
+    element.resumeFlowId = "flow_123";
+    expect(element.resumeFlowId).toBe("flow_123");
+
+    element.resumeFlowId = value;
+
+    expect(element.resumeFlowId).toBe("");
+  });
+
+  it("reads a removed attribute as no handle", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const element = await mount(host);
+    element.setAttribute("resume-flow-id", "flow_123");
+    expect(element.resumeFlowId).toBe("flow_123");
+
+    element.removeAttribute("resume-flow-id");
+
+    expect(element.resumeFlowId).toBe("");
+  });
+});
