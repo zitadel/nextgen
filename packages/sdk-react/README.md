@@ -38,7 +38,7 @@ as `ZitadelSession`).
 
 ## Server rendering
 
-If your app renders on the server, mount the widget on the client only, after hydration, or pass `project-id` and `proxy-path` as strings, because a widget that starts before its configuration arrives shows an error instead of the flow.
+If your app renders on the server, mount the widget on the client only, after hydration, or pass `project-id` and `proxy-path` to the `ZitadelLogin` wrapper as strings (they are written into the server markup as attributes), because a widget that starts before its configuration arrives shows an error instead of the flow.
 
 React 19 does not apply an object property such as `project` while hydrating a server-rendered custom element, so on a server-rendered page pass `project-id` and `proxy-path` as strings instead of a `project` handle.
 
