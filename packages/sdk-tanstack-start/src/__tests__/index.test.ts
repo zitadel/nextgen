@@ -1,6 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
+
+import * as index from "../index";
+import type { AuthResult, AuthState, NextgenSession, UnauthState } from "../index";
 
 // The package ships only what its build emits, so an `exports` target the build
 // misses breaks every consumer that imports it. `test` runs after `build`.
@@ -32,5 +35,15 @@ describe("package manifest", () => {
       react: ">=18",
       "react-dom": ">=18",
     });
+  });
+});
+
+describe("index entry", () => {
+  // A server route imports its helpers and their types from one place, as it
+  // does with every other server SDK.
+  it("exports the types its helpers answer with", () => {
+    expectTypeOf(index.getAuth).returns.toEqualTypeOf<AuthResult>();
+    expectTypeOf<AuthState["session"]>().toEqualTypeOf<NextgenSession>();
+    expectTypeOf<UnauthState["session"]>().toEqualTypeOf<null>();
   });
 });
