@@ -246,6 +246,84 @@ describe("businessLocales", () => {
   });
 });
 
+// Assigning `undefined` to a custom-element property overwrites its default,
+// so an unset prop must leave the element's own default in place.
+describe("unset props keep the element's defaults", () => {
+  it.each([
+    ["heading", "Signed in as"],
+    ["logoutLabel", "Sign out"],
+    ["variant", "widget"],
+    ["theme", ""],
+    ["suppressHeader", false],
+  ] as const)("ZitadelSession keeps the default %s", (prop, expected) => {
+    const { container } = render(ZitadelSession, { props: { project } });
+
+    expect(container.querySelector<ZitadelSessionElement>("zitadel-session")![prop]).toBe(expected);
+  });
+
+  it.each([
+    ["variant", "widget"],
+    ["theme", ""],
+    ["suppressHeader", false],
+    ["lang", ""],
+    ["suppressPasswordToggle", false],
+  ] as const)("ZitadelLogin keeps the default %s", (prop, expected) => {
+    const { container } = render(ZitadelLogin, { props: { project } });
+
+    expect(container.querySelector<ZitadelLoginElement>("zitadel-login")![prop]).toBe(expected);
+  });
+
+  it("ZitadelLogout keeps the default theme", () => {
+    const { container } = render(ZitadelLogout, { props: { project } });
+
+    expect(container.querySelector<ZitadelLogoutElement>("zitadel-logout")!.theme).toBe("");
+  });
+});
+
+describe("props that become unset restore the element's defaults", () => {
+  it.each([
+    ["heading", "Custom", "Signed in as"],
+    ["logoutLabel", "Leave", "Sign out"],
+    ["variant", "page", "widget"],
+    ["theme", "light", ""],
+    ["suppressHeader", true, false],
+  ] as const)("ZitadelSession restores the default %s", async (prop, given, expected) => {
+    const { container, rerender } = render(ZitadelSession, { props: { project, [prop]: given } });
+    const el = container.querySelector<ZitadelSessionElement>("zitadel-session")!;
+    expect(el[prop]).toBe(given);
+
+    await rerender({ [prop]: undefined });
+
+    expect(el[prop]).toBe(expected);
+  });
+
+  it.each([
+    ["variant", "page", "widget"],
+    ["theme", "light", ""],
+    ["suppressHeader", true, false],
+    ["lang", "de", ""],
+    ["suppressPasswordToggle", true, false],
+  ] as const)("ZitadelLogin restores the default %s", async (prop, given, expected) => {
+    const { container, rerender } = render(ZitadelLogin, { props: { project, [prop]: given } });
+    const el = container.querySelector<ZitadelLoginElement>("zitadel-login")!;
+    expect(el[prop]).toBe(given);
+
+    await rerender({ [prop]: undefined });
+
+    expect(el[prop]).toBe(expected);
+  });
+
+  it("ZitadelLogout restores the default theme", async () => {
+    const { container, rerender } = render(ZitadelLogout, { props: { project, theme: "light" } });
+    const el = container.querySelector<ZitadelLogoutElement>("zitadel-logout")!;
+    expect(el.theme).toBe("light");
+
+    await rerender({ theme: undefined });
+
+    expect(el.theme).toBe("");
+  });
+});
+
 // Every config key set to a distinct value. `Required<…>` makes `tsc` fail here
 // when a key is added to a config type, so a new key cannot skip this check.
 const loginConfig: Required<ZitadelLoginConfig> = {
@@ -584,3 +662,70 @@ describe("server-rendered widget config", () => {
   });
 });
 // server-render-cases:end
+
+// Vue's server renderer only strips the `^` force-attribute prefix from 3.5.27,
+// and the peer range reaches back to 3.2, so the wrappers must not emit it
+// where there is no DOM. The jsdom environment defines `document`, so remove it
+// for the render to stand in for a server runtime.
+describe("server-rendered markup carries no force-attribute prefix", () => {
+  it.each([
+    [
+      "ZitadelLogin",
+      ZitadelLogin,
+      { project, variant: "page", theme: "dark", lang: "de" },
+      ['variant="page"', 'theme="dark"', 'lang="de"'],
+    ],
+    ["ZitadelLogout", ZitadelLogout, { project, theme: "dark" }, ['theme="dark"']],
+    [
+      "ZitadelSession",
+      ZitadelSession,
+      { project, variant: "page", theme: "dark", heading: "Hi", logoutLabel: "Bye" },
+      ['variant="page"', 'theme="dark"', 'heading="Hi"', 'logout-label="Bye"'],
+    ],
+  ] as const)("%s", async (_name, component, props, expected) => {
+    vi.stubGlobal("document", undefined);
+    const html = await renderToString(
+      createSSRApp({ render: () => h(component as typeof ZitadelLogin, props) }),
+    );
+    vi.unstubAllGlobals();
+
+    for (const attribute of expected) expect(html).toContain(attribute);
+    expect(html).not.toContain("^");
+  });
+
+  // The installed Vue may already strip the prefix, which would hide a wrapper
+  // that still emits it, so also check the keys the wrapper hands to Vue.
+  it.each([
+    ["ZitadelLogin", ZitadelLogin, { project, variant: "page", theme: "dark", lang: "de" }],
+    ["ZitadelLogout", ZitadelLogout, { project, theme: "dark" }],
+    [
+      "ZitadelSession",
+      ZitadelSession,
+      { project, variant: "page", theme: "dark", heading: "Hi", logoutLabel: "Bye" },
+    ],
+  ] as const)("%s binds no key with the prefix without a DOM", (_name, component, props) => {
+    vi.stubGlobal("document", undefined);
+    const renderFn = (
+      component as unknown as {
+        setup: (p: unknown, ctx: unknown) => () => { props: Record<string, unknown> };
+      }
+    ).setup(props, { emit: () => {}, expose: () => {} });
+    const keys = Object.keys(renderFn().props);
+    vi.unstubAllGlobals();
+
+    expect(keys.filter((key) => key.startsWith("^"))).toEqual([]);
+    expect(keys).toContain(_name === "ZitadelLogout" ? "theme" : "variant");
+  });
+
+  it("keeps the prefix where there is a DOM so an unset prop is removed, not blanked", () => {
+    const renderFn = (
+      ZitadelLogin as unknown as {
+        setup: (p: unknown, ctx: unknown) => () => { props: Record<string, unknown> };
+      }
+    ).setup({ project }, { emit: () => {}, expose: () => {} });
+
+    expect(Object.keys(renderFn().props)).toEqual(
+      expect.arrayContaining(["^lang", "^variant", "^theme"]),
+    );
+  });
+});

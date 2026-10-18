@@ -28,7 +28,7 @@ describe("package manifest", () => {
 
   it("declares its supported peer ranges", () => {
     expect(manifest.peerDependencies).toEqual({
-      vue: ">=3",
+      vue: ">=3.2",
     });
   });
 });

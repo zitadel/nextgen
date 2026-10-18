@@ -5,6 +5,8 @@ import type { ZitadelSignoutDetail } from "@zitadel/sdk-core/types";
 import { defineComponent, h, type PropType, ref, toRaw } from "vue";
 import "@zitadel/components";
 
+import { forceAttr } from "./forceAttr";
+
 /**
  * Vue wrapper for the `<zitadel-session>` Lit web component — the post-sign-in
  * "signed in as" card. See {@link ZitadelLogin} for the rendering strategy.
@@ -33,8 +35,9 @@ export default defineComponent({
     const element = ref<ZitadelSessionElement | null>(null);
     expose({ element });
 
-    return () =>
-      h("zitadel-session", {
+    return () => {
+      const attr = forceAttr();
+      return h("zitadel-session", {
         ref: element,
         // Hand the Lit element the raw SDK handle, not Vue's reactive proxy.
         project: toRaw(props.project),
@@ -50,14 +53,19 @@ export default defineComponent({
         projectId: props.projectId,
         proxyPath: props.proxyPath,
         "post-sign-out-url": props.postSignOutUrl,
-        heading: props.heading,
-        "logout-label": props.logoutLabel,
-        variant: props.variant,
-        theme: props.theme,
+        // A string prop with a default is bound as an attribute (the "^" prefix on
+        // the client, see `forceAttr`): Vue assigns an unset property as "", which
+        // the element cannot tell from an intended empty string, while an unset
+        // attribute is simply removed.
+        [`${attr}heading`]: props.heading,
+        [`${attr}logout-label`]: props.logoutLabel,
+        [`${attr}variant`]: props.variant,
+        [`${attr}theme`]: props.theme,
         suppressHeader: props.suppressHeader,
         onZitadelSignout: (event: CustomEvent<ZitadelSignoutDetail>) => {
           emit("signout", event.detail);
         },
       });
+    };
   },
 });

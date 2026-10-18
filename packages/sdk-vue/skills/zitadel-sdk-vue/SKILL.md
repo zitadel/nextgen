@@ -38,7 +38,7 @@ a partial integration, or customizing what the CLI produced).
 npm install @zitadel/sdk-vue@alpha
 ```
 
-Peer dependencies: `vue >=3`. Requires TypeScript ≥ 5.0 (the published types use `export type *`).
+Peer dependencies: `vue >=3.2`. Requires TypeScript ≥ 5.0 (the published types use `export type *`).
 
 ## Integrate
 

@@ -12,7 +12,7 @@ export class VueDetector implements Detector {
   readonly framework = "vue";
   readonly displayName = "Vue";
   readonly versionPackage = "vue";
-  readonly versionFloor = "3";
+  readonly versionFloor = "3.2";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
     const pkg = await readPackageJson(cwd).catch(() => undefined);

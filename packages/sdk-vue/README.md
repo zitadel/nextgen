@@ -10,7 +10,7 @@ pnpm add @zitadel/sdk-vue@alpha
 
 ## Requirements
 
-Peer dependencies: `vue >=3`.
+Peer dependencies: `vue >=3.2`.
 
 TypeScript ≥ 5.0 — the published type definitions re-export with `export type *`, which TypeScript introduced in 5.0.
 
