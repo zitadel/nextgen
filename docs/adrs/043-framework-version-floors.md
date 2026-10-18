@@ -25,16 +25,18 @@ This ADR records the floors and the enforcement point.
 
 ## Decision
 
-- **Floors:** Next.js **15.2.3+** (App Router, as before) and React **18+**
+- **Floors:** Next.js **15.2.3+** (App Router, as before), React **18+**
   (both 18 and 19 are supported; templates that need React-19-only behavior
-  must degrade safely on 18, as the ref-assigned copy overlay does). The Next
-  floor is a patch release, not the major: 15.0.0 to 15.2.2 skip middleware
+  must degrade safely on 18, as the ref-assigned copy overlay does) and Svelte
+  **5+** (`SvelteDetector`; `@zitadel/sdk-svelte` peers `svelte ^5.0.0` and is
+  written with runes, so a Svelte 4 app can neither install nor compile it).
+  The Next floor is a patch release, not the major: 15.0.0 to 15.2.2 skip middleware
   for a request that sends `x-middleware-subrequest` (CVE-2025-29927), which
   bypasses the generated `protectedRoutes`. A prerelease of 15.2.3 predates
   that fix, so it is below the floor; for a major-only floor such as React 18
   a prerelease of the major counts as at-floor.
 - **Enforcement lives in the framework detectors** (`NextDetector`,
-  `ReactDetector`): a detected framework below its floor throws
+  `ReactDetector`, `SvelteDetector`): a detected framework below its floor throws
   `E_UNSUPPORTED_PROJECT_SHAPE` (exit 3) with the floor in the message and an
   upgrade hint. Detection is the shared gate, so `setup` refuses before any
   mutation and `doctor`'s framework check fails with the same message on an
@@ -56,7 +58,9 @@ This ADR records the floors and the enforcement point.
   floor's major count as at-floor; a prerelease of 15.2.3 does not. The installed
   lookup stops after the workspace root and the refusal names the file it read.
 - **Peer ranges follow the floor:** `@zitadel/sdk-next` declares `next >=15.2.3`
-  (its `react >=18` was already correct). Other frameworks currently declare
+  (its `react >=18` was already correct) and `@zitadel/sdk-svelte` declares
+  `svelte ^5.0.0`. The gate checks the floor only, not the SDK's upper bound;
+  widening the SDK peer is how a newer major gets supported. Other frameworks currently declare
   no floor; adding one later means extending its detector the same way and
   amending this ADR.
 

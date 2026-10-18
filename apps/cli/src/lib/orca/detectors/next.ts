@@ -26,6 +26,8 @@ const NEXT_FLOOR_HINT =
  */
 export class NextDetector implements Detector {
   readonly framework = "next";
+  readonly displayName = "Next.js";
+  readonly versionPackage = "next";
 
   /**
    * Returns `null` when `cwd` is not a Next.js project (no `next` dependency),
@@ -36,7 +38,7 @@ export class NextDetector implements Detector {
    */
   async detect(cwd: string): Promise<FrameworkFacts | null> {
     const pkg = await readPackageJson(cwd).catch(() => undefined);
-    if (!pkg || !hasDependency(pkg, "next")) {
+    if (!pkg || !hasDependency(pkg, this.versionPackage)) {
       return null;
     }
 
@@ -82,7 +84,7 @@ export class NextDetector implements Detector {
     }
 
     const devPort = await detectDevPort(cwd, pkg);
-    const versionMajor = dependencyVersionMajor(pkg, "next");
+    const versionMajor = dependencyVersionMajor(pkg, this.versionPackage);
     return {
       id: "next",
       appDir,
