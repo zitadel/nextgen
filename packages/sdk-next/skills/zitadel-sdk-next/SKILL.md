@@ -30,7 +30,7 @@ the app is bespoke and you are integrating by hand.
 pnpm add @zitadel/sdk-next
 ```
 
-Peer deps the package expects: `next >=15`, `react >=18`, `react-dom >=18`.
+Peer deps the package expects: `next >=15.2.3`, `react >=18`, `react-dom >=18`.
 TypeScript `>=5.0` (the SDK consumer floor; the package is built against a
 newer TypeScript, but that does not raise the floor for your project).
 
