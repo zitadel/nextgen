@@ -35,7 +35,7 @@ for the form-association / accessibility decisions baked into every input atom.
 ## Install
 
 ```sh
-corepack pnpm add @zitadel/components
+corepack pnpm add @zitadel/components@alpha
 ```
 
 `lit`, `liquidjs`, `dompurify`, and `lucide` are runtime dependencies and are intentionally

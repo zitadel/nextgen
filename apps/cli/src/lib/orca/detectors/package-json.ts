@@ -37,7 +37,7 @@ export function hasDependency(pkg: PackageJson, name: string): boolean {
  * Best-effort major version of a declared dependency: the first number in the
  * spec. A heuristic for scaffold decisions (e.g. which Next request-boundary
  * convention to emit), NOT for support gating — range semantics like `<16`
- * are beyond it. Floors use {@link dependencySpecProvablyBelowMajor}.
+ * are beyond it. Floors use {@link dependencySpecProvablyBelow}.
  */
 export function dependencyVersionMajor(pkg: PackageJson, name: string): number | undefined {
   const spec = pkg.dependencies?.[name] ?? pkg.devDependencies?.[name];
@@ -46,19 +46,6 @@ export function dependencyVersionMajor(pkg: PackageJson, name: string): number |
   }
   const match = spec.match(/\d+/);
   return match ? Number(match[0]) : undefined;
-}
-
-/**
- * Returns the declared spec for `name` when that spec provably cannot resolve
- * to `floorMajor` or newer. Shorthand for {@link dependencySpecProvablyBelow}
- * with a whole-major floor.
- */
-export function dependencySpecProvablyBelowMajor(
-  pkg: PackageJson,
-  name: string,
-  floorMajor: number,
-): string | undefined {
-  return dependencySpecProvablyBelow(pkg, name, String(floorMajor));
 }
 
 /**
@@ -83,10 +70,39 @@ export function dependencySpecProvablyBelow(
   if (!spec || !floor || semver.validRange(spec) === null) {
     return undefined;
   }
+  // A prerelease floor (`2.0.0-beta.45`) is itself the bound: a range is judged
+  // by whether npm can resolve that version or a newer one. A prerelease is
+  // resolvable only through a comparator set that names a prerelease of the
+  // same base version, so `<2.0.0` admits no beta and is refused.
+  if (isPrereleaseFloor(minimum)) {
+    return admitsAtOrAbovePrereleaseFloor(spec, minimum, floor) ? undefined : spec;
+  }
   if (semver.intersects(spec, `>=${floor.version}`)) {
     return undefined;
   }
   return declaresPrereleaseAtOrAbove(spec, floor, isExactFloor(minimum)) ? undefined : spec;
+}
+
+/** Whether `spec` can resolve `minimum` (a prerelease such as `2.0.0-beta.45`) or newer under npm's rules. */
+function admitsAtOrAbovePrereleaseFloor(
+  spec: string,
+  minimum: string,
+  floor: semver.SemVer,
+): boolean {
+  if (semver.intersects(spec, `>=${floor.version}`)) {
+    return true;
+  }
+  return new semver.Range(spec).set.some((comparators) => {
+    const range = comparators.map((comparator) => comparator.value).join(" ");
+    return comparators.some(({ semver: version }) => {
+      const base = `${version.major}.${version.minor}.${version.patch}`;
+      if (version.prerelease.length === 0 || semver.lt(base, floor.version)) {
+        return false;
+      }
+      const lower = semver.gt(`${base}-0`, minimum) ? `${base}-0` : minimum;
+      return semver.intersects(range, `>=${lower} <${base}`, { includePrerelease: true });
+    });
+  });
 }
 
 /**
@@ -120,6 +136,11 @@ function declaresPrereleaseAtOrAbove(spec: string, floor: semver.SemVer, exact: 
  */
 function isExactFloor(minimum: string): boolean {
   return semver.valid(minimum) !== null;
+}
+
+/** Whether `minimum` is itself a prerelease (`2.0.0-beta.45`), so it is the bound as written. */
+function isPrereleaseFloor(minimum: string): boolean {
+  return (semver.prerelease(minimum)?.length ?? 0) > 0;
 }
 
 /** A package found in `node_modules`: its version and the manifest it was read from. */
@@ -196,7 +217,8 @@ function versionIn(contents: string): string | undefined {
  * an older one; this judges what actually runs. Nothing installed returns
  * `undefined`, leaving the declared spec as the only gate. A prerelease of a
  * major-only floor (`18`) is not below it; a prerelease of an exact floor
- * (`15.2.3-canary.0`) is, as for the spec.
+ * (`15.2.3-canary.0`) is, and a prerelease floor (`2.0.0-beta.45`) is the bound
+ * as written, as for the spec.
  */
 export async function installedVersionBelow(
   cwd: string,
@@ -208,6 +230,10 @@ export async function installedVersionBelow(
   if (installed === undefined || !floor) {
     return undefined;
   }
-  const bound = isExactFloor(minimum) ? floor.version : `${floor.version}-0`;
+  const bound = isPrereleaseFloor(minimum)
+    ? minimum
+    : isExactFloor(minimum)
+      ? floor.version
+      : `${floor.version}-0`;
   return semver.lt(installed.version, bound) ? installed : undefined;
 }

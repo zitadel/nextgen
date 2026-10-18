@@ -2,21 +2,10 @@ import { stat } from "node:fs/promises";
 import { join } from "node:path";
 
 import { ZitadelError } from "../../errors";
-import {
-  dependencySpecProvablyBelow,
-  dependencyVersionMajor,
-  hasDependency,
-  installedVersionBelow,
-  readPackageJson,
-} from "./package-json";
+import { dependencyVersionMajor, hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
 import type { Detector, FrameworkFacts } from "./types";
-
-/** The oldest Next.js the CLI integrates; see {@link NextDetector.detect}. */
-const NEXT_FLOOR = "15.2.3";
-
-const NEXT_FLOOR_HINT =
-  "Upgrade the app to Next.js 15.2.3 or later (e.g. `npx @next/codemod@latest upgrade`) and rerun: earlier releases let a request skip middleware (CVE-2025-29927).";
+import { enforceVersionFloor } from "./version-floor";
 
 /**
  * Detects a Next.js App Router project and extracts its facts: the App Router
@@ -28,6 +17,8 @@ export class NextDetector implements Detector {
   readonly framework = "next";
   readonly displayName = "Next.js";
   readonly versionPackage = "next";
+  readonly versionFloor = "15.2.3";
+  readonly versionFloorNote = "Earlier releases let a request skip middleware (CVE-2025-29927).";
 
   /**
    * Returns `null` when `cwd` is not a Next.js project (no `next` dependency),
@@ -38,37 +29,11 @@ export class NextDetector implements Detector {
    */
   async detect(cwd: string): Promise<FrameworkFacts | null> {
     const pkg = await readPackageJson(cwd).catch(() => undefined);
-    if (!pkg || !hasDependency(pkg, this.versionPackage)) {
+    if (!pkg || !hasDependency(pkg, "next")) {
       return null;
     }
 
-    // Supported floor (ADR 043): the scaffolded templates target Next 15
-    // (current App Router and request-boundary conventions), and 15.2.3 is
-    // the first 15.x that does not skip middleware for a request carrying
-    // `x-middleware-subrequest` (CVE-2025-29927), which would bypass the
-    // generated `protectedRoutes`. The floor is enforced here so setup and
-    // doctor share one loud gate instead of degrading silently. The declared
-    // spec is refused only when it provably cannot resolve to 15.2.3+, so
-    // `^15.0.0` passes while `15.2.2` and `~15.1.0` do not; protocol specs
-    // and dist-tags pass. What is installed is judged too: `^15.0.0` with
-    // 15.2.2 in node_modules still runs the vulnerable release. With nothing
-    // installed, the spec is the only gate.
-    const belowFloor = dependencySpecProvablyBelow(pkg, "next", NEXT_FLOOR);
-    if (belowFloor !== undefined) {
-      throw new ZitadelError(
-        "E_UNSUPPORTED_PROJECT_SHAPE",
-        `Next.js "${belowFloor}" is below the supported floor — the CLI integrates Next.js ${NEXT_FLOOR} and newer`,
-        { hint: NEXT_FLOOR_HINT },
-      );
-    }
-    const installed = await installedVersionBelow(cwd, "next", NEXT_FLOOR);
-    if (installed !== undefined) {
-      throw new ZitadelError(
-        "E_UNSUPPORTED_PROJECT_SHAPE",
-        `Next.js ${installed.version} is installed (${installed.path}), below the supported floor — the CLI integrates Next.js ${NEXT_FLOOR} and newer`,
-        { hint: NEXT_FLOOR_HINT },
-      );
-    }
+    await enforceVersionFloor(this, pkg, cwd);
 
     const appDir = (await dirExists(join(cwd, "app")))
       ? "app"
@@ -84,7 +49,7 @@ export class NextDetector implements Detector {
     }
 
     const devPort = await detectDevPort(cwd, pkg);
-    const versionMajor = dependencyVersionMajor(pkg, this.versionPackage);
+    const versionMajor = dependencyVersionMajor(pkg, "next");
     return {
       id: "next",
       appDir,

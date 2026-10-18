@@ -6,7 +6,6 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   dependencySpecProvablyBelow,
-  dependencySpecProvablyBelowMajor,
   dependencyVersionMajor,
   hasDependency,
   installedVersion,
@@ -75,55 +74,6 @@ describe("dependencyVersionMajor", () => {
   });
 });
 
-describe("dependencySpecProvablyBelowMajor", () => {
-  function spec(value: string): PackageJson {
-    return { dependencies: { next: value } };
-  }
-
-  it("rejects ranges that can only resolve below the floor", () => {
-    // The upper-bound comparator is the case a first-digits parser inverts:
-    // "<15" contains 15 as text yet admits only versions below it.
-    for (const value of ["<15", "^14.2.0", "~14.5", "14.0.0", "14.x", ">=13 <15"]) {
-      expect(dependencySpecProvablyBelowMajor(spec(value), "next", 15)).toBe(value);
-    }
-  });
-
-  it("passes ranges that also admit a compliant version", () => {
-    for (const value of [">=14", "14 || 16", "*", "^15.0.0", ">=15"]) {
-      expect(dependencySpecProvablyBelowMajor(spec(value), "next", 15)).toBeUndefined();
-    }
-  });
-
-  it("passes prereleases of the floor major and newer", () => {
-    expect(dependencySpecProvablyBelowMajor(spec("15.0.0-rc.0"), "next", 15)).toBeUndefined();
-    expect(
-      dependencySpecProvablyBelowMajor({ dependencies: { react: "19.0.0-rc.1" } }, "react", 18),
-    ).toBeUndefined();
-  });
-
-  it("passes unprovable specs: protocols, dist-tags, git URLs, absence", () => {
-    // A path like "file:../next-14-patched" carries digits but no provable
-    // version — treating it as 14 would reject what cannot be judged.
-    for (const value of [
-      "file:../next-14-patched",
-      "link:../next",
-      "workspace:*",
-      "latest",
-      "canary",
-      "github:vercel/next.js#canary",
-    ]) {
-      expect(dependencySpecProvablyBelowMajor(spec(value), "next", 15)).toBeUndefined();
-    }
-    expect(dependencySpecProvablyBelowMajor({}, "next", 15)).toBeUndefined();
-  });
-
-  it("reads devDependencies too", () => {
-    expect(
-      dependencySpecProvablyBelowMajor({ devDependencies: { next: "^14.0.0" } }, "next", 15),
-    ).toBe("^14.0.0");
-  });
-});
-
 describe("dependencySpecProvablyBelow", () => {
   const pkg = (next: string): PackageJson => ({ dependencies: { next } });
 
@@ -187,6 +137,38 @@ describe("dependencySpecProvablyBelow", () => {
     expect(dependencySpecProvablyBelow(pkg("latest"), "next", "15.2.3")).toBeUndefined();
     expect(dependencySpecProvablyBelow({}, "next", "15.2.3")).toBeUndefined();
   });
+});
+
+describe("a prerelease floor", () => {
+  const pkg = (spec: string): PackageJson => ({ dependencies: { qwik: spec } });
+
+  it.each(["2.0.0-beta.1", "2.0.0-beta.44", "<2.0.0-beta.45", ">=2.0.0-beta.1 <2.0.0-beta.30"])(
+    "rejects %s, which cannot reach the floor",
+    (spec) => {
+      expect(dependencySpecProvablyBelow(pkg(spec), "qwik", "2.0.0-beta.45")).toBe(spec);
+    },
+  );
+
+  it.each(["<2.0.0", "~1.9.0", "<2.0.0-beta.45", ">=1.0.0 <2.0.0"])(
+    "rejects %s for a prerelease floor, since npm admits no beta from it",
+    (spec) => {
+      expect(dependencySpecProvablyBelow(pkg(spec), "qwik", "2.0.0-beta.45")).toBe(spec);
+    },
+  );
+
+  it.each([">=2.0.0-beta.50 <2.0.0", ">=2.0.0-beta.1", "2.0.0-beta.45 || <1.0.0"])(
+    "accepts %s for a prerelease floor, since it names an allowed beta",
+    (spec) => {
+      expect(dependencySpecProvablyBelow(pkg(spec), "qwik", "2.0.0-beta.45")).toBeUndefined();
+    },
+  );
+
+  it.each(["2.0.0-beta.45", "2.0.0-beta.50", "^2.0.0-beta.1", "2.0.0-rc.0", "^2.0.0", "3.0.0"])(
+    "passes %s",
+    (spec) => {
+      expect(dependencySpecProvablyBelow(pkg(spec), "qwik", "2.0.0-beta.45")).toBeUndefined();
+    },
+  );
 });
 
 /** Installs a package under `root`'s `node_modules` with the given manifest. */
@@ -302,6 +284,16 @@ describe("installedVersionBelow", () => {
     await install(dir, "next", JSON.stringify({ version }));
 
     expect(await installedVersionBelow(dir, "next", "15.2.3")).toBeUndefined();
+  });
+
+  it("judges an installed beta against a prerelease minimum as written", async () => {
+    await install(dir, "qwik", JSON.stringify({ version: "2.0.0-beta.12" }));
+    expect(await installedVersionBelow(dir, "qwik", "2.0.0-beta.45")).toMatchObject({
+      version: "2.0.0-beta.12",
+    });
+
+    await install(dir, "qwik", JSON.stringify({ version: "2.0.0-beta.45" }));
+    expect(await installedVersionBelow(dir, "qwik", "2.0.0-beta.45")).toBeUndefined();
   });
 
   it("passes when nothing is installed", async () => {
