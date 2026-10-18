@@ -217,9 +217,9 @@ const UNREDACTED_WIRING = `    onProxyReq: setBearer,
  * itself, in the http-proxy-middleware form and the Vite form alike.
  */
 const REDACTING_WIRING = `    selfHandleResponse: true,
-    onProxyReq: (proxyReq) => {
+    onProxyReq: (proxyReq, req) => {
       setBearer(proxyReq);
-      requestPlainExchange(proxyReq);
+      requestPlainExchange(proxyReq, req);
     },
     onProxyRes: relayResponse,
     configure: (proxy) => {

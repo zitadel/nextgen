@@ -471,6 +471,21 @@ export default defineConfig({
   });
 });
 
+const EXCHANGE_SPELLINGS = [
+  "//sessions/exchange",
+  "/./sessions/exchange",
+  "/sessions//exchange",
+  "/sessions/./exchange",
+  "/sessions/exchange/",
+  "/sessions/exchange?x=1",
+  "/%73essions/exchange",
+  "/sessions%2Fexchange",
+  "/sessions/exchange%2F",
+  "/x/../sessions/exchange",
+  "/Sessions/Exchange",
+  "/sessions/exchange;a=b",
+];
+
 describe("the generated proxy, run by Vite against a remote https server", () => {
   const remote = useRemoteServer();
   const env = { ZITADEL_PROJECT_SECRET: "sk_proj_test" };
@@ -520,6 +535,17 @@ describe("the generated proxy, run by Vite against a remote https server", () =>
     expect(exchange?.headers.authorization).toBe("Bearer sk_proj_test");
     expect(me?.headers.authorization).toBeUndefined();
   });
+
+  it.each(EXCHANGE_SPELLINGS)(
+    "keeps the session token out of an exchange spelled %s",
+    async (tail) => {
+      const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG));
+
+      const response = await fetch(`${origin}/__nextgen${tail}`, { method: "POST" });
+
+      expect(await response.text()).not.toContain(SESSION_TOKEN);
+    },
+  );
 
   it("keeps the session token out of the exchange's body", async () => {
     const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG));

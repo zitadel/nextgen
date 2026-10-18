@@ -119,13 +119,39 @@ const EXCHANGE_DECODERS${ty(": Record<string, (body: Buffer) => Buffer>")} = {
   "x-gzip": ${EXCHANGE_REDACTION_ZLIB}.gunzipSync,
 };
 
+// Whether a request is the session exchange, read generously: a path that only
+// normalises to it (repeated or encoded slashes, dot segments, a trailing slash,
+// path parameters, another letter case) counts too, so a spelling that slips
+// past the bearer's exact match is still redacted rather than relayed.
 function isExchange(method${ty(": string | undefined")}, url${ty(": string | undefined")})${ty(": boolean")} {
-  const pathname = new URL(url ?? "/", "http://zitadel.local").pathname;
-  return method === "POST" && pathname.endsWith("/sessions/exchange");
+  if (String(method).toUpperCase() !== "POST") {
+    return false;
+  }
+  let path = String(url ?? "/").split(/[?#]/)[0] ?? "";
+  try {
+    path = decodeURIComponent(path);
+  } catch {
+    // Left as it came; the checks below still run on it.
+  }
+  path = path.replace(/\\/{2,}/g, "/");
+  const pathname = new URL(path.startsWith("/") ? path : \`/\${path}\`, "http://zitadel.local").pathname
+    .toLowerCase()
+    .replace(/;[^/]*/g, "")
+    .replace(/\\/+$/, "");
+  return pathname.endsWith("/sessions/exchange");
 }
 
-function requestPlainExchange(proxyReq${ty(': import("node:http").ClientRequest')})${ty(": void")} {
+// The requests the outgoing hook saw going to the exchange. The response is
+// classified by this as well as by the incoming URL, so one spelling the two
+// readings disagree on cannot reach the browser unredacted.
+const EXCHANGE_REQUESTS${ty(": WeakSet<object>")} = new WeakSet();
+
+function requestPlainExchange(
+  proxyReq${ty(': import("node:http").ClientRequest')},
+  req${ty(': import("node:http").IncomingMessage')},
+)${ty(": void")} {
   if (isExchange(proxyReq.method, proxyReq.path)) {
+    EXCHANGE_REQUESTS.add(req);
     proxyReq.setHeader("accept-encoding", "identity");
   }
 }
@@ -152,7 +178,7 @@ function relayResponse(
   const abandon = () => res.destroy();
   proxyRes.on("error", abandon);
   proxyRes.on("aborted", abandon);
-  if (!isExchange(req.method, req.url)) {
+  if (!EXCHANGE_REQUESTS.has(req) && !isExchange(req.method, req.url)) {
     res.writeHead(proxyRes.statusCode ?? 502, proxyRes.headers);
     proxyRes.pipe(res);
     return;
