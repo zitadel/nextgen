@@ -26,10 +26,12 @@ function angularMajor(spec: string): number | undefined {
  */
 export class AngularDetector implements Detector {
   readonly framework = "angular";
+  readonly displayName = "Angular";
+  readonly versionPackage = "@angular/core";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
     const pkg = await readPackageJson(cwd).catch(() => undefined);
-    if (!pkg || !hasDependency(pkg, "@angular/core")) {
+    if (!pkg || !hasDependency(pkg, this.versionPackage)) {
       return null;
     }
 
