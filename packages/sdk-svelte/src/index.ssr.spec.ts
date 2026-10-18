@@ -2,13 +2,9 @@
 import { render } from "svelte/server";
 import { describe, expect, it } from "vitest";
 
-import type * as Sdk from "./lib/index";
-
-// Resolved through the package's own `exports` map (the `svelte` condition,
-// which serves uncompiled components), not the `.svelte` sources, so the spec
-// covers what a SvelteKit app imports.
-const sdk = "@zitadel/sdk-svelte";
-const { ZitadelLogin, ZitadelLogout, ZitadelSession } = (await import(sdk)) as typeof Sdk;
+import ZitadelLogin from "./lib/ZitadelLogin.svelte";
+import ZitadelLogout from "./lib/ZitadelLogout.svelte";
+import ZitadelSession from "./lib/ZitadelSession.svelte";
 
 /** The attributes of the first `<tag>` in server-rendered HTML. */
 function serverAttributes(

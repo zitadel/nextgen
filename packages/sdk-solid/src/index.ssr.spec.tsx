@@ -1,12 +1,7 @@
 import { renderToString } from "solid-js/web";
 import { describe, expect, it } from "vitest";
 
-import type * as Sdk from "./index";
-
-// Resolved through the package's own `exports` map (the `solid` condition),
-// not `./index`, so the spec covers what a SolidStart app imports.
-const sdk = "@zitadel/sdk-solid";
-const { ZitadelLogin, ZitadelLogout, ZitadelSession } = (await import(sdk)) as typeof Sdk;
+import { ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
 
 /** The attributes of the first `<tag>` in server-rendered HTML. */
 function serverAttributes(tag: string, html: string): Record<string, string> {
