@@ -119,3 +119,19 @@ export default defineConfig({
   },
 });
 `;
+
+/**
+ * The Angular proxy's request hook as earlier CLIs wrote it, calling the
+ * helper with the outgoing request alone. The current helper also records the
+ * incoming request, so a hook left like this hands it none.
+ */
+export function withFirstAngularRequestHook(current: string): string {
+  const legacy = current.replace(
+    "onProxyReq: (proxyReq, req) => {\n      setBearer(proxyReq);\n      requestPlainExchange(proxyReq, req);",
+    "onProxyReq: (proxyReq) => {\n      setBearer(proxyReq);\n      requestPlainExchange(proxyReq);",
+  );
+  if (legacy === current) {
+    throw new Error("expected the current request hook in the generated Angular proxy");
+  }
+  return legacy;
+}

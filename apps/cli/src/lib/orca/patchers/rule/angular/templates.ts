@@ -228,6 +228,28 @@ const REDACTING_WIRING = `    selfHandleResponse: true,
       proxy.on("proxyRes", relayResponse);
     },`;
 
+/**
+ * The request hook as emitted before the helper took the incoming request: it
+ * called `requestPlainExchange` with the outgoing request alone. Left as it is,
+ * the upgraded helper would never record the exchange for the response handler.
+ */
+const OUTGOING_ONLY_REQUEST_HOOK = `    onProxyReq: (proxyReq) => {
+      setBearer(proxyReq);
+      requestPlainExchange(proxyReq);
+    },`;
+
+const REQUEST_HOOK = `    onProxyReq: (proxyReq, req) => {
+      setBearer(proxyReq);
+      requestPlainExchange(proxyReq, req);
+    },`;
+
+/** Hands the incoming request to the helper from the exact hook an earlier CLI wrote. */
+function handIncomingRequest(source: string): string {
+  return editManagedEntry(source, (entry) =>
+    entry.replace(OUTGOING_ONLY_REQUEST_HOOK, () => REQUEST_HOOK),
+  );
+}
+
 /** The slice of a parsed node {@link managedEntryRange} walks to `module.exports`. */
 interface ExportsNode extends AstNode {
   name?: string;
@@ -344,7 +366,9 @@ function forwardAppOrigin(source: string): string {
 
 /** Moves a managed proxy's generated parts onto their current shapes. */
 function upgradeManaged(source: string): string {
-  return redactExchange(forwardAppOrigin(upgradeExchangeRedaction(source, exchangeRedaction)));
+  return redactExchange(
+    forwardAppOrigin(handIncomingRequest(upgradeExchangeRedaction(source, exchangeRedaction))),
+  );
 }
 
 function upgradeLf(source: string): string {

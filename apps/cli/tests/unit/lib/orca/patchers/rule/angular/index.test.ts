@@ -1,3 +1,6 @@
+import { createRequire } from "node:module";
+import { runInNewContext } from "node:vm";
+
 import { afterEach, describe, expect, it } from "vitest";
 
 import { FRAMEWORK_IDS } from "../../../../../../helpers/framework-ids";
@@ -8,7 +11,10 @@ import type {
 } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
 import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
-import { withFirstRedaction } from "../../../../../../helpers/legacy-proxy";
+import {
+  withFirstAngularRequestHook,
+  withFirstRedaction,
+} from "../../../../../../helpers/legacy-proxy";
 import {
   EXCHANGE_BODY,
   REMOTE_HOST,
@@ -213,6 +219,34 @@ describe("AngularPatcher.plan", () => {
     const edit = proxyConfigEdit();
 
     expect(edit(withFirstRedaction(edit(undefined)))).toBe(edit(undefined));
+  });
+
+  it("moves the request hook it wrote first onto the one that hands over the incoming request", () => {
+    const edit = proxyConfigEdit();
+
+    expect(edit(withFirstAngularRequestHook(withFirstRedaction(edit(undefined))))).toBe(
+      edit(undefined),
+    );
+  });
+
+  it("asks for an unencoded exchange answer through the request hook it wrote first", () => {
+    const edit = proxyConfigEdit();
+    const proxyReq = anExchangeRequest();
+
+    entryOf(edit(withFirstAngularRequestHook(withFirstRedaction(edit(undefined))))).onProxyReq(
+      proxyReq,
+      {},
+    );
+
+    expect(proxyReq.headers["accept-encoding"]).toBe("identity");
+  });
+
+  it("asks for an unencoded exchange answer when a hook hands the helper no incoming request", () => {
+    const proxyReq = anExchangeRequest();
+
+    entryOf(withFirstAngularRequestHook(proxyConfigEdit()(undefined))).onProxyReq(proxyReq);
+
+    expect(proxyReq.headers["accept-encoding"]).toBe("identity");
   });
 
   it("leaves a first redaction changed by hand alone", () => {
@@ -447,6 +481,48 @@ const EXCHANGE_SPELLINGS = [
   "/Sessions/Exchange",
   "/sessions/exchange;a=b",
 ];
+
+interface FakeProxyRequest {
+  method: string;
+  path: string;
+  headers: Record<string, string>;
+  getHeader(name: string): string | undefined;
+  setHeader(name: string, value: string): void;
+}
+
+interface EntryHooks {
+  onProxyReq(proxyReq: FakeProxyRequest, req?: object): void;
+}
+
+function anExchangeRequest(): FakeProxyRequest {
+  const headers: Record<string, string> = {};
+  return {
+    method: "POST",
+    path: "/sessions/exchange",
+    headers,
+    getHeader: (name) => headers[name],
+    setHeader: (name, value) => {
+      headers[name] = value;
+    },
+  };
+}
+
+/** The `/__nextgen` entry a generated `proxy.conf.cjs` exports, as the dev server's proxy layer calls it. */
+function entryOf(proxyConf: string): EntryHooks {
+  const exported: { exports: Record<string, EntryHooks> } = { exports: {} };
+  runInNewContext(proxyConf, {
+    module: exported,
+    require: createRequire(import.meta.url),
+    process: { env: { ZITADEL_URL: "https://zitadel.example.com", ZITADEL_PROJECT_SECRET: "sk" } },
+    Buffer,
+    URL,
+  });
+  const entry = exported.exports["/__nextgen"];
+  if (!entry) {
+    throw new Error("expected the generated proxy to export the /__nextgen entry");
+  }
+  return entry;
+}
 
 describe("the generated proxy.conf.cjs, run by Vite against a remote https server", () => {
   const remote = useRemoteServer();

@@ -158,15 +158,18 @@ function isExchange(method${ty(": string | undefined")}, url${ty(": string | und
 
 // The requests the outgoing hook saw going to the exchange. The response is
 // classified by this as well as by the incoming URL, so one spelling the two
-// readings disagree on cannot reach the browser unredacted.
+// readings disagree on cannot reach the browser unredacted. A hook that hands
+// over no incoming request records nothing; the incoming URL still decides.
 const EXCHANGE_REQUESTS${ty(": WeakSet<object>")} = new WeakSet();
 
 function requestPlainExchange(
   proxyReq${ty(': import("node:http").ClientRequest')},
-  req${ty(': import("node:http").IncomingMessage')},
+  req${ty('?: import("node:http").IncomingMessage')},
 )${ty(": void")} {
   if (isExchange(proxyReq.method, proxyReq.path)) {
-    EXCHANGE_REQUESTS.add(req);
+    if (req) {
+      EXCHANGE_REQUESTS.add(req);
+    }
     proxyReq.setHeader("accept-encoding", "identity");
   }
 }
