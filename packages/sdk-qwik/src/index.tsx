@@ -114,7 +114,7 @@ function projectAttrs(props: {
 }): Attrs {
   return {
     "project-id": props.project?.projectId ?? props.projectId,
-    "proxy-path": props.project?.proxyPath ?? props.proxyPath,
+    "proxy-path": proxyPathAttr(props.project?.proxyPath ?? props.proxyPath),
     url: props.project?.url,
     // Browser-safe by construction (ADR 036), so it can ride in server markup.
     // Without it a resumed widget would start its first flow, or run an SSO
@@ -125,6 +125,15 @@ function projectAttrs(props: {
     // global from configureZitadel() the way the `project` property would.
     "project-explicit": flag(props.project !== undefined),
   };
+}
+
+/**
+ * An explicit empty proxy path means "the origin root" (the API client strips
+ * trailing slashes), but a widget treats an empty `proxy-path` attribute as
+ * unset and falls back to `/__nextgen`. `/` survives that and normalizes to root.
+ */
+function proxyPathAttr(path: string | undefined): string | undefined {
+  return path === "" ? "/" : path;
 }
 
 function flag(value: boolean | undefined): string | undefined {

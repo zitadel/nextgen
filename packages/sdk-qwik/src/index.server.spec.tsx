@@ -62,6 +62,20 @@ describe("server-rendered widget config", () => {
     });
   });
 
+  it("serializes an explicit empty proxy path as the root", async () => {
+    const withHandle = await serverAttributes(
+      "zitadel-login",
+      <ZitadelLogin project={{ projectId: "proj-test", proxyPath: "" }} />,
+    );
+    const discrete = await serverAttributes(
+      "zitadel-login",
+      <ZitadelLogin projectId="proj-test" proxyPath="" />,
+    );
+
+    expect(withHandle).toMatchObject({ "proxy-path": "/" });
+    expect(discrete).toMatchObject({ "proxy-path": "/" });
+  });
+
   it("marks an explicit project handle so it outranks a browser global", async () => {
     const withHandle = await serverAttributes("zitadel-login", <ZitadelLogin project={project} />);
     const discrete = await serverAttributes(
