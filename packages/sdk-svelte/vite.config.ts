@@ -1,12 +1,15 @@
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { defineConfig } from "vite";
 
+import { svelteSource } from "./vite-plugin-svelte-source.ts";
 import { svelteTypes } from "./vite-plugin-svelte-types.ts";
 
 // Svelte library build. vite-plugin-svelte compiles the components to JS;
 // svelteTypes() emits the `.d.ts` via svelte2tsx (the engine svelte-package
 // wraps) so a single `vite build` produces both. Svelte and workspace deps are
-// externalized — the consumer provides them.
+// externalized — the consumer provides them. svelteSource() also publishes the
+// uncompiled components under dist/svelte (the `svelte` export condition) so a
+// SvelteKit app can compile them for the server.
 export default defineConfig({
   build: {
     lib: {
@@ -18,5 +21,9 @@ export default defineConfig({
       external: [/^@zitadel\//, /^svelte($|\/)/],
     },
   },
-  plugins: [svelte(), svelteTypes({ input: "src/lib", tsconfig: "tsconfig.lib.json" })],
+  plugins: [
+    svelte(),
+    svelteTypes({ input: "src/lib", tsconfig: "tsconfig.lib.json" }),
+    svelteSource({ input: "src/lib" }),
+  ],
 });
