@@ -52,9 +52,10 @@ This ADR records the floors and the enforcement point.
   still hold 15.2.2. With nothing installed, the spec is the only gate. Specs that
   carry no provable version at all — protocol specs (`file:`, `link:`,
   `workspace:`, git URLs) and dist-tags (`latest`, `canary`) — always pass;
-  blocking on them would be hostile guessing. Prereleases of the floor major
-  count as at-floor.
-- **Peer ranges follow the floor:** `@zitadel/sdk-next` declares `next >=15`
+  blocking on them would be hostile guessing. Prereleases of a major-only
+  floor's major count as at-floor; a prerelease of 15.2.3 does not. The installed
+  lookup stops after the workspace root and the refusal names the file it read.
+- **Peer ranges follow the floor:** `@zitadel/sdk-next` declares `next >=15.2.3`
   (its `react >=18` was already correct). Other frameworks currently declare
   no floor; adding one later means extending its detector the same way and
   amending this ADR.
