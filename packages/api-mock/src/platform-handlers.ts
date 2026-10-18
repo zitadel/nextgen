@@ -933,8 +933,8 @@ function materializeBundle(projectId: string, bundle: Record<string, unknown>): 
     }
     pointers.push({ kind: "flow_definition", handle, revision_id: id });
   }
-  for (const item of asArray(bundle.brandings)) {
-    const resource = isObject(item) ? item : {};
+  for (const item of isObject(bundle.branding) ? [bundle.branding] : []) {
+    const resource = item;
     pointers.push({
       kind: "branding",
       handle: bundleResourceHandle("branding", resource),
@@ -957,7 +957,6 @@ function bundleDigestEntries(
   const groups: [string, string][] = [
     ["schemas", "schema"],
     ["flow_definitions", "flow_definition"],
-    ["brandings", "branding"],
   ];
   for (const [field, kind] of groups) {
     const items = bundle[field];
@@ -968,6 +967,13 @@ function bundleDigestEntries(
       const resource = isObject(item) ? item : {};
       entries.push({ kind, handle: bundleResourceHandle(kind, resource), content: resource });
     }
+  }
+  if (isObject(bundle.branding)) {
+    entries.push({
+      kind: "branding",
+      handle: bundleResourceHandle("branding", bundle.branding),
+      content: bundle.branding,
+    });
   }
   return entries;
 }

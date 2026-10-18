@@ -65,7 +65,6 @@ describe("validate step", () => {
     const bundle = {
       schemas: [{ objectType: "human-user", hint: "${MISSING_VAR}" }],
       flow_definitions: [],
-      brandings: [],
     };
 
     await expect(validateStep.run(ctx(bundle))).rejects.toMatchObject({
@@ -80,7 +79,7 @@ describe("validate step", () => {
     const bundle = {
       schemas: [{ ...validSchema, $comment: "${PRESENT_VAR}" }],
       flow_definitions: [],
-      brandings: [validBranding],
+      branding: validBranding,
     };
 
     await expect(
@@ -95,7 +94,6 @@ describe("validate step", () => {
       // Missing kind/metaSchema/x-auth-methods: not a valid user schema.
       schemas: [{ objectType: "human-user" }],
       flow_definitions: [],
-      brandings: [],
     };
 
     await expect(validateStep.run(ctx(bundle))).rejects.toMatchObject({ code: "E_VALIDATION" });
@@ -115,7 +113,6 @@ describe("validate step", () => {
       const bundle = {
         schemas: [validSchema],
         flow_definitions: [flowNaming("human-user", ["phone_number"])],
-        brandings: [],
       };
 
       await expect(validateStep.run(ctx(bundle))).rejects.toMatchObject({
@@ -134,7 +131,6 @@ describe("validate step", () => {
       const bundle = {
         schemas: [validSchema],
         flow_definitions: [flowNaming("human-user", ["email"])],
-        brandings: [],
       };
 
       await expect(validateStep.run(ctx(bundle))).resolves.toBeUndefined();
@@ -144,7 +140,6 @@ describe("validate step", () => {
       const bundle = {
         schemas: [validSchema],
         flow_definitions: [flowNaming("some-other-schema", ["phone_number"])],
-        brandings: [],
       };
 
       await expect(validateStep.run(ctx(bundle))).resolves.toBeUndefined();
@@ -153,7 +148,7 @@ describe("validate step", () => {
 
   it("rejects a malformed branding descriptor", async () => {
     const badBranding = { ...validBranding, logo_url: "not-a-url" };
-    const bundle = { schemas: [], flow_definitions: [], brandings: [badBranding] };
+    const bundle = { schemas: [], flow_definitions: [], branding: badBranding };
 
     await expect(
       validateStep.run(ctx(bundle, { brandingSources: [badBranding] })),
@@ -162,7 +157,7 @@ describe("validate step", () => {
 
   it("tells a descriptor with the retired liquid_template_file key how to migrate", async () => {
     const descriptor = { layout: "centered", liquid_template_file: "./login.liquid" };
-    const bundle = { schemas: [], flow_definitions: [], brandings: [{ layout: "centered" }] };
+    const bundle = { schemas: [], flow_definitions: [], branding: { layout: "centered" } };
 
     await expect(validateStep.run(ctx(bundle, { brandingSources: [descriptor] }))).rejects.toThrow(
       /"liquid_template": \{ "\$file": "\.\/login\.liquid" \}/,
@@ -171,7 +166,7 @@ describe("validate step", () => {
 
   it("rejects a login template that leaves out the mandatory gates", async () => {
     const descriptor = { layout: "centered", liquid_template: "<zl-page-shell></zl-page-shell>" };
-    const bundle = { schemas: [], flow_definitions: [], brandings: [descriptor] };
+    const bundle = { schemas: [], flow_definitions: [], branding: descriptor };
 
     await expect(validateStep.run(ctx(bundle, { brandingSources: [descriptor] }))).rejects.toThrow(
       /mandatory-gates/,
@@ -183,7 +178,7 @@ describe("validate step", () => {
       layout: "centered",
       liquid_template: "<script>alert(1)</script>{% mandatory_gates %}",
     };
-    const bundle = { schemas: [], flow_definitions: [], brandings: [descriptor] };
+    const bundle = { schemas: [], flow_definitions: [], branding: descriptor };
 
     await expect(validateStep.run(ctx(bundle, { brandingSources: [descriptor] }))).rejects.toThrow(
       /no-script-tag/,
@@ -194,7 +189,7 @@ describe("validate step", () => {
     dir = await mkdtemp(join(tmpdir(), "zitadel-validate-"));
     await mkdir(join(dir, ".zitadel", "branding"), { recursive: true });
     const descriptor = { layout: "centered", liquid_template: { $file: "./missing.liquid" } };
-    const bundle = { schemas: [], flow_definitions: [], brandings: [{ layout: "centered" }] };
+    const bundle = { schemas: [], flow_definitions: [], branding: { layout: "centered" } };
 
     await expect(
       validateStep.run(ctx(bundle, { cwd: dir, brandingSources: [descriptor] })),

@@ -13,7 +13,7 @@ function ctx(overrides: Partial<StepContext>): StepContext {
     dryRun: false,
     json: true,
     color: false,
-    bundle: { schemas: [], flow_definitions: [], brandings: [] },
+    bundle: { schemas: [], flow_definitions: [] },
     brandingSources: [],
     suggest: (args) => `${args} --env staging` as SuggestedCommand,
     ...overrides,

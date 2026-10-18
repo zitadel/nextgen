@@ -54,7 +54,7 @@ function ctx(cwd: string, over: Partial<StepContext>, held: object = HELD): Step
     dryRun: false,
     json: true,
     color: false,
-    bundle: { schemas: [], flow_definitions: [], brandings: [] },
+    bundle: { schemas: [], flow_definitions: [] },
     brandingSources: [],
     suggest: (args) => `${args} --env staging` as SuggestedCommand,
     ...rest,

@@ -37,7 +37,7 @@ export const validateStep: Step = {
     validateBundleShapes(ctx);
     validateFlows(ctx);
     await validateSsoConsistency(ctx.cwd);
-    for (const warning of await brandingAssetWarnings(ctx.bundle.brandings)) {
+    for (const warning of await brandingAssetWarnings(brandingsOf(ctx))) {
       reportWarning(warning);
     }
   },
@@ -179,12 +179,17 @@ function validateFlows(ctx: StepContext): void {
  * placeholder literally, and the login page would never resolve it. The server
  * cannot check this — the references point at the deployer's environment.
  */
+/** The bundle's branding as a list, empty when it carries none. */
+function brandingsOf(ctx: StepContext): Record<string, unknown>[] {
+  return ctx.bundle.branding === undefined ? [] : [ctx.bundle.branding];
+}
+
 function assertEnvRefsResolve(ctx: StepContext): void {
   const missing = new Set<string>();
   for (const resource of [
     ...ctx.bundle.schemas,
     ...ctx.bundle.flow_definitions,
-    ...ctx.bundle.brandings,
+    ...brandingsOf(ctx),
   ]) {
     for (const name of flowEnvRefs(resource)) {
       if (!ctx.env[name]) {

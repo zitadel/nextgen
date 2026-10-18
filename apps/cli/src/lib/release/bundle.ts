@@ -15,7 +15,7 @@ import { SCHEMAS_DIR } from "../user-schema";
 export type ConfigurationBundle = {
   schemas: Record<string, unknown>[];
   flow_definitions: Record<string, unknown>[];
-  brandings: Record<string, unknown>[];
+  branding?: Record<string, unknown>;
 };
 
 /** A built bundle and the number of resources it carries across every kind. */
@@ -53,7 +53,7 @@ export async function buildBundle(cwd: string): Promise<BuiltBundle> {
   const brandingSources = (await readJsonDir(join(cwd, BRANDING_DIR))).map((descriptor) => ({
     ...descriptor,
   }));
-  // A project has one branding, so the wire bundle caps `brandings` at one
+  // A project has one branding, so the wire bundle carries a single `branding`
   // (ADR: `configuration-bundle`). The total-resource cap below would not catch
   // a second descriptor, so it is refused here — before `$file` inlining and
   // before anything is sent — with the same message the server would answer.
@@ -67,11 +67,13 @@ export async function buildBundle(cwd: string): Promise<BuiltBundle> {
     );
   }
 
-  const brandings = brandingSources.map(
-    (descriptor) => toBrandingWireBody(cwd, descriptor) as Record<string, unknown>,
-  );
+  const [descriptor] = brandingSources;
+  const branding =
+    descriptor === undefined
+      ? undefined
+      : (toBrandingWireBody(cwd, descriptor) as Record<string, unknown>);
 
-  const resourceCount = schemas.length + flow_definitions.length + brandings.length;
+  const resourceCount = schemas.length + flow_definitions.length + (branding === undefined ? 0 : 1);
   if (resourceCount === 0) {
     throw new ZitadelError("E_VALIDATION", "There is nothing in .zitadel/ to deploy", {
       hint: "Add a schema, flow or branding under .zitadel/, or run `zitadel setup` to scaffold one.",
@@ -84,5 +86,9 @@ export async function buildBundle(cwd: string): Promise<BuiltBundle> {
     );
   }
 
-  return { bundle: { schemas, flow_definitions, brandings }, resourceCount, brandingSources };
+  return {
+    bundle: { schemas, flow_definitions, ...(branding === undefined ? {} : { branding }) },
+    resourceCount,
+    brandingSources,
+  };
 }
