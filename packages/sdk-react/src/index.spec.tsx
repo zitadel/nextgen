@@ -193,6 +193,20 @@ describe("server-rendered widget config", () => {
     ).toMatchObject({ purpose: "login", "project-id": "p1", "proxy-path": "/px" });
   });
 
+  it.each([
+    ["zitadel-login", (p: object) => <ZitadelLogin {...p} />],
+    ["zitadel-session", (p: object) => <ZitadelSession {...p} />],
+    ["zitadel-logout", (p: object) => <ZitadelLogout {...p} />],
+  ])("leaves a keyed project handle out of the %s markup", (tag, widget) => {
+    const attributes = serverAttributes(
+      tag,
+      widget({ project: { ...handle, publishableKey: "pk_test_123" }, projectId: "other" }),
+    );
+    expect(attributes).not.toHaveProperty("project-id");
+    expect(attributes).not.toHaveProperty("proxy-path");
+    expect(attributes).not.toHaveProperty("url");
+  });
+
   it("puts the session config into the server markup", () => {
     expect(
       serverAttributes(

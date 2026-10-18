@@ -80,12 +80,18 @@ function asAttributes<T extends typeof HTMLElement>(
  * The project coordinates as attributes, so they are in the server markup. The
  * `project` handle stays a property too: it carries the publishable key and is
  * what the element prefers once React hands it over.
+ *
+ * A handle with a publishable key writes none: attributes cannot carry the key,
+ * so a widget that started from them would send its first request without the
+ * bearer the project needs, and never retry. Left unconfigured, it waits for
+ * the handle React binds at hydration.
  */
 function projectAttributes(props: {
   readonly project?: ZitadelProject;
   readonly projectId?: string;
   readonly proxyPath?: string;
 }) {
+  if (props.project?.publishableKey) return {};
   return {
     "project-id": props.project?.projectId ?? props.projectId,
     "proxy-path": props.project?.proxyPath ?? props.proxyPath,
