@@ -73,7 +73,6 @@ afterEach(() => {
   currentUserId = "user_test";
   sessionAnswer = undefined;
   server.resetHandlers(getHandler, deleteHandler);
-  window.sessionStorage.clear();
   vi.restoreAllMocks();
 });
 
@@ -237,65 +236,42 @@ describe("<zitadel-session>", () => {
     expect(loc.current).toBe("");
   });
 
-  /** Mounts the card on `href` as a fresh page load would, and returns where it went. */
-  async function loadPage(href: string, url: string): Promise<string> {
+  /** Mounts the card on `href`, arriving from `referrer`, and returns where it went. */
+  async function loadPage(href: string, url: string, referrer: string): Promise<string> {
     host.innerHTML = "";
+    vi.spyOn(document, "referrer", "get").mockReturnValue(referrer);
     const loc = stubLocation(href);
     const element = mount(`<zitadel-session post-sign-out-url="${url}"></zitadel-session>`);
     await flush(element);
     return loc.current;
   }
 
-  it("does not navigate again when the target sends the visitor straight back", async () => {
+  it("does not navigate when the visitor was sent here from the target", async () => {
     sessionAnswer = unauthorized;
-    expect(await loadPage("https://app.test/account", "/")).toBe("/");
-    // `/` redirected back to `/account`: the reloaded page must stay put.
-    expect(await loadPage("https://app.test/account", "/")).toBe("");
+    // `/` redirected back to `/account`: the page must stay put.
+    expect(await loadPage("https://app.test/account", "/", "https://app.test/")).toBe("");
     expect(host.querySelector("zitadel-session")?.shadowRoot?.querySelector(".title")).toBeNull();
   });
 
-  it("navigates again once the loop window has passed", async () => {
+  it("does not navigate when the visitor was sent here from this page", async () => {
     sessionAnswer = unauthorized;
-    const now = Date.now();
-    const clock = vi.spyOn(Date, "now").mockReturnValue(now);
-    expect(await loadPage("https://app.test/account", "/")).toBe("/");
-    clock.mockReturnValue(now + 10_001);
-    expect(await loadPage("https://app.test/account", "/")).toBe("/");
+    // The card navigated from `/account` and a redirect brought the visitor back to it.
+    expect(await loadPage("https://app.test/account", "/", "https://app.test/account/")).toBe("");
   });
 
-  it("navigates from another page within the loop window", async () => {
+  it("navigates when the visitor arrives from another page", async () => {
     sessionAnswer = unauthorized;
-    expect(await loadPage("https://app.test/account", "/")).toBe("/");
-    expect(await loadPage("https://app.test/settings", "/")).toBe("/");
+    expect(await loadPage("https://app.test/account", "/", "https://app.test/settings")).toBe("/");
   });
 
-  it("blocks every hop of a loop between two cards that send visitors to each other", async () => {
+  it("navigates when there is no referrer", async () => {
     sessionAnswer = unauthorized;
-    expect(await loadPage("https://app.test/account", "/settings")).toBe("/settings");
-    expect(await loadPage("https://app.test/settings", "/account")).toBe("/account");
-    expect(await loadPage("https://app.test/account", "/settings")).toBe("");
-    expect(await loadPage("https://app.test/settings", "/account")).toBe("");
+    expect(await loadPage("https://app.test/account", "/", "")).toBe("/");
   });
 
-  it("forgets a hop once the loop window has passed while remembering the others", async () => {
+  it("navigates when the referrer cannot be read", async () => {
     sessionAnswer = unauthorized;
-    const now = Date.now();
-    const clock = vi.spyOn(Date, "now").mockReturnValue(now);
-    expect(await loadPage("https://app.test/account", "/settings")).toBe("/settings");
-    clock.mockReturnValue(now + 5_000);
-    expect(await loadPage("https://app.test/settings", "/account")).toBe("/account");
-    clock.mockReturnValue(now + 10_001);
-    expect(await loadPage("https://app.test/account", "/settings")).toBe("/settings");
-    expect(await loadPage("https://app.test/settings", "/account")).toBe("");
-  });
-
-  it("keeps only a bounded number of remembered hops", async () => {
-    sessionAnswer = unauthorized;
-    for (let i = 0; i < 40; i += 1) await loadPage(`https://app.test/p${i}`, "/");
-    const stored = JSON.parse(
-      window.sessionStorage.getItem("zitadel-session:no-session-leave") ?? "[]",
-    );
-    expect(stored.length).toBeLessThanOrEqual(10);
+    expect(await loadPage("https://app.test/account", "/", "not a url")).toBe("/");
   });
 
   it("resolves a relative post-sign-out-url against the document base, as navigation does", async () => {
@@ -312,17 +288,6 @@ describe("<zitadel-session>", () => {
     const element = mount(`<zitadel-session post-sign-out-url="x/account"></zitadel-session>`);
     await flush(element);
     expect(loc.current).toBe("");
-  });
-
-  it("navigates when session storage is unavailable", async () => {
-    sessionAnswer = unauthorized;
-    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
-      throw new Error("denied");
-    });
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
-      throw new Error("denied");
-    });
-    expect(await loadPage("https://app.test/account", "/")).toBe("/");
   });
 
   it.each([
