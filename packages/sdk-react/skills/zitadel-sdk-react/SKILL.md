@@ -19,7 +19,7 @@ app — your own routes, your own bundler (Vite, TanStack Start, etc.) — by
 rendering the SDK's components on your login/profile pages.
 
 If the user instead wants a **fresh** app scaffolded, the CLI does that:
-`zitadel setup --framework react` generates a wired React project. Reach for
+`npx @zitadel/cli@alpha setup --framework react` generates a wired React project. Reach for
 this skill when there is already an app to integrate into and the CLI's
 scaffolding would overwrite or not fit it.
 
@@ -29,8 +29,7 @@ scaffolding would overwrite or not fit it.
 npm install @zitadel/sdk-react@alpha
 ```
 
-Peer dependencies (you almost certainly already have them): `react >=18` and
-`react-dom >=18`. TypeScript projects need **TypeScript ≥ 5.0**.
+Peer dependencies: `react >=18` and `react-dom >=18`. Requires TypeScript ≥ 5.0 (the published types use `export type *`).
 
 ## Integrate
 
