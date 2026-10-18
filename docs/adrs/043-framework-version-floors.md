@@ -27,9 +27,11 @@ This ADR records the floors and the enforcement point.
 
 - **Floors:** Next.js **15+** (App Router, as before) and React **18+** (both
   18 and 19 are supported; templates that need React-19-only behavior must
-  degrade safely on 18, as the ref-assigned copy overlay does).
+  degrade safely on 18, as the ref-assigned copy overlay does) and Svelte
+  **5+** (`SvelteDetector`; `@zitadel/sdk-svelte` peers `svelte ^5.0.0` and is
+  written with runes, so a Svelte 4 app can neither install nor compile it).
 - **Enforcement lives in the framework detectors** (`NextDetector`,
-  `ReactDetector`): a detected framework below its floor throws
+  `ReactDetector`, `SvelteDetector`): a detected framework below its floor throws
   `E_UNSUPPORTED_PROJECT_SHAPE` (exit 3) with the floor in the message and an
   upgrade hint. Detection is the shared gate, so `setup` refuses before any
   mutation and `doctor`'s framework check fails with the same message on an
@@ -46,8 +48,10 @@ This ADR records the floors and the enforcement point.
   blocking on them would be hostile guessing. Prereleases of the floor major
   count as at-floor.
 - **Peer ranges follow the floor:** `@zitadel/sdk-next` declares `next >=15`
-  (its `react >=18` was already correct). Other frameworks currently declare
-  no floor; adding one later means extending its detector the same way and
+  (its `react >=18` was already correct) and `@zitadel/sdk-svelte` declares
+  `svelte ^5.0.0`. The gate checks the floor only, not the SDK's upper bound;
+  widening the SDK peer is how a newer major gets supported. Other frameworks
+  currently declare no floor; adding one later means extending its detector the same way and
   amending this ADR.
 
 ## Consequences

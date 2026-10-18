@@ -5,8 +5,12 @@ Next.js middleware and helpers for Nextgen Auth.
 ## Installation
 
 ```bash
-pnpm add @zitadel/sdk-next
+pnpm add @zitadel/sdk-next@alpha
 ```
+
+Requires Next.js 15.2.3 or later. Earlier 15.x releases skip middleware for a
+request that sends an `x-middleware-subrequest` header (CVE-2025-29927), which
+on self-hosted deployments would let any request past `protectedRoutes`.
 
 ## Entry points
 

@@ -37,6 +37,10 @@ which still points at an early `0.0.0` build. Use an exact `1.0.0-alpha.N`
 selector in agent scripts and bug reports for reproducibility.
 The CLI requires Node.js 24+.
 
+A Vite + Svelte app must be on Svelte 5 or newer. `setup` and `doctor` refuse a
+Svelte 4 app with `E_UNSUPPORTED_PROJECT_SHAPE` (exit 3) before changing
+anything; upgrade the app to Svelte 5 and rerun rather than retrying.
+
 ## Using the CLI
 
 - **Drive it non-interactively.** Always pass `--non-interactive --json` (short:
@@ -305,11 +309,15 @@ replaces a file at a path setup writes, but not the app's root component or
 request boundary at another path.
 
 The app may also live in a subdirectory of the one `start` ran in: `setup`,
-`console` and `--server local` read `.zitadel/local/` from the working
+`console`, `--server local` and `doctor` read `.zitadel/local/` from the working
 directory or the nearest parent that has it (up to the home directory), so
-`mkdir my-app && cd my-app` after `start` works too. `stop`, `reset`, `logs`,
-`status` and `doctor` read only the working directory's `.zitadel/local/`, so
-run them where `start` ran. On a local
+`mkdir my-app && cd my-app` after `start` works too; `doctor` checks that
+server and its port, and when that server is unhealthy it suggests `start` and
+`reset --force` with `--cwd` set to the directory that holds it (when that path needs
+shell quoting the commands are left out, the hint names the directory, and
+`doctor --json` returns the argument lists in `details.suggested_args` to run as they are). `stop`,
+`reset`, `logs` and `status` read only the working directory's
+`.zitadel/local/`, so run them where `start` ran. On a local
 server that hosts the platform project, `setup` attaches the project to the
 local admin's team and ends `data.next_commands` with `console`; when it finds
 no local admin for that server on the way up, it says so in the envelope's

@@ -17,8 +17,7 @@ import {
   checkLocalServerHealth,
   defaultLocalServerImageForCliVersion,
   localServerUrl,
-  peekRuntimeMetadata,
-  readRuntimeMetadata,
+  readNearestRuntimeMetadata,
   type RuntimeBackend,
   type RuntimeMetadata,
 } from "../../lib/local-server/runtime";
@@ -28,7 +27,7 @@ import { createOrca } from "../../lib/orca";
 import { resolveCwd } from "../../lib/paths";
 import { hasZitadelConfig } from "../../lib/project";
 import { listenersForPort } from "../../lib/prober/ports";
-import { publicCliCommand } from "../../lib/public-cli";
+import { portableCommands, publicCliCommand } from "../../lib/public-cli";
 import { SANITY_CHECKS, type CheckContext, type CheckOutcome } from "./checks";
 
 const LOCAL_RUNTIME_CHECK_NAMES = new Set([
@@ -72,13 +71,16 @@ export default class Doctor extends BaseCommand {
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Doctor);
-    const recorded = await peekRuntimeMetadata(
-      resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined),
-    );
-    const port = flags.port ?? recorded?.port ?? DEFAULT_LOCAL_SERVER_PORT;
+    // The local server this directory uses: the one `zitadel start` ran here,
+    // or in the nearest parent, as setup and `console` find it. An unreadable
+    // record only costs the port hint; the read below reports it.
+    const startDir = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
+    const hint = await readNearestRuntimeMetadata(startDir).catch(() => undefined);
+    const port = flags.port ?? hint?.runtime.port ?? DEFAULT_LOCAL_SERVER_PORT;
     await this.toMeta(flags, { resolveServer: false, source: localServerUrl(port) });
     const { cwd, dryRun } = this.meta;
-    const existingRuntime = await readRuntimeMetadata(cwd);
+    const nearest = await readNearestRuntimeMetadata(cwd);
+    const existingRuntime = nearest?.runtime;
     const runtimeBackend = resolveRuntimeBackend({
       runtime: flags.runtime,
       image: flags.image,
@@ -89,7 +91,13 @@ export default class Doctor extends BaseCommand {
       flags.image ??
       this.meta.env.ZITADEL_LOCAL_IMAGE ??
       defaultLocalServerImageForCliVersion(this.meta.cliVersion);
-    const runtimeChecks = await runLocalRuntimeChecks(cwd, runtimeBackend, image, port);
+    const runtimeChecks = await runLocalRuntimeChecks(
+      nearest?.dir ?? cwd,
+      existingRuntime,
+      runtimeBackend,
+      image,
+      port,
+    );
     const hasConfig = await hasZitadelConfig(cwd);
     const ctx: CheckContext = { cwd, orca: createOrca(), cliVersion: this.meta.cliVersion, dryRun };
 
@@ -147,7 +155,13 @@ export default class Doctor extends BaseCommand {
     };
 
     if (failed.length > 0) {
-      const advice = failureAdvice(failed, image, port, this.meta.cliVersion);
+      const advice = failureAdvice(
+        failed,
+        image,
+        port,
+        this.meta.cliVersion,
+        nearest !== undefined && nearest.dir !== cwd ? nearest.dir : undefined,
+      );
       // A check that failed with a typed CLI error advertises its own
       // category (e.g. the framework floor's E_UNSUPPORTED_PROJECT_SHAPE) —
       // surface that instead of the generic validation class so agents can
@@ -158,7 +172,10 @@ export default class Doctor extends BaseCommand {
       throw new ZitadelError(code, "Zitadel doctor found issues", {
         hint: advice.hint,
         nextCommands: advice.nextCommands,
-        details: data,
+        details:
+          advice.suggestedArgs === undefined
+            ? data
+            : { ...data, suggested_args: advice.suggestedArgs },
       });
     }
 
@@ -170,12 +187,13 @@ export default class Doctor extends BaseCommand {
   }
 }
 
-function failureAdvice(
+export function failureAdvice(
   failed: CheckOutcome[],
   image: string,
   port: number,
   cliVersion: string,
-): { hint: string; nextCommands: string[] } {
+  runtimeDir?: string,
+): { hint: string; nextCommands: string[]; suggestedArgs?: string[][] } {
   const failedNames = new Set(failed.map((check) => check.name));
 
   if (failedNames.has("server-binary")) {
@@ -225,12 +243,25 @@ function failureAdvice(
   }
 
   if (failedNames.has("runtime")) {
+    // `start` and `reset` act on their working directory, so a runtime found
+    // in a parent is named explicitly. The directory comes from the file
+    // system and quoting differs between POSIX shells, PowerShell and cmd.exe,
+    // so a path that needs quoting leaves the strings out and the argument
+    // lists in `details.suggested_args` carry the recovery.
+    const at = runtimeDir === undefined ? [] : ["--cwd", runtimeDir];
+    const suggestedArgs = [
+      ["start", ...at],
+      ["reset", "--force", ...at],
+    ];
+    const nextCommands = portableCommands(suggestedArgs, cliVersion);
     return {
-      hint: "Existing local runtime metadata was found, but the local Zitadel server is not healthy. Start it again or reset stale local data.",
-      nextCommands: [
-        publicCliCommand("start", cliVersion),
-        publicCliCommand("reset --force", cliVersion),
-      ],
+      hint:
+        "Existing local runtime metadata was found, but the local Zitadel server is not healthy. Start it again or reset stale local data." +
+        (nextCommands.length === 0
+          ? ` The runtime is in ${runtimeDir ?? "the working directory"}, a directory that needs shell quoting, so no command is printed; run \`zitadel doctor --json\` and use details.suggested_args for the exact arguments.`
+          : ""),
+      nextCommands,
+      suggestedArgs,
     };
   }
 
@@ -310,13 +341,18 @@ function advisoryForWarnings(
   return { nextActions: unique(nextActions), nextCommands: unique(nextCommands) };
 }
 
+/**
+ * The local runtime checks, against the server in `runtimeDir` (the directory
+ * holding its `.zitadel/local` state, or the current directory when no server
+ * was started yet).
+ */
 async function runLocalRuntimeChecks(
-  cwd: string,
+  runtimeDir: string,
+  runtime: RuntimeMetadata | undefined,
   runtimeBackend: RuntimeBackend,
   image: string,
   port: number,
 ): Promise<CheckOutcome[]> {
-  const runtime = await readRuntimeMetadata(cwd);
   const managedRuntimeCheck = await checkManagedRuntimeProcesses(runtime);
   if (runtimeBackend === "binary") {
     return [
@@ -328,7 +364,7 @@ async function runLocalRuntimeChecks(
         "state-dir",
         "Local state directory is writable",
         async () => {
-          const probe = await assertLocalStateWritable(cwd);
+          const probe = await assertLocalStateWritable(runtimeDir);
           return probe.checkedPath === probe.targetPath
             ? `${probe.targetPath} is writable`
             : `${probe.targetPath} can be created (${probe.checkedPath} is writable)`;
@@ -391,7 +427,7 @@ async function runLocalRuntimeChecks(
       "state-dir",
       "Local state directory is writable",
       async () => {
-        const probe = await assertLocalStateWritable(cwd);
+        const probe = await assertLocalStateWritable(runtimeDir);
         return probe.checkedPath === probe.targetPath
           ? `${probe.targetPath} is writable`
           : `${probe.targetPath} can be created (${probe.checkedPath} is writable)`;
