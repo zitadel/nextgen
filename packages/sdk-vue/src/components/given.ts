@@ -1,60 +1,32 @@
-import { onUpdated, type Ref } from "vue";
-
-// Property values of a freshly created, unconfigured element, per tag.
-const pristine = new Map<string, HTMLElement>();
-
-const toProperty = (key: string): string =>
-  key.replace(/-(\w)/g, (_, c: string) => c.toUpperCase());
+const defaults = new WeakMap<object, Map<string, unknown>>();
 
 /**
- * Keeps unset props out of a widget element's props so the element's own
- * defaults apply. Vue assigns `undefined` to a custom-element property that is
- * passed as such, which overwrites the default (an unset `heading` left the
- * session card with an empty title), so only the given props are passed on.
+ * Assigns the given props to a widget element as properties, leaving unset
+ * (`undefined`) ones to the element's own defaults. A Vue prop passed as
+ * `undefined` is assigned to the element too (a string property turns it into
+ * an empty string), which overwrites the element's default — an unset `heading`
+ * left the session card with an empty title.
  *
- * Vue also clears a prop that stops being given (to `''` or by removing the
- * attribute), not back to the element's default, so after each update the
- * element's own value is restored for every prop that was given before and is
- * unset now.
- *
- * Call it from `setup` and pass the returned function the render's props,
- * keyed as the element expects them (a camelCase property or a kebab-case
- * attribute); it returns those that are given.
+ * The element's own value is remembered before a prop is first overridden and
+ * restored when the prop becomes unset again, so a reactive prop going from a
+ * value back to `undefined` does not leave the stale override in place.
  */
-export function useGivenProps(
-  tag: string,
-  element: Ref<HTMLElement | null>,
-): (props: Record<string, unknown>) => Record<string, unknown> {
-  let given = new Set<string>();
-  let cleared: string[] = [];
-
-  onUpdated(() => {
-    const el = element.value;
-    if (!el || cleared.length === 0) return;
-    let fresh = pristine.get(tag);
-    if (!fresh) {
-      fresh = document.createElement(tag);
-      pristine.set(tag, fresh);
-    }
-    for (const key of cleared) {
-      const property = toProperty(key);
-      (el as unknown as Record<string, unknown>)[property] = (
-        fresh as unknown as Record<string, unknown>
-      )[property];
-    }
-  });
-
-  return (props) => {
-    const next = new Set<string>();
-    const passed: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(props)) {
-      if (value !== undefined) {
-        next.add(key);
-        passed[key] = value;
+export function assignGiven(element: object, props: Record<string, unknown>): void {
+  const target = element as Record<string, unknown>;
+  let saved = defaults.get(element);
+  for (const [key, value] of Object.entries(props)) {
+    if (value !== undefined) {
+      if (!saved) {
+        saved = new Map();
+        defaults.set(element, saved);
       }
+      if (!saved.has(key)) {
+        saved.set(key, target[key]);
+      }
+      target[key] = value;
+    } else if (saved?.has(key)) {
+      target[key] = saved.get(key);
+      saved.delete(key);
     }
-    cleared = [...given].filter((key) => !next.has(key));
-    given = next;
-    return passed;
-  };
+  }
 }

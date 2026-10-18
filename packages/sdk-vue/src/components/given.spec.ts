@@ -1,93 +1,64 @@
-// @vitest-environment jsdom
-import { render } from "@testing-library/vue";
 import { describe, expect, it } from "vitest";
-import { defineComponent, h, ref } from "vue";
 
-import { useGivenProps } from "./given";
+import { assignGiven } from "./given";
 
-// A stand-in widget: class fields are its own defaults, and the kebab-case
-// attribute is mirrored to its property the way a Lit element does.
-class GivenWidget extends HTMLElement {
-  static observedAttributes = ["post-sign-out-url"];
-  heading = "Signed in as";
-  variant = "widget";
-  postSignOutUrl = "/signed-out";
-  attributeChangedCallback(name: string, _old: string | null, value: string | null) {
-    if (name === "post-sign-out-url") this.postSignOutUrl = value ?? "";
-  }
-}
-customElements.define("given-widget", GivenWidget);
+const widget = () => ({ heading: "Signed in as", variant: "widget", suppressHeader: false });
 
-const Host = defineComponent({
-  props: { values: { type: Object, default: () => ({}) } },
-  setup(props, { expose }) {
-    const element = ref<GivenWidget | null>(null);
-    expose({ element });
-    const given = useGivenProps("given-widget", element);
-    return () => h("given-widget", { ref: element, ...given(props.values) });
-  },
-});
+describe("assignGiven", () => {
+  it("assigns only the props that are defined", () => {
+    const el = widget();
 
-const widget = (container: Element, index = 0) =>
-  container.querySelectorAll<GivenWidget>("given-widget")[index]!;
+    assignGiven(el, { heading: "Custom", variant: undefined });
 
-describe("useGivenProps", () => {
-  it("passes on only the props that are defined", () => {
-    const { container } = render(Host, {
-      props: { values: { heading: "Custom", variant: undefined } },
-    });
-
-    expect([widget(container).heading, widget(container).variant]).toEqual(["Custom", "widget"]);
+    expect(el).toEqual({ heading: "Custom", variant: "widget", suppressHeader: false });
   });
 
-  it("leaves the element's own value on a prop that was never given", async () => {
-    const { container, rerender } = render(Host, { props: { values: { variant: "page" } } });
+  it("leaves the element's own value on a prop that was never given", () => {
+    const el = widget();
 
-    await rerender({ values: { variant: "page", heading: undefined } });
+    assignGiven(el, { heading: undefined });
 
-    expect(widget(container).heading).toBe("Signed in as");
+    expect(el.heading).toBe("Signed in as");
   });
 
-  it("restores the element's own value when a given prop becomes unset", async () => {
-    const { container, rerender } = render(Host, { props: { values: { heading: "Custom" } } });
-    expect(widget(container).heading).toBe("Custom");
+  it("restores the element's own value when a given prop becomes unset", () => {
+    const el = widget();
+    assignGiven(el, { heading: "Custom", suppressHeader: true });
 
-    await rerender({ values: { heading: undefined } });
+    assignGiven(el, { heading: undefined, suppressHeader: undefined });
 
-    expect(widget(container).heading).toBe("Signed in as");
+    expect(el).toEqual(widget());
   });
 
-  it("restores a property given through its kebab-case attribute", async () => {
-    const { container, rerender } = render(Host, {
-      props: { values: { "post-sign-out-url": "/bye" } },
-    });
-    expect(widget(container).postSignOutUrl).toBe("/bye");
+  it("keeps a falsy value that is given", () => {
+    const el = widget();
 
-    await rerender({ values: { "post-sign-out-url": undefined } });
+    assignGiven(el, { heading: "", suppressHeader: false });
 
-    expect(widget(container).postSignOutUrl).toBe("/signed-out");
+    expect(el.heading).toBe("");
   });
 
-  it("handles repeated set and clear cycles", async () => {
-    const { container, rerender } = render(Host, { props: { values: { heading: "One" } } });
+  it("remembers the original value across repeated override cycles", () => {
+    const el = widget();
 
-    await rerender({ values: { heading: undefined } });
-    await rerender({ values: { heading: "Two" } });
-    expect(widget(container).heading).toBe("Two");
-    await rerender({ values: { heading: undefined } });
+    assignGiven(el, { heading: "One" });
+    assignGiven(el, { heading: "Two" });
+    assignGiven(el, { heading: undefined });
+    assignGiven(el, { heading: "Three" });
+    assignGiven(el, { heading: undefined });
 
-    expect(widget(container).heading).toBe("Signed in as");
+    expect(el.heading).toBe("Signed in as");
   });
 
-  it("does not share given props between two elements", async () => {
-    const first = render(Host, { props: { values: { heading: "First" } } });
-    const second = render(Host, { props: { values: { heading: "Second" } } });
+  it("does not share saved values between two elements", () => {
+    const first = widget();
+    const second = { ...widget(), heading: "Other default" };
+    assignGiven(first, { heading: "Custom" });
+    assignGiven(second, { heading: "Custom" });
 
-    await first.rerender({ values: { heading: undefined } });
+    assignGiven(first, { heading: undefined });
+    assignGiven(second, { heading: undefined });
 
-    expect([widget(first.container).heading, widget(second.container).heading]).toEqual([
-      "Signed in as",
-      "Second",
-    ]);
+    expect([first.heading, second.heading]).toEqual(["Signed in as", "Other default"]);
   });
 });

@@ -9,13 +9,13 @@ import type {
   ZitadelFlowStepDetail,
 } from "@zitadel/sdk-core/types";
 
-import { defineComponent, h, type PropType, ref, toRaw } from "vue";
+import { defineComponent, h, type PropType, ref, toRaw, watchEffect } from "vue";
 // Registers <zitadel-login> / <zitadel-logout> with the browser. Imported at
 // module load (before render) so the element is upgraded by the time Vue
 // patches it — which means Vue binds `project` as a DOM *property* (not a
 // stringified attribute).
 import "@zitadel/components";
-import { useGivenProps } from "./given";
+import { assignGiven } from "./given";
 
 /**
  * Vue wrapper for the `<zitadel-login>` Lit web component.
@@ -65,30 +65,38 @@ export default defineComponent({
     const element = ref<ZitadelLoginElement | null>(null);
     expose({ element });
 
-    const given = useGivenProps("zitadel-login", element);
+    // Props the element has defaults for are assigned only when given; a
+    // binding would assign `undefined` and overwrite the default.
+    watchEffect(
+      () => {
+        if (element.value) {
+          assignGiven(element.value, {
+            lang: props.lang,
+            variant: props.variant,
+            theme: props.theme,
+            suppressHeader: props.suppressHeader,
+            suppressPasswordToggle: props.suppressPasswordToggle,
+          });
+        }
+      },
+      { flush: "post" },
+    );
 
     return () =>
       h("zitadel-login", {
         ref: element,
-        ...given({
-          // Hand the Lit element the raw SDK handle, not Vue's reactive proxy:
-          // the widget does identity checks on it (and `render` from test-utils
-          // would otherwise pass a wrapped clone).
-          project: toRaw(props.project),
-          projectId: props.projectId,
-          proxyPath: props.proxyPath,
-          purpose: props.purpose,
-          "post-sign-in-url": props.postSignInUrl,
-          // Same raw-unwrap rationale as `project`: hand the widget the plain
-          // dictionaries, not Vue's reactive proxy.
-          locales: props.locales === undefined ? undefined : toRaw(props.locales),
-          lang: props.lang,
-          "flow-name": props.flowName,
-          variant: props.variant,
-          theme: props.theme,
-          suppressHeader: props.suppressHeader,
-          suppressPasswordToggle: props.suppressPasswordToggle,
-        }),
+        // Hand the Lit element the raw SDK handle, not Vue's reactive proxy:
+        // the widget does identity checks on it (and `render` from test-utils
+        // would otherwise pass a wrapped clone).
+        project: toRaw(props.project),
+        projectId: props.projectId,
+        proxyPath: props.proxyPath,
+        purpose: props.purpose,
+        "post-sign-in-url": props.postSignInUrl,
+        // Same raw-unwrap rationale as `project`: hand the widget the plain
+        // dictionaries, not Vue's reactive proxy.
+        locales: props.locales === undefined ? undefined : toRaw(props.locales),
+        "flow-name": props.flowName,
         onZitadelFlowStep: (event: CustomEvent<ZitadelFlowStepDetail>) => {
           emit("flowStep", event.detail);
         },

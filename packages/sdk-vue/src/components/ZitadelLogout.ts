@@ -2,9 +2,9 @@ import type { ZitadelProject } from "@zitadel/api/config";
 import type { ZitadelLogout as ZitadelLogoutElement } from "@zitadel/components";
 import type { ZitadelSignoutDetail } from "@zitadel/sdk-core/types";
 
-import { defineComponent, h, type PropType, ref, toRaw } from "vue";
+import { defineComponent, h, type PropType, ref, toRaw, watchEffect } from "vue";
 import "@zitadel/components";
-import { useGivenProps } from "./given";
+import { assignGiven } from "./given";
 
 /**
  * Vue wrapper for the `<zitadel-logout>` Lit web component. See
@@ -36,21 +36,27 @@ export default defineComponent({
     const element = ref<ZitadelLogoutElement | null>(null);
     expose({ element });
 
-    const given = useGivenProps("zitadel-logout", element);
+    // Props the element has defaults for are assigned only when given; a
+    // binding would assign `undefined` and overwrite the default.
+    watchEffect(
+      () => {
+        if (element.value) {
+          assignGiven(element.value, { theme: props.theme });
+        }
+      },
+      { flush: "post" },
+    );
 
     return () =>
       h("zitadel-logout", {
         ref: element,
-        ...given({
-          // Hand the Lit element the raw SDK handle, not Vue's reactive proxy:
-          // the widget does identity checks on it (and `render` from test-utils
-          // would otherwise pass a wrapped clone).
-          project: toRaw(props.project),
-          projectId: props.projectId,
-          proxyPath: props.proxyPath,
-          "post-sign-out-url": props.postSignOutUrl,
-          theme: props.theme,
-        }),
+        // Hand the Lit element the raw SDK handle, not Vue's reactive proxy:
+        // the widget does identity checks on it (and `render` from test-utils
+        // would otherwise pass a wrapped clone).
+        project: toRaw(props.project),
+        projectId: props.projectId,
+        proxyPath: props.proxyPath,
+        "post-sign-out-url": props.postSignOutUrl,
         onZitadelSignout: (event: CustomEvent<ZitadelSignoutDetail>) => {
           emit("signout", event.detail);
         },
