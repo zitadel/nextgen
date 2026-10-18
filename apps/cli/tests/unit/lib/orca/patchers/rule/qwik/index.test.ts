@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { FRAMEWORK_IDS } from "../../../../../../helpers/framework-ids";
 import type {
   FileOp,
   ScaffoldPlan,
@@ -86,5 +87,11 @@ describe("QwikPatcher.artifacts", () => {
     expect(artifacts.markedFiles).toContain("src/app.tsx");
     expect(artifacts.dependencies).toEqual(["@zitadel/sdk-qwik"]);
     expect(artifacts.configEdits).toEqual(["vite.config.*"]);
+  });
+});
+
+describe("QwikPatcher.canPatch", () => {
+  it.each(FRAMEWORK_IDS)("matches %s only when it is its own framework", (id) => {
+    expect(new QwikPatcher().canPatch(id)).toBe(id === "qwik");
   });
 });

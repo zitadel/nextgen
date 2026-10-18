@@ -71,14 +71,17 @@ So the template's root routes live under `/docs` here:
 ## Content
 
 - A page's URL is its path under `content/docs/`. The API reference's own pages
-  are in `content/docs/reference/api/`; a page per operation comes from the
-  OpenAPI document (`lib/source.ts`).
+  are in `content/docs/reference/api/`; a page per operation, and per webhook
+  (one per event type, under `event-webhooks/`), comes from the OpenAPI
+  document (`lib/source.ts`).
 - `moon run docs:generate` bundles `api/openapi` into `.generated/openapi.mjs`,
   which `lib/openapi.ts` imports. The content needs no generation step.
 - A page's Markdown (`/docs/cli.md`, or `/docs/cli` with `Accept:
-  text/markdown`) is its processed Markdown; an operation's is the operation
-  with every schema it references (`docsLlms` in `lib/source.ts`).
-  `llms-full.txt` leaves the operations out.
+  text/markdown`) is its processed Markdown; an operation's or a webhook's is
+  the operation or webhook with every schema it references (`docsLlms` in
+  `lib/source.ts`). `llms-full.txt` leaves the operations and webhooks out,
+  and its test fails on a Markdown link to one of them, so prose links to
+  their section's page (a section page's `<Card>` is fine).
 
 ## Checks
 

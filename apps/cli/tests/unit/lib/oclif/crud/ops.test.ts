@@ -1,3 +1,7 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
@@ -10,6 +14,7 @@ vi.mock("@clack/prompts", () => ({
 import { cancel, confirm, isCancel } from "@clack/prompts";
 
 import { asTerminal } from "../../../../helpers/terminal";
+import { EXIT_CODES } from "../../../../../src/lib/errors";
 import { BaseCommand } from "../../../../../src/lib/oclif";
 import {
   bindOperation,
@@ -137,7 +142,7 @@ describe("operation statics", () => {
       CreateOperation.describe(definition(create)),
       UpdateOperation.describe(definition(update)),
     ]) {
-      expect(Object.keys(statics.flags)).toEqual(["name", "data", "file", "extra"]);
+      expect(Object.keys(statics.flags)).toEqual(["name", "data", "file", "set", "extra"]);
       const flags = statics.flags as Record<string, { helpGroup?: string }>;
       expect(flags.name?.helpGroup).toBe("REQUIRED FIELD");
       expect(flags.data?.helpGroup).toBe("RAW BODY");
@@ -180,6 +185,34 @@ describe("operation statics", () => {
 
     expect(examples[0]).toBe("<%= config.bin %> teams create --data '{...}' --json");
     expect(examples.join(" ")).not.toContain("--name <name>");
+  });
+
+  it("leads with the example a registry entry declares", () => {
+    const declared: CreateSpec<Ctx> = {
+      schema,
+      example: "--name platform",
+      call: async () => ({}),
+    };
+
+    expect(CreateOperation.describe(definition(declared)).examples[0]).toBe(
+      "<%= config.bin %> teams create --name platform --json",
+    );
+  });
+
+  it("names a rooted document's own fields as flags", () => {
+    const rooted: CreateSpec<Ctx> = {
+      root: "team",
+      schema: z.object({ team: z.object({ name: z.string() }) }),
+      call: async () => ({}),
+    };
+
+    expect(Object.keys(CreateOperation.describe(definition(rooted)).flags)).toEqual([
+      "name",
+      "data",
+      "file",
+      "set",
+      "extra",
+    ]);
   });
 
   it("delete is spelled the same way whatever the server does to the resource", () => {
@@ -286,6 +319,103 @@ describe("write results", () => {
 
     // Round-tripped as printed: JSON drops a key whose value is undefined.
     expect(JSON.parse(JSON.stringify(envelope))).toHaveProperty("data", {});
+  });
+});
+
+describe("assembling a body", () => {
+  const connection = z.object({
+    slug: z.string(),
+    oidc: z
+      .object({ issuer: z.string(), pkce: z.boolean().default(true), scopes: z.array(z.string()) })
+      .optional(),
+  });
+  const sent: unknown[] = [];
+  const rooted: CreateSpec<Ctx> = {
+    root: "connection",
+    schema: z.object({ connection }),
+    call: async (_ctx, body) => {
+      sent.push(body);
+      return { id: "c_1" };
+    },
+  };
+  const creating = () =>
+    bindOperation(
+      CreateOperation as OperationClass<Ctx, CreateSpec<Ctx>>,
+      definition(rooted),
+    ) as unknown as { run(argv: string[]): Promise<unknown> };
+
+  afterEach(() => {
+    sent.length = 0;
+  });
+
+  it("wraps a rooted document in its root on the way out", async () => {
+    await creating().run([
+      "--slug",
+      "acme",
+      "--oidc-issuer",
+      "https://x",
+      "--oidc-scopes",
+      "openid",
+      "--json",
+    ]);
+
+    expect(sent).toEqual([
+      {
+        connection: { slug: "acme", oidc: { issuer: "https://x", pkce: true, scopes: ["openid"] } },
+      },
+    ]);
+  });
+
+  it("takes a document still wrapped in its root", async () => {
+    await creating().run(["--data", '{"connection":{"slug":"acme"}}', "--json"]);
+
+    expect(sent).toEqual([{ connection: { slug: "acme" } }]);
+  });
+
+  it("lets --set path:=null replace an object a file gave, and the schema decide on it", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-crud-"));
+    const file = join(dir, "connection.json");
+    await writeFile(
+      file,
+      JSON.stringify({ slug: "acme", oidc: { issuer: "https://x", scopes: ["openid"] } }),
+    );
+    try {
+      await creating().run(["--file", file, "--json"]);
+      expect(sent).toHaveLength(1);
+      // `oidc` may be left out but not be null, so the same file with
+      // `oidc:=null` over it fails validation, and nothing more is sent.
+      await expect(
+        creating().run(["--file", file, "--set", "oidc:=null", "--json"]),
+      ).rejects.toThrowError(expect.objectContaining({ oclif: { exit: EXIT_CODES.E_VALIDATION } }));
+      expect(sent).toHaveLength(1);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("lays each source over the last: the document, the field flags, then --set in order", async () => {
+    await creating().run([
+      "--data",
+      '{"slug":"from-data","oidc":{"issuer":"https://data","scopes":["openid"]}}',
+      "--oidc-issuer",
+      "https://flag",
+      "--set",
+      "slug=first",
+      "--set",
+      "slug=second",
+      "--set",
+      "oidc.pkce=false",
+      "--json",
+    ]);
+
+    expect(sent).toEqual([
+      {
+        connection: {
+          slug: "second",
+          oidc: { issuer: "https://flag", pkce: false, scopes: ["openid"] },
+        },
+      },
+    ]);
   });
 });
 

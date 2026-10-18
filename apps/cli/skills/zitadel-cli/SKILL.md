@@ -35,7 +35,16 @@ npx @zitadel/cli@alpha <command> --non-interactive --json
 Always pass `@alpha`: bare `npx @zitadel/cli` resolves npm's `latest` tag,
 which still points at an early `0.0.0` build. Use an exact `1.0.0-alpha.N`
 selector in agent scripts and bug reports for reproducibility.
-The CLI requires Node.js 24+.
+The CLI requires Node.js 24+. When `setup` creates a new app it first checks the running Node.js against the `engines.node` of the framework CLI it is about to run (`@angular/cli`, `nuxi`, `create-vite`, `create-next-app`). Only the Angular CLI refuses a Node it does not accept, and that range can be newer than 24.0: if `setup` refuses with `E_VALIDATION` naming the Node versions Angular accepts, switch to one of them and run it again. The Angular CLI checks each major on its own, so only 22.22.3+ on 22, 24.15.0+ on 24 and 26.x are accepted (23 and 25 run with a warning), and Node 27 or later is refused even though the published range reads `>=26.0.0`. For the other frameworks the CLI carries on, so `setup` adds a warning to the envelope's `warnings` and continues.
+
+The app's framework must be at or above a minimum version: Next.js 15.2.3,
+React 18, Vue 3.2, Nuxt 4, Angular 17, Solid 1.6, Svelte 5, Qwik 2.0.0-beta.45. Newer major
+versions are not refused. `setup` and `doctor` refuse an app below its minimum,
+by declared range or installed release, with `E_UNSUPPORTED_PROJECT_SHAPE`
+(exit 3); `setup` refuses before it scaffolds or patches anything, while
+`doctor --fix` can still repair unrelated files, so do not assume a floor error
+left the project untouched. The message names the minimum and the hint says to
+upgrade, so upgrade the app and rerun rather than retrying.
 
 ## Using the CLI
 
@@ -74,12 +83,28 @@ The CLI requires Node.js 24+.
   Two deliberate deviations worth knowing: `-n` is `--non-interactive` (not
   `--dry-run`, which is long-only), and machine output is `--json` (not
   `--output json`).
+- **Writing a resource's body.** A `create` or `update` takes every field of
+  its body as a flag, nested ones too: a nested field's flag is its dot path
+  joined with `-` (`oidc.client_id` is `--oidc-client-id`), a list is a
+  repeated flag, a boolean takes `--no-<flag>` for `false`, and an open record
+  (`attributes`) takes repeated `key=value` entries. `--set <path>=<value>`
+  (or `<path>:=<json>` for JSON) reaches any field by its dot path, and
+  `--data` / `--file` take the whole document. They combine: the document
+  first, then the field flags, then each `--set`, with objects merging key by
+  key. `resources --json` lists each write's fields with their dot path
+  (`name`), `flag` (`null` when only `--set` reaches it), `kind` and
+  `required`; `--dry-run --json` returns the body that would be sent. For a
+  deeply nested body, writing the document and passing it with `--file -` is
+  often simplest.
 - **Never put secrets on the command line.** A property whose name reads as a
   credential (`password`, `client_secret`, `api_key`, …) is refused anywhere on
-  argv — as an `--attributes` entry and inside an inline `--data` body alike,
-  since argv is visible to other processes and kept in shell history. Send such
-  bodies with `--file <path>` or `--file -` (stdin), which never pass through
-  argv.
+  argv when it holds free-form text — as a field flag, a `--set` or
+  `--attributes` entry, and inside an inline `--data` body alike, since argv is
+  visible to other processes and kept in shell history. Send such bodies with
+  `--file <path>` or `--file -` (stdin), which never pass through argv. A
+  `${{ NAME }}` reference to a project variable is not a secret and may stay on
+  argv (a connection's `client_secret` takes nothing else); write it in single
+  quotes, since inside double quotes the shell reads `${` as its own expansion.
 - **Streams.** Capture stdout and stderr separately when scripting. The machine
   contract is one parseable JSON object on stdout; installer, audit, and
   package-manager progress belongs on stderr.
@@ -289,11 +314,16 @@ replaces a file at a path setup writes, but not the app's root component or
 request boundary at another path.
 
 The app may also live in a subdirectory of the one `start` ran in: `setup`,
-`console` and `--server local` read `.zitadel/local/` from the working
+`console`, `--server local` and `doctor` read `.zitadel/local/` from the working
 directory or the nearest parent that has it (up to the home directory), so
-`mkdir my-app && cd my-app` after `start` works too. `stop`, `reset`, `logs`,
-`status` and `doctor` read only the working directory's `.zitadel/local/`, so
-run them where `start` ran. On a local
+`mkdir my-app && cd my-app` after `start` works too. `doctor` checks that
+server and its port, but runs its project checks in the working directory, so run
+it from the app. When that server is unhealthy it suggests `start` and
+`reset --force` with `--cwd` set to the directory that holds it (when that path needs
+shell quoting the commands are left out, the hint names the directory, and
+`doctor --json` returns the argument lists in `details.suggested_args` to run as they are). `stop`,
+`reset`, `logs` and `status` read only the working directory's
+`.zitadel/local/`, so run them where `start` ran. On a local
 server that hosts the platform project, `setup` attaches the project to the
 local admin's team and ends `data.next_commands` with `console`; when it finds
 no local admin for that server on the way up, it says so in the envelope's

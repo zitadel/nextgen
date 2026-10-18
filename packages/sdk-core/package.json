@@ -57,6 +57,7 @@
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "@zitadel/components": "workspace:*",
+    "jsdom": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",

@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -196,8 +195,7 @@ func (s *projectService) create(ctx context.Context, project *domain.Project, se
 		if err != nil {
 			return err
 		}
-		var userSchema *jsonschema.Schema
-		err = json.Unmarshal(userschema.Schema, &userSchema)
+		userSchema, err := userschema.Document()
 		if err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to parse default user schema")
 		}
