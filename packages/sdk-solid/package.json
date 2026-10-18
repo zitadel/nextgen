@@ -19,6 +19,7 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "solid": "./dist/index.jsx",
       "import": "./dist/index.js"
     }
   },
@@ -26,7 +27,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "vite build",
+    "build": "vite build && tsc -p tsconfig.lib.json --outDir dist --declaration false --declarationMap false",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
     "test:all": "pnpm run test",
