@@ -18,7 +18,7 @@ JSX you drop into your routes.
 
 ## When to use
 
-- **Fresh project:** prefer the CLI. `zitadel setup --framework solid`
+- **Fresh project:** prefer the CLI. `npx @zitadel/cli@alpha setup --framework solid`
   scaffolds a wired Solid app (and the dev proxy) for you — see the
   `zitadel-cli` skill. Don't hand-assemble what the CLI generates.
 - **This skill:** an app that already exists, or a custom integration the
@@ -31,7 +31,7 @@ JSX you drop into your routes.
 TypeScript >= 5.0.
 
 ```sh
-npm install @zitadel/sdk-solid
+npm install @zitadel/sdk-solid@alpha
 ```
 
 ## Integrate

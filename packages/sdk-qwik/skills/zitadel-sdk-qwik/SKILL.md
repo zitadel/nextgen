@@ -16,7 +16,7 @@ shared SPA config/handler types.
 
 ## When to use
 
-- **Fresh Qwik app → use the CLI instead.** `zitadel setup --framework qwik`
+- **Fresh Qwik app → use the CLI instead.** `npx @zitadel/cli@alpha setup --framework qwik`
   scaffolds auth into a new or detected Qwik project end to end (it wires this
   SDK, the dev proxy, and config). Reach for the `zitadel-cli` skill for that.
   Note the CLI scaffolds against **Qwik 2**, which this package also targets.
@@ -26,7 +26,7 @@ shared SPA config/handler types.
 ## Install
 
 ```sh
-pnpm add @zitadel/sdk-qwik
+pnpm add @zitadel/sdk-qwik@alpha
 ```
 
 The package declares a peer dependency on `@qwik.dev/core` (`^2.0.0-beta.45`),

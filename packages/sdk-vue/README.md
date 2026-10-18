@@ -2,7 +2,15 @@
 
 Vue 3 components for the Zitadel auth UI, for client-side SPAs (Vite, etc.).
 
+## Installation
+
+```bash
+pnpm add @zitadel/sdk-vue@alpha
+```
+
 ## Requirements
+
+Peer dependencies: `vue >=3`.
 
 TypeScript ≥ 5.0 — the published type definitions re-export with `export type *`, which TypeScript introduced in 5.0.
 
