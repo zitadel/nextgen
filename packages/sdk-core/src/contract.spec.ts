@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+import { ZitadelLogin, ZitadelLogout, ZitadelSession } from "@zitadel/components";
 import { DISPATCHED_EVENTS } from "@zitadel/components/events";
 import { describe, expect, it } from "vitest";
 
@@ -8,6 +10,9 @@ import {
   ZITADEL_LOGOUT_EVENTS,
   ZITADEL_SESSION_EVENT_HANDLERS,
   ZITADEL_SESSION_EVENTS,
+  type ZitadelLoginConfig,
+  type ZitadelLogoutConfig,
+  type ZitadelSessionConfig,
 } from "./types.js";
 
 /**
@@ -40,5 +45,126 @@ describe("SPA widget contract ↔ @zitadel/components", () => {
       const names = Object.values(handlers);
       expect(new Set(names).size).toBe(names.length);
     }
+  });
+});
+
+/**
+ * The element↔config drift guard for properties.
+ *
+ * The SPA SDK wrappers take their props from the config types in `types.ts`,
+ * while the elements' real public properties are the Lit reactive properties
+ * in `@zitadel/components`. Nothing tied the two together, so a property added
+ * to an element (`resumeFlowId`) was silently missing from every wrapper. This
+ * lives here, not in `@zitadel/components`, because the dependency points this
+ * way: `sdk-core` already depends on the components (for the event guard
+ * above) and the components never import `sdk-core`.
+ *
+ * Each `*_CONFIG_KEYS` object is checked against its config type by `satisfies
+ * Record<keyof Config, …>`, so a key added to or removed from a config type
+ * fails `tsc` until the list is updated, and the runtime tests then compare
+ * the list with the element's `elementProperties`. A public element property
+ * that is not a config key must be listed in `*_ELEMENT_ONLY` with a reason.
+ */
+const LOGIN_CONFIG_KEYS = {
+  project: true,
+  projectId: true,
+  proxyPath: true,
+  variant: true,
+  theme: true,
+  suppressHeader: true,
+  suppressPasswordToggle: true,
+  purpose: true,
+  flowName: true,
+  postSignInUrl: true,
+  resumeFlowId: true,
+  locales: true,
+  lang: true,
+} satisfies Record<keyof ZitadelLoginConfig, true>;
+
+const SESSION_CONFIG_KEYS = {
+  project: true,
+  projectId: true,
+  proxyPath: true,
+  postSignOutUrl: true,
+  heading: true,
+  logoutLabel: true,
+  variant: true,
+  theme: true,
+  suppressHeader: true,
+} satisfies Record<keyof ZitadelSessionConfig, true>;
+
+const LOGOUT_CONFIG_KEYS = {
+  project: true,
+  projectId: true,
+  proxyPath: true,
+  postSignOutUrl: true,
+  theme: true,
+} satisfies Record<keyof ZitadelLogoutConfig, true>;
+
+const URL_REASON =
+  "declarative full backend URL for plain HTML pages; SPA wrappers configure the backend through project or proxyPath";
+
+const LOGIN_ELEMENT_ONLY: Record<string, string> = {
+  url: URL_REASON,
+  previewState: "operator preview mode, not part of the shared login config",
+  previewSuccessStep: "operator preview mode, not part of the shared login config",
+};
+
+const SESSION_ELEMENT_ONLY: Record<string, string> = { url: URL_REASON };
+
+const LOGOUT_ELEMENT_ONLY: Record<string, string> = { url: URL_REASON };
+
+type Declaration = { state?: boolean };
+type ElementCtor = (typeof ZitadelLogin | typeof ZitadelSession | typeof ZitadelLogout) & {
+  elementProperties: Map<PropertyKey, Declaration>;
+};
+
+/** Public reactive property names of an element (`@state` ones are internal). */
+function publicProperties(ctor: ElementCtor, tag: string): string[] {
+  // Force Lit finalization so `elementProperties` is fully populated.
+  document.createElement(tag);
+  const names: string[] = [];
+  for (const [prop, decl] of ctor.elementProperties) {
+    if (!decl.state) names.push(String(prop));
+  }
+  return names;
+}
+
+describe("config types ↔ element properties", () => {
+  describe.each([
+    ["zitadel-login", ZitadelLogin, LOGIN_CONFIG_KEYS, LOGIN_ELEMENT_ONLY],
+    ["zitadel-session", ZitadelSession, SESSION_CONFIG_KEYS, SESSION_ELEMENT_ONLY],
+    ["zitadel-logout", ZitadelLogout, LOGOUT_CONFIG_KEYS, LOGOUT_ELEMENT_ONLY],
+  ] as const)("<%s>", (tag, ctor, configKeys, elementOnly) => {
+    const properties = publicProperties(ctor as ElementCtor, tag);
+
+    it("has public properties to compare", () => {
+      expect(properties.length).toBeGreaterThan(0);
+    });
+
+    it("represents every public property as a config key or a justified exclusion", () => {
+      const unaccounted = properties.filter(
+        (name) => !(name in configKeys) && !(name in elementOnly),
+      );
+      expect(unaccounted).toEqual([]);
+    });
+
+    it("backs every config key with an element property", () => {
+      const missing = Object.keys(configKeys).filter((key) => !properties.includes(key));
+      expect(missing).toEqual([]);
+    });
+
+    it("lists only real element properties that are not config keys as exclusions", () => {
+      const stale = Object.keys(elementOnly).filter(
+        (name) => !properties.includes(name) || name in configKeys,
+      );
+      expect(stale).toEqual([]);
+    });
+
+    it("gives every exclusion a reason", () => {
+      for (const [name, reason] of Object.entries(elementOnly)) {
+        expect(reason.trim(), `reason for ${name}`).not.toBe("");
+      }
+    });
   });
 });

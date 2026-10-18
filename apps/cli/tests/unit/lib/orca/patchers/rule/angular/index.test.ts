@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
+import { FRAMEWORK_IDS } from "../../../../../../helpers/framework-ids";
 import { AngularPatcher } from "../../../../../../../src/lib/orca/patchers/rule/angular";
 import type {
   FileOp,
@@ -687,5 +688,11 @@ describe("the generated proxy.conf.cjs, run by Vite against a remote https serve
 
     expect(response.ok).toBe(false);
     expect(remote.requests).toHaveLength(reached);
+  });
+});
+
+describe("AngularPatcher.canPatch", () => {
+  it.each(FRAMEWORK_IDS)("matches %s only when it is its own framework", (id) => {
+    expect(new AngularPatcher().canPatch(id)).toBe(id === "angular");
   });
 });

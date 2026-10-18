@@ -1,6 +1,6 @@
 ---
 title: Angular SDK
-description: Angular wrappers for Zitadel login and logout UI.
+description: Client-side Angular wrappers for the Zitadel login and logout components.
 ---
 
 import { Callout } from "fumadocs-ui/components/callout";
@@ -8,7 +8,7 @@ import { File, Files } from "fumadocs-ui/components/files";
 import { Step, Steps } from "fumadocs-ui/components/steps";
 import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 
-The Angular SDK exposes standalone components that wrap the shared Zitadel auth UI.
+The Angular SDK is the SPA wrapper for the shared Zitadel login and logout widgets, exposed as standalone components.
 
 <Callout title="Generated proxy" type="info">
   Angular uses a dev-server proxy config rather than Vite middleware. Production still needs a same-origin proxy for `/__nextgen/*`. See [SDK proxy](/docs/concepts/sdk-proxy).
@@ -71,6 +71,8 @@ The Angular SDK exposes standalone components that wrap the shared Zitadel auth 
       project = project;
     }
     ```
+
+    `<zitadel-auth-login>` also takes `resumeFlowId`, an existing flow to resume instead of starting a new one; unset, `null` or `""` falls back to the `flow` query parameter.
   </Tab>
 </Tabs>
 

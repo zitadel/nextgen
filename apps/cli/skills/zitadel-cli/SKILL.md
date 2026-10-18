@@ -37,6 +37,15 @@ which still points at an early `0.0.0` build. Use an exact `1.0.0-alpha.N`
 selector in agent scripts and bug reports for reproducibility.
 The CLI requires Node.js 24+.
 
+The app's framework must be at or above a minimum version: Next.js 15.2.3,
+React 18, Vue 3, Nuxt 4, Angular 17, Solid 1.6, Svelte 5, Qwik 2.0.0-beta.45. Newer major
+versions are not refused. `setup` and `doctor` refuse an app below its minimum,
+by declared range or installed release, with `E_UNSUPPORTED_PROJECT_SHAPE`
+(exit 3); `setup` refuses before it scaffolds or patches anything, while
+`doctor --fix` can still repair unrelated files, so do not assume a floor error
+left the project untouched. The message names the minimum and the hint says to
+upgrade, so upgrade the app and rerun rather than retrying.
+
 ## Using the CLI
 
 - **Drive it non-interactively.** Always pass `--non-interactive --json` (short:
@@ -305,11 +314,16 @@ replaces a file at a path setup writes, but not the app's root component or
 request boundary at another path.
 
 The app may also live in a subdirectory of the one `start` ran in: `setup`,
-`console` and `--server local` read `.zitadel/local/` from the working
+`console`, `--server local` and `doctor` read `.zitadel/local/` from the working
 directory or the nearest parent that has it (up to the home directory), so
-`mkdir my-app && cd my-app` after `start` works too. `stop`, `reset`, `logs`,
-`status` and `doctor` read only the working directory's `.zitadel/local/`, so
-run them where `start` ran. On a local
+`mkdir my-app && cd my-app` after `start` works too. `doctor` checks that
+server and its port, but runs its project checks in the working directory, so run
+it from the app. When that server is unhealthy it suggests `start` and
+`reset --force` with `--cwd` set to the directory that holds it (when that path needs
+shell quoting the commands are left out, the hint names the directory, and
+`doctor --json` returns the argument lists in `details.suggested_args` to run as they are). `stop`,
+`reset`, `logs` and `status` read only the working directory's
+`.zitadel/local/`, so run them where `start` ran. On a local
 server that hosts the platform project, `setup` attaches the project to the
 local admin's team and ends `data.next_commands` with `console`; when it finds
 no local admin for that server on the way up, it says so in the envelope's
