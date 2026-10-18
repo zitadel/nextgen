@@ -3,18 +3,15 @@ import type { ZitadelLogout as ZitadelLogoutElement } from "@zitadel/components"
 import type { ZitadelSignoutDetail } from "@zitadel/sdk-core/types";
 
 import {
-  type AfterViewInit,
   Component,
   CUSTOM_ELEMENTS_SCHEMA,
   EventEmitter,
   Input,
-  type OnChanges,
   Output,
   ViewChild,
 } from "@angular/core";
 
 import type { ZitadelProject } from "./config";
-import { assignGiven } from "./given";
 
 import "@zitadel/components";
 
@@ -40,10 +37,11 @@ import "@zitadel/components";
     [projectId]="projectId"
     [proxyPath]="proxyPath"
     [attr.post-sign-out-url]="postSignOutUrl"
+    [attr.theme]="theme ?? null"
     (zitadel-signout)="onSignout($event)"
   ></zitadel-logout>`,
 })
-export class ZitadelLogoutComponent implements AfterViewInit, OnChanges {
+export class ZitadelLogoutComponent {
   @Input() project?: ZitadelProject;
   @Input() projectId?: string;
   @Input() proxyPath?: string;
@@ -56,23 +54,6 @@ export class ZitadelLogoutComponent implements AfterViewInit, OnChanges {
   /** The underlying `<zitadel-logout>` custom element, or `null` before view init. */
   get element(): ZitadelLogoutElement | null {
     return this.elementRef?.nativeElement ?? null;
-  }
-
-  ngAfterViewInit(): void {
-    this.assignOptional();
-  }
-
-  ngOnChanges(): void {
-    this.assignOptional();
-  }
-
-  // Props the element has defaults for are assigned only when given; a
-  // binding would assign `undefined` and overwrite the default.
-  private assignOptional(): void {
-    if (!this.element) return;
-    assignGiven(this.element, {
-      theme: this.theme,
-    });
   }
 
   onSignout(event: Event): void {

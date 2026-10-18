@@ -10,18 +10,15 @@ import type {
 } from "@zitadel/sdk-core/types";
 
 import {
-  type AfterViewInit,
   Component,
   CUSTOM_ELEMENTS_SCHEMA,
   EventEmitter,
   Input,
-  type OnChanges,
   Output,
   ViewChild,
 } from "@angular/core";
 
 import type { ZitadelProject } from "./config";
-import { assignGiven } from "./given";
 
 // Registers <zitadel-login> / <zitadel-logout> with the browser.
 import "@zitadel/components";
@@ -57,10 +54,15 @@ import "@zitadel/components";
     [projectId]="projectId"
     [proxyPath]="proxyPath"
     [locales]="locales"
+    [lang]="lang"
     [attr.purpose]="purpose"
     [attr.flow-name]="flowName"
     [attr.post-sign-in-url]="postSignInUrl"
     [attr.resume-flow-id]="resumeFlowId"
+    [attr.variant]="variant ?? null"
+    [attr.theme]="theme ?? null"
+    [suppressHeader]="suppressHeader"
+    [suppressPasswordToggle]="suppressPasswordToggle"
     (zitadel-flow-step)="onFlowStep($event)"
     (zitadel-flow-input)="onFlowInput($event)"
     (zitadel-flow-complete)="onFlowComplete($event)"
@@ -68,7 +70,7 @@ import "@zitadel/components";
     (zitadel-flow-error)="onFlowError($event)"
   ></zitadel-login>`,
 })
-export class ZitadelLoginComponent implements AfterViewInit, OnChanges {
+export class ZitadelLoginComponent {
   @Input() project?: ZitadelProject;
   @Input() projectId?: string;
   @Input() proxyPath?: string;
@@ -94,27 +96,6 @@ export class ZitadelLoginComponent implements AfterViewInit, OnChanges {
   /** The underlying `<zitadel-login>` custom element, or `null` before view init. */
   get element(): ZitadelLoginElement | null {
     return this.elementRef?.nativeElement ?? null;
-  }
-
-  ngAfterViewInit(): void {
-    this.assignOptional();
-  }
-
-  ngOnChanges(): void {
-    this.assignOptional();
-  }
-
-  // Props the element has defaults for are assigned only when given; a
-  // binding would assign `undefined` and overwrite the default.
-  private assignOptional(): void {
-    if (!this.element) return;
-    assignGiven(this.element, {
-      lang: this.lang,
-      variant: this.variant,
-      theme: this.theme,
-      suppressHeader: this.suppressHeader,
-      suppressPasswordToggle: this.suppressPasswordToggle,
-    });
   }
 
   onFlowStep(event: Event): void {
