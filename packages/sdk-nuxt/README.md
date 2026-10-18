@@ -5,7 +5,7 @@ Nuxt module, Nitro middleware, and helpers for Nextgen Auth.
 ## Installation
 
 ```bash
-pnpm add @zitadel/sdk-nuxt
+pnpm add @zitadel/sdk-nuxt@alpha
 ```
 
 There are two ways to wire the SDK. **The module is what `zitadel setup`
@@ -95,7 +95,7 @@ Under strict package managers (pnpm, Yarn PnP) `@zitadel/components` is not
 resolvable as a transitive dependency, so declare it in your app first:
 
 ```bash
-pnpm add @zitadel/components
+pnpm add @zitadel/components@alpha
 ```
 
 ```ts
@@ -120,6 +120,23 @@ const project = useZitadelProject();
     </ClientOnly>
   </main>
 </template>
+```
+
+## Widget events
+
+The widgets are plain custom elements, so each event is a DOM `CustomEvent` that carries its payload in `detail`. The events and payloads are the same ones every SPA SDK exposes as callbacks.
+
+| Widget event | Fires when | Detail | Widgets |
+| --- | --- | --- | --- |
+| `zitadel-flow-step` | Login shows a step, the first one included. | `{ step }` | Login |
+| `zitadel-flow-input` | The visitor edits a field. | `{ name, value }` | Login |
+| `zitadel-flow-complete` | The flow reaches a terminal step. | `{ behavior, redirect_uri?, handoff_token?, handoff_token_expires_at? }` | Login |
+| `zitadel-flow-redirect` | The widget hands the browser to an identity provider; nobody is signed in yet. | `{ redirect_url, step }` | Login |
+| `zitadel-flow-error` | The flow reports an error. | `{ message }` | Login |
+| `zitadel-signout` | The user signs out. | `{ display, identifier }` | Logout, Session |
+
+```vue
+<zitadel-login :project="project" post-sign-in-url="/admin" @zitadel-flow-complete="track" />
 ```
 
 ## Surface 2 — direct middleware (hand-rolled)

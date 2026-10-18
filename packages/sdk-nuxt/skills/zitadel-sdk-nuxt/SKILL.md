@@ -18,7 +18,7 @@ into SSR and hydrates it on the client, and gates protected routes.
 
 ## When to use
 
-The `zitadel` CLI (`zitadel setup --framework nuxt`) scaffolds the module,
+The `zitadel` CLI (`npx @zitadel/cli@alpha setup --framework nuxt`) scaffolds the module,
 plugin, login page, and `.env.local` into a fresh or detected Nuxt project —
 prefer it for greenfield work. Reach for **this skill** when you are adding auth
 to an **existing or custom** Nuxt app by hand, adjusting a scaffolded wiring, or
@@ -27,13 +27,13 @@ wiring the middleware without the module.
 ## Install
 
 ```bash
-pnpm add @zitadel/sdk-nuxt
+pnpm add @zitadel/sdk-nuxt@alpha
 # login/logout web components are a separate, non-transitive dependency under
 # strict package managers (pnpm, Yarn PnP) — declare it explicitly:
-pnpm add @zitadel/components
+pnpm add @zitadel/components@alpha
 ```
 
-Peer deps: `nuxt >=4`, `h3 >=1`.
+Peer dependencies: `nuxt >=4`, `h3 >=1`.
 
 ## Integrate
 
@@ -104,6 +104,23 @@ The other middleware options (`ignoredRoutes`, `audience`,
 built server takes each one from `NUXT_NEXTGEN_<OPTION>` (a list as JSON). Only
 an app without the module hand-rolls `server/middleware/auth.ts` with
 `createNextgenMiddleware(...)` from `@zitadel/sdk-nuxt/server`.
+
+## Widget events
+
+The widgets are plain custom elements, so each event is a DOM `CustomEvent` that carries its payload in `detail`. The events and payloads are the same ones every SPA SDK exposes as callbacks.
+
+| Widget event | Fires when | Detail | Widgets |
+| --- | --- | --- | --- |
+| `zitadel-flow-step` | Login shows a step, the first one included. | `{ step }` | Login |
+| `zitadel-flow-input` | The visitor edits a field. | `{ name, value }` | Login |
+| `zitadel-flow-complete` | The flow reaches a terminal step. | `{ behavior, redirect_uri?, handoff_token?, handoff_token_expires_at? }` | Login |
+| `zitadel-flow-redirect` | The widget hands the browser to an identity provider; nobody is signed in yet. | `{ redirect_url, step }` | Login |
+| `zitadel-flow-error` | The flow reports an error. | `{ message }` | Login |
+| `zitadel-signout` | The user signs out. | `{ display, identifier }` | Logout, Session |
+
+```vue
+<zitadel-login :project="project" post-sign-in-url="/admin" @zitadel-flow-complete="track" />
+```
 
 ## Read these, don't guess
 

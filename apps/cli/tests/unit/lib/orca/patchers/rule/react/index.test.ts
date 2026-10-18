@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { FRAMEWORK_IDS } from "../../../../../../helpers/framework-ids";
 import type {
   FileOp,
   ScaffoldPlan,
@@ -87,5 +88,11 @@ describe("ReactPatcher.artifacts", () => {
     expect(artifacts.markedFiles).toContain("src/App.tsx");
     expect(artifacts.dependencies).toEqual(["@zitadel/sdk-react"]);
     expect(artifacts.configEdits).toEqual(["vite.config.*"]);
+  });
+});
+
+describe("ReactPatcher.canPatch", () => {
+  it.each(FRAMEWORK_IDS)("matches %s only when it is its own framework", (id) => {
+    expect(new ReactPatcher().canPatch(id)).toBe(id === "react");
   });
 });

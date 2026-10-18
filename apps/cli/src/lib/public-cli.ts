@@ -20,7 +20,7 @@ export function npmSelectorForCliVersion(cliVersion: string): string {
  * between them, so a value that needs quoting is not put in a suggested
  * command at all; callers hand it over as an argument list instead.
  */
-function isPortableShellWord(value: string): boolean {
+export function isPortableShellWord(value: string): boolean {
   // `/` is included so a POSIX-style --cwd path can be suggested as written.
   return /^[A-Za-z0-9_./-]+$/.test(value);
 }

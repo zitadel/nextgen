@@ -24,13 +24,15 @@
 //     JSON and the public base is the deployment's URL unless a NEXTGEN_*
 //     variable says otherwise.
 //
-// Migrations run at deploy time, never at startup: build.sh calls
+// A deployment migrates at deploy time, never at startup: build.sh calls
 // `launcher migrate` after compiling, which creates a preview's database when
 // it is missing and runs the server's migrate command against the direct
 // URL. The serving invocation refuses --migrate, so a function cannot change
 // a schema by starting. The build also parses everything the function needs
 // to start (parseServing), so a deployment whose function could not start
-// fails its build and never replaces the deployment that serves.
+// fails its build and never replaces the deployment that serves. A local run
+// without CLOUD_DATABASE_URL (`pnpm run cloud`, scripts/run-cloud.mjs) has no
+// build step, so it migrates its own database before serving.
 package main
 
 import (
@@ -289,6 +291,12 @@ func prepareServer(extra []string) ([]string, error) {
 	}
 
 	args := []string{"server", "--config", configPath}
+	// A local run serves the server's own database (SQLite unless a
+	// NEXTGEN_DATABASE_* variable names another) and no build step migrated
+	// it, so the server migrates it before serving. A deployment never does.
+	if !deployed(env) && s.dsn == "" {
+		args = append(args, "--migrate")
+	}
 
 	if s.admin != nil {
 		adminPath := filepath.Join(dataDir, "admin-user.json")

@@ -1,55 +1,28 @@
-import { setTimeout as sleep } from "node:timers/promises";
-
 import { Flags } from "@oclif/core";
 
 import consola from "consola";
 
 import { ZitadelError, toZitadelError } from "../lib/errors";
 import { ensureLocalAdmin, type LocalAdmin } from "../lib/local-server/admin-credential";
-import { consoleSignInUrl } from "../lib/local-server/sign-in";
-import {
-  binaryLogs,
-  bundledServerVersion,
-  isProcessRunning,
-  startBinaryRuntime,
-  stopBinaryRuntime,
-  type StopBinaryRuntimeResult,
-} from "../lib/local-server/binary";
-import {
-  currentUser,
-  dockerAvailable,
-  ensureImage,
-  inspectContainer,
-  metadataFromStart,
-  startContainer,
-  stopAndRemoveContainer,
-} from "../lib/local-server/docker";
-import {
-  dockerRuntimeGuidance,
-  dockerUnavailableMessage,
-} from "../lib/local-server/docker-guidance";
 import { EMPTY_SUMMARY, loadProjectEnv } from "../lib/local-server/env-vars";
 import {
   DEFAULT_LOCAL_SERVER_PORT,
   PLATFORM_PROJECT_ID,
-  checkLocalServerHealth,
   defaultLocalServerImageForCliVersion,
-  ensureContainerIdentity,
   ensureLocalState,
   localContainerName,
   localServerUrl,
-  readRuntimeMetadata,
-  writeRuntimeMetadata,
+  peekRuntimeMetadata,
   type RuntimeBackend,
   type RuntimeMetadata,
 } from "../lib/local-server/runtime";
+import { LocalServer } from "../lib/local-server/server";
+import { consoleSignInUrl } from "../lib/local-server/sign-in";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../lib/oclif";
-import { listenersForPort, type TcpListener } from "../lib/prober/ports";
-import { reportWarning } from "../lib/warnings";
-import { unscopedCommand } from "../lib/suggestion";
+import { resolveCwd } from "../lib/paths";
 import { nextCommandsData } from "../lib/oclif/envelope";
-
-const START_TIMEOUT_MS = 90_000;
+import { unscopedCommand } from "../lib/suggestion";
+import { reportWarning } from "../lib/warnings";
 
 export default class Start extends BaseCommand {
   static override description = "Start a local Zitadel server.";
@@ -57,7 +30,10 @@ export default class Start extends BaseCommand {
   static override groupOrder = 1;
   static override flags = {
     image: nonBlankString({ description: "Container image to run." }),
-    port: Flags.integer({ description: "Local HTTP port.", default: DEFAULT_LOCAL_SERVER_PORT }),
+    port: Flags.integer({
+      description:
+        "Local HTTP port. By default this directory keeps the port it had, or takes the first free one from 8080.",
+    }),
     runtime: Flags.string({
       description: "Local runtime backend.",
       options: ["binary", "docker"],
@@ -66,7 +42,13 @@ export default class Start extends BaseCommand {
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Start);
-    const port = flags.port ?? DEFAULT_LOCAL_SERVER_PORT;
+    const requestedPort = flags.port;
+    // Where the server will be, as far as is known before one is chosen: the
+    // port asked for, else the one this directory already has.
+    const recorded = await peekRuntimeMetadata(
+      resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined),
+    );
+    const port = requestedPort ?? recorded?.port ?? DEFAULT_LOCAL_SERVER_PORT;
     const serverUrl = localServerUrl(port);
     await this.toMeta(flags, { resolveServer: false, source: serverUrl });
 
@@ -103,13 +85,12 @@ export default class Start extends BaseCommand {
             console: `${serverUrl}/ui/console/`,
             login: `${serverUrl}/ui/login/`,
           },
-          ...nextCommandsData([this.suggestUnscoped("start")]),
+          ...nextCommandsData([unscopedCommand("start", this.meta.cliVersion)]),
         },
       });
     }
 
-    const paths = await ensureLocalState(this.meta.cwd);
-    const existingRuntime = await readRuntimeMetadata(this.meta.cwd);
+    await ensureLocalState(this.meta.cwd);
     // NEXTGEN_* variables from .env.local and .env are read before any runtime
     // is stopped and reach the new runtime through its environment only; see
     // env-vars.ts.
@@ -127,157 +108,24 @@ export default class Start extends BaseCommand {
       ? await ensureLocalAdmin(this.meta.cwd, serverEnv.NEXTGEN_SCHEMA_BUILTIN_PUBLIC_BASE)
       : undefined;
 
-    if (runtimeBackend === "binary") {
-      // A server another CLI release started serves that release's API, and
-      // `setup` against it fails halfway, after the project exists. So a
-      // running server is reused only when it is the version this CLI ships;
-      // the Docker path compares the image for the same reason.
-      const serverVersion = bundledServerVersion();
-      const otherRelease =
-        existingRuntime?.backend === "binary" &&
-        serverVersion !== undefined &&
-        existingRuntime.server_version !== serverVersion
-          ? existingRuntime
-          : undefined;
-      if (
-        existingRuntime?.backend === "binary" &&
-        existingRuntime.port === port &&
-        !otherRelease &&
-        isProcessRunning(existingRuntime.pid) &&
-        (await checkLocalServerHealth(serverUrl))
-      ) {
-        await writeRuntimeMetadata(this.meta.cwd, existingRuntime);
-        return this.emit({
-          status: "ok",
-          data: readyData(
-            existingRuntime,
-            true,
-            this.meta.cliVersion,
-            await consoleLoginFor(serverUrl, local?.admin),
-          ),
-        });
-      }
-      if (otherRelease && isProcessRunning(otherRelease.pid)) {
-        consola.info(
-          `Restarting the local Zitadel server on ${String(serverVersion)}: it ran ${otherRelease.server_version}. Its data stays.`,
-        );
-      }
-      await stopExistingRuntime(existingRuntime);
-      await assertPortAvailableForStart(port, serverUrl, this.meta.cliVersion);
-      const metadata = await startBinaryRuntime({
-        cliVersion: this.meta.cliVersion,
-        dataDir: paths.dataDir,
-        logPath: paths.logFile,
-        port,
-        serverUrl,
-        env,
-        userFile: local?.userFile,
-      });
-      try {
-        await waitForHealth(
-          serverUrl,
-          this.meta.cliVersion,
-          {
-            runtime: "binary",
-            pid: metadata.pid,
-            log_path: metadata.log_path,
-          },
-          {
-            pid: metadata.pid,
-            logPath: metadata.log_path,
-          },
-        );
-      } catch (error) {
-        const stopResult = await stopBinaryRuntime(metadata.pid);
-        if (stopResult.status === "failed") {
-          throw startupCleanupFailedError(error, stopResult, this.meta.cliVersion);
-        }
-        throw error;
-      }
-      await writeRuntimeMetadata(this.meta.cwd, metadata);
-      return this.emit({
-        status: "ok",
-        data: readyData(
-          metadata,
-          false,
-          this.meta.cliVersion,
-          await consoleLoginFor(serverUrl, local?.admin),
-        ),
-      });
-    }
-
-    await assertDockerAvailable(this.meta.cliVersion);
-    if (existingRuntime?.backend === "binary") {
-      await stopBinaryRuntime(existingRuntime.pid);
-    }
-    const existing = await inspectContainer(containerName);
-    if (
-      existing.exists &&
-      existing.running &&
-      existing.image === image &&
-      (await checkLocalServerHealth(serverUrl))
-    ) {
-      const metadata = metadataFromStart({
-        cwdDataDir: paths.dataDir,
-        cliVersion: this.meta.cliVersion,
-        containerName,
-        containerId: existing.id ?? containerName,
-        image,
-        port,
-        serverUrl,
-        // The container was started with whatever was recorded then.
-        env: existingRuntime?.backend === "docker" ? existingRuntime.env : undefined,
-      });
-      await writeRuntimeMetadata(this.meta.cwd, metadata);
-      return this.emit({
-        status: "ok",
-        data: readyData(
-          metadata,
-          true,
-          this.meta.cliVersion,
-          await consoleLoginFor(serverUrl, local?.admin),
-        ),
-      });
-    }
-
-    if (existing.exists) {
-      await stopAndRemoveContainer(containerName);
-    }
-
-    await assertPortAvailableForStart(port, serverUrl, this.meta.cliVersion);
-    await ensureImage(image);
-    const { containerId, env: containerEnv } = await startContainer({
-      containerName,
-      image,
-      port,
-      dataDir: paths.dataDir,
-      identity: await ensureContainerIdentity(this.meta.cwd, currentUser()),
-      env,
-      userFile: local?.userFile,
-    });
-    await waitForHealth(serverUrl, this.meta.cliVersion, {
-      runtime: "docker",
-      container_name: containerName,
-    });
-
-    const metadata = metadataFromStart({
-      cwdDataDir: paths.dataDir,
+    const { runtime, alreadyRunning } = await LocalServer.at(this.meta.cwd, {
       cliVersion: this.meta.cliVersion,
-      containerName,
-      containerId,
-      image,
-      port,
-      serverUrl,
-      env: containerEnv,
-    });
-    await writeRuntimeMetadata(this.meta.cwd, metadata);
+    }).start(
+      runtimeBackend === "docker"
+        ? { backend: "docker", image, env, userFile: local?.userFile }
+        : { backend: "binary", env, userFile: local?.userFile },
+      { port: requestedPort },
+    );
+    // The envelope's `source` named the port guessed before one was chosen; an
+    // agent that follows it would target a different server than the one started.
+    this.meta = { ...this.meta, source: runtime.server_url };
     return this.emit({
       status: "ok",
       data: readyData(
-        metadata,
-        false,
+        runtime,
+        alreadyRunning,
         this.meta.cliVersion,
-        await consoleLoginFor(serverUrl, local?.admin),
+        await consoleLoginFor(runtime.server_url, local?.admin),
       ),
     });
   }
@@ -331,56 +179,6 @@ type ConsoleLogin = {
   hint?: string;
 };
 
-function startupCleanupFailedError(
-  error: unknown,
-  stopResult: StopBinaryRuntimeResult,
-  cliVersion: string,
-): ZitadelError {
-  const startupError = toZitadelError(error);
-  return new ZitadelError(
-    startupError.code,
-    `${startupError.message}; cleanup did not stop the spawned local runtime`,
-    {
-      hint: "Inspect the local runtime process and stop it manually, then rerun `zitadel start`.",
-      nextCommands: unique([
-        ...(startupError.nextCommands ?? []),
-        unscopedCommand("stop --all", cliVersion),
-        unscopedCommand("logs", cliVersion),
-        unscopedCommand("reset --force", cliVersion),
-      ]),
-      details: {
-        startup_error: {
-          code: startupError.code,
-          message: startupError.message,
-          details: startupError.details,
-        },
-        stop_result: stopResult,
-      },
-    },
-  );
-}
-
-async function assertDockerAvailable(cliVersion: string): Promise<void> {
-  let result: Awaited<ReturnType<typeof dockerAvailable>>;
-  try {
-    result = await dockerAvailable();
-  } catch (error) {
-    throw dockerUnavailableError(error, cliVersion);
-  }
-  if (result.status !== 0) {
-    throw dockerUnavailableError(result.stderr || "docker version failed", cliVersion);
-  }
-}
-
-function dockerUnavailableError(error: unknown, cliVersion: string): ZitadelError {
-  const advice = dockerRuntimeGuidance("start", cliVersion);
-  return new ZitadelError("E_VALIDATION", "Docker is not reachable", {
-    hint: advice.hint,
-    nextCommands: advice.nextCommands,
-    details: { message: dockerUnavailableMessage(error) },
-  });
-}
-
 function readyData(
   metadata: RuntimeMetadata,
   alreadyRunning: boolean,
@@ -432,82 +230,6 @@ function readyData(
   };
 }
 
-async function waitForHealth(
-  serverUrl: string,
-  cliVersion: string,
-  details: Record<string, unknown>,
-  runtime?: { logPath?: string; pid?: number },
-): Promise<void> {
-  const started = Date.now();
-  while (Date.now() - started < START_TIMEOUT_MS) {
-    if (runtime?.pid && !isProcessRunning(runtime.pid)) {
-      throw await serverExitedError(serverUrl, cliVersion, details, runtime.logPath);
-    }
-    if (await checkLocalServerHealth(serverUrl, 1000)) {
-      return;
-    }
-    await sleep(1000);
-  }
-  throw new ZitadelError("E_NETWORK", "Local Zitadel server did not become healthy", {
-    hint: "Inspect the local runtime logs, then reset the local runtime if needed.",
-    nextCommands: [
-      unscopedCommand("logs", cliVersion),
-      unscopedCommand("reset --force", cliVersion),
-    ],
-    details: { ...details, server_url: serverUrl },
-  });
-}
-
-async function assertPortAvailableForStart(
-  port: number,
-  serverUrl: string,
-  cliVersion: string,
-): Promise<void> {
-  const listeners = await listenersForPort(port);
-  if (listeners.length === 0) {
-    return;
-  }
-  throw portInUseError(port, serverUrl, listeners, cliVersion);
-}
-
-function portInUseError(
-  port: number,
-  serverUrl: string,
-  listeners: ReadonlyArray<TcpListener>,
-  cliVersion: string,
-): ZitadelError {
-  const fallbackPort = port === DEFAULT_LOCAL_SERVER_PORT ? port + 1 : DEFAULT_LOCAL_SERVER_PORT;
-  return new ZitadelError("E_PORT_IN_USE", `Port ${String(port)} is already in use`, {
-    hint: `Stop the process using ${serverUrl}, run \`zitadel stop --all\` for managed local runtimes, or choose another port.`,
-    nextCommands: [
-      unscopedCommand("stop --all", cliVersion),
-      unscopedCommand(`start --port ${String(fallbackPort)}`, cliVersion),
-    ],
-    details: { port, server_url: serverUrl, listeners },
-  });
-}
-
-async function serverExitedError(
-  serverUrl: string,
-  cliVersion: string,
-  details: Record<string, unknown>,
-  logPath: string | undefined,
-): Promise<ZitadelError> {
-  const logTail = logPath ? await binaryLogs(logPath, 40) : undefined;
-  return new ZitadelError(
-    "E_NETWORK",
-    "Local Zitadel server process exited before becoming healthy",
-    {
-      hint: "Inspect the local runtime logs, then retry after fixing the startup error.",
-      nextCommands: [
-        unscopedCommand("logs", cliVersion),
-        unscopedCommand("reset --force", cliVersion),
-      ],
-      details: { ...details, server_url: serverUrl, ...(logTail ? { log_tail: logTail } : {}) },
-    },
-  );
-}
-
 function validatePort(port: number): void {
   if (!Number.isInteger(port) || port < 1 || port > 65_535) {
     throw new ZitadelError("E_VALIDATION", `Invalid port ${String(port)}`, {
@@ -536,25 +258,4 @@ function assertRuntimeFlags(runtime: RuntimeBackend, image: string | undefined):
       hint: "Use `zitadel start --runtime docker --image <tag>`, or omit --image for the npm binary runtime.",
     });
   }
-}
-
-function unique<T extends string>(values: T[]): T[] {
-  return [...new Set(values)];
-}
-
-async function stopExistingRuntime(runtime: RuntimeMetadata | undefined): Promise<void> {
-  if (!runtime) {
-    return;
-  }
-  if (runtime.backend === "binary") {
-    const stopResult = await stopBinaryRuntime(runtime.pid);
-    if (stopResult.status === "failed") {
-      throw new ZitadelError("E_VALIDATION", "Existing local Zitadel server did not stop", {
-        hint: "Stop the existing local runtime manually, then rerun start.",
-        details: { runtime, stop_result: stopResult },
-      });
-    }
-    return;
-  }
-  await stopAndRemoveContainer(runtime.container_name);
 }

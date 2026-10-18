@@ -37,6 +37,7 @@ import {
   QueryUsersResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { ApiError } from "@zitadel/api/runtime/fetch";
+import { isVariableReference } from "@zitadel/config/idp";
 
 import type { ZitadelClient } from "../lib/api-client";
 import { CommandGroups } from "../lib/oclif/groups";
@@ -48,6 +49,7 @@ import {
   type ResourceRegistry,
   type Schema,
   type UpdateSpec,
+  type WriteShape,
 } from "../lib/oclif/crud";
 
 /**
@@ -63,12 +65,14 @@ export type Platform = Readonly<{ client: ZitadelClient; projectId: string }>;
 const create = <B>(
   schema: Schema<B>,
   call: (ctx: Platform, body: B) => Promise<unknown>,
-): CreateSpec<Platform, B> => ({ schema, call });
+  shape: WriteShape = {},
+): CreateSpec<Platform, B> => ({ ...shape, schema, call });
 
 const update = <B>(
   schema: Schema<B>,
   call: (ctx: Platform, id: string, body: B) => Promise<unknown>,
-): UpdateSpec<Platform, B> => ({ schema, call });
+  shape: WriteShape = {},
+): UpdateSpec<Platform, B> => ({ ...shape, schema, call });
 
 // Infers a structured-query list's request type `B` from its `body` schema. A
 // `GET` list has no body, so it is written as a plain object (request stays `Json`).
@@ -275,8 +279,12 @@ export const RESOURCES = {
       call: ({ client, projectId }, id) => client.getGrant(id, { project_id: projectId }),
       response: GetGrantResponse,
     },
-    create: create(CreateGrantBody, ({ client, projectId }, body) =>
-      client.createGrant(body, { project_id: projectId }),
+    create: create(
+      CreateGrantBody,
+      ({ client, projectId }, body) => client.createGrant(body, { project_id: projectId }),
+      // A grant names exactly one of `user` and `team`, which the required
+      // fields alone cannot say, so the example names the principal itself.
+      { example: "--relation viewer --user-identifier alice@acme.com" },
     ),
     delete: {
       call: ({ client, projectId }, id) => client.deleteGrant(id, { project_id: projectId }),
@@ -309,10 +317,20 @@ export const RESOURCES = {
       call: ({ client, projectId }, id) => client.getIdpById(id, { project_id: projectId }),
       response: GetIdpByIdResponse,
     },
-    // The body nests everything under `idp`, so there are no field flags to
-    // generate; `--data` and `--file` carry it.
-    create: create(CreateIdpBody, ({ client, projectId }, body) =>
-      client.createIdp(body, { project_id: projectId }),
+    // The body nests the connection under `idp`. Rooted there, the flags and
+    // `--set` paths address the connection itself (`--oidc-issuer`), and
+    // `--file` takes the same document as `.zitadel/idps/<slug>.json`. A slug
+    // that already exists is revised rather than duplicated (#1217).
+    create: create(
+      CreateIdpBody,
+      ({ client, projectId }, body) => client.createIdp(body, { project_id: projectId }),
+      {
+        root: "idp",
+        // The `oidc` block is optional to the generated schema, which cannot
+        // say that the protocol requires it, so the example spells it out.
+        example:
+          "--slug acme-sso --protocol oidc --display-name 'Acme SSO' --oidc-issuer https://sso.acme.example --oidc-client-id <client_id> --oidc-client-secret '${{ ACME_SSO_CLIENT_SECRET }}' --oidc-scopes openid --oidc-scopes profile --oidc-scopes email",
+      },
     ),
   },
 
@@ -509,6 +527,10 @@ export const RESOURCES = {
  */
 export const RESOURCE_COMMANDS = buildResourceCommands<Platform>(RESOURCES, {
   operations: FILTER_OPERATIONS,
+  // A `${{ NAME }}` reference to a project variable (ADR 062) names a
+  // credential without revealing it, and is the only form a connection's
+  // `client_secret` takes, so it may stand on a command line.
+  references: { matches: isVariableReference, example: "'${{ NAME }}'" },
   connect: async (open) => {
     const { client, projectId } = await open();
     return { client, projectId };

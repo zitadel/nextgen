@@ -1,5 +1,5 @@
 import { ZitadelError } from "./errors";
-import { resolveLocalServer } from "./local-server/runtime";
+import { LocalServer } from "./local-server/server";
 import type { Parsed } from "@zitadel/config/idp";
 
 /**
@@ -42,7 +42,7 @@ export async function resolveServer(input: ResolveServerInput): Promise<Resolved
     return { value: DEFAULT_SERVER, origin: "default" };
   }
   if (input.serverFlag === "local") {
-    return { value: await resolveLocalServer(input.cwd), origin: "local" };
+    return { value: await LocalServer.resolveUrl(input.cwd), origin: "local" };
   }
   return { value: serverOrigin(input.serverFlag), origin: "flag" };
 }

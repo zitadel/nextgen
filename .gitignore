@@ -123,3 +123,7 @@ tsconfig.tsbuildinfo
 
 # Turborepo (pilot, see turbo.json)
 .turbo
+
+# Vercel CLI: what `vercel dev` (scripts/run-cloud.mjs) keeps, its Go builds
+# and its lock, and a `vercel link`
+.vercel
