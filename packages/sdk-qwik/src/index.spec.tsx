@@ -254,8 +254,10 @@ describe("ZitadelLogin suppressPasswordToggle", () => {
 // a glob over `dist` rather than read from disk.
 describe("package manifest", () => {
   const manifest = manifestJson as {
-    exports: unknown;
+    main?: string;
+    module?: string;
     types?: string;
+    exports: unknown;
     peerDependencies: Record<string, string>;
   };
   const built = Object.keys(import.meta.glob("../dist/**/*", { query: "?url" }));
@@ -267,7 +269,7 @@ describe("package manifest", () => {
   }
 
   it("ships every exports target in dist", () => {
-    const declared = targets([manifest.exports, manifest.types]);
+    const declared = targets([manifest.exports, manifest.main, manifest.module, manifest.types]);
     expect(declared.length).toBeGreaterThan(0);
     expect(declared.filter((file) => !built.includes(file.replace("./dist", "../dist")))).toEqual(
       [],
