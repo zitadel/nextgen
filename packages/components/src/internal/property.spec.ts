@@ -42,9 +42,11 @@ describe("property", () => {
     const probe = new Probe();
     const handle = {};
     probe.handle = handle;
+    expect(probe.handle).toBe(handle);
     probe.handle = undefined;
     expect(probe.handle).toBeUndefined();
     probe.empty = "set";
+    expect(probe.empty).toBe("set");
     probe.empty = null;
     expect(probe.empty).toBeNull();
   });
@@ -56,6 +58,7 @@ describe("property", () => {
     probe.text = "set";
     await probe.updateComplete;
     probe.text = undefined as unknown as string;
+    expect(probe.isUpdatePending).toBe(true);
     await probe.updateComplete;
     expect(probe.text).toBe("default");
     probe.remove();
