@@ -378,9 +378,13 @@ export function hasResponseHook(entry: string): boolean {
   return /proxyRes|cookie(?:Domain|Path)Rewrite/i.test(entry);
 }
 
-/** Whether `text` holds a generated redaction of any version; an older one is upgraded, not skipped. */
+/**
+ * Whether `text` holds the current redaction, or the CLI's own earlier one
+ * byte for byte, which {@link upgradeExchangeRedaction} replaces. A redaction
+ * changed by hand is neither: it is left untouched and still needs review.
+ */
 export function carriesGeneratedRedaction(text: string): boolean {
-  return text.includes("zitadel:proxy:exchange-redaction");
+  return text.includes(EXCHANGE_REDACTION_MARKER) || LEGACY_EXCHANGE_REDACTION_PATTERN.test(text);
 }
 
 /**

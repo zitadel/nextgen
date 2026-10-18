@@ -222,6 +222,7 @@ describe("AngularPatcher.plan", () => {
     );
 
     expect(edit(changed)).toBe(changed);
+    expect(proxyConfigReview()(changed, "proxy.conf.cjs")).toContain("session_token");
   });
 
   it("keeps a managed proxy whose response handling was already chosen by hand", () => {

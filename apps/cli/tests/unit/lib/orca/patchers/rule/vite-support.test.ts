@@ -210,6 +210,7 @@ export default defineConfig({
     );
 
     expect(edit(changed)).toBe(changed);
+    expect(viteProxyReview(changed, "vite.config.ts")).toContain("session_token");
   });
 
   it("keeps a generated entry whose response handling was already chosen by hand", () => {
