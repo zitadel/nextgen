@@ -2,6 +2,8 @@ id: "docs"
 language: "typescript"
 layer: "application"
 stack: "frontend"
+dependsOn:
+  - "api"
 
 workspace:
   inheritedTasks:
@@ -27,6 +29,15 @@ tasks:
   typecheck:
     deps:
       - "generate"
+      # The API reference's TypeScript samples compile against the client
+      # (scripts/sdk-samples.ts, tsconfig.samples.json), whose endpoints this
+      # generates from the same spec.
+      - "api:generate"
+    inputs:
+      # Declaring inputs drops the default project folder, so it is restated.
+      - "**/*"
+      # The client's runtime, which the samples call too.
+      - "/packages/api/src/**/*"
 
   build:
     command: "corepack pnpm exec next build"

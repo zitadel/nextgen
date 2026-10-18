@@ -6,7 +6,9 @@ import { defineDocs } from "fumadocs-mdx/macro";
 import type { OpenAPIV3_2, OperationItem, WebhookItem } from "fumadocs-openapi";
 
 import { codeThemes } from "./code-theme";
+import { defaultRequest, withRefValues } from "./default-request";
 import { openapi } from "./openapi";
+import { sdkSample } from "./sdk-sample";
 import { docsRoute } from "./shared";
 
 const docs = defineDocs({
@@ -51,24 +53,53 @@ ${page.type === "openapi" ? operationText(page) : await page.data.getText("proce
 type OpenAPIPage = Extract<(typeof source)["$inferPage"], { type: "openapi" }>;
 
 // An operation or webhook page has no Markdown of its own. Its text is its
-// endpoints and the part of the OpenAPI document they need, the operations or
-// webhooks and every component they reference, so the page stands on its own.
+// endpoints, an operation's call through @zitadel/api the page shows first,
+// and the part of the OpenAPI document they need, the operations or webhooks
+// and every component they reference, so the page stands on its own.
 function operationText(page: OpenAPIPage) {
   const { operations = [], webhooks = [] } = page.data.getOpenAPIPageProps();
-  const fragment = openapiFragment(page.data.getSchema().bundled, operations, webhooks);
+  const { bundled } = page.data.getSchema();
+  const fragment = openapiFragment(bundled, operations, webhooks);
   const endpoints = [
     ...operations.map(({ method, path }) => `\`${method.toUpperCase()} ${path}\``),
     ...webhooks.map(({ method, name }) => `\`${method.toUpperCase()}\` webhook \`${name}\``),
   ];
+  const samples = operations.flatMap(({ method, path }) => {
+    const sample = operationSample(bundled, path, method);
+    return sample ? [`\`\`\`ts\n${sample}\n\`\`\``] : [];
+  });
 
   return [
     page.data.description,
     endpoints.join("\n"),
+    samples.length > 0 &&
+      "Called through [`@zitadel/api`](/docs/sdks/api-client), with the request the page shows:",
+    ...samples,
     `The ${webhooks.length > 0 ? "webhook" : "operation"} and every component it references, as OpenAPI:`,
     `\`\`\`json\n${JSON.stringify(fragment, null, 2)}\n\`\`\``,
   ]
     .filter(Boolean)
     .join("\n\n");
+}
+
+const resolvable = new WeakMap<OpenAPIV3_2.Document, OpenAPIV3_2.Document>();
+
+// The page's TypeScript sample (lib/sdk-sample.ts) with the operation's
+// default request: the Markdown has no example selector or playground.
+function operationSample(
+  document: OpenAPIV3_2.Document,
+  path: string,
+  method: OperationItem["method"],
+) {
+  let withRefs = resolvable.get(document);
+  if (!withRefs) {
+    withRefs = withRefValues(document);
+    resolvable.set(document, withRefs);
+  }
+  const pathItem = withRefs.paths?.[path];
+  const operation = pathItem?.[method];
+  if (!pathItem || !operation) return undefined;
+  return sdkSample(operation, path, pathItem, defaultRequest(operation, pathItem, method));
 }
 
 function openapiFragment(

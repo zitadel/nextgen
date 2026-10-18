@@ -20,6 +20,10 @@ import {
 // Requests in flight at once over the page list.
 const concurrency = 8;
 
+// An operation page is /docs/reference/api/<tag>/<operation>; the tag's own
+// page, one level up, is content like any other.
+const operationPage = /^\/docs\/reference\/api\/[^/]+\/[^/]+$/;
+
 async function indexedPages(request: APIRequestContext): Promise<IndexedPage[]> {
   const response = await request.get("/docs/llms.txt");
   expect(response.status()).toBe(200);
@@ -116,6 +120,32 @@ test("every page negotiates Markdown through Accept", async ({ request }) => {
   expect(failures(results), "pages that do not negotiate Markdown").toEqual([]);
 });
 
+test("every API operation shows its call through @zitadel/api, as HTML and as Markdown", async ({
+  request,
+}) => {
+  test.setTimeout(120_000);
+  const pages = (await indexedPages(request)).filter((page) => operationPage.test(page.url));
+
+  // The TypeScript sample comes first (components/api-page.tsx), so the page
+  // renders it; the Markdown has it in a code block (lib/source.ts). A
+  // webhook's page, under the same paths, shows its payload instead: the
+  // Markdown says which of the two a page is.
+  const call =
+    /```ts\nimport \{ [^}]+ \} from "@zitadel\/api\/(?:client|config)";\n[\s\S]*?await client\.\w+\(/;
+  let operations = 0;
+  const results = await mapLimit(pages, concurrency, async ({ url }) => {
+    const markdown = await (await request.get(markdownUrl(url))).text();
+    if (!markdown.includes("The operation and every component it references")) return null;
+    operations++;
+    if (!call.test(markdown)) return `${markdownUrl(url)}: no call through @zitadel/api`;
+    const html = await (await request.get(url)).text();
+    if (!html.includes("@zitadel/api/")) return `${url}: no @zitadel/api sample`;
+    return null;
+  });
+  expect(operations).toBeGreaterThan(0);
+  expect(failures(results), "operations without their @zitadel/api call").toEqual([]);
+});
+
 test("a page that does not exist is a 404, as HTML and as Markdown", async ({ request }) => {
   expect((await request.get("/docs/no-such-page")).status()).toBe(404);
   expect((await request.get("/docs/no-such-page.md")).status()).toBe(404);
@@ -131,16 +161,14 @@ test("llms-full.txt carries every page but the API operations", async ({ request
   expect(response.status()).toBe(200);
   const full = await response.text();
 
-  // An operation page is /docs/reference/api/<tag>/<operation>; the tag's own
-  // page, one level up, is content like any other. With the operations and
-  // the schemas they reference the file was twenty times this size (#1685).
-  const operation = /^\/docs\/reference\/api\/[^/]+\/[^/]+$/;
+  // With the operations and the schemas they reference the file was twenty
+  // times this size (#1685).
   const missing = pages
-    .filter((page) => !operation.test(page.url))
+    .filter((page) => !operationPage.test(page.url))
     .filter((page) => !full.includes(`# ${page.title} (${page.url})`))
     .map((page) => page.url);
   expect(missing, "pages missing from llms-full.txt").toEqual([]);
-  const operations = pages.filter((page) => operation.test(page.url));
+  const operations = pages.filter((page) => operationPage.test(page.url));
   expect(operations.length).toBeGreaterThan(0);
   expect(
     operations.filter((page) => full.includes(`(${page.url})`)).map((page) => page.url),
