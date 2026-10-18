@@ -34,9 +34,55 @@
     <nav><a href="/">Tree</a><a href="/join">Join</a><a href="/scenarios">Scenarios</a></nav>
   </header>
   <main>
-    <h1>Phase 2–5 scenarios</h1>
+    <h1>Phase 2–6 scenarios</h1>
     {{if .ScenarioOK}}<div class="flash-ok">{{.ScenarioOK}}</div>{{end}}
     {{if .ScenarioErr}}<div class="flash-err">{{.ScenarioErr}}</div>{{end}}
+
+    <div class="panel">
+      <h2 style="font-size:1rem;margin:0 0 0.5rem">Block / Delete Joe</h2>
+      <p class="muted">
+        Phase 6: home (eu-2) bumps <code>epoch</code> and fans out only to interest subscribers (us).
+        <strong>Block</strong> — online <code>auth/check</code> fails immediately; offline still allows with the unexpired JWT until <code>exp</code> (~60s).
+        <strong>Delete</strong> — pushes <code>user.deleted</code> so us drops the direct grant; home clears group memberships (group FGA check fails); lookup floats a tombstone.
+        If the home cell is stopped, event push errors (fail-closed) and online principal check also fails closed.
+        After delete, re-bootstrap to demo again.
+      </p>
+      <form method="post" action="/scenarios/block-joe" style="display:inline">
+        <button type="submit">Block Joe</button>
+      </form>
+      <form method="post" action="/scenarios/delete-joe" style="display:inline">
+        <button type="submit" class="secondary">Delete Joe</button>
+      </form>
+      {{if .Lifecycle}}
+      <div style="margin-top:1rem">
+        <p class="muted">
+          action=<code>{{.Lifecycle.Action}}</code>
+          · epoch <strong>{{.Lifecycle.Epoch}}</strong>
+          {{if .Lifecycle.Blocked}} · blocked{{end}}
+          {{if .Lifecycle.Deleted}} · deleted{{end}}
+          · us joe-tuples <strong>{{.Lifecycle.USTuplesBefore}} → {{.Lifecycle.USTuplesAfter}}</strong>
+          · offline: {{if .Lifecycle.OfflineAllowed}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">{{.Lifecycle.OfflineReason}}</span>{{end}}
+          · online: {{if .Lifecycle.OnlineAllowed}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">{{.Lifecycle.OnlineReason}}</span>{{end}}
+          {{with .Lifecycle.GroupAllowed}}
+            · group: {{if .}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">denied</span>{{end}}
+          {{end}}
+          {{if ne .Lifecycle.GroupReason ""}} · group reason <code>{{.Lifecycle.GroupReason}}</code>{{end}}
+          {{if ne .Lifecycle.LookupState ""}} · lookup <code>{{.Lifecycle.LookupState}}</code>{{end}}
+        </p>
+        <p class="muted">{{.Lifecycle.Note}}</p>
+        {{if .Lifecycle.Hops}}
+        <table class="trace">
+          <thead><tr><th>Cell</th><th>Method</th><th>ms</th><th>Result</th></tr></thead>
+          <tbody>
+          {{range .Lifecycle.Hops}}
+            <tr><td><code>{{.Cell}}</code></td><td>{{.Method}}</td><td>{{.Ms}}</td><td>{{.Result}}</td></tr>
+          {{end}}
+          </tbody>
+        </table>
+        {{end}}
+      </div>
+      {{end}}
+    </div>
 
     <div class="panel">
       <h2 style="font-size:1rem;margin:0 0 0.5rem">Group check Joe → app:chat</h2>

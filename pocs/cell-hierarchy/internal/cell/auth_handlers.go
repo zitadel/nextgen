@@ -109,6 +109,14 @@ func (s *Server) handleIssueToken(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	if user.DeletedAt != nil {
+		writeErr(w, http.StatusConflict, ErrUserDeleted.Error())
+		return
+	}
+	if user.Blocked {
+		writeErr(w, http.StatusForbidden, ErrUserBlocked.Error())
+		return
+	}
 	epoch := user.Epoch
 	if epoch <= 0 {
 		epoch = DefaultUserEpoch
@@ -172,9 +180,9 @@ func (s *Server) handlePrincipalCheck(w http.ResponseWriter, r *http.Request) {
 	if epoch <= 0 {
 		epoch = DefaultUserEpoch
 	}
-	// P6 will introduce blocked; for now always active if the user exists.
+	active := user.IsActive()
 	writeJSON(w, http.StatusOK, PrincipalCheckResponse{
-		Active: true, Blocked: false, Epoch: epoch, Sub: sub, ProjectID: projectID,
+		Active: active, Blocked: user.Blocked || user.DeletedAt != nil, Epoch: epoch, Sub: sub, ProjectID: projectID,
 	})
 }
 
@@ -273,6 +281,17 @@ func (s *Server) handleAuthCheck(w http.ResponseWriter, r *http.Request) {
 
 	var onlineView *PrincipalView
 	if req.Online {
+		// Local denylist from user.blocked fan-out (optional fail-fast before home RPC).
+		if s.denylist.IsBlocked(projectID, claims.Sub, s.Now()) {
+			trace = append(trace, TraceHop{
+				Cell: meta.URL, Method: "local denylist", Result: "blocked",
+			})
+			onlineView = &PrincipalView{Active: false, Blocked: true, Epoch: claims.Epoch}
+			writeJSON(w, http.StatusOK, AuthCheckResponse{
+				Allowed: false, Reason: ErrPrincipalInactive.Error(), Claims: &claims, Trace: trace, Online: onlineView,
+			})
+			return
+		}
 		hopStart := time.Now()
 		checkHome := NormalizeURL(claims.HomeCell)
 		if checkHome == "" {
@@ -289,6 +308,7 @@ func (s *Server) handleAuthCheck(w http.ResponseWriter, r *http.Request) {
 			Ms: time.Since(hopStart).Milliseconds(),
 		}
 		if err != nil {
+			// Fail-closed when home is unreachable during online check.
 			hop.Result = "error: " + err.Error()
 			trace = append(trace, hop)
 			writeJSON(w, http.StatusOK, AuthCheckResponse{

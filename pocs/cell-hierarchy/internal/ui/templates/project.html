@@ -45,10 +45,18 @@
         <h2 style="font-size:1rem;margin:0 0 0.5rem">Users</h2>
         {{if .Users}}
         <table>
-          <thead><tr><th>Email</th><th>ID</th><th>Created</th></tr></thead>
+          <thead><tr><th>Email</th><th>Epoch</th><th>Status</th><th>ID</th><th>Created</th></tr></thead>
           <tbody>
           {{range .Users}}
-            <tr><td>{{.Email}}</td><td><code>{{.ID}}</code></td><td class="muted">{{.CreatedAt}}</td></tr>
+            <tr>
+              <td>{{.Email}}</td>
+              <td>{{.Epoch}}</td>
+              <td class="muted">
+                {{if .DeletedAt}}deleted{{else if .Blocked}}blocked{{else}}active{{end}}
+              </td>
+              <td><code>{{.ID}}</code></td>
+              <td class="muted">{{.CreatedAt}}</td>
+            </tr>
           {{end}}
           </tbody>
         </table>

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -167,6 +168,7 @@ func (c *PeerClient) PushLookup(ctx context.Context, cellURL string, req PushLoo
 
 type LookupResult struct {
 	Hit              bool   `json:"hit"`
+	Tombstoned       bool   `json:"tombstoned,omitempty"`
 	HomeProjectID    string `json:"home_project_id"`
 	HomeCellURL      string `json:"home_cell_url"`
 	State            string `json:"state,omitempty"`
@@ -176,6 +178,7 @@ type LookupResult struct {
 func (c *PeerClient) Lookup(ctx context.Context, cellURL, projectID, key string) (LookupResult, []TraceHop, error) {
 	var out struct {
 		Hit           bool       `json:"hit"`
+		Tombstoned    bool       `json:"tombstoned"`
 		HomeProjectID string     `json:"home_project_id"`
 		HomeCellURL   string     `json:"home_cell_url"`
 		State         string     `json:"state"`
@@ -186,7 +189,8 @@ func (c *PeerClient) Lookup(ctx context.Context, cellURL, projectID, key string)
 		"key":        key,
 	}, "", &out)
 	return LookupResult{
-		Hit: out.Hit, HomeProjectID: out.HomeProjectID, HomeCellURL: out.HomeCellURL, State: out.State,
+		Hit: out.Hit, Tombstoned: out.Tombstoned || out.State == LookupStateTombstone,
+		HomeProjectID: out.HomeProjectID, HomeCellURL: out.HomeCellURL, State: out.State,
 	}, out.Trace, err
 }
 
@@ -204,6 +208,10 @@ func (c *PeerClient) LookupWalk(ctx context.Context, startCellURL, projectID, ke
 		trace = append(trace, hops...)
 		if err != nil {
 			return LookupResult{}, trace, err
+		}
+		if res.Tombstoned {
+			res.FoundAtProjectID = curProjectID
+			return res, trace, nil
 		}
 		if res.Hit {
 			res.FoundAtProjectID = curProjectID
@@ -366,6 +374,28 @@ func (c *PeerClient) FGAExpand(ctx context.Context, cellURL string, req FGAExpan
 		return out, err
 	}
 	return out, nil
+}
+
+func (c *PeerClient) PushLifecycleEvent(ctx context.Context, subscriberCellURL string, req LifecycleEventRequest) error {
+	return c.doJSON(ctx, http.MethodPost, NormalizeURL(subscriberCellURL)+"/v1/events/user", req, "", nil)
+}
+
+func (c *PeerClient) PushLookupTombstone(ctx context.Context, cellURL string, req PushLookupRequest) error {
+	return c.doJSON(ctx, http.MethodPost, NormalizeURL(cellURL)+"/v1/lookup/tombstone", req, "", nil)
+}
+
+func (c *PeerClient) BlockUser(ctx context.Context, cellURL, projectID, key string) (BlockUserResponse, error) {
+	var out BlockUserResponse
+	path := NormalizeURL(cellURL) + "/v1/projects/" + projectID + "/users/" + url.PathEscape(key) + "/block"
+	err := c.doJSONAllowError(ctx, http.MethodPost, path, map[string]any{}, &out)
+	return out, err
+}
+
+func (c *PeerClient) DeleteUser(ctx context.Context, cellURL, projectID, key string) (DeleteUserResponse, error) {
+	var out DeleteUserResponse
+	path := NormalizeURL(cellURL) + "/v1/projects/" + projectID + "/users/" + url.PathEscape(key) + "/delete"
+	err := c.doJSONAllowError(ctx, http.MethodPost, path, map[string]any{}, &out)
+	return out, err
 }
 
 func (c *PeerClient) doJSON(ctx context.Context, method, url string, body any, bearer string, out any) error {

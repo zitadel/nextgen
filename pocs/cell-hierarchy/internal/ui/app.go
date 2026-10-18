@@ -40,6 +40,9 @@ type App struct {
 
 	groupCheckMu sync.Mutex
 	groupCheck   *groupCheckResult
+
+	lifecycleMu sync.Mutex
+	lifecycle   *lifecycleResult
 }
 
 type traceEntry struct {
@@ -77,6 +80,8 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("POST /scenarios/sign-in-joe", a.handleScenarioSignInJoe)
 	mux.HandleFunc("POST /scenarios/seed-group-chain", a.handleScenarioSeedGroupChain)
 	mux.HandleFunc("POST /scenarios/group-check-joe", a.handleScenarioGroupCheckJoe)
+	mux.HandleFunc("POST /scenarios/block-joe", a.handleScenarioBlockJoe)
+	mux.HandleFunc("POST /scenarios/delete-joe", a.handleScenarioDeleteJoe)
 	mux.HandleFunc("GET /trace", a.handleTrace)
 	mux.HandleFunc("POST /trace/clear", a.handleTraceClear)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -126,6 +131,27 @@ type pageData struct {
 	ScenarioErr string
 	SignIn      *signInResult
 	GroupCheck  *groupCheckResult
+	Lifecycle   *lifecycleResult
+}
+
+type lifecycleResult struct {
+	Action         string
+	Epoch          int
+	Blocked        bool
+	Deleted        bool
+	OnlineAllowed  bool
+	OnlineReason   string
+	OfflineAllowed bool
+	OfflineReason  string
+	Token          string
+	USTuplesBefore int
+	USTuplesAfter  int
+	GroupAllowed   *bool
+	GroupReason    string
+	LookupHit      bool
+	LookupState    string
+	Note           string
+	Hops           []cell.TraceHop
 }
 
 type signInResult struct {
@@ -170,10 +196,13 @@ type projectDetail struct {
 }
 
 type userRow struct {
-	ID        string `json:"id"`
-	ProjectID string `json:"project_id"`
-	Email     string `json:"email"`
-	CreatedAt string `json:"created_at"`
+	ID        string  `json:"id"`
+	ProjectID string  `json:"project_id"`
+	Email     string  `json:"email"`
+	Epoch     int     `json:"epoch"`
+	Blocked   bool    `json:"blocked"`
+	DeletedAt *string `json:"deleted_at,omitempty"`
+	CreatedAt string  `json:"created_at"`
 }
 
 type lookupRow struct {
@@ -323,6 +352,7 @@ func (a *App) handleScenarios(w http.ResponseWriter, r *http.Request) {
 		ScenarioErr: r.URL.Query().Get("err"),
 		SignIn:      a.copySignIn(),
 		GroupCheck:  a.copyGroupCheck(),
+		Lifecycle:   a.copyLifecycle(),
 	})
 }
 
@@ -714,6 +744,237 @@ func (a *App) copyGroupCheck() *groupCheckResult {
 	if a.groupCheck.Hops != nil {
 		cp.Hops = make([]cell.TraceHop, len(a.groupCheck.Hops))
 		copy(cp.Hops, a.groupCheck.Hops)
+	}
+	return &cp
+}
+
+func (a *App) handleScenarioBlockJoe(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
+	defer cancel()
+	result, err := a.runLifecycleScenario(ctx, "block")
+	if err != nil {
+		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		return
+	}
+	a.setLifecycle(result)
+	msg := fmt.Sprintf("blocked joe · epoch=%d · online=%v (%s) · offline=%v (%s)",
+		result.Epoch, result.OnlineAllowed, result.OnlineReason, result.OfflineAllowed, result.OfflineReason)
+	http.Redirect(w, r, "/scenarios?ok="+url.QueryEscape(msg), http.StatusSeeOther)
+}
+
+func (a *App) handleScenarioDeleteJoe(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
+	defer cancel()
+	result, err := a.runLifecycleScenario(ctx, "delete")
+	if err != nil {
+		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		return
+	}
+	a.setLifecycle(result)
+	msg := fmt.Sprintf("deleted joe · us tuples %d→%d · lookup=%s · group=%s",
+		result.USTuplesBefore, result.USTuplesAfter, result.LookupState, result.GroupReason)
+	http.Redirect(w, r, "/scenarios?ok="+url.QueryEscape(msg), http.StatusSeeOther)
+}
+
+func (a *App) runLifecycleScenario(ctx context.Context, action string) (*lifecycleResult, error) {
+	eu2Host, err := a.cellURLByLabel("eu-2")
+	if err != nil {
+		return nil, err
+	}
+	usHost, err := a.cellURLByLabel("us")
+	if err != nil {
+		return nil, err
+	}
+	key := "joe@example.com"
+
+	// Recreate Joe when missing; refuse if already deleted (needs re-bootstrap).
+	// Blocked is ok for delete; for block we refuse so the demo stays clear.
+	if err := a.ensureJoeAlive(ctx, action); err != nil {
+		return nil, err
+	}
+	// Ensure direct grant + group chain exist so before/after is meaningful.
+	if _, err := a.ensureJoeGrant(ctx); err != nil {
+		return nil, err
+	}
+	if err := a.ensureGroupChain(ctx); err != nil {
+		return nil, err
+	}
+
+	tuplesBefore, err := a.Peer.ListTuples(ctx, usHost, "us")
+	if err != nil {
+		return nil, err
+	}
+	joeBefore := countJoeTuples(tuplesBefore)
+
+	var hops []cell.TraceHop
+	result := &lifecycleResult{
+		Action:         action,
+		USTuplesBefore: joeBefore,
+		Note: "Online auth/check fails immediately after block (epoch/blocked). " +
+			"Offline (online=false) still allows until JWT exp (~60s). " +
+			"Delete fans out user.deleted only to interest subscribers; home group memberships are cleared so FGA expand misses Joe. " +
+			"If home is stopped, event push errors (fail-closed) and online principal/check also fails closed.",
+	}
+
+	// Issue a fresh token while Joe is still active so offline can demonstrate stale allow.
+	var token string
+	issued, err := a.Peer.IssueToken(ctx, eu2Host, cell.IssueTokenRequest{
+		ProjectID: "team-eu-2", Sub: key, Aud: "app:chat",
+	})
+	if err != nil {
+		// Already blocked (delete-after-block): skip offline/online token demo.
+		a.appendTrace("lifecycle: issue before "+action, nil, err.Error())
+		result.OfflineReason = "no_token:" + err.Error()
+		result.OnlineReason = "no_token:" + err.Error()
+	} else {
+		token = issued.Token
+		result.Token = token
+		a.appendTrace("lifecycle: issue before "+action, nil, fmt.Sprintf("epoch=%d exp=%d", issued.Claims.Epoch, issued.Claims.Exp))
+	}
+
+	switch action {
+	case "block":
+		out, err := a.Peer.BlockUser(ctx, eu2Host, "team-eu-2", key)
+		hops = out.Trace
+		if err != nil {
+			a.appendTrace("block joe", hops, err.Error())
+			return nil, err
+		}
+		result.Epoch = out.User.Epoch
+		result.Blocked = out.User.Blocked
+		a.appendTrace("block joe", hops, fmt.Sprintf("epoch=%d blocked=%v", out.User.Epoch, out.User.Blocked))
+	case "delete":
+		out, err := a.Peer.DeleteUser(ctx, eu2Host, "team-eu-2", key)
+		hops = out.Trace
+		if err != nil {
+			a.appendTrace("delete joe", hops, err.Error())
+			return nil, err
+		}
+		result.Epoch = out.User.Epoch
+		result.Blocked = out.User.Blocked
+		result.Deleted = out.User.DeletedAt != nil
+		a.appendTrace("delete joe", hops, fmt.Sprintf("epoch=%d deleted=%v", out.User.Epoch, result.Deleted))
+	default:
+		return nil, fmt.Errorf("unknown action %q", action)
+	}
+	result.Hops = hops
+
+	if token != "" {
+		offline, err := a.Peer.AuthCheck(ctx, usHost, cell.AuthCheckRequest{
+			Token: token, ProjectID: "us", Object: "app:chat", Relation: "viewer", Online: false,
+		})
+		if err != nil {
+			return nil, err
+		}
+		result.OfflineAllowed = offline.Allowed
+		result.OfflineReason = offline.Reason
+		a.appendTrace("lifecycle: auth offline after "+action, offline.Trace, offline.Reason)
+
+		online, err := a.Peer.AuthCheck(ctx, usHost, cell.AuthCheckRequest{
+			Token: token, ProjectID: "us", Object: "app:chat", Relation: "viewer", Online: true,
+		})
+		if err != nil {
+			return nil, err
+		}
+		result.OnlineAllowed = online.Allowed
+		result.OnlineReason = online.Reason
+		a.appendTrace("lifecycle: auth online after "+action, online.Trace, online.Reason)
+	}
+
+	tuplesAfter, err := a.Peer.ListTuples(ctx, usHost, "us")
+	if err != nil {
+		return nil, err
+	}
+	result.USTuplesAfter = countJoeTuples(tuplesAfter)
+
+	if action == "delete" {
+		group, err := a.Peer.FGACheck(ctx, usHost, cell.FGACheckRequest{
+			ProjectID: "us", Object: "app:chat", Relation: "viewer", UserKey: key,
+		})
+		if err != nil {
+			return nil, err
+		}
+		allowed := group.Allowed
+		result.GroupAllowed = &allowed
+		result.GroupReason = group.Reason
+		a.appendTrace("lifecycle: group check after delete", group.Trace, group.Reason)
+
+		look, hops, err := a.Peer.LookupWalk(ctx, usHost, "us", key)
+		if err != nil {
+			return nil, err
+		}
+		result.LookupHit = look.Hit
+		if look.Tombstoned {
+			result.LookupState = "tombstone"
+		} else if look.Hit {
+			result.LookupState = "hit:" + look.State
+		} else {
+			result.LookupState = "miss"
+		}
+		a.appendTrace("lifecycle: lookup after delete", hops, result.LookupState)
+	}
+	return result, nil
+}
+
+func countJoeTuples(tuples []cell.TupleView) int {
+	n := 0
+	for _, tup := range tuples {
+		if tup.UserKey == "joe@example.com" && tup.SubjectKind == cell.SubjectKindUser {
+			n++
+		}
+	}
+	return n
+}
+
+// ensureJoeAlive recreates joe@example.com on team-eu-2 when missing.
+// After delete the home row stays as a tombstone — re-bootstrap to demo again.
+func (a *App) ensureJoeAlive(ctx context.Context, action string) error {
+	eu2Host, err := a.cellURLByLabel("eu-2")
+	if err != nil {
+		return err
+	}
+	var raw struct {
+		Users []userRow `json:"users"`
+	}
+	if err := a.Peer.DoRaw(ctx, http.MethodGet, cell.NormalizeURL(eu2Host)+"/v1/projects/team-eu-2", nil, "", &raw); err != nil {
+		return err
+	}
+	for _, u := range raw.Users {
+		if u.Email == "joe@example.com" {
+			if u.DeletedAt != nil {
+				return fmt.Errorf("joe is deleted (tombstone) — re-run ./scripts/run-local.sh to demo again")
+			}
+			if action == "block" && u.Blocked {
+				return fmt.Errorf("joe is already blocked — delete joe or re-bootstrap before a fresh block demo")
+			}
+			return nil
+		}
+	}
+	out, err := a.Peer.CreateUser(ctx, eu2Host, "team-eu-2", "joe@example.com", false)
+	if err != nil {
+		a.appendTrace("recreate joe", out.Trace, err.Error())
+		return err
+	}
+	a.appendTrace("recreate joe", out.Trace, "created")
+	return nil
+}
+
+func (a *App) setLifecycle(lr *lifecycleResult) {
+	a.lifecycleMu.Lock()
+	defer a.lifecycleMu.Unlock()
+	a.lifecycle = lr
+}
+
+func (a *App) copyLifecycle() *lifecycleResult {
+	a.lifecycleMu.Lock()
+	defer a.lifecycleMu.Unlock()
+	if a.lifecycle == nil {
+		return nil
+	}
+	cp := *a.lifecycle
+	if a.lifecycle.Hops != nil {
+		cp.Hops = make([]cell.TraceHop, len(a.lifecycle.Hops))
+		copy(cp.Hops, a.lifecycle.Hops)
 	}
 	return &cp
 }

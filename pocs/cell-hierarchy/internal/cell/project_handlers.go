@@ -29,10 +29,29 @@ type ProjectView struct {
 }
 
 type UserView struct {
-	ID        string `json:"id"`
-	ProjectID string `json:"project_id"`
-	Email     string `json:"email"`
-	CreatedAt string `json:"created_at"`
+	ID        string  `json:"id"`
+	ProjectID string  `json:"project_id"`
+	Email     string  `json:"email"`
+	Epoch     int     `json:"epoch"`
+	Blocked   bool    `json:"blocked"`
+	DeletedAt *string `json:"deleted_at,omitempty"`
+	CreatedAt string  `json:"created_at"`
+}
+
+func userView(u User) UserView {
+	v := UserView{
+		ID: u.ID, ProjectID: u.ProjectID, Email: u.Email,
+		Epoch: u.Epoch, Blocked: u.Blocked,
+		CreatedAt: u.CreatedAt.UTC().Format(time.RFC3339Nano),
+	}
+	if v.Epoch <= 0 {
+		v.Epoch = DefaultUserEpoch
+	}
+	if u.DeletedAt != nil {
+		s := u.DeletedAt.UTC().Format(time.RFC3339Nano)
+		v.DeletedAt = &s
+	}
+	return v
 }
 
 type LookupView struct {
@@ -199,12 +218,7 @@ func (s *Server) handleGetProject(w http.ResponseWriter, r *http.Request) {
 	}
 	uv := make([]UserView, 0, len(users))
 	for _, u := range users {
-		uv = append(uv, UserView{
-			ID:        u.ID,
-			ProjectID: u.ProjectID,
-			Email:     u.Email,
-			CreatedAt: u.CreatedAt.UTC().Format(time.RFC3339Nano),
-		})
+		uv = append(uv, userView(u))
 	}
 	// Lookup table is per cell (per lookup zone host). Surface all entries; UI filters by relevance.
 	lv := make([]LookupView, 0, len(entries))
@@ -347,20 +361,14 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			writeJSON(w, http.StatusConflict, map[string]any{
 				"error": err.Error(),
-				"user": UserView{
-					ID: u.ID, ProjectID: u.ProjectID, Email: u.Email,
-					CreatedAt: u.CreatedAt.UTC().Format(time.RFC3339Nano),
-				},
+				"user":  userView(u),
 				"trace": trace,
 			})
 			return
 		}
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{
-		"user": UserView{
-			ID: u.ID, ProjectID: u.ProjectID, Email: u.Email,
-			CreatedAt: u.CreatedAt.UTC().Format(time.RFC3339Nano),
-		},
+		"user":  userView(u),
 		"trace": trace,
 	})
 }
@@ -520,6 +528,18 @@ func (s *Server) handleLookup(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if entry.State == LookupStateTombstone {
+		hop.Result = "tombstone"
+		writeJSON(w, http.StatusOK, map[string]any{
+			"hit":             false,
+			"tombstoned":      true,
+			"home_project_id": entry.HomeProjectID,
+			"home_cell_url":   entry.HomeCellURL,
+			"state":           entry.State,
+			"trace":           []TraceHop{hop},
+		})
 		return
 	}
 	hop.Result = "hit"

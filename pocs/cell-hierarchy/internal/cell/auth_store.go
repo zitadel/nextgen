@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS signing_keys (
 	if err != nil {
 		return err
 	}
-	// Epoch column for future block/delete (P6); default 1 when absent.
+	// Epoch column for block/delete (P6); default 1 when absent.
 	if err := s.ensureColumn("users", "epoch", "INTEGER NOT NULL DEFAULT 1"); err != nil {
 		return err
 	}
@@ -135,32 +135,6 @@ func (s *Store) getSigningKey(kid string) (SigningKey, error) {
 		PrivateKey: ed25519.PrivateKey(priv),
 		PublicKey:  ed25519.PublicKey(pub),
 	}, nil
-}
-
-func (s *Store) GetUser(projectID, email string) (User, error) {
-	var u User
-	var created string
-	var epoch sql.NullInt64
-	err := s.db.QueryRow(
-		`SELECT id, project_id, email, created_at, epoch FROM users WHERE project_id = ? AND email = ?`,
-		projectID, NormalizeKey(email),
-	).Scan(&u.ID, &u.ProjectID, &u.Email, &created, &epoch)
-	if errors.Is(err, sql.ErrNoRows) {
-		return User{}, ErrUserNotFound
-	}
-	if err != nil {
-		return User{}, err
-	}
-	u.CreatedAt, err = time.Parse(time.RFC3339Nano, created)
-	if err != nil {
-		return User{}, err
-	}
-	if epoch.Valid {
-		u.Epoch = int(epoch.Int64)
-	} else {
-		u.Epoch = DefaultUserEpoch
-	}
-	return u, nil
 }
 
 // FindGrant looks for a local tuple matching object/relation for this principal.

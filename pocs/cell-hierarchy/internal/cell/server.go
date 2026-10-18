@@ -17,6 +17,7 @@ type Server struct {
 	Now        func() time.Time
 	Logger     *log.Logger
 	FloatDelay time.Duration
+	denylist   *Denylist
 
 	mu       sync.Mutex
 	hbCancel context.CancelFunc
@@ -35,10 +36,11 @@ func NewServer(store *Store, peer *PeerClient, logger *log.Logger) *Server {
 		logger = log.Default()
 	}
 	return &Server{
-		Store:  store,
-		Peer:   peer,
-		Now:    time.Now,
-		Logger: logger,
+		Store:    store,
+		Peer:     peer,
+		Now:      time.Now,
+		Logger:   logger,
+		denylist: NewDenylist(),
 	}
 }
 
@@ -56,6 +58,7 @@ func (s *Server) Handler() http.Handler {
 	s.registerGrantRoutes(mux)
 	s.registerAuthRoutes(mux)
 	s.registerFGARoutes(mux)
+	s.registerLifecycleRoutes(mux)
 	return mux
 }
 

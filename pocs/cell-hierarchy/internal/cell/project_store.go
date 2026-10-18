@@ -40,6 +40,8 @@ type User struct {
 	ProjectID string
 	Email     string
 	Epoch     int
+	Blocked   bool
+	DeletedAt *time.Time
 	CreatedAt time.Time
 }
 
@@ -176,39 +178,22 @@ func (s *Store) CreateUser(u User) error {
 	if epoch <= 0 {
 		epoch = DefaultUserEpoch
 	}
+	blocked := 0
+	if u.Blocked {
+		blocked = 1
+	}
+	var deleted any
+	if u.DeletedAt != nil {
+		deleted = u.DeletedAt.UTC().Format(time.RFC3339Nano)
+	}
 	_, err := s.db.Exec(
-		`INSERT INTO users(id, project_id, email, created_at, epoch) VALUES (?, ?, ?, ?, ?)`,
-		u.ID, u.ProjectID, NormalizeKey(u.Email), u.CreatedAt.UTC().Format(time.RFC3339Nano), epoch,
+		`INSERT INTO users(id, project_id, email, created_at, epoch, blocked, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		u.ID, u.ProjectID, NormalizeKey(u.Email), u.CreatedAt.UTC().Format(time.RFC3339Nano), epoch, blocked, deleted,
 	)
 	if err != nil && strings.Contains(err.Error(), "UNIQUE") {
 		return ErrUserExists
 	}
 	return err
-}
-
-func (s *Store) ListUsers(projectID string) ([]User, error) {
-	rows, err := s.db.Query(
-		`SELECT id, project_id, email, created_at FROM users WHERE project_id = ? ORDER BY email`,
-		projectID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []User
-	for rows.Next() {
-		var u User
-		var created string
-		if err := rows.Scan(&u.ID, &u.ProjectID, &u.Email, &created); err != nil {
-			return nil, err
-		}
-		u.CreatedAt, err = time.Parse(time.RFC3339Nano, created)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, u)
-	}
-	return out, rows.Err()
 }
 
 func (s *Store) UpsertLookupLocal(key, homeProjectID, homeCellURL string, at time.Time) error {
