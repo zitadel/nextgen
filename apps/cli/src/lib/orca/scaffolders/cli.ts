@@ -2,7 +2,12 @@ import { spawnSync } from "node:child_process";
 
 import { ZitadelError } from "../../errors";
 import { reportWarning } from "../../warnings";
-import { type NodeEngines, nodeEnginesRange, nodeSupport } from "./node-engines";
+import {
+  describeAcceptedNode,
+  type NodeEngines,
+  nodeEnginesRange,
+  nodeSupport,
+} from "./node-engines";
 import type { Scaffolder } from "./types";
 
 /**
@@ -69,7 +74,7 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
         "E_VALIDATION",
         `${engines.label} needs Node ${range}; this is Node v${this.nodeVersion}`,
         {
-          hint: `Switch to a Node version in that range and rerun, or create the ${this.displayName} app with that Node and run setup inside it.`,
+          hint: `Switch to Node ${describeAcceptedNode(range)} and rerun, or create the ${this.displayName} app with that Node and run setup inside it.`,
           details: { node: this.nodeVersion, required: range },
         },
       );

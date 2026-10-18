@@ -81,6 +81,27 @@ export function nodeSupport(
 }
 
 /**
+ * The Node versions a `refuse` range accepts, in words, derived from the same
+ * parts {@link nodeSupport} reads: each part names a major and its lowest
+ * `minor.patch`, so `^22.22.3 || ^24.15.0 || >=26.0.0` reads `22.22.3 or newer
+ * 22, 24.15.0 or newer 24, or 26`. A range read as a whole would mislead, as
+ * `>=26.0.0` also covers Node 27, which the Angular CLI refuses.
+ */
+export function describeAcceptedNode(range: string): string {
+  const parts = range
+    .replace(/[\^~<>=]/g, "")
+    .split("||")
+    .map((part) => {
+      const [major = 0, minor = 0, patch = 0] = part.trim().split(".", 3).map(Number);
+      return minor === 0 && patch === 0
+        ? String(major)
+        : `${String(major)}.${String(minor)}.${String(patch)} or newer ${String(major)}`;
+    });
+  const last = parts.pop();
+  return parts.length === 0 ? `${last}` : `${parts.join(", ")}, or ${last}`;
+}
+
+/**
  * The Node range the framework CLI that setup will run publishes, asked of
  * npm. Falls back to the declared range when npm is unavailable, takes longer
  * than {@link NODE_ENGINES_TIMEOUT_MS} (a killed spawn has no exit status), or

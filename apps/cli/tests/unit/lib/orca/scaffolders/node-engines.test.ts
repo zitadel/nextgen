@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   CREATE_VITE_NODE_ENGINES,
+  describeAcceptedNode,
   nodeEnginesRange,
   nodeSupport,
 } from "../../../../../src/lib/orca/scaffolders/node-engines";
@@ -40,6 +41,22 @@ describe("nodeSupport", () => {
     ])("decides Node %s is %s", (node, support) => {
       expect(nodeSupport(node, "^22.21.0 || ^24.11.0 || >=26.0.0", "warn")).toBe(support);
     });
+  });
+});
+
+describe("describeAcceptedNode", () => {
+  it("names each accepted major with its minimum, and a bare major when any of it is accepted", () => {
+    expect(describeAcceptedNode(ANGULAR_22)).toBe(
+      "22.22.3 or newer 22, 24.15.0 or newer 24, or 26",
+    );
+  });
+
+  it("reads a single part", () => {
+    expect(describeAcceptedNode("^20.19.0")).toBe("20.19.0 or newer 20");
+  });
+
+  it("does not offer a range that Node 27 satisfies", () => {
+    expect(describeAcceptedNode(ANGULAR_22)).not.toContain(">=");
   });
 });
 

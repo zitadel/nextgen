@@ -3,7 +3,10 @@ import { spawnSync } from "node:child_process";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AbstractCLIScaffolder } from "../../src/lib/orca/scaffolders/cli";
-import { NODE_ENGINES_TIMEOUT_MS } from "../../src/lib/orca/scaffolders/node-engines";
+import {
+  NODE_ENGINES_TIMEOUT_MS,
+  describeAcceptedNode,
+} from "../../src/lib/orca/scaffolders/node-engines";
 import { takeReportedWarnings } from "../../src/lib/warnings";
 
 /**
@@ -176,6 +179,20 @@ export function describeNodeEngines(c: NodeEnginesCase): void {
           await expect(c.make(node).scaffold("/tmp/proj", c.framework)).rejects.toThrow(
             `${c.label} needs Node ${c.fallback}; this is Node v${node}`,
           );
+        },
+      );
+
+      it.each(c.refused)(
+        "recommends the accepted majors, not the raw range, when it refuses Node %s",
+        async (node) => {
+          npmPublishes(c.fallback);
+
+          await expect(c.make(node).scaffold("/tmp/proj", c.framework)).rejects.toMatchObject({
+            hint: expect.stringContaining(`Switch to Node ${describeAcceptedNode(c.fallback)} and`),
+          });
+          await expect(c.make(node).scaffold("/tmp/proj", c.framework)).rejects.toMatchObject({
+            hint: expect.not.stringContaining(c.fallback),
+          });
         },
       );
     } else {
