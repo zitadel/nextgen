@@ -172,7 +172,6 @@ every supported deployment; that removal is its own breaking change.
 |--------------|------------|--------|
 | `flowdef.updated` | [#530](https://github.com/zitadel/nextgen/issues/530): a flow definition is an immutable revision, a change publishes a new one | none planned |
 | `flowdef.deleted` | [#530](https://github.com/zitadel/nextgen/issues/530): no delete endpoint | with retirement under releases ([#536](https://github.com/zitadel/nextgen/issues/536)) |
-| `release.revoked` | revoke is specified but `RevokeRelease` still answers 501, so nothing emits it yet | when the release service can revoke |
 
 ## Contracted
 
