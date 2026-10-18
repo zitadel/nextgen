@@ -102,6 +102,32 @@ from `@zitadel/sdk-next/client` inside the dynamic import, and set the
 for logout and profile UI. Sign-in/out navigate to `post-sign-in-url` /
 `post-sign-out-url`, so chrome re-reads on the next page load.
 
+## Widget events
+
+The widgets are plain custom elements, so each event is a DOM `CustomEvent` that carries its payload in `detail`. The events and payloads are the same ones every SPA SDK exposes as callbacks.
+
+| Widget event | Fires when | Detail | Widgets |
+| --- | --- | --- | --- |
+| `zitadel-flow-step` | Login shows a step, the first one included. | `{ step }` | Login |
+| `zitadel-flow-input` | The visitor edits a field. | `{ name, value }` | Login |
+| `zitadel-flow-complete` | The flow reaches a terminal step. | `{ behavior, redirect_uri?, handoff_token?, handoff_token_expires_at? }` | Login |
+| `zitadel-flow-redirect` | The widget hands the browser to an identity provider; nobody is signed in yet. | `{ redirect_url, step }` | Login |
+| `zitadel-flow-error` | The flow reports an error. | `{ message }` | Login |
+| `zitadel-signout` | The user signs out. | `{ display, identifier }` | Logout, Session |
+
+```tsx
+const ref = useRef<HTMLElementTagNameMap['zitadel-login']>(null);
+
+useEffect(() => {
+  const login = ref.current;
+  const onComplete = (event: Event) => track((event as CustomEvent).detail);
+  login?.addEventListener('zitadel-flow-complete', onComplete);
+  return () => login?.removeEventListener('zitadel-flow-complete', onComplete);
+}, []);
+
+return <zitadel-login ref={ref} post-sign-in-url="/admin" />;
+```
+
 ## Read these, don't guess
 
 This skill is the **pattern**, not an API catalog — it deliberately omits exact
