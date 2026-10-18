@@ -41,7 +41,20 @@ describe("buildBundle", () => {
     expect(resourceCount).toBe(2);
     expect(bundle.schemas).toEqual([{ objectType: "human-user" }]);
     expect(bundle.flow_definitions).toEqual([{ name: "default-login" }]);
-    expect(bundle.brandings).toEqual([]);
+    expect(bundle.branding).toBeUndefined();
+  });
+
+  it("sends the branding as one object under `branding`, never a `brandings` list", async () => {
+    const cwd = await project({
+      ".zitadel/schemas/human-user.json": { objectType: "human-user" },
+      ".zitadel/branding/branding.json": { layout: "centered" },
+    });
+
+    const { bundle, resourceCount } = await buildBundle(cwd);
+
+    expect(resourceCount).toBe(2);
+    expect(bundle.branding).toMatchObject({ layout: "centered" });
+    expect(bundle).not.toHaveProperty("brandings");
   });
 
   it("refuses an empty .zitadel/ directory", async () => {
