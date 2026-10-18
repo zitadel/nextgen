@@ -1,4 +1,5 @@
 import { AbstractCLIScaffolder } from "./cli";
+import type { NodeEngines } from "./node-engines";
 
 const CREATE_NEXT_APP_VERSION = "16.2.4";
 
@@ -6,6 +7,12 @@ const CREATE_NEXT_APP_VERSION = "16.2.4";
 export class NextScaffolder extends AbstractCLIScaffolder {
   readonly displayName = "Next.js";
   readonly supportedFrameworks: ReadonlyArray<string> = ["next"];
+  readonly nodeEngines: NodeEngines = {
+    label: "create-next-app",
+    spec: `create-next-app@${CREATE_NEXT_APP_VERSION}`,
+    fallback: ">=20.9.0",
+    enforcement: "warn",
+  };
 
   /**
    * Runs the pinned `create-next-app` version in `cwd`, creating a TypeScript
@@ -13,7 +20,7 @@ export class NextScaffolder extends AbstractCLIScaffolder {
    * runs unattended, and `--skip-install` leaves dependency installation to the
    * setup command's explicit next step after Zitadel patches package.json.
    */
-  async scaffold(cwd: string, _framework: string): Promise<void> {
+  protected async create(cwd: string, _framework: string): Promise<void> {
     this.runCommand(
       "npx",
       [

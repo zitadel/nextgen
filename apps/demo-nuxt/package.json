@@ -29,6 +29,7 @@
     "vue": "catalog:"
   },
   "devDependencies": {
+    "@babel/core": "catalog:",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vue-tsc": "catalog:"

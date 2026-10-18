@@ -11,6 +11,23 @@ interface ResourceRow {
   readonly verbs?: string[];
 }
 
+const ACME_CONNECTION_FLAGS = [
+  "--slug",
+  "acme-sso",
+  "--protocol",
+  "oidc",
+  "--display-name",
+  "Acme SSO",
+  "--oidc-issuer",
+  "https://sso.acme.example",
+  "--oidc-client-id",
+  "abc123",
+  "--oidc-client-secret",
+  "${{ ACME_SSO_CLIENT_SECRET }}",
+  "--oidc-scopes",
+  "openid",
+];
+
 describe("resources", () => {
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
@@ -106,6 +123,14 @@ describe("resources", () => {
         expect(result).toFailWith("E_VALIDATION");
         expect(result).toHintAt("--force");
         expect(result).toSuggest(`${topic} ${verb} ${id} --force`);
+      });
+
+      it("registers a connection made from its nested fields", async () => {
+        const app = await aSetUpApp();
+
+        await app.run(["idps", "create", ...ACME_CONNECTION_FLAGS, "--json"]);
+
+        expect((await app.registeredIdps()).map((idp) => idp.slug)).toContain("acme-sso");
       });
 
       it("says what can be done to each topic", async () => {

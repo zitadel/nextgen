@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { filterResponseHeaders } from "./middleware.js";
+import {
+  HOP_BY_HOP,
+  filterResponseHeaders,
+  matchesRoutes,
+  requiresProjectSecret,
+} from "./middleware.js";
 
 /** The upstream response headers for one proxied call. */
 function upstream(entries: Record<string, string>): Headers {
@@ -94,5 +99,72 @@ describe("filterResponseHeaders", () => {
     expect(filtered.get("content-type")).toBe("application/json");
     expect(filtered.has("set-cookie")).toBe(false);
     expect(filtered.has("connection")).toBe(false);
+  });
+});
+
+describe("matchesRoutes", () => {
+  it.each([
+    ["/profile", ["/profile"]],
+    ["/profile/", ["/profile"]],
+    ["/profile", ["/profile/"]],
+    ["/profile//", ["/profile"]],
+    ["/", ["/"]],
+    ["/admin/users", ["/admin*"]],
+    ["/admin", ["/admin*"]],
+  ])("matches %s against %j", (pathname, routes) => {
+    expect(matchesRoutes(pathname, routes)).toBe(true);
+  });
+
+  it.each([
+    ["/profiles", ["/profile"]],
+    ["/profile/edit", ["/profile"]],
+    ["/", ["/profile"]],
+    ["/profile", ["/"]],
+    ["/other", ["/admin*"]],
+    ["/profile", []],
+  ])("does not match %s against %j", (pathname, routes) => {
+    expect(matchesRoutes(pathname, routes)).toBe(false);
+  });
+
+  it("treats a path of only slashes as the root", () => {
+    expect(matchesRoutes("///", ["/"])).toBe(true);
+  });
+
+  // The pathname is attacker-controlled. A backtracking trailing-slash regex
+  // takes quadratic time on a long run of slashes; this must stay linear.
+  it("matches a pathname of many slashes in linear time", () => {
+    const pathname = `/${"/".repeat(200_000)}x`;
+    const started = performance.now();
+
+    expect(matchesRoutes(pathname, ["/profile"])).toBe(false);
+    expect(performance.now() - started).toBeLessThan(250);
+  });
+});
+
+describe("HOP_BY_HOP", () => {
+  it("includes content-length, so a re-sent body gets the length the fetch implementation computes", () => {
+    expect(HOP_BY_HOP.has("content-length")).toBe(true);
+  });
+});
+
+describe("requiresProjectSecret", () => {
+  it("allows the secret on the handoff exchange", () => {
+    expect(requiresProjectSecret("POST", "/sessions/exchange")).toBe(true);
+  });
+
+  it("matches the method case-insensitively", () => {
+    expect(requiresProjectSecret("post", "/sessions/exchange")).toBe(true);
+  });
+
+  it.each([
+    ["GET", "/sessions/exchange"],
+    ["PUT", "/sessions/exchange"],
+    ["POST", "/v1/flow"],
+    ["GET", "/v1/flow"],
+    ["POST", "/sessions/exchange/"],
+    ["POST", "/sessions/exchangex"],
+    ["POST", "/sessions"],
+  ])("withholds the secret from %s %s", (method, pathname) => {
+    expect(requiresProjectSecret(method, pathname)).toBe(false);
   });
 });

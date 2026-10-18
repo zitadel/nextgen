@@ -50,6 +50,8 @@ func TestIDPCallbackHandler(t *testing.T) {
 		target string
 		cookie *http.Cookie
 		err    error
+		// storedTarget replaces the stored return target when set.
+		storedTarget string
 
 		wantStatus   int
 		wantLocation string
@@ -119,6 +121,15 @@ func TestIDPCallbackHandler(t *testing.T) {
 			wantIn:     service.FlowSSOCallbackInput{ConnectionSlug: "google", State: "unknown", Code: "the-code"},
 		},
 		{
+			// A target stored before the start-of-sign-in check was as strict
+			// as it is now is never redirected to.
+			name:         "a stored return target that no longer passes the check answers the same page",
+			target:       api.IDPCallbackPath("google") + "?state=proj-1.rand&code=the-code",
+			storedTarget: "https://app.example.com//evil.example/login",
+			wantStatus:   http.StatusInternalServerError,
+			wantIn:       service.FlowSSOCallbackInput{ConnectionSlug: "google", State: "proj-1.rand", Code: "the-code"},
+		},
+		{
 			name:       "an internal error answers the same page",
 			target:     api.IDPCallbackPath("google") + "?state=proj-1.rand&code=the-code",
 			err:        domain.ErrInternal(nil),
@@ -129,7 +140,11 @@ func TestIDPCallbackHandler(t *testing.T) {
 	var errorPage string
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stub := &stubSSOCallback{out: service.FlowSSOCallbackOutput{ReturnTarget: returnTarget}, err: tt.err}
+			stored := returnTarget
+			if tt.storedTarget != "" {
+				stored = tt.storedTarget
+			}
+			stub := &stubSSOCallback{out: service.FlowSSOCallbackOutput{ReturnTarget: stored}, err: tt.err}
 			req := httptest.NewRequest(http.MethodGet, tt.target, nil)
 			if tt.cookie != nil {
 				req.AddCookie(tt.cookie)

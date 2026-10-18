@@ -24,7 +24,7 @@ One Vercel deployment, five [services](https://vercel.com/docs/services):
 
 | Service | Built by | Serves |
 |---|---|---|
-| `server` | Go preset; `apps/cloud/build.sh` builds the login UI the server embeds (with turbo), compiles `apps/cloud/launcher`, then migrates | every path except the console's, the storybook's, the docs' and the website's, including `/console/runtime.json` and the login UI at `/ui/login/` |
+| `server` | Go preset; `apps/cloud/build.sh` builds the login UI the server embeds (with turbo), compiles `apps/cloud/launcher` without the console (`-tags noconsole`), then migrates | every path except the console's, the storybook's, the docs' and the website's, including `/console/runtime.json` and the login UI at `/ui/login/` |
 | `console` | Vite; `turbo run build` with `CONSOLE_BASE_PATH=/console/` and `CONSOLE_VERCEL_INSIGHTS=1`, so it reports Vercel Web Analytics and Speed Insights; the service serves the build where it lands, `internal/staticui/console/dist` | `/console/*` (bare `/console` redirects to the slash form; `/ui/console` and `/ui/console/*` redirect here with a 307) |
 | `storybook` | Storybook; `turbo run build` | `/storybook/*` (bare `/storybook` redirects to the slash form) |
 | `docs` | Next.js; `apps/docs`' own `pnpm run build`, without a task runner: moon cannot archive the symlinks Vercel's Next.js adapter writes, and turbo could never reuse a build, whose cache key holds the deployment's ID under Skew Protection | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
@@ -34,10 +34,12 @@ The console lives on the same origin, at `/console/` rather than a
 self-hosted server's `/ui/console/`. The server's own console is switched
 off and its console path set to `/console`, so the console links it derives
 (claim, dashboard) point there; the session cookie and CSRF protection work
-as in a self-hosted install. The server's `/console/runtime.json` lies
-under the console's path, so its rewrite comes first in `vercel.json`, and a
-launcher test holds the mount, the build's base and the console path
-together.
+as in a self-hosted install. The function does not carry the console either:
+the console service's build lands in the server's embed directory of the
+same checkout, so `build.sh` compiles the launcher with `-tags noconsole`.
+The server's `/console/runtime.json` lies under the console's path, so its
+rewrite comes first in `vercel.json`, and a launcher test holds the mount,
+the build's base and the console path together.
 
 The storybook, the login surface's component workbench, is deployed only
 here. Its orchestrator stories mock the API in the browser with a service
@@ -309,6 +311,63 @@ the command a red check's summary names. A new suite is a turbo task that
 `check:cloud` lists, a job in `deployment-checks.yml` and a status in
 `production-checks.yml`'s `SUITES`.
 
+## Running the cloud locally
+
+`pnpm run cloud` (`moon run workspace:cloud`) runs this deployment at
+http://localhost:3000: `vercel dev -L` over `vercel.json`, every service behind
+the deployment's own routes on one origin, the server on SQLite. No Vercel
+account, link or secret is involved, and Go need not be installed: Vercel's Go
+builder downloads the version `go.mod` names. `CLOUD_DEV_PORT` moves the port;
+`CLOUD_DEV_DEBUG=1` shows why a service did not start, which `vercel dev` logs
+only at debug level.
+
+[`scripts/run-cloud.mjs`](../../scripts/run-cloud.mjs) builds what the
+services read from disk (the login UI the server embeds, the packages the
+console's and storybook's builds import, the docs' generated sources), mints a
+throwaway master key and root admin under `.zitadel/local/cloud/` on the first
+run, and starts `vercel dev`. Sign in to `/console/` with the login in
+`.zitadel/local/cloud/admin.json`. The SQLite database lives beside it, so a
+restart keeps its state; deleting the directory starts over.
+
+`vercel dev` reads `vercel.json` and nothing else (it ignores
+`--local-config`), so what it needs lives there, in fields a deployment does
+not use:
+
+- The `server` service's `entrypoint` names `apps/cloud/launcher`. In dev,
+  Vercel's Go builder builds that package and starts it on `$PORT`; a
+  deployment runs `build.sh`, which compiles the same package, and the
+  builder takes the build command's binary instead. Without
+  `CLOUD_DATABASE_URL` and outside a deployment, the launcher serves from
+  SQLite and migrates it at startup.
+- The `console` and `storybook` services' `devCommand` builds them and serves
+  the build behind the same service rewrites a deployment serves it behind.
+  Their dev servers cannot sit behind those rewrites, so their live loops stay
+  `moon run console:dev-real` and `moon run storybook:dev`. `NODE_ENV` is set
+  because `vercel dev` runs dev commands under `development`, which makes
+  `vite build` a development build.
+- The console's fallback to its `index.html` leaves `assets/` out. `vercel dev`
+  cannot see a service's files, so a fallback for every path would answer the
+  console's scripts with the page. A deployment answers a missing asset with a
+  404 instead of the page.
+
+The docs and the website run `next dev`. `.vercelignore` keeps `vercel dev`
+from watching what no deployment is built from, the desktop app's worktrees
+among them, and keeps a CLI deployment from uploading it.
+
+Where it differs from a deployment:
+
+- `vercel dev` drops a redirect's query, so an old
+  `/ui/console/claim?challenge_id=…` link arrives without its challenge; open
+  `/console/claim?…` instead.
+- `CLOUD_URL=http://localhost:3000 pnpm check:cloud` runs the deployment
+  checks against it. Two fail by design: the redirect's query above, and the
+  docs' assets, which `next dev` serves without the deployment's immutable
+  caching.
+- Services is a beta of the Vercel CLI, and `vercel dev` changes from one
+  major to the next. The script drives a `vercel` on `PATH` of the major it
+  pins and otherwise runs the pinned version through npx; its first lines say
+  which.
+
 ## Rotating the master key
 
 The server re-wraps every project key to the current master key at startup
@@ -395,7 +454,16 @@ project and imports the root admin.
   pnpm compares the lockfile with the one that `node_modules` was installed
   from and installs when they differ. Go would keep each rebuild's compiled
   packages for five days, so `build.sh` drops those no build used in the
-  last two hours. Each build log ends with the cache's size:
+  last two hours. A new Go version starts the Go caches over: when the
+  toolchain Vercel picks from `go.mod`'s `toolchain` line differs from the
+  restored one, its Go builder downloads it and deletes
+  `.vercel/cache/golang`, module cache included. The next build of each
+  branch then downloads every module and compiles the server from nothing:
+  the Go step took 74 s after
+  [zitadel/nextgen#1845](https://github.com/zitadel/nextgen/pull/1845)
+  instead of the usual 7–27 s. A new compiler could not reuse the old build
+  cache anyway; the deletion costs only the module downloads, a few seconds.
+  Each build log ends with the cache's size:
   `Uploading build cache [...]`.
 
 ## Later: read replicas in other regions

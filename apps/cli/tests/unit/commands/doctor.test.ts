@@ -5,6 +5,8 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import { failureAdvice } from "../../../src/commands/doctor";
+import { publicCliCommand } from "../../../src/lib/public-cli";
 import { MANAGED_MARKER } from "../../../src/lib/paths";
 import { advisoryForWarnings } from "../../../src/commands/doctor/index";
 import { environmentSelectorSuffix } from "../../../src/lib/oclif/environment-flags";
@@ -707,5 +709,49 @@ describe("advisoryForWarnings", () => {
     );
 
     expect(advice?.nextCommands).toEqual([expectedPublicCliCommand("claim")]);
+  });
+});
+
+describe("failureAdvice for a runtime found in a parent directory", () => {
+  const failed = [{ name: "runtime", status: "fail" as const, message: "not healthy" }];
+
+  it.each([
+    ["a Windows path with a space", "C:\\work\\my app"],
+    ["a Windows path with an apostrophe", "C:\\work\\it's"],
+    ["a POSIX path with a space", "/home/dev/my app"],
+  ])("hands over %s as arguments, not as commands", (_name, dir) => {
+    const advice = failureAdvice(
+      failed,
+      "image",
+      8080,
+      "1.0.0",
+      environmentSelectorSuffix({}),
+      dir,
+    );
+
+    expect(advice.nextCommands).toEqual([]);
+    expect(advice.suggestedArgs).toEqual([
+      ["start", "--cwd", dir],
+      ["reset", "--force", "--cwd", dir],
+    ]);
+    expect(advice.hint).toContain("details.suggested_args");
+    expect(advice.hint).toContain(dir);
+    expect(advice.hint).toContain("--json");
+  });
+
+  it("writes the commands out for a path that needs no quoting", () => {
+    const advice = failureAdvice(
+      failed,
+      "image",
+      8080,
+      "1.0.0",
+      environmentSelectorSuffix({}),
+      "/home/dev/app",
+    );
+
+    expect(advice.nextCommands).toEqual([
+      publicCliCommand("start --cwd /home/dev/app", "1.0.0"),
+      publicCliCommand("reset --force --cwd /home/dev/app", "1.0.0"),
+    ]);
   });
 });

@@ -10,6 +10,7 @@ import { type Platform, RESOURCES } from "../../../src/commands/resources";
 import { COMMANDS } from "../../../src/index";
 import {
   definitionOf,
+  describeBody,
   parseFilter,
   parseSort,
   type ResourceDescriptor,
@@ -134,6 +135,32 @@ describe("resource registry", () => {
     const json = parseJson(res.stdout) as { code: string; message: string };
     expect(json.code).toBe("E_VALIDATION");
     expect(json.message).toContain("Nonexistent flag");
+  });
+
+  it("gives every field of every write a flag of its own, so none shadows another", () => {
+    // A field whose flag would collide gets none (ADR 071 §2), which is safe
+    // but loses the flag; this is where a schema change that causes one shows.
+    let checked = 0;
+    for (const [topic, resource] of entries()) {
+      for (const [verb, spec] of [
+        ["create", resource.create],
+        ["update", resource.update],
+      ] as const) {
+        if (!spec) {
+          continue;
+        }
+        const command = COMMANDS[`${topic}:${verb}`];
+        for (const field of describeBody(spec.schema, { root: spec.root })) {
+          if (field.kind === "json") {
+            continue;
+          }
+          expect(field.flag, `${topic} ${verb} ${field.name}`).toBeDefined();
+          expect(Object.keys(command?.flags ?? {}), `${topic} ${verb}`).toContain(field.flag);
+          checked++;
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(20);
   });
 
   it("advertises only filter and sort fields the generated query schemas accept", () => {
@@ -993,6 +1020,226 @@ describe("body field flags", () => {
     const res = await run(cwd, ["teams", "update", "team_1", "--name", "renamed"]);
     expect(res.exitCode).toBe(0);
     expect(body).toEqual({ name: "renamed" });
+  });
+});
+
+describe("nested bodies", () => {
+  const CONNECTION_FLAGS = [
+    "--slug",
+    "acme-sso",
+    "--protocol",
+    "oidc",
+    "--display-name",
+    "Acme SSO",
+    "--oidc-issuer",
+    "https://sso.acme.example",
+    "--oidc-client-id",
+    "abc123",
+    "--oidc-client-secret",
+    "${{ ACME_SSO_CLIENT_SECRET }}",
+    "--oidc-scopes",
+    "openid",
+    "--oidc-scopes",
+    "email",
+  ];
+  const connection = {
+    slug: "acme-sso",
+    protocol: "oidc",
+    display_name: "Acme SSO",
+    oidc: {
+      issuer: "https://sso.acme.example",
+      client_id: "abc123",
+      client_secret: "${{ ACME_SSO_CLIENT_SECRET }}",
+      scopes: ["openid", "email"],
+    },
+  };
+
+  /** Capture the connection `POST /idps` receives. */
+  const capturingIdps = (): { body?: { idp?: Record<string, unknown> } } => {
+    const seen: { body?: { idp?: Record<string, unknown> } } = {};
+    server.use(
+      http.post(`${SERVER}/idps`, async ({ request }) => {
+        seen.body = (await request.json()) as typeof seen.body;
+        return HttpResponse.json({ id: "idp_1", slug: "acme-sso" }, { status: 201 });
+      }),
+    );
+    return seen;
+  };
+
+  it("creates an identity provider connection from its nested fields alone", async () => {
+    const cwd = await makeProject();
+    const seen = capturingIdps();
+
+    const res = await run(cwd, ["idps", "create", ...CONNECTION_FLAGS]);
+
+    expect(res.exitCode).toBe(0);
+    expect(seen.body?.idp).toMatchObject(connection);
+  });
+
+  it("takes the connection document inline, its client_secret a reference", async () => {
+    const cwd = await makeProject();
+    const seen = capturingIdps();
+
+    const res = await run(cwd, ["idps", "create", "--data", JSON.stringify(connection)]);
+
+    expect(res.exitCode).toBe(0);
+    expect(seen.body?.idp).toMatchObject(connection);
+  });
+
+  it("refuses a literal client secret on the command line, pointing at a reference", async () => {
+    const cwd = await makeProject();
+    const literal = CONNECTION_FLAGS.map((arg) =>
+      arg === "${{ ACME_SSO_CLIENT_SECRET }}" ? "hunter2" : arg,
+    );
+
+    const res = await run(cwd, ["idps", "create", ...literal]);
+
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as { message: string; hint: string };
+    expect(json.message).toContain('Refusing to read "client_secret" from --oidc-client-secret');
+    expect(json.hint).toContain("${{ NAME }}");
+  });
+
+  it("takes an endpoint URL, which is no credential though its name says token", async () => {
+    const cwd = await makeProject();
+    const seen = capturingIdps();
+
+    const res = await run(cwd, [
+      "idps",
+      "create",
+      ...CONNECTION_FLAGS,
+      "--set",
+      "oidc.token_endpoint=https://sso.acme.example/token",
+      "--dry-run",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    expect(seen.body).toBeUndefined();
+    expect(res.stdout).toContain("https://sso.acme.example/token");
+  });
+
+  it("lists the fields an oidc block is missing once it is given", async () => {
+    const cwd = await makeProject();
+
+    const res = await run(cwd, [
+      "idps",
+      "create",
+      "--slug",
+      "a",
+      "--protocol",
+      "oidc",
+      "--display-name",
+      "A",
+      "--oidc-client-id",
+      "a",
+    ]);
+
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as { message: string; details: { missing: string[] } };
+    expect(json.message).toBe(
+      "idps create is missing required fields: --oidc-issuer, --oidc-client-secret",
+    );
+    expect(json.details.missing).toEqual(["oidc.issuer", "oidc.client_secret"]);
+  });
+
+  it("refuses a --set path the connection does not have", async () => {
+    const cwd = await makeProject();
+
+    const res = await run(cwd, ["idps", "create", ...CONNECTION_FLAGS, "--set", "oidc.isuer=x"]);
+
+    expect(res.exitCode).toBe(3);
+    expect((parseJson(res.stdout) as { message: string }).message).toBe(
+      "--set oidc.isuer names no field of this body",
+    );
+  });
+
+  it("changes one attribute of a --file body instead of replacing them all", async () => {
+    const cwd = await makeProject();
+    const file = join(cwd, "user.json");
+    await writeFile(
+      file,
+      JSON.stringify({
+        schema: "sch_default",
+        attributes: { email: "ada@example.com", givenName: "Ada" },
+      }),
+    );
+    let body: unknown;
+    server.use(
+      http.post(`${SERVER}/users`, async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json(user("user_1"), { status: 201 });
+      }),
+    );
+
+    const res = await run(cwd, [
+      "users",
+      "create",
+      "--file",
+      file,
+      "--attributes",
+      "givenName=Augusta",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    expect(body).toEqual({
+      schema: "sch_default",
+      attributes: { email: "ada@example.com", givenName: "Augusta" },
+    });
+  });
+
+  it("still refuses a password in an inline --data body", async () => {
+    const cwd = await makeProject();
+
+    const res = await run(cwd, [
+      "users",
+      "create",
+      "--data",
+      JSON.stringify({
+        schema: "sch_default",
+        attributes: { email: "a@b.c", password: "hunter2" },
+      }),
+    ]);
+
+    expect(res.exitCode).toBe(3);
+    expect((parseJson(res.stdout) as { message: string }).message).toContain(
+      'Refusing to read "password" from --data',
+    );
+  });
+
+  it("sets a project's hashing method through its nested fields", async () => {
+    const cwd = await makeProject();
+    let body: unknown;
+    server.use(
+      http.patch(`${SERVER}/projects/prj_1`, async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json({ id: "prj_1", name: "p" });
+      }),
+    );
+
+    const res = await run(cwd, [
+      "projects",
+      "update",
+      "prj_1",
+      "--password-hash-algorithm",
+      "bcrypt",
+      "--password-hash-params-cost",
+      "12",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    expect(body).toEqual({ password_hash: { algorithm: "bcrypt", params: { cost: 12 } } });
+  });
+
+  it("previews a connection with its reference and its fixed values shown", async () => {
+    const cwd = await makeProject();
+
+    const res = await run(cwd, ["idps", "create", ...CONNECTION_FLAGS, "--dry-run"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).not.toContain("«redacted»");
+    expect(
+      (parseJson(res.stdout) as { data: { body: { idp: Record<string, unknown> } } }).data.body.idp,
+    ).toMatchObject({ oidc: { client_secret: "${{ ACME_SSO_CLIENT_SECRET }}" } });
   });
 });
 

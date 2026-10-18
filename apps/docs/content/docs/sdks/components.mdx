@@ -52,6 +52,8 @@ The components speak to the configured API base, usually the same-origin `/__nex
 
 For browser automation, remember that the native controls live inside shadow roots. Prefer Playwright-style shadow-DOM-aware locators when available.
 
+If your app renders on the server, mount the widget on the client only, after hydration, or give a raw `<zitadel-login>` element `project-id` and `proxy-path` as attributes, because a widget that starts before its configuration arrives shows an error instead of the flow.
+
 ## See also
 
 - [SDKs](/docs/sdks) — framework wrappers that bundle these components for you.

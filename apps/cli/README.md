@@ -53,7 +53,7 @@ attaches the new project to the local admin's team, so the project is owned
 from the start and `zitadel claim` reports it as already owned. If you opted
 out with `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false`, there is no local admin
 and the project has no owning team; that server cannot claim projects.
-Setup writes `.env.local`, `.env.development.local` and `.zitadel/`, and installs
+Setup writes `.env.local` and `.zitadel/`, and installs
 dependencies with the detected package manager. Pass `--skip-install` to install
 them yourself. The project's default user schema and login flow are provisioned
 from versioned local defaults; setup writes editable copies into
@@ -985,7 +985,8 @@ FLAGS
                           process environment. Cannot be combined with --env.
       --fix               Repair missing files and stale managed wiring.
       --image=<value>     Container image to check.
-      --port=<value>      [default: 8080] Local HTTP port.
+      --port=<value>      Local HTTP port to check. Defaults to the port this
+                          directory's server uses.
       --runtime=<option>  Local runtime backend.
                           <options: binary|docker>
       --[no-]telemetry    Send anonymous usage analytics. Disable with
@@ -1402,8 +1403,10 @@ Create a grant.
 USAGE
   $ zitadel grants create [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
-    <value>] [--relation viewer|editor|admin] [--expires-at <value>] [--data
-    <value> | --file <value>]
+    <value>] [--relation viewer|editor|admin] [--expires-at <value>]
+    [--user-user-id <value>] [--user-identifier <value>] [--team-team-id
+    <value>] [--team-name <value>] [--data <value> | --file <value>] [--set
+    <value>...]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -1424,8 +1427,14 @@ FLAGS
                           --no-telemetry.
 
 RAW BODY FLAGS
-  --data=<value>  Whole body as a JSON object, instead of the field flags.
-  --file=<value>  Read the body from a JSON file; `-` reads stdin.
+  --data=<value>    Whole body as a JSON object. Field flags and --set apply
+                    over it.
+  --file=<value>    Read the body from a JSON file; `-` reads stdin. Field flags
+                    and --set apply over it.
+  --set=<value>...  Set one field by its dot path: path=value, or path:=json for
+                    JSON. Repeatable; applied after the field flags, in order. A
+                    key that contains a dot is set through its parent: --set
+                    'parent:={"a.b":"x"}'.
 
 OPTIONAL FIELD FLAGS
   --expires-at=<value>  Optional expiry.
@@ -1437,10 +1446,22 @@ REQUIRED FIELD FLAGS
   --relation=<option>  (required) Catalog relation on `object_type` `project`.
                        <options: viewer|editor|admin>
 
+TEAM FIELD FLAGS
+  --team-name=<value>     Team name, unique per project case-insensitively.
+  --team-team-id=<value>
+
+USER FIELD FLAGS
+  --user-identifier=<value>  The user schema's designated identifier
+                             (`x-identifier`), looked up in the platform
+                             project.
+  --user-user-id=<value>
+
 DESCRIPTION
   Create a grant.
 
 EXAMPLES
+  $ zitadel grants create --relation viewer --user-identifier alice@acme.com --json
+
   $ zitadel grants create --data '{...}' --json
 
   $ zitadel grants create --file ./grant.json
@@ -1654,7 +1675,17 @@ Create an identity provider connection.
 USAGE
   $ zitadel idps create [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
-    <value>] [--data <value> | --file <value>]
+    <value>] [--slug <value>] [--protocol oidc] [--template <value>]
+    [--display-name <value>] [--subject-claim <value>] [--claim-mapping
+    <value>...] [--verified-claims <value>...] [--provisioning-creation
+    disabled|auto] [--oidc-issuer <value>] [--oidc-jwks-uri <value>]
+    [--oidc-id-token-mapping] [--oidc-authorization-endpoint <value>]
+    [--oidc-token-endpoint <value>] [--oidc-userinfo-endpoint <value>]
+    [--oidc-client-id <value>] [--oidc-client-secret <value>]
+    [--oidc-token-endpoint-auth-method client_secret_basic|client_secret_post]
+    [--oidc-scopes <value>...] [--oidc-pkce-enabled]
+    [--oidc-static-authorize-parameters <value>...] [--data <value> | --file
+    <value>] [--set <value>...]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -1674,20 +1705,97 @@ FLAGS
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
+OPTIONAL FIELD FLAGS
+  --claim-mapping=<value>...    Repeatable claim_mapping entry: key=value for a
+                                string, key:=value for JSON. Maps user-schema
+                                property names (keys) to provider claim names
+                                (values).
+  --subject-claim=<value>       Claim carrying the provider's stable subject
+                                identifier.
+  --template=<value>            Template hint for rendering the provider (logo,
+                                colors).
+  --verified-claims=<value>...  Repeatable verified_claims entry: key=value for
+                                a string, key:=value for JSON. Maps a verifiable
+                                user-schema property to its verification source:
+                                a claim name (read the claim) or the…
+
 RAW BODY FLAGS
-  --data=<value>  Whole body as a JSON object, instead of the field flags.
-  --file=<value>  Read the body from a JSON file; `-` reads stdin.
+  --data=<value>    Whole body as a JSON object. Field flags and --set apply
+                    over it.
+  --file=<value>    Read the body from a JSON file; `-` reads stdin. Field flags
+                    and --set apply over it.
+  --set=<value>...  Set one field by its dot path: path=value, or path:=json for
+                    JSON. Repeatable; applied after the field flags, in order. A
+                    key that contains a dot is set through its parent: --set
+                    'parent:={"a.b":"x"}'.
+
+REQUIRED FIELD FLAGS
+  --display-name=<value>  (required) Shown to the user on the sign-in button.
+  --protocol=<option>     (required) The protocol used by the identity provider.
+                          <options: oidc>
+  --slug=<value>          (required) Stable identifier, referenced by user
+                          schemas (x-auth-methods.sso.providers) and flow steps
+                          (sso_providers).
 
 GLOBAL FLAGS
   --json  Format output as json.
+
+OIDC FIELD FLAGS
+  --oidc-authorization-endpoint=<value>
+      For a provider that exposes no .well-known document.
+
+  --oidc-client-id=<value>
+      (required with oidc.*) Either a literal in case the same client is used in
+      all environments, or a `${{ NAME }}` reference to a…
+
+  --oidc-client-secret=<value>
+      (required with oidc.*) A reference to the variable holding the client
+      secret, never the secret itself.
+
+  --[no-]oidc-id-token-mapping
+      Read user claims from the id_token instead of the userinfo endpoint, for
+      providers that populate only the…
+
+  --oidc-issuer=<value>
+      (required with oidc.*) Discovery base.
+
+  --oidc-jwks-uri=<value>
+      JWKS endpoint, for a provider that exposes no .well-known document.
+
+  --[no-]oidc-pkce-enabled
+      Send PKCE (code_challenge/code_verifier).
+
+  --oidc-scopes=<value>...
+      Repeatable, one value each. Must contain `openid` - without it the provider
+      returns no id_token and the connection is not OIDC.
+
+  --oidc-static-authorize-parameters=<value>...
+      Repeatable oidc.static_authorize_parameters entry: key=value for a string,
+      key:=value for JSON. Extra provider-specific authorize parameters (for
+      example `prompt`).
+
+  --oidc-token-endpoint=<value>
+      For a provider that exposes no .well-known document.
+
+  --oidc-token-endpoint-auth-method=<option>
+      How the client authenticates at the token endpoint.
+      <options: client_secret_basic|client_secret_post>
+
+  --oidc-userinfo-endpoint=<value>
+      For a provider that exposes no .well-known document.
+
+PROVISIONING FIELD FLAGS
+  --provisioning-creation=<option>  <options: disabled|auto>
 
 DESCRIPTION
   Create an identity provider connection.
 
 EXAMPLES
+  $ zitadel idps create --slug acme-sso --protocol oidc --display-name 'Acme SSO' --oidc-issuer https://sso.acme.example --oidc-client-id <client_id> --oidc-client-secret '${{ ACME_SSO_CLIENT_SECRET }}' --oidc-scopes openid --oidc-scopes profile --oidc-scopes email --json
+
   $ zitadel idps create --data '{...}' --json
 
-  $ zitadel idps create --file ./identity provider connection.json
+  $ zitadel idps create --file ./identity-provider-connection.json
 ```
 
 ## `zitadel idps get ID`
@@ -2096,8 +2204,13 @@ Update a project by id.
 USAGE
   $ zitadel projects update ID [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
-    <value>] [--name <value>] [--password-hash <value>] [--data <value> | --file
-    <value>]
+    <value>] [--name <value>] [--password-hash-algorithm
+    argon2i|argon2id|bcrypt|scrypt|pbkdf2|sha2] [--password-hash-params-time
+    <value>] [--password-hash-params-memory <value>]
+    [--password-hash-params-threads <value>] [--password-hash-params-cost
+    <value>] [--password-hash-params-rounds <value>]
+    [--password-hash-params-hash sha1|sha224|sha256|sha384|sha512] [--data
+    <value> | --file <value>] [--set <value>...]
 
 ARGUMENTS
   ID  project id
@@ -2121,15 +2234,35 @@ FLAGS
                           --no-telemetry.
 
 RAW BODY FLAGS
-  --data=<value>  Whole body as a JSON object, instead of the field flags.
-  --file=<value>  Read the body from a JSON file; `-` reads stdin.
+  --data=<value>    Whole body as a JSON object. Field flags and --set apply
+                    over it.
+  --file=<value>    Read the body from a JSON file; `-` reads stdin. Field flags
+                    and --set apply over it.
+  --set=<value>...  Set one field by its dot path: path=value, or path:=json for
+                    JSON. Repeatable; applied after the field flags, in order. A
+                    key that contains a dot is set through its parent: --set
+                    'parent:={"a.b":"x"}'.
 
 GLOBAL FLAGS
   --json  Format output as json.
 
 OPTIONAL FIELD FLAGS
-  --name=<value>           The name of the project.
-  --password-hash=<value>  The method this project's passwords are hashed with.
+  --name=<value>  The name of the project.
+
+PASSWORD HASH FIELD FLAGS
+  --password-hash-algorithm=<option>      (required with password_hash.*) The
+                                          hashing algorithm.
+                                          <options: argon2i|argon2id|bcrypt|scry
+                                          pt|pbkdf2|sha2>
+  --password-hash-params-cost=<value>     bcrypt cost, or scrypt's log2 of the
+                                          CPU/memory cost.
+  --password-hash-params-hash=<option>    The underlying hash.
+                                          <options:
+                                          sha1|sha224|sha256|sha384|sha512>
+  --password-hash-params-memory=<value>   argon2 memory in KiB.
+  --password-hash-params-rounds=<value>   pbkdf2 or sha2 iteration count.
+  --password-hash-params-threads=<value>  argon2 lanes.
+  --password-hash-params-time=<value>     argon2 passes over memory.
 
 DESCRIPTION
   Update a project by id.
@@ -2813,7 +2946,8 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --image=<value>     Container image to run.
-      --port=<value>      [default: 8080] Local HTTP port.
+      --port=<value>      Local HTTP port. By default this directory keeps the
+                          port it had, or takes the first free one from 8080.
       --runtime=<option>  Local runtime backend.
                           <options: binary|docker>
       --[no-]telemetry    Send anonymous usage analytics. Disable with
@@ -2900,7 +3034,8 @@ Create a team.
 USAGE
   $ zitadel teams create [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
-    <value>] [--name <value>] [--data <value> | --file <value>]
+    <value>] [--name <value>] [--data <value> | --file <value>] [--set
+    <value>...]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -2921,8 +3056,14 @@ FLAGS
                           --no-telemetry.
 
 RAW BODY FLAGS
-  --data=<value>  Whole body as a JSON object, instead of the field flags.
-  --file=<value>  Read the body from a JSON file; `-` reads stdin.
+  --data=<value>    Whole body as a JSON object. Field flags and --set apply
+                    over it.
+  --file=<value>    Read the body from a JSON file; `-` reads stdin. Field flags
+                    and --set apply over it.
+  --set=<value>...  Set one field by its dot path: path=value, or path:=json for
+                    JSON. Repeatable; applied after the field flags, in order. A
+                    key that contains a dot is set through its parent: --set
+                    'parent:={"a.b":"x"}'.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -3125,7 +3266,8 @@ Update a team by id.
 USAGE
   $ zitadel teams update ID [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
-    <value>] [--name <value>] [--data <value> | --file <value>]
+    <value>] [--name <value>] [--data <value> | --file <value>] [--set
+    <value>...]
 
 ARGUMENTS
   ID  team id
@@ -3149,8 +3291,14 @@ FLAGS
                           --no-telemetry.
 
 RAW BODY FLAGS
-  --data=<value>  Whole body as a JSON object, instead of the field flags.
-  --file=<value>  Read the body from a JSON file; `-` reads stdin.
+  --data=<value>    Whole body as a JSON object. Field flags and --set apply
+                    over it.
+  --file=<value>    Read the body from a JSON file; `-` reads stdin. Field flags
+                    and --set apply over it.
+  --set=<value>...  Set one field by its dot path: path=value, or path:=json for
+                    JSON. Repeatable; applied after the field flags, in order. A
+                    key that contains a dot is set through its parent: --set
+                    'parent:={"a.b":"x"}'.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -3203,14 +3351,14 @@ ALIASES
 
 ## `zitadel users create`
 
-Create an user.
+Create a user.
 
 ```
 USAGE
   $ zitadel users create [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
     <value>] [--schema <value>] [--attributes <value>...] [--data <value> |
-    --file <value>]
+    --file <value>] [--set <value>...]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -3238,14 +3386,20 @@ REQUIRED FIELD FLAGS
                            `attributes`.
 
 RAW BODY FLAGS
-  --data=<value>  Whole body as a JSON object, instead of the field flags.
-  --file=<value>  Read the body from a JSON file; `-` reads stdin.
+  --data=<value>    Whole body as a JSON object. Field flags and --set apply
+                    over it.
+  --file=<value>    Read the body from a JSON file; `-` reads stdin. Field flags
+                    and --set apply over it.
+  --set=<value>...  Set one field by its dot path: path=value, or path:=json for
+                    JSON. Repeatable; applied after the field flags, in order. A
+                    key that contains a dot is set through its parent: --set
+                    'parent:={"a.b":"x"}'.
 
 GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Create an user.
+  Create a user.
 
 EXAMPLES
   $ zitadel users create --schema <schema> --attributes <key>=<value> --json
@@ -3257,7 +3411,7 @@ EXAMPLES
 
 ## `zitadel users delete ID`
 
-Delete an user by id.
+Delete a user by id.
 
 ```
 USAGE
@@ -3292,7 +3446,7 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Delete an user by id.
+  Delete a user by id.
 
 EXAMPLES
   $ zitadel users delete <id> --force --json
@@ -3439,14 +3593,14 @@ EXAMPLES
 
 ## `zitadel users update ID`
 
-Update an user by id.
+Update a user by id.
 
 ```
 USAGE
   $ zitadel users update ID [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
     <value>] [--schema <value>] [--attributes <value>...] [--data <value> |
-    --file <value>]
+    --file <value>] [--set <value>...]
 
 ARGUMENTS
   ID  user id
@@ -3475,14 +3629,20 @@ OPTIONAL FIELD FLAGS
   --schema=<value>         The schema the user follows after this patch.
 
 RAW BODY FLAGS
-  --data=<value>  Whole body as a JSON object, instead of the field flags.
-  --file=<value>  Read the body from a JSON file; `-` reads stdin.
+  --data=<value>    Whole body as a JSON object. Field flags and --set apply
+                    over it.
+  --file=<value>    Read the body from a JSON file; `-` reads stdin. Field flags
+                    and --set apply over it.
+  --set=<value>...  Set one field by its dot path: path=value, or path:=json for
+                    JSON. Repeatable; applied after the field flags, in order. A
+                    key that contains a dot is set through its parent: --set
+                    'parent:={"a.b":"x"}'.
 
 GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Update an user by id.
+  Update a user by id.
 
 EXAMPLES
   $ zitadel users update <id> --data '{...}' --json

@@ -66,7 +66,7 @@ import { environmentSelectorSuffix } from "../../lib/oclif/environment-flags";
 import { serverKind } from "../../lib/oclif/server-kind";
 import { findLocalAdminFor } from "../../lib/local-server/admin-credential";
 import { claimProjectAsAdmin } from "../../lib/local-server/claim-as-admin";
-import { bundledServerVersion } from "../../lib/local-server/binary";
+import { LocalServer } from "../../lib/local-server/server";
 import { readNearestRuntimeMetadata, readPlatformRuntime } from "../../lib/local-server/runtime";
 import { readZitadelSecret, writeZitadelSecret } from "../../lib/project";
 import {
@@ -1523,7 +1523,7 @@ async function assertLocalServerVersion(
   if (!nearest || runtime?.backend !== "binary" || runtime.server_url !== server) {
     return;
   }
-  const expected = bundledServerVersion();
+  const expected = LocalServer.bundledVersion();
   if (
     expected === undefined ||
     !semver.valid(expected) ||
