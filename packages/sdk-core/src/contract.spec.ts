@@ -106,15 +106,23 @@ const LOGOUT_CONFIG_KEYS = {
 const URL_REASON =
   "declarative full backend URL for plain HTML pages; SPA wrappers configure the backend through project or proxyPath";
 
+const HANDLE_REASONS: Record<string, string> = {
+  publishableKey:
+    "declarative form of the project handle's publishableKey, which SPA wrappers pass inside project",
+  projectExplicit:
+    "server-markup marker the Qwik wrapper sets when it serializes an explicit project handle; no config counterpart",
+};
+
 const LOGIN_ELEMENT_ONLY: Record<string, string> = {
   url: URL_REASON,
+  ...HANDLE_REASONS,
   previewState: "operator preview mode, not part of the shared login config",
   previewSuccessStep: "operator preview mode, not part of the shared login config",
 };
 
-const SESSION_ELEMENT_ONLY: Record<string, string> = { url: URL_REASON };
+const SESSION_ELEMENT_ONLY: Record<string, string> = { url: URL_REASON, ...HANDLE_REASONS };
 
-const LOGOUT_ELEMENT_ONLY: Record<string, string> = { url: URL_REASON };
+const LOGOUT_ELEMENT_ONLY: Record<string, string> = { url: URL_REASON, ...HANDLE_REASONS };
 
 type Declaration = { state?: boolean };
 type ElementCtor = (typeof ZitadelLogin | typeof ZitadelSession | typeof ZitadelLogout) & {
