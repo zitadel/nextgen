@@ -3,6 +3,8 @@
   import type { ZitadelSession as ZitadelSessionElement } from '@zitadel/components';
 
   import type { ZitadelSessionProps, ZitadelSessionErrorDetail, ZitadelSignoutDetail } from './types';
+  import { assignGiven } from './given';
+  import { onClient, proxyPathAttr } from './attributes';
 
   let {
     project,
@@ -29,27 +31,28 @@
     return el;
   }
 
-  // Listeners are bound as event attributes at element creation, before the
-  // widget is attached and can start loading. An `$effect` runs only after
-  // mount, so it would miss a failure the widget raises the moment it mounts.
-  // The handlers read the props when the event fires, so they stay current.
-  const handleSignout = (event: Event): void =>
-    onSignout?.((event as CustomEvent<ZitadelSignoutDetail>).detail);
-  const handleSessionError = (event: Event): void =>
-    onSessionError?.((event as CustomEvent<ZitadelSessionErrorDetail>).detail);
+  // Props the element has defaults for are assigned only when given; a
+  // binding would assign `undefined` and overwrite the default.
+  $effect(() => {
+    if (el) {
+      assignGiven(el, { heading, logoutLabel, variant, theme, suppressHeader });
+    }
+  });
+  // The listeners below are element attributes, bound when the element is created and
+  // before the widget can start loading; an `$effect` runs only after mount and would
+  // miss a failure the widget raises as it mounts. The handlers read the props when the
+  // event fires, so they stay current.
 </script>
 
 <zitadel-session
   bind:this={el}
-  onzitadel-signout={handleSignout}
-  onzitadel-session-error={handleSessionError}
-  {project}
-  project-id={projectId}
-  proxy-path={proxyPath}
+  onzitadel-signout={(event) =>
+    onSignout?.((event as CustomEvent<ZitadelSignoutDetail>).detail)}
+  onzitadel-session-error={(event) =>
+    onSessionError?.((event as CustomEvent<ZitadelSessionErrorDetail>).detail)}
+  project={onClient(project)}
+  project-id={project?.projectId ?? projectId}
+  proxy-path={proxyPathAttr(project?.proxyPath ?? proxyPath)}
+  url={project?.url}
   post-sign-out-url={postSignOutUrl}
-  {heading}
-  logout-label={logoutLabel}
-  {variant}
-  {theme}
-  {suppressHeader}
 ></zitadel-session>

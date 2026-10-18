@@ -1,5 +1,6 @@
 import { css, html, nothing } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { customElement } from "lit/decorators.js";
+import { property } from "../internal/property.js";
 
 import { resolveApi } from "./resolve-api.js";
 import { SessionController } from "./session-controller.js";
@@ -190,7 +191,10 @@ export class ZitadelSession extends ZitadelSurface {
     // A card on the page its `post-sign-out-url` names ("sign out and come
     // back here") would otherwise reload that page on every signed-out visit,
     // and find no session again each time.
-    { onSessionMissing: () => this.leaveWithoutSession() },
+    {
+      onSessionMissing: () => this.leaveWithoutSession(),
+      onSignedOutWhileDetached: () => void this.leave(),
+    },
   );
 
   /** Navigates to `postSignOutUrl` when one is set; reports whether it did. */

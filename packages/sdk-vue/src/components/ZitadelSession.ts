@@ -5,6 +5,8 @@ import type { ZitadelSessionErrorDetail, ZitadelSignoutDetail } from "@zitadel/s
 import { defineComponent, h, type PropType, ref, toRaw } from "vue";
 import "@zitadel/components";
 
+import { forceAttr } from "./forceAttr";
+
 /**
  * Vue wrapper for the `<zitadel-session>` Lit web component — the post-sign-in
  * "signed in as" card. See {@link ZitadelLogin} for the rendering strategy.
@@ -34,18 +36,32 @@ export default defineComponent({
     const element = ref<ZitadelSessionElement | null>(null);
     expose({ element });
 
-    return () =>
-      h("zitadel-session", {
+    return () => {
+      const attr = forceAttr();
+      return h("zitadel-session", {
         ref: element,
         // Hand the Lit element the raw SDK handle, not Vue's reactive proxy.
         project: toRaw(props.project),
+        // Kebab-case attributes are what the element reads at upgrade, and the
+        // only form a server-rendered page carries (the camelCase keys below
+        // render as `projectid=`-style names the element never reads). The
+        // handle's fields are mirrored, and win over the discrete props as they
+        // do in the widget's `resolveApi`, so a page that passes only `project`
+        // is configured before hydration and both channels agree.
+        "project-id": props.project?.projectId ?? props.projectId,
+        "proxy-path": props.project?.proxyPath ?? props.proxyPath,
+        url: props.project?.url,
         projectId: props.projectId,
         proxyPath: props.proxyPath,
         "post-sign-out-url": props.postSignOutUrl,
-        heading: props.heading,
-        "logout-label": props.logoutLabel,
-        variant: props.variant,
-        theme: props.theme,
+        // A string prop with a default is bound as an attribute (the "^" prefix on
+        // the client, see `forceAttr`): Vue assigns an unset property as "", which
+        // the element cannot tell from an intended empty string, while an unset
+        // attribute is simply removed.
+        [`${attr}heading`]: props.heading,
+        [`${attr}logout-label`]: props.logoutLabel,
+        [`${attr}variant`]: props.variant,
+        [`${attr}theme`]: props.theme,
         suppressHeader: props.suppressHeader,
         onZitadelSignout: (event: CustomEvent<ZitadelSignoutDetail>) => {
           emit("signout", event.detail);
@@ -54,5 +70,6 @@ export default defineComponent({
           emit("sessionError", event.detail);
         },
       });
+    };
   },
 });

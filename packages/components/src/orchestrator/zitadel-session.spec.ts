@@ -529,6 +529,34 @@ describe("<zitadel-session>", () => {
     expect(events[0]?.detail).toEqual({ display: "", identifier: "alice@acme.com" });
   });
 
+  it("navigates to post-sign-out-url only once put back when the sign-out completed while removed", async () => {
+    const loc = stubLocation();
+    const element = mount();
+    element.postSignOutUrl = "https://app.test/login";
+    await flush(element);
+    let release: () => void = () => undefined;
+    server.use(
+      http.delete(`${API_BASE}/sessions/me`, async () => {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+
+    activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
+    await new Promise((resolve) => setTimeout(resolve, 16));
+    element.remove();
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 32));
+    expect(loc.current).not.toBe("https://app.test/login");
+
+    host.appendChild(element);
+    await flush(element);
+
+    expect(loc.current).toBe("https://app.test/login");
+  });
+
   it("suppress-header visually hides the heading but keeps it accessible", async () => {
     currentEmail = "alice@acme.com";
     const element = mount("<zitadel-session suppress-header></zitadel-session>");
@@ -712,4 +740,80 @@ describe("<zitadel-session>", () => {
 
     expect(errors).toHaveLength(0);
   });
+});
+
+describe("<zitadel-session> unset public properties", () => {
+  type Declaration = { attribute?: string | boolean; state?: boolean };
+  type Props = Record<string, unknown>;
+  const create = () => document.createElement("zitadel-session");
+  const declared = (
+    customElements.get("zitadel-session") as unknown as {
+      elementProperties: Map<string, Declaration>;
+    }
+  ).elementProperties;
+  // Every public property that has a declared default, read off a fresh element so a
+  // property added later is covered without touching this list.
+  const defaulted = [...declared]
+    .filter(([name, options]) => !options.state && (create() as unknown as Props)[name] != null)
+    .map(([name, options]) => ({
+      name,
+      attribute:
+        typeof options.attribute === "string"
+          ? options.attribute
+          : options.attribute === false
+            ? undefined
+            : name.toLowerCase(),
+      fallback: (create() as unknown as Props)[name],
+    }));
+  const other = (fallback: unknown) => (typeof fallback === "boolean" ? !fallback : "other");
+
+  it("covers the element's defaulted properties", () => {
+    expect(defaulted.length).toBeGreaterThan(0);
+  });
+
+  it.each(defaulted)(
+    "keeps the default of $name when it is assigned undefined",
+    ({ name, fallback }) => {
+      const element = create() as unknown as Props;
+      element[name] = undefined;
+      expect(element[name]).toEqual(fallback);
+    },
+  );
+
+  it.each(defaulted)(
+    "keeps the default of $name when it is assigned null",
+    ({ name, fallback }) => {
+      const element = create() as unknown as Props;
+      element[name] = null;
+      expect(element[name]).toEqual(fallback);
+    },
+  );
+
+  it.each(defaulted)(
+    "restores the default of $name when a set value is cleared",
+    ({ name, fallback }) => {
+      const element = create() as unknown as Props;
+      element[name] = other(fallback);
+      expect(element[name]).toEqual(other(fallback));
+      element[name] = undefined;
+      expect(element[name]).toEqual(fallback);
+    },
+  );
+
+  it.each(defaulted)("keeps a supplied value of $name", ({ name, fallback }) => {
+    const element = create() as unknown as Props;
+    element[name] = other(fallback);
+    expect(element[name]).toEqual(other(fallback));
+  });
+
+  it.each(defaulted.filter(({ attribute }) => attribute !== undefined))(
+    "restores the default of $name when its attribute is removed",
+    ({ name, attribute, fallback }) => {
+      const element = create();
+      element.setAttribute(attribute as string, typeof fallback === "boolean" ? "" : "other");
+      expect((element as unknown as Props)[name]).toEqual(other(fallback));
+      element.removeAttribute(attribute as string);
+      expect((element as unknown as Props)[name]).toEqual(fallback);
+    },
+  );
 });

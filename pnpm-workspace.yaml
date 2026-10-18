@@ -8,6 +8,7 @@ packages:
   - "tools/*"
 
 catalog:
+  "@angular/platform-server": ^22.2.3
   # Babel 7 for the Nuxt projects: Nuxt's sub-packages have optional peers on
   # Babel 7 plugins, which pnpm auto-installs into every project with Nuxt in
   # its graph, and it pairs their required @babel/core peer with the newest

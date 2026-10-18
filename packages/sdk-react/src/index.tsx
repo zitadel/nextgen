@@ -58,10 +58,59 @@ export { businessLocales } from "@zitadel/components";
  * }
  * ```
  */
+/**
+ * `createComponent` binds every key found on the element's prototype as a DOM
+ * property, and a property is never written into server markup. The widget
+ * starts its first flow when it upgrades, before React hydrates, so the keys
+ * that define that flow must reach the browser as attributes. This hides the
+ * given keys from that lookup: they are passed through as plain attributes
+ * (server markup included) and the element still reads them as properties.
+ */
+function asAttributes<T extends typeof HTMLElement>(
+  elementClass: T,
+  ...keys: readonly string[]
+): T {
+  const hidden = new Set<PropertyKey>(keys);
+  const prototype = new Proxy(elementClass.prototype, {
+    has: (target, key) => !hidden.has(key) && key in target,
+  });
+  return { name: elementClass.name, prototype } as unknown as T;
+}
+
+/**
+ * The project coordinates as attributes, so they are in the server markup. The
+ * `project` handle stays a property too: it carries the publishable key and is
+ * what the element prefers once React hands it over.
+ *
+ * A handle with a publishable key writes none: attributes cannot carry the key,
+ * so a widget that started from them would send its first request without the
+ * bearer the project needs, and never retry. `ZitadelLogin` renders nothing for
+ * such a handle until it has mounted, so its element is created with the
+ * handle already bound.
+ */
+function projectAttributes(props: {
+  readonly project?: ZitadelProject;
+  readonly projectId?: string;
+  readonly proxyPath?: string;
+}) {
+  if (props.project?.publishableKey) return {};
+  return {
+    "project-id": props.project?.projectId ?? props.projectId,
+    "proxy-path": props.project?.proxyPath ?? props.proxyPath,
+    url: props.project?.url,
+  };
+}
+
 const ZitadelLoginElementReact = createComponent({
   react: React,
   tagName: "zitadel-login",
-  elementClass: ZitadelLoginElement,
+  elementClass: asAttributes(
+    ZitadelLoginElement,
+    "purpose",
+    "resumeFlowId",
+    "postSignInUrl",
+    "url",
+  ),
   events: {
     onZitadelFlowStep: "zitadel-flow-step" as EventName<CustomEvent<ZitadelFlowStepDetail>>,
     onZitadelFlowInput: "zitadel-flow-input" as EventName<CustomEvent<ZitadelFlowInputDetail>>,
@@ -78,7 +127,7 @@ const ZitadelLoginElementReact = createComponent({
 const ZitadelLogoutElementReact = createComponent({
   react: React,
   tagName: "zitadel-logout",
-  elementClass: ZitadelLogoutElement,
+  elementClass: asAttributes(ZitadelLogoutElement, "url"),
   events: {
     onZitadelSignout: "zitadel-signout" as EventName<CustomEvent<ZitadelSignoutDetail>>,
     onZitadelSessionError: "zitadel-session-error" as EventName<
@@ -90,7 +139,7 @@ const ZitadelLogoutElementReact = createComponent({
 const ZitadelSessionElementReact = createComponent({
   react: React,
   tagName: "zitadel-session",
-  elementClass: ZitadelSessionElement,
+  elementClass: asAttributes(ZitadelSessionElement, "url"),
   events: {
     onZitadelSignout: "zitadel-signout" as EventName<CustomEvent<ZitadelSignoutDetail>>,
     onZitadelSessionError: "zitadel-session-error" as EventName<
@@ -126,14 +175,35 @@ export type ZitadelLoginReactProps = ZitadelLoginProps & {
 
 export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginReactProps>(
   function ZitadelLogin(
-    { purpose, onFlowStep, onFlowInput, onFlowComplete, onFlowRedirect, onFlowError, ...props },
+    {
+      purpose,
+      resumeFlowId,
+      postSignInUrl,
+      onFlowStep,
+      onFlowInput,
+      onFlowComplete,
+      onFlowRedirect,
+      onFlowError,
+      ...props
+    },
     ref,
   ) {
+    const keyed = Boolean(props.project?.publishableKey);
+    const [mounted, setMounted] = React.useState(false);
+    React.useEffect(() => setMounted(true), []);
+    // A keyed handle cannot reach the element as attributes, and the element
+    // starts its first flow when it first updates. Create it only once the
+    // handle can be bound at the same time, never during server rendering.
+    if (keyed && !mounted) return null;
     return (
       <ZitadelLoginElementReact
         {...props}
         ref={ref}
         purpose={purpose ?? "login"}
+        flow-name={props.flowName}
+        {...projectAttributes(props)}
+        resume-flow-id={resumeFlowId || undefined}
+        post-sign-in-url={postSignInUrl || undefined}
         onZitadelFlowStep={onFlowStep && ((event) => onFlowStep(event.detail))}
         onZitadelFlowInput={onFlowInput && ((event) => onFlowInput(event.detail))}
         onZitadelFlowComplete={onFlowComplete && ((event) => onFlowComplete(event.detail))}
@@ -160,6 +230,8 @@ export const ZitadelLogout = React.forwardRef<ZitadelLogoutElement, ZitadelLogou
     return (
       <ZitadelLogoutElementReact
         {...props}
+        {...projectAttributes(props)}
+        post-sign-out-url={props.postSignOutUrl}
         ref={ref}
         onZitadelSignout={onSignout && ((event) => onSignout(event.detail))}
         onZitadelSessionError={onSessionError && ((event) => onSessionError(event.detail))}
@@ -184,6 +256,8 @@ export const ZitadelSession = React.forwardRef<ZitadelSessionElement, ZitadelSes
     return (
       <ZitadelSessionElementReact
         {...props}
+        {...projectAttributes(props)}
+        post-sign-out-url={props.postSignOutUrl}
         ref={ref}
         onZitadelSignout={onSignout && ((event) => onSignout(event.detail))}
         onZitadelSessionError={onSessionError && ((event) => onSessionError(event.detail))}

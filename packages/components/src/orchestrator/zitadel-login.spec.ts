@@ -207,6 +207,23 @@ describe("<zitadel-login> against the typed Flow API", () => {
     });
   });
 
+  it("sends the publishable-key attribute as the bearer on the first request", async () => {
+    _resetConfigForTesting();
+    const bearers: (string | null)[] = [];
+    server.events.on("request:start", ({ request }) => {
+      bearers.push(request.headers.get("authorization"));
+    });
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.setAttribute("project-id", "demo-project");
+    element.setAttribute("proxy-path", API_BASE);
+    element.setAttribute("publishable-key", "pk_test_123");
+    host.appendChild(element);
+    await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+    server.events.removeAllListeners();
+
+    expect(bearers[0]).toBe("Bearer pk_test_123");
+  });
+
   it("prefers the project property over the project-id attribute", async () => {
     const element = document.createElement("zitadel-login") as ZitadelLogin;
     element.project = testProject; // projectId "demo-project"
@@ -2448,4 +2465,106 @@ describe("<zitadel-login preview-state> repaint", () => {
     expect(document.activeElement).toBe(control);
     control.remove();
   });
+});
+
+describe("<zitadel-login> resume-flow-id", () => {
+  it.each([undefined, null, ""])("reads %j as no handle", async (value) => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const element = await mount(host);
+    element.resumeFlowId = "flow_123";
+    expect(element.resumeFlowId).toBe("flow_123");
+
+    element.resumeFlowId = value;
+
+    expect(element.resumeFlowId).toBe("");
+  });
+
+  it("reads a removed attribute as no handle", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const element = await mount(host);
+    element.setAttribute("resume-flow-id", "flow_123");
+    expect(element.resumeFlowId).toBe("flow_123");
+
+    element.removeAttribute("resume-flow-id");
+
+    expect(element.resumeFlowId).toBe("");
+  });
+});
+
+describe("<zitadel-login> unset public properties", () => {
+  type Declaration = { attribute?: string | boolean; state?: boolean };
+  type Props = Record<string, unknown>;
+  const create = () => document.createElement("zitadel-login");
+  const declared = (
+    customElements.get("zitadel-login") as unknown as {
+      elementProperties: Map<string, Declaration>;
+    }
+  ).elementProperties;
+  // Every public property that has a declared default, read off a fresh element so a
+  // property added later is covered without touching this list.
+  const defaulted = [...declared]
+    .filter(([name, options]) => !options.state && (create() as unknown as Props)[name] != null)
+    .map(([name, options]) => ({
+      name,
+      attribute:
+        typeof options.attribute === "string"
+          ? options.attribute
+          : options.attribute === false
+            ? undefined
+            : name.toLowerCase(),
+      fallback: (create() as unknown as Props)[name],
+    }));
+  const other = (fallback: unknown) => (typeof fallback === "boolean" ? !fallback : "other");
+
+  it("covers the element's defaulted properties", () => {
+    expect(defaulted.length).toBeGreaterThan(0);
+  });
+
+  it.each(defaulted)(
+    "keeps the default of $name when it is assigned undefined",
+    ({ name, fallback }) => {
+      const element = create() as unknown as Props;
+      element[name] = undefined;
+      expect(element[name]).toEqual(fallback);
+    },
+  );
+
+  it.each(defaulted)(
+    "keeps the default of $name when it is assigned null",
+    ({ name, fallback }) => {
+      const element = create() as unknown as Props;
+      element[name] = null;
+      expect(element[name]).toEqual(fallback);
+    },
+  );
+
+  it.each(defaulted)(
+    "restores the default of $name when a set value is cleared",
+    ({ name, fallback }) => {
+      const element = create() as unknown as Props;
+      element[name] = other(fallback);
+      expect(element[name]).toEqual(other(fallback));
+      element[name] = undefined;
+      expect(element[name]).toEqual(fallback);
+    },
+  );
+
+  it.each(defaulted)("keeps a supplied value of $name", ({ name, fallback }) => {
+    const element = create() as unknown as Props;
+    element[name] = other(fallback);
+    expect(element[name]).toEqual(other(fallback));
+  });
+
+  it.each(defaulted.filter(({ attribute }) => attribute !== undefined))(
+    "restores the default of $name when its attribute is removed",
+    ({ name, attribute, fallback }) => {
+      const element = create();
+      element.setAttribute(attribute as string, typeof fallback === "boolean" ? "" : "other");
+      expect((element as unknown as Props)[name]).toEqual(other(fallback));
+      element.removeAttribute(attribute as string);
+      expect((element as unknown as Props)[name]).toEqual(fallback);
+    },
+  );
 });
