@@ -2556,15 +2556,73 @@ describe("<zitadel-login> config that arrives after upgrade", () => {
     expect(createFlows()).toHaveLength(0);
   });
 
-  it("resumes the flow a resume handle names when it arrives after the first start", async () => {
+  it("ignores a resume handle that arrives after the first start created a flow", async () => {
     const host = document.createElement("div");
     document.body.appendChild(host);
     const element = await mount(host);
 
     element.resumeFlowId = "flow_resumed";
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
-    await waitFor(() => mock.getCaptured().some((entry) => entry.kind === "getFlowStep"));
+    // Creating replaced the flow cookie, so the server would refuse the handle.
+    expect(mock.getCaptured().filter((entry) => entry.kind === "getFlowStep")).toHaveLength(0);
     expect(createFlows()).toHaveLength(1);
+  });
+
+  it("resumes a late handle when the first start created no flow", async () => {
+    _resetConfigForTesting();
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    host.appendChild(element);
+    await waitFor(() => element.shadowRoot?.querySelector("zl-alert"));
+
+    element.projectId = "demo-project";
+    element.proxyPath = API_BASE;
+    element.resumeFlowId = "flow_resumed";
+
+    await waitFor(() => mock.getCaptured().find((entry) => entry.kind === "getFlowStep"));
+    expect(createFlows()).toHaveLength(0);
+  });
+
+  it("keeps loading until the outermost start finishes when config changes during recovery", async () => {
+    const gates: Array<() => void> = [];
+    let posts = 0;
+    server.use(
+      http.get(
+        "*/flow/:id",
+        () =>
+          HttpResponse.json(
+            { code: "flow.restart_required", message: "the flow must be restarted" },
+            { status: 409 },
+          ),
+        { once: true },
+      ),
+      http.post("*/flow", async () => {
+        posts++;
+        await new Promise<void>((resolve) => gates.push(resolve));
+      }),
+    );
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.project = testProject;
+    element.resumeFlowId = "flow_stale";
+    host.appendChild(element);
+    await waitFor(() => posts === 1);
+
+    element.purpose = "register";
+    await element.updateComplete;
+    gates[0]?.();
+    await waitFor(() => posts === 2);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // The replacement for the changed config is still pending.
+    expect((element as unknown as { loading: boolean }).loading).toBe(true);
+    gates[1]?.();
+    await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(posts).toBe(2);
   });
 
   it("does not start a second flow when the config reverts before the restart runs", async () => {

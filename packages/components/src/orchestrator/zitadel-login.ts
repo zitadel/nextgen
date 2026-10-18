@@ -787,6 +787,24 @@ export class ZitadelLogin extends ZitadelSurface {
    */
   private resumed = false;
 
+  /**
+   * Set when the current start created a flow (rather than resuming one or
+   * failing). Creating replaces the flow cookie, so a resume handle arriving
+   * afterwards names a flow the server would now refuse; it is ignored until
+   * a start that created nothing.
+   */
+  private created = false;
+
+  /** The `resume-flow-id` the current start used, kept so {@link flowConfigKey} can pin it once a flow is created. */
+  private startedResumeId = "";
+
+  /**
+   * Number of {@link startFlow} calls on the stack. A start that recovers via
+   * {@link restartIfRequired} nests another, and only the outermost one may
+   * clear `loading` or drain a queued restart.
+   */
+  private startDepth = 0;
+
   private flowConfigKey(): string {
     const handle = this.project;
     return JSON.stringify([
@@ -799,7 +817,7 @@ export class ZitadelLogin extends ZitadelSurface {
       this.url,
       this.purpose,
       this.flowName,
-      this.resumeFlowId,
+      this.created ? this.startedResumeId : this.resumeFlowId,
     ]);
   }
 
@@ -836,8 +854,11 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   private async startFlow(): Promise<void> {
+    this.startDepth++;
     this.loading = true;
     this.startupError = null;
+    this.created = false;
+    this.startedResumeId = this.resumeFlowId;
     this.startedWith = this.flowConfigKey();
     this.resumed = false;
     try {
@@ -878,6 +899,7 @@ export class ZitadelLogin extends ZitadelSurface {
           purpose: this.purpose,
           ...(this.flowName ? { flow_definition_name: this.flowName } : {}),
         });
+        this.created = true;
       }
       if (this.restarting) {
         wire = { ...wire, step: { ...wire.step, error: "error.flow_restart_required" } };
@@ -889,11 +911,15 @@ export class ZitadelLogin extends ZitadelSurface {
       // after the visitor's first submit.
       emit(this, "zitadel-flow-step", { step: wire.step });
     } catch (error) {
-      if (await this.restartIfRequired(error)) return;
-      this.handleTransportError(this.describeFlowSelectionError(error));
+      if (!(await this.restartIfRequired(error))) {
+        this.handleTransportError(this.describeFlowSelectionError(error));
+      }
     } finally {
-      this.loading = false;
+      this.startDepth--;
+      if (this.startDepth === 0) this.loading = false;
     }
+    // A nested start (recovery) leaves this to the outermost call, which owns `loading`.
+    if (this.startDepth > 0) return;
     // After `loading` has settled: the `loading` preview holds it back up.
     if (this.preview) this.applyPreviewState();
     if (this.restartPending) {
