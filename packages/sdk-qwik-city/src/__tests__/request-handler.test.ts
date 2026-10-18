@@ -10,7 +10,7 @@
 
 import { generateKeyPairSync, createSign } from "node:crypto";
 import type { RequestEvent, RequestHandler } from "@qwik.dev/router";
-import { describe, it, expect, expectTypeOf, vi, beforeEach } from "vitest";
+import { afterEach, describe, it, expect, expectTypeOf, vi, beforeEach } from "vitest";
 
 import type { QwikRequestEvent } from "../request-handler";
 
@@ -411,25 +411,6 @@ describe("createNextgenOnRequest (Qwik City)", () => {
       expect(captured()?.get("authorization")).toBe("Bearer sk-1");
     });
 
-    // ADR 036: on any other operation the secret would make the public proxy
-    // an open relay carrying project authority.
-    it.each([
-      ["GET", "/__nextgen/v1/flow"],
-      ["POST", "/__nextgen/v1/flow"],
-      ["GET", "/__nextgen/sessions/exchange"],
-    ])("withholds the project secret from %s %s", async (method, path) => {
-      const captured = captureUpstreamHeaders();
-
-      const handler = createNextgenOnRequest({
-        url: "http://localhost:4000",
-        projectSecret: "sk-1",
-      });
-      const h = makeHarness(`http://localhost:3000${path}`, { method });
-
-      await run(handler, h.ev);
-      expect(captured()?.has("authorization")).toBe(false);
-    });
-
     it("keeps a caller-supplied credential on the handoff exchange", async () => {
       const captured = captureUpstreamHeaders();
 
@@ -574,5 +555,218 @@ describe("opaque session cookie", () => {
     await run(protectedHandler(), h.ev);
 
     expect(h.deleted).toEqual(["__nextgen_session"]);
+  });
+});
+
+// The cases below run under the same titles in every server SDK (sdk-next,
+// sdk-nuxt, sdk-sveltekit, sdk-solid-start, sdk-qwik-city, sdk-tanstack-start).
+// Only `serve` differs: it drives this SDK's handler with one request and
+// reports the proxied response (undefined when the request was not proxied).
+type ServeOptions = NonNullable<Parameters<typeof createNextgenOnRequest>[0]>;
+interface ServeInit {
+  readonly method?: string;
+  readonly headers?: Record<string, string>;
+  readonly authorization?: string;
+}
+
+async function serve(
+  url: string,
+  init: ServeInit = {},
+  options: ServeOptions = {},
+): Promise<{ response?: Response; request: Request }> {
+  const h = makeHarness(url, init);
+  await run(createNextgenOnRequest(options), h.ev);
+  return { response: h.sent, request: h.ev.request };
+}
+
+function captureFetch(response: () => Response = () => new Response("{}", { status: 200 })) {
+  const calls: { url: string; headers: Headers }[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockImplementation((url: string, init: RequestInit) => {
+      calls.push({ url: String(url), headers: new Headers(init?.headers) });
+      return Promise.resolve(response());
+    }),
+  );
+  return calls;
+}
+
+describe("shared server SDK cases", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  describe("proxy: credential planes", () => {
+    it.each([
+      ["GET", "/__nextgen/sessions/me"],
+      ["DELETE", "/__nextgen/sessions/me"],
+      ["POST", "/__nextgen/flow"],
+      ["GET", "/__nextgen/projects"],
+      ["GET", "/__nextgen/sessions/exchange"],
+      ["POST", "/__nextgen/sessions/exchange/extra"],
+    ])("does not attach the project secret to %s %s", async (method, pathname) => {
+      vi.stubEnv("ZITADEL_PROJECT_SECRET", "project-secret");
+      const calls = captureFetch();
+
+      await serve(`http://localhost:3000${pathname}`, { method }, { url: "http://localhost:4000" });
+
+      expect(calls[0]?.headers.has("authorization")).toBe(false);
+    });
+
+    it("attaches the project secret only to POST /sessions/exchange, ignoring the query", async () => {
+      vi.stubEnv("ZITADEL_PROJECT_SECRET", "project-secret");
+      const calls = captureFetch();
+
+      await serve(
+        "http://localhost:3000/__nextgen/sessions/exchange?source=browser",
+        { method: "POST" },
+        { url: "http://localhost:4000" },
+      );
+
+      expect(calls[0]?.headers.get("authorization")).toBe("Bearer project-secret");
+    });
+
+    it("preserves the upstream session cache policy", async () => {
+      captureFetch(
+        () =>
+          new Response("{}", { status: 200, headers: { "cache-control": "private, no-store" } }),
+      );
+
+      const { response } = await serve(
+        "http://localhost:3000/__nextgen/sessions/me",
+        {},
+        { url: "http://localhost:4000" },
+      );
+
+      expect(response?.headers.get("cache-control")).toBe("private, no-store");
+    });
+  });
+
+  describe("proxy: Location header rewriting (S-1)", () => {
+    it("keeps the path but never the internal host of an upstream redirect", async () => {
+      captureFetch(
+        () =>
+          new Response("{}", {
+            status: 302,
+            headers: {
+              "content-type": "application/json",
+              location: "http://internal-auth.corp:4000/callback",
+            },
+          }),
+      );
+
+      const { response } = await serve(
+        "http://localhost:3000/__nextgen/v1/flow",
+        {},
+        { url: "http://localhost:4000" },
+      );
+
+      // Only the path is taken, so the upstream's own host never reaches the browser.
+      expect(response?.headers.get("location")).toBe("http://localhost:3000/callback");
+      expect(response?.headers.get("location")).not.toContain("internal-auth.corp");
+      expect(response?.headers.get("content-type")).toBe("application/json");
+    });
+  });
+
+  describe("proxy: path-separator guard (W-2)", () => {
+    it("proxies an exact match of proxyPath", async () => {
+      const calls = captureFetch();
+
+      const { response } = await serve(
+        "http://localhost:3000/__nextgen",
+        {},
+        { url: "http://localhost:4000" },
+      );
+
+      expect(calls).toHaveLength(1);
+      expect(response?.status).toBe(200);
+    });
+
+    it("proxies paths under proxyPath", async () => {
+      const calls = captureFetch();
+
+      const { response } = await serve(
+        "http://localhost:3000/__nextgen/v1/flow",
+        {},
+        { url: "http://localhost:4000" },
+      );
+
+      expect(calls).toHaveLength(1);
+      expect(response?.status).toBe(200);
+    });
+  });
+
+  describe("inbound x-nextgen-auth-token", () => {
+    it.each([
+      ["a public route", "http://localhost:3000/"],
+      ["an ignored route", "http://localhost:3000/health"],
+    ])("is stripped on %s", async (_l, url) => {
+      const { request } = await serve(
+        url,
+        { headers: { "x-nextgen-auth-token": "forged" } },
+        { ignoredRoutes: ["/health"] },
+      );
+
+      expect(request.headers.has("x-nextgen-auth-token")).toBe(false);
+    });
+
+    it("refuses the request when the header cannot be removed", async () => {
+      const h = makeHarness("http://localhost:3000/", {
+        headers: { "x-nextgen-auth-token": "forged" },
+      });
+      h.ev.request.headers.delete = () => {
+        throw new TypeError("immutable");
+      };
+
+      await run(createNextgenOnRequest(), h.ev);
+
+      expect(h.sent?.status).toBe(400);
+    });
+
+    it("lets the request through when removal fails but the header is absent", async () => {
+      const h = makeHarness("http://localhost:3000/");
+      h.ev.request.headers.delete = () => {
+        throw new TypeError("immutable");
+      };
+
+      await run(createNextgenOnRequest(), h.ev);
+
+      expect(h.sent).toBeUndefined();
+    });
+  });
+
+  // An app that reads its secret from a secrets manager at runtime passes it in.
+  describe("project secret sources", () => {
+    it.each([
+      ["the option", "sk_option", "sk_env", "Bearer sk_option"],
+      ["ZITADEL_PROJECT_SECRET", undefined, "sk_env", "Bearer sk_env"],
+      ["nothing", undefined, undefined, null],
+    ])("sends the exchange bearer from %s", async (_l, option, env, expected) => {
+      vi.stubEnv("ZITADEL_PROJECT_SECRET", env);
+      const calls = captureFetch(() => Response.json({ session_id: "s1" }));
+
+      await serve(
+        "http://localhost:3000/__nextgen/sessions/exchange",
+        { method: "POST" },
+        { url: "http://localhost:4000", projectSecret: option },
+      );
+
+      expect(calls[0]?.headers.get("authorization")).toBe(expected);
+    });
+  });
+
+  describe("backend URL sources", () => {
+    it.each([
+      ["the option", "http://option.test:4000", "http://env.test:4000", "http://option.test:4000/"],
+      ["ZITADEL_URL", undefined, "http://env.test:4000", "http://env.test:4000/"],
+    ])("proxies to the backend from %s", async (_l, option, env, expected) => {
+      vi.stubEnv("ZITADEL_URL", env);
+      const calls = captureFetch();
+
+      await serve("http://localhost:3000/__nextgen/v1/flow", {}, { url: option });
+
+      expect(calls[0]?.url.startsWith(expected)).toBe(true);
+    });
   });
 });
