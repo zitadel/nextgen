@@ -180,7 +180,7 @@ function sessionAttrs(props: ZitadelSessionProps): Attrs {
 function bindLoginConfig(el: ZitadelLoginElement, props: ZitadelLoginProps): void {
   setProp(el, "project", props.project);
   setProp(el, "projectId", props.projectId);
-  setProp(el, "proxyPath", props.proxyPath);
+  setProp(el, "proxyPath", proxyPathAttr(props.proxyPath));
   setProp(el, "purpose", props.purpose ?? "login");
   setProp(el, "flowName", props.flowName);
   setProp(el, "postSignInUrl", props.postSignInUrl);
@@ -201,7 +201,7 @@ function bindLoginConfig(el: ZitadelLoginElement, props: ZitadelLoginProps): voi
 function bindLogoutConfig(el: ZitadelLogoutElement, props: ZitadelLogoutProps): void {
   setProp(el, "project", props.project);
   setProp(el, "projectId", props.projectId);
-  setProp(el, "proxyPath", props.proxyPath);
+  setProp(el, "proxyPath", proxyPathAttr(props.proxyPath));
   setProp(el, "postSignOutUrl", props.postSignOutUrl);
   setProp(el, "theme", props.theme);
 }
@@ -210,7 +210,7 @@ function bindLogoutConfig(el: ZitadelLogoutElement, props: ZitadelLogoutProps): 
 function bindSessionConfig(el: ZitadelSessionElement, props: ZitadelSessionProps): void {
   setProp(el, "project", props.project);
   setProp(el, "projectId", props.projectId);
-  setProp(el, "proxyPath", props.proxyPath);
+  setProp(el, "proxyPath", proxyPathAttr(props.proxyPath));
   setProp(el, "postSignOutUrl", props.postSignOutUrl);
   setProp(el, "heading", props.heading ?? DEFAULT_HEADING);
   setProp(el, "logoutLabel", props.logoutLabel ?? DEFAULT_LOGOUT_LABEL);

@@ -137,6 +137,24 @@ describe("ZitadelLogin", () => {
     expect(el!.proxyPath).toBe("/__nextgen");
   });
 
+  it("binds an empty proxyPath as the origin root, matching its attribute", async () => {
+    const received: Record<string, unknown>[] = [];
+    const host = await renderWidget(
+      <ZitadelLogin
+        projectId="proj-test"
+        proxyPath=""
+        onFlowStep$={$((detail: object) => {
+          received.push(detail as Record<string, unknown>);
+        })}
+      />,
+    );
+    const el = host.querySelector<ZitadelLoginElement>("zitadel-login");
+    // The listener is wired by the same visible task that re-applies the config.
+    await dispatchUntilForwarded(el!, "zitadel-flow-step", { probe: 1 }, received);
+    expect(el!.getAttribute("proxy-path")).toBe("/");
+    expect(el!.proxyPath).toBe("/");
+  });
+
   it("forwards resumeFlowId to the widget", async () => {
     const host = await renderWidget(<ZitadelLogin project={project} resumeFlowId="flow_123" />);
     const el = host.querySelector<ZitadelLoginElement>("zitadel-login");
@@ -216,6 +234,24 @@ describe("ZitadelLogout", () => {
     expect(el!.proxyPath).toBe("/__nextgen");
   });
 
+  it("binds an empty proxyPath as the origin root, matching its attribute", async () => {
+    const received: Record<string, unknown>[] = [];
+    const host = await renderWidget(
+      <ZitadelLogout
+        projectId="proj-test"
+        proxyPath=""
+        onSignout$={$((detail: object) => {
+          received.push(detail as Record<string, unknown>);
+        })}
+      />,
+    );
+    const el = host.querySelector<ZitadelLogoutElement>("zitadel-logout");
+    // The listener is wired by the same visible task that re-applies the config.
+    await dispatchUntilForwarded(el!, "zitadel-signout", { probe: 1 }, received);
+    expect(el!.getAttribute("proxy-path")).toBe("/");
+    expect(el!.proxyPath).toBe("/");
+  });
+
   it.each(Object.entries(ZITADEL_LOGOUT_EVENT_HANDLERS))(
     "forwards %s to its callback",
     async (eventName, handlerProp) => {
@@ -285,6 +321,24 @@ describe("ZitadelSession", () => {
     const el = host.querySelector<ZitadelSessionElement>("zitadel-session");
     expect(el!.projectId).toBe("proj-test");
     expect(el!.proxyPath).toBe("/__nextgen");
+  });
+
+  it("binds an empty proxyPath as the origin root, matching its attribute", async () => {
+    const received: Record<string, unknown>[] = [];
+    const host = await renderWidget(
+      <ZitadelSession
+        projectId="proj-test"
+        proxyPath=""
+        onSignout$={$((detail: object) => {
+          received.push(detail as Record<string, unknown>);
+        })}
+      />,
+    );
+    const el = host.querySelector<ZitadelSessionElement>("zitadel-session");
+    // The listener is wired by the same visible task that re-applies the config.
+    await dispatchUntilForwarded(el!, "zitadel-signout", { probe: 1 }, received);
+    expect(el!.getAttribute("proxy-path")).toBe("/");
+    expect(el!.proxyPath).toBe("/");
   });
 
   it("forwards the surface variant/theme", async () => {
