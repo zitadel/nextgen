@@ -57,10 +57,46 @@ export { businessLocales } from "@zitadel/components";
  * }
  * ```
  */
+/**
+ * `createComponent` binds every key found on the element's prototype as a DOM
+ * property, and a property is never written into server markup. The widget
+ * starts its first flow when it upgrades, before React hydrates, so the keys
+ * that define that flow must reach the browser as attributes. This hides the
+ * given keys from that lookup: they are passed through as plain attributes
+ * (server markup included) and the element still reads them as properties.
+ */
+function asAttributes<T extends typeof HTMLElement>(
+  elementClass: T,
+  ...keys: readonly string[]
+): T {
+  const hidden = new Set<PropertyKey>(keys);
+  const prototype = new Proxy(elementClass.prototype, {
+    has: (target, key) => !hidden.has(key) && key in target,
+  });
+  return { name: elementClass.name, prototype } as unknown as T;
+}
+
+/**
+ * The project coordinates as attributes, so they are in the server markup. The
+ * `project` handle stays a property too: it carries the publishable key and is
+ * what the element prefers once React hands it over.
+ */
+function projectAttributes(props: {
+  readonly project?: ZitadelProject;
+  readonly projectId?: string;
+  readonly proxyPath?: string;
+}) {
+  return {
+    "project-id": props.project?.projectId ?? props.projectId,
+    "proxy-path": props.project?.proxyPath ?? props.proxyPath,
+    url: props.project?.url,
+  };
+}
+
 const ZitadelLoginElementReact = createComponent({
   react: React,
   tagName: "zitadel-login",
-  elementClass: ZitadelLoginElement,
+  elementClass: asAttributes(ZitadelLoginElement, "purpose", "url"),
   events: {
     onZitadelFlowStep: "zitadel-flow-step" as EventName<CustomEvent<ZitadelFlowStepDetail>>,
     onZitadelFlowInput: "zitadel-flow-input" as EventName<CustomEvent<ZitadelFlowInputDetail>>,
@@ -77,7 +113,7 @@ const ZitadelLoginElementReact = createComponent({
 const ZitadelLogoutElementReact = createComponent({
   react: React,
   tagName: "zitadel-logout",
-  elementClass: ZitadelLogoutElement,
+  elementClass: asAttributes(ZitadelLogoutElement, "url"),
   events: {
     onZitadelSignout: "zitadel-signout" as EventName<CustomEvent<ZitadelSignoutDetail>>,
   },
@@ -86,7 +122,7 @@ const ZitadelLogoutElementReact = createComponent({
 const ZitadelSessionElementReact = createComponent({
   react: React,
   tagName: "zitadel-session",
-  elementClass: ZitadelSessionElement,
+  elementClass: asAttributes(ZitadelSessionElement, "url"),
   events: {
     onZitadelSignout: "zitadel-signout" as EventName<CustomEvent<ZitadelSignoutDetail>>,
   },
@@ -127,6 +163,8 @@ export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginRe
         {...props}
         ref={ref}
         purpose={purpose ?? "login"}
+        flow-name={props.flowName}
+        {...projectAttributes(props)}
         onZitadelFlowStep={onFlowStep && ((event) => onFlowStep(event.detail))}
         onZitadelFlowInput={onFlowInput && ((event) => onFlowInput(event.detail))}
         onZitadelFlowComplete={onFlowComplete && ((event) => onFlowComplete(event.detail))}
@@ -153,6 +191,8 @@ export const ZitadelLogout = React.forwardRef<ZitadelLogoutElement, ZitadelLogou
     return (
       <ZitadelLogoutElementReact
         {...props}
+        {...projectAttributes(props)}
+        post-sign-out-url={props.postSignOutUrl}
         ref={ref}
         onZitadelSignout={onSignout && ((event) => onSignout(event.detail))}
       />
@@ -175,6 +215,8 @@ export const ZitadelSession = React.forwardRef<ZitadelSessionElement, ZitadelSes
     return (
       <ZitadelSessionElementReact
         {...props}
+        {...projectAttributes(props)}
+        post-sign-out-url={props.postSignOutUrl}
         ref={ref}
         onZitadelSignout={onSignout && ((event) => onSignout(event.detail))}
       />

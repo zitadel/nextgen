@@ -5,7 +5,8 @@ import type {
   ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
 
-import { render } from "@testing-library/react";
+import { render, waitFor } from "@testing-library/react";
+import { _resetConfigForTesting, configureZitadel } from "@zitadel/api/config";
 import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
@@ -13,7 +14,9 @@ import {
   ZITADEL_SESSION_EVENT_HANDLERS,
 } from "@zitadel/sdk-core/types";
 import * as React from "react";
-import { describe, expect, it, vi } from "vitest";
+import { hydrateRoot } from "react-dom/client";
+import { renderToString } from "react-dom/server";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { businessLocales, ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
 
@@ -153,6 +156,98 @@ describe("ZitadelSession", () => {
     const { container } = render(<ZitadelSession ref={ref} project={project} />);
     expect(ref.current).toBe(container.querySelector("zitadel-session"));
     expect(ref.current?.tagName.toLowerCase()).toBe("zitadel-session");
+  });
+});
+
+/** The attributes of the first `<tag>` in server-rendered HTML. */
+function serverAttributes(tag: string, node: React.ReactElement): Record<string, string> {
+  const html = renderToString(node);
+  const open = new RegExp(`<${tag}(\\s[^>]*)?>`).exec(html);
+  expect(open, `<${tag}> missing from server HTML`).not.toBeNull();
+  return Object.fromEntries(
+    [...(open?.[1] ?? "").matchAll(/([a-z][\w-]*)(?:="([^"]*)")?/g)].map((m) => [m[1], m[2] ?? ""]),
+  );
+}
+
+describe("server-rendered widget config", () => {
+  const handle = { projectId: "proj-test", proxyPath: "/__nextgen", url: "http://auth.test" };
+
+  it("puts the login flow config into the server markup", () => {
+    expect(
+      serverAttributes(
+        "zitadel-login",
+        <ZitadelLogin project={handle} purpose="register" flowName="signup" />,
+      ),
+    ).toMatchObject({
+      purpose: "register",
+      "flow-name": "signup",
+      "project-id": "proj-test",
+      "proxy-path": "/__nextgen",
+      url: "http://auth.test",
+    });
+  });
+
+  it("puts the discrete project props into the login markup", () => {
+    expect(
+      serverAttributes("zitadel-login", <ZitadelLogin projectId="p1" proxyPath="/px" />),
+    ).toMatchObject({ purpose: "login", "project-id": "p1", "proxy-path": "/px" });
+  });
+
+  it("puts the session config into the server markup", () => {
+    expect(
+      serverAttributes(
+        "zitadel-session",
+        <ZitadelSession project={handle} postSignOutUrl="/bye" />,
+      ),
+    ).toMatchObject({
+      "project-id": "proj-test",
+      "proxy-path": "/__nextgen",
+      url: "http://auth.test",
+      "post-sign-out-url": "/bye",
+    });
+  });
+
+  it("puts the logout config into the server markup", () => {
+    expect(
+      serverAttributes("zitadel-logout", <ZitadelLogout project={handle} postSignOutUrl="/bye" />),
+    ).toMatchObject({
+      "project-id": "proj-test",
+      "proxy-path": "/__nextgen",
+      url: "http://auth.test",
+      "post-sign-out-url": "/bye",
+    });
+  });
+});
+
+describe("hydrating a server-rendered login", () => {
+  afterEach(() => {
+    _resetConfigForTesting();
+    vi.restoreAllMocks();
+  });
+
+  it("starts its first flow with the purpose the server rendered", async () => {
+    const globalProject = configureZitadel({
+      projectId: "proj-global",
+      proxyPath: "https://flow.test.invalid",
+    });
+    const fetched = vi.spyOn(globalThis, "fetch");
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    host.innerHTML = renderToString(<ZitadelLogin project={globalProject} purpose="register" />);
+
+    hydrateRoot(host, <ZitadelLogin project={globalProject} purpose="register" />);
+
+    await waitFor(() => expect(fetched).toHaveBeenCalled());
+    const bodies = await Promise.all(
+      fetched.mock.calls.map(async ([input, init]) =>
+        JSON.parse(
+          String(init?.body ?? (input instanceof Request ? await input.clone().text() : "null")),
+        ),
+      ),
+    );
+    const created = bodies.filter((body) => body?.project_id);
+    expect(created[0]).toMatchObject({ purpose: "register" });
+    host.remove();
   });
 });
 
