@@ -13,7 +13,7 @@ import {
   ZITADEL_SESSION_EVENT_HANDLERS,
 } from "@zitadel/sdk-core/types";
 import { describe, expect, it, vi } from "vitest";
-import { defineComponent, h, shallowRef, type Ref } from "vue";
+import { defineComponent, h, shallowRef, withDirectives, type Ref } from "vue";
 
 import ZitadelLogin from "./components/ZitadelLogin";
 import ZitadelLogout from "./components/ZitadelLogout";
@@ -37,6 +37,30 @@ function mountWithInstanceRef(
   });
   const { container } = render(parent);
   return { captured, container };
+}
+
+// Raises one event on the widget element before it is attached to the document,
+// i.e. before the widget can start loading, and returns what the consumer got.
+function renderRaisingEarly(
+  child: typeof ZitadelLogout | typeof ZitadelSession,
+  eventName: string,
+  handlerProp: string,
+): unknown[] {
+  const received: unknown[] = [];
+  const detail = { probe: eventName };
+  const early = {
+    beforeMount: (el: Element) => {
+      el.dispatchEvent(new CustomEvent(eventName, { detail }));
+    },
+  };
+  const parent = defineComponent({
+    setup: () => () =>
+      withDirectives(h(child, { project, [handlerProp]: (d: unknown) => received.push(d) }), [
+        [early],
+      ]),
+  });
+  render(parent);
+  return received;
 }
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
@@ -125,6 +149,15 @@ describe("ZitadelLogout", () => {
     },
   );
 
+  it.each([
+    ["zitadel-session-error", "onSessionError"],
+    ["zitadel-signout", "onSignout"],
+  ])("forwards %s raised the moment the element mounts", (eventName, handlerProp) => {
+    expect(renderRaisingEarly(ZitadelLogout, eventName, handlerProp)).toEqual([
+      { probe: eventName },
+    ]);
+  });
+
   it("exposes the rendered element via the instance ref", () => {
     const { captured, container } = mountWithInstanceRef(ZitadelLogout);
     const element = captured.value!.element;
@@ -174,6 +207,15 @@ describe("ZitadelSession", () => {
       expect(spy).toHaveBeenCalledWith(detail);
     },
   );
+
+  it.each([
+    ["zitadel-session-error", "onSessionError"],
+    ["zitadel-signout", "onSignout"],
+  ])("forwards %s raised the moment the element mounts", (eventName, handlerProp) => {
+    expect(renderRaisingEarly(ZitadelSession, eventName, handlerProp)).toEqual([
+      { probe: eventName },
+    ]);
+  });
 
   it("exposes the rendered element via the instance ref", () => {
     const { captured, container } = mountWithInstanceRef(ZitadelSession);

@@ -75,28 +75,60 @@ const ZitadelLoginElementReact = createComponent({
   },
 });
 
+/**
+ * The session widgets report a failed load or sign-out as soon as they start,
+ * which can be before React's layout effects run. `@lit/react` registers its
+ * `events` listeners in such an effect, so an event raised while the element
+ * mounts would be lost. This callback ref registers the listeners at attach
+ * time instead, before the element can start loading, and reads the handlers
+ * at event time so a re-render never has to re-register them.
+ */
+function useSessionEvents<T extends HTMLElement>(
+  handlers: {
+    onSignout?: ZitadelSessionProps["onSignout"];
+    onSessionError?: ZitadelSessionProps["onSessionError"];
+  },
+  forwardedRef: React.ForwardedRef<T>,
+): React.RefCallback<T> {
+  const latest = React.useRef(handlers);
+  latest.current = handlers;
+  const dispose = React.useRef<(() => void) | undefined>(undefined);
+  return React.useCallback(
+    (el: T | null) => {
+      dispose.current?.();
+      dispose.current = undefined;
+      if (el) {
+        const onSignout = (event: Event) =>
+          latest.current.onSignout?.((event as CustomEvent<ZitadelSignoutDetail>).detail);
+        const onSessionError = (event: Event) =>
+          latest.current.onSessionError?.((event as CustomEvent<ZitadelSessionErrorDetail>).detail);
+        el.addEventListener("zitadel-signout", onSignout);
+        el.addEventListener("zitadel-session-error", onSessionError);
+        dispose.current = () => {
+          el.removeEventListener("zitadel-signout", onSignout);
+          el.removeEventListener("zitadel-session-error", onSessionError);
+        };
+      }
+      if (typeof forwardedRef === "function") {
+        forwardedRef(el);
+      } else if (forwardedRef) {
+        forwardedRef.current = el;
+      }
+    },
+    [forwardedRef],
+  );
+}
+
 const ZitadelLogoutElementReact = createComponent({
   react: React,
   tagName: "zitadel-logout",
   elementClass: ZitadelLogoutElement,
-  events: {
-    onZitadelSignout: "zitadel-signout" as EventName<CustomEvent<ZitadelSignoutDetail>>,
-    onZitadelSessionError: "zitadel-session-error" as EventName<
-      CustomEvent<ZitadelSessionErrorDetail>
-    >,
-  },
 });
 
 const ZitadelSessionElementReact = createComponent({
   react: React,
   tagName: "zitadel-session",
   elementClass: ZitadelSessionElement,
-  events: {
-    onZitadelSignout: "zitadel-signout" as EventName<CustomEvent<ZitadelSignoutDetail>>,
-    onZitadelSessionError: "zitadel-session-error" as EventName<
-      CustomEvent<ZitadelSessionErrorDetail>
-    >,
-  },
 });
 
 /**
@@ -157,14 +189,8 @@ ZitadelLogin.displayName = "ZitadelLogin";
  */
 export const ZitadelLogout = React.forwardRef<ZitadelLogoutElement, ZitadelLogoutProps>(
   function ZitadelLogout({ onSignout, onSessionError, ...props }, ref) {
-    return (
-      <ZitadelLogoutElementReact
-        {...props}
-        ref={ref}
-        onZitadelSignout={onSignout && ((event) => onSignout(event.detail))}
-        onZitadelSessionError={onSessionError && ((event) => onSessionError(event.detail))}
-      />
-    );
+    const elementRef = useSessionEvents({ onSignout, onSessionError }, ref);
+    return <ZitadelLogoutElementReact {...props} ref={elementRef} />;
   },
 );
 
@@ -181,14 +207,8 @@ ZitadelLogout.displayName = "ZitadelLogout";
  */
 export const ZitadelSession = React.forwardRef<ZitadelSessionElement, ZitadelSessionProps>(
   function ZitadelSession({ onSignout, onSessionError, ...props }, ref) {
-    return (
-      <ZitadelSessionElementReact
-        {...props}
-        ref={ref}
-        onZitadelSignout={onSignout && ((event) => onSignout(event.detail))}
-        onZitadelSessionError={onSessionError && ((event) => onSessionError(event.detail))}
-      />
-    );
+    const elementRef = useSessionEvents({ onSignout, onSessionError }, ref);
+    return <ZitadelSessionElementReact {...props} ref={elementRef} />;
   },
 );
 

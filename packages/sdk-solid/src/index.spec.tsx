@@ -105,6 +105,25 @@ describe("ZitadelLogout", () => {
     },
   );
 
+  it.each([
+    ["zitadel-session-error", "onSessionError"],
+    ["zitadel-signout", "onSignout"],
+  ])("forwards %s raised the moment the element mounts", (eventName, handlerProp) => {
+    const spy = vi.fn();
+    const detail = { probe: eventName };
+    render(() => (
+      <ZitadelLogout
+        ref={(e) => {
+          e.dispatchEvent(new CustomEvent(eventName, { detail }));
+        }}
+        project={project}
+        {...{ [handlerProp]: spy }}
+      />
+    ));
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith(detail);
+  });
+
   it("forwards the ref to the underlying element", () => {
     let captured: ZitadelLogoutElement | undefined;
     const { container } = render(() => (
@@ -160,6 +179,25 @@ describe("ZitadelSession", () => {
       expect(spy).toHaveBeenCalledWith(detail);
     },
   );
+
+  it.each([
+    ["zitadel-session-error", "onSessionError"],
+    ["zitadel-signout", "onSignout"],
+  ])("forwards %s raised the moment the element mounts", (eventName, handlerProp) => {
+    const spy = vi.fn();
+    const detail = { probe: eventName };
+    render(() => (
+      <ZitadelSession
+        ref={(e) => {
+          e.dispatchEvent(new CustomEvent(eventName, { detail }));
+        }}
+        project={project}
+        {...{ [handlerProp]: spy }}
+      />
+    ));
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith(detail);
+  });
 
   it("forwards the ref to the underlying element", () => {
     let captured: ZitadelSessionElement | undefined;

@@ -101,6 +101,20 @@ describe("ZitadelLogout", () => {
     },
   );
 
+  it.each([
+    ["zitadel-session-error", "onSessionError"],
+    ["zitadel-signout", "onSignout"],
+  ])("forwards %s raised the moment the element mounts", (eventName, handlerProp) => {
+    const spy = vi.fn();
+    const detail = { probe: eventName };
+    const early = (el: ZitadelLogoutElement | null) => {
+      el?.dispatchEvent(new CustomEvent(eventName, { detail }));
+    };
+    render(<ZitadelLogout project={project} ref={early} {...{ [handlerProp]: spy }} />);
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith(detail);
+  });
+
   it("forwards a ref to the underlying element", () => {
     const ref = React.createRef<ZitadelLogoutElement>();
     const { container } = render(<ZitadelLogout ref={ref} project={project} />);
@@ -147,6 +161,20 @@ describe("ZitadelSession", () => {
       expect(spy).toHaveBeenCalledWith(detail);
     },
   );
+
+  it.each([
+    ["zitadel-session-error", "onSessionError"],
+    ["zitadel-signout", "onSignout"],
+  ])("forwards %s raised the moment the element mounts", (eventName, handlerProp) => {
+    const spy = vi.fn();
+    const detail = { probe: eventName };
+    const early = (el: ZitadelSessionElement | null) => {
+      el?.dispatchEvent(new CustomEvent(eventName, { detail }));
+    };
+    render(<ZitadelSession project={project} ref={early} {...{ [handlerProp]: spy }} />);
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith(detail);
+  });
 
   it("forwards a ref to the underlying element", () => {
     const ref = React.createRef<ZitadelSessionElement>();
