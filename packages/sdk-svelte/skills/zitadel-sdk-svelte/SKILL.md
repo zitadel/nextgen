@@ -30,7 +30,7 @@ npx @zitadel/cli@alpha setup --framework svelte --non-interactive --json
 ## Install
 
 ```sh
-npm install @zitadel/sdk-svelte
+npm install @zitadel/sdk-svelte@alpha
 ```
 
 Peer dependencies: `svelte ^5.0.0`. Requires TypeScript ≥ 5.0 (the published types use `export type *`).

@@ -28,7 +28,7 @@ install the package and wire the components in manually.
 ## Install
 
 ```sh
-npm install @zitadel/sdk-angular
+npm install @zitadel/sdk-angular@alpha
 ```
 
 Peer dependencies: `@angular/core` and `@angular/common`, both `>=17`. Requires TypeScript ≥ 5.0 (the published types use `export type *`).

@@ -26,7 +26,7 @@ scaffolding would overwrite or not fit it.
 ## Install
 
 ```sh
-npm install @zitadel/sdk-react
+npm install @zitadel/sdk-react@alpha
 ```
 
 Peer dependencies: `react >=18` and `react-dom >=18`. Requires TypeScript ≥ 5.0 (the published types use `export type *`).
