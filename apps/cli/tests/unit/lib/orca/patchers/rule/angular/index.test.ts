@@ -428,7 +428,9 @@ describe("AngularPatcher.artifacts", () => {
   });
 });
 
-const MALFORMED_PATHS = ["/%5C%5B", "/%5C%5B/sessions/exchange", "/%E0%A4%A", "/%5B"];
+const UNPARSEABLE_PATHS = ["/%5C%5B", "/%5C%5B/sessions/exchange"];
+
+const UNREADABLE_NON_EXCHANGE_PATHS = ["/%E0%A4%A", "/%5B"];
 
 const EXCHANGE_SPELLINGS = [
   "//sessions/exchange",
@@ -504,19 +506,35 @@ describe("the generated proxy.conf.cjs, run by Vite against a remote https serve
 
       const response = await fetch(`${origin}/__nextgen${tail}`, { method: "POST" });
 
-      expect(await response.text()).not.toContain(SESSION_TOKEN);
+      expect(await response.json()).toEqual({ session: EXCHANGE_BODY.session });
     },
   );
 
-  it.each(MALFORMED_PATHS)("survives a request for the malformed path %s", async (tail) => {
-    const { origin } = await serve(proxyConfigEdit()(undefined));
+  it.each(UNPARSEABLE_PATHS)(
+    "keeps the session token out of an unparseable path %s",
+    async (tail) => {
+      const { origin } = await serve(proxyConfigEdit()(undefined));
 
-    const response = await fetch(`${origin}/__nextgen${tail}`, { method: "POST" });
-    const next = await fetch(`${origin}/__nextgen/healthz`);
+      const response = await fetch(`${origin}/__nextgen${tail}`, { method: "POST" });
+      const next = await fetch(`${origin}/__nextgen/healthz`);
 
-    expect(await response.text()).not.toContain(SESSION_TOKEN);
-    expect(next.status).toBe(200);
-  });
+      expect(await response.json()).toEqual({ session: EXCHANGE_BODY.session });
+      expect(next.status).toBe(200);
+    },
+  );
+
+  it.each(UNREADABLE_NON_EXCHANGE_PATHS)(
+    "survives a request for the malformed path %s",
+    async (tail) => {
+      const { origin } = await serve(proxyConfigEdit()(undefined));
+
+      const response = await fetch(`${origin}/__nextgen${tail}`, { method: "POST" });
+      const next = await fetch(`${origin}/__nextgen/healthz`);
+
+      expect(response.status).toBe(200);
+      expect(next.status).toBe(200);
+    },
+  );
 
   it("keeps the session token out of the exchange's body", async () => {
     const { origin } = await serve(proxyConfigEdit()(undefined));

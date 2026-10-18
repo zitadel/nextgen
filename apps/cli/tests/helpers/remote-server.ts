@@ -18,10 +18,10 @@ export const REMOTE_HOST = "zitadel.test";
 /** The session token the remote server hands out, in the body and the cookie. */
 export const SESSION_TOKEN = "SECRET-SESSION-TOKEN";
 
-/** The `Set-Cookie` the remote server answers every `/sessions/*` call with. */
+/** The `Set-Cookie` the remote server answers every non-`/healthz` call with. */
 export const SESSION_COOKIE = `__nextgen_session=${SESSION_TOKEN}; Path=/; HttpOnly; SameSite=Lax`;
 
-/** The body the remote server answers every `/sessions/*` call with: the exchange's. */
+/** The body the remote server answers every non-`/healthz` call with: the exchange's. */
 export const EXCHANGE_BODY = { session: { session_id: "s1" }, session_token: SESSION_TOKEN };
 
 /** A request as it reached the remote server. */
@@ -39,12 +39,11 @@ export interface ReceivedRequest {
  * shared edge such as Vercel refuses any other server name, and it routes by
  * `Host`, answering `421 Misdirected Request` to anything else. Every request
  * is answered `200`, so a test sees what the server was sent rather than how it
- * would have handled it: a `/sessions/*` path with the session exchange's
- * {@link EXCHANGE_BODY} and {@link SESSION_COOKIE} (plain text when the query
- * has `as=text`, with the status of `status=<code>` if given), anything else
- * with `ok`.
+ * would have handled it: `/healthz`, and any path whose query has `as=text`
+ * (with the status of `status=<code>` if given), with `ok`, anything else with
+ * the session exchange's {@link EXCHANGE_BODY} and {@link SESSION_COOKIE}.
  *
- * A `/sessions/*` query can make that answer misbehave the way an intermediary
+ * A query can make that answer misbehave the way an intermediary
  * might, whatever the request asked for: `encoding=gzip` or `encoding=br`
  * compresses it, `encoding=garbled` labels as `gzip` bytes that are neither
  * gzip nor JSON but still carry the token, and `abort` drops the connection
@@ -99,12 +98,12 @@ export function useRemoteServer(): RemoteServer {
         if (misdirected) {
           res.writeHead(421, { "content-type": "text/plain" });
           res.end("misdirected");
-        } else if (req.url?.startsWith("/sessions/") && !req.url.includes("as=text")) {
-          answerSession(new URL(req.url, url).searchParams, res);
-        } else {
+        } else if (isPlain(req.url ?? "/", url)) {
           const status = new URL(req.url ?? "/", url).searchParams.get("status");
           res.writeHead(Number(status ?? 200), { "content-type": "text/plain" });
           res.end("ok");
+        } else {
+          answerSession(new URL(req.url ?? "/", url).searchParams, res);
         }
       },
     );
@@ -128,7 +127,19 @@ export function useRemoteServer(): RemoteServer {
   };
 }
 
-/** Answers a `/sessions/*` call with the exchange's body, misbehaving as `query` asks. */
+/**
+ * Whether a request is one the server answers with plain `ok`: `/healthz`, or
+ * anything whose query has `as=text`. Every other path is answered as the
+ * session exchange, however it is spelled (`/%73essions/exchange`,
+ * `/Sessions/Exchange`, an unparseable one), so a test that spells the
+ * exchange oddly always meets a token-bearing answer and a missing redaction
+ * cannot hide behind a fallback.
+ */
+function isPlain(target: string, base: string): boolean {
+  return new URL(target, base).pathname === "/healthz" || target.includes("as=text");
+}
+
+/** Answers a call with the exchange's body, misbehaving as `query` asks. */
 function answerSession(query: URLSearchParams, res: ServerResponse): void {
   const plain = Buffer.from(JSON.stringify(EXCHANGE_BODY));
   const encoding = query.get("encoding");
