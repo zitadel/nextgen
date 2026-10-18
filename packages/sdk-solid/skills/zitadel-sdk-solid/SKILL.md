@@ -92,6 +92,7 @@ Exported surface (discover-first, confirm against the types above):
 
 ## Gotchas
 
+- **Server rendering.** If your app renders on the server, mount the widget on the client only, after hydration, or pass `project-id` and `proxy-path` as strings, because a widget that starts before its configuration arrives shows an error instead of the flow.
 - **Production SPA deployment is not yet supported.** The same-origin proxy
   path must come from your hosting platform, and the CLI can't scaffold those
   configs yet, so a production SPA build has no proxy to talk to. See

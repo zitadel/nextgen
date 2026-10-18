@@ -96,6 +96,7 @@ exact names, inputs, and props, treat the installed package as authoritative:
 
 ## Gotchas
 
+- **Server rendering.** If your app renders on the server, mount the widget on the client only, after hydration, or pass `project-id` and `proxy-path` as strings, because a widget that starts before its configuration arrives shows an error instead of the flow.
 - **Selector is `zitadel-auth-login`, not `zitadel-login`.** The wrapper's
   selector is `zitadel-auth-login` (and `zitadel-auth-logout`,
   `zitadel-auth-session`); `<zitadel-login>` is the underlying custom element

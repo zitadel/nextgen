@@ -88,6 +88,7 @@ independently and a hardcoded API list here would drift.
 
 ## Gotchas
 
+- **Server rendering.** If your app renders on the server, mount the widget on the client only, after hydration, or pass `project-id` and `proxy-path` as strings, because a widget that starts before its configuration arrives shows an error instead of the flow. React 19 does not apply an object property such as `project` while hydrating a server-rendered custom element, so on a server-rendered page pass `project-id` and `proxy-path` as strings instead of a `project` handle.
 - **TypeScript ≥ 5.0 required** — the published types use `export type *`, which
   older TypeScript cannot parse.
 - **Client-side only.** These wrap browser web components; render them in the
