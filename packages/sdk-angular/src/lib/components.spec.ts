@@ -67,6 +67,15 @@ describe("ZitadelLogin", () => {
     expect(el!.getAttribute("url")).toBe("https://auth.example.com");
   });
 
+  it("lets the project handle win over conflicting discrete inputs", async () => {
+    const { container } = await render(ZitadelLoginComponent, {
+      inputs: { project: handle, projectId: "proj-other", proxyPath: "/__other" },
+    });
+    const el = container.querySelector("zitadel-login");
+    expect(el!.getAttribute("project-id")).toBe("proj-handle");
+    expect(el!.getAttribute("proxy-path")).toBe("/__handle");
+  });
+
   it("writes no config attributes when none is given", async () => {
     const { container } = await render(ZitadelLoginComponent, { inputs: {} });
     const el = container.querySelector("zitadel-login");
@@ -149,6 +158,15 @@ describe("ZitadelLogout", () => {
     expect(el!.getAttribute("url")).toBe("https://auth.example.com");
   });
 
+  it("lets the project handle win over conflicting discrete inputs", async () => {
+    const { container } = await render(ZitadelLogoutComponent, {
+      inputs: { project: handle, projectId: "proj-other", proxyPath: "/__other" },
+    });
+    const el = container.querySelector("zitadel-logout");
+    expect(el!.getAttribute("project-id")).toBe("proj-handle");
+    expect(el!.getAttribute("proxy-path")).toBe("/__handle");
+  });
+
   it("writes no config attributes when none is given", async () => {
     const { container } = await render(ZitadelLogoutComponent, { inputs: {} });
     const el = container.querySelector("zitadel-logout");
@@ -219,6 +237,15 @@ describe("ZitadelSession", () => {
     expect(el!.getAttribute("project-id")).toBe("proj-handle");
     expect(el!.getAttribute("proxy-path")).toBe("/__handle");
     expect(el!.getAttribute("url")).toBe("https://auth.example.com");
+  });
+
+  it("lets the project handle win over conflicting discrete inputs", async () => {
+    const { container } = await render(ZitadelSessionComponent, {
+      inputs: { project: handle, projectId: "proj-other", proxyPath: "/__other" },
+    });
+    const el = container.querySelector("zitadel-session");
+    expect(el!.getAttribute("project-id")).toBe("proj-handle");
+    expect(el!.getAttribute("proxy-path")).toBe("/__handle");
   });
 
   it("writes no config attributes when none is given", async () => {

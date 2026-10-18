@@ -32,7 +32,8 @@ import "@zitadel/components";
  * as are the discrete `projectId` / `proxyPath` the element reads when no handle
  * is supplied; `purpose` / `post-sign-in-url` are bound as attributes the Lit
  * element reads, and `project-id` / `proxy-path` / `url` are bound as attributes
- * too so a server-rendered page carries them before hydration. The widget's `zitadel-*` events are re-emitted with their
+ * too so a server-rendered page carries them before hydration (the handle wins over the discrete
+ * inputs, as in the element). The widget's `zitadel-*` events are re-emitted with their
  * detail as the `flowStep` / `flowInput` / `flowComplete` / `flowError` outputs.
  *
  * The underlying `<zitadel-login>` custom element is exposed via the
@@ -54,8 +55,8 @@ import "@zitadel/components";
     [project]="project"
     [projectId]="projectId"
     [proxyPath]="proxyPath"
-    [attr.project-id]="projectId ?? project?.projectId ?? null"
-    [attr.proxy-path]="proxyPath ?? project?.proxyPath ?? null"
+    [attr.project-id]="project?.projectId ?? projectId ?? null"
+    [attr.proxy-path]="project?.proxyPath ?? proxyPath ?? null"
     [attr.url]="project?.url ?? null"
     [locales]="locales"
     [lang]="lang"
