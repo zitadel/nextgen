@@ -172,7 +172,9 @@ describe("NextDetector", () => {
       await installNext(installed);
 
       await expect(detector.detect(dir)).rejects.toThrow(
-        `Next.js ${installed} is installed, below the supported floor — the CLI integrates Next.js 15.2.3 and newer`,
+        new RegExp(
+          `^Next\\.js ${installed.replaceAll(".", "\\.")} is installed \\(.*node_modules/next/package\\.json\\), below the supported floor — the CLI integrates Next\\.js 15\\.2\\.3 and newer$`,
+        ),
       );
     },
   );
@@ -188,6 +190,34 @@ describe("NextDetector", () => {
     });
   });
 
+  it("names the package.json it read, so a stale install above the app is traceable", async () => {
+    await mkdir(join(dir, "app"));
+    await writeNextPackageJson({ dependencies: { next: "^15.2.3" } });
+    await installNext("15.2.2");
+
+    await expect(detector.detect(dir)).rejects.toThrow(
+      `${join("node_modules", "next", "package.json")}), below the supported floor`,
+    );
+  });
+
+  it("does not judge an app by a next installed above its workspace root", async () => {
+    const root = join(dir, "repo");
+    const app = join(root, "apps", "web");
+    await mkdir(join(app, "app"), { recursive: true });
+    await writeFile(join(root, "pnpm-workspace.yaml"), "packages:\n  - apps/*\n");
+    await writeFile(
+      join(app, "package.json"),
+      JSON.stringify({ name: "web", dependencies: { next: "^15.2.3" } }),
+    );
+    await mkdir(join(dir, "node_modules", "next"), { recursive: true });
+    await writeFile(
+      join(dir, "node_modules", "next", "package.json"),
+      JSON.stringify({ name: "next", version: "15.0.0" }),
+    );
+
+    expect(await detector.detect(app)).toMatchObject({ id: "next" });
+  });
+
   it.each(["15.2.3", "15.5.4", "16.0.0"])(
     "accepts next ^15.0.0 with %s installed",
     async (installed) => {
@@ -198,6 +228,21 @@ describe("NextDetector", () => {
       expect(await detector.detect(dir)).toMatchObject({ id: "next" });
     },
   );
+
+  it("refuses the pinned canary of the fixed patch, which predates the fix", async () => {
+    await mkdir(join(dir, "app"));
+    await writeNextPackageJson({ dependencies: { next: "15.2.3-canary.0" } });
+
+    await expect(detector.detect(dir)).rejects.toThrow("below the supported floor");
+  });
+
+  it("refuses a canary of the fixed patch installed under an accepting range", async () => {
+    await mkdir(join(dir, "app"));
+    await writeNextPackageJson({ dependencies: { next: "^15.0.0" } });
+    await installNext("15.2.3-canary.0");
+
+    await expect(detector.detect(dir)).rejects.toThrow("15.2.3-canary.0 is installed");
+  });
 
   it.each(["15.3.0-canary.1", "16.0.0-rc.1"])(
     "accepts the pinned prerelease %s, newer than the floor",

@@ -57,7 +57,8 @@ export function dependencyVersionMajor(pkg: PackageJson, name: string): number |
  * compliant version (`>=14`, `14 || 16`, `^15.0.0` for `15.2.3`). A range
  * that explicitly names a prerelease at or above the floor (`15.0.0-rc.0`,
  * `16.0.0-rc.1` for the 15 floor) is not rejected; ranges like `<15.2.3`
- * resolve no prerelease of it.
+ * resolve no prerelease of it. For an exact floor (`15.2.3`) a prerelease of
+ * that very release (`15.2.3-canary.0`) predates it and is rejected.
  */
 export function dependencySpecProvablyBelow(
   pkg: PackageJson,
@@ -72,7 +73,7 @@ export function dependencySpecProvablyBelow(
   if (semver.intersects(spec, `>=${floor.version}`)) {
     return undefined;
   }
-  return declaresPrereleaseAtOrAbove(spec, floor) ? undefined : spec;
+  return declaresPrereleaseAtOrAbove(spec, floor, isExactFloor(minimum)) ? undefined : spec;
 }
 
 /**
@@ -84,14 +85,14 @@ export function dependencySpecProvablyBelow(
  * `[base-0, base)`. That holds for strict bounds too: `>15.2.3-canary.1
  * <15.2.3` admits `15.2.3-canary.2` though neither endpoint does.
  */
-function declaresPrereleaseAtOrAbove(spec: string, floor: semver.SemVer): boolean {
+function declaresPrereleaseAtOrAbove(spec: string, floor: semver.SemVer, exact: boolean): boolean {
   return new semver.Range(spec).set.some((comparators) => {
     const range = comparators.map((comparator) => comparator.value).join(" ");
     return comparators.some(({ semver: version }) => {
       const base = `${version.major}.${version.minor}.${version.patch}`;
       return (
         version.prerelease.length > 0 &&
-        semver.gte(base, floor) &&
+        (exact ? semver.gt(base, floor) : semver.gte(base, floor)) &&
         semver.intersects(range, `>=${base}-0 <${base}`, { includePrerelease: true })
       );
     });
@@ -99,26 +100,70 @@ function declaresPrereleaseAtOrAbove(spec: string, floor: semver.SemVer): boolea
 }
 
 /**
- * The version of `name` installed for the app at `cwd`: the `package.json` that
- * Node's own lookup reaches first, walking up from `cwd` through each
- * `node_modules`, so a hoisted install in a monorepo counts too. `undefined`
- * when nothing is installed there, or the file names no valid version.
+ * Whether `minimum` names one exact release (`15.2.3`) rather than a major or
+ * minor line (`18`, `1.6`). A prerelease of a line's first version (`18.0.0-rc.0`)
+ * counts as at-floor, but a prerelease of an exact release (`15.2.3-canary.0`)
+ * predates it, and for a security floor that means predates the fix.
  */
-export async function installedVersion(cwd: string, name: string): Promise<string | undefined> {
+function isExactFloor(minimum: string): boolean {
+  return semver.valid(minimum) !== null;
+}
+
+/** A package found in `node_modules`: its version and the manifest it was read from. */
+export type InstalledPackage = { version: string; path: string };
+
+/** Whether `dir` is the root of a workspace, above which no app's dependencies are installed. */
+async function isWorkspaceRoot(dir: string): Promise<boolean> {
+  if (
+    await readFile(join(dir, "pnpm-workspace.yaml")).then(
+      () => true,
+      () => false,
+    )
+  ) {
+    return true;
+  }
+  try {
+    const { workspaces } = JSON.parse(await readFile(join(dir, "package.json"), "utf8")) as {
+      workspaces?: unknown;
+    };
+    return workspaces !== undefined && workspaces !== null;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The package `name` installed for the app at `cwd`: the `package.json` that
+ * Node's own lookup reaches first, walking up from `cwd` through each
+ * `node_modules`, so a hoisted install in a monorepo counts too. The walk ends
+ * after the workspace root (a directory with `pnpm-workspace.yaml` or a
+ * `package.json` `workspaces` field) or the filesystem root, so a stray
+ * `node_modules` above the project is never mistaken for the app's install.
+ * `undefined` when nothing is installed there, or the file names no valid version.
+ */
+export async function installedPackage(
+  cwd: string,
+  name: string,
+): Promise<InstalledPackage | undefined> {
   let dir = await realpath(resolve(cwd)).catch(() => resolve(cwd));
   for (;;) {
-    const contents = await readFile(join(dir, "node_modules", name, "package.json"), "utf8").catch(
-      () => undefined,
-    );
+    const path = join(dir, "node_modules", name, "package.json");
+    const contents = await readFile(path, "utf8").catch(() => undefined);
     if (contents !== undefined) {
-      return versionIn(contents);
+      const version = versionIn(contents);
+      return version === undefined ? undefined : { version, path };
     }
     const parent = dirname(dir);
-    if (parent === dir) {
+    if (parent === dir || (await isWorkspaceRoot(dir))) {
       return undefined;
     }
     dir = parent;
   }
+}
+
+/** The version of `name` installed for the app at `cwd`; see {@link installedPackage}. */
+export async function installedVersion(cwd: string, name: string): Promise<string | undefined> {
+  return (await installedPackage(cwd, name))?.version;
 }
 
 /** The valid semver `version` a `package.json` declares, if any. */
@@ -132,22 +177,24 @@ function versionIn(contents: string): string | undefined {
 }
 
 /**
- * Returns the installed version of `name` for the app at `cwd` when it is older
+ * Returns the installed package `name` for the app at `cwd` when it is older
  * than `minimum`. A range such as `^15.0.0` passes {@link dependencySpecProvablyBelow}
  * because it can resolve to a supported release, but the lockfile may still hold
  * an older one; this judges what actually runs. Nothing installed returns
- * `undefined`, leaving the declared spec as the only gate. A prerelease of the
- * floor itself is not below it, as for the spec.
+ * `undefined`, leaving the declared spec as the only gate. A prerelease of a
+ * major-only floor (`18`) is not below it; a prerelease of an exact floor
+ * (`15.2.3-canary.0`) is, as for the spec.
  */
 export async function installedVersionBelow(
   cwd: string,
   name: string,
   minimum: string,
-): Promise<string | undefined> {
-  const installed = await installedVersion(cwd, name);
+): Promise<InstalledPackage | undefined> {
+  const installed = await installedPackage(cwd, name);
   const floor = semver.coerce(minimum);
-  if (installed === undefined || !floor || !semver.lt(installed, `${floor.version}-0`)) {
+  if (installed === undefined || !floor) {
     return undefined;
   }
-  return installed;
+  const bound = isExactFloor(minimum) ? floor.version : `${floor.version}-0`;
+  return semver.lt(installed.version, bound) ? installed : undefined;
 }

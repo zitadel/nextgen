@@ -59,8 +59,12 @@ This ADR records the floors and the enforcement point.
   may still hold one. With nothing installed, the spec is the only gate. Specs
   that carry no provable version at all, protocol specs (`file:`, `link:`,
   `workspace:`, git URLs) and dist-tags (`latest`, `canary`), always pass;
-  blocking on them would be hostile guessing. A prerelease of the floor counts
-  as at-floor. There is no ceiling: a newer major is never refused here.
+  blocking on them would be hostile guessing. A prerelease of a
+  floor that names only a major or minor line (React 18, Solid 1.6) counts as
+  at-floor, but a prerelease of an exact release floor (`15.2.3-canary.0`)
+  predates it and is below. The installed lookup walks up from the app through
+  each `node_modules` and stops after the workspace root, and the refusal names
+  the `package.json` it read. There is no ceiling: a newer major is never refused here.
 - **Peer ranges follow the floor, and a test keeps them aligned.** Each SDK
   package's peer range for the framework starts at the same major as the
   detector's floor (`next >=15`, `nuxt >=4`, `react >=18`, `vue >=3`,

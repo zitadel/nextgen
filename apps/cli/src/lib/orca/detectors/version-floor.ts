@@ -15,8 +15,8 @@ import type { Detector } from "./types";
  * Throws `E_UNSUPPORTED_PROJECT_SHAPE` only for a provable violation: a
  * declared spec that cannot resolve to the floor or newer, or an installed
  * release older than the floor (a range such as `^15.0.0` can still be locked
- * to an older one). Protocol specs and dist-tags pass, a prerelease of the
- * floor counts as at-floor, and a newer major is never refused. With nothing
+ * to an older one). Protocol specs and dist-tags pass, a prerelease of a
+ * major-only floor counts as at-floor (of an exact floor, it is below), and a newer major is never refused. With nothing
  * installed the declared spec is the only gate.
  */
 export async function enforceVersionFloor(
@@ -43,7 +43,7 @@ export async function enforceVersionFloor(
   if (installed !== undefined) {
     throw new ZitadelError(
       "E_UNSUPPORTED_PROJECT_SHAPE",
-      `${displayName} ${installed} is installed, below the supported floor — ${supported}`,
+      `${displayName} ${installed.version} is installed (${installed.path}), below the supported floor — ${supported}`,
       { hint },
     );
   }
