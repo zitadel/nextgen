@@ -38,8 +38,9 @@ published types use `export type *`.
 
 ## Integrate
 
-The widgets are **browser** components. In SvelteKit, mount them in a
-`+page.svelte` (they render client-side). The minimal pattern, from the README:
+In SvelteKit, use them in a `+page.svelte`; they also server-render (the page
+carries the widget element with its config attributes, and the widget itself
+starts in the browser). The minimal pattern, from the README:
 
 ```svelte
 <script lang="ts">
@@ -92,5 +93,8 @@ The public exports are `ZitadelLogin`, `ZitadelLogout`, `ZitadelSession`,
 - **`proxyPath` must reach the backend.** A same-origin path needs a proxy in
   front of your app; without one, point `proxyPath` at the backend origin
   directly (dev only, cross-origin).
-- **Browser-only.** The components render the auth UI client-side; do not expect
-  them to run during SvelteKit SSR.
+- **The widget starts in the browser.** During SvelteKit SSR the components
+  render the widget element with its `project-id`, `proxy-path` and `url`
+  attributes, but the auth UI itself only appears once the browser upgrades the
+  element. SvelteKit compiles the components for the server through the
+  package's `svelte` export condition, which points at uncompiled sources.
