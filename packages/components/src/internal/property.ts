@@ -26,7 +26,7 @@ export function property(options?: PropertyDeclaration) {
     name: string,
   ) => PropertyDescriptor | undefined;
 
-  return (proto: object, name: string): PropertyDescriptor | undefined => {
+  const decorator = (proto: object, name: string): PropertyDescriptor | undefined => {
     const decorated = decorate(proto, name);
     const descriptor = decorated ?? Object.getOwnPropertyDescriptor(proto, name);
     if (!descriptor?.get || !descriptor.set) return decorated;
@@ -44,4 +44,7 @@ export function property(options?: PropertyDeclaration) {
       },
     };
   };
+  // Legacy decorators may return a replacement descriptor; the library's own
+  // type for the decorator does not say so.
+  return decorator as unknown as ReturnType<typeof litProperty>;
 }
