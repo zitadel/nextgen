@@ -5,6 +5,7 @@ import type {
 } from "@zitadel/components";
 
 import { $, render, type Signal } from "@qwik.dev/core";
+import { _resetConfigForTesting, configureZitadel } from "@zitadel/api/config";
 import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
@@ -476,5 +477,51 @@ describe("ZitadelLogin resumeFlowId", () => {
     await expect.poll(() => window.__unsetResumeFlowId).toBeTypeOf("function");
     window.__unsetResumeFlowId!();
     await expect.poll(() => el().resumeFlowId).toBe("");
+  });
+});
+
+describe("an explicit project beats the global handle", () => {
+  const own = { projectId: "proj-own", proxyPath: "/__own" };
+
+  it("starts a resumed widget against the wrapper's project, not configureZitadel()", async () => {
+    _resetConfigForTesting();
+    const rendered = await renderWidget(<ZitadelLogin project={own} />);
+    // The markup the wrapper emits is all a resumed widget has: no property handle.
+    const markup = rendered.innerHTML;
+    rendered.remove();
+    document.body.innerHTML = "";
+    configureZitadel({ projectId: "proj-global", proxyPath: "/__global" });
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    try {
+      const host = document.createElement("div");
+      document.body.appendChild(host);
+      host.innerHTML = markup;
+
+      await expect
+        .poll(() => fetchSpy.mock.calls.find(([input]) => String(input).includes("/__own")))
+        .toBeDefined();
+      expect(fetchSpy.mock.calls.some(([input]) => String(input).includes("/__global"))).toBe(
+        false,
+      );
+    } finally {
+      _resetConfigForTesting();
+    }
+  });
+
+  it("starts a client-rendered widget against its own project, not configureZitadel()", async () => {
+    _resetConfigForTesting();
+    configureZitadel({ projectId: "proj-global", proxyPath: "/__global" });
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    try {
+      await renderWidget(<ZitadelLogin project={own} />);
+      await expect
+        .poll(() => fetchSpy.mock.calls.find(([input]) => String(input).includes("/__own")))
+        .toBeDefined();
+      expect(fetchSpy.mock.calls.some(([input]) => String(input).includes("/__global"))).toBe(
+        false,
+      );
+    } finally {
+      _resetConfigForTesting();
+    }
   });
 });

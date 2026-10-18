@@ -48,6 +48,16 @@ export class ZitadelConfigured extends LitElement {
    */
   @property({ type: String, attribute: "publishable-key" }) accessor publishableKey = "";
 
+  /**
+   * Marks the `project-id`/`proxy-path`/`url`/`publishable-key` attributes as the
+   * serialized form of an explicit project handle, so they outrank the
+   * `configureZitadel()` global like the `project` property would. Set by
+   * framework wrappers that render on a server, where the property cannot be
+   * emitted; leave it off for hand-written HTML, where the attributes stay the
+   * fallback behind the global.
+   */
+  @property({ type: Boolean, attribute: "project-explicit" }) accessor projectExplicit = false;
+
   /** Declarative config read from this element's attributes. */
   protected get projectAttrs(): ProjectAttrs {
     return {
@@ -55,6 +65,7 @@ export class ZitadelConfigured extends LitElement {
       proxyPath: this.proxyPath,
       url: this.url,
       publishableKey: this.publishableKey,
+      explicit: this.projectExplicit,
     };
   }
 }

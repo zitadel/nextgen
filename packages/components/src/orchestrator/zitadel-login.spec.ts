@@ -254,6 +254,22 @@ describe("<zitadel-login> against the typed Flow API", () => {
     });
   });
 
+  it("prefers the project-id attribute over the global when project-explicit is set", async () => {
+    // A wrapper that serialized its `project` handle as attributes marks them
+    // explicit, so a different global configured in the browser cannot win.
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.setAttribute("project-id", "explicit-attr-project");
+    element.setAttribute("proxy-path", API_BASE);
+    element.setAttribute("project-explicit", "");
+    host.appendChild(element);
+    await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+
+    expect(mock.getCaptured()[0]).toEqual({
+      kind: "createFlow",
+      body: { purpose: "login", project_id: "explicit-attr-project" },
+    });
+  });
+
   it("sends flow_definition_name when flow-name is set", async () => {
     const element = document.createElement("zitadel-login") as ZitadelLogin;
     element.project = testProject;
