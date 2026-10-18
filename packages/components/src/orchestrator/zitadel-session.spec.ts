@@ -45,7 +45,7 @@ function sessionBody(identifier: string, userId: string) {
 let currentEmail = "alice@acme.com";
 let currentUserId = "user_test";
 // Replaces the signed-in answer to `GET /sessions/me` when set.
-let sessionAnswer: (() => Response) | undefined;
+let sessionAnswer: (() => Response | Promise<Response>) | undefined;
 
 const getHandler = http.get(`${API_BASE}/sessions/me`, () =>
   sessionAnswer ? sessionAnswer() : HttpResponse.json(sessionBody(currentEmail, currentUserId)),
@@ -172,6 +172,28 @@ describe("<zitadel-session>", () => {
       '<zitadel-session post-sign-out-url="https://app.test/login"></zitadel-session>',
     );
     await flush(element);
+    expect(loc.current).toBe("https://app.test/login");
+  });
+
+  it("navigates once it is put back when the no-session answer came while it was detached", async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    sessionAnswer = async () => {
+      await gate;
+      return sessionNotFound();
+    };
+    const loc = stubLocation();
+    const element = mount(
+      '<zitadel-session post-sign-out-url="https://app.test/login"></zitadel-session>',
+    );
+    element.remove();
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 32));
+    expect(loc.current).toBe("");
+
+    host.appendChild(element);
+    await flush(element);
+
     expect(loc.current).toBe("https://app.test/login");
   });
 

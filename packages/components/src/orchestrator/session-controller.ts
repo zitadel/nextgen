@@ -83,6 +83,11 @@ export class SessionController implements ReactiveController {
   // or after a framework assigns `project` post-mount.
   private identityRequested = false;
 
+  // The "no session" answer settled while the host was detached: it must not
+  // act for the page then (the redirect would leave a page the card is not on),
+  // so it is replayed once the host is back.
+  private missedSessionMissing = false;
+
   private readonly host: ReactiveControllerHost & HTMLElement;
   private readonly resolve: () => Api;
   private readonly options: SessionControllerOptions;
@@ -103,6 +108,10 @@ export class SessionController implements ReactiveController {
   }
 
   hostConnected(): void {
+    if (this.missedSessionMissing) {
+      this.missedSessionMissing = false;
+      this.options.onSessionMissing?.();
+    }
     this.maybeLoadIdentity();
   }
 
@@ -188,6 +197,8 @@ export class SessionController implements ReactiveController {
     }
     this.host.requestUpdate();
     this.options.onIdentitySettled?.();
-    if (missing && this.host.isConnected) this.options.onSessionMissing?.();
+    if (!missing) return;
+    if (this.host.isConnected) this.options.onSessionMissing?.();
+    else this.missedSessionMissing = true;
   }
 }
