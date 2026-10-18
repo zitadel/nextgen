@@ -32,7 +32,9 @@ test("lists a built release and opens the configuration it pins", async ({
   await page.goto("/deployments");
   const row = page.getByRole("row").filter({ hasText: release.id }).first();
   await expect(row).toBeVisible();
+  // The kind and the status come from the record the server wrote.
   await expect(row.getByText("Primary")).toBeVisible();
+  await expect(row.getByText("active")).toBeVisible();
   await row.getByRole("link", { name: release.id }).click();
 
   await expect(page.getByRole("heading", { name: release.id })).toBeVisible();

@@ -7,33 +7,26 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { formatDateTime } from "@/lib/date";
-import { KIND_LABEL, type ReleaseDeployment } from "@/lib/deployment";
+import { type Deployment, KIND_LABEL } from "@/lib/deployment";
 
 /**
  * The card under a release's pointers: every deployment of the release, newest
  * first. A row names where it went (the project's primary origins, or preview
  * URLs), whether any origin still serves it, each origin as a link, and when
  * it was deployed. A line in place of the rows says when the release has
- * none, or when the server does not list deployments yet.
+ * none.
  */
-export function ReleaseDeployments({
-  deployments,
-}: {
-  /** `undefined` while the server does not serve deployments. */
-  deployments: ReleaseDeployment[] | undefined;
-}) {
+export function ReleaseDeployments({ deployments }: { deployments: Deployment[] }) {
   return (
     <DetailSection title="Deployment of this release" titleStyle="heading">
-      {deployments === undefined ? (
-        <p className="text-sm text-muted-foreground">This server does not list deployments yet.</p>
-      ) : deployments.length === 0 ? (
+      {deployments.length === 0 ? (
         <p className="text-sm text-muted-foreground">This release has not been deployed.</p>
       ) : (
         <div className="flex flex-col gap-4">
-          {deployments.map((entry, index) => (
-            <Fragment key={entry.deployment.id}>
+          {deployments.map((deployment, index) => (
+            <Fragment key={deployment.id}>
               {index > 0 && <Separator />}
-              <DeploymentRow entry={entry} />
+              <DeploymentRow deployment={deployment} />
             </Fragment>
           ))}
         </div>
@@ -42,15 +35,16 @@ export function ReleaseDeployments({
   );
 }
 
-function DeploymentRow({ entry }: { entry: ReleaseDeployment }) {
-  const { deployment, kind, status } = entry;
+function DeploymentRow({ deployment }: { deployment: Deployment }) {
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-6">
       {/* 216px, less the gap: the origins start on the column the pointer
           groups' lists use. */}
       <div className="flex shrink-0 items-center gap-2 sm:w-48">
-        <span className="text-sm leading-5 text-muted-foreground">{KIND_LABEL[kind]}</span>
-        {status === "live" ? (
+        <span className="text-sm leading-5 text-muted-foreground">
+          {KIND_LABEL[deployment.kind]}
+        </span>
+        {deployment.status === "live" ? (
           <StatusBadge status="active" />
         ) : (
           <Badge variant="secondary">Superseded</Badge>
