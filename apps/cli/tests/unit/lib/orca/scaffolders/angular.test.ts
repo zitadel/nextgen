@@ -170,6 +170,22 @@ describe("AngularScaffolder", () => {
     expect(mockSpawn.mock.calls[0]?.[2]).toMatchObject({ timeout: ANGULAR_CLI_ENGINES_TIMEOUT_MS });
   });
 
+  it.each([
+    ["win32", true],
+    ["darwin", false],
+    ["linux", false],
+  ] as const)(
+    "runs the npm lookup through a shell only on Windows (%s)",
+    async (platform, shell) => {
+      angularPublishes(ANGULAR_CLI_NODE_FALLBACK);
+
+      await new AngularScaffolder(SUPPORTED_NODE, platform).scaffold("/tmp/proj", "angular");
+
+      expect(mockSpawn.mock.calls[0]?.[0]).toBe("npm");
+      expect(mockSpawn.mock.calls[0]?.[2]).toMatchObject({ shell });
+    },
+  );
+
   it("applies the range npm publishes over the built-in one", async () => {
     angularPublishes(">=28.0.0");
 

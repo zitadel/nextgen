@@ -79,12 +79,20 @@ function angularProjectName(cwd: string): string {
  * back to {@link ANGULAR_CLI_NODE_FALLBACK} when npm is unavailable, takes
  * longer than {@link ANGULAR_CLI_ENGINES_TIMEOUT_MS} (a killed spawn has no exit
  * status), or answers with something that is not a range.
+ *
+ * On Windows npm is a `.cmd` shim, which `spawnSync` cannot start without a
+ * shell (it reports ENOENT, or EINVAL on current Node), so the lookup would
+ * always fall back to the built-in range there. The command line is constant,
+ * so running it through the shell on Windows is safe. The call is synchronous
+ * and may block for up to the timeout, once, before scaffolding starts; nothing
+ * else is running in the process at that point.
  */
-function angularCliNodeRange(cwd: string): string {
+function angularCliNodeRange(cwd: string, platform: NodeJS.Platform): string {
   const result = spawnSync("npm", ["view", ANGULAR_CLI, "engines.node"], {
     cwd,
     encoding: "utf8",
     timeout: ANGULAR_CLI_ENGINES_TIMEOUT_MS,
+    shell: platform === "win32",
   });
   const range = result.status === 0 ? String(result.stdout ?? "").trim() : "";
   return range && semver.validRange(range) ? range : ANGULAR_CLI_NODE_FALLBACK;
@@ -110,15 +118,20 @@ export class AngularScaffolder extends AbstractCLIScaffolder {
   readonly supportedFrameworks: ReadonlyArray<string> = ["angular"];
 
   private readonly nodeVersion: string;
+  private readonly platform: NodeJS.Platform;
 
-  /** `nodeVersion` defaults to the running Node; tests pass another. */
-  constructor(nodeVersion: string = process.versions.node) {
+  /** `nodeVersion` and `platform` default to the running ones; tests pass others. */
+  constructor(
+    nodeVersion: string = process.versions.node,
+    platform: NodeJS.Platform = process.platform,
+  ) {
     super();
     this.nodeVersion = nodeVersion;
+    this.platform = platform;
   }
 
   async scaffold(cwd: string, _framework: string): Promise<void> {
-    const range = angularCliNodeRange(cwd);
+    const range = angularCliNodeRange(cwd, this.platform);
     const support = angularNodeSupport(this.nodeVersion, range);
     if (support === "warned") {
       reportWarning(
