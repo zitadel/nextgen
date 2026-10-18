@@ -2,7 +2,10 @@ import { readFile, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 
 import pc from "picocolors";
+import semver from "semver";
 
+import { detectors } from "../../lib/orca/detectors";
+import type { Detector } from "../../lib/orca/detectors/types";
 import { detectPackageManager, type PackageManager } from "../../lib/package-manager";
 
 /**
@@ -101,8 +104,9 @@ export async function detectProjectFacts(cwd: string, frameworkId: string): Prom
     };
     const depPkg = depFromFramework(frameworkId);
     const range = pj.dependencies?.[depPkg] ?? pj.devDependencies?.[depPkg];
-    if (range) {
-      facts.frameworkVersion = stripRange(range);
+    const version = range ? stripRange(range) : undefined;
+    if (version) {
+      facts.frameworkVersion = version;
     }
   } catch {
     // Missing or unreadable package.json — version stays undefined; the
@@ -131,35 +135,30 @@ async function fileExists(p: string): Promise<boolean> {
   }
 }
 
+function detectorFor(framework: string): Detector | undefined {
+  return detectors.find((detector) => detector.framework === framework);
+}
+
 function depFromFramework(framework: string): string {
-  switch (framework) {
-    case "next":
-      return "next";
-    case "nuxt":
-      return "nuxt";
-    default:
-      return framework;
-  }
+  return detectorFor(framework)?.versionPackage ?? framework;
 }
 
 function prettyFramework(framework: string): string {
-  switch (framework) {
-    case "next":
-      return "Next.js";
-    case "nuxt":
-      return "Nuxt";
-    default:
-      return framework;
-  }
+  return detectorFor(framework)?.displayName ?? framework;
 }
 
-/** Strips `^`/`~`/`>=`/`v` prefixes from an npm range so the version reads cleanly in the summary. */
-function stripRange(range: string): string {
-  const trimmed = range.replace(/^([\^~]|>=?|v)/, "").trim();
-  // Take the first dotted segment so multi-range strings (`^15.0.0 || ^14.0.0`)
-  // collapse to a single readable version in the report.
-  const first = trimmed.split(/\s+/)[0];
-  return first ?? trimmed;
+/**
+ * Reduces a declared npm range to the version the summary shows: the lowest
+ * version it admits (`semver.minVersion`), so `^15.0.0`, `>= 15.0.0`,
+ * `=15.0.0`, `^15.0.0 || ^14.0.0` all read `15.0.0` and `20.1.x` reads
+ * `20.1.0`. Returns `undefined` when the spec is not a valid semver range
+ * (`catalog:`, `workspace:*`, `file:`, git URLs, dist-tags such as `latest`) or
+ * names no version (`*`), because printing that as the framework version would
+ * be wrong.
+ */
+function stripRange(range: string): string | undefined {
+  if (!/\d/.test(range) || semver.validRange(range) === null) return undefined;
+  return semver.minVersion(range)?.version;
 }
 
 /** Returns just the file name from a relative path, for the `→ filename` secondary detail in PACKAGE rows. */
