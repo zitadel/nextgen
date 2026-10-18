@@ -230,6 +230,90 @@ describe("businessLocales", () => {
   });
 });
 
+// Assigning `undefined` to a custom-element property overwrites its default,
+// so an unset prop must leave the element's own default in place.
+describe("unset props keep the element's defaults", () => {
+  it.each([
+    ["heading", "Signed in as"],
+    ["logoutLabel", "Sign out"],
+    ["variant", "widget"],
+    ["theme", ""],
+    ["suppressHeader", false],
+  ] as const)("ZitadelSession keeps the default %s", async (prop, expected) => {
+    const { container } = await render(ZitadelSessionComponent, { inputs: { project } });
+
+    expect(container.querySelector<ZitadelSessionElement>("zitadel-session")![prop]).toBe(expected);
+  });
+
+  it.each([
+    ["variant", "widget"],
+    ["theme", ""],
+    ["suppressHeader", false],
+    ["lang", ""],
+    ["suppressPasswordToggle", false],
+  ] as const)("ZitadelLogin keeps the default %s", async (prop, expected) => {
+    const { container } = await render(ZitadelLoginComponent, { inputs: { project } });
+
+    expect(container.querySelector<ZitadelLoginElement>("zitadel-login")![prop]).toBe(expected);
+  });
+
+  it("ZitadelLogout keeps the default theme", async () => {
+    const { container } = await render(ZitadelLogoutComponent, { inputs: { project } });
+
+    expect(container.querySelector<ZitadelLogoutElement>("zitadel-logout")!.theme).toBe("");
+  });
+});
+
+describe("props that become unset restore the element's defaults", () => {
+  it.each([
+    ["heading", "Custom", "Signed in as"],
+    ["logoutLabel", "Leave", "Sign out"],
+    ["variant", "page", "widget"],
+    ["theme", "light", ""],
+    ["suppressHeader", true, false],
+  ] as const)("ZitadelSession restores the default %s", async (prop, given, expected) => {
+    const { container, rerender } = await render(ZitadelSessionComponent, {
+      inputs: { project, [prop]: given },
+    });
+    const el = container.querySelector<ZitadelSessionElement>("zitadel-session")!;
+    expect(el[prop]).toBe(given);
+
+    await rerender({ inputs: { [prop]: undefined } });
+
+    expect(el[prop]).toBe(expected);
+  });
+
+  it.each([
+    ["variant", "page", "widget"],
+    ["theme", "light", ""],
+    ["suppressHeader", true, false],
+    ["lang", "de", ""],
+    ["suppressPasswordToggle", true, false],
+  ] as const)("ZitadelLogin restores the default %s", async (prop, given, expected) => {
+    const { container, rerender } = await render(ZitadelLoginComponent, {
+      inputs: { project, [prop]: given },
+    });
+    const el = container.querySelector<ZitadelLoginElement>("zitadel-login")!;
+    expect(el[prop]).toBe(given);
+
+    await rerender({ inputs: { [prop]: undefined } });
+
+    expect(el[prop]).toBe(expected);
+  });
+
+  it("ZitadelLogout restores the default theme", async () => {
+    const { container, rerender } = await render(ZitadelLogoutComponent, {
+      inputs: { project, theme: "light" },
+    });
+    const el = container.querySelector<ZitadelLogoutElement>("zitadel-logout")!;
+    expect(el.theme).toBe("light");
+
+    await rerender({ inputs: { theme: undefined } });
+
+    expect(el.theme).toBe("");
+  });
+});
+
 // Every config key set to a distinct value. `Required<…>` makes `tsc` fail here
 // when a key is added to a config type, so a new key cannot skip this check. The discrete
 // `projectId` / `proxyPath` repeat the `project` handle's fields: the handle wins as an attribute.
