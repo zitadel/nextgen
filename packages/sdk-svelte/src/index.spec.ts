@@ -210,7 +210,7 @@ describe("props that become unset restore the element's defaults", () => {
   it.each([
     ["heading", "Custom", "Signed in as"],
     ["logoutLabel", "Leave", "Sign out"],
-    ["variant", "card", "widget"],
+    ["variant", "page", "widget"],
     ["theme", "light", ""],
     ["suppressHeader", true, false],
   ] as const)("ZitadelSession restores the default %s", async (prop, given, expected) => {
@@ -224,7 +224,7 @@ describe("props that become unset restore the element's defaults", () => {
   });
 
   it.each([
-    ["variant", "card", "widget"],
+    ["variant", "page", "widget"],
     ["theme", "light", ""],
     ["suppressHeader", true, false],
     ["lang", "de", ""],
