@@ -2,4 +2,4 @@
 "@zitadel/sdk-angular": patch
 ---
 
-Leave an omitted widget input to the element's own default, and restore that default when an input is cleared, instead of overwriting it with `undefined` or `null`.
+An unset widget input now leaves the web component's own default in place in the Angular wrappers, and an input that is cleared after being set restores that default, instead of leaving `undefined` or `null` on the element. For example, `<zitadel-auth-session />` without a `variant` keeps the default "widget" variant rather than `null`.
