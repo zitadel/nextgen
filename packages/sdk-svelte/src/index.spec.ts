@@ -177,6 +177,7 @@ describe("businessLocales", () => {
 describe("unset props keep the element's defaults", () => {
   it.each([
     ["heading", "Signed in as"],
+    ["logoutLabel", "Sign out"],
     ["variant", "widget"],
     ["theme", ""],
     ["suppressHeader", false],
@@ -208,6 +209,7 @@ describe("unset props keep the element's defaults", () => {
 describe("props that become unset restore the element's defaults", () => {
   it.each([
     ["heading", "Custom", "Signed in as"],
+    ["logoutLabel", "Leave", "Sign out"],
     ["variant", "card", "widget"],
     ["theme", "light", ""],
     ["suppressHeader", true, false],
