@@ -83,11 +83,11 @@ Resource commands
   teams get:                    Get one team by id
   teams list:                   List teams
   teams update:                 Update a team by id
-  users create:                 Create an user
-  users delete:                 Delete an user by id
+  users create:                 Create a user
+  users delete:                 Delete a user by id
   users get:                    Get one user by id
   users list:                   List users
-  users update:                 Update an user by id
+  users update:                 Update a user by id
 
 Additional commands
   autocomplete:                 Display autocomplete installation instructions

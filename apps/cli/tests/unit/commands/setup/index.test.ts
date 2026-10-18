@@ -12,9 +12,9 @@ import {
   restoreCredentialEnvFiles,
 } from "../../../../src/commands/setup/index";
 import { takeReportedWarnings } from "../../../../src/lib/warnings";
-import { bundledServerVersion } from "../../../../src/lib/local-server/binary";
+import { LocalServer } from "../../../../src/lib/local-server/server";
+import { aBinaryRecord } from "../../../helpers/runtime-record";
 import {
-  localContainerName,
   localRuntimePaths,
   writeRuntimeMetadata,
   type RuntimeMetadata,
@@ -214,7 +214,7 @@ describe("setup command pre-flight", () => {
     };
     expect(json.code).toBe("E_CONFLICT");
     expect(json.message).toBe(
-      `The local Zitadel server runs 0.0.1, but this CLI ships ${String(bundledServerVersion())}`,
+      `The local Zitadel server runs 0.0.1, but this CLI ships ${String(LocalServer.bundledVersion())}`,
     );
     expect(json.hint).toContain("Run start to restart it");
     expect(json.next_commands).toEqual([
@@ -231,7 +231,7 @@ describe("setup command pre-flight", () => {
   it("goes on against a local server of this CLI's own version", async () => {
     const cwd = await makeTempDir();
     const serverUrl = await startHealthServer();
-    const version = bundledServerVersion();
+    const version = LocalServer.bundledVersion();
     expect(version).toBeDefined();
     await writeRuntimeMetadata(cwd, binaryRuntimeFor(cwd, serverUrl, String(version)));
 
@@ -1150,35 +1150,21 @@ function envEntries(contents: string): Record<string, string> {
   return entries;
 }
 
+/** A runtime record of a server that is running: this process, at the version the CLI ships. */
 function runtimeFor(cwd: string, serverUrl: string): RuntimeMetadata {
-  return {
-    schema_version: 1,
-    backend: "docker",
-    container_name: localContainerName(cwd),
-    container_id: "container-test-id",
-    image: "ghcr.io/zitadel/nextgen:test",
-    port: Number(new URL(serverUrl).port),
-    server_url: serverUrl,
-    data_dir: localRuntimePaths(cwd).dataDir,
-    created_at: "2026-06-09T00:00:00.000Z",
-    cli_version: "0.0.0-test",
-  };
+  return binaryRuntimeFor(cwd, serverUrl, String(LocalServer.bundledVersion()));
 }
 
 /** A binary runtime as `start` records it, running `serverVersion`. */
 function binaryRuntimeFor(cwd: string, serverUrl: string, serverVersion: string): RuntimeMetadata {
-  return {
-    schema_version: 1,
-    backend: "binary",
+  return aBinaryRecord({
     pid: process.pid,
     command: process.execPath,
     log_path: localRuntimePaths(cwd).logFile,
-    server_package: "@zitadel/server",
     server_version: serverVersion,
     port: Number(new URL(serverUrl).port),
     server_url: serverUrl,
     data_dir: localRuntimePaths(cwd).dataDir,
-    created_at: "2026-06-09T00:00:00.000Z",
     cli_version: serverVersion,
-  };
+  });
 }

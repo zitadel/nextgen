@@ -278,6 +278,26 @@ func DeploymentPayloadSnapshot(dep *Deployment) DeploymentPayload {
 	return payload
 }
 
+// VariableSetPayload is the record of one variable row written: variable.set
+// covers entering and replacing alike, since the write cannot tell them apart
+// and the value would be the only difference. The name is the entity id; the
+// kind is the rest of the row's key, which the envelope has no column for.
+// The secret flag says whether the value is held encrypted. The value itself
+// never appears, plain or as ciphertext: a plain value may be a pasted secret
+// the caller forgot to flag, and the ciphertext names the key that wrote it
+// (ADR 062).
+type VariableSetPayload struct {
+	Kind   string `json:"kind"`
+	Secret bool   `json:"secret"`
+}
+
+// VariableRemovedPayload is the record of one variable row removed. It
+// carries no secret flag: a removal learns nothing about the row it deleted,
+// and reading it first would be a round-trip spent on the audit record alone.
+type VariableRemovedPayload struct {
+	Kind string `json:"kind"`
+}
+
 type AuthzGrantedPayload struct {
 	PrincipalType string `json:"principal_type,omitempty"`
 	PrincipalID   string `json:"principal_id,omitempty"`

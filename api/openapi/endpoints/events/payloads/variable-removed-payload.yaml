@@ -1,0 +1,9 @@
+title: VariableRemovedPayload
+type: object
+description: Payload for `variable.removed` events, one row removed.
+properties:
+  kind:
+    type: string
+    enum:
+      - primary
+      - preview
