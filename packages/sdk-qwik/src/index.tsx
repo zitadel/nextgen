@@ -76,7 +76,10 @@ function setProp<E extends Element, K extends keyof E>(
     }
     keys.add(key);
     el[key] = value;
-  } else if (keys?.delete(key)) {
+  } else if (keys?.has(key)) {
+    // Kept in the set: clearing a prop makes Qwik drop its attribute *after*
+    // this runs, and Lit then resets the property to `null`, so every later
+    // bind with the prop still unset has to put the default back again.
     el[key] = pristineDefault(el, key);
   }
 }
