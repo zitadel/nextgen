@@ -37,6 +37,10 @@ which still points at an early `0.0.0` build. Use an exact `1.0.0-alpha.N`
 selector in agent scripts and bug reports for reproducibility.
 The CLI requires Node.js 24+.
 
+A Vite + Svelte app must be on Svelte 5 or newer. `setup` and `doctor` refuse a
+Svelte 4 app with `E_UNSUPPORTED_PROJECT_SHAPE` (exit 3) before changing
+anything; upgrade the app to Svelte 5 and rerun rather than retrying.
+
 ## Using the CLI
 
 - **Drive it non-interactively.** Always pass `--non-interactive --json` (short:
