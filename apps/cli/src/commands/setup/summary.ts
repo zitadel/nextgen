@@ -148,20 +148,17 @@ function prettyFramework(framework: string): string {
 }
 
 /**
- * Reduces a declared npm range to the version the summary shows: the first
- * comparator of the first alternative, without its `^`/`~`/`>=`/`v` prefix, so
- * `^15.0.0 || ^14.0.0` and `^15.0.0||^14.0.0` read `15.0.0` and `20.1.x` stays
- * `20.1.x`. Returns `undefined` when the spec is not a valid semver range
+ * Reduces a declared npm range to the version the summary shows: the lowest
+ * version it admits (`semver.minVersion`), so `^15.0.0`, `>= 15.0.0`,
+ * `=15.0.0`, `^15.0.0 || ^14.0.0` all read `15.0.0` and `20.1.x` reads
+ * `20.1.0`. Returns `undefined` when the spec is not a valid semver range
  * (`catalog:`, `workspace:*`, `file:`, git URLs, dist-tags such as `latest`) or
  * names no version (`*`), because printing that as the framework version would
  * be wrong.
  */
 function stripRange(range: string): string | undefined {
-  if (semver.validRange(range) === null) return undefined;
-  const alternative = range.split("||")[0] ?? "";
-  const first = alternative.trim().split(/\s+/)[0] ?? "";
-  const version = first.replace(/^([\^~]|>=?|v)/, "");
-  return /^\d/.test(version) ? version : undefined;
+  if (!/\d/.test(range) || semver.validRange(range) === null) return undefined;
+  return semver.minVersion(range)?.version;
 }
 
 /** Returns just the file name from a relative path, for the `→ filename` secondary detail in PACKAGE rows. */
