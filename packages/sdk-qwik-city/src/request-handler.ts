@@ -340,6 +340,14 @@ export function createNextgenOnRequest(
   return async (ev: QwikRequestEvent): Promise<void> => {
     const { pathname } = ev.url;
 
+    // Strip any client-supplied x-nextgen-auth-token so downstream server code
+    // cannot read an attacker-controlled value; getAuth() is canonical.
+    try {
+      ev.request.headers.delete("x-nextgen-auth-token");
+    } catch {
+      // Immutable headers on this adapter - nothing to strip.
+    }
+
     // Resolve the backend URL and project secret per request. Precedence:
     // explicit option > Qwik City's `ev.env` (which carries `.env.local`) >
     // `process.env` (set in production adapters) > localhost default. Qwik does

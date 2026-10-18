@@ -202,6 +202,14 @@ export async function handleNextgenRequest(
   const url2 = new URL(request.url);
   const { pathname } = url2;
 
+  // Strip any client-supplied x-nextgen-auth-token so downstream server code
+  // cannot read an attacker-controlled value; getAuth() is canonical.
+  try {
+    request.headers.delete("x-nextgen-auth-token");
+  } catch {
+    // Immutable headers on this adapter - nothing to strip.
+  }
+
   if (matchesRoutes(pathname, ignoredRoutes)) {
     return { type: "continue", auth: { isAuthenticated: false, session: null } };
   }
