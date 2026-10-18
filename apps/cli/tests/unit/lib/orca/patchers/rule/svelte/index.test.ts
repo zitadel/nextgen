@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { FRAMEWORK_IDS } from "../../../../../../helpers/framework-ids";
 import type {
   FileOp,
   ScaffoldPlan,
@@ -86,5 +87,11 @@ describe("SveltePatcher.artifacts", () => {
     expect(artifacts.markedFiles).toContain("src/App.svelte");
     expect(artifacts.dependencies).toEqual(["@zitadel/sdk-svelte"]);
     expect(artifacts.configEdits).toEqual(["vite.config.*"]);
+  });
+});
+
+describe("SveltePatcher.canPatch", () => {
+  it.each(FRAMEWORK_IDS)("matches %s only when it is its own framework", (id) => {
+    expect(new SveltePatcher().canPatch(id)).toBe(id === "svelte");
   });
 });
