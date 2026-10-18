@@ -19,6 +19,7 @@
     purpose = 'login',
     flowName,
     postSignInUrl,
+    resumeFlowId,
     locales,
     lang,
     variant,
@@ -89,5 +90,6 @@
   project-id={projectId}
   proxy-path={proxyPath}
   post-sign-in-url={postSignInUrl}
+  resume-flow-id={resumeFlowId}
   flow-name={flowName}
 ></zitadel-login>
