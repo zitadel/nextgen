@@ -258,7 +258,7 @@ export function failureAdvice(
       hint:
         "Existing local runtime metadata was found, but the local Zitadel server is not healthy. Start it again or reset stale local data." +
         (nextCommands.length === 0
-          ? " The runtime is in a directory that needs shell quoting, so details.suggested_args holds the exact arguments."
+          ? ` The runtime is in ${runtimeDir ?? "the working directory"}, a directory that needs shell quoting, so no command is printed; run \`zitadel doctor --json\` and use details.suggested_args for the exact arguments.`
           : ""),
       nextCommands,
       suggestedArgs,

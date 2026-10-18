@@ -610,6 +610,8 @@ describe("failureAdvice for a runtime found in a parent directory", () => {
       ["reset", "--force", "--cwd", dir],
     ]);
     expect(advice.hint).toContain("details.suggested_args");
+    expect(advice.hint).toContain(dir);
+    expect(advice.hint).toContain("--json");
   });
 
   it("writes the commands out for a path that needs no quoting", () => {

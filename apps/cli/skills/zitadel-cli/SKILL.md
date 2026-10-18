@@ -310,8 +310,8 @@ directory or the nearest parent that has it (up to the home directory), so
 `mkdir my-app && cd my-app` after `start` works too; `doctor` checks that
 server and its port, and when that server is unhealthy it suggests `start` and
 `reset --force` with `--cwd` set to the directory that holds it (when that path needs
-shell quoting the commands are left out; run the argument lists in
-`details.suggested_args` as they are). `stop`,
+shell quoting the commands are left out, the hint names the directory, and
+`doctor --json` returns the argument lists in `details.suggested_args` to run as they are). `stop`,
 `reset`, `logs` and `status` read only the working directory's
 `.zitadel/local/`, so run them where `start` ran. On a local
 server that hosts the platform project, `setup` attaches the project to the

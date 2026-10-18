@@ -239,6 +239,17 @@ describe("doctor", () => {
 
         expect(result).not.toSuggest("--cwd");
       });
+
+      it("names the directory and the JSON fallback in the hint", async () => {
+        const parent = await parentNamed("my app");
+        await parent.writeStoppedServerRecord();
+        const app = await parent.appInside("my-app");
+
+        const result = await app.doctorAtItsServer();
+
+        expect(result).toHintAt(parent.path);
+        expect(result).toHintAt("--json");
+      });
     });
   });
 });
