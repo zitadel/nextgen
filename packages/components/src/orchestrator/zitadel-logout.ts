@@ -209,7 +209,10 @@ export class ZitadelLogout extends ZitadelConfigured {
   private readonly session = new SessionController(
     this,
     () => resolveApi(this.project, this.projectAttrs, "<zitadel-logout>").api,
-    { onIdentitySettled: () => this.projectTemplate() },
+    {
+      onIdentitySettled: () => this.projectTemplate(),
+      onSignedOutWhileDetached: () => this.navigateAfterSignOut(),
+    },
   );
 
   override connectedCallback(): void {
@@ -317,6 +320,10 @@ export class ZitadelLogout extends ZitadelConfigured {
       this.open = false;
     };
     if (!(await this.session.signOut(closeMenu))) return;
+    this.navigateAfterSignOut();
+  }
+
+  private navigateAfterSignOut(): void {
     if (this.postSignOutUrl && typeof window !== "undefined") {
       window.location.href = this.postSignOutUrl;
     }

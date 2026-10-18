@@ -88,6 +88,13 @@ export interface SessionControllerOptions {
   readonly onIdentitySettled?: () => void;
   /** Runs when the identity request finds that the visitor has no session. */
   readonly onSessionMissing?: () => void;
+  /**
+   * Runs, after `zitadel-signout`, once a host that was removed while its
+   * sign-out succeeded is put back: the navigation `signOut()` held back
+   * because a full-page load would have unloaded the host before it could
+   * report.
+   */
+  readonly onSignedOutWhileDetached?: () => void;
 }
 
 /**
@@ -154,6 +161,7 @@ export class SessionController implements ReactiveController {
     if (signedOut) {
       this.missedSignOut = undefined;
       emit(this.host, "zitadel-signout", signedOut);
+      this.options.onSignedOutWhileDetached?.();
     }
     const missed = this.missedSignOutFailure;
     if (missed) {
@@ -183,7 +191,8 @@ export class SessionController implements ReactiveController {
 
   /**
    * Revokes the session with credentials; the server clears the cookie. Fires
-   * `zitadel-signout` (after `onRevoked`) and resolves `true` on success. The
+   * `zitadel-signout` (after `onRevoked`) and resolves `true` on success; a host
+   * removed meanwhile resolves `false` and fires it once put back. The
    * backend answering that there is no session (see {@link isNoSession}) means
    * it is already gone, which is what signing out asks for, so it succeeds the
    * same way. Any other failure, a gateway's 401 or 404 included, revoked
@@ -221,9 +230,14 @@ export class SessionController implements ReactiveController {
     const detail = { display: this.display, identifier: this.identifier };
     // Removed while the request was in flight: the session is gone all the same,
     // and the page hears of it when the host is put back.
-    if (this.host.isConnected) emit(this.host, "zitadel-signout", detail);
-    else this.missedSignOut = detail;
-    return true;
+    if (this.host.isConnected) {
+      emit(this.host, "zitadel-signout", detail);
+      return true;
+    }
+    // Resolves `false` so the caller does not navigate yet: `hostConnected`
+    // reports, then runs `onSignedOutWhileDetached`.
+    this.missedSignOut = detail;
+    return false;
   }
 
   private maybeLoadIdentity(): void {

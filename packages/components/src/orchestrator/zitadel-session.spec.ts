@@ -529,6 +529,34 @@ describe("<zitadel-session>", () => {
     expect(events[0]?.detail).toEqual({ display: "", identifier: "alice@acme.com" });
   });
 
+  it("navigates to post-sign-out-url only once put back when the sign-out completed while removed", async () => {
+    const loc = stubLocation();
+    const element = mount();
+    element.postSignOutUrl = "https://app.test/login";
+    await flush(element);
+    let release: () => void = () => undefined;
+    server.use(
+      http.delete(`${API_BASE}/sessions/me`, async () => {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+
+    activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
+    await new Promise((resolve) => setTimeout(resolve, 16));
+    element.remove();
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 32));
+    expect(loc.current).not.toBe("https://app.test/login");
+
+    host.appendChild(element);
+    await flush(element);
+
+    expect(loc.current).toBe("https://app.test/login");
+  });
+
   it("suppress-header visually hides the heading but keeps it accessible", async () => {
     currentEmail = "alice@acme.com";
     const element = mount("<zitadel-session suppress-header></zitadel-session>");

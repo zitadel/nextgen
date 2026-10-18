@@ -381,6 +381,40 @@ describe("<zitadel-logout>", () => {
     expect(events).toHaveLength(1);
   });
 
+  it("navigates to post-sign-out-url only once put back when the sign-out completed while removed", async () => {
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...window.location, href: "" },
+      writable: true,
+    });
+    const element = mount();
+    element.postSignOutUrl = "https://app.test/done";
+    await flush(element);
+    let release: () => void = () => undefined;
+    server.use(
+      http.delete(`${API_BASE}/sessions/me`, async () => {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+
+    shadowQuery<HTMLButtonElement>(element, ".trigger").click();
+    await element.updateComplete;
+    shadowQuery<HTMLButtonElement>(element, ".signout-btn").click();
+    await new Promise((resolve) => setTimeout(resolve, 16));
+    element.remove();
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 32));
+    expect(window.location.href).toBe("");
+
+    host.appendChild(element);
+    await flush(element);
+
+    expect(window.location.href).toBe("https://app.test/done");
+  });
+
   it("substitutes template tokens and wires data-action='logout' triggers", async () => {
     currentName = "Bob Builder";
     currentEmail = "bob@example.com";
