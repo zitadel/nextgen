@@ -129,5 +129,6 @@ The public exports are `ZitadelLogin`, `ZitadelLogout`, `ZitadelSession`,
 - **`proxyPath` must reach the backend.** A same-origin path needs a proxy in
   front of your app; without one, point `proxyPath` at the backend origin
   directly (dev only, cross-origin).
-- **Browser-only.** The components render the auth UI client-side; do not expect
-  them to run during SvelteKit SSR.
+- **Browser web components.** The widgets only start in the browser. A SvelteKit
+  server render emits a bare element, so follow the server-rendering gotcha
+  above: string `projectId` and `proxyPath` may be server-rendered.

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { FRAMEWORK_IDS } from "../../../../../../helpers/framework-ids";
 import type {
   FileOp,
   ScaffoldPlan,
@@ -68,6 +69,13 @@ describe("VuePatcher.plan", () => {
       .ops.find((op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep");
     expect(dep).toMatchObject({ name: "@zitadel/sdk-vue", version: "alpha" });
   });
+
+  it("exposes the project id through a VITE_-prefixed env var", () => {
+    const env = new VuePatcher()
+      .plan(ctx())
+      .ops.filter((op): op is Extract<FileOp, { kind: "merge-env" }> => op.kind === "merge-env");
+    expect(env.some((op) => "VITE_ZITADEL_PROJECT_ID" in op.entries)).toBe(true);
+  });
 });
 
 describe("VuePatcher.artifacts", () => {
@@ -79,5 +87,11 @@ describe("VuePatcher.artifacts", () => {
     expect(artifacts.markedFiles).toContain("src/App.vue");
     expect(artifacts.dependencies).toEqual(["@zitadel/sdk-vue"]);
     expect(artifacts.configEdits).toEqual(["vite.config.*"]);
+  });
+});
+
+describe("VuePatcher.canPatch", () => {
+  it.each(FRAMEWORK_IDS)("matches %s only when it is its own framework", (id) => {
+    expect(new VuePatcher().canPatch(id)).toBe(id === "vue");
   });
 });

@@ -67,6 +67,13 @@ describe("ReactDetector", () => {
     expect(facts).not.toHaveProperty("versionMajor");
   });
 
+  it("accepts a pinned React 19 prerelease against the React 18 floor", async () => {
+    const facts = await new ReactDetector().detect(
+      await project({ react: "19.0.0-rc.1", vite: "^5" }),
+    );
+    expect(facts?.id).toBe("react");
+  });
+
   it("judges the floor by range semantics, not by digits in the spec", async () => {
     // "<18" contains the digits 18 yet admits only versions below the floor.
     await expect(
