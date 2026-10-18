@@ -2,6 +2,7 @@ import { rm } from "node:fs/promises";
 import { join } from "node:path";
 
 import { AbstractCLIScaffolder } from "./cli";
+import type { NodeEngines } from "./node-engines";
 
 /**
  * Scaffolds a new SvelteKit app with the `sv` CLI (`sv create`), then removes
@@ -16,7 +17,14 @@ export class SvelteKitScaffolder extends AbstractCLIScaffolder {
   readonly displayName = "SvelteKit";
   readonly supportedFrameworks: ReadonlyArray<string> = ["sveltekit"];
 
-  async scaffold(cwd: string, _framework: string): Promise<void> {
+  readonly nodeEngines: NodeEngines = {
+    label: "sv",
+    spec: "sv@latest",
+    fallback: "^20.19.0 || >=22.12.0",
+    enforcement: "warn",
+  };
+
+  protected async create(cwd: string, _framework: string): Promise<void> {
     this.runCommand(
       "npx",
       [

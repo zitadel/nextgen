@@ -1,6 +1,7 @@
 import { hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
 import type { Detector, FrameworkFacts } from "./types";
+import { enforceVersionFloor } from "./version-floor";
 
 /**
  * Detects a TanStack Start project by its `@tanstack/react-start` dependency
@@ -17,12 +18,17 @@ import type { Detector, FrameworkFacts } from "./types";
  */
 export class TanStackStartDetector implements Detector {
   readonly framework = "tanstack-start";
+  readonly displayName = "TanStack Start";
+  readonly versionPackage = "@tanstack/react-start";
+  readonly versionFloor = "1";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
     const pkg = await readPackageJson(cwd).catch(() => undefined);
     if (!pkg || !hasDependency(pkg, "react") || !hasDependency(pkg, "@tanstack/react-start")) {
       return null;
     }
+
+    await enforceVersionFloor(this, pkg, cwd);
 
     const devPort = await detectDevPort(cwd, pkg);
     return { id: "tanstack-start", appDir: "src", devPort, url: issuerFromPort(devPort) };

@@ -1,6 +1,8 @@
-import { createApp, toWebHandler, getRequestHeader } from "h3";
+import { createApp, toWebHandler, getRequestHeader, type H3EventContext } from "h3";
 import { generateKeyPairSync, createSign } from "node:crypto";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, expectTypeOf, vi, beforeEach } from "vitest";
+
+import type { AuthResult } from "../../runtime/types";
 
 import { createNextgenMiddleware } from "../../runtime/server/middleware";
 import { setRuntimeConfig } from "../stubs/nuxt-imports";
@@ -1071,5 +1073,13 @@ describe("createNextgenMiddleware (H3)", () => {
 
       expect(capturedToken).toBeUndefined();
     });
+  });
+});
+
+describe("H3EventContext augmentation", () => {
+  // The middleware does not run on every route (ignoredRoutes, handlers outside
+  // its reach), and getAuth answers signed out when it did not.
+  it("declares nextgenAuth optional", () => {
+    expectTypeOf<H3EventContext["nextgenAuth"]>().toEqualTypeOf<AuthResult | undefined>();
   });
 });

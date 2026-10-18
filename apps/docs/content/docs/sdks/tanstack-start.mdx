@@ -83,7 +83,14 @@ The TanStack Start SDK is a global request middleware that proxies and verifies 
     import { createServerFn } from "@tanstack/react-start";
     import { getAuth } from "@zitadel/sdk-tanstack-start/server";
 
-    const fetchAuth = createServerFn().handler(({ context }) => getAuth(context));
+    // A server function's return value reaches the browser, so return only
+    // client-safe fields: `getAuth` also carries the raw session token.
+    const fetchAuth = createServerFn().handler(({ context }) => {
+      const auth = getAuth(context);
+      return auth.isAuthenticated
+        ? { isAuthenticated: true as const, userId: auth.session.userId }
+        : { isAuthenticated: false as const };
+    });
 
     export const Route = createFileRoute("/profile")({
       beforeLoad: async () => {
@@ -94,6 +101,8 @@ The TanStack Start SDK is a global request middleware that proxies and verifies 
       },
     });
     ```
+
+    Never return `getAuth(context)` itself from a server function: its `session` carries the raw session token, and a server function's result reaches browser scripts. Return only `userId` and other client-safe fields.
 
     Render the widgets from `@zitadel/sdk-tanstack-start/react`. They mount client-only: on the server and during hydration they render nothing, so no flow starts before the app hydrates with its config. The `/react` entry also exports `businessLocales` and the Login, Logout and Session prop types; `@zitadel/sdk-tanstack-start/client` exports only `configureZitadel`, `getApi` and `getZitadelConfig`, with no element classes.
 

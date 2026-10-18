@@ -2,6 +2,7 @@ import { rm } from "node:fs/promises";
 import { join } from "node:path";
 
 import { AbstractCLIScaffolder } from "./cli";
+import type { NodeEngines } from "./node-engines";
 import { removeInstall } from "./remove-install";
 
 /**
@@ -20,7 +21,14 @@ export class SolidStartScaffolder extends AbstractCLIScaffolder {
   readonly displayName = "SolidStart";
   readonly supportedFrameworks: ReadonlyArray<string> = ["solid-start"];
 
-  async scaffold(cwd: string, _framework: string): Promise<void> {
+  readonly nodeEngines: NodeEngines = {
+    label: "create-solid",
+    spec: "create-solid@latest",
+    fallback: "^20.19.0 || >=22.12.0",
+    enforcement: "warn",
+  };
+
+  protected async create(cwd: string, _framework: string): Promise<void> {
     this.runCommand(
       "npx",
       ["-y", "create-solid@latest", ".", "basic", "--solidstart", "--ts", "--v2"],

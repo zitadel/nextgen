@@ -1,6 +1,7 @@
 import { hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
 import type { Detector, FrameworkFacts } from "./types";
+import { enforceVersionFloor } from "./version-floor";
 
 /**
  * Detects a Qwik City project on Qwik 2: depends on both `@qwik.dev/core` and
@@ -20,12 +21,17 @@ import type { Detector, FrameworkFacts } from "./types";
  */
 export class QwikCityDetector implements Detector {
   readonly framework = "qwik-city";
+  readonly displayName = "Qwik City";
+  readonly versionPackage = "@qwik.dev/router";
+  readonly versionFloor = "2.0.0-beta.45";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
     const pkg = await readPackageJson(cwd).catch(() => undefined);
     if (!pkg || !hasDependency(pkg, "@qwik.dev/core") || !hasDependency(pkg, "@qwik.dev/router")) {
       return null;
     }
+
+    await enforceVersionFloor(this, pkg, cwd);
 
     const devPort = await detectDevPort(cwd, pkg);
     return { id: "qwik-city", appDir: "src", devPort, url: issuerFromPort(devPort) };
