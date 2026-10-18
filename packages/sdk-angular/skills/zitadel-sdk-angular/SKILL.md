@@ -19,7 +19,7 @@ You are adding Zitadel login, registration, logout, or session handling to an
 Angular app and wiring the auth UI in by hand.
 
 The `zitadel` CLI can scaffold a *fresh* Angular app
-(`zitadel setup --framework angular`) with this SDK already wired in, and it can
+(`npx @zitadel/cli@alpha setup --framework angular`) with this SDK already wired in, and it can
 patch some existing frameworks (e.g. Next.js). It **cannot** integrate into an
 **existing** Angular app — it only scaffolds Angular into an empty directory. So
 for an app that already exists, do **not** rely on the CLI; follow this skill to
@@ -28,11 +28,10 @@ install the package and wire the components in manually.
 ## Install
 
 ```sh
-npm install @zitadel/sdk-angular
+npm install @zitadel/sdk-angular@alpha
 ```
 
-Peer dependencies (already present in any Angular 17+ app): `@angular/core` and
-`@angular/common`, both `>=17`. The published types require TypeScript `>= 5.0`.
+Peer dependencies: `@angular/core` and `@angular/common`, both `>=17`. Requires TypeScript ≥ 5.0 (the published types use `export type *`).
 
 ## Integrate
 

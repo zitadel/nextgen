@@ -4,6 +4,7 @@ import type {
   ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
 
+import manifestJson from "../package.json";
 import { $, render, type Signal } from "@qwik.dev/core";
 import { _resetConfigForTesting, configureZitadel } from "@zitadel/api/config";
 import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
@@ -434,6 +435,41 @@ describe("resumed server markup", () => {
     expect(JSON.parse(String(init?.body))).toEqual({
       purpose: "register",
       project_id: "proj-test",
+    });
+  });
+});
+
+// The package ships only what its build emits, so an `exports` target the build
+// misses breaks every consumer that imports it. `test` runs after `build`. This
+// lane runs in a browser, so the built files are listed at transform time with
+// a glob over `dist` rather than read from disk.
+describe("package manifest", () => {
+  const manifest = manifestJson as {
+    main?: string;
+    module?: string;
+    types?: string;
+    exports: unknown;
+    peerDependencies: Record<string, string>;
+  };
+  const built = Object.keys(import.meta.glob("../dist/**/*", { query: "?url" }));
+
+  function targets(value: unknown): string[] {
+    if (typeof value === "string") return value.startsWith("./") ? [value] : [];
+    if (value && typeof value === "object") return Object.values(value).flatMap(targets);
+    return [];
+  }
+
+  it("ships every exports target in dist", () => {
+    const declared = targets([manifest.exports, manifest.main, manifest.module, manifest.types]);
+    expect(declared.length).toBeGreaterThan(0);
+    expect(declared.filter((file) => !built.includes(file.replace("./dist", "../dist")))).toEqual(
+      [],
+    );
+  });
+
+  it("declares its supported peer ranges", () => {
+    expect(manifest.peerDependencies).toEqual({
+      "@qwik.dev/core": "^2.0.0-beta.45",
     });
   });
 });
