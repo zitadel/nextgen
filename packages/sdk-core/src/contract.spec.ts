@@ -109,8 +109,6 @@ const URL_REASON =
 const HANDLE_REASONS: Record<string, string> = {
   publishableKey:
     "declarative form of the project handle's publishableKey, which SPA wrappers pass inside project",
-  projectExplicit:
-    "server-markup marker the Qwik wrapper sets when it serializes an explicit project handle; no config counterpart",
 };
 
 const LOGIN_ELEMENT_ONLY: Record<string, string> = {

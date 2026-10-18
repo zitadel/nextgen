@@ -36,7 +36,6 @@ declare module "react" {
           "project-id"?: string;
           "proxy-path"?: string;
           "publishable-key"?: string;
-          "project-explicit"?: boolean;
           url?: string;
           "post-sign-in-url"?: string;
           "resume-flow-id"?: string;
@@ -55,7 +54,6 @@ declare module "react" {
           "project-id"?: string;
           "proxy-path"?: string;
           "publishable-key"?: string;
-          "project-explicit"?: boolean;
           url?: string;
           "post-sign-out-url"?: string;
           heading?: string;
@@ -68,7 +66,6 @@ declare module "react" {
           "project-id"?: string;
           "proxy-path"?: string;
           "publishable-key"?: string;
-          "project-explicit"?: boolean;
           url?: string;
           "post-sign-out-url"?: string;
         };

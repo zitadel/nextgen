@@ -76,17 +76,6 @@ describe("server-rendered widget config", () => {
     expect(discrete).toMatchObject({ "proxy-path": "/" });
   });
 
-  it("marks an explicit project handle so it outranks a browser global", async () => {
-    const withHandle = await serverAttributes("zitadel-login", <ZitadelLogin project={project} />);
-    const discrete = await serverAttributes(
-      "zitadel-login",
-      <ZitadelLogin projectId="proj-test" proxyPath="/__nextgen" />,
-    );
-
-    expect(withHandle).toHaveProperty("project-explicit");
-    expect(discrete).not.toHaveProperty("project-explicit");
-  });
-
   it("omits the resume handle and the flags when they are unset", async () => {
     const attrs = await serverAttributes("zitadel-login", <ZitadelLogin project={project} />);
 

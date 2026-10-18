@@ -17,13 +17,6 @@ export interface ProjectAttrs {
   readonly proxyPath: string;
   readonly url: string;
   readonly publishableKey: string;
-  /**
-   * Set by a framework wrapper that serialized an explicit `project` handle as
-   * these attributes (the property cannot ride in server markup). The
-   * attributes then outrank the global handle, as the property they stand in
-   * for would have.
-   */
-  readonly explicit?: boolean;
 }
 
 /**
@@ -84,11 +77,7 @@ function projectFromAttrs({
  *
  * Both JS paths (property and global) win over the declarative attributes, so a
  * deliberate `configureZitadel()` is never silently overridden by fallback or
- * stale HTML attributes; the attributes are the no-JS fallback. The one
- * exception is the `project-explicit` attribute, which a wrapper sets when the
- * attributes are the serialized form of its `project` handle: they then rank
- * with the property (1), because the property could not reach the widget before
- * it started.
+ * stale HTML attributes; the attributes are the no-JS fallback.
  *
  * Both `<zitadel-login>` and `<zitadel-logout>` need the same resolution and
  * the same "no config" failure, so it lives here rather than being copied
@@ -105,11 +94,7 @@ export function resolveApi(
   attrs: ProjectAttrs,
   element: string,
 ): { project: ZitadelProject; api: ZitadelApi } {
-  const cfg =
-    project ??
-    (attrs.explicit ? projectFromAttrs(attrs) : undefined) ??
-    getZitadelConfig() ??
-    projectFromAttrs(attrs);
+  const cfg = project ?? getZitadelConfig() ?? projectFromAttrs(attrs);
   if (!cfg) {
     throw new Error(
       `${element} requires a configured project: set the \`project-id\` attribute, ` +

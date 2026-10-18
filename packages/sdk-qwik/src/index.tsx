@@ -79,10 +79,6 @@ function projectAttrs(props: {
     // Without it a resumed widget would start its first flow, or run an SSO
     // handoff exchange, with no bearer before the property handle is restored.
     "publishable-key": props.project?.publishableKey,
-    // The property handle cannot ride in server markup, so a resumed widget
-    // starts from these attributes. Marked explicit, they outrank a different
-    // global from configureZitadel() the way the `project` property would.
-    "project-explicit": flag(props.project !== undefined),
   };
 }
 
