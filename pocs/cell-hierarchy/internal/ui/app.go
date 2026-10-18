@@ -65,6 +65,7 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("GET /scenarios", a.handleScenarios)
 	mux.HandleFunc("POST /scenarios/create-user", a.handleScenarioCreateUser)
 	mux.HandleFunc("POST /scenarios/lookup", a.handleScenarioLookup)
+	mux.HandleFunc("POST /scenarios/grant-joe", a.handleScenarioGrantJoe)
 	mux.HandleFunc("GET /trace", a.handleTrace)
 	mux.HandleFunc("POST /trace/clear", a.handleTraceClear)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -98,19 +99,19 @@ type projectNode struct {
 }
 
 type pageData struct {
-	Title      string
-	Flash      string
-	FlashErr   string
-	Tree       []*snapshotNode
-	Unjoined   []*snapshotNode
+	Title       string
+	Flash       string
+	FlashErr    string
+	Tree        []*snapshotNode
+	Unjoined    []*snapshotNode
 	ProjectTree []*projectNode
-	Parents    []CellRef
-	UnjoinedO  []CellRef
-	Detail     *cellDetail
-	Project    *projectDetail
-	Trace      []traceEntry
-	Now        string
-	ScenarioOK string
+	Parents     []CellRef
+	UnjoinedO   []CellRef
+	Detail      *cellDetail
+	Project     *projectDetail
+	Trace       []traceEntry
+	Now         string
+	ScenarioOK  string
 	ScenarioErr string
 }
 
@@ -122,10 +123,13 @@ type cellDetail struct {
 }
 
 type projectDetail struct {
-	Project cell.ProjectResponse
-	Users   []userRow
-	Lookup  []lookupRow
-	Error   string
+	Project   cell.ProjectResponse
+	Users     []userRow
+	Lookup    []lookupRow
+	Apps      []cell.AppView
+	Tuples    []cell.TupleView
+	Interests []cell.InterestView
+	Error     string
 }
 
 type userRow struct {
@@ -256,14 +260,20 @@ func (a *App) handleProjectDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	detail.Project = proj
 	var raw struct {
-		Users  []userRow   `json:"users"`
-		Lookup []lookupRow `json:"lookup"`
+		Users     []userRow           `json:"users"`
+		Lookup    []lookupRow         `json:"lookup"`
+		Apps      []cell.AppView      `json:"apps"`
+		Tuples    []cell.TupleView    `json:"tuples"`
+		Interests []cell.InterestView `json:"interests"`
 	}
 	if err := a.Peer.DoRaw(ctx, http.MethodGet, cell.NormalizeURL(hostURL)+"/v1/projects/"+id, nil, "", &raw); err != nil {
 		detail.Error = err.Error()
 	} else {
 		detail.Users = raw.Users
 		detail.Lookup = raw.Lookup
+		detail.Apps = raw.Apps
+		detail.Tuples = raw.Tuples
+		detail.Interests = raw.Interests
 	}
 	a.render(w, "project", pageData{Title: "Project " + id, Project: detail, Trace: a.copyTrace()})
 }
@@ -337,6 +347,48 @@ func (a *App) handleScenarioLookup(w http.ResponseWriter, r *http.Request) {
 	a.appendTrace("lookup walk from us: "+key, hops, note)
 	msg := note
 	http.Redirect(w, r, "/scenarios?ok="+url.QueryEscape(msg), http.StatusSeeOther)
+}
+
+func (a *App) handleScenarioGrantJoe(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	usHost, err := a.cellURLByLabel("us")
+	if err != nil {
+		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		return
+	}
+	// Ensure chat app exists (idempotent for re-runs).
+	apps, err := a.Peer.ListApps(ctx, usHost, "us")
+	if err != nil {
+		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		return
+	}
+	hasChat := false
+	for _, app := range apps {
+		if app.Name == "chat" {
+			hasChat = true
+			break
+		}
+	}
+	if !hasChat {
+		if _, err := a.Peer.CreateApp(ctx, usHost, "us", map[string]any{"name": "chat"}); err != nil {
+			http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+			return
+		}
+	}
+	out, err := a.Peer.CreateTuple(ctx, usHost, "us", map[string]any{
+		"object":   "app:chat",
+		"relation": "viewer",
+		"user_key": "joe@example.com",
+	})
+	note := "grant joe viewer on us/app:chat"
+	if err != nil {
+		a.appendTrace(note, out.Trace, err.Error())
+		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		return
+	}
+	a.appendTrace(note, out.Trace, "tuple="+out.Tuple.ID+" home="+out.Tuple.HomeProjectID)
+	http.Redirect(w, r, "/scenarios?ok="+url.QueryEscape("granted joe viewer on us/chat"), http.StatusSeeOther)
 }
 
 func (a *App) handleTrace(w http.ResponseWriter, r *http.Request) {

@@ -182,6 +182,21 @@ func (s *Server) handleGetProject(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	apps, err := s.Store.ListApps(id)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	tuples, err := s.Store.ListTuples(id)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	interests, err := s.Store.ListInterestsForProject(id)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	uv := make([]UserView, 0, len(users))
 	for _, u := range users {
 		uv = append(uv, UserView{
@@ -196,10 +211,25 @@ func (s *Server) handleGetProject(w http.ResponseWriter, r *http.Request) {
 	for _, e := range entries {
 		lv = append(lv, lookupView(e))
 	}
+	av := make([]AppView, 0, len(apps))
+	for _, a := range apps {
+		av = append(av, appView(a))
+	}
+	tv := make([]TupleView, 0, len(tuples))
+	for _, t := range tuples {
+		tv = append(tv, tupleView(t))
+	}
+	iv := make([]InterestView, 0, len(interests))
+	for _, i := range interests {
+		iv = append(iv, interestView(i))
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"project": projectView(p, meta.URL),
-		"users":   uv,
-		"lookup":  lv,
+		"project":   projectView(p, meta.URL),
+		"users":     uv,
+		"lookup":    lv,
+		"apps":      av,
+		"tuples":    tv,
+		"interests": iv,
 	})
 }
 

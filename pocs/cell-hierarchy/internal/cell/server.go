@@ -48,6 +48,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/heartbeat", s.handleHeartbeat)
 	mux.HandleFunc("DELETE /v1/children", s.handleDeleteChild)
 	s.registerProjectRoutes(mux)
+	s.registerGrantRoutes(mux)
 	return mux
 }
 

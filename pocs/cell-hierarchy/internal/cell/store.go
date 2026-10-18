@@ -90,7 +90,10 @@ CREATE TABLE IF NOT EXISTS join_tokens (
 	if err != nil {
 		return err
 	}
-	return s.migrateProjects()
+	if err := s.migrateProjects(); err != nil {
+		return err
+	}
+	return s.migrateGrants()
 }
 
 func (s *Store) ensureMeta(cellURL, label string, isParent bool) error {

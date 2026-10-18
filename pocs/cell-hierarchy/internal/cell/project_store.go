@@ -8,15 +8,15 @@ import (
 )
 
 var (
-	ErrProjectExists      = errors.New("project_exists")
-	ErrProjectNotFound    = errors.New("project_not_found")
-	ErrProjectAttached    = errors.New("project_already_attached")
-	ErrUserExists         = errors.New("user_exists")
-	ErrLookupConflict     = errors.New("lookup_conflict")
-	ErrLookupNotFound     = errors.New("lookup_not_found")
-	ErrInvalidProjectID   = errors.New("invalid_project_id")
-	ErrParentProjectMiss  = errors.New("parent_project_not_found")
-	ErrLookupKeyRequired  = errors.New("lookup_key_required")
+	ErrProjectExists     = errors.New("project_exists")
+	ErrProjectNotFound   = errors.New("project_not_found")
+	ErrProjectAttached   = errors.New("project_already_attached")
+	ErrUserExists        = errors.New("user_exists")
+	ErrLookupConflict    = errors.New("lookup_conflict")
+	ErrLookupNotFound    = errors.New("lookup_not_found")
+	ErrInvalidProjectID  = errors.New("invalid_project_id")
+	ErrParentProjectMiss = errors.New("parent_project_not_found")
+	ErrLookupKeyRequired = errors.New("lookup_key_required")
 )
 
 const (

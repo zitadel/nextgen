@@ -1,6 +1,6 @@
-# Cell hierarchy POC (Phase 1 + Phase 2)
+# Cell hierarchy POC (Phase 1–3)
 
-Greenfield multi-container Go cells with SQLite membership, join/heartbeat, project attach, user lookup float-up, and an HTMX UI.
+Greenfield multi-container Go cells with SQLite membership, join/heartbeat, project attach, user lookup float-up, regional apps/grants with home-cell interest registration, and an HTMX UI.
 
 Lives under `pocs/cell-hierarchy/` as a nested Go module (not wired into Moon/CI).
 
@@ -25,7 +25,7 @@ platform PROJECT  [lookup ON]  ← customer lookup zone (no separate CusB)
 ├── eu            [lookup ON]   hosted on eu cell
 │   ├── team-eu-1 [lookup off]  hosted on eu-1 · Alice
 │   └── team-eu-2 [lookup off]  hosted on eu-2 · Bob, Joe
-├── us            [lookup off]  hosted on us
+├── us            [lookup off]  hosted on us · app chat
 └── aus           [lookup off]  hosted on aus
 ```
 
@@ -36,6 +36,7 @@ platform PROJECT  [lookup ON]  ← customer lookup zone (no separate CusB)
 - User routing floats on PROJECT parents only. Lookup never walks children.
 - Identifier uniqueness: under one lookup-enabled ancestor (platform), first-write-wins conflict.
 - Float-up push; lookup miss if the row is not yet at the ancestor you ask.
+- Grants (tuples) live on the **resource** project cell; interests live on the principal’s **home** cell.
 
 ## Quick start
 
@@ -47,7 +48,28 @@ cd pocs/cell-hierarchy
 
 - UI: http://localhost:3000
 - Cells: http://localhost:8100–8106
-- Bootstrap runs joins then `scripts/bootstrap-projects.sh` (projects, attach, seed users with float).
+- Bootstrap runs joins then `scripts/bootstrap-projects.sh` (projects, attach, seed users with float, seed `chat` app on `us`).
+
+## Phase 3 scenarios
+
+| Scenario | How |
+|---|---|
+| Grant Joe on us/chat | UI → Scenarios → **Grant Joe on us/chat**. Trace shows lookup walk + tuple write on us + `POST /v1/interests` on eu-2 |
+| Inspect placement | Project `us`: apps + tuples. Project `team-eu-2`: interests for Joe; users still only Bob/Joe locally. No Joe user row on `us`. |
+
+Manual curl (after bootstrap):
+
+```bash
+# Grant (lookup resolves Joe at platform → home team-eu-2 @ eu-2)
+curl -sS -X POST http://127.0.0.1:8104/v1/projects/us/tuples \
+  -H 'Content-Type: application/json' \
+  -d '{"object":"app:chat","relation":"viewer","user_key":"joe@example.com"}' | jq .
+
+# Tuple only on us
+curl -sS http://127.0.0.1:8104/v1/projects/us/tuples | jq .
+# Interest only on home (eu-2)
+curl -sS 'http://127.0.0.1:8103/v1/interests?home_project_id=team-eu-2' | jq .
+```
 
 ## Phase 2 scenarios
 
@@ -60,7 +82,7 @@ cd pocs/cell-hierarchy
 
 Optional demo delay: set `FLOAT_DELAY_MS` on a cell so each float push sleeps (miss-before-push is easier to see with defer float + manual lookup).
 
-### Seed users
+### Seed users / apps
 
 | User | Project |
 |---|---|
@@ -68,12 +90,28 @@ Optional demo delay: set `FLOAT_DELAY_MS` on a cell so each float push sleeps (m
 | bob@example.com | team-eu-2 |
 | joe@example.com | team-eu-2 |
 
+| App | Project (cell) |
+|---|---|
+| chat | us (us) |
+
+## Phase 3 HTTP APIs
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET/POST` | `/v1/projects/{id}/apps` | List / create apps on this project |
+| `GET/DELETE` | `/v1/projects/{id}/apps/{appId}` | Get / delete one app |
+| `GET/POST` | `/v1/projects/{id}/tuples` | List / create grant (lookup walk → tuple → RegisterInterest on home) |
+| `GET` | `/v1/interests` | List interests on this cell (`?home_project_id=` optional) |
+| `POST` | `/v1/interests` | RegisterInterest (called by resource cell on home cell) |
+
+`GET /v1/projects/{id}` also returns `apps`, `tuples`, and `interests` (interests filtered to this project as home).
+
 ## Phase 2 HTTP APIs
 
 | Method | Path | Purpose |
 |---|---|---|
 | `GET/POST` | `/v1/projects` | List / create projects on this cell |
-| `GET` | `/v1/projects/{id}` | Project + users + lookup table |
+| `GET` | `/v1/projects/{id}` | Project + users + lookup + apps + tuples + interests |
 | `POST` | `/v1/projects/{id}/attach` | Attach to parent project on parent cell |
 | `POST` | `/v1/projects/{id}/users` | Create user → local lookup → float (`defer_float` optional) |
 | `POST` | `/v1/projects/{id}/float` | Push an existing local lookup row up |

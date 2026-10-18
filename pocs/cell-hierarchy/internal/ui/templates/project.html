@@ -57,6 +57,63 @@
         {{end}}
       </div>
       <div class="panel">
+        <h2 style="font-size:1rem;margin:0 0 0.5rem">Apps</h2>
+        {{if .Apps}}
+        <table>
+          <thead><tr><th>Name</th><th>ID</th><th>Created</th></tr></thead>
+          <tbody>
+          {{range .Apps}}
+            <tr><td>{{.Name}}</td><td><code>{{.ID}}</code></td><td class="muted">{{.CreatedAt}}</td></tr>
+          {{end}}
+          </tbody>
+        </table>
+        {{else}}
+        <p class="muted">No apps on this project.</p>
+        {{end}}
+      </div>
+      <div class="panel">
+        <h2 style="font-size:1rem;margin:0 0 0.5rem">Tuples (grants)</h2>
+        {{if .Tuples}}
+        <table>
+          <thead><tr><th>Object</th><th>Relation</th><th>Subject</th><th>Home</th></tr></thead>
+          <tbody>
+          {{range .Tuples}}
+            <tr>
+              <td><code>{{.Object}}</code></td>
+              <td>{{.Relation}}</td>
+              <td><code>{{.Subject}}</code></td>
+              <td class="muted">{{.HomeProjectID}}</td>
+            </tr>
+          {{end}}
+          </tbody>
+        </table>
+        {{else}}
+        <p class="muted">No tuples on this project.</p>
+        {{end}}
+      </div>
+      <div class="panel">
+        <h2 style="font-size:1rem;margin:0 0 0.5rem">Interests (home of principals)</h2>
+        <p class="muted">Interests registered when another cell grants a principal whose home is this project.</p>
+        {{if .Interests}}
+        <table>
+          <thead><tr><th>Principal</th><th>Object</th><th>Relation</th><th>Subscriber</th><th>Tuple</th></tr></thead>
+          <tbody>
+          {{range .Interests}}
+            <tr>
+              <td>{{.PrincipalKey}}</td>
+              <td><code>{{.Object}}</code></td>
+              <td>{{.Relation}}</td>
+              <td><code>{{.SubscriberProjectID}}</code> · {{.SubscriberCellURL}}</td>
+              <td><code>{{.TupleID}}</code></td>
+            </tr>
+          {{end}}
+          </tbody>
+        </table>
+        {{else}}
+        <p class="muted">No interests for this home project.</p>
+        {{end}}
+      </div>
+      <div class="panel">
         <h2 style="font-size:1rem;margin:0 0 0.5rem">Lookup table (this cell)</h2>
         {{if .Lookup}}
         <table>

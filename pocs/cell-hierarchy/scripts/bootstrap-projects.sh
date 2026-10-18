@@ -68,6 +68,22 @@ create_user() {
     -d "$(jq -n --arg e "$email" '{email:$e, defer_float:false}')" >/dev/null
 }
 
+create_app() {
+  local cell_url="$1"
+  local project_id="$2"
+  local name="$3"
+  local apps
+  apps="$(curl -fsS "$cell_url/v1/projects/$project_id/apps")"
+  if printf '%s' "$apps" | jq -e --arg n "$name" '.apps[]? | select(.name == $n)' >/dev/null 2>&1; then
+    echo "skip app $name on $project_id"
+    return 0
+  fi
+  echo "create app $name on $project_id"
+  curl -fsS -X POST "$cell_url/v1/projects/$project_id/apps" \
+    -H 'Content-Type: application/json' \
+    -d "$(jq -n --arg n "$name" '{name:$n}')" >/dev/null
+}
+
 PLATFORM="${PLATFORM_URL:-http://platform:8100}"
 EU="${EU_URL:-http://eu:8101}"
 EU1="${EU1_URL:-http://eu-1:8102}"
@@ -96,5 +112,8 @@ attach_project "$AUS" "aus" "platform" "$PLATFORM"
 create_user "$EU1" "team-eu-1" "alice@example.com"
 create_user "$EU2" "team-eu-2" "bob@example.com"
 create_user "$EU2" "team-eu-2" "joe@example.com"
+
+# Phase 3: regional app on us (grant left to scenario button)
+create_app "$US" "us" "chat"
 
 echo "project bootstrap complete"

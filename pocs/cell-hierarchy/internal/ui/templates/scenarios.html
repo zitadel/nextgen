@@ -34,9 +34,17 @@
     <nav><a href="/">Tree</a><a href="/join">Join</a><a href="/scenarios">Scenarios</a></nav>
   </header>
   <main>
-    <h1>Phase 2 scenarios</h1>
+    <h1>Phase 2 + 3 scenarios</h1>
     {{if .ScenarioOK}}<div class="flash-ok">{{.ScenarioOK}}</div>{{end}}
     {{if .ScenarioErr}}<div class="flash-err">{{.ScenarioErr}}</div>{{end}}
+
+    <div class="panel">
+      <h2 style="font-size:1rem;margin:0 0 0.5rem">Grant Joe on us/chat</h2>
+      <p class="muted">Phase 3: from project <code>us</code>, lookup-walk <code>joe@example.com</code> (resolves at platform → home team-eu-2), write tuple <code>app:chat#viewer</code> on us only, then <code>POST /v1/interests</code> on eu-2. Inspect <a href="/projects/us">us</a> tuples and <a href="/projects/team-eu-2">team-eu-2</a> interests.</p>
+      <form method="post" action="/scenarios/grant-joe">
+        <button type="submit">Grant Joe on us/chat</button>
+      </form>
+    </div>
 
     <div class="panel">
       <h2 style="font-size:1rem;margin:0 0 0.5rem">Create user (watch float)</h2>

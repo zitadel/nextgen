@@ -216,6 +216,114 @@ func (c *PeerClient) LookupWalk(ctx context.Context, startCellURL, projectID, ke
 	}
 }
 
+type RegisterInterestRequest struct {
+	PrincipalKey        string `json:"principal_key"`
+	HomeProjectID       string `json:"home_project_id"`
+	SubscriberCellURL   string `json:"subscriber_cell_url"`
+	SubscriberProjectID string `json:"subscriber_project_id"`
+	TupleID             string `json:"tuple_id"`
+	Object              string `json:"object,omitempty"`
+	Relation            string `json:"relation,omitempty"`
+}
+
+func (c *PeerClient) RegisterInterest(ctx context.Context, homeCellURL string, req RegisterInterestRequest) error {
+	return c.doJSON(ctx, http.MethodPost, NormalizeURL(homeCellURL)+"/v1/interests", req, "", nil)
+}
+
+type CreateTupleResponse struct {
+	Tuple TupleView  `json:"tuple"`
+	Trace []TraceHop `json:"trace"`
+	Error string     `json:"error"`
+}
+
+func (c *PeerClient) CreateTuple(ctx context.Context, cellURL, projectID string, body map[string]any) (CreateTupleResponse, error) {
+	var out CreateTupleResponse
+	err := c.doJSONAllowError(ctx, http.MethodPost, NormalizeURL(cellURL)+"/v1/projects/"+projectID+"/tuples", body, &out)
+	if err != nil {
+		return out, err
+	}
+	if out.Error != "" {
+		return out, fmt.Errorf("%s", out.Error)
+	}
+	return out, nil
+}
+
+// doJSONAllowError unmarshals the body even when status >= 300 so callers can keep traces.
+func (c *PeerClient) doJSONAllowError(ctx context.Context, method, url string, body any, out any) error {
+	var rdr io.Reader
+	if body != nil {
+		b, err := json.Marshal(body)
+		if err != nil {
+			return err
+		}
+		rdr = bytes.NewReader(b)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, url, rdr)
+	if err != nil {
+		return err
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	res, err := c.HTTP.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	data, err := io.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
+	if out != nil && len(data) > 0 {
+		_ = json.Unmarshal(data, out)
+	}
+	if res.StatusCode >= 300 {
+		var er struct {
+			Error string `json:"error"`
+		}
+		_ = json.Unmarshal(data, &er)
+		if er.Error != "" {
+			return fmt.Errorf("%s", er.Error)
+		}
+		return fmt.Errorf("http %d: %s", res.StatusCode, string(data))
+	}
+	return nil
+}
+
+func (c *PeerClient) CreateApp(ctx context.Context, cellURL, projectID string, body map[string]any) (AppView, error) {
+	var out AppView
+	err := c.doJSON(ctx, http.MethodPost, NormalizeURL(cellURL)+"/v1/projects/"+projectID+"/apps", body, "", &out)
+	return out, err
+}
+
+func (c *PeerClient) ListApps(ctx context.Context, cellURL, projectID string) ([]AppView, error) {
+	var out struct {
+		Apps []AppView `json:"apps"`
+	}
+	err := c.doJSON(ctx, http.MethodGet, NormalizeURL(cellURL)+"/v1/projects/"+projectID+"/apps", nil, "", &out)
+	return out.Apps, err
+}
+
+func (c *PeerClient) ListTuples(ctx context.Context, cellURL, projectID string) ([]TupleView, error) {
+	var out struct {
+		Tuples []TupleView `json:"tuples"`
+	}
+	err := c.doJSON(ctx, http.MethodGet, NormalizeURL(cellURL)+"/v1/projects/"+projectID+"/tuples", nil, "", &out)
+	return out.Tuples, err
+}
+
+func (c *PeerClient) ListInterests(ctx context.Context, cellURL string, homeProjectID string) ([]InterestView, error) {
+	u := NormalizeURL(cellURL) + "/v1/interests"
+	if homeProjectID != "" {
+		u += "?home_project_id=" + homeProjectID
+	}
+	var out struct {
+		Interests []InterestView `json:"interests"`
+	}
+	err := c.doJSON(ctx, http.MethodGet, u, nil, "", &out)
+	return out.Interests, err
+}
+
 func (c *PeerClient) DoRaw(ctx context.Context, method, url string, body any, bearer string, out any) error {
 	return c.doJSON(ctx, method, url, body, bearer, out)
 }
