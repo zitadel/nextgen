@@ -113,7 +113,7 @@ Confirm the current surface before wiring — do not rely on memory:
 
 ## Gotchas
 
-- **Server rendering.** If your app renders on the server, mount the widget on the client only, after hydration (the `ZitadelLogin` wrapper sets `projectId` and `proxyPath` as element properties, so adding them to the wrapper does not put them in server markup), or use a raw `<zitadel-login>` element with `project-id` and `proxy-path` as attributes, because a widget that starts before its configuration arrives shows an error instead of the flow.
+- **Server rendering.** If your app renders on the server, pass `projectId` and `proxyPath` to the `ZitadelLogin` wrapper as strings (it writes them as the `project-id` and `proxy-path` attributes; use those hyphenated names only on a raw `<zitadel-login>` element), because a widget that starts before its configuration arrives shows an error instead of the flow. `ZitadelLogout` and `ZitadelSession` do the same, and the other string and boolean options (`purpose`, `flowName`, `postSignInUrl`, `resumeFlowId`, `postSignOutUrl`, `variant`, `theme`, `heading`, `logoutLabel`, `lang`, `suppressHeader`, `suppressPasswordToggle`) are written as attributes too. A `project` handle contributes its `projectId`, `proxyPath`, `url` and `publishableKey` as attributes and is marked explicit; the rest of the handle, and `locales`, are set as element properties after hydration, so a widget that needs `locales` still gets them only on the client.
 - **Qwik 2 only.** The peer dep is `@qwik.dev/core ^2.0.0-beta.45` and imports
   come from `@qwik.dev/core` (not `@builder.io/qwik`). A Qwik 1 app will not
   satisfy the peer range.
@@ -125,7 +125,9 @@ Confirm the current surface before wiring — do not rely on memory:
 - **Local dev without the proxy.** You can point `proxyPath` straight at the
   backend cross-origin, e.g. `proxyPath: 'http://localhost:8080'` (the
   `zitadel start` local runtime default port).
-- **Properties, not attributes.** Config is applied imperatively as DOM
-  properties because Qwik 2 binds custom-element JSX props as lower-cased
-  attributes only — which is why the SDK wrapper exists rather than using the
-  web components directly.
+- **Properties and attributes.** Qwik 2 binds custom-element JSX props as
+  lower-cased attributes only, so the wrapper writes string and boolean config
+  as kebab-case attributes (present in server markup) and applies all config,
+  including property-only values such as `locales`, as DOM properties on the
+  client — which is why the SDK wrapper exists rather than using the web
+  components directly.
