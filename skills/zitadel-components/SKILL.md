@@ -120,6 +120,7 @@ these before writing it — don't reproduce a catalogue from memory.
 
 ## Gotchas
 
+- **Server rendering.** If your app renders on the server, mount the widget on the client only, after hydration, or give a raw `<zitadel-login>` element `project-id` and `proxy-path` as attributes, because a widget that starts before its configuration arrives shows an error instead of the flow.
 - **Open shadow roots, nested.** The automation hooks sit inside nested shadow
   roots, so a flat `document.querySelector('[data-testid="zitadel-input-email"]')`
   misses them. Use a shadow-aware locator (Playwright) or recurse through

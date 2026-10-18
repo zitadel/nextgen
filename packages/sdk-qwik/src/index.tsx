@@ -30,30 +30,11 @@ export * from "./types";
 // direct @zitadel/components dependency (strict package managers reject those).
 export { businessLocales } from "@zitadel/components";
 
-// Props `setProp` has assigned on each element, so a prop that is cleared later
-// is known to need its default put back.
-const assigned = new WeakMap<Element, Set<PropertyKey>>();
-
-// Unconfigured elements, one per tag: the source of truth for an element's own
-// property defaults (the element a prop was first read from may already carry
-// server-rendered attributes).
-const pristine = new Map<string, Element>();
-
-function pristineDefault<E extends Element, K extends keyof E>(el: E, key: K): E[K] {
-  let fresh = pristine.get(el.localName);
-  if (!fresh) {
-    fresh = document.createElement(el.localName);
-    pristine.set(el.localName, fresh);
-  }
-  return (fresh as E)[key];
-}
-
 /**
- * Assigns a widget config value as a DOM *property*, leaving `undefined` to the
- * element's own accessor default (e.g. the session card's "Signed in as"
- * heading). A prop that goes from a value back to unset gets the default of a
- * pristine element of the same tag put back, so no stale override stays on the
- * element and the result does not depend on what the element held before.
+ * Assigns a widget config value as a DOM *property*. An `undefined` value is
+ * assigned too, not skipped: the widget elements restore their own default when
+ * a prop is unset, so a cleared prop (e.g. the session card's `heading`) goes
+ * back to "Signed in as" instead of keeping its last value.
  *
  * Qwik 2 binds custom-element JSX props as *attributes* only — its client
  * renderer has no property-setting path for elements — and the widgets expose
@@ -68,20 +49,7 @@ function setProp<E extends Element, K extends keyof E>(
   key: K,
   value: E[K] | undefined,
 ): void {
-  let keys = assigned.get(el);
-  if (value !== undefined) {
-    if (!keys) {
-      keys = new Set();
-      assigned.set(el, keys);
-    }
-    keys.add(key);
-    el[key] = value;
-  } else if (keys?.has(key)) {
-    // Kept in the set: clearing a prop makes Qwik drop its attribute *after*
-    // this runs, and Lit then resets the property to `null`, so every later
-    // bind with the prop still unset has to put the default back again.
-    el[key] = pristineDefault(el, key);
-  }
+  el[key] = value as E[K];
 }
 
 /**
@@ -97,15 +65,6 @@ function setProp<E extends Element, K extends keyof E>(
  * full `project` handle, `locales`) is applied on top.
  */
 type Attrs = Record<string, string | undefined>;
-
-/**
- * The session card's own defaults. They are emitted explicitly when the
- * override is unset: omitting the attribute makes Lit reset the String property
- * to `null` (blank text), and `setProp` skips `undefined`, so a string-to-unset
- * change would otherwise leave the heading or sign-out label empty.
- */
-const DEFAULT_HEADING = "Signed in as";
-const DEFAULT_LOGOUT_LABEL = "Sign out";
 
 function projectAttrs(props: {
   readonly project?: ZitadelProject;
@@ -168,8 +127,8 @@ function sessionAttrs(props: ZitadelSessionProps): Attrs {
   return {
     ...projectAttrs(props),
     "post-sign-out-url": props.postSignOutUrl,
-    heading: props.heading ?? DEFAULT_HEADING,
-    "logout-label": props.logoutLabel ?? DEFAULT_LOGOUT_LABEL,
+    heading: props.heading,
+    "logout-label": props.logoutLabel,
     variant: props.variant,
     theme: props.theme,
     "suppress-header": flag(props.suppressHeader),
@@ -212,8 +171,8 @@ function bindSessionConfig(el: ZitadelSessionElement, props: ZitadelSessionProps
   setProp(el, "projectId", props.projectId);
   setProp(el, "proxyPath", proxyPathAttr(props.proxyPath));
   setProp(el, "postSignOutUrl", props.postSignOutUrl);
-  setProp(el, "heading", props.heading ?? DEFAULT_HEADING);
-  setProp(el, "logoutLabel", props.logoutLabel ?? DEFAULT_LOGOUT_LABEL);
+  setProp(el, "heading", props.heading);
+  setProp(el, "logoutLabel", props.logoutLabel);
   setProp(el, "variant", props.variant);
   setProp(el, "theme", props.theme);
   setProp(el, "suppressHeader", props.suppressHeader);

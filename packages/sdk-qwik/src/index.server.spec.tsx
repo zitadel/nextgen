@@ -146,10 +146,11 @@ describe("server-rendered widget config", () => {
     });
   });
 
-  it("emits the session card defaults when heading and logoutLabel are unset", async () => {
+  it("leaves heading and logoutLabel to the widget's own defaults when unset", async () => {
     const attrs = await serverAttributes("zitadel-session", <ZitadelSession project={project} />);
 
-    expect(attrs).toMatchObject({ heading: "Signed in as", "logout-label": "Sign out" });
+    expect(attrs).not.toHaveProperty("heading");
+    expect(attrs).not.toHaveProperty("logout-label");
   });
 
   it("emits the discrete project id and proxy path", async () => {

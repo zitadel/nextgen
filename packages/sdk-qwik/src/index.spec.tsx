@@ -15,8 +15,15 @@ import {
 } from "@zitadel/sdk-core/types";
 import { describe, expect, it, vi } from "vitest";
 
+import {
+  LoginConfigHarness,
+  loginConfig,
+  LogoutConfigHarness,
+  logoutConfig,
+  SessionConfigHarness,
+  sessionConfig,
+} from "./__tests__/config-parity-harness";
 import { PasswordToggleHarness, ResumeFlowIdHarness } from "./__tests__/login-prop-harness";
-import { SessionHeadingHarness } from "./__tests__/session-heading-harness";
 import { UnsetPropHarness } from "./__tests__/unset-prop-harness";
 import { businessLocales, ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
 
@@ -403,20 +410,6 @@ describe("ZitadelLogin suppressPasswordToggle", () => {
   });
 });
 
-describe("ZitadelSession heading and logoutLabel", () => {
-  it("returns to the widget defaults when the props go from a string back to unset", async () => {
-    const host = await renderWidget(<SessionHeadingHarness />);
-    const el = () => host.querySelector<ZitadelSessionElement>("zitadel-session")!;
-    await expect.poll(() => el().heading).toBe("Hi");
-    expect(el().logoutLabel).toBe("Hi");
-
-    await expect.poll(() => window.__unsetSessionLabels).toBeTypeOf("function");
-    window.__unsetSessionLabels!();
-    await expect.poll(() => el().heading).toBe("Signed in as");
-    expect(el().logoutLabel).toBe("Sign out");
-  });
-});
-
 describe("resumed server markup", () => {
   it("starts a register flow from the attributes alone, before any binder runs", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
@@ -436,6 +429,91 @@ describe("resumed server markup", () => {
       purpose: "register",
       project_id: "proj-test",
     });
+  });
+});
+
+// Assigning `undefined` to a custom-element property overwrites its default,
+// so an unset prop must leave the element's own default in place.
+describe("unset props keep the element's defaults", () => {
+  it.each([
+    ["heading", "Signed in as"],
+    ["logoutLabel", "Sign out"],
+    ["variant", "widget"],
+    ["theme", ""],
+    ["suppressHeader", false],
+  ] as const)("ZitadelSession keeps the default %s", async (prop, expected) => {
+    const host = await renderWidget(<ZitadelSession project={project} />);
+    await macrotask();
+
+    expect(host.querySelector<ZitadelSessionElement>("zitadel-session")![prop]).toBe(expected);
+  });
+
+  it.each([
+    ["variant", "widget"],
+    ["theme", ""],
+    ["suppressHeader", false],
+    ["lang", ""],
+    ["suppressPasswordToggle", false],
+  ] as const)("ZitadelLogin keeps the default %s", async (prop, expected) => {
+    const host = await renderWidget(<ZitadelLogin project={project} />);
+    await macrotask();
+
+    expect(host.querySelector<ZitadelLoginElement>("zitadel-login")![prop]).toBe(expected);
+  });
+
+  it("ZitadelLogout keeps the default theme", async () => {
+    const host = await renderWidget(<ZitadelLogout project={project} />);
+    await macrotask();
+
+    expect(host.querySelector<ZitadelLogoutElement>("zitadel-logout")!.theme).toBe("");
+  });
+});
+
+describe("props that become unset restore the element's defaults", () => {
+  it.each([
+    ["heading", "Custom", "Signed in as"],
+    ["logoutLabel", "Leave", "Sign out"],
+    ["variant", "page", "widget"],
+    ["theme", "light", ""],
+    ["suppressHeader", true, false],
+  ] as const)("ZitadelSession restores the default %s", async (prop, given, expected) => {
+    const host = await renderWidget(
+      <UnsetPropHarness widget="session" prop={prop} given={given} />,
+    );
+    const el = () => host.querySelector<ZitadelSessionElement>("zitadel-session")!;
+    await expect.poll(() => el()[prop]).toBe(given);
+
+    await expect.poll(() => window.__unsetProp).toBeTypeOf("function");
+    window.__unsetProp!();
+    await expect.poll(() => el()[prop]).toBe(expected);
+  });
+
+  it.each([
+    ["variant", "page", "widget"],
+    ["theme", "light", ""],
+    ["suppressHeader", true, false],
+    ["lang", "de", ""],
+    ["suppressPasswordToggle", true, false],
+  ] as const)("ZitadelLogin restores the default %s", async (prop, given, expected) => {
+    const host = await renderWidget(<UnsetPropHarness widget="login" prop={prop} given={given} />);
+    const el = () => host.querySelector<ZitadelLoginElement>("zitadel-login")!;
+    await expect.poll(() => el()[prop]).toBe(given);
+
+    await expect.poll(() => window.__unsetProp).toBeTypeOf("function");
+    window.__unsetProp!();
+    await expect.poll(() => el()[prop]).toBe(expected);
+  });
+
+  it("ZitadelLogout restores the default theme", async () => {
+    const host = await renderWidget(
+      <UnsetPropHarness widget="logout" prop="theme" given="light" />,
+    );
+    const el = () => host.querySelector<ZitadelLogoutElement>("zitadel-logout")!;
+    await expect.poll(() => el().theme).toBe("light");
+
+    await expect.poll(() => window.__unsetProp).toBeTypeOf("function");
+    window.__unsetProp!();
+    await expect.poll(() => el().theme).toBe("");
   });
 });
 
@@ -613,5 +691,29 @@ describe("an explicit project beats the global handle", () => {
     } finally {
       _resetConfigForTesting();
     }
+  });
+});
+
+// The element's value for each key, so a key the wrapper drops shows up by name.
+const elementValues = (el: object, config: object): Record<string, unknown> =>
+  Object.fromEntries(Object.keys(config).map((key) => [key, (el as Record<string, unknown>)[key]]));
+
+describe("wrapper config parity", () => {
+  it("forwards every ZitadelLoginConfig key to <zitadel-login>", async () => {
+    const host = await renderWidget(<LoginConfigHarness />);
+    const el = host.querySelector<ZitadelLoginElement>("zitadel-login");
+    expect(elementValues(el!, loginConfig)).toEqual(loginConfig);
+  });
+
+  it("forwards every ZitadelSessionConfig key to <zitadel-session>", async () => {
+    const host = await renderWidget(<SessionConfigHarness />);
+    const el = host.querySelector<ZitadelSessionElement>("zitadel-session");
+    expect(elementValues(el!, sessionConfig)).toEqual(sessionConfig);
+  });
+
+  it("forwards every ZitadelLogoutConfig key to <zitadel-logout>", async () => {
+    const host = await renderWidget(<LogoutConfigHarness />);
+    const el = host.querySelector<ZitadelLogoutElement>("zitadel-logout");
+    expect(elementValues(el!, logoutConfig)).toEqual(logoutConfig);
   });
 });

@@ -35,11 +35,16 @@ npx @zitadel/cli@alpha <command> --non-interactive --json
 Always pass `@alpha`: bare `npx @zitadel/cli` resolves npm's `latest` tag,
 which still points at an early `0.0.0` build. Use an exact `1.0.0-alpha.N`
 selector in agent scripts and bug reports for reproducibility.
-The CLI requires Node.js 24+.
+The CLI requires Node.js 24+. When `setup` creates a new app it first checks the running Node.js against the `engines.node` of the framework CLI it is about to run (`@angular/cli`, `nuxi`, `create-vite`, `create-next-app`). Only the Angular CLI refuses a Node it does not accept, and that range can be newer than 24.0: if `setup` refuses with `E_VALIDATION` naming the Node versions Angular accepts, switch to one of them and run it again. The Angular CLI checks each major on its own, so only 22.22.3+ on 22, 24.15.0+ on 24 and 26.x are accepted (23 and 25 run with a warning), and Node 27 or later is refused even though the published range reads `>=26.0.0`. For the other frameworks the CLI carries on, so `setup` adds a warning to the envelope's `warnings` and continues.
 
-A Vite + Svelte app must be on Svelte 5 or newer. `setup` and `doctor` refuse a
-Svelte 4 app with `E_UNSUPPORTED_PROJECT_SHAPE` (exit 3) before changing
-anything; upgrade the app to Svelte 5 and rerun rather than retrying.
+The app's framework must be at or above a minimum version: Next.js 15.2.3,
+React 18, Vue 3.2, Nuxt 4, Angular 17, Solid 1.6, Svelte 5, Qwik 2.0.0-beta.45. Newer major
+versions are not refused. `setup` and `doctor` refuse an app below its minimum,
+by declared range or installed release, with `E_UNSUPPORTED_PROJECT_SHAPE`
+(exit 3); `setup` refuses before it scaffolds or patches anything, while
+`doctor --fix` can still repair unrelated files, so do not assume a floor error
+left the project untouched. The message names the minimum and the hint says to
+upgrade, so upgrade the app and rerun rather than retrying.
 
 ## Using the CLI
 
@@ -311,8 +316,9 @@ request boundary at another path.
 The app may also live in a subdirectory of the one `start` ran in: `setup`,
 `console`, `--server local` and `doctor` read `.zitadel/local/` from the working
 directory or the nearest parent that has it (up to the home directory), so
-`mkdir my-app && cd my-app` after `start` works too; `doctor` checks that
-server and its port, and when that server is unhealthy it suggests `start` and
+`mkdir my-app && cd my-app` after `start` works too. `doctor` checks that
+server and its port, but runs its project checks in the working directory, so run
+it from the app. When that server is unhealthy it suggests `start` and
 `reset --force` with `--cwd` set to the directory that holds it (when that path needs
 shell quoting the commands are left out, the hint names the directory, and
 `doctor --json` returns the argument lists in `details.suggested_args` to run as they are). `stop`,

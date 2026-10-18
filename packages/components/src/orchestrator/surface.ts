@@ -1,5 +1,5 @@
 import { LitElement } from "lit";
-import { property } from "lit/decorators.js";
+import { property } from "../internal/property.js";
 import type { ZitadelProject } from "@zitadel/api/config";
 
 import type { Branding } from "./branding.js";
