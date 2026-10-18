@@ -161,7 +161,16 @@ export type ZitadelLoginReactProps = ZitadelLoginProps & {
 
 export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginReactProps>(
   function ZitadelLogin(
-    { purpose, onFlowStep, onFlowInput, onFlowComplete, onFlowRedirect, onFlowError, ...props },
+    {
+      purpose,
+      resumeFlowId,
+      onFlowStep,
+      onFlowInput,
+      onFlowComplete,
+      onFlowRedirect,
+      onFlowError,
+      ...props
+    },
     ref,
   ) {
     return (
@@ -171,6 +180,7 @@ export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginRe
         purpose={purpose ?? "login"}
         flow-name={props.flowName}
         {...projectAttributes(props)}
+        resumeFlowId={resumeFlowId ?? ""}
         onZitadelFlowStep={onFlowStep && ((event) => onFlowStep(event.detail))}
         onZitadelFlowInput={onFlowInput && ((event) => onFlowInput(event.detail))}
         onZitadelFlowComplete={onFlowComplete && ((event) => onFlowComplete(event.detail))}

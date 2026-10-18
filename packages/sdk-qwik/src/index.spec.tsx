@@ -4,6 +4,7 @@ import type {
   ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
 
+import manifestJson from "../package.json";
 import { $, render, type Signal } from "@qwik.dev/core";
 import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import {
@@ -13,7 +14,15 @@ import {
 } from "@zitadel/sdk-core/types";
 import { describe, expect, it } from "vitest";
 
-import { PasswordToggleHarness } from "./__tests__/password-toggle-harness";
+import {
+  LoginConfigHarness,
+  loginConfig,
+  LogoutConfigHarness,
+  logoutConfig,
+  SessionConfigHarness,
+  sessionConfig,
+} from "./__tests__/config-parity-harness";
+import { PasswordToggleHarness, ResumeFlowIdHarness } from "./__tests__/login-prop-harness";
 import { businessLocales, ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
@@ -78,6 +87,18 @@ describe("ZitadelLogin", () => {
     const el = host.querySelector<ZitadelLoginElement>("zitadel-login");
     expect(el!.projectId).toBe("proj-test");
     expect(el!.proxyPath).toBe("/__nextgen");
+  });
+
+  it("forwards resumeFlowId to the widget", async () => {
+    const host = await renderWidget(<ZitadelLogin project={project} resumeFlowId="flow_123" />);
+    const el = host.querySelector<ZitadelLoginElement>("zitadel-login");
+    expect(el!.resumeFlowId).toBe("flow_123");
+  });
+
+  it("reads a null resumeFlowId as no handle", async () => {
+    const host = await renderWidget(<ZitadelLogin project={project} resumeFlowId={null} />);
+    const el = host.querySelector<ZitadelLoginElement>("zitadel-login");
+    expect(el!.resumeFlowId).toBe("");
   });
 
   it("forwards locales and lang to the widget", async () => {
@@ -244,5 +265,76 @@ describe("ZitadelLogin suppressPasswordToggle", () => {
     await expect.poll(() => window.__unsetSuppressPasswordToggle).toBeTypeOf("function");
     window.__unsetSuppressPasswordToggle!();
     await expect.poll(() => el().suppressPasswordToggle).toBe(false);
+  });
+});
+
+// The package ships only what its build emits, so an `exports` target the build
+// misses breaks every consumer that imports it. `test` runs after `build`. This
+// lane runs in a browser, so the built files are listed at transform time with
+// a glob over `dist` rather than read from disk.
+describe("package manifest", () => {
+  const manifest = manifestJson as {
+    main?: string;
+    module?: string;
+    types?: string;
+    exports: unknown;
+    peerDependencies: Record<string, string>;
+  };
+  const built = Object.keys(import.meta.glob("../dist/**/*", { query: "?url" }));
+
+  function targets(value: unknown): string[] {
+    if (typeof value === "string") return value.startsWith("./") ? [value] : [];
+    if (value && typeof value === "object") return Object.values(value).flatMap(targets);
+    return [];
+  }
+
+  it("ships every exports target in dist", () => {
+    const declared = targets([manifest.exports, manifest.main, manifest.module, manifest.types]);
+    expect(declared.length).toBeGreaterThan(0);
+    expect(declared.filter((file) => !built.includes(file.replace("./dist", "../dist")))).toEqual(
+      [],
+    );
+  });
+
+  it("declares its supported peer ranges", () => {
+    expect(manifest.peerDependencies).toEqual({
+      "@qwik.dev/core": "^2.0.0-beta.45",
+    });
+  });
+});
+
+describe("ZitadelLogin resumeFlowId", () => {
+  it("drops the handle when the prop goes from a value back to unset", async () => {
+    const host = await renderWidget(<ResumeFlowIdHarness />);
+    const el = () => host.querySelector<ZitadelLoginElement>("zitadel-login")!;
+    await expect.poll(() => el().resumeFlowId).toBe("flow_123");
+
+    await expect.poll(() => window.__unsetResumeFlowId).toBeTypeOf("function");
+    window.__unsetResumeFlowId!();
+    await expect.poll(() => el().resumeFlowId).toBe("");
+  });
+});
+
+// The element's value for each key, so a key the wrapper drops shows up by name.
+const elementValues = (el: object, config: object): Record<string, unknown> =>
+  Object.fromEntries(Object.keys(config).map((key) => [key, (el as Record<string, unknown>)[key]]));
+
+describe("wrapper config parity", () => {
+  it("forwards every ZitadelLoginConfig key to <zitadel-login>", async () => {
+    const host = await renderWidget(<LoginConfigHarness />);
+    const el = host.querySelector<ZitadelLoginElement>("zitadel-login");
+    expect(elementValues(el!, loginConfig)).toEqual(loginConfig);
+  });
+
+  it("forwards every ZitadelSessionConfig key to <zitadel-session>", async () => {
+    const host = await renderWidget(<SessionConfigHarness />);
+    const el = host.querySelector<ZitadelSessionElement>("zitadel-session");
+    expect(elementValues(el!, sessionConfig)).toEqual(sessionConfig);
+  });
+
+  it("forwards every ZitadelLogoutConfig key to <zitadel-logout>", async () => {
+    const host = await renderWidget(<LogoutConfigHarness />);
+    const el = host.querySelector<ZitadelLogoutElement>("zitadel-logout");
+    expect(elementValues(el!, logoutConfig)).toEqual(logoutConfig);
   });
 });
