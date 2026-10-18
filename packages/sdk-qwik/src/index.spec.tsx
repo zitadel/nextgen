@@ -415,7 +415,7 @@ describe("resumed server markup", () => {
     const host = document.createElement("div");
     document.body.appendChild(host);
     // What Qwik Router sends and then resumes: attributes only, no `ref` binder
-    // and no property handle (see index.server.spec.tsx for the server HTML).
+    // and no property handle.
     host.innerHTML =
       '<zitadel-login project-id="proj-test" proxy-path="/__resumed" purpose="register"></zitadel-login>';
 
@@ -428,6 +428,35 @@ describe("resumed server markup", () => {
       purpose: "register",
       project_id: "proj-test",
     });
+  });
+});
+
+describe("a resumed flow that is already terminal", () => {
+  it("still reaches onFlowComplete$, which attaches after the widget has fetched", async () => {
+    const original = globalThis.fetch;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      if (!String(input).includes("/__nextgen/flow/flow_done")) {
+        return original(input, init);
+      }
+      return Response.json({
+        flow_id: "flow_done",
+        step: { name: "done", complete: "show" },
+        handoff_token: "ht_resumed",
+      });
+    });
+    const received: Record<string, unknown>[] = [];
+
+    await renderWidget(
+      <ZitadelLogin
+        project={project}
+        resumeFlowId="flow_done"
+        onFlowComplete$={$((detail) => {
+          received.push({ ...detail });
+        })}
+      />,
+    );
+
+    await expect.poll(() => received.map((detail) => detail.handoff_token)).toEqual(["ht_resumed"]);
   });
 });
 
