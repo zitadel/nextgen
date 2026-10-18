@@ -35,7 +35,7 @@ for the form-association / accessibility decisions baked into every input atom.
 ## Install
 
 ```sh
-corepack pnpm add @zitadel/components
+corepack pnpm add @zitadel/components@alpha
 ```
 
 `lit`, `liquidjs`, `dompurify`, and `lucide` are runtime dependencies and are intentionally
@@ -257,6 +257,14 @@ A tenant Liquid template can already be supplied through the branding
 payload's `liquid_template` field; a dedicated declarative `template`
 surface on `<zitadel-login>` is not yet exposed. The orchestrator otherwise
 renders the bundled `default.liquid`. Tracked as a follow-up.
+
+## Server rendering and late configuration
+
+A server-rendered page ships the widget as a bare custom element, and the browser upgrades it as soon as the components bundle has run, usually before the framework has hydrated and handed the element its configuration. Attributes the server writes into the markup (`project-id`, `proxy-path`, `purpose`, `flow-name`) are there at upgrade, but properties (the `project` handle from `configureZitadel()`, `locales`) only arrive on hydration, and some wrappers set even the attribute-shaped values as properties once the element is running. `<zitadel-login>` reads its configuration once, when it starts, and does not restart when the configuration changes later: an element that starts with no resolvable project sends no request and shows "requires a configured project", and a `purpose` or `flow-name` that arrives after the start does not change the flow already running. `<zitadel-session>` and `<zitadel-logout>` wait for a project and fetch the identity once, with whatever resolved first.
+
+So the configuration has to be there when the element starts. Give a raw element `project-id` and `proxy-path` as attributes in the server markup, configure globally with `configureZitadel()` before the bundle loads, or mount the widget on the client only, after hydration. Which of these a framework wrapper supports differs, so follow the page for your SDK.
+
+Do not build on server-rendered markup that carries an object-valued prop. React 19 does not apply a custom element's object property while hydrating it, so a `project` handle passed to a raw `<zitadel-login>` that was server-rendered is never delivered. Pass `project-id` and `proxy-path` as strings, configure globally before the bundle loads, or mount on the client only.
 
 ## Element APIs
 
