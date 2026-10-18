@@ -109,6 +109,7 @@ export function ZitadelLogin(
       purpose={props.purpose ?? "login"}
       flow-name={props.flowName}
       post-sign-in-url={props.postSignInUrl}
+      resume-flow-id={props.resumeFlowId}
       on:zitadel-flow-step={(event) => props.onFlowStep?.(event.detail)}
       on:zitadel-flow-input={(event) => props.onFlowInput?.(event.detail)}
       on:zitadel-flow-complete={(event) => props.onFlowComplete?.(event.detail)}
