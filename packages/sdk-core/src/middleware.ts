@@ -14,6 +14,13 @@
  */
 export const HOP_BY_HOP: ReadonlySet<string> = new Set([
   "connection",
+  // content-length is not hop-by-hop per RFC 7230, but it must be stripped: the
+  // proxy re-sends a freshly buffered body, so the fetch implementation computes
+  // the correct content-length itself. Forwarding the client's value is at best
+  // redundant and at worst fatal — undici rejects a manually-set content-length
+  // alongside a body with `UND_ERR_INVALID_ARG: invalid content-length header`,
+  // which surfaced as an opaque "fetch failed" in the Qwik City proxy.
+  "content-length",
   // host is not a hop-by-hop header per RFC 7230, but it must be stripped so
   // the fetch implementation derives the correct Host from the upstream URL
   // rather than forwarding the client's Host and causing SNI/vhost mismatches.
@@ -40,22 +47,51 @@ export const INTERNAL_HEADERS: ReadonlySet<string> = new Set(["x-nextgen-auth-to
  * Returns `true` when `pathname` matches at least one entry in `routes`.
  *
  * An entry ending with `*` matches any path that starts with the prefix
- * before the `*`. All other entries require an exact match.
+ * before the `*`. All other entries match exactly, ignoring a trailing slash
+ * on either side: `/profile` and `/profile/` name the same route, and several
+ * frameworks (Qwik Router by default) serve the slashed form as canonical. An
+ * exact compare would let `/profile/` past a `protectedRoutes: ["/profile"]`.
  *
  * @param pathname - The URL pathname to test.
  * @param routes   - The list of route patterns to match against.
  * @returns `true` if at least one pattern matches.
  */
 export function matchesRoutes(pathname: string, routes: readonly string[]): boolean {
-  if (routes.length === 0) {
-    return false;
-  }
-  return routes.some((pattern) => {
-    if (pattern.endsWith("*")) {
-      return pathname.startsWith(pattern.slice(0, -1));
+  // A linear scan, not /\/+$/: that regex backtracks quadratically on a long
+  // run of slashes, and the pathname is attacker-controlled on every request.
+  const withoutTrailingSlash = (path: string): string => {
+    let end = path.length;
+    while (end > 1 && path.charCodeAt(end - 1) === 0x2f) {
+      end--;
     }
-    return pathname === pattern;
+    return path.slice(0, end);
+  };
+  const path = withoutTrailingSlash(pathname);
+
+  return routes.some((route) => {
+    if (route.endsWith("*")) {
+      return pathname.startsWith(route.slice(0, -1));
+    }
+    return path === withoutTrailingSlash(route);
   });
+}
+
+// ─── Proxy credentials ───────────────────────────────────────────────────────
+
+/**
+ * Whether a proxied call may carry the confidential project secret.
+ *
+ * ADR 036: the browser flow needs the secret only for the handoff exchange
+ * (`POST /sessions/exchange`). Stamping it onto every proxied operation would
+ * turn the app's public `/__nextgen/*` boundary into an open relay carrying
+ * project-level authority for any anonymous caller.
+ *
+ * @param method   - The proxied request's HTTP method.
+ * @param pathname - The path after the proxy prefix, e.g. `/sessions/exchange`.
+ * @returns `true` only for the handoff exchange.
+ */
+export function requiresProjectSecret(method: string, pathname: string): boolean {
+  return method.toUpperCase() === "POST" && pathname === "/sessions/exchange";
 }
 
 // ─── Response header filtering ───────────────────────────────────────────────

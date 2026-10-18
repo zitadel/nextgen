@@ -7,6 +7,7 @@ import {
   INTERNAL_HEADERS,
   filterResponseHeaders,
   matchesRoutes,
+  requiresProjectSecret,
 } from "@zitadel/sdk-core/middleware";
 import { NextResponse } from "next/server";
 
@@ -245,10 +246,6 @@ async function proxyRequest(
     status: upstream.status,
     headers: responseHeaders,
   });
-}
-
-function requiresProjectSecret(method: string, pathname: string): boolean {
-  return method.toUpperCase() === "POST" && pathname === "/sessions/exchange";
 }
 
 /**

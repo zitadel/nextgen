@@ -69,7 +69,7 @@
     "server-only": "^0.0.1"
   },
   "peerDependencies": {
-    "next": ">=15",
+    "next": ">=15.2.3",
     "react": ">=18",
     "react-dom": ">=18"
   },
@@ -80,7 +80,7 @@
     "@types/react": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "jsdom": "catalog:",
-    "next": "^16.2.11",
+    "next": "^16.3.8",
     "react": "catalog:",
     "react-dom": "catalog:",
     "typescript": "catalog:",

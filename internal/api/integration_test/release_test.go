@@ -3,6 +3,7 @@
 package integration_test
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/url"
@@ -181,6 +182,20 @@ func TestCreateRelease(t *testing.T) {
 		assert.NotEmpty(t, message)
 	})
 
+	t.Run("referencing a flow without its user schema is rejected", func(t *testing.T) {
+		resp := fixture.create(t, &api.CreateReleaseRequest{
+			Pointers: []api.CreateReleasePointer{
+				{Kind: api.ReleasePointerKindFlowDefinition, RevisionID: fixture.flowdefID},
+				{Kind: api.ReleasePointerKindBranding, RevisionID: fixture.brandingID},
+			},
+		})
+		status, code, message, ok := errorResponseParts(t, resp)
+		require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, resp))
+		assert.Equal(t, http.StatusBadRequest, status)
+		assert.Equal(t, domain.ErrReleaseUnresolvedReference().Code, code)
+		assert.Contains(t, message, "user_schema human-user not found")
+	})
+
 	// A release describes one state of the project, so it cannot hold two
 	// revisions of the same resource. Both pointers below name the branding of
 	// this project, which has a single handle.
@@ -286,24 +301,50 @@ func TestCreateReleaseUnauthenticated(t *testing.T) {
 	assert.Equal(t, domain.ErrAuthUnauthorized(nil).Code, code)
 }
 
-// TestRevokeReleaseNotImplemented pins revoke to 501 for an authorized caller:
-// the access check passes first, then the stub answers not-implemented until
-// the release service can revoke.
-func TestRevokeReleaseNotImplemented(t *testing.T) {
+// v2 drops firstName, which the flow collects.
+func TestCreateReleaseChecksFlowAgainstItsSchemaRevision(t *testing.T) {
 	t.Parallel()
 
-	fixture := newReleaseFixture(t)
-	created := fixture.create(t, &api.CreateReleaseRequest{Pointers: fixture.pointers()})
-	require.IsType(t, &api.CreateReleaseCreated{}, created, helpers.MustMarshal(t, created))
-	releaseID := created.(*api.CreateReleaseCreated).ID
-
-	resp, err := fixture.client.RevokeRelease(t.Context(), api.RevokeReleaseParams{
-		ProjectID: api.ProjectID(fixture.project),
-		ReleaseID: releaseID,
-	})
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	status, code, _, ok := errorResponseParts(t, resp)
-	require.True(t, ok, helpers.MustMarshal(t, resp))
-	assert.Equal(t, http.StatusNotImplemented, status)
-	assert.Equal(t, domain.ErrNotImplemented().Code, code)
+	base := harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema
+	v1 := harness.CreateUserSchema(t, project, base)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	definition := newFlowDefinitionFixture("release-fit-flow", "example-user")
+	definition.Steps[0].Fields = []string{"email", "firstName"}
+	created, err := client.CreateFlowDefinition(t.Context(),
+		newCreateFlowDefinitionRequest(api.ProjectID(project.ID), definition))
+	require.NoError(t, err)
+	require.IsType(t, &api.FlowDefinitionResponse{}, created, helpers.MustMarshal(t, created))
+	flowID := created.(*api.FlowDefinitionResponse).ID
+
+	var doc map[string]any
+	require.NoError(t, json.Unmarshal([]byte(base), &doc))
+	doc["$id"] = "https://example.com/schemas/example-user-v2.json"
+	delete(doc["properties"].(map[string]any), "firstName")
+	v2doc, err := json.Marshal(doc)
+	require.NoError(t, err)
+	v2 := harness.CreateUserSchema(t, project, string(v2doc))
+
+	fixture := releaseFixture{project: project.ID, client: client}
+	release := func(schemaID string) api.CreateReleaseRes {
+		return fixture.create(t, &api.CreateReleaseRequest{Pointers: []api.CreateReleasePointer{
+			{Kind: api.ReleasePointerKindFlowDefinition, RevisionID: flowID},
+			{Kind: api.ReleasePointerKindSchema, RevisionID: schemaID},
+		}})
+	}
+
+	resp := release(v2)
+	status, code, message, ok := errorResponseParts(t, resp)
+	require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, resp))
+	assert.Equal(t, http.StatusBadRequest, status)
+	assert.Equal(t, domain.ErrReleaseInvalid(nil, nil).Code, code)
+	assert.Contains(t, message, "flow_definition release-fit-flow: invalid")
+
+	resp = release(v1)
+	require.IsType(t, &api.CreateReleaseCreated{}, resp, "create release: %s", helpers.MustMarshal(t, resp))
 }

@@ -11,6 +11,13 @@
 > is settled as `env`, which is singular under the same rule. Rationale and the
 > noun list: [`docs/design/glossary.md` §11](../design/glossary.md#11-cli-grammar).
 > The shipped commands are renamed without a deprecation window (alpha).
+>
+> **Amendment (2026-10-15):** §6 and §13 are extended by
+> [ADR 071](071-cli-resource-properties.md). Every leaf of a request body gets
+> a flag, nested ones included (`--oidc-client-id`); `--set <path>=<value>`
+> reaches any field; the document, the field flags and `--set` merge key by
+> key; and a `${{ NAME }}` reference, a boolean, or a value the schema fixes is
+> not taken for a credential.
 
 Reference documentation for the surface lives in
 [`docs/design/cli/resource-commands.md`](../design/cli/resource-commands.md).

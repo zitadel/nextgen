@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { FRAMEWORK_IDS } from "../../../../../../helpers/framework-ids";
 import type {
   FileOp,
   ScaffoldPlan,
@@ -238,5 +239,11 @@ describe("NextPatcher.artifacts", () => {
     });
     expect(artifacts.markedFiles).toContain("proxy.ts");
     expect(artifacts.markedFiles).not.toContain("middleware.ts");
+  });
+});
+
+describe("NextPatcher.canPatch", () => {
+  it.each(FRAMEWORK_IDS)("matches %s only when it is its own framework", (id) => {
+    expect(new NextPatcher().canPatch(id)).toBe(id === "next");
   });
 });
