@@ -10,13 +10,15 @@ import type { Detector, FrameworkFacts } from "./types";
  */
 export class SolidDetector implements Detector {
   readonly framework = "solid";
+  readonly displayName = "Solid";
+  readonly versionPackage = "solid-js";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
     const pkg = await readPackageJson(cwd).catch(() => undefined);
     if (
       !pkg ||
       hasDependency(pkg, "@solidjs/start") ||
-      !hasDependency(pkg, "solid-js") ||
+      !hasDependency(pkg, this.versionPackage) ||
       !hasDependency(pkg, "vite")
     ) {
       return null;

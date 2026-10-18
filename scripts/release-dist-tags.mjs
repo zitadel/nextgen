@@ -19,6 +19,9 @@ import { mapWithConcurrency, runCapture } from "./dev-process.mjs";
 // create a package: a maintainer publishes a placeholder once and adds the
 // trusted publisher (.changeset/README.md, "Publishing"). The same placeholder
 // gives the package its version outside the prerelease tag.
+//
+// The preflight asks the npm registry before `release publish --dry-run`
+// returns, so an offline dry run fails closed instead of passing unchecked.
 
 /** The prerelease tag from `.changeset/pre.json`, or undefined outside pre mode. */
 export async function readPrereleaseTag(root) {
@@ -34,13 +37,22 @@ export async function readPrereleaseTag(root) {
   return pre.mode === "pre" && typeof pre.tag === "string" ? pre.tag : undefined;
 }
 
-/** The name, version, and license of the package in each of `dirs`. */
+/**
+ * The name, version, and license of the package in each of `dirs`. A private
+ * package is skipped: it is never published, so it has nothing to check.
+ */
 export async function readLocalPackages(root, dirs) {
-  return Promise.all(
+  const read = await Promise.all(
     dirs.map(async (dir) => {
-      const { name, version, license } = JSON.parse(
-        await readFile(join(root, dir, "package.json"), "utf8"),
-      );
+      const {
+        name,
+        version,
+        license,
+        private: isPrivate,
+      } = JSON.parse(await readFile(join(root, dir, "package.json"), "utf8"));
+      if (isPrivate === true) {
+        return undefined;
+      }
       for (const [field, value] of Object.entries({ name, version, license })) {
         if (typeof value !== "string" || value === "") {
           throw new Error(`${join(dir, "package.json")} has no ${field}`);
@@ -49,6 +61,7 @@ export async function readLocalPackages(root, dirs) {
       return { name, version, license };
     }),
   );
+  return read.filter((pkg) => pkg !== undefined);
 }
 
 /** The first prerelease identifier of a semver version (`alpha` in `1.0.0-alpha.25`). */

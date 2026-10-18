@@ -33,7 +33,7 @@
   // binding would assign `undefined` and overwrite the default.
   $effect(() => {
     if (el) {
-      assignGiven(el, { heading, variant, theme, suppressHeader });
+      assignGiven(el, { heading, logoutLabel, variant, theme, suppressHeader });
     }
   });
 
@@ -57,5 +57,4 @@
   project-id={projectId}
   proxy-path={proxyPath}
   post-sign-out-url={postSignOutUrl}
-  logout-label={logoutLabel}
 ></zitadel-session>

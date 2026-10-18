@@ -15,6 +15,8 @@ import type { Detector, FrameworkFacts } from "./types";
  */
 export class SvelteKitDetector implements Detector {
   readonly framework = "sveltekit";
+  readonly displayName = "SvelteKit";
+  readonly versionPackage = "@sveltejs/kit";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
     const pkg = await readPackageJson(cwd).catch(() => undefined);

@@ -17,6 +17,8 @@ import type { Detector, FrameworkFacts } from "./types";
  */
 export class SolidStartDetector implements Detector {
   readonly framework = "solid-start";
+  readonly displayName = "SolidStart";
+  readonly versionPackage = "@solidjs/start";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
     const pkg = await readPackageJson(cwd).catch(() => undefined);
