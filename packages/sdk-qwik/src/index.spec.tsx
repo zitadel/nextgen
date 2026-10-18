@@ -24,6 +24,7 @@ import {
 } from "./__tests__/config-parity-harness";
 import { PasswordToggleHarness, ResumeFlowIdHarness } from "./__tests__/login-prop-harness";
 import { UnsetPropHarness } from "./__tests__/unset-prop-harness";
+import { listenWithReplay, WRAPPER_MARKER } from "./early-events";
 import { businessLocales, ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
@@ -457,6 +458,114 @@ describe("a resumed flow that is already terminal", () => {
     );
 
     await expect.poll(() => received.map((detail) => detail.handoff_token)).toEqual(["ht_resumed"]);
+  });
+});
+
+describe("early event buffer", () => {
+  const emit = (el: Element, name: string, detail: Record<string, unknown>): void => {
+    el.dispatchEvent(new CustomEvent(name, { detail, bubbles: true, composed: true }));
+  };
+  const hostElement = (wrapper: boolean): HTMLElement => {
+    // A plain element: only the event plumbing is under test, not a live widget.
+    const el = document.createElement("div");
+    if (wrapper) {
+      el.setAttribute(WRAPPER_MARKER, "");
+    }
+    document.body.appendChild(el);
+    return el;
+  };
+  const replayed = (el: Element, names: readonly string[]): string[] => {
+    const seen: string[] = [];
+    const cleanup = listenWithReplay(
+      el,
+      Object.fromEntries(
+        names.map((name) => [
+          name,
+          (e: Event) => seen.push(`${name}:${JSON.stringify((e as CustomEvent).detail)}`),
+        ]),
+      ),
+    );
+    cleanup();
+    return seen;
+  };
+  const ALL = [
+    "zitadel-flow-step",
+    "zitadel-flow-input",
+    "zitadel-flow-complete",
+    "zitadel-flow-redirect",
+    "zitadel-flow-error",
+    "zitadel-signout",
+  ];
+
+  it("ignores events from a raw widget that no wrapper rendered", () => {
+    const raw = hostElement(false);
+    emit(raw, "zitadel-flow-complete", { handoff_token: "ht" });
+    emit(raw, "zitadel-signout", {});
+
+    expect(replayed(raw, ALL)).toEqual([]);
+  });
+
+  it("never retains flow input values, even for a wrapper host", () => {
+    const el = hostElement(true);
+    emit(el, "zitadel-flow-input", { name: "password", value: "hunter2" });
+    emit(el, "zitadel-flow-step", { step: "password" });
+
+    expect(replayed(el, ALL)).toEqual([]);
+  });
+
+  it("replays the terminal events of a wrapper host in order after a late attach", () => {
+    const el = hostElement(true);
+    emit(el, "zitadel-flow-error", { n: 1 });
+    emit(el, "zitadel-flow-redirect", { n: 2 });
+    emit(el, "zitadel-flow-complete", { n: 3 });
+    emit(el, "zitadel-signout", { n: 4 });
+
+    expect(replayed(el, ALL)).toEqual([
+      'zitadel-flow-error:{"n":1}',
+      'zitadel-flow-redirect:{"n":2}',
+      'zitadel-flow-complete:{"n":3}',
+      'zitadel-signout:{"n":4}',
+    ]);
+  });
+
+  it("keeps only the newest events per host", () => {
+    const el = hostElement(true);
+    for (let n = 0; n < 20; n++) {
+      emit(el, "zitadel-flow-error", { n });
+    }
+
+    const seen = replayed(el, ALL);
+    expect(seen).toHaveLength(8);
+    expect(seen[0]).toBe('zitadel-flow-error:{"n":12}');
+    expect(seen[7]).toBe('zitadel-flow-error:{"n":19}');
+  });
+
+  it("drops the buffer once the listeners attach and stops collecting", () => {
+    const el = hostElement(true);
+    emit(el, "zitadel-flow-complete", { n: 1 });
+    const live: string[] = [];
+    const cleanup = listenWithReplay(el, {
+      "zitadel-flow-complete": (e) => live.push(String((e as CustomEvent).detail.n)),
+    });
+    emit(el, "zitadel-flow-complete", { n: 2 });
+    cleanup();
+
+    expect(live).toEqual(["1", "2"]);
+    expect(replayed(el, ALL)).toEqual([]);
+  });
+
+  it("marks the host each wrapper renders", async () => {
+    const host = await renderWidget(
+      <>
+        <ZitadelLogin project={project} />
+        <ZitadelLogout project={project} />
+        <ZitadelSession project={project} />
+      </>,
+    );
+
+    for (const tag of ["zitadel-login", "zitadel-logout", "zitadel-session"]) {
+      expect(host.querySelector(tag)?.hasAttribute(WRAPPER_MARKER)).toBe(true);
+    }
   });
 });
 
