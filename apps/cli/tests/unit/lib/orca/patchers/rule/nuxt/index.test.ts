@@ -90,7 +90,7 @@ describe("NuxtPatcher.plan", () => {
     expect(profile).toContain('variant="widget"');
   });
 
-  it("writes at the root for a Nuxt 3 project (appDir '.')", () => {
+  it("writes at the root for a Nuxt 4 root-layout project (appDir '.')", () => {
     const plan = new NuxtPatcher().plan(ctx("."));
     expect(writeContents(plan, "app.vue")).toContain(MANAGED_MARKER);
     expect(writeContents(plan, "pages/login.vue")).toContain(MANAGED_MARKER);

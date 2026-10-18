@@ -37,6 +37,15 @@ export interface Detector {
    */
   readonly versionPackage: string;
   /**
+   * The oldest version of {@link versionPackage} the CLI integrates, as a plain
+   * semver string (`"15.2.3"`, `"18"`, `"1.6"`). It is a floor only, never a
+   * ceiling, and `enforceVersionFloor` is the single place it is enforced. It
+   * must track the matching SDK package's peer range (ADR 043).
+   */
+  readonly versionFloor: string;
+  /** Optional reason appended to the upgrade hint when the floor is refused. */
+  readonly versionFloorNote?: string;
+  /**
    * Probe `cwd`. Returns {@link FrameworkFacts} when it is a project of this
    * framework, or `null` when it is not (so the orchestrator tries the next
    * detector). MAY throw a `ZitadelError` when the framework is recognised but
