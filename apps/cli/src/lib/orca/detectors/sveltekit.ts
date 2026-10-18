@@ -1,7 +1,7 @@
-import { ZitadelError } from "../../errors";
-import { dependencySpecProvablyBelowMajor, hasDependency, readPackageJson } from "./package-json";
+import { hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
 import type { Detector, FrameworkFacts } from "./types";
+import { enforceVersionFloor } from "./version-floor";
 
 /**
  * Detects a SvelteKit project by its `@sveltejs/kit` dependency. Like Next.js
@@ -17,6 +17,7 @@ export class SvelteKitDetector implements Detector {
   readonly framework = "sveltekit";
   readonly displayName = "SvelteKit";
   readonly versionPackage = "@sveltejs/kit";
+  readonly versionFloor = "2";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
     const pkg = await readPackageJson(cwd).catch(() => undefined);
@@ -24,16 +25,15 @@ export class SvelteKitDetector implements Detector {
       return null;
     }
 
+    await enforceVersionFloor(this, pkg, cwd);
+
     // The widgets come from @zitadel/sdk-svelte, which peers Svelte 5 and is
     // written with runes; a Svelte 4 app cannot install or compile it.
-    const belowFloor = dependencySpecProvablyBelowMajor(pkg, "svelte", 5);
-    if (belowFloor !== undefined) {
-      throw new ZitadelError(
-        "E_UNSUPPORTED_PROJECT_SHAPE",
-        `Svelte "${belowFloor}" is below the supported floor — the CLI integrates Svelte 5 and newer`,
-        { hint: "Upgrade the app to Svelte 5 and rerun." },
-      );
-    }
+    await enforceVersionFloor(
+      { displayName: "Svelte", versionPackage: "svelte", versionFloor: "5" },
+      pkg,
+      cwd,
+    );
 
     const devPort = await detectDevPort(cwd, pkg);
     return { id: "sveltekit", appDir: "src", devPort, url: issuerFromPort(devPort) };

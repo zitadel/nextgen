@@ -28,7 +28,7 @@ describe("package manifest", () => {
 
   it("declares its supported peer ranges", () => {
     expect(manifest.peerDependencies).toEqual({
-      "@solidjs/start": "^1.0.0 || ^2.0.0-0",
+      "@solidjs/start": "^2.0.0",
       "solid-js": "^1.8.0",
     });
   });

@@ -5,6 +5,11 @@ import { join } from "node:path";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 import { SvelteKitScaffolder } from "../../../../../src/lib/orca/scaffolders/sveltekit";
+import {
+  SUPPORTED_NODE,
+  describeNodeEngines,
+  scaffoldingCalls,
+} from "../../../../helpers/node-engines";
 
 vi.mock("node:child_process", () => ({ spawnSync: vi.fn() }));
 vi.mock("node:fs/promises", () => ({ rm: vi.fn() }));
@@ -27,9 +32,9 @@ describe("SvelteKitScaffolder", () => {
   it("runs `sv create` then removes the starter +page.svelte", async () => {
     mockSpawn.mockReturnValue(spawnOk());
 
-    await new SvelteKitScaffolder().scaffold("/tmp/proj", "sveltekit");
+    await new SvelteKitScaffolder(SUPPORTED_NODE).scaffold("/tmp/proj", "sveltekit");
 
-    const [command, args, opts] = mockSpawn.mock.calls[0] ?? [];
+    const [command, args, opts] = scaffoldingCalls()[0] ?? [];
     expect(command).toBe("npx");
     expect(args).toEqual([
       "-y",
@@ -51,6 +56,18 @@ describe("SvelteKitScaffolder", () => {
     expect(mockRm).toHaveBeenCalledWith(join("/tmp/proj", "src/routes/+layout.svelte"), {
       force: true,
     });
+  });
+
+  describeNodeEngines({
+    make: (node, platform) => new SvelteKitScaffolder(node, platform),
+    framework: "sveltekit",
+    label: "sv",
+    spec: "sv@latest",
+    fallback: "^20.19.0 || >=22.12.0",
+    enforcement: "warn",
+    supported: ["24.15.0", "20.19.0", "22.12.0"],
+    warned: ["21.0.0", "20.18.0"],
+    refused: [],
   });
 
   it("only supports sveltekit", () => {

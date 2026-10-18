@@ -1,7 +1,7 @@
-import { ZitadelError } from "../../errors";
-import { dependencySpecProvablyBelowMajor, hasDependency, readPackageJson } from "./package-json";
+import { hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
 import type { Detector, FrameworkFacts } from "./types";
+import { enforceVersionFloor } from "./version-floor";
 
 /**
  * Detects a SolidStart project by its `solid-js` AND `@solidjs/start`
@@ -19,6 +19,7 @@ export class SolidStartDetector implements Detector {
   readonly framework = "solid-start";
   readonly displayName = "SolidStart";
   readonly versionPackage = "@solidjs/start";
+  readonly versionFloor = "2";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
     const pkg = await readPackageJson(cwd).catch(() => undefined);
@@ -29,14 +30,7 @@ export class SolidStartDetector implements Detector {
     // SolidStart 1 registers middleware in app.config.ts and has no
     // vite.config, which the patch edits; refuse up front with a clear reason
     // instead of failing later on a missing config file.
-    const belowFloor = dependencySpecProvablyBelowMajor(pkg, "@solidjs/start", 2);
-    if (belowFloor !== undefined) {
-      throw new ZitadelError(
-        "E_UNSUPPORTED_PROJECT_SHAPE",
-        `SolidStart "${belowFloor}" is below the supported floor — the CLI integrates SolidStart 2 and newer`,
-        { hint: "Upgrade the app to SolidStart 2 (@solidjs/start@^2) and rerun." },
-      );
-    }
+    await enforceVersionFloor(this, pkg, cwd);
 
     const devPort = await detectDevPort(cwd, pkg);
     return { id: "solid-start", appDir: "src", devPort, url: issuerFromPort(devPort) };

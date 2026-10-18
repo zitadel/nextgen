@@ -5,6 +5,11 @@ import { join } from "node:path";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 import { QwikCityScaffolder } from "../../../../../src/lib/orca/scaffolders/qwik-city";
+import {
+  SUPPORTED_NODE,
+  describeNodeEngines,
+  scaffoldingCalls,
+} from "../../../../helpers/node-engines";
 
 vi.mock("node:child_process", () => ({ spawnSync: vi.fn() }));
 vi.mock("node:fs/promises", () => ({ rm: vi.fn() }));
@@ -27,15 +32,27 @@ describe("QwikCityScaffolder", () => {
   it("runs `create-qwik` then removes the starter index.tsx", async () => {
     mockSpawn.mockReturnValue(spawnOk());
 
-    await new QwikCityScaffolder().scaffold("/tmp/proj", "qwik-city");
+    await new QwikCityScaffolder(SUPPORTED_NODE).scaffold("/tmp/proj", "qwik-city");
 
-    const [command, args, opts] = mockSpawn.mock.calls[0] ?? [];
+    const [command, args, opts] = scaffoldingCalls()[0] ?? [];
     expect(command).toBe("npx");
     expect(args).toEqual(["-y", "create-qwik@2.0.0-rc.3", "empty", ".", "--installDeps=false"]);
     expect(opts).toMatchObject({ cwd: "/tmp/proj" });
     expect(mockRm).toHaveBeenCalledWith(join("/tmp/proj", "src/routes/index.tsx"), {
       force: true,
     });
+  });
+
+  describeNodeEngines({
+    make: (node, platform) => new QwikCityScaffolder(node, platform),
+    framework: "qwik-city",
+    label: "create-qwik",
+    spec: "create-qwik@2.0.0-rc.3",
+    fallback: "^18.17.0 || ^20.3.0 || >=21.0.0",
+    enforcement: "warn",
+    supported: ["24.15.0", "18.17.0", "20.3.0", "21.0.0"],
+    warned: ["19.0.0", "20.2.0"],
+    refused: [],
   });
 
   it("only supports qwik-city", () => {

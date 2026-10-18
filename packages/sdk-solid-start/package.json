@@ -48,7 +48,7 @@
     "@zitadel/sdk-core": "workspace:*"
   },
   "peerDependencies": {
-    "@solidjs/start": "^1.0.0 || ^2.0.0-0",
+    "@solidjs/start": "^2.0.0",
     "solid-js": "^1.8.0"
   },
   "devDependencies": {
