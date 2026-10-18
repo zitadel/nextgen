@@ -30,10 +30,30 @@ export * from "./types";
 // direct @zitadel/components dependency (strict package managers reject those).
 export { businessLocales } from "@zitadel/components";
 
+// Props `setProp` has assigned on each element, so a prop that is cleared later
+// is known to need its default put back.
+const assigned = new WeakMap<Element, Set<PropertyKey>>();
+
+// Unconfigured elements, one per tag: the source of truth for an element's own
+// property defaults (the element a prop was first read from may already carry
+// server-rendered attributes).
+const pristine = new Map<string, Element>();
+
+function pristineDefault<E extends Element, K extends keyof E>(el: E, key: K): E[K] {
+  let fresh = pristine.get(el.localName);
+  if (!fresh) {
+    fresh = document.createElement(el.localName);
+    pristine.set(el.localName, fresh);
+  }
+  return (fresh as E)[key];
+}
+
 /**
- * Assigns a widget config value as a DOM *property*, skipping `undefined` so the
- * element keeps its own accessor default (e.g. the session card's "Signed in
- * as" heading).
+ * Assigns a widget config value as a DOM *property*, leaving `undefined` to the
+ * element's own accessor default (e.g. the session card's "Signed in as"
+ * heading). A prop that goes from a value back to unset gets the default of a
+ * pristine element of the same tag put back, so no stale override stays on the
+ * element and the result does not depend on what the element held before.
  *
  * Qwik 2 binds custom-element JSX props as *attributes* only — its client
  * renderer has no property-setting path for elements — and the widgets expose
@@ -48,8 +68,16 @@ function setProp<E extends Element, K extends keyof E>(
   key: K,
   value: E[K] | undefined,
 ): void {
+  let keys = assigned.get(el);
   if (value !== undefined) {
+    if (!keys) {
+      keys = new Set();
+      assigned.set(el, keys);
+    }
+    keys.add(key);
     el[key] = value;
+  } else if (keys?.delete(key)) {
+    el[key] = pristineDefault(el, key);
   }
 }
 
