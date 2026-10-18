@@ -31,6 +31,8 @@ export function ProfilePage() {
 }
 ```
 
+`ZitadelLogin` also takes `resumeFlowId`, an existing flow to resume instead of starting a new one; unset, `null` or `""` falls back to the `flow` query parameter.
+
 The signed-in session card is `<ZitadelSession project={project} />` (exported
 as `ZitadelSession`).
 

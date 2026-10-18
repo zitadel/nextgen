@@ -27,4 +27,13 @@ describe("lit dev-mode notice", () => {
     const source = readFileSync(join(SRC, entry), "utf8");
     expect(source.match(FIRST_IMPORT)?.[1]).toMatch(/\/internal\/lit-dev-mode\.js$/);
   });
+
+  // The bundler drops a bare import it believes is pure (a `sideEffects` list
+  // that does not cover this module would do exactly that), and then every
+  // app's test run prints the notice again. `components:test` runs after the
+  // build.
+  it("is silenced first by the built package entry", () => {
+    const built = readFileSync(join(process.cwd(), "dist/index.mjs"), "utf8");
+    expect(built.match(FIRST_IMPORT)?.[1]).toBe("./internal/lit-dev-mode.mjs");
+  });
 });

@@ -30,6 +30,8 @@ export class LoginPage {
 
 `<zitadel-auth-logout [project]="project" postSignOutUrl="/login" />` works the same way.
 
+`<zitadel-auth-login>` also takes `resumeFlowId`, an existing flow to resume instead of starting a new one; unset, `null` or `""` falls back to the `flow` query parameter.
+
 The signed-in session card is `<zitadel-auth-session>` (exported as `ZitadelSessionComponent`).
 
 > The wrapper uses the selector `zitadel-auth-login` (not `zitadel-login`) because

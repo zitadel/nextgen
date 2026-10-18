@@ -75,7 +75,7 @@ The Qwik SDK is the SPA wrapper for the shared Zitadel login and logout widgets.
     });
     ```
 
-    The widget's flow events surface as optional QRL callbacks: `onFlowStep$`, `onFlowInput$`, `onFlowComplete$`, and `onFlowError$`.
+    The widget's flow events surface as optional QRL callbacks: `onFlowStep$`, `onFlowInput$`, `onFlowComplete$`, and `onFlowError$`. `ZitadelLogin` also takes `resumeFlowId`, an existing flow to resume instead of starting a new one; unset, `null` or `""` falls back to the `flow` query parameter.
   </Tab>
 </Tabs>
 
