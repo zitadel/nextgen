@@ -40,6 +40,10 @@ The widget's flow events are surfaced as optional QRL callbacks:
 > The SDK binds `project` (and the discrete `projectId` / `proxyPath`) to the
 > element as DOM properties, the same as the other framework SDKs.
 
+## Server rendering
+
+If your app renders on the server, mount the widget on the client only, after hydration (the `ZitadelLogin` wrapper sets `projectId` and `proxyPath` as element properties, so adding them to the wrapper does not put them in server markup), or use a raw `<zitadel-login>` element with `project-id` and `proxy-path` as attributes, because a widget that starts before its configuration arrives shows an error instead of the flow.
+
 ## Proxying to the backend (deployment)
 
 The widgets call `${proxyPath}/…` same-origin (default `/__nextgen`). In

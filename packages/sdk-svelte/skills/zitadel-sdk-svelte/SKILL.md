@@ -84,6 +84,7 @@ The public exports are `ZitadelLogin`, `ZitadelLogout`, `ZitadelSession`,
 
 ## Gotchas
 
+- **Server rendering.** If your app renders on the server, mount the widget on the client only, after hydration, or pass `projectId` and `proxyPath` to the `ZitadelLogin` wrapper as strings (it writes them as the `project-id` and `proxy-path` attributes; use those hyphenated names only on a raw `<zitadel-login>` element), because a widget that starts before its configuration arrives shows an error instead of the flow.
 - **Production SPA deployment is not yet supported.** The same-origin proxy path
   must come from your hosting platform, and the CLI cannot scaffold those configs
   yet (see ADR 036 and zitadel/nextgen#560). The CLI dev proxy covers local
