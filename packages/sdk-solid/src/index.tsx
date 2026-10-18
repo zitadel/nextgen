@@ -5,7 +5,7 @@ import type {
 } from "@zitadel/components";
 
 import "@zitadel/components";
-import { createRenderEffect, type JSX } from "solid-js";
+import type { JSX } from "solid-js";
 
 import {
   configureZitadel,
@@ -15,7 +15,6 @@ import {
   type ZitadelProject,
 } from "@zitadel/api/config";
 
-import { assignGiven } from "./given";
 import type {
   ZitadelFlowCompleteDetail,
   ZitadelFlowRedirectDetail,
@@ -99,36 +98,29 @@ export function ZitadelLogin(
     ref?: ZitadelLoginElement | ((el: ZitadelLoginElement) => void);
   },
 ): JSX.Element {
-  const element = (
+  return (
     <zitadel-login
       ref={props.ref}
       prop:project={props.project}
       prop:locales={props.locales}
+      prop:lang={props.lang}
       project-id={props.projectId}
       proxy-path={props.proxyPath}
       purpose={props.purpose ?? "login"}
       flow-name={props.flowName}
       post-sign-in-url={props.postSignInUrl}
       resume-flow-id={props.resumeFlowId}
+      variant={props.variant}
+      theme={props.theme}
+      prop:suppressHeader={props.suppressHeader}
+      prop:suppressPasswordToggle={props.suppressPasswordToggle}
       on:zitadel-flow-step={(event) => props.onFlowStep?.(event.detail)}
       on:zitadel-flow-input={(event) => props.onFlowInput?.(event.detail)}
       on:zitadel-flow-complete={(event) => props.onFlowComplete?.(event.detail)}
       on:zitadel-flow-redirect={(event) => props.onFlowRedirect?.(event.detail)}
       on:zitadel-flow-error={(event) => props.onFlowError?.(event.detail)}
     />
-  ) as ZitadelLoginElement;
-  // Props the element has defaults for are assigned only when given; a
-  // binding would assign `undefined` and overwrite the default.
-  createRenderEffect(() =>
-    assignGiven(element, {
-      lang: props.lang,
-      variant: props.variant,
-      theme: props.theme,
-      suppressHeader: props.suppressHeader,
-      suppressPasswordToggle: props.suppressPasswordToggle,
-    }),
   );
-  return element;
 }
 
 /**
@@ -145,20 +137,17 @@ export function ZitadelLogout(
     ref?: ZitadelLogoutElement | ((el: ZitadelLogoutElement) => void);
   },
 ): JSX.Element {
-  const element = (
+  return (
     <zitadel-logout
       ref={props.ref}
       prop:project={props.project}
       project-id={props.projectId}
       proxy-path={props.proxyPath}
       post-sign-out-url={props.postSignOutUrl}
+      theme={props.theme}
       on:zitadel-signout={(event) => props.onSignout?.(event.detail)}
     />
-  ) as ZitadelLogoutElement;
-  // Props the element has defaults for are assigned only when given; a
-  // binding would assign `undefined` and overwrite the default.
-  createRenderEffect(() => assignGiven(element, { theme: props.theme }));
-  return element;
+  );
 }
 
 /**
@@ -174,26 +163,19 @@ export function ZitadelSession(
     ref?: ZitadelSessionElement | ((el: ZitadelSessionElement) => void);
   },
 ): JSX.Element {
-  const element = (
+  return (
     <zitadel-session
       ref={props.ref}
       prop:project={props.project}
       project-id={props.projectId}
       proxy-path={props.proxyPath}
       post-sign-out-url={props.postSignOutUrl}
+      heading={props.heading}
+      logout-label={props.logoutLabel}
+      variant={props.variant}
+      theme={props.theme}
+      prop:suppressHeader={props.suppressHeader}
       on:zitadel-signout={(event) => props.onSignout?.(event.detail)}
     />
-  ) as ZitadelSessionElement;
-  // Props the element has defaults for are assigned only when given; a
-  // binding would assign `undefined` and overwrite the default.
-  createRenderEffect(() =>
-    assignGiven(element, {
-      heading: props.heading,
-      logoutLabel: props.logoutLabel,
-      variant: props.variant,
-      theme: props.theme,
-      suppressHeader: props.suppressHeader,
-    }),
   );
-  return element;
 }
