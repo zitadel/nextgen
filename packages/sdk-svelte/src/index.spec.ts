@@ -196,8 +196,12 @@ describe("businessLocales", () => {
 
 // Every config key set to a distinct value. `Required<…>` makes `tsc` fail here
 // when a key is added to a config type, so a new key cannot skip this check.
+// The handle carries the same coordinates as the discrete props: the handle wins
+// for the project attributes, so a different handle would mask the discrete props.
+const parityProject = { projectId: "proj-parity", proxyPath: "/__parity" };
+
 const loginConfig: Required<ZitadelLoginConfig> = {
-  project,
+  project: parityProject,
   projectId: "proj-parity",
   proxyPath: "/__parity",
   variant: "page",
@@ -213,7 +217,7 @@ const loginConfig: Required<ZitadelLoginConfig> = {
 };
 
 const sessionConfig: Required<ZitadelSessionConfig> = {
-  project,
+  project: parityProject,
   projectId: "proj-parity",
   proxyPath: "/__parity",
   postSignOutUrl: "/parity-after-sign-out",
@@ -225,7 +229,7 @@ const sessionConfig: Required<ZitadelSessionConfig> = {
 };
 
 const logoutConfig: Required<ZitadelLogoutConfig> = {
-  project,
+  project: parityProject,
   projectId: "proj-parity",
   proxyPath: "/__parity",
   postSignOutUrl: "/parity-after-sign-out",
