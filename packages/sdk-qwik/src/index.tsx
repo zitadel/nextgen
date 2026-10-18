@@ -22,6 +22,8 @@ import {
   type ZitadelProject,
 } from "@zitadel/api/config";
 
+import { assignGiven } from "./given";
+
 export { configureZitadel, getApi, getZitadelConfig };
 export type { ZitadelConfig, ZitadelProject };
 export * from "./types";
@@ -30,30 +32,10 @@ export * from "./types";
 // direct @zitadel/components dependency (strict package managers reject those).
 export { businessLocales } from "@zitadel/components";
 
-// Props `setProp` has assigned on each element, so a prop that is cleared later
-// is known to need its default put back.
-const assigned = new WeakMap<Element, Set<PropertyKey>>();
-
-// Unconfigured elements, one per tag: the source of truth for an element's own
-// property defaults (the element a prop was first read from may already carry
-// server-rendered attributes).
-const pristine = new Map<string, Element>();
-
-function pristineDefault<E extends Element, K extends keyof E>(el: E, key: K): E[K] {
-  let fresh = pristine.get(el.localName);
-  if (!fresh) {
-    fresh = document.createElement(el.localName);
-    pristine.set(el.localName, fresh);
-  }
-  return (fresh as E)[key];
-}
-
 /**
- * Assigns a widget config value as a DOM *property*, leaving `undefined` to the
- * element's own accessor default (e.g. the session card's "Signed in as"
- * heading). A prop that goes from a value back to unset gets the default of a
- * pristine element of the same tag put back, so no stale override stays on the
- * element and the result does not depend on what the element held before.
+ * Assigns a widget config value as a DOM *property*, skipping `undefined` so the
+ * element keeps its own accessor default (e.g. the session card's "Signed in
+ * as" heading).
  *
  * Qwik 2 binds custom-element JSX props as *attributes* only — its client
  * renderer has no property-setting path for elements — and the widgets expose
@@ -68,19 +50,8 @@ function setProp<E extends Element, K extends keyof E>(
   key: K,
   value: E[K] | undefined,
 ): void {
-  let keys = assigned.get(el);
   if (value !== undefined) {
-    if (!keys) {
-      keys = new Set();
-      assigned.set(el, keys);
-    }
-    keys.add(key);
     el[key] = value;
-  } else if (keys?.has(key)) {
-    // Kept in the set: clearing a prop makes Qwik drop its attribute *after*
-    // this runs, and Lit then resets the property to `null`, so every later
-    // bind with the prop still unset has to put the default back again.
-    el[key] = pristineDefault(el, key);
   }
 }
 
@@ -92,14 +63,16 @@ function bindLoginConfig(el: ZitadelLoginElement, props: ZitadelLoginProps): voi
   setProp(el, "purpose", props.purpose ?? "login");
   setProp(el, "flowName", props.flowName);
   setProp(el, "postSignInUrl", props.postSignInUrl);
-  setProp(el, "variant", props.variant);
-  setProp(el, "theme", props.theme);
-  setProp(el, "suppressHeader", props.suppressHeader);
-  // A concrete boolean, not the raw prop: `setProp` skips `undefined`, so
-  // going from `true` back to unset would otherwise leave the toggle hidden.
-  setProp(el, "suppressPasswordToggle", props.suppressPasswordToggle === true);
   setProp(el, "locales", props.locales);
-  setProp(el, "lang", props.lang);
+  // Props the element has defaults for are assigned only when given; a
+  // binding would assign `undefined` and overwrite the default.
+  assignGiven(el, {
+    lang: props.lang,
+    variant: props.variant,
+    theme: props.theme,
+    suppressHeader: props.suppressHeader,
+    suppressPasswordToggle: props.suppressPasswordToggle,
+  });
 }
 
 /** Applies the `<zitadel-logout>` surface config to the element as DOM properties. */
@@ -108,7 +81,9 @@ function bindLogoutConfig(el: ZitadelLogoutElement, props: ZitadelLogoutProps): 
   setProp(el, "projectId", props.projectId);
   setProp(el, "proxyPath", props.proxyPath);
   setProp(el, "postSignOutUrl", props.postSignOutUrl);
-  setProp(el, "theme", props.theme);
+  // Props the element has defaults for are assigned only when given; a
+  // binding would assign `undefined` and overwrite the default.
+  assignGiven(el, { theme: props.theme });
 }
 
 /** Applies the `<zitadel-session>` surface config to the element as DOM properties. */
@@ -117,11 +92,15 @@ function bindSessionConfig(el: ZitadelSessionElement, props: ZitadelSessionProps
   setProp(el, "projectId", props.projectId);
   setProp(el, "proxyPath", props.proxyPath);
   setProp(el, "postSignOutUrl", props.postSignOutUrl);
-  setProp(el, "heading", props.heading);
-  setProp(el, "logoutLabel", props.logoutLabel);
-  setProp(el, "variant", props.variant);
-  setProp(el, "theme", props.theme);
-  setProp(el, "suppressHeader", props.suppressHeader);
+  // Props the element has defaults for are assigned only when given; a
+  // binding would assign `undefined` and overwrite the default.
+  assignGiven(el, {
+    heading: props.heading,
+    logoutLabel: props.logoutLabel,
+    variant: props.variant,
+    theme: props.theme,
+    suppressHeader: props.suppressHeader,
+  });
 }
 
 function eventDetail<T>(event: Event): T {
