@@ -22,7 +22,13 @@ import {
   SESSION_TOKEN,
   useRemoteServer,
 } from "../../../../../../helpers/remote-server";
-import { aProxyConfApp, type DevApp, deliveryOf, wireBodyOf } from "../../../../../../helpers/vite";
+import {
+  aProxyConfApp,
+  type DevApp,
+  deliveryOf,
+  headersOf,
+  wireBodyOf,
+} from "../../../../../../helpers/vite";
 
 function ctx(): PatchContext {
   return {
@@ -738,6 +744,56 @@ describe("the generated proxy.conf.cjs, run by Vite against a remote https serve
     const response = await fetch(`${origin}/__nextgen/sessions/exchange?bom`, { method: "POST" });
 
     expect(await response.json()).toEqual({ session: EXCHANGE_BODY.session });
+  });
+
+  it("answers an exchange the server sent chunked with a trailer, without the trailer", async () => {
+    const { origin } = await serve(proxyConfigEdit()(undefined));
+
+    const answer = await headersOf(`${origin}/__nextgen/sessions/exchange?trailer`, "POST");
+
+    expect(answer.status).toBe(200);
+    expect(answer.headers.trailer).toBeUndefined();
+    expect(answer.headers["content-length"]).toBeDefined();
+  });
+
+  it("keeps the session token out of an exchange the server sent with a trailer", async () => {
+    const { origin } = await serve(proxyConfigEdit()(undefined));
+
+    const response = await fetch(`${origin}/__nextgen/sessions/exchange?trailer`, {
+      method: "POST",
+    });
+
+    expect(await response.json()).toEqual({ session: EXCHANGE_BODY.session });
+  });
+
+  it("passes none of the server's connection-scoped headers on with an exchange answer", async () => {
+    const { origin } = await serve(proxyConfigEdit()(undefined));
+
+    const { headers } = await headersOf(`${origin}/__nextgen/sessions/exchange?hop`, "POST");
+
+    expect(headers).not.toHaveProperty("x-hop");
+    expect(headers["keep-alive"] ?? "").not.toContain("99");
+    expect(headers).not.toHaveProperty("proxy-connection");
+    expect(headers).not.toHaveProperty("upgrade");
+  });
+
+  it("sets exactly one content-length and no transfer-encoding on an exchange answer", async () => {
+    const { origin } = await serve(proxyConfigEdit()(undefined));
+
+    const { headers } = await headersOf(`${origin}/__nextgen/sessions/exchange?trailer`, "POST");
+
+    expect(headers["transfer-encoding"]).toBeUndefined();
+    expect(headers["content-length"]).toMatch(/^\d+$/);
+  });
+
+  it("keeps the session cookie on an exchange answer the server sent with a trailer", async () => {
+    const { origin } = await serve(proxyConfigEdit()(undefined));
+
+    const response = await fetch(`${origin}/__nextgen/sessions/exchange?trailer`, {
+      method: "POST",
+    });
+
+    expect(response.headers.getSetCookie()).toEqual([SESSION_COOKIE]);
   });
 
   it("relays every other call's body as the server sent it", async () => {

@@ -188,6 +188,59 @@ function decodeExchange(body${ty(": Buffer")}, contentEncoding${ty(": string | s
   }, body);
 }
 
+// Headers that describe the backend's connection or its encoding of the body,
+// or a digest of the bytes it sent. The proxy sends a body of its own, whole and
+// unencoded, so none of them describes it: a \`Trailer\` header on a response
+// with a \`Content-Length\` makes Node throw when the head is written.
+const EXCHANGE_DROPPED_HEADERS = [
+  "connection",
+  "content-digest",
+  "content-encoding",
+  "content-length",
+  "content-md5",
+  "digest",
+  "keep-alive",
+  "proxy-connection",
+  "repr-digest",
+  "te",
+  "trailer",
+  "transfer-encoding",
+  "upgrade",
+];
+
+// The backend's headers for the answer the proxy sends: everything but the
+// ones above and any header the backend's \`Connection\` names as its own.
+// \`Set-Cookie\` always stays, as the browser's session cookie arrives by it.
+function exchangeHeaders(headers${ty(': import("node:http").IncomingHttpHeaders')})${ty(': import("node:http").OutgoingHttpHeaders')} {
+  const kept = { ...headers };
+  for (const named of String(kept.connection ?? "").split(",")) {
+    const name = named.trim().toLowerCase();
+    if (name !== "" && name !== "set-cookie") {
+      delete kept[name];
+    }
+  }
+  for (const name of EXCHANGE_DROPPED_HEADERS) {
+    delete kept[name];
+  }
+  return kept;
+}
+
+// Ends an answer that cannot be written: with a \`502\` if its head is still
+// unsent, otherwise by cutting the connection. Nothing the backend sent goes
+// out with it, and the exception stays here rather than reaching the process.
+function abandonRelay(res${ty(': import("node:http").ServerResponse')})${ty(": void")} {
+  try {
+    if (!res.headersSent) {
+      res.writeHead(502, { "content-type": "text/plain; charset=utf-8" });
+      res.end("The response could not be relayed.");
+      return;
+    }
+  } catch {
+    // Fall through to cutting the connection.
+  }
+  res.destroy();
+}
+
 function relayResponse(
   proxyRes${ty(': import("node:http").IncomingMessage')},
   req${ty(': import("node:http").IncomingMessage')},
@@ -197,8 +250,12 @@ function relayResponse(
   proxyRes.on("error", abandon);
   proxyRes.on("aborted", abandon);
   if (!EXCHANGE_REQUESTS.has(req) && !isExchange(req.method, req.url)) {
-    res.writeHead(proxyRes.statusCode ?? 502, proxyRes.headers);
-    proxyRes.pipe(res);
+    try {
+      res.writeHead(proxyRes.statusCode ?? 502, proxyRes.headers);
+      proxyRes.pipe(res);
+    } catch {
+      abandonRelay(res);
+    }
     return;
   }
   const chunks${ty(": Buffer[]")} = [];
@@ -207,43 +264,45 @@ function relayResponse(
     if (res.destroyed) {
       return;
     }
-    const headers = { ...proxyRes.headers };
-    let body${ty(": Buffer")};
     try {
-      body = decodeExchange(Buffer.concat(chunks), headers["content-encoding"]);
-    } catch {
-      // Never relay a body the proxy could not read: the browser would decode
-      // it, session token and all.
-      res.writeHead(502, { "content-type": "text/plain; charset=utf-8" });
-      res.end("The session exchange answer could not be decoded.");
-      return;
-    }
-    delete headers["content-encoding"];
-    delete headers["transfer-encoding"];
-    try {
-      // A byte order mark is no part of the JSON, and a browser reads past it.
-      const json = JSON.parse(body.toString("utf8").replace(/^\\uFEFF/, ""));
-      const found = EXCHANGE_CREDENTIAL_FIELDS.filter((field) => Object.hasOwn(Object(json), field));
-      if (found.length > 0 && !Array.isArray(json)) {
-        for (const field of found) {
-          delete json[field];
-        }
-        body = Buffer.from(JSON.stringify(json));
-      }
-    } catch {
-      const status = proxyRes.statusCode ?? 502;
-      if (status >= 200 && status < 300) {
-        // A successful exchange is JSON. One the proxy cannot read may still
-        // hold the token for a reader that can, so it is never relayed.
+      const headers = exchangeHeaders(proxyRes.headers);
+      let body${ty(": Buffer")};
+      try {
+        body = decodeExchange(Buffer.concat(chunks), proxyRes.headers["content-encoding"]);
+      } catch {
+        // Never relay a body the proxy could not read: the browser would decode
+        // it, session token and all.
         res.writeHead(502, { "content-type": "text/plain; charset=utf-8" });
-        res.end("The session exchange answer could not be read.");
+        res.end("The session exchange answer could not be decoded.");
         return;
       }
-      // An error page, say. It carries no session token.
+      try {
+        // A byte order mark is no part of the JSON, and a browser reads past it.
+        const json = JSON.parse(body.toString("utf8").replace(/^\\uFEFF/, ""));
+        const found = EXCHANGE_CREDENTIAL_FIELDS.filter((field) => Object.hasOwn(Object(json), field));
+        if (found.length > 0 && !Array.isArray(json)) {
+          for (const field of found) {
+            delete json[field];
+          }
+          body = Buffer.from(JSON.stringify(json));
+        }
+      } catch {
+        const status = proxyRes.statusCode ?? 502;
+        if (status >= 200 && status < 300) {
+          // A successful exchange is JSON. One the proxy cannot read may still
+          // hold the token for a reader that can, so it is never relayed.
+          res.writeHead(502, { "content-type": "text/plain; charset=utf-8" });
+          res.end("The session exchange answer could not be read.");
+          return;
+        }
+        // An error page, say. It carries no session token.
+      }
+      headers["content-length"] = String(body.length);
+      res.writeHead(proxyRes.statusCode ?? 502, headers);
+      res.end(body);
+    } catch {
+      abandonRelay(res);
     }
-    headers["content-length"] = String(body.length);
-    res.writeHead(proxyRes.statusCode ?? 502, headers);
-    res.end(body);
   });
 }`,
     indent,

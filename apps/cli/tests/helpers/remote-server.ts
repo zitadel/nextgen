@@ -47,7 +47,9 @@ export interface ReceivedRequest {
  * might, whatever the request asked for: `encoding=gzip` or `encoding=br`
  * compresses it, `encoding=garbled` labels as `gzip` bytes that are neither
  * gzip nor JSON but still carry the token, and `abort` drops the connection
- * halfway through the body, and `bom` puts a UTF-8 byte order mark before it.
+ * halfway through the body, and `bom` puts a UTF-8 byte order mark before it,
+ * `trailer` sends it chunked with a `Trailer` header and a trailer, and `hop`
+ * adds the connection-scoped headers a proxy must not pass on.
  */
 export interface RemoteServer {
   /** `https://zitadel.test:<port>`. */
@@ -139,6 +141,18 @@ function isPlain(target: string, base: string): boolean {
   return new URL(target, base).pathname === "/healthz" || target.includes("as=text");
 }
 
+/**
+ * Connection-scoped headers an intermediary might leave on an answer. The
+ * dev proxy rewrites the body, so none of them describes what it sends.
+ */
+export const HOP_BY_HOP_HEADERS = {
+  connection: "x-hop",
+  "x-hop": "1",
+  "keep-alive": "timeout=99",
+  "proxy-connection": "keep-alive",
+  upgrade: "h2c",
+};
+
 /** Answers a call with the exchange's body, misbehaving as `query` asks. */
 function answerSession(query: URLSearchParams, res: ServerResponse): void {
   const plain = Buffer.from(JSON.stringify(EXCHANGE_BODY));
@@ -158,8 +172,14 @@ function answerSession(query: URLSearchParams, res: ServerResponse): void {
     ...(encoding === null
       ? {}
       : { "content-encoding": encoding === "garbled" ? "gzip" : encoding }),
+    ...(query.has("trailer") ? { trailer: "X-Checksum" } : {}),
+    ...(query.has("hop") ? HOP_BY_HOP_HEADERS : {}),
   });
-  if (query.has("abort")) {
+  if (query.has("trailer")) {
+    res.write(body);
+    res.addTrailers({ "X-Checksum": "abc123" });
+    res.end();
+  } else if (query.has("abort")) {
     res.write(body.subarray(0, body.length / 2), () => res.destroy());
   } else {
     res.end(body);

@@ -1,5 +1,5 @@
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
-import { request } from "node:http";
+import { type IncomingHttpHeaders, request } from "node:http";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -85,6 +85,28 @@ export function wireBodyOf(url: string, method = "GET"): Promise<string> {
       const chunks: Buffer[] = [];
       response.on("data", (chunk: Buffer) => chunks.push(chunk));
       response.on("end", () => resolve(Buffer.concat(chunks).toString("latin1")));
+      response.on("error", reject);
+    });
+    sent.on("error", reject);
+    sent.end();
+  });
+}
+
+/** The status and headers of the answer to `url`, as plain `node:http` receives them. */
+export function headersOf(
+  url: string,
+  method = "GET",
+): Promise<{ status: number; headers: IncomingHttpHeaders; trailers: IncomingHttpHeaders }> {
+  return new Promise((resolve, reject) => {
+    const sent = request(url, { method }, (response) => {
+      response.resume();
+      response.on("end", () =>
+        resolve({
+          status: response.statusCode ?? 0,
+          headers: response.headers,
+          trailers: response.trailers,
+        }),
+      );
       response.on("error", reject);
     });
     sent.on("error", reject);
