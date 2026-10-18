@@ -4,6 +4,7 @@ import type {
   ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
 
+import manifestJson from "../package.json";
 import { $, render, type Signal } from "@qwik.dev/core";
 import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import {
@@ -11,9 +12,19 @@ import {
   ZITADEL_LOGOUT_EVENT_HANDLERS,
   ZITADEL_SESSION_EVENT_HANDLERS,
 } from "@zitadel/sdk-core/types";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { PasswordToggleHarness } from "./__tests__/password-toggle-harness";
+import {
+  LoginConfigHarness,
+  loginConfig,
+  LogoutConfigHarness,
+  logoutConfig,
+  SessionConfigHarness,
+  sessionConfig,
+} from "./__tests__/config-parity-harness";
+import { PasswordToggleHarness, ResumeFlowIdHarness } from "./__tests__/login-prop-harness";
+import { UnsetPropHarness } from "./__tests__/unset-prop-harness";
+import { listenWithReplay, WRAPPER_MARKER } from "./early-events";
 import { businessLocales, ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
@@ -84,6 +95,7 @@ describe("ZitadelLogin", () => {
         postSignInUrl="/profile"
         flowName="signup"
         suppressHeader
+        suppressPasswordToggle
       />,
     );
 
@@ -96,6 +108,7 @@ describe("ZitadelLogin", () => {
         "post-sign-in-url",
         "flow-name",
         "suppress-header",
+        "suppress-password-toggle",
       ]),
     ).toEqual({
       "project-id": "proj-test",
@@ -105,6 +118,7 @@ describe("ZitadelLogin", () => {
       "post-sign-in-url": "/profile",
       "flow-name": "signup",
       "suppress-header": "",
+      "suppress-password-toggle": "",
     });
   });
 
@@ -129,6 +143,36 @@ describe("ZitadelLogin", () => {
     const el = host.querySelector<ZitadelLoginElement>("zitadel-login");
     expect(el!.projectId).toBe("proj-test");
     expect(el!.proxyPath).toBe("/__nextgen");
+  });
+
+  it("binds an empty proxyPath as the origin root, matching its attribute", async () => {
+    const received: Record<string, unknown>[] = [];
+    const host = await renderWidget(
+      <ZitadelLogin
+        projectId="proj-test"
+        proxyPath=""
+        onFlowStep$={$((detail: object) => {
+          received.push(detail as Record<string, unknown>);
+        })}
+      />,
+    );
+    const el = host.querySelector<ZitadelLoginElement>("zitadel-login");
+    // The listener is wired by the same visible task that re-applies the config.
+    await dispatchUntilForwarded(el!, "zitadel-flow-step", { probe: 1 }, received);
+    expect(el!.getAttribute("proxy-path")).toBe("/");
+    expect(el!.proxyPath).toBe("/");
+  });
+
+  it("forwards resumeFlowId to the widget", async () => {
+    const host = await renderWidget(<ZitadelLogin project={project} resumeFlowId="flow_123" />);
+    const el = host.querySelector<ZitadelLoginElement>("zitadel-login");
+    expect(el!.resumeFlowId).toBe("flow_123");
+  });
+
+  it("reads a null resumeFlowId as no handle", async () => {
+    const host = await renderWidget(<ZitadelLogin project={project} resumeFlowId={null} />);
+    const el = host.querySelector<ZitadelLoginElement>("zitadel-login");
+    expect(el!.resumeFlowId).toBe("");
   });
 
   it("forwards locales and lang to the widget", async () => {
@@ -196,6 +240,24 @@ describe("ZitadelLogout", () => {
     const el = host.querySelector<ZitadelLogoutElement>("zitadel-logout");
     expect(el!.projectId).toBe("proj-test");
     expect(el!.proxyPath).toBe("/__nextgen");
+  });
+
+  it("binds an empty proxyPath as the origin root, matching its attribute", async () => {
+    const received: Record<string, unknown>[] = [];
+    const host = await renderWidget(
+      <ZitadelLogout
+        projectId="proj-test"
+        proxyPath=""
+        onSignout$={$((detail: object) => {
+          received.push(detail as Record<string, unknown>);
+        })}
+      />,
+    );
+    const el = host.querySelector<ZitadelLogoutElement>("zitadel-logout");
+    // The listener is wired by the same visible task that re-applies the config.
+    await dispatchUntilForwarded(el!, "zitadel-signout", { probe: 1 }, received);
+    expect(el!.getAttribute("proxy-path")).toBe("/");
+    expect(el!.proxyPath).toBe("/");
   });
 
   it.each(Object.entries(ZITADEL_LOGOUT_EVENT_HANDLERS))(
@@ -269,6 +331,24 @@ describe("ZitadelSession", () => {
     expect(el!.proxyPath).toBe("/__nextgen");
   });
 
+  it("binds an empty proxyPath as the origin root, matching its attribute", async () => {
+    const received: Record<string, unknown>[] = [];
+    const host = await renderWidget(
+      <ZitadelSession
+        projectId="proj-test"
+        proxyPath=""
+        onSignout$={$((detail: object) => {
+          received.push(detail as Record<string, unknown>);
+        })}
+      />,
+    );
+    const el = host.querySelector<ZitadelSessionElement>("zitadel-session");
+    // The listener is wired by the same visible task that re-applies the config.
+    await dispatchUntilForwarded(el!, "zitadel-signout", { probe: 1 }, received);
+    expect(el!.getAttribute("proxy-path")).toBe("/");
+    expect(el!.proxyPath).toBe("/");
+  });
+
   it("forwards the surface variant/theme", async () => {
     const host = await renderWidget(
       <ZitadelSession project={project} variant="page" theme="light" suppressHeader={true} />,
@@ -327,5 +407,320 @@ describe("ZitadelLogin suppressPasswordToggle", () => {
     await expect.poll(() => window.__unsetSuppressPasswordToggle).toBeTypeOf("function");
     window.__unsetSuppressPasswordToggle!();
     await expect.poll(() => el().suppressPasswordToggle).toBe(false);
+  });
+});
+
+describe("resumed server markup", () => {
+  it("starts a register flow from the attributes alone, before any binder runs", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    // What Qwik Router sends and then resumes: attributes only, no `ref` binder
+    // and no property handle.
+    host.innerHTML =
+      '<zitadel-login project-id="proj-test" proxy-path="/__resumed" purpose="register"></zitadel-login>';
+
+    await expect
+      .poll(() => fetchSpy.mock.calls.find(([input]) => String(input).includes("/__resumed")))
+      .toBeDefined();
+    const [input, init] = fetchSpy.mock.calls.find(([i]) => String(i).includes("/__resumed"))!;
+    expect(String(input)).toContain("/__resumed/");
+    expect(JSON.parse(String(init?.body))).toEqual({
+      purpose: "register",
+      project_id: "proj-test",
+    });
+  });
+});
+
+describe("a resumed flow that is already terminal", () => {
+  it("still reaches onFlowComplete$, which attaches after the widget has fetched", async () => {
+    const original = globalThis.fetch;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      if (!String(input).includes("/__nextgen/flow/flow_done")) {
+        return original(input, init);
+      }
+      return Response.json({
+        flow_id: "flow_done",
+        step: { name: "done", complete: "show" },
+        handoff_token: "ht_resumed",
+      });
+    });
+    const received: Record<string, unknown>[] = [];
+
+    await renderWidget(
+      <ZitadelLogin
+        project={project}
+        resumeFlowId="flow_done"
+        onFlowComplete$={$((detail) => {
+          received.push({ ...detail });
+        })}
+      />,
+    );
+
+    await expect.poll(() => received.map((detail) => detail.handoff_token)).toEqual(["ht_resumed"]);
+  });
+});
+
+describe("early event buffer", () => {
+  const emit = (el: Element, name: string, detail: Record<string, unknown>): void => {
+    el.dispatchEvent(new CustomEvent(name, { detail, bubbles: true, composed: true }));
+  };
+  const hostElement = (wrapper: boolean): HTMLElement => {
+    // A plain element: only the event plumbing is under test, not a live widget.
+    const el = document.createElement("div");
+    if (wrapper) {
+      el.setAttribute(WRAPPER_MARKER, "");
+    }
+    document.body.appendChild(el);
+    return el;
+  };
+  const replayed = (el: Element, names: readonly string[]): string[] => {
+    const seen: string[] = [];
+    const cleanup = listenWithReplay(
+      el,
+      Object.fromEntries(
+        names.map((name) => [
+          name,
+          (e: Event) => seen.push(`${name}:${JSON.stringify((e as CustomEvent).detail)}`),
+        ]),
+      ),
+    );
+    cleanup();
+    return seen;
+  };
+  const ALL = [
+    "zitadel-flow-step",
+    "zitadel-flow-input",
+    "zitadel-flow-complete",
+    "zitadel-flow-redirect",
+    "zitadel-flow-error",
+    "zitadel-signout",
+  ];
+
+  it("ignores events from a raw widget that no wrapper rendered", () => {
+    const raw = hostElement(false);
+    emit(raw, "zitadel-flow-complete", { handoff_token: "ht" });
+    emit(raw, "zitadel-signout", {});
+
+    expect(replayed(raw, ALL)).toEqual([]);
+  });
+
+  it("never retains flow input values, even for a wrapper host", () => {
+    const el = hostElement(true);
+    emit(el, "zitadel-flow-input", { name: "password", value: "hunter2" });
+    emit(el, "zitadel-flow-step", { step: "password" });
+
+    expect(replayed(el, ALL)).toEqual([]);
+  });
+
+  it("replays the terminal events of a wrapper host in order after a late attach", () => {
+    const el = hostElement(true);
+    emit(el, "zitadel-flow-error", { n: 1 });
+    emit(el, "zitadel-flow-redirect", { n: 2 });
+    emit(el, "zitadel-flow-complete", { n: 3 });
+    emit(el, "zitadel-signout", { n: 4 });
+
+    expect(replayed(el, ALL)).toEqual([
+      'zitadel-flow-error:{"n":1}',
+      'zitadel-flow-redirect:{"n":2}',
+      'zitadel-flow-complete:{"n":3}',
+      'zitadel-signout:{"n":4}',
+    ]);
+  });
+
+  it("keeps only the newest events per host", () => {
+    const el = hostElement(true);
+    for (let n = 0; n < 20; n++) {
+      emit(el, "zitadel-flow-error", { n });
+    }
+
+    const seen = replayed(el, ALL);
+    expect(seen).toHaveLength(8);
+    expect(seen[0]).toBe('zitadel-flow-error:{"n":12}');
+    expect(seen[7]).toBe('zitadel-flow-error:{"n":19}');
+  });
+
+  it("drops the buffer once the listeners attach and stops collecting", () => {
+    const el = hostElement(true);
+    emit(el, "zitadel-flow-complete", { n: 1 });
+    const live: string[] = [];
+    const cleanup = listenWithReplay(el, {
+      "zitadel-flow-complete": (e) => live.push(String((e as CustomEvent).detail.n)),
+    });
+    emit(el, "zitadel-flow-complete", { n: 2 });
+    cleanup();
+
+    expect(live).toEqual(["1", "2"]);
+    expect(replayed(el, ALL)).toEqual([]);
+  });
+
+  it("marks the host each wrapper renders", async () => {
+    const host = await renderWidget(
+      <>
+        <ZitadelLogin project={project} />
+        <ZitadelLogout project={project} />
+        <ZitadelSession project={project} />
+      </>,
+    );
+
+    for (const tag of ["zitadel-login", "zitadel-logout", "zitadel-session"]) {
+      expect(host.querySelector(tag)?.hasAttribute(WRAPPER_MARKER)).toBe(true);
+    }
+  });
+});
+
+// Assigning `undefined` to a custom-element property overwrites its default,
+// so an unset prop must leave the element's own default in place.
+describe("unset props keep the element's defaults", () => {
+  it.each([
+    ["heading", "Signed in as"],
+    ["logoutLabel", "Sign out"],
+    ["variant", "widget"],
+    ["theme", ""],
+    ["suppressHeader", false],
+  ] as const)("ZitadelSession keeps the default %s", async (prop, expected) => {
+    const host = await renderWidget(<ZitadelSession project={project} />);
+    await macrotask();
+
+    expect(host.querySelector<ZitadelSessionElement>("zitadel-session")![prop]).toBe(expected);
+  });
+
+  it.each([
+    ["variant", "widget"],
+    ["theme", ""],
+    ["suppressHeader", false],
+    ["lang", ""],
+    ["suppressPasswordToggle", false],
+  ] as const)("ZitadelLogin keeps the default %s", async (prop, expected) => {
+    const host = await renderWidget(<ZitadelLogin project={project} />);
+    await macrotask();
+
+    expect(host.querySelector<ZitadelLoginElement>("zitadel-login")![prop]).toBe(expected);
+  });
+
+  it("ZitadelLogout keeps the default theme", async () => {
+    const host = await renderWidget(<ZitadelLogout project={project} />);
+    await macrotask();
+
+    expect(host.querySelector<ZitadelLogoutElement>("zitadel-logout")!.theme).toBe("");
+  });
+});
+
+describe("props that become unset restore the element's defaults", () => {
+  it.each([
+    ["heading", "Custom", "Signed in as"],
+    ["logoutLabel", "Leave", "Sign out"],
+    ["variant", "page", "widget"],
+    ["theme", "light", ""],
+    ["suppressHeader", true, false],
+  ] as const)("ZitadelSession restores the default %s", async (prop, given, expected) => {
+    const host = await renderWidget(
+      <UnsetPropHarness widget="session" prop={prop} given={given} />,
+    );
+    const el = () => host.querySelector<ZitadelSessionElement>("zitadel-session")!;
+    await expect.poll(() => el()[prop]).toBe(given);
+
+    await expect.poll(() => window.__unsetProp).toBeTypeOf("function");
+    window.__unsetProp!();
+    await expect.poll(() => el()[prop]).toBe(expected);
+  });
+
+  it.each([
+    ["variant", "page", "widget"],
+    ["theme", "light", ""],
+    ["suppressHeader", true, false],
+    ["lang", "de", ""],
+    ["suppressPasswordToggle", true, false],
+  ] as const)("ZitadelLogin restores the default %s", async (prop, given, expected) => {
+    const host = await renderWidget(<UnsetPropHarness widget="login" prop={prop} given={given} />);
+    const el = () => host.querySelector<ZitadelLoginElement>("zitadel-login")!;
+    await expect.poll(() => el()[prop]).toBe(given);
+
+    await expect.poll(() => window.__unsetProp).toBeTypeOf("function");
+    window.__unsetProp!();
+    await expect.poll(() => el()[prop]).toBe(expected);
+  });
+
+  it("ZitadelLogout restores the default theme", async () => {
+    const host = await renderWidget(
+      <UnsetPropHarness widget="logout" prop="theme" given="light" />,
+    );
+    const el = () => host.querySelector<ZitadelLogoutElement>("zitadel-logout")!;
+    await expect.poll(() => el().theme).toBe("light");
+
+    await expect.poll(() => window.__unsetProp).toBeTypeOf("function");
+    window.__unsetProp!();
+    await expect.poll(() => el().theme).toBe("");
+  });
+});
+
+// The package ships only what its build emits, so an `exports` target the build
+// misses breaks every consumer that imports it. `test` runs after `build`. This
+// lane runs in a browser, so the built files are listed at transform time with
+// a glob over `dist` rather than read from disk.
+describe("package manifest", () => {
+  const manifest = manifestJson as {
+    main?: string;
+    module?: string;
+    types?: string;
+    exports: unknown;
+    peerDependencies: Record<string, string>;
+  };
+  const built = Object.keys(import.meta.glob("../dist/**/*", { query: "?url" }));
+
+  function targets(value: unknown): string[] {
+    if (typeof value === "string") return value.startsWith("./") ? [value] : [];
+    if (value && typeof value === "object") return Object.values(value).flatMap(targets);
+    return [];
+  }
+
+  it("ships every exports target in dist", () => {
+    const declared = targets([manifest.exports, manifest.main, manifest.module, manifest.types]);
+    expect(declared.length).toBeGreaterThan(0);
+    expect(declared.filter((file) => !built.includes(file.replace("./dist", "../dist")))).toEqual(
+      [],
+    );
+  });
+
+  it("declares its supported peer ranges", () => {
+    expect(manifest.peerDependencies).toEqual({
+      "@qwik.dev/core": "^2.0.0-beta.45",
+    });
+  });
+});
+
+describe("ZitadelLogin resumeFlowId", () => {
+  it("drops the handle when the prop goes from a value back to unset", async () => {
+    const host = await renderWidget(<ResumeFlowIdHarness />);
+    const el = () => host.querySelector<ZitadelLoginElement>("zitadel-login")!;
+    await expect.poll(() => el().resumeFlowId).toBe("flow_123");
+
+    await expect.poll(() => window.__unsetResumeFlowId).toBeTypeOf("function");
+    window.__unsetResumeFlowId!();
+    await expect.poll(() => el().resumeFlowId).toBe("");
+  });
+});
+
+// The element's value for each key, so a key the wrapper drops shows up by name.
+const elementValues = (el: object, config: object): Record<string, unknown> =>
+  Object.fromEntries(Object.keys(config).map((key) => [key, (el as Record<string, unknown>)[key]]));
+
+describe("wrapper config parity", () => {
+  it("forwards every ZitadelLoginConfig key to <zitadel-login>", async () => {
+    const host = await renderWidget(<LoginConfigHarness />);
+    const el = host.querySelector<ZitadelLoginElement>("zitadel-login");
+    expect(elementValues(el!, loginConfig)).toEqual(loginConfig);
+  });
+
+  it("forwards every ZitadelSessionConfig key to <zitadel-session>", async () => {
+    const host = await renderWidget(<SessionConfigHarness />);
+    const el = host.querySelector<ZitadelSessionElement>("zitadel-session");
+    expect(elementValues(el!, sessionConfig)).toEqual(sessionConfig);
+  });
+
+  it("forwards every ZitadelLogoutConfig key to <zitadel-logout>", async () => {
+    const host = await renderWidget(<LogoutConfigHarness />);
+    const el = host.querySelector<ZitadelLogoutElement>("zitadel-logout");
+    expect(elementValues(el!, logoutConfig)).toEqual(logoutConfig);
   });
 });

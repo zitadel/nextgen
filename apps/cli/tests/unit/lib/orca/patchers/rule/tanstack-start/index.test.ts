@@ -72,9 +72,17 @@ describe("TanStackStartPatcher.plan", () => {
   it("guards the profile route in beforeLoad through a server function", () => {
     const profile = writeContents(new TanStackStartPatcher().plan(ctx()), "src/routes/profile.tsx");
 
-    expect(profile).toContain(
-      "const fetchAuth = createServerFn().handler(({ context }) => getAuth(context));",
-    );
+    expect(profile).toContain("const fetchAuth = createServerFn().handler(({ context }) => {");
+  });
+
+  // A server function's return value reaches browser scripts, and getAuth's
+  // session carries the raw session token.
+  it("returns only client-safe auth fields from the profile server function", () => {
+    const profile = writeContents(new TanStackStartPatcher().plan(ctx()), "src/routes/profile.tsx");
+
+    expect(profile).toContain("return { isAuthenticated, userId: session?.userId ?? null };");
+    expect(profile).not.toMatch(/=>\s*getAuth\(|return\s+getAuth\(/);
+    expect(profile).not.toMatch(/\.token\b|\btoken\b/);
   });
 
   it("redirects a signed-out profile visit to login from beforeLoad", () => {

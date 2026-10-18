@@ -35,3 +35,11 @@ tasks:
     deps:
       # contract.spec.ts imports @zitadel/components/events from its dist.
       - "components:build"
+    inputs:
+      - "**/*"
+      # contract.spec.ts reads these SDK specs to check their copied
+      # SERVER_RENDER_CASES tables for drift.
+      - "/packages/sdk-react/src/index.spec.tsx"
+      - "/packages/sdk-vue/src/components.spec.ts"
+      - "/packages/sdk-angular/src/lib/components.spec.ts"
+      - "/packages/sdk-svelte/src/index.spec.ts"

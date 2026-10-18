@@ -11,7 +11,8 @@ import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
 import { zitadelTrustmarkInnerHtml } from "../internal/attribution-markup.js";
 import type { Liquid, Template } from "liquidjs";
 import { css, html, LitElement, nothing, type PropertyValues } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, state } from "lit/decorators.js";
+import { property } from "../internal/property.js";
 
 import "../atoms/index.js";
 import type { ZlFieldInputDetail, ZlSubmitDetail } from "../atoms/index.js";
@@ -214,8 +215,16 @@ export class ZitadelLogin extends ZitadelSurface {
    * Leaving it empty falls back to the `flow` query parameter, which is how a
    * provider callback hands the flow back (see {@link flowIdFromLocation}), so
    * a host page needs no code of its own for external sign-in to finish.
+   * Unset, `null` or `""` all mean "no handle".
    */
-  @property({ type: String, attribute: "resume-flow-id" }) accessor resumeFlowId = "";
+  @property({ type: String, attribute: "resume-flow-id" })
+  get resumeFlowId(): string {
+    return this.#resumeFlowId;
+  }
+  set resumeFlowId(value: string | null | undefined) {
+    this.#resumeFlowId = value || "";
+  }
+  #resumeFlowId = "";
 
   /**
    * Hide the show/hide button on password fields. The button is shown by

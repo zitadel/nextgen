@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -91,7 +92,7 @@ func TestPrepareServerRendersTheMasterKeyIntoTheConfig(t *testing.T) {
 	require.NoError(t, err)
 
 	configPath := filepath.Join(dataDir, "nextgen.yaml")
-	assert.Equal(t, []string{"server", "--config", configPath}, args)
+	assert.Equal(t, []string{"server", "--config", configPath, "--migrate"}, args, "a local run migrates its own database")
 
 	config, err := os.ReadFile(configPath)
 	require.NoError(t, err)
@@ -366,7 +367,7 @@ func TestPrepareServerRendersTheBootstrapAdminDocument(t *testing.T) {
 	require.NoError(t, err)
 
 	adminPath := filepath.Join(dataDir, "admin-user.json")
-	assert.Equal(t, []string{"server", "--config", filepath.Join(dataDir, "nextgen.yaml"), "--user-file", adminPath, "--disable-master-key-generation"}, args)
+	assert.Equal(t, []string{"server", "--config", filepath.Join(dataDir, "nextgen.yaml"), "--migrate", "--user-file", adminPath, "--disable-master-key-generation"}, args)
 	written, err := os.ReadFile(adminPath)
 	require.NoError(t, err)
 	assert.Equal(t, doc, string(written))
@@ -381,6 +382,34 @@ func TestPrepareServerLocallyKeepsTheConfiguredDatabase(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "postgres://local/db", os.Getenv("NEXTGEN_DATABASE_POSTGRES"), "without CLOUD_DATABASE_URL a local run keeps its own database")
+}
+
+// Only a local run serving its own database migrates when it starts: no build
+// step ran for it. A deployment, or a local run against a cloud database,
+// never changes a schema by starting.
+func TestPrepareServerMigratesOnlyALocalRunsOwnDatabase(t *testing.T) {
+	for _, tc := range []struct {
+		name, env, databaseURL string
+		migrates               bool
+	}{
+		{name: "by hand", env: "", migrates: true},
+		{name: "vercel dev", env: "development", migrates: true},
+		{name: "local against a cloud database", env: "", databaseURL: pooledURL},
+		{name: "preview", env: "preview", databaseURL: pooledURL},
+		{name: "production", env: "production", databaseURL: pooledURL},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setLauncherEnv(t, t.TempDir())
+			t.Setenv("VERCEL_ENV", tc.env)
+			t.Setenv("VERCEL_GIT_COMMIT_REF", branch)
+			t.Setenv("CLOUD_DATABASE_URL", tc.databaseURL)
+
+			args, err := prepareServer(nil)
+			require.NoError(t, err)
+
+			assert.Equal(t, tc.migrates, slices.Contains(args, "--migrate"), "args: %q", args)
+		})
+	}
 }
 
 func TestPrepareServerRefusesBadInput(t *testing.T) {

@@ -2,6 +2,7 @@ import { rm } from "node:fs/promises";
 import { join } from "node:path";
 
 import { AbstractCLIScaffolder } from "./cli";
+import type { NodeEngines } from "./node-engines";
 import { removeInstall } from "./remove-install";
 
 /**
@@ -26,7 +27,14 @@ export class QwikCityScaffolder extends AbstractCLIScaffolder {
   readonly displayName = "Qwik City";
   readonly supportedFrameworks: ReadonlyArray<string> = ["qwik-city"];
 
-  async scaffold(cwd: string, _framework: string): Promise<void> {
+  readonly nodeEngines: NodeEngines = {
+    label: "create-qwik",
+    spec: CREATE_QWIK,
+    fallback: "^18.17.0 || ^20.3.0 || >=21.0.0",
+    enforcement: "warn",
+  };
+
+  protected async create(cwd: string, _framework: string): Promise<void> {
     this.runCommand("npx", ["-y", CREATE_QWIK, "empty", ".", "--installDeps=false"], cwd);
     await rm(join(cwd, "src/routes/index.tsx"), { force: true });
     // Setup must install the workspace packages from the detected registry with

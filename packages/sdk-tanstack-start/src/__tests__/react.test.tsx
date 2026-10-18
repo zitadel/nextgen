@@ -14,9 +14,12 @@ import type {
   ZitadelFlowInputDetail,
   ZitadelFlowRedirectDetail,
   ZitadelFlowStepDetail,
+  ZitadelLoginConfig,
   ZitadelLoginProps,
   ZitadelLoginReactProps,
+  ZitadelLogoutConfig,
   ZitadelLogoutProps,
+  ZitadelSessionConfig,
   ZitadelSessionProps,
   ZitadelSignoutDetail,
 } from "../react";
@@ -196,5 +199,62 @@ describe("@zitadel/sdk-tanstack-start/react", () => {
     expectTypeOf<ZitadelLoginReactProps>().toEqualTypeOf<sdkReact.ZitadelLoginReactProps>();
     expectTypeOf<ZitadelLogoutProps>().toEqualTypeOf<sdkReact.ZitadelLogoutProps>();
     expectTypeOf<ZitadelSessionProps>().toEqualTypeOf<sdkReact.ZitadelSessionProps>();
+  });
+});
+
+// Every config key set to a distinct value. `Required<…>` makes `tsc` fail here
+// when a key is added to a config type, so a new key cannot skip this check.
+const loginConfig: Required<ZitadelLoginConfig> = {
+  project,
+  projectId: "proj-parity",
+  proxyPath: "/__parity",
+  variant: "page",
+  theme: "dark",
+  suppressHeader: true,
+  suppressPasswordToggle: true,
+  purpose: "register",
+  flowName: "parity-flow",
+  postSignInUrl: "/parity-after-login",
+  resumeFlowId: "flow_parity",
+  locales: { en: { "identifier.title": "Parity" } },
+  lang: "de",
+};
+
+const sessionConfig: Required<ZitadelSessionConfig> = {
+  project,
+  projectId: "proj-parity",
+  proxyPath: "/__parity",
+  postSignOutUrl: "/parity-after-sign-out",
+  heading: "Parity heading",
+  logoutLabel: "Parity sign out",
+  variant: "page",
+  theme: "dark",
+  suppressHeader: true,
+};
+
+const logoutConfig: Required<ZitadelLogoutConfig> = {
+  project,
+  projectId: "proj-parity",
+  proxyPath: "/__parity",
+  postSignOutUrl: "/parity-after-sign-out",
+  theme: "dark",
+};
+
+// The element's value for each key, so a key the wrapper drops shows up by name.
+const elementValues = (el: object, config: object): Record<string, unknown> =>
+  Object.fromEntries(Object.keys(config).map((key) => [key, (el as Record<string, unknown>)[key]]));
+
+describe("wrapper config parity", () => {
+  it.each([
+    ["ZitadelLoginConfig", "zitadel-login", ZitadelLogin, loginConfig],
+    ["ZitadelSessionConfig", "zitadel-session", ZitadelSession, sessionConfig],
+    ["ZitadelLogoutConfig", "zitadel-logout", ZitadelLogout, logoutConfig],
+  ])("forwards every %s key to <%s>", async (_name, tag, Widget, config) => {
+    await act(async () => {
+      root = createRoot(container);
+      root.render(createElement(Widget as ElementType, config));
+    });
+
+    expect(elementValues(container.querySelector(tag) as Element, config)).toEqual(config);
   });
 });

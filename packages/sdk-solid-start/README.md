@@ -48,9 +48,6 @@ export default defineConfig({
 });
 ```
 
-> SolidStart 1 instead read `middleware` from a top-level `app.config.ts` field
-> (`defineConfig({ middleware })`). On SolidStart 1, set it there.
-
 The middleware runs on every request and does three things in one pass:
 
 1. **Proxies** `/__nextgen/*` requests to the auth backend. The project secret

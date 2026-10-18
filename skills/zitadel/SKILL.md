@@ -49,7 +49,7 @@ that way to get the CLI and per-framework skills alongside this router.
 The CLI can **scaffold** a fresh app for every framework above, but it can only
 **integrate (patch) an existing project for Next.js**. For an existing app in any
 other framework, the CLI cannot wire it up on its own — reach for that framework's
-SDK skill and add auth by hand: install `@zitadel/sdk-<framework>`, configure it,
+SDK skill and add auth by hand: install `@zitadel/sdk-<framework>@alpha`, configure it,
 add the provider/guard/routes, and drop in the login component. That SDK skill is
 the authoritative path for the existing-app case.
 
