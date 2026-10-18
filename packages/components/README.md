@@ -367,10 +367,7 @@ the card and is also its sign-out target (`/account` with
 does not reload itself forever. A sign-out on that page still navigates there,
 which reloads it once.
 
-The card also does not repeat a no-session navigation from the same page to
-the same target within ten seconds (remembered in `sessionStorage`). When the
-target sends the visitor straight back, for example `post-sign-out-url="/"`
-where `/` redirects to the card's page, the second visit renders nothing.
+The card also does not navigate when the visitor was sent to it from the target or from the card's own page, judged by the browser's referrer, which survives redirects. Do not point `post-sign-out-url` at a page that leads back to a page with this card; the card stays put on the second visit.
 
 A `200` from `GET /sessions/me` with an empty `session_id` is an error the
 widgets show, not a signed-out visitor, matching the server SDKs.

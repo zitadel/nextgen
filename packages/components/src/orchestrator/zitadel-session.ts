@@ -9,23 +9,8 @@ import { baseHostStyles, t } from "../styles/index.js";
 
 import "../atoms/index.js";
 
-// How long a no-session navigation from one page to another is remembered.
-// Long enough to span a redirect back and the reload it causes, short enough
-// that a visitor who returns on purpose later is sent on again.
-const LEAVE_LOOP_WINDOW_MS = 10_000;
-const LEAVE_STORAGE_KEY = "zitadel-session:no-session-leave";
-
-interface Leave {
-  readonly from: string;
-  readonly to: string;
-  readonly at: number;
-}
-
-// Enough for a loop through several cards, bounded so storage cannot grow.
-const LEAVE_HISTORY_LIMIT = 10;
-
 /**
- * A page's identity for the same-page and loop checks: origin, path without
+ * A page's identity for the same-page and referrer checks: origin, path without
  * a trailing slash (hosts add or strip it with a redirect) and the query
  * parameters in key order. The fragment is ignored, since assigning one does
  * not reload.
@@ -35,27 +20,6 @@ function pageKey(url: URL): string {
   const params = new URLSearchParams(url.search);
   params.sort();
   return `${url.origin}${path}?${params.toString()}`;
-}
-
-// Storage can be missing or throw (privacy modes, sandboxed frames); the
-// guard is then off and the card navigates as before.
-function readLeaves(): Leave[] {
-  try {
-    const raw = window.sessionStorage.getItem(LEAVE_STORAGE_KEY);
-    if (!raw) return [];
-    const value: unknown = JSON.parse(raw);
-    if (!Array.isArray(value)) return [];
-    return value.filter(
-      (entry): entry is Leave =>
-        typeof entry === "object" &&
-        entry !== null &&
-        typeof (entry as Leave).from === "string" &&
-        typeof (entry as Leave).to === "string" &&
-        typeof (entry as Leave).at === "number",
-    );
-  } catch {
-    return [];
-  }
 }
 
 /**
@@ -194,9 +158,10 @@ export class ZitadelSession extends ZitadelSurface {
 
   /**
    * The no-session navigation to `postSignOutUrl`, skipped when that URL is
-   * this page, or when this page made the same navigation moments ago: the
-   * host or the server sent the visitor back here (a redirect from the target
-   * to this page), and navigating again would reload the two pages forever.
+   * this page, or when the visitor was sent here from this page or from that URL
+   * (the browser keeps the original referrer across redirects): the host or the
+   * server sent the visitor back here, and navigating again would reload the two
+   * pages forever.
    */
   private leaveWithoutSession(): void {
     if (!this.postSignOutUrl || typeof window === "undefined") return;
@@ -210,20 +175,14 @@ export class ZitadelSession extends ZitadelSurface {
     } catch {
       return;
     }
-    const from = pageKey(here);
-    const to = pageKey(target);
-    if (from === to) return;
-    const now = Date.now();
-    // Every recent hop is kept, not just the last: cards on two pages that send
-    // visitors to each other would otherwise overwrite one another's record.
-    const recent = readLeaves().filter((entry) => now - entry.at < LEAVE_LOOP_WINDOW_MS);
-    if (recent.some((entry) => entry.from === from && entry.to === to)) return;
+    let came = "";
     try {
-      const leaves = [...recent, { from, to, at: now }].slice(-LEAVE_HISTORY_LIMIT);
-      window.sessionStorage.setItem(LEAVE_STORAGE_KEY, JSON.stringify(leaves));
+      if (document.referrer) came = pageKey(new URL(document.referrer));
     } catch {
-      // See readLeaves.
+      // An unreadable referrer proves nothing, so the card navigates as before.
     }
+    const from = pageKey(here);
+    if (from === pageKey(target) || came === from || came === pageKey(target)) return;
     this.leave();
   }
 
