@@ -68,6 +68,19 @@ function proxyConfigEdit(): (source: string | undefined) => string {
   return op.edit;
 }
 
+function proxyConfigReview(): (source: string, path: string) => string | undefined {
+  const op = new AngularPatcher()
+    .plan(ctx())
+    .ops.find(
+      (candidate): candidate is Extract<FileOp, { kind: "edit" }> =>
+        candidate.kind === "edit" && candidate.path === "proxy.conf.cjs",
+    );
+  if (!op?.review) {
+    throw new Error("expected a review on the proxy.conf.cjs edit op in the Angular plan");
+  }
+  return op.review;
+}
+
 /**
  * The managed proxy as setup wrote it before it kept the session token out of
  * the browser: it relayed every response body as the server sent it.
@@ -263,6 +276,39 @@ describe("AngularPatcher.plan", () => {
       expect(proxyConfigEdit()(rewriting)).toBe(rewriting);
     },
   );
+
+  it("asks for review of a managed proxy left without the redaction by its own response hook", () => {
+    const hooked = unredactedProxyConf().replace(
+      "    onProxyReq: setBearer,\n",
+      '    onProxyRes: (proxyRes) => delete proxyRes.headers["set-cookie"],\n    onProxyReq: setBearer,\n',
+    );
+
+    expect(proxyConfigReview()(proxyConfigEdit()(hooked), "proxy.conf.cjs")).toMatch(
+      /proxy\.conf\.cjs.*session_token.*(own proxy hook|cookie rewrite)/,
+    );
+  });
+
+  it.each(["cookieDomainRewrite", "cookiePathRewrite"])(
+    "asks for review of a managed proxy left without the redaction by %s",
+    (option) => {
+      const rewriting = unredactedProxyConf()
+        .replace("    onProxyReq: setBearer,\n", `    ${option}: "",\n    onProxyReq: setBearer,\n`)
+        .replace(/\n/g, "\r\n");
+
+      expect(proxyConfigReview()(rewriting, "proxy.conf.cjs")).toContain("session_token");
+    },
+  );
+
+  it("asks for nothing when the managed proxy is redacted or unmanaged", () => {
+    const review = proxyConfigReview();
+    const hooked = unredactedProxyConf().replace(
+      "    onProxyReq: setBearer,\n",
+      "    onProxyRes: () => {},\n    onProxyReq: setBearer,\n",
+    );
+
+    expect(review(proxyConfigEdit()(unredactedProxyConf()), "proxy.conf.cjs")).toBeUndefined();
+    expect(review(hooked.replace(`${MANAGED_MARKER}\n`, ""), "proxy.conf.cjs")).toBeUndefined();
+  });
 
   it("adds the redaction to a managed proxy written with CRLF line endings", () => {
     const edit = proxyConfigEdit();

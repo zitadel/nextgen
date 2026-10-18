@@ -423,6 +423,19 @@ describe("DependencyCheck", () => {
   });
 });
 
+/** The managed proxy as setup wrote it before the session-token redaction. */
+function withoutRedaction(proxyConf: string): string {
+  return proxyConf
+    .replace(
+      /\n\nconst zitadelZlib = require\("node:zlib"\);\n\n\/\* zitadel:proxy:exchange-redaction:v2 \*\/[\s\S]*?(?=\n\nfunction stripPrefix)/,
+      "",
+    )
+    .replace(
+      / {4}selfHandleResponse: true,\n[\s\S]*?\n {4}},\n(?= {2}},\n};)/,
+      '    onProxyReq: setBearer,\n    configure: (proxy) => proxy.on("proxyReq", setBearer),\n',
+    );
+}
+
 describe("ManagedFilesCheck", () => {
   type ManagedDetails = {
     mode: "manifest" | "template";
@@ -750,15 +763,7 @@ describe("ManagedFilesCheck", () => {
   it("fails on a managed proxy that relays the session token, and --fix adds the redaction", async () => {
     const cwd = await makeAngularProject();
     const proxyPath = join(cwd, "proxy.conf.cjs");
-    const unredacted = proxyConfTemplate()
-      .replace(
-        /\n\nconst zitadelZlib = require\("node:zlib"\);\n\n\/\* zitadel:proxy:exchange-redaction:v2 \*\/[\s\S]*?(?=\n\nfunction stripPrefix)/,
-        "",
-      )
-      .replace(
-        / {4}selfHandleResponse: true,\n[\s\S]*?\n {4}},\n(?= {2}},\n};)/,
-        '    onProxyReq: setBearer,\n    configure: (proxy) => proxy.on("proxyReq", setBearer),\n',
-      );
+    const unredacted = withoutRedaction(proxyConfTemplate());
     await writeFile(proxyPath, unredacted);
     const check = new ManagedFilesCheck();
     const before = await check.run(ctxFor(cwd));
@@ -769,6 +774,24 @@ describe("ManagedFilesCheck", () => {
 
     expect(await readFile(proxyPath, "utf8")).toBe(proxyConfTemplate());
     expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("warns, naming the file, when a managed proxy's own response hook kept the redaction out", async () => {
+    const cwd = await makeAngularProject();
+    const hooked = withoutRedaction(proxyConfTemplate()).replace(
+      "    onProxyReq: setBearer,\n",
+      '    onProxyRes: (proxyRes) => delete proxyRes.headers["set-cookie"],\n    onProxyReq: setBearer,\n',
+    );
+    await writeFile(join(cwd, "proxy.conf.cjs"), hooked);
+    const check = new ManagedFilesCheck();
+
+    const result = await check.run(ctxFor(cwd));
+    await check.fix(ctxFor(cwd));
+
+    expect(result.status).toBe("warn");
+    expect(result.message).toMatch(/manual review required.*proxy\.conf\.cjs.*session_token/);
+    expect(await readFile(join(cwd, "proxy.conf.cjs"), "utf8")).toBe(hooked);
+    expect((await check.run(ctxFor(cwd))).status).toBe("warn");
   });
 
   it("fails on a managed proxy with the first redaction, and --fix upgrades it", async () => {

@@ -370,10 +370,27 @@ export function proxyEntryRange(
  * `onProxyRes`), or rewrites the cookies it relays (`cookieDomainRewrite`,
  * `cookiePathRewrite`). The redaction takes over writing every response, so a
  * hook would run against headers already sent and the proxy's own cookie
- * rewriting would no longer apply; such an entry is left as it is. The CLI's generated entries before the redaction had none.
+ * rewriting would no longer apply; such an entry is left as it is, and `zitadel doctor` and `setup` say so. The
+ * CLI's generated entries before the redaction had none.
  */
 export function hasResponseHook(entry: string): boolean {
   return /proxyRes|cookie(?:Domain|Path)Rewrite/i.test(entry);
+}
+
+/** Whether `text` holds a generated redaction of any version; an older one is upgraded, not skipped. */
+export function carriesGeneratedRedaction(text: string): boolean {
+  return text.includes("zitadel:proxy:exchange-redaction");
+}
+
+/**
+ * What to tell the developer when a managed `/__nextgen` entry was left
+ * without the session-token redaction because of a response hook or cookie
+ * rewrite of their own. The edit returns the file as it was, so without this
+ * note `zitadel doctor` would read the wiring as applied while the exchange
+ * answer still carries `session_token`.
+ */
+export function skippedRedactionNote(path: string): string {
+  return `${path}: the ${PROXY_PATH} proxy entry has its own proxyRes hook or cookie rewrite, so the session-token redaction was not added and POST /sessions/exchange answers still carry session_token to the browser. Move the redaction into your own proxy hook (drop session_token from that answer's body) or remove the cookie rewrite and run zitadel doctor --fix.`;
 }
 
 function indented(code: string, indent: string): string {

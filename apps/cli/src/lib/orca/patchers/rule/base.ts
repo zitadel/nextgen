@@ -140,10 +140,17 @@ export abstract class AbstractRulePatcher implements Patcher {
         continue;
       }
       try {
+        const note = op.review?.(source, path);
         statuses.push({
           path,
           wiring: op.wiring,
-          state: op.edit(source, path) === source ? "applied" : "detached",
+          state:
+            note !== undefined
+              ? "unknown"
+              : op.edit(source, path) === source
+                ? "applied"
+                : "detached",
+          ...(note === undefined ? {} : { reason: note }),
         });
       } catch (error) {
         statuses.push({

@@ -1,8 +1,9 @@
 import { chmod, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 
 import { ZitadelError } from "../../../../errors";
 import { isObject, parseJsonObject, setTopLevelJsonKey, stableStringify } from "../../../../json";
+import { reportWarning } from "../../../../warnings";
 import type { PatchedFile } from "../../types";
 import type { FileOp, ScaffoldPlan, ScaffoldResult } from "./types";
 
@@ -108,7 +109,7 @@ async function applyOp(
       await addDependency(abs(opts.cwd, "package.json"), op, opts.dryRun, result);
       break;
     case "edit":
-      await editFile(opts.cwd, op.path, op.edit, opts.dryRun, result);
+      await editFile(opts.cwd, op.path, op.edit, op.review, opts.dryRun, result);
       break;
   }
 }
@@ -124,6 +125,7 @@ async function editFile(
   cwd: string,
   pathOrPaths: string | ReadonlyArray<string>,
   edit: (source: string | undefined, path?: string) => string,
+  review: ((source: string, path: string) => string | undefined) | undefined,
   dryRun: boolean,
   result: ScaffoldAccumulator,
 ): Promise<void> {
@@ -152,6 +154,10 @@ async function editFile(
     }
   }
   const next = edit(source, path);
+  const note = review?.(next, relative(cwd, path));
+  if (note !== undefined) {
+    reportWarning(note);
+  }
   if (next === source) {
     result.filesSkipped.push(path);
     return;

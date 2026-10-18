@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { ZitadelError } from "../../../../../../../src/lib/errors";
 import { scaffold } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/index";
+import { takeReportedWarnings } from "../../../../../../../src/lib/warnings";
 import type { ScaffoldPlan } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
 
 let dir: string;
@@ -439,6 +440,40 @@ describe("scaffold - edit", () => {
     );
     expect(result.filesWritten).toEqual([target]);
     expect(await readFile(target, "utf8")).toBe("export default {}\n// edited");
+  });
+
+  it("reports the note of an edit's review as a warning, even when the edit changes nothing", async () => {
+    await writeFile(join(dir, "proxy.conf.cjs"), "unchanged");
+    takeReportedWarnings();
+
+    await scaffold(
+      plan({
+        kind: "edit",
+        path: "proxy.conf.cjs",
+        edit: (s) => s ?? "",
+        review: (source, path) => `${path} needs review: ${source}`,
+      }),
+      { cwd: dir, dryRun: false, force: false },
+    );
+
+    expect(takeReportedWarnings()).toEqual(["proxy.conf.cjs needs review: unchanged"]);
+  });
+
+  it("reports nothing when an edit's review has no note", async () => {
+    await writeFile(join(dir, "proxy.conf.cjs"), "fine");
+    takeReportedWarnings();
+
+    await scaffold(
+      plan({
+        kind: "edit",
+        path: "proxy.conf.cjs",
+        edit: (s) => s ?? "",
+        review: () => undefined,
+      }),
+      { cwd: dir, dryRun: false, force: false },
+    );
+
+    expect(takeReportedWarnings()).toEqual([]);
   });
 
   it("edits the first existing candidate from a priority list", async () => {

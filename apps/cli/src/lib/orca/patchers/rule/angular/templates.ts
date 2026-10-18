@@ -11,7 +11,9 @@ import {
   exchangeRedactionFunctions,
   hasResponseHook,
   PROXY_CREDENTIAL_POLICY_MARKER,
+  carriesGeneratedRedaction,
   proxyEntryRange,
+  skippedRedactionNote,
   upgradeExchangeRedaction,
 } from "../proxy-credential-policy";
 
@@ -351,6 +353,21 @@ function upgradeLf(source: string): string {
   }
   assertNoUnreviewedProjectSecretProxy(source, "proxy.conf.cjs");
   return source.includes(MANAGED_MARKER) ? upgradeManaged(source) : source;
+}
+
+/**
+ * The note for a managed `proxy.conf.cjs` entry left without the redaction
+ * because of a response hook or cookie rewrite of the project's own, or
+ * `undefined` when there is nothing to review.
+ */
+export function proxyConfReview(source: string, path: string): string | undefined {
+  const lf = source.replace(/\r\n/g, "\n");
+  const range = source.includes(MANAGED_MARKER) ? managedEntryRange(lf) : undefined;
+  return range !== undefined &&
+    !carriesGeneratedRedaction(lf) &&
+    hasResponseHook(lf.slice(range.start, range.end))
+    ? skippedRedactionNote(path)
+    : undefined;
 }
 
 /**

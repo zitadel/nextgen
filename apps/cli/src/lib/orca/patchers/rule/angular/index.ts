@@ -7,7 +7,7 @@ import { AbstractRulePatcher } from "../base";
 import { angularEntry, assertMountsRootComponent, type RootMount } from "../root-component";
 import { angularProxyEdit } from "./angular-json";
 import { angularRoutesEdit } from "./angular-routes";
-import { appComponentTemplate, appTemplateHtml, proxyConfEdit } from "./templates";
+import { appComponentTemplate, appTemplateHtml, proxyConfEdit, proxyConfReview } from "./templates";
 
 const SDK_DEPENDENCY = "@zitadel/sdk-angular";
 
@@ -94,6 +94,7 @@ export class AngularPatcher extends AbstractRulePatcher {
         kind: "edit",
         path: "proxy.conf.cjs",
         edit: proxyConfEdit(),
+        review: proxyConfReview,
         // The transform creates the managed proxy when absent and safely
         // migrates the exact unconditional bearer hook emitted by older CLIs.
         wiring: "infrastructure",

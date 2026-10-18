@@ -7,6 +7,7 @@ import { Readable } from "node:stream";
 
 import { expect } from "vitest";
 
+import { UNREDACTED_VITE_CONFIG_WITH_RESPONSE_HOOK } from "./legacy-proxy";
 import { aFakeServerBinary, trackLocalServerDir, type ServerShape } from "./local-server";
 import { cliPackageRoot } from "./oclif-build";
 import { nextPort } from "./ports";
@@ -641,6 +642,14 @@ export class ScaffoldedApp {
     return writeFile(join(this.path, relativePath), contents);
   }
 
+  /**
+   * Leaves the Vite config with the proxy an earlier CLI wrote, and a response
+   * hook the developer added to it.
+   */
+  hookTheUnredactedProxyResponses(): Promise<void> {
+    return this.writeProjectFile("vite.config.ts", UNREDACTED_VITE_CONFIG_WITH_RESPONSE_HOOK);
+  }
+
   deleteProjectFile(relativePath: string): Promise<void> {
     return rm(join(this.path, relativePath));
   }
@@ -950,6 +959,48 @@ export async function anApp({
     "export default function RootLayout({ children }: { children: React.ReactNode }) { return <html><body>{children}</body></html>; }\n",
   );
   return new ScaffoldedApp(path);
+}
+
+/** A Vite and React app in a temp directory, for specs about the dev proxy `setup` writes into it. */
+export async function aReactApp(): Promise<ScaffoldedApp> {
+  const path = await mkdtemp(join(tmpdir(), "zitadel-react-"));
+  await mkdir(join(path, "src"), { recursive: true });
+  await writeFile(
+    join(path, "package.json"),
+    JSON.stringify(
+      {
+        name: "demo-react-app",
+        private: true,
+        type: "module",
+        dependencies: { react: "^19.0.0", "react-dom": "^19.0.0" },
+        devDependencies: { vite: "^7.0.0", "@vitejs/plugin-react": "^5.0.0" },
+      },
+      null,
+      2,
+    ),
+  );
+  await writeFile(join(path, ".gitignore"), "node_modules\n");
+  await writeFile(
+    join(path, "index.html"),
+    '<!doctype html>\n<html><body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body></html>\n',
+  );
+  await writeFile(
+    join(path, "src/main.tsx"),
+    "import { createRoot } from 'react-dom/client'\nimport App from './App.tsx'\n\ncreateRoot(document.getElementById('root')!).render(<App />)\n",
+  );
+  await writeFile(
+    join(path, "vite.config.ts"),
+    'import { defineConfig } from "vite";\nimport react from "@vitejs/plugin-react";\n\nexport default defineConfig({ plugins: [react()] });\n',
+  );
+  return new ScaffoldedApp(path);
+}
+
+/** A React app already through `setup`. */
+export async function aSetUpReactApp(): Promise<ScaffoldedApp> {
+  const app = await aReactApp();
+  const result = await app.setup();
+  expect(result, "arranging setup should have succeeded").toSucceed();
+  return app;
 }
 
 /** An app already through `setup`, for specs about the commands after it. */

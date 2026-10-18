@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp, type ScaffoldedApp } from "../helpers/project";
+import { aSetUpApp, aSetUpReactApp, type ScaffoldedApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 
@@ -94,6 +94,26 @@ describe("doctor", () => {
 
         expect(result).toSucceed();
         expect((await before.changes()).added).toContain("app/login/page.tsx");
+      });
+
+      it("names the proxy file whose own response hook keeps the session token in the exchange answer", async () => {
+        const app = await aSetUpReactApp();
+        await app.hookTheUnredactedProxyResponses();
+
+        const result = await app.doctor();
+
+        expect(result).toSay("vite.config.ts");
+        expect(result).toSay("session_token");
+      });
+
+      it("leaves a proxy with its own response hook alone while repairing", async () => {
+        const app = await aSetUpReactApp();
+        await app.hookTheUnredactedProxyResponses();
+        const before = await app.snapshot();
+
+        await app.doctor(["--fix"]);
+
+        expect((await before.changes()).modified).not.toContain("vite.config.ts");
       });
 
       it("removes nothing while repairing", async () => {

@@ -11,7 +11,9 @@ import {
   exchangeRedactionFunctions,
   hasResponseHook,
   PROXY_CREDENTIAL_POLICY_MARKER,
+  carriesGeneratedRedaction,
   proxyEntryRange,
+  skippedRedactionNote,
   upgradeExchangeRedaction,
 } from "./proxy-credential-policy";
 import {
@@ -325,6 +327,31 @@ export function viteProxyEdit(
 }
 
 /**
+ * The note for a managed dev proxy entry that the migration left without the
+ * redaction because of a response hook or cookie rewrite of the project's own,
+ * or `undefined` when there is nothing to review.
+ */
+export function viteProxyReview(source: string, path: string): string | undefined {
+  try {
+    const label = "the Vite config (vite.config.*)";
+    const parsed = parseConfigModule(source, label);
+    const range = proxyEntryRange(
+      source,
+      proxyTableNode(resolveDefaultExportObject(parsed, label)),
+    );
+    const entry = range === undefined ? undefined : source.slice(range.start, range.end);
+    return entry !== undefined &&
+      entry.includes(PROXY_CREDENTIAL_POLICY_MARKER) &&
+      !carriesGeneratedRedaction(entry) &&
+      hasResponseHook(entry)
+      ? skippedRedactionNote(path)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Candidate Vite config filenames, in resolution priority. The patcher hands
  * this list to the generic `edit` file-op, which patches the first one that
  * exists — so any project layout (`vite.config.ts`, `.mts`, `.js`, …) is covered.
@@ -350,6 +377,7 @@ export function buildViteProxyOp(devPort: number, server: string): FileOp {
     kind: "edit",
     path: [...VITE_CONFIG_PATHS],
     edit: viteProxyEdit(devPort, server),
+    review: viteProxyReview,
     // The dev proxy is the auth request path — the doctor managed-files
     // check fails when this merge is no longer applied.
     wiring: "infrastructure",

@@ -76,3 +76,46 @@ export function withFirstRedaction(current: string): string {
   }
   return legacy;
 }
+
+/**
+ * A Vite config holding the dev proxy as an earlier CLI wrote it, before it
+ * kept the session token out of the browser, with a response hook of the
+ * developer's own added: the redaction cannot be migrated into it.
+ */
+export const UNREDACTED_VITE_CONFIG_WITH_RESPONSE_HOOK = `import { defineConfig, loadEnv } from "vite";
+
+export default defineConfig({
+  server: {
+    port: 5173,
+    strictPort: true,
+    proxy: {
+      "/__nextgen": /* zitadel:proxy:v2 */ {
+        target: "http://127.0.0.1:8080",
+        changeOrigin: true,
+        xfwd: true,
+        rewrite: (path) => path.replace(/^\\/__nextgen/, "").replace(/^(?!\\/)/, "/"),
+        configure: (proxy) => {
+          const secret = loadEnv("development", process.cwd(), "ZITADEL_").ZITADEL_PROJECT_SECRET;
+          if (!secret) {
+            throw new Error("ZITADEL_PROJECT_SECRET is not set; add it to .env.local (zitadel setup writes it).");
+          }
+          const bearer = \`Bearer \${secret}\`;
+          proxy.on("proxyReq", (proxyReq) => {
+            const pathname = new URL(proxyReq.path, "http://zitadel.local").pathname;
+            if (
+              proxyReq.method === "POST" &&
+              pathname === "/sessions/exchange" &&
+              !proxyReq.getHeader("authorization")
+            ) {
+              proxyReq.setHeader("authorization", bearer);
+            }
+          });
+          proxy.on("proxyRes", (proxyRes) => {
+            delete proxyRes.headers["x-powered-by"];
+          });
+        },
+      },
+    },
+  },
+});
+`;

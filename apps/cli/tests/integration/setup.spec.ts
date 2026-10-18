@@ -3,7 +3,7 @@ import { realpath } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { anApp, type ScaffoldedApp } from "../helpers/project";
+import { aReactApp, anApp, type ScaffoldedApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 
@@ -108,6 +108,17 @@ describe("setup", () => {
 
         expect(result).toSucceed();
         expect((await before.changes()).added).toEqual(expect.arrayContaining(SCAFFOLDED_PAGES));
+      });
+
+      it("warns, naming the file, about a dev proxy whose own response hook keeps the session token in the exchange answer", async () => {
+        const app = await aReactApp();
+        await app.hookTheUnredactedProxyResponses();
+
+        const result = await app.setup();
+
+        expect(result).toSucceed();
+        expect(result).toSay("vite.config.ts");
+        expect(result).toSay("session_token");
       });
 
       it("reports the configuration files it wrote", async () => {

@@ -10,4 +10,8 @@ drops `session_token` from that one answer and keeps everything else, including 
 other call streams through unchanged. For an app set up earlier, run `zitadel doctor --fix`: it
 reports the proxy and adds the redaction in place, keeping your other changes to the file. A
 proxy entry you have rewritten by hand is left alone, so drop `session_token` from the
-`POST /sessions/exchange` response there yourself.
+`POST /sessions/exchange` response there yourself. When the entry has its own `proxyRes` hook or a
+cookie rewrite, `zitadel doctor` and `zitadel setup` warn, naming the file, and `doctor` no longer
+reports it as healthy. Only the `POST /sessions/exchange` answer is redacted, matching the SDKs'
+server-side scope: `session_token` in the other generated API responses, such as create-session
+and the flow responses, is outside this change.

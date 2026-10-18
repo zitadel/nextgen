@@ -70,6 +70,15 @@ export type FileOp =
       readonly edit: (source: string | undefined, path?: string) => string;
       readonly overwrites?: true;
       /**
+       * Reads the file the transform leaves behind and returns a note when it
+       * holds something the transform deliberately skipped and the developer
+       * must handle by hand. The file-writer reports the note as a warning
+       * when it applies the edit, and the doctor managed-files check reports
+       * the wiring as unverifiable with it, even though the transform changes
+       * nothing and would otherwise read as applied.
+       */
+      readonly review?: (source: string, path: string) => string | undefined;
+      /**
        * Marks a merging edit as managed *wiring* the doctor managed-files
        * check verifies via the transform's idempotency: when running the
        * transform against the current file changes it, the wiring is absent.

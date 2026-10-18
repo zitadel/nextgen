@@ -5,7 +5,10 @@ import { join } from "node:path";
 import ts from "typescript";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { viteProxyEdit } from "../../../../../../src/lib/orca/patchers/rule/vite-support";
+import {
+  viteProxyEdit,
+  viteProxyReview,
+} from "../../../../../../src/lib/orca/patchers/rule/vite-support";
 import { withFirstRedaction } from "../../../../../helpers/legacy-proxy";
 import {
   EXCHANGE_BODY,
@@ -296,6 +299,35 @@ export default defineConfig({
       expect(edit(rewriting)).toBe(rewriting);
     },
   );
+
+  it("asks for review of a generated entry left without the redaction by its own response hook", () => {
+    const hooked = UNREDACTED_CONFIG.replace(
+      "        configure: (proxy) => {",
+      '        configure: (proxy) => {\n          proxy.on("proxyRes", (proxyRes) => { delete proxyRes.headers["set-cookie"]; });',
+    );
+
+    expect(viteProxyReview(edit(hooked), "vite.config.ts")).toMatch(
+      /vite\.config\.ts.*session_token.*(own proxy hook|cookie rewrite)/,
+    );
+  });
+
+  it.each(["cookieDomainRewrite", "cookiePathRewrite"])(
+    "asks for review of a generated entry left without the redaction by %s",
+    (option) => {
+      const rewriting = UNREDACTED_CONFIG.replace(
+        "xfwd: true,",
+        `xfwd: true,\n        ${option}: "",`,
+      );
+
+      expect(viteProxyReview(rewriting, "vite.config.ts")).toContain("session_token");
+    },
+  );
+
+  it("asks for nothing when the entry is redacted or the file has no managed entry", () => {
+    expect(viteProxyReview(edit(UNREDACTED_CONFIG), "vite.config.ts")).toBeUndefined();
+    expect(viteProxyReview(edit(BARE_CONFIG), "vite.config.ts")).toBeUndefined();
+    expect(viteProxyReview(BARE_CONFIG, "vite.config.ts")).toBeUndefined();
+  });
 
   it("keeps the config's own zlib import and adds the redaction's under its own name", () => {
     const own = 'import zlib from "zlib";\n';
