@@ -11,6 +11,7 @@ import {
   ZITADEL_LOGOUT_EVENT_HANDLERS,
   ZITADEL_SESSION_EVENT_HANDLERS,
   type ZitadelSessionErrorDetail,
+  type ZitadelSignoutDetail,
 } from "@zitadel/sdk-core/types";
 import { describe, expect, it } from "vitest";
 
@@ -76,6 +77,36 @@ async function arrivalOf(received: readonly unknown[]): Promise<void> {
   while (received.length === 0 && Date.now() < deadline) {
     await macrotask();
   }
+}
+
+/**
+ * Makes the first `zitadel-signout` / `zitadel-session-error` listener added to
+ * a `<tag>` a no-op, as on a page Qwik resumed from server-rendered markup: the
+ * `ref` callback that registers the first one does not run there, so only the
+ * `document-ready` task registers listeners. Returns the restore function.
+ */
+function dropRefCallbackListeners(tag: string): () => void {
+  const original = EventTarget.prototype.addEventListener;
+  const seen = new Set<string>();
+  EventTarget.prototype.addEventListener = function (
+    this: EventTarget,
+    type: string,
+    ...rest: [EventListenerOrEventListenerObject | null, (boolean | AddEventListenerOptions)?]
+  ): void {
+    const watched =
+      this instanceof Element &&
+      this.localName === tag &&
+      (type === "zitadel-signout" || type === "zitadel-session-error");
+    const key = `${tag}:${type}`;
+    if (watched && !seen.has(key)) {
+      seen.add(key);
+      return;
+    }
+    original.call(this, type, ...rest);
+  } as typeof original;
+  return () => {
+    EventTarget.prototype.addEventListener = original;
+  };
 }
 
 describe("ZitadelLogin", () => {
@@ -171,7 +202,36 @@ describe("ZitadelLogout", () => {
     },
   );
 
-  it("forwards a session error raised the moment the element mounts", async () => {
+  it("forwards the session events from the task alone, as on a resumed page", async () => {
+    const restore = dropRefCallbackListeners("zitadel-logout");
+    try {
+      const signouts: Record<string, unknown>[] = [];
+      const errors: Record<string, unknown>[] = [];
+      const host = await renderWidget(
+        <ZitadelLogout
+          project={project}
+          onSignout$={$((d: ZitadelSignoutDetail) => {
+            signouts.push(d as unknown as Record<string, unknown>);
+          })}
+          onSessionError$={$((d: ZitadelSessionErrorDetail) => {
+            errors.push(d as unknown as Record<string, unknown>);
+          })}
+        />,
+      );
+      const el = host.querySelector("zitadel-logout");
+      expect(el).not.toBeNull();
+      const signout = { probe: "signout" };
+      const failure = { probe: "error" };
+      await dispatchUntilForwarded(el!, "zitadel-signout", signout, signouts);
+      await dispatchUntilForwarded(el!, "zitadel-session-error", failure, errors);
+      expect(signouts).toContain(signout);
+      expect(errors).toContain(failure);
+    } finally {
+      restore();
+    }
+  });
+
+  it("forwards a session error raised the moment the logout element mounts", async () => {
     const received: ZitadelSessionErrorDetail[] = [];
     const detail: ZitadelSessionErrorDetail = { phase: "load", message: "down" };
     const early = {
@@ -252,7 +312,36 @@ describe("ZitadelSession", () => {
     },
   );
 
-  it("forwards a session error raised the moment the element mounts", async () => {
+  it("forwards the session events from the task alone, as on a resumed page", async () => {
+    const restore = dropRefCallbackListeners("zitadel-session");
+    try {
+      const signouts: Record<string, unknown>[] = [];
+      const errors: Record<string, unknown>[] = [];
+      const host = await renderWidget(
+        <ZitadelSession
+          project={project}
+          onSignout$={$((d: ZitadelSignoutDetail) => {
+            signouts.push(d as unknown as Record<string, unknown>);
+          })}
+          onSessionError$={$((d: ZitadelSessionErrorDetail) => {
+            errors.push(d as unknown as Record<string, unknown>);
+          })}
+        />,
+      );
+      const el = host.querySelector("zitadel-session");
+      expect(el).not.toBeNull();
+      const signout = { probe: "signout" };
+      const failure = { probe: "error" };
+      await dispatchUntilForwarded(el!, "zitadel-signout", signout, signouts);
+      await dispatchUntilForwarded(el!, "zitadel-session-error", failure, errors);
+      expect(signouts).toContain(signout);
+      expect(errors).toContain(failure);
+    } finally {
+      restore();
+    }
+  });
+
+  it("forwards a session error raised the moment the session element mounts", async () => {
     const received: ZitadelSessionErrorDetail[] = [];
     const detail: ZitadelSessionErrorDetail = { phase: "load", message: "down" };
     const early = {

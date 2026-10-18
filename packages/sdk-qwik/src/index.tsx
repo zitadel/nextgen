@@ -97,18 +97,19 @@ function eventDetail<T>(event: Event): T {
   return (event as CustomEvent<T>).detail;
 }
 
+const sessionForwarders = new WeakMap<Element, () => void>();
+
 /**
  * Forwards the `zitadel-signout` and `zitadel-session-error` events of a session
  * widget to the consumer's QRL callbacks. Called from the `ref` callback, so the
  * listeners exist before the widget can start loading: the widget reports an
  * early request failure once and never replays it, and the `document-ready`
- * task runs a turn later. Handlers read the callbacks from `props` when the
- * event fires, so a changed callback needs no re-registration. A prior
- * registration on the same element is removed first (no duplicate listeners),
- * and the returned disposer removes this one.
+ * task runs a turn later. It is called from that task too, because Qwik resumes
+ * server-rendered markup without running the `ref` callback again. Handlers read
+ * the callbacks from `props` when the event fires, so a changed callback needs
+ * no re-registration. A prior registration on the same element is removed first
+ * (no duplicate listeners), and the returned disposer removes this one.
  */
-const sessionForwarders = new WeakMap<Element, () => void>();
-
 function forwardSessionEvents(
   el: Element,
   props: {
@@ -253,6 +254,7 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
       }
       track(() => ({ ...props }));
       bindLogoutConfig(el, props);
+      forwardSessionEvents(el, props);
     },
     { strategy: "document-ready" },
   );
@@ -315,6 +317,7 @@ export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
       }
       track(() => ({ ...props }));
       bindSessionConfig(el, props);
+      forwardSessionEvents(el, props);
     },
     { strategy: "document-ready" },
   );

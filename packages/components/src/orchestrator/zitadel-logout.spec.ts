@@ -351,6 +351,36 @@ describe("<zitadel-logout>", () => {
     expect(errors[0]?.detail).toMatchObject({ phase: "signout", status: 500, code: "internal" });
   });
 
+  it("reports a sign-out it completed while removed, once put back", async () => {
+    const element = mount();
+    await flush(element);
+    let release: () => void = () => undefined;
+    server.use(
+      http.delete(`${API_BASE}/sessions/me`, async () => {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const events: CustomEvent[] = [];
+    element.addEventListener("zitadel-signout", (e) => events.push(e as CustomEvent));
+
+    shadowQuery<HTMLButtonElement>(element, ".trigger").click();
+    await element.updateComplete;
+    shadowQuery<HTMLButtonElement>(element, ".signout-btn").click();
+    await new Promise((resolve) => setTimeout(resolve, 16));
+    element.remove();
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 32));
+    expect(events).toHaveLength(0);
+
+    host.appendChild(element);
+    await flush(element);
+
+    expect(events).toHaveLength(1);
+  });
+
   it("substitutes template tokens and wires data-action='logout' triggers", async () => {
     currentName = "Bob Builder";
     currentEmail = "bob@example.com";
