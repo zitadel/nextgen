@@ -36,7 +36,16 @@ function raiseOnConnect(tagName: string, eventName: string, detail: unknown): vo
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
+
+// The widget itself fails its first request (no synthetic event): the way it
+// raises `zitadel-session-error` on its own, always after an awaited fetch.
+const failEveryRequest = () =>
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response("{}", { status: 500 })),
+  );
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 
@@ -197,6 +206,14 @@ describe("ZitadelSession", () => {
     render(ZitadelSession, { props: { project, [handlerProp]: spy } });
     expect(spy).toHaveBeenCalledTimes(1);
     expect(spy).toHaveBeenCalledWith(detail);
+  });
+
+  it("delivers the error the widget raises when its own first request fails", async () => {
+    failEveryRequest();
+    const spy = vi.fn();
+    render(ZitadelSession, { props: { project, onSessionError: spy } });
+    await vi.waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ phase: "load", status: 500 }));
   });
 
   it("exposes the underlying element via getElement()", () => {

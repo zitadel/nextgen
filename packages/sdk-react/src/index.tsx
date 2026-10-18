@@ -81,7 +81,8 @@ const ZitadelLoginElementReact = createComponent({
  * `events` listeners in such an effect, so an event raised while the element
  * mounts would be lost. This callback ref registers the listeners at attach
  * time instead, before the element can start loading, and reads the handlers
- * at event time so a re-render never has to re-register them.
+ * published by the last commit at event time so a re-render never has to
+ * re-register them.
  */
 function useSessionEvents<T extends HTMLElement>(
   handlers: {
@@ -91,7 +92,13 @@ function useSessionEvents<T extends HTMLElement>(
   forwardedRef: React.ForwardedRef<T>,
 ): React.RefCallback<T> {
   const latest = React.useRef(handlers);
-  latest.current = handlers;
+  // Handlers are published when the render commits, never during render: a
+  // render that is abandoned (a transition whose sibling suspends) must not
+  // hand its callbacks to the widget that is still on screen. An insertion
+  // effect runs before refs attach, so a forwarded ref still sees them.
+  React.useInsertionEffect(() => {
+    latest.current = handlers;
+  });
   const dispose = React.useRef<(() => void) | undefined>(undefined);
   return React.useCallback(
     (el: T | null) => {

@@ -12,11 +12,23 @@ import {
   ZITADEL_LOGOUT_EVENT_HANDLERS,
   ZITADEL_SESSION_EVENT_HANDLERS,
 } from "@zitadel/sdk-core/types";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { businessLocales, ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
+
+// The widget itself fails its first request (no synthetic event): the way it
+// raises `zitadel-session-error` on its own, always after an awaited fetch.
+const failEveryRequest = () =>
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response("{}", { status: 500 })),
+  );
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("ZitadelLogin", () => {
   it("binds the project handle as a property", () => {
@@ -197,6 +209,14 @@ describe("ZitadelSession", () => {
     ));
     expect(spy).toHaveBeenCalledTimes(1);
     expect(spy).toHaveBeenCalledWith(detail);
+  });
+
+  it("delivers the error the widget raises when its own first request fails", async () => {
+    failEveryRequest();
+    const spy = vi.fn();
+    render(() => <ZitadelSession project={project} onSessionError={spy} />);
+    await vi.waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ phase: "load", status: 500 }));
   });
 
   it("forwards the ref to the underlying element", () => {

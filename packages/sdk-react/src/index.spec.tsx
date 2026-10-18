@@ -5,7 +5,7 @@ import type {
   ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
 
-import { render } from "@testing-library/react";
+import { act, render, waitFor } from "@testing-library/react";
 import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
@@ -13,7 +13,8 @@ import {
   ZITADEL_SESSION_EVENT_HANDLERS,
 } from "@zitadel/sdk-core/types";
 import * as React from "react";
-import { describe, expect, it, vi } from "vitest";
+import { Suspense, startTransition } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { businessLocales, ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
 
@@ -21,6 +22,18 @@ import { businessLocales, ZitadelLogin, ZitadelLogout, ZitadelSession } from "./
 // @lit/react binds this prop (see vitest.config.ts), so the expected mount-time
 // rejection is ignored package-wide; these are light binding/event assertions.
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+// The widget itself fails its first request (no synthetic event): the only way
+// it raises `zitadel-session-error` on its own, always after an awaited fetch.
+const failEveryRequest = () =>
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response("{}", { status: 500 })),
+  );
 
 describe("ZitadelLogin", () => {
   it("binds the project handle as a property", () => {
@@ -115,6 +128,14 @@ describe("ZitadelLogout", () => {
     expect(spy).toHaveBeenCalledWith(detail);
   });
 
+  it("delivers the error the widget raises when its own first request fails", async () => {
+    failEveryRequest();
+    const spy = vi.fn();
+    render(<ZitadelLogout project={project} onSessionError={spy} />);
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ phase: "load", status: 500 }));
+  });
+
   it("forwards a ref to the underlying element", () => {
     const ref = React.createRef<ZitadelLogoutElement>();
     const { container } = render(<ZitadelLogout ref={ref} project={project} />);
@@ -176,11 +197,72 @@ describe("ZitadelSession", () => {
     expect(spy).toHaveBeenCalledWith(detail);
   });
 
+  it("delivers the error the widget raises when its own first request fails", async () => {
+    failEveryRequest();
+    const spy = vi.fn();
+    render(<ZitadelSession project={project} onSessionError={spy} />);
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ phase: "load", status: 500 }));
+  });
+
   it("forwards a ref to the underlying element", () => {
     const ref = React.createRef<ZitadelSessionElement>();
     const { container } = render(<ZitadelSession ref={ref} project={project} />);
     expect(ref.current).toBe(container.querySelector("zitadel-session"));
     expect(ref.current?.tagName.toLowerCase()).toBe("zitadel-session");
+  });
+});
+
+describe("session handlers under concurrent rendering", () => {
+  // Suspends until released, standing in for a sibling that is not ready yet.
+  const gate = { release: () => {}, promise: Promise.resolve() };
+  const Sibling = ({ blocked }: { blocked: boolean }) => {
+    if (blocked) throw gate.promise;
+    return null;
+  };
+
+  function Harness({ onSessionError, blocked }: { onSessionError: () => void; blocked: boolean }) {
+    return (
+      <Suspense fallback={null}>
+        <ZitadelSession project={project} onSessionError={onSessionError} />
+        <Sibling blocked={blocked} />
+      </Suspense>
+    );
+  }
+
+  const raise = (container: HTMLElement) =>
+    container
+      .querySelector("zitadel-session")
+      ?.dispatchEvent(new CustomEvent("zitadel-session-error", { detail: {} }));
+
+  it("does not hand an abandoned update's callback to the widget still on screen", async () => {
+    gate.promise = new Promise<void>((resolve) => {
+      gate.release = resolve;
+    });
+    const committed = vi.fn();
+    const abandoned = vi.fn();
+    const { container, rerender } = render(<Harness onSessionError={committed} blocked={false} />);
+
+    await act(async () => {
+      startTransition(() => {
+        rerender(<Harness onSessionError={abandoned} blocked />);
+      });
+    });
+    raise(container);
+
+    expect(abandoned).not.toHaveBeenCalled();
+    expect(committed).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses the new callback once the update commits", async () => {
+    const before = vi.fn();
+    const after = vi.fn();
+    const { container, rerender } = render(<Harness onSessionError={before} blocked={false} />);
+    rerender(<Harness onSessionError={after} blocked={false} />);
+    raise(container);
+
+    expect(before).not.toHaveBeenCalled();
+    expect(after).toHaveBeenCalledTimes(1);
   });
 });
 

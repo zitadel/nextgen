@@ -12,7 +12,7 @@ import {
   ZITADEL_LOGOUT_EVENT_HANDLERS,
   ZITADEL_SESSION_EVENT_HANDLERS,
 } from "@zitadel/sdk-core/types";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { defineComponent, h, shallowRef, withDirectives, type Ref } from "vue";
 
 import ZitadelLogin from "./components/ZitadelLogin";
@@ -62,6 +62,18 @@ function renderRaisingEarly(
   render(parent);
   return received;
 }
+
+// The widget itself fails its first request (no synthetic event): the way it
+// raises `zitadel-session-error` on its own, always after an awaited fetch.
+const failEveryRequest = () =>
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response("{}", { status: 500 })),
+  );
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 
@@ -215,6 +227,14 @@ describe("ZitadelSession", () => {
     expect(renderRaisingEarly(ZitadelSession, eventName, handlerProp)).toEqual([
       { probe: eventName },
     ]);
+  });
+
+  it("delivers the error the widget raises when its own first request fails", async () => {
+    failEveryRequest();
+    const spy = vi.fn();
+    render(ZitadelSession, { props: { project, onSessionError: spy } });
+    await vi.waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ phase: "load", status: 500 }));
   });
 
   it("exposes the rendered element via the instance ref", () => {
