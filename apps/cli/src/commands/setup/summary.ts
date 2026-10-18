@@ -2,6 +2,7 @@ import { readFile, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 
 import pc from "picocolors";
+import semver from "semver";
 
 import { detectors } from "../../lib/orca/detectors";
 import type { Detector } from "../../lib/orca/detectors/types";
@@ -103,8 +104,9 @@ export async function detectProjectFacts(cwd: string, frameworkId: string): Prom
     };
     const depPkg = depFromFramework(frameworkId);
     const range = pj.dependencies?.[depPkg] ?? pj.devDependencies?.[depPkg];
-    if (range) {
-      facts.frameworkVersion = stripRange(range);
+    const version = range ? stripRange(range) : undefined;
+    if (version) {
+      facts.frameworkVersion = version;
     }
   } catch {
     // Missing or unreadable package.json — version stays undefined; the
@@ -145,13 +147,21 @@ function prettyFramework(framework: string): string {
   return detectorFor(framework)?.displayName ?? framework;
 }
 
-/** Strips `^`/`~`/`>=`/`v` prefixes from an npm range so the version reads cleanly in the summary. */
-function stripRange(range: string): string {
-  const trimmed = range.replace(/^([\^~]|>=?|v)/, "").trim();
-  // Take the first dotted segment so multi-range strings (`^15.0.0 || ^14.0.0`)
-  // collapse to a single readable version in the report.
-  const first = trimmed.split(/\s+/)[0];
-  return first ?? trimmed;
+/**
+ * Reduces a declared npm range to the version the summary shows: the first
+ * comparator of the first alternative, without its `^`/`~`/`>=`/`v` prefix, so
+ * `^15.0.0 || ^14.0.0` and `^15.0.0||^14.0.0` read `15.0.0` and `20.1.x` stays
+ * `20.1.x`. Returns `undefined` when the spec is not a valid semver range
+ * (`catalog:`, `workspace:*`, `file:`, git URLs, dist-tags such as `latest`) or
+ * names no version (`*`), because printing that as the framework version would
+ * be wrong.
+ */
+function stripRange(range: string): string | undefined {
+  if (semver.validRange(range) === null) return undefined;
+  const alternative = range.split("||")[0] ?? "";
+  const first = alternative.trim().split(/\s+/)[0] ?? "";
+  const version = first.replace(/^([\^~]|>=?|v)/, "");
+  return /^\d/.test(version) ? version : undefined;
 }
 
 /** Returns just the file name from a relative path, for the `→ filename` secondary detail in PACKAGE rows. */

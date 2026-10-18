@@ -59,4 +59,34 @@ describe("detectProjectFacts", () => {
 
     expect(formatFrameworkLine({ ...facts, typescript: false })).toMatch(new RegExp(`^${line} `));
   });
+
+  it.each([
+    ["20.1.x", "20.1.x"],
+    ["^18.0.0||^19.0.0", "18.0.0"],
+    ["^18.0.0 || ^19.0.0", "18.0.0"],
+    [">=18 <20", "18"],
+    ["~3.0.1", "3.0.1"],
+  ])("shows the first version of the valid range %s", async (spec, shown) => {
+    const facts = await detectProjectFacts(await app({ react: spec }), "react");
+
+    expect(facts.frameworkVersion).toBe(shown);
+  });
+
+  it.each([
+    "catalog:",
+    "workspace:*",
+    "file:../react",
+    "link:../react",
+    "latest",
+    "canary",
+    "next",
+    "*",
+    "github:facebook/react",
+    "npm:react@^18.0.0",
+  ])("prints no version when the spec is %s", async (spec) => {
+    const facts = await detectProjectFacts(await app({ react: spec }), "react");
+
+    expect(facts.frameworkVersion).toBeUndefined();
+    expect(formatFrameworkLine({ ...facts, typescript: false })).toMatch(/^React · /);
+  });
 });
