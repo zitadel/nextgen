@@ -41,8 +41,10 @@ The app's framework must be at or above a minimum version: Next.js 15.2.3,
 React 18, Vue 3, Nuxt 4, Angular 17, Solid 1.6, Svelte 5, Qwik 2. Newer major
 versions are not refused. `setup` and `doctor` refuse an app below its minimum,
 by declared range or installed release, with `E_UNSUPPORTED_PROJECT_SHAPE`
-(exit 3) before changing anything; the message names the minimum and the hint
-says to upgrade, so upgrade the app and rerun rather than retrying.
+(exit 3); `setup` refuses before it scaffolds or patches anything, while
+`doctor --fix` can still repair unrelated files, so do not assume a floor error
+left the project untouched. The message names the minimum and the hint says to
+upgrade, so upgrade the app and rerun rather than retrying.
 
 ## Using the CLI
 
