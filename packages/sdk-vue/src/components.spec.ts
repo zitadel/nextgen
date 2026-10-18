@@ -256,18 +256,30 @@ describe("wrapper config parity", () => {
   it("forwards every ZitadelLoginConfig key to <zitadel-login>", () => {
     const { container } = render(ZitadelLogin, { props: { ...loginConfig } });
     const el = container.querySelector<ZitadelLoginElement>("zitadel-login");
+    // Vue forwards an undeclared key to the root as an attribute, so a dropped prop declaration alone would not fail.
+    expect(Object.keys(ZitadelLogin.props)).toEqual(
+      expect.arrayContaining(Object.keys(loginConfig)),
+    );
     expect(elementValues(el!, loginConfig)).toEqual(loginConfig);
   });
 
   it("forwards every ZitadelSessionConfig key to <zitadel-session>", () => {
     const { container } = render(ZitadelSession, { props: { ...sessionConfig } });
     const el = container.querySelector<ZitadelSessionElement>("zitadel-session");
+    // Vue forwards an undeclared key to the root as an attribute, so a dropped prop declaration alone would not fail.
+    expect(Object.keys(ZitadelSession.props)).toEqual(
+      expect.arrayContaining(Object.keys(sessionConfig)),
+    );
     expect(elementValues(el!, sessionConfig)).toEqual(sessionConfig);
   });
 
   it("forwards every ZitadelLogoutConfig key to <zitadel-logout>", () => {
     const { container } = render(ZitadelLogout, { props: { ...logoutConfig } });
     const el = container.querySelector<ZitadelLogoutElement>("zitadel-logout");
+    // Vue forwards an undeclared key to the root as an attribute, so a dropped prop declaration alone would not fail.
+    expect(Object.keys(ZitadelLogout.props)).toEqual(
+      expect.arrayContaining(Object.keys(logoutConfig)),
+    );
     expect(elementValues(el!, logoutConfig)).toEqual(logoutConfig);
   });
 });
