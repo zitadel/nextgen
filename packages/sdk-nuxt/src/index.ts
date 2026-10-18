@@ -4,4 +4,11 @@ export { ZitadelLogin, ZitadelLogout } from "@zitadel/components";
 export { businessLocales } from "@zitadel/components";
 export { createNextgenMiddleware, getAuth } from "./server.js";
 export { useZitadelProject } from "./runtime/composables/useZitadelProject.js";
-export type { NextgenMiddlewareOptions, AuthResult, ClientAuthResult } from "./runtime/types.js";
+export type {
+  NextgenMiddlewareOptions,
+  AuthResult,
+  NextgenSession,
+  AuthState,
+  UnauthState,
+  ClientAuthResult,
+} from "./runtime/types.js";

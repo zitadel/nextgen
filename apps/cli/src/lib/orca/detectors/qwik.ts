@@ -12,13 +12,15 @@ import type { Detector, FrameworkFacts } from "./types";
  */
 export class QwikDetector implements Detector {
   readonly framework = "qwik";
+  readonly displayName = "Qwik";
+  readonly versionPackage = "@qwik.dev/core";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
     const pkg = await readPackageJson(cwd).catch(() => undefined);
     if (
       !pkg ||
       hasDependency(pkg, "@qwik.dev/router") ||
-      !hasDependency(pkg, "@qwik.dev/core") ||
+      !hasDependency(pkg, this.versionPackage) ||
       !hasDependency(pkg, "vite")
     ) {
       return null;
