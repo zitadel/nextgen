@@ -25,7 +25,7 @@ import {
   type ZitadelProject,
 } from "@zitadel/api/config";
 
-import { listenWithReplay } from "./early-events";
+import { listenWithReplay, WRAPPER_MARKER } from "./early-events";
 
 export { configureZitadel, getApi, getZitadelConfig };
 export type { ZitadelConfig, ZitadelProject };
@@ -253,6 +253,7 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
   );
   return (
     <zitadel-login
+      {...{ [WRAPPER_MARKER]: "" }}
       ref={(el) => {
         host.value = el;
         if (props.ref) {
@@ -307,6 +308,7 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
   );
   return (
     <zitadel-logout
+      {...{ [WRAPPER_MARKER]: "" }}
       ref={(el) => {
         host.value = el;
         if (props.ref) {
@@ -361,6 +363,7 @@ export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
   );
   return (
     <zitadel-session
+      {...{ [WRAPPER_MARKER]: "" }}
       ref={(el) => {
         host.value = el;
         if (props.ref) {

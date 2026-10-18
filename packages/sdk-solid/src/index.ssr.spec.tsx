@@ -95,3 +95,28 @@ describe("server-rendered widget config", () => {
     ).toMatchObject({ "proxy-path": "/" });
   });
 });
+
+describe("server-rendered widget options", () => {
+  it("puts the resume flow id into the login markup", () => {
+    expect(
+      serverAttributes(
+        "zitadel-login",
+        renderToString(() => <ZitadelLogin projectId="proj-test" resumeFlowId="flow_123" />),
+      ),
+    ).toMatchObject({ "resume-flow-id": "flow_123" });
+  });
+
+  it("puts the session heading into the server markup", () => {
+    expect(
+      serverAttributes(
+        "zitadel-session",
+        renderToString(() => <ZitadelSession projectId="proj-test" heading="Hi" />),
+      ),
+    ).toMatchObject({ heading: "Hi" });
+  });
+
+  it("leaves unset props out of the markup", () => {
+    const html = renderToString(() => <ZitadelSession projectId="proj-test" />);
+    expect(html).not.toContain("heading=");
+  });
+});
