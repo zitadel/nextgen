@@ -7,7 +7,7 @@ Use this path when you want to add Zitadel auth to a local app without a source 
 
 ## Prerequisites
 
-- Node.js 24 or newer. When setup creates a new app it checks your Node against the range the framework's CLI publishes before it starts. To create an Angular app, use a Node version the Angular CLI accepts (currently `^22.22.3 || ^24.15.0 || >=26.0.0`); setup refuses any other and names the range. For the other frameworks, setup warns if your Node is outside the range and carries on.
+- Node.js 24 or newer. When setup creates a new app it checks your Node against the range the framework's CLI publishes before it starts. To create an Angular app, use a Node version the Angular CLI accepts: 22.22.3 or newer 22.x, 24.15.0 or newer 24.x, or 26.x (the Angular CLI publishes `^22.22.3 || ^24.15.0 || >=26.0.0`, but it checks each major on its own, so Node 27 and later are refused). Node 23 and 25 run with a warning. Setup refuses any other Node and names the range. For the other frameworks, setup warns if your Node is outside the range and carries on.
 - A package manager supported by your app.
 - Docker only if you intentionally choose the Docker runtime backend.
 
