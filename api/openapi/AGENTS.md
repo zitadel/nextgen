@@ -56,3 +56,14 @@ Resource ids are prefixed opaque strings (`user_01H…`, `proj_01H…`,
 [ADR 012](../../docs/adrs/012-ephemeral-id-api-representation.md). Use the
 prefixed form in `example:` fields — the retired dictionary-slug form
 (`river-8421`) must not reappear.
+
+## CLI commands — `x-zitadel-cli`
+
+An operation the `zitadel` CLI runs names its command in `x-zitadel-cli`, on
+the line right after its `operationId` (`x-zitadel-cli: users create`). The API
+reference shows that command beside the TypeScript and cURL samples
+([`apps/docs/lib/cli-sample.ts`](../../apps/docs/lib/cli-sample.ts)), and an
+operation's Markdown carries it for agents. The CLI's
+[`api-coverage` test](../../apps/cli/tests/unit/commands/api-coverage.test.ts)
+fails until every command names exactly one operation it calls, and on a name
+no command answers to, so a new resource verb comes with its line here.

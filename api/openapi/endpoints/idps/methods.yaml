@@ -1,5 +1,6 @@
 post:
   operationId: createIdp
+  x-zitadel-cli: idps create
   summary: Create or revise an identity provider connection
   description: |
     Creates or revises a connection document. If the slug does not already
