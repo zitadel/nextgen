@@ -28,6 +28,14 @@ export type FrameworkFacts = Readonly<{
 export interface Detector {
   /** The framework id this detector recognises (used to honour `--framework`). */
   readonly framework: string;
+  /** How the setup summary names the framework ("Next.js"). */
+  readonly displayName: string;
+  /**
+   * The npm package whose declared range is the framework's version
+   * ("@angular/core" for Angular). The detector looks for this package, and the
+   * setup summary reads the version from it.
+   */
+  readonly versionPackage: string;
   /**
    * Probe `cwd`. Returns {@link FrameworkFacts} when it is a project of this
    * framework, or `null` when it is not (so the orchestrator tries the next

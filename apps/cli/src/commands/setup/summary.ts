@@ -3,6 +3,8 @@ import { basename, join } from "node:path";
 
 import pc from "picocolors";
 
+import { detectors } from "../../lib/orca/detectors";
+import type { Detector } from "../../lib/orca/detectors/types";
 import { detectPackageManager, type PackageManager } from "../../lib/package-manager";
 
 /**
@@ -131,28 +133,16 @@ async function fileExists(p: string): Promise<boolean> {
   }
 }
 
-/**
- * How the summary names each framework, and the package whose declared range
- * is the framework version it shows ("Angular 20.1.0 · TypeScript · npm").
- */
-const FRAMEWORKS: Readonly<Record<string, { readonly name: string; readonly dependency: string }>> =
-  {
-    next: { name: "Next.js", dependency: "next" },
-    nuxt: { name: "Nuxt", dependency: "nuxt" },
-    react: { name: "React", dependency: "react" },
-    vue: { name: "Vue", dependency: "vue" },
-    angular: { name: "Angular", dependency: "@angular/core" },
-    solid: { name: "Solid", dependency: "solid-js" },
-    svelte: { name: "Svelte", dependency: "svelte" },
-    qwik: { name: "Qwik", dependency: "@qwik.dev/core" },
-  };
+function detectorFor(framework: string): Detector | undefined {
+  return detectors.find((detector) => detector.framework === framework);
+}
 
 function depFromFramework(framework: string): string {
-  return FRAMEWORKS[framework]?.dependency ?? framework;
+  return detectorFor(framework)?.versionPackage ?? framework;
 }
 
 function prettyFramework(framework: string): string {
-  return FRAMEWORKS[framework]?.name ?? framework;
+  return detectorFor(framework)?.displayName ?? framework;
 }
 
 /** Strips `^`/`~`/`>=`/`v` prefixes from an npm range so the version reads cleanly in the summary. */

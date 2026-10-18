@@ -24,6 +24,8 @@ afterEach(async () => {
 describe("Orca.scaffold stash", () => {
   const fakeDetector: Detector = {
     framework: "fake",
+    displayName: "Fake",
+    versionPackage: "fake",
     async detect(cwd) {
       try {
         await readFile(join(cwd, "package.json"), "utf8");
