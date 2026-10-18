@@ -4,7 +4,11 @@ import type {
   ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
 
+import { Component, type Type } from "@angular/core";
+import { bootstrapApplication, provideClientHydration } from "@angular/platform-browser";
+import { provideServerRendering, renderApplication } from "@angular/platform-server";
 import { render } from "@testing-library/angular";
+import { _resetConfigForTesting, configureZitadel } from "@zitadel/api/config";
 import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
@@ -221,6 +225,135 @@ describe("ZitadelSession", () => {
     expect(exposed).not.toBeNull();
     expect(exposed!.tagName.toLowerCase()).toBe("zitadel-session");
     expect(exposed).toBe(el);
+  });
+});
+
+/** Snapshots every readable global so it can be put back after a server render. */
+function snapshotGlobals(): Map<PropertyKey, unknown> {
+  const snapshot = new Map<PropertyKey, unknown>();
+  for (const key of Reflect.ownKeys(globalThis)) {
+    try {
+      snapshot.set(key, (globalThis as Record<PropertyKey, unknown>)[key]);
+    } catch {
+      // A getter that throws on read is not something a render replaces.
+    }
+  }
+  return snapshot;
+}
+
+/**
+ * Renders `template` to a document string with the real Angular server
+ * renderer. Angular's server platform assigns its DOM classes (`Event`,
+ * `CustomEvent`, `Node`, ...) onto `globalThis` for the render, which would
+ * replace jsdom's for every later test in this file, so they are put back
+ * afterwards (by assignment, as jsdom's globals are accessors).
+ */
+async function serverRender(template: string, imports: Type<unknown>[] = []): Promise<string> {
+  @Component({ selector: "app-root", standalone: true, imports, template })
+  class Root {}
+  const before = snapshotGlobals();
+  try {
+    return await renderApplication(
+      (context) =>
+        bootstrapApplication(
+          Root,
+          { providers: [provideServerRendering(), provideClientHydration()] },
+          context,
+        ),
+      { document: "<!doctype html><html><head></head><body><app-root></app-root></body></html>" },
+    );
+  } finally {
+    for (const key of Reflect.ownKeys(globalThis)) {
+      if (!before.has(key)) Reflect.deleteProperty(globalThis, key);
+    }
+    for (const [key, value] of before) {
+      const globals = globalThis as Record<PropertyKey, unknown>;
+      if (Object.is(globals[key], value)) continue;
+      const descriptor = Object.getOwnPropertyDescriptor(globalThis, key);
+      // A read-only or getter-only global is not one a render can have replaced.
+      if (descriptor?.writable || descriptor?.set) globals[key] = value;
+    }
+  }
+}
+
+/** The attributes of the first `<tag>` in server-rendered HTML. */
+function attributesOf(html: string, tag: string): Record<string, string> {
+  const open = new RegExp(`<${tag}(\\s[^>]*)?>`).exec(html);
+  expect(open, `<${tag}> missing from server HTML`).not.toBeNull();
+  return Object.fromEntries(
+    [...(open?.[1] ?? "").matchAll(/([a-z][\w-]*)(?:="([^"]*)")?/g)].map((m) => [m[1], m[2] ?? ""]),
+  );
+}
+
+describe("server-rendered widget config", () => {
+  it("puts the login flow config into the server markup", async () => {
+    const html = await serverRender(
+      `<zitadel-auth-login purpose="register" flowName="signup" resumeFlowId="flow_123" postSignInUrl="/home" />`,
+      [ZitadelLoginComponent],
+    );
+    expect(attributesOf(html, "zitadel-login")).toMatchObject({
+      purpose: "register",
+      "flow-name": "signup",
+      "resume-flow-id": "flow_123",
+      "post-sign-in-url": "/home",
+    });
+  });
+
+  it("puts the session config into the server markup", async () => {
+    const html = await serverRender(`<zitadel-auth-session postSignOutUrl="/bye" heading="Hi" />`, [
+      ZitadelSessionComponent,
+    ]);
+    expect(attributesOf(html, "zitadel-session")).toMatchObject({
+      "post-sign-out-url": "/bye",
+      heading: "Hi",
+    });
+  });
+});
+
+describe("hydrating a server-rendered login", () => {
+  afterEach(() => {
+    _resetConfigForTesting();
+    vi.restoreAllMocks();
+  });
+
+  it("starts its first flow with the purpose the server rendered", async () => {
+    const globalProject = configureZitadel({
+      projectId: "proj-global",
+      proxyPath: "https://flow.test.invalid",
+    });
+    const template = `<zitadel-auth-login purpose="register" />`;
+    const fetched = vi.spyOn(globalThis, "fetch");
+    const html = await serverRender(template, [ZitadelLoginComponent]);
+    document.body.innerHTML = html
+      .slice(html.indexOf("<body"), html.indexOf("</body>"))
+      .replace(/^<body[^>]*>/, "");
+    const firstStep = new Promise((resolve) =>
+      document
+        .querySelector("zitadel-login")
+        ?.addEventListener("zitadel-flow-step", resolve, { once: true }),
+    );
+
+    @Component({
+      selector: "app-root",
+      standalone: true,
+      imports: [ZitadelLoginComponent],
+      template,
+    })
+    class Root {}
+    await bootstrapApplication(Root, { providers: [provideClientHydration()] });
+
+    await firstStep;
+    const bodies = await Promise.all(
+      fetched.mock.calls.map(async ([input, init]) =>
+        JSON.parse(
+          String(init?.body ?? (input instanceof Request ? await input.clone().text() : "null")),
+        ),
+      ),
+    );
+    const created = bodies.filter((body) => body?.project_id);
+    expect(created).toHaveLength(1);
+    expect(created[0]).toMatchObject({ purpose: "register" });
+    expect(globalProject.projectId).toBe("proj-global");
   });
 });
 

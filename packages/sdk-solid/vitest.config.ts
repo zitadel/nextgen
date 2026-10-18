@@ -4,14 +4,15 @@ import { defineConfig } from "vitest/config";
 import { baseTest } from "../../vitest.shared.mjs";
 
 /**
- * Two projects in one config:
+ * Three projects in one config, one per way Solid compiles the wrappers:
  *
- * - `dom` (jsdom): the wrappers compiled for the browser, as a client-only
- *   Solid app runs them.
- * - `ssr` (node): `*.ssr.spec.tsx` imports the component source (`./index`)
- *   and `vite-plugin-solid({ ssr: true })` compiles it for the server. It
- *   checks the markup the components write, not the published package
- *   entry, which this config leaves unchanged.
+ * - `dom` (jsdom): compiled for the browser, as a client-only Solid app runs
+ *   them.
+ * - `ssr` (node): `*.ssr.spec.tsx` is compiled for the server with
+ *   `vite-plugin-solid({ ssr: true })`, as a server-rendering app runs them.
+ * - `hydrate` (jsdom): `*.hydrate.spec.tsx` is compiled for hydration
+ *   (`hydratable`) and takes its server markup from the server compile of the
+ *   same wrappers.
  */
 export default defineConfig({
   cacheDir: ".vitest",
@@ -29,7 +30,7 @@ export default defineConfig({
           environment: "jsdom",
           setupFiles: ["src/test-setup.ts"],
           include: ["src/**/*.{test,spec}.{ts,tsx}"],
-          exclude: ["src/**/*.ssr.spec.tsx"],
+          exclude: ["src/**/*.ssr.spec.tsx", "src/**/*.hydrate.spec.tsx"],
         },
       },
       {
@@ -40,6 +41,17 @@ export default defineConfig({
           globals: true,
           environment: "node",
           include: ["src/**/*.ssr.spec.tsx"],
+        },
+      },
+      {
+        cacheDir: ".vitest/hydrate",
+        plugins: [solid({ solid: { hydratable: true } })],
+        test: {
+          name: "hydrate",
+          globals: true,
+          environment: "jsdom",
+          setupFiles: ["src/test-setup.ts"],
+          include: ["src/**/*.hydrate.spec.tsx"],
         },
       },
     ],
