@@ -13,8 +13,7 @@ import {
 } from "@zitadel/sdk-core/types";
 import { describe, expect, it } from "vitest";
 
-import { PasswordToggleHarness } from "./__tests__/password-toggle-harness";
-import { ResumeFlowIdHarness } from "./__tests__/resume-flow-id-harness";
+import { PasswordToggleHarness, ResumeFlowIdHarness } from "./__tests__/login-prop-harness";
 import { businessLocales, ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
