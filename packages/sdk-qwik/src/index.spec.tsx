@@ -13,6 +13,14 @@ import {
 } from "@zitadel/sdk-core/types";
 import { describe, expect, it } from "vitest";
 
+import {
+  LoginConfigHarness,
+  loginConfig,
+  LogoutConfigHarness,
+  logoutConfig,
+  SessionConfigHarness,
+  sessionConfig,
+} from "./__tests__/config-parity-harness";
 import { PasswordToggleHarness, ResumeFlowIdHarness } from "./__tests__/login-prop-harness";
 import { businessLocales, ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
 
@@ -268,5 +276,29 @@ describe("ZitadelLogin resumeFlowId", () => {
     await expect.poll(() => window.__unsetResumeFlowId).toBeTypeOf("function");
     window.__unsetResumeFlowId!();
     await expect.poll(() => el().resumeFlowId).toBe("");
+  });
+});
+
+// The element's value for each key, so a key the wrapper drops shows up by name.
+const elementValues = (el: object, config: object): Record<string, unknown> =>
+  Object.fromEntries(Object.keys(config).map((key) => [key, (el as Record<string, unknown>)[key]]));
+
+describe("wrapper config parity", () => {
+  it("forwards every ZitadelLoginConfig key to <zitadel-login>", async () => {
+    const host = await renderWidget(<LoginConfigHarness />);
+    const el = host.querySelector<ZitadelLoginElement>("zitadel-login");
+    expect(elementValues(el!, loginConfig)).toEqual(loginConfig);
+  });
+
+  it("forwards every ZitadelSessionConfig key to <zitadel-session>", async () => {
+    const host = await renderWidget(<SessionConfigHarness />);
+    const el = host.querySelector<ZitadelSessionElement>("zitadel-session");
+    expect(elementValues(el!, sessionConfig)).toEqual(sessionConfig);
+  });
+
+  it("forwards every ZitadelLogoutConfig key to <zitadel-logout>", async () => {
+    const host = await renderWidget(<LogoutConfigHarness />);
+    const el = host.querySelector<ZitadelLogoutElement>("zitadel-logout");
+    expect(elementValues(el!, logoutConfig)).toEqual(logoutConfig);
   });
 });
