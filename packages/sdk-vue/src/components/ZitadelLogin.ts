@@ -9,13 +9,12 @@ import type {
   ZitadelFlowStepDetail,
 } from "@zitadel/sdk-core/types";
 
-import { defineComponent, h, type PropType, ref, toRaw, watchEffect } from "vue";
+import { defineComponent, h, type PropType, ref, toRaw } from "vue";
 // Registers <zitadel-login> / <zitadel-logout> with the browser. Imported at
 // module load (before render) so the element is upgraded by the time Vue
 // patches it — which means Vue binds `project` as a DOM *property* (not a
 // stringified attribute).
 import "@zitadel/components";
-import { assignGiven } from "./given";
 
 /**
  * Vue wrapper for the `<zitadel-login>` Lit web component.
@@ -66,23 +65,6 @@ export default defineComponent({
     const element = ref<ZitadelLoginElement | null>(null);
     expose({ element });
 
-    // Props the element has defaults for are assigned only when given; a
-    // binding would assign `undefined` and overwrite the default.
-    watchEffect(
-      () => {
-        if (element.value) {
-          assignGiven(element.value, {
-            lang: props.lang,
-            variant: props.variant,
-            theme: props.theme,
-            suppressHeader: props.suppressHeader,
-            suppressPasswordToggle: props.suppressPasswordToggle,
-          });
-        }
-      },
-      { flush: "post" },
-    );
-
     return () =>
       h("zitadel-login", {
         ref: element,
@@ -99,6 +81,14 @@ export default defineComponent({
         // dictionaries, not Vue's reactive proxy.
         locales: props.locales === undefined ? undefined : toRaw(props.locales),
         "flow-name": props.flowName,
+        // A string prop with a default is bound as an attribute (the "^" prefix):
+        // Vue assigns an unset property as "", which the element cannot tell from
+        // an intended empty string, while an unset attribute is simply removed.
+        "^lang": props.lang,
+        "^variant": props.variant,
+        "^theme": props.theme,
+        suppressHeader: props.suppressHeader,
+        suppressPasswordToggle: props.suppressPasswordToggle,
         onZitadelFlowStep: (event: CustomEvent<ZitadelFlowStepDetail>) => {
           emit("flowStep", event.detail);
         },

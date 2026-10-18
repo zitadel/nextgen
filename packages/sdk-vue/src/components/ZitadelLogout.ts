@@ -2,9 +2,8 @@ import type { ZitadelProject } from "@zitadel/api/config";
 import type { ZitadelLogout as ZitadelLogoutElement } from "@zitadel/components";
 import type { ZitadelSignoutDetail } from "@zitadel/sdk-core/types";
 
-import { defineComponent, h, type PropType, ref, toRaw, watchEffect } from "vue";
+import { defineComponent, h, type PropType, ref, toRaw } from "vue";
 import "@zitadel/components";
-import { assignGiven } from "./given";
 
 /**
  * Vue wrapper for the `<zitadel-logout>` Lit web component. See
@@ -36,17 +35,6 @@ export default defineComponent({
     const element = ref<ZitadelLogoutElement | null>(null);
     expose({ element });
 
-    // Props the element has defaults for are assigned only when given; a
-    // binding would assign `undefined` and overwrite the default.
-    watchEffect(
-      () => {
-        if (element.value) {
-          assignGiven(element.value, { theme: props.theme });
-        }
-      },
-      { flush: "post" },
-    );
-
     return () =>
       h("zitadel-logout", {
         ref: element,
@@ -57,6 +45,10 @@ export default defineComponent({
         projectId: props.projectId,
         proxyPath: props.proxyPath,
         "post-sign-out-url": props.postSignOutUrl,
+        // A string prop with a default is bound as an attribute (the "^" prefix):
+        // Vue assigns an unset property as "", which the element cannot tell from
+        // an intended empty string, while an unset attribute is simply removed.
+        "^theme": props.theme,
         onZitadelSignout: (event: CustomEvent<ZitadelSignoutDetail>) => {
           emit("signout", event.detail);
         },
