@@ -9,13 +9,15 @@ import type { Detector, FrameworkFacts } from "./types";
  */
 export class VueDetector implements Detector {
   readonly framework = "vue";
+  readonly displayName = "Vue";
+  readonly versionPackage = "vue";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
     const pkg = await readPackageJson(cwd).catch(() => undefined);
     if (
       !pkg ||
       hasDependency(pkg, "nuxt") ||
-      !hasDependency(pkg, "vue") ||
+      !hasDependency(pkg, this.versionPackage) ||
       !hasDependency(pkg, "vite")
     ) {
       return null;
