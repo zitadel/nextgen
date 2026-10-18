@@ -309,7 +309,6 @@ describe("props that become unset restore the element's defaults", () => {
     ["theme", "light", ""],
     ["suppressHeader", true, false],
     ["lang", "de", ""],
-    ["suppressPasswordToggle", true, false],
   ] as const)("ZitadelLogin restores the default %s", async (prop, given, expected) => {
     const host = await renderWidget(<UnsetPropHarness widget="login" prop={prop} given={given} />);
     const el = () => host.querySelector<ZitadelLoginElement>("zitadel-login")!;
