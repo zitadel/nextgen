@@ -211,6 +211,25 @@ describe("release dist-tags preflight", () => {
     );
   });
 
+  it("skips a private package", async () => {
+    const root = await mkdtemp(join(tmpdir(), "release-dist-tags-"));
+    tempDirs.push(root);
+    await mkdir(join(root, "packages/internal"), { recursive: true });
+    await writeFile(
+      join(root, "packages/internal/package.json"),
+      JSON.stringify({ name: "@zitadel/internal", version: "0.0.0", private: true }),
+    );
+    await mkdir(join(root, "packages/sdk-solid"), { recursive: true });
+    await writeFile(
+      join(root, "packages/sdk-solid/package.json"),
+      JSON.stringify({ name: "@zitadel/sdk-solid", version: "1.0.0-alpha.26", license: "MIT" }),
+    );
+
+    expect(
+      await distTags.readLocalPackages(root, ["packages/internal", "packages/sdk-solid"]),
+    ).toEqual([localPackage("@zitadel/sdk-solid")]);
+  });
+
   it("reads the prerelease tag only in pre mode", async () => {
     const root = await mkdtemp(join(tmpdir(), "release-dist-tags-"));
     tempDirs.push(root);
