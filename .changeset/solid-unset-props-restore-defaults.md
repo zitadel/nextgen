@@ -2,4 +2,4 @@
 "@zitadel/sdk-solid": patch
 ---
 
-Restore the element's own default when a widget prop is cleared. A `heading`, `logoutLabel`, `variant`, `theme`, `lang`, `suppressHeader` or `suppressPasswordToggle` that went from a value back to `undefined` used to leave `undefined` on the widget instead of its default.
+A widget prop that is cleared after being set now restores the web component's own default in the Solid components, instead of leaving `undefined` on the element, and an unset prop keeps that default. For example, a `heading` that goes from "Custom" back to `undefined` shows the default "Signed in as" title again rather than an empty one.
