@@ -30,7 +30,9 @@ This ADR records the floors and the enforcement point.
   must degrade safely on 18, as the ref-assigned copy overlay does). The Next
   floor is a patch release, not the major: 15.0.0 to 15.2.2 skip middleware
   for a request that sends `x-middleware-subrequest` (CVE-2025-29927), which
-  bypasses the generated `protectedRoutes`.
+  bypasses the generated `protectedRoutes`. A prerelease of 15.2.3 predates
+  that fix, so it is below the floor; for a major-only floor such as React 18
+  a prerelease of the major counts as at-floor.
 - **Enforcement lives in the framework detectors** (`NextDetector`,
   `ReactDetector`): a detected framework below its floor throws
   `E_UNSUPPORTED_PROJECT_SHAPE` (exit 3) with the floor in the message and an

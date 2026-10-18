@@ -63,7 +63,7 @@ export class NextDetector implements Detector {
     if (installed !== undefined) {
       throw new ZitadelError(
         "E_UNSUPPORTED_PROJECT_SHAPE",
-        `Next.js ${installed} is installed, below the supported floor — the CLI integrates Next.js ${NEXT_FLOOR} and newer`,
+        `Next.js ${installed.version} is installed (${installed.path}), below the supported floor — the CLI integrates Next.js ${NEXT_FLOOR} and newer`,
         { hint: NEXT_FLOOR_HINT },
       );
     }

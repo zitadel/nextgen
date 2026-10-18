@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -136,8 +136,14 @@ describe("dependencySpecProvablyBelow", () => {
     expect(dependencySpecProvablyBelow(pkg("<15.2.3"), "next", "15.2.3")).toBe("<15.2.3");
   });
 
-  it("passes a range that explicitly names a prerelease of the floor", () => {
-    expect(dependencySpecProvablyBelow(pkg("15.2.3-canary.1"), "next", "15.2.3")).toBeUndefined();
+  it("rejects a pinned prerelease of a patch-level floor, which predates the fix", () => {
+    expect(dependencySpecProvablyBelow(pkg("15.2.3-canary.1"), "next", "15.2.3")).toBe(
+      "15.2.3-canary.1",
+    );
+  });
+
+  it("passes a range naming a prerelease of the floor that also admits the release", () => {
+    expect(dependencySpecProvablyBelow(pkg("^15.2.3-canary.1"), "next", "15.2.3")).toBeUndefined();
   });
 
   it("passes a pinned prerelease newer than the floor", () => {
@@ -151,13 +157,18 @@ describe("dependencySpecProvablyBelow", () => {
     );
   });
 
-  it("passes a range whose strict bounds still admit a prerelease of the floor", () => {
-    expect(
-      dependencySpecProvablyBelow(pkg(">15.2.3-canary.1 <15.2.3"), "next", "15.2.3"),
-    ).toBeUndefined();
-    expect(
-      dependencySpecProvablyBelow(pkg(">=14 <15.2.3-canary.5"), "next", "15.2.3"),
-    ).toBeUndefined();
+  it("passes a range whose strict bounds still admit a prerelease of a major-only floor", () => {
+    expect(dependencySpecProvablyBelow(pkg(">15.0.0-rc.1 <15.0.0"), "next", "15")).toBeUndefined();
+    expect(dependencySpecProvablyBelow(pkg(">=14 <15.0.0-rc.5"), "next", "15")).toBeUndefined();
+  });
+
+  it("rejects a range that admits only prereleases of a patch-level floor", () => {
+    expect(dependencySpecProvablyBelow(pkg(">15.2.3-canary.1 <15.2.3"), "next", "15.2.3")).toBe(
+      ">15.2.3-canary.1 <15.2.3",
+    );
+    expect(dependencySpecProvablyBelow(pkg(">=14 <15.2.3-canary.5"), "next", "15.2.3")).toBe(
+      ">=14 <15.2.3-canary.5",
+    );
   });
 
   it("rejects a range naming a prerelease of the floor that it cannot admit", () => {
@@ -222,6 +233,36 @@ describe("installedVersion", () => {
     expect(await installedVersion(dir, "zitadel-not-installed-anywhere")).toBeUndefined();
   });
 
+  it("does not look above a pnpm workspace root", async () => {
+    const root = join(dir, "repo");
+    const app = join(root, "apps", "web");
+    await mkdir(app, { recursive: true });
+    await writeFile(join(root, "pnpm-workspace.yaml"), "packages:\n  - apps/*\n");
+    await install(dir, "next", JSON.stringify({ name: "next", version: "15.0.0" }));
+
+    expect(await installedVersion(app, "next")).toBeUndefined();
+  });
+
+  it("does not look above a package.json workspaces root", async () => {
+    const root = join(dir, "repo");
+    const app = join(root, "apps", "web");
+    await mkdir(app, { recursive: true });
+    await writeFile(join(root, "package.json"), JSON.stringify({ workspaces: ["apps/*"] }));
+    await install(dir, "next", JSON.stringify({ name: "next", version: "15.0.0" }));
+
+    expect(await installedVersion(app, "next")).toBeUndefined();
+  });
+
+  it("still finds a version hoisted to the workspace root itself", async () => {
+    const root = join(dir, "repo");
+    const app = join(root, "apps", "web");
+    await mkdir(app, { recursive: true });
+    await writeFile(join(root, "pnpm-workspace.yaml"), "packages:\n  - apps/*\n");
+    await install(root, "next", JSON.stringify({ name: "next", version: "15.1.7" }));
+
+    expect(await installedVersion(app, "next")).toBe("15.1.7");
+  });
+
   it.each([
     ["no version", JSON.stringify({ name: "next" })],
     ["an invalid version", JSON.stringify({ name: "next", version: "fifteen" })],
@@ -234,13 +275,30 @@ describe("installedVersion", () => {
 });
 
 describe("installedVersionBelow", () => {
-  it("returns an installed version below the minimum", async () => {
+  it("returns an installed version below the minimum with the manifest it read", async () => {
     await install(dir, "next", JSON.stringify({ version: "15.2.2" }));
 
-    expect(await installedVersionBelow(dir, "next", "15.2.3")).toBe("15.2.2");
+    expect(await installedVersionBelow(dir, "next", "15.2.3")).toEqual({
+      version: "15.2.2",
+      path: join(await realpath(dir), "node_modules", "next", "package.json"),
+    });
   });
 
-  it.each(["15.2.3", "15.2.3-canary.1", "16.0.0"])("passes %s installed", async (version) => {
+  it("returns a prerelease of a patch-level minimum, which predates the release", async () => {
+    await install(dir, "next", JSON.stringify({ version: "15.2.3-canary.1" }));
+
+    expect(await installedVersionBelow(dir, "next", "15.2.3")).toMatchObject({
+      version: "15.2.3-canary.1",
+    });
+  });
+
+  it("passes a prerelease of a major-only minimum as at-floor", async () => {
+    await install(dir, "react", JSON.stringify({ version: "18.0.0-rc.0" }));
+
+    expect(await installedVersionBelow(dir, "react", "18")).toBeUndefined();
+  });
+
+  it.each(["15.2.3", "15.3.0-canary.1", "16.0.0"])("passes %s installed", async (version) => {
     await install(dir, "next", JSON.stringify({ version }));
 
     expect(await installedVersionBelow(dir, "next", "15.2.3")).toBeUndefined();
