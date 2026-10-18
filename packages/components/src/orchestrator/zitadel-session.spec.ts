@@ -500,6 +500,35 @@ describe("<zitadel-session>", () => {
     expect(errors[0]?.detail).toMatchObject({ phase: "signout", status: 500, code: "internal" });
   });
 
+  it("reports a sign-out it completed while removed, once put back", async () => {
+    const element = mount();
+    await flush(element);
+    let release: () => void = () => undefined;
+    server.use(
+      http.delete(`${API_BASE}/sessions/me`, async () => {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const events: CustomEvent[] = [];
+    element.addEventListener("zitadel-signout", (e) => events.push(e as CustomEvent));
+
+    activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
+    await new Promise((resolve) => setTimeout(resolve, 16));
+    element.remove();
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 32));
+    expect(events).toHaveLength(0);
+
+    host.appendChild(element);
+    await flush(element);
+
+    expect(events).toHaveLength(1);
+    expect(events[0]?.detail).toEqual({ display: "", identifier: "alice@acme.com" });
+  });
+
   it("suppress-header visually hides the heading but keeps it accessible", async () => {
     currentEmail = "alice@acme.com";
     const element = mount("<zitadel-session suppress-header></zitadel-session>");
