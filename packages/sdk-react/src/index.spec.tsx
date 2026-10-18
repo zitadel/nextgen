@@ -8,6 +8,7 @@ import type {
 import { render, waitFor } from "@testing-library/react";
 import { _resetConfigForTesting, configureZitadel } from "@zitadel/api/config";
 import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
+import { SERVER_RENDER_CASES, SERVER_RENDER_SUITE } from "@zitadel/sdk-core/server-render-cases";
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
   ZITADEL_LOGOUT_EVENT_HANDLERS,
@@ -184,106 +185,14 @@ function serverAttributes(tag: string, node: React.ReactElement): Record<string,
   );
 }
 
-describe("server-rendered widget config", () => {
-  const handle = { projectId: "proj-test", proxyPath: "/__nextgen", url: "http://auth.test" };
+describe(SERVER_RENDER_SUITE, () => {
+  const widgets = { login: ZitadelLogin, session: ZitadelSession, logout: ZitadelLogout } as const;
 
-  it("puts the login flow config into the server markup", () => {
-    expect(
-      serverAttributes(
-        "zitadel-login",
-        <ZitadelLogin project={handle} purpose="register" flowName="signup" />,
-      ),
-    ).toMatchObject({
-      purpose: "register",
-      "flow-name": "signup",
-      "project-id": "proj-test",
-      "proxy-path": "/__nextgen",
-      url: "http://auth.test",
-    });
-  });
-
-  it("puts the discrete project props into the login markup", () => {
-    expect(
-      serverAttributes("zitadel-login", <ZitadelLogin projectId="p1" proxyPath="/px" />),
-    ).toMatchObject({ purpose: "login", "project-id": "p1", "proxy-path": "/px" });
-  });
-
-  it.each([
-    ["zitadel-login", (p: object) => <ZitadelLogin {...p} />],
-    ["zitadel-session", (p: object) => <ZitadelSession {...p} />],
-    ["zitadel-logout", (p: object) => <ZitadelLogout {...p} />],
-  ])("leaves a keyed project handle out of the %s markup", (tag, widget) => {
-    const attributes = serverAttributes(
-      tag,
-      widget({ project: { ...handle, publishableKey: "pk_test_123" }, projectId: "other" }),
-    );
-    expect(attributes).not.toHaveProperty("project-id");
-    expect(attributes).not.toHaveProperty("proxy-path");
-    expect(attributes).not.toHaveProperty("url");
-  });
-
-  it("puts the display options into the server markup", () => {
-    expect(
-      serverAttributes(
-        "zitadel-login",
-        <ZitadelLogin
-          project={handle}
-          variant="page"
-          theme="dark"
-          lang="de"
-          suppressHeader
-          suppressPasswordToggle
-        />,
-      ),
-    ).toMatchObject({
-      variant: "page",
-      theme: "dark",
-      lang: "de",
-      "suppress-header": "",
-      "suppress-password-toggle": "",
-    });
-    expect(
-      serverAttributes(
-        "zitadel-session",
-        <ZitadelSession
-          project={handle}
-          heading="Hi"
-          logoutLabel="Out"
-          variant="page"
-          suppressHeader
-        />,
-      ),
-    ).toMatchObject({
-      heading: "Hi",
-      "logout-label": "Out",
-      variant: "page",
-      "suppress-header": "",
-    });
-  });
-
-  it("puts the session config into the server markup", () => {
-    expect(
-      serverAttributes(
-        "zitadel-session",
-        <ZitadelSession project={handle} postSignOutUrl="/bye" />,
-      ),
-    ).toMatchObject({
-      "project-id": "proj-test",
-      "proxy-path": "/__nextgen",
-      url: "http://auth.test",
-      "post-sign-out-url": "/bye",
-    });
-  });
-
-  it("puts the logout config into the server markup", () => {
-    expect(
-      serverAttributes("zitadel-logout", <ZitadelLogout project={handle} postSignOutUrl="/bye" />),
-    ).toMatchObject({
-      "project-id": "proj-test",
-      "proxy-path": "/__nextgen",
-      url: "http://auth.test",
-      "post-sign-out-url": "/bye",
-    });
+  it.each(SERVER_RENDER_CASES)("$title", ({ widget, props, present, absent }) => {
+    const Widget = widgets[widget] as React.ComponentType<object>;
+    const attributes = serverAttributes(`zitadel-${widget}`, <Widget {...props} />);
+    expect(attributes).toMatchObject(present);
+    for (const name of absent) expect(attributes).not.toHaveProperty(name);
   });
 });
 

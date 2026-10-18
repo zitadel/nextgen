@@ -41,6 +41,11 @@
       "types": "./dist/attributes.d.mts",
       "import": "./dist/attributes.mjs"
     },
+    "./server-render-cases": {
+      "@zitadel/source": "./src/server-render-cases.ts",
+      "types": "./dist/server-render-cases.d.mts",
+      "import": "./dist/server-render-cases.mjs"
+    },
     "./jwt": {
       "@zitadel/source": "./src/jwt.ts",
       "types": "./dist/jwt.d.mts",

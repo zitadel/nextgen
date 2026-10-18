@@ -17,6 +17,7 @@ import {
 } from "@zitadel/sdk-core/types";
 import { describe, expect, it, vi } from "vitest";
 import { createSSRApp, defineComponent, h, shallowRef, type Ref } from "vue";
+import { SERVER_RENDER_CASES, SERVER_RENDER_SUITE } from "@zitadel/sdk-core/server-render-cases";
 import { renderToString } from "vue/server-renderer";
 
 import ZitadelLogin from "./components/ZitadelLogin";
@@ -62,60 +63,19 @@ async function serverRender(
   return host.firstElementChild!;
 }
 
+describe(SERVER_RENDER_SUITE, () => {
+  const widgets = { login: ZitadelLogin, session: ZitadelSession, logout: ZitadelLogout } as const;
+
+  it.each(SERVER_RENDER_CASES)("$title", async ({ widget, props, present, absent }) => {
+    const el = await serverRender(widgets[widget], { ...props });
+    for (const [name, value] of Object.entries(present)) {
+      expect(el.getAttribute(name), name).toBe(value);
+    }
+    for (const name of absent) expect(el.hasAttribute(name), name).toBe(false);
+  });
+});
+
 describe("ZitadelLogin", () => {
-  it("writes the discrete config as kebab-case attributes in the server markup", async () => {
-    const el = await serverRender(ZitadelLogin, {
-      projectId: "proj-test",
-      proxyPath: "/__nextgen",
-    });
-    expect(el.tagName.toLowerCase()).toBe("zitadel-login");
-    expect(el.getAttribute("project-id")).toBe("proj-test");
-    expect(el.getAttribute("proxy-path")).toBe("/__nextgen");
-  });
-
-  it("writes the project handle's fields as attributes in the server markup", async () => {
-    const el = await serverRender(ZitadelLogin, { project: handle });
-    expect(el.getAttribute("project-id")).toBe("proj-handle");
-    expect(el.getAttribute("proxy-path")).toBe("/__handle");
-    expect(el.getAttribute("url")).toBe("https://auth.example.com");
-  });
-
-  it("prefers the project handle over conflicting discrete props in the server markup", async () => {
-    const el = await serverRender(ZitadelLogin, {
-      project: handle,
-      projectId: "proj-other",
-      proxyPath: "/__other",
-    });
-    expect(el.getAttribute("project-id")).toBe("proj-handle");
-    expect(el.getAttribute("proxy-path")).toBe("/__handle");
-  });
-
-  it("writes the display options in the server markup", async () => {
-    const el = await serverRender(ZitadelLogin, {
-      project: handle,
-      variant: "page",
-      theme: "dark",
-      lang: "de",
-      suppressHeader: true,
-      suppressPasswordToggle: true,
-    });
-    expect(el.getAttribute("variant")).toBe("page");
-    expect(el.getAttribute("theme")).toBe("dark");
-    expect(el.getAttribute("lang")).toBe("de");
-    expect(el.hasAttribute("suppress-header")).toBe(true);
-    expect(el.hasAttribute("suppress-password-toggle")).toBe(true);
-  });
-
-  it("writes no project attribute for a keyed handle in the server markup", async () => {
-    const el = await serverRender(ZitadelLogin, {
-      project: { ...handle, publishableKey: "pk_test_123" },
-      projectId: "proj-other",
-    });
-    expect(el.hasAttribute("project-id")).toBe(false);
-    expect(el.hasAttribute("proxy-path")).toBe(false);
-    expect(el.hasAttribute("url")).toBe(false);
-  });
-
   it("keeps the properties the client render assigns", () => {
     const { container } = render(ZitadelLogin, { props: { project: handle } });
     const el = container.querySelector<HTMLElement & { project: unknown }>("zitadel-login");
@@ -192,33 +152,6 @@ describe("ZitadelLogin", () => {
 });
 
 describe("ZitadelLogout", () => {
-  it("writes the discrete config as kebab-case attributes in the server markup", async () => {
-    const el = await serverRender(ZitadelLogout, {
-      projectId: "proj-test",
-      proxyPath: "/__nextgen",
-    });
-    expect(el.tagName.toLowerCase()).toBe("zitadel-logout");
-    expect(el.getAttribute("project-id")).toBe("proj-test");
-    expect(el.getAttribute("proxy-path")).toBe("/__nextgen");
-  });
-
-  it("writes the project handle's fields as attributes in the server markup", async () => {
-    const el = await serverRender(ZitadelLogout, { project: handle });
-    expect(el.getAttribute("project-id")).toBe("proj-handle");
-    expect(el.getAttribute("proxy-path")).toBe("/__handle");
-    expect(el.getAttribute("url")).toBe("https://auth.example.com");
-  });
-
-  it("prefers the project handle over conflicting discrete props in the server markup", async () => {
-    const el = await serverRender(ZitadelLogout, {
-      project: handle,
-      projectId: "proj-other",
-      proxyPath: "/__other",
-    });
-    expect(el.getAttribute("project-id")).toBe("proj-handle");
-    expect(el.getAttribute("proxy-path")).toBe("/__handle");
-  });
-
   it("keeps the properties the client render assigns", () => {
     const { container } = render(ZitadelLogout, { props: { project: handle } });
     const el = container.querySelector<HTMLElement & { project: unknown }>("zitadel-logout");
@@ -265,33 +198,6 @@ describe("ZitadelLogout", () => {
 });
 
 describe("ZitadelSession", () => {
-  it("writes the discrete config as kebab-case attributes in the server markup", async () => {
-    const el = await serverRender(ZitadelSession, {
-      projectId: "proj-test",
-      proxyPath: "/__nextgen",
-    });
-    expect(el.tagName.toLowerCase()).toBe("zitadel-session");
-    expect(el.getAttribute("project-id")).toBe("proj-test");
-    expect(el.getAttribute("proxy-path")).toBe("/__nextgen");
-  });
-
-  it("writes the project handle's fields as attributes in the server markup", async () => {
-    const el = await serverRender(ZitadelSession, { project: handle });
-    expect(el.getAttribute("project-id")).toBe("proj-handle");
-    expect(el.getAttribute("proxy-path")).toBe("/__handle");
-    expect(el.getAttribute("url")).toBe("https://auth.example.com");
-  });
-
-  it("prefers the project handle over conflicting discrete props in the server markup", async () => {
-    const el = await serverRender(ZitadelSession, {
-      project: handle,
-      projectId: "proj-other",
-      proxyPath: "/__other",
-    });
-    expect(el.getAttribute("project-id")).toBe("proj-handle");
-    expect(el.getAttribute("proxy-path")).toBe("/__handle");
-  });
-
   it("keeps the properties the client render assigns", () => {
     const { container } = render(ZitadelSession, { props: { project: handle } });
     const el = container.querySelector<HTMLElement & { project: unknown }>("zitadel-session");
