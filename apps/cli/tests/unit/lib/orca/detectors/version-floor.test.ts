@@ -25,6 +25,16 @@ afterEach(async () => {
 
 /** Versions around a detector's floor, derived from the floor it declares. */
 function around(floor: string) {
+  if ((semver.prerelease(floor)?.length ?? 0) > 0) {
+    // A prerelease floor is the bound as written: `-0` sorts below any named prerelease.
+    const base = semver.coerce(floor)?.version as string;
+    return {
+      below: `${base}-0`,
+      at: floor,
+      above: `${semver.major(floor) + 1}.0.0`,
+      prerelease: `${base}-rc.0`,
+    };
+  }
   const at = semver.coerce(floor);
   if (!at) {
     throw new Error(`unparseable floor ${floor}`);
@@ -95,7 +105,6 @@ describe.each(detectors.map((detector) => [detector.framework, detector] as cons
     it.each([
       ["the floor", at],
       ["a newer major", above],
-      ["a prerelease of the floor", prerelease],
       ["a range spanning the floor", `>=${below}`],
       ["a workspace protocol", "workspace:*"],
       ["a path protocol", `file:../${detector.versionPackage}-${below}`],
@@ -104,6 +113,20 @@ describe.each(detectors.map((detector) => [detector.framework, detector] as cons
     ])("accepts %s", async (_label, spec) => {
       await expect(check(spec)).resolves.toBeUndefined();
     });
+
+    // A floor naming only a line (React 18) takes a prerelease of it as at-floor; an
+    // exact release floor (Next.js 15.2.3) does not, since the prerelease predates it.
+    const exactRelease = semver.valid(detector.versionFloor) !== null;
+    const prereleaseFloor = (semver.prerelease(detector.versionFloor)?.length ?? 0) > 0;
+    if (exactRelease && !prereleaseFloor) {
+      it("refuses a prerelease of the exact release floor", async () => {
+        expect((await refusal(check(prerelease))).code).toBe("E_UNSUPPORTED_PROJECT_SHAPE");
+      });
+    } else {
+      it("accepts a prerelease of the floor", async () => {
+        await expect(check(prerelease)).resolves.toBeUndefined();
+      });
+    }
 
     it("accepts a project that does not declare the package", async () => {
       await expect(enforceVersionFloor(detector, {}, await emptyDir())).resolves.toBeUndefined();
@@ -130,8 +153,8 @@ describe.each(detectors.map((detector) => [detector.framework, detector] as cons
         expect(error.message).toContain(`${detector.displayName} ${below} is installed`);
       });
 
-      it("accepts an installed release at the floor and its prerelease", async () => {
-        for (const version of [at, prerelease]) {
+      it("accepts an installed release at the floor", async () => {
+        for (const version of exactRelease && !prereleaseFloor ? [at] : [at, prerelease]) {
           await expect(
             enforceVersionFloor(
               detector,

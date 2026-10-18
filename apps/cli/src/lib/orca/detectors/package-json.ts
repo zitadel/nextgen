@@ -70,6 +70,11 @@ export function dependencySpecProvablyBelow(
   if (!spec || !floor || semver.validRange(spec) === null) {
     return undefined;
   }
+  // A prerelease floor (`2.0.0-beta.45`) is itself the bound: a range is judged
+  // by whether it admits that version or a newer one, prereleases included.
+  if (isPrereleaseFloor(minimum)) {
+    return semver.intersects(spec, `>=${minimum}`, { includePrerelease: true }) ? undefined : spec;
+  }
   if (semver.intersects(spec, `>=${floor.version}`)) {
     return undefined;
   }
@@ -107,6 +112,11 @@ function declaresPrereleaseAtOrAbove(spec: string, floor: semver.SemVer, exact: 
  */
 function isExactFloor(minimum: string): boolean {
   return semver.valid(minimum) !== null;
+}
+
+/** Whether `minimum` is itself a prerelease (`2.0.0-beta.45`), so it is the bound as written. */
+function isPrereleaseFloor(minimum: string): boolean {
+  return (semver.prerelease(minimum)?.length ?? 0) > 0;
 }
 
 /** A package found in `node_modules`: its version and the manifest it was read from. */
@@ -183,7 +193,8 @@ function versionIn(contents: string): string | undefined {
  * an older one; this judges what actually runs. Nothing installed returns
  * `undefined`, leaving the declared spec as the only gate. A prerelease of a
  * major-only floor (`18`) is not below it; a prerelease of an exact floor
- * (`15.2.3-canary.0`) is, as for the spec.
+ * (`15.2.3-canary.0`) is, and a prerelease floor (`2.0.0-beta.45`) is the bound
+ * as written, as for the spec.
  */
 export async function installedVersionBelow(
   cwd: string,
@@ -195,6 +206,10 @@ export async function installedVersionBelow(
   if (installed === undefined || !floor) {
     return undefined;
   }
-  const bound = isExactFloor(minimum) ? floor.version : `${floor.version}-0`;
+  const bound = isPrereleaseFloor(minimum)
+    ? minimum
+    : isExactFloor(minimum)
+      ? floor.version
+      : `${floor.version}-0`;
   return semver.lt(installed.version, bound) ? installed : undefined;
 }

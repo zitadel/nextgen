@@ -15,7 +15,7 @@ export class QwikDetector implements Detector {
   readonly framework = "qwik";
   readonly displayName = "Qwik";
   readonly versionPackage = "@qwik.dev/core";
-  readonly versionFloor = "2";
+  readonly versionFloor = "2.0.0-beta.45";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
     const pkg = await readPackageJson(cwd).catch(() => undefined);

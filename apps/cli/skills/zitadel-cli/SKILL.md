@@ -38,7 +38,7 @@ selector in agent scripts and bug reports for reproducibility.
 The CLI requires Node.js 24+.
 
 The app's framework must be at or above a minimum version: Next.js 15.2.3,
-React 18, Vue 3, Nuxt 4, Angular 17, Solid 1.6, Svelte 5, Qwik 2. Newer major
+React 18, Vue 3, Nuxt 4, Angular 17, Solid 1.6, Svelte 5, Qwik 2.0.0-beta.45. Newer major
 versions are not refused. `setup` and `doctor` refuse an app below its minimum,
 by declared range or installed release, with `E_UNSUPPORTED_PROJECT_SHAPE`
 (exit 3); `setup` refuses before it scaffolds or patches anything, while

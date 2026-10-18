@@ -28,7 +28,8 @@ This ADR records the floors and the enforcement point.
 - **Floors:** every framework the CLI detects declares one, as a plain
   semver string: Next.js **15.2.3**, React **18**, Vue **3**, Nuxt **4**,
   Angular **17** (`@angular/core`), Solid **1.6** (`solid-js`), Svelte **5**
-  and Qwik **2** (`@qwik.dev/core`). Both 18 and 19 are supported for React;
+  and Qwik **2.0.0-beta.45** (`@qwik.dev/core`, the first release the SDK's peer
+  range accepts, so the floor is a prerelease and is the bound as written). Both 18 and 19 are supported for React;
   templates that need React-19-only behavior must degrade safely on 18, as the
   ref-assigned copy overlay does. The Next floor is a patch release, not the
   major: 15.0.0 to 15.2.2 skip middleware for a request that sends

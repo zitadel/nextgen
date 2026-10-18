@@ -139,6 +139,24 @@ describe("dependencySpecProvablyBelow", () => {
   });
 });
 
+describe("a prerelease floor", () => {
+  const pkg = (spec: string): PackageJson => ({ dependencies: { qwik: spec } });
+
+  it.each(["2.0.0-beta.1", "2.0.0-beta.44", "<2.0.0-beta.45", ">=2.0.0-beta.1 <2.0.0-beta.30"])(
+    "rejects %s, which cannot reach the floor",
+    (spec) => {
+      expect(dependencySpecProvablyBelow(pkg(spec), "qwik", "2.0.0-beta.45")).toBe(spec);
+    },
+  );
+
+  it.each(["2.0.0-beta.45", "2.0.0-beta.50", "^2.0.0-beta.1", "2.0.0-rc.0", "^2.0.0", "3.0.0"])(
+    "passes %s",
+    (spec) => {
+      expect(dependencySpecProvablyBelow(pkg(spec), "qwik", "2.0.0-beta.45")).toBeUndefined();
+    },
+  );
+});
+
 /** Installs a package under `root`'s `node_modules` with the given manifest. */
 async function install(root: string, name: string, manifest: string): Promise<void> {
   await mkdir(join(root, "node_modules", name), { recursive: true });
@@ -252,6 +270,16 @@ describe("installedVersionBelow", () => {
     await install(dir, "next", JSON.stringify({ version }));
 
     expect(await installedVersionBelow(dir, "next", "15.2.3")).toBeUndefined();
+  });
+
+  it("judges an installed beta against a prerelease minimum as written", async () => {
+    await install(dir, "qwik", JSON.stringify({ version: "2.0.0-beta.12" }));
+    expect(await installedVersionBelow(dir, "qwik", "2.0.0-beta.45")).toMatchObject({
+      version: "2.0.0-beta.12",
+    });
+
+    await install(dir, "qwik", JSON.stringify({ version: "2.0.0-beta.45" }));
+    expect(await installedVersionBelow(dir, "qwik", "2.0.0-beta.45")).toBeUndefined();
   });
 
   it("passes when nothing is installed", async () => {
