@@ -34,6 +34,49 @@ export * from "./types";
 export { businessLocales } from "@zitadel/components";
 
 /**
+ * The element's own defaults, read once from a pristine instance of each class.
+ */
+const pristine = new WeakMap<object, Record<string, unknown>>();
+
+/**
+ * `@lit/react` writes `undefined` onto the element when a prop is dropped (or
+ * passed as `undefined`), which overwrites the element's own default: a
+ * `heading` that went back to unset left the session card with an empty title.
+ * This runs after `@lit/react`'s own layout effect on every render and puts the
+ * element's default back on any property left `undefined`.
+ */
+function useRestoreUnsetDefaults<E extends HTMLElement>(
+  forwardedRef: React.ForwardedRef<E>,
+  elementClass: { new (): E; elementProperties: ReadonlyMap<PropertyKey, unknown> },
+): React.RefCallback<E> {
+  const element = React.useRef<E | null>(null);
+
+  React.useLayoutEffect(() => {
+    const target = element.current as Record<string, unknown> | null;
+    if (!target) return;
+    let defaults = pristine.get(elementClass);
+    if (!defaults) {
+      defaults = new elementClass() as Record<string, unknown>;
+      pristine.set(elementClass, defaults);
+    }
+    for (const key of elementClass.elementProperties.keys()) {
+      if (typeof key === "string" && target[key] === undefined && defaults[key] !== undefined) {
+        target[key] = defaults[key];
+      }
+    }
+  });
+
+  return React.useCallback(
+    (node: E | null) => {
+      element.current = node;
+      if (typeof forwardedRef === "function") forwardedRef(node);
+      else if (forwardedRef) forwardedRef.current = node;
+    },
+    [forwardedRef],
+  );
+}
+
+/**
  * React components for the Zitadel auth widgets.
  *
  * These wrap the framework-agnostic Lit web components from
@@ -122,10 +165,11 @@ export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginRe
     { purpose, onFlowStep, onFlowInput, onFlowComplete, onFlowRedirect, onFlowError, ...props },
     ref,
   ) {
+    const elementRef = useRestoreUnsetDefaults(ref, ZitadelLoginElement);
     return (
       <ZitadelLoginElementReact
         {...props}
-        ref={ref}
+        ref={elementRef}
         purpose={purpose ?? "login"}
         onZitadelFlowStep={onFlowStep && ((event) => onFlowStep(event.detail))}
         onZitadelFlowInput={onFlowInput && ((event) => onFlowInput(event.detail))}
@@ -150,10 +194,11 @@ ZitadelLogin.displayName = "ZitadelLogin";
  */
 export const ZitadelLogout = React.forwardRef<ZitadelLogoutElement, ZitadelLogoutProps>(
   function ZitadelLogout({ onSignout, ...props }, ref) {
+    const elementRef = useRestoreUnsetDefaults(ref, ZitadelLogoutElement);
     return (
       <ZitadelLogoutElementReact
         {...props}
-        ref={ref}
+        ref={elementRef}
         onZitadelSignout={onSignout && ((event) => onSignout(event.detail))}
       />
     );
@@ -172,10 +217,11 @@ ZitadelLogout.displayName = "ZitadelLogout";
  */
 export const ZitadelSession = React.forwardRef<ZitadelSessionElement, ZitadelSessionProps>(
   function ZitadelSession({ onSignout, ...props }, ref) {
+    const elementRef = useRestoreUnsetDefaults(ref, ZitadelSessionElement);
     return (
       <ZitadelSessionElementReact
         {...props}
-        ref={ref}
+        ref={elementRef}
         onZitadelSignout={onSignout && ((event) => onSignout(event.detail))}
       />
     );
