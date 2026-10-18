@@ -31,7 +31,7 @@ JSX you drop into your routes.
 TypeScript >= 5.0.
 
 ```sh
-npm install @zitadel/sdk-solid
+npm install @zitadel/sdk-solid@alpha
 ```
 
 ## Integrate

@@ -28,7 +28,7 @@ install the package and wire the components in manually.
 ## Install
 
 ```sh
-npm install @zitadel/sdk-angular
+npm install @zitadel/sdk-angular@alpha
 ```
 
 Peer dependencies (already present in any Angular 17+ app): `@angular/core` and

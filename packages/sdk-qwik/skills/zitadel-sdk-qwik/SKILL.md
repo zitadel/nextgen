@@ -26,7 +26,7 @@ shared SPA config/handler types.
 ## Install
 
 ```sh
-pnpm add @zitadel/sdk-qwik
+pnpm add @zitadel/sdk-qwik@alpha
 ```
 
 The package declares a peer dependency on `@qwik.dev/core` (`^2.0.0-beta.45`),
