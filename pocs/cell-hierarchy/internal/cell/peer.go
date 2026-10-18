@@ -81,6 +81,141 @@ func (c *PeerClient) Heartbeat(ctx context.Context, parentURL, joinSecret string
 	return c.doJSON(ctx, http.MethodPost, NormalizeURL(parentURL)+"/v1/heartbeat", map[string]any{}, joinSecret, nil)
 }
 
+type ProjectResponse struct {
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	IsParent        bool   `json:"is_parent"`
+	LookupEnabled   bool   `json:"lookup_enabled"`
+	ParentProjectID string `json:"parent_project_id"`
+	ParentCellURL   string `json:"parent_cell_url"`
+	HostCellURL     string `json:"host_cell_url"`
+	CreatedAt       string `json:"created_at"`
+}
+
+func (c *PeerClient) ListProjects(ctx context.Context, cellURL string) ([]ProjectResponse, error) {
+	var out struct {
+		Projects []ProjectResponse `json:"projects"`
+	}
+	err := c.doJSON(ctx, http.MethodGet, NormalizeURL(cellURL)+"/v1/projects", nil, "", &out)
+	return out.Projects, err
+}
+
+func (c *PeerClient) CreateProject(ctx context.Context, cellURL string, body map[string]any) (ProjectResponse, error) {
+	var out ProjectResponse
+	err := c.doJSON(ctx, http.MethodPost, NormalizeURL(cellURL)+"/v1/projects", body, "", &out)
+	return out, err
+}
+
+func (c *PeerClient) GetProject(ctx context.Context, cellURL, projectID string) (ProjectResponse, error) {
+	var out struct {
+		Project ProjectResponse `json:"project"`
+	}
+	err := c.doJSON(ctx, http.MethodGet, NormalizeURL(cellURL)+"/v1/projects/"+projectID, nil, "", &out)
+	return out.Project, err
+}
+
+func (c *PeerClient) AttachProject(ctx context.Context, cellURL, projectID string, parentProjectID, parentCellURL string) error {
+	return c.doJSON(ctx, http.MethodPost, NormalizeURL(cellURL)+"/v1/projects/"+projectID+"/attach", map[string]any{
+		"parent_project_id": parentProjectID,
+		"parent_cell_url":   parentCellURL,
+	}, "", nil)
+}
+
+type CreateUserResponse struct {
+	User struct {
+		ID        string `json:"id"`
+		ProjectID string `json:"project_id"`
+		Email     string `json:"email"`
+		CreatedAt string `json:"created_at"`
+	} `json:"user"`
+	Trace []TraceHop `json:"trace"`
+	Error string     `json:"error"`
+}
+
+func (c *PeerClient) CreateUser(ctx context.Context, cellURL, projectID, email string, deferFloat bool) (CreateUserResponse, error) {
+	var out CreateUserResponse
+	err := c.doJSON(ctx, http.MethodPost, NormalizeURL(cellURL)+"/v1/projects/"+projectID+"/users", map[string]any{
+		"email":       email,
+		"defer_float": deferFloat,
+	}, "", &out)
+	return out, err
+}
+
+func (c *PeerClient) FloatUser(ctx context.Context, cellURL, projectID, key string) ([]TraceHop, error) {
+	var out struct {
+		OK    bool       `json:"ok"`
+		Trace []TraceHop `json:"trace"`
+		Error string     `json:"error"`
+	}
+	err := c.doJSON(ctx, http.MethodPost, NormalizeURL(cellURL)+"/v1/projects/"+projectID+"/float", map[string]any{
+		"key": key,
+	}, "", &out)
+	return out.Trace, err
+}
+
+type PushLookupRequest struct {
+	Key           string `json:"key"`
+	HomeProjectID string `json:"home_project_id"`
+	HomeCellURL   string `json:"home_cell_url"`
+	ProjectID     string `json:"project_id,omitempty"`
+}
+
+func (c *PeerClient) PushLookup(ctx context.Context, cellURL string, req PushLookupRequest) error {
+	return c.doJSON(ctx, http.MethodPost, NormalizeURL(cellURL)+"/v1/lookup/push", req, "", nil)
+}
+
+type LookupResult struct {
+	Hit              bool   `json:"hit"`
+	HomeProjectID    string `json:"home_project_id"`
+	HomeCellURL      string `json:"home_cell_url"`
+	State            string `json:"state,omitempty"`
+	FoundAtProjectID string `json:"found_at,omitempty"`
+}
+
+func (c *PeerClient) Lookup(ctx context.Context, cellURL, projectID, key string) (LookupResult, []TraceHop, error) {
+	var out struct {
+		Hit           bool       `json:"hit"`
+		HomeProjectID string     `json:"home_project_id"`
+		HomeCellURL   string     `json:"home_cell_url"`
+		State         string     `json:"state"`
+		Trace         []TraceHop `json:"trace"`
+	}
+	err := c.doJSON(ctx, http.MethodPost, NormalizeURL(cellURL)+"/v1/lookup", map[string]any{
+		"project_id": projectID,
+		"key":        key,
+	}, "", &out)
+	return LookupResult{
+		Hit: out.Hit, HomeProjectID: out.HomeProjectID, HomeCellURL: out.HomeCellURL, State: out.State,
+	}, out.Trace, err
+}
+
+// LookupWalk starts at projectID on startCellURL and walks UP parent project pointers only.
+func (c *PeerClient) LookupWalk(ctx context.Context, startCellURL, projectID, key string) (LookupResult, []TraceHop, error) {
+	var trace []TraceHop
+	cellURL := NormalizeURL(startCellURL)
+	curProjectID := projectID
+	for {
+		proj, err := c.GetProject(ctx, cellURL, curProjectID)
+		if err != nil {
+			return LookupResult{}, trace, err
+		}
+		res, hops, err := c.Lookup(ctx, cellURL, curProjectID, key)
+		trace = append(trace, hops...)
+		if err != nil {
+			return LookupResult{}, trace, err
+		}
+		if res.Hit {
+			res.FoundAtProjectID = curProjectID
+			return res, trace, nil
+		}
+		if proj.ParentProjectID == "" || proj.ParentCellURL == "" {
+			return LookupResult{Hit: false}, trace, nil
+		}
+		cellURL = NormalizeURL(proj.ParentCellURL)
+		curProjectID = proj.ParentProjectID
+	}
+}
+
 func (c *PeerClient) DoRaw(ctx context.Context, method, url string, body any, bearer string, out any) error {
 	return c.doJSON(ctx, method, url, body, bearer, out)
 }

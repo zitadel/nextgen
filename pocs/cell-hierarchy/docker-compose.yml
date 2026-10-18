@@ -85,7 +85,7 @@ services:
 
   bootstrap:
     <<: *cell
-    entrypoint: ["/bin/bash", "/usr/local/bin/bootstrap-joins.sh"]
+    entrypoint: ["/bin/bash", "-c", "/usr/local/bin/bootstrap-joins.sh && /usr/local/bin/bootstrap-projects.sh"]
     depends_on:
       - platform
       - eu

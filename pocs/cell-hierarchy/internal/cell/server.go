@@ -12,10 +12,11 @@ import (
 )
 
 type Server struct {
-	Store  *Store
-	Peer   *PeerClient
-	Now    func() time.Time
-	Logger *log.Logger
+	Store      *Store
+	Peer       *PeerClient
+	Now        func() time.Time
+	Logger     *log.Logger
+	FloatDelay time.Duration
 
 	mu       sync.Mutex
 	hbCancel context.CancelFunc
@@ -46,6 +47,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/join/complete", s.handleComplete)
 	mux.HandleFunc("POST /v1/heartbeat", s.handleHeartbeat)
 	mux.HandleFunc("DELETE /v1/children", s.handleDeleteChild)
+	s.registerProjectRoutes(mux)
 	return mux
 }
 

@@ -87,7 +87,10 @@ CREATE TABLE IF NOT EXISTS join_tokens (
   expires_at TEXT NOT NULL,
   consumed_at TEXT
 );`)
-	return err
+	if err != nil {
+		return err
+	}
+	return s.migrateProjects()
 }
 
 func (s *Store) ensureMeta(cellURL, label string, isParent bool) error {

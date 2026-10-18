@@ -43,6 +43,7 @@ export EU2_URL=http://127.0.0.1:8103
 export US_URL=http://127.0.0.1:8104
 export AUS_URL=http://127.0.0.1:8105
 "$ROOT/scripts/bootstrap-joins.sh"
+"$ROOT/scripts/bootstrap-projects.sh"
 
 kill_port 3000
 CELLS="platform=http://127.0.0.1:8100,eu=http://127.0.0.1:8101,eu-1=http://127.0.0.1:8102,eu-2=http://127.0.0.1:8103,us=http://127.0.0.1:8104,aus=http://127.0.0.1:8105,spare=http://127.0.0.1:8106" \

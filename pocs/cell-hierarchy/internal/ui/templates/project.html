@@ -1,0 +1,84 @@
+{{define "project"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{{.Title}} · cell hierarchy</title>
+  <style>
+    :root { --bg:#0f1419; --panel:#1a222c; --text:#e7ecf1; --muted:#8b9aab; --accent:#3d9cf0; --ok:#3ecf8e; --bad:#f07178; --border:#2a3542; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:ui-sans-serif,system-ui,sans-serif; background:var(--bg); color:var(--text); line-height:1.45; }
+    header { display:flex; gap:1rem; align-items:center; padding:0.75rem 1.25rem; border-bottom:1px solid var(--border); background:var(--panel); }
+    header a { color:var(--muted); text-decoration:none; margin-right:0.75rem; }
+    main { padding:1.25rem; max-width:960px; margin:0 auto; }
+    .panel { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:1rem; margin-bottom:1rem; }
+    .muted { color:var(--muted); font-size:0.875rem; }
+    .flash-err { color:var(--bad); }
+    .badge { display:inline-block; font-size:0.7rem; padding:0.1rem 0.4rem; border-radius:4px; border:1px solid var(--border); color:var(--muted); margin-left:0.35rem; }
+    .badge.lookup { color:var(--ok); border-color:var(--ok); }
+    table { width:100%; border-collapse:collapse; }
+    th, td { text-align:left; padding:0.4rem 0.5rem; border-bottom:1px solid var(--border); font-size:0.9rem; }
+    code { font-size:0.8rem; color:var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>cell hierarchy</strong>
+    <nav><a href="/">Tree</a><a href="/join">Join</a><a href="/scenarios">Scenarios</a></nav>
+  </header>
+  <main>
+    <h1>{{.Title}}</h1>
+    {{with .Project}}
+      {{if .Error}}<p class="flash-err">{{.Error}}</p>{{end}}
+      <div class="panel">
+        <h2 style="font-size:1rem;margin:0 0 0.5rem">Project</h2>
+        <p>
+          <strong>{{.Project.Name}}</strong>
+          {{if .Project.IsParent}}<span class="badge">parent</span>{{end}}
+          {{if .Project.LookupEnabled}}<span class="badge lookup">lookup</span>{{else}}<span class="badge">lookup off</span>{{end}}
+        </p>
+        <p class="muted">id={{.Project.ID}} · host={{.Project.HostCellURL}}</p>
+        <p class="muted">parent_project_id={{.Project.ParentProjectID}} · parent_cell_url={{.Project.ParentCellURL}}</p>
+      </div>
+      <div class="panel">
+        <h2 style="font-size:1rem;margin:0 0 0.5rem">Users</h2>
+        {{if .Users}}
+        <table>
+          <thead><tr><th>Email</th><th>ID</th><th>Created</th></tr></thead>
+          <tbody>
+          {{range .Users}}
+            <tr><td>{{.Email}}</td><td><code>{{.ID}}</code></td><td class="muted">{{.CreatedAt}}</td></tr>
+          {{end}}
+          </tbody>
+        </table>
+        {{else}}
+        <p class="muted">No users on this project.</p>
+        {{end}}
+      </div>
+      <div class="panel">
+        <h2 style="font-size:1rem;margin:0 0 0.5rem">Lookup table (this cell)</h2>
+        {{if .Lookup}}
+        <table>
+          <thead><tr><th>Key</th><th>Home project</th><th>Home cell</th><th>State</th><th>Updated</th></tr></thead>
+          <tbody>
+          {{range .Lookup}}
+            <tr>
+              <td>{{.Key}}</td>
+              <td><code>{{.HomeProjectID}}</code></td>
+              <td><code>{{.HomeCellURL}}</code></td>
+              <td>{{.State}}</td>
+              <td class="muted">{{.UpdatedAt}}</td>
+            </tr>
+          {{end}}
+          </tbody>
+        </table>
+        {{else}}
+        <p class="muted">Empty lookup table.</p>
+        {{end}}
+      </div>
+    {{end}}
+  </main>
+</body>
+</html>
+{{end}}

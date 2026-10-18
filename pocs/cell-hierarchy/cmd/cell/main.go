@@ -27,6 +27,9 @@ func main() {
 	defer store.Close()
 
 	srv := cell.NewServer(store, cell.NewPeerClient(), logger)
+	if ms, err := strconv.Atoi(env("FLOAT_DELAY_MS", "0")); err == nil && ms > 0 {
+		srv.FloatDelay = time.Duration(ms) * time.Millisecond
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 

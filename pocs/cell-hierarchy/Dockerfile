@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 COPY --from=build /out/cell /usr/local/bin/cell
 COPY --from=build /out/ui /usr/local/bin/ui
 COPY scripts/bootstrap-joins.sh /usr/local/bin/bootstrap-joins.sh
-RUN chmod +x /usr/local/bin/bootstrap-joins.sh
+COPY scripts/bootstrap-projects.sh /usr/local/bin/bootstrap-projects.sh
+RUN chmod +x /usr/local/bin/bootstrap-joins.sh /usr/local/bin/bootstrap-projects.sh
 WORKDIR /data
 EXPOSE 8100 3000
