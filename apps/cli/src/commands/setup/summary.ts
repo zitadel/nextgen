@@ -103,8 +103,9 @@ export async function detectProjectFacts(cwd: string, frameworkId: string): Prom
     };
     const depPkg = depFromFramework(frameworkId);
     const range = pj.dependencies?.[depPkg] ?? pj.devDependencies?.[depPkg];
-    if (range) {
-      facts.frameworkVersion = stripRange(range);
+    const version = range ? stripRange(range) : undefined;
+    if (version) {
+      facts.frameworkVersion = version;
     }
   } catch {
     // Missing or unreadable package.json — version stays undefined; the
@@ -145,13 +146,17 @@ function prettyFramework(framework: string): string {
   return detectorFor(framework)?.displayName ?? framework;
 }
 
-/** Strips `^`/`~`/`>=`/`v` prefixes from an npm range so the version reads cleanly in the summary. */
-function stripRange(range: string): string {
+/**
+ * Strips `^`/`~`/`>=`/`v` prefixes from an npm range so the version reads cleanly in the summary.
+ * Returns `undefined` when the spec is not a plain semver range (`catalog:`, `workspace:*`,
+ * `latest`, a git URL), because printing that as the framework version would be wrong.
+ */
+function stripRange(range: string): string | undefined {
   const trimmed = range.replace(/^([\^~]|>=?|v)/, "").trim();
-  // Take the first dotted segment so multi-range strings (`^15.0.0 || ^14.0.0`)
+  // Take the first segment so multi-range strings (`^15.0.0 || ^14.0.0`)
   // collapse to a single readable version in the report.
-  const first = trimmed.split(/\s+/)[0];
-  return first ?? trimmed;
+  const first = trimmed.split(/\s+/)[0] ?? "";
+  return /^\d+(\.\d+){0,2}(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$/.test(first) ? first : undefined;
 }
 
 /** Returns just the file name from a relative path, for the `→ filename` secondary detail in PACKAGE rows. */

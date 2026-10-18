@@ -59,4 +59,14 @@ describe("detectProjectFacts", () => {
 
     expect(formatFrameworkLine({ ...facts, typescript: false })).toMatch(new RegExp(`^${line} `));
   });
+
+  it.each(["catalog:", "workspace:*", "latest", "github:facebook/react", "npm:react@^18.0.0"])(
+    "prints no version when the spec is %s",
+    async (spec) => {
+      const facts = await detectProjectFacts(await app({ react: spec }), "react");
+
+      expect(facts.frameworkVersion).toBeUndefined();
+      expect(formatFrameworkLine({ ...facts, typescript: false })).toMatch(/^React · /);
+    },
+  );
 });
