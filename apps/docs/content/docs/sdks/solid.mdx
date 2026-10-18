@@ -82,6 +82,8 @@ The Solid SDK is the SPA wrapper for the shared Zitadel login and logout widgets
   <Step>In production, you supply the same-origin proxy yourself. The generated app sends no credential, so that proxy must add the project secret to the session exchange, and to no other call. A plain rewrite cannot do that (see [SDK proxy](/docs/concepts/sdk-proxy#spas-in-production)).</Step>
 </Steps>
 
+If your app renders on the server, mount the widget on the client only, after hydration, or pass `projectId` and `proxyPath` to the `ZitadelLogin` wrapper as strings (it writes them as the `project-id` and `proxy-path` attributes; use those hyphenated names only on a raw `<zitadel-login>` element), because a widget that starts before its configuration arrives shows an error instead of the flow.
+
 ## Verify
 
 - Run the Vite app with generated environment variables.

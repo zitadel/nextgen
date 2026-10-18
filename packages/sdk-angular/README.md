@@ -45,6 +45,10 @@ The signed-in session card is `<zitadel-auth-session>` (exported as `ZitadelSess
 > The wrapper uses the selector `zitadel-auth-login` (not `zitadel-login`) because
 > the latter is the underlying custom element the component renders internally.
 
+## Server rendering
+
+If your app renders on the server, mount the widget on the client only, after hydration (the `zitadel-auth-login` wrapper sets `projectId` and `proxyPath` as element properties, so adding them to the wrapper does not put them in server markup), or use a raw `<zitadel-login>` element with `project-id` and `proxy-path` as attributes, because a widget that starts before its configuration arrives shows an error instead of the flow.
+
 ## Proxying to the backend (deployment)
 
 The widgets call `${proxyPath}/…` same-origin (default `/__nextgen`). In
