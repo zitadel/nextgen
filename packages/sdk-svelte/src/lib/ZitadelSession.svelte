@@ -4,6 +4,7 @@
 
   import type { ZitadelSessionProps, ZitadelSignoutDetail } from './types';
   import { assignGiven } from './given';
+  import { onClient, proxyPathAttr } from './attributes';
 
   let {
     project,
@@ -53,8 +54,9 @@
 
 <zitadel-session
   bind:this={el}
-  {project}
-  project-id={projectId}
-  proxy-path={proxyPath}
+  project={onClient(project)}
+  project-id={project?.projectId ?? projectId}
+  proxy-path={proxyPathAttr(project?.proxyPath ?? proxyPath)}
+  url={project?.url}
   post-sign-out-url={postSignOutUrl}
 ></zitadel-session>

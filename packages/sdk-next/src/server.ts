@@ -9,3 +9,11 @@
 export { auth } from "./auth.js";
 export type { AuthOptions } from "./auth.js";
 export { NextgenProvider } from "./provider.js";
+export type {
+  AuthResult,
+  AuthState,
+  UnauthState,
+  NextgenSession,
+  ClientAuthResult,
+  NextgenMiddlewareOptions,
+} from "./types.js";

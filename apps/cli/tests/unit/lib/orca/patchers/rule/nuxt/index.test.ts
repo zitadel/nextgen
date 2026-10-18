@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { FRAMEWORK_IDS } from "../../../../../../helpers/framework-ids";
 import type {
   FileOp,
   ScaffoldPlan,
@@ -89,7 +90,7 @@ describe("NuxtPatcher.plan", () => {
     expect(profile).toContain('variant="widget"');
   });
 
-  it("writes at the root for a Nuxt 3 project (appDir '.')", () => {
+  it("writes at the root for a Nuxt 4 root-layout project (appDir '.')", () => {
     const plan = new NuxtPatcher().plan(ctx("."));
     expect(writeContents(plan, "app.vue")).toContain(MANAGED_MARKER);
     expect(writeContents(plan, "pages/login.vue")).toContain(MANAGED_MARKER);
@@ -156,5 +157,11 @@ describe("NuxtPatcher.artifacts", () => {
       rendererId: "react",
     });
     expect(artifacts.conditionalFiles).toEqual(["app/app.vue", "app/pages/index.vue"]);
+  });
+});
+
+describe("NuxtPatcher.canPatch", () => {
+  it.each(FRAMEWORK_IDS)("matches %s only when it is its own framework", (id) => {
+    expect(new NuxtPatcher().canPatch(id)).toBe(id === "nuxt");
   });
 });
