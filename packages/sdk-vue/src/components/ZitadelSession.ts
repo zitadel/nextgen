@@ -38,6 +38,14 @@ export default defineComponent({
         ref: element,
         // Hand the Lit element the raw SDK handle, not Vue's reactive proxy.
         project: toRaw(props.project),
+        // Kebab-case attributes are what the element reads at upgrade, and the
+        // only form a server-rendered page carries (the camelCase keys below
+        // render as `projectid=`-style names the element never reads). The
+        // handle's fields are mirrored so a page that passes only `project`
+        // is still configured before hydration.
+        "project-id": props.projectId ?? props.project?.projectId,
+        "proxy-path": props.proxyPath ?? props.project?.proxyPath,
+        url: props.project?.url,
         projectId: props.projectId,
         proxyPath: props.proxyPath,
         "post-sign-out-url": props.postSignOutUrl,

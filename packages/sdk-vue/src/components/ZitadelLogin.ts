@@ -23,8 +23,10 @@ import "@zitadel/components";
  * `zitadel-login` as a Vue component — no `compilerOptions.isCustomElement`
  * needed. Supply the SDK handle from `configureZitadel(...)` as `:project`, or
  * the discrete `:project-id` / `:proxy-path` the widget reads instead — the
- * widget uses whichever is present. All three are bound as DOM properties and
- * read by the widget at startup. The widget's `zitadel-*` events are re-emitted
+ * widget uses whichever is present. All three are bound as DOM properties, and
+ * the discrete values (and the handle's fields) are also written as
+ * `project-id` / `proxy-path` / `url` attributes so a server-rendered page
+ * carries them before hydration. The widget's `zitadel-*` events are re-emitted
  * with their detail as `flowStep`, `flowInput`, `flowComplete`,
  * `flowRedirect` and
  * `flowError` (the names declared in `emits`).
@@ -71,6 +73,14 @@ export default defineComponent({
         // the widget does identity checks on it (and `render` from test-utils
         // would otherwise pass a wrapped clone).
         project: toRaw(props.project),
+        // Kebab-case attributes are what the element reads at upgrade, and the
+        // only form a server-rendered page carries (the camelCase keys below
+        // render as `projectid=`-style names the element never reads). The
+        // handle's fields are mirrored so a page that passes only `project`
+        // is still configured before hydration.
+        "project-id": props.projectId ?? props.project?.projectId,
+        "proxy-path": props.proxyPath ?? props.project?.proxyPath,
+        url: props.project?.url,
         projectId: props.projectId,
         proxyPath: props.proxyPath,
         purpose: props.purpose,
