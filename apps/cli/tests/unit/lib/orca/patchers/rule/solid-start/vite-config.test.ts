@@ -33,6 +33,28 @@ describe("solidStartConfigEdit", () => {
     expect(open).toBe(close);
   });
 
+  it("ignores quotes inside a line comment in the solidStart() options", () => {
+    const source = BARE.replace(
+      "solidStart()",
+      "solidStart({\n// Don't disable SSR\nssr: true\n})",
+    );
+    const out = edit(source);
+    expect(out).toContain('middleware: "./src/middleware.ts"');
+    expect(out).toContain("// Don't disable SSR");
+    expect(out).toContain("nitro()");
+  });
+
+  it("ignores quotes and brackets inside a block comment in the solidStart() options", () => {
+    const source = BARE.replace(
+      "solidStart()",
+      "solidStart({\n/* don't ( [ close */\nssr: true\n})",
+    );
+    const out = edit(source);
+    expect(out).toContain('middleware: "./src/middleware.ts"');
+    expect(out).toContain("/* don't ( [ close */");
+    expect(out).toContain("nitro()");
+  });
+
   it("is idempotent — re-running over its own output changes nothing", () => {
     const once = edit(BARE);
     expect(edit(once)).toBe(once);
