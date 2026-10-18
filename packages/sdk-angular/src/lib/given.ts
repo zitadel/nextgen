@@ -8,8 +8,8 @@ const defaults = new WeakMap<object, Map<string, unknown>>();
  * unset `variant` left the widget with a `null` variant).
  *
  * The element's own value is remembered before a prop is first overridden and
- * restored when the prop becomes unset again, so an input going from a value
- * back to `undefined` does not leave the stale override in place.
+ * restored when the prop becomes unset again, so a reactive prop going from a
+ * value back to `undefined` does not leave the stale override in place.
  */
 export function assignGiven(element: object, props: Record<string, unknown>): void {
   const target = element as Record<string, unknown>;

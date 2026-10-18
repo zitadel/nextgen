@@ -102,8 +102,8 @@ export class ZitadelLoginComponent implements AfterViewInit, OnChanges {
     this.assignOptional();
   }
 
-  // Optional inputs are applied only when set, so an omitted one leaves the
-  // element's own default alone and a cleared one restores it.
+  // Props the element has defaults for are assigned only when given; a
+  // binding would assign `undefined` and overwrite the default.
   private assignOptional(): void {
     if (!this.element) return;
     assignGiven(this.element, {
