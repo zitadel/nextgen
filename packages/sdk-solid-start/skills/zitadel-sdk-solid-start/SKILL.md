@@ -35,7 +35,7 @@ pnpm add @zitadel/sdk-solid-start@alpha
 pnpm add @zitadel/sdk-solid@alpha
 ```
 
-Peer deps: `@solidjs/start ^1.0.0 || ^2.0.0-0`, `solid-js ^1.8.0`.
+Peer deps: `@solidjs/start ^2.0.0`, `solid-js ^1.8.0`.
 
 ## Integrate
 
@@ -67,8 +67,7 @@ export default defineConfig({
 ```
 
 `url` and `projectSecret` default to `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET`
-from the server environment; pass them only to override. On SolidStart 1 the
-`middleware` field lives in `app.config.ts` instead. To compose with your own
+from the server environment; pass them only to override. To compose with your own
 handlers, spread the config's `onRequest` into your own `createMiddleware` call.
 
 **2. Read auth server-side** with `getAuth(getRequestEvent()!)` inside a
