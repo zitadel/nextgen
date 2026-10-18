@@ -28,14 +28,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { useLoadMore } from "@/hooks/use-load-more";
 import { formatRecent } from "@/lib/date";
-import {
-  type DeploymentPage,
-  KIND_LABEL,
-  type ReleaseDeployment,
-  isNotServed,
-  listLiveDeploymentIds,
-  listProjectDeployments,
-} from "@/lib/deployment";
+import { type Deployment, KIND_LABEL, listProjectDeployments } from "@/lib/deployment";
 import {
   projectScopeDeps,
   requireProjectScope,
@@ -48,37 +41,17 @@ import {
  * origins it went to and of which kind, whether any origin still serves it,
  * and when. A row opens the release.
  *
- * The design also draws a **New deployment** button on the title row. It is
- * left out until `POST /deployments` is served (#1572): a button over a 501
- * would read as a broken screen.
- *
- * While `GET /deployments` answers 501 the directory says so in place of its
- * rows; any other failure is the route's error, as on every other screen.
+ * The design also draws a **New deployment** button on the title row; it
+ * arrives with the other actions (#1857).
  */
 export const Route = createFileRoute("/_authed/deployments/")({
   // Order 6: Login flows sits at 5, with Branding nested under it; Project
   // settings stays last at 7.
   staticData: { scope: "project", nav: { label: "Deployments", order: 7, icon: Layers3 } },
   loaderDeps: projectScopeDeps,
-  loader: async ({ deps }): Promise<LoadedDeployments> => {
-    const projectId = requireProjectScope(deps.project);
-    try {
-      const liveIds = await listLiveDeploymentIds(projectId);
-      const page = await listProjectDeployments(projectId, liveIds);
-      return { ...page, liveIds, readable: true };
-    } catch (error) {
-      if (isNotServed(error)) return { items: [], liveIds: new Set(), readable: false };
-      throw error;
-    }
-  },
+  loader: ({ deps }) => listProjectDeployments(requireProjectScope(deps.project)),
   component: DeploymentsScreen,
 });
-
-interface LoadedDeployments extends DeploymentPage {
-  liveIds: Set<string>;
-  /** `false` while the server does not serve deployments. */
-  readable: boolean;
-}
 
 function DeploymentsScreen() {
   const projectId = useRequiredProjectScope();
@@ -86,7 +59,7 @@ function DeploymentsScreen() {
 
   const paging = useLoadMore(
     loaded,
-    (pageToken) => listProjectDeployments(projectId, loaded.liveIds, pageToken),
+    (pageToken) => listProjectDeployments(projectId, pageToken),
     "Could not load more deployments.",
   );
   const deployments = [...loaded.items, ...paging.extra];
@@ -110,15 +83,11 @@ function DeploymentsScreen() {
             </ResourceHeaderRow>
           </TableHeader>
           <TableBody>
-            {!loaded.readable ? (
-              <ResourceEmptyRow colSpan={5}>
-                This server does not list deployments yet.
-              </ResourceEmptyRow>
-            ) : deployments.length === 0 ? (
+            {deployments.length === 0 ? (
               <ResourceEmptyRow colSpan={5}>This project has no deployments.</ResourceEmptyRow>
             ) : (
-              deployments.map((entry) => (
-                <DeploymentRowItem key={entry.deployment.id} entry={entry} />
+              deployments.map((deployment) => (
+                <DeploymentRowItem key={deployment.id} deployment={deployment} />
               ))
             )}
           </TableBody>
@@ -131,8 +100,7 @@ function DeploymentsScreen() {
 }
 
 /** One row of the directory. The whole row opens the release it deployed. */
-function DeploymentRowItem({ entry }: { entry: ReleaseDeployment }) {
-  const { deployment, status } = entry;
+function DeploymentRowItem({ deployment }: { deployment: Deployment }) {
   const navigate = useNavigate();
   const params = { releaseId: deployment.release_id };
 
@@ -154,10 +122,10 @@ function DeploymentRowItem({ entry }: { entry: ReleaseDeployment }) {
         </span>
       </TableCell>
       <TableCell className={RESOURCE_CELL}>
-        <Targets entry={entry} />
+        <Targets deployment={deployment} />
       </TableCell>
       <TableCell className={RESOURCE_CELL}>
-        {status === "live" ? (
+        {deployment.status === "live" ? (
           <StatusBadge status="active" />
         ) : (
           <Badge variant="secondary">Superseded</Badge>
@@ -183,8 +151,8 @@ function DeploymentRowItem({ entry }: { entry: ReleaseDeployment }) {
  * Where the deployment went: the origins counted, with the kind under the
  * count. The count opens the list: each origin opens its target and copies.
  */
-function Targets({ entry }: { entry: ReleaseDeployment }) {
-  const origins = entry.deployment.targets.map((target) => target.origin);
+function Targets({ deployment }: { deployment: Deployment }) {
+  const origins = deployment.targets.map((target) => target.origin);
   return (
     <div className="flex min-w-0 flex-col">
       <Popover>
@@ -222,7 +190,7 @@ function Targets({ entry }: { entry: ReleaseDeployment }) {
           </ul>
         </PopoverContent>
       </Popover>
-      <span className="text-xs leading-4 text-muted-foreground">{KIND_LABEL[entry.kind]}</span>
+      <span className="text-xs leading-4 text-muted-foreground">{KIND_LABEL[deployment.kind]}</span>
     </div>
   );
 }

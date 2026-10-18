@@ -66,26 +66,18 @@ function deployment(id: string, overrides: Record<string, unknown> = {}) {
     id,
     project_id: "proj_test",
     release_id: "rel_1",
+    kind: "primary",
     targets: [{ origin: "https://app.acme.com" }, { origin: "https://www.acme.com" }],
+    status: "live",
     deployed_at: DEPLOYED_AT,
     metadata: { reason: "deploy", message: null, rollback_to: null, deployed_by: null },
     ...overrides,
   };
 }
 
-/**
- * `GET /deployments` for the project: the history, and the live view when
- * `live=true`. The default is a project nothing has deployed.
- */
-function serveDeployments(history: unknown[] = [], live: unknown[] = []) {
-  server.use(
-    http.get(DEPLOYMENTS_URL, ({ request }) => {
-      const url = new URL(request.url);
-      return HttpResponse.json({
-        deployments: url.searchParams.get("live") === "true" ? live : history,
-      });
-    }),
-  );
+/** `GET /deployments` for the project, newest first; by default nothing has been deployed. */
+function serveDeployments(history: unknown[] = []) {
+  server.use(http.get(DEPLOYMENTS_URL, () => HttpResponse.json({ deployments: history })));
 }
 
 /** The reads behind each pointer of {@link release}, and no deployments. */
@@ -209,14 +201,14 @@ describe("release detail", () => {
     server.use(http.get(`${RELEASES_URL}/rel_1`, () => HttpResponse.json(release())));
     servePointers();
     const preview = deployment("dep_2", {
+      kind: "preview",
       targets: [{ origin: "https://acme-k3x9v2.vercel.app", expires_at: "2026-10-09T14:52:00Z" }],
       deployed_at: "2026-10-03T09:00:00Z",
     });
-    // The history holds both and another release's deployment, which the
-    // card leaves out; the live view holds only the preview, so the primary
-    // deployment has since been replaced.
+    // The history also holds another release's deployment, which the card
+    // leaves out.
     const other = deployment("dep_9", { release_id: "rel_2" });
-    serveDeployments([preview, deployment("dep_1"), other], [preview, other]);
+    serveDeployments([preview, deployment("dep_1", { status: "inactive" }), other]);
     await renderAt("/releases/rel_1");
 
     const card = (await screen.findByText("Deployment of this release")).closest(
@@ -247,21 +239,6 @@ describe("release detail", () => {
     expect(await screen.findByText("This release has not been deployed.")).toBeInTheDocument();
   });
 
-  it("keeps the release while the server does not list deployments", async () => {
-    server.use(http.get(`${RELEASES_URL}/rel_1`, () => HttpResponse.json(release())));
-    servePointers();
-    server.use(
-      http.get(DEPLOYMENTS_URL, () =>
-        HttpResponse.json({ code: "not_implemented", message: "" }, { status: 501 }),
-      ),
-    );
-    await renderAt("/releases/rel_1");
-
-    await screen.findByRole("heading", { name: "rel_1" });
-    expect(screen.getByText("This server does not list deployments yet.")).toBeInTheDocument();
-    expect(screen.queryByText("This release has not been deployed.")).not.toBeInTheDocument();
-  });
-
   it("reads every page of the history for the release's own deployments", async () => {
     server.use(http.get(`${RELEASES_URL}/rel_1`, () => HttpResponse.json(release())));
     servePointers();
@@ -269,9 +246,7 @@ describe("release detail", () => {
     // project's history, behind one of another release.
     server.use(
       http.get(DEPLOYMENTS_URL, ({ request }) => {
-        const url = new URL(request.url);
-        if (url.searchParams.get("live") === "true") return HttpResponse.json({ deployments: [] });
-        return url.searchParams.get("page_token") === "next"
+        return new URL(request.url).searchParams.get("page_token") === "next"
           ? HttpResponse.json({ deployments: [deployment("dep_2")] })
           : HttpResponse.json({
               deployments: [deployment("dep_9", { release_id: "rel_2" })],
@@ -292,10 +267,7 @@ describe("release detail", () => {
     const seen: string[] = [];
     server.use(
       http.get(DEPLOYMENTS_URL, ({ request }) => {
-        const url = new URL(request.url);
-        seen.push(
-          `deployments${url.searchParams.get("live") === "true" ? " live" : ""}:${url.searchParams.get("project_id")}`,
-        );
+        seen.push(`deployments:${new URL(request.url).searchParams.get("project_id")}`);
         return HttpResponse.json({ deployments: [] });
       }),
       http.get(`${RELEASES_URL}/rel_1`, ({ request }) => {
@@ -317,11 +289,6 @@ describe("release detail", () => {
     );
     await renderAt("/releases/rel_1");
     await screen.findByRole("heading", { name: "rel_1" });
-    expect(seen.sort()).toEqual([
-      "deployments live:proj_test",
-      "deployments:proj_test",
-      "release:proj_test",
-      "schema:proj_test",
-    ]);
+    expect(seen.sort()).toEqual(["deployments:proj_test", "release:proj_test", "schema:proj_test"]);
   });
 });
