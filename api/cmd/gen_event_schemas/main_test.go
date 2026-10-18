@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestPayloadMapCoversDomainEventTypes(t *testing.T) {
@@ -22,7 +23,7 @@ func TestPayloadMapCoversDomainEventTypes(t *testing.T) {
 
 	eventTypes, err := extractEventTypes(domainEventPath)
 	require.NoError(t, err)
-	require.Len(t, eventTypes, 39, "domain EventType constant count changed; update payloadByEventType")
+	require.Len(t, eventTypes, 41, "domain EventType constant count changed; update payloadByEventType")
 	require.NoError(t, validateMappings(eventTypes, payloadsDir))
 }
 
@@ -88,4 +89,148 @@ func TestGeneratedEventYAMLMappingComplete(t *testing.T) {
 		assert.Truef(t, strings.Contains(string(raw), "    "+et+": types/"),
 			"event.yaml discriminator mapping missing %q", et)
 	}
+}
+
+func TestWebhookDocsCoverDomainEventTypes(t *testing.T) {
+	t.Parallel()
+	eventTypes := domainEventTypes(t)
+	require.NoError(t, validateWebhookDocs(eventTypes))
+}
+
+func TestSpecWebhooksMatchDomain(t *testing.T) {
+	t.Parallel()
+	_, filename, _, ok := runtime.Caller(0)
+	require.True(t, ok)
+	specPath := filepath.Join(filepath.Dir(filename), "../../openapi/openapi-spec.yaml")
+
+	require.NoError(t, checkSpecWebhooks(specPath, domainEventTypes(t)))
+}
+
+func TestCheckSpecWebhooksReportsDrift(t *testing.T) {
+	t.Parallel()
+	specPath := filepath.Join(t.TempDir(), "openapi-spec.yaml")
+	require.NoError(t, os.WriteFile(specPath, []byte(`webhooks:
+  user.created:
+    $ref: endpoints/events/webhooks/user-created.yaml
+  user.deleted:
+    $ref: endpoints/events/webhooks/user-removed.yaml
+  user.renamed:
+    $ref: endpoints/events/webhooks/user-renamed.yaml
+`), 0o644))
+
+	err := checkSpecWebhooks(specPath, []string{"user.created", "user.deleted", "user.updated"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "missing user.updated, with $ref: endpoints/events/webhooks/user-updated.yaml")
+	assert.Contains(t, err.Error(), "user.deleted has $ref: endpoints/events/webhooks/user-removed.yaml")
+	assert.Contains(t, err.Error(), "user.renamed is not a domain event type")
+	assert.NotContains(t, err.Error(), "user.created")
+}
+
+// The webhook statuses must say what the catalog's Retired and Contracted
+// sections say, since a webhook page tells a receiver whether to expect it.
+func TestWebhookStatusesMatchCatalog(t *testing.T) {
+	t.Parallel()
+	_, filename, _, ok := runtime.Caller(0)
+	require.True(t, ok)
+	catalogPath := filepath.Join(filepath.Dir(filename), "../../../docs/design/api/events-catalog.md")
+	raw, err := os.ReadFile(catalogPath)
+	require.NoError(t, err)
+	catalog := string(raw)
+
+	for status, section := range map[eventStatus]string{
+		statusRetired:    "Retired",
+		statusContracted: "Contracted",
+	} {
+		var want []string
+		for _, m := range regexp.MustCompile("`([a-z][a-z0-9_.]+)`").FindAllStringSubmatch(catalogSection(t, catalog, section), -1) {
+			if _, ok := webhookByEventType[m[1]]; ok {
+				want = append(want, m[1])
+			}
+		}
+		require.NotEmptyf(t, want, "no event types in the catalog's %s section", section)
+
+		var got []string
+		for et, doc := range webhookByEventType {
+			if doc.status == status {
+				got = append(got, et)
+			}
+		}
+		assert.ElementsMatchf(t, want, got, "event types with the catalog's %s status", section)
+	}
+}
+
+func TestWebhookYAML(t *testing.T) {
+	t.Parallel()
+	for _, et := range domainEventTypes(t) {
+		doc := webhookByEventType[et]
+		var webhook struct {
+			Post struct {
+				OperationID string                `yaml:"operationId"`
+				Summary     string                `yaml:"summary"`
+				Description string                `yaml:"description"`
+				Tags        []string              `yaml:"tags"`
+				Deprecated  bool                  `yaml:"deprecated"`
+				Security    []map[string][]string `yaml:"security"`
+				RequestBody struct {
+					Required bool `yaml:"required"`
+					Content  map[string]struct {
+						Schema struct {
+							Ref string `yaml:"$ref"`
+						} `yaml:"schema"`
+					} `yaml:"content"`
+				} `yaml:"requestBody"`
+				Responses map[string]struct {
+					Description string `yaml:"description"`
+				} `yaml:"responses"`
+			} `yaml:"post"`
+		}
+		require.NoErrorf(t, yaml.Unmarshal([]byte(webhookYAML(et, doc)), &webhook), "webhook %s", et)
+
+		post := webhook.Post
+		assert.Equal(t, et, post.Summary)
+		assert.Equal(t, webhookOperationID(et), post.OperationID)
+		assert.Equal(t, []string{webhookTag}, post.Tags)
+		assert.Equal(t, doc.status == statusRetired, post.Deprecated, et)
+		assert.NotNil(t, post.Security, "%s: security must be declared empty", et)
+		assert.Empty(t, post.Security, et)
+		assert.True(t, post.RequestBody.Required, et)
+		assert.Equal(t, "../types/"+eventTypeSlug(et)+".yaml", post.RequestBody.Content["application/json"].Schema.Ref)
+		assert.Contains(t, post.Responses, "2XX", et)
+		assert.Contains(t, post.Responses, "default", et)
+		// The description reflows at spaces only, so its words survive intact.
+		assert.Contains(t, strings.Join(strings.Fields(post.Description), " "), doc.description, et)
+	}
+}
+
+func TestWebhookOperationID(t *testing.T) {
+	t.Parallel()
+	for et, want := range map[string]string{
+		"user.created":              "userCreated",
+		"request.api":               "requestApi",
+		"auth.attempt.handed_off":   "authAttemptHandedOff",
+		"idp.identity_link.created": "idpIdentityLinkCreated",
+	} {
+		assert.Equal(t, want, webhookOperationID(et), et)
+	}
+}
+
+func domainEventTypes(t *testing.T) []string {
+	t.Helper()
+	_, filename, _, ok := runtime.Caller(0)
+	require.True(t, ok)
+	eventTypes, err := extractEventTypes(filepath.Join(filepath.Dir(filename), "../../../internal/domain/event.go"))
+	require.NoError(t, err)
+	return eventTypes
+}
+
+// catalogSection returns a `## name` section of the catalog, up to the next.
+func catalogSection(t *testing.T, catalog, name string) string {
+	t.Helper()
+	start := strings.Index(catalog, "\n## "+name+"\n")
+	require.GreaterOrEqualf(t, start, 0, "catalog has no %q section", name)
+	section := catalog[start+1:]
+	if end := strings.Index(section[1:], "\n## "); end >= 0 {
+		section = section[:end+1]
+	}
+	return section
 }

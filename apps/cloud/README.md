@@ -11,7 +11,7 @@ deployment as five [services](https://vercel.com/docs/services):
 
 | Service | Root | What it is | Paths |
 |---|---|---|---|
-| `server` | `.` | the Go server on Vercel's Go preset, login UI embedded, console off | everything else, including `/console/runtime.json` |
+| `server` | `.` | the Go server on Vercel's Go preset, login UI embedded, console off and left out of the build (`-tags noconsole`) | everything else, including `/console/runtime.json` |
 | `console` | `apps/console` | the console SPA, built for `/console/` with Vercel Web Analytics and Speed Insights | `/console/*` |
 | `storybook` | `apps/storybook` | the component workbench, a static build | `/storybook/*` |
 | `docs` | `apps/docs` | the docs site, Fumadocs on Next.js, with Vercel Web Analytics and Speed Insights | `/docs`, `/docs/*` |
@@ -43,6 +43,11 @@ own `pnpm run build`.
 | [`launcher/`](launcher/) | the function binary: maps `CLOUD_DATABASE_URL` / `CLOUD_MIGRATOR_DATABASE_URL`, the master key and Vercel's `PORT` onto the server's configuration; at build time it creates a preview's database, checks the function's configuration and migrates |
 | [`build.sh`](build.sh) | the `server` service's build: login UI, launcher, migrations |
 | [`setup-secrets.sh`](setup-secrets.sh) | mints an environment's master key and root admin (with [`admin-document.mjs`](admin-document.mjs)) and sets them on the Vercel project; the originals go to 1Password |
+
+`pnpm run cloud` runs the same services on http://localhost:3000 with
+`vercel dev`, the server on SQLite and a throwaway master key
+([`scripts/run-cloud.mjs`](../../scripts/run-cloud.mjs); the runbook's
+[Running the cloud locally](../../docs/runbooks/cloud.md#running-the-cloud-locally)).
 
 Every deployment is tested once it is built:
 [`deployment-checks.yml`](../../.github/workflows/deployment-checks.yml) runs the services'

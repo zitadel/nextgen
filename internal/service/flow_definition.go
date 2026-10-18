@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -120,8 +119,7 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionR
 }
 
 func (fd *flowDefinitionService) validate(ctx context.Context, flowDefinition *domain.FlowDefinition, sch *domain.JSONSchema) error {
-	var userSchema *jsonschema.Schema
-	err := json.Unmarshal(sch.Schema, &userSchema)
+	userSchema, err := sch.Document()
 	if err != nil {
 		return domain.ErrSchemaFetchFailed("failed to unmarshal user schema", err)
 	}

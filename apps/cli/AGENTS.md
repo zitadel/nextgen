@@ -18,6 +18,11 @@ Scope pointers first — this file's own body covers **telemetry only**:
 - The test contract — the unit/spec split and one spec per command — is
   [`tests/AGENTS.md`](tests/AGENTS.md). Read it before adding or moving any
   test.
+- Running, finding and stopping a directory's local server (`start`, `stop`,
+  `status`, `logs`, `reset`, `console`, and how `setup` resolves
+  `--server local`) is one class, `LocalServer`, and its rules are in
+  [`src/lib/local-server/AGENTS.md`](src/lib/local-server/AGENTS.md). Read it
+  before changing any of them.
 - Warnings go through `reportWarning` in `src/lib/warnings.ts`, or the
   `warnings` field of a command's result. Never call `consola.warn` directly:
   `--json` silences consola, so the warning would never reach an agent.

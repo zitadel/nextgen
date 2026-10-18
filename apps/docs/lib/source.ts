@@ -3,7 +3,7 @@ import { lucideIconsPlugin } from "fumadocs-core/source/lucide-icons";
 import { metaSchema, pageSchema } from "fumadocs-core/source/schema";
 import { applyMdxPreset } from "fumadocs-mdx/config";
 import { defineDocs } from "fumadocs-mdx/macro";
-import type { OpenAPIV3_2, OperationItem } from "fumadocs-openapi";
+import type { OpenAPIV3_2, OperationItem, WebhookItem } from "fumadocs-openapi";
 
 import { codeThemes } from "./code-theme";
 import { openapi } from "./openapi";
@@ -50,25 +50,32 @@ ${page.type === "openapi" ? operationText(page) : await page.data.getText("proce
 
 type OpenAPIPage = Extract<(typeof source)["$inferPage"], { type: "openapi" }>;
 
-// An operation page has no Markdown of its own. Its text is its endpoints and
-// the part of the OpenAPI document they need, the operations and every
-// component they reference, so the page stands on its own.
+// An operation or webhook page has no Markdown of its own. Its text is its
+// endpoints and the part of the OpenAPI document they need, the operations or
+// webhooks and every component they reference, so the page stands on its own.
 function operationText(page: OpenAPIPage) {
-  const { operations = [] } = page.data.getOpenAPIPageProps();
-  const fragment = openapiFragment(page.data.getSchema().bundled, operations);
-  const endpoints = operations.map(({ method, path }) => `\`${method.toUpperCase()} ${path}\``);
+  const { operations = [], webhooks = [] } = page.data.getOpenAPIPageProps();
+  const fragment = openapiFragment(page.data.getSchema().bundled, operations, webhooks);
+  const endpoints = [
+    ...operations.map(({ method, path }) => `\`${method.toUpperCase()} ${path}\``),
+    ...webhooks.map(({ method, name }) => `\`${method.toUpperCase()}\` webhook \`${name}\``),
+  ];
 
   return [
     page.data.description,
     endpoints.join("\n"),
-    "The operation and every component it references, as OpenAPI:",
+    `The ${webhooks.length > 0 ? "webhook" : "operation"} and every component it references, as OpenAPI:`,
     `\`\`\`json\n${JSON.stringify(fragment, null, 2)}\n\`\`\``,
   ]
     .filter(Boolean)
     .join("\n\n");
 }
 
-function openapiFragment(document: OpenAPIV3_2.Document, operations: OperationItem[]) {
+function openapiFragment(
+  document: OpenAPIV3_2.Document,
+  operations: OperationItem[],
+  webhooks: WebhookItem[],
+) {
   const paths: Record<string, Record<string, unknown>> = {};
   for (const { path, method } of operations) {
     const item = document.paths?.[path];
@@ -80,9 +87,21 @@ function openapiFragment(document: OpenAPIV3_2.Document, operations: OperationIt
     };
   }
 
+  // The bundle inlines a webhook's path item, as it does a path's.
+  const hooks: Record<string, Record<string, unknown>> = {};
+  for (const { name, method } of webhooks) {
+    const item = document.webhooks?.[name];
+    if (!item || "$ref" in item) continue;
+    hooks[name] = {
+      ...(item.parameters && { parameters: item.parameters }),
+      ...hooks[name],
+      [method]: item[method],
+    };
+  }
+
   const available = (document.components ?? {}) as Record<string, Record<string, unknown>>;
   const components: Record<string, Record<string, unknown>> = {};
-  const pending = refsIn(paths);
+  const pending = refsIn([paths, hooks]);
   for (let ref = pending.pop(); ref !== undefined; ref = pending.pop()) {
     const [, group, escaped] = /^#\/components\/([^/]+)\/([^/]+)$/.exec(ref) ?? [];
     if (!group || !escaped) continue;
@@ -93,7 +112,11 @@ function openapiFragment(document: OpenAPIV3_2.Document, operations: OperationIt
     pending.push(...refsIn(component));
   }
 
-  return { paths, components };
+  return {
+    ...(operations.length > 0 && { paths }),
+    ...(webhooks.length > 0 && { webhooks: hooks }),
+    components,
+  };
 }
 
 function refsIn(value: unknown): string[] {

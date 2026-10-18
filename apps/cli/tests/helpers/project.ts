@@ -1,3 +1,4 @@
+import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -7,6 +8,10 @@ import { parseEnv } from "node:util";
 
 import { expect } from "vitest";
 
+import { aFakeServerBinary, trackLocalServerDir, type ServerShape } from "./local-server";
+import { cliPackageRoot } from "./oclif-build";
+import { nextPort } from "./ports";
+import { aBinaryRecord } from "./runtime-record";
 import { parseJson, runCliForTest } from "./run-cli";
 
 const SCHEMA_FILE = ".zitadel/schemas/default-human-user.json";
@@ -150,35 +155,6 @@ export interface FlowDocument {
 
 interface PackageJson {
   dependencies: Record<string, string>;
-}
-
-/**
- * A port from this worker's own block, because a bind-then-close probe races
- * the other vitest workers: a reserved port gets taken as an outbound source
- * port before the CLI binds it.
- *
- * The band sits below every platform's ephemeral range — macOS allocates from
- * 49152 and Linux from 32768 — so a reserved port cannot be taken as an
- * outbound source port by another worker's traffic before the CLI binds it.
- * It also stays clear of the repository's other deferred-bind reservations,
- * 22000-23999 for the journey runner and 24000-31999 for embedded Postgres,
- * which hand out ports before their processes bind just as this does, and of
- * the fixed ports the other suites pin above 18000.
- *
- * Indexed by `VITEST_POOL_ID`, the reusable 1-based pool slot.
- * `VITEST_WORKER_ID` is a unique worker identity that keeps climbing as files
- * spawn workers, so indexing by it walks the block past 65535 and hands the
- * CLI a port that cannot exist. The modulo bounds it either way.
- */
-const PORT_FIRST = 16_000;
-const PORT_LAST = 18_000;
-const PORT_BLOCK = 200;
-const PORT_BLOCKS = Math.floor((PORT_LAST - PORT_FIRST) / PORT_BLOCK);
-const POOL_SLOT = Math.max(1, Number(process.env.VITEST_POOL_ID ?? 1));
-const PORT_BASE = PORT_FIRST + ((POOL_SLOT - 1) % PORT_BLOCKS) * PORT_BLOCK;
-let portOffset = 0;
-function nextPort(): number {
-  return PORT_BASE + (portOffset++ % PORT_BLOCK);
 }
 
 /**
@@ -426,6 +402,130 @@ export class ScaffoldedApp {
       PATH: `${docker.binDir}:${process.env.PATH ?? ""}`,
       DOCKER_LOG: docker.logPath,
     });
+  }
+
+  /** An app in a directory inside this one, the way a developer nests one under `start`. */
+  async appInside(name: string): Promise<ScaffoldedApp> {
+    await mkdir(join(this.path, name), { recursive: true });
+    return new ScaffoldedApp(join(this.path, name));
+  }
+
+  /** Runs `doctor` without naming a port, so it checks the one this directory's server uses. */
+  async doctorAtItsServer(): Promise<CliResult> {
+    const docker = await fakeDocker();
+    return this.cli(["doctor", "--json"], {
+      PATH: `${docker.binDir}:${process.env.PATH ?? ""}`,
+      DOCKER_LOG: docker.logPath,
+    });
+  }
+
+  /** The port a `doctor` run reported it checked. */
+  doctoredPortOf(result: CliResult): number {
+    return this.envelopeOf<{ port: number }>(result).data.port;
+  }
+
+  /** The argument lists a failed `doctor` run offered as recovery, for an agent to run as they are. */
+  suggestedArgsOf(result: CliResult): string[][] {
+    const { details } = this.envelopeOf<Record<string, unknown>>(result) as unknown as {
+      details?: { suggested_args?: string[][] };
+    };
+    return details?.suggested_args ?? [];
+  }
+
+  /** Leaves this directory with the record of a local server that is not running. */
+  async writeStoppedServerRecord(): Promise<void> {
+    await mkdir(join(this.path, ".zitadel/local"), { recursive: true });
+    await writeFile(
+      join(this.path, ".zitadel/local/runtime.json"),
+      JSON.stringify(aBinaryRecord({ port: nextPort() })),
+    );
+  }
+
+  /** Leaves this directory with a record of its local server that is JSON but not a record. */
+  async writeMalformedServerRecord(): Promise<void> {
+    await mkdir(join(this.path, ".zitadel/local"), { recursive: true });
+    await writeFile(join(this.path, ".zitadel/local/runtime.json"), JSON.stringify({ x: 1 }));
+  }
+
+  /**
+   * Starts this app's local server from a stand-in for the server binary, on a
+   * port from this worker unless one is named.
+   */
+  async startLocalServer({
+    shape = "plain",
+    port = nextPort(),
+  }: {
+    shape?: ServerShape;
+    port?: number;
+  } = {}): Promise<CliResult> {
+    trackLocalServerDir(this.path);
+    return this.cli(["start", "--port", String(port), "--json"], {
+      ZITADEL_SERVER_BINARY: await aFakeServerBinary(shape),
+    });
+  }
+
+  /** Starts the server again without naming a port, so the one the directory had is used. */
+  async restartLocalServer(): Promise<CliResult> {
+    trackLocalServerDir(this.path);
+    return this.cli(["start", "--json"], {
+      ZITADEL_SERVER_BINARY: await aFakeServerBinary("plain"),
+    });
+  }
+
+  /**
+   * Two starts racing in this app's directory, each its own process: the
+   * in-process runner captures output globally, so two runs at once in it
+   * would garble each other's.
+   */
+  async startLocalServerTwiceAtOnce(): Promise<CliResult[]> {
+    trackLocalServerDir(this.path);
+    const env = { ...process.env, ZITADEL_SERVER_BINARY: await aFakeServerBinary("plain") };
+    const port = String(nextPort());
+    const results = await Promise.all(
+      [0, 1].map(
+        () =>
+          new Promise<CliResult>((resolve) => {
+            execFile(
+              process.execPath,
+              [
+                join(cliPackageRoot, "bin/run.js"),
+                ...["start", "--cwd", this.path, "--server", MOCK_SERVER_URL],
+                ...["--port", port, "--json"],
+              ],
+              { env },
+              (error, stdout, stderr) =>
+                resolve({
+                  exitCode: typeof error?.code === "number" ? error.code : 0,
+                  stdout,
+                  stderr,
+                }),
+            );
+          }),
+      ),
+    );
+    return results;
+  }
+
+  /** The port a start reported its server on. */
+  localPortOf(result: CliResult): number {
+    return this.envelopeOf<{ runtime: { port: number } }>(result).data.runtime.port;
+  }
+
+  /** The process a start reported its server as. */
+  localPidOf(result: CliResult): number {
+    return this.envelopeOf<{ runtime: { pid: number } }>(result).data.runtime.pid;
+  }
+
+  /** Leaves this directory with a record of its local server that cannot be read. */
+  async corruptLocalServerRecord(): Promise<void> {
+    await mkdir(join(this.path, ".zitadel/local"), { recursive: true });
+    await writeFile(join(this.path, ".zitadel/local/runtime.json"), "{not json");
+  }
+
+  /** The lifecycle `status` reports for the local server. */
+  async localServerLifecycle(): Promise<string> {
+    const status = await this.cli(["status", "--json"]);
+    return this.envelopeOf<{ server: { lifecycle: string } }>(status).data.server.lifecycle;
   }
 
   status(extraArgs: string[] = []): Promise<CliResult> {
@@ -696,6 +796,15 @@ export class ScaffoldedApp {
 
   writeProjectFile(relativePath: string, contents: string): Promise<void> {
     return writeFile(join(this.path, relativePath), contents);
+  }
+
+  /** Leaves `version` of `name` in the app's `node_modules`, as its lockfile installed it. */
+  async hasInstalled(name: string, version: string): Promise<void> {
+    await mkdir(join(this.path, "node_modules", name), { recursive: true });
+    await this.writeProjectFile(
+      `node_modules/${name}/package.json`,
+      JSON.stringify({ name, version }),
+    );
   }
 
   deleteProjectFile(relativePath: string): Promise<void> {

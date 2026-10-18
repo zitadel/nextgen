@@ -2,14 +2,10 @@ import { stat } from "node:fs/promises";
 import { join } from "node:path";
 
 import { ZitadelError } from "../../errors";
-import {
-  dependencySpecProvablyBelowMajor,
-  dependencyVersionMajor,
-  hasDependency,
-  readPackageJson,
-} from "./package-json";
+import { dependencyVersionMajor, hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
 import type { Detector, FrameworkFacts } from "./types";
+import { enforceVersionFloor } from "./version-floor";
 
 /**
  * Detects a Next.js App Router project and extracts its facts: the App Router
@@ -19,6 +15,10 @@ import type { Detector, FrameworkFacts } from "./types";
  */
 export class NextDetector implements Detector {
   readonly framework = "next";
+  readonly displayName = "Next.js";
+  readonly versionPackage = "next";
+  readonly versionFloor = "15.2.3";
+  readonly versionFloorNote = "Earlier releases let a request skip middleware (CVE-2025-29927).";
 
   /**
    * Returns `null` when `cwd` is not a Next.js project (no `next` dependency),
@@ -33,21 +33,7 @@ export class NextDetector implements Detector {
       return null;
     }
 
-    // Supported floor (ADR 043): the scaffolded templates target Next 15+
-    // (current App Router and request-boundary conventions). The floor is
-    // enforced here so setup and doctor share one loud gate instead of
-    // degrading silently; only a spec that provably cannot resolve to 15+
-    // is rejected — protocol specs and dist-tags pass.
-    const belowFloor = dependencySpecProvablyBelowMajor(pkg, "next", 15);
-    if (belowFloor !== undefined) {
-      throw new ZitadelError(
-        "E_UNSUPPORTED_PROJECT_SHAPE",
-        `Next.js "${belowFloor}" is below the supported floor — the CLI integrates Next.js 15 and newer`,
-        {
-          hint: "Upgrade the app to Next 15+ (e.g. `npx @next/codemod@latest upgrade`) and rerun.",
-        },
-      );
-    }
+    await enforceVersionFloor(this, pkg, cwd);
 
     const appDir = (await dirExists(join(cwd, "app")))
       ? "app"
