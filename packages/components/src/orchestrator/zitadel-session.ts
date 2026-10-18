@@ -56,9 +56,9 @@ function pageKey(url: URL): string {
  *   one is set and otherwise renders nothing. It never navigates to the page
  *   it is on (same origin, path with or without a trailing slash, and query):
  *   it renders nothing there instead, so a card whose sign-out comes back to
- *   its own page does not reload it forever. Nor does it repeat a navigation
- *   this page made within the last ten seconds (kept in `sessionStorage`),
- *   which stops the loop when the target redirects back here. Anything else is
+ *   its own page does not reload it forever. Nor does it navigate when the
+ *   visitor was sent here from the target or from this page (the browser's
+ *   referrer), which stops the loop when the target redirects back here. Anything else is
  *   not "signed out": a network error, a 5xx, a gateway's 401 or 404 without
  *   the backend's code, or a 200 that is not a session keeps the card and
  *   shows the error.
