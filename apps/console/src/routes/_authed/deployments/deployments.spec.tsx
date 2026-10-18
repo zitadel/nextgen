@@ -19,29 +19,24 @@ const DEPLOYMENTS_URL = "http://localhost/api/deployments";
 
 const DEPLOYED_AT = "2026-10-02T14:52:00Z";
 
-/** One entry of `GET /deployments`: a primary deployment unless told otherwise. */
+/** One entry of `GET /deployments`: a live primary deployment unless told otherwise. */
 function deployment(id: string, overrides: Record<string, unknown> = {}) {
   return {
     id,
     project_id: "proj_test",
     release_id: "rel_1",
+    kind: "primary",
     targets: [{ origin: "https://app.acme.com" }, { origin: "https://www.acme.com" }],
+    status: "live",
     deployed_at: DEPLOYED_AT,
     metadata: { reason: "deploy", message: null, rollback_to: null, deployed_by: null },
     ...overrides,
   };
 }
 
-/** `GET /deployments`: the history, and the live view when `live=true`. */
-function serveDeployments(history: unknown[] = [], live: unknown[] = []) {
-  server.use(
-    http.get(DEPLOYMENTS_URL, ({ request }) => {
-      const url = new URL(request.url);
-      return HttpResponse.json({
-        deployments: url.searchParams.get("live") === "true" ? live : history,
-      });
-    }),
-  );
+/** `GET /deployments`: the project's history, newest first. */
+function serveDeployments(history: unknown[] = []) {
+  server.use(http.get(DEPLOYMENTS_URL, () => HttpResponse.json({ deployments: history })));
 }
 
 async function renderAt(path: string) {
@@ -68,12 +63,11 @@ describe("deployments list", () => {
   it("lists each deployment with its release, targets, state and time", async () => {
     const preview = deployment("dep_2", {
       release_id: "rel_2",
+      kind: "preview",
       targets: [{ origin: "https://acme-k3x9v2.vercel.app", expires_at: "2026-10-09T14:52:00Z" }],
       deployed_at: "2026-10-03T09:00:00Z",
     });
-    // The live view holds only the preview, so the primary deployment has
-    // since been replaced.
-    serveDeployments([preview, deployment("dep_1")], [preview]);
+    serveDeployments([preview, deployment("dep_1", { status: "inactive" })]);
     await renderAt("/deployments");
 
     const rows = await screen.findAllByRole("row");
@@ -87,7 +81,7 @@ describe("deployments list", () => {
       scopedPath("/releases/rel_2"),
     );
     expect(first.getByRole("button", { name: "Copy release ID rel_2" })).toBeInTheDocument();
-    // The origins are counted, and a preview target says so.
+    // The origins are counted, with the kind under the count.
     expect(first.getByRole("button", { name: "1 origin" })).toBeInTheDocument();
     expect(first.getByText("Preview")).toBeInTheDocument();
     expect(first.getByText("active")).toBeInTheDocument();
@@ -114,32 +108,17 @@ describe("deployments list", () => {
     expect(screen.getByRole("button", { name: "Copy https://www.acme.com" })).toBeInTheDocument();
   });
 
-  it("scopes both reads to the selected project", async () => {
+  it("scopes the read to the selected project", async () => {
     const seen: string[] = [];
     server.use(
       http.get(DEPLOYMENTS_URL, ({ request }) => {
-        const url = new URL(request.url);
-        seen.push(
-          `deployments${url.searchParams.get("live") === "true" ? " live" : ""}:${url.searchParams.get("project_id")}`,
-        );
+        seen.push(new URL(request.url).searchParams.get("project_id") ?? "");
         return HttpResponse.json({ deployments: [] });
       }),
     );
     await renderAt("/deployments");
     await screen.findByText("This project has no deployments.");
-    expect(seen.sort()).toEqual(["deployments live:proj_test", "deployments:proj_test"]);
-  });
-
-  it("says so while the server does not list deployments", async () => {
-    server.use(
-      http.get(DEPLOYMENTS_URL, () =>
-        HttpResponse.json({ code: "not_implemented", message: "" }, { status: 501 }),
-      ),
-    );
-    await renderAt("/deployments");
-
-    expect(await screen.findByRole("heading", { name: "Deployments" })).toBeInTheDocument();
-    expect(screen.getByText("This server does not list deployments yet.")).toBeInTheDocument();
+    expect(seen).toEqual(["proj_test"]);
   });
 
   it("leaves a refused read to the route's error state", async () => {
@@ -156,9 +135,7 @@ describe("deployments list", () => {
       await renderAt("/deployments");
 
       expect(await screen.findByText("Not authorized")).toBeInTheDocument();
-      expect(
-        screen.queryByText("This server does not list deployments yet."),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText("This project has no deployments.")).not.toBeInTheDocument();
     } finally {
       errorSpy.mockRestore();
       warnSpy.mockRestore();

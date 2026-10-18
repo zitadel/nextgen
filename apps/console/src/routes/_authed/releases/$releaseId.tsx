@@ -37,8 +37,8 @@ import {
  * and **Redeploy**, **Rollback** and **Revoke release** under its menu. They
  * are #1857's, once the API serves the writes.
  *
- * The pointers and the deployments each fail soft; the release read is what
- * the route's error state reports.
+ * The pointers fail soft; the release and deployment reads are what the
+ * route's error state reports.
  */
 export const Route = createFileRoute("/_authed/releases/$releaseId")({
   staticData: { scope: "project" },
