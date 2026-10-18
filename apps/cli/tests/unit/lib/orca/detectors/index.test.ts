@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { detectors } from "../../../../../src/lib/orca/detectors";
 
 describe("detectors", () => {
-  it.each(detectors.map((detector) => [detector.framework, detector]))(
+  it.each(detectors.map((detector) => [detector.framework, detector] as const))(
     "%s names itself and the package its version comes from",
     (_framework, detector) => {
       expect(detector.displayName.trim()).not.toBe("");
