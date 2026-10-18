@@ -127,7 +127,15 @@ function flowIdFromLocation(): string {
 const FLOW_QUERY_PARAM = "flow";
 
 /** The properties that decide which flow starts; a late change restarts an untouched flow. */
-const FLOW_INPUTS = ["project", "projectId", "proxyPath", "url", "purpose", "flowName"] as const;
+const FLOW_INPUTS = [
+  "project",
+  "projectId",
+  "proxyPath",
+  "url",
+  "purpose",
+  "flowName",
+  "resumeFlowId",
+] as const;
 
 /**
  * The page URL the callback sends the browser back to, with this flow's id
@@ -791,6 +799,7 @@ export class ZitadelLogin extends ZitadelSurface {
       this.url,
       this.purpose,
       this.flowName,
+      this.resumeFlowId,
     ]);
   }
 
