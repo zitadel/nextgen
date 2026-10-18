@@ -11,6 +11,9 @@ import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
   ZITADEL_LOGOUT_EVENT_HANDLERS,
   ZITADEL_SESSION_EVENT_HANDLERS,
+  type ZitadelLoginConfig,
+  type ZitadelLogoutConfig,
+  type ZitadelSessionConfig,
 } from "@zitadel/sdk-core/types";
 import * as React from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -171,5 +174,67 @@ describe("ZitadelSession", () => {
 describe("businessLocales", () => {
   it("re-exports the business copy overlay from @zitadel/components", () => {
     expect(businessLocales).toBe(componentsBusinessLocales);
+  });
+});
+
+// Every config key set to a distinct value. `Required<…>` makes `tsc` fail here
+// when a key is added to a config type, so a new key cannot skip this check.
+const loginConfig: Required<ZitadelLoginConfig> = {
+  project,
+  projectId: "proj-parity",
+  proxyPath: "/__parity",
+  variant: "page",
+  theme: "dark",
+  suppressHeader: true,
+  suppressPasswordToggle: true,
+  purpose: "register",
+  flowName: "parity-flow",
+  postSignInUrl: "/parity-after-login",
+  resumeFlowId: "flow_parity",
+  locales: { en: { "identifier.title": "Parity" } },
+  lang: "de",
+};
+
+const sessionConfig: Required<ZitadelSessionConfig> = {
+  project,
+  projectId: "proj-parity",
+  proxyPath: "/__parity",
+  postSignOutUrl: "/parity-after-sign-out",
+  heading: "Parity heading",
+  logoutLabel: "Parity sign out",
+  variant: "page",
+  theme: "dark",
+  suppressHeader: true,
+};
+
+const logoutConfig: Required<ZitadelLogoutConfig> = {
+  project,
+  projectId: "proj-parity",
+  proxyPath: "/__parity",
+  postSignOutUrl: "/parity-after-sign-out",
+  theme: "dark",
+};
+
+// The element's value for each key, so a key the wrapper drops shows up by name.
+const elementValues = (el: object, config: object): Record<string, unknown> =>
+  Object.fromEntries(Object.keys(config).map((key) => [key, (el as Record<string, unknown>)[key]]));
+
+describe("wrapper config parity", () => {
+  it("forwards every ZitadelLoginConfig key to <zitadel-login>", () => {
+    const { container } = render(<ZitadelLogin {...loginConfig} />);
+    const el = container.querySelector<ZitadelLoginElement>("zitadel-login");
+    expect(elementValues(el!, loginConfig)).toEqual(loginConfig);
+  });
+
+  it("forwards every ZitadelSessionConfig key to <zitadel-session>", () => {
+    const { container } = render(<ZitadelSession {...sessionConfig} />);
+    const el = container.querySelector<ZitadelSessionElement>("zitadel-session");
+    expect(elementValues(el!, sessionConfig)).toEqual(sessionConfig);
+  });
+
+  it("forwards every ZitadelLogoutConfig key to <zitadel-logout>", () => {
+    const { container } = render(<ZitadelLogout {...logoutConfig} />);
+    const el = container.querySelector<ZitadelLogoutElement>("zitadel-logout");
+    expect(elementValues(el!, logoutConfig)).toEqual(logoutConfig);
   });
 });
