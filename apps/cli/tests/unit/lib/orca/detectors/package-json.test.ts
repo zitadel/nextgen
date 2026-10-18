@@ -149,6 +149,20 @@ describe("a prerelease floor", () => {
     },
   );
 
+  it.each(["<2.0.0", "~1.9.0", "<2.0.0-beta.45", ">=1.0.0 <2.0.0"])(
+    "rejects %s for a prerelease floor, since npm admits no beta from it",
+    (spec) => {
+      expect(dependencySpecProvablyBelow(pkg(spec), "qwik", "2.0.0-beta.45")).toBe(spec);
+    },
+  );
+
+  it.each([">=2.0.0-beta.50 <2.0.0", ">=2.0.0-beta.1", "2.0.0-beta.45 || <1.0.0"])(
+    "accepts %s for a prerelease floor, since it names an allowed beta",
+    (spec) => {
+      expect(dependencySpecProvablyBelow(pkg(spec), "qwik", "2.0.0-beta.45")).toBeUndefined();
+    },
+  );
+
   it.each(["2.0.0-beta.45", "2.0.0-beta.50", "^2.0.0-beta.1", "2.0.0-rc.0", "^2.0.0", "3.0.0"])(
     "passes %s",
     (spec) => {

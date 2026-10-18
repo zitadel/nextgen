@@ -36,7 +36,7 @@ export class NuxtPatcher extends AbstractRulePatcher {
   protected routeOps(ctx: PatchContext): FileOp[] {
     const src = (rel: string) => join(ctx.framework.appDir, rel);
     return [
-      // app.vue/pages/plugins live under the Nuxt srcDir (`app/`); nuxt.config,
+      // app.vue/pages/plugins live under the Nuxt srcDir (`app/`, or the root for a root-layout app); nuxt.config,
       // env, and the dep stay at the project root.
       // The app shell and homepage redirect are written only when setup created
       // the skeleton itself — a pre-existing app keeps its own shell, theme,

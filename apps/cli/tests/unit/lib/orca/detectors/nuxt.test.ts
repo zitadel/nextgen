@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -8,11 +8,14 @@ import { NuxtDetector } from "../../../../../src/lib/orca/detectors/nuxt";
 
 const dirs: string[] = [];
 
-async function project(opts: { nuxt?: boolean } = {}): Promise<string> {
+async function project(opts: { nuxt?: boolean; dirs?: string[] } = {}): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "nuxt-detect-"));
   dirs.push(cwd);
   const dep = opts.nuxt === false ? { vue: "^3" } : { nuxt: "^4" };
   await writeFile(join(cwd, "package.json"), JSON.stringify({ dependencies: dep }));
+  for (const dir of opts.dirs ?? []) {
+    await mkdir(join(cwd, dir));
+  }
   return cwd;
 }
 
@@ -28,6 +31,19 @@ describe("NuxtDetector", () => {
     expect(facts?.id).toBe("nuxt");
     expect(facts?.appDir).toBe("app");
   });
+
+  it("reports appDir 'app' when an app/ srcDir exists", async () => {
+    const facts = await new NuxtDetector().detect(await project({ dirs: ["app", "pages"] }));
+    expect(facts?.appDir).toBe("app");
+  });
+
+  it.each(["pages", "plugins", "layouts", "middleware", "assets"])(
+    "reports appDir '.' for a Nuxt 4 root-layout project with a root %s/",
+    async (dir) => {
+      const facts = await new NuxtDetector().detect(await project({ dirs: [dir] }));
+      expect(facts?.appDir).toBe(".");
+    },
+  );
 
   it("returns null without a nuxt dependency", async () => {
     expect(await new NuxtDetector().detect(await project({ nuxt: false }))).toBeNull();

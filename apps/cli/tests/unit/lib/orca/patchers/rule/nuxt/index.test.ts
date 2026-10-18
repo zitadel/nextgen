@@ -89,6 +89,12 @@ describe("NuxtPatcher.plan", () => {
     expect(profile).toContain('variant="widget"');
   });
 
+  it("writes at the root for a Nuxt 4 root-layout project (appDir '.')", () => {
+    const plan = new NuxtPatcher().plan(ctx("."));
+    expect(writeContents(plan, "app.vue")).toContain(MANAGED_MARKER);
+    expect(writeContents(plan, "pages/login.vue")).toContain(MANAGED_MARKER);
+  });
+
   it("keeps a pre-existing app's shell and homepage (ADR 044)", () => {
     // Only fresh scaffolds get the CLI's app.vue and the /login redirect —
     // writing them into an existing app would stomp (or conflict with) the

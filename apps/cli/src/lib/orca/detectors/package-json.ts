@@ -71,14 +71,38 @@ export function dependencySpecProvablyBelow(
     return undefined;
   }
   // A prerelease floor (`2.0.0-beta.45`) is itself the bound: a range is judged
-  // by whether it admits that version or a newer one, prereleases included.
+  // by whether npm can resolve that version or a newer one. A prerelease is
+  // resolvable only through a comparator set that names a prerelease of the
+  // same base version, so `<2.0.0` admits no beta and is refused.
   if (isPrereleaseFloor(minimum)) {
-    return semver.intersects(spec, `>=${minimum}`, { includePrerelease: true }) ? undefined : spec;
+    return admitsAtOrAbovePrereleaseFloor(spec, minimum, floor) ? undefined : spec;
   }
   if (semver.intersects(spec, `>=${floor.version}`)) {
     return undefined;
   }
   return declaresPrereleaseAtOrAbove(spec, floor, isExactFloor(minimum)) ? undefined : spec;
+}
+
+/** Whether `spec` can resolve `minimum` (a prerelease such as `2.0.0-beta.45`) or newer under npm's rules. */
+function admitsAtOrAbovePrereleaseFloor(
+  spec: string,
+  minimum: string,
+  floor: semver.SemVer,
+): boolean {
+  if (semver.intersects(spec, `>=${floor.version}`)) {
+    return true;
+  }
+  return new semver.Range(spec).set.some((comparators) => {
+    const range = comparators.map((comparator) => comparator.value).join(" ");
+    return comparators.some(({ semver: version }) => {
+      const base = `${version.major}.${version.minor}.${version.patch}`;
+      if (version.prerelease.length === 0 || semver.lt(base, floor.version)) {
+        return false;
+      }
+      const lower = semver.gt(`${base}-0`, minimum) ? `${base}-0` : minimum;
+      return semver.intersects(range, `>=${lower} <${base}`, { includePrerelease: true });
+    });
+  });
 }
 
 /**
