@@ -5,7 +5,7 @@ import type {
 } from "@zitadel/components";
 
 import "@zitadel/components";
-import type { JSX } from "solid-js";
+import { createRenderEffect, type JSX } from "solid-js";
 
 import {
   configureZitadel,
@@ -84,6 +84,37 @@ export * from "./types";
 // direct @zitadel/components dependency (strict package managers reject those).
 export { businessLocales } from "@zitadel/components";
 
+const defaults = new WeakMap<object, Map<string, unknown>>();
+
+/**
+ * Assigns the given props to a widget element as properties, leaving unset
+ * (`undefined`) ones to the element's own defaults. A `prop:` binding assigns
+ * `undefined` once its value changes, which overwrites the element's default.
+ *
+ * The element's own value is remembered before a prop is first overridden and
+ * restored when the prop becomes unset again, so a reactive prop going from a
+ * value back to `undefined` does not leave the stale override in place.
+ */
+function assignGiven(element: object, props: Record<string, unknown>): void {
+  const target = element as Record<string, unknown>;
+  let saved = defaults.get(element);
+  for (const [key, value] of Object.entries(props)) {
+    if (value !== undefined) {
+      if (!saved) {
+        saved = new Map();
+        defaults.set(element, saved);
+      }
+      if (!saved.has(key)) {
+        saved.set(key, target[key]);
+      }
+      target[key] = value;
+    } else if (saved?.has(key)) {
+      target[key] = saved.get(key);
+      saved.delete(key);
+    }
+  }
+}
+
 /**
  * Solid component wrapping the `<zitadel-login>` web component. Binds the
  * {@link ZitadelProject} handle as a DOM property (or the discrete project id /
@@ -98,28 +129,33 @@ export function ZitadelLogin(
     ref?: ZitadelLoginElement | ((el: ZitadelLoginElement) => void);
   },
 ): JSX.Element {
-  return (
+  const element = (
     <zitadel-login
       ref={props.ref}
       prop:project={props.project}
       prop:locales={props.locales}
-      prop:lang={props.lang}
       project-id={props.projectId}
       proxy-path={props.proxyPath}
       purpose={props.purpose ?? "login"}
       flow-name={props.flowName}
       post-sign-in-url={props.postSignInUrl}
-      variant={props.variant}
-      theme={props.theme}
-      prop:suppressHeader={props.suppressHeader}
-      prop:suppressPasswordToggle={props.suppressPasswordToggle}
       on:zitadel-flow-step={(event) => props.onFlowStep?.(event.detail)}
       on:zitadel-flow-input={(event) => props.onFlowInput?.(event.detail)}
       on:zitadel-flow-complete={(event) => props.onFlowComplete?.(event.detail)}
       on:zitadel-flow-redirect={(event) => props.onFlowRedirect?.(event.detail)}
       on:zitadel-flow-error={(event) => props.onFlowError?.(event.detail)}
     />
+  ) as ZitadelLoginElement;
+  createRenderEffect(() =>
+    assignGiven(element, {
+      lang: props.lang,
+      variant: props.variant,
+      theme: props.theme,
+      suppressHeader: props.suppressHeader,
+      suppressPasswordToggle: props.suppressPasswordToggle,
+    }),
   );
+  return element;
 }
 
 /**
@@ -136,17 +172,18 @@ export function ZitadelLogout(
     ref?: ZitadelLogoutElement | ((el: ZitadelLogoutElement) => void);
   },
 ): JSX.Element {
-  return (
+  const element = (
     <zitadel-logout
       ref={props.ref}
       prop:project={props.project}
       project-id={props.projectId}
       proxy-path={props.proxyPath}
       post-sign-out-url={props.postSignOutUrl}
-      theme={props.theme}
       on:zitadel-signout={(event) => props.onSignout?.(event.detail)}
     />
-  );
+  ) as ZitadelLogoutElement;
+  createRenderEffect(() => assignGiven(element, { theme: props.theme }));
+  return element;
 }
 
 /**
@@ -162,19 +199,24 @@ export function ZitadelSession(
     ref?: ZitadelSessionElement | ((el: ZitadelSessionElement) => void);
   },
 ): JSX.Element {
-  return (
+  const element = (
     <zitadel-session
       ref={props.ref}
       prop:project={props.project}
       project-id={props.projectId}
       proxy-path={props.proxyPath}
       post-sign-out-url={props.postSignOutUrl}
-      heading={props.heading}
-      logout-label={props.logoutLabel}
-      variant={props.variant}
-      theme={props.theme}
-      prop:suppressHeader={props.suppressHeader}
       on:zitadel-signout={(event) => props.onSignout?.(event.detail)}
     />
+  ) as ZitadelSessionElement;
+  createRenderEffect(() =>
+    assignGiven(element, {
+      heading: props.heading,
+      logoutLabel: props.logoutLabel,
+      variant: props.variant,
+      theme: props.theme,
+      suppressHeader: props.suppressHeader,
+    }),
   );
+  return element;
 }
