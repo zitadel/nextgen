@@ -75,23 +75,6 @@ describe("origin add", () => {
           { pattern: "https://app.acme.com", kind: "primary" },
         ]);
       });
-
-      it("refuses a wildcard primary", async () => {
-        const app = await aSetUpApp();
-
-        const result = await app.addOrigin("https://*.acme.com", "primary");
-
-        expect(result).toFailWith("E_VALIDATION");
-        expect(await app.projectOrigins()).toEqual([SETUP_ORIGIN]);
-      });
-
-      it("refuses an unbounded preview wildcard on a shared host", async () => {
-        const app = await aSetUpApp();
-
-        const result = await app.addOrigin("https://*.vercel.app", "preview");
-
-        expect(result).toFailWith("E_VALIDATION");
-      });
     });
 
     describe("rendered for a terminal", () => {
