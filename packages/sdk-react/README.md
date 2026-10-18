@@ -2,7 +2,15 @@
 
 React components for the Zitadel auth UI, for client-side SPAs.
 
+## Installation
+
+```bash
+pnpm add @zitadel/sdk-react@alpha
+```
+
 ## Requirements
+
+Peer dependencies: `react >=18` and `react-dom >=18`.
 
 TypeScript ≥ 5.0 — the published type definitions re-export with `export type *`, which TypeScript introduced in 5.0.
 

@@ -1,6 +1,6 @@
 ---
 title: Vue SDK
-description: Vue wrappers for Zitadel login and logout UI.
+description: Client-side Vue 3 wrappers for the Zitadel login and logout components.
 ---
 
 import { Callout } from "fumadocs-ui/components/callout";
@@ -8,7 +8,7 @@ import { File, Files } from "fumadocs-ui/components/files";
 import { Step, Steps } from "fumadocs-ui/components/steps";
 import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 
-The Vue SDK wraps the shared web components with Vue 3-friendly bindings.
+The Vue SDK is the SPA wrapper for the shared Zitadel login and logout widgets, built for Vue 3.
 
 <Callout title="SPA proxy requirement" type="warn">
   The CLI sets up a Vite dev proxy. Production deployments need a same-origin proxy for `/__nextgen/*`. See [SDK proxy](/docs/concepts/sdk-proxy).
@@ -86,9 +86,9 @@ If your app renders on the server, mount the widget on the client only, after hy
 ## Verify
 
 - Run the Vite app with generated environment variables.
-- Complete registration/login through the widget.
-- Confirm logout redirects to the configured path.
-- Use shadow-DOM-aware locators for browser automation.
+- Register or sign in through the rendered widget.
+- Confirm logout returns to the configured login path.
+- In browser automation, use shadow-DOM-aware locators because the native inputs live inside shared web components.
 
 ## See also
 

@@ -2,7 +2,15 @@
 
 Angular components for the Zitadel auth UI, for client-side SPAs.
 
+## Installation
+
+```bash
+pnpm add @zitadel/sdk-angular@alpha
+```
+
 ## Requirements
+
+Peer dependencies: `@angular/core` and `@angular/common`, both `>=17`.
 
 TypeScript ≥ 5.0 — the published type definitions re-export with `export type *`, which TypeScript introduced in 5.0.
 
