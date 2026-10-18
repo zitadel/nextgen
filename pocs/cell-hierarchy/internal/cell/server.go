@@ -20,6 +20,11 @@ type Server struct {
 
 	mu       sync.Mutex
 	hbCancel context.CancelFunc
+
+	signerMu  sync.Mutex
+	signer    *SigningKey
+	jwksMu    sync.Mutex
+	jwksCache map[string]jwksCacheEntry
 }
 
 func NewServer(store *Store, peer *PeerClient, logger *log.Logger) *Server {
@@ -49,6 +54,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /v1/children", s.handleDeleteChild)
 	s.registerProjectRoutes(mux)
 	s.registerGrantRoutes(mux)
+	s.registerAuthRoutes(mux)
 	return mux
 }
 

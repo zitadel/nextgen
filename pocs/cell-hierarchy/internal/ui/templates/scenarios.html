@@ -34,9 +34,33 @@
     <nav><a href="/">Tree</a><a href="/join">Join</a><a href="/scenarios">Scenarios</a></nav>
   </header>
   <main>
-    <h1>Phase 2 + 3 scenarios</h1>
+    <h1>Phase 2–4 scenarios</h1>
     {{if .ScenarioOK}}<div class="flash-ok">{{.ScenarioOK}}</div>{{end}}
     {{if .ScenarioErr}}<div class="flash-err">{{.ScenarioErr}}</div>{{end}}
+
+    <div class="panel">
+      <h2 style="font-size:1rem;margin:0 0 0.5rem">Sign in on us as Joe</h2>
+      <p class="muted">Phase 4: lookup walk from <code>us</code> → issue Ed25519 JWT at home (<code>team-eu-2</code> on eu-2) → <code>POST /v1/auth/check</code> on us (offline + online principal check). Shows raw token and decoded claims. Auto-grants the Phase 3 tuple if missing.</p>
+      <form method="post" action="/scenarios/sign-in-joe">
+        <label><input type="checkbox" name="auto_grant" value="1" checked/> Auto-grant if missing (else run Phase 3 grant first)</label>
+        <div class="row">
+          <button type="submit">Sign in on us as Joe</button>
+        </div>
+      </form>
+      {{if .SignIn}}
+      <div style="margin-top:1rem">
+        <p class="muted">Home: <code>{{.SignIn.HomeProject}}</code> @ <code>{{.SignIn.HomeCell}}</code>
+          {{if .SignIn.AutoGranted}} · auto-granted{{end}}
+          · offline: {{if .SignIn.AllowedOffline}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">{{.SignIn.ReasonOffline}}</span>{{end}}
+          · online: {{if .SignIn.AllowedOnline}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">{{.SignIn.ReasonOnline}}</span>{{end}}
+        </p>
+        <label>Raw token</label>
+        <textarea readonly rows="3" style="width:100%;font:0.75rem ui-monospace,monospace;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:0.5rem">{{.SignIn.Token}}</textarea>
+        <label>Decoded claims</label>
+        <pre style="margin:0.25rem 0 0;padding:0.75rem;background:var(--bg);border:1px solid var(--border);border-radius:6px;overflow:auto;font-size:0.8rem">{{.SignIn.ClaimsJSON}}</pre>
+      </div>
+      {{end}}
+    </div>
 
     <div class="panel">
       <h2 style="font-size:1rem;margin:0 0 0.5rem">Grant Joe on us/chat</h2>

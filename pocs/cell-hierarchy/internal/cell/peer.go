@@ -328,6 +328,30 @@ func (c *PeerClient) DoRaw(ctx context.Context, method, url string, body any, be
 	return c.doJSON(ctx, method, url, body, bearer, out)
 }
 
+func (c *PeerClient) GetJWKS(ctx context.Context, cellURL string) (JWKS, error) {
+	var out JWKS
+	err := c.doJSON(ctx, http.MethodGet, NormalizeURL(cellURL)+"/v1/jwks", nil, "", &out)
+	return out, err
+}
+
+func (c *PeerClient) IssueToken(ctx context.Context, cellURL string, req IssueTokenRequest) (IssueTokenResponse, error) {
+	var out IssueTokenResponse
+	err := c.doJSON(ctx, http.MethodPost, NormalizeURL(cellURL)+"/v1/token/issue", req, "", &out)
+	return out, err
+}
+
+func (c *PeerClient) PrincipalCheck(ctx context.Context, cellURL string, req PrincipalCheckRequest) (PrincipalCheckResponse, error) {
+	var out PrincipalCheckResponse
+	err := c.doJSON(ctx, http.MethodPost, NormalizeURL(cellURL)+"/v1/principal/check", req, "", &out)
+	return out, err
+}
+
+func (c *PeerClient) AuthCheck(ctx context.Context, cellURL string, req AuthCheckRequest) (AuthCheckResponse, error) {
+	var out AuthCheckResponse
+	err := c.doJSONAllowError(ctx, http.MethodPost, NormalizeURL(cellURL)+"/v1/auth/check", req, &out)
+	return out, err
+}
+
 func (c *PeerClient) doJSON(ctx context.Context, method, url string, body any, bearer string, out any) error {
 	var rdr io.Reader
 	if body != nil {

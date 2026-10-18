@@ -39,6 +39,7 @@ type User struct {
 	ID        string
 	ProjectID string
 	Email     string
+	Epoch     int
 	CreatedAt time.Time
 }
 
@@ -171,9 +172,13 @@ func (s *Store) AttachProject(id, parentProjectID, parentCellURL string) error {
 }
 
 func (s *Store) CreateUser(u User) error {
+	epoch := u.Epoch
+	if epoch <= 0 {
+		epoch = DefaultUserEpoch
+	}
 	_, err := s.db.Exec(
-		`INSERT INTO users(id, project_id, email, created_at) VALUES (?, ?, ?, ?)`,
-		u.ID, u.ProjectID, NormalizeKey(u.Email), u.CreatedAt.UTC().Format(time.RFC3339Nano),
+		`INSERT INTO users(id, project_id, email, created_at, epoch) VALUES (?, ?, ?, ?, ?)`,
+		u.ID, u.ProjectID, NormalizeKey(u.Email), u.CreatedAt.UTC().Format(time.RFC3339Nano), epoch,
 	)
 	if err != nil && strings.Contains(err.Error(), "UNIQUE") {
 		return ErrUserExists

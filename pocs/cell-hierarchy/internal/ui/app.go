@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"embed"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"log"
@@ -32,6 +33,9 @@ type App struct {
 
 	traceMu sync.Mutex
 	trace   []traceEntry
+
+	signInMu sync.Mutex
+	signIn   *signInResult
 }
 
 type traceEntry struct {
@@ -66,6 +70,7 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("POST /scenarios/create-user", a.handleScenarioCreateUser)
 	mux.HandleFunc("POST /scenarios/lookup", a.handleScenarioLookup)
 	mux.HandleFunc("POST /scenarios/grant-joe", a.handleScenarioGrantJoe)
+	mux.HandleFunc("POST /scenarios/sign-in-joe", a.handleScenarioSignInJoe)
 	mux.HandleFunc("GET /trace", a.handleTrace)
 	mux.HandleFunc("POST /trace/clear", a.handleTraceClear)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -113,6 +118,20 @@ type pageData struct {
 	Now         string
 	ScenarioOK  string
 	ScenarioErr string
+	SignIn      *signInResult
+}
+
+type signInResult struct {
+	Token          string
+	ClaimsJSON     string
+	AllowedOffline bool
+	ReasonOffline  string
+	AllowedOnline  bool
+	ReasonOnline   string
+	AutoGranted    bool
+	LookupHit      bool
+	HomeProject    string
+	HomeCell       string
 }
 
 type cellDetail struct {
@@ -284,6 +303,7 @@ func (a *App) handleScenarios(w http.ResponseWriter, r *http.Request) {
 		Trace:       a.copyTrace(),
 		ScenarioOK:  r.URL.Query().Get("ok"),
 		ScenarioErr: r.URL.Query().Get("err"),
+		SignIn:      a.copySignIn(),
 	})
 }
 
@@ -352,16 +372,143 @@ func (a *App) handleScenarioLookup(w http.ResponseWriter, r *http.Request) {
 func (a *App) handleScenarioGrantJoe(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
+	if _, err := a.ensureJoeGrant(ctx); err != nil {
+		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, "/scenarios?ok="+url.QueryEscape("granted joe viewer on us/chat"), http.StatusSeeOther)
+}
+
+func (a *App) handleScenarioSignInJoe(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
+	defer cancel()
+	if err := r.ParseForm(); err != nil {
+		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape("invalid form"), http.StatusSeeOther)
+		return
+	}
+	// Checkbox only posts when checked.
+	autoGrant := r.FormValue("auto_grant") == "1"
+
 	usHost, err := a.cellURLByLabel("us")
 	if err != nil {
 		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
-	// Ensure chat app exists (idempotent for re-runs).
-	apps, err := a.Peer.ListApps(ctx, usHost, "us")
+	key := "joe@example.com"
+	var allHops []cell.TraceHop
+
+	// 1) Lookup walk from us → home.
+	res, hops, err := a.Peer.LookupWalk(ctx, usHost, "us", key)
+	allHops = append(allHops, hops...)
+	if err != nil {
+		a.appendTrace("sign-in joe: lookup", allHops, err.Error())
+		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		return
+	}
+	if !res.Hit {
+		a.appendTrace("sign-in joe: lookup", allHops, "miss — run grant / seed float first")
+		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape("lookup miss for joe@example.com from us (float may be pending)"), http.StatusSeeOther)
+		return
+	}
+	a.appendTrace("sign-in joe: lookup", hops, "hit home="+res.HomeProjectID+" cell="+res.HomeCellURL)
+
+	// 2) Optionally ensure grant exists (Phase 3) before auth check.
+	autoGranted := false
+	tuples, err := a.Peer.ListTuples(ctx, usHost, "us")
 	if err != nil {
 		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
+	}
+	hasGrant := false
+	for _, tup := range tuples {
+		if tup.Object == "app:chat" && tup.Relation == "viewer" && tup.UserKey == key {
+			hasGrant = true
+			break
+		}
+	}
+	if !hasGrant {
+		if !autoGrant {
+			a.appendTrace("sign-in joe: grant", nil, "missing — run Phase 3 grant scenario first")
+			http.Redirect(w, r, "/scenarios?err="+url.QueryEscape("no grant for joe on us/chat — run Grant Joe scenario or enable auto-grant"), http.StatusSeeOther)
+			return
+		}
+		if _, err := a.ensureJoeGrant(ctx); err != nil {
+			http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+			return
+		}
+		autoGranted = true
+	}
+
+	// 3) Issue token at home cell.
+	issued, err := a.Peer.IssueToken(ctx, res.HomeCellURL, cell.IssueTokenRequest{
+		ProjectID: res.HomeProjectID,
+		Sub:       key,
+		Aud:       "app:chat",
+	})
+	issueHop := []cell.TraceHop{{
+		Cell: res.HomeCellURL, Method: "POST /v1/token/issue", Result: "ok",
+	}}
+	if err != nil {
+		a.appendTrace("sign-in joe: issue", append(allHops, issueHop...), err.Error())
+		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		return
+	}
+	a.appendTrace("sign-in joe: issue", issueHop, "token issued epoch="+fmt.Sprintf("%d", issued.Claims.Epoch))
+
+	claimsJSON, _ := json.MarshalIndent(issued.Claims, "", "  ")
+	result := &signInResult{
+		Token:       issued.Token,
+		ClaimsJSON:  string(claimsJSON),
+		AutoGranted: autoGranted,
+		LookupHit:   true,
+		HomeProject: res.HomeProjectID,
+		HomeCell:    res.HomeCellURL,
+	}
+
+	// 4) Auth check on us — offline then online.
+	offline, err := a.Peer.AuthCheck(ctx, usHost, cell.AuthCheckRequest{
+		Token: issued.Token, ProjectID: "us", Object: "app:chat", Relation: "viewer", Online: false,
+	})
+	if err != nil {
+		a.appendTrace("sign-in joe: auth offline", offline.Trace, err.Error())
+		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		return
+	}
+	result.AllowedOffline = offline.Allowed
+	result.ReasonOffline = offline.Reason
+	a.appendTrace("sign-in joe: auth offline", offline.Trace, offline.Reason)
+
+	online, err := a.Peer.AuthCheck(ctx, usHost, cell.AuthCheckRequest{
+		Token: issued.Token, ProjectID: "us", Object: "app:chat", Relation: "viewer", Online: true,
+	})
+	if err != nil {
+		a.appendTrace("sign-in joe: auth online", online.Trace, err.Error())
+		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		return
+	}
+	result.AllowedOnline = online.Allowed
+	result.ReasonOnline = online.Reason
+	a.appendTrace("sign-in joe: auth online", online.Trace, online.Reason)
+
+	a.setSignIn(result)
+	msg := "signed in joe on us"
+	if autoGranted {
+		msg += " (auto-granted)"
+	}
+	if !online.Allowed {
+		msg += " — denied: " + online.Reason
+	}
+	http.Redirect(w, r, "/scenarios?ok="+url.QueryEscape(msg), http.StatusSeeOther)
+}
+
+func (a *App) ensureJoeGrant(ctx context.Context) (cell.CreateTupleResponse, error) {
+	usHost, err := a.cellURLByLabel("us")
+	if err != nil {
+		return cell.CreateTupleResponse{}, err
+	}
+	apps, err := a.Peer.ListApps(ctx, usHost, "us")
+	if err != nil {
+		return cell.CreateTupleResponse{}, err
 	}
 	hasChat := false
 	for _, app := range apps {
@@ -372,8 +519,18 @@ func (a *App) handleScenarioGrantJoe(w http.ResponseWriter, r *http.Request) {
 	}
 	if !hasChat {
 		if _, err := a.Peer.CreateApp(ctx, usHost, "us", map[string]any{"name": "chat"}); err != nil {
-			http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
-			return
+			return cell.CreateTupleResponse{}, err
+		}
+	}
+	// Idempotent: if tuple already exists, treat as success.
+	tuples, err := a.Peer.ListTuples(ctx, usHost, "us")
+	if err != nil {
+		return cell.CreateTupleResponse{}, err
+	}
+	for _, tup := range tuples {
+		if tup.Object == "app:chat" && tup.Relation == "viewer" && tup.UserKey == "joe@example.com" {
+			a.appendTrace("grant joe viewer on us/app:chat", nil, "already exists tuple="+tup.ID)
+			return cell.CreateTupleResponse{Tuple: tup}, nil
 		}
 	}
 	out, err := a.Peer.CreateTuple(ctx, usHost, "us", map[string]any{
@@ -384,11 +541,26 @@ func (a *App) handleScenarioGrantJoe(w http.ResponseWriter, r *http.Request) {
 	note := "grant joe viewer on us/app:chat"
 	if err != nil {
 		a.appendTrace(note, out.Trace, err.Error())
-		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
-		return
+		return out, err
 	}
 	a.appendTrace(note, out.Trace, "tuple="+out.Tuple.ID+" home="+out.Tuple.HomeProjectID)
-	http.Redirect(w, r, "/scenarios?ok="+url.QueryEscape("granted joe viewer on us/chat"), http.StatusSeeOther)
+	return out, nil
+}
+
+func (a *App) setSignIn(sr *signInResult) {
+	a.signInMu.Lock()
+	defer a.signInMu.Unlock()
+	a.signIn = sr
+}
+
+func (a *App) copySignIn() *signInResult {
+	a.signInMu.Lock()
+	defer a.signInMu.Unlock()
+	if a.signIn == nil {
+		return nil
+	}
+	cp := *a.signIn
+	return &cp
 }
 
 func (a *App) handleTrace(w http.ResponseWriter, r *http.Request) {

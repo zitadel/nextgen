@@ -1,6 +1,6 @@
-# Cell hierarchy POC (Phase 1–3)
+# Cell hierarchy POC (Phase 1–4)
 
-Greenfield multi-container Go cells with SQLite membership, join/heartbeat, project attach, user lookup float-up, regional apps/grants with home-cell interest registration, and an HTMX UI.
+Greenfield multi-container Go cells with SQLite membership, join/heartbeat, project attach, user lookup float-up, regional apps/grants with home-cell interest registration, inspectable home-issued JWTs (Ed25519 / JWKS), resource-cell auth checks, and an HTMX UI.
 
 Lives under `pocs/cell-hierarchy/` as a nested Go module (not wired into Moon/CI).
 
@@ -50,6 +50,33 @@ cd pocs/cell-hierarchy
 - Cells: http://localhost:8100–8106
 - Bootstrap runs joins then `scripts/bootstrap-projects.sh` (projects, attach, seed users with float, seed `chat` app on `us`).
 
+## Phase 4 scenarios
+
+| Scenario | How |
+|---|---|
+| Sign in on us as Joe | UI → Scenarios → **Sign in on us as Joe**. Lookup from us → issue JWT at eu-2 → auth check on us (offline + online). Raw token + decoded claims shown. Auto-grants if the Phase 3 tuple is missing. |
+| Deny without grant | Uncheck auto-grant (and clear the us tuple), then sign-in → `grant_denied`. Or curl auth/check before granting. |
+| Tampered token | Alter JWT payload without re-signing → `token_signature_invalid`. |
+
+Manual curl (after bootstrap + grant):
+
+```bash
+# Issue at home (eu-2 hosts team-eu-2)
+TOKEN=$(curl -sS -X POST http://127.0.0.1:8103/v1/token/issue \
+  -H 'Content-Type: application/json' \
+  -d '{"project_id":"team-eu-2","sub":"joe@example.com","aud":"app:chat"}')
+echo "$TOKEN" | jq .
+
+# JWKS on home
+curl -sS http://127.0.0.1:8103/v1/jwks | jq .
+
+# Auth check on us (resource cell) with online principal check
+curl -sS -X POST http://127.0.0.1:8104/v1/auth/check \
+  -H 'Content-Type: application/json' \
+  -d "$(jq -n --arg t "$(echo "$TOKEN" | jq -r .token)" \
+    '{token:$t, project_id:"us", object:"app:chat", relation:"viewer", online:true}')" | jq .
+```
+
 ## Phase 3 scenarios
 
 | Scenario | How |
@@ -93,6 +120,17 @@ Optional demo delay: set `FLOAT_DELAY_MS` on a cell so each float push sleeps (m
 | App | Project (cell) |
 |---|---|
 | chat | us (us) |
+
+## Phase 4 HTTP APIs
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/v1/jwks` | Public Ed25519 JWK set (key persisted in SQLite across restarts) |
+| `POST` | `/v1/token/issue` | Home cell: `{project_id, sub, aud, epoch?}` → compact JWT + decoded claims |
+| `POST` | `/v1/principal/check` | Home cell: `{project_id, sub, epoch?}` → `{active, blocked, epoch}` (P6 adds block) |
+| `POST` | `/v1/auth/check` | Resource cell: `{token, project_id, object, relation, online}` → verify JWKS, optional online principal check, local grant |
+
+JWT claims: `sub`, `home_cell`, `home_project`, `aud`, `epoch`, `exp` (60s TTL), `iss` (cell URL). Alg: `EdDSA`.
 
 ## Phase 3 HTTP APIs
 
