@@ -397,7 +397,15 @@ async function serverMarkup(props: Record<string, unknown>): Promise<string> {
     const { default: Login } = (await server.ssrLoadModule("/src/lib/ZitadelLogin.svelte")) as {
       default: typeof ZitadelLogin;
     };
-    return renderOnServer(Login, { props }).body;
+    // A real server has no `document`, which `onClient` reads to leave the
+    // property-only `project` handle out of the markup.
+    const document = Object.getOwnPropertyDescriptor(globalThis, "document");
+    Reflect.deleteProperty(globalThis, "document");
+    try {
+      return renderOnServer(Login, { props }).body;
+    } finally {
+      if (document) Object.defineProperty(globalThis, "document", document);
+    }
   } finally {
     define.mockRestore();
     await server.close();
@@ -418,7 +426,9 @@ describe("hydrating a server-rendered login", () => {
     const fetched = vi.spyOn(globalThis, "fetch");
     const host = document.createElement("div");
     document.body.appendChild(host);
-    host.innerHTML = await serverMarkup({ project: globalProject, purpose: "register" });
+    const markup = await serverMarkup({ project: globalProject, purpose: "register" });
+    expect(markup).not.toContain("[object Object]");
+    host.innerHTML = markup;
     const firstStep = new Promise((resolve) =>
       host
         .querySelector("zitadel-login")
