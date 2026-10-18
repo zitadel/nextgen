@@ -116,4 +116,38 @@ create_user "$EU2" "team-eu-2" "joe@example.com"
 # Phase 3: regional app on us (grant left to scenario button)
 create_app "$US" "us" "chat"
 
+# Phase 5: group chain Joe ∈ A@eu-2 ∈ B@eu → viewer on us/chat
+# Idempotent: skip when the subject tuple already exists.
+seed_tuple() {
+  local cell_url="$1"
+  local project_id="$2"
+  local object="$3"
+  local relation="$4"
+  local subject_kind="$5"
+  local user_key="$6"
+  local home_project="$7"
+  local home_cell="$8"
+  local tuples
+  tuples="$(curl -fsS "$cell_url/v1/projects/$project_id/tuples")"
+  if printf '%s' "$tuples" | jq -e \
+    --arg o "$object" --arg r "$relation" --arg k "$user_key" --arg sk "$subject_kind" \
+    '.tuples[]? | select(.object == $o and .relation == $r and .user_key == $k and .subject_kind == $sk)' \
+    >/dev/null 2>&1; then
+    echo "skip tuple $object#$relation@$subject_kind:$user_key on $project_id"
+    return 0
+  fi
+  echo "create tuple $object#$relation@$subject_kind:$user_key on $project_id"
+  curl -fsS -X POST "$cell_url/v1/projects/$project_id/tuples" \
+    -H 'Content-Type: application/json' \
+    -d "$(jq -n \
+      --arg o "$object" --arg r "$relation" --arg sk "$subject_kind" --arg k "$user_key" \
+      --arg hp "$home_project" --arg hc "$home_cell" \
+      '{object:$o, relation:$r, subject_kind:$sk, user_key:$k,
+        home_project_id:$hp, home_cell_url:$hc, skip_interest:true}')" >/dev/null
+}
+
+seed_tuple "$EU2" "team-eu-2" "group:A" "member" "user" "joe@example.com" "team-eu-2" "$EU2"
+seed_tuple "$EU" "eu" "group:B" "member" "group" "A" "team-eu-2" "$EU2"
+seed_tuple "$US" "us" "app:chat" "viewer" "group" "B" "eu" "$EU"
+
 echo "project bootstrap complete"

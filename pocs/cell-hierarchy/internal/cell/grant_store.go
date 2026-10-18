@@ -9,16 +9,25 @@ import (
 )
 
 var (
-	ErrAppExists         = errors.New("app_exists")
-	ErrAppNotFound       = errors.New("app_not_found")
-	ErrTupleExists       = errors.New("tuple_exists")
-	ErrTupleNotFound     = errors.New("tuple_not_found")
-	ErrInterestExists    = errors.New("interest_exists")
-	ErrInvalidAppName    = errors.New("invalid_app_name")
-	ErrInvalidRelation   = errors.New("invalid_relation")
-	ErrInvalidObject     = errors.New("invalid_object")
-	ErrSubjectRequired   = errors.New("subject_required")
-	ErrPrincipalNotFound = errors.New("principal_not_found")
+	ErrAppExists          = errors.New("app_exists")
+	ErrAppNotFound        = errors.New("app_not_found")
+	ErrTupleExists        = errors.New("tuple_exists")
+	ErrTupleNotFound      = errors.New("tuple_not_found")
+	ErrInterestExists     = errors.New("interest_exists")
+	ErrInvalidAppName     = errors.New("invalid_app_name")
+	ErrInvalidRelation    = errors.New("invalid_relation")
+	ErrInvalidObject      = errors.New("invalid_object")
+	ErrSubjectRequired    = errors.New("subject_required")
+	ErrPrincipalNotFound  = errors.New("principal_not_found")
+	ErrInvalidSubjectKind = errors.New("invalid_subject_kind")
+	ErrMaxDepthExceeded   = errors.New("max_depth_exceeded")
+	ErrExpandCycle        = errors.New("expand_cycle")
+)
+
+const (
+	SubjectKindUser    = "user"
+	SubjectKindGroup   = "group"
+	DefaultFGAMaxDepth = 8
 )
 
 type App struct {
@@ -33,14 +42,34 @@ type Tuple struct {
 	ProjectID     string
 	Object        string
 	Relation      string
-	UserKey       string
+	SubjectKind   string // "user" | "group"
+	UserKey       string // user email or group id (e.g. "A")
 	HomeProjectID string
 	HomeCellURL   string
 	CreatedAt     time.Time
 }
 
+func (t Tuple) Kind() string {
+	if t.SubjectKind == "" {
+		return SubjectKindUser
+	}
+	return t.SubjectKind
+}
+
 func (t Tuple) Subject() string {
-	return fmt.Sprintf("user:%s@%s@%s", t.UserKey, t.HomeProjectID, t.HomeCellURL)
+	kind := t.Kind()
+	if t.HomeProjectID == "" && t.HomeCellURL == "" {
+		return fmt.Sprintf("%s:%s", kind, t.UserKey)
+	}
+	return fmt.Sprintf("%s:%s@%s@%s", kind, t.UserKey, t.HomeProjectID, t.HomeCellURL)
+}
+
+func (t Tuple) IsGroupSubject() bool {
+	return t.Kind() == SubjectKindGroup
+}
+
+func (t Tuple) IsUserSubject() bool {
+	return t.Kind() == SubjectKindUser
 }
 
 type Interest struct {
@@ -87,7 +116,10 @@ CREATE TABLE IF NOT EXISTS interests (
   created_at TEXT NOT NULL,
   UNIQUE(principal_key, subscriber_project_id, tuple_id)
 );`)
-	return err
+	if err != nil {
+		return err
+	}
+	return s.ensureColumn("tuples", "subject_kind", "TEXT NOT NULL DEFAULT 'user'")
 }
 
 func (s *Store) CreateApp(a App) error {
@@ -176,23 +208,57 @@ func (s *Store) DeleteApp(projectID, id string) error {
 	return nil
 }
 
+func NormalizeSubjectKind(kind string) (string, error) {
+	kind = strings.TrimSpace(strings.ToLower(kind))
+	if kind == "" {
+		return SubjectKindUser, nil
+	}
+	switch kind {
+	case SubjectKindUser, SubjectKindGroup:
+		return kind, nil
+	default:
+		return "", ErrInvalidSubjectKind
+	}
+}
+
+func NormalizeSubjectKey(kind, key string) string {
+	key = strings.TrimSpace(key)
+	if kind == SubjectKindUser {
+		return NormalizeKey(key)
+	}
+	// Group ids stay as-is (case-sensitive trim only).
+	return key
+}
+
 func (s *Store) CreateTuple(t Tuple) error {
 	obj := strings.TrimSpace(t.Object)
 	rel := strings.TrimSpace(t.Relation)
-	key := NormalizeKey(t.UserKey)
+	kind, err := NormalizeSubjectKind(t.SubjectKind)
+	if err != nil {
+		return err
+	}
+	key := NormalizeSubjectKey(kind, t.UserKey)
 	if obj == "" {
 		return ErrInvalidObject
 	}
 	if rel == "" {
 		return ErrInvalidRelation
 	}
-	if key == "" || t.HomeProjectID == "" || t.HomeCellURL == "" {
+	if key == "" {
 		return ErrSubjectRequired
 	}
-	_, err := s.db.Exec(
-		`INSERT INTO tuples(id, project_id, object, relation, user_key, home_project_id, home_cell_url, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		t.ID, t.ProjectID, obj, rel, key, t.HomeProjectID, NormalizeURL(t.HomeCellURL),
+	// User subjects always need a home (resolved via lookup). Group subjects need
+	// home when they live on another project/cell; local groups may omit home.
+	if kind == SubjectKindUser && (t.HomeProjectID == "" || t.HomeCellURL == "") {
+		return ErrSubjectRequired
+	}
+	if kind == SubjectKindGroup && (t.HomeProjectID == "") != (t.HomeCellURL == "") {
+		return ErrSubjectRequired
+	}
+	_, err = s.db.Exec(
+		`INSERT INTO tuples(id, project_id, object, relation, subject_kind, user_key, home_project_id, home_cell_url, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		t.ID, t.ProjectID, obj, rel, kind, key, t.HomeProjectID, NormalizeURL(t.HomeCellURL),
 		t.CreatedAt.UTC().Format(time.RFC3339Nano),
 	)
 	if err != nil && strings.Contains(err.Error(), "UNIQUE") {
@@ -201,26 +267,43 @@ func (s *Store) CreateTuple(t Tuple) error {
 	return err
 }
 
-func (s *Store) GetTuple(id string) (Tuple, error) {
+func scanTuple(scanner interface {
+	Scan(dest ...any) error
+}) (Tuple, error) {
 	var t Tuple
 	var created string
-	err := s.db.QueryRow(
-		`SELECT id, project_id, object, relation, user_key, home_project_id, home_cell_url, created_at
-		 FROM tuples WHERE id = ?`, id,
-	).Scan(&t.ID, &t.ProjectID, &t.Object, &t.Relation, &t.UserKey, &t.HomeProjectID, &t.HomeCellURL, &created)
-	if errors.Is(err, sql.ErrNoRows) {
-		return Tuple{}, ErrTupleNotFound
-	}
+	var kind sql.NullString
+	err := scanner.Scan(
+		&t.ID, &t.ProjectID, &t.Object, &t.Relation, &kind,
+		&t.UserKey, &t.HomeProjectID, &t.HomeCellURL, &created,
+	)
 	if err != nil {
 		return Tuple{}, err
+	}
+	if kind.Valid && kind.String != "" {
+		t.SubjectKind = kind.String
+	} else {
+		t.SubjectKind = SubjectKindUser
 	}
 	t.CreatedAt, err = time.Parse(time.RFC3339Nano, created)
 	return t, err
 }
 
+func (s *Store) GetTuple(id string) (Tuple, error) {
+	row := s.db.QueryRow(
+		`SELECT id, project_id, object, relation, subject_kind, user_key, home_project_id, home_cell_url, created_at
+		 FROM tuples WHERE id = ?`, id,
+	)
+	t, err := scanTuple(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Tuple{}, ErrTupleNotFound
+	}
+	return t, err
+}
+
 func (s *Store) ListTuples(projectID string) ([]Tuple, error) {
 	rows, err := s.db.Query(
-		`SELECT id, project_id, object, relation, user_key, home_project_id, home_cell_url, created_at
+		`SELECT id, project_id, object, relation, subject_kind, user_key, home_project_id, home_cell_url, created_at
 		 FROM tuples WHERE project_id = ? ORDER BY object, relation, user_key`,
 		projectID,
 	)
@@ -230,12 +313,30 @@ func (s *Store) ListTuples(projectID string) ([]Tuple, error) {
 	defer rows.Close()
 	var out []Tuple
 	for rows.Next() {
-		var t Tuple
-		var created string
-		if err := rows.Scan(&t.ID, &t.ProjectID, &t.Object, &t.Relation, &t.UserKey, &t.HomeProjectID, &t.HomeCellURL, &created); err != nil {
+		t, err := scanTuple(rows)
+		if err != nil {
 			return nil, err
 		}
-		t.CreatedAt, err = time.Parse(time.RFC3339Nano, created)
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
+// ListTuplesForRelation returns local tuples for object#relation on a project.
+func (s *Store) ListTuplesForRelation(projectID, object, relation string) ([]Tuple, error) {
+	rows, err := s.db.Query(
+		`SELECT id, project_id, object, relation, subject_kind, user_key, home_project_id, home_cell_url, created_at
+		 FROM tuples WHERE project_id = ? AND object = ? AND relation = ?
+		 ORDER BY subject_kind, user_key`,
+		projectID, strings.TrimSpace(object), strings.TrimSpace(relation),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Tuple
+	for rows.Next() {
+		t, err := scanTuple(rows)
 		if err != nil {
 			return nil, err
 		}

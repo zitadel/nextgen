@@ -15,7 +15,8 @@ type PeerClient struct {
 }
 
 func NewPeerClient() *PeerClient {
-	return &PeerClient{HTTP: &http.Client{Timeout: 5 * time.Second}}
+	// Longer timeout so Phase 5 delay-slider demos (per-hop sleep) do not abort mid-chain.
+	return &PeerClient{HTTP: &http.Client{Timeout: 60 * time.Second}}
 }
 
 type MeResponse struct {
@@ -350,6 +351,21 @@ func (c *PeerClient) AuthCheck(ctx context.Context, cellURL string, req AuthChec
 	var out AuthCheckResponse
 	err := c.doJSONAllowError(ctx, http.MethodPost, NormalizeURL(cellURL)+"/v1/auth/check", req, &out)
 	return out, err
+}
+
+func (c *PeerClient) FGACheck(ctx context.Context, cellURL string, req FGACheckRequest) (FGACheckResponse, error) {
+	var out FGACheckResponse
+	err := c.doJSONAllowError(ctx, http.MethodPost, NormalizeURL(cellURL)+"/v1/fga/check", req, &out)
+	return out, err
+}
+
+func (c *PeerClient) FGAExpand(ctx context.Context, cellURL string, req FGAExpandRequest) (FGAExpandResponse, error) {
+	var out FGAExpandResponse
+	err := c.doJSONAllowError(ctx, http.MethodPost, NormalizeURL(cellURL)+"/v1/fga/expand", req, &out)
+	if err != nil {
+		return out, err
+	}
+	return out, nil
 }
 
 func (c *PeerClient) doJSON(ctx context.Context, method, url string, body any, bearer string, out any) error {

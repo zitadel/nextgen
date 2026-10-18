@@ -22,6 +22,7 @@ type TupleView struct {
 	ProjectID     string `json:"project_id"`
 	Object        string `json:"object"`
 	Relation      string `json:"relation"`
+	SubjectKind   string `json:"subject_kind"`
 	UserKey       string `json:"user_key"`
 	HomeProjectID string `json:"home_project_id"`
 	HomeCellURL   string `json:"home_cell_url"`
@@ -51,7 +52,8 @@ func appView(a App) AppView {
 func tupleView(t Tuple) TupleView {
 	return TupleView{
 		ID: t.ID, ProjectID: t.ProjectID, Object: t.Object, Relation: t.Relation,
-		UserKey: t.UserKey, HomeProjectID: t.HomeProjectID, HomeCellURL: t.HomeCellURL,
+		SubjectKind: t.Kind(), UserKey: t.UserKey,
+		HomeProjectID: t.HomeProjectID, HomeCellURL: t.HomeCellURL,
 		Subject: t.Subject(), CreatedAt: t.CreatedAt.UTC().Format(time.RFC3339Nano),
 	}
 }
@@ -194,15 +196,18 @@ func (s *Server) handleListTuples(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleCreateTuple creates a grant on the resource project.
-// Subject is resolved via lookup walk UP from this project; after the tuple
-// lands, RegisterInterest is POSTed to the principal's home cell.
+// User subjects are resolved via lookup walk UP from this project (unless home
+// is supplied); after the tuple lands, RegisterInterest is POSTed to the
+// principal's home cell. Group subjects skip lookup/interest and may point at
+// a remote home project/cell (Phase 5 cross-cell group chain).
 func (s *Server) handleCreateTuple(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	var req struct {
-		Object   string `json:"object"`
-		Relation string `json:"relation"`
-		UserKey  string `json:"user_key"`
-		// Optional: skip peer interest registration (tests / already-known subject).
+		Object      string `json:"object"`
+		Relation    string `json:"relation"`
+		UserKey     string `json:"user_key"`
+		SubjectKind string `json:"subject_kind"`
+		// Optional: skip peer interest registration (tests / group subjects).
 		SkipInterest bool   `json:"skip_interest"`
 		HomeProject  string `json:"home_project_id"`
 		HomeCellURL  string `json:"home_cell_url"`
@@ -211,7 +216,12 @@ func (s *Server) handleCreateTuple(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid_json")
 		return
 	}
-	key := NormalizeKey(req.UserKey)
+	kind, err := NormalizeSubjectKind(req.SubjectKind)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	key := NormalizeSubjectKey(kind, req.UserKey)
 	object := strings.TrimSpace(req.Object)
 	relation := strings.TrimSpace(req.Relation)
 	if key == "" || object == "" || relation == "" {
@@ -237,32 +247,47 @@ func (s *Server) handleCreateTuple(w http.ResponseWriter, r *http.Request) {
 	homeProjectID := strings.TrimSpace(req.HomeProject)
 	homeCellURL := NormalizeURL(req.HomeCellURL)
 
-	if homeProjectID == "" || homeCellURL == "" {
-		start := time.Now()
-		result, hops, walkErr := s.Peer.LookupWalk(r.Context(), meta.URL, p.ID, key)
-		trace = append(trace, hops...)
-		if walkErr != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"error": walkErr.Error(), "trace": trace})
+	switch kind {
+	case SubjectKindGroup:
+		// Local group subject: default home to this project/cell when omitted.
+		if homeProjectID == "" && homeCellURL == "" {
+			homeProjectID = p.ID
+			homeCellURL = meta.URL
+		}
+		if homeProjectID == "" || homeCellURL == "" {
+			writeErr(w, http.StatusBadRequest, "group_subject_home_required")
 			return
 		}
-		if !result.Hit {
+		// Groups are not user principals — never register interests.
+		req.SkipInterest = true
+	case SubjectKindUser:
+		if homeProjectID == "" || homeCellURL == "" {
+			start := time.Now()
+			result, hops, walkErr := s.Peer.LookupWalk(r.Context(), meta.URL, p.ID, key)
+			trace = append(trace, hops...)
+			if walkErr != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"error": walkErr.Error(), "trace": trace})
+				return
+			}
+			if !result.Hit {
+				trace = append(trace, TraceHop{
+					Cell: meta.URL, Method: "POST /v1/lookup/walk",
+					Ms: time.Since(start).Milliseconds(), Result: "principal_not_found",
+				})
+				writeJSON(w, http.StatusNotFound, map[string]any{
+					"error": ErrPrincipalNotFound.Error(),
+					"trace": trace,
+				})
+				return
+			}
+			homeProjectID = result.HomeProjectID
+			homeCellURL = NormalizeURL(result.HomeCellURL)
 			trace = append(trace, TraceHop{
-				Cell: meta.URL, Method: "POST /v1/lookup/walk",
-				Ms: time.Since(start).Milliseconds(), Result: "principal_not_found",
+				Cell: meta.URL, Method: "resolve subject",
+				Ms:     time.Since(start).Milliseconds(),
+				Result: fmt.Sprintf("home=%s@%s", homeProjectID, homeCellURL),
 			})
-			writeJSON(w, http.StatusNotFound, map[string]any{
-				"error": ErrPrincipalNotFound.Error(),
-				"trace": trace,
-			})
-			return
 		}
-		homeProjectID = result.HomeProjectID
-		homeCellURL = NormalizeURL(result.HomeCellURL)
-		trace = append(trace, TraceHop{
-			Cell: meta.URL, Method: "resolve subject",
-			Ms:     time.Since(start).Milliseconds(),
-			Result: fmt.Sprintf("home=%s@%s", homeProjectID, homeCellURL),
-		})
 	}
 
 	tid, err := RandomToken(12)
@@ -273,7 +298,8 @@ func (s *Server) handleCreateTuple(w http.ResponseWriter, r *http.Request) {
 	now := s.Now()
 	t := Tuple{
 		ID: tid, ProjectID: p.ID, Object: object, Relation: relation,
-		UserKey: key, HomeProjectID: homeProjectID, HomeCellURL: homeCellURL,
+		SubjectKind: kind, UserKey: key,
+		HomeProjectID: homeProjectID, HomeCellURL: homeCellURL,
 		CreatedAt: now,
 	}
 	start := time.Now()
@@ -290,7 +316,7 @@ func (s *Server) handleCreateTuple(w http.ResponseWriter, r *http.Request) {
 		Ms: time.Since(start).Milliseconds(), Result: "created@" + p.ID,
 	})
 
-	if !req.SkipInterest {
+	if !req.SkipInterest && kind == SubjectKindUser {
 		hopStart := time.Now()
 		err := s.Peer.RegisterInterest(r.Context(), homeCellURL, RegisterInterestRequest{
 			PrincipalKey:        key,

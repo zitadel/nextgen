@@ -1,6 +1,6 @@
-# Cell hierarchy POC (Phase 1–4)
+# Cell hierarchy POC (Phase 1–5)
 
-Greenfield multi-container Go cells with SQLite membership, join/heartbeat, project attach, user lookup float-up, regional apps/grants with home-cell interest registration, inspectable home-issued JWTs (Ed25519 / JWKS), resource-cell auth checks, and an HTMX UI.
+Greenfield multi-container Go cells with SQLite membership, join/heartbeat, project attach, user lookup float-up, regional apps/grants with home-cell interest registration, inspectable home-issued JWTs (Ed25519 / JWKS), resource-cell auth checks, cross-cell group Expand/Check with hop traces, and an HTMX UI.
 
 Lives under `pocs/cell-hierarchy/` as a nested Go module (not wired into Moon/CI).
 
@@ -48,7 +48,42 @@ cd pocs/cell-hierarchy
 
 - UI: http://localhost:3000
 - Cells: http://localhost:8100–8106
-- Bootstrap runs joins then `scripts/bootstrap-projects.sh` (projects, attach, seed users with float, seed `chat` app on `us`).
+- Bootstrap runs joins then `scripts/bootstrap-projects.sh` (projects, attach, seed users with float, seed `chat` app on `us`, seed Phase 5 group chain).
+
+## Phase 5 scenarios
+
+| Scenario | How |
+|---|---|
+| Seed group chain | UI → Scenarios → **Seed group chain** (or rely on bootstrap / auto-seed). Creates `group:A#member@joe` on eu-2, `group:B#member@group:A@eu-2` on eu, `app:chat#viewer@group:B@eu` on us. |
+| Group check Joe → app:chat | UI → Scenarios → set **delay slider** → **Group check**. `POST /v1/fga/check` on us walks viewers → RPC expand B on eu → RPC expand A on eu-2 → find Joe. Trace lists each hop + ms; total and cross-cell hop count shown. |
+| Delay grows latency | Same check with delay 0 vs 50–200 ms/hop — measured `total_ms` grows. |
+| Cycle guard | Mutual group membership across cells stops via visited set (and max depth 8). |
+
+Chain (Zanzibar-style):
+
+```text
+eu-2 / team-eu-2:  group:A#member@user:joe@example.com
+eu    / eu:        group:B#member@group:A@team-eu-2@<eu-2>
+us    / us:        app:chat#viewer@group:B@eu@<eu>
+```
+
+Optional note: a Phase 3 flattened direct grant (`app:chat#viewer@user:joe` on us) is one local hop — no cross-cell expand.
+
+Manual curl (after bootstrap):
+
+```bash
+# Check through the group chain (delay_ms optional, applied per hop)
+curl -sS -X POST http://127.0.0.1:8104/v1/fga/check \
+  -H 'Content-Type: application/json' \
+  -d '{"project_id":"us","object":"app:chat","relation":"viewer","user_key":"joe@example.com","delay_ms":25}' | jq .
+
+# Expand group B on eu
+curl -sS -X POST http://127.0.0.1:8101/v1/fga/expand \
+  -H 'Content-Type: application/json' \
+  -d '{"project_id":"eu","object":"group:B","relation":"member","delay_ms":0}' | jq .
+```
+
+Env: `FGA_DELAY_MS` on a cell applies a default per-hop sleep when the request omits `delay_ms`.
 
 ## Phase 4 scenarios
 
@@ -121,6 +156,15 @@ Optional demo delay: set `FLOAT_DELAY_MS` on a cell so each float push sleeps (m
 |---|---|
 | chat | us (us) |
 
+## Phase 5 HTTP APIs
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/v1/fga/check` | `{project_id, object, relation, user_key, delay_ms?, max_depth?, visited?}` → walk local tuples; RPC expand remote group subjects; return `{allowed, reason, trace, total_ms, cross_cell_hops}` |
+| `POST` | `/v1/fga/expand` | `{project_id, object, relation, delay_ms?, max_depth?, visited?, depth?}` → flatten members (users) via live cross-cell RPCs; cycle/depth guards |
+
+Tuple create also accepts `subject_kind: "user"|"group"` so subjects can be `group:…` with `home_project_id` / `home_cell_url`.
+
 ## Phase 4 HTTP APIs
 
 | Method | Path | Purpose |
@@ -128,7 +172,7 @@ Optional demo delay: set `FLOAT_DELAY_MS` on a cell so each float push sleeps (m
 | `GET` | `/v1/jwks` | Public Ed25519 JWK set (key persisted in SQLite across restarts) |
 | `POST` | `/v1/token/issue` | Home cell: `{project_id, sub, aud, epoch?}` → compact JWT + decoded claims |
 | `POST` | `/v1/principal/check` | Home cell: `{project_id, sub, epoch?}` → `{active, blocked, epoch}` (P6 adds block) |
-| `POST` | `/v1/auth/check` | Resource cell: `{token, project_id, object, relation, online}` → verify JWKS, optional online principal check, local grant |
+| `POST` | `/v1/auth/check` | Resource cell: `{token, project_id, object, relation, online}` → verify JWKS, optional online principal check, local **user** grant (group chains use `/v1/fga/check`) |
 
 JWT claims: `sub`, `home_cell`, `home_project`, `aud`, `epoch`, `exp` (60s TTL), `iss` (cell URL). Alg: `EdDSA`.
 
@@ -138,7 +182,7 @@ JWT claims: `sub`, `home_cell`, `home_project`, `aud`, `epoch`, `exp` (60s TTL),
 |---|---|---|
 | `GET/POST` | `/v1/projects/{id}/apps` | List / create apps on this project |
 | `GET/DELETE` | `/v1/projects/{id}/apps/{appId}` | Get / delete one app |
-| `GET/POST` | `/v1/projects/{id}/tuples` | List / create grant (lookup walk → tuple → RegisterInterest on home) |
+| `GET/POST` | `/v1/projects/{id}/tuples` | List / create grant (user: lookup walk → tuple → RegisterInterest; group: structured subject, no interest) |
 | `GET` | `/v1/interests` | List interests on this cell (`?home_project_id=` optional) |
 | `POST` | `/v1/interests` | RegisterInterest (called by resource cell on home cell) |
 

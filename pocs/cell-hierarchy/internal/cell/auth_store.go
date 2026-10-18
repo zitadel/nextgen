@@ -179,6 +179,10 @@ func (s *Store) FindGrant(projectID, object, relation, userKey, homeProjectID, h
 		if t.Object != object || t.Relation != relation {
 			continue
 		}
+		// Phase 4 direct grant: only user subjects (group chains use /v1/fga/check).
+		if !t.IsUserSubject() {
+			continue
+		}
 		if t.UserKey == key {
 			// Direct subject match (same user key on this grant).
 			if homeProjectID == "" || homeCellURL == "" {

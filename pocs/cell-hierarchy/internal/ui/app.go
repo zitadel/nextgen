@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -36,6 +37,9 @@ type App struct {
 
 	signInMu sync.Mutex
 	signIn   *signInResult
+
+	groupCheckMu sync.Mutex
+	groupCheck   *groupCheckResult
 }
 
 type traceEntry struct {
@@ -71,6 +75,8 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("POST /scenarios/lookup", a.handleScenarioLookup)
 	mux.HandleFunc("POST /scenarios/grant-joe", a.handleScenarioGrantJoe)
 	mux.HandleFunc("POST /scenarios/sign-in-joe", a.handleScenarioSignInJoe)
+	mux.HandleFunc("POST /scenarios/seed-group-chain", a.handleScenarioSeedGroupChain)
+	mux.HandleFunc("POST /scenarios/group-check-joe", a.handleScenarioGroupCheckJoe)
 	mux.HandleFunc("GET /trace", a.handleTrace)
 	mux.HandleFunc("POST /trace/clear", a.handleTraceClear)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -119,6 +125,7 @@ type pageData struct {
 	ScenarioOK  string
 	ScenarioErr string
 	SignIn      *signInResult
+	GroupCheck  *groupCheckResult
 }
 
 type signInResult struct {
@@ -132,6 +139,17 @@ type signInResult struct {
 	LookupHit      bool
 	HomeProject    string
 	HomeCell       string
+}
+
+type groupCheckResult struct {
+	Allowed       bool
+	Reason        string
+	DelayMs       int
+	TotalMs       int64
+	CrossCellHops int
+	Hops          []cell.TraceHop
+	Seeded        bool
+	Note          string
 }
 
 type cellDetail struct {
@@ -304,6 +322,7 @@ func (a *App) handleScenarios(w http.ResponseWriter, r *http.Request) {
 		ScenarioOK:  r.URL.Query().Get("ok"),
 		ScenarioErr: r.URL.Query().Get("err"),
 		SignIn:      a.copySignIn(),
+		GroupCheck:  a.copyGroupCheck(),
 	})
 }
 
@@ -499,6 +518,204 @@ func (a *App) handleScenarioSignInJoe(w http.ResponseWriter, r *http.Request) {
 		msg += " — denied: " + online.Reason
 	}
 	http.Redirect(w, r, "/scenarios?ok="+url.QueryEscape(msg), http.StatusSeeOther)
+}
+
+func (a *App) handleScenarioSeedGroupChain(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
+	defer cancel()
+	if err := a.ensureGroupChain(ctx); err != nil {
+		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, "/scenarios?ok="+url.QueryEscape("seeded group chain A→B→chat"), http.StatusSeeOther)
+}
+
+func (a *App) handleScenarioGroupCheckJoe(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
+	defer cancel()
+	if err := r.ParseForm(); err != nil {
+		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape("invalid form"), http.StatusSeeOther)
+		return
+	}
+	delayMs := 0
+	if v := strings.TrimSpace(r.FormValue("delay_ms")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			delayMs = n
+		}
+	}
+	if delayMs < 0 {
+		delayMs = 0
+	}
+	if delayMs > 500 {
+		delayMs = 500
+	}
+	autoSeed := r.FormValue("auto_seed") == "1"
+
+	usHost, err := a.cellURLByLabel("us")
+	if err != nil {
+		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		return
+	}
+
+	seeded := false
+	if autoSeed {
+		if err := a.ensureGroupChain(ctx); err != nil {
+			http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+			return
+		}
+		seeded = true
+	}
+
+	res, err := a.Peer.FGACheck(ctx, usHost, cell.FGACheckRequest{
+		ProjectID: "us",
+		Object:    "app:chat",
+		Relation:  "viewer",
+		UserKey:   "joe@example.com",
+		DelayMs:   &delayMs,
+	})
+	if err != nil {
+		a.appendTrace("group check joe → app:chat", res.Trace, err.Error())
+		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		return
+	}
+	note := fmt.Sprintf("allowed=%v total_ms=%d cross_cell_hops=%d delay_ms=%d",
+		res.Allowed, res.TotalMs, res.CrossCellHops, delayMs)
+	a.appendTrace("group check joe → app:chat", res.Trace, note)
+
+	result := &groupCheckResult{
+		Allowed:       res.Allowed,
+		Reason:        res.Reason,
+		DelayMs:       delayMs,
+		TotalMs:       res.TotalMs,
+		CrossCellHops: res.CrossCellHops,
+		Hops:          res.Trace,
+		Seeded:        seeded,
+		Note:          "Compare with Phase 3/4 flattened direct grant (app:chat#viewer@user:joe) — one local hop, no cross-cell expand.",
+	}
+	a.setGroupCheck(result)
+
+	msg := fmt.Sprintf("group check: %s · %dms · %d cross-cell hops", res.Reason, res.TotalMs, res.CrossCellHops)
+	if !res.Allowed {
+		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(msg), http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, "/scenarios?ok="+url.QueryEscape(msg), http.StatusSeeOther)
+}
+
+func (a *App) ensureGroupChain(ctx context.Context) error {
+	euHost, err := a.cellURLByLabel("eu")
+	if err != nil {
+		return err
+	}
+	eu2Host, err := a.cellURLByLabel("eu-2")
+	if err != nil {
+		return err
+	}
+	usHost, err := a.cellURLByLabel("us")
+	if err != nil {
+		return err
+	}
+
+	apps, err := a.Peer.ListApps(ctx, usHost, "us")
+	if err != nil {
+		return err
+	}
+	hasChat := false
+	for _, app := range apps {
+		if app.Name == "chat" {
+			hasChat = true
+			break
+		}
+	}
+	if !hasChat {
+		if _, err := a.Peer.CreateApp(ctx, usHost, "us", map[string]any{"name": "chat"}); err != nil {
+			return err
+		}
+	}
+
+	type seed struct {
+		cellURL, projectID string
+		body               map[string]any
+		label              string
+	}
+	seeds := []seed{
+		{
+			cellURL: eu2Host, projectID: "team-eu-2", label: "group:A#member@user:joe",
+			body: map[string]any{
+				"object": "group:A", "relation": "member", "user_key": "joe@example.com",
+				"subject_kind": "user", "home_project_id": "team-eu-2", "home_cell_url": eu2Host,
+				"skip_interest": true,
+			},
+		},
+		{
+			cellURL: euHost, projectID: "eu", label: "group:B#member@group:A@team-eu-2",
+			body: map[string]any{
+				"object": "group:B", "relation": "member",
+				"subject_kind": "group", "user_key": "A",
+				"home_project_id": "team-eu-2", "home_cell_url": eu2Host,
+			},
+		},
+		{
+			cellURL: usHost, projectID: "us", label: "app:chat#viewer@group:B@eu",
+			body: map[string]any{
+				"object": "app:chat", "relation": "viewer",
+				"subject_kind": "group", "user_key": "B",
+				"home_project_id": "eu", "home_cell_url": euHost,
+			},
+		},
+	}
+	for _, s := range seeds {
+		existing, err := a.Peer.ListTuples(ctx, s.cellURL, s.projectID)
+		if err != nil {
+			return err
+		}
+		wantKind, _ := s.body["subject_kind"].(string)
+		wantKey, _ := s.body["user_key"].(string)
+		wantObj, _ := s.body["object"].(string)
+		wantRel, _ := s.body["relation"].(string)
+		if wantKind == "" {
+			wantKind = cell.SubjectKindUser
+		}
+		found := false
+		for _, tup := range existing {
+			if tup.Object == wantObj && tup.Relation == wantRel &&
+				tup.SubjectKind == wantKind && tup.UserKey == wantKey {
+				found = true
+				a.appendTrace("seed "+s.label, nil, "already exists")
+				break
+			}
+		}
+		if found {
+			continue
+		}
+		out, err := a.Peer.CreateTuple(ctx, s.cellURL, s.projectID, s.body)
+		if err != nil {
+			a.appendTrace("seed "+s.label, out.Trace, err.Error())
+			return err
+		}
+		a.appendTrace("seed "+s.label, out.Trace, "tuple="+out.Tuple.ID)
+	}
+	return nil
+}
+
+func (a *App) setGroupCheck(gc *groupCheckResult) {
+	a.groupCheckMu.Lock()
+	defer a.groupCheckMu.Unlock()
+	a.groupCheck = gc
+}
+
+func (a *App) copyGroupCheck() *groupCheckResult {
+	a.groupCheckMu.Lock()
+	defer a.groupCheckMu.Unlock()
+	if a.groupCheck == nil {
+		return nil
+	}
+	cp := *a.groupCheck
+	if a.groupCheck.Hops != nil {
+		cp.Hops = make([]cell.TraceHop, len(a.groupCheck.Hops))
+		copy(cp.Hops, a.groupCheck.Hops)
+	}
+	return &cp
 }
 
 func (a *App) ensureJoeGrant(ctx context.Context) (cell.CreateTupleResponse, error) {

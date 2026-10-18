@@ -75,12 +75,13 @@
         <h2 style="font-size:1rem;margin:0 0 0.5rem">Tuples (grants)</h2>
         {{if .Tuples}}
         <table>
-          <thead><tr><th>Object</th><th>Relation</th><th>Subject</th><th>Home</th></tr></thead>
+          <thead><tr><th>Object</th><th>Relation</th><th>Kind</th><th>Subject</th><th>Home</th></tr></thead>
           <tbody>
           {{range .Tuples}}
             <tr>
               <td><code>{{.Object}}</code></td>
               <td>{{.Relation}}</td>
+              <td class="muted">{{.SubjectKind}}</td>
               <td><code>{{.Subject}}</code></td>
               <td class="muted">{{.HomeProjectID}}</td>
             </tr>

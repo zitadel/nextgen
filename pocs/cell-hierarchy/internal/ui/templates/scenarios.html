@@ -34,9 +34,48 @@
     <nav><a href="/">Tree</a><a href="/join">Join</a><a href="/scenarios">Scenarios</a></nav>
   </header>
   <main>
-    <h1>Phase 2–4 scenarios</h1>
+    <h1>Phase 2–5 scenarios</h1>
     {{if .ScenarioOK}}<div class="flash-ok">{{.ScenarioOK}}</div>{{end}}
     {{if .ScenarioErr}}<div class="flash-err">{{.ScenarioErr}}</div>{{end}}
+
+    <div class="panel">
+      <h2 style="font-size:1rem;margin:0 0 0.5rem">Group check Joe → app:chat</h2>
+      <p class="muted">Phase 5: seed <code>group:A#member@joe</code> on eu-2, <code>group:B#member@group:A@eu-2</code> on eu, <code>app:chat#viewer@group:B@eu</code> on us. Then <code>POST /v1/fga/check</code> walks viewers → expand B → expand A → find Joe. Delay slider sleeps per hop so latency grows with the chain. Depth/visited only stop cycles (cap 8).</p>
+      <form method="post" action="/scenarios/seed-group-chain" style="margin-bottom:0.75rem">
+        <button class="secondary" type="submit">Seed group chain</button>
+      </form>
+      <form method="post" action="/scenarios/group-check-joe">
+        <label><input type="checkbox" name="auto_seed" value="1" checked/> Auto-seed chain if missing</label>
+        <label for="delay_ms">Delay per hop (ms): <span id="delay_val">25</span></label>
+        <input id="delay_ms" name="delay_ms" type="range" min="0" max="200" step="5" value="25"
+               oninput="document.getElementById('delay_val').textContent=this.value" style="width:100%"/>
+        <div class="row">
+          <button type="submit">Group check Joe → app:chat</button>
+        </div>
+      </form>
+      {{if .GroupCheck}}
+      <div style="margin-top:1rem">
+        <p class="muted">
+          {{if .GroupCheck.Allowed}}<span style="color:var(--ok)">allowed</span>{{else}}<span style="color:var(--bad)">{{.GroupCheck.Reason}}</span>{{end}}
+          · total <strong>{{.GroupCheck.TotalMs}} ms</strong>
+          · cross-cell hops <strong>{{.GroupCheck.CrossCellHops}}</strong>
+          · delay {{.GroupCheck.DelayMs}} ms/hop
+          {{if .GroupCheck.Seeded}} · auto-seeded{{end}}
+        </p>
+        <p class="muted">{{.GroupCheck.Note}}</p>
+        {{if .GroupCheck.Hops}}
+        <table class="trace">
+          <thead><tr><th>Cell</th><th>Method</th><th>ms</th><th>Result</th></tr></thead>
+          <tbody>
+          {{range .GroupCheck.Hops}}
+            <tr><td><code>{{.Cell}}</code></td><td>{{.Method}}</td><td>{{.Ms}}</td><td>{{.Result}}</td></tr>
+          {{end}}
+          </tbody>
+        </table>
+        {{end}}
+      </div>
+      {{end}}
+    </div>
 
     <div class="panel">
       <h2 style="font-size:1rem;margin:0 0 0.5rem">Sign in on us as Joe</h2>

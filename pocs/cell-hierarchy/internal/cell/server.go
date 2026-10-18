@@ -55,6 +55,7 @@ func (s *Server) Handler() http.Handler {
 	s.registerProjectRoutes(mux)
 	s.registerGrantRoutes(mux)
 	s.registerAuthRoutes(mux)
+	s.registerFGARoutes(mux)
 	return mux
 }
 
