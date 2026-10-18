@@ -8,6 +8,10 @@ import {
   agentsGuidanceSection,
   readmeGuidanceSection,
 } from "../../../../../../src/lib/orca/patchers/rule/guidance";
+import {
+  appComponentTemplate,
+  appTemplateHtml,
+} from "../../../../../../src/lib/orca/patchers/rule/angular/templates";
 import { reactRenderer } from "../../../../../../src/lib/orca/patchers/rule/next/renderers/react";
 import {
   appVueTemplate,
@@ -18,6 +22,12 @@ import {
   profilePageTemplate,
   registerPageTemplate,
 } from "../../../../../../src/lib/orca/patchers/rule/nuxt/templates";
+import { appTemplate as qwikAppTemplate } from "../../../../../../src/lib/orca/patchers/rule/qwik/templates";
+import { appTemplate as reactAppTemplate } from "../../../../../../src/lib/orca/patchers/rule/react/templates";
+import { appTemplate as solidAppTemplate } from "../../../../../../src/lib/orca/patchers/rule/solid/templates";
+import { appTemplate as svelteAppTemplate } from "../../../../../../src/lib/orca/patchers/rule/svelte/templates";
+import { appTemplate as vueAppTemplate } from "../../../../../../src/lib/orca/patchers/rule/vue/templates";
+import { FRAMEWORK_IDS } from "../../../../../helpers/framework-ids";
 
 /**
  * Guard against guidance/template drift from the real package surfaces: every
@@ -40,9 +50,15 @@ const PACKAGE_DIRS: Record<string, string> = {
   "@zitadel/cli": "apps/cli",
   "@zitadel/components": "packages/components",
   "@zitadel/config": "packages/config",
+  "@zitadel/sdk-angular": "packages/sdk-angular",
   "@zitadel/sdk-core": "packages/sdk-core",
   "@zitadel/sdk-next": "packages/sdk-next",
   "@zitadel/sdk-nuxt": "packages/sdk-nuxt",
+  "@zitadel/sdk-qwik": "packages/sdk-qwik",
+  "@zitadel/sdk-react": "packages/sdk-react",
+  "@zitadel/sdk-solid": "packages/sdk-solid",
+  "@zitadel/sdk-svelte": "packages/sdk-svelte",
+  "@zitadel/sdk-vue": "packages/sdk-vue",
 };
 
 const SPECIFIER_PATTERN = /@zitadel\/[a-z0-9-]+(?:\/[a-z0-9-]+)*/g;
@@ -65,6 +81,16 @@ function baseContext(frameworkId: string, overrides: Partial<PatchContext> = {})
   } as PatchContext;
 }
 
+/** The root-component template each single-page-app patcher emits. */
+const SPA_ROOT_TEMPLATES: Record<string, (ctx: PatchContext) => string> = {
+  react: reactAppTemplate,
+  vue: vueAppTemplate,
+  solid: solidAppTemplate,
+  svelte: svelteAppTemplate,
+  qwik: qwikAppTemplate,
+  angular: appComponentTemplate,
+};
+
 /** Every emitted text surface, across the knobs that change what is emitted. */
 function emittedCorpus(): string[] {
   const corpus: string[] = [];
@@ -80,6 +106,10 @@ function emittedCorpus(): string[] {
       corpus.push(loginPageTemplate(nuxtCtx));
       corpus.push(registerPageTemplate(nuxtCtx));
       corpus.push(profilePageTemplate(nuxtCtx));
+      for (const [frameworkId, template] of Object.entries(SPA_ROOT_TEMPLATES)) {
+        corpus.push(template(baseContext(frameworkId, { posture, useCase })));
+      }
+      corpus.push(appTemplateHtml(baseContext("angular", { posture, useCase })));
     }
   }
   corpus.push(reactRenderer.templates.customElementsDts!().contents);
@@ -89,7 +119,7 @@ function emittedCorpus(): string[] {
     componentsPluginTemplate(),
     authPluginTemplate(),
   );
-  for (const frameworkId of ["next", "nuxt", "react"]) {
+  for (const frameworkId of FRAMEWORK_IDS) {
     for (const posture of postures) {
       for (const preset of ["password-first", "passkey-first"]) {
         const ctx = baseContext(frameworkId, { posture, preset });

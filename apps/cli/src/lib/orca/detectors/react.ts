@@ -1,12 +1,7 @@
-import { ZitadelError } from "../../errors";
-import {
-  dependencySpecProvablyBelowMajor,
-  dependencyVersionMajor,
-  hasDependency,
-  readPackageJson,
-} from "./package-json";
+import { dependencyVersionMajor, hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
 import type { Detector, FrameworkFacts } from "./types";
+import { enforceVersionFloor } from "./version-floor";
 
 /**
  * Detects a Vite + React single-page app and extracts its facts: the source
@@ -21,6 +16,7 @@ export class ReactDetector implements Detector {
   readonly framework = "react";
   readonly displayName = "React";
   readonly versionPackage = "react";
+  readonly versionFloor = "18";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
     const pkg = await readPackageJson(cwd).catch(() => undefined);
@@ -33,18 +29,7 @@ export class ReactDetector implements Detector {
       return null;
     }
 
-    // Supported floor (ADR 043): the SDK wrappers and scaffolded templates
-    // target React 18+. Enforced here so setup and doctor share one loud
-    // gate; only a spec that provably cannot resolve to 18+ is rejected —
-    // protocol specs and dist-tags pass.
-    const belowFloor = dependencySpecProvablyBelowMajor(pkg, this.versionPackage, 18);
-    if (belowFloor !== undefined) {
-      throw new ZitadelError(
-        "E_UNSUPPORTED_PROJECT_SHAPE",
-        `React "${belowFloor}" is below the supported floor — the CLI integrates React 18 and newer`,
-        { hint: "Upgrade the app to React 18+ and rerun." },
-      );
-    }
+    await enforceVersionFloor(this, pkg, cwd);
 
     const devPort = await detectDevPort(cwd, pkg);
     const versionMajor = dependencyVersionMajor(pkg, this.versionPackage);
