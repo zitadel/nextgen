@@ -211,7 +211,6 @@ describe("server-rendered widget config", () => {
   });
 
   it.each([
-    ["zitadel-login", (p: object) => <ZitadelLogin {...p} />],
     ["zitadel-session", (p: object) => <ZitadelSession {...p} />],
     ["zitadel-logout", (p: object) => <ZitadelLogout {...p} />],
   ])("leaves a keyed project handle out of the %s markup", (tag, widget) => {
@@ -278,6 +277,39 @@ describe("hydrating a server-rendered login", () => {
     );
     const created = bodies.filter((body) => body?.project_id);
     expect(created[0]).toMatchObject({ purpose: "register" });
+    host.remove();
+  });
+});
+
+describe("a login with a keyed project handle", () => {
+  const keyed = {
+    projectId: "proj-keyed",
+    proxyPath: "https://flow.test.invalid",
+    publishableKey: "pk_test_123",
+  };
+
+  afterEach(() => {
+    _resetConfigForTesting();
+    vi.restoreAllMocks();
+  });
+
+  it("renders no element on the server", () => {
+    expect(renderToString(<ZitadelLogin project={keyed} />)).toBe("");
+  });
+
+  it("starts its first flow once, with the bearer, after mounting", async () => {
+    const fetched = vi.spyOn(globalThis, "fetch");
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    hydrateRoot(host, <ZitadelLogin project={keyed} />);
+
+    await waitFor(() => expect(host.querySelector("zitadel-login")).not.toBeNull());
+    expect(host.querySelector<ZitadelLoginElement>("zitadel-login")!.project).toBe(keyed);
+    await waitFor(() => expect(fetched).toHaveBeenCalled());
+    expect(fetched).toHaveBeenCalledTimes(1);
+    const [input, init] = fetched.mock.calls[0]!;
+    const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : {}));
+    expect(headers.get("authorization")).toBe("Bearer pk_test_123");
     host.remove();
   });
 });

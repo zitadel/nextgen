@@ -83,8 +83,9 @@ function asAttributes<T extends typeof HTMLElement>(
  *
  * A handle with a publishable key writes none: attributes cannot carry the key,
  * so a widget that started from them would send its first request without the
- * bearer the project needs, and never retry. Left unconfigured, it waits for
- * the handle React binds at hydration.
+ * bearer the project needs, and never retry. `ZitadelLogin` renders nothing for
+ * such a handle until it has mounted, so its element is created with the
+ * handle already bound.
  */
 function projectAttributes(props: {
   readonly project?: ZitadelProject;
@@ -173,6 +174,13 @@ export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginRe
     },
     ref,
   ) {
+    const keyed = Boolean(props.project?.publishableKey);
+    const [mounted, setMounted] = React.useState(false);
+    React.useEffect(() => setMounted(true), []);
+    // A keyed handle cannot reach the element as attributes, and the element
+    // starts its first flow when it first updates. Create it only once the
+    // handle can be bound at the same time, never during server rendering.
+    if (keyed && !mounted) return null;
     return (
       <ZitadelLoginElementReact
         {...props}
