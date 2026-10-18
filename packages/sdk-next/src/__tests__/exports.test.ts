@@ -35,4 +35,10 @@ describe("package manifest", () => {
     expect(declared.length).toBeGreaterThan(0);
     expect(declared.filter((file) => !existsSync(resolve(packageRoot, file)))).toEqual([]);
   });
+
+  // Next 15.0.0 to 15.2.2 skip middleware for a request that sends
+  // `x-middleware-subrequest` (CVE-2025-29927), which bypasses protectedRoutes.
+  it("declares its supported peer ranges", () => {
+    expect(manifest.peerDependencies.next).toBe(">=15.2.3");
+  });
 });

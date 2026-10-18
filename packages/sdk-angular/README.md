@@ -2,7 +2,15 @@
 
 Angular components for the Zitadel auth UI, for client-side SPAs.
 
+## Installation
+
+```bash
+pnpm add @zitadel/sdk-angular@alpha
+```
+
 ## Requirements
+
+Peer dependencies: `@angular/core` and `@angular/common`, both `>=17`.
 
 TypeScript ≥ 5.0 — the published type definitions re-export with `export type *`, which TypeScript introduced in 5.0.
 
@@ -29,6 +37,8 @@ export class LoginPage {
 ```
 
 `<zitadel-auth-logout [project]="project" postSignOutUrl="/login" />` works the same way.
+
+`<zitadel-auth-login>` also takes `resumeFlowId`, an existing flow to resume instead of starting a new one; unset, `null` or `""` falls back to the `flow` query parameter.
 
 The signed-in session card is `<zitadel-auth-session>` (exported as `ZitadelSessionComponent`).
 

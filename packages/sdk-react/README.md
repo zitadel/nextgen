@@ -2,7 +2,15 @@
 
 React components for the Zitadel auth UI, for client-side SPAs.
 
+## Installation
+
+```bash
+pnpm add @zitadel/sdk-react@alpha
+```
+
 ## Requirements
+
+Peer dependencies: `react >=18` and `react-dom >=18`.
 
 TypeScript ≥ 5.0 — the published type definitions re-export with `export type *`, which TypeScript introduced in 5.0.
 
@@ -30,6 +38,8 @@ export function ProfilePage() {
   return <ZitadelLogout project={project} postSignOutUrl="/login" />;
 }
 ```
+
+`ZitadelLogin` also takes `resumeFlowId`, an existing flow to resume instead of starting a new one; unset, `null` or `""` falls back to the `flow` query parameter.
 
 The signed-in session card is `<ZitadelSession project={project} />` (exported
 as `ZitadelSession`).

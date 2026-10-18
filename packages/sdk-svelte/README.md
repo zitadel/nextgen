@@ -2,7 +2,15 @@
 
 Svelte 5 components for the Zitadel auth UI, for client-side SPAs (Vite, etc.).
 
+## Installation
+
+```bash
+pnpm add @zitadel/sdk-svelte@alpha
+```
+
 ## Requirements
+
+Peer dependencies: `svelte ^5.0.0`.
 
 TypeScript ≥ 5.0 — the published type definitions re-export with `export type *`, which TypeScript introduced in 5.0.
 
@@ -22,6 +30,8 @@ TypeScript ≥ 5.0 — the published type definitions re-export with `export typ
 ```
 
 `<ZitadelLogout {project} postSignOutUrl="/login" />` works the same way.
+
+`ZitadelLogin` also takes `resumeFlowId`, an existing flow to resume instead of starting a new one; unset, `null` or `""` falls back to the `flow` query parameter.
 
 The signed-in session card is `<ZitadelSession {project} />` (exported as `ZitadelSession`).
 

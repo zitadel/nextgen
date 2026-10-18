@@ -1463,8 +1463,8 @@ importers:
         version: link:../sdk-core
     devDependencies:
       '@qwik.dev/core':
-        specifier: ^2.0.0-beta.45
-        version: 2.0.0-beta.45(@oxc-project/types@0.152.0)(esbuild@0.28.2)(prettier@3.8.3)(rolldown@1.2.12)(rollup@4.62.2)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(vitest@4.1.11)(webpack@5.106.2(esbuild@0.28.2))
+        specifier: ^2.0.0-rc.2
+        version: 2.0.0-rc.3(@oxc-project/types@0.152.0)(esbuild@0.28.2)(prettier@3.8.3)(rolldown@1.2.12)(rollup@4.62.2)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(vitest@4.1.11)(webpack@5.106.2(esbuild@0.28.2))
       '@types/node':
         specifier: ^24.19.1
         version: 24.19.1
@@ -5152,8 +5152,8 @@ packages:
   '@quansync/fs@1.0.0':
     resolution: {integrity: sha512-4TJ3DFtlf1L5LDMaM6CanJ/0lckGNtJcMjQ1NAV6zDmA0tEHKZtxNKin8EgPaVX1YzljbxckyT2tJrpQKAtngQ==}
 
-  '@qwik.dev/core@2.0.0-beta.45':
-    resolution: {integrity: sha512-+J1MqfTmsAARJduDLGFg6Y2Lp/fzyh8eojN9wdecOL8kKJMF2Xf4JWcObc1xbPYl7Txt/rKjpo8w1Jh3Z2Qa5g==}
+  '@qwik.dev/core@2.0.0-rc.3':
+    resolution: {integrity: sha512-s87/I5hyQAPXzLg1ihKwoGzA5931uIYdqBzwR6tKUCixrH2fijLrLQSZgAQk1Z0wA5Cw4KsfHMNX8tzx/tNSkg==}
     engines: {node: ^20.3.0 || >=21.0.0}
     hasBin: true
     peerDependencies:
@@ -18536,7 +18536,7 @@ snapshots:
     dependencies:
       quansync: 1.0.0
 
-  '@qwik.dev/core@2.0.0-beta.45(@oxc-project/types@0.152.0)(esbuild@0.28.2)(prettier@3.8.3)(rolldown@1.2.12)(rollup@4.62.2)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(vitest@4.1.11)(webpack@5.106.2(esbuild@0.28.2))':
+  '@qwik.dev/core@2.0.0-rc.3(@oxc-project/types@0.152.0)(esbuild@0.28.2)(prettier@3.8.3)(rolldown@1.2.12)(rollup@4.62.2)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(vitest@4.1.11)(webpack@5.106.2(esbuild@0.28.2))':
     dependencies:
       '@emnapi/core': 1.11.3
       '@emnapi/runtime': 1.11.3
@@ -25177,7 +25177,7 @@ snapshots:
 
   magic-regexp@0.11.2(esbuild@0.28.2)(rolldown@1.2.12)(rollup@4.62.2)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(webpack@5.106.2(esbuild@0.28.2)):
     dependencies:
-      magic-string: 1.4.1
+      magic-string: 1.4.3
       regexp-tree: 0.1.27
       type-level-regexp: 0.1.17
       unplugin: 3.3.0(esbuild@0.28.2)(rolldown@1.2.12)(rollup@4.62.2)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(webpack@5.106.2(esbuild@0.28.2))

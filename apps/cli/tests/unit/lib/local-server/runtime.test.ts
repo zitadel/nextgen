@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { ZitadelError } from "../../../../src/lib/errors";
 import {
   LOCAL_RUNTIME_FILE,
   defaultLocalServerImageForCliVersion,
@@ -12,8 +13,10 @@ import {
   ensureLocalState,
   localContainerName,
   localRuntimePaths,
+  readNearestRuntimeMetadata,
   readRuntimeMetadata,
   removeLocalData,
+  retargetMalformedRuntime,
   writeRuntimeMetadata,
   type RuntimeMetadata,
 } from "../../../../src/lib/local-server/runtime";
@@ -166,6 +169,64 @@ describe("findUpward", () => {
 
     await expect(findUpward(app, LOCAL_RUNTIME_FILE, home)).resolves.toBeUndefined();
     await expect(findUpward(app, LOCAL_RUNTIME_FILE, cwd)).resolves.toBe(cwd);
+  });
+});
+
+describe("readNearestRuntimeMetadata", () => {
+  async function malformedRecordAt(dir: string): Promise<void> {
+    await mkdir(join(dir, ".zitadel/local"), { recursive: true });
+    await writeFile(join(dir, LOCAL_RUNTIME_FILE), JSON.stringify({ backend: "nope" }));
+  }
+
+  it("recovers a malformed record in a parent where it is", async () => {
+    await malformedRecordAt(cwd);
+    const app = join(cwd, "my-app");
+    await mkdir(app);
+
+    await expect(readNearestRuntimeMetadata(app)).rejects.toMatchObject({
+      nextCommands: [`zitadel reset --force --cwd ${cwd}`, `zitadel start --cwd ${cwd}`],
+    });
+  });
+
+  it("recovers a malformed record in the working directory without naming it", async () => {
+    await malformedRecordAt(cwd);
+
+    await expect(readNearestRuntimeMetadata(cwd)).rejects.toMatchObject({
+      nextCommands: ["zitadel reset --force", "zitadel start"],
+    });
+  });
+});
+
+describe("retargetMalformedRuntime", () => {
+  const malformed = new ZitadelError("E_VALIDATION", `${LOCAL_RUNTIME_FILE} is malformed`, {
+    details: { x: 1 },
+  });
+
+  it.each([
+    ["a Windows path with a space", "C:\\work\\my app"],
+    ["a Windows path with an apostrophe", "C:\\work\\it's"],
+    ["a POSIX path with a space", "/home/dev/my app"],
+  ])("hands over %s as arguments, not as commands", (_name, dir) => {
+    const retargeted = retargetMalformedRuntime(malformed, dir) as ZitadelError;
+
+    expect(retargeted.nextCommands).toBeUndefined();
+    expect(retargeted.details).toEqual({
+      x: 1,
+      suggested_args: [
+        ["reset", "--force", "--cwd", dir],
+        ["start", "--cwd", dir],
+      ],
+    });
+    expect(retargeted.hint).toContain("details.suggested_args");
+  });
+
+  it("writes the commands out for a path that needs no quoting", () => {
+    const retargeted = retargetMalformedRuntime(malformed, "/home/dev/app") as ZitadelError;
+
+    expect(retargeted.nextCommands).toEqual([
+      "zitadel reset --force --cwd /home/dev/app",
+      "zitadel start --cwd /home/dev/app",
+    ]);
   });
 });
 

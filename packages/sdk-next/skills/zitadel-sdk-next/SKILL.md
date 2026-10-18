@@ -19,7 +19,7 @@ verification into an App Router app.
 Use this when adding or customizing Zitadel auth in an **existing or custom**
 Next.js app, or when you need to understand how the pieces fit together.
 
-For a brand-new app, prefer the CLI: `zitadel setup --framework next` scaffolds
+For a brand-new app, prefer the CLI: `npx @zitadel/cli@alpha setup --framework next` scaffolds
 the whole integration (middleware, login page, env) and wires it for you. Reach
 for this skill when that scaffold already exists and you are editing it, or when
 the app is bespoke and you are integrating by hand.
@@ -27,10 +27,10 @@ the app is bespoke and you are integrating by hand.
 ## Install
 
 ```bash
-pnpm add @zitadel/sdk-next
+pnpm add @zitadel/sdk-next@alpha
 ```
 
-Peer deps the package expects: `next >=15`, `react >=18`, `react-dom >=18`.
+Peer deps the package expects: `next >=15.2.3`, `react >=18`, `react-dom >=18`.
 TypeScript `>=5.0` (the SDK consumer floor; the package is built against a
 newer TypeScript, but that does not raise the floor for your project).
 

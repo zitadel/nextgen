@@ -17,10 +17,12 @@ import type { Detector, FrameworkFacts } from "./types";
  */
 export class NuxtDetector implements Detector {
   readonly framework = "nuxt";
+  readonly displayName = "Nuxt";
+  readonly versionPackage = "nuxt";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
     const pkg = await readPackageJson(cwd).catch(() => undefined);
-    if (!pkg || !hasDependency(pkg, "nuxt")) {
+    if (!pkg || !hasDependency(pkg, this.versionPackage)) {
       return null;
     }
 
