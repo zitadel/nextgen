@@ -11,6 +11,7 @@
     ZitadelLoginProps,
   } from './types';
   import { assignGiven } from './given';
+  import { onClient, proxyPathAttr } from './attributes';
 
   let {
     project,
@@ -84,11 +85,12 @@
 
 <zitadel-login
   bind:this={el}
-  {project}
+  project={onClient(project)}
   {purpose}
   {locales}
-  project-id={projectId}
-  proxy-path={proxyPath}
+  project-id={project?.projectId ?? projectId}
+  proxy-path={proxyPathAttr(project?.proxyPath ?? proxyPath)}
+  url={project?.url}
   post-sign-in-url={postSignInUrl}
   resume-flow-id={resumeFlowId}
   flow-name={flowName}
