@@ -3,15 +3,18 @@ import type { ZitadelSession as ZitadelSessionElement } from "@zitadel/component
 import type { ZitadelSignoutDetail } from "@zitadel/sdk-core/types";
 
 import {
+  type AfterViewInit,
   Component,
   CUSTOM_ELEMENTS_SCHEMA,
   EventEmitter,
   Input,
+  type OnChanges,
   Output,
   ViewChild,
 } from "@angular/core";
 
 import type { ZitadelProject } from "./config";
+import { assignGiven } from "./given";
 
 import "@zitadel/components";
 
@@ -37,15 +40,10 @@ import "@zitadel/components";
     [projectId]="projectId"
     [proxyPath]="proxyPath"
     [attr.post-sign-out-url]="postSignOutUrl"
-    [attr.heading]="heading"
-    [attr.logout-label]="logoutLabel"
-    [attr.variant]="variant ?? null"
-    [attr.theme]="theme ?? null"
-    [suppressHeader]="suppressHeader"
     (zitadel-signout)="onSignout($event)"
   ></zitadel-session>`,
 })
-export class ZitadelSessionComponent {
+export class ZitadelSessionComponent implements AfterViewInit, OnChanges {
   @Input() project?: ZitadelProject;
   @Input() projectId?: string;
   @Input() proxyPath?: string;
@@ -62,6 +60,27 @@ export class ZitadelSessionComponent {
   /** The underlying `<zitadel-session>` custom element, or `null` before view init. */
   get element(): ZitadelSessionElement | null {
     return this.elementRef?.nativeElement ?? null;
+  }
+
+  ngAfterViewInit(): void {
+    this.assignOptional();
+  }
+
+  ngOnChanges(): void {
+    this.assignOptional();
+  }
+
+  // Optional inputs are applied only when set, so an omitted one leaves the
+  // element's own default alone and a cleared one restores it.
+  private assignOptional(): void {
+    if (!this.element) return;
+    assignGiven(this.element, {
+      heading: this.heading,
+      logoutLabel: this.logoutLabel,
+      variant: this.variant,
+      theme: this.theme,
+      suppressHeader: this.suppressHeader,
+    });
   }
 
   onSignout(event: Event): void {
