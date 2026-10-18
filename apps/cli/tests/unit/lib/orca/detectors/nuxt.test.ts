@@ -8,13 +8,13 @@ import { NuxtDetector } from "../../../../../src/lib/orca/detectors/nuxt";
 
 const dirs: string[] = [];
 
-async function project(opts: { appDir?: boolean; nuxt?: boolean } = {}): Promise<string> {
+async function project(opts: { nuxt?: boolean; dirs?: string[] } = {}): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "nuxt-detect-"));
   dirs.push(cwd);
   const dep = opts.nuxt === false ? { vue: "^3" } : { nuxt: "^4" };
   await writeFile(join(cwd, "package.json"), JSON.stringify({ dependencies: dep }));
-  if (opts.appDir) {
-    await mkdir(join(cwd, "app"));
+  for (const dir of opts.dirs ?? []) {
+    await mkdir(join(cwd, dir));
   }
   return cwd;
 }
@@ -26,16 +26,24 @@ afterEach(async () => {
 });
 
 describe("NuxtDetector", () => {
-  it("reports appDir 'app' when an app/ srcDir exists (Nuxt 4)", async () => {
-    const facts = await new NuxtDetector().detect(await project({ appDir: true }));
+  it("reports appDir 'app' for a Nuxt 4 project", async () => {
+    const facts = await new NuxtDetector().detect(await project());
     expect(facts?.id).toBe("nuxt");
     expect(facts?.appDir).toBe("app");
   });
 
-  it("reports appDir '.' for a root-layout project (Nuxt 3)", async () => {
-    const facts = await new NuxtDetector().detect(await project({ appDir: false }));
-    expect(facts?.appDir).toBe(".");
+  it("reports appDir 'app' when an app/ srcDir exists", async () => {
+    const facts = await new NuxtDetector().detect(await project({ dirs: ["app", "pages"] }));
+    expect(facts?.appDir).toBe("app");
   });
+
+  it.each(["pages", "plugins", "layouts", "middleware", "assets"])(
+    "reports appDir '.' for a Nuxt 4 root-layout project with a root %s/",
+    async (dir) => {
+      const facts = await new NuxtDetector().detect(await project({ dirs: [dir] }));
+      expect(facts?.appDir).toBe(".");
+    },
+  );
 
   it("returns null without a nuxt dependency", async () => {
     expect(await new NuxtDetector().detect(await project({ nuxt: false }))).toBeNull();

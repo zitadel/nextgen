@@ -1,5 +1,6 @@
 import { css, html, nothing } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { customElement } from "lit/decorators.js";
+import { property } from "../internal/property.js";
 
 import { resolveApi } from "./resolve-api.js";
 import { SessionController } from "./session-controller.js";

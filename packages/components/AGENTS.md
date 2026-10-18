@@ -75,6 +75,17 @@ accessors when the build target is `es2022` or any toolchain that sets
 error in dev mode and silently fails to detect changes in prod. The fix is
 not "turn off the warning" — it is the `accessor` keyword.
 
+### Orchestrator properties import `property` from `internal/property.ts`
+
+The orchestrator elements (`surface.ts`, `<zitadel-login>`, `<zitadel-session>`,
+`<zitadel-logout>`) declare their public properties with `property` from
+`src/internal/property.ts`, not from `lit/decorators.js`. It is Lit's decorator,
+plus one rule: assigning `undefined` or `null` (or removing the attribute)
+restores the property's declared default. Framework wrappers assign `undefined`
+for a prop the caller did not set, so the default lives in the element and no
+wrapper needs its own "assign only when given" code. A property whose default is
+`undefined` or `null` is left as assigned. `@state` is unaffected.
+
 ### Atoms are form-associated by default
 
 Every input atom (e.g. `<zl-field>`) must:
