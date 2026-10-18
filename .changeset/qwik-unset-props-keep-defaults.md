@@ -2,4 +2,4 @@
 "@zitadel/sdk-qwik": patch
 ---
 
-An unset widget prop now leaves the web component's own default in place in the Qwik components, and a prop that is cleared after being set restores that default, instead of leaving `undefined` on the element. For example, `<ZitadelSession />` without a `heading` shows the default "Signed in as" title rather than an empty one.
+A widget prop that is unset or cleared in the Qwik components now restores the web component's own default instead of keeping its last value. For example, clearing the `heading` of `<ZitadelSession />` brings back the default "Signed in as" title.
