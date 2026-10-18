@@ -838,7 +838,8 @@ func requireUsersNotFound(t *testing.T, resp api.QueryUsersRes) {
 	assert.True(t, denied.Response.IsUserNotFound(), helpers.MustMarshal(t, resp))
 }
 
-// seedRelease builds a release pinning the project's seeded flow definition,
+// seedRelease builds a release pinning the project's seeded flow definition
+// and the user schema it names (a release must resolve its own references),
 // through the project secret: that is the only principal the build accepts.
 func seedRelease(t *testing.T, secret *helpers.ApiClient, projectID string) api.Release {
 	t.Helper()
@@ -847,9 +848,16 @@ func seedRelease(t *testing.T, secret *helpers.ApiClient, projectID string) api.
 	require.IsType(t, &api.FlowDefinitionListResponse{}, flows, helpers.MustMarshal(t, flows))
 	definitions := flows.(*api.FlowDefinitionListResponse).FlowDefinitions
 	require.NotEmpty(t, definitions)
+	schemas, err := secret.ListSchemas(t.Context(), api.ListSchemasParams{ProjectID: api.ProjectID(projectID)})
+	require.NoError(t, err)
+	require.IsType(t, &api.ListSchemasResponse{}, schemas, helpers.MustMarshal(t, schemas))
+	pointers := []api.CreateReleasePointer{{Kind: api.ReleasePointerKindFlowDefinition, RevisionID: definitions[0].ID}}
+	for _, schema := range schemas.(*api.ListSchemasResponse).Schemas {
+		pointers = append(pointers, api.CreateReleasePointer{Kind: api.ReleasePointerKindSchema, RevisionID: schema.ID})
+	}
 
 	resp, err := secret.CreateRelease(t.Context(), &api.CreateReleaseRequest{
-		Pointers: []api.CreateReleasePointer{{Kind: api.ReleasePointerKindFlowDefinition, RevisionID: definitions[0].ID}},
+		Pointers: pointers,
 	}, api.CreateReleaseParams{ProjectID: api.ProjectID(projectID)})
 	require.NoError(t, err)
 	require.IsType(t, &api.CreateReleaseCreated{}, resp, helpers.MustMarshal(t, resp))
