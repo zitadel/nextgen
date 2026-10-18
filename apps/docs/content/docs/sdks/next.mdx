@@ -117,7 +117,7 @@ The widgets are plain custom elements, so each event is a DOM `CustomEvent` that
 | `zitadel-signout` | The user signs out. | `{ display, identifier }` | Logout, Session |
 
 ```tsx
-const ref = useRef<HTMLElement>(null);
+const ref = useRef<HTMLElementTagNameMap['zitadel-login']>(null);
 
 useEffect(() => {
   const login = ref.current;
