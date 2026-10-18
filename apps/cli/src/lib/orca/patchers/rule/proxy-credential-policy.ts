@@ -122,23 +122,38 @@ const EXCHANGE_DECODERS${ty(": Record<string, (body: Buffer) => Buffer>")} = {
 // Whether a request is the session exchange, read generously: a path that only
 // normalises to it (repeated or encoded slashes, dot segments, a trailing slash,
 // path parameters, another letter case) counts too, so a spelling that slips
-// past the bearer's exact match is still redacted rather than relayed.
+// past the bearer's exact match is still redacted rather than relayed. A path
+// that cannot be read at all is treated as the exchange: redacting a response
+// that was not one costs nothing, and letting one through would leak the token.
 function isExchange(method${ty(": string | undefined")}, url${ty(": string | undefined")})${ty(": boolean")} {
   if (String(method).toUpperCase() !== "POST") {
     return false;
   }
-  let path = String(url ?? "/").split(/[?#]/)[0] ?? "";
   try {
-    path = decodeURIComponent(path);
+    let path = String(url ?? "/").split(/[?#]/)[0] ?? "";
+    // Decoded until it settles, as a backend may decode an encoded path twice.
+    // Left as it came where it is not valid encoding; the checks below still run.
+    for (let pass = 0; pass < 4; pass += 1) {
+      let decoded = path;
+      try {
+        decoded = decodeURIComponent(path);
+      } catch {
+        break;
+      }
+      if (decoded === path) {
+        break;
+      }
+      path = decoded;
+    }
+    path = path.replace(/\\/{2,}/g, "/");
+    const pathname = new URL(path.startsWith("/") ? path : \`/\${path}\`, "http://zitadel.local").pathname
+      .toLowerCase()
+      .replace(/;[^/]*/g, "")
+      .replace(/\\/+$/, "");
+    return pathname.endsWith("/sessions/exchange");
   } catch {
-    // Left as it came; the checks below still run on it.
+    return true;
   }
-  path = path.replace(/\\/{2,}/g, "/");
-  const pathname = new URL(path.startsWith("/") ? path : \`/\${path}\`, "http://zitadel.local").pathname
-    .toLowerCase()
-    .replace(/;[^/]*/g, "")
-    .replace(/\\/+$/, "");
-  return pathname.endsWith("/sessions/exchange");
 }
 
 // The requests the outgoing hook saw going to the exchange. The response is
@@ -394,14 +409,16 @@ export function proxyEntryRange(
 
 /**
  * Whether an entry's text hooks the proxy's responses itself (`proxyRes`,
- * `onProxyRes`), or rewrites the cookies it relays (`cookieDomainRewrite`,
- * `cookiePathRewrite`). The redaction takes over writing every response, so a
- * hook would run against headers already sent and the proxy's own cookie
- * rewriting would no longer apply; such an entry is left as it is, and `zitadel doctor` and `setup` say so. The
+ * `onProxyRes`), rewrites the cookies it relays (`cookieDomainRewrite`,
+ * `cookiePathRewrite`), or sets `selfHandleResponse` itself (either way). The
+ * redaction takes over writing every response, so a hook would run against
+ * headers already sent, the proxy's own cookie rewriting would no longer
+ * apply, and a `selfHandleResponse: false` would leave the answer unredacted;
+ * such an entry is left as it is, and `zitadel doctor` and `setup` say so. The
  * CLI's generated entries before the redaction had none.
  */
 export function hasResponseHook(entry: string): boolean {
-  return /proxyRes|cookie(?:Domain|Path)Rewrite/i.test(entry);
+  return /proxyRes|selfHandleResponse|cookie(?:Domain|Path)Rewrite/i.test(entry);
 }
 
 /**
@@ -415,13 +432,13 @@ export function carriesGeneratedRedaction(text: string): boolean {
 
 /**
  * What to tell the developer when a managed `/__nextgen` entry was left
- * without the session-token redaction because of a response hook or cookie
- * rewrite of their own. The edit returns the file as it was, so without this
- * note `zitadel doctor` would read the wiring as applied while the exchange
+ * without the session-token redaction because of a response hook, cookie
+ * rewrite or selfHandleResponse setting of their own. The edit returns the
+ * file as it was, so without this note `zitadel doctor` would read the wiring as applied while the exchange
  * answer still carries `session_token`.
  */
 export function skippedRedactionNote(path: string): string {
-  return `${path}: the ${PROXY_PATH} proxy entry has its own proxyRes hook or cookie rewrite, so the session-token redaction was not added and POST /sessions/exchange answers still carry session_token to the browser. Move the redaction into your own proxy hook (drop session_token from that answer's body) or remove the cookie rewrite and run zitadel doctor --fix.`;
+  return `${path}: the ${PROXY_PATH} proxy entry has its own proxyRes hook, cookie rewrite or selfHandleResponse setting, so the session-token redaction was not added and POST /sessions/exchange answers still carry session_token to the browser. Move the redaction into your own proxy hook (drop session_token from that answer's body) or remove the hook, cookie rewrite or selfHandleResponse setting and run zitadel doctor --fix.`;
 }
 
 function indented(code: string, indent: string): string {

@@ -220,6 +220,7 @@ export default defineConfig({
     );
 
     expect(edit(chosen)).toBe(chosen);
+    expect(viteProxyReview(chosen, "vite.config.ts")).toContain("selfHandleResponse");
   });
 
   it.each(["// }", 'note: "}",', "note: `}`,", "// {"])(
@@ -471,6 +472,8 @@ export default defineConfig({
   });
 });
 
+const MALFORMED_PATHS = ["/%5C%5B", "/%5C%5B/sessions/exchange", "/%E0%A4%A", "/%5B"];
+
 const EXCHANGE_SPELLINGS = [
   "//sessions/exchange",
   "/./sessions/exchange",
@@ -546,6 +549,16 @@ describe("the generated proxy, run by Vite against a remote https server", () =>
       expect(await response.text()).not.toContain(SESSION_TOKEN);
     },
   );
+
+  it.each(MALFORMED_PATHS)("survives a request for the malformed path %s", async (tail) => {
+    const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG));
+
+    const response = await fetch(`${origin}/__nextgen${tail}`, { method: "POST" });
+    const next = await fetch(`${origin}/__nextgen/healthz`);
+
+    expect(await response.text()).not.toContain(SESSION_TOKEN);
+    expect(next.status).toBe(200);
+  });
 
   it("keeps the session token out of the exchange's body", async () => {
     const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG));
