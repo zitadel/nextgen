@@ -2569,6 +2569,51 @@ describe("<zitadel-login> config that arrives after upgrade", () => {
     expect(createFlows()).toHaveLength(0);
   });
 
+  it("resumes the flow a resume handle names when it arrives after the first start", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const element = await mount(host);
+
+    element.resumeFlowId = "flow_resumed";
+
+    await waitFor(() => mock.getCaptured().some((entry) => entry.kind === "getFlowStep"));
+    expect(createFlows()).toHaveLength(1);
+  });
+
+  it("does not start a second flow when the config reverts before the restart runs", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const element = await mount(host);
+
+    // Reverts in the same commit that schedules the restart, before it runs.
+    const updated = element.updated.bind(element);
+    element.updated = (changed) => {
+      updated(changed);
+      if (element.purpose === "register") element.purpose = "login";
+    };
+    element.purpose = "register";
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    expect(createFlows()).toHaveLength(1);
+  });
+
+  it("clears what the visitor typed when late config restarts the flow", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const element = await mount(host);
+    type(element, "email", "alice@acme.com");
+
+    element.purpose = "register";
+    await waitFor(() => createFlows().length === 2);
+    await waitFor(() => !(element as unknown as { loading: boolean }).loading);
+    await element.updateComplete;
+
+    const field = element.shadowRoot?.querySelector<HTMLElement & { formValue: string }>(
+      'zl-field[name="email"]',
+    );
+    expect(field?.formValue).toBe("");
+  });
+
   it("does not restart when a framework re-assigns an equal project handle", async () => {
     const host = document.createElement("div");
     document.body.appendChild(host);
