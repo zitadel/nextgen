@@ -63,6 +63,9 @@ function bindLoginConfig(el: ZitadelLoginElement, props: ZitadelLoginProps): voi
   setProp(el, "purpose", props.purpose ?? "login");
   setProp(el, "flowName", props.flowName);
   setProp(el, "postSignInUrl", props.postSignInUrl);
+  // A concrete string, not the raw prop: `setProp` skips `undefined`, so
+  // going from a handle back to unset would otherwise keep the old handle.
+  setProp(el, "resumeFlowId", props.resumeFlowId ?? "");
   setProp(el, "locales", props.locales);
   // Props the element has defaults for are assigned only when given; a
   // binding would assign `undefined` and overwrite the default.

@@ -19,6 +19,8 @@ import type { Detector, FrameworkFacts } from "./types";
  */
 export class NextDetector implements Detector {
   readonly framework = "next";
+  readonly displayName = "Next.js";
+  readonly versionPackage = "next";
 
   /**
    * Returns `null` when `cwd` is not a Next.js project (no `next` dependency),
@@ -29,7 +31,7 @@ export class NextDetector implements Detector {
    */
   async detect(cwd: string): Promise<FrameworkFacts | null> {
     const pkg = await readPackageJson(cwd).catch(() => undefined);
-    if (!pkg || !hasDependency(pkg, "next")) {
+    if (!pkg || !hasDependency(pkg, this.versionPackage)) {
       return null;
     }
 
@@ -38,7 +40,7 @@ export class NextDetector implements Detector {
     // enforced here so setup and doctor share one loud gate instead of
     // degrading silently; only a spec that provably cannot resolve to 15+
     // is rejected — protocol specs and dist-tags pass.
-    const belowFloor = dependencySpecProvablyBelowMajor(pkg, "next", 15);
+    const belowFloor = dependencySpecProvablyBelowMajor(pkg, this.versionPackage, 15);
     if (belowFloor !== undefined) {
       throw new ZitadelError(
         "E_UNSUPPORTED_PROJECT_SHAPE",
@@ -63,7 +65,7 @@ export class NextDetector implements Detector {
     }
 
     const devPort = await detectDevPort(cwd, pkg);
-    const versionMajor = dependencyVersionMajor(pkg, "next");
+    const versionMajor = dependencyVersionMajor(pkg, this.versionPackage);
     return {
       id: "next",
       appDir,
