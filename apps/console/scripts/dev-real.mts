@@ -246,6 +246,9 @@ if (!claimMode && devUser && !(await grantDevUserAdmin(devUser.id))) {
  * asks of it. Best-effort, like the grant: a failure costs the screen its
  * data, not the instance.
  */
+/** The revision the seeded connection was created as; a release pins it. */
+let idpRevisionId: string | null = null;
+
 async function seedAuthentication(): Promise<boolean> {
   const headers = {
     authorization: `Bearer ${projectSecret}`,
@@ -278,6 +281,7 @@ async function seedAuthentication(): Promise<boolean> {
       },
     });
     if (!idp.ok) return false;
+    idpRevisionId = ((await idp.json()) as { revision_id: string }).revision_id;
 
     const list = await fetch(scoped("/schemas", { kind: "user-schema", revisions: "latest" }), {
       headers,
@@ -324,12 +328,11 @@ if (!claimMode && !(await seedAuthentication())) {
  * Two releases pinning the project's configuration, and their deployments, so
  * the release and deployment screens render against real data: one built from
  * a clean tree with a message, pinning the newest revision of every user
- * schema and login flow seeded above and a branding revision; one from a dirty
- * tree without a message, pinning the flows alone. The identity provider connection is not
- * pinned: the server does not accept an `idp` pointer yet (#851). Releases are
- * otherwise only ever built by the CLI from a repository. Best-effort, like
- * the rest: a failure costs the screens their rows, not the instance, and the
- * warning says why.
+ * schema and login flow seeded above, the identity provider connection and a
+ * branding revision; one from a dirty tree without a message, pinning the
+ * flows and the schemas they sign into. Releases are otherwise only ever built
+ * by the CLI from a repository. Best-effort, like the rest: a failure costs
+ * the screens their rows, not the instance, and the warning says why.
  */
 async function seedReleases(): Promise<string | null> {
   const headers = { authorization: `Bearer ${projectSecret}`, "content-type": "application/json" };
@@ -350,11 +353,22 @@ async function seedReleases(): Promise<string | null> {
   try {
     const latest = { revisions: "latest" };
     const [schemas, flows] = await Promise.all([
-      list<{ id: string }>("/schemas", "schemas", latest),
-      list<{ id: string }>("/flow_definitions", "flow_definitions", latest),
+      list<{ id: string; schema: { objectType?: string } }>("/schemas", "schemas", latest),
+      list<{ id: string; flow_definition: { user_schema?: string } }>(
+        "/flow_definitions",
+        "flow_definitions",
+        latest,
+      ),
     ]);
     const schemaPointers = schemas.map(({ id }) => ({ kind: "schema", revision_id: id }));
     const flowPointers = flows.map(({ id }) => ({ kind: "flow_definition", revision_id: id }));
+    // A release must pin every handle its revisions name: the schema each
+    // flow signs into, and the provider the customer schema allows.
+    const signedInto = new Set(flows.map((flow) => flow.flow_definition.user_schema));
+    const flowSchemaPointers = schemas
+      .filter((schema) => signedInto.has(schema.schema.objectType))
+      .map(({ id }) => ({ kind: "schema", revision_id: id }));
+    const idpPointers = idpRevisionId ? [{ kind: "idp", revision_id: idpRevisionId }] : [];
     const post = async <T,>(path: string, body: unknown): Promise<T> => {
       const response = await fetch(scoped(path), {
         method: "POST",
@@ -374,13 +388,14 @@ async function seedReleases(): Promise<string | null> {
       pointers: [
         ...schemaPointers,
         ...flowPointers,
+        ...idpPointers,
         { kind: "branding", revision_id: branding.id },
       ],
       message: "Add phone_number to human-user",
       git_sha: "4a5b268343c0ffee0123456789abcdef01234567",
     });
     const second = await post<{ id: string }>("/releases", {
-      pointers: flowPointers,
+      pointers: [...flowSchemaPointers, ...flowPointers],
       git_sha: "9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de9",
       git_dirty: true,
     });
@@ -394,11 +409,17 @@ async function seedReleases(): Promise<string | null> {
     await post(origins, { pattern: "https://*-acmeinc.vercel.app", kind: "preview" });
     await post("/deployments", { release_id: first.id, targets: ["primary"] });
     await post("/deployments", { release_id: second.id, targets: ["primary"] });
-    await post("/deployments", {
-      release_id: first.id,
-      targets: ["https://acme-k3x9v2-acmeinc.vercel.app"],
-      ttl: "168h",
-    });
+    try {
+      await post("/deployments", {
+        release_id: first.id,
+        targets: ["https://acme-k3x9v2-acmeinc.vercel.app"],
+        ttl: "168h",
+      });
+    } catch (error) {
+      // The server deploys to primary origins before it deploys to preview
+      // URLs; until it does, the screens show the two primary rows.
+      if (!(error instanceof Error && error.message.includes("answered 501"))) throw error;
+    }
     return null;
   } catch (error) {
     return error instanceof Error ? error.message : String(error);
