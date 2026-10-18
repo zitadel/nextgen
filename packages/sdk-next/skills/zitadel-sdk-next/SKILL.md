@@ -19,7 +19,7 @@ verification into an App Router app.
 Use this when adding or customizing Zitadel auth in an **existing or custom**
 Next.js app, or when you need to understand how the pieces fit together.
 
-For a brand-new app, prefer the CLI: `zitadel setup --framework next` scaffolds
+For a brand-new app, prefer the CLI: `npx @zitadel/cli@alpha setup --framework next` scaffolds
 the whole integration (middleware, login page, env) and wires it for you. Reach
 for this skill when that scaffold already exists and you are editing it, or when
 the app is bespoke and you are integrating by hand.

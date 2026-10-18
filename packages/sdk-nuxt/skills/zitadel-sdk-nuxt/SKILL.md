@@ -18,7 +18,7 @@ into SSR and hydrates it on the client, and gates protected routes.
 
 ## When to use
 
-The `zitadel` CLI (`zitadel setup --framework nuxt`) scaffolds the module,
+The `zitadel` CLI (`npx @zitadel/cli@alpha setup --framework nuxt`) scaffolds the module,
 plugin, login page, and `.env.local` into a fresh or detected Nuxt project —
 prefer it for greenfield work. Reach for **this skill** when you are adding auth
 to an **existing or custom** Nuxt app by hand, adjusting a scaffolded wiring, or
@@ -33,7 +33,7 @@ pnpm add @zitadel/sdk-nuxt
 pnpm add @zitadel/components
 ```
 
-Peer deps: `nuxt >=4`, `h3 >=1`.
+Peer dependencies: `nuxt >=4`, `h3 >=1`.
 
 ## Integrate
 
