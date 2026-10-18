@@ -710,6 +710,30 @@ describe("shared server SDK cases", () => {
 
       expect(request.headers.has("x-nextgen-auth-token")).toBe(false);
     });
+
+    it("refuses the request when the header cannot be removed", async () => {
+      const h = makeHarness("http://localhost:3000/", {
+        headers: { "x-nextgen-auth-token": "forged" },
+      });
+      h.ev.request.headers.delete = () => {
+        throw new TypeError("immutable");
+      };
+
+      await run(createNextgenOnRequest(), h.ev);
+
+      expect(h.sent?.status).toBe(400);
+    });
+
+    it("lets the request through when removal fails but the header is absent", async () => {
+      const h = makeHarness("http://localhost:3000/");
+      h.ev.request.headers.delete = () => {
+        throw new TypeError("immutable");
+      };
+
+      await run(createNextgenOnRequest(), h.ev);
+
+      expect(h.sent).toBeUndefined();
+    });
   });
 
   // An app that reads its secret from a secrets manager at runtime passes it in.

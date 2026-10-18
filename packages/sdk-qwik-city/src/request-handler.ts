@@ -342,10 +342,15 @@ export function createNextgenOnRequest(
 
     // Strip any client-supplied x-nextgen-auth-token so downstream server code
     // cannot read an attacker-controlled value; getAuth() is canonical.
+    // If the adapter's headers are immutable the value cannot be removed, so
+    // refuse the request rather than let it reach downstream handlers.
     try {
       ev.request.headers.delete("x-nextgen-auth-token");
     } catch {
-      // Immutable headers on this adapter - nothing to strip.
+      if (ev.request.headers.has("x-nextgen-auth-token")) {
+        ev.send(new Response("Bad Request", { status: 400 }));
+        return;
+      }
     }
 
     // Resolve the backend URL and project secret per request. Precedence:

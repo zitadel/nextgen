@@ -27,6 +27,7 @@ const PROCESS_ENV: Record<string, string | undefined> =
 export type NextgenRequestDecision =
   | { readonly type: "proxy"; readonly response: Response }
   | { readonly type: "redirect"; readonly response: Response }
+  | { readonly type: "reject"; readonly response: Response }
   | {
       readonly type: "continue";
       readonly auth: AuthResult;
@@ -204,10 +205,14 @@ export async function handleNextgenRequest(
 
   // Strip any client-supplied x-nextgen-auth-token so downstream server code
   // cannot read an attacker-controlled value; getAuth() is canonical.
+  // If the adapter's headers are immutable the value cannot be removed, so
+  // refuse the request rather than let it reach downstream handlers.
   try {
     request.headers.delete("x-nextgen-auth-token");
   } catch {
-    // Immutable headers on this adapter - nothing to strip.
+    if (request.headers.has("x-nextgen-auth-token")) {
+      return { type: "reject", response: new Response("Bad Request", { status: 400 }) };
+    }
   }
 
   if (matchesRoutes(pathname, ignoredRoutes)) {
