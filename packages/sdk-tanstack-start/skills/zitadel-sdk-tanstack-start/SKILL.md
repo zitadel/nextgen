@@ -75,13 +75,20 @@ import { createServerFn } from '@tanstack/react-start';
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { getAuth } from '@zitadel/sdk-tanstack-start/server';
 
-const fetchAuth = createServerFn().handler(({ context }) => getAuth(context));
+// A server function's return value is serialised to the browser, so return
+// only client-safe fields: `getAuth` also carries the raw session token.
+const fetchAuth = createServerFn().handler(({ context }) => {
+  const auth = getAuth(context);
+  return auth.isAuthenticated
+    ? { isAuthenticated: true as const, userId: auth.session.userId }
+    : { isAuthenticated: false as const };
+});
 
 export const Route = createFileRoute('/admin')({
   beforeLoad: async () => {
     const auth = await fetchAuth();
     if (!auth.isAuthenticated) throw redirect({ to: '/login' });
-    return { userId: auth.session.userId };
+    return { userId: auth.userId };
   },
 });
 ```
@@ -127,6 +134,9 @@ than assuming.
   of TanStack Start's automatic CSRF protection.
 - **`beforeLoad` has no `nextgenAuth`.** Read it with `getAuth(context)` inside a
   server function, not from the route context.
+- **Never return `getAuth(context)` itself from a server function.** Its session
+  carries the raw token, and a server function's result reaches browser scripts.
+  Return only `userId` and other client-safe fields.
 - **`protectedRoutes` only guards full document requests.** Client-side `<Link>`
   navigation needs the `beforeLoad` server-function guard; without it only the
   `ZitadelSession` card sends a signed-out visitor away.
