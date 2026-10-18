@@ -29,8 +29,8 @@ This ADR records the floors and the enforcement point.
   semver string: Next.js **15.2.3**, React **18**, Vue **3**, Nuxt **4**,
   Angular **17** (`@angular/core`), Solid **1.6** (`solid-js`), Svelte **5**
   and Qwik **2.0.0-beta.45** (`@qwik.dev/core`, the first release the SDK's peer
-  range accepts, so the floor is a prerelease and is the bound as written). Both 18 and 19 are supported for React;
-  templates that need React-19-only behavior must degrade safely on 18, as the
+  range accepts, so the floor is a prerelease and is the bound as written). Both 18 and 19 are
+  supported for React; templates that need React-19-only behavior must degrade safely on 18, as the
   ref-assigned copy overlay does. The Next floor is a patch release, not the
   major: 15.0.0 to 15.2.2 skip middleware for a request that sends
   `x-middleware-subrequest` (CVE-2025-29927), which bypasses the generated
@@ -67,16 +67,17 @@ This ADR records the floors and the enforcement point.
   each `node_modules` and stops after the workspace root, and the refusal names
   the `package.json` it read. There is no ceiling: a newer major is never refused here.
 - **Peer ranges follow the floor, and a test keeps them aligned.** Each SDK
-  package's peer range for the framework starts at the same major as the
-  detector's floor (`next >=15`, `nuxt >=4`, `react >=18`, `vue >=3`,
-  `@angular/core >=17`, `solid-js >=1.6`, `svelte ^5.0.0`,
-  `@qwik.dev/core ^2.0.0-beta.45`). The registry's mirror test reads each
-  `packages/sdk-<framework>/package.json` and fails if the floor's major differs
-  from the peer minimum's, or the floor does not satisfy the peer range (Next's
-  patch floor may sit above the peer minimum). The gate checks the floor only,
-  not the SDK's upper bound; widening the SDK peer is how a newer major gets
-  supported. Raising a floor means changing the detector's `versionFloor` and the
-  SDK peer together, and amending this ADR.
+  package's peer range for the framework starts at the detector's floor
+  (`next >=15.2.3`, `nuxt >=4`, `react >=18`, `vue >=3`, `@angular/core >=17`,
+  `solid-js >=1.6`, `svelte ^5.0.0`, `@qwik.dev/core ^2.0.0-beta.45`). The
+  registry's mirror test reads each `packages/sdk-<framework>/package.json` and
+  fails unless the floor, read as written (`2.0.0-beta.45`) or as the first
+  release of its line (`18`), equals the peer minimum's version and satisfies
+  the peer range, so a bare `2` cannot accept the earlier Qwik betas the peer
+  refuses. The gate checks the floor only, not the SDK's upper bound; widening
+  the SDK peer is how a newer major gets supported. Raising a floor means
+  changing the detector's `versionFloor` and the SDK peer together, and
+  amending this ADR.
 
 ## Consequences
 
