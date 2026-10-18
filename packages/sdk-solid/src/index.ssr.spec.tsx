@@ -13,51 +13,106 @@ function serverAttributes(tag: string, html: string): Record<string, string> {
 }
 
 describe("server-rendered widget config", () => {
+  const handle = { projectId: "proj-test", proxyPath: "/__nextgen", url: "http://auth.test" };
+
   it("puts the login flow config into the server markup", () => {
-    const html = renderToString(() => (
-      <ZitadelLogin
-        projectId="proj-test"
-        proxyPath="/__nextgen"
-        purpose="register"
-        flowName="signup"
-        resumeFlowId="flow_123"
-      />
-    ));
-    expect(serverAttributes("zitadel-login", html)).toMatchObject({
+    expect(
+      serverAttributes(
+        "zitadel-login",
+        renderToString(() => (
+          <ZitadelLogin project={handle} purpose="register" flowName="signup" />
+        )),
+      ),
+    ).toMatchObject({
       purpose: "register",
       "flow-name": "signup",
       "project-id": "proj-test",
       "proxy-path": "/__nextgen",
-      "resume-flow-id": "flow_123",
+      url: "http://auth.test",
     });
   });
 
+  it("puts the discrete project props into the login markup", () => {
+    expect(
+      serverAttributes(
+        "zitadel-login",
+        renderToString(() => <ZitadelLogin projectId="p1" proxyPath="/px" />),
+      ),
+    ).toMatchObject({ purpose: "login", "project-id": "p1", "proxy-path": "/px" });
+  });
+
   it("puts the session config into the server markup", () => {
-    const html = renderToString(() => (
-      <ZitadelSession
-        projectId="proj-test"
-        proxyPath="/__nextgen"
-        postSignOutUrl="/bye"
-        heading="Hi"
-      />
-    ));
-    expect(serverAttributes("zitadel-session", html)).toMatchObject({
+    expect(
+      serverAttributes(
+        "zitadel-session",
+        renderToString(() => <ZitadelSession project={handle} postSignOutUrl="/bye" />),
+      ),
+    ).toMatchObject({
       "project-id": "proj-test",
       "proxy-path": "/__nextgen",
+      url: "http://auth.test",
       "post-sign-out-url": "/bye",
-      heading: "Hi",
     });
   });
 
   it("puts the logout config into the server markup", () => {
-    const html = renderToString(() => (
-      <ZitadelLogout projectId="proj-test" proxyPath="/__nextgen" postSignOutUrl="/bye" />
-    ));
-    expect(serverAttributes("zitadel-logout", html)).toMatchObject({
+    expect(
+      serverAttributes(
+        "zitadel-logout",
+        renderToString(() => <ZitadelLogout project={handle} postSignOutUrl="/bye" />),
+      ),
+    ).toMatchObject({
       "project-id": "proj-test",
       "proxy-path": "/__nextgen",
+      url: "http://auth.test",
       "post-sign-out-url": "/bye",
     });
+  });
+
+  it.each([
+    ["zitadel-login", (p: object) => <ZitadelLogin {...p} />],
+    ["zitadel-session", (p: object) => <ZitadelSession {...p} />],
+    ["zitadel-logout", (p: object) => <ZitadelLogout {...p} />],
+  ])("lets the project handle win over discrete props in %s", (tag, widget) => {
+    expect(
+      serverAttributes(
+        tag,
+        renderToString(() => widget({ project: handle, projectId: "other", proxyPath: "/other" })),
+      ),
+    ).toMatchObject({ "project-id": "proj-test", "proxy-path": "/__nextgen" });
+  });
+
+  it.each([
+    ["zitadel-login", (p: object) => <ZitadelLogin {...p} />],
+    ["zitadel-session", (p: object) => <ZitadelSession {...p} />],
+    ["zitadel-logout", (p: object) => <ZitadelLogout {...p} />],
+  ])("writes an empty proxy path as / in %s", (tag, widget) => {
+    expect(
+      serverAttributes(
+        tag,
+        renderToString(() => widget({ project: { projectId: "p", proxyPath: "" } })),
+      ),
+    ).toMatchObject({ "proxy-path": "/" });
+  });
+});
+
+describe("server-rendered widget options", () => {
+  it("puts the resume flow id into the login markup", () => {
+    expect(
+      serverAttributes(
+        "zitadel-login",
+        renderToString(() => <ZitadelLogin projectId="proj-test" resumeFlowId="flow_123" />),
+      ),
+    ).toMatchObject({ "resume-flow-id": "flow_123" });
+  });
+
+  it("puts the session heading into the server markup", () => {
+    expect(
+      serverAttributes(
+        "zitadel-session",
+        renderToString(() => <ZitadelSession projectId="proj-test" heading="Hi" />),
+      ),
+    ).toMatchObject({ heading: "Hi" });
   });
 
   it("leaves unset props out of the markup", () => {

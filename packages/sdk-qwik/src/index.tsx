@@ -31,9 +31,10 @@ export * from "./types";
 export { businessLocales } from "@zitadel/components";
 
 /**
- * Assigns a widget config value as a DOM *property*, skipping `undefined` so the
- * element keeps its own accessor default (e.g. the session card's "Signed in
- * as" heading).
+ * Assigns a widget config value as a DOM *property*. An `undefined` value is
+ * assigned too, not skipped: the widget elements restore their own default when
+ * a prop is unset, so a cleared prop (e.g. the session card's `heading`) goes
+ * back to "Signed in as" instead of keeping its last value.
  *
  * Qwik 2 binds custom-element JSX props as *attributes* only — its client
  * renderer has no property-setting path for elements — and the widgets expose
@@ -48,9 +49,7 @@ function setProp<E extends Element, K extends keyof E>(
   key: K,
   value: E[K] | undefined,
 ): void {
-  if (value !== undefined) {
-    el[key] = value;
-  }
+  el[key] = value as E[K];
 }
 
 /** Applies the `<zitadel-login>` surface config to the element as DOM properties. */

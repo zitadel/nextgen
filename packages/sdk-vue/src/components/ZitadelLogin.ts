@@ -16,6 +16,8 @@ import { defineComponent, h, type PropType, ref, toRaw } from "vue";
 // stringified attribute).
 import "@zitadel/components";
 
+import { forceAttr } from "./forceAttr";
+
 /**
  * Vue wrapper for the `<zitadel-login>` Lit web component.
  *
@@ -67,8 +69,9 @@ export default defineComponent({
     const element = ref<ZitadelLoginElement | null>(null);
     expose({ element });
 
-    return () =>
-      h("zitadel-login", {
+    return () => {
+      const attr = forceAttr();
+      return h("zitadel-login", {
         ref: element,
         // Hand the Lit element the raw SDK handle, not Vue's reactive proxy:
         // the widget does identity checks on it (and `render` from test-utils
@@ -91,10 +94,14 @@ export default defineComponent({
         // Same raw-unwrap rationale as `project`: hand the widget the plain
         // dictionaries, not Vue's reactive proxy.
         locales: props.locales === undefined ? undefined : toRaw(props.locales),
-        lang: props.lang,
         "flow-name": props.flowName,
-        variant: props.variant,
-        theme: props.theme,
+        // A string prop with a default is bound as an attribute (the "^" prefix on
+        // the client, see `forceAttr`): Vue assigns an unset property as "", which
+        // the element cannot tell from an intended empty string, while an unset
+        // attribute is simply removed.
+        [`${attr}lang`]: props.lang,
+        [`${attr}variant`]: props.variant,
+        [`${attr}theme`]: props.theme,
         suppressHeader: props.suppressHeader,
         suppressPasswordToggle: props.suppressPasswordToggle,
         onZitadelFlowStep: (event: CustomEvent<ZitadelFlowStepDetail>) => {
@@ -113,5 +120,6 @@ export default defineComponent({
           emit("flowError", event.detail);
         },
       });
+    };
   },
 });

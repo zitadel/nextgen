@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { ZitadelLogin, ZitadelLogout, ZitadelSession } from "@zitadel/components";
 import { DISPATCHED_EVENTS } from "@zitadel/components/events";
 import { describe, expect, it } from "vitest";
@@ -166,5 +168,33 @@ describe("config types ↔ element properties", () => {
         expect(reason.trim(), `reason for ${name}`).not.toBe("");
       }
     });
+  });
+});
+
+/**
+ * The SDK specs that write widget attributes into markup each carry the same
+ * server-render table between two marker comments, so every SDK is held to the
+ * same cases. Only the SDK's own `renderAttributes` differs. This fails when
+ * the copies drift apart.
+ */
+describe("server-render cases ↔ SDK specs", () => {
+  const SPECS = [
+    "../../sdk-react/src/index.spec.tsx",
+    "../../sdk-vue/src/components.spec.ts",
+    "../../sdk-angular/src/lib/components.spec.ts",
+    "../../sdk-svelte/src/index.spec.ts",
+  ];
+
+  const casesIn = (spec: string): string => {
+    const source = readFileSync(fileURLToPath(new URL(spec, import.meta.url)), "utf8");
+    const begin = source.indexOf("// server-render-cases:begin");
+    const end = source.indexOf("// server-render-cases:end");
+    expect(begin, `${spec} has no server-render cases`).toBeGreaterThanOrEqual(0);
+    expect(end, `${spec} has an unterminated server-render cases block`).toBeGreaterThan(begin);
+    return source.slice(begin, end);
+  };
+
+  it.each(SPECS)("%s carries the same cases as the React spec", (spec) => {
+    expect(casesIn(spec)).toBe(casesIn(SPECS[0]!));
   });
 });

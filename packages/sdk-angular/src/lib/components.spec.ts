@@ -26,11 +26,6 @@ import { ZitadelLogoutComponent } from "./zitadel-logout.component";
 import { ZitadelSessionComponent } from "./zitadel-session.component";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
-const handle = {
-  projectId: "proj-handle",
-  proxyPath: "/__handle",
-  url: "https://auth.example.com",
-};
 
 // `'zitadel-flow-step'` → `'flowStep'`: the camelCased `@Output()` name Angular
 // exposes for the event (the `zitadel-` prefix dropped, the rest camelCased).
@@ -57,40 +52,6 @@ afterEach(() => {
 });
 
 describe("ZitadelLogin", () => {
-  it("writes the discrete config as attributes the element reads at upgrade", async () => {
-    const { container } = await render(ZitadelLoginComponent, {
-      inputs: { projectId: "proj-test", proxyPath: "/__nextgen" },
-    });
-    const el = container.querySelector("zitadel-login");
-    expect(el!.getAttribute("project-id")).toBe("proj-test");
-    expect(el!.getAttribute("proxy-path")).toBe("/__nextgen");
-  });
-
-  it("writes the project handle's fields as attributes", async () => {
-    const { container } = await render(ZitadelLoginComponent, { inputs: { project: handle } });
-    const el = container.querySelector("zitadel-login");
-    expect(el!.getAttribute("project-id")).toBe("proj-handle");
-    expect(el!.getAttribute("proxy-path")).toBe("/__handle");
-    expect(el!.getAttribute("url")).toBe("https://auth.example.com");
-  });
-
-  it("lets the project handle win over conflicting discrete inputs", async () => {
-    const { container } = await render(ZitadelLoginComponent, {
-      inputs: { project: handle, projectId: "proj-other", proxyPath: "/__other" },
-    });
-    const el = container.querySelector("zitadel-login");
-    expect(el!.getAttribute("project-id")).toBe("proj-handle");
-    expect(el!.getAttribute("proxy-path")).toBe("/__handle");
-  });
-
-  it("writes no config attributes when none is given", async () => {
-    const { container } = await render(ZitadelLoginComponent, { inputs: {} });
-    const el = container.querySelector("zitadel-login");
-    expect(el!.hasAttribute("project-id")).toBe(false);
-    expect(el!.hasAttribute("proxy-path")).toBe(false);
-    expect(el!.hasAttribute("url")).toBe(false);
-  });
-
   it("binds the project handle as a property", async () => {
     const { container } = await render(ZitadelLoginComponent, {
       inputs: { project },
@@ -164,40 +125,6 @@ describe("ZitadelLogin", () => {
 });
 
 describe("ZitadelLogout", () => {
-  it("writes the discrete config as attributes the element reads at upgrade", async () => {
-    const { container } = await render(ZitadelLogoutComponent, {
-      inputs: { projectId: "proj-test", proxyPath: "/__nextgen" },
-    });
-    const el = container.querySelector("zitadel-logout");
-    expect(el!.getAttribute("project-id")).toBe("proj-test");
-    expect(el!.getAttribute("proxy-path")).toBe("/__nextgen");
-  });
-
-  it("writes the project handle's fields as attributes", async () => {
-    const { container } = await render(ZitadelLogoutComponent, { inputs: { project: handle } });
-    const el = container.querySelector("zitadel-logout");
-    expect(el!.getAttribute("project-id")).toBe("proj-handle");
-    expect(el!.getAttribute("proxy-path")).toBe("/__handle");
-    expect(el!.getAttribute("url")).toBe("https://auth.example.com");
-  });
-
-  it("lets the project handle win over conflicting discrete inputs", async () => {
-    const { container } = await render(ZitadelLogoutComponent, {
-      inputs: { project: handle, projectId: "proj-other", proxyPath: "/__other" },
-    });
-    const el = container.querySelector("zitadel-logout");
-    expect(el!.getAttribute("project-id")).toBe("proj-handle");
-    expect(el!.getAttribute("proxy-path")).toBe("/__handle");
-  });
-
-  it("writes no config attributes when none is given", async () => {
-    const { container } = await render(ZitadelLogoutComponent, { inputs: {} });
-    const el = container.querySelector("zitadel-logout");
-    expect(el!.hasAttribute("project-id")).toBe(false);
-    expect(el!.hasAttribute("proxy-path")).toBe(false);
-    expect(el!.hasAttribute("url")).toBe(false);
-  });
-
   it("binds the project handle as a property", async () => {
     const { container } = await render(ZitadelLogoutComponent, {
       inputs: { project },
@@ -245,40 +172,6 @@ describe("ZitadelLogout", () => {
 });
 
 describe("ZitadelSession", () => {
-  it("writes the discrete config as attributes the element reads at upgrade", async () => {
-    const { container } = await render(ZitadelSessionComponent, {
-      inputs: { projectId: "proj-test", proxyPath: "/__nextgen" },
-    });
-    const el = container.querySelector("zitadel-session");
-    expect(el!.getAttribute("project-id")).toBe("proj-test");
-    expect(el!.getAttribute("proxy-path")).toBe("/__nextgen");
-  });
-
-  it("writes the project handle's fields as attributes", async () => {
-    const { container } = await render(ZitadelSessionComponent, { inputs: { project: handle } });
-    const el = container.querySelector("zitadel-session");
-    expect(el!.getAttribute("project-id")).toBe("proj-handle");
-    expect(el!.getAttribute("proxy-path")).toBe("/__handle");
-    expect(el!.getAttribute("url")).toBe("https://auth.example.com");
-  });
-
-  it("lets the project handle win over conflicting discrete inputs", async () => {
-    const { container } = await render(ZitadelSessionComponent, {
-      inputs: { project: handle, projectId: "proj-other", proxyPath: "/__other" },
-    });
-    const el = container.querySelector("zitadel-session");
-    expect(el!.getAttribute("project-id")).toBe("proj-handle");
-    expect(el!.getAttribute("proxy-path")).toBe("/__handle");
-  });
-
-  it("writes no config attributes when none is given", async () => {
-    const { container } = await render(ZitadelSessionComponent, { inputs: {} });
-    const el = container.querySelector("zitadel-session");
-    expect(el!.hasAttribute("project-id")).toBe(false);
-    expect(el!.hasAttribute("proxy-path")).toBe(false);
-    expect(el!.hasAttribute("url")).toBe(false);
-  });
-
   it("binds the project handle as a property", async () => {
     const { container } = await render(ZitadelSessionComponent, {
       inputs: { project },
@@ -470,6 +363,90 @@ describe("businessLocales", () => {
   });
 });
 
+// Assigning `undefined` to a custom-element property overwrites its default,
+// so an unset prop must leave the element's own default in place.
+describe("unset props keep the element's defaults", () => {
+  it.each([
+    ["heading", "Signed in as"],
+    ["logoutLabel", "Sign out"],
+    ["variant", "widget"],
+    ["theme", ""],
+    ["suppressHeader", false],
+  ] as const)("ZitadelSession keeps the default %s", async (prop, expected) => {
+    const { container } = await render(ZitadelSessionComponent, { inputs: { project } });
+
+    expect(container.querySelector<ZitadelSessionElement>("zitadel-session")![prop]).toBe(expected);
+  });
+
+  it.each([
+    ["variant", "widget"],
+    ["theme", ""],
+    ["suppressHeader", false],
+    ["lang", ""],
+    ["suppressPasswordToggle", false],
+  ] as const)("ZitadelLogin keeps the default %s", async (prop, expected) => {
+    const { container } = await render(ZitadelLoginComponent, { inputs: { project } });
+
+    expect(container.querySelector<ZitadelLoginElement>("zitadel-login")![prop]).toBe(expected);
+  });
+
+  it("ZitadelLogout keeps the default theme", async () => {
+    const { container } = await render(ZitadelLogoutComponent, { inputs: { project } });
+
+    expect(container.querySelector<ZitadelLogoutElement>("zitadel-logout")!.theme).toBe("");
+  });
+});
+
+describe("props that become unset restore the element's defaults", () => {
+  it.each([
+    ["heading", "Custom", "Signed in as"],
+    ["logoutLabel", "Leave", "Sign out"],
+    ["variant", "page", "widget"],
+    ["theme", "light", ""],
+    ["suppressHeader", true, false],
+  ] as const)("ZitadelSession restores the default %s", async (prop, given, expected) => {
+    const { container, rerender } = await render(ZitadelSessionComponent, {
+      inputs: { project, [prop]: given },
+    });
+    const el = container.querySelector<ZitadelSessionElement>("zitadel-session")!;
+    expect(el[prop]).toBe(given);
+
+    await rerender({ inputs: { [prop]: undefined } });
+
+    expect(el[prop]).toBe(expected);
+  });
+
+  it.each([
+    ["variant", "page", "widget"],
+    ["theme", "light", ""],
+    ["suppressHeader", true, false],
+    ["lang", "de", ""],
+    ["suppressPasswordToggle", true, false],
+  ] as const)("ZitadelLogin restores the default %s", async (prop, given, expected) => {
+    const { container, rerender } = await render(ZitadelLoginComponent, {
+      inputs: { project, [prop]: given },
+    });
+    const el = container.querySelector<ZitadelLoginElement>("zitadel-login")!;
+    expect(el[prop]).toBe(given);
+
+    await rerender({ inputs: { [prop]: undefined } });
+
+    expect(el[prop]).toBe(expected);
+  });
+
+  it("ZitadelLogout restores the default theme", async () => {
+    const { container, rerender } = await render(ZitadelLogoutComponent, {
+      inputs: { project, theme: "light" },
+    });
+    const el = container.querySelector<ZitadelLogoutElement>("zitadel-logout")!;
+    expect(el.theme).toBe("light");
+
+    await rerender({ inputs: { theme: undefined } });
+
+    expect(el.theme).toBe("");
+  });
+});
+
 // Every config key set to a distinct value. `Required<…>` makes `tsc` fail here
 // when a key is added to a config type, so a new key cannot skip this check. The discrete
 // `projectId` / `proxyPath` repeat the `project` handle's fields: the handle wins as an attribute.
@@ -532,3 +509,274 @@ describe("wrapper config parity", () => {
     expect(elementValues(el!, logoutConfig)).toEqual(logoutConfig);
   });
 });
+
+const SDK = "angular";
+
+/** The attributes on the widget's element once the component has rendered. */
+async function renderAttributes(
+  widget: "login" | "session" | "logout",
+  props: Readonly<Record<string, unknown>>,
+): Promise<Record<string, string>> {
+  const component = {
+    login: ZitadelLoginComponent,
+    session: ZitadelSessionComponent,
+    logout: ZitadelLogoutComponent,
+  }[widget] as typeof ZitadelLoginComponent;
+  const { container } = await render(component, { inputs: { ...props } });
+  const el = container.querySelector(`zitadel-${widget}`);
+  expect(el, `<zitadel-${widget}> missing from the markup`).not.toBeNull();
+  return Object.fromEntries(el!.getAttributeNames().map((n) => [n, el!.getAttribute(n) ?? ""]));
+}
+
+// server-render-cases:begin
+// These cases are copied verbatim into every SDK spec that writes widget
+// attributes into markup (see the drift check in sdk-core's contract.spec.ts).
+// Each spec supplies its own `renderAttributes`; only that function differs.
+type ServerRenderCase = {
+  readonly title: string;
+  readonly widget: "login" | "session" | "logout";
+  readonly props: Readonly<Record<string, unknown>>;
+  readonly present: Readonly<Record<string, string>>;
+  readonly absent: readonly string[];
+  /** SDKs whose markup does not do this yet: not covered, so the row is not run there. */
+  readonly gaps?: readonly string[];
+};
+
+const SERVER_RENDER_HANDLE = {
+  projectId: "proj-handle",
+  proxyPath: "/__handle",
+  url: "https://auth.example.com",
+};
+
+const SERVER_RENDER_CASES: readonly ServerRenderCase[] = [
+  {
+    title: "puts the discrete project props into the login markup",
+    widget: "login",
+    props: { projectId: "p1", proxyPath: "/px" },
+    present: { "project-id": "p1", "proxy-path": "/px" },
+    absent: ["url"],
+  },
+  {
+    title: "puts the project handle into the login markup",
+    widget: "login",
+    props: { project: SERVER_RENDER_HANDLE },
+    present: {
+      "project-id": "proj-handle",
+      "proxy-path": "/__handle",
+      url: "https://auth.example.com",
+    },
+    absent: [],
+    gaps: ["svelte"],
+  },
+  {
+    title: "lets the project handle win over conflicting discrete props in the login markup",
+    widget: "login",
+    props: { project: SERVER_RENDER_HANDLE, projectId: "proj-other", proxyPath: "/__other" },
+    present: { "project-id": "proj-handle", "proxy-path": "/__handle" },
+    absent: [],
+    gaps: ["svelte"],
+  },
+  {
+    title: "writes nothing for no config in the login markup",
+    widget: "login",
+    props: {},
+    present: {},
+    absent: ["project-id", "proxy-path", "url", "flow-name", "resume-flow-id", "post-sign-in-url"],
+  },
+  {
+    title: "puts the purpose into the login markup",
+    widget: "login",
+    props: { projectId: "p1", purpose: "register" },
+    present: { purpose: "register" },
+    absent: [],
+    gaps: ["svelte"],
+  },
+  {
+    title: "puts the default purpose into the login markup",
+    widget: "login",
+    props: { projectId: "p1" },
+    present: { purpose: "login" },
+    absent: [],
+    gaps: ["svelte"],
+  },
+  {
+    title: "puts the flow name into the login markup",
+    widget: "login",
+    props: { projectId: "p1", flowName: "signup" },
+    present: { "flow-name": "signup" },
+    absent: [],
+  },
+  {
+    title: "puts the resume flow id into the login markup",
+    widget: "login",
+    props: { projectId: "p1", resumeFlowId: "flow_123" },
+    present: { "resume-flow-id": "flow_123" },
+    absent: [],
+  },
+  {
+    title: "leaves an unset resume flow id out of the login markup",
+    widget: "login",
+    props: { projectId: "p1" },
+    present: {},
+    absent: ["resume-flow-id"],
+  },
+  {
+    title: "leaves an empty resume flow id out of the login markup",
+    widget: "login",
+    props: { projectId: "p1", resumeFlowId: "" },
+    present: {},
+    absent: ["resume-flow-id"],
+    gaps: ["vue", "angular", "svelte"],
+  },
+  {
+    title: "puts the post-sign-in URL into the login markup",
+    widget: "login",
+    props: { projectId: "p1", postSignInUrl: "/home" },
+    present: { "post-sign-in-url": "/home" },
+    absent: [],
+  },
+  {
+    title: "leaves an unset post-sign-in URL out of the login markup",
+    widget: "login",
+    props: { projectId: "p1" },
+    present: {},
+    absent: ["post-sign-in-url"],
+  },
+  {
+    title: "puts the display options into the login markup",
+    widget: "login",
+    props: { projectId: "p1", variant: "page", theme: "dark" },
+    present: { variant: "page", theme: "dark" },
+    absent: [],
+    gaps: ["react", "svelte"],
+  },
+  {
+    title: "leaves unset display options out of the login markup",
+    widget: "login",
+    props: { projectId: "p1" },
+    present: {},
+    absent: ["variant", "theme", "suppress-header", "suppress-password-toggle"],
+  },
+  {
+    title: "leaves a false boolean option out of the login markup",
+    widget: "login",
+    props: { projectId: "p1", suppressHeader: false, suppressPasswordToggle: false },
+    present: {},
+    absent: ["suppress-header", "suppress-password-toggle"],
+  },
+  {
+    title: "puts the discrete project props into the session markup",
+    widget: "session",
+    props: { projectId: "p1", proxyPath: "/px" },
+    present: { "project-id": "p1", "proxy-path": "/px" },
+    absent: ["url"],
+  },
+  {
+    title: "puts the project handle into the session markup",
+    widget: "session",
+    props: { project: SERVER_RENDER_HANDLE },
+    present: {
+      "project-id": "proj-handle",
+      "proxy-path": "/__handle",
+      url: "https://auth.example.com",
+    },
+    absent: [],
+    gaps: ["svelte"],
+  },
+  {
+    title: "lets the project handle win over conflicting discrete props in the session markup",
+    widget: "session",
+    props: { project: SERVER_RENDER_HANDLE, projectId: "proj-other", proxyPath: "/__other" },
+    present: { "project-id": "proj-handle", "proxy-path": "/__handle" },
+    absent: [],
+    gaps: ["svelte"],
+  },
+  {
+    title: "writes nothing for no config in the session markup",
+    widget: "session",
+    props: {},
+    present: {},
+    absent: ["project-id", "proxy-path", "url", "post-sign-out-url"],
+  },
+  {
+    title: "puts the post-sign-out URL into the session markup",
+    widget: "session",
+    props: { projectId: "p1", postSignOutUrl: "/bye" },
+    present: { "post-sign-out-url": "/bye" },
+    absent: [],
+  },
+  {
+    title: "leaves a keyed project handle out of the session markup",
+    widget: "session",
+    props: {
+      project: { ...SERVER_RENDER_HANDLE, publishableKey: "pk_test_123" },
+      projectId: "proj-other",
+    },
+    present: {},
+    absent: ["project-id", "proxy-path", "url"],
+    gaps: ["vue", "angular", "svelte"],
+  },
+  {
+    title: "leaves a keyed project handle out of the logout markup",
+    widget: "logout",
+    props: {
+      project: { ...SERVER_RENDER_HANDLE, publishableKey: "pk_test_123" },
+      projectId: "proj-other",
+    },
+    present: {},
+    absent: ["project-id", "proxy-path", "url"],
+    gaps: ["vue", "angular", "svelte"],
+  },
+  {
+    title: "puts the discrete project props into the logout markup",
+    widget: "logout",
+    props: { projectId: "p1", proxyPath: "/px" },
+    present: { "project-id": "p1", "proxy-path": "/px" },
+    absent: ["url"],
+  },
+  {
+    title: "puts the project handle into the logout markup",
+    widget: "logout",
+    props: { project: SERVER_RENDER_HANDLE },
+    present: {
+      "project-id": "proj-handle",
+      "proxy-path": "/__handle",
+      url: "https://auth.example.com",
+    },
+    absent: [],
+    gaps: ["svelte"],
+  },
+  {
+    title: "lets the project handle win over conflicting discrete props in the logout markup",
+    widget: "logout",
+    props: { project: SERVER_RENDER_HANDLE, projectId: "proj-other", proxyPath: "/__other" },
+    present: { "project-id": "proj-handle", "proxy-path": "/__handle" },
+    absent: [],
+    gaps: ["svelte"],
+  },
+  {
+    title: "writes nothing for no config in the logout markup",
+    widget: "logout",
+    props: {},
+    present: {},
+    absent: ["project-id", "proxy-path", "url", "post-sign-out-url"],
+  },
+  {
+    title: "puts the post-sign-out URL into the logout markup",
+    widget: "logout",
+    props: { projectId: "p1", postSignOutUrl: "/bye" },
+    present: { "post-sign-out-url": "/bye" },
+    absent: [],
+  },
+];
+
+describe("server-rendered widget config", () => {
+  const covered = SERVER_RENDER_CASES.filter((c) => !c.gaps?.includes(SDK));
+
+  it.each(covered)("$title", async ({ widget, props, present, absent }) => {
+    const attributes = await renderAttributes(widget, props);
+    expect(attributes).toMatchObject(present);
+    for (const name of absent) expect(attributes).not.toHaveProperty(name);
+  });
+});
+// server-render-cases:end

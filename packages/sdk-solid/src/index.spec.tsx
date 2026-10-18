@@ -8,6 +8,7 @@ import type {
 } from "@zitadel/components";
 
 import { render } from "@solidjs/testing-library";
+import { createSignal } from "solid-js";
 import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
@@ -199,10 +200,113 @@ describe("businessLocales", () => {
   });
 });
 
+// Assigning `undefined` to a custom-element property overwrites its default,
+// so an unset prop must leave the element's own default in place.
+describe("unset props keep the element's defaults", () => {
+  it.each([
+    ["heading", "Signed in as"],
+    ["logoutLabel", "Sign out"],
+    ["variant", "widget"],
+    ["theme", ""],
+    ["suppressHeader", false],
+  ] as const)("ZitadelSession keeps the default %s", (prop, expected) => {
+    const { container } = render(() => <ZitadelSession project={project} />);
+
+    expect(container.querySelector<ZitadelSessionElement>("zitadel-session")![prop]).toBe(expected);
+  });
+
+  it.each([
+    ["variant", "widget"],
+    ["theme", ""],
+    ["suppressHeader", false],
+    ["lang", ""],
+    ["suppressPasswordToggle", false],
+  ] as const)("ZitadelLogin keeps the default %s", (prop, expected) => {
+    const { container } = render(() => <ZitadelLogin project={project} />);
+
+    expect(container.querySelector<ZitadelLoginElement>("zitadel-login")![prop]).toBe(expected);
+  });
+
+  it("ZitadelLogout keeps the default theme", () => {
+    const { container } = render(() => <ZitadelLogout project={project} />);
+
+    expect(container.querySelector<ZitadelLogoutElement>("zitadel-logout")!.theme).toBe("");
+  });
+});
+
+describe("props that become unset restore the element's defaults", () => {
+  it.each([
+    ["heading", "Custom", "Signed in as"],
+    ["logoutLabel", "Leave", "Sign out"],
+    ["variant", "page", "widget"],
+    ["theme", "light", ""],
+    ["suppressHeader", true, false],
+  ] as const)("ZitadelSession restores the default %s", (prop, given, expected) => {
+    const [value, setValue] = createSignal<unknown>(given);
+    const { container } = render(() => (
+      <ZitadelSession
+        project={project}
+        {...({
+          get [prop]() {
+            return value();
+          },
+        } as object)}
+      />
+    ));
+    const el = container.querySelector<ZitadelSessionElement>("zitadel-session")!;
+    expect(el[prop]).toBe(given);
+
+    setValue(undefined);
+
+    expect(el[prop]).toBe(expected);
+  });
+
+  it.each([
+    ["variant", "page", "widget"],
+    ["theme", "light", ""],
+    ["suppressHeader", true, false],
+    ["lang", "de", ""],
+    ["suppressPasswordToggle", true, false],
+  ] as const)("ZitadelLogin restores the default %s", (prop, given, expected) => {
+    const [value, setValue] = createSignal<unknown>(given);
+    const { container } = render(() => (
+      <ZitadelLogin
+        project={project}
+        {...({
+          get [prop]() {
+            return value();
+          },
+        } as object)}
+      />
+    ));
+    const el = container.querySelector<ZitadelLoginElement>("zitadel-login")!;
+    expect(el[prop]).toBe(given);
+
+    setValue(undefined);
+
+    expect(el[prop]).toBe(expected);
+  });
+
+  it("ZitadelLogout restores the default theme", () => {
+    const [theme, setTheme] = createSignal<"light" | undefined>("light");
+    const { container } = render(() => <ZitadelLogout project={project} theme={theme()} />);
+    const el = container.querySelector<ZitadelLogoutElement>("zitadel-logout")!;
+    expect(el.theme).toBe("light");
+
+    setTheme(undefined);
+
+    expect(el.theme).toBe("");
+  });
+});
+
 // Every config key set to a distinct value. `Required<…>` makes `tsc` fail here
 // when a key is added to a config type, so a new key cannot skip this check.
+// The handle carries the same coordinates as the discrete props: the handle wins
+// for the project attributes, so a different handle would mask the discrete props.
+const parityProject = { projectId: "proj-parity", proxyPath: "/__parity" };
+
 const loginConfig: Required<ZitadelLoginConfig> = {
-  project,
+  project: parityProject,
   projectId: "proj-parity",
   proxyPath: "/__parity",
   variant: "page",
@@ -218,7 +322,7 @@ const loginConfig: Required<ZitadelLoginConfig> = {
 };
 
 const sessionConfig: Required<ZitadelSessionConfig> = {
-  project,
+  project: parityProject,
   projectId: "proj-parity",
   proxyPath: "/__parity",
   postSignOutUrl: "/parity-after-sign-out",
@@ -230,7 +334,7 @@ const sessionConfig: Required<ZitadelSessionConfig> = {
 };
 
 const logoutConfig: Required<ZitadelLogoutConfig> = {
-  project,
+  project: parityProject,
   projectId: "proj-parity",
   proxyPath: "/__parity",
   postSignOutUrl: "/parity-after-sign-out",
