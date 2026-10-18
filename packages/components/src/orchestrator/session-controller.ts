@@ -38,18 +38,6 @@ function isNoSession(error: unknown): boolean {
   );
 }
 
-/**
- * Whether a `GET /sessions/me` 200 carries the session JSON, which always has
- * a non-empty `session_id`. Anything else (an SPA host's `index.html` served
- * for an unrewritten proxy path, a proxy's `{}`, an empty id) did not come
- * from the backend. The server SDKs reject the same bodies.
- */
-function isSessionBody(body: unknown): body is SessionIdentity {
-  if (typeof body !== "object" || body === null) return false;
-  const id = (body as { session_id?: unknown }).session_id;
-  return typeof id === "string" && id !== "";
-}
-
 export interface SessionControllerOptions {
   /** Runs after the identity fetch resolves or fails. */
   readonly onIdentitySettled?: () => void;
@@ -175,8 +163,11 @@ export class SessionController implements ReactiveController {
   private async loadIdentity(api: Api): Promise<void> {
     let missing: boolean;
     try {
-      const session: unknown = await getSession(api);
-      if (!isSessionBody(session)) {
+      const session = (await getSession(api)) as Partial<SessionIdentity> | null;
+      // A 200 without the session JSON's non-empty `session_id` (an SPA host's
+      // `index.html` served for an unrewritten proxy path, a proxy's `{}`, an empty
+      // id) did not come from the backend. The server SDKs reject the same bodies.
+      if (typeof session?.session_id !== "string" || session.session_id === "") {
         throw new Error("Could not load the session: the response is not a session.");
       }
       this.display = session.user?.display ?? "";

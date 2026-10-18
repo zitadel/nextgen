@@ -37,10 +37,6 @@ function pageKey(url: URL): string {
   return `${url.origin}${path}?${params.toString()}`;
 }
 
-function samePage(a: URL, b: URL): boolean {
-  return pageKey(a) === pageKey(b);
-}
-
 // Storage can be missing or throw (privacy modes, sandboxed frames); the
 // guard is then off and the card navigates as before.
 function readLeaves(): Leave[] {
@@ -59,14 +55,6 @@ function readLeaves(): Leave[] {
     );
   } catch {
     return [];
-  }
-}
-
-function writeLeaves(value: readonly Leave[]): void {
-  try {
-    window.sessionStorage.setItem(LEAVE_STORAGE_KEY, JSON.stringify(value));
-  } catch {
-    // See readLeaves.
   }
 }
 
@@ -219,15 +207,20 @@ export class ZitadelSession extends ZitadelSurface {
     } catch {
       return;
     }
-    if (samePage(here, target)) return;
     const from = pageKey(here);
     const to = pageKey(target);
+    if (from === to) return;
     const now = Date.now();
     // Every recent hop is kept, not just the last: cards on two pages that send
     // visitors to each other would otherwise overwrite one another's record.
     const recent = readLeaves().filter((entry) => now - entry.at < LEAVE_LOOP_WINDOW_MS);
     if (recent.some((entry) => entry.from === from && entry.to === to)) return;
-    writeLeaves([...recent, { from, to, at: now }].slice(-LEAVE_HISTORY_LIMIT));
+    try {
+      const leaves = [...recent, { from, to, at: now }].slice(-LEAVE_HISTORY_LIMIT);
+      window.sessionStorage.setItem(LEAVE_STORAGE_KEY, JSON.stringify(leaves));
+    } catch {
+      // See readLeaves.
+    }
     this.leave();
   }
 
