@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -12,14 +12,33 @@ describe("package exports", () => {
   });
 });
 
+// The package ships only what its build emits, so an `exports` target the build
+// misses breaks every consumer that imports it. `test` runs after `build`.
 describe("package manifest", () => {
+  const packageRoot = resolve(import.meta.dirname, "../..");
+  const manifest = JSON.parse(readFileSync(resolve(packageRoot, "package.json"), "utf8")) as {
+    main?: string;
+    module?: string;
+    types?: string;
+    exports: unknown;
+    peerDependencies: Record<string, string>;
+  };
+
+  function targets(value: unknown): string[] {
+    if (typeof value === "string") return value.startsWith("./") ? [value] : [];
+    if (value && typeof value === "object") return Object.values(value).flatMap(targets);
+    return [];
+  }
+
+  it("ships every exports target in dist", () => {
+    const declared = targets([manifest.exports, manifest.main, manifest.module, manifest.types]);
+    expect(declared.length).toBeGreaterThan(0);
+    expect(declared.filter((file) => !existsSync(resolve(packageRoot, file)))).toEqual([]);
+  });
+
   // Next 15.0.0 to 15.2.2 skip middleware for a request that sends
   // `x-middleware-subrequest` (CVE-2025-29927), which bypasses protectedRoutes.
-  it("requires a Next.js release that runs middleware for every request", () => {
-    const manifest = JSON.parse(readFileSync(resolve(__dirname, "../../package.json"), "utf8")) as {
-      peerDependencies: Record<string, string>;
-    };
-
+  it("declares its supported peer ranges", () => {
     expect(manifest.peerDependencies.next).toBe(">=15.2.3");
   });
 });
