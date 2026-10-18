@@ -216,6 +216,15 @@ describe("server-rendered widget config", () => {
     ).not.toHaveProperty("resume-flow-id");
   });
 
+  it("puts the post-sign-in URL into the login markup, and omits an unset one", () => {
+    expect(
+      serverAttributes("zitadel-login", <ZitadelLogin projectId="p1" postSignInUrl="/home" />),
+    ).toMatchObject({ "post-sign-in-url": "/home" });
+    expect(serverAttributes("zitadel-login", <ZitadelLogin projectId="p1" />)).not.toHaveProperty(
+      "post-sign-in-url",
+    );
+  });
+
   it("puts the discrete project props into the login markup", () => {
     expect(
       serverAttributes("zitadel-login", <ZitadelLogin projectId="p1" proxyPath="/px" />),
@@ -310,6 +319,57 @@ describe("hydrating a server-rendered login", () => {
     expect(first.method).toBe("GET");
     expect(first.url).toContain("flow_123");
     host.remove();
+  });
+});
+
+describe("a login resumed to completion before it hydrates", () => {
+  afterEach(() => {
+    _resetConfigForTesting();
+    vi.restoreAllMocks();
+  });
+
+  it("exchanges the handoff and navigates to the server-rendered post-sign-in URL", async () => {
+    const globalProject = configureZitadel({
+      projectId: "proj-global",
+      proxyPath: "https://flow.test.invalid",
+    });
+    const exchanged: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const request = new Request(input, init);
+      if (request.method === "GET") {
+        return Response.json({
+          flow_id: "flow_123",
+          step: { name: "done", complete: "show" },
+          handoff_token: "handoff-token",
+        });
+      }
+      exchanged.push(await request.text());
+      return Response.json({});
+    });
+    const assign = vi.fn();
+    const { location } = window;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...location, assign },
+    });
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    try {
+      const login = (
+        <ZitadelLogin project={globalProject} resumeFlowId="flow_123" postSignInUrl="/home" />
+      );
+      // The element upgrades from the server markup and finishes the flow
+      // before React has hydrated anything.
+      host.innerHTML = renderToString(login);
+      await waitFor(() => expect(assign).toHaveBeenCalledWith("/home"));
+      expect(exchanged).toHaveLength(1);
+      expect(exchanged[0]).toContain("handoff-token");
+
+      hydrateRoot(host, login);
+    } finally {
+      Object.defineProperty(window, "location", { configurable: true, value: location });
+      host.remove();
+    }
   });
 });
 

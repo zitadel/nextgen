@@ -103,7 +103,13 @@ function projectAttributes(props: {
 const ZitadelLoginElementReact = createComponent({
   react: React,
   tagName: "zitadel-login",
-  elementClass: asAttributes(ZitadelLoginElement, "purpose", "resumeFlowId", "url"),
+  elementClass: asAttributes(
+    ZitadelLoginElement,
+    "purpose",
+    "resumeFlowId",
+    "postSignInUrl",
+    "url",
+  ),
   events: {
     onZitadelFlowStep: "zitadel-flow-step" as EventName<CustomEvent<ZitadelFlowStepDetail>>,
     onZitadelFlowInput: "zitadel-flow-input" as EventName<CustomEvent<ZitadelFlowInputDetail>>,
@@ -165,6 +171,7 @@ export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginRe
     {
       purpose,
       resumeFlowId,
+      postSignInUrl,
       onFlowStep,
       onFlowInput,
       onFlowComplete,
@@ -189,6 +196,7 @@ export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginRe
         flow-name={props.flowName}
         {...projectAttributes(props)}
         resume-flow-id={resumeFlowId || undefined}
+        post-sign-in-url={postSignInUrl || undefined}
         onZitadelFlowStep={onFlowStep && ((event) => onFlowStep(event.detail))}
         onZitadelFlowInput={onFlowInput && ((event) => onFlowInput(event.detail))}
         onZitadelFlowComplete={onFlowComplete && ((event) => onFlowComplete(event.detail))}
