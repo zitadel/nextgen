@@ -14,6 +14,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { PasswordToggleHarness } from "./__tests__/password-toggle-harness";
+import { UnsetPropHarness } from "./__tests__/unset-prop-harness";
 import { businessLocales, ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
@@ -244,5 +245,90 @@ describe("ZitadelLogin suppressPasswordToggle", () => {
     await expect.poll(() => window.__unsetSuppressPasswordToggle).toBeTypeOf("function");
     window.__unsetSuppressPasswordToggle!();
     await expect.poll(() => el().suppressPasswordToggle).toBe(false);
+  });
+});
+
+// Assigning `undefined` to a custom-element property overwrites its default,
+// so an unset prop must leave the element's own default in place.
+describe("unset props keep the element's defaults", () => {
+  it.each([
+    ["heading", "Signed in as"],
+    ["logoutLabel", "Sign out"],
+    ["variant", "widget"],
+    ["theme", ""],
+    ["suppressHeader", false],
+  ] as const)("ZitadelSession keeps the default %s", async (prop, expected) => {
+    const host = await renderWidget(<ZitadelSession project={project} />);
+    await macrotask();
+
+    expect(host.querySelector<ZitadelSessionElement>("zitadel-session")![prop]).toBe(expected);
+  });
+
+  it.each([
+    ["variant", "widget"],
+    ["theme", ""],
+    ["suppressHeader", false],
+    ["lang", ""],
+    ["suppressPasswordToggle", false],
+  ] as const)("ZitadelLogin keeps the default %s", async (prop, expected) => {
+    const host = await renderWidget(<ZitadelLogin project={project} />);
+    await macrotask();
+
+    expect(host.querySelector<ZitadelLoginElement>("zitadel-login")![prop]).toBe(expected);
+  });
+
+  it("ZitadelLogout keeps the default theme", async () => {
+    const host = await renderWidget(<ZitadelLogout project={project} />);
+    await macrotask();
+
+    expect(host.querySelector<ZitadelLogoutElement>("zitadel-logout")!.theme).toBe("");
+  });
+});
+
+describe("props that become unset restore the element's defaults", () => {
+  it.each([
+    ["heading", "Custom", "Signed in as"],
+    ["logoutLabel", "Leave", "Sign out"],
+    ["variant", "page", "widget"],
+    ["theme", "light", ""],
+    ["suppressHeader", true, false],
+  ] as const)("ZitadelSession restores the default %s", async (prop, given, expected) => {
+    const host = await renderWidget(
+      <UnsetPropHarness widget="session" prop={prop} given={given} />,
+    );
+    const el = () => host.querySelector<ZitadelSessionElement>("zitadel-session")!;
+    await expect.poll(() => el()[prop]).toBe(given);
+
+    await expect.poll(() => window.__unsetProp).toBeTypeOf("function");
+    window.__unsetProp!();
+    await expect.poll(() => el()[prop]).toBe(expected);
+  });
+
+  it.each([
+    ["variant", "page", "widget"],
+    ["theme", "light", ""],
+    ["suppressHeader", true, false],
+    ["lang", "de", ""],
+    ["suppressPasswordToggle", true, false],
+  ] as const)("ZitadelLogin restores the default %s", async (prop, given, expected) => {
+    const host = await renderWidget(<UnsetPropHarness widget="login" prop={prop} given={given} />);
+    const el = () => host.querySelector<ZitadelLoginElement>("zitadel-login")!;
+    await expect.poll(() => el()[prop]).toBe(given);
+
+    await expect.poll(() => window.__unsetProp).toBeTypeOf("function");
+    window.__unsetProp!();
+    await expect.poll(() => el()[prop]).toBe(expected);
+  });
+
+  it("ZitadelLogout restores the default theme", async () => {
+    const host = await renderWidget(
+      <UnsetPropHarness widget="logout" prop="theme" given="light" />,
+    );
+    const el = () => host.querySelector<ZitadelLogoutElement>("zitadel-logout")!;
+    await expect.poll(() => el().theme).toBe("light");
+
+    await expect.poll(() => window.__unsetProp).toBeTypeOf("function");
+    window.__unsetProp!();
+    await expect.poll(() => el().theme).toBe("");
   });
 });

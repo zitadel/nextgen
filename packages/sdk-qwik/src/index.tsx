@@ -30,10 +30,14 @@ export * from "./types";
 // direct @zitadel/components dependency (strict package managers reject those).
 export { businessLocales } from "@zitadel/components";
 
+const elementDefaults = new WeakMap<Element, Map<PropertyKey, unknown>>();
+
 /**
- * Assigns a widget config value as a DOM *property*, skipping `undefined` so the
- * element keeps its own accessor default (e.g. the session card's "Signed in
- * as" heading).
+ * Assigns a widget config value as a DOM *property*, leaving `undefined` to the
+ * element's own accessor default (e.g. the session card's "Signed in as"
+ * heading). The element's own value is remembered before a prop is first
+ * overridden and restored when the prop is cleared again, so a prop going from a
+ * value back to unset does not leave the stale override on the element.
  *
  * Qwik 2 binds custom-element JSX props as *attributes* only — its client
  * renderer has no property-setting path for elements — and the widgets expose
@@ -48,8 +52,19 @@ function setProp<E extends Element, K extends keyof E>(
   key: K,
   value: E[K] | undefined,
 ): void {
+  let saved = elementDefaults.get(el);
   if (value !== undefined) {
+    if (!saved) {
+      saved = new Map();
+      elementDefaults.set(el, saved);
+    }
+    if (!saved.has(key)) {
+      saved.set(key, el[key]);
+    }
     el[key] = value;
+  } else if (saved?.has(key)) {
+    el[key] = saved.get(key) as E[K];
+    saved.delete(key);
   }
 }
 
