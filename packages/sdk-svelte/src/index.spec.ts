@@ -5,14 +5,18 @@ import type {
   ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
 
+import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { render } from "@testing-library/svelte";
+import { _resetConfigForTesting, configureZitadel } from "@zitadel/api/config";
 import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
   ZITADEL_LOGOUT_EVENT_HANDLERS,
   ZITADEL_SESSION_EVENT_HANDLERS,
 } from "@zitadel/sdk-core/types";
-import { describe, expect, it, vi } from "vitest";
+import { hydrate, unmount } from "svelte";
+import { createServer } from "vite";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { businessLocales } from "./lib/index";
 import ZitadelLogin from "./lib/ZitadelLogin.svelte";
@@ -263,5 +267,78 @@ describe("props that become unset restore the element's defaults", () => {
     await rerender({ theme: undefined });
 
     expect(el.theme).toBe("");
+  });
+});
+
+/**
+ * The login's server markup. The server compile of the component cannot share
+ * a module graph with this file's browser compile, so a throwaway Vite server
+ * loads it, and `svelte/server`, with the plugin's server build. The widget's
+ * own module is kept out of that load (it is already registered in this jsdom
+ * window).
+ */
+async function serverMarkup(props: Record<string, unknown>): Promise<string> {
+  const server = await createServer({
+    configFile: false,
+    logLevel: "silent",
+    plugins: [svelte()],
+    server: { middlewareMode: true, hmr: false, watch: null },
+    appType: "custom",
+    ssr: { external: ["@zitadel/components", "@zitadel/api"] },
+  });
+  const define = vi.spyOn(customElements, "define").mockImplementation(() => {});
+  try {
+    const { render: renderOnServer } = (await server.ssrLoadModule(
+      "svelte/server",
+    )) as typeof import("svelte/server");
+    const { default: Login } = (await server.ssrLoadModule("/src/lib/ZitadelLogin.svelte")) as {
+      default: typeof ZitadelLogin;
+    };
+    return renderOnServer(Login, { props }).body;
+  } finally {
+    define.mockRestore();
+    await server.close();
+  }
+}
+
+describe("hydrating a server-rendered login", () => {
+  afterEach(() => {
+    _resetConfigForTesting();
+    vi.restoreAllMocks();
+  });
+
+  it("starts its first flow with the purpose the server rendered", async () => {
+    const globalProject = configureZitadel({
+      projectId: "proj-global",
+      proxyPath: "https://flow.test.invalid",
+    });
+    const fetched = vi.spyOn(globalThis, "fetch");
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    host.innerHTML = await serverMarkup({ project: globalProject, purpose: "register" });
+    const firstStep = new Promise((resolve) =>
+      host
+        .querySelector("zitadel-login")
+        ?.addEventListener("zitadel-flow-step", resolve, { once: true }),
+    );
+
+    const app = hydrate(ZitadelLogin, {
+      target: host,
+      props: { project: globalProject, purpose: "register" },
+    });
+
+    await firstStep;
+    const bodies = await Promise.all(
+      fetched.mock.calls.map(async ([input, init]) =>
+        JSON.parse(
+          String(init?.body ?? (input instanceof Request ? await input.clone().text() : "null")),
+        ),
+      ),
+    );
+    const created = bodies.filter((body) => body?.project_id);
+    expect(created).toHaveLength(1);
+    expect(created[0]).toMatchObject({ purpose: "register" });
+    await unmount(app);
+    host.remove();
   });
 });
