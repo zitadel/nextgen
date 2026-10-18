@@ -662,3 +662,70 @@ describe("server-rendered widget config", () => {
   });
 });
 // server-render-cases:end
+
+// Vue's server renderer only strips the `^` force-attribute prefix from 3.5.27,
+// and the peer range reaches back to 3.2, so the wrappers must not emit it
+// where there is no DOM. The jsdom environment defines `document`, so remove it
+// for the render to stand in for a server runtime.
+describe("server-rendered markup carries no force-attribute prefix", () => {
+  it.each([
+    [
+      "ZitadelLogin",
+      ZitadelLogin,
+      { project, variant: "page", theme: "dark", lang: "de" },
+      ['variant="page"', 'theme="dark"', 'lang="de"'],
+    ],
+    ["ZitadelLogout", ZitadelLogout, { project, theme: "dark" }, ['theme="dark"']],
+    [
+      "ZitadelSession",
+      ZitadelSession,
+      { project, variant: "page", theme: "dark", heading: "Hi", logoutLabel: "Bye" },
+      ['variant="page"', 'theme="dark"', 'heading="Hi"', 'logout-label="Bye"'],
+    ],
+  ] as const)("%s", async (_name, component, props, expected) => {
+    vi.stubGlobal("document", undefined);
+    const html = await renderToString(
+      createSSRApp({ render: () => h(component as typeof ZitadelLogin, props) }),
+    );
+    vi.unstubAllGlobals();
+
+    for (const attribute of expected) expect(html).toContain(attribute);
+    expect(html).not.toContain("^");
+  });
+
+  // The installed Vue may already strip the prefix, which would hide a wrapper
+  // that still emits it, so also check the keys the wrapper hands to Vue.
+  it.each([
+    ["ZitadelLogin", ZitadelLogin, { project, variant: "page", theme: "dark", lang: "de" }],
+    ["ZitadelLogout", ZitadelLogout, { project, theme: "dark" }],
+    [
+      "ZitadelSession",
+      ZitadelSession,
+      { project, variant: "page", theme: "dark", heading: "Hi", logoutLabel: "Bye" },
+    ],
+  ] as const)("%s binds no key with the prefix without a DOM", (_name, component, props) => {
+    vi.stubGlobal("document", undefined);
+    const renderFn = (
+      component as unknown as {
+        setup: (p: unknown, ctx: unknown) => () => { props: Record<string, unknown> };
+      }
+    ).setup(props, { emit: () => {}, expose: () => {} });
+    const keys = Object.keys(renderFn().props);
+    vi.unstubAllGlobals();
+
+    expect(keys.filter((key) => key.startsWith("^"))).toEqual([]);
+    expect(keys).toContain(_name === "ZitadelLogout" ? "theme" : "variant");
+  });
+
+  it("keeps the prefix where there is a DOM so an unset prop is removed, not blanked", () => {
+    const renderFn = (
+      ZitadelLogin as unknown as {
+        setup: (p: unknown, ctx: unknown) => () => { props: Record<string, unknown> };
+      }
+    ).setup({ project }, { emit: () => {}, expose: () => {} });
+
+    expect(Object.keys(renderFn().props)).toEqual(
+      expect.arrayContaining(["^lang", "^variant", "^theme"]),
+    );
+  });
+});
