@@ -35,7 +35,7 @@ npx @zitadel/cli@alpha <command> --non-interactive --json
 Always pass `@alpha`: bare `npx @zitadel/cli` resolves npm's `latest` tag,
 which still points at an early `0.0.0` build. Use an exact `1.0.0-alpha.N`
 selector in agent scripts and bug reports for reproducibility.
-The CLI requires Node.js 24+. Creating an Angular app needs a Node.js version the Angular CLI accepts, which can be newer than 24.0: if `setup` refuses with `E_VALIDATION` naming the Node versions Angular accepts, switch to one of them and run it again.
+The CLI requires Node.js 24+. When `setup` creates a new app it first checks the running Node.js against the `engines.node` of the framework CLI it is about to run (`@angular/cli`, `nuxi`, `create-vite`, `create-next-app`). Only the Angular CLI refuses a Node it does not accept, and that range can be newer than 24.0: if `setup` refuses with `E_VALIDATION` naming the Node versions Angular accepts, switch to one of them and run it again. For the other frameworks the CLI carries on, so `setup` adds a warning to the envelope's `warnings` and continues.
 
 ## Using the CLI
 
