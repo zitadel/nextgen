@@ -31,8 +31,6 @@ The React SDK is the SPA wrapper for the shared Zitadel login and logout widgets
     ```sh
     yarn add @zitadel/sdk-react@alpha
     ```
-
-    `ZitadelLogin` also takes `resumeFlowId`, an existing flow to resume instead of starting a new one; unset, `null` or `""` falls back to the `flow` query parameter.
   </Tab>
 </Tabs>
 
@@ -71,6 +69,8 @@ The React SDK is the SPA wrapper for the shared Zitadel login and logout widgets
       return <ZitadelLogout project={project} postSignOutUrl="/login" />;
     }
     ```
+
+    `ZitadelLogin` also takes `resumeFlowId`, an existing flow to resume instead of starting a new one; unset, `null` or `""` falls back to the `flow` query parameter.
   </Tab>
 </Tabs>
 
