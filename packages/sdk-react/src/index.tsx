@@ -13,6 +13,7 @@ import {
 } from "@zitadel/components";
 import * as React from "react";
 
+import { assignGiven } from "./given";
 import type {
   ZitadelFlowCompleteDetail,
   ZitadelFlowRedirectDetail,
@@ -34,11 +35,6 @@ export * from "./types";
 export { businessLocales } from "@zitadel/components";
 
 /**
- * The element's own defaults, read once from a pristine instance of each class.
- */
-const pristine = new WeakMap<object, Record<string, unknown>>();
-
-/**
  * `useLayoutEffect` warns on every server render in React 18 (the peer range is
  * `>=18`), and `@lit/react` guards its own layout effects for the same reason.
  * Effects never run on the server, so `useEffect` is a safe stand-in there.
@@ -47,41 +43,23 @@ const useIsomorphicLayoutEffect =
   typeof window === "undefined" ? React.useEffect : React.useLayoutEffect;
 
 /**
- * `@lit/react` writes `undefined` onto the element when a prop is dropped (or
- * passed as `undefined`), which overwrites the element's own default: a
- * `heading` that went back to unset left the session card with an empty title.
- * This runs after `@lit/react`'s own layout effect on every render and puts the
- * element's default back on any property left `undefined`.
+ * Returns the ref to put on the widget element and assigns `props` to it after
+ * every render. `@lit/react` would write `undefined` onto the element for a
+ * prop that is unset, so the props the element has defaults for are kept away
+ * from it and assigned here only when given.
  */
-function useRestoreUnsetDefaults<E extends HTMLElement>(
+function useGiven<E extends HTMLElement>(
   forwardedRef: React.ForwardedRef<E>,
-  elementClass: { new (): E; elementProperties: ReadonlyMap<PropertyKey, unknown> },
-): React.RefCallback<E> {
+  props: Record<string, unknown>,
+): React.RefObject<E | null> {
   const element = React.useRef<E | null>(null);
-
+  React.useImperativeHandle(forwardedRef, () => element.current as E);
   useIsomorphicLayoutEffect(() => {
-    const target = element.current as Record<string, unknown> | null;
-    if (!target) return;
-    let defaults = pristine.get(elementClass);
-    if (!defaults) {
-      defaults = new elementClass() as Record<string, unknown>;
-      pristine.set(elementClass, defaults);
-    }
-    for (const key of elementClass.elementProperties.keys()) {
-      if (typeof key === "string" && target[key] === undefined && defaults[key] !== undefined) {
-        target[key] = defaults[key];
-      }
+    if (element.current) {
+      assignGiven(element.current, props);
     }
   });
-
-  return React.useCallback(
-    (node: E | null) => {
-      element.current = node;
-      if (typeof forwardedRef === "function") forwardedRef(node);
-      else if (forwardedRef) forwardedRef.current = node;
-    },
-    [forwardedRef],
-  );
+  return element;
 }
 
 /**
@@ -170,10 +148,31 @@ export type ZitadelLoginReactProps = ZitadelLoginProps & {
 
 export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginReactProps>(
   function ZitadelLogin(
-    { purpose, onFlowStep, onFlowInput, onFlowComplete, onFlowRedirect, onFlowError, ...props },
+    {
+      purpose,
+      lang,
+      variant,
+      theme,
+      suppressHeader,
+      suppressPasswordToggle,
+      onFlowStep,
+      onFlowInput,
+      onFlowComplete,
+      onFlowRedirect,
+      onFlowError,
+      ...props
+    },
     ref,
   ) {
-    const elementRef = useRestoreUnsetDefaults(ref, ZitadelLoginElement);
+    // Props the element has defaults for are assigned only when given; a
+    // binding would assign `undefined` and overwrite the default.
+    const elementRef = useGiven(ref, {
+      lang,
+      variant,
+      theme,
+      suppressHeader,
+      suppressPasswordToggle,
+    });
     return (
       <ZitadelLoginElementReact
         {...props}
@@ -201,8 +200,10 @@ ZitadelLogin.displayName = "ZitadelLogin";
  * so consumers can imperatively access the upgraded web component.
  */
 export const ZitadelLogout = React.forwardRef<ZitadelLogoutElement, ZitadelLogoutProps>(
-  function ZitadelLogout({ onSignout, ...props }, ref) {
-    const elementRef = useRestoreUnsetDefaults(ref, ZitadelLogoutElement);
+  function ZitadelLogout({ onSignout, theme, ...props }, ref) {
+    // Props the element has defaults for are assigned only when given; a
+    // binding would assign `undefined` and overwrite the default.
+    const elementRef = useGiven(ref, { theme });
     return (
       <ZitadelLogoutElementReact
         {...props}
@@ -224,8 +225,13 @@ ZitadelLogout.displayName = "ZitadelLogout";
  * A forwarded `ref` resolves to the underlying `<zitadel-session>` DOM element.
  */
 export const ZitadelSession = React.forwardRef<ZitadelSessionElement, ZitadelSessionProps>(
-  function ZitadelSession({ onSignout, ...props }, ref) {
-    const elementRef = useRestoreUnsetDefaults(ref, ZitadelSessionElement);
+  function ZitadelSession(
+    { onSignout, heading, logoutLabel, variant, theme, suppressHeader, ...props },
+    ref,
+  ) {
+    // Props the element has defaults for are assigned only when given; a
+    // binding would assign `undefined` and overwrite the default.
+    const elementRef = useGiven(ref, { heading, logoutLabel, variant, theme, suppressHeader });
     return (
       <ZitadelSessionElementReact
         {...props}
