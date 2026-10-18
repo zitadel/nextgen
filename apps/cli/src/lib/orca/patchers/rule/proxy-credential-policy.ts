@@ -136,10 +136,11 @@ function decodeExchange(body${ty(": Buffer")}, contentEncoding${ty(": string | s
     .map((coding) => coding.trim().toLowerCase())
     .filter((coding) => coding !== "" && coding !== "identity");
   return codings.reduceRight((decoded${ty(": Buffer")}, coding) => {
-    if (!Object.hasOwn(EXCHANGE_DECODERS, coding)) {
+    const decoder = Object.hasOwn(EXCHANGE_DECODERS, coding) ? EXCHANGE_DECODERS[coding] : undefined;
+    if (decoder === undefined) {
       throw new Error(\`unsupported content-encoding \${coding}\`);
     }
-    return EXCHANGE_DECODERS[coding](decoded);
+    return decoder(decoded);
   }, body);
 }
 

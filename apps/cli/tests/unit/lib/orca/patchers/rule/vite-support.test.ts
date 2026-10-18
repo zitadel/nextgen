@@ -347,7 +347,7 @@ export default defineConfig({
     expect(out).toContain("selfHandleResponse: true,");
   });
 
-  it("emits helpers a TypeScript config can typecheck under noImplicitAny", async () => {
+  it("emits helpers a TypeScript config can typecheck under strict, noUncheckedIndexedAccess and exactOptionalPropertyTypes", async () => {
     const dir = await mkdtemp(join(tmpdir(), "zitadel-typed-"));
     try {
       await symlink(join(process.cwd(), "node_modules"), join(dir, "node_modules"), "dir");
@@ -357,6 +357,8 @@ export default defineConfig({
         noEmit: true,
         strict: true,
         noImplicitAny: true,
+        noUncheckedIndexedAccess: true,
+        exactOptionalPropertyTypes: true,
         skipLibCheck: true,
         esModuleInterop: true,
         module: ts.ModuleKind.ESNext,
