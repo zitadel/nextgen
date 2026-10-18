@@ -11,7 +11,8 @@ import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
 import { zitadelTrustmarkInnerHtml } from "../internal/attribution-markup.js";
 import type { Liquid, Template } from "liquidjs";
 import { css, html, LitElement, nothing, type PropertyValues } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, state } from "lit/decorators.js";
+import { property } from "../internal/property.js";
 
 import "../atoms/index.js";
 import type { ZlFieldInputDetail, ZlSubmitDetail } from "../atoms/index.js";
