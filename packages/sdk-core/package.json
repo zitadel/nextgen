@@ -36,6 +36,11 @@
       "types": "./dist/types.d.mts",
       "import": "./dist/types.mjs"
     },
+    "./attributes": {
+      "@zitadel/source": "./src/attributes.ts",
+      "types": "./dist/attributes.d.mts",
+      "import": "./dist/attributes.mjs"
+    },
     "./jwt": {
       "@zitadel/source": "./src/jwt.ts",
       "types": "./dist/jwt.d.mts",

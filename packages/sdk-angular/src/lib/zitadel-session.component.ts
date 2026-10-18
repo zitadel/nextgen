@@ -2,9 +2,11 @@ import type { ElementRef } from "@angular/core";
 import type { ZitadelSession as ZitadelSessionElement } from "@zitadel/components";
 import type { ZitadelSignoutDetail } from "@zitadel/sdk-core/types";
 
+import { widgetAttributes } from "@zitadel/sdk-core/attributes";
 import {
   Component,
   CUSTOM_ELEMENTS_SCHEMA,
+  type DoCheck,
   EventEmitter,
   Input,
   Output,
@@ -12,6 +14,7 @@ import {
 } from "@angular/core";
 
 import type { ZitadelProject } from "./config";
+import { writeAttributes } from "./attributes";
 
 import "@zitadel/components";
 
@@ -36,19 +39,11 @@ import "@zitadel/components";
     [project]="project"
     [projectId]="projectId"
     [proxyPath]="proxyPath"
-    [attr.project-id]="project?.projectId ?? projectId ?? null"
-    [attr.proxy-path]="project?.proxyPath ?? proxyPath ?? null"
-    [attr.url]="project?.url ?? null"
-    [attr.post-sign-out-url]="postSignOutUrl"
-    [attr.heading]="heading"
-    [attr.logout-label]="logoutLabel"
-    [attr.variant]="variant ?? null"
-    [attr.theme]="theme ?? null"
     [suppressHeader]="suppressHeader"
     (zitadel-signout)="onSignout($event)"
   ></zitadel-session>`,
 })
-export class ZitadelSessionComponent {
+export class ZitadelSessionComponent implements DoCheck {
   @Input() project?: ZitadelProject;
   @Input() projectId?: string;
   @Input() proxyPath?: string;
@@ -60,7 +55,12 @@ export class ZitadelSessionComponent {
   @Input() suppressHeader?: boolean;
   @Output() signout = new EventEmitter<ZitadelSignoutDetail>();
 
-  @ViewChild("el") private elementRef?: ElementRef<ZitadelSessionElement>;
+  @ViewChild("el", { static: true }) private elementRef?: ElementRef<ZitadelSessionElement>;
+
+  ngDoCheck(): void {
+    if (this.elementRef)
+      writeAttributes(this.elementRef.nativeElement, widgetAttributes("session", this));
+  }
 
   /** The underlying `<zitadel-session>` custom element, or `null` before view init. */
   get element(): ZitadelSessionElement | null {

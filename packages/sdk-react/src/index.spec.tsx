@@ -222,6 +222,45 @@ describe("server-rendered widget config", () => {
     expect(attributes).not.toHaveProperty("url");
   });
 
+  it("puts the display options into the server markup", () => {
+    expect(
+      serverAttributes(
+        "zitadel-login",
+        <ZitadelLogin
+          project={handle}
+          variant="page"
+          theme="dark"
+          lang="de"
+          suppressHeader
+          suppressPasswordToggle
+        />,
+      ),
+    ).toMatchObject({
+      variant: "page",
+      theme: "dark",
+      lang: "de",
+      "suppress-header": "",
+      "suppress-password-toggle": "",
+    });
+    expect(
+      serverAttributes(
+        "zitadel-session",
+        <ZitadelSession
+          project={handle}
+          heading="Hi"
+          logoutLabel="Out"
+          variant="page"
+          suppressHeader
+        />,
+      ),
+    ).toMatchObject({
+      heading: "Hi",
+      "logout-label": "Out",
+      variant: "page",
+      "suppress-header": "",
+    });
+  });
+
   it("puts the session config into the server markup", () => {
     expect(
       serverAttributes(

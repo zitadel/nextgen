@@ -11,6 +11,7 @@ import {
   ZitadelLogout as ZitadelLogoutElement,
   ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
+import { WIDGET_ATTRIBUTES, widgetAttributes } from "@zitadel/sdk-core/attributes";
 import * as React from "react";
 
 import type {
@@ -77,32 +78,17 @@ function asAttributes<T extends typeof HTMLElement>(
 }
 
 /**
- * The project coordinates as attributes, so they are in the server markup. The
- * `project` handle stays a property too: it carries the publishable key and is
- * what the element prefers once React hands it over.
- *
- * A handle with a publishable key writes none: attributes cannot carry the key,
- * so a widget that started from them would send its first request without the
- * bearer the project needs, and never retry. Left unconfigured, it waits for
- * the handle React binds at hydration.
+ * The attribute names a widget is written under, to hide from `createComponent`
+ * so each reaches the markup as an attribute rather than a bound property.
  */
-function projectAttributes(props: {
-  readonly project?: ZitadelProject;
-  readonly projectId?: string;
-  readonly proxyPath?: string;
-}) {
-  if (props.project?.publishableKey) return {};
-  return {
-    "project-id": props.project?.projectId ?? props.projectId,
-    "proxy-path": props.project?.proxyPath ?? props.proxyPath,
-    url: props.project?.url,
-  };
+function attributeNames(widget: keyof typeof WIDGET_ATTRIBUTES): string[] {
+  return Object.values(WIDGET_ATTRIBUTES[widget]).flatMap((rule) => (rule ? [rule.attribute] : []));
 }
 
 const ZitadelLoginElementReact = createComponent({
   react: React,
   tagName: "zitadel-login",
-  elementClass: asAttributes(ZitadelLoginElement, "purpose", "url"),
+  elementClass: asAttributes(ZitadelLoginElement, ...attributeNames("login")),
   events: {
     onZitadelFlowStep: "zitadel-flow-step" as EventName<CustomEvent<ZitadelFlowStepDetail>>,
     onZitadelFlowInput: "zitadel-flow-input" as EventName<CustomEvent<ZitadelFlowInputDetail>>,
@@ -119,7 +105,7 @@ const ZitadelLoginElementReact = createComponent({
 const ZitadelLogoutElementReact = createComponent({
   react: React,
   tagName: "zitadel-logout",
-  elementClass: asAttributes(ZitadelLogoutElement, "url"),
+  elementClass: asAttributes(ZitadelLogoutElement, ...attributeNames("logout")),
   events: {
     onZitadelSignout: "zitadel-signout" as EventName<CustomEvent<ZitadelSignoutDetail>>,
   },
@@ -128,7 +114,7 @@ const ZitadelLogoutElementReact = createComponent({
 const ZitadelSessionElementReact = createComponent({
   react: React,
   tagName: "zitadel-session",
-  elementClass: asAttributes(ZitadelSessionElement, "url"),
+  elementClass: asAttributes(ZitadelSessionElement, ...attributeNames("session")),
   events: {
     onZitadelSignout: "zitadel-signout" as EventName<CustomEvent<ZitadelSignoutDetail>>,
   },
@@ -177,10 +163,8 @@ export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginRe
       <ZitadelLoginElementReact
         {...props}
         ref={ref}
-        purpose={purpose ?? "login"}
         resumeFlowId={resumeFlowId ?? ""}
-        flow-name={props.flowName}
-        {...projectAttributes(props)}
+        {...widgetAttributes("login", { ...props, purpose: purpose ?? "login", resumeFlowId })}
         onZitadelFlowStep={onFlowStep && ((event) => onFlowStep(event.detail))}
         onZitadelFlowInput={onFlowInput && ((event) => onFlowInput(event.detail))}
         onZitadelFlowComplete={onFlowComplete && ((event) => onFlowComplete(event.detail))}
@@ -207,8 +191,7 @@ export const ZitadelLogout = React.forwardRef<ZitadelLogoutElement, ZitadelLogou
     return (
       <ZitadelLogoutElementReact
         {...props}
-        {...projectAttributes(props)}
-        post-sign-out-url={props.postSignOutUrl}
+        {...widgetAttributes("logout", props)}
         ref={ref}
         onZitadelSignout={onSignout && ((event) => onSignout(event.detail))}
       />
@@ -231,8 +214,7 @@ export const ZitadelSession = React.forwardRef<ZitadelSessionElement, ZitadelSes
     return (
       <ZitadelSessionElementReact
         {...props}
-        {...projectAttributes(props)}
-        post-sign-out-url={props.postSignOutUrl}
+        {...widgetAttributes("session", props)}
         ref={ref}
         onZitadelSignout={onSignout && ((event) => onSignout(event.detail))}
       />

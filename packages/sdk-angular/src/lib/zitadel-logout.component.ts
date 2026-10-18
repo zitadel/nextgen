@@ -2,9 +2,11 @@ import type { ElementRef } from "@angular/core";
 import type { ZitadelLogout as ZitadelLogoutElement } from "@zitadel/components";
 import type { ZitadelSignoutDetail } from "@zitadel/sdk-core/types";
 
+import { widgetAttributes } from "@zitadel/sdk-core/attributes";
 import {
   Component,
   CUSTOM_ELEMENTS_SCHEMA,
+  type DoCheck,
   EventEmitter,
   Input,
   Output,
@@ -12,6 +14,7 @@ import {
 } from "@angular/core";
 
 import type { ZitadelProject } from "./config";
+import { writeAttributes } from "./attributes";
 
 import "@zitadel/components";
 
@@ -36,15 +39,10 @@ import "@zitadel/components";
     [project]="project"
     [projectId]="projectId"
     [proxyPath]="proxyPath"
-    [attr.project-id]="project?.projectId ?? projectId ?? null"
-    [attr.proxy-path]="project?.proxyPath ?? proxyPath ?? null"
-    [attr.url]="project?.url ?? null"
-    [attr.post-sign-out-url]="postSignOutUrl"
-    [attr.theme]="theme ?? null"
     (zitadel-signout)="onSignout($event)"
   ></zitadel-logout>`,
 })
-export class ZitadelLogoutComponent {
+export class ZitadelLogoutComponent implements DoCheck {
   @Input() project?: ZitadelProject;
   @Input() projectId?: string;
   @Input() proxyPath?: string;
@@ -52,7 +50,12 @@ export class ZitadelLogoutComponent {
   @Input() theme?: "light" | "dark" | "auto";
   @Output() signout = new EventEmitter<ZitadelSignoutDetail>();
 
-  @ViewChild("el") private elementRef?: ElementRef<ZitadelLogoutElement>;
+  @ViewChild("el", { static: true }) private elementRef?: ElementRef<ZitadelLogoutElement>;
+
+  ngDoCheck(): void {
+    if (this.elementRef)
+      writeAttributes(this.elementRef.nativeElement, widgetAttributes("logout", this));
+  }
 
   /** The underlying `<zitadel-logout>` custom element, or `null` before view init. */
   get element(): ZitadelLogoutElement | null {

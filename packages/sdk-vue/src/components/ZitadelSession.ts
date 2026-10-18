@@ -2,6 +2,7 @@ import type { ZitadelProject } from "@zitadel/api/config";
 import type { ZitadelSession as ZitadelSessionElement } from "@zitadel/components";
 import type { ZitadelSignoutDetail } from "@zitadel/sdk-core/types";
 
+import { widgetAttributes } from "@zitadel/sdk-core/attributes";
 import { defineComponent, h, type PropType, ref, toRaw } from "vue";
 import "@zitadel/components";
 
@@ -38,22 +39,13 @@ export default defineComponent({
         ref: element,
         // Hand the Lit element the raw SDK handle, not Vue's reactive proxy.
         project: toRaw(props.project),
-        // Kebab-case attributes are what the element reads at upgrade, and the
-        // only form a server-rendered page carries (the camelCase keys below
-        // render as `projectid=`-style names the element never reads). The
-        // handle's fields are mirrored, and win over the discrete props as they
-        // do in the widget's `resolveApi`, so a page that passes only `project`
-        // is configured before hydration and both channels agree.
-        "project-id": props.project?.projectId ?? props.projectId,
-        "proxy-path": props.project?.proxyPath ?? props.proxyPath,
-        url: props.project?.url,
+        // The attributes are what the element reads at upgrade, and the only
+        // form a server-rendered page carries; the shared function decides
+        // them (the camelCase keys below render as `projectid=`-style names
+        // the element never reads, so they stay property-only).
+        ...widgetAttributes("session", props),
         projectId: props.projectId,
         proxyPath: props.proxyPath,
-        "post-sign-out-url": props.postSignOutUrl,
-        heading: props.heading,
-        "logout-label": props.logoutLabel,
-        variant: props.variant,
-        theme: props.theme,
         suppressHeader: props.suppressHeader,
         onZitadelSignout: (event: CustomEvent<ZitadelSignoutDetail>) => {
           emit("signout", event.detail);

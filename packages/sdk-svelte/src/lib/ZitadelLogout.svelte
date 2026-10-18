@@ -4,7 +4,8 @@
 
   import type { ZitadelLogoutProps, ZitadelSignoutDetail } from './types';
   import { assignGiven } from './given';
-  import { onClient, proxyPathAttr } from './attributes';
+  import { widgetAttributes } from '@zitadel/sdk-core/attributes';
+  import { onClient, onServer } from './attributes';
 
   let {
     project,
@@ -30,7 +31,7 @@
   // binding would assign `undefined` and overwrite the default.
   $effect(() => {
     if (el) {
-      assignGiven(el, { theme });
+      assignGiven(el, { projectId, proxyPath, postSignOutUrl, theme });
     }
   });
 
@@ -51,8 +52,5 @@
 <zitadel-logout
   bind:this={el}
   project={onClient(project)}
-  project-id={project?.projectId ?? projectId}
-  proxy-path={proxyPathAttr(project?.proxyPath ?? proxyPath)}
-  url={project?.url}
-  post-sign-out-url={postSignOutUrl}
+  {...widgetAttributes('logout', { project, projectId, proxyPath, postSignOutUrl, ...onServer({ theme }) })}
 ></zitadel-logout>

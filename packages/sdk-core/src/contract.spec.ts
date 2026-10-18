@@ -3,6 +3,7 @@ import { ZitadelLogin, ZitadelLogout, ZitadelSession } from "@zitadel/components
 import { DISPATCHED_EVENTS } from "@zitadel/components/events";
 import { describe, expect, it } from "vitest";
 
+import { WIDGET_ATTRIBUTES } from "./attributes.js";
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
   ZITADEL_LOGIN_EVENTS,
@@ -10,9 +11,6 @@ import {
   ZITADEL_LOGOUT_EVENTS,
   ZITADEL_SESSION_EVENT_HANDLERS,
   ZITADEL_SESSION_EVENTS,
-  type ZitadelLoginConfig,
-  type ZitadelLogoutConfig,
-  type ZitadelSessionConfig,
 } from "./types.js";
 
 /**
@@ -59,47 +57,20 @@ describe("SPA widget contract ↔ @zitadel/components", () => {
  * way: `sdk-core` already depends on the components (for the event guard
  * above) and the components never import `sdk-core`.
  *
- * Each `*_CONFIG_KEYS` object is checked against its config type by `satisfies
- * Record<keyof Config, …>`, so a key added to or removed from a config type
- * fails `tsc` until the list is updated, and the runtime tests then compare
- * the list with the element's `elementProperties`. A public element property
+ * A key added to or removed from a config type fails `tsc` until the rules in
+ * `attributes.ts` are updated, and the runtime tests then compare the rules
+ * with the element's `elementProperties`. A public element property
  * that is not a config key must be listed in `*_ELEMENT_ONLY` with a reason.
  */
-const LOGIN_CONFIG_KEYS = {
-  project: true,
-  projectId: true,
-  proxyPath: true,
-  variant: true,
-  theme: true,
-  suppressHeader: true,
-  suppressPasswordToggle: true,
-  purpose: true,
-  flowName: true,
-  postSignInUrl: true,
-  resumeFlowId: true,
-  locales: true,
-  lang: true,
-} satisfies Record<keyof ZitadelLoginConfig, true>;
 
-const SESSION_CONFIG_KEYS = {
-  project: true,
-  projectId: true,
-  proxyPath: true,
-  postSignOutUrl: true,
-  heading: true,
-  logoutLabel: true,
-  variant: true,
-  theme: true,
-  suppressHeader: true,
-} satisfies Record<keyof ZitadelSessionConfig, true>;
-
-const LOGOUT_CONFIG_KEYS = {
-  project: true,
-  projectId: true,
-  proxyPath: true,
-  postSignOutUrl: true,
-  theme: true,
-} satisfies Record<keyof ZitadelLogoutConfig, true>;
+/** The config keys of a widget: its attribute rules, less the handle-only `url`. */
+function configKeys(widget: keyof typeof WIDGET_ATTRIBUTES): Record<string, true> {
+  return Object.fromEntries(
+    Object.keys(WIDGET_ATTRIBUTES[widget])
+      .filter((key) => key !== "url")
+      .map((key) => [key, true]),
+  );
+}
 
 const URL_REASON =
   "declarative full backend URL for plain HTML pages; SPA wrappers configure the backend through project or proxyPath";
@@ -132,10 +103,11 @@ function publicProperties(ctor: ElementCtor, tag: string): string[] {
 
 describe("config types ↔ element properties", () => {
   describe.each([
-    ["zitadel-login", ZitadelLogin, LOGIN_CONFIG_KEYS, LOGIN_ELEMENT_ONLY],
-    ["zitadel-session", ZitadelSession, SESSION_CONFIG_KEYS, SESSION_ELEMENT_ONLY],
-    ["zitadel-logout", ZitadelLogout, LOGOUT_CONFIG_KEYS, LOGOUT_ELEMENT_ONLY],
-  ] as const)("<%s>", (tag, ctor, configKeys, elementOnly) => {
+    ["zitadel-login", ZitadelLogin, "login", LOGIN_ELEMENT_ONLY],
+    ["zitadel-session", ZitadelSession, "session", SESSION_ELEMENT_ONLY],
+    ["zitadel-logout", ZitadelLogout, "logout", LOGOUT_ELEMENT_ONLY],
+  ] as const)("<%s>", (tag, ctor, widget, elementOnly) => {
+    const keys = configKeys(widget);
     const properties = publicProperties(ctor as ElementCtor, tag);
 
     it("has public properties to compare", () => {
@@ -143,22 +115,29 @@ describe("config types ↔ element properties", () => {
     });
 
     it("represents every public property as a config key or a justified exclusion", () => {
-      const unaccounted = properties.filter(
-        (name) => !(name in configKeys) && !(name in elementOnly),
-      );
+      const unaccounted = properties.filter((name) => !(name in keys) && !(name in elementOnly));
       expect(unaccounted).toEqual([]);
     });
 
     it("backs every config key with an element property", () => {
-      const missing = Object.keys(configKeys).filter((key) => !properties.includes(key));
+      const missing = Object.keys(keys).filter((key) => !properties.includes(key));
       expect(missing).toEqual([]);
     });
 
     it("lists only real element properties that are not config keys as exclusions", () => {
       const stale = Object.keys(elementOnly).filter(
-        (name) => !properties.includes(name) || name in configKeys,
+        (name) => !properties.includes(name) || name in keys,
       );
       expect(stale).toEqual([]);
+    });
+
+    it("writes every attribute under a name the element observes", () => {
+      document.createElement(tag);
+      const observed = (ctor as unknown as { observedAttributes: string[] }).observedAttributes;
+      const written = Object.values(WIDGET_ATTRIBUTES[widget]).flatMap((rule) =>
+        rule ? [rule.attribute] : [],
+      );
+      expect(written.filter((name) => !observed.includes(name))).toEqual([]);
     });
 
     it("gives every exclusion a reason", () => {

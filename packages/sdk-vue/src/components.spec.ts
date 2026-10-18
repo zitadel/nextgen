@@ -90,6 +90,32 @@ describe("ZitadelLogin", () => {
     expect(el.getAttribute("proxy-path")).toBe("/__handle");
   });
 
+  it("writes the display options in the server markup", async () => {
+    const el = await serverRender(ZitadelLogin, {
+      project: handle,
+      variant: "page",
+      theme: "dark",
+      lang: "de",
+      suppressHeader: true,
+      suppressPasswordToggle: true,
+    });
+    expect(el.getAttribute("variant")).toBe("page");
+    expect(el.getAttribute("theme")).toBe("dark");
+    expect(el.getAttribute("lang")).toBe("de");
+    expect(el.hasAttribute("suppress-header")).toBe(true);
+    expect(el.hasAttribute("suppress-password-toggle")).toBe(true);
+  });
+
+  it("writes no project attribute for a keyed handle in the server markup", async () => {
+    const el = await serverRender(ZitadelLogin, {
+      project: { ...handle, publishableKey: "pk_test_123" },
+      projectId: "proj-other",
+    });
+    expect(el.hasAttribute("project-id")).toBe(false);
+    expect(el.hasAttribute("proxy-path")).toBe(false);
+    expect(el.hasAttribute("url")).toBe(false);
+  });
+
   it("keeps the properties the client render assigns", () => {
     const { container } = render(ZitadelLogin, { props: { project: handle } });
     const el = container.querySelector<HTMLElement & { project: unknown }>("zitadel-login");

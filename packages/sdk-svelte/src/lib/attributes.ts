@@ -10,10 +10,10 @@ export function onClient<T>(value: T): T | undefined {
 }
 
 /**
- * An empty proxy path as `/`. A widget treats an empty `proxy-path` attribute
- * as unset and falls back to its default path, while `/` survives that and
- * normalizes to the site root.
+ * The counterpart of {@link onClient}, for props the browser assigns as element
+ * properties (see `given.ts`): only the server renders them as attributes, since
+ * an attribute written on the client would be taken for the element's default.
  */
-export function proxyPathAttr(path: string | undefined): string | undefined {
-  return path === "" ? "/" : path;
+export function onServer<T>(value: T): T | undefined {
+  return typeof document === "undefined" ? value : undefined;
 }

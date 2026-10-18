@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { onClient, proxyPathAttr } from "./attributes";
+import { onClient, onServer } from "./attributes";
 
 describe("onClient", () => {
   afterEach(() => {
@@ -20,13 +20,18 @@ describe("onClient", () => {
   });
 });
 
-describe("proxyPathAttr", () => {
-  it("writes an empty path as /", () => {
-    expect(proxyPathAttr("")).toBe("/");
+describe("onServer", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
-  it("leaves other paths and an unset path alone", () => {
-    expect(proxyPathAttr("/px")).toBe("/px");
-    expect(proxyPathAttr(undefined)).toBeUndefined();
+  it("returns undefined in a browser", () => {
+    expect(onServer({ variant: "page" })).toBeUndefined();
+  });
+
+  it("returns the value where there is no document", () => {
+    vi.stubGlobal("document", undefined);
+
+    expect(onServer({ variant: "page" })).toEqual({ variant: "page" });
   });
 });

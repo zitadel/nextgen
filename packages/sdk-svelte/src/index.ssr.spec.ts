@@ -49,6 +49,32 @@ describe("server-rendered widget config", () => {
     ).toMatchObject({ purpose: "login", "project-id": "p1", "proxy-path": "/px" });
   });
 
+  it("puts the display options into the server markup", () => {
+    expect(
+      serverAttributes("zitadel-login", ZitadelLogin, {
+        project: handle,
+        variant: "page",
+        theme: "dark",
+        lang: "de",
+        suppressHeader: true,
+      }),
+    ).toMatchObject({ variant: "page", theme: "dark", lang: "de", "suppress-header": "" });
+  });
+
+  it.each([
+    ["zitadel-login", ZitadelLogin],
+    ["zitadel-session", ZitadelSession],
+    ["zitadel-logout", ZitadelLogout],
+  ])("leaves a keyed project handle out of %s", (tag, component) => {
+    const attributes = serverAttributes(tag, component, {
+      project: { ...handle, publishableKey: "pk_test_123" },
+      projectId: "other",
+    });
+    expect(attributes).not.toHaveProperty("project-id");
+    expect(attributes).not.toHaveProperty("proxy-path");
+    expect(attributes).not.toHaveProperty("url");
+  });
+
   it("puts the session config into the server markup", () => {
     expect(
       serverAttributes("zitadel-session", ZitadelSession, {

@@ -79,6 +79,48 @@ describe("ZitadelLogin", () => {
     expect(el!.getAttribute("proxy-path")).toBe("/__handle");
   });
 
+  it("writes the flow and display options as attributes", async () => {
+    const { container } = await render(ZitadelLoginComponent, {
+      inputs: {
+        project,
+        flowName: "signup",
+        variant: "page" as const,
+        theme: "dark" as const,
+        lang: "de",
+        suppressHeader: true,
+      },
+    });
+    const el = container.querySelector("zitadel-login");
+    expect(el!.getAttribute("purpose")).toBe("login");
+    expect(el!.getAttribute("flow-name")).toBe("signup");
+    expect(el!.getAttribute("variant")).toBe("page");
+    expect(el!.getAttribute("theme")).toBe("dark");
+    expect(el!.getAttribute("lang")).toBe("de");
+    expect(el!.hasAttribute("suppress-header")).toBe(true);
+  });
+
+  it("removes an attribute whose input is cleared", async () => {
+    const { container, fixture } = await render(ZitadelLoginComponent, {
+      inputs: { project, flowName: "signup" },
+    });
+    fixture.componentRef.setInput("flowName", undefined);
+    fixture.detectChanges();
+    expect(container.querySelector("zitadel-login")!.hasAttribute("flow-name")).toBe(false);
+  });
+
+  it("writes no project attribute for a keyed handle", async () => {
+    const { container } = await render(ZitadelLoginComponent, {
+      inputs: {
+        project: { ...handle, publishableKey: "pk_test_123" } as typeof handle,
+        projectId: "proj-other",
+      },
+    });
+    const el = container.querySelector("zitadel-login");
+    expect(el!.hasAttribute("project-id")).toBe(false);
+    expect(el!.hasAttribute("proxy-path")).toBe(false);
+    expect(el!.hasAttribute("url")).toBe(false);
+  });
+
   it("writes no config attributes when none is given", async () => {
     const { container } = await render(ZitadelLoginComponent, { inputs: {} });
     const el = container.querySelector("zitadel-login");

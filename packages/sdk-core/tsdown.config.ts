@@ -4,6 +4,7 @@ export default defineConfig({
   entry: {
     index: "src/index.ts",
     types: "src/types.ts",
+    attributes: "src/attributes.ts",
     jwt: "src/jwt.ts",
     middleware: "src/middleware.ts",
   },

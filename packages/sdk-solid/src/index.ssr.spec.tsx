@@ -46,6 +46,29 @@ describe("server-rendered widget config", () => {
     ).toMatchObject({ purpose: "login", "project-id": "p1", "proxy-path": "/px" });
   });
 
+  it("puts the display options into the server markup", () => {
+    expect(
+      serverAttributes(
+        "zitadel-login",
+        renderToString(() => (
+          <ZitadelLogin project={handle} variant="page" theme="dark" lang="de" suppressHeader />
+        )),
+      ),
+    ).toMatchObject({ variant: "page", theme: "dark", lang: "de", "suppress-header": "" });
+  });
+
+  it("leaves a keyed project handle out of the server markup", () => {
+    const attributes = serverAttributes(
+      "zitadel-login",
+      renderToString(() => (
+        <ZitadelLogin project={{ ...handle, publishableKey: "pk_test_123" }} projectId="other" />
+      )),
+    );
+    expect(attributes).not.toHaveProperty("project-id");
+    expect(attributes).not.toHaveProperty("proxy-path");
+    expect(attributes).not.toHaveProperty("url");
+  });
+
   it("puts the session config into the server markup", () => {
     expect(
       serverAttributes(

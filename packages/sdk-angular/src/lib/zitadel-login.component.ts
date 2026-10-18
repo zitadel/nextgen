@@ -9,9 +9,11 @@ import type {
   ZitadelFlowStepDetail,
 } from "@zitadel/sdk-core/types";
 
+import { widgetAttributes } from "@zitadel/sdk-core/attributes";
 import {
   Component,
   CUSTOM_ELEMENTS_SCHEMA,
+  type DoCheck,
   EventEmitter,
   Input,
   Output,
@@ -19,6 +21,7 @@ import {
 } from "@angular/core";
 
 import type { ZitadelProject } from "./config";
+import { writeAttributes } from "./attributes";
 
 // Registers <zitadel-login> / <zitadel-logout> with the browser.
 import "@zitadel/components";
@@ -30,10 +33,9 @@ import "@zitadel/components";
  * element in its template under `CUSTOM_ELEMENTS_SCHEMA`. The `project` handle
  * (from `configureZitadel(...)`) is bound as a DOM **property** via `[project]`,
  * as are the discrete `projectId` / `proxyPath` the element reads when no handle
- * is supplied; `purpose` / `post-sign-in-url` are bound as attributes the Lit
- * element reads, and `project-id` / `proxy-path` / `url` are bound as attributes
- * too so a server-rendered page carries them before hydration (the handle wins over the discrete
- * inputs, as in the element). The widget's `zitadel-*` events are re-emitted with their
+ * is supplied. The widget's configuration is also written as attributes (from
+ * `widgetAttributes` in `@zitadel/sdk-core`, applied on every change-detection
+ * pass) so a server-rendered page carries it before hydration. The widget's `zitadel-*` events are re-emitted with their
  * detail as the `flowStep` / `flowInput` / `flowComplete` / `flowError` outputs.
  *
  * The underlying `<zitadel-login>` custom element is exposed via the
@@ -55,17 +57,8 @@ import "@zitadel/components";
     [project]="project"
     [projectId]="projectId"
     [proxyPath]="proxyPath"
-    [attr.project-id]="project?.projectId ?? projectId ?? null"
-    [attr.proxy-path]="project?.proxyPath ?? proxyPath ?? null"
-    [attr.url]="project?.url ?? null"
     [locales]="locales"
     [lang]="lang"
-    [attr.purpose]="purpose"
-    [attr.flow-name]="flowName"
-    [attr.post-sign-in-url]="postSignInUrl"
-    [attr.resume-flow-id]="resumeFlowId"
-    [attr.variant]="variant ?? null"
-    [attr.theme]="theme ?? null"
     [suppressHeader]="suppressHeader"
     [suppressPasswordToggle]="suppressPasswordToggle"
     (zitadel-flow-step)="onFlowStep($event)"
@@ -75,7 +68,7 @@ import "@zitadel/components";
     (zitadel-flow-error)="onFlowError($event)"
   ></zitadel-login>`,
 })
-export class ZitadelLoginComponent {
+export class ZitadelLoginComponent implements DoCheck {
   @Input() project?: ZitadelProject;
   @Input() projectId?: string;
   @Input() proxyPath?: string;
@@ -96,7 +89,12 @@ export class ZitadelLoginComponent {
   @Output() flowRedirect = new EventEmitter<ZitadelFlowRedirectDetail>();
   @Output() flowError = new EventEmitter<ZitadelFlowErrorDetail>();
 
-  @ViewChild("el") private elementRef?: ElementRef<ZitadelLoginElement>;
+  @ViewChild("el", { static: true }) private elementRef?: ElementRef<ZitadelLoginElement>;
+
+  ngDoCheck(): void {
+    if (this.elementRef)
+      writeAttributes(this.elementRef.nativeElement, widgetAttributes("login", this));
+  }
 
   /** The underlying `<zitadel-login>` custom element, or `null` before view init. */
   get element(): ZitadelLoginElement | null {

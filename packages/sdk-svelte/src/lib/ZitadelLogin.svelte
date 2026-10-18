@@ -11,7 +11,8 @@
     ZitadelLoginProps,
   } from './types';
   import { assignGiven } from './given';
-  import { onClient, proxyPathAttr } from './attributes';
+  import { widgetAttributes } from '@zitadel/sdk-core/attributes';
+  import { onClient, onServer } from './attributes';
 
   let {
     project,
@@ -49,7 +50,7 @@
   // binding would assign `undefined` and overwrite the default.
   $effect(() => {
     if (el) {
-      assignGiven(el, { lang, variant, theme, suppressHeader, suppressPasswordToggle });
+      assignGiven(el, { projectId, proxyPath, lang, variant, theme, suppressHeader, suppressPasswordToggle });
     }
   });
 
@@ -86,12 +87,6 @@
 <zitadel-login
   bind:this={el}
   project={onClient(project)}
-  {purpose}
+  {...widgetAttributes('login', { project, projectId, proxyPath, purpose, flowName, postSignInUrl, resumeFlowId, ...onServer({ lang, variant, theme, suppressHeader, suppressPasswordToggle }) })}
   {locales}
-  project-id={project?.projectId ?? projectId}
-  proxy-path={proxyPathAttr(project?.proxyPath ?? proxyPath)}
-  url={project?.url}
-  post-sign-in-url={postSignInUrl}
-  resume-flow-id={resumeFlowId}
-  flow-name={flowName}
 ></zitadel-login>
