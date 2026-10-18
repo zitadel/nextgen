@@ -2,6 +2,7 @@ import { readFile, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 
 import pc from "picocolors";
+import semver from "semver";
 
 import { detectors } from "../../lib/orca/detectors";
 import type { Detector } from "../../lib/orca/detectors/types";
@@ -147,16 +148,20 @@ function prettyFramework(framework: string): string {
 }
 
 /**
- * Strips `^`/`~`/`>=`/`v` prefixes from an npm range so the version reads cleanly in the summary.
- * Returns `undefined` when the spec is not a plain semver range (`catalog:`, `workspace:*`,
- * `latest`, a git URL), because printing that as the framework version would be wrong.
+ * Reduces a declared npm range to the version the summary shows: the first
+ * comparator of the first alternative, without its `^`/`~`/`>=`/`v` prefix, so
+ * `^15.0.0 || ^14.0.0` and `^15.0.0||^14.0.0` read `15.0.0` and `20.1.x` stays
+ * `20.1.x`. Returns `undefined` when the spec is not a valid semver range
+ * (`catalog:`, `workspace:*`, `file:`, git URLs, dist-tags such as `latest`) or
+ * names no version (`*`), because printing that as the framework version would
+ * be wrong.
  */
 function stripRange(range: string): string | undefined {
-  const trimmed = range.replace(/^([\^~]|>=?|v)/, "").trim();
-  // Take the first segment so multi-range strings (`^15.0.0 || ^14.0.0`)
-  // collapse to a single readable version in the report.
-  const first = trimmed.split(/\s+/)[0] ?? "";
-  return /^\d+(\.\d+){0,2}(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$/.test(first) ? first : undefined;
+  if (semver.validRange(range) === null) return undefined;
+  const alternative = range.split("||")[0] ?? "";
+  const first = alternative.trim().split(/\s+/)[0] ?? "";
+  const version = first.replace(/^([\^~]|>=?|v)/, "");
+  return /^\d/.test(version) ? version : undefined;
 }
 
 /** Returns just the file name from a relative path, for the `→ filename` secondary detail in PACKAGE rows. */
