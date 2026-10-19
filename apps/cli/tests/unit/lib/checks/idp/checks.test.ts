@@ -13,6 +13,8 @@ import {
 const DOCUMENT: Discovery = {
   issuer: "https://issuer.example",
   authorization_endpoint: "https://issuer.example/authorize",
+  token_endpoint: "https://issuer.example/token",
+  userinfo_endpoint: "https://issuer.example/userinfo",
   scopes_supported: ["openid", "email"],
   claims_supported: ["sub", "email"],
   code_challenge_methods_supported: ["S256"],
@@ -74,6 +76,52 @@ describe("IDP_CHECKS", () => {
       "skipped",
       "skipped",
     ]);
+  });
+
+  it.each([
+    ["token_endpoint", { ...DOCUMENT, token_endpoint: undefined }],
+    ["authorization_endpoint", { ...DOCUMENT, authorization_endpoint: undefined }],
+    ["userinfo_endpoint", { ...DOCUMENT, userinfo_endpoint: undefined }],
+    ["token_endpoint", { ...DOCUMENT, token_endpoint: "http://issuer.example/token" }],
+  ])(
+    "fails a discovery document with no usable %s, as the runtime would",
+    async (name, document) => {
+      const { by } = await resultsFor({}, document);
+
+      expect(by("discovery")).toMatchObject({
+        status: "fail",
+        message: expect.stringContaining(name),
+        recovery: expect.stringContaining(name),
+      });
+    },
+  );
+
+  it("does not need a userinfo endpoint from a connection that reads claims from the ID token", async () => {
+    const { by } = await resultsFor(
+      { idTokenMapping: true },
+      { ...DOCUMENT, userinfo_endpoint: undefined },
+    );
+
+    expect(by("discovery")?.status).toBe("pass");
+  });
+
+  it("fails the probe, with a way to retry, when the authorization endpoint cannot be reached", async () => {
+    const { context } = aContext({
+      request: async (url) => {
+        if (url.endsWith("/.well-known/openid-configuration")) {
+          return { status: 200, url, body: JSON.stringify(DOCUMENT) };
+        }
+        throw new Error("The operation timed out");
+      },
+    });
+
+    const results = await runChecks(IDP_CHECKS, context);
+
+    expect(results.find((result) => result.name === "callback-uri")).toMatchObject({
+      status: "fail",
+      message: expect.stringContaining("timed out"),
+      recovery: expect.stringContaining("https://issuer.example"),
+    });
   });
 
   it("fails an issuer the provider does not report, naming the one it does", async () => {

@@ -103,6 +103,8 @@ export interface PlatformMock {
    * is checked against.
    */
   hasOidcProvider(issuer: string): void;
+  /** A provider whose discovery document is larger than the CLI will read. */
+  hasOversizedDiscovery(issuer: string): void;
 
   /**
    * Arranges the project's audit stream for a live sign-in: it is empty when
@@ -216,6 +218,8 @@ export function usePlatformMock(): PlatformMock {
           HttpResponse.json({
             issuer,
             authorization_endpoint: `${GOOGLE_ISSUER}/o/oauth2/v2/auth`,
+            token_endpoint: `${GOOGLE_ISSUER}/token`,
+            userinfo_endpoint: `${GOOGLE_ISSUER}/userinfo`,
             scopes_supported: ["openid", "email", "profile"],
             claims_supported: ["sub", "email", "email_verified", "given_name", "family_name"],
             code_challenge_methods_supported: ["plain", "S256"],
@@ -236,6 +240,7 @@ export function usePlatformMock(): PlatformMock {
             issuer,
             authorization_endpoint: `${issuer}/authorize`,
             token_endpoint: `${issuer}/token`,
+            userinfo_endpoint: `${issuer}/userinfo`,
             scopes_supported: ["openid", "profile", "email"],
             code_challenge_methods_supported: ["S256"],
           }),
@@ -265,6 +270,14 @@ export function usePlatformMock(): PlatformMock {
               .reverse(),
           });
         }),
+      );
+    },
+
+    hasOversizedDiscovery(issuer) {
+      server.use(
+        http.get(`${issuer}/.well-known/openid-configuration`, () =>
+          HttpResponse.json({ issuer, padding: "x".repeat(2_000_000) }),
+        ),
       );
     },
 
