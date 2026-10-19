@@ -1,5 +1,53 @@
 # @zitadel/sdk-vue
 
+## 1.0.0-alpha.26
+
+### Minor Changes
+
+- [#1630](https://github.com/zitadel/nextgen/pull/1630) [`3949dab`](https://github.com/zitadel/nextgen/commit/3949daba71747aa6590ef6d454df482329f3322b) Thanks [@peintnermax](https://github.com/peintnermax)! - feat: password fields in `<zitadel-login>` now have a show/hide button, as
+  NIST SP 800-63B recommends. It is on by default; set `suppress-password-toggle`
+  on the element (a `suppressPasswordToggle` prop on every framework wrapper) to
+  hide it. The setting belongs to the embedding page and is not stored with the
+  branding.
+
+  The button replaces the clear button on password fields, so the field shows
+  one icon. It sits in the tab order right after the input, so keyboard users
+  can reach it, while a pointer click keeps focus in the field. A revealed
+  field opts out of spellcheck and autocorrect, and it is hidden again on
+  submit, form reset and step change. The widget applies the setting to its
+  fields directly, so it also holds for ejected templates; it is not a
+  `<zl-field>` attribute.
+
+  `@zitadel/testing`: the flow helpers' label fallback (`flowField` with a
+  `label`, used by `loginWithPassword` and `registerWithPassword`) now matches
+  the field by its textbox role, so the toggle's "Show password" name never
+  competes with the password field.
+
+- [#1938](https://github.com/zitadel/nextgen/pull/1938) [`9564ecf`](https://github.com/zitadel/nextgen/commit/9564ecf403a6e3383c7bf2215708e897aed1f124) Thanks [@mridang](https://github.com/mridang)! - Every SDK's `ZitadelLogin` now takes `resumeFlowId`, documented in its README, so a page can resume an existing sign-in flow (for example one kept across a reload) without reaching for the element. Clearing it, or passing `null` or an empty string, on `<zitadel-login>` now means "no handle" in every framework, which falls back to the `flow` query parameter as before.
+
+### Patch Changes
+
+- [#1977](https://github.com/zitadel/nextgen/pull/1977) [`2f2b873`](https://github.com/zitadel/nextgen/commit/2f2b87360d8604bf0f82271fb27958fbd29170f3) Thanks [@mridang](https://github.com/mridang)! - The SPA SDK READMEs now have an Installation section with the `@alpha` dist-tag and name their peer dependencies, and the Agent Skills use one install-note wording and the same `npx @zitadel/cli@alpha setup` command for scaffolding a new app.
+
+- [#1965](https://github.com/zitadel/nextgen/pull/1965) [`40470cc`](https://github.com/zitadel/nextgen/commit/40470ccc49759e091c72e103430df0e035dc1f9e) Thanks [@mridang](https://github.com/mridang)! - The READMEs and agent skills now explain what to do when an app server-renders the widgets: mount them on the client only, after hydration, or, where the SDK wrapper writes the project id and proxy path as attributes (React, Solid, Svelte), pass them as strings instead of a `project` object; the Vue, Angular and Qwik wrappers set them as element properties, so those pages point to client-only mounting or a raw `<zitadel-login>` element.
+
+- [#1995](https://github.com/zitadel/nextgen/pull/1995) [`decabad`](https://github.com/zitadel/nextgen/commit/decabad10dcd9fb78e5745a62d1e0a9434bd76c0) Thanks [@mridang](https://github.com/mridang)! - The READMEs and agent skills of every SDK now list the same widget props (including `heading`, `logoutLabel` and `suppressPasswordToggle`) and all six widget events, and the Next.js and Nuxt SDKs list the events their widgets dispatch.
+
+- [#1956](https://github.com/zitadel/nextgen/pull/1956) [`bdfca75`](https://github.com/zitadel/nextgen/commit/bdfca75531cd27245da2056b0d048723be012820) Thanks [@mridang](https://github.com/mridang)! - The README and Agent Skill install commands now name the `@alpha` dist-tag (`pnpm add @zitadel/sdk-react@alpha`). Without it, npm installs an old preview from `latest` instead of the current release.
+
+- [#2024](https://github.com/zitadel/nextgen/pull/2024) [`c0c48ce`](https://github.com/zitadel/nextgen/commit/c0c48ce3102fc25d2719eb6d3fa46507757a9e5d) Thanks [@mridang](https://github.com/mridang)! - Every SDK README now has a Requirements section after Installation that lists the peer dependencies the package declares and links the TypeScript floor shared by all SDKs, instead of the Next.js, Nuxt, Qwik City, SolidStart, SvelteKit and TanStack Start READMEs having none and the others restating the reason for the floor.
+
+- [#1948](https://github.com/zitadel/nextgen/pull/1948) [`eef798c`](https://github.com/zitadel/nextgen/commit/eef798c54db423216548f076f71249c505086166) Thanks [@mridang](https://github.com/mridang)! - The Vue components now bind the string props that have a widget default (`heading`, `logoutLabel`, `variant`, `theme` and `lang`) as attributes in the browser (and as plain attributes on the server, where Vue before 3.5.27 would otherwise write the `^` prefix into the markup), so an unset prop leaves the web component's own default in place instead of the empty string Vue assigns to a property. For example, `<ZitadelSession />` without a `heading` shows the default "Signed in as" title rather than an empty one, and a prop that is cleared after being set restores that default.
+
+  The Vue peer dependency is now `>=3.2`: the attribute binding needs Vue 3.2, and the components already relied on `expose`, which also arrived in 3.2.
+
+- [#1970](https://github.com/zitadel/nextgen/pull/1970) [`e704b1c`](https://github.com/zitadel/nextgen/commit/e704b1c9a8af834c68fbbc6dcba919992879f343) Thanks [@mridang](https://github.com/mridang)! - Fix the Vue `ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` components writing their configuration into server-rendered pages under names the widget never reads. The server markup now carries `project-id`, `proxy-path` and `url` attributes, including the values from a `project` handle, so the widget is configured when the browser upgrades it, before Vue hydrates.
+
+- Updated dependencies [[`7f82bfc`](https://github.com/zitadel/nextgen/commit/7f82bfc46930d2b8ca4132e569dfa4db4abfd5c7), [`17f56de`](https://github.com/zitadel/nextgen/commit/17f56de60ea40128898b6142d93a22c6fc6f2acd), [`717ae39`](https://github.com/zitadel/nextgen/commit/717ae39f47a1f27383e0f4e09d2d32125d5d8f57), [`c3e8fa4`](https://github.com/zitadel/nextgen/commit/c3e8fa47306d9f286d07303fea977e3f6d910d7d), [`66ad8b6`](https://github.com/zitadel/nextgen/commit/66ad8b6a3b2bc42ea8e4678940b686a15a1555ea), [`40470cc`](https://github.com/zitadel/nextgen/commit/40470ccc49759e091c72e103430df0e035dc1f9e), [`b4886f9`](https://github.com/zitadel/nextgen/commit/b4886f98de362ef6e80cb5e49a38e97daa2288b0), [`290dfe6`](https://github.com/zitadel/nextgen/commit/290dfe6f1c9b45d592e42703573a6acd5b16fa2a), [`4a4132f`](https://github.com/zitadel/nextgen/commit/4a4132fd2dc13f3a833a7aa0ab1dd35ef9b8fd6b), [`a76143e`](https://github.com/zitadel/nextgen/commit/a76143ef82829d098a30de40542f1c9bffb8eb99), [`cba30e6`](https://github.com/zitadel/nextgen/commit/cba30e6df9d61cf399c9d3f7288d21e97c63dd88), [`7f82bfc`](https://github.com/zitadel/nextgen/commit/7f82bfc46930d2b8ca4132e569dfa4db4abfd5c7), [`3949dab`](https://github.com/zitadel/nextgen/commit/3949daba71747aa6590ef6d454df482329f3322b), [`7fbd942`](https://github.com/zitadel/nextgen/commit/7fbd942580560ccab74d3fdd19b3e1eb6d922ee7), [`bdfca75`](https://github.com/zitadel/nextgen/commit/bdfca75531cd27245da2056b0d048723be012820), [`4a5578b`](https://github.com/zitadel/nextgen/commit/4a5578bf825132c047f37d124d616a3a4f9e9da9), [`44abdb8`](https://github.com/zitadel/nextgen/commit/44abdb8e827ce34d7aae8d620d43904b3142baf9), [`40c35c8`](https://github.com/zitadel/nextgen/commit/40c35c8f49e4e967ff701cf510b6cc6a4e776fc8), [`7f82bfc`](https://github.com/zitadel/nextgen/commit/7f82bfc46930d2b8ca4132e569dfa4db4abfd5c7), [`02c751f`](https://github.com/zitadel/nextgen/commit/02c751fc59b542e1c9ac6081875a91aa03bc0cbc), [`9564ecf`](https://github.com/zitadel/nextgen/commit/9564ecf403a6e3383c7bf2215708e897aed1f124), [`36fbcb4`](https://github.com/zitadel/nextgen/commit/36fbcb4e5383a0d6764efc44e9ac6da4e5c8d596), [`b3b0b28`](https://github.com/zitadel/nextgen/commit/b3b0b2888f0e64a4805f373a9835d8dc853add84), [`c205f49`](https://github.com/zitadel/nextgen/commit/c205f49fa0c6c0ea44407da6776cdb6e5dcfdfc9), [`13042d8`](https://github.com/zitadel/nextgen/commit/13042d8957738091ac428f28c7191f9b2e912697), [`c095aa3`](https://github.com/zitadel/nextgen/commit/c095aa334f77b5b59b6f72baae22703cd7c5369d), [`8182584`](https://github.com/zitadel/nextgen/commit/8182584001fe2115851022e8f92e696db52ee8be), [`3301e90`](https://github.com/zitadel/nextgen/commit/3301e90778a633b6d900a8ca427944f9e0b996d8)]:
+  - @zitadel/sdk-core@1.0.0-alpha.26
+  - @zitadel/api@1.0.0-alpha.26
+  - @zitadel/components@1.0.0-alpha.26
+
 ## 1.0.0-alpha.25
 
 ### Minor Changes
