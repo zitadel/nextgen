@@ -33,6 +33,7 @@ export class QwikCityScaffolder extends AbstractCLIScaffolder {
     fallback: "^18.17.0 || ^20.3.0 || >=21.0.0",
     enforcement: "warn",
   };
+  override readonly pinnedPackages: ReadonlyArray<string> = [CREATE_QWIK];
 
   protected async create(cwd: string, _framework: string): Promise<void> {
     this.runCommand("npx", ["-y", CREATE_QWIK, "empty", ".", "--installDeps=false"], cwd);

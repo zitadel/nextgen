@@ -18,6 +18,7 @@
   "include": [
     "*.config.mts",
     "*.config.ts",
+    "checks/**/*.ts",
     "scripts/**/*.ts",
     "src/**/*.d.ts",
     "src/**/*.spec.ts",
