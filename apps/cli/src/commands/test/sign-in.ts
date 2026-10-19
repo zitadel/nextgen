@@ -86,22 +86,21 @@ async function readBounded(response: Response, limit: number): Promise<string> {
   if (reader === undefined) {
     return "";
   }
-  const read = async (
-    size: number,
-    chunks: readonly Uint8Array[],
-  ): Promise<readonly Uint8Array[]> => {
+  const chunks: Uint8Array[] = [];
+  const seen = { bytes: 0 };
+  for (;;) {
     const { done, value } = await reader.read();
     if (done) {
-      return chunks;
+      break;
     }
-    if (size + value.byteLength > limit) {
+    seen.bytes += value.byteLength;
+    if (seen.bytes > limit) {
       // Not awaited: cancelling waits on the sender, which is the very thing being cut off.
       reader.cancel().catch(() => undefined);
       throw new Error(`${response.url} answered with more than ${limit} bytes`);
     }
-    return read(size + value.byteLength, [...chunks, value]);
-  };
-  const chunks = await read(0, []);
+    chunks.push(value);
+  }
   return new TextDecoder().decode(Buffer.concat(chunks));
 }
 

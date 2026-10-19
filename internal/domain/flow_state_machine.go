@@ -431,6 +431,13 @@ func (r *FlowStateMachineRuntime) Render(ctx context.Context, def *FlowDefinitio
 	return FlowStepResult{State: state, Step: step}, nil
 }
 
+// startsOver reports an error that is the flow starting over, not a sign-in that failed: the
+// attempt expired or was handed off, or another request settled it first. The live check takes
+// any SSO failure event for the end of the sign-in, so these must not be recorded as one.
+func startsOver(err error) bool {
+	return errors.Is(err, ErrFlowRestartRequired()) || errors.Is(err, ErrAuthAttemptAlreadyHandedOff())
+}
+
 // ssoFailureRecorded marks an error whose SSO failure event has been recorded
 // where it happened, so a caller further up does not record it again.
 type ssoFailureRecorded struct{ error }
@@ -592,8 +599,7 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 			// The creation recorded its own failure, with the phase it failed in. A restart is
 			// the flow starting over, not a sign-in that failed, so it records nothing.
 			_, recorded := errors.AsType[*ssoFailureRecorded](err)
-			restarts := errors.Is(err, ErrFlowRestartRequired()) || errors.Is(err, ErrAuthAttemptAlreadyHandedOff())
-			if !recorded && !restarts {
+			if !recorded && !startsOver(err) {
 				r.recordSSOFailure(ctx, state, parked.ProviderSlug, ssoevent.PhaseResolved, ssoevent.ReasonInternal)
 			}
 			return FlowStepResult{}, false, err
@@ -629,7 +635,9 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		return r.resolveStaleSSOBind(pc, resolvedFields, loadInput)
 	}
 	if err != nil {
-		r.recordSSOFailure(ctx, state, parked.ProviderSlug, ssoevent.PhaseResolved, ssoevent.ReasonInternal)
+		if !startsOver(err) {
+			r.recordSSOFailure(ctx, state, parked.ProviderSlug, ssoevent.PhaseResolved, ssoevent.ReasonInternal)
+		}
 		return FlowStepResult{}, false, fmt.Errorf("flow state machine: bind sso identity: %w", err)
 	}
 	return r.retrySSOHandoff(pc, resolvedFields, parked.Link.UserID, false)
@@ -704,7 +712,7 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 	if err != nil {
 		// A parked row another request already claimed is a race the caller settles by
 		// retrying from the bind, not a failure of this sign-in.
-		if !errors.Is(err, ErrSSOStateInvalid()) {
+		if !errors.Is(err, ErrSSOStateInvalid()) && !startsOver(err) {
 			r.recordSSOFailure(ctx, state, parked.ProviderSlug, ssoevent.PhaseUserCreated, ssoevent.ReasonInternal)
 			return "", &ssoFailureRecorded{fmt.Errorf("flow state machine: create sso user: %w", err)}
 		}
@@ -1605,7 +1613,9 @@ func (r *FlowStateMachineRuntime) processSSOCollection(pc *processCtx, resolved 
 		// Each field passed on its own, so the values fail only together.
 		return r.renderStepError(pc, resolved, new(FlowStepErrorSSOUserInvalid))
 	case err != nil:
-		r.recordSSOFailure(pc.ctx, state, collected.ProviderSlug, ssoevent.PhaseUserCreated, ssoevent.ReasonInternal)
+		if !startsOver(err) {
+			r.recordSSOFailure(pc.ctx, state, collected.ProviderSlug, ssoevent.PhaseUserCreated, ssoevent.ReasonInternal)
+		}
 		return FlowStepResult{}, fmt.Errorf("flow state machine: create sso user: %w", err)
 	}
 	recordResolvedUser(state, userID)

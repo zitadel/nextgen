@@ -7195,6 +7195,31 @@ func TestFlowStateMachine_Render_SSORecordsFailures(t *testing.T) {
 			want:    []domain.FlowSSOFailureInput{{ConnectionSlug: "google", Phase: ssoevent.PhaseUserCreated, Reason: ssoevent.ReasonInternal}},
 		},
 		{
+			name: "a bind that finds the attempt settled elsewhere is not a failure",
+			parked: func() *domain.FlowSSOParkedIdentity {
+				p := linkedParked()
+				p.ProviderSlug = "google"
+				return p
+			}(),
+			expect: func(w *flowTestWorld) {
+				w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Return(domain.ErrFlowRestartRequired())
+			},
+			wantErr: true,
+		},
+		{
+			name: "a creation that finds the attempt settled elsewhere is not a failure",
+			parked: func() *domain.FlowSSOParkedIdentity {
+				p := unlinkedParked(claims, verified)
+				p.ProviderSlug = "google"
+				return p
+			}(),
+			expect: func(w *flowTestWorld) {
+				w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(3)
+				w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Return("", domain.ErrFlowRestartRequired())
+			},
+			wantErr: true,
+		},
+		{
 			name: "a flow that starts over because the attempt already has a user is not a failure",
 			parked: func() *domain.FlowSSOParkedIdentity {
 				p := unlinkedParked(claims, verified)
