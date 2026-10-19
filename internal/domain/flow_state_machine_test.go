@@ -5448,7 +5448,9 @@ func TestFlowStateMachine_Render_SSOTeamUniqueClaimBindsOwnerWithoutTeam(t *test
 func TestFlowStateMachine_Render_SSOOutcomeUnwiredRendersStepError(t *testing.T) {
 	t.Parallel()
 	w, def, state := ssoRenderWorld(t)
-	w.expectParked(unlinkedParked(map[string]any{"email": "alice@example.com"}, nil), nil)
+	parked := unlinkedParked(map[string]any{"email": "alice@example.com"}, nil)
+	parked.ProviderSlug = "google"
+	w.expectParked(parked, nil)
 	w.expectOwner("email", "alice@example.com", "")
 
 	result, err := w.sm.Render(t.Context(), def, state)
@@ -5457,6 +5459,10 @@ func TestFlowStateMachine_Render_SSOOutcomeUnwiredRendersStepError(t *testing.T)
 	require.NotNil(t, result.Step.Error)
 	assert.Equal(t, domain.FlowStepErrorSSOUserNotFound, *result.Step.Error)
 	assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID)
+	assert.Equal(t, []domain.FlowSSOFailureInput{{
+		ProjectID: testProjectID, AttemptID: "att-1", ConnectionSlug: "google",
+		Phase: ssoevent.PhaseResolved, Reason: ssoevent.ReasonUnroutable,
+	}}, w.ssoFailures, "an outcome nothing routes ends the sign-in, so the audit trail says so")
 }
 
 // The validator does not require user_already_exists on a step that offers
@@ -7030,6 +7036,9 @@ func TestFlowStateMachine_Process_SSOCollectionStepErrors(t *testing.T) {
 			require.NotNil(t, result.Step.Error)
 			assert.Equal(t, tc.wantErr, *result.Step.Error)
 			assert.Empty(t, result.State.CollectedData.UserID)
+			if tc.wantErr == domain.FlowStepErrorSSOUserInvalid {
+				assert.Empty(t, w.ssoFailures, "a value the person can correct is not the end of the sign-in")
+			}
 		})
 	}
 }
@@ -7052,6 +7061,28 @@ func TestFlowStateMachine_Process_SSOCollectionRecordsAnUncreatableUser(t *testi
 	assert.Equal(t, []domain.FlowSSOFailureInput{{
 		ProjectID: testProjectID, AttemptID: "att-1", ConnectionSlug: "google",
 		Phase: ssoevent.PhaseUserCreated, Reason: ssoevent.ReasonUserInvalid,
+	}}, w.ssoFailures)
+}
+
+// A collision the collection step cannot route ends the sign-in, so it is recorded.
+func TestFlowStateMachine_Process_SSOCollectionRecordsAnUnroutableCollision(t *testing.T) {
+	t.Parallel()
+	w, def, state := submittableCollectionStepWorld(t)
+	step := &def.Steps[len(def.Steps)-1]
+	delete(step.Transitions, domain.FlowImplicitOutcomeUserAlreadyExists)
+	parked := unlinkedParked(map[string]any{"email": "alice@example.com", "badge": "b-7"}, map[string]bool{"email": true})
+	parked.ProviderSlug = "google"
+	w.expectCollected(parked, nil).MinTimes(1).MaxTimes(2)
+	w.expectOwner("badge", "b-7", "")
+	w.expectOwner("email", "alice@example.com", "user-9")
+
+	result, err := w.sm.Process(t.Context(), def, state, collectionSubmit(func(map[string]any) {}))
+
+	require.NoError(t, err)
+	require.NotNil(t, result.Step.Error)
+	assert.Equal(t, []domain.FlowSSOFailureInput{{
+		ProjectID: testProjectID, AttemptID: "att-1", ConnectionSlug: "google",
+		Phase: ssoevent.PhaseResolved, Reason: ssoevent.ReasonUnroutable,
 	}}, w.ssoFailures)
 }
 
@@ -7304,6 +7335,7 @@ func TestFlowStateMachine_Render_SSORecordsFailures(t *testing.T) {
 			t.Parallel()
 			w, def, state := ssoRenderWorld(t)
 			def.Steps[0].Transitions[domain.FlowImplicitOutcomeSSOAuthenticated] = domain.FlowStepTransition{Target: "done"}
+			def.Steps[0].Transitions[domain.FlowImplicitOutcomeSSOUserNotFound] = domain.FlowStepTransition{Target: "done"}
 			w.expectParked(tt.parked, tt.loadErr)
 			if tt.expect != nil {
 				tt.expect(w)

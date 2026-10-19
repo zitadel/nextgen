@@ -282,6 +282,20 @@ describe("LiveSignInCheck", () => {
     expect(await outcome).toMatchObject({ status: "fail", message: "no sign-in attempt seen" });
   });
 
+  it("fails an attempt that went back and finished with another connection", async () => {
+    const { outcome } = run([
+      sso({ phase: "exchange_finished" }),
+      sso({ slug: "other", phase: "exchange_finished" }),
+      event({ phase: "handed_off" }),
+    ]);
+
+    expect(await outcome).toMatchObject({
+      status: "fail",
+      message: "The sign-in went on with other instead of acme",
+      details: { attempt_id: "att_1" },
+    });
+  });
+
   it("ignores events of other connections", async () => {
     const { outcome } = run([
       sso({

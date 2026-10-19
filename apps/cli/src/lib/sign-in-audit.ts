@@ -59,9 +59,6 @@ const text = (value: unknown): string | undefined =>
 export function signInEventOf(event: AuditEvent, slug: string): SignInEvent | undefined {
   const { payload } = event;
   const connection = text(payload?.connection_slug) || undefined;
-  if (connection !== undefined && connection !== slug) {
-    return undefined;
-  }
   const failure = event.event_type === RESOLUTION_FAILED;
   const meaning = failure ? { status: "failed" as const, sso: true } : MEANING[event.event_type];
   const phase = failure ? text(payload?.phase) : MEANING[event.event_type]?.phase;
@@ -76,7 +73,9 @@ export function signInEventOf(event: AuditEvent, slug: string): SignInEvent | un
   const reason = text(payload?.reason);
   const side = text(payload?.side);
   return {
-    slug,
+    // An event of another connection keeps its own, so the follower can tell that an attempt
+    // it is following went on with a different provider.
+    slug: connection ?? slug,
     flowId: text(payload?.auth_attempt_id) ?? event.entity_id ?? "",
     ...(meaning.sso ? { sso: true as const } : {}),
     phase: phase as SignInPhase,

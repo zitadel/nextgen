@@ -118,10 +118,10 @@ describe("signInEventOf", () => {
     ]).toEqual(["att_9", "att_1"]);
   });
 
-  it("ignores an event of another connection", () => {
+  it("keeps an event of another connection under that connection, for the follower to tell", () => {
     const event = audit("auth.sso.exchange.succeeded", { payload: { connection_slug: "github" } });
 
-    expect(signInEventOf(event, "google")).toBeUndefined();
+    expect(signInEventOf(event, "google")).toMatchObject({ slug: "github", sso: true });
   });
 
   it.each([

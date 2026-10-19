@@ -198,6 +198,20 @@ export class LiveSignInCheck extends Check<IdpContext> {
     }
     const event = next.value;
     if (event.slug !== context.slug) {
+      if (
+        event.sso === true &&
+        progress.attempt !== undefined &&
+        event.flowId === progress.attempt
+      ) {
+        // One attempt can go back from this provider and finish with another; a handoff then is
+        // not a sign-in with this one.
+        return {
+          status: "fail",
+          message: `The sign-in went on with ${event.slug} instead of ${context.slug}`,
+          recovery: `Start again from ${context.live?.loginUrl} and choose ${context.slug}`,
+          details: detailsOf(progress.attempt, progress.seen, progress.last),
+        };
+      }
       return this.follow(watching, progress);
     }
     // The start and the handoff of an attempt belong to every kind of sign-in, a password

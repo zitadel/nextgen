@@ -610,6 +610,11 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		if outcome == FlowImplicitOutcomeSSOAuthenticated {
 			return r.retrySSOHandoff(pc, resolvedFields, state.CollectedData.UserID, true)
 		}
+		// Collecting what is missing needs a step wired for it; without one the person is shown
+		// an error and nothing can follow, which the audit trail must say.
+		if _, wired := currentStep.Transitions[outcome]; !wired && outcome == FlowImplicitOutcomeSSOUserNotFound {
+			r.recordSSOFailure(ctx, state, parked.ProviderSlug, ssoevent.PhaseResolved, ssoevent.ReasonUnroutable)
+		}
 		result, err := r.routeOutcome(pc, resolvedFields, outcome, false)
 		return result, true, err
 	}
@@ -1583,7 +1588,6 @@ func (r *FlowStateMachineRuntime) processSSOCollection(pc *processCtx, resolved 
 	case errors.Is(err, ErrSSOStateInvalid()):
 		return r.resolveStaleSSOSubmit(pc, resolved, loadInput)
 	case errors.Is(err, ErrUserInvalid()):
-		r.recordSSOFailure(pc.ctx, state, collected.ProviderSlug, ssoevent.PhaseUserCreated, ssoevent.ReasonUserInvalid)
 		// RequiredPaths does not see a property that allOf or a reference
 		// requires. The schema library locates it by keyword, as in
 		// properties/account allOf/0 required/id. It reports a property a then
@@ -1607,6 +1611,8 @@ func (r *FlowStateMachineRuntime) processSSOCollection(pc *processCtx, resolved 
 				}
 			}
 			if !slices.ContainsFunc(resolved.Fields, func(f FlowField) bool { return f.Name == string(path) }) {
+				// Only this refusal ends the sign-in; a value the person can correct below does not.
+				r.recordSSOFailure(pc.ctx, state, collected.ProviderSlug, ssoevent.PhaseUserCreated, ssoevent.ReasonUserInvalid)
 				return r.renderStepError(pc, resolved, new(FlowStepErrorSSOUserCannotBeCreated))
 			}
 		}
@@ -1636,6 +1642,7 @@ func (r *FlowStateMachineRuntime) ssoCollectionBindResult(pc *processCtx, resolv
 		result, err := r.resolveStaleSSOSubmit(pc, resolved, loadInput)
 		return result, true, err
 	case errors.Is(err, errSSOUnroutable):
+		r.recordSSOFailure(pc.ctx, pc.state, pc.state.SSOProviderSlug, ssoevent.PhaseResolved, ssoevent.ReasonUnroutable)
 		result, err := r.renderStepError(pc, resolved, new(FlowStepErrorSSOUnavailable))
 		return result, true, err
 	case errors.Is(err, ErrSSOOwnerOtherSchema):
