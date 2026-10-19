@@ -213,6 +213,22 @@ describe("server middleware", () => {
     expect(served.headers.get("location")).toContain("next=%2Fadmin");
   });
 
+  it("protected route with a query string redirects to /login?next=/admin?tab=x", async () => {
+    const served = await serve(`${ORIGIN}/admin?tab=x`, {}, OPTIONS);
+
+    expect(served.status).toBe(302);
+    const location = new URL(served.headers.get("location") ?? "", ORIGIN);
+    expect(`${location.pathname}${location.search}`).toBe("/login?next=%2Fadmin%3Ftab%3Dx");
+  });
+
+  it("does not nest a next parameter the request already carries", async () => {
+    const served = await serve(`${ORIGIN}/admin?tab=x&next=%2Fbilling`, {}, OPTIONS);
+
+    expect(served.status).toBe(302);
+    const location = new URL(served.headers.get("location") ?? "", ORIGIN);
+    expect(location.searchParams.getAll("next")).toEqual(["/admin?tab=x"]);
+  });
+
   // Routers that canonicalise to a trailing slash request `/profile/`, which
   // must not slip past `protectedRoutes: ["/profile"]`.
   it("protected route requested with a trailing slash redirects to login", async () => {

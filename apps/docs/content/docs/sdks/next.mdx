@@ -82,7 +82,7 @@ The Next.js SDK wires App Router applications through one server-side middleware
 <Steps>
   <Step>Proxy `/__nextgen/*` requests to the Zitadel backend.</Step>
   <Step>Validate the encrypted session token against `GET /sessions/me`.</Step>
-  <Step>Redirect unauthenticated users from protected routes to `loginPath`, with the requested path in `?next=`, where the login widget returns after sign-in.</Step>
+  <Step>Redirect unauthenticated users from protected routes to `loginPath`, with the requested path and query string in `?next=`, where the login widget returns after sign-in.</Step>
 </Steps>
 
 ## Usage

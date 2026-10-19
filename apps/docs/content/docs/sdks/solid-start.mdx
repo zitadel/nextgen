@@ -109,7 +109,7 @@ The SolidStart SDK is request middleware that proxies and verifies sessions on t
 <Steps>
   <Step>The middleware proxies same-origin `/__nextgen/*` requests to the backend, attaching the project secret only to the session handoff.</Step>
   <Step>It verifies the session token and puts the result on `event.locals.nextgenAuth`; read it with `getAuth(getRequestEvent()!)` in a server function.</Step>
-  <Step>It redirects unauthenticated requests for `protectedRoutes` to `loginPath`, with the requested path in `?next=`, where the login widget returns after sign-in.</Step>
+  <Step>It redirects unauthenticated requests for `protectedRoutes` to `loginPath`, with the requested path and query string in `?next=`, where the login widget returns after sign-in.</Step>
 </Steps>
 
 Nitro loads `.env` and `.env.local` into `process.env` in development, so the middleware finds `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET` there. Only `VITE_`-prefixed variables reach the browser.

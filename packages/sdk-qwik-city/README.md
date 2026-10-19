@@ -52,7 +52,7 @@ The handler runs on every request and does three things in one pass:
    never reaches the browser.
 2. **Verifies** the session JWT via JWKS using the Web Crypto API and stores the
    result on `requestEvent.sharedMap`.
-3. **Redirects** unauthenticated requests to `loginPath` for protected routes, with the requested path in `?next=`, where `<zitadel-login>` returns after sign-in.
+3. **Redirects** unauthenticated requests to `loginPath` for protected routes, with the requested path and query string in `?next=`, where `<zitadel-login>` returns after sign-in.
 
 To run alongside your own `onRequest`, export an array — Qwik City runs them in
 order:

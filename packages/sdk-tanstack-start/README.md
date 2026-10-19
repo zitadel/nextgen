@@ -54,7 +54,7 @@ The middleware runs on every request and does three things in one pass:
 2. **Verifies** the session JWT via JWKS using the Web Crypto API and places the
    result on the request context as `nextgenAuth`, which server functions
    receive.
-3. **Redirects** unauthenticated requests to `loginPath` for protected routes, with the requested path in `?next=`, where `<zitadel-login>` returns after sign-in.
+3. **Redirects** unauthenticated requests to `loginPath` for protected routes, with the requested path and query string in `?next=`, where `<zitadel-login>` returns after sign-in.
 
 The proxy/verify/protect decision is also exported as the framework-agnostic
 `handleNextgenRequest(request, options)` if you prefer to wire it into a custom

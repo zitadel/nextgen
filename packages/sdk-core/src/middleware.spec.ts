@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   HOP_BY_HOP,
   filterResponseHeaders,
+  loginRedirectUrl,
   matchesRoutes,
   requiresProjectSecret,
   validateOpaqueSessionToken,
@@ -139,6 +140,60 @@ describe("matchesRoutes", () => {
 
     expect(matchesRoutes(pathname, ["/profile"])).toBe(false);
     expect(performance.now() - started).toBeLessThan(250);
+  });
+});
+
+describe("loginRedirectUrl", () => {
+  /** The path `<zitadel-login>` reads back from the login page's `next`. */
+  const nextOf = (url: URL): string | null => url.searchParams.get("next");
+
+  it("puts the path of a request without a query in next", () => {
+    expect(loginRedirectUrl("/login", `${APP}/admin`).href).toBe(`${APP}/login?next=%2Fadmin`);
+  });
+
+  it("carries the query string in next", () => {
+    expect(loginRedirectUrl("/login", `${APP}/admin?tab=x`).href).toBe(
+      `${APP}/login?next=%2Fadmin%3Ftab%3Dx`,
+    );
+  });
+
+  it("keeps the query exactly as it was sent", () => {
+    // `%20` and `+` both read as a space to URLSearchParams, but not to every
+    // app, and a bare `flag` is not `flag=`: re-encoding would change them.
+    const url = loginRedirectUrl("/login", `${APP}/search?q=a%20b+c&flag&tags=x,y`);
+
+    expect(nextOf(url)).toBe("/search?q=a%20b+c&flag&tags=x,y");
+  });
+
+  it.each([
+    ["/admin?next=%2Fbilling", "/admin"],
+    ["/admin?tab=x&next=%2Fbilling", "/admin?tab=x"],
+    ["/admin?next=a&tab=x&next=b", "/admin?tab=x"],
+    ["/admin?next&tab=x", "/admin?tab=x"],
+    ["/admin?ne%78t=%2Fbilling&tab=x", "/admin?tab=x"],
+  ])("leaves the request's own next out of %s", (requested, expected) => {
+    expect(nextOf(loginRedirectUrl("/login", `${APP}${requested}`))).toBe(expected);
+  });
+
+  it("keeps the query of loginPath and replaces a next of its own", () => {
+    const url = loginRedirectUrl("/login?tab=sso&next=%2Fhome", `${APP}/admin?tab=x`);
+
+    expect(url.pathname).toBe("/login");
+    expect(url.searchParams.get("tab")).toBe("sso");
+    expect(url.searchParams.getAll("next")).toEqual(["/admin?tab=x"]);
+  });
+
+  // SvelteKit makes `search` throw on the request event's URL while it
+  // prerenders, so a protected page that gets prerendered must still redirect.
+  it("never reads search on the URL it is given", () => {
+    const requested = new URL(`${APP}/admin`);
+    Object.defineProperty(requested, "search", {
+      get() {
+        throw new Error("Cannot access url.search on a page with prerendering enabled");
+      },
+    });
+
+    expect(loginRedirectUrl("/login", requested).href).toBe(`${APP}/login?next=%2Fadmin`);
   });
 });
 

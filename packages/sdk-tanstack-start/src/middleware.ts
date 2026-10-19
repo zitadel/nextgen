@@ -4,6 +4,7 @@ import {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
   filterResponseHeaders,
+  loginRedirectUrl,
   matchesRoutes,
   requiresProjectSecret,
   validateOpaqueSessionToken,
@@ -291,9 +292,7 @@ export async function handleNextgenRequest(
     : [...cookies.keys()].filter((name) => name.startsWith("__nextgen")).map(clearCookie);
 
   if (matchesRoutes(pathname, protectedRoutes)) {
-    const loginUrl = new URL(loginPath, url2);
-    loginUrl.searchParams.set("next", pathname);
-    const headers = new Headers({ location: loginUrl.toString() });
+    const headers = new Headers({ location: loginRedirectUrl(loginPath, url2).toString() });
     for (const cookie of setCookies) {
       headers.append("set-cookie", cookie);
     }

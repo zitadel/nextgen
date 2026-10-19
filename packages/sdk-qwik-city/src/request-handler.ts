@@ -4,6 +4,7 @@ import {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
   filterResponseHeaders,
+  loginRedirectUrl,
   matchesRoutes,
   requiresProjectSecret,
   validateOpaqueSessionToken,
@@ -280,8 +281,7 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
   }
 
   if (matchesRoutes(pathname, protectedRoutes)) {
-    const loginUrl = new URL(loginPath, ev.url);
-    loginUrl.searchParams.set("next", pathname);
+    const loginUrl = loginRedirectUrl(loginPath, ev.url);
     throw ev.redirect(302, `${loginUrl.pathname}${loginUrl.search}`);
   }
 }

@@ -6,6 +6,7 @@ import {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
   filterResponseHeaders,
+  loginRedirectUrl,
   matchesRoutes,
   requiresProjectSecret,
 } from "@zitadel/sdk-core/middleware";
@@ -442,9 +443,7 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<voi
   }
 
   if (matchesRoutes(pathname, protectedRoutes)) {
-    const loginUrl = new URL(loginPath, getRequestURL(event));
-    loginUrl.searchParams.set("next", pathname);
-    await sendRedirect(event, loginUrl.toString(), 302);
+    await sendRedirect(event, loginRedirectUrl(loginPath, getRequestURL(event)).toString(), 302);
     return;
   }
 }
