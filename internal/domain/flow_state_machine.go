@@ -589,8 +589,11 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 			return result, true, err
 		}
 		if err != nil {
-			// The creation recorded its own failure, with the phase it failed in.
-			if _, recorded := errors.AsType[*ssoFailureRecorded](err); !recorded {
+			// The creation recorded its own failure, with the phase it failed in. A restart is
+			// the flow starting over, not a sign-in that failed, so it records nothing.
+			_, recorded := errors.AsType[*ssoFailureRecorded](err)
+			restarts := errors.Is(err, ErrFlowRestartRequired()) || errors.Is(err, ErrAuthAttemptAlreadyHandedOff())
+			if !recorded && !restarts {
 				r.recordSSOFailure(ctx, state, parked.ProviderSlug, ssoevent.PhaseResolved, ssoevent.ReasonInternal)
 			}
 			return FlowStepResult{}, false, err

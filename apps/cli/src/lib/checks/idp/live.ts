@@ -53,6 +53,17 @@ const EVENTS = "Run zitadel events list and look for the auth.sso events of the 
 /** What to do about a failed attempt: one action, chosen by the side that failed and the reason. */
 function recoveryFor(event: SignInEvent, context: IdpContext): string {
   const file = `.zitadel/idps/${context.slug}.json`;
+  switch (event.reason) {
+    case "discovery_failed":
+      return `Check oidc.issuer in ${file}, and that the provider is reachable from the server`;
+    case "userinfo_failed":
+    case "id_token_invalid":
+      return `Check oidc.scopes and oidc.id_token_mapping in ${file}: the provider's answer could not be used`;
+    case "provider_denied":
+      return `If you did not cancel it, check the client ID, the secret and the redirect URI ${context.callbackUri} at ${context.consoleUrl ?? "the provider's console"}; otherwise run it again`;
+    default:
+      break;
+  }
   if (event.side === "provider") {
     const where = context.consoleUrl ?? "the provider's console";
     return `Check the client ID, the secret and the redirect URI ${context.callbackUri} at ${where}`;

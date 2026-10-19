@@ -231,6 +231,69 @@ describe("watchSignInAudit", () => {
     expect(early).toBe("still reading");
   });
 
+  it("carries on after a read fails once, since the person is still signing in", async () => {
+    const stop = new AbortController();
+    const reads: Array<() => AuditPage> = [
+      () => page(["evt_old"]),
+      () => {
+        throw new Error("503");
+      },
+      () => ({ data: [audit("auth.sso.authorization.failed", { id: "evt_new" })] }),
+    ];
+    const fetchPage = async (): Promise<AuditPage> => reads.shift()?.() ?? { data: [] };
+
+    const events = (await watchSignInAudit(fetchPage, "google", instantly, 0, stop.signal))[
+      Symbol.asyncIterator
+    ]();
+    const first = await events.next();
+    stop.abort();
+
+    expect(first.value).toMatchObject({ phase: "callback_received" });
+  });
+
+  it("gives up once reads keep failing, saying why", async () => {
+    const stop = new AbortController();
+    const reads = [() => page([])];
+    const fetchPage = async (): Promise<AuditPage> => {
+      const read = reads.shift();
+      if (read === undefined) {
+        throw new Error("503");
+      }
+      return read();
+    };
+
+    const events = (await watchSignInAudit(fetchPage, "google", instantly, 0, stop.signal))[
+      Symbol.asyncIterator
+    ]();
+
+    await expect(events.next()).rejects.toThrow("503");
+    stop.abort();
+  });
+
+  it("takes an event with an empty connection slug for one that names none", async () => {
+    const stop = new AbortController();
+    const reads = [
+      page([]),
+      {
+        data: [
+          audit("auth.sso.authorization.failed", {
+            id: "evt_new",
+            payload: { connection_slug: "" },
+          }),
+        ],
+      },
+    ];
+    const fetchPage = async (): Promise<AuditPage> => reads.shift() ?? { data: [] };
+
+    const events = (await watchSignInAudit(fetchPage, "google", instantly, 0, stop.signal))[
+      Symbol.asyncIterator
+    ]();
+    const first = await events.next();
+    stop.abort();
+
+    expect(first.value).toMatchObject({ slug: "google" });
+  });
+
   it("ends when the signal aborts", async () => {
     const stop = new AbortController();
     stop.abort();

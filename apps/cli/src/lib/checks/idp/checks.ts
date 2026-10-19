@@ -36,7 +36,10 @@ export class DiscoveryReachableCheck extends Check<IdpContext> {
         : {
             status: "fail",
             message: `The discovery document has no usable ${missing.join(", ")}`,
-            recovery: `Check oidc.issuer in .zitadel/idps/${context.slug}.json: the runtime needs an https endpoint for each of ${missing.join(", ")}`,
+            recovery:
+              missing.length === 1 && missing[0] === "userinfo_endpoint"
+                ? `Set oidc.id_token_mapping to true in .zitadel/idps/${context.slug}.json to read claims from the ID token, since the provider lists no userinfo endpoint`
+                : `Check oidc.issuer in .zitadel/idps/${context.slug}.json: the runtime needs an https endpoint for each of ${missing.join(", ")}`,
           };
     }
     return {
@@ -65,6 +68,10 @@ function unusableEndpoints(document: Discovery, context: IdpContext): readonly s
   );
 }
 
+/** "a is", "a, b are all", so a lone entry does not read as a plural. */
+const listed = (names: readonly string[]) =>
+  names.length === 1 ? `${names.join("")} is` : `${names.join(", ")} are all`;
+
 export class IssuerCheck extends DiscoveryCheck {
   readonly name = "issuer";
   readonly title = "Issuer";
@@ -82,7 +89,9 @@ export class IssuerCheck extends DiscoveryCheck {
       : {
           status: "fail",
           message: `The provider reports ${reported || "no issuer"}, not ${context.issuer}`,
-          recovery: `Set oidc.issuer in .zitadel/idps/${context.slug}.json to ${reported}`,
+          recovery: reported.includes("{")
+            ? `The provider reports a templated issuer, ${reported}: set oidc.issuer in .zitadel/idps/${context.slug}.json to the issuer of one tenant, with the placeholder filled in`
+            : `Set oidc.issuer in .zitadel/idps/${context.slug}.json to ${reported}`,
         };
   }
 }
@@ -101,7 +110,7 @@ export class ScopesCheck extends DiscoveryCheck {
     }
     const unlisted = context.scopes.filter((scope) => !supported.includes(scope));
     return unlisted.length === 0
-      ? { status: "pass", message: `${context.scopes.join(", ")} are all listed by the provider` }
+      ? { status: "pass", message: `${listed(context.scopes)} listed by the provider` }
       : {
           status: "warn",
           message: `The provider does not list ${unlisted.join(", ")}`,
@@ -125,7 +134,7 @@ export class ClaimsCheck extends DiscoveryCheck {
     }
     const unlisted = context.claims.filter((claim) => !advertised.includes(claim));
     return unlisted.length === 0
-      ? { status: "pass", message: `${context.claims.join(", ")} are all listed by the provider` }
+      ? { status: "pass", message: `${listed(context.claims)} listed by the provider` }
       : {
           status: "warn",
           message: `The provider does not list ${unlisted.join(", ")}`,

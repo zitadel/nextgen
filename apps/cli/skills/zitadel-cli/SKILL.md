@@ -390,7 +390,7 @@ and waits for them to sign in, then reports from the project's audit events
 (`zitadel events list`) which phase failed and on which side, provider or
 journey; a wrong secret shows up there as a provider-side failure at the
 exchange. It works against any server the project is on, but the project must be
-claimed (`zitadel claim`), because the events of an unclaimed project are hidden,
+claimed (`zitadel claim`), because a project that is not claimed hides its events,
 and the files must be applied. A `--dry-run` starts nothing, since a sign-in can
 create a user and `--live` leaves any user it created in the project. It follows
 the first attempt that exchanges with the named connection and ignores the

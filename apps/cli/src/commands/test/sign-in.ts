@@ -60,6 +60,10 @@ const send: Send = async (url) => {
   });
   // Only the discovery document is read; a page such as the provider's sign-in or error page is not.
   const isJson = (response.headers.get("content-type") ?? "").includes("json");
+  if (!isJson) {
+    // Not awaited: cancelling waits on the sender, and nothing here needs its answer.
+    response.body?.cancel().catch(() => undefined);
+  }
   return {
     status: response.status,
     url: response.url,
@@ -77,21 +81,22 @@ async function readBounded(response: Response, limit: number): Promise<string> {
   if (reader === undefined) {
     return "";
   }
-  const chunks: Uint8Array[] = [];
-  const read = async (size: number): Promise<number> => {
+  const read = async (
+    size: number,
+    chunks: readonly Uint8Array[],
+  ): Promise<readonly Uint8Array[]> => {
     const { done, value } = await reader.read();
     if (done) {
-      return size;
+      return chunks;
     }
     if (size + value.byteLength > limit) {
       // Not awaited: cancelling waits on the sender, which is the very thing being cut off.
       reader.cancel().catch(() => undefined);
       throw new Error(`${response.url} answered with more than ${limit} bytes`);
     }
-    chunks.push(value);
-    return read(size + value.byteLength);
+    return read(size + value.byteLength, [...chunks, value]);
   };
-  await read(0);
+  const chunks = await read(0, []);
   return new TextDecoder().decode(Buffer.concat(chunks));
 }
 
@@ -133,8 +138,15 @@ export default class TestSignIn extends BaseCommand {
     const live = flags.live;
     await this.toMeta(flags);
     const { cwd } = this.meta;
-
+    const secret = await readZitadelSecret(cwd);
+    consola.info(`Project   ${secret.project_id}`);
+    consola.info(`Server    ${this.meta.source}`);
     const connections = await this.connections(cwd, flags.provider);
+    if (connections.length > 1 && live) {
+      throw new ZitadelError("E_VALIDATION", "A live sign-in belongs to one provider", {
+        hint: `Name one with --provider: ${connections.map(slugOf).join(", ")}`,
+      });
+    }
     if (live && this.meta.dryRun) {
       // A live sign-in is started by a person in a browser and can create a user and a
       // session, so a dry run stops before opening anything, as `claim` does.
@@ -145,11 +157,6 @@ export default class TestSignIn extends BaseCommand {
           title: "The live sign-in was not started.",
           would: `Open the login page and wait for a sign-in with ${connections.map(slugOf).join(", ")}, then report which phase failed and on which side.`,
         },
-      });
-    }
-    if (connections.length > 1 && live) {
-      throw new ZitadelError("E_VALIDATION", "A live sign-in belongs to one provider", {
-        hint: `Name one with --provider: ${connections.map(slugOf).join(", ")}`,
       });
     }
     const projectIssuer = readDevelopmentIssuer(await readZitadelConfig(cwd));
@@ -204,10 +211,28 @@ export default class TestSignIn extends BaseCommand {
               ? undefined
               : escaped(providers.length > 1 ? `${first.provider}: ${recovery}` : recovery),
           details: data,
+          nextCommands: [
+            publicCliCommand(`test sign-in --provider ${first.provider}`, this.meta.cliVersion),
+          ],
         },
       );
     }
-    return this.emit({ status: "ok", data });
+    const [only] = providers;
+    return this.emit({
+      status: "ok",
+      data: {
+        ...data,
+        next_actions: [
+          live
+            ? "The live sign-in completed; a user it created is still in the project."
+            : "Sign in once to be sure: these checks cannot prove the whole journey.",
+        ],
+        next_commands:
+          only === undefined
+            ? []
+            : [publicCliCommand(`test sign-in --provider ${only.provider}`, this.meta.cliVersion)],
+      },
+    });
   }
 
   /** Runs the battery for one connection, printing each check as it finishes. */
@@ -261,7 +286,9 @@ export default class TestSignIn extends BaseCommand {
                 // Under --json consola is silent, so the login URL a person has to open would reach
                 // nobody; stderr keeps stdout clean for the envelope and still shows it.
                 say: (message) =>
-                  this.jsonEnabled() ? process.stderr.write(`${message}\n`) : consola.info(message),
+                  this.jsonEnabled()
+                    ? process.stderr.write(`${escaped(message)}\n`)
+                    : consola.info(escaped(message)),
                 watch: async (signal) => {
                   const { client, projectId } = await this.projectClient(cwd);
                   return watchSignInAudit(
@@ -335,7 +362,7 @@ export default class TestSignIn extends BaseCommand {
         throw failure;
       },
     );
-    if (held === undefined || typeof held !== "object") {
+    if (held === undefined || held === null || typeof held !== "object") {
       throw new ZitadelError(
         "E_CREDENTIAL_MISSING",
         `The client secret variable ${name} is ${held === undefined ? "not set" : "not a secret"}`,

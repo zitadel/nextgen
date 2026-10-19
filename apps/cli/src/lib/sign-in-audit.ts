@@ -56,7 +56,7 @@ const text = (value: unknown): string | undefined =>
  */
 export function signInEventOf(event: AuditEvent, slug: string): SignInEvent | undefined {
   const { payload } = event;
-  const connection = text(payload?.connection_slug);
+  const connection = text(payload?.connection_slug) || undefined;
   if (connection !== undefined && connection !== slug) {
     return undefined;
   }
@@ -80,6 +80,8 @@ export function signInEventOf(event: AuditEvent, slug: string): SignInEvent | un
 }
 
 /** How many pages one read follows back, so a busy project cannot make a poll unbounded. */
+/** Reads in a row that may fail before the watcher gives up and says so. */
+const MAX_CONSECUTIVE_FAILURES = 5;
 const MAX_PAGES = 10;
 
 /**
@@ -120,13 +122,28 @@ export async function watchSignInAudit(
   signal: AbortSignal,
 ): Promise<AsyncIterable<SignInEvent>> {
   const known = new Set<string>();
+  const misses = { count: 0 };
   const poll = async function* (): AsyncGenerator<SignInEvent> {
     while (!signal.aborted) {
       await sleep(pollMs, signal);
       if (signal.aborted) {
         return;
       }
-      const fresh = await readNewAuditEvents(fetchPage, known, MAX_PAGES);
+      const fresh = await readNewAuditEvents(fetchPage, known, MAX_PAGES).then(
+        (events) => {
+          misses.count = 0;
+          return events;
+        },
+        (error: unknown) => {
+          // One failed read is a blip while the person is mid sign-in; only a run of them
+          // means the events cannot be read at all.
+          misses.count += 1;
+          if (misses.count >= MAX_CONSECUTIVE_FAILURES) {
+            throw error;
+          }
+          return [];
+        },
+      );
       for (const event of fresh) {
         known.add(event.id);
       }

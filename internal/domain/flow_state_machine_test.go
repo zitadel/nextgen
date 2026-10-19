@@ -7174,6 +7174,19 @@ func TestFlowStateMachine_Render_SSORecordsFailures(t *testing.T) {
 			want:    []domain.FlowSSOFailureInput{{ConnectionSlug: "google", Phase: ssoevent.PhaseUserCreated, Reason: ssoevent.ReasonInternal}},
 		},
 		{
+			name: "a flow that starts over because the attempt already has a user is not a failure",
+			parked: func() *domain.FlowSSOParkedIdentity {
+				p := unlinkedParked(claims, verified)
+				p.ProviderSlug = "google"
+				p.AttemptUserID = "user-signed-in"
+				return p
+			}(),
+			expect: func(w *flowTestWorld) {
+				w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).AnyTimes()
+			},
+			wantErr: true,
+		},
+		{
 			name:   "a handoff retried after a lost cookie is the connection the load recovered",
 			parked: &domain.FlowSSOParkedIdentity{BoundUserID: "user-1", ProviderSlug: "google"},
 			expect: func(w *flowTestWorld) {

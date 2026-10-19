@@ -163,8 +163,35 @@ describe("LiveSignInCheck", () => {
       message:
         "Failed at the provider's redirect back (provider side): the sign-in was declined at the provider",
       recovery:
-        "Check the client ID, the secret and the redirect URI http://localhost:3000/__nextgen/idp/acme/callback at https://console.example",
+        "If you did not cancel it, check the client ID, the secret and the redirect URI http://localhost:3000/__nextgen/idp/acme/callback at https://console.example; otherwise run it again",
     });
+  });
+
+  it("sends a provider-side exchange failure to the console, as the client or secret is wrong", async () => {
+    const { outcome } = run([
+      sso({
+        phase: "exchange_finished",
+        status: "failed",
+        reason: "exchange_failed",
+        side: "provider",
+      }),
+    ]);
+
+    expect((await outcome).recovery).toBe(
+      "Check the client ID, the secret and the redirect URI http://localhost:3000/__nextgen/idp/acme/callback at https://console.example",
+    );
+  });
+
+  it.each([
+    ["discovery_failed", "Check oidc.issuer in .zitadel/idps/acme.json"],
+    ["userinfo_failed", "Check oidc.scopes and oidc.id_token_mapping in .zitadel/idps/acme.json"],
+    ["id_token_invalid", "Check oidc.scopes and oidc.id_token_mapping in .zitadel/idps/acme.json"],
+  ])("does not blame the client or secret for %s", async (reason, expected) => {
+    const { outcome } = run([
+      sso({ phase: "exchange_finished", status: "failed", reason, side: "provider" }),
+    ]);
+
+    expect((await outcome).recovery).toContain(expected);
   });
 
   it.each([
