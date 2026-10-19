@@ -99,7 +99,9 @@ export async function getSession(api: ZitadelApi): Promise<SessionIdentity> {
 /**
  * Revokes the current session (`DELETE /sessions/me`) with credentials. The
  * server deletes the session and clears the cookie via `Set-Cookie: Max-Age=0`.
+ * It answers `204` with no body, so the answer is `undefined`; the caller checks
+ * that, since anything else did not come from the backend.
  */
-export async function revokeSession(api: ZitadelApi): Promise<void> {
-  await api.revokeMySession(apiRequestInit);
+export async function revokeSession(api: ZitadelApi): Promise<unknown> {
+  return api.revokeMySession(apiRequestInit);
 }

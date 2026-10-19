@@ -7,6 +7,7 @@ import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import {
   NO_SESSION,
   OUTAGES,
+  UNREADABLE_REVOCATIONS,
   UNREADABLE_SESSIONS,
   sessionNotFound,
   unauthorized,
@@ -463,6 +464,72 @@ describe("<zitadel-session>", () => {
 
     expect(errors).toHaveLength(1);
     expect(errors[0]?.detail).toMatchObject({ phase: "signout", status: 500, code: "internal" });
+  });
+
+  it.each(UNREADABLE_REVOCATIONS)(
+    "reports status 200 and does not sign out when sign-out gets %s",
+    async (_, answer) => {
+      const element = mount();
+      await flush(element);
+      server.use(http.delete(`${API_BASE}/sessions/me`, answer));
+      const errors: CustomEvent[] = [];
+      const signouts: Event[] = [];
+      element.addEventListener("zitadel-session-error", (e) => errors.push(e as CustomEvent));
+      element.addEventListener("zitadel-signout", (e) => signouts.push(e));
+
+      activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
+      await new Promise((resolve) => setTimeout(resolve, 32));
+      await element.updateComplete;
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]?.detail).toMatchObject({ phase: "signout", status: 200 });
+      expect(signouts).toHaveLength(0);
+    },
+  );
+
+  it("keeps a sign-out failure's message when the load that follows also fails while removed", async () => {
+    let requests = 0;
+    let answerLoad: () => void = () => undefined;
+    let answerSignOut: () => void = () => undefined;
+    server.use(
+      http.get(`${API_BASE}/sessions/me`, async () => {
+        requests += 1;
+        if (requests === 1) {
+          await new Promise<void>((resolve) => {
+            answerLoad = resolve;
+          });
+          return HttpResponse.json(
+            { code: "internal", message: "Internal error" },
+            { status: 500 },
+          );
+        }
+        return HttpResponse.json(sessionBody(currentEmail, currentUserId));
+      }),
+      http.delete(`${API_BASE}/sessions/me`, async () => {
+        await new Promise<void>((resolve) => {
+          answerSignOut = resolve;
+        });
+        return HttpResponse.json({ code: "internal", message: "Internal error" }, { status: 500 });
+      }),
+    );
+    const errors: CustomEvent[] = [];
+    const element = mount();
+    element.addEventListener("zitadel-session-error", (e) => errors.push(e as CustomEvent));
+    await flush(element);
+
+    activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
+    await new Promise((resolve) => setTimeout(resolve, 16));
+    element.remove();
+    answerSignOut();
+    answerLoad();
+    await new Promise((resolve) => setTimeout(resolve, 32));
+
+    host.appendChild(element);
+    await flush(element);
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.detail).toMatchObject({ phase: "signout", status: 500 });
+    expect(element.shadowRoot?.querySelector(".error")).not.toBeNull();
   });
 
   it("reports a sign-out it completed while removed, once put back", async () => {

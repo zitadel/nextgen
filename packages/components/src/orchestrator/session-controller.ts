@@ -51,10 +51,11 @@ export interface SessionErrorDetail {
 }
 
 /**
- * A `GET /sessions/me` that answered 200 with something that is not a session.
- * A response did come back, so the event carries its status.
+ * A request that answered 200 with something the backend would not send: not a
+ * session for `GET /sessions/me`, a body for `DELETE /sessions/me`. A response
+ * did come back, so the event carries its status.
  */
-class NotASessionError extends Error {
+class UnexpectedAnswerError extends Error {
   readonly status = 200;
 }
 
@@ -63,7 +64,7 @@ function sessionErrorDetail(
   message: string,
   phase: SessionErrorDetail["phase"],
 ): SessionErrorDetail {
-  if (error instanceof NotASessionError) return { status: error.status, message, phase };
+  if (error instanceof UnexpectedAnswerError) return { status: error.status, message, phase };
   if (!(error instanceof ApiError)) return { message, phase };
   const code = apiErrorCode(error);
   return code === undefined
@@ -193,7 +194,12 @@ export class SessionController implements ReactiveController {
     this.host.requestUpdate();
 
     try {
-      await revokeSession(this.resolve());
+      const answer = await revokeSession(this.resolve());
+      // The backend answers `204` with no body. Anything else (an SPA host's
+      // page, a proxy's `{}`) did not come from the backend, so nothing was revoked.
+      if (answer !== undefined) {
+        throw new UnexpectedAnswerError("Could not sign out: the response is not the backend's.");
+      }
     } catch (error) {
       if (!isNoSession(error)) {
         const message = error instanceof Error ? error.message : "";
@@ -252,7 +258,9 @@ export class SessionController implements ReactiveController {
       // `index.html` served for an unrewritten proxy path, a proxy's `{}`, an empty
       // id) did not come from the backend. The server SDKs reject the same bodies.
       if (typeof session?.session_id !== "string" || session.session_id === "") {
-        throw new NotASessionError("Could not load the session: the response is not a session.");
+        throw new UnexpectedAnswerError(
+          "Could not load the session: the response is not a session.",
+        );
       }
       this.display = session.user?.display ?? "";
       this.identifier = session.user?.identifier ?? "";
@@ -281,7 +289,10 @@ export class SessionController implements ReactiveController {
         // that answer instead, and the failure it discards must not outlive a
         // retry that succeeds.
         this.identityRequested = false;
-        this.errorMessage = "";
+        // A sign-out failure that is waiting to be reported keeps its message.
+        if (this.missedSignOutFailure === undefined) {
+          this.errorMessage = "";
+        }
       }
     }
     if (!missing) return;

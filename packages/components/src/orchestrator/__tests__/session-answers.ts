@@ -71,3 +71,16 @@ export const UNREADABLE_SESSIONS: readonly (readonly [string, () => Response])[]
   ["a 200 JSON that is not a session", () => HttpResponse.json({ ok: true })],
   ["a 200 with an empty session_id", () => HttpResponse.json({ session_id: "" })],
 ];
+
+/** `DELETE /sessions/me` 200s that carry a body; the backend answers `204` with none. */
+export const UNREADABLE_REVOCATIONS: readonly (readonly [string, () => Response])[] = [
+  [
+    "an SPA host's HTML 200",
+    () =>
+      new HttpResponse("<!doctype html><html><body>app</body></html>", {
+        status: 200,
+        headers: { "content-type": "text/html" },
+      }),
+  ],
+  ["a 200 JSON that is not the backend's", () => HttpResponse.json({ ok: true })],
+];

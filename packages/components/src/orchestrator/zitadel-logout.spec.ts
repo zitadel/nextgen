@@ -7,6 +7,7 @@ import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import {
   NO_SESSION,
   OUTAGES,
+  UNREADABLE_REVOCATIONS,
   UNREADABLE_SESSIONS,
   unauthorized,
 } from "./__tests__/session-answers.js";
@@ -613,6 +614,29 @@ describe("<zitadel-logout>", () => {
       expect(errorBar.textContent?.trim().length).toBeGreaterThan(0);
       expect(events).toHaveLength(0);
       expect(window.location.href).toBe("");
+    },
+  );
+
+  it.each(UNREADABLE_REVOCATIONS)(
+    "reports status 200 and does not sign out when sign-out gets %s",
+    async (_, answer) => {
+      const element = mount();
+      await flush(element);
+      server.use(http.delete(`${API_BASE}/sessions/me`, answer));
+      const errors: CustomEvent[] = [];
+      const signouts: Event[] = [];
+      element.addEventListener("zitadel-session-error", (e) => errors.push(e as CustomEvent));
+      element.addEventListener("zitadel-signout", (e) => signouts.push(e));
+
+      shadowQuery<HTMLButtonElement>(element, ".trigger").click();
+      await element.updateComplete;
+      shadowQuery<HTMLButtonElement>(element, ".signout-btn").click();
+      await new Promise((resolve) => setTimeout(resolve, 32));
+      await element.updateComplete;
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]?.detail).toMatchObject({ phase: "signout", status: 200 });
+      expect(signouts).toHaveLength(0);
     },
   );
 
