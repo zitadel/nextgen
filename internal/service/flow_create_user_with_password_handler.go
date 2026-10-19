@@ -12,6 +12,7 @@ import (
 // persist a new user from validated identifier + password fields.
 type FlowCreateUserWithPasswordHandler struct {
 	hashers     ProjectHasherResolver
+	passwords   PasswordGate
 	userService UserService
 	schemaStore domain.JSONSchemaStore
 	db          StatementPool
@@ -19,6 +20,7 @@ type FlowCreateUserWithPasswordHandler struct {
 
 func NewFlowCreateUserHandler(
 	hashers ProjectHasherResolver,
+	passwords PasswordGate,
 	userService UserService,
 	schemaStore domain.JSONSchemaStore,
 	db StatementPool,
@@ -27,6 +29,7 @@ func NewFlowCreateUserHandler(
 		userService: userService,
 		schemaStore: schemaStore,
 		hashers:     hashers,
+		passwords:   passwords,
 		db:          db,
 	}
 }
@@ -60,6 +63,7 @@ func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domai
 			Password:  password,
 		},
 		h.hashers,
+		h.passwords,
 	)
 	// The user just chose this password, so knowledge is proven: record real
 	// user + password factors on the attempt in the same transaction, so the
@@ -77,6 +81,15 @@ func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domai
 	if err != nil {
 		if derr, ok := errors.AsType[domain.Error](err); ok && derr.Code == domain.ErrUserAlreadyExists().Code {
 			return domain.FlowOnSuccessResult{StepError: new(domain.FlowStepErrorUserAlreadyExists)}, nil
+		}
+		// A password the policy rejects stays on the step, next to the field,
+		// so the user can pick another one instead of seeing a failed request.
+		if errors.Is(err, domain.ErrUserPasswordPolicyViolation(nil)) {
+			if derr, ok := errors.AsType[domain.Error](err); ok {
+				if details, ok := derr.Details.(domain.PasswordPolicyViolations); ok {
+					return domain.FlowOnSuccessResult{StepError: new(domain.PasswordPolicyStepError(details.Violations))}, nil
+				}
+			}
 		}
 		return domain.FlowOnSuccessResult{}, err
 	}

@@ -1538,6 +1538,15 @@ func (r *FlowStateMachineRuntime) processSSOCollection(pc *processCtx, resolved 
 		return r.renderStepError(pc, resolved, new(FlowStepErrorUserAlreadyExists))
 	case errors.Is(err, ErrSSOStateInvalid()):
 		return r.resolveStaleSSOSubmit(pc, resolved, loadInput)
+	case errors.Is(err, ErrUserPasswordPolicyViolation(nil)):
+		// The password the user chose breaks the policy: show it on the
+		// password field, as registration does, so they can pick another.
+		if derr, ok := errors.AsType[Error](err); ok {
+			if details, ok := derr.Details.(PasswordPolicyViolations); ok {
+				return r.renderStepError(pc, resolved, new(PasswordPolicyStepError(details.Violations)))
+			}
+		}
+		return FlowStepResult{}, fmt.Errorf("flow state machine: create sso user: %w", err)
 	case IsUserInvalid(err):
 		// RequiredPaths does not see a property that allOf or a reference
 		// requires. The schema library locates it by keyword, as in

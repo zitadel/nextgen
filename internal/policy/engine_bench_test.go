@@ -8,12 +8,13 @@ import (
 
 // The benchmarks below measure what evaluating the password policy through
 // CEL costs next to the same three checks written in Go (#1437). The
-// instance is bound once, as the gate will do per resolve; each iteration is
+// instance is bound once, as the gate does per resolve; each iteration is
 // one password save's evaluation, without building the context and without
 // any hashing.
 
 var benchContext = map[string]any{
 	"candidate":       map[string]any{"length": 14},
+	"self_service":    true,
 	"history_matches": []bool{false, false, true, false},
 }
 
@@ -40,7 +41,7 @@ func BenchmarkEvaluate_CEL(b *testing.B) {
 }
 
 // passwordRulesGo is the hand-written twin of the template's rules.
-func passwordRulesGo(minLength, maxLength, historyDepth int, length int, historyMatches []bool) map[string]any {
+func passwordRulesGo(minLength, maxLength, historyDepth int, length int, selfService bool, historyMatches []bool) map[string]any {
 	var violations map[string]any
 	add := func(rule string, value int) {
 		if violations == nil {
@@ -55,6 +56,9 @@ func passwordRulesGo(minLength, maxLength, historyDepth int, length int, history
 		add("max_length", maxLength)
 	}
 	for _, matched := range historyMatches[:min(len(historyMatches), historyDepth)] {
+		if !selfService {
+			break
+		}
 		if matched {
 			add("history_depth", historyDepth)
 			break
@@ -67,7 +71,7 @@ func BenchmarkEvaluate_Go(b *testing.B) {
 	matches := benchContext["history_matches"].([]bool)
 	b.ReportAllocs()
 	for b.Loop() {
-		if v := passwordRulesGo(15, 64, 4, 14, matches); len(v) == 0 {
+		if v := passwordRulesGo(15, 64, 4, 14, true, matches); len(v) == 0 {
 			b.Fatal("want a deny")
 		}
 	}

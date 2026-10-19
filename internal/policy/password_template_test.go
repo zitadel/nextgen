@@ -25,6 +25,7 @@ func passwordContext(length int, historyMatches ...bool) map[string]any {
 	}
 	return map[string]any{
 		"candidate":       map[string]any{"length": length},
+		"self_service":    true,
 		"history_matches": historyMatches,
 	}
 }
@@ -50,10 +51,9 @@ func TestPasswordTemplate_BoundsMatchDomain(t *testing.T) {
 	}
 
 	// history_depth counts the current password; UserPasswordHistoryDepth
-	// still counts only the previous ones storage returns. Storage can
-	// therefore supply the current password plus that many, and the template
-	// must not ask for more. Tighten to equality once the constant counts the
-	// current password too.
+	// counts the previous ones storage returns, without the current one. The
+	// gate reads the current password plus those, so the template may ask
+	// for at most one more than the constant.
 	require.NotNil(t, tpl.Config["history_depth"].Maximum)
 	assert.LessOrEqual(t, *tpl.Config["history_depth"].Maximum, int64(domain.UserPasswordHistoryDepth)+1)
 }
@@ -116,6 +116,11 @@ func TestPasswordSet_Evaluate(t *testing.T) {
 			wantViolations: map[string]any{"history_depth": int64(4)},
 		},
 		{
+			name:    "history is ignored unless the user sets their own password",
+			config:  `{"history_depth":4}`,
+			context: map[string]any{"candidate": map[string]any{"length": 10}, "self_service": false, "history_matches": []bool{}},
+		},
+		{
 			name:    "no kept password matches",
 			config:  `{"history_depth":4}`,
 			context: passwordContext(10, false, false, false, false),
@@ -142,6 +147,7 @@ func TestPasswordSet_Evaluate(t *testing.T) {
 			config: `{"min_length":12}`,
 			context: map[string]any{
 				"candidate":       map[string]any{"length": float64(16)},
+				"self_service":    true,
 				"history_matches": []any{false},
 			},
 		},

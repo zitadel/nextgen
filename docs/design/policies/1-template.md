@@ -21,12 +21,13 @@ all hold, as far as they are active, for the operation to proceed.
   ],
   "context": {
     "candidate":       { "length": "int" },
+    "self_service":    "bool",
     "history_matches": "list<bool>"
   },
   "rules": [
     { "name": "min_length",    "expression": "candidate.length >= config.min_length" },
     { "name": "max_length",    "expression": "candidate.length <= config.max_length" },
-    { "name": "history_depth", "expression": "!history_matches.slice(0, size(history_matches) < config.history_depth ? size(history_matches) : config.history_depth).exists(m, m)" }
+    { "name": "history_depth", "expression": "!self_service || !history_matches.slice(0, size(history_matches) < config.history_depth ? size(history_matches) : config.history_depth).exists(m, m)" }
   ]
 }
 ```
