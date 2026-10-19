@@ -6,7 +6,6 @@ import {
   IssuerCheck,
   PkceCheck,
   ScopesCheck,
-  SecretProbeCheck,
 } from "./checks";
 import type { IdpContext, ProviderProbes } from "./context";
 import { GOOGLE_PROBES } from "./google";
@@ -30,7 +29,6 @@ export const IDP_CHECKS: readonly Check<IdpContext>[] = [
   new ClaimsCheck(),
   new PkceCheck(),
   new AuthorizeProbeCheck(),
-  new SecretProbeCheck(),
   new LiveSignInCheck(),
 ];
 

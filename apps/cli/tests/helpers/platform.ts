@@ -24,11 +24,9 @@ export interface ProviderBehaviour {
   readonly issuer?: string;
   readonly callbackUri?: "registered" | "unregistered";
   readonly client?: "known" | "unknown";
-  readonly secret?: "right" | "wrong";
 }
 
 const GOOGLE_ISSUER = "https://accounts.google.com";
-const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 
 /** The cause Google puts in the URL of the error page it ends an authorization request on. */
 const refusalPage = (cause: string) =>
@@ -192,12 +190,7 @@ export function usePlatformMock(): PlatformMock {
       watchers.push(watcher);
     },
 
-    hasGoogle({
-      callbackUri = "registered",
-      client = "known",
-      secret = "right",
-      issuer = GOOGLE_ISSUER,
-    } = {}) {
+    hasGoogle({ callbackUri = "registered", client = "known", issuer = GOOGLE_ISSUER } = {}) {
       const authorizeTo =
         client === "unknown"
           ? refusalPage("invalid_client")
@@ -209,7 +202,6 @@ export function usePlatformMock(): PlatformMock {
           HttpResponse.json({
             issuer,
             authorization_endpoint: `${GOOGLE_ISSUER}/o/oauth2/v2/auth`,
-            token_endpoint: GOOGLE_TOKEN_URL,
             scopes_supported: ["openid", "email", "profile"],
             claims_supported: ["sub", "email", "email_verified", "given_name", "family_name"],
             code_challenge_methods_supported: ["plain", "S256"],
@@ -220,20 +212,6 @@ export function usePlatformMock(): PlatformMock {
         ),
         http.get(`${GOOGLE_ISSUER}/v3/signin/identifier`, () => HttpResponse.html("sign in")),
         http.get(`${GOOGLE_ISSUER}/signin/oauth/error`, () => HttpResponse.html("error")),
-        http.post(GOOGLE_TOKEN_URL, () =>
-          secret === "wrong"
-            ? HttpResponse.json(
-                {
-                  error: "invalid_client",
-                  error_description: "The provided client secret is invalid.",
-                },
-                { status: 401 },
-              )
-            : HttpResponse.json(
-                { error: "invalid_grant", error_description: "Malformed auth code." },
-                { status: 400 },
-              ),
-        ),
       );
     },
 
@@ -252,10 +230,7 @@ export function usePlatformMock(): PlatformMock {
     },
 
     googleIsUnreachable() {
-      server.use(
-        http.all(`${GOOGLE_ISSUER}/*`, () => HttpResponse.error()),
-        http.all(GOOGLE_TOKEN_URL, () => HttpResponse.error()),
-      );
+      server.use(http.all(`${GOOGLE_ISSUER}/*`, () => HttpResponse.error()));
     },
 
     capturesBrandingPublishes() {

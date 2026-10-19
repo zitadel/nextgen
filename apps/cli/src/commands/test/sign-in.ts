@@ -58,15 +58,13 @@ const wait = (ms: number, signal: AbortSignal) =>
     );
   });
 
-/** One HTTP exchange, following redirects, bounded in time and in the body it keeps. */
-const send: Send = async (url, init) => {
+/** One GET, following redirects, bounded in time and in the body it keeps. */
+const send: Send = async (url) => {
   const response = await fetch(url, {
-    ...init,
-    // A POST carries the client secret, so it is never forwarded to wherever a redirect points.
-    redirect: init === undefined ? "follow" : "manual",
+    redirect: "follow",
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
-  // Only the discovery document and the token answer are read; a page such as the provider's sign-in or error page is not.
+  // Only the discovery document is read; a page such as the provider's sign-in or error page is not.
   const isJson = (response.headers.get("content-type") ?? "").includes("json");
   if (!isJson) {
     response.body?.cancel().catch(() => undefined);
@@ -82,26 +80,23 @@ const send: Send = async (url, init) => {
  * `zitadel test sign-in` — check a sign-in provider's setup before the first
  * sign-in.
  *
- * Runs the {@link IDP_CHECKS} battery against one connection: the provider's
- * discovery document, then what the provider itself says about the client, the
- * callback URI and (when supplied) the client secret. Each check prints as it
- * finishes. A check that fails makes the command fail; one that could not tell
- * is shown as skipped and never counted as a pass.
+ * Runs the {@link IDP_CHECKS} battery against every connection the project
+ * has, or the one named: the provider's discovery document, then what the
+ * provider itself says about the client and the callback URI. None of it needs
+ * the client secret, which the platform never reads back. Each check prints as
+ * it finishes. A check that fails makes the command fail; one that could not
+ * tell is shown as skipped and never counted as a pass.
  */
 export default class TestSignIn extends BaseCommand {
   static override description = "Check that a sign-in provider is set up correctly.";
   static override group = CommandGroups.configuration;
   static override examples = [
     "<%= config.bin %> test sign-in --provider google",
-    "echo $GOOGLE_CLIENT_SECRET | <%= config.bin %> test sign-in --provider google --client-secret-stdin",
     "<%= config.bin %> test sign-in --provider google --live",
   ];
   static override flags = {
     provider: nonBlankString({
       description: "Connection to check. Defaults to every connection the Project has.",
-    }),
-    "client-secret-stdin": Flags.boolean({
-      description: "Read the provider's client secret, to check it, from stdin.",
     }),
     live: Flags.boolean({
       description:
@@ -135,12 +130,10 @@ export default class TestSignIn extends BaseCommand {
     }
 
     const connections = await this.connections(cwd, flags.provider);
-    if (connections.length > 1 && (live || flags["client-secret-stdin"])) {
-      throw new ZitadelError(
-        "E_VALIDATION",
-        `${live ? "A live sign-in" : "A client secret"} belongs to one provider`,
-        { hint: `Name one with --provider: ${connections.map(slugOf).join(", ")}` },
-      );
+    if (connections.length > 1 && live) {
+      throw new ZitadelError("E_VALIDATION", "A live sign-in belongs to one provider", {
+        hint: `Name one with --provider: ${connections.map(slugOf).join(", ")}`,
+      });
     }
     const projectIssuer = readDevelopmentIssuer(await readZitadelConfig(cwd));
     if (projectIssuer === undefined) {
@@ -148,16 +141,6 @@ export default class TestSignIn extends BaseCommand {
         hint: "The callback URI is built from it; run zitadel setup first.",
       });
     }
-    const suppliedSecret = await this.input({
-      kind: "secret",
-      name: "client secret",
-      message: "Client secret",
-      flag: "--client-secret-stdin",
-      stdin: flags["client-secret-stdin"],
-      optional: true,
-      parse: (raw) => ({ ok: true, value: raw.trim() }),
-    });
-
     const providers = await connections.reduce<Promise<readonly ProviderReport[]>>(
       async (done, connection) => [
         ...(await done),
@@ -167,7 +150,6 @@ export default class TestSignIn extends BaseCommand {
           server,
           live,
           timeoutSeconds: flags.timeout,
-          clientSecret: suppliedSecret === "" ? undefined : suppliedSecret,
           heading: connections.length > 1,
         }),
       ],
@@ -217,10 +199,9 @@ export default class TestSignIn extends BaseCommand {
     readonly server: LocalServer;
     readonly live: boolean;
     readonly timeoutSeconds: number;
-    readonly clientSecret: string | undefined;
     readonly heading: boolean;
   }): Promise<ProviderReport> {
-    const { connection, projectIssuer, server, live, clientSecret } = options;
+    const { connection, projectIssuer, server, live } = options;
     const { cwd } = this.meta;
     const slug = slugOf(connection);
     const oidc = isObject(connection.body.oidc) ? connection.body.oidc : {};
@@ -244,17 +225,12 @@ export default class TestSignIn extends BaseCommand {
         slug,
         issuer: typeof oidc.issuer === "string" ? oidc.issuer : "",
         clientId: await this.clientId(cwd, oidc.client_id),
-        clientSecret,
         scopes: stringsIn(oidc.scopes),
         claims: [
           ...stringsIn(connection.body.claim_mapping),
           ...stringsIn(connection.body.verified_claims),
         ],
         callbackUri,
-        tokenAuthMethod:
-          oidc.token_endpoint_auth_method === "client_secret_post"
-            ? "client_secret_post"
-            : "client_secret_basic",
         endpoints: endpointsOf(oidc),
         consoleUrl: catalogId === undefined ? undefined : idpProvider(catalogId).consoleUrl,
         probes: PROVIDER_PROBES.get(slug),
@@ -423,12 +399,10 @@ export default class TestSignIn extends BaseCommand {
   }
 }
 
-/** The endpoints the connection names itself, which the server then uses without discovery. */
+/** The authorization endpoint the connection names itself, which the server then uses without discovery. */
 function endpointsOf(oidc: Record<string, unknown>) {
-  const { authorization_endpoint: authorization, token_endpoint: token } = oidc;
-  return typeof authorization === "string" && typeof token === "string"
-    ? { authorization, token }
-    : undefined;
+  const { authorization_endpoint: authorization } = oidc;
+  return typeof authorization === "string" ? { authorization } : undefined;
 }
 
 /** What the checks said about one connection. */

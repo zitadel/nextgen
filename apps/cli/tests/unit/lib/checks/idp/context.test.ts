@@ -6,11 +6,9 @@ const base = (request: Send): Omit<IdpContext, "discovery"> => ({
   slug: "google",
   issuer: "https://issuer.example/",
   clientId: "id",
-  clientSecret: undefined,
   scopes: ["openid"],
   claims: [],
   callbackUri: "http://localhost:3000/cb",
-  tokenAuthMethod: "client_secret_basic",
   endpoints: undefined,
   consoleUrl: undefined,
   probes: undefined,
@@ -78,10 +76,7 @@ describe("idpContext discovery", () => {
         asked.push(url);
         return { status: 200, url, body: "{}" };
       }),
-      endpoints: {
-        authorization: "https://idp.example/authorize",
-        token: "https://idp.example/token",
-      },
+      endpoints: { authorization: "https://idp.example/authorize" },
     });
 
     const found = await context.discovery;
@@ -94,7 +89,6 @@ describe("idpContext discovery", () => {
         source: "connection",
         document: {
           authorization_endpoint: "https://idp.example/authorize",
-          token_endpoint: "https://idp.example/token",
         },
       },
     ]);
