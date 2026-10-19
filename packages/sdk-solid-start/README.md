@@ -1,6 +1,6 @@
 # @zitadel/sdk-solid-start
 
-SolidStart middleware and helpers for Nextgen Auth.
+SolidStart middleware and helpers for Zitadel.
 
 ## Installation
 

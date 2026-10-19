@@ -1,4 +1,4 @@
-# @zitadel/sdk-qwik-city
+# @zitadel/sdk-qwik-router
 
 ## 1.0.0-alpha.27
 

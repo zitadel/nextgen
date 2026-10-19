@@ -40,7 +40,7 @@ describe("package manifest", () => {
 });
 
 /**
- * `@zitadel/sdk-qwik-city` is server-only: the `<zitadel-*>` widgets come from
+ * `@zitadel/sdk-qwik-router` is server-only: the `<zitadel-*>` widgets come from
  * `@zitadel/sdk-qwik`, whose specs check every config key against the element.
  * If an entry here ever exports a widget wrapper, it needs the same
  * "wrapper config parity" checks, so this fails until they are added.

@@ -1,17 +1,17 @@
 ---
-name: zitadel-sdk-qwik-city
+name: zitadel-sdk-qwik-router
 description: >-
-  Integrate Zitadel authentication into an existing or custom Qwik City app with
-  @zitadel/sdk-qwik-city. Use when the user wants login, logout, session
-  handling, or protected routes in a Qwik 2 (Qwik City) app and is wiring the
+  Integrate Zitadel authentication into an existing or custom Qwik Router app with
+  @zitadel/sdk-qwik-router. Use when the user wants login, logout, session
+  handling, or protected routes in a Qwik 2 (Qwik Router) app and is wiring the
   SDK by hand rather than letting the CLI scaffold a fresh project — adding the
   request handler, reading auth state in a `routeLoader$`, or rendering the
   `ZitadelLogin` / `ZitadelSession` widgets.
 ---
 
-# @zitadel/sdk-qwik-city
+# @zitadel/sdk-qwik-router
 
-A Qwik City request handler and helpers that add Zitadel (Nextgen) auth to a
+A Qwik Router request handler and helpers that add Zitadel (Nextgen) auth to a
 Qwik 2 app. The handler proxies auth traffic same-origin under `/__nextgen`,
 verifies the session JWT via JWKS on the server, stores the result on
 `requestEvent.sharedMap`, and redirects unauthenticated requests on protected
@@ -19,16 +19,16 @@ routes. The package is server-only; the widgets come from `@zitadel/sdk-qwik`.
 
 ## When to use
 
-The `zitadel` CLI (`zitadel setup --framework qwik-city`) scaffolds the handler
+The `zitadel` CLI (`zitadel setup --framework qwik-router`) scaffolds the handler
 plugin, login/register/profile routes, and `.env.local` into a fresh or detected
-Qwik City project — prefer it for greenfield work. Reach for **this skill** when
-you are adding auth to an **existing or custom** Qwik City app by hand, or
+Qwik Router project — prefer it for greenfield work. Reach for **this skill** when
+you are adding auth to an **existing or custom** Qwik Router app by hand, or
 adjusting a scaffolded wiring.
 
 ## Install
 
 ```bash
-pnpm add -D @zitadel/sdk-qwik-city@alpha
+pnpm add -D @zitadel/sdk-qwik-router@alpha
 # the login/logout/session widgets are a separate package:
 pnpm add -D @zitadel/sdk-qwik@alpha
 ```
@@ -43,7 +43,7 @@ must migrate to `@qwik.dev/*` first.
 **1. Request handler.** Add a root plugin, e.g. `src/routes/plugin@nextgen.ts`:
 
 ```ts
-import { createNextgenOnRequest } from '@zitadel/sdk-qwik-city/server';
+import { createNextgenOnRequest } from '@zitadel/sdk-qwik-router/server';
 
 export const onRequest = createNextgenOnRequest({
   protectedRoutes: ['/admin', '/dashboard*'], // trailing * matches sub-paths
@@ -52,7 +52,7 @@ export const onRequest = createNextgenOnRequest({
 ```
 
 `url` and `projectSecret` default to `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET`,
-read per request from Qwik City's `requestEvent.env` (where Vite loads
+read per request from Qwik Router's `requestEvent.env` (where Vite loads
 `.env.local`), falling back to `process.env`; pass them only to override.
 Sessions count only in the app's own project: `projectId`, else
 `ZITADEL_PROJECT_ID`, else `PUBLIC_ZITADEL_PROJECT_ID`, read the same way. With
@@ -64,7 +64,7 @@ endpoint:
 
 ```ts
 import { routeLoader$ } from '@qwik.dev/router';
-import { getAuth } from '@zitadel/sdk-qwik-city/server';
+import { getAuth } from '@zitadel/sdk-qwik-router/server';
 
 export const useUser = routeLoader$((ev) => {
   const auth = getAuth(ev);
@@ -75,7 +75,7 @@ export const useUser = routeLoader$((ev) => {
 
 `protectedRoutes` only guards full page loads. To keep a route from rendering at
 all without a session, export a loader like this one from the route itself —
-Qwik City runs it on the server for `<Link>` navigation too.
+Qwik Router runs it on the server for `<Link>` navigation too.
 
 **3. Render the widgets** from `@zitadel/sdk-qwik`:
 
@@ -102,7 +102,7 @@ This SDK is server-only. The widgets come from `@zitadel/sdk-qwik`, so read its 
 
 ## Read these, don't guess
 
-The package README at `node_modules/@zitadel/sdk-qwik-city/README.md` and the
+The package README at `node_modules/@zitadel/sdk-qwik-router/README.md` and the
 bundled `.d.ts` types (`dist/server.d.ts`, `dist/client.d.ts`) are authoritative
 and versioned with the installed package — read them before wiring anything, and
 let them override anything remembered. This skill teaches the pattern, not a
@@ -118,7 +118,7 @@ names and defaults against the installed version rather than assuming.
 - **Dev dependency, not dependency.** Qwik's starter `vite.config.ts` throws if a
   package is listed in both sections, and a regular dependency stays external to
   the server bundle.
-- **`@zitadel/sdk-qwik-city` renders no widgets.** They come from
+- **`@zitadel/sdk-qwik-router` renders no widgets.** They come from
   `@zitadel/sdk-qwik`.
 - **Env comes from `requestEvent.env`.** Vite loads `.env.local` there, not onto
   `process.env`, so the handler reads it per request.
