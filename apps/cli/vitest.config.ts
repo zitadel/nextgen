@@ -19,7 +19,9 @@ export default defineConfig({
     // renamed suite must not vanish silently. Specs are `*.spec.ts`, unit
     // tests `*.test.ts` (tests/AGENTS.md).
     include: ["tests/**/*.{test,spec}.ts"],
-    setupFiles: ["./tests/helpers/matchers.ts"],
+    // `offline.ts` first: it fails any test that connects past loopback, so a
+    // unit test or spec cannot reach a real server, Zitadel's or anyone's.
+    setupFiles: ["./tests/helpers/offline.ts", "./tests/helpers/matchers.ts"],
     // Every file running at the same time takes its ports from a block of its
     // own (tests/helpers/ports.ts), and there are PORT_WORKERS blocks. Vitest's
     // default of a worker per core but one would outnumber them on a bigger
