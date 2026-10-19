@@ -128,7 +128,12 @@ export const sessions: Session[] = [
     description:
       "Change what a step asks for and where it goes next, plan, apply. The login follows.",
     artifact: {
-      graph: { before: ["identifier", "password", "done"], after: ["identifier", "done"] },
+      // After the change the identifier step asks for the password too: its
+      // pill shows it, or the flow would look like it lost the password.
+      graph: {
+        before: ["identifier", "password", "done"],
+        after: [{ name: "identifier", adds: "password" }, "done"],
+      },
       files: [
         {
           path: ".zitadel/flows/default-login.json",

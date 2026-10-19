@@ -179,7 +179,10 @@ happens; text between backticks in the line is code.
   take the login's look on their own; when its copy or a step's fields change,
   change the screens.
 - In steps 3 and 4 the frame's switch shows the page before or after the
-  change, and the fourth step's flow steps follow it. Both screens stand in
+  change, and the fourth step's flow steps follow it: `identifier → password →
+  done` before, `identifier + password → done` after, the password in the
+  diff's green as what the identifier step took over, so the flow does not
+  look like it lost it. Both screens stand in
   one place, the one not shown faded out and inert, so the frame keeps the
   taller one's height and the switch adds or takes away a field where it
   sits.

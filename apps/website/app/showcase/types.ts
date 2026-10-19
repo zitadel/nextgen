@@ -17,13 +17,19 @@ export type FileLine = { type: "context" | "added" | "removed"; text: string };
 export type ArtifactFile = { path: string; lines: FileLine[] };
 
 /**
+ * A step of a flow in the editor card's strip: its name, or its name and the
+ * field it takes over from a step the change removed.
+ */
+export type FlowStep = string | { name: string; adds: string };
+
+/**
  * The changed files of a row as an editor card: the recorded diff, for a flow
  * the graph of its steps before and after, and the commands that publish the
  * change with the one line of their output that matters.
  */
 export type Artifact = {
   files: ArtifactFile[];
-  graph?: { before: string[]; after: string[] };
+  graph?: { before: FlowStep[]; after: FlowStep[] };
   commands?: { command: string; output?: string }[];
 };
 

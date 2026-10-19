@@ -2,7 +2,7 @@ import { Fragment, type ReactNode } from "react";
 import { LINE_COPY } from "../command-block";
 import { CopyButton } from "../copy-button";
 import { GradientBorder, TITLE_BAR, WindowDots } from "../gradient-border";
-import type { Artifact, FileLine } from "./types";
+import type { Artifact, FileLine, FlowStep } from "./types";
 
 /** Green and red lines on tinted rows. */
 const LINE_CLASSES: Record<FileLine["type"], string> = {
@@ -27,36 +27,43 @@ function runCorners(lines: FileLine[], index: number): string {
   return `${first ? "rounded-t" : ""} ${last ? "rounded-b" : ""}`;
 }
 
-/** The steps of the flow, before or after the change, as pills with arrows. */
-function FlowSteps({ steps, after }: { steps: string[]; after: boolean }) {
+/**
+ * The steps of the flow, before or after the change, as pills with arrows. A
+ * step that takes over a removed step's field shows it, in the diff's green.
+ */
+function FlowSteps({ steps, after }: { steps: FlowStep[]; after: boolean }) {
   return (
     <div className="flex flex-wrap items-center gap-2 border-border-secondary border-b px-5 py-3 md:px-6">
       <span className="mr-1 w-12 font-semibold text-[0.6875rem] text-text-muted leading-4">
         {after ? "After" : "Before"}
       </span>
-      {steps.map((step, index) => (
-        <Fragment key={step}>
-          {index > 0 && (
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              fill="none"
-              className="size-3.5 shrink-0 text-text-muted"
-            >
-              <path
-                d="M5 12h14M13 6l6 6-6 6"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          )}
-          <span className="rounded-md border border-border-secondary bg-surface-black-secondary px-2.5 py-1 font-mono text-text-primary text-xs leading-4">
-            {step}
-          </span>
-        </Fragment>
-      ))}
+      {steps.map((step, index) => {
+        const { name, adds } = typeof step === "string" ? { name: step, adds: undefined } : step;
+        return (
+          <Fragment key={name}>
+            {index > 0 && (
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                className="size-3.5 shrink-0 text-text-muted"
+              >
+                <path
+                  d="M5 12h14M13 6l6 6-6 6"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            )}
+            <span className="rounded-md border border-border-secondary bg-surface-black-secondary px-2.5 py-1 font-mono text-text-primary text-xs leading-4">
+              {name}
+              {adds && <span className="text-[#86efac]"> + {adds}</span>}
+            </span>
+          </Fragment>
+        );
+      })}
     </div>
   );
 }
