@@ -143,10 +143,9 @@ func CreateSessionUsingPassword(t testing.TB,
 		ProjectID:   projectID,
 		AttemptID:   attempt.ID,
 		ChallengeID: userChallenge.GetID(),
-		Proof: service.UserProof{
-			AttributeName: "email",
-			LoginName:     userEmail,
-		},
+		// The direct-API proof: no flow, so no bound schema to scope a
+		// property lookup to.
+		Proof: service.UserProof{LoginName: userEmail},
 	})
 	if err != nil {
 		return nil, err
