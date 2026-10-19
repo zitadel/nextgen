@@ -109,7 +109,8 @@ function buildUpstreamHeaders(event: H3Event): Headers {
  * ```
  *
  * A session counts only in the app's own project: `projectId`, else
- * `ZITADEL_PROJECT_ID`, else `NUXT_PUBLIC_ZITADEL_PROJECT_ID`.
+ * `ZITADEL_PROJECT_ID`, else `NUXT_PUBLIC_ZITADEL_PROJECT_ID`. The module's
+ * handler passes `nextgen.projectId`, else the public project id.
  *
  * @param options - Middleware configuration options.
  * @returns An H3 event handler suitable for use as a global server middleware.

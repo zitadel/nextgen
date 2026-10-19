@@ -37,8 +37,8 @@ seeds server-side auth state, hydrates it on the client, and calls
 `configureZitadel()` from runtime config), and auto-imports the
 composables — no `server/middleware/auth.ts`, no manual plugin.
 
-It takes four settings. Nuxt itself loads only `.env`; `zitadel setup` writes
-all four to `.env.local` and the module registration to `nuxt.config.ts`.
+It takes three settings. Nuxt itself loads only `.env`; `zitadel setup` writes
+all three to `.env.local` and the module registration to `nuxt.config.ts`.
 `nuxt dev` reads them from the environment, or from `.env.local` when the
 environment has none:
 
@@ -46,7 +46,6 @@ environment has none:
 | --- | --- | --- |
 | `ZITADEL_URL` | the backend URL, unless `nextgen.url` or `NUXT_NEXTGEN_URL` sets it | `http://localhost:8080` |
 | `NUXT_PUBLIC_ZITADEL_PROJECT_ID` | `runtimeConfig.public.zitadelProjectId`, unless `nuxt.config.ts` sets it | the plugin skips `configureZitadel()`, `useZitadelProject()` returns `null`, and the login widget cannot initialize |
-| `ZITADEL_PROJECT_ID` | `nextgen.projectId`, the project a session must belong to; unset, the public project id above | with neither, no session counts as signed in |
 | `ZITADEL_PROJECT_SECRET` | the server-only secret, unless `NUXT_NEXTGEN_PROJECT_SECRET` sets it | sign-in cannot finish: the session exchange has no credential |
 
 The backend URL and the project secret default to `ZITADEL_URL` and
@@ -59,9 +58,9 @@ backend. `nuxt build` never copies the URL or the secret from its environment
 or from `.env.local` into `.output/`, so the secret exists only where the
 server runs; `.env.local` is not read by a built server. A `nextgen.url` in
 `nuxt.config.ts` is the exception: you wrote it into the config, so it is part
-of the build. The project ids are public and are still read when `nuxt build`
-runs; set `NUXT_PUBLIC_ZITADEL_PROJECT_ID` and `NUXT_NEXTGEN_PROJECT_ID` in the
-runtime environment to change them per deployment.
+of the build. `NUXT_PUBLIC_ZITADEL_PROJECT_ID` is public and is still read when
+`nuxt build` runs; set it in the runtime environment to change it per
+deployment.
 
 ### Module options
 
@@ -183,7 +182,7 @@ Both surfaces take these options: the module under `nextgen` in
 | Option              | Type                 | Default                  | Description                                                                                                                |
 | ------------------- | -------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
 | `url`                 | `string`             | `ZITADEL_URL` env, read when the server starts (`nuxt dev` also reads `.env.local`), else `http://localhost:8080` | Full URL of the Zitadel auth backend                                                                                       |
-| `projectId`         | `string`             | `ZITADEL_PROJECT_ID`, else `NUXT_PUBLIC_ZITADEL_PROJECT_ID` | The project this app signs its users in to. A session of any other project on the server reads as signed out and keeps its cookie; with no project, no session counts |
+| `projectId`         | `string`             | the public project id (`runtimeConfig.public.zitadelProjectId`), else `ZITADEL_PROJECT_ID` at runtime; `createNextgenMiddleware` alone: `ZITADEL_PROJECT_ID`, else `NUXT_PUBLIC_ZITADEL_PROJECT_ID` | The project this app signs its users in to. A session of any other project on the server reads as signed out and keeps its cookie; with no project, no session counts. A built server takes it from `NUXT_NEXTGEN_PROJECT_ID` |
 | `proxyPath`         | `string`             | `"/__nextgen"`           | Path prefix proxied to the auth backend. Sign-in with an external provider currently requires the default: the provider returns to `/__nextgen/idp/{slug}/callback` |
 | `protectedRoutes`   | `string[]`           | `[]`                     | Paths requiring a valid session. Trailing `*` matches sub-paths                                                            |
 | `ignoredRoutes`     | `string[]`           | `[]`                     | Paths skipped entirely — no JWT check, no tunnelling. Useful for webhooks or health checks. Trailing `*` matches sub-paths |

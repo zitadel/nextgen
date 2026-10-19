@@ -174,6 +174,15 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     });
     expect(served.status).toBe(200);
     expect(await served.json()).toMatchObject({ project_id: "proj_me_app" });
+
+    // Like the server, a project_id outside the project-id pattern is a bad
+    // request, not a verdict on the session.
+    for (const invalid of ["", "proj%20me"]) {
+      const rejected = await fetch(`${BASE}/sessions/me?project_id=${invalid}`, {
+        headers: { cookie: cookie ?? "" },
+      });
+      expect(rejected.status).toBe(400);
+    }
   });
 
   test("GET /sessions/me returns body parseable by GetMySessionResponse with a user ref", async () => {

@@ -1038,6 +1038,23 @@ describe("server middleware", () => {
     expect(served.headers.get("set-cookie")).toBeNull();
   });
 
+  // The Bearer token and the cookie are separate credentials: a Bearer token
+  // that is not this app's neither signs anyone in nor costs the cookie.
+  it("signs in by the session cookie behind a Bearer JWT of another project", async () => {
+    const sign = signer();
+    const bearer = sign({ sub: "bearer-user", aud: OTHER_PROJECT });
+    const cookie = sign({ sub: "cookie-user" });
+
+    const served = await serve(
+      `${ORIGIN}/admin`,
+      { headers: { authorization: `Bearer ${bearer}`, cookie: `${SESSION}=${cookie}` } },
+      OPTIONS,
+    );
+
+    expect(served.auth).toMatchObject({ isAuthenticated: true, session: { token: cookie } });
+    expect(served.headers.get("set-cookie")).toBeNull();
+  });
+
   it("signs in a JWT whose audience includes this project", async () => {
     const sign = signer();
     const token = sign({ aud: ["https://api.example.com", PROJECT] });

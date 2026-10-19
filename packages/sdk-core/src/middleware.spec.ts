@@ -318,33 +318,31 @@ describe("opaque session tokens", () => {
       },
     );
 
-    // Live in its own project, so not dead: callers keep its cookie.
+    // Live in its own project, so not refused: callers keep its cookie.
     it.each([
-      ["the backend refuses", Response.json({ code: "sess.project_mismatch" }, { status: 403 })],
+      ["the backend refuses it", Response.json({ code: "sess.project_mismatch" }, { status: 403 })],
       [
-        "a backend that predates project_id answers",
+        "a backend that predates project_id answers for it",
         Response.json({ project_id: "proj_other", user_id: "u1", user: { identifier: "a@b.c" } }),
       ],
       ["the answer names no project", Response.json({ user_id: "u1" })],
-    ])(
-      "reports a live session with no user when %s for another project",
-      async (_label, response) => {
-        backend(response);
+    ])("reports a session of another project, when %s, as live with no user", async (_l, res) => {
+      backend(res);
 
-        expect(await checkOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT)).toEqual({
-          verdict: "live",
-          session: {
-            userId: null,
-            identifier: null,
-            identifierProperty: null,
-            display: null,
-            expiresAt: null,
-          },
-        });
-      },
-    );
+      expect(await checkOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT)).toEqual({
+        verdict: "live",
+        session: {
+          userId: null,
+          identifier: null,
+          identifierProperty: null,
+          display: null,
+          expiresAt: null,
+        },
+      });
+      expect(warn).not.toHaveBeenCalled();
+    });
 
-    it("reports a live session with no user, without asking the backend, when no project is configured", async () => {
+    it("reports no user, without asking the backend, when no project is configured", async () => {
       const fetchMock = backend(Response.json({ user_id: "u1" }));
 
       expect(await checkOpaqueSessionToken("tok", "http://auth.test", 1000, "")).toMatchObject({
@@ -379,6 +377,7 @@ describe("opaque session tokens", () => {
       ["a 503", new Response(null, { status: 503 })],
       ["a 429", new Response(null, { status: 429 })],
       ["a 404 the backend did not give", new Response("Not Found", { status: 404 })],
+      ["a 400 for the request itself", Response.json({ code: "req.invalid" }, { status: 400 })],
       ["a 403 for another reason", Response.json({ code: "auth.csrf_invalid" }, { status: 403 })],
       ["an unreadable body", new Response("not json", { status: 200 })],
       ["a network error", new TypeError("fetch failed")],
@@ -433,6 +432,14 @@ describe("opaque session tokens", () => {
         display: null,
         expiresAt: null,
       });
+    });
+
+    it("returns no user for a session of another project", async () => {
+      backend(Response.json({ code: "sess.project_mismatch" }, { status: 403 }));
+
+      expect(
+        await validateOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT),
+      ).toMatchObject({ userId: null });
     });
 
     it.each([
@@ -686,6 +693,8 @@ describe("resolveSession", () => {
     opaqueTokenTimeoutMs: 1000,
   };
   const SIGNED_OUT = { isAuthenticated: false, session: null };
+  /** What clears the project's own session cookie. */
+  const CLEARED = { name: OWN, value: "", maxAge: 0, secure: false };
 
   function request(
     cookies: Record<string, string>,
@@ -695,16 +704,67 @@ describe("resolveSession", () => {
     return { bearer, cookie: (name: string) => cookies[name], requestUrl };
   }
 
-  function backend(response: () => Response) {
+  function backend(response: () => Response | Promise<Response>) {
     const fetchMock = vi.fn(async () => response());
     vi.stubGlobal("fetch", fetchMock);
     return fetchMock;
   }
 
+  beforeEach(() => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
     clearJwksCache();
+  });
+
+  it.each([
+    [
+      "an opaque session of this project",
+      () => Response.json({ project_id: PROJECT, user_id: "u1" }),
+      { signedIn: true, cookies: [], undecided: false },
+    ],
+    [
+      "an anonymous opaque session",
+      () => Response.json({ project_id: PROJECT }),
+      { signedIn: false, cookies: [], undecided: false },
+    ],
+    [
+      "another project's opaque session",
+      () => Response.json({ code: "sess.project_mismatch" }, { status: 403 }),
+      { signedIn: false, cookies: [], undecided: false },
+    ],
+    [
+      "a refused opaque session",
+      () => new Response(null, { status: 401 }),
+      { signedIn: false, cookies: [CLEARED], undecided: false },
+    ],
+    [
+      "an opaque session that is gone",
+      () => Response.json({ code: "sess.not_found" }, { status: 404 }),
+      { signedIn: false, cookies: [CLEARED], undecided: false },
+    ],
+    [
+      "a session behind a backend that is down",
+      () => new Response(null, { status: 503 }),
+      { signedIn: false, cookies: [], undecided: true },
+    ],
+    [
+      "a session behind a backend that cannot be reached",
+      () => Promise.reject(new TypeError("fetch failed")),
+      { signedIn: false, cookies: [], undecided: true },
+    ],
+  ])("judges a cookie holding %s", async (_label, sessionsMe, expected) => {
+    backend(sessionsMe);
+
+    const { auth, cookies, undecided } = await resolveSession(
+      request({ [OWN]: "opaque-token" }),
+      OPTIONS,
+    );
+
+    expect({ signedIn: auth.isAuthenticated, cookies, undecided }).toEqual(expected);
   });
 
   it("reads the project's own cookie before the server's", async () => {
@@ -764,23 +824,6 @@ describe("resolveSession", () => {
     expect(resolved.cookies).toEqual([{ name: cleared, value: "", maxAge: 0, secure: false }]);
   });
 
-  it("keeps a cookie the backend gave no verdict on, and says so", async () => {
-    vi.spyOn(console, "warn").mockImplementation(() => {});
-    backend(() => new Response(null, { status: 500 }));
-
-    const resolved = await resolveSession(request({ [OWN]: "tok" }), OPTIONS);
-
-    expect(resolved).toEqual({ auth: SIGNED_OUT, undecided: true, cookies: [] });
-  });
-
-  it("clears the cookie of a session that is gone", async () => {
-    backend(() => Response.json({ code: "sess.not_found" }, { status: 404 }));
-
-    const resolved = await resolveSession(request({ [OWN]: "gone" }), OPTIONS);
-
-    expect(resolved.cookies).toEqual([{ name: OWN, value: "", maxAge: 0, secure: false }]);
-  });
-
   it("ignores another app's session cookie", async () => {
     const fetchMock = backend(() => Response.json({}));
 
@@ -804,7 +847,8 @@ describe("resolveSession", () => {
     expect(resolved.cookies).toEqual([{ name: OWN, value: "", maxAge: 0, secure: true }]);
   });
 
-  it("touches no cookie without a project", async () => {
+  it("signs in no one, and touches no cookie, without a project", async () => {
+    const fetchMock = backend(() => Response.json({ project_id: PROJECT, user_id: "u1" }));
     vi.spyOn(console, "error").mockImplementation(() => {});
 
     const resolved = await resolveSession(request({ [OWN]: "x", [SERVER_SESSION_COOKIE]: "y" }), {
@@ -813,6 +857,7 @@ describe("resolveSession", () => {
     });
 
     expect(resolved).toEqual({ auth: SIGNED_OUT, undecided: false, cookies: [] });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   describe("with JWTs", () => {
@@ -836,6 +881,38 @@ describe("resolveSession", () => {
       return `${signing}.${createSign("SHA256").update(signing).sign(privateKey).toString("base64url")}`;
     }
 
+    /** Serves the JWKS, and answers `GET /sessions/me` with `sessionsMe`. */
+    function keysAnd(sessionsMe: () => Response = () => new Response(null, { status: 500 })) {
+      const fetchMock = vi.fn(async (url: string | URL) =>
+        String(url).endsWith("/auth/keys") ? Response.json({ keys: [jwk] }) : sessionsMe(),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+      return fetchMock;
+    }
+
+    it.each([
+      ["a JWT of this project", {}, { signedIn: true, cookies: [] }],
+      ["a JWT of another project", { aud: "proj_other" }, { signedIn: false, cookies: [] }],
+      [
+        "a JWT of this project without a user",
+        { sub: undefined },
+        { signedIn: false, cookies: [CLEARED] },
+      ],
+      ["an expired JWT", { exp: 1 }, { signedIn: false, cookies: [CLEARED] }],
+    ])("judges a cookie holding %s", async (_label, claims, expected) => {
+      keysAnd();
+
+      const { auth, cookies, undecided } = await resolveSession(
+        request({ [OWN]: jwt(claims) }),
+        OPTIONS,
+      );
+
+      expect({ signedIn: auth.isAuthenticated, cookies, undecided }).toEqual({
+        ...expected,
+        undecided: false,
+      });
+    });
+
     it("moves a JWT of this project out of the server's cookie, for as long as it lives", async () => {
       backend(() => Response.json({ keys: [jwk] }));
       const token = jwt();
@@ -853,23 +930,62 @@ describe("resolveSession", () => {
       });
     });
 
-    it("leaves the cookie alone behind a Bearer token that signs no one in", async () => {
-      backend(() => Response.json({ keys: [jwk] }));
+    // A Bearer token and the cookie are separate credentials: a Bearer token that
+    // is not this app's leaves the cookie to be judged on its own.
+    it.each([
+      ["of another project", jwt({ sub: "bearer-user", aud: "proj_other" })],
+      ["without a user", jwt({ sub: undefined })],
+      ["that fails verification", `${jwt({ sub: "bearer-user" }).slice(0, -4)}AAAA`],
+      ["that is no JWT", "opaque-bearer"],
+    ])("judges the cookie on its own behind a Bearer token %s", async (_label, bearer) => {
+      const fetchMock = keysAnd(() =>
+        Response.json({ project_id: PROJECT, user_id: "cookie-user" }),
+      );
+
+      const resolved = await resolveSession(request({ [OWN]: "opaque-token" }, bearer), OPTIONS);
+
+      expect(resolved).toMatchObject({
+        auth: { isAuthenticated: true, session: { userId: "cookie-user", token: "opaque-token" } },
+        undecided: false,
+        cookies: [],
+      });
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${OPTIONS.url}/sessions/me?project_id=${PROJECT}`,
+        expect.anything(),
+      );
+    });
+
+    it("judges a JWT cookie on its own behind a Bearer token that signs no one in", async () => {
+      keysAnd();
+      const token = jwt();
 
       const resolved = await resolveSession(
-        request({ [OWN]: jwt() }, jwt({ aud: "proj_other" })),
+        request({ [OWN]: token }, jwt({ aud: "proj_other" })),
         OPTIONS,
       );
 
-      expect(resolved).toEqual({ auth: SIGNED_OUT, undecided: false, cookies: [] });
+      expect(resolved).toMatchObject({
+        auth: { isAuthenticated: true, session: { token } },
+        undecided: false,
+        cookies: [],
+      });
     });
 
-    it("leaves a JWT cookie alone behind a Bearer token that fails", async () => {
-      backend(() => Response.json({ keys: [jwk] }));
+    it("keeps a dead cookie it never judged behind a Bearer token that signs in", async () => {
+      const fetchMock = keysAnd(() => new Response(null, { status: 401 }));
+      const bearer = jwt({ sub: "bearer-user" });
 
-      const resolved = await resolveSession(request({ [OWN]: jwt() }, "not-a-jwt"), OPTIONS);
+      const resolved = await resolveSession(request({ [OWN]: "opaque-token" }, bearer), OPTIONS);
 
-      expect(resolved.cookies).toEqual([]);
+      expect(resolved).toMatchObject({
+        auth: { isAuthenticated: true, session: { userId: "bearer-user", token: bearer } },
+        undecided: false,
+        cookies: [],
+      });
+      expect(fetchMock).not.toHaveBeenCalledWith(
+        expect.stringContaining("/sessions/me"),
+        expect.anything(),
+      );
     });
   });
 });

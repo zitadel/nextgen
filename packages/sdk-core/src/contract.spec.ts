@@ -484,6 +484,7 @@ describe("server SDK test titles", () => {
     "does not sign in a JWT issued for %s",
     "does not sign in a Bearer JWT issued for another project",
     "keeps the cookie of a JWT issued for another project",
+    "signs in by the session cookie behind a Bearer JWT of another project",
     "signs in a JWT whose audience includes this project",
     "signs in no one when no project is configured",
     "holds sessions to the project from %s",

@@ -363,6 +363,13 @@ export function createMockApp(options: { issuer: string }): express.Express {
   // GET /sessions/me — validate opaque session cookie and return session data.
   // Mirrors the Go server's GetMySession handler.
   app.get("/sessions/me", (req: express.Request, res: express.Response) => {
+    // Mirrors the server, which validates a present project_id against the
+    // project-id pattern before it reads the session.
+    const projectParam = req.query.project_id;
+    if (projectParam !== undefined && !/^[a-zA-Z0-9_-]+$/.test(String(projectParam))) {
+      res.status(400).json(errorBody("req.invalid", "project_id is not a valid project id."));
+      return;
+    }
     const found = lookupSession(req);
     switch (found.status) {
       case "missing":

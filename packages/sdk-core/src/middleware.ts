@@ -901,7 +901,10 @@ export function jwtNamesProject(payload: JwtPayload, projectId: string): boolean
 
 /** What a request carries that decides its session. */
 export interface SessionRequest {
-  /** The `Authorization: Bearer` token, which takes precedence, or `null`. */
+  /**
+   * The `Authorization: Bearer` token, or `null`. It takes precedence: when it
+   * signs a user of this project in, the cookie is not consulted.
+   */
   readonly bearer: string | null;
   /** Reads one of the request's cookies by name. */
   readonly cookie: (name: string) => string | null | undefined;
@@ -938,7 +941,8 @@ export interface ResolvedSession {
    * in the server's cookie moves to the project's own. No other cookie is
    * touched: a session that is live but signs no one in here (an anonymous
    * one, or one of another project) keeps its cookie, and so does one the
-   * backend gave no verdict on.
+   * backend gave no verdict on, and one behind a Bearer token that signed the
+   * request in, which was never judged.
    */
   readonly cookies: readonly SessionCookie[];
 }
@@ -981,21 +985,81 @@ function storedSession(
 }
 
 /**
+ * What {@link judgeJwt} makes of a JWT: who it signs in, whether a cookie
+ * holding it is dead, and how long it lives.
+ */
+interface JwtVerdict {
+  readonly auth: AuthResult;
+  /** Whether a cookie holding the JWT is dead, so the browser can drop it. */
+  readonly dead: boolean;
+  /** Seconds until a JWT that signs its user in expires, if it says. */
+  readonly maxAge: number | undefined;
+}
+
+/**
+ * Judges a JWT. It signs its `sub` in when it verifies and its `aud` names
+ * this project. Held in a cookie, it is dead when it fails verification or
+ * names no user of this project; a verified JWT of another project is live
+ * there, so its cookie stays.
+ */
+async function judgeJwt(
+  token: string,
+  projectId: string,
+  options: ResolveSessionOptions,
+): Promise<JwtVerdict> {
+  const payload = isJwtShaped(token)
+    ? await verifyJwt(token, {
+        issuerUrl: options.url,
+        allowedAlgorithms: options.allowedAlgorithms,
+        clockSkewMs: options.clockSkewMs,
+        audience: options.audience,
+        allowedTokenTypes: options.allowedTokenTypes,
+        jwksTimeoutMs: options.jwksTimeoutMs,
+      })
+    : null;
+  if (!payload) {
+    return { auth: signedOut(), dead: true, maxAge: undefined };
+  }
+  const namesProject = jwtNamesProject(payload, projectId);
+  if (!payload.sub || !namesProject) {
+    return { auth: signedOut(), dead: namesProject, maxAge: undefined };
+  }
+  return {
+    auth: {
+      isAuthenticated: true,
+      session: {
+        userId: payload.sub,
+        identifier: payload.email ?? null,
+        identifierProperty: null,
+        display: payload.name ?? null,
+        token,
+      },
+    },
+    dead: false,
+    maxAge: payload.exp === undefined ? undefined : secondsUntil(payload.exp * 1000),
+  };
+}
+
+/**
  * Judges which user, if any, a request is signed in as in this app's project.
  * The one implementation behind every server SDK's middleware, so they cannot
  * drift on who counts as signed in.
  *
- * - The Bearer token, else the session cookie, is first verified as a JWT. A
- *   verified JWT signs its `sub` in when its `aud` names the project.
- * - A session cookie that is not JWT-shaped is checked by the backend
- *   ({@link checkOpaqueSessionToken}) and signs its user in when the session
- *   is live in this project. A JWT-shaped token that failed verification never
- *   reaches the backend: the backend does not re-check JWT claims.
+ * - A Bearer token is judged first, as a JWT. When it signs a user of this
+ *   project in, that is the answer and the cookie is not judged; otherwise the
+ *   cookie speaks for itself.
  * - The session cookie is the project's own, else the server's. A session of
  *   this project found in the server's cookie moves to the project's own.
+ * - A JWT-shaped session cookie signs its `sub` in when it verifies and its
+ *   `aud` names the project. It never reaches the backend, which does not
+ *   re-check JWT claims.
+ * - Any other session cookie is checked by the backend
+ *   ({@link checkOpaqueSessionToken}) and signs its user in when the session
+ *   is live in this project.
  * - Only a cookie that held a dead session is cleared: one the backend refused,
- *   or a JWT that failed verification. When the backend gives no verdict, the
- *   result says so ({@link ResolvedSession.undecided}) and the cookie stays.
+ *   or a JWT that fails verification or names no user of this project. When
+ *   the backend gives no verdict, the result says so
+ *   ({@link ResolvedSession.undecided}) and the cookie stays.
  * - Without a project nothing signs in, and no cookie is touched.
  */
 export async function resolveSession(
@@ -1008,90 +1072,61 @@ export async function resolveSession(
     return { auth: signedOut(), undecided: false, cookies: [] };
   }
 
-  const secure = secureFor(request.requestUrl);
+  // A Bearer token and the cookie are separate credentials: one that is not
+  // this app's leaves the cookie to be judged on its own.
+  if (request.bearer !== null) {
+    const bearer = await judgeJwt(request.bearer, projectId, options);
+    if (bearer.auth.isAuthenticated) {
+      return { auth: bearer.auth, undecided: false, cookies: [] };
+    }
+  }
+
   const stored = storedSession(request.cookie, projectId);
+  if (!stored) {
+    return { auth: signedOut(), undecided: false, cookies: [] };
+  }
+  const secure = secureFor(request.requestUrl);
   // The cookie's session moves to the project's own cookie once it signs a
   // user in; a session already there stays where it is.
   const moved = (maxAge: number | undefined): SessionCookie[] =>
-    stored && stored.name === SERVER_SESSION_COOKIE
+    stored.name === SERVER_SESSION_COOKIE
       ? movedToProjectCookie(stored.token, projectId, maxAge, secure)
       : [];
-  const cleared = (): SessionCookie[] => (stored ? [clearedCookie(stored.name, secure)] : []);
+  const cleared = (): SessionCookie[] => [clearedCookie(stored.name, secure)];
 
-  const token = request.bearer ?? stored?.token ?? null;
-  // Whether the token judged is the cookie's: only then does the cookie move,
-  // or get cleared when the token is dead.
-  const fromCookie = request.bearer === null && stored !== null;
-  const payload = token
-    ? await verifyJwt(token, {
-        issuerUrl: url,
-        allowedAlgorithms: options.allowedAlgorithms,
-        clockSkewMs: options.clockSkewMs,
-        audience: options.audience,
-        allowedTokenTypes: options.allowedTokenTypes,
-        jwksTimeoutMs: options.jwksTimeoutMs,
-      })
-    : null;
-
-  if (token && payload) {
-    if (payload.sub && jwtNamesProject(payload, projectId)) {
-      return {
-        auth: {
-          isAuthenticated: true,
-          session: {
-            userId: payload.sub,
-            identifier: payload.email ?? null,
-            identifierProperty: null,
-            display: payload.name ?? null,
-            token,
-          },
-        },
-        undecided: false,
-        cookies: fromCookie
-          ? moved(payload.exp === undefined ? undefined : secondsUntil(payload.exp * 1000))
-          : [],
-      };
+  if (isJwtShaped(stored.token)) {
+    const judged = await judgeJwt(stored.token, projectId, options);
+    if (judged.auth.isAuthenticated) {
+      return { auth: judged.auth, undecided: false, cookies: moved(judged.maxAge) };
     }
-    // A JWT of another project is live there, so a cookie holding it stays. One
-    // of this project that names no user is dead.
+    return { auth: signedOut(), undecided: false, cookies: judged.dead ? cleared() : [] };
+  }
+
+  const check = await checkOpaqueSessionToken(stored.token, url, opaqueTokenTimeoutMs, projectId);
+  const userId = check.verdict === "live" ? check.session.userId : null;
+  if (check.verdict === "live" && userId) {
+    const { session } = check;
     return {
-      auth: signedOut(),
+      auth: {
+        isAuthenticated: true,
+        session: {
+          userId,
+          identifier: session.identifier,
+          identifierProperty: session.identifierProperty,
+          display: session.display,
+          token: stored.token,
+        },
+      },
       undecided: false,
-      cookies: fromCookie && jwtNamesProject(payload, projectId) ? cleared() : [],
+      cookies: moved(session.expiresAt ? secondsUntil(Date.parse(session.expiresAt)) : undefined),
     };
   }
-
-  if (stored && !isJwtShaped(stored.token)) {
-    const check = await checkOpaqueSessionToken(stored.token, url, opaqueTokenTimeoutMs, projectId);
-    const userId = check.verdict === "live" ? check.session.userId : null;
-    if (check.verdict === "live" && userId) {
-      const { session } = check;
-      return {
-        auth: {
-          isAuthenticated: true,
-          session: {
-            userId,
-            identifier: session.identifier,
-            identifierProperty: session.identifierProperty,
-            display: session.display,
-            token: stored.token,
-          },
-        },
-        undecided: false,
-        cookies: moved(session.expiresAt ? secondsUntil(Date.parse(session.expiresAt)) : undefined),
-      };
-    }
-    // Only the backend's refusal makes the cookie dead: a live session that
-    // signs no one in here may still complete its sign-in or belongs to another
-    // app, and a check without a verdict refused nothing.
-    return {
-      auth: signedOut(),
-      undecided: check.verdict === "undecided",
-      cookies: check.verdict === "refused" ? cleared() : [],
-    };
-  }
-
-  // A JWT cookie that failed verification is dead. Behind a Bearer token that
-  // failed, the cookie was never judged, so it stays.
-  return { auth: signedOut(), undecided: false, cookies: fromCookie ? cleared() : [] };
+  // Only the backend's refusal makes the cookie dead: a live session that
+  // signs no one in here may still complete its sign-in or belongs to another
+  // app, and a check without a verdict refused nothing.
+  return {
+    auth: signedOut(),
+    undecided: check.verdict === "undecided",
+    cookies: check.verdict === "refused" ? cleared() : [],
+  };
 }
