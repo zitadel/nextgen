@@ -389,6 +389,54 @@ describe("DependencyCheck", () => {
     expect((await new DependencyCheck().run(ctxFor(cwd))).status).toBe("fail");
   });
 
+  // The check asks each framework's own patcher which SDK packages it adds, so one row
+  // per framework pins that the doctor names exactly those, the widget SDK included.
+  it.each([
+    ["next", { next: "^16" }, "@zitadel/sdk-next"],
+    ["nuxt", { nuxt: "^4" }, "@zitadel/sdk-nuxt"],
+    ["react", { react: "^19", vite: "^8" }, "@zitadel/sdk-react"],
+    ["vue", { vue: "^3.5", vite: "^8" }, "@zitadel/sdk-vue"],
+    ["solid", { "solid-js": "^1.9", vite: "^8" }, "@zitadel/sdk-solid"],
+    ["svelte", { svelte: "^5", vite: "^8" }, "@zitadel/sdk-svelte"],
+    ["qwik", { "@qwik.dev/core": "^2.0.0-beta.45", vite: "^8" }, "@zitadel/sdk-qwik"],
+    ["angular", { "@angular/core": "^20" }, "@zitadel/sdk-angular"],
+    [
+      "sveltekit",
+      { "@sveltejs/kit": "^2", svelte: "^5" },
+      "@zitadel/sdk-sveltekit, @zitadel/sdk-svelte",
+    ],
+    [
+      "tanstack-start",
+      { react: "^19", "@tanstack/react-start": "^1" },
+      "@zitadel/sdk-tanstack-start",
+    ],
+    [
+      "solid-start",
+      { "solid-js": "^1.9", "@solidjs/start": "^2.0.0" },
+      "@zitadel/sdk-solid-start, @zitadel/sdk-solid",
+    ],
+    [
+      "qwik-city",
+      { "@qwik.dev/core": "^2.0.0-beta.45", "@qwik.dev/router": "^2.0.0-beta.45" },
+      "@zitadel/sdk-qwik-city, @zitadel/sdk-qwik",
+    ],
+  ])("requires the %s SDK package, not just the CLI", async (_framework, dependencies, missing) => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies,
+        devDependencies: { "@zitadel/cli": "0.1.0-alpha.0" },
+      }),
+    );
+    const outcome = await new DependencyCheck().run(ctxFor(cwd));
+    expect(outcome).toMatchObject({
+      status: "fail",
+      message: `package.json does not declare ${missing}, which the app imports`,
+    });
+  });
+
   it("fails when the only @zitadel package is not the SDK the app imports", async () => {
     const cwd = await makeProject();
     await writeFile(
