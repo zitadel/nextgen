@@ -49,7 +49,9 @@ describe("NuxtPatcher.plan", () => {
     expect(writeContents(plan, "app/pages/login.vue")).not.toContain("align-items: center");
     // The embedding alternative is named where a developer will see it.
     expect(writeContents(plan, "app/pages/login.vue")).toContain('variant="widget"');
-    expect(writeContents(plan, "app/plugins/auth.server.ts")).toContain(MANAGED_MARKER);
+    expect(writeContents(plan, "app/plugins/zitadel-components.client.ts")).toContain(
+      MANAGED_MARKER,
+    );
     const edit = plan.ops.find(
       (op): op is Extract<FileOp, { kind: "edit" }> =>
         op.kind === "edit" && String(op.path).includes("nuxt.config"),
@@ -66,11 +68,11 @@ describe("NuxtPatcher.plan", () => {
     const business = new NuxtPatcher().plan({ ...ctx(), useCase: "business" });
     for (const path of ["app/pages/login.vue", "app/pages/register.vue"]) {
       const page = writeContents(business, path);
-      // The overlay ships with the SDK: the page pulls it from the entry it
-      // already imports, and a plain :locales binding suffices even on the
-      // raw custom element — Vue sets bindings whose key exists on the
+      // The page takes the overlay from the client plugin rather than
+      // importing the components, and a plain :locales binding suffices even
+      // on the raw custom element — Vue sets bindings whose key exists on the
       // element as DOM properties (no React-18 ref detour as in Next).
-      expect(page).toContain("businessLocales, useZitadelProject");
+      expect(page).toContain("const { $zitadelBusinessLocales: businessLocales } = useNuxtApp();");
       expect(page).toContain(':locales="businessLocales"');
     }
     // Consumer scaffolds keep the neutral built-ins, like minimal ones.
@@ -128,11 +130,48 @@ describe("NuxtPatcher.plan", () => {
     }
   });
 
-  it("adds the SDK dependency at the CLI's prerelease tag", () => {
-    const dep = new NuxtPatcher()
-      .plan(ctx())
-      .ops.find((op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep");
-    expect(dep).toMatchObject({ name: "@zitadel/sdk-nuxt", version: "alpha" });
+  it.each(["@zitadel/sdk-nuxt", "@zitadel/components"])(
+    "adds %s at the CLI's prerelease tag",
+    (name) => {
+      const dep = new NuxtPatcher()
+        .plan(ctx())
+        .ops.find(
+          (op): op is Extract<FileOp, { kind: "add-dep" }> =>
+            op.kind === "add-dep" && op.name === name,
+        );
+      expect(dep).toMatchObject({ version: "alpha" });
+    },
+  );
+
+  it("declares the components package the client plugin imports", () => {
+    const plan = new NuxtPatcher().plan(ctx());
+    expect(writeContents(plan, "app/plugins/zitadel-components.client.ts")).toContain(
+      'import "@zitadel/components";',
+    );
+  });
+
+  it("provides the business overlay from the client plugin", () => {
+    const plan = new NuxtPatcher().plan({ ...ctx(), useCase: "business" });
+    expect(writeContents(plan, "app/plugins/zitadel-components.client.ts")).toContain(
+      "provide: { zitadelBusinessLocales: businessLocales }",
+    );
+  });
+
+  it("leaves seeding the auth state to the module's own plugin", () => {
+    const plan = new NuxtPatcher().plan(ctx());
+    expect(writeContents(plan, "app/plugins/auth.server.ts")).toBeUndefined();
+  });
+
+  it.each([
+    ["minimal page", undefined, "page"],
+    ["minimal widget", undefined, "widget"],
+    ["business page", "business", "page"],
+    ["business widget", "business", "widget"],
+  ] as const)("keeps the %s pages free of @zitadel imports", (_label, useCase, posture) => {
+    const plan = new NuxtPatcher().plan({ ...ctx(), useCase, posture });
+    for (const path of ["app/pages/login.vue", "app/pages/register.vue", "app/pages/profile.vue"]) {
+      expect(writeContents(plan, path)).not.toContain('from "@zitadel/');
+    }
   });
 });
 
@@ -143,7 +182,7 @@ describe("NuxtPatcher.artifacts", () => {
       rendererId: "react",
     });
     expect(artifacts.markedFiles).toContain("app/pages/login.vue");
-    expect(artifacts.dependencies).toEqual(["@zitadel/sdk-nuxt"]);
+    expect(artifacts.dependencies).toEqual(["@zitadel/sdk-nuxt", "@zitadel/components"]);
     // package.json is listed too: the `dev` script gets the registered
     // dev-server port pinned into it, and eject can't auto-revert that.
     expect(artifacts.configEdits).toEqual(["nuxt.config.*", "package.json"]);
@@ -156,7 +195,18 @@ describe("NuxtPatcher.artifacts", () => {
       framework: { id: "nuxt", appDir: "app", devPort: 3000, url: "http://localhost:3000" },
       rendererId: "react",
     });
-    expect(artifacts.conditionalFiles).toEqual(["app/app.vue", "app/pages/index.vue"]);
+    expect(artifacts.conditionalFiles).toEqual(
+      expect.arrayContaining(["app/app.vue", "app/pages/index.vue"]),
+    );
+  });
+
+  it("still ejects the auth plugin an older setup wrote, without expecting it", () => {
+    const artifacts = new NuxtPatcher().artifacts({
+      framework: { id: "nuxt", appDir: "app", devPort: 3000, url: "http://localhost:3000" },
+      rendererId: "react",
+    });
+    expect(artifacts.markedFiles).toContain("app/plugins/auth.server.ts");
+    expect(artifacts.conditionalFiles).toContain("app/plugins/auth.server.ts");
   });
 });
 
