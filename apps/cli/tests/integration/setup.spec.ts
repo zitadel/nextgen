@@ -138,6 +138,32 @@ describe("setup", () => {
         expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
       });
 
+      it.each([
+        ["the platform is down", () => platform.isUnavailable()],
+        ["the schema upload fails", () => platform.rejectsSchemaUploads()],
+      ])("leaves the directory start ran in as it was when %s", async (_failure, fail) => {
+        const app = await aNewAppDirectory();
+        await app.startLocalServer();
+        const before = await app.snapshot();
+        fail();
+
+        await app.setupNewApp();
+
+        expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+      });
+
+      it("sets a new app up as new when rerun after a failed run", async () => {
+        const app = await aNewAppDirectory();
+        platform.isUnavailable();
+        await app.setupNewApp();
+        platform.recovers();
+
+        const rerun = await app.setupNewApp();
+
+        const { data } = app.envelopeOf<{ files_written: string[] }>(rerun);
+        expect(data.files_written).toContain("app/page.tsx");
+      });
+
       it("reports the configuration files it wrote", async () => {
         const app = await anApp();
 

@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -345,6 +345,117 @@ describe("Orca.scaffold", () => {
       }),
     });
     expect(scaffold).not.toHaveBeenCalled();
+  });
+
+  it("removes what a failed scaffold left in an empty directory", async () => {
+    const cwd = await tmpPackageSafe();
+    const failingOrca = new Orca(
+      [fakeDetector],
+      [
+        {
+          ...fakeScaffolder,
+          async scaffold(scaffoldCwd) {
+            await writeFile(join(scaffoldCwd, "half-written.txt"), "junk");
+            throw new ZitadelError("E_VALIDATION", "boom");
+          },
+        },
+      ],
+      [],
+    );
+
+    await expect(failingOrca.scaffold(cwd, "fake")).rejects.toMatchObject({
+      code: "E_VALIDATION",
+    });
+    await expect(readdir(cwd)).resolves.toEqual([]);
+  });
+
+  describe("undoably", () => {
+    /** A scaffold that writes its own `.gitignore` and `package.json`, as the generators do. */
+    const generatorOrca = new Orca(
+      [fakeDetector],
+      [
+        {
+          ...fakeScaffolder,
+          async scaffold(scaffoldCwd) {
+            await writeFile(join(scaffoldCwd, ".gitignore"), "node_modules\n");
+            await writeFile(join(scaffoldCwd, "package.json"), "{}");
+          },
+        },
+      ],
+      [],
+    );
+
+    it("puts back what start left, without what was written after the scaffold", async () => {
+      const cwd = await tmpPackageSafe();
+      await writeFile(join(cwd, ".gitignore"), ".zitadel/local/\n");
+      await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
+      await writeFile(join(cwd, ".zitadel/local/runtime.json"), "{}");
+      const scaffold = await generatorOrca.scaffoldUndoably(cwd, "fake");
+      await writeFile(join(cwd, "zitadel.json"), "{}");
+      await writeFile(join(cwd, ".zitadel/secret"), "{}");
+
+      await scaffold.undo();
+
+      await expect(readdir(cwd)).resolves.toEqual([".gitignore", ".zitadel"]);
+      await expect(readdir(join(cwd, ".zitadel"))).resolves.toEqual(["local"]);
+      await expect(readFile(join(cwd, ".gitignore"), "utf8")).resolves.toBe(".zitadel/local/\n");
+      await expect(readFile(join(cwd, ".zitadel/local/runtime.json"), "utf8")).resolves.toBe("{}");
+    });
+
+    it("puts back the files the scaffold replaced with force", async () => {
+      const cwd = await tmpPackageSafe();
+      await writeFile(join(cwd, "package.json"), "mine");
+      await writeFile(join(cwd, "notes.txt"), "mine");
+      const scaffold = await generatorOrca.scaffoldUndoably(cwd, "fake", true);
+
+      await scaffold.undo();
+
+      await expect(readdir(cwd)).resolves.toEqual(["notes.txt", "package.json"]);
+      await expect(readFile(join(cwd, "package.json"), "utf8")).resolves.toBe("mine");
+    });
+
+    it("leaves nothing beside the directory once undone", async () => {
+      const cwd = await tmpPackageSafe();
+      await writeFile(join(cwd, "package.json"), "mine");
+      const scaffold = await generatorOrca.scaffoldUndoably(cwd, "fake", true);
+
+      await scaffold.undo();
+
+      await expect(readdir(dirname(cwd))).resolves.toEqual([basename(cwd)]);
+    });
+
+    it("keeps the new app, and nothing beside the directory, once kept", async () => {
+      const cwd = await tmpPackageSafe();
+      await writeFile(join(cwd, "package.json"), "mine");
+      const scaffold = await generatorOrca.scaffoldUndoably(cwd, "fake", true);
+
+      await scaffold.keep();
+
+      await expect(readFile(join(cwd, "package.json"), "utf8")).resolves.toBe("{}");
+      await expect(readdir(dirname(cwd))).resolves.toEqual([basename(cwd)]);
+    });
+
+    it("undoes a scaffold whose app it cannot detect", async () => {
+      const cwd = await tmpPackageSafe();
+      await writeFile(join(cwd, ".gitignore"), ".zitadel/local/\n");
+      const undetectableOrca = new Orca(
+        [fakeDetector],
+        [
+          {
+            ...fakeScaffolder,
+            async scaffold(scaffoldCwd) {
+              await writeFile(join(scaffoldCwd, "index.html"), "<p>not an app</p>");
+            },
+          },
+        ],
+        [],
+      );
+
+      await expect(undetectableOrca.scaffoldUndoably(cwd, "fake")).rejects.toMatchObject({
+        code: "E_FRAMEWORK_NOT_DETECTED",
+      });
+      await expect(readdir(cwd)).resolves.toEqual([".gitignore"]);
+    });
   });
 });
 

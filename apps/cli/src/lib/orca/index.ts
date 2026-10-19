@@ -23,6 +23,23 @@ export type ScaffoldTarget = Readonly<{
   entries: ReadonlyArray<string>;
 }>;
 
+/**
+ * A new app {@link Orca.scaffoldUndoably} created. Call `keep` or `undo`, once:
+ * until then, what the scaffold replaced waits beside the directory.
+ */
+export type UndoableScaffold = Readonly<{
+  facts: FrameworkFacts;
+  /** Keeps the new app, and lets go of what it replaced. */
+  keep(): Promise<void>;
+  /**
+   * Removes the new app and what was written into the directory since, and
+   * puts back what the directory held: an entry it did not hold goes, and so
+   * does one added inside a directory it held; an entry the scaffold replaced
+   * comes back. An edit to a file it already held stays.
+   */
+  undo(): Promise<void>;
+}>;
+
 /** A new app {@link Orca.scaffold} can create, as far as it is known before it exists. */
 export type PlannedApp = Readonly<{
   framework: string;
@@ -152,6 +169,18 @@ export class Orca {
    * scaffolder supports the framework.
    */
   async scaffold(cwd: string, framework: string, force = false): Promise<FrameworkFacts> {
+    const scaffold = await this.scaffoldUndoably(cwd, framework, force);
+    await scaffold.keep();
+    return scaffold.facts;
+  }
+
+  /**
+   * {@link scaffold}, undoable until the caller keeps the new app: for a caller
+   * with more to do before the app is worth keeping, which puts the directory
+   * back as it was when that fails. A scaffold that fails itself is undone
+   * before this throws.
+   */
+  async scaffoldUndoably(cwd: string, framework: string, force = false): Promise<UndoableScaffold> {
     const target = await inspectScaffoldTarget(cwd);
     if (!target.scaffoldable && !force) {
       throw new ZitadelError("E_CONFLICT", `Cannot scaffold: ${cwd} is not empty`, {
@@ -162,19 +191,23 @@ export class Orca {
       });
     }
     assertNpmSafeScaffoldDirectoryName(cwd);
+    const before = await listEntries(cwd);
     // The underlying scaffolders require an empty directory. When it holds the
     // local runtime `start` left, or --force lets us scaffold into a non-empty
     // one, move the existing entries aside, scaffold, then restore anything the
     // scaffold did not create itself.
     const stash = await stashScaffoldDir(cwd, target.entries);
-    let scaffolded = false;
+    const undo = () => undoScaffold(cwd, before, stash);
+    let facts: FrameworkFacts;
     try {
       await this.scaffolderFor(framework).scaffold(cwd, framework);
-      scaffolded = true;
-    } finally {
-      await restoreScaffoldDir(cwd, stash, scaffolded);
+      await restoreBesideScaffold(cwd, stash);
+      facts = await this.detect(cwd, framework);
+    } catch (error) {
+      await undo();
+      throw error;
     }
-    return this.detect(cwd, framework);
+    return { facts, undo, keep: () => dropStash(stash) };
   }
 
   /**
@@ -369,46 +402,83 @@ async function stashScaffoldDir(
   return { root, names };
 }
 
-async function restoreScaffoldDir(
-  cwd: string,
-  stash: ScaffoldStash | undefined,
-  succeeded = true,
-): Promise<void> {
+/**
+ * Moves back each stashed entry the scaffold left free. An entry the scaffold
+ * created its own file at stays in the stash, so an undo can put it back.
+ */
+async function restoreBesideScaffold(cwd: string, stash: ScaffoldStash | undefined): Promise<void> {
   if (!stash) {
     return;
   }
-
-  try {
-    if (!succeeded) {
-      // The scaffold threw. The directory was emptied before scaffolding, so
-      // anything in it now is partial output — remove it and put the originals
-      // back, so a failed `setup --force` never destroys pre-existing files.
-      for (const entry of await readdir(cwd)) {
-        await rm(join(cwd, entry), { recursive: true, force: true });
+  for (const name of stash.names) {
+    const dest = join(cwd, name);
+    if (await pathExists(dest)) {
+      // The scaffold created its own file at a stashed name. For `.gitignore`,
+      // union the stashed rules back in so ignores the pre-existing setup
+      // relied on — notably `.zitadel/local/`, which keeps the local admin
+      // credential out of git — are not silently dropped. Any other collision
+      // keeps the scaffold's version (that is what `--force` is for).
+      if (name === ".gitignore") {
+        await mergeGitignore(join(stash.root, name), dest);
       }
-      for (const name of stash.names) {
-        await rename(join(stash.root, name), join(cwd, name));
-      }
-      return;
+    } else {
+      // The scaffold left this name free; restore the pre-existing entry.
+      await rename(join(stash.root, name), dest);
     }
+  }
+}
 
-    for (const name of stash.names) {
-      const dest = join(cwd, name);
-      if (await pathExists(dest)) {
-        // The scaffold created its own file at a stashed name. For `.gitignore`,
-        // union the stashed rules back in so ignores the pre-existing setup
-        // relied on — notably `.zitadel/local/`, which keeps the local admin
-        // credential out of git — are not silently dropped. Any other collision
-        // keeps the scaffold's version (that is what `--force` is for).
-        if (name === ".gitignore") {
-          await mergeGitignore(join(stash.root, name), dest);
+/**
+ * What a directory holds: each entry, with the entries inside it when it is a
+ * directory, so an undo can tell what was added since.
+ */
+type DirectoryListing = ReadonlyMap<string, ReadonlySet<string> | undefined>;
+
+async function listEntries(cwd: string): Promise<DirectoryListing> {
+  const listing = new Map<string, ReadonlySet<string> | undefined>();
+  for (const entry of await readdir(cwd, { withFileTypes: true })) {
+    listing.set(
+      entry.name,
+      entry.isDirectory() ? new Set(await readdir(join(cwd, entry.name))) : undefined,
+    );
+  }
+  return listing;
+}
+
+/**
+ * Puts `cwd` back to `before`: removes what the scaffold and anything after
+ * it added, including entries added inside a directory `cwd` already held,
+ * then moves back what is still in the stash, which the scaffold replaced or
+ * a failure kept from coming back.
+ */
+async function undoScaffold(
+  cwd: string,
+  before: DirectoryListing,
+  stash: ScaffoldStash | undefined,
+): Promise<void> {
+  const stashed = new Set(stash ? await readdir(stash.root) : []);
+  for (const entry of await readdir(cwd)) {
+    const inside = before.get(entry);
+    if (!before.has(entry) || stashed.has(entry)) {
+      await rm(join(cwd, entry), { recursive: true, force: true });
+    } else if (inside !== undefined) {
+      for (const child of await readdir(join(cwd, entry))) {
+        if (!inside.has(child)) {
+          await rm(join(cwd, entry, child), { recursive: true, force: true });
         }
-      } else {
-        // The scaffold left this name free; restore the pre-existing entry.
-        await rename(join(stash.root, name), dest);
       }
     }
-  } finally {
+  }
+  if (stash) {
+    for (const name of stashed) {
+      await rename(join(stash.root, name), join(cwd, name));
+    }
+  }
+  await dropStash(stash);
+}
+
+async function dropStash(stash: ScaffoldStash | undefined): Promise<void> {
+  if (stash) {
     await rm(stash.root, { recursive: true, force: true });
   }
 }

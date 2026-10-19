@@ -896,6 +896,37 @@ describe("setup command", () => {
     // its presence proves the non-default use case survived into the guidance.
     expect(res.stdout).toContain("--use-case business");
   });
+
+  describe("when the default resources of a new app cannot be uploaded", () => {
+    const failingUpload = async () => {
+      const cwd = await makeNewAppDirectory();
+      server.use(
+        http.post("*/schemas", () =>
+          HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+        ),
+      );
+      const res = await runCliForTest(
+        [
+          ...["setup", "--cwd", cwd, "--json", "--server", "https://api.zitadel.cloud"],
+          ...["--framework", "next", "--non-interactive", "--skip-install"],
+        ],
+        { PATH: await aFakeAppGeneratorPath() },
+      );
+      return parseJson(res.stdout) as { hint?: string; next_commands?: string[] };
+    };
+
+    it("says the new app is gone again", async () => {
+      const json = await failingUpload();
+
+      expect(json.hint).toContain("so setup removed the new app again");
+    });
+
+    it("does not suggest --force, which the emptied directory does not need", async () => {
+      const json = await failingUpload();
+
+      expect(json.next_commands ?? []).toEqual([]);
+    });
+  });
 });
 
 describe("a retry after a failure before the wizard", () => {
