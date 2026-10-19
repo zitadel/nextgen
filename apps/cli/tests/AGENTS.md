@@ -146,12 +146,32 @@ Reading source from a spec is otherwise forbidden, but the assertion is the
 cross-check between the two sides — split it and each half proves nothing, so
 it stays here deliberately rather than by oversight.
 
+## Ports
+
+A port a test hands the CLI, in a unit test as in a spec, comes from
+`nextPort()` in [`helpers/ports.ts`](helpers/ports.ts), never from a
+listen-on-zero probe. A port bound and closed again races the other vitest
+workers: one of their outbound connections can take it as its source port
+before the CLI binds it, and the CLI refuses it with `E_PORT_IN_USE`. Retrying
+on that hides the race rather than fixing it. This is the per-worker allocation
+[`e2e/journey/AGENTS.md`](../../../e2e/journey/AGENTS.md) requires of the
+journey runner. A listener a test holds until it is over may listen on zero:
+nobody can take a port that is held.
+
+## Network
+
+No test leaves the machine. [`helpers/offline.ts`](helpers/offline.ts) runs
+before every file and fails a test that connects anywhere but loopback, naming
+where it tried to go: refusing the request alone would not do, because the CLI
+carries on past a server it cannot reach. A unit test answers the platform with
+msw — `setupServer(...setupPlatformHandlers())` with
+`onUnhandledRequest: "error"`, plus a handler that refuses where the failure is
+what the test is about — and a spec with `usePlatformMock()`. A command run
+without `--server` talks to `DEFAULT_SERVER`, the real platform, so it needs
+the same arrangement as any other.
+
 ## Prohibited in specs
 
-- **No listen-on-zero port probes.** A bind-then-close probe races the other
-  vitest workers, and retrying on `E_PORT_IN_USE` hides the race rather than
-  fixing it. Take a port from a per-worker allocation, the way
-  [`e2e/journey/AGENTS.md`](../../../e2e/journey/AGENTS.md) requires.
 - **No doubles of our own modules.** A spec that stubs something in `src/` has
   stopped being a spec. Fake an external binary on `PATH` if the journey needs
   one; never fake our own code.

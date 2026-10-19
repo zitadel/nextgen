@@ -317,8 +317,10 @@ The Spanner emulator suite (`moon run server:test-spanner`) is not part of
 demand, and is not a required check. To run it against a branch, use
 `gh workflow run spanner.yml --ref <branch>`, or run the Moon task locally.
 
-**Version-only mode** (Changesets version PRs) runs `release:version`,
-`release:pack`, and tarball verification instead.
+**Version-only mode** (Changesets version PRs) runs `release:version`, the
+publish preflight's npm check (`node scripts/release.mjs check-npm`: npm must
+already know every public package the version publishes), `release:pack`, and
+tarball verification instead.
 
 CI consumes the workflow's packed npm tarballs, not public Zitadel packages.
 Changesets PR comments are informational release-intent feedback, not a

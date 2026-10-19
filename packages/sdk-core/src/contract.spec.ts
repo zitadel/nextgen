@@ -466,6 +466,8 @@ describe("server SDK test titles", () => {
     "signs in a live session that names a user",
     "redirects an anonymous session on a protected route to login",
     "keeps an anonymous session's cookie, since its sign-in may still complete",
+    "treats a 200 session without a user as anonymous on a public route",
+    "redirects a session whose answer has a null user id to login on a protected route",
     "clears a dead session cookie on a public page",
     "clears a dead session cookie and redirects on a protected route",
     "clears the cookie of a session that is gone",

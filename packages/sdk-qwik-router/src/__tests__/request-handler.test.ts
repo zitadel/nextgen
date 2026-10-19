@@ -819,6 +819,32 @@ describe("server middleware", () => {
     expect(served.headers.get("set-cookie")).toBeNull();
   });
 
+  it("treats a 200 session without a user as anonymous on a public route", async () => {
+    sessionsMe(Response.json({ project_id: PROJECT }));
+
+    const served = await serve(
+      `${ORIGIN}/`,
+      { headers: { cookie: `${SESSION}=opaque-session-token` } },
+      OPTIONS,
+    );
+
+    expect(served.answered).toBe(false);
+    expect(served.auth?.isAuthenticated ?? false).toBe(false);
+    expect(served.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("redirects a session whose answer has a null user id to login on a protected route", async () => {
+    sessionsMe(Response.json({ project_id: PROJECT, user_id: null }));
+
+    const served = await serve(
+      `${ORIGIN}/admin`,
+      { headers: { cookie: `${SESSION}=opaque-session-token` } },
+      OPTIONS,
+    );
+
+    expect(served.status).toBe(302);
+  });
+
   it("clears a dead session cookie on a public page", async () => {
     sessionsMe(new Response(null, { status: 401 }));
 
@@ -869,6 +895,18 @@ describe("server middleware", () => {
   // every user out. Only its refusal makes a cookie dead.
   describe.each([
     ["a 500", () => sessionsMe(new Response(null, { status: 500 }))],
+    ["a 502", () => sessionsMe(new Response("Bad gateway", { status: 502 }))],
+    ["a 200 with an empty body", () => sessionsMe(new Response(null, { status: 200 }))],
+    [
+      "a 200 that is not JSON",
+      () =>
+        sessionsMe(
+          new Response("<html>Bad gateway</html>", {
+            status: 200,
+            headers: { "content-type": "text/html" },
+          }),
+        ),
+    ],
     ["no answer in time", sessionsMeSilent],
     ["a network error", sessionsMeUnreachable],
   ])("when the session check gets %s", (_label, backend) => {
