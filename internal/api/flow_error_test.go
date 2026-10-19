@@ -162,3 +162,13 @@ func TestMapFlowGetError_restartRequiredIs409(t *testing.T) {
 	assert.Equal(t, "flow.restart_required", string(conflict.Code))
 	assert.Equal(t, "the flow must be restarted", conflict.Message)
 }
+
+func TestMapFlowGetError_releaseRevokedIs409(t *testing.T) {
+	t.Parallel()
+
+	res, err := mapFlowGetError(domain.ErrReleaseRevoked())
+	require.NoError(t, err)
+	conflict, ok := res.(*api.GetFlowStepConflict)
+	require.True(t, ok, "got %T", res)
+	assert.Equal(t, "rel.revoked", string(conflict.Code))
+}
