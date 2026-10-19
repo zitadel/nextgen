@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ZitadelLogin, ZitadelLogout, ZitadelSession } from "@zitadel/components";
 import { DISPATCHED_EVENTS } from "@zitadel/components/events";
@@ -202,5 +203,53 @@ describe("server-render cases ↔ SDK specs", () => {
 
   it.each(SPECS)("%s carries the same cases as the React spec", (spec) => {
     expect(casesIn(spec)).toBe(casesIn(SPECS[0]!));
+  });
+});
+
+/**
+ * Apps go through their SDK. Each SDK that renders the widgets lists
+ * `@zitadel/components` as its own dependency, so the elements load from the SDK
+ * and the app never installs or imports `components` by name; no SDK's docs tell
+ * a user to add it.
+ */
+describe("widget loading ↔ SDK packages", () => {
+  // Vitest runs with the package directory as cwd; `import.meta.url` is rewritten under jsdom.
+  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+  const sdkDirs = readdirSync(packagesDir).filter((dir) => dir.startsWith("sdk-"));
+  const WIDGET_SDKS = [
+    "sdk-angular",
+    "sdk-next",
+    "sdk-nuxt",
+    "sdk-qwik",
+    "sdk-react",
+    "sdk-solid",
+    "sdk-svelte",
+    "sdk-vue",
+  ];
+
+  const read = (path: string): string => readFileSync(path, "utf8");
+
+  it.each(WIDGET_SDKS)("%s depends on @zitadel/components itself", (dir) => {
+    const manifest = JSON.parse(read(`${packagesDir}${dir}/package.json`)) as {
+      dependencies?: Record<string, string>;
+      peerDependencies?: Record<string, string>;
+    };
+    expect(manifest.dependencies?.["@zitadel/components"]).toBeDefined();
+    expect(manifest.peerDependencies?.["@zitadel/components"]).toBeUndefined();
+  });
+
+  it.each(sdkDirs)("%s docs never tell an app to install @zitadel/components", (dir) => {
+    const skillsDir = `${packagesDir}${dir}/skills`;
+    const docs = [
+      `${packagesDir}${dir}/README.md`,
+      ...(existsSync(skillsDir)
+        ? readdirSync(skillsDir).map((skill) => `${skillsDir}/${skill}/SKILL.md`)
+        : []),
+    ].filter((path) => existsSync(path));
+    for (const path of docs) {
+      expect(read(path)).not.toMatch(
+        /(?:pnpm|npm|yarn|bun)\s+(?:add|install|i)\b[^\n]*@zitadel\/components/,
+      );
+    }
   });
 });
