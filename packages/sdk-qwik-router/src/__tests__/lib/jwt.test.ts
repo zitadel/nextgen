@@ -27,7 +27,7 @@ const PUBLIC_KEY_JWK = publicKey.export({ format: "jwk" }) as JsonWebKey;
 
 let kidCounter = 0;
 function nextKid(): string {
-  return `qwikcity-test-key-${++kidCounter}`;
+  return `qwikrouter-test-key-${++kidCounter}`;
 }
 
 function b64url(buf: Buffer): string {

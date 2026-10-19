@@ -56,7 +56,7 @@ const PACKAGE_DIRS: Record<string, string> = {
   "@zitadel/sdk-next": "packages/sdk-next",
   "@zitadel/sdk-nuxt": "packages/sdk-nuxt",
   "@zitadel/sdk-qwik": "packages/sdk-qwik",
-  "@zitadel/sdk-qwik-city": "packages/sdk-qwik-city",
+  "@zitadel/sdk-qwik-router": "packages/sdk-qwik-router",
   "@zitadel/sdk-react": "packages/sdk-react",
   "@zitadel/sdk-solid": "packages/sdk-solid",
   "@zitadel/sdk-solid-start": "packages/sdk-solid-start",
