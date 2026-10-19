@@ -75,20 +75,20 @@ export function parseSignInEvent(line: string): SignInEvent | undefined {
 
 /**
  * Sign-in events as they are logged from now on. Whatever the log holds when
- * this is called is the baseline, taken at once, so an attempt made before is
- * never reported and one made right after is not missed; each poll then
+ * this is called is the baseline, and the promise resolves only once it has
+ * been read, so an attempt made before is never reported and one made after
+ * the caller is told it may begin is not mistaken for old; each poll then
  * yields the lines it has not seen. Matching on the log's own lines needs no
  * clock, and a line carries its timestamp, so two lines are never alike.
  */
-export function watchSignInEvents(
+export async function watchSignInEvents(
   read: () => Promise<string>,
   sleep: (ms: number, signal: AbortSignal) => Promise<void>,
   pollMs: number,
   signal: AbortSignal,
-): AsyncIterable<SignInEvent> {
-  const baseline = read().then((log) => new Set(log.split("\n")));
+): Promise<AsyncIterable<SignInEvent>> {
+  const seen = new Set((await read()).split("\n"));
   return (async function* () {
-    const seen = await baseline;
     while (!signal.aborted) {
       await sleep(pollMs, signal);
       if (signal.aborted) {

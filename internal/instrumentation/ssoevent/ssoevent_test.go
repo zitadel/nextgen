@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -55,6 +56,16 @@ func TestEmit(t *testing.T) {
 			name:  "claim names are sorted and carry no values",
 			event: ssoevent.Event{Slug: "google", Phase: ssoevent.PhaseExchangeFinished, ClaimNames: []string{"name", "email"}},
 			want:  map[string]any{"claims": []any{"email", "name"}},
+		},
+		{
+			name:  "the longest slug a connection may have is kept",
+			event: ssoevent.Event{Slug: strings.Repeat("a", 64), Phase: ssoevent.PhaseCallbackReceived},
+			want:  map[string]any{"slug": strings.Repeat("a", 64)},
+		},
+		{
+			name:  "a slug one longer than a connection may have is dropped",
+			event: ssoevent.Event{Slug: strings.Repeat("a", 65), Phase: ssoevent.PhaseCallbackReceived},
+			want:  map[string]any{"slug": ""},
 		},
 		{
 			name:  "a slug that is not a slug is dropped",

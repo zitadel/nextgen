@@ -31,8 +31,20 @@ describe("GOOGLE_PROBES.authorize", () => {
   it.each([
     ["an error page naming a cause it does not know", refusalUrl("access_blocked")],
     ["a page that is not a sign-in page", "https://accounts.google.com/somewhere/else"],
+    ["a sign-in page this check does not know", "https://accounts.google.com/signin/v2/other"],
+    ["a sign-in page on another host", "https://elsewhere.example/v3/signin/identifier"],
   ])("does not recognise %s", (_name, url) => {
     expect(GOOGLE_PROBES.authorize(at(url))).toEqual({ kind: "unknown" });
+  });
+
+  it("does not accept the sign-in page when it was served with an error", () => {
+    const failing = {
+      status: 500,
+      url: "https://accounts.google.com/v3/signin/identifier",
+      body: "",
+    };
+
+    expect(GOOGLE_PROBES.authorize(failing)).toEqual({ kind: "unknown" });
   });
 });
 

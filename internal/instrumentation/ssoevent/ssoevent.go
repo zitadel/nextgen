@@ -128,7 +128,7 @@ type Event struct {
 	ClaimNames []string
 }
 
-var slugPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,62}$`)
+var slugPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,63}$`)
 
 // Emit writes the event: info on success, warn on failure.
 func Emit(ctx context.Context, e Event) {

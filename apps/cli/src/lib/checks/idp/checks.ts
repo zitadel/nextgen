@@ -25,6 +25,9 @@ export class DiscoveryReachableCheck extends Check<IdpContext> {
 
   async run(context: IdpContext): Promise<Outcome> {
     const found = await context.discovery;
+    if (found.ok && found.source === "connection") {
+      return { status: "pass", message: "Using the endpoints written in the connection" };
+    }
     return found.ok
       ? { status: "pass", message: `Fetched ${found.url}` }
       : {
@@ -40,8 +43,14 @@ export class IssuerCheck extends DiscoveryCheck {
   readonly title = "Issuer";
 
   protected inspect(context: IdpContext, document: Discovery): Outcome {
+    if (context.endpoints !== undefined) {
+      return {
+        status: "skipped",
+        message: "The connection names its own endpoints, so there is no discovery document",
+      };
+    }
     const reported = document.issuer ?? "";
-    return reported.replace(/\/$/, "") === context.issuer.replace(/\/$/, "")
+    return reported === context.issuer
       ? { status: "pass", message: "Matches the issuer the provider reports" }
       : {
           status: "fail",
@@ -60,13 +69,13 @@ export class ScopesCheck extends DiscoveryCheck {
     if (supported === undefined) {
       return { status: "skipped", message: "The provider does not list the scopes it supports" };
     }
-    const unsupported = context.scopes.filter((scope) => !supported.includes(scope));
-    return unsupported.length === 0
-      ? { status: "pass", message: `${context.scopes.join(", ")} are all supported` }
+    const unlisted = context.scopes.filter((scope) => !supported.includes(scope));
+    return unlisted.length === 0
+      ? { status: "pass", message: `${context.scopes.join(", ")} are all listed by the provider` }
       : {
-          status: "fail",
-          message: `The provider does not support ${unsupported.join(", ")}`,
-          recovery: `Remove them from oidc.scopes in .zitadel/idps/${context.slug}.json`,
+          status: "warn",
+          message: `The provider does not list ${unlisted.join(", ")}`,
+          recovery: `Check oidc.scopes in .zitadel/idps/${context.slug}.json; a provider can accept a scope it does not list`,
         };
   }
 }
@@ -105,6 +114,13 @@ export class PkceCheck extends DiscoveryCheck {
       ? { status: "pass", message: "The provider supports S256" }
       : { status: "warn", message: "The provider does not list S256 among its challenge methods" };
   }
+}
+
+/** The server's own rule for an endpoint: HTTPS, or plain HTTP only to this machine. */
+function isSecureEndpoint(endpoint: string): boolean {
+  return /^(https:\/\/[^\s/?#]+|http:\/\/(localhost|127\.0\.0\.1)(:[0-9]+)?)([/?][^\s#]*)?$/.test(
+    endpoint,
+  );
 }
 
 /** What to do about a rejection, in the provider's own console. */
@@ -176,6 +192,13 @@ export class SecretProbeCheck extends DiscoveryCheck {
       return {
         status: "skipped",
         message: "The secret is write-only, so it cannot be read back; supply it to check it",
+      };
+    }
+    if (!isSecureEndpoint(document.token_endpoint)) {
+      return {
+        status: "fail",
+        message: `The token endpoint ${document.token_endpoint} is not HTTPS, so the secret was not sent`,
+        recovery: "Use an https:// token endpoint; plain http is only allowed for localhost",
       };
     }
     const response = await context.request(document.token_endpoint, {

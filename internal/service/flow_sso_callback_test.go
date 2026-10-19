@@ -602,7 +602,9 @@ func TestFlowSSOCallback_Process_EmitsOneEventPerPhase(t *testing.T) {
 		consumeErr error
 		// revision is how the pinned revision is read; nil means it is not.
 		revision *revisionRead
-		want     []want
+		// setResultErrs answers the store of the exchanged identity.
+		setResultErrs []error
+		want          []want
 	}{
 		{
 			name:     "a completed callback reports the callback and the exchange",
@@ -654,6 +656,13 @@ func TestFlowSSOCallback_Process_EmitsOneEventPerPhase(t *testing.T) {
 			want:     []want{{"callback_received", "ok", "", ""}, {"exchange_finished", "failed", "secret_unavailable", "journey"}},
 		},
 		{
+			name:          "a state replaced during the exchange is the journey's",
+			in:            service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"},
+			revision:      &revisionRead{secret: &domain.Variable{Name: "GOOGLE_SECRET", Value: canarySecret, IsSecret: true}},
+			setResultErrs: []error{domain.ErrSSOStateInvalid()},
+			want:          []want{{"callback_received", "ok", "", ""}, {"exchange_finished", "failed", "state_invalid", "journey"}},
+		},
+		{
 			name:     "a connection revision that cannot be read is the journey's",
 			in:       service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"},
 			revision: &revisionRead{err: errors.New("gone")},
@@ -666,6 +675,7 @@ func TestFlowSSOCallback_Process_EmitsOneEventPerPhase(t *testing.T) {
 			var logs bytes.Buffer
 			ctx := zlog.WithLoggingContext(t.Context(), slog.New(slog.NewJSONHandler(&logs, nil)))
 			svc, attempts := newCallbackWithRevision(t, tt.revision, tt.consumeErr)
+			attempts.setResultErrs = tt.setResultErrs
 
 			_, _ = svc.Process(ctx, tt.in)
 
