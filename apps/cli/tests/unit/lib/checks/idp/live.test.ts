@@ -316,6 +316,26 @@ describe("LiveSignInCheck", () => {
     });
   });
 
+  it("keeps what it saw when the events can no longer be read", async () => {
+    const base = aRuntime([]).live;
+    const live: LiveSignIn = {
+      ...base,
+      watch: async () =>
+        (async function* () {
+          yield sso({ phase: "exchange_finished" });
+          throw new Error("503");
+        })(),
+    };
+
+    const outcome = await new LiveSignInCheck().run(aContext(live), [PASSED]);
+
+    expect(outcome).toMatchObject({
+      status: "fail",
+      message: "The project's events could not be read: 503",
+      details: { attempt_id: "att_1", events: [{ phase: "exchange_finished" }] },
+    });
+  });
+
   it("stops watching and waiting when it finishes", async () => {
     const aborted: boolean[] = [];
     const base = aRuntime(SIGNED_IN).live;

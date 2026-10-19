@@ -85,7 +85,7 @@ function recoveryFor(event: SignInEvent, context: IdpContext): string {
     case "user_invalid":
       return `Fix claim_mapping and verified_claims in ${file}, or the matching rule in your user schema`;
     case "unroutable":
-      return "Route sso_authenticated from the step that offers this provider in your login flow";
+      return "Route sso_authenticated, and user_already_exists if an existing user may be bound, from the step that offers this provider in your login flow";
     default:
       return EVENTS;
   }
@@ -181,7 +181,18 @@ export class LiveSignInCheck extends Check<IdpContext> {
   /** Reads events until the attempt being followed ends, or the clock runs out. */
   private async follow(watching: Watching, progress: Progress): Promise<Outcome> {
     const { context, live, events, timedOut } = watching;
-    const next = await Promise.race([events.next(), timedOut]);
+    const next = await Promise.race([events.next(), timedOut]).catch((error: unknown) =>
+      error instanceof Error ? error : new Error(String(error)),
+    );
+    if (next instanceof Error) {
+      // The attempt may well have finished; say what was seen, and that the reading failed.
+      return {
+        status: "fail",
+        message: `The project's events could not be read: ${next.message}`,
+        recovery: EVENTS,
+        details: detailsOf(progress.attempt, progress.seen, progress.last),
+      };
+    }
     if (next === TIMED_OUT || next.done) {
       return this.unfinished(progress);
     }
