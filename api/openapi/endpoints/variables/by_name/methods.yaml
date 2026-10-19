@@ -1,5 +1,6 @@
 get:
   operationId: getVariable
+  x-zitadel-cli: variables get
   summary: Get a variable
   description: |
     Reads one variable by name, with its value per kind. A name with no
@@ -26,6 +27,7 @@ get:
 
 delete:
   operationId: deleteVariable
+  x-zitadel-cli: variables delete
   summary: Delete a variable
   description: |
     Removes a variable for the requested kind, or for both kinds without
