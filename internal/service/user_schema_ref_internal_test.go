@@ -104,3 +104,32 @@ func TestSameUserSchema(t *testing.T) {
 		})
 	}
 }
+
+func TestUserSchemaRevisionURLs(t *testing.T) {
+	v1 := &domain.JSONSchema{URL: "sch_human_v1", ObjectType: new("human-user")}
+	v2 := &domain.JSONSchema{URL: "sch_human_v2", ObjectType: new("human-user")}
+	staff := &domain.JSONSchema{URL: "https://example.com/staff.json", ObjectType: new("staff-user")}
+	schemas := fakeUserSchemas{v1, v2, staff}
+
+	tests := []struct {
+		name     string
+		schemaID string
+		want     []string
+		wantErr  error
+	}{
+		{name: "one revision", schemaID: staff.URL, want: []string{staff.URL}},
+		{name: "several revisions", schemaID: v2.URL, want: []string{v1.URL, v2.URL}},
+		{name: "unknown id", schemaID: "sch_unknown", wantErr: domain.ErrJSONSchemaNotFound()},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := userSchemaRevisionURLs(t.Context(), schemas, "proj", tt.schemaID)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.ElementsMatch(t, tt.want, got)
+		})
+	}
+}

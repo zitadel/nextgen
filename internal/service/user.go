@@ -972,10 +972,15 @@ type UserStatementsLookup struct {
 
 // GetByAttributes resolves a login identifier, so it matches only uniquely
 // registered values: an equal value in a non-unique property of another user
-// must not make the lookup ambiguous and reject the sign-in.
-func (l UserStatementsLookup) GetByAttributes(ctx context.Context, projectID string, attrs []domain.Attribute) (*domain.User, error) {
+// must not make the lookup ambiguous and reject the sign-in. It matches only
+// users of the given schema URLs, so a user of another schema can neither
+// match nor collide (ADR 058 §5).
+func (l UserStatementsLookup) GetByAttributes(ctx context.Context, projectID string, schemaURLs []string, attrs []domain.Attribute) (*domain.User, error) {
 	return l.Pool.Statements().GetUser(ctx,
-		database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+		database.And(
+			database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+			database.Or(equalIDFilters(domain.UserFieldSchemaURL, schemaURLs)...),
+		),
 		UserQueryOptions{Attributes: attrs, UniqueAttributesOnly: true},
 	)
 }

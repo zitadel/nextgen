@@ -1763,6 +1763,7 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved Fl
 				AttemptID:     state.AuthAttemptID,
 				AttributeName: name,
 				Value:         value,
+				UserSchemaURL: state.UserSchemaURL,
 			})
 			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
 				if state.CurrentPurpose == FlowDefinitionPurposeRegister {
@@ -1965,6 +1966,7 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 						AttemptID:     state.AuthAttemptID,
 						AttributeName: candidate[0],
 						Value:         candidate[1],
+						UserSchemaURL: state.UserSchemaURL,
 					})
 					if rerr == nil {
 						recordResolvedUser(state, userID)

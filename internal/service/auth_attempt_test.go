@@ -585,7 +585,16 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 		}
 	}
 
-	userProof := service.UserProof{AttributeName: "email", LoginName: "u@example.com"}
+	userProof := service.UserProof{AttributeName: "email", LoginName: "u@example.com", UserSchemaURL: "sch_v2"}
+	// lineage is every revision of the bound schema: users keep the revision
+	// they were created under while the flow runs on the newest one.
+	lineage := []string{"sch_v1", "sch_v2"}
+	expectLineage := func(stmts *mocks.MockAllStatements) {
+		stmts.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj", "sch_v2").Return(&domain.JSONSchema{URL: "sch_v2", ObjectType: new("human-user")}, nil)
+		stmts.EXPECT().ListJSONSchemas(gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.JSONSchema]{
+			Items: []*domain.JSONSchema{{URL: "sch_v1"}, {URL: "sch_v2"}},
+		}, nil)
+	}
 
 	t.Run("verifies user proof and persists success", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
@@ -600,7 +609,8 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 			succeededFactor = factor
 			return nil
 		})
-		users.EXPECT().GetByAttributes(gomock.Any(), "proj", gomock.Any()).Return(&domain.User{ID: "user-1"}, nil)
+		expectLineage(stmts)
+		users.EXPECT().GetByAttributes(gomock.Any(), "proj", gomock.Any(), gomock.Any()).Return(&domain.User{ID: "user-1"}, nil)
 
 		svc := newAuthAttemptSvc(ctrl, stmts, nil, users)
 		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
@@ -612,6 +622,45 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 		require.IsType(t, &domain.AuthFactorUser{}, succeededFactor, "ChallengeSucceeded factor must be *domain.AuthFactorUser")
 		userFactor := succeededFactor.(*domain.AuthFactorUser)
 		assert.Equal(t, "user-1", userFactor.UserID)
+	})
+
+	t.Run("flow path scopes the lookup to the lineage of the bound schema", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		users := mocks.NewMockUserLookup(ctrl)
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
+			return newUserChallengeAttempt(), nil
+		})
+		stmts.EXPECT().AuthAttemptChallengeSucceeded(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+		expectLineage(stmts)
+		users.EXPECT().GetByAttributes(gomock.Any(), "proj", lineage, []domain.Attribute{{Key: "email", Value: "u@example.com"}}).Return(&domain.User{ID: "user-1"}, nil)
+
+		svc := newAuthAttemptSvc(ctrl, stmts, nil, users)
+		_, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
+			ProjectID: "proj", AttemptID: "att-1", ChallengeID: "ch-1", Proof: userProof,
+		})
+
+		require.NoError(t, err)
+	})
+
+	t.Run("unknown bound schema is an internal error, not a rejected proof", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		users := mocks.NewMockUserLookup(ctrl)
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
+			return newUserChallengeAttempt(), nil
+		})
+		// No AuthAttemptChallengeFailed: a server-side inconsistency is not a failed check.
+		stmts.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj", "sch_v2").Return(nil, new(database.NoRowFoundError))
+
+		svc := newAuthAttemptSvc(ctrl, stmts, nil, users)
+		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
+			ProjectID: "proj", AttemptID: "att-1", ChallengeID: "ch-1", Proof: userProof,
+		})
+
+		assert.Nil(t, got)
+		assert.ErrorIs(t, err, domain.ErrInternal(nil))
+		assert.NotErrorIs(t, err, domain.ErrAuthAttemptProofRejected(nil))
 	})
 
 	t.Run("stale challenge returns error without recording failure", func(t *testing.T) {
@@ -644,7 +693,8 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 			failedChallenge = c
 			return nil
 		})
-		users.EXPECT().GetByAttributes(gomock.Any(), "proj", gomock.Any()).Return(nil, rejectErr)
+		expectLineage(stmts)
+		users.EXPECT().GetByAttributes(gomock.Any(), "proj", gomock.Any(), gomock.Any()).Return(nil, rejectErr)
 
 		svc := newAuthAttemptSvc(ctrl, stmts, nil, users)
 		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
@@ -667,7 +717,8 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 		stmts.EXPECT().AuthAttemptChallengeSucceeded(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string, domain.AuthFactor, string) error {
 			return succeedErr
 		})
-		users.EXPECT().GetByAttributes(gomock.Any(), "proj", gomock.Any()).Return(&domain.User{ID: "user-1"}, nil)
+		expectLineage(stmts)
+		users.EXPECT().GetByAttributes(gomock.Any(), "proj", gomock.Any(), gomock.Any()).Return(&domain.User{ID: "user-1"}, nil)
 
 		svc := newAuthAttemptSvc(ctrl, stmts, nil, users)
 		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
