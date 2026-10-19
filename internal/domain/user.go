@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/ianlancetaylor/jsonschema"
+	"github.com/muhlemmer/gu"
 )
 
 const (
@@ -47,6 +48,24 @@ func ErrUserPermissionDenied() Error {
 // project does not have.
 type UserSchemaUnknownDetails struct {
 	Schema string `json:"schema"`
+}
+
+func CheckUserSchemaMigration(current, target *JSONSchema) error {
+	if current.URL == target.URL {
+		return nil
+	}
+	currentObjectType, targetObjectType := gu.Value(current.ObjectType), gu.Value(target.ObjectType)
+	if currentObjectType != "" && currentObjectType == targetObjectType {
+		return nil
+	}
+	return ErrUserInvalid().
+		WithMessage("cannot change the kind of user in a migration").
+		WithDetails(map[string]string{
+			"schema":              target.URL,
+			"object_type":         targetObjectType,
+			"current_schema":      current.URL,
+			"current_object_type": currentObjectType,
+		})
 }
 
 // CreatedUserDetails names a user the server created, for the answer that

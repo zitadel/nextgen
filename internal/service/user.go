@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/muhlemmer/gu"
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -778,11 +779,12 @@ func (o *PatchUserAction) Prepare(ctx context.Context) error {
 		return domain.ErrInternal(err).WithMessage("failed to get unique attribute scopes from database")
 	}
 
-	targetSchemaURL := user.SchemaURL
-	if o.SchemaURL != nil {
-		targetSchemaURL = *o.SchemaURL
+	targetSchemaURL := gu.Value(o.SchemaURL)
+	if targetSchemaURL == "" {
+		targetSchemaURL = user.SchemaURL
 	}
-	schemaEntity, err := o.schemaStore.GetJSONSchemaByID(ctx, o.ProjectID, targetSchemaURL)
+
+	targetSchema, err := o.schemaStore.GetJSONSchemaByID(ctx, o.ProjectID, targetSchemaURL)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return domain.ErrUserInvalid().
@@ -792,11 +794,21 @@ func (o *PatchUserAction) Prepare(ctx context.Context) error {
 		return domain.ErrInternal(err).WithMessage("failed to get schema from database")
 	}
 
-	o.schemaJSON = schemaEntity.Schema
+	if targetSchemaURL != user.SchemaURL {
+		currentSchema, err := o.schemaStore.GetJSONSchemaByID(ctx, o.ProjectID, user.SchemaURL)
+		if err != nil {
+			return domain.ErrInternal(err).WithMessage("failed to get the user's current schema from database")
+		}
+		if err := domain.CheckUserSchemaMigration(currentSchema, targetSchema); err != nil {
+			return err
+		}
+	}
+
+	o.schemaJSON = targetSchema.Schema
 	o.patch, err = domain.NewPatchUser(domain.PatchUserParams{
 		Current:              user,
 		SchemaURL:            targetSchemaURL,
-		Schema:               schemaEntity.Schema,
+		Schema:               targetSchema.Schema,
 		AttributesPatch:      o.Attributes,
 		StoredRegistryScopes: storedScopes,
 	})

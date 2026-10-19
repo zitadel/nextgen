@@ -445,6 +445,65 @@ func TestUserService_PatchUser_EmptyPatchRefused(t *testing.T) {
 	require.ErrorIs(t, err, domain.ErrUserInvalid())
 }
 
+// A patch naming a schema of another objectType is refused before the write
+// transaction opens, so the user keeps both its attributes and its schema.
+func TestUserService_PatchUser_OtherLogicalSchemaRefused(t *testing.T) {
+	t.Parallel()
+
+	const schemaJSON = `{"type": "object", "properties": {"givenName": {"type": "string"}}}`
+
+	ctrl := gomock.NewController(t)
+	pool := servicemocks.NewMockPool(ctrl)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	pool.EXPECT().Statements().Return(stmts).AnyTimes()
+	// No Transaction, PatchUser or InsertEvent expectation: reaching any of
+	// them fails the test.
+
+	stmts.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(&domain.User{
+			ProjectID:  "proj_1",
+			SchemaURL:  "https://example.test/human.json",
+			ID:         "user_1",
+			Attributes: domain.Attributes{{Key: "givenName", Value: "Alice"}},
+		}, nil)
+	stmts.EXPECT().GetUserUniqueAttributeScopes(gomock.Any(), "proj_1", "user_1").
+		Return(map[domain.AttributeKey]string{}, nil)
+
+	schemaStore := domainmock.NewMockJSONSchemaStore(ctrl)
+	schemaStore.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj_1", "https://example.test/human.json").
+		Return(&domain.JSONSchema{
+			ProjectID:  "proj_1",
+			URL:        "https://example.test/human.json",
+			ObjectType: new("human-user"),
+			Schema:     []byte(schemaJSON),
+		}, nil)
+	schemaStore.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj_1", "https://example.test/machine.json").
+		Return(&domain.JSONSchema{
+			ProjectID:  "proj_1",
+			URL:        "https://example.test/machine.json",
+			ObjectType: new("machine-user"),
+			Schema:     []byte(schemaJSON),
+		}, nil)
+
+	svcPool := service.NewPool(pool)
+	svc := service.NewUserService(svcPool, schemaStore, nil, service.StatementsUserRefResolver{Pool: svcPool})
+
+	_, err := svc.PatchUser(t.Context(), service.PatchUserInput{
+		ProjectID: "proj_1",
+		UserID:    "user_1",
+		SchemaURL: new("https://example.test/machine.json"),
+	})
+	require.ErrorIs(t, err, domain.ErrUserInvalid())
+	var de domain.Error
+	require.ErrorAs(t, err, &de)
+	assert.Equal(t, map[string]string{
+		"schema":              "https://example.test/machine.json",
+		"object_type":         "machine-user",
+		"current_schema":      "https://example.test/human.json",
+		"current_object_type": "human-user",
+	}, de.Details)
+}
+
 func TestUserService_PatchMyUser_SessionGuards(t *testing.T) {
 	t.Parallel()
 
