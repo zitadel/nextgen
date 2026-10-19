@@ -38,12 +38,6 @@ func IsUserInvalid(err error) bool {
 	return err != nil && (errors.Is(err, ErrUserInvalid()) || errors.Is(err, ErrUserAttributesInvalid(nil)))
 }
 
-// IsUserAlreadyExists reports whether a user write lost on a value another
-// user holds: a taken unique attribute or an identity already linked.
-func IsUserAlreadyExists(err error) bool {
-	return err != nil && (errors.Is(err, ErrUserAlreadyExists()) || errors.Is(err, ErrUserAttributesConflict()))
-}
-
 // UserAttributesDetails names the attributes an error is about by key, as in
 // address.zip. The empty key is the attributes document itself.
 type UserAttributesDetails struct {
@@ -56,10 +50,6 @@ func ErrUserNotFound() Error {
 
 func ErrUserAlreadyExists() Error {
 	return newError(PrefixUser.ErrorCodePrefix("already_exists"), "a user already exists with the given unique attributes", nil, nil)
-}
-
-func ErrUserAttributesConflict() Error {
-	return newError(PrefixUser.ErrorCodePrefix("attributes_conflict"), "another user holds a value of a unique attribute", nil, nil)
 }
 
 func ErrUserConflict() Error {

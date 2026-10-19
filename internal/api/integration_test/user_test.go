@@ -279,7 +279,7 @@ func TestCreateUser(t *testing.T) {
 			assert.NoError(t, err)
 			require.IsType(t, &api.CreateUserConflict{}, resp, helpers.MustMarshal(t, resp))
 			conflict := resp.(*api.CreateUserConflict)
-			assert.Equal(t, api.ErrorCode(domain.ErrUserAttributesConflict().Code), conflict.Code)
+			assert.Equal(t, api.ErrorCode(domain.ErrUserAlreadyExists().Code), conflict.Code)
 			assert.JSONEq(t, `{"fields":["attributes.email"]}`, string(conflict.Details.Value["details"]))
 		})
 	})
@@ -720,7 +720,7 @@ func TestPatchUser(t *testing.T) {
 		require.IsType(t, &api.PatchUserByIDConflict{}, resp, helpers.MustMarshal(t, resp))
 		// The taken attribute is named, the user holding it is not.
 		conflict := resp.(*api.PatchUserByIDConflict)
-		assert.Equal(t, api.ErrorCode(domain.ErrUserAttributesConflict().Code), conflict.Code)
+		assert.Equal(t, api.ErrorCode(domain.ErrUserAlreadyExists().Code), conflict.Code)
 		assert.JSONEq(t, `{"fields":["attributes.email"]}`, string(conflict.Details.Value["details"]))
 	})
 

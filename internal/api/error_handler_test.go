@@ -485,12 +485,10 @@ func TestErrorResponseUserAttributesInvalidIsRequestInvalid(t *testing.T) {
 func TestErrorResponseUserAttributesAreNamedByBodyPath(t *testing.T) {
 	t.Parallel()
 
-	for _, taken := range []domain.Error{domain.ErrUserAlreadyExists(), domain.ErrUserAttributesConflict()} {
-		conflict := errorResponse(taken.WithDetails(domain.UserAttributesDetails{Keys: []domain.AttributeKey{"email"}}))
-		require.Equal(t, http.StatusConflict, conflict.StatusCode)
-		require.Equal(t, api.ErrorCode(taken.Code), conflict.Response.Code)
-		require.JSONEq(t, `{"fields":["attributes.email"]}`, string(conflict.Response.Details.Value["details"]))
-	}
+	conflict := errorResponse(domain.ErrUserAlreadyExists().WithDetails(domain.UserAttributesDetails{Keys: []domain.AttributeKey{"email"}}))
+	require.Equal(t, http.StatusConflict, conflict.StatusCode)
+	require.Equal(t, api.ErrorCode(domain.ErrUserAlreadyExists().Code), conflict.Response.Code)
+	require.JSONEq(t, `{"fields":["attributes.email"]}`, string(conflict.Response.Details.Value["details"]))
 
 	invalid := errorResponse(userAttributesRequestInvalid(domain.ErrUserAttributesInvalid(nil).
 		WithDetails(domain.UserAttributesDetails{Keys: []domain.AttributeKey{"", "address.zip"}})))

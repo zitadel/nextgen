@@ -732,16 +732,10 @@ func (o *CreateUserAction) Err(ctx context.Context, stmts AllStatements) error {
 		emitUserCreateFailedBestEffort(ctx, stmts, user.ProjectID, unique)
 		conflictingKeys, err := listConflictingUniqueAttributes(ctx, stmts,
 			user.ProjectID, user.ID, user.Attributes, user.Attributes.RegistryTeamScopes(nil, user.AttributeTeamScope()))
-		if err != nil {
-			// The lookup did not run, so the conflict is not known to be one
-			// no attribute explains. A create's user id is minted, which
-			// leaves the unique attributes as the likely cause.
-			return domain.ErrUserAttributesConflict().WithParent(unique)
-		}
-		if len(conflictingKeys) == 0 {
+		if err != nil || len(conflictingKeys) == 0 {
 			return domain.ErrUserAlreadyExists().WithParent(unique)
 		}
-		return domain.ErrUserAttributesConflict().WithParent(unique).WithDetails(domain.UserAttributesDetails{Keys: conflictingKeys})
+		return domain.ErrUserAlreadyExists().WithParent(unique).WithDetails(domain.UserAttributesDetails{Keys: conflictingKeys})
 	}
 	return domain.ErrInternal(o.err).WithMessage("failed to create user in the database")
 }
@@ -913,9 +907,9 @@ func (o *PatchUserAction) Err(ctx context.Context, stmts AllStatements) error {
 		conflictingKeys, _ := listConflictingUniqueAttributes(ctx, stmts,
 			o.patch.ProjectID, o.patch.UserID, o.patch.Attributes, o.patch.RegistryTeamScopes)
 		if len(conflictingKeys) == 0 {
-			return domain.ErrUserAttributesConflict().WithParent(unique)
+			return domain.ErrUserAlreadyExists().WithParent(unique)
 		}
-		return domain.ErrUserAttributesConflict().WithParent(unique).WithDetails(domain.UserAttributesDetails{Keys: conflictingKeys})
+		return domain.ErrUserAlreadyExists().WithParent(unique).WithDetails(domain.UserAttributesDetails{Keys: conflictingKeys})
 	}
 	return domain.ErrInternal(o.err).WithMessage("failed to patch user in the database")
 }

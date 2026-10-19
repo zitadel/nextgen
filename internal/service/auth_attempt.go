@@ -513,7 +513,7 @@ func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofI
 		// uniqueness race inside the transaction. Surfacing the stable code
 		// explicitly also puts user.already_exists into the generated error
 		// unions: erroranalysis cannot look into the txExtra closure.
-		if domain.IsUserAlreadyExists(err) {
+		if errors.Is(err, domain.ErrUserAlreadyExists()) {
 			return nil, domain.ErrUserAlreadyExists().WithParent(err)
 		}
 		if de, ok := errors.AsType[domain.Error](err); ok {

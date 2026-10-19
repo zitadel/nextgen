@@ -80,11 +80,10 @@ post:
         schema indicates that the email field should be unique across the team,
         only one user can have a given `email` attribute.
 
-        A taken value answers `user.attributes_conflict`, with
-        `details.details.fields` naming the attributes whose value is taken in
+        `details.details.fields` names the attributes whose value is taken in
         the same dotted form as a `400`, such as `attributes.email`. The user
-        holding the value is not named. A conflict no attribute explains
-        answers `user.already_exists`.
+        holding the value is not named. When no attribute can be named, as
+        when the value was freed again since, `details` is absent.
       content:
         application/json:
           schema:

@@ -10,7 +10,6 @@ content:
         - $ref: '../../components/schemas/errors/internal.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../components/schemas/errors/user-already_exists.yaml'
-        - $ref: '../../components/schemas/errors/user-attributes_conflict.yaml'
         - $ref: '../../components/schemas/errors/user-invalid.yaml'
         - $ref: '../../components/schemas/errors/user-not_found.yaml'
         - $ref: '../../components/schemas/errors/user-permission_denied.yaml'
@@ -23,7 +22,6 @@ content:
           internal: '../../components/schemas/errors/internal.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
           user.already_exists: '../../components/schemas/errors/user-already_exists.yaml'
-          user.attributes_conflict: '../../components/schemas/errors/user-attributes_conflict.yaml'
           user.invalid: '../../components/schemas/errors/user-invalid.yaml'
           user.not_found: '../../components/schemas/errors/user-not_found.yaml'
           user.permission_denied: '../../components/schemas/errors/user-permission_denied.yaml'
@@ -58,11 +56,6 @@ content:
         value:
           code: user.already_exists
           message: 'a user already exists with the given unique attributes'
-      user.attributes_conflict:
-        summary: user.attributes_conflict
-        value:
-          code: user.attributes_conflict
-          message: 'another user holds a value of a unique attribute'
       user.invalid:
         summary: user.invalid
         value:

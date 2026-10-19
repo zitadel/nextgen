@@ -658,7 +658,7 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 		Subject:       parked.Subject,
 		Attributes:    attributes,
 	})
-	if IsUserAlreadyExists(err) {
+	if errors.Is(err, ErrUserAlreadyExists()) {
 		// Another flow took a unique value since the probe (a request on this
 		// attempt loses on the parked row instead): whoever took a probed
 		// attribute is bound, and anything else falls back to collection.
@@ -1524,7 +1524,7 @@ func (r *FlowStateMachineRuntime) processSSOCollection(pc *processCtx, resolved 
 		Password:      state.CollectedData.AuthMethods.Password,
 	})
 	switch {
-	case IsUserAlreadyExists(err):
+	case errors.Is(err, ErrUserAlreadyExists()):
 		// Another flow took a unique value since the probe: whoever took it
 		// is bound.
 		bound, err := r.bindSSOCollision(pc.ctx, state, step, collected, probe, attributes)
@@ -1936,7 +1936,7 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 				state.IssuedAt = r.now()
 				return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
 			}
-			if IsUserAlreadyExists(err) {
+			if errors.Is(err, ErrUserAlreadyExists()) {
 				// A unique attribute of the provisional user is taken: route
 				// like the identifier dispatch does. That path pins the
 				// existing user on the attempt before routing — and the

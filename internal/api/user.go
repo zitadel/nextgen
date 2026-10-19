@@ -490,7 +490,7 @@ func userErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 			domain.ErrUserInvalid().WithMessage("user is not valid according to schema").WithParent(err))
 	case domain.ErrUserNotFound().Code:
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
-	case domain.ErrUserAlreadyExists().Code, domain.ErrUserAttributesConflict().Code:
+	case domain.ErrUserAlreadyExists().Code:
 		if _, ok := err.Details.(domain.UserAttributesDetails); ok {
 			err = err.WithDetails(userAttributeFieldPaths(err.Details))
 		}

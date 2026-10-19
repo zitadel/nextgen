@@ -278,7 +278,7 @@ func bindSSOIdentity(ctx context.Context, stmts AllStatements, in domain.FlowSSO
 
 // CreateLinked creates the user, links the subject to it and binds the
 // attempt, all in one transaction. A unique attribute or the subject already
-// taken returns an error [domain.IsUserAlreadyExists] matches.
+// taken returns ErrUserAlreadyExists.
 func (r *FlowSSOIdentityResolver) CreateLinked(ctx context.Context, in domain.FlowSSOCreateInput) (string, error) {
 	userID, err := r.db.Statements().NewManagedID(string(domain.PrefixUser))
 	if err != nil {

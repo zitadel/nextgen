@@ -845,7 +845,7 @@ func TestFlowSSOIdentityResolver_CreateLinked_UniqueErrorMapsToUserAlreadyExists
 			f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil)
 
 			_, err := f.resolver.CreateLinked(t.Context(), createInput())
-			require.True(t, domain.IsUserAlreadyExists(err), err)
+			require.ErrorIs(t, err, domain.ErrUserAlreadyExists())
 		})
 	}
 }

@@ -131,11 +131,12 @@ patch:
         A patched value is unique and already taken by another user, or
         concurrent writes kept the user changing under the patch; retry.
 
-        A taken value answers `user.attributes_conflict`, with
+        A taken value answers `user.already_exists`, as on create, with
         `details.details.fields` naming the attributes whose value is taken in
         the same dotted form as a `400`, such as `attributes.email`. The user
-        holding the value is not named. Concurrent writes answer
-        `user.conflict`.
+        holding the value is not named. When no attribute can be named, as
+        when the value was freed again since, `details` is absent. Concurrent
+        writes answer `user.conflict`.
       content:
         application/json:
           schema:

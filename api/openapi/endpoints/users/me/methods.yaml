@@ -87,7 +87,7 @@ patch:
         A patched value is unique and already taken by another user, or
         concurrent writes kept the user changing under the patch; retry.
 
-        A taken value answers `user.attributes_conflict`, with
+        A taken value answers `user.already_exists`, with
         `details.details.fields` naming the attributes whose value is taken,
         such as `attributes.email`. The user holding the value is not named.
       content:

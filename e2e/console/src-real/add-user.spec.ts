@@ -119,7 +119,7 @@ test("surfaces the API's own message when the email is already taken", async ({
   await expect(alert).toBeVisible();
   // ADR 030 makes the payload's `message` the human-facing string; the transport
   // string ("POST /users returned 409") must never reach an operator.
-  await expect(alert).toContainText("another user holds a value of a unique attribute");
+  await expect(alert).toContainText("already exists");
   // The server names the taken field.
   await expect(alert).toContainText("(email)");
   await expect(alert).not.toContainText("returned 409");

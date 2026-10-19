@@ -15837,17 +15837,16 @@ func (*CreateUserConflict) createUserRes() {}
 
 // CreateUserErrorResponse represents sum type.
 type CreateUserErrorResponse struct {
-	Type                   CreateUserErrorResponseType // switch on this field
-	AuthCsrfInvalid        AuthCsrfInvalid
-	AuthUnauthorized       AuthUnauthorized
-	EvtInvalid             EvtInvalid
-	Internal               Internal
-	ReqInvalid             ReqInvalid
-	UserAlreadyExists      UserAlreadyExists
-	UserAttributesConflict UserAttributesConflict
-	UserInvalid            UserInvalid
-	UserNotFound           UserNotFound
-	UserPermissionDenied   UserPermissionDenied
+	Type                 CreateUserErrorResponseType // switch on this field
+	AuthCsrfInvalid      AuthCsrfInvalid
+	AuthUnauthorized     AuthUnauthorized
+	EvtInvalid           EvtInvalid
+	Internal             Internal
+	ReqInvalid           ReqInvalid
+	UserAlreadyExists    UserAlreadyExists
+	UserInvalid          UserInvalid
+	UserNotFound         UserNotFound
+	UserPermissionDenied UserPermissionDenied
 }
 
 // CreateUserErrorResponseType is oneOf type of CreateUserErrorResponse.
@@ -15855,16 +15854,15 @@ type CreateUserErrorResponseType string
 
 // Possible values for CreateUserErrorResponseType.
 const (
-	AuthCsrfInvalidCreateUserErrorResponse        CreateUserErrorResponseType = "auth.csrf_invalid"
-	AuthUnauthorizedCreateUserErrorResponse       CreateUserErrorResponseType = "auth.unauthorized"
-	EvtInvalidCreateUserErrorResponse             CreateUserErrorResponseType = "evt.invalid"
-	InternalCreateUserErrorResponse               CreateUserErrorResponseType = "internal"
-	ReqInvalidCreateUserErrorResponse             CreateUserErrorResponseType = "req.invalid"
-	UserAlreadyExistsCreateUserErrorResponse      CreateUserErrorResponseType = "user.already_exists"
-	UserAttributesConflictCreateUserErrorResponse CreateUserErrorResponseType = "user.attributes_conflict"
-	UserInvalidCreateUserErrorResponse            CreateUserErrorResponseType = "user.invalid"
-	UserNotFoundCreateUserErrorResponse           CreateUserErrorResponseType = "user.not_found"
-	UserPermissionDeniedCreateUserErrorResponse   CreateUserErrorResponseType = "user.permission_denied"
+	AuthCsrfInvalidCreateUserErrorResponse      CreateUserErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedCreateUserErrorResponse     CreateUserErrorResponseType = "auth.unauthorized"
+	EvtInvalidCreateUserErrorResponse           CreateUserErrorResponseType = "evt.invalid"
+	InternalCreateUserErrorResponse             CreateUserErrorResponseType = "internal"
+	ReqInvalidCreateUserErrorResponse           CreateUserErrorResponseType = "req.invalid"
+	UserAlreadyExistsCreateUserErrorResponse    CreateUserErrorResponseType = "user.already_exists"
+	UserInvalidCreateUserErrorResponse          CreateUserErrorResponseType = "user.invalid"
+	UserNotFoundCreateUserErrorResponse         CreateUserErrorResponseType = "user.not_found"
+	UserPermissionDeniedCreateUserErrorResponse CreateUserErrorResponseType = "user.permission_denied"
 )
 
 // IsAuthCsrfInvalid reports whether CreateUserErrorResponse is AuthCsrfInvalid.
@@ -15893,11 +15891,6 @@ func (s CreateUserErrorResponse) IsReqInvalid() bool {
 // IsUserAlreadyExists reports whether CreateUserErrorResponse is UserAlreadyExists.
 func (s CreateUserErrorResponse) IsUserAlreadyExists() bool {
 	return s.Type == UserAlreadyExistsCreateUserErrorResponse
-}
-
-// IsUserAttributesConflict reports whether CreateUserErrorResponse is UserAttributesConflict.
-func (s CreateUserErrorResponse) IsUserAttributesConflict() bool {
-	return s.Type == UserAttributesConflictCreateUserErrorResponse
 }
 
 // IsUserInvalid reports whether CreateUserErrorResponse is UserInvalid.
@@ -16038,27 +16031,6 @@ func (s CreateUserErrorResponse) GetUserAlreadyExists() (v UserAlreadyExists, ok
 func NewUserAlreadyExistsCreateUserErrorResponse(v UserAlreadyExists) CreateUserErrorResponse {
 	var s CreateUserErrorResponse
 	s.SetUserAlreadyExists(v)
-	return s
-}
-
-// SetUserAttributesConflict sets CreateUserErrorResponse to UserAttributesConflict.
-func (s *CreateUserErrorResponse) SetUserAttributesConflict(v UserAttributesConflict) {
-	s.Type = UserAttributesConflictCreateUserErrorResponse
-	s.UserAttributesConflict = v
-}
-
-// GetUserAttributesConflict returns UserAttributesConflict and true boolean if CreateUserErrorResponse is UserAttributesConflict.
-func (s CreateUserErrorResponse) GetUserAttributesConflict() (v UserAttributesConflict, ok bool) {
-	if !s.IsUserAttributesConflict() {
-		return v, false
-	}
-	return s.UserAttributesConflict, true
-}
-
-// NewUserAttributesConflictCreateUserErrorResponse returns new CreateUserErrorResponse from UserAttributesConflict.
-func NewUserAttributesConflictCreateUserErrorResponse(v UserAttributesConflict) CreateUserErrorResponse {
-	var s CreateUserErrorResponse
-	s.SetUserAttributesConflict(v)
 	return s
 }
 
@@ -26726,7 +26698,6 @@ type GetFlowStepErrorResponse struct {
 	ReqInvalid              ReqInvalid
 	EncKeyUnknownAlg        EncKeyUnknownAlg
 	UserAlreadyExists       UserAlreadyExists
-	UserAttributesConflict  UserAttributesConflict
 	UserConflict            UserConflict
 	UserInvalid             UserInvalid
 	UserNotFound            UserNotFound
@@ -26766,7 +26737,6 @@ const (
 	ReqInvalidGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgGetFlowStepErrorResponse        GetFlowStepErrorResponseType = "enc_key.unknown_alg"
 	UserAlreadyExistsGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "user.already_exists"
-	UserAttributesConflictGetFlowStepErrorResponse  GetFlowStepErrorResponseType = "user.attributes_conflict"
 	UserConflictGetFlowStepErrorResponse            GetFlowStepErrorResponseType = "user.conflict"
 	UserInvalidGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "user.invalid"
 	UserNotFoundGetFlowStepErrorResponse            GetFlowStepErrorResponseType = "user.not_found"
@@ -26907,11 +26877,6 @@ func (s GetFlowStepErrorResponse) IsEncKeyUnknownAlg() bool {
 // IsUserAlreadyExists reports whether GetFlowStepErrorResponse is UserAlreadyExists.
 func (s GetFlowStepErrorResponse) IsUserAlreadyExists() bool {
 	return s.Type == UserAlreadyExistsGetFlowStepErrorResponse
-}
-
-// IsUserAttributesConflict reports whether GetFlowStepErrorResponse is UserAttributesConflict.
-func (s GetFlowStepErrorResponse) IsUserAttributesConflict() bool {
-	return s.Type == UserAttributesConflictGetFlowStepErrorResponse
 }
 
 // IsUserConflict reports whether GetFlowStepErrorResponse is UserConflict.
@@ -27503,27 +27468,6 @@ func (s GetFlowStepErrorResponse) GetUserAlreadyExists() (v UserAlreadyExists, o
 func NewUserAlreadyExistsGetFlowStepErrorResponse(v UserAlreadyExists) GetFlowStepErrorResponse {
 	var s GetFlowStepErrorResponse
 	s.SetUserAlreadyExists(v)
-	return s
-}
-
-// SetUserAttributesConflict sets GetFlowStepErrorResponse to UserAttributesConflict.
-func (s *GetFlowStepErrorResponse) SetUserAttributesConflict(v UserAttributesConflict) {
-	s.Type = UserAttributesConflictGetFlowStepErrorResponse
-	s.UserAttributesConflict = v
-}
-
-// GetUserAttributesConflict returns UserAttributesConflict and true boolean if GetFlowStepErrorResponse is UserAttributesConflict.
-func (s GetFlowStepErrorResponse) GetUserAttributesConflict() (v UserAttributesConflict, ok bool) {
-	if !s.IsUserAttributesConflict() {
-		return v, false
-	}
-	return s.UserAttributesConflict, true
-}
-
-// NewUserAttributesConflictGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from UserAttributesConflict.
-func NewUserAttributesConflictGetFlowStepErrorResponse(v UserAttributesConflict) GetFlowStepErrorResponse {
-	var s GetFlowStepErrorResponse
-	s.SetUserAttributesConflict(v)
 	return s
 }
 
@@ -50804,52 +50748,6 @@ func (o OptUserAttributes) Or(d UserAttributes) UserAttributes {
 	return d
 }
 
-// NewOptUserAttributesConflictDetails returns new OptUserAttributesConflictDetails with value set to v.
-func NewOptUserAttributesConflictDetails(v UserAttributesConflictDetails) OptUserAttributesConflictDetails {
-	return OptUserAttributesConflictDetails{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptUserAttributesConflictDetails is optional UserAttributesConflictDetails.
-type OptUserAttributesConflictDetails struct {
-	Value UserAttributesConflictDetails
-	Set   bool
-}
-
-// IsSet returns true if OptUserAttributesConflictDetails was set.
-func (o OptUserAttributesConflictDetails) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptUserAttributesConflictDetails) Reset() {
-	var v UserAttributesConflictDetails
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptUserAttributesConflictDetails) SetTo(v UserAttributesConflictDetails) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptUserAttributesConflictDetails) Get() (v UserAttributesConflictDetails, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptUserAttributesConflictDetails) Or(d UserAttributesConflictDetails) UserAttributesConflictDetails {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptUserConflictDetails returns new OptUserConflictDetails with value set to v.
 func NewOptUserConflictDetails(v UserConflictDetails) OptUserConflictDetails {
 	return OptUserConflictDetails{
@@ -54269,17 +54167,17 @@ func (*PatchMyUserConflict) patchMyUserRes() {}
 
 // PatchMyUserErrorResponse represents sum type.
 type PatchMyUserErrorResponse struct {
-	Type                   PatchMyUserErrorResponseType // switch on this field
-	AuthCsrfInvalid        AuthCsrfInvalid
-	AuthUnauthorized       AuthUnauthorized
-	EvtInvalid             EvtInvalid
-	Internal               Internal
-	ReqInvalid             ReqInvalid
-	SessTokenInvalid       SessTokenInvalid
-	UserAttributesConflict UserAttributesConflict
-	UserConflict           UserConflict
-	UserInvalid            UserInvalid
-	UserNotFound           UserNotFound
+	Type              PatchMyUserErrorResponseType // switch on this field
+	AuthCsrfInvalid   AuthCsrfInvalid
+	AuthUnauthorized  AuthUnauthorized
+	EvtInvalid        EvtInvalid
+	Internal          Internal
+	ReqInvalid        ReqInvalid
+	SessTokenInvalid  SessTokenInvalid
+	UserAlreadyExists UserAlreadyExists
+	UserConflict      UserConflict
+	UserInvalid       UserInvalid
+	UserNotFound      UserNotFound
 }
 
 // PatchMyUserErrorResponseType is oneOf type of PatchMyUserErrorResponse.
@@ -54287,16 +54185,16 @@ type PatchMyUserErrorResponseType string
 
 // Possible values for PatchMyUserErrorResponseType.
 const (
-	AuthCsrfInvalidPatchMyUserErrorResponse        PatchMyUserErrorResponseType = "auth.csrf_invalid"
-	AuthUnauthorizedPatchMyUserErrorResponse       PatchMyUserErrorResponseType = "auth.unauthorized"
-	EvtInvalidPatchMyUserErrorResponse             PatchMyUserErrorResponseType = "evt.invalid"
-	InternalPatchMyUserErrorResponse               PatchMyUserErrorResponseType = "internal"
-	ReqInvalidPatchMyUserErrorResponse             PatchMyUserErrorResponseType = "req.invalid"
-	SessTokenInvalidPatchMyUserErrorResponse       PatchMyUserErrorResponseType = "sess.token_invalid"
-	UserAttributesConflictPatchMyUserErrorResponse PatchMyUserErrorResponseType = "user.attributes_conflict"
-	UserConflictPatchMyUserErrorResponse           PatchMyUserErrorResponseType = "user.conflict"
-	UserInvalidPatchMyUserErrorResponse            PatchMyUserErrorResponseType = "user.invalid"
-	UserNotFoundPatchMyUserErrorResponse           PatchMyUserErrorResponseType = "user.not_found"
+	AuthCsrfInvalidPatchMyUserErrorResponse   PatchMyUserErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedPatchMyUserErrorResponse  PatchMyUserErrorResponseType = "auth.unauthorized"
+	EvtInvalidPatchMyUserErrorResponse        PatchMyUserErrorResponseType = "evt.invalid"
+	InternalPatchMyUserErrorResponse          PatchMyUserErrorResponseType = "internal"
+	ReqInvalidPatchMyUserErrorResponse        PatchMyUserErrorResponseType = "req.invalid"
+	SessTokenInvalidPatchMyUserErrorResponse  PatchMyUserErrorResponseType = "sess.token_invalid"
+	UserAlreadyExistsPatchMyUserErrorResponse PatchMyUserErrorResponseType = "user.already_exists"
+	UserConflictPatchMyUserErrorResponse      PatchMyUserErrorResponseType = "user.conflict"
+	UserInvalidPatchMyUserErrorResponse       PatchMyUserErrorResponseType = "user.invalid"
+	UserNotFoundPatchMyUserErrorResponse      PatchMyUserErrorResponseType = "user.not_found"
 )
 
 // IsAuthCsrfInvalid reports whether PatchMyUserErrorResponse is AuthCsrfInvalid.
@@ -54329,9 +54227,9 @@ func (s PatchMyUserErrorResponse) IsSessTokenInvalid() bool {
 	return s.Type == SessTokenInvalidPatchMyUserErrorResponse
 }
 
-// IsUserAttributesConflict reports whether PatchMyUserErrorResponse is UserAttributesConflict.
-func (s PatchMyUserErrorResponse) IsUserAttributesConflict() bool {
-	return s.Type == UserAttributesConflictPatchMyUserErrorResponse
+// IsUserAlreadyExists reports whether PatchMyUserErrorResponse is UserAlreadyExists.
+func (s PatchMyUserErrorResponse) IsUserAlreadyExists() bool {
+	return s.Type == UserAlreadyExistsPatchMyUserErrorResponse
 }
 
 // IsUserConflict reports whether PatchMyUserErrorResponse is UserConflict.
@@ -54475,24 +54373,24 @@ func NewSessTokenInvalidPatchMyUserErrorResponse(v SessTokenInvalid) PatchMyUser
 	return s
 }
 
-// SetUserAttributesConflict sets PatchMyUserErrorResponse to UserAttributesConflict.
-func (s *PatchMyUserErrorResponse) SetUserAttributesConflict(v UserAttributesConflict) {
-	s.Type = UserAttributesConflictPatchMyUserErrorResponse
-	s.UserAttributesConflict = v
+// SetUserAlreadyExists sets PatchMyUserErrorResponse to UserAlreadyExists.
+func (s *PatchMyUserErrorResponse) SetUserAlreadyExists(v UserAlreadyExists) {
+	s.Type = UserAlreadyExistsPatchMyUserErrorResponse
+	s.UserAlreadyExists = v
 }
 
-// GetUserAttributesConflict returns UserAttributesConflict and true boolean if PatchMyUserErrorResponse is UserAttributesConflict.
-func (s PatchMyUserErrorResponse) GetUserAttributesConflict() (v UserAttributesConflict, ok bool) {
-	if !s.IsUserAttributesConflict() {
+// GetUserAlreadyExists returns UserAlreadyExists and true boolean if PatchMyUserErrorResponse is UserAlreadyExists.
+func (s PatchMyUserErrorResponse) GetUserAlreadyExists() (v UserAlreadyExists, ok bool) {
+	if !s.IsUserAlreadyExists() {
 		return v, false
 	}
-	return s.UserAttributesConflict, true
+	return s.UserAlreadyExists, true
 }
 
-// NewUserAttributesConflictPatchMyUserErrorResponse returns new PatchMyUserErrorResponse from UserAttributesConflict.
-func NewUserAttributesConflictPatchMyUserErrorResponse(v UserAttributesConflict) PatchMyUserErrorResponse {
+// NewUserAlreadyExistsPatchMyUserErrorResponse returns new PatchMyUserErrorResponse from UserAlreadyExists.
+func NewUserAlreadyExistsPatchMyUserErrorResponse(v UserAlreadyExists) PatchMyUserErrorResponse {
 	var s PatchMyUserErrorResponse
-	s.SetUserAttributesConflict(v)
+	s.SetUserAlreadyExists(v)
 	return s
 }
 
@@ -54999,16 +54897,16 @@ func (*PatchUserByIDConflict) patchUserByIDRes() {}
 
 // PatchUserByIDErrorResponse represents sum type.
 type PatchUserByIDErrorResponse struct {
-	Type                   PatchUserByIDErrorResponseType // switch on this field
-	AuthUnauthorized       AuthUnauthorized
-	EvtInvalid             EvtInvalid
-	Internal               Internal
-	ReqInvalid             ReqInvalid
-	UserAttributesConflict UserAttributesConflict
-	UserConflict           UserConflict
-	UserInvalid            UserInvalid
-	UserNotFound           UserNotFound
-	UserPermissionDenied   UserPermissionDenied
+	Type                 PatchUserByIDErrorResponseType // switch on this field
+	AuthUnauthorized     AuthUnauthorized
+	EvtInvalid           EvtInvalid
+	Internal             Internal
+	ReqInvalid           ReqInvalid
+	UserAlreadyExists    UserAlreadyExists
+	UserConflict         UserConflict
+	UserInvalid          UserInvalid
+	UserNotFound         UserNotFound
+	UserPermissionDenied UserPermissionDenied
 }
 
 // PatchUserByIDErrorResponseType is oneOf type of PatchUserByIDErrorResponse.
@@ -55016,15 +54914,15 @@ type PatchUserByIDErrorResponseType string
 
 // Possible values for PatchUserByIDErrorResponseType.
 const (
-	AuthUnauthorizedPatchUserByIDErrorResponse       PatchUserByIDErrorResponseType = "auth.unauthorized"
-	EvtInvalidPatchUserByIDErrorResponse             PatchUserByIDErrorResponseType = "evt.invalid"
-	InternalPatchUserByIDErrorResponse               PatchUserByIDErrorResponseType = "internal"
-	ReqInvalidPatchUserByIDErrorResponse             PatchUserByIDErrorResponseType = "req.invalid"
-	UserAttributesConflictPatchUserByIDErrorResponse PatchUserByIDErrorResponseType = "user.attributes_conflict"
-	UserConflictPatchUserByIDErrorResponse           PatchUserByIDErrorResponseType = "user.conflict"
-	UserInvalidPatchUserByIDErrorResponse            PatchUserByIDErrorResponseType = "user.invalid"
-	UserNotFoundPatchUserByIDErrorResponse           PatchUserByIDErrorResponseType = "user.not_found"
-	UserPermissionDeniedPatchUserByIDErrorResponse   PatchUserByIDErrorResponseType = "user.permission_denied"
+	AuthUnauthorizedPatchUserByIDErrorResponse     PatchUserByIDErrorResponseType = "auth.unauthorized"
+	EvtInvalidPatchUserByIDErrorResponse           PatchUserByIDErrorResponseType = "evt.invalid"
+	InternalPatchUserByIDErrorResponse             PatchUserByIDErrorResponseType = "internal"
+	ReqInvalidPatchUserByIDErrorResponse           PatchUserByIDErrorResponseType = "req.invalid"
+	UserAlreadyExistsPatchUserByIDErrorResponse    PatchUserByIDErrorResponseType = "user.already_exists"
+	UserConflictPatchUserByIDErrorResponse         PatchUserByIDErrorResponseType = "user.conflict"
+	UserInvalidPatchUserByIDErrorResponse          PatchUserByIDErrorResponseType = "user.invalid"
+	UserNotFoundPatchUserByIDErrorResponse         PatchUserByIDErrorResponseType = "user.not_found"
+	UserPermissionDeniedPatchUserByIDErrorResponse PatchUserByIDErrorResponseType = "user.permission_denied"
 )
 
 // IsAuthUnauthorized reports whether PatchUserByIDErrorResponse is AuthUnauthorized.
@@ -55047,9 +54945,9 @@ func (s PatchUserByIDErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidPatchUserByIDErrorResponse
 }
 
-// IsUserAttributesConflict reports whether PatchUserByIDErrorResponse is UserAttributesConflict.
-func (s PatchUserByIDErrorResponse) IsUserAttributesConflict() bool {
-	return s.Type == UserAttributesConflictPatchUserByIDErrorResponse
+// IsUserAlreadyExists reports whether PatchUserByIDErrorResponse is UserAlreadyExists.
+func (s PatchUserByIDErrorResponse) IsUserAlreadyExists() bool {
+	return s.Type == UserAlreadyExistsPatchUserByIDErrorResponse
 }
 
 // IsUserConflict reports whether PatchUserByIDErrorResponse is UserConflict.
@@ -55156,24 +55054,24 @@ func NewReqInvalidPatchUserByIDErrorResponse(v ReqInvalid) PatchUserByIDErrorRes
 	return s
 }
 
-// SetUserAttributesConflict sets PatchUserByIDErrorResponse to UserAttributesConflict.
-func (s *PatchUserByIDErrorResponse) SetUserAttributesConflict(v UserAttributesConflict) {
-	s.Type = UserAttributesConflictPatchUserByIDErrorResponse
-	s.UserAttributesConflict = v
+// SetUserAlreadyExists sets PatchUserByIDErrorResponse to UserAlreadyExists.
+func (s *PatchUserByIDErrorResponse) SetUserAlreadyExists(v UserAlreadyExists) {
+	s.Type = UserAlreadyExistsPatchUserByIDErrorResponse
+	s.UserAlreadyExists = v
 }
 
-// GetUserAttributesConflict returns UserAttributesConflict and true boolean if PatchUserByIDErrorResponse is UserAttributesConflict.
-func (s PatchUserByIDErrorResponse) GetUserAttributesConflict() (v UserAttributesConflict, ok bool) {
-	if !s.IsUserAttributesConflict() {
+// GetUserAlreadyExists returns UserAlreadyExists and true boolean if PatchUserByIDErrorResponse is UserAlreadyExists.
+func (s PatchUserByIDErrorResponse) GetUserAlreadyExists() (v UserAlreadyExists, ok bool) {
+	if !s.IsUserAlreadyExists() {
 		return v, false
 	}
-	return s.UserAttributesConflict, true
+	return s.UserAlreadyExists, true
 }
 
-// NewUserAttributesConflictPatchUserByIDErrorResponse returns new PatchUserByIDErrorResponse from UserAttributesConflict.
-func NewUserAttributesConflictPatchUserByIDErrorResponse(v UserAttributesConflict) PatchUserByIDErrorResponse {
+// NewUserAlreadyExistsPatchUserByIDErrorResponse returns new PatchUserByIDErrorResponse from UserAlreadyExists.
+func NewUserAlreadyExistsPatchUserByIDErrorResponse(v UserAlreadyExists) PatchUserByIDErrorResponse {
 	var s PatchUserByIDErrorResponse
-	s.SetUserAttributesConflict(v)
+	s.SetUserAlreadyExists(v)
 	return s
 }
 
@@ -67516,7 +67414,6 @@ type SubmitFlowStepErrorResponse struct {
 	EncKeyUnknownAlg        EncKeyUnknownAlg
 	Unavailable             Unavailable
 	UserAlreadyExists       UserAlreadyExists
-	UserAttributesConflict  UserAttributesConflict
 	UserConflict            UserConflict
 	UserInvalid             UserInvalid
 	UserNotFound            UserNotFound
@@ -67558,7 +67455,6 @@ const (
 	EncKeyUnknownAlgSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "enc_key.unknown_alg"
 	UnavailableSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "unavailable"
 	UserAlreadyExistsSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "user.already_exists"
-	UserAttributesConflictSubmitFlowStepErrorResponse  SubmitFlowStepErrorResponseType = "user.attributes_conflict"
 	UserConflictSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "user.conflict"
 	UserInvalidSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "user.invalid"
 	UserNotFoundSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "user.not_found"
@@ -67709,11 +67605,6 @@ func (s SubmitFlowStepErrorResponse) IsUnavailable() bool {
 // IsUserAlreadyExists reports whether SubmitFlowStepErrorResponse is UserAlreadyExists.
 func (s SubmitFlowStepErrorResponse) IsUserAlreadyExists() bool {
 	return s.Type == UserAlreadyExistsSubmitFlowStepErrorResponse
-}
-
-// IsUserAttributesConflict reports whether SubmitFlowStepErrorResponse is UserAttributesConflict.
-func (s SubmitFlowStepErrorResponse) IsUserAttributesConflict() bool {
-	return s.Type == UserAttributesConflictSubmitFlowStepErrorResponse
 }
 
 // IsUserConflict reports whether SubmitFlowStepErrorResponse is UserConflict.
@@ -68347,27 +68238,6 @@ func (s SubmitFlowStepErrorResponse) GetUserAlreadyExists() (v UserAlreadyExists
 func NewUserAlreadyExistsSubmitFlowStepErrorResponse(v UserAlreadyExists) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetUserAlreadyExists(v)
-	return s
-}
-
-// SetUserAttributesConflict sets SubmitFlowStepErrorResponse to UserAttributesConflict.
-func (s *SubmitFlowStepErrorResponse) SetUserAttributesConflict(v UserAttributesConflict) {
-	s.Type = UserAttributesConflictSubmitFlowStepErrorResponse
-	s.UserAttributesConflict = v
-}
-
-// GetUserAttributesConflict returns UserAttributesConflict and true boolean if SubmitFlowStepErrorResponse is UserAttributesConflict.
-func (s SubmitFlowStepErrorResponse) GetUserAttributesConflict() (v UserAttributesConflict, ok bool) {
-	if !s.IsUserAttributesConflict() {
-		return v, false
-	}
-	return s.UserAttributesConflict, true
-}
-
-// NewUserAttributesConflictSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from UserAttributesConflict.
-func NewUserAttributesConflictSubmitFlowStepErrorResponse(v UserAttributesConflict) SubmitFlowStepErrorResponse {
-	var s SubmitFlowStepErrorResponse
-	s.SetUserAttributesConflict(v)
 	return s
 }
 
@@ -71100,59 +70970,6 @@ func (s *UserAlreadyExistsDetails) init() UserAlreadyExistsDetails {
 type UserAttributes map[string]jx.Raw
 
 func (s *UserAttributes) init() UserAttributes {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
-// Merged schema.
-// Ref: #
-type UserAttributesConflict struct {
-	// Merged property.
-	Code string `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Additional error-specific context.
-	Details OptUserAttributesConflictDetails `json:"details"`
-}
-
-// GetCode returns the value of Code.
-func (s *UserAttributesConflict) GetCode() string {
-	return s.Code
-}
-
-// GetMessage returns the value of Message.
-func (s *UserAttributesConflict) GetMessage() string {
-	return s.Message
-}
-
-// GetDetails returns the value of Details.
-func (s *UserAttributesConflict) GetDetails() OptUserAttributesConflictDetails {
-	return s.Details
-}
-
-// SetCode sets the value of Code.
-func (s *UserAttributesConflict) SetCode(val string) {
-	s.Code = val
-}
-
-// SetMessage sets the value of Message.
-func (s *UserAttributesConflict) SetMessage(val string) {
-	s.Message = val
-}
-
-// SetDetails sets the value of Details.
-func (s *UserAttributesConflict) SetDetails(val OptUserAttributesConflictDetails) {
-	s.Details = val
-}
-
-// Additional error-specific context.
-type UserAttributesConflictDetails map[string]jx.Raw
-
-func (s *UserAttributesConflictDetails) init() UserAttributesConflictDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -76219,24 +76036,23 @@ func (*VariablesByKind) updateVariablesRes() {}
 
 // VerifyChallengeProofErrorResponse represents sum type.
 type VerifyChallengeProofErrorResponse struct {
-	Type                   VerifyChallengeProofErrorResponseType // switch on this field
-	AttAlreadyHandedOff    AttAlreadyHandedOff
-	AttInvalidProof        AttInvalidProof
-	AttInvalidRequest      AttInvalidRequest
-	AttInvalidState        AttInvalidState
-	AttNotFound            AttNotFound
-	AttProofRejected       AttProofRejected
-	AttStaleChallenge      AttStaleChallenge
-	AuthUnauthorized       AuthUnauthorized
-	EvtInvalid             EvtInvalid
-	Internal               Internal
-	ReqInvalid             ReqInvalid
-	UserAlreadyExists      UserAlreadyExists
-	UserAttributesConflict UserAttributesConflict
-	UserInvalid            UserInvalid
-	UserNotFound           UserNotFound
-	UserPasswordEmpty      UserPasswordEmpty
-	UserPasswordTooLong    UserPasswordTooLong
+	Type                VerifyChallengeProofErrorResponseType // switch on this field
+	AttAlreadyHandedOff AttAlreadyHandedOff
+	AttInvalidProof     AttInvalidProof
+	AttInvalidRequest   AttInvalidRequest
+	AttInvalidState     AttInvalidState
+	AttNotFound         AttNotFound
+	AttProofRejected    AttProofRejected
+	AttStaleChallenge   AttStaleChallenge
+	AuthUnauthorized    AuthUnauthorized
+	EvtInvalid          EvtInvalid
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+	UserAlreadyExists   UserAlreadyExists
+	UserInvalid         UserInvalid
+	UserNotFound        UserNotFound
+	UserPasswordEmpty   UserPasswordEmpty
+	UserPasswordTooLong UserPasswordTooLong
 }
 
 // VerifyChallengeProofErrorResponseType is oneOf type of VerifyChallengeProofErrorResponse.
@@ -76244,23 +76060,22 @@ type VerifyChallengeProofErrorResponseType string
 
 // Possible values for VerifyChallengeProofErrorResponseType.
 const (
-	AttAlreadyHandedOffVerifyChallengeProofErrorResponse    VerifyChallengeProofErrorResponseType = "att.already_handed_off"
-	AttInvalidProofVerifyChallengeProofErrorResponse        VerifyChallengeProofErrorResponseType = "att.invalid_proof"
-	AttInvalidRequestVerifyChallengeProofErrorResponse      VerifyChallengeProofErrorResponseType = "att.invalid_request"
-	AttInvalidStateVerifyChallengeProofErrorResponse        VerifyChallengeProofErrorResponseType = "att.invalid_state"
-	AttNotFoundVerifyChallengeProofErrorResponse            VerifyChallengeProofErrorResponseType = "att.not_found"
-	AttProofRejectedVerifyChallengeProofErrorResponse       VerifyChallengeProofErrorResponseType = "att.proof_rejected"
-	AttStaleChallengeVerifyChallengeProofErrorResponse      VerifyChallengeProofErrorResponseType = "att.stale_challenge"
-	AuthUnauthorizedVerifyChallengeProofErrorResponse       VerifyChallengeProofErrorResponseType = "auth.unauthorized"
-	EvtInvalidVerifyChallengeProofErrorResponse             VerifyChallengeProofErrorResponseType = "evt.invalid"
-	InternalVerifyChallengeProofErrorResponse               VerifyChallengeProofErrorResponseType = "internal"
-	ReqInvalidVerifyChallengeProofErrorResponse             VerifyChallengeProofErrorResponseType = "req.invalid"
-	UserAlreadyExistsVerifyChallengeProofErrorResponse      VerifyChallengeProofErrorResponseType = "user.already_exists"
-	UserAttributesConflictVerifyChallengeProofErrorResponse VerifyChallengeProofErrorResponseType = "user.attributes_conflict"
-	UserInvalidVerifyChallengeProofErrorResponse            VerifyChallengeProofErrorResponseType = "user.invalid"
-	UserNotFoundVerifyChallengeProofErrorResponse           VerifyChallengeProofErrorResponseType = "user.not_found"
-	UserPasswordEmptyVerifyChallengeProofErrorResponse      VerifyChallengeProofErrorResponseType = "user.password_empty"
-	UserPasswordTooLongVerifyChallengeProofErrorResponse    VerifyChallengeProofErrorResponseType = "user.password_too_long"
+	AttAlreadyHandedOffVerifyChallengeProofErrorResponse VerifyChallengeProofErrorResponseType = "att.already_handed_off"
+	AttInvalidProofVerifyChallengeProofErrorResponse     VerifyChallengeProofErrorResponseType = "att.invalid_proof"
+	AttInvalidRequestVerifyChallengeProofErrorResponse   VerifyChallengeProofErrorResponseType = "att.invalid_request"
+	AttInvalidStateVerifyChallengeProofErrorResponse     VerifyChallengeProofErrorResponseType = "att.invalid_state"
+	AttNotFoundVerifyChallengeProofErrorResponse         VerifyChallengeProofErrorResponseType = "att.not_found"
+	AttProofRejectedVerifyChallengeProofErrorResponse    VerifyChallengeProofErrorResponseType = "att.proof_rejected"
+	AttStaleChallengeVerifyChallengeProofErrorResponse   VerifyChallengeProofErrorResponseType = "att.stale_challenge"
+	AuthUnauthorizedVerifyChallengeProofErrorResponse    VerifyChallengeProofErrorResponseType = "auth.unauthorized"
+	EvtInvalidVerifyChallengeProofErrorResponse          VerifyChallengeProofErrorResponseType = "evt.invalid"
+	InternalVerifyChallengeProofErrorResponse            VerifyChallengeProofErrorResponseType = "internal"
+	ReqInvalidVerifyChallengeProofErrorResponse          VerifyChallengeProofErrorResponseType = "req.invalid"
+	UserAlreadyExistsVerifyChallengeProofErrorResponse   VerifyChallengeProofErrorResponseType = "user.already_exists"
+	UserInvalidVerifyChallengeProofErrorResponse         VerifyChallengeProofErrorResponseType = "user.invalid"
+	UserNotFoundVerifyChallengeProofErrorResponse        VerifyChallengeProofErrorResponseType = "user.not_found"
+	UserPasswordEmptyVerifyChallengeProofErrorResponse   VerifyChallengeProofErrorResponseType = "user.password_empty"
+	UserPasswordTooLongVerifyChallengeProofErrorResponse VerifyChallengeProofErrorResponseType = "user.password_too_long"
 )
 
 // IsAttAlreadyHandedOff reports whether VerifyChallengeProofErrorResponse is AttAlreadyHandedOff.
@@ -76321,11 +76136,6 @@ func (s VerifyChallengeProofErrorResponse) IsReqInvalid() bool {
 // IsUserAlreadyExists reports whether VerifyChallengeProofErrorResponse is UserAlreadyExists.
 func (s VerifyChallengeProofErrorResponse) IsUserAlreadyExists() bool {
 	return s.Type == UserAlreadyExistsVerifyChallengeProofErrorResponse
-}
-
-// IsUserAttributesConflict reports whether VerifyChallengeProofErrorResponse is UserAttributesConflict.
-func (s VerifyChallengeProofErrorResponse) IsUserAttributesConflict() bool {
-	return s.Type == UserAttributesConflictVerifyChallengeProofErrorResponse
 }
 
 // IsUserInvalid reports whether VerifyChallengeProofErrorResponse is UserInvalid.
@@ -76597,27 +76407,6 @@ func (s VerifyChallengeProofErrorResponse) GetUserAlreadyExists() (v UserAlready
 func NewUserAlreadyExistsVerifyChallengeProofErrorResponse(v UserAlreadyExists) VerifyChallengeProofErrorResponse {
 	var s VerifyChallengeProofErrorResponse
 	s.SetUserAlreadyExists(v)
-	return s
-}
-
-// SetUserAttributesConflict sets VerifyChallengeProofErrorResponse to UserAttributesConflict.
-func (s *VerifyChallengeProofErrorResponse) SetUserAttributesConflict(v UserAttributesConflict) {
-	s.Type = UserAttributesConflictVerifyChallengeProofErrorResponse
-	s.UserAttributesConflict = v
-}
-
-// GetUserAttributesConflict returns UserAttributesConflict and true boolean if VerifyChallengeProofErrorResponse is UserAttributesConflict.
-func (s VerifyChallengeProofErrorResponse) GetUserAttributesConflict() (v UserAttributesConflict, ok bool) {
-	if !s.IsUserAttributesConflict() {
-		return v, false
-	}
-	return s.UserAttributesConflict, true
-}
-
-// NewUserAttributesConflictVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from UserAttributesConflict.
-func NewUserAttributesConflictVerifyChallengeProofErrorResponse(v UserAttributesConflict) VerifyChallengeProofErrorResponse {
-	var s VerifyChallengeProofErrorResponse
-	s.SetUserAttributesConflict(v)
 	return s
 }
 

@@ -547,9 +547,9 @@ func newTakenAttributesFixture(t *testing.T, holders map[domain.AttributeKey]str
 	return service.NewUserService(svcPool, schemaStore, nil, service.StatementsUserRefResolver{Pool: svcPool}), stmts
 }
 
-func requireTakenFields(t *testing.T, err error, code domain.Error, keys ...domain.AttributeKey) {
+func requireTakenFields(t *testing.T, err error, keys ...domain.AttributeKey) {
 	t.Helper()
-	require.ErrorIs(t, err, code)
+	require.ErrorIs(t, err, domain.ErrUserAlreadyExists())
 	var derr domain.Error
 	require.ErrorAs(t, err, &derr)
 	if len(keys) == 0 {
@@ -577,7 +577,7 @@ func TestUserService_UniquenessConflictNamesTheAttribute(t *testing.T) {
 			SchemaURL:  "https://example.test/schema.json",
 			Attributes: map[string]any{"email": "taken@example.com", "username": "alice", "givenName": "Alice"},
 		})
-		requireTakenFields(t, err, domain.ErrUserAttributesConflict(), "email")
+		requireTakenFields(t, err, "email")
 	})
 
 	t.Run("patch", func(t *testing.T) {
@@ -593,7 +593,7 @@ func TestUserService_UniquenessConflictNamesTheAttribute(t *testing.T) {
 			UserID:     "user_1",
 			Attributes: map[string]any{"email": "alice@example.com", "username": "taken"},
 		})
-		requireTakenFields(t, err, domain.ErrUserAttributesConflict(), "username")
+		requireTakenFields(t, err, "username")
 	})
 
 	t.Run("a value freed since stays unnamed", func(t *testing.T) {
@@ -606,7 +606,7 @@ func TestUserService_UniquenessConflictNamesTheAttribute(t *testing.T) {
 			UserID:     "user_1",
 			Attributes: map[string]any{"email": "alice@example.com"},
 		})
-		requireTakenFields(t, err, domain.ErrUserAttributesConflict())
+		requireTakenFields(t, err)
 	})
 }
 
@@ -643,9 +643,9 @@ func TestCreateUserAction_RetriedApplyForgetsTheEarlierError(t *testing.T) {
 	assert.NoError(t, action.Err(t.Context(), stmts))
 }
 
-// A lookup that fails does not tell whether an attribute explains the
-// conflict, so a create does not claim that none does.
-func TestCreateUserAction_FailedLookupStaysAnAttributesConflict(t *testing.T) {
+// A lookup that fails names no attribute: the conflict is still answered,
+// without fields.
+func TestCreateUserAction_FailedLookupStaysUnnamed(t *testing.T) {
 	t.Parallel()
 	action, stmts := preparedCreateUserAction(t)
 	stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).
@@ -654,9 +654,5 @@ func TestCreateUserAction_FailedLookupStaysAnAttributesConflict(t *testing.T) {
 	stmts.EXPECT().ListUserAttributes(gomock.Any(), gomock.Any()).Return(nil, database.NewUnavailableError(nil))
 
 	require.Error(t, action.Apply(t.Context(), stmts))
-	err := action.Err(t.Context(), stmts)
-	require.ErrorIs(t, err, domain.ErrUserAttributesConflict())
-	var derr domain.Error
-	require.ErrorAs(t, err, &derr)
-	assert.Nil(t, derr.Details)
+	requireTakenFields(t, action.Err(t.Context(), stmts))
 }
