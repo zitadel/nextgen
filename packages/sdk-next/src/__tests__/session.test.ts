@@ -83,6 +83,7 @@ describe("getSession()", () => {
 
   it.each([
     [401, "auth.unauthorized"],
+    [403, "sess.project_mismatch"],
     [404, "sess.not_found"],
   ])("treats canonical HTTP %i / %s as definitive signed-out", async (status, code) => {
     fetchMock.mockResolvedValue(jsonResponse({ code, message: "No live session" }, status));
@@ -97,6 +98,7 @@ describe("getSession()", () => {
     [404, { code: "route.not_found", message: "Wrong route" }],
     [401, { code: "sess.not_found", message: "Status/code mismatch" }],
     [404, { code: "auth.unauthorized", message: "Status/code mismatch" }],
+    [403, { code: "auth.csrf_invalid", message: "Not a project mismatch" }],
   ])("throws on non-canonical HTTP %i error body %#", async (status, body) => {
     fetchMock.mockResolvedValue(jsonResponse(body, status));
 
@@ -136,7 +138,10 @@ describe("getSession()", () => {
 
     await getSession({ proxyPath: "/explicit" });
 
-    expect(fetchMock).toHaveBeenCalledWith("/explicit/sessions/me", expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/explicit/sessions/me?project_id=proj",
+      expect.anything(),
+    );
   });
 
   it("falls back to the configureZitadel() proxy path when set", async () => {
@@ -145,7 +150,43 @@ describe("getSession()", () => {
 
     await getSession();
 
-    expect(fetchMock).toHaveBeenCalledWith("/configured/sessions/me", expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/configured/sessions/me?project_id=proj",
+      expect.anything(),
+    );
+  });
+
+  // A browser sends one host's cookie to every app on it, so the session it
+  // holds may belong to another project on the same server.
+  it("reads a session of another project as signed out", async () => {
+    configureZitadel({ projectId: "proj-app" });
+    fetchMock.mockResolvedValue(
+      jsonResponse({ session_id: "s", project_id: "proj-other", state: "active", user_id: "u" }),
+    );
+
+    await expect(getSession()).resolves.toEqual({ isAuthenticated: false, session: null });
+  });
+
+  it("signs in a session of the configured project", async () => {
+    configureZitadel({ projectId: "proj-app" });
+    fetchMock.mockResolvedValue(
+      jsonResponse({ session_id: "s", project_id: "proj-app", state: "active", user_id: "u" }),
+    );
+
+    await expect(getSession()).resolves.toMatchObject({ isAuthenticated: true });
+  });
+
+  it("prefers an explicit projectId over the configured one", async () => {
+    configureZitadel({ projectId: "proj-configured" });
+    fetchMock.mockResolvedValue(jsonResponse({ project_id: "proj-explicit", user_id: "u" }));
+
+    const result = await getSession({ projectId: "proj-explicit" });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/__nextgen/sessions/me?project_id=proj-explicit",
+      expect.anything(),
+    );
+    expect(result.isAuthenticated).toBe(true);
   });
 
   it("refuses to run server-side and points at auth()", async () => {

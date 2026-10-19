@@ -56,7 +56,7 @@ Install both packages as dev dependencies. Qwik bundles `devDependencies` into t
     Every setup also writes `zitadel.json` and the `.zitadel/` folder, adds its entries to `.gitignore`, and adds managed sections to `AGENTS.md` and `README.md`.
   </Tab>
   <Tab>
-    Create `src/routes/plugin@nextgen.ts`. The handler reads `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET` per request from the request event's `env`, which is where Vite loads `.env.local`:
+    Create `src/routes/plugin@nextgen.ts`. The handler reads `ZITADEL_URL`, `ZITADEL_PROJECT_SECRET`, and `ZITADEL_PROJECT_ID` per request from the request event's `env`, which is where Vite loads `.env.local`:
 
     ```ts
     import { createNextgenOnRequest } from "@zitadel/sdk-qwik-city/server";

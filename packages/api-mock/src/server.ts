@@ -374,8 +374,20 @@ export function createMockApp(options: { issuer: string }): express.Express {
       case "expired":
         res.status(401).json(errorBody("unauthenticated", "session expired"));
         return;
-      case "active":
+      case "active": {
+        // Mirrors the server: a read that names a project refuses a session
+        // of any other project, the way an app on a shared host sees one.
+        const projectId = req.query.project_id;
+        if (typeof projectId === "string" && found.session.project_id !== projectId) {
+          res
+            .status(403)
+            .json(
+              errorBody("sess.project_mismatch", "The session belongs to a different project."),
+            );
+          return;
+        }
         res.json(found.session);
+      }
     }
   });
 

@@ -147,6 +147,12 @@ describe("@zitadel/sdk-nuxt module", () => {
     expect(runtime.nextgen.projectSecret).toBe("sk_local");
   });
 
+  it("reads the project sessions are held to from ZITADEL_PROJECT_ID in .env.local", async () => {
+    const runtime = await install({ envLocal: "ZITADEL_PROJECT_ID=proj_local\n" });
+
+    expect(runtime.nextgen.projectId).toBe("proj_local");
+  });
+
   it("prefers the environment over .env.local", async () => {
     vi.stubEnv("ZITADEL_URL", "https://env.example");
     vi.stubEnv("NUXT_PUBLIC_ZITADEL_PROJECT_ID", "proj_env");

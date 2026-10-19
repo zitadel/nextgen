@@ -40,9 +40,23 @@ middleware runs (`verifyJwt`):
 8. `exp` must be present and in the future (with `clockSkewMs` tolerance) —
    tokens without an expiry are rejected.
 9. `nbf` and `iat` are validated with `clockSkewMs` tolerance when present.
+10. `aud` must name the app's project (`projectId`).
 
 Opaque (non-JWT) session tokens are validated against the backend's
-`GET /sessions/me` instead, bounded by `opaqueTokenTimeoutMs`.
+`GET /sessions/me?project_id=…` instead, bounded by `opaqueTokenTimeoutMs`.
+
+A session belongs to one project, while a browser sends the session cookie
+to every app on the same host, including the Console of a local server. So a
+session counts as signed in only in the app's own project: `projectId`, which
+each SDK otherwise reads from `ZITADEL_PROJECT_ID` (then its framework's public
+project id variable, as `zitadel setup` writes both). The backend refuses an
+opaque session of another project (`403 sess.project_mismatch`), and the SDK
+checks the project the answer names as well. A session of another project
+reads as signed out and keeps its cookie, since it is live in its own app.
+With no project configured, no session counts as signed in.
+
+`resolveSession` is the one implementation of these rules; every server SDK's
+middleware calls it.
 
 Framework-specific steps (header tunnelling, `auth()` re-verification) are
 documented in each framework SDK's README on top of this pipeline.

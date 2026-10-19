@@ -1,4 +1,8 @@
-import type { AuthResult, NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
+import type {
+  AuthResult,
+  NextgenMiddlewareOptions,
+  ResolveSessionOptions,
+} from "@zitadel/sdk-core/middleware";
 import type { EventHandler, H3Event } from "h3";
 
 import { useRuntimeConfig } from "#imports";
@@ -8,6 +12,7 @@ import {
   filterResponseHeaders,
   matchesRoutes,
   requiresProjectSecret,
+  resolveSession,
 } from "@zitadel/sdk-core/middleware";
 import {
   defineEventHandler,
@@ -20,8 +25,6 @@ import {
   setResponseStatus,
   readRawBody,
 } from "h3";
-
-import { verifyJwt, base64UrlDecode } from "../lib/jwt";
 
 declare module "h3" {
   interface H3EventContext {
@@ -101,12 +104,16 @@ function buildUpstreamHeaders(event: H3Event): Headers {
  * });
  * ```
  *
+ * A session counts only in the app's own project: `projectId`, else
+ * `ZITADEL_PROJECT_ID`, else `NUXT_PUBLIC_ZITADEL_PROJECT_ID`.
+ *
  * @param options - Middleware configuration options.
  * @returns An H3 event handler suitable for use as a global server middleware.
  */
 export function createNextgenMiddleware(options: NextgenMiddlewareOptions = {}): EventHandler {
   const {
     url = process.env.ZITADEL_URL ?? "http://localhost:8080",
+    projectId = process.env.ZITADEL_PROJECT_ID || process.env.NUXT_PUBLIC_ZITADEL_PROJECT_ID,
     proxyPath = "/__nextgen",
     protectedRoutes = [],
     ignoredRoutes = [],
@@ -152,6 +159,7 @@ export function createNextgenMiddleware(options: NextgenMiddlewareOptions = {}):
 
     return handleAuth(event, {
       url,
+      projectId,
       protectedRoutes,
       loginPath,
       allowedAlgorithms,
@@ -244,196 +252,45 @@ async function proxyRequest(
   return response.body;
 }
 
-const DECODER = new TextDecoder();
-
-/**
- * Returns `true` when `token` looks structurally like a signed JWT (JWS) —
- * NOT an encrypted token (JWE).
- *
- * JWS compact: 3 dot-separated segments; header has `alg` but NOT `enc`.
- * JWE compact: 5 dot-separated segments; header has BOTH `alg` and `enc`.
- *
- * Our backend issues JWE tokens (AES-256-GCM via go-jose `A256GCMKW/A256GCM`),
- * whose compact form is `header.encrypted_key.iv.ciphertext.tag`. The header
- * decodes to JSON with `"alg":"A256GCMKW","enc":"A256GCM"`. Checking for the
- * absence of `enc` correctly identifies signed JWTs without false-positives on
- * JWE tokens.
- *
- * This is a structural check only — not a security check.
- */
-function isJwtShaped(token: string): boolean {
-  const parts = token.split(".");
-  if (parts.length < 3 || !parts[0]) return false;
-  try {
-    const header = JSON.parse(DECODER.decode(base64UrlDecode(parts[0]))) as Record<string, unknown>;
-    return typeof header?.alg === "string" && !("enc" in header);
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Validates an opaque (non-JWT) session token by calling the backend's
- * `/sessions/me` endpoint. Returns the response JSON when the backend
- * confirms the session is live (HTTP 200), `null` otherwise.
- *
- * This is the fallback path for backends that issue encrypted opaque tokens
- * rather than self-contained JWTs.
- */
-async function validateOpaqueSessionToken(
-  token: string,
-  issuerUrl: string,
-  timeoutMs: number,
-): Promise<{
-  userId?: string;
-  identifier: string | null;
-  identifierProperty: string | null;
-  display: string | null;
-} | null> {
-  try {
-    const res = await fetch(`${issuerUrl}/sessions/me`, {
-      method: "GET",
-      headers: { cookie: `__nextgen_session=${token}` },
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    if (!res.ok) return null;
-    const body = (await res.json()) as {
-      user_id?: string;
-      user?: { identifier?: string; identifier_property?: string; display?: string };
-    };
-    return {
-      userId: body.user_id,
-      identifier: body.user?.identifier ?? null,
-      identifierProperty: body.user?.identifier_property ?? null,
-      display: body.user?.display ?? null,
-    };
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Options passed internally to {@link handleAuth} after destructuring the
- * public-facing {@link NextgenMiddlewareOptions}.
+ * public-facing {@link NextgenMiddlewareOptions}: the route policy, plus what
+ * the shared {@link resolveSession} judges the session by.
  */
-interface AuthHandlerOptions {
-  readonly url: string;
+interface AuthHandlerOptions extends ResolveSessionOptions {
   readonly protectedRoutes: readonly string[];
   readonly loginPath: string;
-  /**
-   * Forwarded from {@link NextgenMiddlewareOptions.allowedAlgorithms}.
-   * Declared as `readonly string[]` to match the {@link VerifyJwtOptions}
-   * contract and prevent accidental mutation between option destructuring
-   * and JWT verification.
-   */
-  readonly allowedAlgorithms: readonly string[] | undefined;
-  readonly clockSkewMs: number;
-  /**
-   * Forwarded from {@link NextgenMiddlewareOptions.audience}.
-   * Declared as `readonly string[]` to match the {@link VerifyJwtOptions}
-   * contract.
-   */
-  readonly audience: string | readonly string[] | undefined;
-  /**
-   * Forwarded from {@link NextgenMiddlewareOptions.allowedTokenTypes}.
-   * Declared as `readonly string[]` to match the {@link VerifyJwtOptions}
-   * contract and prevent accidental mutation between option destructuring
-   * and JWT verification.
-   */
-  readonly allowedTokenTypes: readonly string[];
-  readonly jwksTimeoutMs: number | undefined;
-  readonly opaqueTokenTimeoutMs: number;
   readonly pathname: string;
 }
 
 /**
- * Verifies the session token and writes the auth result to `event.context`.
- * Deletes all `__nextgen*` cookies when the token is present but invalid.
- * Redirects to the login page on protected routes with no valid session.
+ * Judges the session and writes the auth result to `event.context`. Deletes
+ * all `__nextgen*` cookies when they hold dead credentials. Redirects to the
+ * login page on protected routes when nobody is signed in.
  *
  * @param event - The current H3 event.
  * @param opts  - Auth handler options.
  */
 async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<void> {
-  const {
-    url,
-    protectedRoutes,
-    loginPath,
-    allowedAlgorithms,
-    clockSkewMs,
-    audience,
-    allowedTokenTypes,
-    jwksTimeoutMs,
-    opaqueTokenTimeoutMs,
-    pathname,
-  } = opts;
+  const { protectedRoutes, loginPath, pathname, ...verification } = opts;
 
   const authHeader = getRequestHeader(event, "authorization");
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
   const cookieToken = getCookie(event, "__nextgen_session") ?? null;
-  // Bearer token takes explicit precedence over the session cookie. API clients
-  // (e.g. mobile apps, CLIs) use Authorization headers while browsers use
-  // cookies; when both are present the caller clearly intended the Bearer token.
-  const token = bearerToken ?? cookieToken;
+  const { auth, clearCookies } = await resolveSession(
+    { bearer: bearerToken, cookie: cookieToken },
+    verification,
+  );
 
-  const payload = token
-    ? await verifyJwt(token, {
-        issuerUrl: url,
-        allowedAlgorithms,
-        clockSkewMs,
-        audience,
-        allowedTokenTypes,
-        jwksTimeoutMs,
-      })
-    : null;
-
-  if (payload && token && payload.sub) {
-    event.context.nextgenAuth = {
-      isAuthenticated: true,
-      session: {
-        userId: payload.sub,
-        identifier: payload.email ?? null,
-        identifierProperty: null,
-        display: payload.name ?? null,
-        token,
-      },
-    };
+  event.context.nextgenAuth = auth;
+  if (auth.isAuthenticated) {
     return;
   }
 
-  // The backend issues opaque encrypted session tokens rather than JWTs.
-  // Only fall back to /sessions/me validation when the token is definitively
-  // not a JWT (non-JSON segments). A token with a valid JWT structure that
-  // failed verification (bad sig, wrong typ/alg) must be rejected — never
-  // accepted by a backend call that doesn't re-check the JWT claims.
-  let liveAnonymousSession = false;
-  if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
-    const opaqueResult = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
-    // A session without a user id is an anonymous session — the flow has not
-    // verified a user factor yet. Treat it as unauthenticated rather than
-    // inventing a placeholder identity that no route handler can resolve.
-    if (opaqueResult?.userId) {
-      event.context.nextgenAuth = {
-        isAuthenticated: true,
-        session: {
-          userId: opaqueResult.userId,
-          identifier: opaqueResult.identifier,
-          identifierProperty: opaqueResult.identifierProperty,
-          display: opaqueResult.display,
-          token: cookieToken,
-        },
-      };
-      return;
-    }
-    liveAnonymousSession = opaqueResult !== null;
-  }
-
-  event.context.nextgenAuth = { isAuthenticated: false, session: null };
-
-  // Clearing cookies stops the browser from replaying dead credentials. A
-  // live anonymous session is not dead — the backend confirmed it above, and
-  // an in-progress login flow may still complete it — so its cookie stays.
-  if (!liveAnonymousSession) {
+  // Clearing cookies stops the browser from replaying dead credentials. A live
+  // session that signs no one in here (an anonymous one, whose sign-in may
+  // still complete, or one of another project) keeps its cookie.
+  if (clearCookies) {
     for (const name of Object.keys(parseCookies(event))) {
       if (name.startsWith("__nextgen")) {
         deleteCookie(event, name);

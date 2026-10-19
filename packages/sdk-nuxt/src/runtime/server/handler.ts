@@ -29,10 +29,16 @@ function finiteNumber(value: unknown): number | undefined {
  * as unset, and the middleware's own default applies: passed through, `""`
  * would make every timeout zero and reject every token for audience `""`.
  */
-export function middlewareOptions(nextgen: Record<string, unknown> = {}): NextgenMiddlewareOptions {
+export function middlewareOptions(
+  nextgen: Record<string, unknown> = {},
+  publicConfig: Record<string, unknown> = {},
+): NextgenMiddlewareOptions {
   return {
     url:
       nonEmptyString(nextgen.url) ?? nonEmptyString(nextgen.issuerUrl) ?? "http://localhost:8080",
+    // Sessions are held to this project; with none stored, to the public
+    // project id the widgets sign users in to.
+    projectId: nonEmptyString(nextgen.projectId) ?? nonEmptyString(publicConfig.zitadelProjectId),
     proxyPath: nonEmptyString(nextgen.proxyPath) ?? "/__nextgen",
     loginPath: nonEmptyString(nextgen.loginPath) ?? "/login",
     protectedRoutes: stringList(nextgen.protectedRoutes) ?? [],
@@ -47,7 +53,10 @@ export function middlewareOptions(nextgen: Record<string, unknown> = {}): Nextge
   };
 }
 
-const config = useRuntimeConfig() as { nextgen?: Record<string, unknown> };
+const config = useRuntimeConfig() as {
+  nextgen?: Record<string, unknown>;
+  public?: Record<string, unknown>;
+};
 
 /**
  * Default Nitro/H3 event handler registered by the `@zitadel/sdk-nuxt` module
@@ -55,4 +64,4 @@ const config = useRuntimeConfig() as { nextgen?: Record<string, unknown> };
  * config (`nuxt.config.ts → nextgen`) so consumers do not need to create
  * their own `server/middleware/auth.ts` when using the module.
  */
-export default createNextgenMiddleware(middlewareOptions(config.nextgen));
+export default createNextgenMiddleware(middlewareOptions(config.nextgen, config.public));

@@ -1,9 +1,13 @@
 /**
  * Shared constants and utility functions for the SDK middleware proxy layer.
  *
- * These are consumed by both `sdk-next` and `sdk-nuxt` to avoid duplicating
- * pure, framework-agnostic logic.
+ * These are consumed by every server SDK to avoid duplicating
+ * framework-agnostic logic.
  */
+
+import type { JwtPayload } from "./jwt.js";
+
+import { isJwtShaped, verifyJwt } from "./jwt.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -249,6 +253,24 @@ export type NextgenMiddlewareOptions = {
   url?: string;
 
   /**
+   * The project this app signs its users in to. A session counts as signed in
+   * only when it belongs to this project. A session of any other project on the
+   * same server (a second app, or the Console, whose cookie the browser sends
+   * to every port of a shared host) reads as signed out, and its cookie is left
+   * alone.
+   *
+   * An opaque session token is checked by the backend
+   * (`GET /sessions/me?project_id=…`) and against the project its answer names;
+   * a JWT must name the project in its `aud` claim.
+   *
+   * Required: with no project, no session counts as signed in. Each SDK falls
+   * back to the `ZITADEL_PROJECT_ID` environment variable, then to its
+   * framework's public project id variable, which `zitadel setup` writes to
+   * `.env.local`.
+   */
+  projectId?: string;
+
+  /**
    * URL path prefix that is reverse-proxied to the auth backend.
    *
    * Sign-in with an external provider currently requires the default: the
@@ -347,11 +369,14 @@ export type NextgenMiddlewareOptions = {
 /**
  * What the backend reports for an opaque (non-JWT) session token.
  *
- * `userId` is `null` for an anonymous session: `CreateSession` sets the
- * session cookie before any user factor is verified, so an abandoned or
- * in-progress sign-in holds a live session that names no user. Such a session
- * is **not** signed in, but it is not dead either — its flow may still
- * complete — so callers keep its cookie instead of clearing it.
+ * `userId` is `null` when the session names no user of this app's project.
+ * That is an anonymous session — `CreateSession` sets the session cookie
+ * before any user factor is verified, so an abandoned or in-progress sign-in
+ * holds a live session that names no user — or a live session of another
+ * project. Such a session is **not** signed in, but it is not dead either, so
+ * callers keep its cookie instead of clearing it: an anonymous sign-in may
+ * still complete, and the other project's session belongs to the app that
+ * signed it in.
  */
 export interface OpaqueSession {
   readonly userId: string | null;
@@ -361,34 +386,69 @@ export interface OpaqueSession {
 }
 
 /**
+ * The error code the backend answers a session read with when the session
+ * belongs to another project than the one the read names.
+ */
+export const SESSION_PROJECT_MISMATCH = "sess.project_mismatch";
+
+/** A live session that names no user of this app's project. */
+function noUser(): OpaqueSession {
+  return { userId: null, identifier: null, identifierProperty: null, display: null };
+}
+
+/**
  * Validates an opaque session token by asking the backend
- * (`GET {issuerUrl}/sessions/me`) whether the session is live.
+ * (`GET {issuerUrl}/sessions/me?project_id={projectId}`) whether the session is
+ * live in this app's project.
+ *
+ * A live session of another project comes back with no user, like an
+ * anonymous one: it signs no one in here, and its cookie is not dead. The
+ * backend refuses such a session itself (`403 sess.project_mismatch`); the
+ * project its answer names is checked as well, because a backend that predates
+ * the parameter answers for any project.
  *
  * @param token     - The opaque session token from the `__nextgen_session` cookie.
  * @param issuerUrl - Base URL of the auth backend.
  * @param timeoutMs - How long to wait for the backend before giving up.
- * @returns The live session — with a `null` `userId` when it is anonymous — or
- *   `null` when the backend does not hold a live session for the token (any
- *   non-2xx answer, a timeout, a network error, or an unreadable body).
+ * @param projectId - The project this app signs its users in to. Without one,
+ *   no session can be shown to belong here, so none names a user.
+ * @returns The live session — with a `null` `userId` when it names no user of
+ *   this project — or `null` when the backend does not hold a live session for
+ *   the token (any other non-2xx answer, a timeout, a network error, or an
+ *   unreadable body).
  */
 export async function validateOpaqueSessionToken(
   token: string,
   issuerUrl: string,
   timeoutMs: number,
+  projectId: string,
 ): Promise<OpaqueSession | null> {
+  if (!projectId) {
+    return noUser();
+  }
   try {
-    const res = await fetch(`${issuerUrl}/sessions/me`, {
-      method: "GET",
-      headers: { cookie: `__nextgen_session=${token}` },
-      signal: AbortSignal.timeout(timeoutMs),
-    });
+    const res = await fetch(
+      `${issuerUrl}/sessions/me?project_id=${encodeURIComponent(projectId)}`,
+      {
+        method: "GET",
+        headers: { cookie: `__nextgen_session=${token}` },
+        signal: AbortSignal.timeout(timeoutMs),
+      },
+    );
+    if (res.status === 403) {
+      return (await errorCode(res)) === SESSION_PROJECT_MISMATCH ? noUser() : null;
+    }
     if (!res.ok) {
       return null;
     }
     const body = (await res.json()) as {
+      project_id?: unknown;
       user_id?: unknown;
       user?: { identifier?: unknown; identifier_property?: unknown; display?: unknown };
     };
+    if (body.project_id !== projectId) {
+      return noUser();
+    }
     const text = (value: unknown): string | null =>
       typeof value === "string" && value !== "" ? value : null;
     return {
@@ -400,4 +460,161 @@ export async function validateOpaqueSessionToken(
   } catch {
     return null;
   }
+}
+
+/** The `code` of an error envelope, or `undefined` when the body is not one. */
+async function errorCode(res: Response): Promise<string | undefined> {
+  try {
+    const body = (await res.json()) as { code?: unknown };
+    return typeof body.code === "string" ? body.code : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Whether a verified JWT names `projectId` in its `aud` claim, the one place a
+ * self-contained token can say which project it was issued for.
+ */
+export function jwtNamesProject(payload: JwtPayload, projectId: string): boolean {
+  const audience = payload.aud === undefined ? [] : [payload.aud].flat();
+  return projectId !== "" && audience.includes(projectId);
+}
+
+// ─── Session resolution ──────────────────────────────────────────────────────
+
+/** The session tokens a request carries. */
+export interface SessionTokens {
+  /** The `Authorization: Bearer` token, which takes precedence, or `null`. */
+  readonly bearer: string | null;
+  /** The `__nextgen_session` cookie, or `null`. */
+  readonly cookie: string | null;
+}
+
+/** The settings {@link resolveSession} judges a request's session by. */
+export interface ResolveSessionOptions {
+  readonly url: string;
+  /** The project this app signs its users in to; see {@link NextgenMiddlewareOptions.projectId}. */
+  readonly projectId: string | undefined;
+  readonly allowedAlgorithms: readonly string[] | undefined;
+  readonly clockSkewMs: number;
+  readonly audience: string | readonly string[] | undefined;
+  readonly allowedTokenTypes: readonly string[];
+  readonly jwksTimeoutMs: number | undefined;
+  readonly opaqueTokenTimeoutMs: number;
+}
+
+/** A request's session, as {@link resolveSession} judged it. */
+export interface ResolvedSession {
+  readonly auth: AuthResult;
+  /**
+   * Whether the response should clear the request's `__nextgen*` cookies so
+   * the browser stops sending dead credentials. A session cookie that is live
+   * but signs no one in here (an anonymous session, or a session of another
+   * project) is kept.
+   */
+  readonly clearCookies: boolean;
+}
+
+function signedOut(): UnauthState {
+  return { isAuthenticated: false, session: null };
+}
+
+let warnedMissingProject = false;
+
+/** Says once per process why no session counts: no project is configured. */
+function warnMissingProject(): void {
+  if (warnedMissingProject) {
+    return;
+  }
+  warnedMissingProject = true;
+  console.error(
+    "[nextgen] No project id is configured, so no session counts as signed in. " +
+      "Set ZITADEL_PROJECT_ID (or the `projectId` option) to the project this app signs its users in to.",
+  );
+}
+
+/**
+ * Judges which user, if any, a request is signed in as in this app's project.
+ * The one implementation behind every server SDK's middleware, so they cannot
+ * drift on who counts as signed in.
+ *
+ * - The Bearer token, else the session cookie, is first verified as a JWT. A
+ *   verified JWT signs its `sub` in when its `aud` names the project.
+ * - A session cookie that is not JWT-shaped is validated by the backend
+ *   ({@link validateOpaqueSessionToken}) and signs its user in when the
+ *   session is live in this project. A JWT-shaped token that failed
+ *   verification never reaches the backend: the backend does not re-check JWT
+ *   claims.
+ * - Without a project nothing signs in, and no cookie is cleared.
+ */
+export async function resolveSession(
+  tokens: SessionTokens,
+  options: ResolveSessionOptions,
+): Promise<ResolvedSession> {
+  const { url, projectId, opaqueTokenTimeoutMs } = options;
+  if (!projectId) {
+    warnMissingProject();
+    return { auth: signedOut(), clearCookies: false };
+  }
+
+  const token = tokens.bearer ?? tokens.cookie;
+  const payload = token
+    ? await verifyJwt(token, {
+        issuerUrl: url,
+        allowedAlgorithms: options.allowedAlgorithms,
+        clockSkewMs: options.clockSkewMs,
+        audience: options.audience,
+        allowedTokenTypes: options.allowedTokenTypes,
+        jwksTimeoutMs: options.jwksTimeoutMs,
+      })
+    : null;
+
+  if (token && payload) {
+    if (payload.sub && jwtNamesProject(payload, projectId)) {
+      return {
+        auth: {
+          isAuthenticated: true,
+          session: {
+            userId: payload.sub,
+            identifier: payload.email ?? null,
+            identifierProperty: null,
+            display: payload.name ?? null,
+            token,
+          },
+        },
+        clearCookies: false,
+      };
+    }
+    // A JWT of another project is live there: a cookie holding it stays.
+    const otherProjectCookie = token === tokens.cookie && !jwtNamesProject(payload, projectId);
+    return { auth: signedOut(), clearCookies: !otherProjectCookie };
+  }
+
+  if (tokens.cookie && !isJwtShaped(tokens.cookie)) {
+    const opaque = await validateOpaqueSessionToken(
+      tokens.cookie,
+      url,
+      opaqueTokenTimeoutMs,
+      projectId,
+    );
+    if (opaque?.userId) {
+      return {
+        auth: {
+          isAuthenticated: true,
+          session: {
+            userId: opaque.userId,
+            identifier: opaque.identifier,
+            identifierProperty: opaque.identifierProperty,
+            display: opaque.display,
+            token: tokens.cookie,
+          },
+        },
+        clearCookies: false,
+      };
+    }
+    return { auth: signedOut(), clearCookies: opaque === null };
+  }
+
+  return { auth: signedOut(), clearCookies: true };
 }

@@ -4,7 +4,7 @@ import { getSession, revokeSession } from "./api-client.js";
 import type { resolveApi } from "./resolve-api.js";
 import { emit } from "../internal/emit.js";
 
-type Api = ReturnType<typeof resolveApi>["api"];
+type Resolved = ReturnType<typeof resolveApi>;
 
 /**
  * The signed-in identity and the sign-out call shared by `<zitadel-session>`
@@ -27,17 +27,17 @@ export class SessionController implements ReactiveController {
   private identityRequested = false;
 
   /**
-   * @param resolve Returns the host's API handle, throwing while no project is
-   *   resolvable.
+   * @param resolve Returns the host's project and API handle, throwing while no
+   *   project is resolvable.
    * @param onIdentitySettled Runs after the identity fetch resolves or fails.
    */
   private readonly host: ReactiveControllerHost & HTMLElement;
-  private readonly resolve: () => Api;
+  private readonly resolve: () => Resolved;
   private readonly onIdentitySettled?: () => void;
 
   constructor(
     host: ReactiveControllerHost & HTMLElement,
-    resolve: () => Api,
+    resolve: () => Resolved,
     onIdentitySettled?: () => void,
   ) {
     this.host = host;
@@ -75,7 +75,7 @@ export class SessionController implements ReactiveController {
     this.host.requestUpdate();
 
     try {
-      await revokeSession(this.resolve());
+      await revokeSession(this.resolve().api);
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       this.errorMessage = message || "Sign-out failed. Please try again.";
@@ -93,25 +93,26 @@ export class SessionController implements ReactiveController {
 
   private maybeLoadIdentity(): void {
     if (this.identityRequested) return;
-    let api: Api;
+    let resolved: Resolved;
     try {
-      api = this.resolve();
+      resolved = this.resolve();
     } catch {
       return;
     }
     this.identityRequested = true;
-    void this.loadIdentity(api);
+    void this.loadIdentity(resolved);
   }
 
-  private async loadIdentity(api: Api): Promise<void> {
+  private async loadIdentity({ api, project }: Resolved): Promise<void> {
     try {
-      const session = await getSession(api);
+      const session = await getSession(api, project.projectId);
       this.display = session.user?.display ?? "";
       this.identifier = session.user?.identifier ?? "";
       this.userId = session.user_id ?? "";
       this.host.requestUpdate();
     } catch {
-      // No active session, or not configured: render without an identity.
+      // No active session, a session of another project, or not configured:
+      // render without an identity.
     } finally {
       this.onIdentitySettled?.();
     }

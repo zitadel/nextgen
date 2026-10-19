@@ -92,6 +92,10 @@ const nextgenModule: NuxtModule<NextgenMiddlewareOptions> =
       nuxt.options.runtimeConfig.nextgen = {
         // A `nextgen.url` in nuxt.config wins over `ZITADEL_URL`.
         url: options.url || setting("ZITADEL_URL") || DEFAULT_URL,
+        // The project a session must belong to for its user to count as signed
+        // in. Unset, the handler falls back to the public project id the
+        // widgets sign users in to.
+        projectId: options.projectId || setting("ZITADEL_PROJECT_ID"),
         // The server middleware proxies this prefix; the plugin hands the same
         // one to the widgets, so the browser calls the path the server serves.
         proxyPath,

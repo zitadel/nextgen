@@ -15,6 +15,14 @@ export type GetSessionOptions = {
    * on this page, else `"/__nextgen"` (the scaffold default).
    */
   proxyPath?: string;
+
+  /**
+   * The project this app signs its users in to. A session of another project
+   * reads as signed out. Defaults to the project from `configureZitadel()`
+   * when it has run on this page; without one, the session is not checked
+   * against a project.
+   */
+  projectId?: string;
 };
 
 /**
@@ -32,8 +40,11 @@ export type GetSessionOptions = {
  *
  * - `200` with an authenticated user → `{ isAuthenticated: true, session }`
  *   with the client-safe identity (`userId`, `email`, `name` — no token).
- * - `200` for an anonymous session, `401` with `auth.unauthorized`, or `404`
- *   with `sess.not_found` → signed out.
+ * - `200` for an anonymous session, `401` with `auth.unauthorized`, `403`
+ *   with `sess.project_mismatch`, or `404` with `sess.not_found` → signed out.
+ *   The `403` answers a session of another project on the same server: with a
+ *   project id (the option, or `configureZitadel()`'s), the read names it, and
+ *   a `200` for another project reads as signed out too.
  * - Any other response throws — including a framework's HTML 404 page from
  *   a misrouted proxy: a failing proxy is a misconfiguration and must not
  *   silently render as "signed out". Treat a rejection as "unknown" —
@@ -81,8 +92,10 @@ export async function getSession(options: GetSessionOptions = {}): Promise<Clien
   while (proxyPath.endsWith("/")) {
     proxyPath = proxyPath.slice(0, -1);
   }
+  const projectId = options.projectId || getZitadelConfig()?.projectId || undefined;
+  const query = projectId ? `?project_id=${encodeURIComponent(projectId)}` : "";
 
-  const response = await fetch(`${proxyPath}/sessions/me`, {
+  const response = await fetch(`${proxyPath}/sessions/me${query}`, {
     cache: "no-store",
     credentials: "include",
     headers: { accept: "application/json" },
@@ -91,10 +104,11 @@ export async function getSession(options: GetSessionOptions = {}): Promise<Clien
   // Only the backend's canonical error envelope is definitive signed-out.
   // A framework route, gateway, or WAF can also return 401/404; accepting the
   // status or content type alone would turn a broken proxy into signed-out.
-  if (response.status === 401 || response.status === 404) {
+  if (response.status === 401 || response.status === 403 || response.status === 404) {
     const error = await readErrorEnvelope(response);
     const isSignedOut =
       (response.status === 401 && error?.code === "auth.unauthorized") ||
+      (response.status === 403 && error?.code === "sess.project_mismatch") ||
       (response.status === 404 && error?.code === "sess.not_found");
     if (isSignedOut) {
       return { isAuthenticated: false, session: null };
@@ -109,9 +123,10 @@ export async function getSession(options: GetSessionOptions = {}): Promise<Clien
 
   const session = (await response.json()) as GetMySession200;
 
-  // An anonymous session (no verified user factor yet) has no user_id —
-  // for app chrome that is "not signed in".
-  if (!session.user_id) {
+  // An anonymous session (no verified user factor yet) has no user_id, and a
+  // backend that predates `project_id` answers for any project: for app
+  // chrome, either is "not signed in".
+  if (!session.user_id || (projectId && session.project_id !== projectId)) {
     return { isAuthenticated: false, session: null };
   }
 

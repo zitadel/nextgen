@@ -1,4 +1,8 @@
-import type { AuthResult, NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
+import type {
+  AuthResult,
+  NextgenMiddlewareOptions,
+  ResolveSessionOptions,
+} from "@zitadel/sdk-core/middleware";
 
 import {
   HOP_BY_HOP,
@@ -6,10 +10,8 @@ import {
   filterResponseHeaders,
   matchesRoutes,
   requiresProjectSecret,
-  validateOpaqueSessionToken,
+  resolveSession,
 } from "@zitadel/sdk-core/middleware";
-
-import { verifyJwt, base64UrlDecode } from "./lib/jwt";
 
 /**
  * `process` is undefined in some edge/serverless runtimes; read env defensively
@@ -155,125 +157,55 @@ async function proxyRequest(
   });
 }
 
-const DECODER = new TextDecoder();
-
-/**
- * Returns `true` when `token` looks structurally like a signed JWT (JWS) — NOT
- * an encrypted token (JWE). A structural check only, not a security check.
- */
-function isJwtShaped(token: string): boolean {
-  const parts = token.split(".");
-  if (parts.length < 3 || !parts[0]) return false;
-  try {
-    const header = JSON.parse(DECODER.decode(base64UrlDecode(parts[0]))) as Record<string, unknown>;
-    return typeof header?.alg === "string" && !("enc" in header);
-  } catch {
-    return false;
-  }
-}
-
 /** A `Set-Cookie` value that clears `name` on the root path. */
 function clearCookie(name: string): string {
   return `${name}=; Path=/; Max-Age=0`;
 }
 
-interface AuthHandlerOptions {
-  readonly url: string;
+/**
+ * The route policy, plus what the shared {@link resolveSession} judges the
+ * session by.
+ */
+interface AuthHandlerOptions extends ResolveSessionOptions {
   readonly protectedRoutes: readonly string[];
   readonly loginPath: string;
-  readonly allowedAlgorithms: readonly string[] | undefined;
-  readonly clockSkewMs: number;
-  readonly audience: string | readonly string[] | undefined;
-  readonly allowedTokenTypes: readonly string[];
-  readonly jwksTimeoutMs: number | undefined;
-  readonly opaqueTokenTimeoutMs: number;
 }
 
 /**
- * Verifies the session token, writes the auth result to `event.locals`, and
- * returns a redirect `Response` on a protected route with no valid session
- * (otherwise `undefined` to continue). Stale `__nextgen*` cookies are cleared on
- * the redirect when the token is present but invalid.
+ * Judges the session, writes the auth result to `event.locals`, and returns a
+ * redirect `Response` on a protected route when nobody is signed in (otherwise
+ * `undefined` to continue). Stale `__nextgen*` cookies are cleared when they
+ * hold dead credentials.
  */
 async function handleAuth(
   event: SolidFetchEvent,
   url2: URL,
   opts: AuthHandlerOptions,
 ): Promise<Response | undefined> {
-  const {
-    url,
-    protectedRoutes,
-    loginPath,
-    allowedAlgorithms,
-    clockSkewMs,
-    audience,
-    allowedTokenTypes,
-    jwksTimeoutMs,
-    opaqueTokenTimeoutMs,
-  } = opts;
+  const { protectedRoutes, loginPath, ...verification } = opts;
   const { pathname } = url2;
 
   const cookies = parseCookieHeader(event.request.headers.get("cookie"));
   const authHeader = event.request.headers.get("authorization");
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
   const cookieToken = cookies.get("__nextgen_session") ?? null;
-  // Bearer token takes explicit precedence over the session cookie.
-  const token = bearerToken ?? cookieToken;
+  const { auth, clearCookies } = await resolveSession(
+    { bearer: bearerToken, cookie: cookieToken },
+    verification,
+  );
 
-  const payload = token
-    ? await verifyJwt(token, {
-        issuerUrl: url,
-        allowedAlgorithms,
-        clockSkewMs,
-        audience,
-        allowedTokenTypes,
-        jwksTimeoutMs,
-      })
-    : null;
-
-  if (payload && token && payload.sub) {
-    event.locals.nextgenAuth = {
-      isAuthenticated: true,
-      session: {
-        userId: payload.sub,
-        identifier: payload.email ?? null,
-        identifierProperty: null,
-        display: payload.name ?? null,
-        token,
-      },
-    };
+  event.locals.nextgenAuth = auth;
+  if (auth.isAuthenticated) {
     return;
   }
 
-  let liveAnonymousSession = false;
-  if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
-    const opaque = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
-    // A session without a user is anonymous: its sign-in has not verified a
-    // factor yet. It is not signed in, but it is live — keep its cookie.
-    if (opaque?.userId) {
-      event.locals.nextgenAuth = {
-        isAuthenticated: true,
-        session: {
-          userId: opaque.userId,
-          identifier: opaque.identifier,
-          identifierProperty: opaque.identifierProperty,
-          display: opaque.display,
-          token: cookieToken,
-        },
-      };
-      return;
-    }
-    liveAnonymousSession = opaque !== null;
-  }
-
-  event.locals.nextgenAuth = { isAuthenticated: false, session: null };
-
   // Dead credentials are cleared on every unauthenticated response so the
   // browser stops replaying them (each replay costs a backend session check);
-  // a live anonymous session's cookie stays, since its sign-in may complete.
-  const staleCookies = liveAnonymousSession
-    ? []
-    : [...cookies.keys()].filter((name) => name.startsWith("__nextgen"));
+  // a live session that signs no one in here (an anonymous one, whose sign-in
+  // may still complete, or one of another project) keeps its cookie.
+  const staleCookies = clearCookies
+    ? [...cookies.keys()].filter((name) => name.startsWith("__nextgen"))
+    : [];
 
   if (matchesRoutes(pathname, protectedRoutes)) {
     const loginUrl = new URL(loginPath, url2);
@@ -321,6 +253,9 @@ async function handleAuth(
  * would 404. To compose with your own handlers, pass them in the same call:
  * `createMiddleware({ onRequest: [...createNextgenMiddleware(...).onRequest, mine] })`.
  *
+ * A session counts only in the app's own project: `projectId`, else
+ * `ZITADEL_PROJECT_ID`, else `VITE_ZITADEL_PROJECT_ID`.
+ *
  * @param options - Middleware configuration. `projectSecret` is the project
  *   service-key, sent as the bearer on the `POST /sessions/exchange` handoff only.
  * @returns A SolidStart middleware config object.
@@ -330,6 +265,7 @@ export function createNextgenMiddleware(
 ): SolidMiddlewareConfig {
   const {
     url = PROCESS_ENV.ZITADEL_URL ?? "http://localhost:8080",
+    projectId = PROCESS_ENV.ZITADEL_PROJECT_ID || PROCESS_ENV.VITE_ZITADEL_PROJECT_ID,
     proxyPath = "/__nextgen",
     protectedRoutes = [],
     ignoredRoutes = [],
@@ -373,6 +309,7 @@ export function createNextgenMiddleware(
 
     return handleAuth(event, url2, {
       url,
+      projectId,
       protectedRoutes,
       loginPath,
       allowedAlgorithms,

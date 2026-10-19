@@ -12,8 +12,16 @@ export {
   filterResponseHeaders,
   requiresProjectSecret,
   validateOpaqueSessionToken,
+  jwtNamesProject,
+  resolveSession,
+  SESSION_PROJECT_MISMATCH,
 } from "./middleware.js";
-export type { OpaqueSession } from "./middleware.js";
+export type {
+  OpaqueSession,
+  SessionTokens,
+  ResolveSessionOptions,
+  ResolvedSession,
+} from "./middleware.js";
 export {
   verifyJwt,
   decodeJwt,

@@ -49,11 +49,12 @@ export default defineNuxtConfig({
 
 The module registers the Nitro middleware and auth plugin and auto-imports the
 composables — no manual `server/middleware/auth.ts`. It reads `ZITADEL_URL`,
-`NUXT_PUBLIC_ZITADEL_PROJECT_ID`, and the server-only `ZITADEL_PROJECT_SECRET`
-from the environment, or from `.env.local` when the environment has none (Nuxt
-itself loads only `.env`). A `nextgen.url` or
+`NUXT_PUBLIC_ZITADEL_PROJECT_ID`, `ZITADEL_PROJECT_ID`, and the server-only
+`ZITADEL_PROJECT_SECRET` from the environment, or from `.env.local` when the
+environment has none (Nuxt itself loads only `.env`). A `nextgen.url` or
 `runtimeConfig.public.zitadelProjectId` in `nuxt.config.ts` wins over the
-variables.
+variables. Sessions count only in the app's own project (`ZITADEL_PROJECT_ID`,
+else the public project id): with neither, nobody is signed in.
 
 The module also loads the web components in the browser through a client-only
 plugin and provides the business copy overlay as

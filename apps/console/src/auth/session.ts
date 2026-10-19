@@ -9,6 +9,7 @@ import { ApiError } from "@zitadel/api/runtime/fetch";
 import { api, apiBase } from "@/api/zitadel";
 import { clearSessionCaches } from "@/lib/session-cache";
 import { stringParam } from "@/lib/search-params";
+import { getConsoleProjectId } from "@/runtime/runtime";
 
 /**
  * Console session helpers (Console ADR 0003).
@@ -93,10 +94,33 @@ export function _resetSessionForTesting(): void {
 }
 
 /**
+ * Reads the cookie's session, held to the project the console signs into once
+ * the runtime document names it. The browser sends one host's cookie to every
+ * app on it, so on localhost the cookie may hold an app's session: the server
+ * refuses it (`403 sess.project_mismatch`), and a server that predates the
+ * parameter answers for any project, so the project the answer names is
+ * checked too. Either way the result is `null`: no console session.
+ */
+async function readSession(): Promise<ConsoleSession | null> {
+  const projectId = getConsoleProjectId();
+  if (!projectId) {
+    return api.getMySession(undefined, withCredentials);
+  }
+  try {
+    const session = await api.getMySession({ project_id: projectId }, withCredentials);
+    return session.project_id === projectId ? session : null;
+  } catch (cause) {
+    if (cause instanceof ApiError && cause.status === 403) return null;
+    throw cause;
+  }
+}
+
+/**
  * Reads the current session (`GET /sessions/me`).
  *
  * Returns `null` when there is no usable session — missing/expired cookie
- * (401), a non-`active` state, or an anonymous session without a user. Any
+ * (401), a session of another project, a non-`active` state, or an anonymous
+ * session without a user. Any
  * failure (including network errors) also resolves to `null`: the guard
  * fails closed to the login screen, where a backend outage surfaces as a
  * widget error instead of a half-rendered console. A session that now belongs
@@ -107,9 +131,9 @@ export async function fetchSession(): Promise<ConsoleSession | null> {
   if (cachedSession && Date.now() - cachedSession.at < SESSION_CACHE_MS) {
     return cachedSession.session;
   }
-  let session: ConsoleSession;
+  let session: ConsoleSession | null;
   try {
-    session = await api.getMySession(withCredentials);
+    session = await readSession();
   } catch (cause) {
     // The session is gone, and with it the token and the reads cached for it.
     // A transport failure says nothing about the session and keeps them.
@@ -117,7 +141,7 @@ export async function fetchSession(): Promise<ConsoleSession | null> {
     return null;
   }
   if (reloading) return startOver();
-  if (session.state !== "active" || !session.user_id) {
+  if (!session || session.state !== "active" || !session.user_id) {
     invalidateSessionCache();
     return null;
   }
@@ -179,15 +203,15 @@ let recheck: Promise<string | undefined> | undefined;
 async function recheckAfterRejection(): Promise<string | undefined> {
   if (pageUserId === undefined || reloading) return undefined;
   const token = readCsrfToken();
-  let session: ConsoleSession;
+  let session: ConsoleSession | null;
   try {
-    session = await api.getMySession(withCredentials);
+    session = await readSession();
   } catch (cause) {
     if (cause instanceof ApiError && cause.status === 401) void startOver();
     return undefined;
   }
   if (reloading) return undefined;
-  if (session.state !== "active" || session.user_id !== pageUserId) {
+  if (!session || session.state !== "active" || session.user_id !== pageUserId) {
     void startOver();
     return undefined;
   }

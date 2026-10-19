@@ -15,10 +15,10 @@ import type { ZitadelSession } from "./zitadel-session.js";
 const API_BASE = "https://session.test.invalid";
 const deleteLog: { url: string; method: string; credentials: string }[] = [];
 
-function sessionBody(identifier: string, userId: string) {
+function sessionBody(identifier: string, userId: string, projectId: string) {
   const body: Record<string, unknown> = {
     session_id: "sess_test",
-    project_id: "test",
+    project_id: projectId,
     state: "active",
     user_id: userId,
     factors: [],
@@ -37,13 +37,16 @@ function sessionBody(identifier: string, userId: string) {
 
 let currentEmail = "alice@acme.com";
 let currentUserId = "user_test";
+let currentProjectId = "test";
 let sessionStatus = 200;
+const getLog: string[] = [];
 
-const getHandler = http.get(`${API_BASE}/sessions/me`, () => {
+const getHandler = http.get(`${API_BASE}/sessions/me`, ({ request }) => {
+  getLog.push(request.url);
   if (sessionStatus !== 200) {
     return new HttpResponse(null, { status: sessionStatus });
   }
-  return HttpResponse.json(sessionBody(currentEmail, currentUserId));
+  return HttpResponse.json(sessionBody(currentEmail, currentUserId, currentProjectId));
 });
 
 const deleteHandler = http.delete(`${API_BASE}/sessions/me`, ({ request }) => {
@@ -64,8 +67,10 @@ beforeAll(() => {
 
 afterEach(() => {
   deleteLog.length = 0;
+  getLog.length = 0;
   currentEmail = "alice@acme.com";
   currentUserId = "user_test";
+  currentProjectId = "test";
   sessionStatus = 200;
   server.resetHandlers(getHandler, deleteHandler);
 });
@@ -141,6 +146,24 @@ describe("<zitadel-session>", () => {
 
   it("omits the identity line when the session request is unauthenticated", async () => {
     sessionStatus = 401;
+    const element = mount();
+    await flush(element);
+    expect(element.shadowRoot?.querySelector(".identity")).toBeNull();
+  });
+
+  it("asks for the session in its own project", async () => {
+    const element = mount();
+    await flush(element);
+    expect(new URL(getLog[0] ?? "").searchParams.get("project_id")).toBe("test");
+  });
+
+  // One host's cookie reaches every app on it, so the session it holds may be
+  // another project's: the server refuses it, or an older one answers for it.
+  it.each([
+    ["the server refuses it", () => (sessionStatus = 403)],
+    ["an older server answers for it", () => (currentProjectId = "other")],
+  ])("omits the identity of another project's session when %s", async (_label, arrange) => {
+    arrange();
     const element = mount();
     await flush(element);
     expect(element.shadowRoot?.querySelector(".identity")).toBeNull();

@@ -45,6 +45,7 @@ all three to `.env.local` and the module registration to `nuxt.config.ts`:
 | --- | --- | --- |
 | `ZITADEL_URL` | `nextgen.url`, unless `nuxt.config.ts` sets it | `http://localhost:8080` |
 | `NUXT_PUBLIC_ZITADEL_PROJECT_ID` | `runtimeConfig.public.zitadelProjectId`, unless `nuxt.config.ts` sets it | the plugin skips `configureZitadel()`, `useZitadelProject()` returns `null`, and the login widget cannot initialize |
+| `ZITADEL_PROJECT_ID` | `nextgen.projectId`, the project a session must belong to; unset, the public project id above | with neither, no session counts as signed in |
 | `ZITADEL_PROJECT_SECRET` | the server-only `runtimeConfig.nextgen.projectSecret` | sign-in cannot finish: the session exchange has no credential |
 
 The module reads them when `nuxt dev` or `nuxt build` runs, and a build keeps
@@ -172,6 +173,7 @@ Both surfaces take these options: the module under `nextgen` in
 | Option              | Type                 | Default                  | Description                                                                                                                |
 | ------------------- | -------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
 | `url`                 | `string`             | `ZITADEL_URL` env (the module also reads `.env.local`), else `http://localhost:8080` | Full URL of the Zitadel auth backend                                                                                       |
+| `projectId`         | `string`             | `ZITADEL_PROJECT_ID`, else `NUXT_PUBLIC_ZITADEL_PROJECT_ID` | The project this app signs its users in to. A session of any other project on the server reads as signed out and keeps its cookie; with no project, no session counts |
 | `proxyPath`         | `string`             | `"/__nextgen"`           | Path prefix proxied to the auth backend. Sign-in with an external provider currently requires the default: the provider returns to `/__nextgen/idp/{slug}/callback` |
 | `protectedRoutes`   | `string[]`           | `[]`                     | Paths requiring a valid session. Trailing `*` matches sub-paths                                                            |
 | `ignoredRoutes`     | `string[]`           | `[]`                     | Paths skipped entirely — no JWT check, no tunnelling. Useful for webhooks or health checks. Trailing `*` matches sub-paths |

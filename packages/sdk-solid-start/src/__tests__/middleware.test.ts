@@ -57,6 +57,16 @@ function ts(offsetSeconds: number): number {
   return Math.floor(Date.now() / 1000) + offsetSeconds;
 }
 
+/** The project the app under test signs its users in to. */
+const PROJECT = "proj_app";
+
+/**
+ * Another project on the same server: a second app, or the console's own
+ * project. On one host every port shares the cookie jar, so its session cookie
+ * reaches this app too.
+ */
+const OTHER_PROJECT = "proj_other";
+
 /** Publishes the test key as the JWKS and returns a signer for tokens it verifies. */
 function signer() {
   const kid = nextKid();
@@ -67,6 +77,7 @@ function signer() {
         sub: "user-123",
         email: "user@example.com",
         iss: "http://localhost:4000",
+        aud: PROJECT,
         exp: ts(3600),
         ...claims,
       },
@@ -150,6 +161,12 @@ function configureSecret(configured?: string, environment?: string): ServeOption
   return { projectSecret: configured };
 }
 
+function configureProject(configured?: string, environment?: string): ServeOptions {
+  vi.stubEnv("ZITADEL_PROJECT_ID", environment);
+  vi.stubEnv("VITE_ZITADEL_PROJECT_ID", undefined);
+  return { projectId: configured };
+}
+
 async function readAuth(context: unknown): Promise<AuthResult> {
   return getAuth({
     request: new Request("http://localhost:3000/"),
@@ -166,6 +183,7 @@ function expectHandlerType(): void {
 const ORIGIN = "http://localhost:3000";
 const OPTIONS: ServeOptions = {
   url: "http://localhost:4000",
+  projectId: PROJECT,
   protectedRoutes: ["/admin"],
   loginPath: "/login",
 };
@@ -524,6 +542,7 @@ describe("server middleware", () => {
   it("signs in a live session that names a user", async () => {
     sessionsMe(
       Response.json({
+        project_id: PROJECT,
         user_id: "u1",
         user: { identifier: "ada@example.com", identifier_property: "email", display: "Ada" },
       }),
@@ -545,7 +564,7 @@ describe("server middleware", () => {
   // CreateSession sets the cookie before any factor is verified: an abandoned
   // sign-in must not open protected routes.
   it("redirects an anonymous session on a protected route to login", async () => {
-    sessionsMe(Response.json({}));
+    sessionsMe(Response.json({ project_id: PROJECT }));
 
     const served = await serve(
       `${ORIGIN}/admin`,
@@ -557,7 +576,7 @@ describe("server middleware", () => {
   });
 
   it("keeps an anonymous session's cookie, since its sign-in may still complete", async () => {
-    sessionsMe(Response.json({}));
+    sessionsMe(Response.json({ project_id: PROJECT }));
 
     const served = await serve(
       `${ORIGIN}/admin`,
@@ -579,6 +598,160 @@ describe("server middleware", () => {
 
     expect(served.headers.get("set-cookie")).toMatch(/__nextgen_session=/);
     expect(served.headers.get("set-cookie")).toMatch(/Max-Age=0|expires=.*1970/i);
+  });
+
+  it("does not sign in a live session of another project", async () => {
+    sessionsMe(Response.json({ project_id: OTHER_PROJECT, user_id: "u1" }));
+
+    const served = await serve(
+      `${ORIGIN}/admin`,
+      { headers: { cookie: "__nextgen_session=opaque-session-token" } },
+      OPTIONS,
+    );
+
+    expect(served.status).toBe(302);
+    expect(served.headers.get("location")).toContain("/login");
+  });
+
+  it("reads a live session of another project as signed out on a public page", async () => {
+    sessionsMe(Response.json({ project_id: OTHER_PROJECT, user_id: "u1" }));
+
+    const served = await serve(
+      `${ORIGIN}/`,
+      { headers: { cookie: "__nextgen_session=opaque-session-token" } },
+      OPTIONS,
+    );
+
+    expect(served.answered).toBe(false);
+    expect(served.auth?.isAuthenticated).toBe(false);
+  });
+
+  // That session is live in its own project: clearing the cookie would sign the
+  // person out of the app it belongs to.
+  it("keeps the cookie of another project's session", async () => {
+    sessionsMe(Response.json({ project_id: OTHER_PROJECT, user_id: "u1" }));
+
+    const served = await serve(
+      `${ORIGIN}/`,
+      { headers: { cookie: "__nextgen_session=opaque-session-token" } },
+      OPTIONS,
+    );
+
+    expect(served.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("asks the backend for the session in this app's project", async () => {
+    const calls = captureFetch(() => Response.json({ project_id: PROJECT, user_id: "u1" }));
+
+    await serve(
+      `${ORIGIN}/admin`,
+      { headers: { cookie: "__nextgen_session=opaque-session-token" } },
+      OPTIONS,
+    );
+
+    expect(new URL(calls[0]?.url ?? "").searchParams.get("project_id")).toBe(PROJECT);
+  });
+
+  it("does not sign in a session the backend refuses for this project", async () => {
+    sessionsMe(
+      Response.json(
+        { code: "sess.project_mismatch", message: "The session belongs to a different project." },
+        { status: 403 },
+      ),
+    );
+
+    const served = await serve(
+      `${ORIGIN}/admin`,
+      { headers: { cookie: "__nextgen_session=opaque-session-token" } },
+      OPTIONS,
+    );
+
+    expect(served.status).toBe(302);
+    expect(served.headers.get("set-cookie")).toBeNull();
+  });
+
+  it.each([
+    ["another project", OTHER_PROJECT],
+    ["no project", undefined],
+  ])("does not sign in a JWT issued for %s", async (_l, aud) => {
+    const sign = signer();
+    const token = sign({ aud });
+
+    const served = await serve(
+      `${ORIGIN}/admin`,
+      { headers: { cookie: `__nextgen_session=${token}` } },
+      OPTIONS,
+    );
+
+    expect(served.status).toBe(302);
+  });
+
+  it("does not sign in a Bearer JWT issued for another project", async () => {
+    const sign = signer();
+    const token = sign({ aud: OTHER_PROJECT });
+
+    const served = await serve(
+      `${ORIGIN}/admin`,
+      { headers: { authorization: `Bearer ${token}` } },
+      OPTIONS,
+    );
+
+    expect(served.status).toBe(302);
+  });
+
+  it("keeps the cookie of a JWT issued for another project", async () => {
+    const sign = signer();
+    const token = sign({ aud: OTHER_PROJECT });
+
+    const served = await serve(
+      `${ORIGIN}/`,
+      { headers: { cookie: `__nextgen_session=${token}` } },
+      OPTIONS,
+    );
+
+    expect(served.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("signs in a JWT whose audience includes this project", async () => {
+    const sign = signer();
+    const token = sign({ aud: ["https://api.example.com", PROJECT] });
+
+    const served = await serve(
+      `${ORIGIN}/admin`,
+      { headers: { cookie: `__nextgen_session=${token}` } },
+      OPTIONS,
+    );
+
+    expect(served.answered).toBe(false);
+    expect(served.auth).toMatchObject({ isAuthenticated: true, session: { token } });
+  });
+
+  // Without a project there is nothing to hold a session against.
+  it("signs in no one when no project is configured", async () => {
+    sessionsMe(Response.json({ project_id: PROJECT, user_id: "u1" }));
+
+    const served = await serve(
+      `${ORIGIN}/admin`,
+      { headers: { cookie: "__nextgen_session=opaque-session-token" } },
+      { ...OPTIONS, ...configureProject(undefined, undefined) },
+    );
+
+    expect(served.status).toBe(302);
+  });
+
+  it.each([
+    ["the configuration", PROJECT, OTHER_PROJECT],
+    ["the environment", undefined, PROJECT],
+  ])("holds sessions to the project from %s", async (_l, configured, environment) => {
+    sessionsMe(Response.json({ project_id: PROJECT, user_id: "u1" }));
+
+    const served = await serve(
+      `${ORIGIN}/admin`,
+      { headers: { cookie: "__nextgen_session=opaque-session-token" } },
+      { ...OPTIONS, ...configureProject(configured, environment) },
+    );
+
+    expect(served.auth?.isAuthenticated).toBe(true);
   });
 
   it.each([

@@ -1,5 +1,9 @@
 import type { RequestEvent } from "@sveltejs/kit";
-import type { AuthResult, NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
+import type {
+  AuthResult,
+  NextgenMiddlewareOptions,
+  ResolveSessionOptions,
+} from "@zitadel/sdk-core/middleware";
 
 import {
   HOP_BY_HOP,
@@ -7,10 +11,8 @@ import {
   filterResponseHeaders,
   matchesRoutes,
   requiresProjectSecret,
-  validateOpaqueSessionToken,
+  resolveSession,
 } from "@zitadel/sdk-core/middleware";
-
-import { verifyJwt, base64UrlDecode } from "./lib/jwt";
 
 /**
  * `process` is undefined in some edge/serverless runtimes; read env defensively
@@ -164,48 +166,14 @@ async function proxyRequest(
   });
 }
 
-const DECODER = new TextDecoder();
-
-/**
- * Returns `true` when `token` looks structurally like a signed JWT (JWS) —
- * NOT an encrypted token (JWE).
- *
- * JWS compact: 3 dot-separated segments; header has `alg` but NOT `enc`.
- * JWE compact: 5 dot-separated segments; header has BOTH `alg` and `enc`.
- *
- * Our backend issues JWE tokens (AES-256-GCM via go-jose `A256GCMKW/A256GCM`),
- * whose compact form is `header.encrypted_key.iv.ciphertext.tag`. The header
- * decodes to JSON with `"alg":"A256GCMKW","enc":"A256GCM"`. Checking for the
- * absence of `enc` correctly identifies signed JWTs without false-positives on
- * JWE tokens.
- *
- * This is a structural check only — not a security check.
- */
-function isJwtShaped(token: string): boolean {
-  const parts = token.split(".");
-  if (parts.length < 3 || !parts[0]) return false;
-  try {
-    const header = JSON.parse(DECODER.decode(base64UrlDecode(parts[0]))) as Record<string, unknown>;
-    return typeof header?.alg === "string" && !("enc" in header);
-  } catch {
-    return false;
-  }
-}
-
 /**
  * Options passed internally to {@link handleAuth} after destructuring the
- * public-facing {@link NextgenMiddlewareOptions}.
+ * public-facing {@link NextgenMiddlewareOptions}: the route policy, plus what
+ * the shared {@link resolveSession} judges the session by.
  */
-interface AuthHandlerOptions {
-  readonly url: string;
+interface AuthHandlerOptions extends ResolveSessionOptions {
   readonly protectedRoutes: readonly string[];
   readonly loginPath: string;
-  readonly allowedAlgorithms: readonly string[] | undefined;
-  readonly clockSkewMs: number;
-  readonly audience: string | readonly string[] | undefined;
-  readonly allowedTokenTypes: readonly string[];
-  readonly jwksTimeoutMs: number | undefined;
-  readonly opaqueTokenTimeoutMs: number;
 }
 
 /**
@@ -233,87 +201,31 @@ async function handleAuth(
   resolve: (event: RequestEvent) => Promise<Response> | Response,
   opts: AuthHandlerOptions,
 ): Promise<Response> {
-  const {
-    url,
-    protectedRoutes,
-    loginPath,
-    allowedAlgorithms,
-    clockSkewMs,
-    audience,
-    allowedTokenTypes,
-    jwksTimeoutMs,
-    opaqueTokenTimeoutMs,
-  } = opts;
+  const { protectedRoutes, loginPath, ...verification } = opts;
   const { pathname } = event.url;
 
   const authHeader = event.request.headers.get("authorization");
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
   const cookieToken = event.cookies.get("__nextgen_session") ?? null;
-  // Bearer token takes explicit precedence over the session cookie. API clients
-  // (e.g. mobile apps, CLIs) use Authorization headers while browsers use
-  // cookies; when both are present the caller clearly intended the Bearer token.
-  const token = bearerToken ?? cookieToken;
+  const { auth, clearCookies } = await resolveSession(
+    { bearer: bearerToken, cookie: cookieToken },
+    verification,
+  );
 
-  const payload = token
-    ? await verifyJwt(token, {
-        issuerUrl: url,
-        allowedAlgorithms,
-        clockSkewMs,
-        audience,
-        allowedTokenTypes,
-        jwksTimeoutMs,
-      })
-    : null;
-
-  if (payload && token && payload.sub) {
-    event.locals.nextgenAuth = {
-      isAuthenticated: true,
-      session: {
-        userId: payload.sub,
-        identifier: payload.email ?? null,
-        identifierProperty: null,
-        display: payload.name ?? null,
-        token,
-      },
-    };
+  event.locals.nextgenAuth = auth;
+  if (auth.isAuthenticated) {
     return resolve(event);
   }
 
-  // The backend issues opaque encrypted session tokens rather than JWTs.
-  // Only fall back to /sessions/me validation when the token is definitively
-  // not a JWT (non-JSON segments). A token with a valid JWT structure that
-  // failed verification (bad sig, wrong typ/alg) must be rejected.
-  let liveAnonymousSession = false;
-  if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
-    const opaque = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
-    // A session without a user is anonymous: its sign-in has not verified a
-    // factor yet. It is not signed in, but it is live — keep its cookie.
-    if (opaque?.userId) {
-      event.locals.nextgenAuth = {
-        isAuthenticated: true,
-        session: {
-          userId: opaque.userId,
-          identifier: opaque.identifier,
-          identifierProperty: opaque.identifierProperty,
-          display: opaque.display,
-          token: cookieToken,
-        },
-      };
-      return resolve(event);
-    }
-    liveAnonymousSession = opaque !== null;
-  }
-
-  event.locals.nextgenAuth = { isAuthenticated: false, session: null };
-
   // Dead credentials are cleared so the browser stops replaying them; a live
-  // anonymous session's cookie stays, since its sign-in may still complete.
-  const staleCookies = liveAnonymousSession
-    ? []
-    : event.cookies
+  // session that signs no one in here (an anonymous one, whose sign-in may
+  // still complete, or one of another project) keeps its cookie.
+  const staleCookies = clearCookies
+    ? event.cookies
         .getAll()
         .filter((c) => c.name.startsWith("__nextgen"))
-        .map((c) => c.name);
+        .map((c) => c.name)
+    : [];
 
   if (matchesRoutes(pathname, protectedRoutes)) {
     const loginUrl = new URL(loginPath, event.url);
@@ -356,6 +268,8 @@ async function handleAuth(
  *
  * `url` and `projectSecret` default to `ZITADEL_URL` / `ZITADEL_PROJECT_SECRET`
  * from `process.env` (version-independent, unlike SvelteKit's `$env` modules).
+ * A session counts only in the app's own project: `projectId`, else
+ * `ZITADEL_PROJECT_ID`, else `VITE_ZITADEL_PROJECT_ID`.
  * Compose it with other hooks via `sequence()` from `@sveltejs/kit/hooks`.
  *
  * @param options - Middleware configuration options. `projectSecret` is the
@@ -367,6 +281,7 @@ export function createNextgenHandle(
 ): NextgenHandle {
   const {
     url = PROCESS_ENV.ZITADEL_URL ?? "http://localhost:8080",
+    projectId = PROCESS_ENV.ZITADEL_PROJECT_ID || PROCESS_ENV.VITE_ZITADEL_PROJECT_ID,
     proxyPath = "/__nextgen",
     protectedRoutes = [],
     ignoredRoutes = [],
@@ -411,6 +326,7 @@ export function createNextgenHandle(
 
     return handleAuth(event, resolve, {
       url,
+      projectId,
       protectedRoutes,
       loginPath,
       allowedAlgorithms,

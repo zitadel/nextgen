@@ -1,4 +1,8 @@
-import type { AuthResult, NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
+import type {
+  AuthResult,
+  NextgenMiddlewareOptions,
+  ResolveSessionOptions,
+} from "@zitadel/sdk-core/middleware";
 
 import {
   HOP_BY_HOP,
@@ -6,10 +10,8 @@ import {
   filterResponseHeaders,
   matchesRoutes,
   requiresProjectSecret,
-  validateOpaqueSessionToken,
+  resolveSession,
 } from "@zitadel/sdk-core/middleware";
-
-import { verifyJwt, base64UrlDecode } from "./lib/jwt";
 
 /**
  * `process` is undefined in some edge/serverless runtimes; read env defensively
@@ -157,55 +159,26 @@ async function proxyResponse(
   });
 }
 
-const DECODER = new TextDecoder();
-
-/**
- * Returns `true` when `token` looks structurally like a signed JWT (JWS) — NOT
- * an encrypted token (JWE). A structural check only, not a security check.
- */
-function isJwtShaped(token: string): boolean {
-  const parts = token.split(".");
-  if (parts.length < 3 || !parts[0]) return false;
-  try {
-    const header = JSON.parse(DECODER.decode(base64UrlDecode(parts[0]))) as Record<string, unknown>;
-    return typeof header?.alg === "string" && !("enc" in header);
-  } catch {
-    return false;
-  }
-}
-
 /** Key under which the auth result is stored on `ev.sharedMap`. */
 const SHARED_MAP_KEY = "nextgenAuth";
 
-interface AuthHandlerOptions {
-  readonly url: string;
+/**
+ * The route policy, plus what the shared {@link resolveSession} judges the
+ * session by.
+ */
+interface AuthHandlerOptions extends ResolveSessionOptions {
   readonly protectedRoutes: readonly string[];
   readonly loginPath: string;
-  readonly allowedAlgorithms: readonly string[] | undefined;
-  readonly clockSkewMs: number;
-  readonly audience: string | readonly string[] | undefined;
-  readonly allowedTokenTypes: readonly string[];
-  readonly jwksTimeoutMs: number | undefined;
-  readonly opaqueTokenTimeoutMs: number;
 }
 
 /**
- * Verifies the session token and writes the auth result to `ev.sharedMap`. On a
- * protected route with no valid session it clears stale `__nextgen*` cookies and
- * throws `ev.redirect(...)` to send the browser to the login page.
+ * Judges the session and writes the auth result to `ev.sharedMap`. Clears
+ * `__nextgen*` cookies that hold dead credentials, and on a protected route
+ * with nobody signed in throws `ev.redirect(...)` to send the browser to the
+ * login page.
  */
 async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promise<void> {
-  const {
-    url,
-    protectedRoutes,
-    loginPath,
-    allowedAlgorithms,
-    clockSkewMs,
-    audience,
-    allowedTokenTypes,
-    jwksTimeoutMs,
-    opaqueTokenTimeoutMs,
-  } = opts;
+  const { protectedRoutes, loginPath, ...verification } = opts;
   const { pathname } = ev.url;
 
   const cookies = parseCookieHeader(ev.request.headers.get("cookie"));
@@ -213,65 +186,22 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
   const cookieToken =
     ev.cookie.get("__nextgen_session")?.value ?? cookies.get("__nextgen_session") ?? null;
-  // Bearer token takes explicit precedence over the session cookie.
-  const token = bearerToken ?? cookieToken;
+  const { auth, clearCookies } = await resolveSession(
+    { bearer: bearerToken, cookie: cookieToken },
+    verification,
+  );
 
-  const payload = token
-    ? await verifyJwt(token, {
-        issuerUrl: url,
-        allowedAlgorithms,
-        clockSkewMs,
-        audience,
-        allowedTokenTypes,
-        jwksTimeoutMs,
-      })
-    : null;
-
-  if (payload && token && payload.sub) {
-    ev.sharedMap.set(SHARED_MAP_KEY, {
-      isAuthenticated: true,
-      session: {
-        userId: payload.sub,
-        identifier: payload.email ?? null,
-        identifierProperty: null,
-        display: payload.name ?? null,
-        token,
-      },
-    } satisfies AuthResult);
+  ev.sharedMap.set(SHARED_MAP_KEY, auth);
+  if (auth.isAuthenticated) {
     return;
   }
 
-  let liveAnonymousSession = false;
-  if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
-    const opaque = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
-    // A session without a user is anonymous: its sign-in has not verified a
-    // factor yet. It is not signed in, but it is live — keep its cookie.
-    if (opaque?.userId) {
-      ev.sharedMap.set(SHARED_MAP_KEY, {
-        isAuthenticated: true,
-        session: {
-          userId: opaque.userId,
-          identifier: opaque.identifier,
-          identifierProperty: opaque.identifierProperty,
-          display: opaque.display,
-          token: cookieToken,
-        },
-      } satisfies AuthResult);
-      return;
-    }
-    liveAnonymousSession = opaque !== null;
-  }
-
-  ev.sharedMap.set(SHARED_MAP_KEY, {
-    isAuthenticated: false,
-    session: null,
-  } satisfies AuthResult);
-
   // Dead credentials are cleared on every unauthenticated response so the
   // browser stops replaying them (each replay costs a backend session check);
-  // a live anonymous session's cookie stays, since its sign-in may complete.
-  // Qwik applies the deletion to whichever response goes out.
-  if (!liveAnonymousSession) {
+  // a live session that signs no one in here (an anonymous one, whose sign-in
+  // may still complete, or one of another project) keeps its cookie. Qwik
+  // applies the deletion to whichever response goes out.
+  if (clearCookies) {
     for (const name of Object.keys(ev.cookie.getAll())) {
       if (name.startsWith("__nextgen")) {
         ev.cookie.delete(name, { path: "/" });
@@ -303,7 +233,8 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
  *
  * `url` and `projectSecret` default to `ZITADEL_URL` / `ZITADEL_PROJECT_SECRET`,
  * read per request from `ev.env` (where Vite loads `.env.local`), then
- * `process.env`.
+ * `process.env`. A session counts only in the app's own project: `projectId`,
+ * else `ZITADEL_PROJECT_ID`, else `PUBLIC_ZITADEL_PROJECT_ID`, read the same way.
  *
  * @param options - Configuration. `projectSecret` is the project service-key
  *   sent as the bearer on the `POST /sessions/exchange` handoff only.
@@ -314,6 +245,7 @@ export function createNextgenOnRequest(
 ): (ev: QwikRequestEvent) => Promise<void> {
   const {
     url: urlOption,
+    projectId: projectIdOption,
     proxyPath = "/__nextgen",
     protectedRoutes = [],
     ignoredRoutes = [],
@@ -358,6 +290,12 @@ export function createNextgenOnRequest(
       projectSecretOption ??
       ev.env?.get("ZITADEL_PROJECT_SECRET") ??
       PROCESS_ENV.ZITADEL_PROJECT_SECRET;
+    const projectId =
+      projectIdOption ??
+      (ev.env?.get("ZITADEL_PROJECT_ID") ||
+        ev.env?.get("PUBLIC_ZITADEL_PROJECT_ID") ||
+        PROCESS_ENV.ZITADEL_PROJECT_ID ||
+        PROCESS_ENV.PUBLIC_ZITADEL_PROJECT_ID);
 
     if (matchesRoutes(pathname, ignoredRoutes)) {
       return;
@@ -370,6 +308,7 @@ export function createNextgenOnRequest(
 
     await handleAuth(ev, {
       url,
+      projectId,
       protectedRoutes,
       loginPath,
       allowedAlgorithms,

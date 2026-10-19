@@ -4,6 +4,7 @@ import {
   HOP_BY_HOP,
   filterResponseHeaders,
   matchesRoutes,
+  jwtNamesProject,
   requiresProjectSecret,
   validateOpaqueSessionToken,
 } from "./middleware.js";
@@ -171,6 +172,8 @@ describe("requiresProjectSecret", () => {
 });
 
 describe("validateOpaqueSessionToken", () => {
+  const PROJECT = "proj_app";
+
   function backend(response: Response | Error) {
     const fetchMock = vi.fn(async () => {
       if (response instanceof Error) throw response;
@@ -187,12 +190,13 @@ describe("validateOpaqueSessionToken", () => {
   it("returns the signed-in user of a live session", async () => {
     backend(
       Response.json({
+        project_id: PROJECT,
         user_id: "u1",
         user: { identifier: "a@b.c", identifier_property: "email", display: "Ada" },
       }),
     );
 
-    expect(await validateOpaqueSessionToken("tok", "http://auth.test", 1000)).toEqual({
+    expect(await validateOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT)).toEqual({
       userId: "u1",
       identifier: "a@b.c",
       identifierProperty: "email",
@@ -200,37 +204,82 @@ describe("validateOpaqueSessionToken", () => {
     });
   });
 
-  it("asks the backend for the session the cookie names", async () => {
-    const fetchMock = backend(Response.json({ user_id: "u1" }));
+  it("asks the backend for the session the cookie names, in this app's project", async () => {
+    const fetchMock = backend(Response.json({ project_id: PROJECT, user_id: "u1" }));
 
-    await validateOpaqueSessionToken("tok", "http://auth.test", 1000);
+    await validateOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT);
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://auth.test/sessions/me",
+      "http://auth.test/sessions/me?project_id=proj_app",
       expect.objectContaining({ headers: { cookie: "__nextgen_session=tok" } }),
     );
   });
 
   // CreateSession sets the cookie before any factor is verified.
-  it.each([[{}], [{ user_id: "" }]])(
+  it.each([[{ project_id: PROJECT }], [{ project_id: PROJECT, user_id: "" }]])(
     "reports a live session without a user (%j) as anonymous",
     async (body) => {
       backend(Response.json(body));
 
-      expect(await validateOpaqueSessionToken("tok", "http://auth.test", 1000)).toMatchObject({
-        userId: null,
-      });
+      expect(
+        await validateOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT),
+      ).toMatchObject({ userId: null });
     },
   );
+
+  // Live in its own project, so not dead: callers keep its cookie.
+  it.each([
+    ["the backend refuses", Response.json({ code: "sess.project_mismatch" }, { status: 403 })],
+    [
+      "a backend that predates project_id answers",
+      Response.json({ project_id: "proj_other", user_id: "u1", user: { identifier: "a@b.c" } }),
+    ],
+    ["the answer names no project", Response.json({ user_id: "u1" })],
+  ])("reports no user when %s for another project", async (_label, response) => {
+    backend(response);
+
+    expect(await validateOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT)).toEqual({
+      userId: null,
+      identifier: null,
+      identifierProperty: null,
+      display: null,
+    });
+  });
+
+  it("reports no user, without asking the backend, when no project is configured", async () => {
+    const fetchMock = backend(Response.json({ user_id: "u1" }));
+
+    expect(await validateOpaqueSessionToken("tok", "http://auth.test", 1000, "")).toMatchObject({
+      userId: null,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 
   it.each([
     ["a 401", new Response(null, { status: 401 })],
     ["a 404", new Response(null, { status: 404 })],
+    ["a 403 for another reason", Response.json({ code: "auth.csrf_invalid" }, { status: 403 })],
     ["an unreadable body", new Response("not json", { status: 200 })],
     ["a network error", new Error("ECONNREFUSED")],
   ])("reports no live session for %s", async (_label, response) => {
     backend(response);
 
-    expect(await validateOpaqueSessionToken("tok", "http://auth.test", 1000)).toBeNull();
+    expect(await validateOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT)).toBeNull();
+  });
+});
+
+describe("jwtNamesProject", () => {
+  it.each([
+    [true, "names the project", "proj_app"],
+    [true, "lists the project among others", ["https://api.example.com", "proj_app"]],
+    [false, "names another project", "proj_other"],
+    [false, "lists only other audiences", ["proj_other"]],
+    [false, "is absent", undefined],
+  ])("is %s when the audience %s", (expected, _label, aud) => {
+    expect(jwtNamesProject({ aud }, "proj_app")).toBe(expected);
+  });
+
+  it("never matches an empty project id", () => {
+    expect(jwtNamesProject({ aud: "" }, "")).toBe(false);
   });
 });
