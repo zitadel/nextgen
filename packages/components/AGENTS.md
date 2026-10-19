@@ -75,6 +75,17 @@ accessors when the build target is `es2022` or any toolchain that sets
 error in dev mode and silently fails to detect changes in prod. The fix is
 not "turn off the warning" — it is the `accessor` keyword.
 
+### Orchestrator properties import `property` from `internal/property.ts`
+
+The orchestrator elements (`surface.ts`, `<zitadel-login>`, `<zitadel-session>`,
+`<zitadel-logout>`) declare their public properties with `property` from
+`src/internal/property.ts`, not from `lit/decorators.js`. It is Lit's decorator,
+plus one rule: assigning `undefined` or `null` (or removing the attribute)
+restores the property's declared default. Framework wrappers assign `undefined`
+for a prop the caller did not set, so the default lives in the element and no
+wrapper needs its own "assign only when given" code. A property whose default is
+`undefined` or `null` is left as assigned. `@state` is unaffected.
+
 ### Atoms are form-associated by default
 
 Every input atom (e.g. `<zl-field>`) must:
@@ -174,14 +185,17 @@ suppressHeader is unset").
 
 Output from the Liquid pipeline is run through DOMPurify with an allowlist
 built from `manifestRegistry`. When you add a new attribute or part to an atom,
-update its manifest in `manifests.ts` so the sanitiser keeps it. Anything not
-in the allowlist is silently stripped.
+update its manifest in `manifests.ts`: `exportparts` forwarding is derived from
+the manifest's `parts`, so an unlisted part cannot be reached through the
+orchestrator. On `zl-*` elements the sanitiser keeps any lowercase attribute
+name; on other elements, anything not in the allowlist is silently stripped.
 
 ### Tokens, not magic values
 
-Atom styles must consume design tokens through the `t` helper
+An atom's `zl-<atom>.css` references `var(--zl-*)` directly. Styles written in
+a Lit `css` template consume tokens through the `t` helper
 (`src/styles/tokens.ts`), which wraps the `@zitadel/design-tokens` `cssVars`
-tree as Lit `CSSResult` values (e.g. `t.color.surface.defaultWhite`). Tokens
+tree as Lit `CSSResult` values (e.g. `t.theme.background`). Tokens
 themselves are owned by the `@zitadel/design-tokens` package — add new ones
 there, not here. The orchestrator maps `branding` tokens to CSS variables on
 its own shadow root — do not reach for inline styles in atoms.
@@ -251,11 +265,11 @@ step routing stay consistent.
 
 The full sign-in handover (terminal step → session exchange → real
 `Set-Cookie` on the demo origin → full-page navigation to a protected
-route) is covered end-to-end in `apps/demo-next-e2e/` and
-`apps/demo-nuxt-e2e/`, not here. The terminal `handoff_token` is exchanged
+route) is covered end-to-end in `e2e/demo-next/` and
+`e2e/demo-nuxt/`, not here. The terminal `handoff_token` is exchanged
 through the generated `exchangeSession` wrapper in `api-client.ts` (which
 hits the SDK proxy path); there is no `session-exchange-path` attribute. Unit
-coverage lives in `api-client.spec.ts` and `zitadel-login.spec.ts`. When a
+coverage lives in `zitadel-login.spec.ts`. When a
 change touches `maybeCompleteFlow` or the `postSignInUrl` path, run **both**
 e2e projects — they exercise different SDK middlewares against the same
 orchestrator code, which is how a regression in one framework slips past the
@@ -270,15 +284,17 @@ the relevant build tasks so CI is safe; manual loops need a fresh
 
 The interactive workbench is [`apps/storybook`](../../apps/storybook/README.md)
 (`moon run storybook:dev`, `:6006`): the Lit atoms and the
-`<zitadel-login>` orchestrator (MSW via `msw-storybook-addon`). It loads the built `dist/`, so rebuild after source
-changes (`moon run components:build`) — the Storybook tasks depend on it.
+`<zitadel-login>` orchestrator (MSW via `msw-storybook-addon`). Its bundler aliases this package to source
+(`apps/storybook/.storybook/main.ts`), so the dev server hot-reloads atom edits without a rebuild.
 
 ## Build
 
 `tsdown.config.ts` produces ESM + `.d.mts` and externalises `lit`, `liquidjs`,
-`dompurify`, and the `@zitadel/api*` packages so npm consumers dedupe
+`dompurify`, and `lucide` so npm consumers dedupe
 with their own copies. Do not bundle those in by default — that breaks shared
-instances and bloats the package.
+instances and bloats the package. `@zitadel/api` and `@zitadel/design-tokens`
+are inlined; `@zitadel/config` stays external in the library build and is
+inlined only into the standalone file.
 
 ## Don't
 

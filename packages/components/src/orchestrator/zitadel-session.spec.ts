@@ -126,7 +126,9 @@ describe("<zitadel-session>", () => {
     const element = mount();
     await flush(element);
     expect(shadowQuery<HTMLElement>(element, ".title").textContent?.trim()).toBe("Signed in as");
-    expect(shadowQuery<HTMLElement>(element, ".identity").textContent?.trim()).toBe("alice@acme.com");
+    expect(shadowQuery<HTMLElement>(element, ".identity").textContent?.trim()).toBe(
+      "alice@acme.com",
+    );
   });
 
   it("falls back to user_id when the session ref carries no identifier", async () => {
@@ -146,7 +148,7 @@ describe("<zitadel-session>", () => {
 
   it("suppress-header visually hides the heading but keeps it accessible", async () => {
     currentEmail = "alice@acme.com";
-    const element = mount('<zitadel-session suppress-header></zitadel-session>');
+    const element = mount("<zitadel-session suppress-header></zitadel-session>");
     await flush(element);
     // Boolean attribute reflects into the property (and back — reflect
     // keeps DOM assertions honest under React 19's property-first binding).
@@ -167,16 +169,17 @@ describe("<zitadel-session>", () => {
     const element = mount();
     await flush(element);
     expect(element.suppressHeader).toBe(false);
-    expect(
-      shadowQuery<HTMLElement>(element, ".title").classList.contains("sr-only"),
-    ).toBe(false);
+    expect(shadowQuery<HTMLElement>(element, ".title").classList.contains("sr-only")).toBe(false);
     expect(shadowQuery<HTMLElement>(element, ".identity").getAttribute("slot")).toBe("header");
   });
 
   it("renders a single primary Sign out action", async () => {
     const element = mount();
     await flush(element);
-    const out = shadowQuery<HTMLElement>(element, 'zl-button[data-testid="zitadel-session-logout"]');
+    const out = shadowQuery<HTMLElement>(
+      element,
+      'zl-button[data-testid="zitadel-session-logout"]',
+    );
     expect(out.getAttribute("hierarchy")).toBe("primary");
     expect(
       element.shadowRoot?.querySelector('zl-button[data-testid="zitadel-session-continue"]'),
@@ -244,7 +247,85 @@ describe("<zitadel-session>", () => {
     await new Promise((resolve) => setTimeout(resolve, 32));
     await element.updateComplete;
 
-    expect(shadowQuery<HTMLElement>(element, ".error").textContent?.trim().length).toBeGreaterThan(0);
+    expect(shadowQuery<HTMLElement>(element, ".error").textContent?.trim().length).toBeGreaterThan(
+      0,
+    );
     expect(loc.current).toBe("");
   });
+});
+
+describe("<zitadel-session> unset public properties", () => {
+  type Declaration = { attribute?: string | boolean; state?: boolean };
+  type Props = Record<string, unknown>;
+  const create = () => document.createElement("zitadel-session");
+  const declared = (
+    customElements.get("zitadel-session") as unknown as {
+      elementProperties: Map<string, Declaration>;
+    }
+  ).elementProperties;
+  // Every public property that has a declared default, read off a fresh element so a
+  // property added later is covered without touching this list.
+  const defaulted = [...declared]
+    .filter(([name, options]) => !options.state && (create() as unknown as Props)[name] != null)
+    .map(([name, options]) => ({
+      name,
+      attribute:
+        typeof options.attribute === "string"
+          ? options.attribute
+          : options.attribute === false
+            ? undefined
+            : name.toLowerCase(),
+      fallback: (create() as unknown as Props)[name],
+    }));
+  const other = (fallback: unknown) => (typeof fallback === "boolean" ? !fallback : "other");
+
+  it("covers the element's defaulted properties", () => {
+    expect(defaulted.length).toBeGreaterThan(0);
+  });
+
+  it.each(defaulted)(
+    "keeps the default of $name when it is assigned undefined",
+    ({ name, fallback }) => {
+      const element = create() as unknown as Props;
+      element[name] = undefined;
+      expect(element[name]).toEqual(fallback);
+    },
+  );
+
+  it.each(defaulted)(
+    "keeps the default of $name when it is assigned null",
+    ({ name, fallback }) => {
+      const element = create() as unknown as Props;
+      element[name] = null;
+      expect(element[name]).toEqual(fallback);
+    },
+  );
+
+  it.each(defaulted)(
+    "restores the default of $name when a set value is cleared",
+    ({ name, fallback }) => {
+      const element = create() as unknown as Props;
+      element[name] = other(fallback);
+      expect(element[name]).toEqual(other(fallback));
+      element[name] = undefined;
+      expect(element[name]).toEqual(fallback);
+    },
+  );
+
+  it.each(defaulted)("keeps a supplied value of $name", ({ name, fallback }) => {
+    const element = create() as unknown as Props;
+    element[name] = other(fallback);
+    expect(element[name]).toEqual(other(fallback));
+  });
+
+  it.each(defaulted.filter(({ attribute }) => attribute !== undefined))(
+    "restores the default of $name when its attribute is removed",
+    ({ name, attribute, fallback }) => {
+      const element = create();
+      element.setAttribute(attribute as string, typeof fallback === "boolean" ? "" : "other");
+      expect((element as unknown as Props)[name]).toEqual(other(fallback));
+      element.removeAttribute(attribute as string);
+      expect((element as unknown as Props)[name]).toEqual(fallback);
+    },
+  );
 });

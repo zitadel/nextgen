@@ -1184,7 +1184,7 @@ function highlightJSON(text) {
   ).replace(
     /:\s*("(?:[^"\\]|\\.)*")/g, ': <span class="str">$1</span>'
   ).replace(
-    /(?<=[\[,\n]\s*)("(?:[^"\\]|\\.)*")(?=\s*[,\]\n])/g, '<span class="str">$1</span>'
+    /(?<=[[,\n]\s*)("(?:[^"\\]|\\.)*")(?=\s*[,\]\n])/g, '<span class="str">$1</span>'
   ).replace(
     /\b(\d+(?:\.\d+)?)\b/g, '<span class="num">$1</span>'
   ).replace(
@@ -2042,7 +2042,7 @@ function highlightInline(json) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/("(?:[^"\\]|\\.)*")\s*:/g, '<span class="key">$1</span>:')
     .replace(/:\s*("(?:[^"\\]|\\.)*")/g, ': <span class="str">$1</span>')
-    .replace(/(?<=[\[,\n]\s*)("(?:[^"\\]|\\.)*")(?=\s*[,\]\n])/g, '<span class="str">$1</span>')
+    .replace(/(?<=[[,\n]\s*)("(?:[^"\\]|\\.)*")(?=\s*[,\]\n])/g, '<span class="str">$1</span>')
     .replace(/\b(true|false)\b/g, '<span class="bool">$1</span>');
 }
 </script>

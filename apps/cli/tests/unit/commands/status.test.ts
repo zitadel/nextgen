@@ -26,6 +26,7 @@ const SECRET = {
   project_id: "proj-001",
   project_secret: "sk_proj_test",
   preview_secret: "sk_proj_preview",
+  primary_origins: [],
   preview_origins: [],
   // Recent, so the claim window reads as open; the closed-window test writes
   // its own stale timestamp.
@@ -245,7 +246,14 @@ describe("status command", () => {
     await chmod(join(binDir, "docker"), 0o755);
 
     const res = await runCliForTest(
-      ["status", "--cwd", relative(process.cwd(), cwd), "--json", "--server", "https://api.zitadel.cloud"],
+      [
+        "status",
+        "--cwd",
+        relative(process.cwd(), cwd),
+        "--json",
+        "--server",
+        "https://api.zitadel.cloud",
+      ],
       { PATH: `${binDir}:${process.env.PATH ?? ""}` },
     );
 

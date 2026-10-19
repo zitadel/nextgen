@@ -13,6 +13,11 @@ fileGroups:
     - "/go.sum"
     - "/api/**/*.yaml"
     - "/api/**/*.json"
+    # Also compiled in through //go:embed or read by tests: the config defaults
+    # (incl. presets), the integration-test fixtures and the events catalog.
+    - "/packages/config/defaults/**/*"
+    - "/internal/**/*.json"
+    - "/docs/design/api/events-catalog.md"
     - "/api/.ogen.yaml"
     - "/scripts/check-go-generate.mjs"
     - "/scripts/generate-meta-schemas.ts"
@@ -22,9 +27,10 @@ fileGroups:
 
 tasks:
   openapi:
-    command: "npx --yes @redocly/cli@2.31.5 lint api/openapi/openapi-spec.yaml --format=github-actions"
+    command: "node scripts/lint-openapi.mjs"
     inputs:
       - "@group(serverInputs)"
+      - "/scripts/lint-openapi.mjs"
       # Without these a lint-config change still cache-hits.
       - "/redocly.yaml"
       - "/.redocly.lint-ignore.yaml"
@@ -61,6 +67,9 @@ tasks:
       - "/api/generated/**"
       - "/api/openapi/components/schemas/errors/**"
       - "/api/openapi/endpoints/**/*-error-response.yaml"
+      - "/api/openapi/endpoints/events/event.yaml"
+      - "/api/openapi/endpoints/events/types/*.yaml"
+      - "/api/openapi/endpoints/events/webhooks/*.yaml"
       - "/api/openapi/endpoints/schemas/*.json"
       - "/internal/**/*_enumer.go"
       - "/internal/**/*.mock.go"
@@ -148,12 +157,19 @@ tasks:
       for tag in postgres_integration spanner_integration sqlite_integration; do
         GOFLAGS="-tags=$tag" go run ./tools/analyzers/cmd/analyzers ./...
       done
+      # This is a Go project, so it inherits no Biome lint task, but it owns a
+      # JavaScript launcher (bin/zitadel-server.js). Lint it here so a change to
+      # it cannot bypass Biome. `bin/**` is already in serverInputs, so this
+      # task is selected when the launcher changes.
+      corepack pnpm exec biome check apps/server/bin --no-errors-on-unmatched
     deps:
       - "check-generate"
       - "console:build"
       - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
+      # The Biome config the launcher check runs against.
+      - "/biome.json"
     options:
       runFromWorkspaceRoot: true
 
@@ -168,17 +184,20 @@ tasks:
     deps:
       - "openapi"
       - "format"
-      - "check-generate"
       - "vet"
       - "lint"
-      # Order UI builds before go test so a batched moon graph cannot compile
-      # //go:embed all:dist while vite emptyOutDir has cleared .gitkeep.
-      # Intentionally deps-only (not inputs): UI-only changes must not invalidate
-      # the Go test cache — see build.inputs note below.
+      # The test binary embeds both UI dists (//go:embed all:dist). Listed here
+      # and not only reached through vet: vet has no outputs, so moon would not
+      # hash these builds through it and a UI change would replay a cached run.
       - "console:build"
       - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
+      # Read by the cloud launcher's tests (apps/cloud/launcher), which hold
+      # the deployment's configuration together. Scoped to test: nothing the
+      # server compiles reads them.
+      - "/vercel.json"
+      - "/apps/cloud/build.sh"
     options:
       runFromWorkspaceRoot: true
 
@@ -207,6 +226,11 @@ tasks:
       - "10m"
       - "./..."
     deps:
+      # check-generate rewrites api/generated while it runs. These suites
+      # compile that package and api/internal/erroranalysis type-loads it, so a
+      # lane run beside it reads half-written files. vet, lint and build wait
+      # for it the same way.
+      - "check-generate"
       # Order UI builds before go test so //go:embed all:dist has files.
       - "console:build"
       - "login-ui:build"
@@ -217,10 +241,13 @@ tasks:
       # See the -count=1 note above: moon's own cache would skip the process
       # before go's cache mattered.
       cache: false
-      # Invoked explicitly by the CI "Run Go integration tests (postgres)" step.
-      # runInCI must be true, otherwise moon hides the task from `moon run` in CI
-      # ("No tasks found"). It is not pulled into `moon ci :...:test` because that
-      # selects the `test` task by name, not `test-postgres`.
+      # ci.yml's graph step (`moon ci --downstream deep`) runs it whenever it is
+      # affected, as a dependent of the UI builds. The "Run Go integration tests
+      # (postgres)" step runs it only when the graph did not, as when ci-mode
+      # forces a full run for a workflow-only edit, which no lane lists as
+      # input.
+      # runInCI must be true for both: moon ci leaves out a task that is not,
+      # and `moon run` in CI refuses one ("No tasks found").
       runInCI: true
 
   test-spanner:
@@ -263,6 +290,8 @@ tasks:
       - "1"
       - "./..."
     deps:
+      # check-generate rewrites api/generated; see test-postgres.
+      - "check-generate"
       # Order UI builds before go test so //go:embed all:dist has files.
       - "console:build"
       - "login-ui:build"
@@ -282,11 +311,13 @@ tasks:
       # before go's cache mattered. Observed on #934, where moon replayed the
       # emulator task's result for a real-instance run.
       cache: false
-      # Invoked by .github/workflows/spanner.yml (not by ci.yml).
-      # runInCI must be true, otherwise moon hides the task from `moon run` in CI
-      # ("No tasks found"). It is not pulled into `moon ci :...:test` because that
-      # selects the `test` task by name, not `test-spanner`.
-      runInCI: true
+      # Runs in .github/workflows/spanner.yml, never in ci.yml. "skip" keeps
+      # `moon ci` from pulling it in: --downstream deep selects it as a
+      # dependent of the UI builds whenever the server or a UI changes, and
+      # its ~3.5 minutes then held up the whole PR graph. In CI, `moon run`
+      # refuses a skipped task ("No tasks found"); spanner.yml runs it with
+      # `moon exec --ignore-ci-checks`. Local `moon run` is unaffected.
+      runInCI: "skip"
 
   test-sqlite:
     # -count=1 disables go's test-result cache; see test-postgres above. SQLite
@@ -304,6 +335,8 @@ tasks:
       - "5m"
       - "./..."
     deps:
+      # check-generate rewrites api/generated; see test-postgres.
+      - "check-generate"
       # Order UI builds before go test so //go:embed all:dist has files.
       - "console:build"
       - "login-ui:build"
@@ -314,10 +347,9 @@ tasks:
       # See the -count=1 note above: moon's own cache would skip the process
       # before go's cache mattered.
       cache: false
-      # Invoked explicitly by the CI "Run Go integration tests (sqlite)" step.
-      # runInCI must be true, otherwise moon hides the task from `moon run` in CI
-      # ("No tasks found"). It is not pulled into `moon ci :...:test` because that
-      # selects the `test` task by name, not `test-sqlite`.
+      # Runs in CI as test-postgres does: in ci.yml's graph step when it is
+      # affected, and in the "Run Go integration tests (sqlite)" step only when
+      # the graph did not run it.
       runInCI: true
 
   build:

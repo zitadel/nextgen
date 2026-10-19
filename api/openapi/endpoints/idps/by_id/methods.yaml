@@ -1,5 +1,6 @@
 get:
   operationId: getIdpById
+  x-zitadel-cli: idps get
   summary: Get an identity provider connection by id
   description: |
     Reads a connection by its id, at its newest revision.
@@ -11,15 +12,10 @@ get:
   security:
     - oauth2:
         - idp.read
+    - nextgenSession: []
   parameters:
     - $ref: ../../../components/parameters/project-id.yaml
-    - name: id
-      in: path
-      required: true
-      description: The connection id, allocated when the connection was created.
-      schema:
-        type: string
-        example: idp_01KWH3B72K7M7F0N9WD3P2E4YM
+    - $ref: ../../../components/parameters/idp-id.yaml
   responses:
     '200':
       description: The identity provider connection was retrieved successfully.

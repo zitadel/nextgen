@@ -9,6 +9,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { type Platform, RESOURCES } from "../../../src/commands/resources";
 import { COMMANDS } from "../../../src/index";
 import {
+  describeBody,
   parseFilter,
   parseSort,
   type ResourceDescriptor,
@@ -32,6 +33,7 @@ async function makeProject(): Promise<string> {
       project_id: "proj_test",
       project_secret: "sk_proj_test_full",
       preview_secret: "sk_proj_test_preview",
+      primary_origins: [],
       preview_origins: [],
       created_at: "2026-01-01T00:00:00Z",
     }),
@@ -73,7 +75,7 @@ describe("resource registry", () => {
   });
 
   it("gives no generated command an --environment flag, since none addresses one", () => {
-    const generated = Object.entries(COMMANDS).filter(([id]) => id.split(":")[0] in RESOURCES);
+    const generated = Object.entries(COMMANDS).filter(([id]) => id!.split(":")[0]! in RESOURCES);
     expect(generated.length).toBeGreaterThan(0);
     for (const [id, command] of generated) {
       const flags = { ...command.baseFlags, ...command.flags };
@@ -99,6 +101,32 @@ describe("resource registry", () => {
     const json = parseJson(res.stdout) as { code: string; message: string };
     expect(json.code).toBe("E_VALIDATION");
     expect(json.message).toContain("Nonexistent flag");
+  });
+
+  it("gives every field of every write a flag of its own, so none shadows another", () => {
+    // A field whose flag would collide gets none (ADR 071 §2), which is safe
+    // but loses the flag; this is where a schema change that causes one shows.
+    let checked = 0;
+    for (const [topic, resource] of entries()) {
+      for (const [verb, spec] of [
+        ["create", resource.create],
+        ["update", resource.update],
+      ] as const) {
+        if (!spec) {
+          continue;
+        }
+        const command = COMMANDS[`${topic}:${verb}`];
+        for (const field of describeBody(spec.schema, { root: spec.root })) {
+          if (field.kind === "json") {
+            continue;
+          }
+          expect(field.flag, `${topic} ${verb} ${field.name}`).toBeDefined();
+          expect(Object.keys(command?.flags ?? {}), `${topic} ${verb}`).toContain(field.flag);
+          checked++;
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(20);
   });
 
   it("advertises only filter and sort fields the generated query schemas accept", () => {
@@ -314,7 +342,16 @@ describe("get rendering", () => {
     server.use(http.get(`${SERVER}/users/user_1`, () => HttpResponse.json(user("user_1"))));
 
     const res = await asTerminal(() =>
-      runCliForTest(["users", "get", "user_1", "--cwd", cwd, "--server", SERVER, "--non-interactive"]),
+      runCliForTest([
+        "users",
+        "get",
+        "user_1",
+        "--cwd",
+        cwd,
+        "--server",
+        SERVER,
+        "--non-interactive",
+      ]),
     );
 
     expect(res.exitCode).toBe(0);
@@ -560,7 +597,9 @@ describe("the drain spinner", () => {
   it("is stopped when a page fails, so it does not outlive the command", async () => {
     const cwd = await makeProject();
     server.use(
-      http.post(`${SERVER}/users/query`, () => HttpResponse.json({ code: "boom" }, { status: 500 })),
+      http.post(`${SERVER}/users/query`, () =>
+        HttpResponse.json({ code: "boom" }, { status: 500 }),
+      ),
     );
 
     // The spinner holds a SIGINT handler between start and stop; counting them
@@ -780,10 +819,7 @@ describe("next page suggestion", () => {
 
   it("suggests nothing after --all drained every page", async () => {
     const cwd = await makeProject();
-    const pages = [
-      { users: [user("user_1")], next_page_token: "p2" },
-      { users: [user("user_2")] },
-    ];
+    const pages = [{ users: [user("user_1")], next_page_token: "p2" }, { users: [user("user_2")] }];
     let call = 0;
     server.use(http.post(`${SERVER}/users/query`, () => HttpResponse.json(pages[call++] ?? {})));
 
@@ -950,6 +986,226 @@ describe("body field flags", () => {
     const res = await run(cwd, ["teams", "update", "team_1", "--name", "renamed"]);
     expect(res.exitCode).toBe(0);
     expect(body).toEqual({ name: "renamed" });
+  });
+});
+
+describe("nested bodies", () => {
+  const CONNECTION_FLAGS = [
+    "--slug",
+    "acme-sso",
+    "--protocol",
+    "oidc",
+    "--display-name",
+    "Acme SSO",
+    "--oidc-issuer",
+    "https://sso.acme.example",
+    "--oidc-client-id",
+    "abc123",
+    "--oidc-client-secret",
+    "${{ ACME_SSO_CLIENT_SECRET }}",
+    "--oidc-scopes",
+    "openid",
+    "--oidc-scopes",
+    "email",
+  ];
+  const connection = {
+    slug: "acme-sso",
+    protocol: "oidc",
+    display_name: "Acme SSO",
+    oidc: {
+      issuer: "https://sso.acme.example",
+      client_id: "abc123",
+      client_secret: "${{ ACME_SSO_CLIENT_SECRET }}",
+      scopes: ["openid", "email"],
+    },
+  };
+
+  /** Capture the connection `POST /idps` receives. */
+  const capturingIdps = (): { body?: { idp?: Record<string, unknown> } } => {
+    const seen: { body?: { idp?: Record<string, unknown> } } = {};
+    server.use(
+      http.post(`${SERVER}/idps`, async ({ request }) => {
+        seen.body = (await request.json()) as typeof seen.body;
+        return HttpResponse.json({ id: "idp_1", slug: "acme-sso" }, { status: 201 });
+      }),
+    );
+    return seen;
+  };
+
+  it("creates an identity provider connection from its nested fields alone", async () => {
+    const cwd = await makeProject();
+    const seen = capturingIdps();
+
+    const res = await run(cwd, ["idps", "create", ...CONNECTION_FLAGS]);
+
+    expect(res.exitCode).toBe(0);
+    expect(seen.body?.idp).toMatchObject(connection);
+  });
+
+  it("takes the connection document inline, its client_secret a reference", async () => {
+    const cwd = await makeProject();
+    const seen = capturingIdps();
+
+    const res = await run(cwd, ["idps", "create", "--data", JSON.stringify(connection)]);
+
+    expect(res.exitCode).toBe(0);
+    expect(seen.body?.idp).toMatchObject(connection);
+  });
+
+  it("refuses a literal client secret on the command line, pointing at a reference", async () => {
+    const cwd = await makeProject();
+    const literal = CONNECTION_FLAGS.map((arg) =>
+      arg === "${{ ACME_SSO_CLIENT_SECRET }}" ? "hunter2" : arg,
+    );
+
+    const res = await run(cwd, ["idps", "create", ...literal]);
+
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as { message: string; hint: string };
+    expect(json.message).toContain('Refusing to read "client_secret" from --oidc-client-secret');
+    expect(json.hint).toContain("${{ NAME }}");
+  });
+
+  it("takes an endpoint URL, which is no credential though its name says token", async () => {
+    const cwd = await makeProject();
+    const seen = capturingIdps();
+
+    const res = await run(cwd, [
+      "idps",
+      "create",
+      ...CONNECTION_FLAGS,
+      "--set",
+      "oidc.token_endpoint=https://sso.acme.example/token",
+      "--dry-run",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    expect(seen.body).toBeUndefined();
+    expect(res.stdout).toContain("https://sso.acme.example/token");
+  });
+
+  it("lists the fields an oidc block is missing once it is given", async () => {
+    const cwd = await makeProject();
+
+    const res = await run(cwd, [
+      "idps",
+      "create",
+      "--slug",
+      "a",
+      "--protocol",
+      "oidc",
+      "--display-name",
+      "A",
+      "--oidc-client-id",
+      "a",
+    ]);
+
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as { message: string; details: { missing: string[] } };
+    expect(json.message).toBe(
+      "idps create is missing required fields: --oidc-issuer, --oidc-client-secret",
+    );
+    expect(json.details.missing).toEqual(["oidc.issuer", "oidc.client_secret"]);
+  });
+
+  it("refuses a --set path the connection does not have", async () => {
+    const cwd = await makeProject();
+
+    const res = await run(cwd, ["idps", "create", ...CONNECTION_FLAGS, "--set", "oidc.isuer=x"]);
+
+    expect(res.exitCode).toBe(3);
+    expect((parseJson(res.stdout) as { message: string }).message).toBe(
+      "--set oidc.isuer names no field of this body",
+    );
+  });
+
+  it("changes one attribute of a --file body instead of replacing them all", async () => {
+    const cwd = await makeProject();
+    const file = join(cwd, "user.json");
+    await writeFile(
+      file,
+      JSON.stringify({
+        schema: "sch_default",
+        attributes: { email: "ada@example.com", givenName: "Ada" },
+      }),
+    );
+    let body: unknown;
+    server.use(
+      http.post(`${SERVER}/users`, async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json(user("user_1"), { status: 201 });
+      }),
+    );
+
+    const res = await run(cwd, [
+      "users",
+      "create",
+      "--file",
+      file,
+      "--attributes",
+      "givenName=Augusta",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    expect(body).toEqual({
+      schema: "sch_default",
+      attributes: { email: "ada@example.com", givenName: "Augusta" },
+    });
+  });
+
+  it("still refuses a password in an inline --data body", async () => {
+    const cwd = await makeProject();
+
+    const res = await run(cwd, [
+      "users",
+      "create",
+      "--data",
+      JSON.stringify({
+        schema: "sch_default",
+        attributes: { email: "a@b.c", password: "hunter2" },
+      }),
+    ]);
+
+    expect(res.exitCode).toBe(3);
+    expect((parseJson(res.stdout) as { message: string }).message).toContain(
+      'Refusing to read "password" from --data',
+    );
+  });
+
+  it("sets a project's hashing method through its nested fields", async () => {
+    const cwd = await makeProject();
+    let body: unknown;
+    server.use(
+      http.patch(`${SERVER}/projects/prj_1`, async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json({ id: "prj_1", name: "p" });
+      }),
+    );
+
+    const res = await run(cwd, [
+      "projects",
+      "update",
+      "prj_1",
+      "--password-hash-algorithm",
+      "bcrypt",
+      "--password-hash-params-cost",
+      "12",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    expect(body).toEqual({ password_hash: { algorithm: "bcrypt", params: { cost: 12 } } });
+  });
+
+  it("previews a connection with its reference and its fixed values shown", async () => {
+    const cwd = await makeProject();
+
+    const res = await run(cwd, ["idps", "create", ...CONNECTION_FLAGS, "--dry-run"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).not.toContain("«redacted»");
+    expect(
+      (parseJson(res.stdout) as { data: { body: { idp: Record<string, unknown> } } }).data.body.idp,
+    ).toMatchObject({ oidc: { client_secret: "${{ ACME_SSO_CLIENT_SECRET }}" } });
   });
 });
 
@@ -1138,7 +1394,7 @@ describe("other resources", () => {
 
 describe("configuration resources are read-only", () => {
   it("exposes only list and get for every configuration topic", () => {
-    for (const topic of ["schemas", "environments", "releases", "flow-definitions", "branding"]) {
+    for (const topic of ["schemas", "releases", "flow-definitions", "branding"]) {
       const resource = RESOURCES[topic as keyof typeof RESOURCES];
       expect(resource, topic).toBeDefined();
       expect(Object.keys(resource!), topic).toEqual(
@@ -1157,7 +1413,11 @@ describe("configuration resources are read-only", () => {
         url = new URL(request.url);
         return HttpResponse.json({
           schemas: [
-            { id: "sch_1", schema: { objectType: "human-user", kind: "user-schema" }, metadata: { created_at: "2026-01-01T00:00:00Z" } },
+            {
+              id: "sch_1",
+              schema: { objectType: "human-user", kind: "user-schema" },
+              metadata: { created_at: "2026-01-01T00:00:00Z" },
+            },
           ],
         });
       }),
@@ -1178,26 +1438,6 @@ describe("configuration resources are read-only", () => {
     expect(url?.searchParams.get("limit")).toBe("5");
     const json = parseJson(res.stdout) as { data: { items: Array<{ id: string }> } };
     expect(json.data.items.map((s) => s.id)).toEqual(["sch_1"]);
-  });
-
-  it("addresses an environment by name rather than by id", async () => {
-    const cwd = await makeProject();
-    server.use(
-      http.get(`${SERVER}/environments/staging`, () =>
-        HttpResponse.json({
-          id: "env_1",
-          project_id: "proj_test",
-          name: "staging",
-          created_at: "2026-01-01T00:00:00Z",
-        }),
-      ),
-    );
-
-    const res = await run(cwd, ["environments", "get", "staging"]);
-
-    expect(res.exitCode).toBe(0);
-    const json = parseJson(res.stdout) as { data: { name: string } };
-    expect(json.data.name).toBe("staging");
   });
 
   it("offers no paging flags for an unpaginated collection and reads the bare array", async () => {
@@ -1234,8 +1474,16 @@ describe("schemas list shows the current schemas, not the history", () => {
         url = new URL(request.url);
         return HttpResponse.json({
           schemas: [
-            { id: "sch_04", schema: { objectType: "human-user", kind: "user-schema" }, metadata: { created_at: "2026-07-02T00:00:00Z" } },
-            { id: "sch_05", schema: { objectType: "machine-user", kind: "user-schema" }, metadata: { created_at: "2026-07-03T00:00:00Z" } },
+            {
+              id: "sch_04",
+              schema: { objectType: "human-user", kind: "user-schema" },
+              metadata: { created_at: "2026-07-02T00:00:00Z" },
+            },
+            {
+              id: "sch_05",
+              schema: { objectType: "machine-user", kind: "user-schema" },
+              metadata: { created_at: "2026-07-03T00:00:00Z" },
+            },
           ],
         });
       }),

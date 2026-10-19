@@ -1,5 +1,6 @@
 post:
   operationId: queryUsers
+  x-zitadel-cli: users list
   summary: Query users
   description: |
     Returns the users of a project, paginated with a cursor.
@@ -8,8 +9,8 @@ post:
     project is listed.
 
     Accepts either a project secret (`oauth2`) or a user-bound Console
-    session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
-    is a follow-up (#1140).
+    session cookie (`nextgenSession`). Cookie-authenticated requests
+    follow the scheme's CSRF rules (`nextgenSession`).
   tags:
     - Users
   # user.read alone: scopes in one requirement are ANDed, and the expansion

@@ -1,16 +1,22 @@
 {
-  "extends": "./tsconfig.json",
-  "include": ["src/**/*.ts"],
-  "exclude": ["src/**/__tests__/**"],
-  "references": [
-    {
-      "path": "../sdk-core"
-    },
-    {
-      "path": "../components"
-    },
-    {
-      "path": "../api"
-    }
-  ]
+  "extends": "./tsconfig.lib.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    // No `noEmit` (typecheck passes `--noEmit`): the analog vitest plugin
+    // compiles the specs through this program and does not override it, so
+    // `noEmit` would leave every component "not in the TypeScript program".
+    // It does not override `emitDeclarationOnly` either, hence the reset.
+    "emitDeclarationOnly": false,
+    "types": ["node", "vitest", "vitest/globals", "vitest/importMeta"]
+  },
+  "include": [
+    "*.config.mts",
+    "*.config.ts",
+    "src/**/*.d.ts",
+    "src/**/*.spec.ts",
+    "src/**/*.test.ts",
+    "src/**/__tests__/**/*.ts",
+    "src/test-setup.ts"
+  ],
+  "exclude": []
 }

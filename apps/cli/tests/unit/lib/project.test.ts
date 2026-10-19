@@ -25,6 +25,7 @@ const VALID_SECRET = {
   project_id: "proj-001",
   project_secret: "sk_proj_test",
   preview_secret: "sk_proj_preview",
+  primary_origins: [],
   preview_origins: ["https://example.test"],
   created_at: "2026-01-01T00:00:00.000Z",
 };
@@ -140,6 +141,18 @@ describe("readZitadelSecret", () => {
     await expect(readZitadelSecret(cwd)).rejects.toThrow(
       ".zitadel/secret is missing required fields",
     );
+  });
+
+  it("defaults missing primary_origins to an empty array", async () => {
+    const cwd = await makeTempDir();
+    await mkdir(join(cwd, ".zitadel"), { recursive: true });
+    const { primary_origins: _omit, ...legacy } = VALID_SECRET;
+    await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(legacy));
+
+    await expect(readZitadelSecret(cwd)).resolves.toEqual({
+      ...VALID_SECRET,
+      primary_origins: [],
+    });
   });
 
   it("propagates malformed-JSON errors unchanged (not wrapped as not-found)", async () => {

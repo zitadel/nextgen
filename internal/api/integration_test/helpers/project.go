@@ -38,6 +38,7 @@ func (h *Harness) ensureProjectService(t testing.TB) service.ProjectService {
 			h.EnsureSchemaValidator(t),
 			h.EnsureKeyService(t),
 			h.EnsureHasherFactory(t),
+			domain.DefaultSharedHosts,
 		)
 	}
 	return h.projectService.value
@@ -55,8 +56,8 @@ type cleanupProjectService struct {
 // registered here, before anything the test itself registers, so under
 // t.Cleanup's last in, first out order it runs last: every cleanup the test
 // adds afterwards still sees the project.
-func (s cleanupProjectService) Create(ctx context.Context, name string, previewOrigins []string, seedDefaults bool) (*domain.Project, error) {
-	project, err := s.ProjectService.Create(ctx, name, previewOrigins, seedDefaults)
+func (s cleanupProjectService) Create(ctx context.Context, name string, origins []domain.Origin, seedDefaults bool) (*domain.Project, error) {
+	project, err := s.ProjectService.Create(ctx, name, origins, seedDefaults)
 	if err != nil {
 		return project, err
 	}

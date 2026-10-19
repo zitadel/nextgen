@@ -1,0 +1,19 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "typecheck": {
+      "dependsOn": ["@zitadel/sdk-next#build"]
+    },
+    "build": {
+      "dependsOn": ["@zitadel/sdk-next#build"],
+      "outputs": [".next/**", "!.next/cache/**"]
+    },
+    "dev": {
+      "dependsOn": ["@zitadel/sdk-next#build"]
+    },
+    "start": {
+      "dependsOn": ["build"]
+    }
+  }
+}

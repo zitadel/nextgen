@@ -2,7 +2,7 @@ import { Flags } from "@oclif/core";
 
 import { CommandGroups, OwnerCommand, type JsonEnvelope } from "../../lib/oclif";
 import { renderRows, renderTable } from "../../lib/oclif/crud/table";
-import { toVariableRows, variableCells } from "../../lib/variables";
+import { primaryValues, toVariableRows, variableCells } from "../../lib/variables";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["name", "value"] as const;
@@ -11,9 +11,8 @@ const COLUMNS = ["name", "value"] as const;
  * The `variables list` topic command — show the variables entered at the
  * project level.
  *
- * Owners are separate, not a ladder (ADR 062 §4), so this is the project's own
- * set and not a merge of anything an environment holds. A secret is reported as
- * held without its value, because the platform never discloses one.
+ * A secret is reported as held without its value, because the platform never
+ * discloses one.
  */
 export default class VariablesList extends OwnerCommand {
   static override description = "List the variables entered on the project.";
@@ -34,7 +33,8 @@ export default class VariablesList extends OwnerCommand {
     await this.toMeta(flags);
     const { client, scope } = await this.connect();
 
-    const rows = toVariableRows(await client.getVariables(scope));
+    const body = await client.getVariables({ ...scope, kind: "primary" });
+    const rows = toVariableRows(primaryValues(body));
     this.recordTelemetry({ variable_count: rows.length });
 
     // The resource commands' list rendering: a pipe (or `--plain`) gets one

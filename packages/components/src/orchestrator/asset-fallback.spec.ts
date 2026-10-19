@@ -1,10 +1,8 @@
 /**
- * Broken-branding-asset degradation, exercised over the last shipped split
- * and hero templates (retired from the eject catalog in #1039, still
- * rendered for already-published revisions) rather than hand-written markup: the regression this guards is
- * that `.zl-split__placeholder` is keyed on "no asset configured", so a
- * configured-but-dead asset used to leave the brand pane empty (a 0×0 img,
- * no console error, nothing in plan output).
+ * Broken-branding-asset degradation. `.zl-split__placeholder` is keyed on "no
+ * asset configured", so a configured-but-dead asset must still fill the brand
+ * pane. Runs over the split and hero fixtures, which published revisions
+ * still render.
  *
  * jsdom never loads images, so failure is injected the way the browser
  * reports it — an `error` event on the element.

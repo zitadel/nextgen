@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import * as endpoints from "@zitadel/api/generated/endpoints/zitadelNextGen";
@@ -70,12 +70,18 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   // generated surface; recorded as a question rather than implied to be owned.
   completeClaim: "part of the claim flow, but currently called by no command — unresolved",
   getClaimWindow: "part of the claim flow, but currently called by no command — unresolved",
+  // A preview exists only through a deployment to it, so it has no create to
+  // offer; listing and removing it are `zitadel preview`'s.
+  listPreviews: "previews are listed by `zitadel preview` (#1312)",
+  removePreview: "previews are removed by `zitadel preview` (#1312)",
 
   // Configuration is written declaratively (ADR 035), never imperatively here.
   createSchema: "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
   createBranding:
     "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
   createRelease: "a release is constructed by `zitadel deploy` (ADR 035)",
+  buildRelease: "a release is built from .zitadel/ by `zitadel deploy` (ADR 035)",
+  revokeRelease: "an operator's hard stop; `zitadel release revoke` owns it (#539)",
   createDeployment: "a release goes live through `zitadel deploy` orchestration (ADR 035, #529)",
   getDeploymentById: "deployment history reads arrive with the `zitadel deploy` surface (#529)",
   listDeployments: "deployment history reads arrive with the `zitadel deploy` surface (#529)",
@@ -87,6 +93,8 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   getMyUser: "the end user's own view of themselves, on their own credential",
   patchMyUser: "the end user's own view of themselves, on their own credential",
   getMySession: "the end user's own session, on their own credential",
+  getMySessionCsrfToken:
+    "the session's CSRF token (ADR 053 §5), read on the session's own credential; only the local-admin claim helper, not a command, uses it",
   listMyProjects: "the projects the signed-in user can act on, read on their own credential",
   revokeMySession: "the end user's own session, on their own credential",
 
@@ -109,6 +117,10 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   setUserPassword: "not yet exposed — follow-up, needs a credential-safe input route (ADR 064 §12)",
   listUserTeams: "not yet exposed — follow-up, a user sub-resource listing",
   listUserPasskeys: "not yet exposed — follow-up, a user sub-resource listing",
+  listUserIdentityLinks: "not yet exposed — follow-up, a user sub-resource listing",
+  addOrigin: "not yet exposed — `zitadel origin add` lands with the origins CLI surface (#1578)",
+  removeOrigin:
+    "not yet exposed — `zitadel origin remove` lands with the origins CLI surface (#1578)",
 };
 
 const capitalize = (word: string): string => `${word[0]?.toUpperCase() ?? ""}${word.slice(1)}`;
@@ -164,51 +176,101 @@ const STANDALONE: Readonly<Record<string, readonly string[]>> = {
 };
 
 /**
- * The client operations the standalone commands call, read from their sources.
- * The registry's evidence is which client properties its verbs touch; a
- * `client.<operation>(` call site is the same evidence, so a command that stops
- * calling an operation leaves that operation unaccounted and this test fails.
+ * The client operations each standalone command calls, read from its source
+ * and keyed by its command (`variables set`). The registry's evidence is which
+ * client properties its verbs touch; a `client.<operation>(` call site is the
+ * same evidence, so a command that stops calling an operation leaves that
+ * operation unaccounted and this test fails.
  */
-const standaloneOperations = async (): Promise<ReadonlySet<string>> => {
-  const sources = await Promise.all(
-    Object.values(STANDALONE)
-      .flat()
-      .map((command) =>
-        readFile(join(import.meta.dirname, "../../../src/commands", `${command}.ts`), "utf8"),
-      ),
-  );
-  return new Set(
-    sources.flatMap((source) =>
-      [...source.matchAll(/\bclient\.(\w+)\(/g)].map((m) => m[1] as string),
+const standaloneCommandOperations = async (): Promise<ReadonlyMap<string, ReadonlySet<string>>> =>
+  new Map(
+    await Promise.all(
+      Object.values(STANDALONE)
+        .flat()
+        .map(async (command): Promise<[string, ReadonlySet<string>]> => {
+          const source = await readFile(
+            join(import.meta.dirname, "../../../src/commands", `${command}.ts`),
+            "utf8",
+          );
+          const called = [...source.matchAll(/\bclient\.(\w+)\(/g)].map((m) => m[1] as string);
+          return [command.replaceAll("/", " "), new Set(called)];
+        }),
     ),
   );
-};
 
-/** The client operations the registry's verbs actually invoke. */
-const calledOperations = async (): Promise<ReadonlySet<string>> => {
-  const called = new Set<string>();
-  const client = new Proxy({} as Record<string, unknown>, {
-    get: (_target, property) => {
-      called.add(String(property));
-      return () => Promise.resolve({});
-    },
-  });
-  const context = { client, projectId: "proj_test" } as never;
+/** The client operations the standalone commands call. */
+const standaloneOperations = async (): Promise<ReadonlySet<string>> =>
+  new Set([...(await standaloneCommandOperations()).values()].flatMap((called) => [...called]));
 
-  for (const resource of Object.values(RESOURCES)) {
-    const verbs = resource as Record<string, { call?: (...args: never[]) => unknown } | undefined>;
+/** The client operations each registry verb invokes, keyed by its command (`teams deactivate`). */
+const verbOperations = async (): Promise<ReadonlyMap<string, ReadonlySet<string>>> => {
+  const operations = new Map<string, ReadonlySet<string>>();
+
+  for (const [topic, resource] of Object.entries(RESOURCES)) {
+    const verbs = resource as unknown as Record<
+      string,
+      { verb?: string; call?: (...args: never[]) => Promise<unknown> } | undefined
+    >;
     for (const verb of ["list", "get", "create", "update", "delete"] as const) {
+      const spec = verbs[verb];
+      if (!spec?.call) continue;
+      const called = new Set<string>();
+      const client = new Proxy({} as Record<string, unknown>, {
+        get: (_target, property) => {
+          called.add(String(property));
+          return () => Promise.resolve({});
+        },
+      });
+      const context = { client, projectId: "proj_test" } as never;
       // A verb may branch on the shape of its argument — a schema is addressed
       // by revision id or by object type — so every branch is driven, or the
       // client call behind the untaken one would look unused. The recording
       // client resolves `{}`, so a call that inspects its response throws;
       // only the property that was reached matters, so the throw is discarded.
       for (const ref of REFS) {
-        await verbs[verb]?.call?.(context, ref as never, {} as never).catch(() => undefined);
+        await spec.call(context, ref as never, {} as never).catch(() => undefined);
       }
+      // A delete may be named after what it does instead (`deactivate`).
+      operations.set(`${topic} ${verb === "delete" ? (spec.verb ?? verb) : verb}`, called);
     }
   }
-  return called;
+  return operations;
+};
+
+/** The client operations the registry's verbs actually invoke. */
+const calledOperations = async (): Promise<ReadonlySet<string>> =>
+  new Set([...(await verbOperations()).values()].flatMap((called) => [...called]));
+
+const SPEC_ENDPOINTS = join(import.meta.dirname, "../../../../../api/openapi/endpoints");
+
+/**
+ * The command the spec names for each client operation: the `x-zitadel-cli`
+ * line that follows the operation's `operationId` in the `methods.yaml` files
+ * under api/openapi/endpoints. The API reference shows that command
+ * beside the operation, so it has to be one the CLI really runs. The line is
+ * read where the convention puts it rather than through a YAML parser, and an
+ * annotation anywhere else fails instead of going unread.
+ */
+const specCommands = async (): Promise<ReadonlyMap<string, string>> => {
+  const files = (await readdir(SPEC_ENDPOINTS, { recursive: true })).filter((file) =>
+    file.endsWith("methods.yaml"),
+  );
+  expect(files.length, "no methods.yaml found under api/openapi/endpoints").toBeGreaterThan(20);
+
+  const commands = new Map<string, string>();
+  for (const file of files) {
+    const source = await readFile(join(SPEC_ENDPOINTS, file), "utf8");
+    const named = [...source.matchAll(/^( +)operationId: *(\S+) *\n\1x-zitadel-cli: *(.+?) *$/gm)];
+    expect(
+      named.length,
+      `${file}: every x-zitadel-cli goes on the line right after its operation's operationId`,
+    ).toBe(source.match(/^ *x-zitadel-cli:/gm)?.length ?? 0);
+    for (const [, , operationId = "", command = ""] of named) {
+      // orval names the client function after the operationId, camel-cased.
+      commands.set(`${operationId.charAt(0).toLowerCase()}${operationId.slice(1)}`, command);
+    }
+  }
+  return commands;
 };
 
 describe("the CLI covers the API client", () => {
@@ -303,5 +365,43 @@ describe("the CLI covers the API client", () => {
         `NOT_RESOURCES lists "${collection}", which the client no longer reaches`,
       ).toBe(true);
     }
+  });
+});
+
+describe("the spec names the command behind each operation", () => {
+  it("names one operation of every command with that command", async () => {
+    const named = await specCommands();
+    const commands = new Map([
+      ...(await verbOperations()),
+      ...(await standaloneCommandOperations()),
+    ]);
+    const unnamed = [...commands]
+      .filter(
+        ([command, called]) => [...called].filter((op) => named.get(op) === command).length !== 1,
+      )
+      .map(([command, called]) => `${command} (calls ${[...called].join(", ")})`);
+
+    expect(
+      unnamed,
+      `Commands the API reference cannot show beside their operation: ${unnamed.join("; ")}. ` +
+        "In api/openapi/endpoints, give exactly one operation each command calls an " +
+        "`x-zitadel-cli: <command>` line right after its operationId.",
+    ).toEqual([]);
+  });
+
+  it("names only a command that calls the operation", async () => {
+    const commands = new Map([
+      ...(await verbOperations()),
+      ...(await standaloneCommandOperations()),
+    ]);
+    const wrong = [...(await specCommands())]
+      .filter(([operation, command]) => !commands.get(command)?.has(operation))
+      .map(([operation, command]) => `${operation}: x-zitadel-cli: ${command}`);
+
+    expect(
+      wrong,
+      `The spec names commands that do not run these operations: ${wrong.join("; ")}. ` +
+        "Correct the command, or remove the line from the operation.",
+    ).toEqual([]);
   });
 });

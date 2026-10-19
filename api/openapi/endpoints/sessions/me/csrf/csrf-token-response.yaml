@@ -1,0 +1,11 @@
+type: object
+description: The session-bound CSRF token (ADR 053 §5).
+required:
+  - csrf_token
+properties:
+  csrf_token:
+    type: string
+    description: |
+      Send it in the `X-Zitadel-CSRF` header on state-changing requests the
+      session cookie authenticates.
+    example: 3q9Y5mJ7m1wq0yBqS4kz0mJ3o1bG8v7t2Y4r6Pp9Ls0

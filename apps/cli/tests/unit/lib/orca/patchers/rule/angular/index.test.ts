@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
+import { FRAMEWORK_IDS } from "../../../../../../helpers/framework-ids";
 import { AngularPatcher } from "../../../../../../../src/lib/orca/patchers/rule/angular";
 import type {
   FileOp,
@@ -7,6 +8,8 @@ import type {
 } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
 import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
+import { REMOTE_HOST, useRemoteServer } from "../../../../../../helpers/remote-server";
+import { aProxyConfApp, type DevApp } from "../../../../../../helpers/vite";
 
 function ctx(): PatchContext {
   return {
@@ -16,7 +19,7 @@ function ctx(): PatchContext {
       id: "proj-1",
       project_secret: "sk_full",
       preview_secret: "sk_preview",
-      preview_origins: [],
+      origins: [],
       created_at: "2026-01-01T00:00:00.000Z",
     },
     issuer: "http://localhost:3000",
@@ -59,6 +62,23 @@ function proxyConfigEdit(): (source: string | undefined) => string {
   return op.edit;
 }
 
+/**
+ * The managed proxy as setup wrote it before it forwarded the app's origin:
+ * `changeOrigin: false` kept the browser's `Host`, and with it `localhost` as
+ * the TLS server name.
+ */
+function previousProxyConf(): string {
+  const current = proxyConfigEdit()(undefined);
+  const previous = current.replace(
+    "    changeOrigin: true,\n    xfwd: true,\n",
+    "    changeOrigin: false,\n",
+  );
+  if (previous === current) {
+    throw new Error("expected the origin-forwarding entry in the managed proxy");
+  }
+  return previous;
+}
+
 describe("AngularPatcher.plan", () => {
   it("wires the business copy overlay for business-use-case projects", () => {
     // Minimal scaffolds keep the widget's neutral built-in copy.
@@ -94,7 +114,40 @@ describe("AngularPatcher.plan", () => {
     expect(proxy).toContain('proxyReq.method === "POST"');
     expect(proxy).toContain('pathname === "/sessions/exchange"');
     expect(proxy).toContain('!proxyReq.getHeader("authorization")');
+    // The backend by its own name, the app's origin in X-Forwarded-*.
+    expect(proxy).toContain("    changeOrigin: true,\n    xfwd: true,\n");
     expect(plan.ops.some((op) => op.kind === "edit" && op.path === "angular.json")).toBe(true);
+  });
+
+  it("moves the proxy entry it wrote before onto the origin-forwarding shape", () => {
+    const edit = proxyConfigEdit();
+
+    expect(edit(previousProxyConf())).toBe(edit(undefined));
+  });
+
+  it("migrates a legacy proxy's bearer hook and its entry together", () => {
+    const edit = proxyConfigEdit();
+    const legacy = previousProxyConf().replace(
+      /\/\* zitadel:proxy:v2 \*\/\nfunction setBearer\(proxyReq\) \{\n[\s\S]*?\n\}\n/,
+      `function setBearer(proxyReq) {\n  proxyReq.setHeader("authorization", bearer);\n}\n`,
+    );
+
+    expect(edit(legacy)).toBe(edit(undefined));
+  });
+
+  it("leaves an unmanaged proxy that keeps the browser's Host alone", () => {
+    const custom = previousProxyConf().replace(`${MANAGED_MARKER}\n`, "");
+
+    expect(proxyConfigEdit()(custom)).toBe(custom);
+  });
+
+  it("keeps a managed entry whose forwarding was already chosen by hand", () => {
+    const chosen = previousProxyConf().replace(
+      "    changeOrigin: false,\n",
+      "    changeOrigin: false,\n    xfwd: false,\n",
+    );
+
+    expect(proxyConfigEdit()(chosen)).toBe(chosen);
   });
 
   it("migrates only the legacy managed proxy bearer hook", () => {
@@ -168,7 +221,7 @@ function setBearer(proxyReq) {
     const dep = new AngularPatcher()
       .plan(ctx())
       .ops.find((op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep");
-    expect(dep).toMatchObject({ name: "@zitadel/sdk-angular", version: "alpha" });
+    expect(dep).toMatchObject({ name: "@zitadel/sdk-angular", version: "0.1.0-alpha.0" });
   });
 });
 
@@ -185,5 +238,74 @@ describe("AngularPatcher.artifacts", () => {
       "src/app/app.routes.ts",
       "package.json",
     ]);
+  });
+});
+
+describe("the generated proxy.conf.cjs, run by Vite against a remote https server", () => {
+  const remote = useRemoteServer();
+  let app: DevApp | undefined;
+
+  afterEach(async () => {
+    await app?.close();
+    app = undefined;
+  });
+
+  async function serve(proxyConf: string): Promise<DevApp> {
+    app = await aProxyConfApp(proxyConf, {
+      ZITADEL_URL: remote.url,
+      ZITADEL_PROJECT_SECRET: "sk_proj_test",
+    });
+    return app;
+  }
+
+  it("reaches the server by its own name", async () => {
+    const { origin } = await serve(proxyConfigEdit()(undefined));
+
+    const response = await fetch(`${origin}/__nextgen/healthz`);
+
+    expect(response.status).toBe(200);
+    expect(remote.requests.at(-1)).toMatchObject({
+      path: "/healthz",
+      servername: REMOTE_HOST,
+      headers: { host: new URL(remote.url).host },
+    });
+  });
+
+  it("tells the server the app's origin", async () => {
+    const { origin } = await serve(proxyConfigEdit()(undefined));
+
+    await fetch(`${origin}/__nextgen/healthz`);
+
+    expect(remote.requests.at(-1)?.headers).toMatchObject({
+      "x-forwarded-host": new URL(origin).host,
+      "x-forwarded-proto": "http",
+    });
+  });
+
+  it("attaches the project secret to the session exchange only", async () => {
+    const { origin } = await serve(proxyConfigEdit()(undefined));
+
+    await fetch(`${origin}/__nextgen/sessions/exchange`, { method: "POST" });
+    await fetch(`${origin}/__nextgen/sessions/me`);
+
+    const [exchange, me] = remote.requests.slice(-2);
+    expect(exchange?.headers.authorization).toBe("Bearer sk_proj_test");
+    expect(me?.headers.authorization).toBeUndefined();
+  });
+
+  it("could not reach it with the entry it wrote before", async () => {
+    const { origin } = await serve(previousProxyConf());
+    const reached = remote.requests.length;
+
+    const response = await fetch(`${origin}/__nextgen/healthz`);
+
+    expect(response.ok).toBe(false);
+    expect(remote.requests).toHaveLength(reached);
+  });
+});
+
+describe("AngularPatcher.canPatch", () => {
+  it.each(FRAMEWORK_IDS)("matches %s only when it is its own framework", (id) => {
+    expect(new AngularPatcher().canPatch(id)).toBe(id === "angular");
   });
 });

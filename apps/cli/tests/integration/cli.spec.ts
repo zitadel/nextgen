@@ -9,7 +9,7 @@ import { expectedPublicCliCommand, parseJson, runCliForTest } from "../helpers/r
 
 const platform = usePlatformMock();
 
-/** `"sso enable --flag"` and `"sso:enable"` both name the id `sso:enable`. */
+/** `"auth-method sso enable --flag"` and `"auth-method:sso:enable"` name the same id. */
 function commandIdFromArgs(args: string): string | undefined {
   const words: string[] = [];
   for (const token of args.trim().split(/\s+/)) {
@@ -39,7 +39,7 @@ async function suggestedCommandIds(): Promise<Set<string>> {
   for (const file of await typescriptFiles(join(import.meta.dirname, "../../src"))) {
     const source = await readFile(file, "utf8");
     for (const match of source.matchAll(/publicCliCommand\(\s*(["`])([^"`$]*)/g)) {
-      const id = commandIdFromArgs(match[2]);
+      const id = commandIdFromArgs(match[2]!);
       if (id) commands.add(id);
     }
     for (const match of source.matchAll(/["`]zitadel\s+([^"`]*)/g)) {

@@ -9,6 +9,19 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
+// RevokeRelease answers 501 until the release service can revoke. Without it
+// the generated stub's sentinel is not a domain error and maps to 500.
+func (h *Handler) RevokeRelease(context.Context, api.RevokeReleaseParams) (api.RevokeReleaseRes, error) {
+	return nil, domain.ErrNotImplemented()
+}
+
+// BuildRelease answers 501 until the release service can build from a
+// bundle. Without it the generated stub's sentinel is not a domain error and
+// maps to 500.
+func (h *Handler) BuildRelease(context.Context, *api.BuildReleaseRequest, api.BuildReleaseParams) (api.BuildReleaseRes, error) {
+	return nil, domain.ErrNotImplemented()
+}
+
 func (h *Handler) CreateRelease(ctx context.Context, req *api.CreateReleaseRequest, params api.CreateReleaseParams) (api.CreateReleaseRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), releaseAccess, opWrite); err != nil {
 		return nil, err
@@ -18,8 +31,9 @@ func (h *Handler) CreateRelease(ctx context.Context, req *api.CreateReleaseReque
 	for _, pointer := range req.Pointers {
 		kind, err := domain.ReleasePointerKindString(string(pointer.Kind))
 		if err != nil {
-			// Unreachable over HTTP — the wire enum is closed and the decoder
-			// rejects anything else with req.invalid first.
+			// The decoder rejects kinds outside the wire enum with req.invalid,
+			// so this is reached only by a kind the contract admits before the
+			// service resolves it: idp, until the release service learns it.
 			return nil, domain.ErrReleaseInvalid("unknown pointer kind", err)
 		}
 		pointers = append(pointers, service.CreateReleasePointer{
@@ -75,7 +89,7 @@ func (h *Handler) GetReleaseById(ctx context.Context, params api.GetReleaseByIdP
 }
 
 func (h *Handler) ListReleases(ctx context.Context, params api.ListReleasesParams) (api.ListReleasesRes, error) {
-	ctx, err := h.requireProjectListAccess(ctx, string(params.ProjectID), releaseAccess, domain.ResourceKindRelease)
+	ctx, _, err := h.requireProjectListAccess(ctx, string(params.ProjectID), releaseAccess, domain.ResourceKindRelease)
 	if err != nil {
 		return nil, err
 	}
@@ -92,9 +106,11 @@ func (h *Handler) ListReleases(ctx context.Context, params api.ListReleasesParam
 	resp := api.ListReleasesResponse{Releases: make([]api.ReleaseSummary, len(result.Items))}
 	for i, entity := range result.Items {
 		resp.Releases[i] = api.ReleaseSummary{
-			ID:        api.ReleaseID(entity.ID),
-			ProjectID: api.ProjectID(entity.ProjectID),
-			Metadata:  toAPIReleaseMetadata(entity),
+			ID:          api.ReleaseID(entity.ID),
+			ProjectID:   api.ProjectID(entity.ProjectID),
+			ContentHash: toAPIReleaseContentHash(entity.ContentHash),
+			Metadata:    toAPIReleaseMetadata(entity),
+			RevokedAt:   api.NilDateTime{Null: true},
 		}
 	}
 	if result.NextPageToken != "" {
@@ -104,6 +120,14 @@ func (h *Handler) ListReleases(ctx context.Context, params api.ListReleasesParam
 }
 
 /* ---------------- CONVERTERS ---------------- */
+
+// releaseContentHashWirePrefix names the digest algorithm on the wire. The
+// store keeps the bare hex; the prefix is added here and stripped here.
+const releaseContentHashWirePrefix = "sha256:"
+
+func toAPIReleaseContentHash(hash string) api.ReleaseContentHash {
+	return api.ReleaseContentHash(releaseContentHashWirePrefix + hash)
+}
 
 func toAPIRelease(entity *domain.Release) api.Release {
 	pointers := make([]api.ReleasePointer, len(entity.Pointers))
@@ -115,10 +139,12 @@ func toAPIRelease(entity *domain.Release) api.Release {
 		}
 	}
 	return api.Release{
-		ID:        api.ReleaseID(entity.ID),
-		ProjectID: api.ProjectID(entity.ProjectID),
-		Metadata:  toAPIReleaseMetadata(entity),
-		Pointers:  pointers,
+		ID:          api.ReleaseID(entity.ID),
+		ProjectID:   api.ProjectID(entity.ProjectID),
+		ContentHash: toAPIReleaseContentHash(entity.ContentHash),
+		Metadata:    toAPIReleaseMetadata(entity),
+		RevokedAt:   api.NilDateTime{Null: true},
+		Pointers:    pointers,
 	}
 }
 
@@ -163,7 +189,8 @@ func releaseErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
 	case domain.ErrReleaseInvalid(nil, nil).Code,
 		domain.ErrReleaseRevisionNotFound(nil).Code,
-		domain.ErrReleaseRevisionUnpinnable(nil).Code:
+		domain.ErrReleaseRevisionUnpinnable(nil).Code,
+		domain.ErrReleaseUnresolvedReference().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case domain.ErrReleasePermissionDenied().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)

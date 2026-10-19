@@ -51,11 +51,6 @@ func ApplyCursor(filter database.Filter[domain.UserField], page database.Page[do
 	return database.And(filter, database.CompareLess(terms...)), nil
 }
 
-// NextCursor returns a marshaled keyset cursor when the page is full; otherwise nil.
-func NextCursor(users []*domain.User, page database.Page[domain.UserField]) []byte {
-	return pagination.MarshalNext(page.OrderBy, users, Schema, page.Limit)
-}
-
 // ProjectGroup is one project's users prepared for attribute hydration.
 type ProjectGroup struct {
 	ProjectID string

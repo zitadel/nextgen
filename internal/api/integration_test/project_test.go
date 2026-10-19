@@ -79,6 +79,14 @@ func (s *stubAuthAttemptService) IssueSSOState(ctx context.Context, input servic
 	return nil, nil
 }
 
+func (s *stubAuthAttemptService) ConsumeSSOState(ctx context.Context, projectID, state, bindingNonce string) (*domain.SSOCallbackCheck, error) {
+	return nil, nil
+}
+
+func (s *stubAuthAttemptService) SetSSOCallbackResult(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, result *domain.SSOCallbackResult, eventType domain.EventType) error {
+	return nil
+}
+
 // VerifyProof implements [service.AuthAttemptService].
 func (s *stubAuthAttemptService) VerifyProof(ctx context.Context, input service.VerifyProofInput) (*domain.AuthAttempt, error) {
 	return nil, nil
@@ -108,15 +116,18 @@ func TestCreateProject(t *testing.T) {
 		{
 			name: "no optional fields",
 			req: &api.CreateProjectRequest{
-				Name:           helpers.ProjectName(),
-				PreviewOrigins: make([]string, 0),
+				Name:    helpers.ProjectName(),
+				Origins: make([]api.ProjectOrigin, 0),
 			},
 		},
 		{
 			name: "with optional fields",
 			req: &api.CreateProjectRequest{
-				Name:           helpers.ProjectName(),
-				PreviewOrigins: []string{"*.vercel.app", "*.netlify.app"},
+				Name: helpers.ProjectName(),
+				Origins: []api.ProjectOrigin{
+					{Pattern: "https://*-acme.vercel.app", Kind: api.ProjectOriginKindPreview},
+					{Pattern: "https://*--acme.netlify.app", Kind: api.ProjectOriginKindPreview},
+				},
 			},
 		},
 	}
@@ -138,7 +149,7 @@ func TestCreateProject(t *testing.T) {
 			assert.Equal(t, tc.req.Name, got.Name)
 			assert.NotEmpty(t, got.ProjectSecret)
 			assert.NotEmpty(t, got.PreviewSecret)
-			assert.Equal(t, tc.req.PreviewOrigins, got.PreviewOrigins)
+			assert.Equal(t, tc.req.Origins, got.Origins)
 		})
 	}
 }
@@ -173,7 +184,8 @@ func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 	require.Len(t, listed.Items, 1)
 
 	flowDef := listed.Items[0]
-	assert.Equal(t, schemaURL, flowDef.UserSchema)
+	require.NotNil(t, schema.ObjectType)
+	assert.Equal(t, *schema.ObjectType, flowDef.UserSchema, "the flow names the schema by objectType")
 	assert.Equal(t, "identifier", flowDef.Purposes[domain.FlowDefinitionPurposeLogin])
 	assert.Equal(t, "register", flowDef.Purposes[domain.FlowDefinitionPurposeRegister])
 
@@ -212,9 +224,9 @@ func TestCreateProjectSkipsDefaultLoginFlow(t *testing.T) {
 	require.NoError(t, err)
 
 	resp, err := client.CreateProject(t.Context(), &api.CreateProjectRequest{
-		Name:           helpers.ProjectName(),
-		PreviewOrigins: make([]string, 0),
-		SeedDefaults:   api.NewOptBool(false),
+		Name:         helpers.ProjectName(),
+		Origins:      make([]api.ProjectOrigin, 0),
+		SeedDefaults: api.NewOptBool(false),
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.CreateProjectResponse{}, resp, helpers.MustMarshal(t, resp))
@@ -248,8 +260,11 @@ func TestCreateProjectSkipsDefaultLoginFlow(t *testing.T) {
 func TestGetProject(t *testing.T) {
 	t.Parallel()
 
-	previewOrigins := []string{"*.example.com", "localhost:3000"}
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), previewOrigins, true)
+	origins := []domain.Origin{
+		{Pattern: "https://*.example.com", Kind: domain.OriginKindPreview},
+		{Pattern: "http://localhost:3000", Kind: domain.OriginKindPreview},
+	}
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), origins, true)
 	require.NoError(t, err)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
@@ -266,7 +281,10 @@ func TestGetProject(t *testing.T) {
 	}{
 		{
 			name: "ok",
-			want: &api.ProjectResponse{Name: project.Name, PreviewOrigins: previewOrigins},
+			want: &api.ProjectResponse{Name: project.Name, Origins: []api.ProjectOrigin{
+				{Pattern: "https://*.example.com", Kind: api.ProjectOriginKindPreview},
+				{Pattern: "http://localhost:3000", Kind: api.ProjectOriginKindPreview},
+			}},
 		},
 		{
 			name:      "not found",
@@ -315,7 +333,7 @@ func TestProjectSessionCaller(t *testing.T) {
 	t.Run("granted person opens the project", func(t *testing.T) {
 		resp, err := grantee.GetProject(t.Context(), params)
 		require.NoError(t, err)
-		assertProjectResponse(t, &api.ProjectResponse{Name: project.Name, PreviewOrigins: []string{}}, resp)
+		assertProjectResponse(t, &api.ProjectResponse{Name: project.Name, Origins: []api.ProjectOrigin{}}, resp)
 	})
 
 	t.Run("granted person renames the project", func(t *testing.T) {
@@ -370,31 +388,37 @@ func TestPatchProject(t *testing.T) {
 	require.NoError(t, err)
 
 	var (
-		renamed       = helpers.ProjectName()
-		renamedKeep   = helpers.ProjectName()
-		keptOrigins   = []string{"*.example.com", "localhost:3000"}
+		renamed     = helpers.ProjectName()
+		renamedKeep = helpers.ProjectName()
+		keptOrigins = []domain.Origin{
+			{Pattern: "https://*.example.com", Kind: domain.OriginKindPreview},
+			{Pattern: "http://localhost:3000", Kind: domain.OriginKindPreview},
+		}
 		nameInvalid   = domain.ErrProjectNameInvalid()
 		notFound      = domain.ErrProjectNotFound()
 		validRenameTo = &api.PatchProjectRequest{Name: api.NewOptNilString(helpers.ProjectName())}
 	)
 
 	tcs := []struct {
-		name           string
-		previewOrigins []string
-		projectID      api.ProjectID
-		req            *api.PatchProjectRequest
-		want           api.PatchProjectRes
+		name      string
+		origins   []domain.Origin
+		projectID api.ProjectID
+		req       *api.PatchProjectRequest
+		want      api.PatchProjectRes
 	}{
 		{
 			name: "rename",
 			req:  &api.PatchProjectRequest{Name: api.NewOptNilString(renamed)},
-			want: &api.ProjectResponse{Name: renamed, PreviewOrigins: []string{}},
+			want: &api.ProjectResponse{Name: renamed, Origins: []api.ProjectOrigin{}},
 		},
 		{
-			name:           "preview origins are left untouched",
-			previewOrigins: keptOrigins,
-			req:            &api.PatchProjectRequest{Name: api.NewOptNilString(renamedKeep)},
-			want:           &api.ProjectResponse{Name: renamedKeep, PreviewOrigins: keptOrigins},
+			name:    "origins are left untouched",
+			origins: keptOrigins,
+			req:     &api.PatchProjectRequest{Name: api.NewOptNilString(renamedKeep)},
+			want: &api.ProjectResponse{Name: renamedKeep, Origins: []api.ProjectOrigin{
+				{Pattern: "https://*.example.com", Kind: api.ProjectOriginKindPreview},
+				{Pattern: "http://localhost:3000", Kind: api.ProjectOriginKindPreview},
+			}},
 		},
 		{
 			name: "absent name",
@@ -429,7 +453,7 @@ func TestPatchProject(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), tc.previewOrigins, true)
+			project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), tc.origins, true)
 			require.NoError(t, err)
 
 			client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
@@ -627,8 +651,11 @@ func TestProjectPasswordHashPolicyGovernsHashing(t *testing.T) {
 func TestQueryProjects(t *testing.T) {
 	t.Parallel()
 
-	previewOrigins := []string{"*.example.com", "localhost:3000"}
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), previewOrigins, true)
+	origins := []domain.Origin{
+		{Pattern: "https://*.example.com", Kind: domain.OriginKindPreview},
+		{Pattern: "http://localhost:3000", Kind: domain.OriginKindPreview},
+	}
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), origins, true)
 	require.NoError(t, err)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
@@ -636,7 +663,10 @@ func TestQueryProjects(t *testing.T) {
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	var (
-		own            = api.ProjectResponse{Name: project.Name, PreviewOrigins: previewOrigins}
+		own = api.ProjectResponse{Name: project.Name, Origins: []api.ProjectOrigin{
+			{Pattern: "https://*.example.com", Kind: api.ProjectOriginKindPreview},
+			{Pattern: "http://localhost:3000", Kind: api.ProjectOriginKindPreview},
+		}}
 		requestInvalid = domain.ErrRequestInvalid()
 		// A minute of slack absorbs the whole-second truncation RFC3339 applies.
 		before = project.CreatedAt.Add(-time.Minute).Format(time.RFC3339)
@@ -690,13 +720,12 @@ func TestQueryProjects(t *testing.T) {
 			want: &api.QueryProjectsResponse{Projects: []api.ProjectResponse{own}},
 		},
 		{
-			// A full page always carries a cursor: the store cannot know the
-			// next one is empty without reading it.
+			// A full page that is also the last carries no cursor: look-ahead
+			// reads one row past the limit and finds none, so no token (#849).
 			name: "limit fills the page",
 			req:  &api.QueryProjectsRequest{Limit: api.NewOptLimit(1)},
 			want: &api.QueryProjectsResponse{
-				Projects:      []api.ProjectResponse{own},
-				NextPageToken: api.NewOptNilPageToken("opaque, only its presence is asserted"),
+				Projects: []api.ProjectResponse{own},
 			},
 		},
 		{
@@ -728,90 +757,6 @@ func TestQueryProjects(t *testing.T) {
 	}
 }
 
-func TestQueryProjectsPageTokenRoundTrip(t *testing.T) {
-	t.Parallel()
-
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
-	require.NoError(t, err)
-
-	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
-	require.NoError(t, err)
-	harness.SetProjectSecretOnApiClient(t, client, project)
-
-	req := &api.QueryProjectsRequest{Limit: api.NewOptLimit(1)}
-	first, err := client.QueryProjects(t.Context(), req)
-	require.NoError(t, err)
-	require.IsType(t, &api.QueryProjectsResponse{}, first, helpers.MustMarshal(t, first))
-	firstPage := first.(*api.QueryProjectsResponse)
-	require.Len(t, firstPage.Projects, 1)
-
-	pageToken, ok := firstPage.NextPageToken.Get()
-	require.True(t, ok, "a full page carries a cursor")
-
-	req.PageToken = api.NewOptNilPageToken(pageToken)
-	second, err := client.QueryProjects(t.Context(), req)
-	require.NoError(t, err)
-	require.IsType(t, &api.QueryProjectsResponse{}, second, helpers.MustMarshal(t, second))
-	secondPage := second.(*api.QueryProjectsResponse)
-	assert.Empty(t, secondPage.Projects)
-	assert.False(t, secondPage.NextPageToken.IsSet())
-}
-
-// TestQueryProjectsPageTokenRequiresMatchingSorting proves that page tokens
-// validate OrderBy: a DESC page-1 token fails when page 2 omits sorting (default
-// ASC), and succeeds when the same DESC sorting is repeated.
-func TestQueryProjectsPageTokenRequiresMatchingSorting(t *testing.T) {
-	t.Parallel()
-
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
-	require.NoError(t, err)
-
-	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
-	require.NoError(t, err)
-	harness.SetProjectSecretOnApiClient(t, client, project)
-
-	sorting := api.NewOptQueryProjectsRequestSorting(api.QueryProjectsRequestSorting{
-		Field:     api.FilterFieldCreatedAt,
-		Direction: api.SortDirectionDesc,
-	})
-	first, err := client.QueryProjects(t.Context(), &api.QueryProjectsRequest{
-		Limit:   api.NewOptLimit(1),
-		Sorting: sorting,
-	})
-	require.NoError(t, err)
-	require.IsType(t, &api.QueryProjectsResponse{}, first, helpers.MustMarshal(t, first))
-	firstPage := first.(*api.QueryProjectsResponse)
-	require.Len(t, firstPage.Projects, 1)
-	pageToken, ok := firstPage.NextPageToken.Get()
-	require.True(t, ok, "a full page carries a cursor")
-
-	mismatch, err := client.QueryProjects(t.Context(), &api.QueryProjectsRequest{
-		Limit:     api.NewOptLimit(1),
-		PageToken: api.NewOptNilPageToken(pageToken),
-	})
-	require.NoError(t, err)
-	require.IsType(t, &api.QueryProjectsBadRequest{}, mismatch, helpers.MustMarshal(t, mismatch))
-	requestInvalid := domain.ErrRequestInvalid()
-	assertProjectResponse(t, &api.QueryProjectsBadRequest{
-		Code:    api.ErrorCode(requestInvalid.Code),
-		Message: requestInvalid.Message,
-		Details: api.NewOptErrorDetailsDetails(api.ErrorDetailsDetails{
-			"details": jx.Raw(helpers.MustMarshal(t, "page token does not match the requested sorting")),
-		}),
-	}, mismatch)
-
-	matched, err := client.QueryProjects(t.Context(), &api.QueryProjectsRequest{
-		Limit:     api.NewOptLimit(1),
-		PageToken: api.NewOptNilPageToken(pageToken),
-		Sorting:   sorting,
-	})
-	require.NoError(t, err)
-	require.IsType(t, &api.QueryProjectsResponse{}, matched, helpers.MustMarshal(t, matched))
-	matchedPage := matched.(*api.QueryProjectsResponse)
-	assert.Empty(t, matchedPage.Projects)
-	assert.False(t, matchedPage.NextPageToken.IsSet())
-}
-
 // assertProjectResponse covers every operation answering with the shared
 // project body: getProject, patchProject, and each item of queryProjects.
 func assertProjectResponse(t *testing.T, want, got any) {
@@ -827,7 +772,7 @@ func assertProjectResponse(t *testing.T, want, got any) {
 
 		assert.NotEmpty(t, actual.ID)
 		assert.Equal(t, expected.Name, actual.Name)
-		assert.Equal(t, expected.PreviewOrigins, actual.PreviewOrigins)
+		assert.Equal(t, expected.Origins, actual.Origins)
 		assert.NotEmpty(t, actual.CreatedAt)
 		assert.False(t, actual.UpdatedAt.Before(actual.CreatedAt))
 	case *api.QueryProjectsResponse:

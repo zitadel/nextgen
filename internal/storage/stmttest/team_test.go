@@ -583,11 +583,9 @@ func TestTeamStatements_List(t *testing.T) {
 			second, err := d.stmts.ListTeams(unfilteredListCtx(t), &database.ListOptions[domain.TeamField]{Filter: filter, Pagination: page})
 			require.NoError(t, err)
 			assert.Equal(t, []string{ids[2]}, teamIDs(second.Items))
-
-			page.Cursor = second.NextCursor
-			third, err := d.stmts.ListTeams(unfilteredListCtx(t), &database.ListOptions[domain.TeamField]{Filter: filter, Pagination: page})
-			require.NoError(t, err)
-			assert.Empty(t, teamIDs(third.Items))
+			// Exact multiple of the limit, yet the final page carries no token:
+			// look-ahead sees no further row (#849).
+			assert.Empty(t, second.NextCursor)
 		})
 	})
 }

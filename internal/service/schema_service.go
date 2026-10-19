@@ -27,11 +27,8 @@ type CreateSchemaByURLInput struct {
 
 type ListSchemasInput struct {
 	ProjectID string
-	// IDs narrows the list to the given schema ids. Empty means no id filter.
-	// Not exposed on the wire: it serves in-process batch resolution, such as
-	// the flow-definition expand hydrator.
-	IDs        []string
-	ObjectType string
+	// ObjectTypes narrows the list to any of the given object types.
+	ObjectTypes []string
 	// Kind is nil when the caller did not filter by one. It is a pointer rather
 	// than a zero value because JSONSchemaKindUnknown is a real stored kind, so
 	// it cannot double as "no filter".
@@ -214,20 +211,12 @@ func (s *SchemaService) ListSchemas(ctx context.Context, input ListSchemasInput)
 	filters := []database.Filter[domain.JSONSchemaField]{
 		database.Equal(database.Col(domain.JSONSchemaFieldProjectID), input.ProjectID),
 	}
-	// The ids are ORed with each other and ANDed with everything else, so they
-	// narrow the caller's already-authorized rows rather than reaching outside
-	// them: an id from another project matches nothing, like an unknown one.
-	if len(input.IDs) > 0 {
-		ids := make([]database.Filter[domain.JSONSchemaField], len(input.IDs))
-		for i, id := range input.IDs {
-			ids[i] = database.Equal(database.Col(domain.JSONSchemaFieldURL), id)
+	if len(input.ObjectTypes) > 0 {
+		objectTypes := make([]database.Filter[domain.JSONSchemaField], len(input.ObjectTypes))
+		for i, objectType := range input.ObjectTypes {
+			objectTypes[i] = database.Equal(database.Col(domain.JSONSchemaFieldObjectType), objectType)
 		}
-		filters = append(filters, database.Or(ids...))
-	}
-	if input.ObjectType != "" {
-		filters = append(filters,
-			database.Equal(database.Col(domain.JSONSchemaFieldObjectType), input.ObjectType),
-		)
+		filters = append(filters, database.Or(objectTypes...))
 	}
 	// Schemas persisted without their document being parsed — ingested by URL,
 	// or a $ref target pulled in during resolution (#812) — are stored as

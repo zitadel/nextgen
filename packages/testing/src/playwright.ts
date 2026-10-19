@@ -54,7 +54,7 @@ export const test = base.extend<ZitadelTestFixtures, ZitadelWorkerFixtures>({
   zitadel: [
     // Playwright derives fixture dependencies from the destructuring pattern,
     // so the empty pattern is required here.
-    // oxlint-disable-next-line no-empty-pattern
+    // biome-ignore lint/correctness/noEmptyPattern: Playwright fixture signature requires the destructuring pattern
     async ({}, use) => {
       const handshakePath = process.env.ZITADEL_TESTING_HANDSHAKE;
       if (!handshakePath) {
@@ -138,6 +138,8 @@ export { enableVirtualPasskey } from "./passkey";
 export type { VirtualPasskey } from "./passkey";
 export { withZitadel } from "./playwright-config";
 export type { WithZitadelOptions } from "./playwright-config";
+export { identity } from "./seed";
+export { SESSION_COOKIE_NAME } from "./session";
 export type {
   ConnectedZitadel,
   Identity,

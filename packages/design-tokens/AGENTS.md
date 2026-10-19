@@ -78,21 +78,12 @@ still guards two collections landing on the same key. Neither failure is
 catchable downstream: the snapshot test only sees names that already reached
 `build.ts`.
 
-## Coexistence: legacy vs shadcn
+## Colour surfaces
 
-Two colour systems ship at once so consumers migrate incrementally:
-
-- **Legacy** (`--zl-color-surface-*`, `--zl-color-text-*`, `--zl-color-gray-*`,
-  spacing, radius) lives in `src/legacy.tokens.json`, authored as
-  `{ dark, light }` pairs whose light halves `build.ts` emits under
-  `[data-theme="light"]` (amended ADR 014 §5). It is actively maintained —
-  new mode-aware semantic names may be added (as #818 did) — but existing
-  names and their dark values are the migration's stable floor: do not rename
-  or change them while consumers reference them. In the typed export it stays
-  under `tokens.color.*`.
 - **shadcn** (`--zl-background`, `--zl-foreground`, `--zl-primary`, `--zl-card`,
   `--zl-border`, `--zl-sidebar-*`, `--zl-chart-*`) comes from the designer export
-  and lives under `tokens.theme.*`. This is the target surface.
+  and lives under `tokens.theme.*`. Colours are authored as `{ dark, light }`
+  pairs; `build.ts` emits the light halves under `[data-theme="light"]`.
 - **Themed groups** (`--zl-syntax-*`, `--zl-gradient-*`) are the designer's
   other Light/Dark collections, under `tokens.<group>.*`. They theme like the
   shadcn colours but are deliberately kept out of `css/shadcn.css`: that file
@@ -103,10 +94,6 @@ Two colour systems ship at once so consumers migrate incrementally:
   positions recorded in `overrides.ts`. Figma keeps each gradient as a style,
   which the sync cannot read; the override goes once it publishes the angle and
   positions as variables.
-
-When migrating a consumer, replace legacy `--zl-color-*` references with the new
-`--zl-*` names (or `bg-zl-*` / `text-zl-*` Tailwind utilities) and verify light +
-dark in the browser. Retire legacy names only once no consumer references them.
 
 **Console exception:** `apps/console` imports `css/shadcn.css` and authors the
 **unprefixed** shadcn contract (`bg-background`, `text-muted-foreground`). Do
@@ -136,25 +123,22 @@ not reintroduce `bg-zl-*` there — the bridge file owns the mapping.
   `:sync-export`.
 - `src/generated/tokens.css`, `tokens.ts`, `tailwind.css`, `shadcn.css` —
   overwritten by `:generate`.
-- `src/legacy.tokens.json` — the legacy colour source (two-mode, see above).
-  Add semantic names deliberately; retire a token only once no consumer
-  references it; update `tokens.snapshot.spec.ts` in the same change.
 - `figma-tokens.lock` — only bumped as part of a sync PR.
 
 ## Output ordering
 
-`scripts/build.ts` emits legacy semantic colours, then the new shadcn colours
-(`theme.*`), then the remaining categories in a fixed order (spacing → radius →
-font → motion → focus → breakpoint → container → layout → themed groups).
-Spacing keys are numeric-sorted. Themed groups emit last, in export order, so a
+`scripts/build.ts` emits the shadcn colours (`theme.*`), then the remaining
+categories in a fixed order (spacing → custom roles → radius → text → font
+weight → shadow → font family → motion → focus → breakpoint → container →
+themed groups → composed gradients). Spacing keys are numeric-sorted. Themed
+groups emit after the fixed categories, in export order, so a
 new Light/Dark collection from Figma appends to the diff rather than shifting
 every existing line. Keep new categories appended at the end for the same
 reason.
 
 ## Tests
 
-Single Vitest project, Node mode: `tokens.snapshot.spec.ts` (public-name guard,
-both surfaces) and `sync-from-export.spec.ts` (resolver logic + real-export
+Single Vitest project, Node mode: `tokens.snapshot.spec.ts` (public-name guard) and `sync-from-export.spec.ts` (resolver logic + real-export
 regression). If you add a token category, extend the snapshot to cover its keys
 so it can't silently disappear.
 

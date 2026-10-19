@@ -111,6 +111,33 @@ func TestToFlowField_OmitsAutocompleteWhenAbsent(t *testing.T) {
 	require.False(t, got.Autocomplete.Set)
 }
 
+func TestToFlowField_ReadOnly(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		readOnly bool
+		want     apigen.OptBool
+	}{
+		{name: "set", readOnly: true, want: apigen.NewOptBool(true)},
+		{name: "omitted when false", readOnly: false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := toFlowField(domain.FlowField{
+				Name:     "email",
+				Type:     domain.FlowFieldTypeEmail,
+				TextKey:  "register.field.email",
+				ReadOnly: tc.readOnly,
+			})
+
+			require.Equal(t, tc.want, got.ReadOnly)
+		})
+	}
+}
+
 func TestToFlowStep_EmitsSSOProvidersInOrder(t *testing.T) {
 	t.Parallel()
 
@@ -166,7 +193,7 @@ func TestValidateOriginAgainstProject(t *testing.T) {
 	tests := []struct {
 		name        string
 		origin      string
-		allowed     []string
+		allowed     []domain.Origin
 		wantErr     bool
 		wantInError []string
 	}{
@@ -176,34 +203,43 @@ func TestValidateOriginAgainstProject(t *testing.T) {
 			allowed: nil,
 		},
 		{
-			name:    "exact match allows",
-			origin:  "http://localhost:3000",
-			allowed: []string{"http://localhost:3000"},
+			name:    "exact primary match allows",
+			origin:  "https://app.example.com",
+			allowed: []domain.Origin{{Pattern: "https://app.example.com", Kind: domain.OriginKindPrimary}},
 		},
 		{
-			name:    "loopback spellings are not aliased",
-			origin:  "http://127.0.0.1:3000",
-			allowed: []string{"http://localhost:3000", "https://app.example.com"},
-			wantErr: true,
-			wantInError: []string{
-				`"http://127.0.0.1:3000"`,
-				"http://localhost:3000, https://app.example.com",
+			name:   "loopback is admitted when allowlist is non-empty",
+			origin: "http://127.0.0.1:3000",
+			allowed: []domain.Origin{
+				{Pattern: "https://app.example.com", Kind: domain.OriginKindPrimary},
 			},
 		},
 		{
-			name:    "ipv6 loopback is not aliased",
+			name:    "ipv6 loopback is admitted when allowlist is non-empty",
 			origin:  "http://[::1]:3000",
-			allowed: []string{"http://localhost:3000"},
+			allowed: []domain.Origin{{Pattern: "https://app.example.com", Kind: domain.OriginKindPrimary}},
+		},
+		{
+			name:    "preview exact pattern does not admit",
+			origin:  "https://preview.example.com",
+			allowed: []domain.Origin{{Pattern: "https://preview.example.com", Kind: domain.OriginKindPreview}},
 			wantErr: true,
 			wantInError: []string{
-				`"http://[::1]:3000"`,
-				"http://localhost:3000",
+				`"https://preview.example.com"`,
 			},
 		},
 		{
-			name:    "ipv6 exact match allows",
-			origin:  "http://[::1]:3000",
-			allowed: []string{"http://[::1]:3000"},
+			name:   "non-loopback without primary match is rejected",
+			origin: "https://other.example.com",
+			allowed: []domain.Origin{
+				{Pattern: "https://app.example.com", Kind: domain.OriginKindPrimary},
+				{Pattern: "https://*-acme.vercel.app", Kind: domain.OriginKindPreview},
+			},
+			wantErr: true,
+			wantInError: []string{
+				`"https://other.example.com"`,
+				"https://app.example.com",
+			},
 		},
 	}
 
@@ -211,7 +247,7 @@ func TestValidateOriginAgainstProject(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := validateOriginAgainstProject(tc.origin, &domain.Project{PreviewOrigins: tc.allowed})
+			err := validateOriginAgainstProject(tc.origin, &domain.Project{Origins: tc.allowed})
 
 			if !tc.wantErr {
 				require.NoError(t, err)

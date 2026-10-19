@@ -87,10 +87,6 @@
   background: var(--zl-accent);
   color: var(--zl-accent-foreground);
 }
-.zr-alert__close:focus-visible {
-  outline: var(--zl-focus-width) solid var(--zl-ring);
-  outline-offset: var(--zl-focus-offset);
-}
 
 /* An error can carry more than one sentence: a provider's own words
    (`error_description`) and a link to its explanation (`error_uri`). They are

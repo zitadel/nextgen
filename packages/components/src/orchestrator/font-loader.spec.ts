@@ -18,7 +18,9 @@ function links(id: string): HTMLLinkElement[] {
 }
 
 afterEach(() => {
-  [...links(TENANT_LINK_ID), ...links(DEFAULT_LINK_ID)].forEach((el) => el.remove());
+  [...links(TENANT_LINK_ID), ...links(DEFAULT_LINK_ID)].forEach((el) => {
+    el.remove();
+  });
   document.body.innerHTML = "";
 });
 
@@ -134,7 +136,9 @@ describe("shared link ownership across surfaces", () => {
     const removed = makeShadowRoot();
     applyDefaultFont(removed);
     removed.host.remove();
-    links(DEFAULT_LINK_ID).forEach((el) => el.remove());
+    links(DEFAULT_LINK_ID).forEach((el) => {
+      el.remove();
+    });
 
     // The stale registration must not resurrect the link on an unrelated
     // surface's withdrawal…

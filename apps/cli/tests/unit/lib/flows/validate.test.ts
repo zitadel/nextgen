@@ -22,10 +22,12 @@ describe("validateFlows", () => {
       caught = error;
     }
     expect(caught).toBeInstanceOf(ZitadelError);
-    const issues = (caught as ZitadelError).details?.issues as Array<{ index: number }>;
+    const issues = ((caught as ZitadelError).details as { issues?: unknown })?.issues as Array<{
+      index: number;
+    }>;
     expect(issues).toHaveLength(2);
-    expect(issues[0].index).toBe(0);
-    expect(issues[1].index).toBe(1);
+    expect(issues[0]!.index).toBe(0);
+    expect(issues[1]!.index).toBe(1);
   });
 
   it("returns an empty array for an empty input", () => {

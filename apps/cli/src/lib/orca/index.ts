@@ -2,6 +2,7 @@ import { access, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs
 import { basename, dirname, join } from "node:path";
 
 import { ZitadelError } from "../errors";
+import { LOCAL_RUNTIME_DIR } from "../local-server/runtime";
 import { detectors } from "./detectors";
 import type { Detector, FrameworkFacts } from "./detectors/types";
 import { patchers } from "./patchers";
@@ -35,16 +36,25 @@ type ScaffoldStash = Readonly<{
  * internal to that patcher. Registries are injected so tests can supply fakes.
  */
 export class Orca {
+  private readonly detectors: ReadonlyArray<Detector>;
+  private readonly scaffolders: ReadonlyArray<Scaffolder>;
+  private readonly patchers: ReadonlyArray<Patcher>;
+
   constructor(
-    private readonly detectors: ReadonlyArray<Detector>,
-    private readonly scaffolders: ReadonlyArray<Scaffolder>,
-    private readonly patchers: ReadonlyArray<Patcher>,
-  ) {}
+    detectors: ReadonlyArray<Detector>,
+    scaffolders: ReadonlyArray<Scaffolder>,
+    patchers: ReadonlyArray<Patcher>,
+  ) {
+    this.detectors = detectors;
+    this.scaffolders = scaffolders;
+    this.patchers = patchers;
+  }
 
   /**
    * Detects the framework in `cwd` and extracts its {@link FrameworkFacts},
    * honouring an explicit `requested` framework. Throws
-   * `E_FRAMEWORK_NOT_DETECTED` when nothing matches; a detector's
+   * `E_FRAMEWORK_NOT_DETECTED` when nothing matches, and `E_CONFLICT` when
+   * `cwd` holds an app of a framework other than `requested`; a detector's
    * `E_UNSUPPORTED_PROJECT_SHAPE` (recognised but unsupported) propagates.
    */
   async detect(cwd: string, requested?: string): Promise<FrameworkFacts> {
@@ -60,6 +70,20 @@ export class Orca {
       const facts = await detector.detect(cwd);
       if (facts) {
         return facts;
+      }
+    }
+    if (requested) {
+      // An app the requested framework's detector does not recognise is still
+      // an app. Reported as not detected, it would read as a directory to
+      // scaffold into, where `--force` creates a new app over this one.
+      for (const detector of this.detectors) {
+        if (detector.framework === requested) {
+          continue;
+        }
+        const facts = await detector.detect(cwd);
+        if (facts) {
+          throw this.frameworkMismatch(requested, facts.id);
+        }
       }
     }
     throw new ZitadelError(
@@ -112,10 +136,11 @@ export class Orca {
       });
     }
     assertNpmSafeScaffoldDirectoryName(cwd);
-    // The underlying scaffolders require an empty directory. When --force lets us
-    // scaffold into a non-empty one, move the existing entries aside, scaffold,
-    // then restore anything the scaffold did not create itself.
-    const stash = target.scaffoldable ? undefined : await stashScaffoldDir(cwd, target.entries);
+    // The underlying scaffolders require an empty directory. When it holds the
+    // local runtime `start` left, or --force lets us scaffold into a non-empty
+    // one, move the existing entries aside, scaffold, then restore anything the
+    // scaffold did not create itself.
+    const stash = await stashScaffoldDir(cwd, target.entries);
     let scaffolded = false;
     try {
       await this.scaffolderFor(framework).scaffold(cwd, framework);
@@ -167,6 +192,23 @@ export class Orca {
   private frameworkIds(): ReadonlyArray<string> {
     return this.detectors.map((detector) => detector.framework);
   }
+
+  /** `cwd` holds a `detected` app, and setup was asked to set up a `requested` one. */
+  private frameworkMismatch(requested: string, detected: string): ZitadelError {
+    const name = (id: string) =>
+      this.availableFrameworks().find((framework) => framework.id === id)?.displayName ?? id;
+    return new ZitadelError(
+      "E_CONFLICT",
+      `Setup detects ${name(detected)} here, not ${name(requested)}`,
+      {
+        hint:
+          `Rerun setup without --framework, or with --framework ${detected}, to set up this ` +
+          `app, or point --cwd at the ${name(requested)} app you meant. Setup never scaffolds ` +
+          "a new app over one it detects, --force or not.",
+        details: { requested, detected },
+      },
+    );
+  }
 }
 
 function assertNpmSafeScaffoldDirectoryName(cwd: string): void {
@@ -180,8 +222,7 @@ function assertNpmSafeScaffoldDirectoryName(cwd: string): void {
     "E_VALIDATION",
     `Fresh app directory name "${name}" is not npm-package-safe`,
     {
-      hint:
-        "Rename the directory to a lowercase npm-package-safe name, for example `my-zitadel-app`, then rerun setup.",
+      hint: "Rename the directory to a lowercase npm-package-safe name, for example `my-zitadel-app`, then rerun setup.",
       details: { cwd, name, validation_errors: errors },
     },
   );
@@ -207,7 +248,9 @@ function npmPackageNameErrors(name: string): string[] {
     errors.push("name cannot start with a period or underscore");
   }
   if (!/^[a-z0-9][a-z0-9._~-]*$/.test(name)) {
-    errors.push("name may only contain lowercase letters, numbers, dots, underscores, tildes, and hyphens");
+    errors.push(
+      "name may only contain lowercase letters, numbers, dots, underscores, tildes, and hyphens",
+    );
   }
   if (name === "node_modules" || name === "favicon.ico") {
     errors.push(`name "${name}" is reserved`);
@@ -222,19 +265,51 @@ export function createOrca(): Orca {
 
 export async function inspectScaffoldTarget(cwd: string): Promise<ScaffoldTarget> {
   // A fresh scaffold needs an empty directory. We deliberately keep no allowlist
-  // of "harmless" entries (`.gitignore`, `.zitadel`, `.claude`, …): that list is
-  // a maintenance treadmill, and each tool invents new metadata. Anything present
-  // means not-fresh, and `--force` is the single, explicit override.
-  const entries = await readdir(cwd);
-  const names = [...entries].sort();
-  if (names.length === 0) {
+  // of other tools' "harmless" entries (`.claude`, editor settings, …): that list
+  // is a maintenance treadmill, and each tool invents new metadata. Anything
+  // present means not-fresh, and `--force` is the single, explicit override.
+  //
+  // The one exception is what `zitadel start` itself leaves, so that `start`
+  // and then `setup` work in a new directory: the local runtime, and the
+  // `.gitignore` line that keeps it out of git. `scaffold()` moves both aside
+  // while the generator runs and merges the `.gitignore` back.
+  const names = [...(await readdir(cwd))].sort();
+  const others: string[] = [];
+  for (const name of names) {
+    if (!(await isLocalRuntimeEntry(cwd, name))) {
+      others.push(name);
+    }
+  }
+  if (others.length === 0) {
     return { scaffoldable: true, entries: names };
   }
   return {
     scaffoldable: false,
-    reason: `Directory is not empty (contains ${names.join(", ")}).`,
+    reason: `Directory is not empty (contains ${others.join(", ")}).`,
     entries: names,
   };
+}
+
+/**
+ * Whether `name` in `cwd` is one of the entries `zitadel start` writes
+ * (`ensureLocalState`): a `.zitadel` that holds nothing but the local runtime,
+ * or a `.gitignore` that holds nothing but the line ignoring it. Either may be
+ * empty once `reset` has removed the runtime.
+ */
+async function isLocalRuntimeEntry(cwd: string, name: string): Promise<boolean> {
+  try {
+    if (name === dirname(LOCAL_RUNTIME_DIR)) {
+      const inside = await readdir(join(cwd, name));
+      return inside.every((entry) => entry === basename(LOCAL_RUNTIME_DIR));
+    }
+    if (name === ".gitignore") {
+      const lines = (await readFile(join(cwd, name), "utf8")).split(/\r?\n/);
+      return lines.every((line) => ["", `${LOCAL_RUNTIME_DIR}/`].includes(line.trim()));
+    }
+  } catch {
+    // Not a directory, or not a readable file: not what `start` wrote.
+  }
+  return false;
 }
 
 async function stashScaffoldDir(
@@ -250,8 +325,20 @@ async function stashScaffoldDir(
     `.${basename(cwd)}.fresh-scaffold-stash-${String(process.pid)}-${String(Date.now())}`,
   );
   await mkdir(root, { mode: 0o700 });
-  for (const name of names) {
-    await rename(join(cwd, name), join(root, name));
+  const moved: string[] = [];
+  try {
+    for (const name of names) {
+      await rename(join(cwd, name), join(root, name));
+      moved.push(name);
+    }
+  } catch (error) {
+    // Put back what already moved, so a stash that fails halfway leaves the
+    // directory as it was rather than stranding entries in the stash.
+    for (const name of moved) {
+      await rename(join(root, name), join(cwd, name));
+    }
+    await rm(root, { recursive: true, force: true });
+    throw error;
   }
   return { root, names };
 }

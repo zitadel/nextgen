@@ -3,21 +3,17 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import {
-  normalizeFlowBody,
-  normalizeSchemaBody,
-  USER_PROPERTY_DEFAULTS,
-} from "./normalize";
+import { normalizeFlowBody, normalizeSchemaBody, USER_PROPERTY_DEFAULTS } from "./normalize";
 
 describe("normalizeFlowBody", () => {
   it("drops an empty audience in both wire shapes", () => {
     expect(normalizeFlowBody({ name: "login", audience: {} })).toEqual({ name: "login" });
-    expect(
-      normalizeFlowBody({ name: "login", audience: { team_ids: [], app_ids: [] } }),
-    ).toEqual({ name: "login" });
-    expect(
-      normalizeFlowBody({ name: "login", audience: { team_ids: null } }),
-    ).toEqual({ name: "login" });
+    expect(normalizeFlowBody({ name: "login", audience: { team_ids: [], app_ids: [] } })).toEqual({
+      name: "login",
+    });
+    expect(normalizeFlowBody({ name: "login", audience: { team_ids: null } })).toEqual({
+      name: "login",
+    });
   });
 
   it("keeps a non-empty audience verbatim", () => {
@@ -43,9 +39,9 @@ describe("normalizeFlowBody", () => {
   });
 
   it("strips the local-only $schema editor pointer", () => {
-    expect(
-      normalizeFlowBody({ $schema: "../meta/flow-definition.json", name: "login" }),
-    ).toEqual({ name: "login" });
+    expect(normalizeFlowBody({ $schema: "../meta/flow-definition.json", name: "login" })).toEqual({
+      name: "login",
+    });
   });
 
   it("does not mutate its input and is idempotent", () => {

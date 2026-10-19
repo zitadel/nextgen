@@ -69,15 +69,18 @@ describe("<zl-sso-providers> branding isolation (chromium)", () => {
     return { background: inner.backgroundColor, border: inner.borderTopColor, label: label.color };
   }
 
-  it.each(["light", "dark"] as const)("keeps the %s provider button off the tenant palette", async (theme) => {
-    const shipped = await paint(theme, undefined);
-    const branded = await paint(theme, LOUD_BRANDING);
+  it.each(["light", "dark"] as const)(
+    "keeps the %s provider button off the tenant palette",
+    async (theme) => {
+      const shipped = await paint(theme, undefined);
+      const branded = await paint(theme, LOUD_BRANDING);
 
-    expect(branded).toEqual(shipped);
-    for (const colour of Object.values(branded)) {
-      expect(colour).not.toBe("rgb(255, 0, 0)");
-    }
-  });
+      expect(branded).toEqual(shipped);
+      for (const colour of Object.values(branded)) {
+        expect(colour).not.toBe("rgb(255, 0, 0)");
+      }
+    },
+  );
 
   it("still lets the branding reach the rest of the surface", async () => {
     // Guards the test itself: if the branding sheet stopped applying, the

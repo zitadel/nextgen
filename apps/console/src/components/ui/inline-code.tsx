@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
 /**
  * `Typography / InlineCode` — shadcn's inline-code treatment.
@@ -20,5 +20,5 @@ export function InlineCode({ className, ...props }: React.ComponentProps<"code">
       )}
       {...props}
     />
-  )
+  );
 }

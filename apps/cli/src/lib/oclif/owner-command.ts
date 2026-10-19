@@ -8,16 +8,9 @@ import { BaseCommand } from "./base";
 import type { GlobalOptions } from "./types";
 
 /**
- * A command that addresses one owner of a project's variables. The platform has
- * two kinds — an environment, or the project level — and they are separate
- * rather than a ladder: nothing one holds reaches the other (ADR 062 §4).
- *
- * Only the project level can be addressed from the CLI today. The platform's
- * environments are still unsettled (#1258 may rename or drop them), and a
- * half-meant `--environment` is worse than none: a value written on a name the
- * platform later spells differently is a value nothing will ever read. The
- * owner is therefore named rather than assumed — `--project-level` is required
- * — so that when `--environment` returns, every command already written keeps
+ * A command that addresses a project's variables. The project is the only
+ * owner, and it is named rather than assumed — `--project-level` is required —
+ * so that if variables gain another owner, every command already written keeps
  * meaning exactly what it means now.
  */
 export abstract class OwnerCommand extends BaseCommand {
@@ -45,7 +38,7 @@ export abstract class OwnerCommand extends BaseCommand {
   ): Promise<GlobalOptions> {
     if (flags["project-level"] !== true) {
       throw new ZitadelError("E_VALIDATION", "Name the owner: --project-level", {
-        hint: "The project level is the only owner the CLI can address today; --environment returns when the platform's environments settle.",
+        hint: "The project level is the only owner the CLI can address.",
       });
     }
     return super.toMeta(flags, options);

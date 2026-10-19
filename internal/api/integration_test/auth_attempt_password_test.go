@@ -81,6 +81,7 @@ func TestAuthAttemptIdentifier_AmbiguousAcrossSchemasIsRejected(t *testing.T) {
 		"metaSchema": "https://test.example.schemas.com/schemas/user-schema.json",
 		"$id": "https://attempt-admin.example.com/schemas/admin-user.json",
 		"kind": "user-schema",
+		"objectType": "attempt-admin-user",
 		"type": "object",
 		"x-identifier": "username",
 		"x-auth-methods": {"password": {"enabled": true}},

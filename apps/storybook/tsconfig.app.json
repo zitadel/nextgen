@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // No `rootDir`: nothing is emitted (Storybook bundles with Vite), and
+    // `.storybook/main.ts` imports `packages/components/vite-liquid-plugin.ts`
+    // by source path, which lies outside any root inside this app.
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx"
+  },
+  // api + api-mock resolve to their source via the `@zitadel/source` condition
+  // (like every other workspace dep here), so no project references are needed.
+  "include": [".storybook/**/*.ts", "src/**/*.ts", "src/**/*.tsx"],
+  "exclude": [
+    "src/**/*.spec.ts",
+    "src/**/*.spec.tsx",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/__tests__/**",
+    "src/test-setup.ts"
+  ]
+}

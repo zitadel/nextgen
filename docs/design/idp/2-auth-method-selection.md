@@ -4,7 +4,7 @@
 > **Area:** 2 of 4 (see [`README.md`](README.md))
 
 This document defines how a user schema declares which external identity
-providers (like Google or GitHub) its users are permitted to sign in with, and
+providers (like Google or a company's own OIDC provider) its users are permitted to sign in with, and
 how that configuration is wired into the login flow.
 
 ## The Three-Way Linkage
@@ -89,7 +89,7 @@ A hand-edited field is never overwritten; the journey reports it instead
 "x-auth-methods": {
   "passkey":  { "enabled": true },
   "password": { "enabled": true },
-  "sso":      { "enabled": true, "providers": ["github"] }
+  "sso":      { "enabled": true, "providers": ["corp_idp"] }
 }
 ```
 
@@ -197,7 +197,7 @@ Same split as `user-property.json` / `property-name.json`.
 The `providers` array is required and non-empty when SSO is enabled.
 
 - **Avoiding the "Absent-Means-All" Footgun:** If an omitted array defaulted to
-  "allow all," adding a new GitHub connection for one specific schema would
+  "allow all," adding a new company SSO connection for one specific schema would
   silently activate it across *every* schema where `sso.enabled: true`.
   This directly violates the rule that simply creating a provider connection
   does not make it universally available.
@@ -265,7 +265,7 @@ it (emitting an error like
 | :--- | :--- |
 | **Pair-level `claim_mapping` intersection:** warn when an offered provider's `claim_mapping` shares zero properties with the pinned schema (the [Validation Rules](#validation-rules) row). | `validate.ts` and the Go server mirror, at flow create and update |
 | **Pair-level `verified_claims` intersection:** warn when a provider's `verified_claims` keys share no properties with the pinned schema. | `validate.ts` and the Go server mirror, at flow create and update |
-| **Register-step topology:** whether registration shares the entry steps' `sso_providers` or carries its own step. Both shapes pass the validator and run, so the choice is scaffolding, not validation. | [`4-cli-provider-setup.md`](4-cli-provider-setup.md#flow-architecture-decisions) (settled: `sso_providers` on both shared entry steps and the conflict step) |
+| **Register-step topology:** whether registration shares the entry steps' `sso_providers` or carries its own step. Both shapes pass the validator and run, so the choice is scaffolding, not validation. | [`4-cli-provider-setup.md`](4-cli-provider-setup.md#flow-architecture-decisions) (settled: `sso_providers` on both shared entry steps, the password step and the conflict step) |
 
 The two pairing rows live here because the flow definition is the only document
 that references both sides: its `user_schema` pins the schema revision and its
@@ -284,7 +284,7 @@ the Go mirror of the new error-grade rules is tracked in area 1's
 - [ADR 020](../../adrs/020-credentials-out-of-user-schema.md) (`x-auth-methods`
   as policy input)
 - `api/openapi/endpoints/schemas/auth-methods.json`, `auth-method.json`
-- `packages/config/src/validate.ts` (`validateFlowDefinition`,
+- `packages/config/src/validation/` (`validateFlowDefinition`,
   `RESERVED_OUTCOMES`, `PURPOSE_FLIP_TARGETS`; internal `authMethodEnabled`,
   `resolveFieldChallenge`, `AUTH_METHOD_PREFIX`)
 - `packages/config/defaults/default-login.json` (step shapes)

@@ -70,6 +70,19 @@ func platformSessionCookie(t *testing.T, userID string) *http.Cookie {
 	return sessionCookieIn(t, harness.EnsurePlatformProject(t), userID)
 }
 
+// ownSessionUser signs a new user into a home project of the test's own,
+// instead of the shared platform project, so the user, its team, the session
+// and its token go when the project is deleted at the end of the test
+// (internal/AGENTS.md). A session reaches other projects through grants alone,
+// so which project it is homed in does not change what these tests pin.
+func ownSessionUser(t *testing.T) (home *domain.Project, userID string, cookie *http.Cookie) {
+	t.Helper()
+	home, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	userID, _ = harness.CreateUserOwnedByTeam(t, home.ID)
+	return home, userID, sessionCookieIn(t, home, userID)
+}
+
 // sessionCookieIn signs the user into project through the harness's
 // CreateActiveSession and returns the session's cookie.
 func sessionCookieIn(t *testing.T, project *domain.Project, userID string) *http.Cookie {

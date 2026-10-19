@@ -5,7 +5,7 @@
  * the atoms a step needs. The authoring-side validation of the same files
  * lives in `packages/config/src/template.test.ts`.
  *
- * The retired page-layout designs (`split`, `split-right`, `hero`, #1039)
+ * The retired page-layout designs (`split`, `split-right`, `hero`)
  * are no longer ejectable, but revisions already published from them keep
  * rendering on the `layout-chrome.css` split/hero chrome. Their last shipped
  * templates live in `__fixtures__/legacy-designs/` so that promise stays
@@ -18,9 +18,11 @@ import { describe, expect, it } from "vitest";
 import heroTemplate from "./__fixtures__/legacy-designs/hero.liquid";
 import splitRightTemplate from "./__fixtures__/legacy-designs/split-right.liquid";
 import splitTemplate from "./__fixtures__/legacy-designs/split.liquid";
-import { createLiquidEngine } from "./liquid.js";
+import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
+import { en } from "./locales/en.js";
 import { mandatoryGatesMarkerComment, patchMandatoryGates } from "./mandatory-gates.js";
 import { createSanitiser } from "./sanitiser.js";
+import { TEMPLATE_NAMES } from "./template-names.js";
 
 const locale: Record<string, string> = {
   "identifier.title": "Sign in",
@@ -144,6 +146,24 @@ describe("branding design catalog", () => {
     });
   }
 
+  // A verified unique provider claim renders read-only, so the user cannot
+  // type a value the server refuses on submit.
+  it.each([...BRANDING_DESIGNS])("%s renders a read_only field read-only", (design) => {
+    const engine = createLiquidEngine({ locale });
+    const rendered = engine.parseAndRenderSync(templateFor(design), {
+      ...context,
+      fields: [
+        { ...step.fields[0], value: "alice@example.com", read_only: true },
+        { name: "given_name", type: "text", text_key: "identifier.field.email" },
+      ],
+    });
+    const fields = createSanitiser()(rendered).match(/<zl-field\b[^>]*>/g) ?? [];
+
+    expect(fields).toHaveLength(2);
+    expect(fields.find((f) => f.includes('name="email"'))).toMatch(/\sreadonly[\s>=]/);
+    expect(fields.find((f) => f.includes('name="given_name"'))).not.toMatch(/\sreadonly[\s>=]/);
+  });
+
   describe.each([...BRANDING_DESIGNS])("%s with identity providers", (design) => {
     /** The step as the engine renders it once a connection is enabled. */
     const withProviders = {
@@ -209,12 +229,47 @@ describe("branding design catalog", () => {
     });
 
     it("renders nothing for a step with no providers", () => {
-      // The shipped presets carry none until `sso enable` adds one, so this
-      // is the common case and must cost the markup nothing.
+      // The shipped presets carry none until `auth-method sso enable` adds one,
+      // so this is the common case and must cost the markup nothing.
       expect(render(context)).not.toContain("zl-sso-providers");
       expect(render({ ...context, sso_providers: [] })).not.toContain("zl-sso-providers");
     });
   });
+
+  /**
+   * A failed provider sign-in comes back as a plain step error key the engine's
+   * callback stored on the originating step (`flow_sso_callback.go`), and the
+   * step shows it like any other form-level error: the key's `.title` and
+   * `.body`, through the same localisation the orchestrator applies.
+   */
+  describe.each([...BRANDING_DESIGNS, "default.liquid"])(
+    "%s after a failed provider return",
+    (design) => {
+      function render(stepError: string): string {
+        const engine = createLiquidEngine({ locale: en });
+        const errors = localiseFlowErrorKeys(stepError, {
+          locale: en,
+          stepName: step.name ?? "",
+          fields: (step.fields ?? []).map((field) => field.name),
+        });
+        const ctx = { ...context, errors };
+        const rendered =
+          design === "default.liquid"
+            ? engine.renderFileSync(TEMPLATE_NAMES.default, ctx)
+            : engine.parseAndRenderSync(getDefaultBrandingConfig(design).template, ctx);
+        return createSanitiser()(rendered);
+      }
+
+      it.each(["error.sso_cancelled", "error.sso_failed"])("renders %s's title and body", (key) => {
+        const html = render(key);
+
+        expect(html).toContain(en[`${key}.title`]);
+        expect(html).toContain(en[`${key}.body`]);
+        // The key itself must not leak through as copy.
+        expect(html).not.toContain(key);
+      });
+    },
+  );
 
   it("legacy split revisions keep the brand pane and mirror class", () => {
     const split = renderDesign("split");

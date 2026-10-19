@@ -1,35 +1,32 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { scopedPath } from "@/lib/project-scope.fixture";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { scopedPath } from "@/test/project-scope.fixture";
+import { server } from "@/test/msw";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
 vi.mock("@/auth/session", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/auth/session")>();
-  const { makeTestSession } = await import("@/auth/session.fixture");
+  const { makeTestSession } = await import("@/test/session.fixture");
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
-
-vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
 
 const PROJECT_ID = "proj_1";
 const PROJECT_URL = `http://localhost/api/projects/${PROJECT_ID}`;
 // The page also reads the project's grants for its admins section (#1238); an
-// empty list, as a base handler that survives `resetHandlers`, keeps these
-// tests about the project itself.
-const server = setupServer(
-  http.post("http://localhost/api/grants/query", () => HttpResponse.json({ grants: [] })),
+// empty list keeps these tests about the project itself. The person can act on
+// the project, so the context switcher names it from their list rather than by
+// its id while its own read is in flight.
+beforeEach(() =>
+  server.use(
+    http.post("http://localhost/api/grants/query", () => HttpResponse.json({ grants: [] })),
+    http.get("http://localhost/api/users/me/projects", () =>
+      HttpResponse.json({ projects: [{ id: PROJECT_ID, name: "River" }] }),
+    ),
+  ),
 );
-
-beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
-afterEach(() => server.resetHandlers());
-afterAll(() => {
-  server.close();
-  vi.unstubAllEnvs();
-});
 
 function project(overrides: Record<string, unknown> = {}) {
   return {
@@ -61,8 +58,8 @@ describe("project detail", () => {
     const router = await renderDetail(`/projects/${PROJECT_ID}`);
 
     expect(await screen.findByRole("heading", { name: "River" })).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe("/project");
-    expect(router.state.location.search).toMatchObject({ project: PROJECT_ID });
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/project"));
+    expect(router.state.resolvedLocation?.search).toMatchObject({ project: PROJECT_ID });
   });
 
   it("renders the name, the id and the created date", async () => {

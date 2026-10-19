@@ -69,8 +69,7 @@ const DENSITY_MAP: Record<NonNullable<BrandingShape["density"]>, Record<string, 
 // the design-tokens variable names that atoms actually consume. The keys are
 // intentionally semantic — tenants do NOT see internal token names; they say
 // "background", "surface", "primary", "text". The orchestrator translates here,
-// which is what lets the internal vocabulary move (as it just did, off the
-// legacy `--zl-color-*` names onto the shadcn roles) without touching a single
+// which is what lets the internal vocabulary move without touching a single
 // tenant's `branding.json`.
 //
 // A key maps to more than one variable where the design system splits a role
@@ -170,7 +169,10 @@ function collectDeclarations(branding: Branding | undefined): Record<string, str
 function mapPalette(palette: BrandingPalette | undefined): Record<string, string> {
   if (!palette) return {};
   const out: Record<string, string> = {};
-  for (const [key, varNames] of Object.entries(PALETTE_MAP) as [keyof BrandingPalette, string[]][]) {
+  for (const [key, varNames] of Object.entries(PALETTE_MAP) as [
+    keyof BrandingPalette,
+    string[],
+  ][]) {
     const value = palette[key];
     if (typeof value === "string" && value.length > 0) {
       for (const varName of varNames) {

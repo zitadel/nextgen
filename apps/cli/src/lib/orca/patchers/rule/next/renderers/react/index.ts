@@ -38,7 +38,7 @@ export const reactRenderer: RendererSpec = {
   displayName: "React (Next.js App Router)",
   status: "available",
   frameworks: ["next"],
-  dependency: { name: "@zitadel/sdk-next", version: "latest" },
+  dependency: { name: "@zitadel/sdk-next" },
   templates: {
     authPage(mode, context) {
       const componentName = mode === "login" ? "LoginPage" : "RegisterPage";

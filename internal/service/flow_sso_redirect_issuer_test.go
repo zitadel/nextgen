@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -61,7 +62,7 @@ var ssoIssueInput = domain.FlowIssueSSORedirectInput{
 	AttemptID:    "attempt-1",
 	ProviderSlug: "google",
 	FlowSSOReturn: domain.FlowSSOReturn{
-		RedirectURI:  "https://auth.example.com/__nextgen/idp/callback",
+		RedirectURI:  "https://auth.example.com/__nextgen/idp/google/callback",
 		ReturnTarget: "https://auth.example.com/login?flow=flow-1",
 	},
 }
@@ -144,7 +145,7 @@ func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 	t.Run("a client_id reference is filled from the project variable", func(t *testing.T) {
 		t.Parallel()
 		variables := servicemocks.NewMockVariableService(gomock.NewController(t))
-		variables.EXPECT().GetVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, "GOOGLE_CLIENT_ID").
+		variables.EXPECT().GetVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, new(domain.DeploymentOriginKindPrimary), "GOOGLE_CLIENT_ID").
 			Return([]*domain.Variable{{Name: "GOOGLE_CLIENT_ID", Value: "client-from-variable"}}, nil)
 		attempts := &fakeAuthAttempts{issueSSOState: &domain.SSOState{State: "state-1", BindingNonce: "bind-1", OIDCNonce: "nonce-1"}}
 
@@ -159,7 +160,7 @@ func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 	t.Run("a client_id reference with no variable is unavailable and issues no record", func(t *testing.T) {
 		t.Parallel()
 		variables := servicemocks.NewMockVariableService(gomock.NewController(t))
-		variables.EXPECT().GetVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, "GOOGLE_CLIENT_ID").Return(nil, nil)
+		variables.EXPECT().GetVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, new(domain.DeploymentOriginKindPrimary), "GOOGLE_CLIENT_ID").Return(nil, nil)
 		attempts := &fakeAuthAttempts{}
 
 		_, err := ssoIssuer(t, ssoClientIDReferenceDocument, attempts, nil, variables, nil).Issue(t.Context(), ssoIssueInput)
@@ -170,7 +171,7 @@ func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 	t.Run("a client_id reference to a secret is unavailable and issues no record", func(t *testing.T) {
 		t.Parallel()
 		variables := servicemocks.NewMockVariableService(gomock.NewController(t))
-		variables.EXPECT().GetVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, "GOOGLE_CLIENT_ID").
+		variables.EXPECT().GetVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, new(domain.DeploymentOriginKindPrimary), "GOOGLE_CLIENT_ID").
 			Return([]*domain.Variable{{Name: "GOOGLE_CLIENT_ID", Value: "ciphertext", IsSecret: true}}, nil)
 		attempts := &fakeAuthAttempts{}
 
@@ -239,6 +240,17 @@ func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 		require.ErrorIs(t, err, domain.ErrFlowSSOUnavailable(nil))
 		require.ErrorIs(t, err, context.Canceled)
 		assert.Empty(t, logs.String())
+	})
+
+	t.Run("a request past its deadline is unavailable with a provider warning", func(t *testing.T) {
+		t.Parallel()
+		var logs bytes.Buffer
+		ctx, cancel := context.WithDeadline(zlog.WithLoggingContext(t.Context(), slog.New(slog.NewTextHandler(&logs, nil))), time.Now().Add(-time.Second))
+		defer cancel()
+
+		_, err := ssoIssuer(t, []byte(ssoDiscoveryDocument), &fakeAuthAttempts{}, nil, nil, nil).Issue(ctx, ssoIssueInput)
+		require.ErrorIs(t, err, domain.ErrFlowSSOUnavailable(nil))
+		assert.Contains(t, logs.String(), "sso provider unavailable")
 	})
 
 	t.Run("attempt error passes through", func(t *testing.T) {

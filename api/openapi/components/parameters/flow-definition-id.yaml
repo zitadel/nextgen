@@ -5,4 +5,4 @@ description: |
   The id returned by the POST /flow_definitions endpoint.
 schema:
   type: string
-  example: fd_123abc456def
+example: flowdef_01KWH8Q5NZT7F0N9WD3P2E4YM6

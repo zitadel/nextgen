@@ -90,8 +90,8 @@ body {
   }
 }
 
-/* Tailwind v4 Preflight no longer forces `cursor: pointer` on interactive
-   controls; restore it for genuinely interactive elements. */
+/* Tailwind v4 Preflight sets no `cursor: pointer`; set it for genuinely
+   interactive elements. */
 button:not(:disabled):not([aria-disabled="true"]),
 [role="button"]:not([aria-disabled="true"]),
 [role="radio"]:not([aria-disabled="true"]),
@@ -105,7 +105,7 @@ a[href] {
 
    Clipping the fill to the glyphs removes it while leaving the text painted, so
    the field keeps whatever surface its own utilities gave it — important here
-   because console inputs are transparent or `input/30` over a sheet or card, so
+   because console inputs sit on `background` over a sheet or card, so
    overpainting an opaque colour (the usual `box-shadow` inset trick) would be
    visibly wrong on anything that is not the page background.
    `-webkit-text-fill-color` is needed because the autofill style overrides

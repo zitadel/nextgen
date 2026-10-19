@@ -1,32 +1,23 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { scopedPath } from "@/lib/project-scope.fixture";
+import { describe, expect, it, vi } from "vitest";
+import { TEST_PROJECT_ID, scopedPath } from "@/test/project-scope.fixture";
+import { server } from "@/test/msw";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
 vi.mock("@/auth/session", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/auth/session")>();
-  const { makeTestSession } = await import("@/auth/session.fixture");
+  const { makeTestSession } = await import("@/test/session.fixture");
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
-
-vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
 
 const USERS_URL = "http://localhost/api/users";
 const USERS_QUERY_URL = `${USERS_URL}/query`;
 const SCHEMAS_URL = "http://localhost/api/schemas";
+const IDPS_QUERY_URL = "http://localhost/api/idps/query";
 const USER_ID = "user_1";
-const server = setupServer();
-
-beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
-afterEach(() => server.resetHandlers());
-afterAll(() => {
-  server.close();
-  vi.unstubAllEnvs();
-});
 
 const BUSINESS = {
   title: "Business",
@@ -46,14 +37,22 @@ function stub({
     identifier: "maya@acme.com",
     identifier_property: "email",
     attributes: { email: "maya@acme.com", companyName: "Acme" },
-    metadata: { status: "active", created_at: "2026-07-12T09:00:00Z", updated_at: "2026-07-12T09:00:00Z" },
+    metadata: {
+      status: "active",
+      created_at: "2026-07-12T09:00:00Z",
+      updated_at: "2026-07-12T09:00:00Z",
+    },
   },
   passkeys = [{ id: "pk_1", name: "MacBook", created_at: "2026-07-01T00:00:00Z" }],
   passkeysStatus = 200,
+  identityLinks = [],
+  identityLinksStatus = 200,
 }: {
   user?: Record<string, unknown>;
   passkeys?: unknown[];
   passkeysStatus?: number;
+  identityLinks?: unknown[];
+  identityLinksStatus?: number;
 } = {}) {
   server.use(
     http.get(`${USERS_URL}/${USER_ID}`, () => HttpResponse.json(user)),
@@ -68,6 +67,11 @@ function stub({
       passkeysStatus === 200
         ? HttpResponse.json({ passkeys })
         : new HttpResponse(null, { status: passkeysStatus }),
+    ),
+    http.get(`${USERS_URL}/${USER_ID}/identity_links`, () =>
+      identityLinksStatus === 200
+        ? HttpResponse.json({ identity_links: identityLinks })
+        : new HttpResponse(null, { status: identityLinksStatus }),
     ),
   );
 }
@@ -102,6 +106,9 @@ describe("user detail", () => {
     stub();
     const projects: (string | null)[] = [];
     server.use(
+      http.get("*/api/projects/proj_other", () =>
+        HttpResponse.json({ id: "proj_other", name: "Other project" }),
+      ),
       http.get(`${SCHEMAS_URL}/sch_business`, ({ request }) => {
         projects.push(new URL(request.url).searchParams.get("project_id"));
         return HttpResponse.json({ id: "sch_business", schema: BUSINESS });
@@ -142,6 +149,9 @@ describe("user detail", () => {
         }),
       ),
       http.get(`${USERS_URL}/${USER_ID}/passkeys`, () => HttpResponse.json({ passkeys: [] })),
+      http.get(`${USERS_URL}/${USER_ID}/identity_links`, () =>
+        HttpResponse.json({ identity_links: [] }),
+      ),
     );
     await renderDetail();
 
@@ -244,8 +254,76 @@ describe("user detail", () => {
     await renderDetail();
 
     await userEvent.click(await screen.findByRole("tab", { name: "Authentication" }));
-    expect(within(screen.getByRole("tabpanel")).getByText("Could not be loaded")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("tabpanel")).getByText("Could not be loaded"),
+    ).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "maya@acme.com" })).toBeInTheDocument();
+  });
+
+  it("lists the linked identity providers by name on the Authentication tab", async () => {
+    stub({
+      identityLinks: [
+        { id: "idplink_1", connection_id: "idp_google", created_at: "2026-07-03T00:00:00Z" },
+      ],
+    });
+    const projects: (string | null)[] = [];
+    server.use(
+      http.post(IDPS_QUERY_URL, ({ request }) => {
+        projects.push(new URL(request.url).searchParams.get("project_id"));
+        return HttpResponse.json({
+          idps: [{ id: "idp_google", slug: "google", definition: { display_name: "Google" } }],
+        });
+      }),
+    );
+    await renderDetail();
+
+    await userEvent.click(await screen.findByRole("tab", { name: "Authentication" }));
+    const panel = within(screen.getByRole("tabpanel"));
+    // Passkeys stay their own row; the provider is not folded into them.
+    expect(panel.getByText("Passkey")).toBeInTheDocument();
+    expect(panel.getByRole("link", { name: "Google" })).toBeInTheDocument();
+    expect(panel.getByText(/^Linked .*2026/)).toBeInTheDocument();
+    expect(projects).toEqual([TEST_PROJECT_ID]);
+  });
+
+  it("names a linked connection by id when the connections cannot be read", async () => {
+    // `idp.read` is a separate grant: a refusal costs the name, not the row.
+    stub({
+      identityLinks: [
+        { id: "idplink_1", connection_id: "idp_google", created_at: "2026-07-03T00:00:00Z" },
+      ],
+    });
+    server.use(http.post(IDPS_QUERY_URL, () => new HttpResponse(null, { status: 403 })));
+    await renderDetail();
+
+    await userEvent.click(await screen.findByRole("tab", { name: "Authentication" }));
+    const panel = within(screen.getByRole("tabpanel"));
+    expect(panel.getByText("idp_google")).toBeInTheDocument();
+    expect(panel.queryByRole("link")).not.toBeInTheDocument();
+  });
+
+  it("says when no identity provider is linked, without reading the connections", async () => {
+    // No `/idps/query` handler: the unhandled request would fail the test.
+    stub();
+    await renderDetail();
+
+    await userEvent.click(await screen.findByRole("tab", { name: "Authentication" }));
+    expect(
+      within(screen.getByRole("tabpanel")).getByText(
+        "No identity provider is linked to this user.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("still renders the screen when the identity link list fails", async () => {
+    stub({ identityLinksStatus: 500 });
+    await renderDetail();
+
+    await userEvent.click(await screen.findByRole("tab", { name: "Authentication" }));
+    const panel = within(screen.getByRole("tabpanel"));
+    expect(panel.getByText("Could not be loaded")).toBeInTheDocument();
+    // The passkey row is unaffected.
+    expect(panel.getByText("1 registered")).toBeInTheDocument();
   });
 
   it("offers delete, and returns to the list once it succeeds", async () => {
@@ -270,8 +348,8 @@ describe("user detail", () => {
       within(screen.getByRole("alertdialog")).getByRole("button", { name: "Delete user" }),
     );
 
-    await vi.waitFor(() => expect(deleted).toBe(true));
+    await waitFor(() => expect(deleted).toBe(true));
     // The record the screen is about is gone, so staying on it would 404.
-    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/users"));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/users"));
   });
 });

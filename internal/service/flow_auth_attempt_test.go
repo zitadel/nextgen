@@ -32,6 +32,16 @@ type fakeAuthAttempts struct {
 	issueSSOStateIn  service.IssueSSOStateInput
 	issueSSOState    *domain.SSOState
 	issueSSOStateErr error
+	consumeState     string
+	consumeNonce     string
+	consumeCheck     *domain.SSOCallbackCheck
+	consumeErr       error
+	setResultCheck   *domain.SSOCallbackCheck
+	setResult        *domain.SSOCallbackResult
+	setResultEvent   domain.EventType
+	// setResultErrs answers SetSSOCallbackResult calls in order; a call past
+	// the end succeeds.
+	setResultErrs []error
 }
 
 func (f *fakeAuthAttempts) Create(_ context.Context, in service.CreateAuthAttemptInput) (*domain.AuthAttempt, error) {
@@ -62,6 +72,21 @@ func (f *fakeAuthAttempts) Handoff(_ context.Context, in service.HandoffInput) (
 func (f *fakeAuthAttempts) IssueSSOState(_ context.Context, in service.IssueSSOStateInput) (*domain.SSOState, error) {
 	f.issueSSOStateIn = in
 	return f.issueSSOState, f.issueSSOStateErr
+}
+
+func (f *fakeAuthAttempts) ConsumeSSOState(_ context.Context, _, state, bindingNonce string) (*domain.SSOCallbackCheck, error) {
+	f.consumeState, f.consumeNonce = state, bindingNonce
+	return f.consumeCheck, f.consumeErr
+}
+
+func (f *fakeAuthAttempts) SetSSOCallbackResult(_ context.Context, _ string, check *domain.SSOCallbackCheck, result *domain.SSOCallbackResult, eventType domain.EventType) error {
+	f.setResultCheck, f.setResult, f.setResultEvent = check, result, eventType
+	if len(f.setResultErrs) == 0 {
+		return nil
+	}
+	err := f.setResultErrs[0]
+	f.setResultErrs = f.setResultErrs[1:]
+	return err
 }
 
 func (f *fakeAuthAttempts) BeginPasskeyEnrollment(context.Context, service.BeginPasskeyEnrollmentInput) (*service.BeginPasskeyEnrollmentOutput, error) {

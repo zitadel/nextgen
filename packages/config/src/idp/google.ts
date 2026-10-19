@@ -1,8 +1,9 @@
 import { OidcProvider } from "./oidc-provider.js";
 import type { CallbackGuidance } from "./provider.js";
+import type { ConnectionSlug, DisplayName, Issuer, Scopes } from "./types.js";
 
 /**
- * Google, as `zitadel setup` and `sso enable` scaffold it.
+ * Google, as `zitadel setup` and `auth-method sso enable` scaffold it.
  *
  * Everything here is Google's own documented behaviour, cross-checked against
  * its discovery document and the provider packages in zitadel/zitadel. It names
@@ -11,14 +12,14 @@ import type { CallbackGuidance } from "./provider.js";
  * committed here would be a guess that ages.
  */
 export class GoogleProvider extends OidcProvider {
-  readonly slug = "google";
-  readonly displayName = "Google";
+  readonly slug = "google" as ConnectionSlug;
+  readonly displayName = "Google" as DisplayName;
   readonly template = "google";
   readonly consoleUrl = "https://console.cloud.google.com/apis/credentials";
   readonly docsUrl = "https://developers.google.com/identity/openid-connect/openid-connect";
   /** One client takes many redirect URIs, so one application serves every environment. */
   readonly callbackGuidance: CallbackGuidance = "multi_uri_client";
-  readonly issuer = "https://accounts.google.com";
+  readonly issuer = "https://accounts.google.com" as Issuer;
 
   protected readonly claimTable = {
     email: "email",
@@ -26,7 +27,7 @@ export class GoogleProvider extends OidcProvider {
     familyName: "family_name",
   };
 
-  protected readonly scopes = ["openid", "profile", "email"];
+  protected readonly scopes: Scopes = ["openid", "profile", "email"];
 
   /** `sub` never changes, unlike an email, so identity keys on it. */
   protected override readonly subjectClaim = "sub";

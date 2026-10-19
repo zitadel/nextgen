@@ -10,7 +10,10 @@ const node = process.execPath;
 const OUT = process.env.OUT || join(here, "out");
 
 export async function setup() {
-  const r = spawnSync(node, [join(here, "scripts/run.mjs")], { stdio: "inherit", env: process.env });
+  const r = spawnSync(node, [join(here, "scripts/run.mjs")], {
+    stdio: "inherit",
+    env: process.env,
+  });
   if (r.status !== 0) throw new Error(`eval run failed (exit ${r.status})`);
 }
 

@@ -79,11 +79,16 @@ img[data-zl-asset-broken] {
 }
 .zl-trustmark__mark:hover {
   text-decoration: underline;
-  text-underline-offset: 4px;
+  text-underline-offset: var(--zl-spacing-1);
 }
-.zl-trustmark__mark:focus-visible {
+/* One focus outline for every link this stylesheet paints. */
+.zl-trustmark__mark:focus-visible,
+.zl-card-nav__link:focus-visible,
+.zl-card-forgot__link:focus-visible {
   outline: var(--zl-focus-width) solid var(--zl-ring);
   outline-offset: var(--zl-focus-offset);
+}
+.zl-trustmark__mark:focus-visible {
   border-radius: var(--zl-radius-sm);
 }
 .zl-trustmark__logotype {
@@ -98,13 +103,6 @@ img[data-zl-asset-broken] {
   width: 100%;
   height: 100%;
 }
-/* Card header typography. Templates slot raw <h1>/<p> elements into
-   <zl-card>, which keeps them in the light DOM where this stylesheet can
-   reach them — the atom intentionally doesn't dictate typography.
-
-   `line-height: 1` on the title is the design's, not an oversight: the header
-   is a single line whose 6px gap to the description does the separating, so
-   leading above the cap height only pads the top of the card. */
 /* Brand mark above the card, from the resolved side's logo. `--zl-logo-scale`
    is the tenant's `shape.logo_scale`; it multiplies whatever cap is in force so
    a host override of the cap keeps working underneath it. Bounded the way the
@@ -117,6 +115,13 @@ img[data-zl-asset-broken] {
   max-height: calc(var(--zl-card-logo-max-height, 2.5rem) * var(--zl-logo-scale, 1));
   object-fit: contain;
 }
+/* Card header typography. Templates slot raw <h1>/<p> elements into
+   <zl-card>, which keeps them in the light DOM where this stylesheet can
+   reach them — the atom intentionally doesn't dictate typography.
+
+   `line-height: 1` on the title is the design's, not an oversight: the header
+   is a single line whose 6px gap to the description does the separating, so
+   leading above the cap height only pads the top of the card. */
 .zl-card-title {
   margin: 0;
   font-family: var(--zl-font-family-heading);
@@ -155,20 +160,27 @@ img[data-zl-asset-broken] {
   flex-direction: column;
   gap: var(--zl-spacing-3);
 }
-/* suppress-header: the host asked for the heading block to be visually
-   hidden (its page already carries one). Stamped by the orchestrator on the
-   shell so it covers user-ejected templates too. Screen-reader-only rather
-   than display:none — the step keeps its accessible name. */
+/* `<zl-passkey>` renders its pending status and cancel button into light DOM. */
+.zl-passkey-pending {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zl-spacing-3);
+}
 /* A terminal step is a heading with no form under it, so the heading is
-   centred in the card rather than left-aligned over fields that are not
-   there, and the card drops the gap it keeps for a body. */
+   centred in the card rather than left-aligned over fields that are not there.
+   The empty field group is already hidden (see `.zl-field-group:not(:has(*))`),
+   so the card's own region gap is what sits between the heading and the actions
+   — keep it, or the heading ends up flush against the buttons. When a terminal
+   step has no actions either, the empty body region hides itself and no gap
+   remains. */
 .zl-card--terminal .zl-card-title,
 .zl-card--terminal .zl-card-subtitle {
   text-align: center;
 }
-.zl-card--terminal::part(card) {
-  gap: 0;
-}
+/* suppress-header: the host asked for the heading block to be visually
+   hidden (its page already carries one). Stamped by the orchestrator on the
+   shell so it covers user-ejected templates too. Screen-reader-only rather
+   than display:none — the step keeps its accessible name. */
 [data-suppress-header] .zl-card-title,
 [data-suppress-header] .zl-card-subtitle {
   position: absolute;
@@ -202,7 +214,7 @@ img[data-zl-asset-broken] {
   line-height: inherit;
   color: var(--zl-link);
   text-decoration: underline;
-  text-underline-offset: 4px;
+  text-underline-offset: var(--zl-spacing-1);
   cursor: pointer;
 }
 /* The switcher's underline is how the design marks it, so hover lifts the link
@@ -210,14 +222,8 @@ img[data-zl-asset-broken] {
 .zl-card-nav__link:hover {
   color: var(--zl-foreground);
 }
-.zl-card-nav__link:focus-visible {
-  outline: var(--zl-focus-width) solid var(--zl-ring);
-  outline-offset: var(--zl-focus-offset);
-}
-/* Forgot-password is no longer a row of its own: the design sits it on the
-   password field's label row, so `<zl-field>` renders it (see its
-   `forgot-password-*` attributes). These rules remain for templates ejected
-   before that move, which still emit the standalone paragraph. */
+/* Standalone forgot-password row: emitted only by templates ejected before
+   `<zl-field>` carried the link on its label row. */
 .zl-card-forgot {
   margin: 0;
   text-align: right;
@@ -234,17 +240,13 @@ img[data-zl-asset-broken] {
   font-weight: var(--zl-font-weight-normal);
   color: var(--zl-link);
   text-decoration: none;
-  text-underline-offset: 4px;
+  text-underline-offset: var(--zl-spacing-1);
   cursor: pointer;
 }
 /* Matches the field-level affordance in `zl-field.css`: the design draws
    forgot-password as plain text, and the underline is the hover. */
 .zl-card-forgot__link:hover {
   text-decoration: underline;
-}
-.zl-card-forgot__link:focus-visible {
-  outline: var(--zl-focus-width) solid var(--zl-ring);
-  outline-offset: var(--zl-focus-offset);
 }
 /* Split-design chrome (ADR 040 design catalog: `split` / `split-right`).
    Those designs are retired from the eject catalog (#1039) — page layout

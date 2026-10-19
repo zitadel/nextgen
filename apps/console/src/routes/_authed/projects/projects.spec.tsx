@@ -1,31 +1,21 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { server } from "@/test/msw";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
 vi.mock("@/auth/session", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/auth/session")>();
-  const { makeTestSession } = await import("@/auth/session.fixture");
+  const { makeTestSession } = await import("@/test/session.fixture");
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
-
-vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
 
 // `GET /users/me/projects`: the projects the signed-in person can act on, read
 // with the session cookie (#1237). Not `POST /projects/query`, which the server
 // pins to the calling credential's one home project.
 const PROJECTS_URL = "http://localhost/api/users/me/projects";
-const server = setupServer();
-
-beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
-afterEach(() => server.resetHandlers());
-afterAll(() => {
-  server.close();
-  vi.unstubAllEnvs();
-});
 
 /** The same locale-derived string the screen renders, rather than one locale's output. */
 function expectedDate(value: string): string {
@@ -54,7 +44,12 @@ describe("projects screen", () => {
       http.get(PROJECTS_URL, () =>
         HttpResponse.json({
           projects: [
-            { id: "proj_1", name: "River", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" },
+            {
+              id: "proj_1",
+              name: "River",
+              created_at: "2026-07-08T09:00:00Z",
+              updated_at: "2026-07-08T09:00:00Z",
+            },
           ],
         }),
       ),
@@ -74,7 +69,12 @@ describe("projects screen", () => {
       http.get(PROJECTS_URL, () =>
         HttpResponse.json({
           projects: [
-            { id: "proj_theirs", name: "Granted to me", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" },
+            {
+              id: "proj_theirs",
+              name: "Granted to me",
+              created_at: "2026-07-08T09:00:00Z",
+              updated_at: "2026-07-08T09:00:00Z",
+            },
           ],
         }),
       ),
@@ -110,7 +110,12 @@ describe("projects screen", () => {
       http.get(PROJECTS_URL, () =>
         HttpResponse.json({
           projects: [
-            { id: "proj_1", name: "River", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" },
+            {
+              id: "proj_1",
+              name: "River",
+              created_at: "2026-07-08T09:00:00Z",
+              updated_at: "2026-07-08T09:00:00Z",
+            },
           ],
         }),
       ),
@@ -130,8 +135,18 @@ describe("projects screen", () => {
       http.get(PROJECTS_URL, () =>
         HttpResponse.json({
           projects: [
-            { id: "proj_1", name: "River", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" },
-            { id: "proj_2", name: "Delta", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" },
+            {
+              id: "proj_1",
+              name: "River",
+              created_at: "2026-07-08T09:00:00Z",
+              updated_at: "2026-07-08T09:00:00Z",
+            },
+            {
+              id: "proj_2",
+              name: "Delta",
+              created_at: "2026-07-08T09:00:00Z",
+              updated_at: "2026-07-08T09:00:00Z",
+            },
           ],
         }),
       ),
@@ -148,8 +163,18 @@ describe("projects screen", () => {
       http.get(PROJECTS_URL, () =>
         HttpResponse.json({
           projects: [
-            { id: "proj_1", name: "River", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" },
-            { id: "proj_2", name: "Delta", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" },
+            {
+              id: "proj_1",
+              name: "River",
+              created_at: "2026-07-08T09:00:00Z",
+              updated_at: "2026-07-08T09:00:00Z",
+            },
+            {
+              id: "proj_2",
+              name: "Delta",
+              created_at: "2026-07-08T09:00:00Z",
+              updated_at: "2026-07-08T09:00:00Z",
+            },
           ],
         }),
       ),
@@ -167,8 +192,18 @@ describe("projects screen", () => {
       http.get(PROJECTS_URL, () =>
         HttpResponse.json({
           projects: [
-            { id: "proj_1", name: "River", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" },
-            { id: "proj_2", name: "Delta", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" },
+            {
+              id: "proj_1",
+              name: "River",
+              created_at: "2026-07-08T09:00:00Z",
+              updated_at: "2026-07-08T09:00:00Z",
+            },
+            {
+              id: "proj_2",
+              name: "Delta",
+              created_at: "2026-07-08T09:00:00Z",
+              updated_at: "2026-07-08T09:00:00Z",
+            },
           ],
         }),
       ),
@@ -197,13 +232,27 @@ describe("projects screen", () => {
         const cursor = new URL(request.url).searchParams.get("page_token");
         if (cursor === null) {
           return HttpResponse.json({
-            projects: [{ id: "proj_1", name: "River", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" }],
+            projects: [
+              {
+                id: "proj_1",
+                name: "River",
+                created_at: "2026-07-08T09:00:00Z",
+                updated_at: "2026-07-08T09:00:00Z",
+              },
+            ],
             next_page_token: "page-2",
           });
         }
         cursors.push(cursor);
         return HttpResponse.json({
-          projects: [{ id: "proj_2", name: "Delta", created_at: "2026-07-09T09:00:00Z", updated_at: "2026-07-09T09:00:00Z" }],
+          projects: [
+            {
+              id: "proj_2",
+              name: "Delta",
+              created_at: "2026-07-09T09:00:00Z",
+              updated_at: "2026-07-09T09:00:00Z",
+            },
+          ],
         });
       }),
     );

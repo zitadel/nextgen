@@ -10,6 +10,7 @@ const SECRET = {
   project_id: "proj-001",
   project_secret: "sk_proj_test",
   preview_secret: "sk_proj_preview",
+  primary_origins: [],
   preview_origins: [],
   created_at: "2026-01-01T00:00:00.000Z",
   schema_version: 2,
@@ -17,6 +18,7 @@ const SECRET = {
 
 const VALID_USER_SCHEMA = {
   kind: "user-schema",
+  objectType: "human-user",
   metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
   "x-auth-methods": { password: { enabled: true } },
   properties: { email: { type: "string" } },
@@ -103,6 +105,8 @@ describe("plan command", () => {
       updates: 0,
       revisions: 0,
       deletes: 0,
+      moves: 0,
+      unsupported_deletions: 0,
       total: 2,
       changes: [
         { kind: "schema", action: "create", file: ".zitadel/schemas/user.json" },
@@ -110,6 +114,27 @@ describe("plan command", () => {
       ],
       warnings: [],
     });
+  });
+
+  it("does not count a removed connection file as unchanged", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, ".zitadel/state.json"),
+      JSON.stringify({
+        framework: "next",
+        resources: { ".zitadel/idps/gone.json": { id: "idp_1", hash: "abc" } },
+      }),
+    );
+
+    const res = await runCliForTest([
+      "plan",
+      "--cwd",
+      cwd,
+      "--server",
+      "https://api.zitadel.cloud",
+    ]);
+
+    expect(`${res.stdout}\n${res.stderr}`).toContain("0 unchanged");
   });
 
   it("errors with E_VALIDATION when a local resource is invalid", async () => {

@@ -1,6 +1,7 @@
 import { hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
 import type { Detector, FrameworkFacts } from "./types";
+import { enforceVersionFloor } from "./version-floor";
 
 /**
  * Detects a Vite + Svelte single-page app: depends on `svelte` and `vite` but
@@ -10,17 +11,22 @@ import type { Detector, FrameworkFacts } from "./types";
  */
 export class SvelteDetector implements Detector {
   readonly framework = "svelte";
+  readonly displayName = "Svelte";
+  readonly versionPackage = "svelte";
+  readonly versionFloor = "5";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
     const pkg = await readPackageJson(cwd).catch(() => undefined);
     if (
       !pkg ||
       hasDependency(pkg, "@sveltejs/kit") ||
-      !hasDependency(pkg, "svelte") ||
+      !hasDependency(pkg, this.versionPackage) ||
       !hasDependency(pkg, "vite")
     ) {
       return null;
     }
+
+    await enforceVersionFloor(this, pkg, cwd);
 
     const devPort = await detectDevPort(cwd, pkg);
     return { id: "svelte", appDir: "src", devPort, url: issuerFromPort(devPort) };

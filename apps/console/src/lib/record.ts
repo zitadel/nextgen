@@ -26,3 +26,8 @@ export function displayValue(record: Record<string, unknown>, key: string): stri
   if (typeof value === "number" || typeof value === "boolean") return String(value);
   return undefined;
 }
+
+/** Type guard that drops `undefined` and `null` from a list. */
+export function isPresent<T>(value: T | undefined | null): value is T {
+  return value !== undefined && value !== null;
+}

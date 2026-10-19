@@ -13,7 +13,7 @@ import (
 	configdefaults "github.com/zitadel/nextgen/packages/config/defaults"
 )
 
-func DefaultLoginFlowDefinitions(serverURL string, projectID string, userSchemaURL string) ([]*domain.FlowDefinition, error) {
+func DefaultLoginFlowDefinitions(serverURL string, projectID string) ([]*domain.FlowDefinition, error) {
 	bss := [][]byte{configdefaults.DefaultLoginFlowDefinition()}
 
 	defs := make([]*domain.FlowDefinition, len(bss))
@@ -21,7 +21,6 @@ func DefaultLoginFlowDefinitions(serverURL string, projectID string, userSchemaU
 	for i, bs := range bss {
 		jscontent := string(bs)
 		jscontent = strings.ReplaceAll(jscontent, "${SERVER_URL}", serverURL)
-		jscontent = strings.ReplaceAll(jscontent, "${USER_SCHEMA_URL}", userSchemaURL)
 		jscontent = fmt.Sprintf(
 			`{"project_id":%q,"schema_uri":%q,"flow_definition":%s}`,
 			projectID,

@@ -9,9 +9,7 @@ import type {
 import defaultHumanUserSchemaTemplate from "../defaults/default-human-user.json" with {
   type: "json",
 };
-import defaultLoginFlowTemplate from "../defaults/default-login.json" with {
-  type: "json",
-};
+import defaultLoginFlowTemplate from "../defaults/default-login.json" with { type: "json" };
 import passkeyFirstHumanUserSchemaTemplate from "../defaults/presets/passkey-first/human-user.json" with {
   type: "json",
 };
@@ -263,9 +261,7 @@ export type DefaultConfigRenderOptions = {
   useCase?: string;
 };
 
-export function defaultHumanUserSchemaUrl(
-  builtinSchemaBase = DEFAULT_BUILTIN_SCHEMA_BASE,
-): string {
+export function defaultHumanUserSchemaUrl(builtinSchemaBase = DEFAULT_BUILTIN_SCHEMA_BASE): string {
   return `${trimTrailingSlash(builtinSchemaBase)}/default-human-user.json`;
 }
 
@@ -285,15 +281,17 @@ export function getDefaultHumanUserSchema(
   ) as CreateSchemaBody;
 }
 
+/** The flow names its user schema by `objectType`, so no schema URL renders into it. */
+export type DefaultFlowRenderOptions = Omit<DefaultConfigRenderOptions, "userSchemaUrl">;
+
 export function getDefaultLoginFlow(
-  options: DefaultConfigRenderOptions = {},
+  options: DefaultFlowRenderOptions = {},
 ): CreateFlowDefinitionBodyFlowDefinition {
   const builtinSchemaBase = trimTrailingSlash(
     options.builtinSchemaBase ?? DEFAULT_BUILTIN_SCHEMA_BASE,
   );
   const rendered = renderTemplate(presetTemplates(options.preset ?? DEFAULT_SETUP_PRESET).flow, {
     SERVER_URL: builtinSchemaBase,
-    USER_SCHEMA_URL: options.userSchemaUrl ?? defaultHumanUserSchemaUrl(builtinSchemaBase),
   }) as Record<string, unknown>;
   return applyUseCaseToFlow(
     rendered,

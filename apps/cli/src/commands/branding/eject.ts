@@ -1,7 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import { cancel, isCancel, select } from "@clack/prompts";
 import { Flags } from "@oclif/core";
 import { consola } from "consola";
 
@@ -13,18 +12,17 @@ import {
   brandingReadmeContent,
   getDefaultBrandingConfig,
 } from "@zitadel/config/defaults";
-import { BRANDING_FILE_SCHEMA_REF, META_SCHEMA_DIR, metaSchemaFiles } from "@zitadel/config/meta-schemas";
+import {
+  BRANDING_FILE_SCHEMA_REF,
+  META_SCHEMA_DIR,
+  metaSchemaFiles,
+} from "@zitadel/config/meta-schemas";
 
 import { BRANDING_DIR } from "../../lib/branding";
 import { BRANDING_DESIGN_INFO, resolveBrandingDesign } from "../../lib/branding/designs";
 import { ZitadelError } from "../../lib/errors";
 import { stableStringify } from "../../lib/json";
-import {
-  BaseCommand,
-  CommandGroups,
-  type JsonEnvelope,
-  nonBlankString,
-} from "../../lib/oclif";
+import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { hasZitadelConfig } from "../../lib/project";
 import {
   normalizePublicCliJson,
@@ -144,7 +142,9 @@ export default class BrandingEject extends BaseCommand {
     if (nonInteractive) {
       return DEFAULT_BRANDING_DESIGN;
     }
-    const choice = await select({
+    return this.input({
+      kind: "select",
+      name: "design",
       message: "Which design do you want to start from?",
       initialValue: DEFAULT_BRANDING_DESIGN as string,
       options: BRANDING_DESIGNS.map((design) => ({
@@ -153,11 +153,6 @@ export default class BrandingEject extends BaseCommand {
         hint: BRANDING_DESIGN_INFO[design].hint,
       })),
     });
-    if (isCancel(choice)) {
-      cancel("Eject cancelled.");
-      throw new ZitadelError("E_VALIDATION", "Eject cancelled by user");
-    }
-    return choice;
   }
 }
 

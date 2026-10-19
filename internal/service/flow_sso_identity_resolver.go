@@ -20,10 +20,11 @@ type FlowSSOIdentityResolver struct {
 	connections IDPConnectionService
 	users       UserService
 	schemaStore domain.JSONSchemaStore
+	hashers     ProjectHasherResolver
 }
 
-func NewFlowSSOIdentityResolver(db StatementPool, connections IDPConnectionService, users UserService, schemaStore domain.JSONSchemaStore) *FlowSSOIdentityResolver {
-	return &FlowSSOIdentityResolver{db: db, connections: connections, users: users, schemaStore: schemaStore}
+func NewFlowSSOIdentityResolver(db StatementPool, connections IDPConnectionService, users UserService, schemaStore domain.JSONSchemaStore, hashers ProjectHasherResolver) *FlowSSOIdentityResolver {
+	return &FlowSSOIdentityResolver{db: db, connections: connections, users: users, schemaStore: schemaStore, hashers: hashers}
 }
 
 var _ domain.FlowSSOIdentityService = (*FlowSSOIdentityResolver)(nil)
@@ -67,6 +68,13 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 		return nil, nil
 	}
 	result := check.Result
+
+	// An error result carries no identity, so none of the reads below apply.
+	// The row stays parked, like creation disabled, until the attempt expires
+	// or the next ceremony replaces it.
+	if result.IsError() {
+		return &domain.FlowSSOParkedIdentity{CheckID: check.ID, ErrorKey: result.ErrorKey, AttemptUserID: attemptUserID}, nil
+	}
 
 	// The pinned revision, not the newest: the result was produced under it.
 	connection, err := r.connections.GetRevision(ctx, in.ProjectID, result.ConnectionRevisionID)
@@ -115,7 +123,11 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 	if err != nil {
 		return nil, fmt.Errorf("load parked sso identity: read linked user: %w", err)
 	}
-	if user.SchemaURL != in.UserSchemaURL {
+	sameSchema, err := r.storedUserSchemaMatches(ctx, in.ProjectID, user.SchemaURL, in.UserSchemaURL)
+	if err != nil {
+		return nil, fmt.Errorf("load parked sso identity: %w", err)
+	}
+	if !sameSchema {
 		// The flow validates against one schema and cannot continue with a
 		// user of another. The response stays generic; the log says why.
 		getLoggingContext(ctx, "flow").Warn("sso identity is linked to a user of another schema",
@@ -127,6 +139,54 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 	}
 	parked.Link = &domain.FlowSSOLinkedUser{LinkID: link.ID, UserID: link.UserID}
 	return parked, nil
+}
+
+func (r *FlowSSOIdentityResolver) LoadCollected(ctx context.Context, in domain.FlowSSOLoadInput) (*domain.FlowSSOParkedIdentity, error) {
+	attempt, err := r.db.Statements().GetAuthAttemptByID(ctx, in.ProjectID, in.AttemptID)
+	if err != nil {
+		return nil, fmt.Errorf("load collected sso identity: read attempt: %w", err)
+	}
+	// Only the row the engine resolved: a newer row is resolved by the next
+	// render first and may turn out to be linked.
+	check, ok := attempt.SSOCallback()
+	if !ok || check.ID != in.ResolvedCheckID || check.Result == nil || check.Result.CollisionUserID != "" {
+		return nil, nil
+	}
+	result := check.Result
+	// An error result means the ceremony failed: the callback stores only the
+	// key, no identity, and that ceremony replaced the collected row. This step
+	// offers no provider to retry from.
+	if result.IsError() {
+		return nil, domain.ErrFlowRestartRequired()
+	}
+	connection, err := r.connections.GetRevision(ctx, in.ProjectID, result.ConnectionRevisionID)
+	if errors.Is(err, domain.ErrIDPConnectionNotFound()) {
+		getLoggingContext(ctx, "flow").Warn("sso identity parked on a connection revision that no longer exists",
+			slog.String("project_id", in.ProjectID),
+			slog.String("connection_revision_id", result.ConnectionRevisionID),
+		)
+		return nil, domain.ErrFlowRestartRequired()
+	}
+	if err != nil {
+		return nil, fmt.Errorf("load collected sso identity: read connection revision: %w", err)
+	}
+	parsed, err := idp.ParseConnection(connection.RevisionID, connection.Document)
+	if err != nil {
+		return nil, fmt.Errorf("load collected sso identity: parse connection revision: %w", err)
+	}
+	// The engine collects only where creation is allowed, but a render with an
+	// older cookie can resolve a newer row on this step. Its submit would
+	// create the user the connection refuses.
+	if parsed.CreationDisabled {
+		return nil, domain.ErrFlowRestartRequired()
+	}
+	return &domain.FlowSSOParkedIdentity{
+		CheckID:      check.ID,
+		ConnectionID: connection.ID,
+		Subject:      result.Subject,
+		Claims:       result.Claims,
+		Verified:     result.Verified,
+	}, nil
 }
 
 // boundThroughSSO reports the user an earlier BindLinked recorded, while the
@@ -176,7 +236,7 @@ func bindSSOIdentity(ctx context.Context, stmts AllStatements, in domain.FlowSSO
 	if err != nil {
 		return fmt.Errorf("bind sso identity: read attempt: %w", err)
 	}
-	// Creation without a project-unique claim reaches here with no earlier
+	// Creation without a unique claim reaches here with no earlier
 	// attempt check, so a dead attempt is refused here and every write before
 	// it rolls back.
 	if attempt.IsExpired() || attempt.IsHandedOff() {
@@ -240,9 +300,27 @@ func (r *FlowSSOIdentityResolver) CreateLinked(ctx context.Context, in domain.Fl
 	// The parked row is claimed before the user is created, so a concurrent
 	// request on the same attempt loses on the row (ErrSSOStateInvalid), not on
 	// a unique value, and is not mistaken for a collision.
-	if err := r.users.ApplyActions(ctx, &ssoClaimAction{bind: bind}, createUser, &ssoLinkAction{subject: in.Subject, bind: bind}); err != nil {
+	actions := []UserAction{&ssoClaimAction{bind: bind}, createUser}
+	if in.Password != "" {
+		actions = append(actions, NewSetUserPasswordAction(SetPasswordInput{ProjectID: in.ProjectID, UserID: userID, Password: in.Password}, r.hashers))
+	}
+	actions = append(actions, &ssoLinkAction{subject: in.Subject, bind: bind})
+	if err := r.users.ApplyActions(ctx, actions...); err != nil {
 		// Audited like a create through the user API.
 		emitUserCreateFailedBestEffort(ctx, r.db, createUser, err)
+		if errors.Is(err, domain.ErrUserInvalid()) {
+			// The validator's messages quote the values, so only where they
+			// failed is logged.
+			var locations []string
+			for _, ve := range domain.ValidationFailures(err) {
+				locations = append(locations, domain.ValidationLocation(ve))
+			}
+			getLoggingContext(ctx, "flow").WarnContext(ctx, "sso user fails the user schema",
+				slog.String("project_id", in.ProjectID),
+				slog.String("schema_url", in.UserSchemaURL),
+				slog.Any("locations", locations),
+			)
+		}
 		return "", err
 	}
 	return userID, nil
@@ -302,11 +380,12 @@ func (a *ssoLinkAction) Apply(ctx context.Context, stmts AllStatements) error {
 
 var _ UserAction = (*ssoLinkAction)(nil)
 
-// FindUniqueOwner looks the value up in the project-scoped rows of the
-// unique-attributes registry, without recording anything on the attempt. A
-// team-scoped row for the same value would not collide with the new user, so
-// it does not count.
-func (r *FlowSSOIdentityResolver) FindUniqueOwner(ctx context.Context, projectID, userSchemaURL, attribute, value string) (string, error) {
+// FindUniqueOwner looks the value up in the rows of the unique-attributes
+// registry with team scope "", without recording anything on the attempt.
+// Those are the rows a new user with no team collides with: project-unique
+// values, and team-unique values of users with no team. A row of a team does
+// not collide, so it does not count.
+func (r *FlowSSOIdentityResolver) FindUniqueOwner(ctx context.Context, projectID, userSchemaURL, attribute string, value any) (string, error) {
 	user, err := r.db.Statements().GetUser(ctx,
 		database.Equal(database.Col(domain.UserFieldProjectID), projectID),
 		UserQueryOptions{
@@ -324,14 +403,30 @@ func (r *FlowSSOIdentityResolver) FindUniqueOwner(ctx context.Context, projectID
 	// The registry key has no schema, so the owner can be a user of another
 	// schema that also marks the property project-unique. The flow cannot
 	// continue with that user, and creation would collide on the value.
-	if user.SchemaURL != userSchemaURL {
+	sameSchema, err := r.storedUserSchemaMatches(ctx, projectID, user.SchemaURL, userSchemaURL)
+	if err != nil {
+		return "", fmt.Errorf("find unique owner: %w", err)
+	}
+	if !sameSchema {
 		getLoggingContext(ctx, "flow").Warn("sso claim is owned by a user of another schema",
 			slog.String("project_id", projectID),
 			slog.String("attribute", attribute),
 			slog.String("flow_schema_url", userSchemaURL),
 			slog.String("user_schema_url", user.SchemaURL),
 		)
-		return "", domain.ErrFlowRestartRequired()
+		return "", domain.ErrSSOOwnerOtherSchema
 	}
 	return user.ID, nil
+}
+
+// storedUserSchemaMatches compares a stored user's schema with the flow's.
+// Both ids come from stored records, never from the request, so a schema the
+// project does not hold is an inconsistency on the server's side and not a
+// client error.
+func (r *FlowSSOIdentityResolver) storedUserSchemaMatches(ctx context.Context, projectID, userSchemaID, flowSchemaID string) (bool, error) {
+	same, err := sameUserSchema(ctx, r.schemaStore, projectID, userSchemaID, flowSchemaID)
+	if errors.Is(err, domain.ErrJSONSchemaNotFound()) {
+		return false, domain.ErrInternal(err).WithMessage("user schema revision not found")
+	}
+	return same, err
 }

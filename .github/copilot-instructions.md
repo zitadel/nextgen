@@ -30,10 +30,19 @@ touched path** — read those first; the scoped files under
   reaches customer release notes. Guards:
   `node scripts/check-pr-title.mjs --title "<title>"` and
   `node scripts/check-changesets-status.mjs`.
+- Node version: every runtime uses the `.nvmrc` major; minor versions do not
+  matter. Flag a major bump that misses `devbox.json`,
+  `.devcontainer/devcontainer.json`, `apps/cli-skill-e2e/scripts/run.mjs`,
+  the Vercel apps' `engines.node` or the `@types/node` catalog entry, and any
+  hard-coded `node-version` in a workflow. Do not ask for exact-version
+  matches ([`AGENTS.md` — Node.js version](../AGENTS.md#nodejs-version)).
+- Dependency versions: flag exact pins without a comment saying why, and a
+  dependency shared by several packages that is not a `catalog:` entry
+  ([`AGENTS.md` — Node.js version](../AGENTS.md#nodejs-version)).
 - Licensing split: [`LICENSING.md`](../LICENSING.md).
-- Journey-gate changes (`apps/cli-journey-e2e/**`, `ci.yml` journey steps):
-  [`apps/cli-journey-e2e/AGENTS.md`](../apps/cli-journey-e2e/AGENTS.md) is
-  canonical (the project id is `cli-journey-e2e`).
+- Journey-gate changes (`e2e/journey/**`, `ci.yml` journey steps):
+  [`e2e/journey/AGENTS.md`](../e2e/journey/AGENTS.md) is
+  canonical (the project id is `e2e`).
 - Local runtime command changes: verify `.zitadel/local/` state handling,
   `--server local` resolution, and the zero-config smoke paths per
   [`apps/cli/SKILLS.md`](../apps/cli/SKILLS.md).

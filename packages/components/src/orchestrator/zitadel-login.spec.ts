@@ -24,6 +24,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import "./zitadel-login.js";
 import type { ZlAlert } from "../atoms/zl-alert.js";
+import type { ZlField } from "../atoms/zl-field.js";
 import { loginPreviewStatesFor, type ZitadelLogin } from "./zitadel-login.js";
 
 const API_BASE = "https://flow.test.invalid";
@@ -161,6 +162,35 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(submitted?.body.fields).toEqual({ email: "alice@acme.com" });
   });
 
+  it("offers the password show/hide toggle by default", async () => {
+    const element = await mount(host);
+    type(element, "email", "alice@acme.com");
+    submit(element);
+    const field = await waitFor(() =>
+      element.shadowRoot?.querySelector<ZlField>(`zl-field[name="${PASSWORD_FIELD}"]`),
+    );
+    expect(field.passwordToggle).toBe(true);
+    expect(field.passwordToggleLabel).toBe("Show password");
+    // The choice is applied to the field, never written into the markup.
+    expect(field.hasAttribute("password-toggle")).toBe(false);
+  });
+
+  it.each([
+    ["suppress-password-toggle", true, false],
+    // An unset framework prop reaches the element as `undefined`.
+    ["unset suppressPasswordToggle", undefined, true],
+  ])("%s decides the password toggle", async (_label, suppress, shown) => {
+    const element = attachLogin(host);
+    element.suppressPasswordToggle = suppress as unknown as boolean;
+    await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+    type(element, "email", "alice@acme.com");
+    submit(element);
+    const field = await waitFor(() =>
+      element.shadowRoot?.querySelector<ZlField>(`zl-field[name="${PASSWORD_FIELD}"]`),
+    );
+    expect(field.passwordToggle).toBe(shown);
+  });
+
   it("starts a flow from project-id / proxy-path attributes with no global config", async () => {
     // Clear the global so the attributes are the only thing that can configure
     // the element — proves declarative HTML config works on its own.
@@ -175,6 +205,23 @@ describe("<zitadel-login> against the typed Flow API", () => {
       kind: "createFlow",
       body: { purpose: "login", project_id: "demo-project" },
     });
+  });
+
+  it("sends the publishable-key attribute as the bearer on the first request", async () => {
+    _resetConfigForTesting();
+    const bearers: (string | null)[] = [];
+    server.events.on("request:start", ({ request }) => {
+      bearers.push(request.headers.get("authorization"));
+    });
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.setAttribute("project-id", "demo-project");
+    element.setAttribute("proxy-path", API_BASE);
+    element.setAttribute("publishable-key", "pk_test_123");
+    host.appendChild(element);
+    await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+    server.events.removeAllListeners();
+
+    expect(bearers[0]).toBe("Bearer pk_test_123");
   });
 
   it("prefers the project property over the project-id attribute", async () => {
@@ -450,8 +497,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(element.shadowRoot?.querySelector("zl-alert")?.textContent).toContain(serverMessage);
     // The failure keeps the login surface: the alert renders inside the same
     // page-shell/card chrome a step would, not bare on an otherwise empty
-    // page — a misconfigured origin is the common trigger and used to blank
-    // the app after the first step had painted normally.
+    // page — a misconfigured origin is the common trigger.
     const alert = element.shadowRoot?.querySelector("zl-alert");
     expect(alert?.closest("zl-card")).not.toBeNull();
     expect(alert?.closest("zl-page-shell")).not.toBeNull();
@@ -502,8 +548,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
   });
 
   it("renders a primary passkey action as exactly one button", async () => {
-    // Regression for the duplicate "Continue with passkey" button: the
-    // template renders primary actions generically AND has a dedicated
+    // The template renders primary actions generically AND has a dedicated
     // passkey block, which must skip a passkey that is already primary.
     server.use(
       http.post("*/flow", () =>
@@ -984,9 +1029,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     // One more frame so the post-render applyValuesToFields callback fires.
     await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
 
-    // Regression: empty defaults from the re-rendered step used to wipe
-    // formValues, which then propagated back to the field via
-    // applyValuesToFields. The typed input must survive.
+    // Empty defaults from the re-rendered step must not wipe formValues.
     const emailField = element.shadowRoot?.querySelector<HTMLElement & { value?: string }>(
       'zl-field[name="email"]',
     );
@@ -1170,7 +1213,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
               ],
               actions: [{ name: "submit", text_key: "submit.signin", primary: true }],
               gates: {},
-              error: "user_not_found",
+              error: "not_a_key",
             },
             branding: {},
           },
@@ -1188,7 +1231,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
 
     const alert = await waitFor(() => {
       const candidate = element.shadowRoot?.querySelector("zl-alert");
-      return candidate?.textContent?.includes("user_not_found") ? candidate : null;
+      return candidate?.textContent?.includes("not_a_key") ? candidate : null;
     });
     expect(alert).toBeTruthy();
   });
@@ -1261,7 +1304,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
   }
 
   it("clears the step error banner when the user edits a field, keeping typed input", async () => {
-    const element = await mountWithStepErrorBanner(host, "user_not_found");
+    const element = await mountWithStepErrorBanner(host, "error.user_not_found");
 
     typeInto(element, "email", "fixed@acme.com");
 
@@ -1300,7 +1343,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
   });
 
   it("does not resurrect a dismissed banner during the loading re-render", async () => {
-    const element = await mountWithStepErrorBanner(host, "user_not_found");
+    const element = await mountWithStepErrorBanner(host, "error.user_not_found");
     typeInto(element, "email", "fixed@acme.com");
     expect(element.shadowRoot?.querySelector("zl-alert[data-zl-step-error]")).toBeNull();
 
@@ -1344,7 +1387,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
   });
 
   it("shows the banner again when the next response re-reports the error", async () => {
-    const element = await mountWithStepErrorBanner(host, "user_not_found");
+    const element = await mountWithStepErrorBanner(host, "error.user_not_found");
     typeInto(element, "email", "still-wrong@acme.com");
     expect(element.shadowRoot?.querySelector("zl-alert[data-zl-step-error]")).toBeNull();
 
@@ -1361,7 +1404,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
   });
 
   it("keeps an explicitly dismissed banner away through the next loading render", async () => {
-    const element = await mountWithStepErrorBanner(host, "user_not_found");
+    const element = await mountWithStepErrorBanner(host, "error.user_not_found");
 
     // The shipped templates render the design's non-dismissible alert, so the
     // close control has to be opted into here — as a tenant template opting
@@ -1500,9 +1543,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
       // (ADR 022). The kind-based exclusion also keeps it out of the generic
       // secondary-button loop.
       expect(element.shadowRoot?.querySelector('[data-action="back"]')).toBeNull();
-      expect(
-        element.shadowRoot?.querySelector('[data-testid="zitadel-action-back"]'),
-      ).toBeNull();
+      expect(element.shadowRoot?.querySelector('[data-testid="zitadel-action-back"]')).toBeNull();
     });
 
     it("pushes a single sentinel entry without touching the URL", async () => {
@@ -1593,9 +1634,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
       // ON the sentinel. That is not a request to go back in the flow.
       window.dispatchEvent(new PopStateEvent("popstate", { state: { zl: true } }));
 
-      const submitsAfter = mock
-        .getCaptured()
-        .filter((req) => req.kind === "submitFlowStep").length;
+      const submitsAfter = mock.getCaptured().filter((req) => req.kind === "submitFlowStep").length;
       expect(submitsAfter).toBe(submitsBefore);
 
       // The widget stays armed: a real back press still maps to the back
@@ -1769,9 +1808,8 @@ describe("<zitadel-login> against the typed Flow API", () => {
   });
 
   it("captures <zl-select> and <zl-checkbox> values on submit", async () => {
-    // A step whose only inputs are the non-text atoms. Regression: the
-    // orchestrator used to read `.value` from `<zl-field>` only, so a chosen
-    // select option and a ticked checkbox were submitted as empty strings.
+    // A step whose only inputs are the non-text atoms: values are read from
+    // `<zl-select>` and `<zl-checkbox>` too.
     server.use(
       http.post("*/flow", () =>
         HttpResponse.json(
@@ -2156,7 +2194,12 @@ describe("<zitadel-login preview-state>", () => {
                       },
                     ],
                     actions: [
-                      { name: "submit", kind: "submit", text_key: "submit.continue", primary: true },
+                      {
+                        name: "submit",
+                        kind: "submit",
+                        text_key: "submit.continue",
+                        primary: true,
+                      },
                     ],
                     gates: {},
                   },
@@ -2337,7 +2380,9 @@ describe("<zitadel-login preview-state>", () => {
 
     expect(
       loginPreviewStatesFor(
-        step([{ name: "email", type: "email", text_key: "identifier.field.email", required: true }]),
+        step([
+          { name: "email", type: "email", text_key: "identifier.field.email", required: true },
+        ]),
       ),
     ).toContain("validation_error");
     // An optional field, a must-accept checkbox, or no fields at all: an empty
@@ -2378,9 +2423,7 @@ describe("<zitadel-login preview-state>", () => {
     await waitFor(() => element.shadowRoot?.querySelector('zl-field[name="email"][invalid]'));
 
     element.previewState = "default";
-    await waitFor(() =>
-      element.shadowRoot?.querySelector('zl-field[name="email"]:not([invalid])'),
-    );
+    await waitFor(() => element.shadowRoot?.querySelector('zl-field[name="email"]:not([invalid])'));
     expect(element.shadowRoot?.querySelector("zl-alert")).toBeNull();
     expect(requests()).toEqual(["createFlow"]);
   });
@@ -2422,4 +2465,106 @@ describe("<zitadel-login preview-state> repaint", () => {
     expect(document.activeElement).toBe(control);
     control.remove();
   });
+});
+
+describe("<zitadel-login> resume-flow-id", () => {
+  it.each([undefined, null, ""])("reads %j as no handle", async (value) => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const element = await mount(host);
+    element.resumeFlowId = "flow_123";
+    expect(element.resumeFlowId).toBe("flow_123");
+
+    element.resumeFlowId = value;
+
+    expect(element.resumeFlowId).toBe("");
+  });
+
+  it("reads a removed attribute as no handle", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const element = await mount(host);
+    element.setAttribute("resume-flow-id", "flow_123");
+    expect(element.resumeFlowId).toBe("flow_123");
+
+    element.removeAttribute("resume-flow-id");
+
+    expect(element.resumeFlowId).toBe("");
+  });
+});
+
+describe("<zitadel-login> unset public properties", () => {
+  type Declaration = { attribute?: string | boolean; state?: boolean };
+  type Props = Record<string, unknown>;
+  const create = () => document.createElement("zitadel-login");
+  const declared = (
+    customElements.get("zitadel-login") as unknown as {
+      elementProperties: Map<string, Declaration>;
+    }
+  ).elementProperties;
+  // Every public property that has a declared default, read off a fresh element so a
+  // property added later is covered without touching this list.
+  const defaulted = [...declared]
+    .filter(([name, options]) => !options.state && (create() as unknown as Props)[name] != null)
+    .map(([name, options]) => ({
+      name,
+      attribute:
+        typeof options.attribute === "string"
+          ? options.attribute
+          : options.attribute === false
+            ? undefined
+            : name.toLowerCase(),
+      fallback: (create() as unknown as Props)[name],
+    }));
+  const other = (fallback: unknown) => (typeof fallback === "boolean" ? !fallback : "other");
+
+  it("covers the element's defaulted properties", () => {
+    expect(defaulted.length).toBeGreaterThan(0);
+  });
+
+  it.each(defaulted)(
+    "keeps the default of $name when it is assigned undefined",
+    ({ name, fallback }) => {
+      const element = create() as unknown as Props;
+      element[name] = undefined;
+      expect(element[name]).toEqual(fallback);
+    },
+  );
+
+  it.each(defaulted)(
+    "keeps the default of $name when it is assigned null",
+    ({ name, fallback }) => {
+      const element = create() as unknown as Props;
+      element[name] = null;
+      expect(element[name]).toEqual(fallback);
+    },
+  );
+
+  it.each(defaulted)(
+    "restores the default of $name when a set value is cleared",
+    ({ name, fallback }) => {
+      const element = create() as unknown as Props;
+      element[name] = other(fallback);
+      expect(element[name]).toEqual(other(fallback));
+      element[name] = undefined;
+      expect(element[name]).toEqual(fallback);
+    },
+  );
+
+  it.each(defaulted)("keeps a supplied value of $name", ({ name, fallback }) => {
+    const element = create() as unknown as Props;
+    element[name] = other(fallback);
+    expect(element[name]).toEqual(other(fallback));
+  });
+
+  it.each(defaulted.filter(({ attribute }) => attribute !== undefined))(
+    "restores the default of $name when its attribute is removed",
+    ({ name, attribute, fallback }) => {
+      const element = create();
+      element.setAttribute(attribute as string, typeof fallback === "boolean" ? "" : "other");
+      expect((element as unknown as Props)[name]).toEqual(other(fallback));
+      element.removeAttribute(attribute as string);
+      expect((element as unknown as Props)[name]).toEqual(fallback);
+    },
+  );
 });

@@ -1,16 +1,11 @@
 import { Flags } from "@oclif/core";
-import { cancel, confirm, isCancel } from "@clack/prompts";
 
-import { ZitadelError } from "../lib/errors";
-import { stopBinaryRuntime } from "../lib/local-server/binary";
-import { stopAndRemoveContainer } from "../lib/local-server/docker";
 import {
   DEFAULT_LOCAL_SERVER_URL,
   localContainerName,
   readRuntimeMetadata,
-  removeLocalData,
-  removeRuntimeMetadata,
 } from "../lib/local-server/runtime";
+import { LocalServer } from "../lib/local-server/server";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { resolveCwd } from "../lib/paths";
 import { publicCliCommand } from "../lib/public-cli";
@@ -54,39 +49,17 @@ export default class Reset extends BaseCommand {
       });
     }
 
-    if (!this.meta.force) {
-      if (this.meta.nonInteractive) {
-        throw new ZitadelError("E_VALIDATION", "Reset requires --force in non-interactive mode", {
-          hint: "Pass --force to delete `.zitadel/local/nextgen-data`.",
-          nextCommands: [publicCliCommand("reset --force", this.meta.cliVersion)],
-        });
-      }
-      const answer = await confirm({
-        message: "Delete the local Zitadel runtime and .zitadel/local/nextgen-data?",
-        initialValue: false,
-      });
-      if (isCancel(answer)) {
-        cancel("Reset cancelled.");
-        throw new ZitadelError("E_VALIDATION", "Reset cancelled by user");
-      }
-      if (!answer) {
-        return this.emit({ status: "skipped", reason: "reset-cancelled" });
-      }
+    const confirmed = await this.input({
+      kind: "confirm",
+      name: "delete the local runtime and its data",
+      message: "Delete the local Zitadel runtime and .zitadel/local/nextgen-data?",
+      retry: publicCliCommand("reset --force", this.meta.cliVersion),
+    });
+    if (!confirmed) {
+      return this.emit({ status: "skipped", reason: "reset-cancelled" });
     }
 
-    if (runtime?.backend === "binary") {
-      const stopResult = await stopBinaryRuntime(runtime.pid);
-      if (stopResult.status === "failed") {
-        throw new ZitadelError("E_VALIDATION", "Local Zitadel server did not stop", {
-          hint: "Stop the local runtime manually, then rerun reset.",
-          details: { runtime, stop_result: stopResult },
-        });
-      }
-    } else {
-      await stopAndRemoveContainer(containerName);
-    }
-    await removeLocalData(this.meta.cwd);
-    await removeRuntimeMetadata(this.meta.cwd);
+    await LocalServer.at(this.meta.cwd, { cliVersion: this.meta.cliVersion }).reset();
 
     return this.emit({
       status: "ok",

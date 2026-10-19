@@ -1,4 +1,3 @@
-import { type ZitadelProject } from "@zitadel/api/config";
 import type {
   CreateFlow201,
   CreateFlow201Step,
@@ -12,9 +11,11 @@ import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
 import { zitadelTrustmarkInnerHtml } from "../internal/attribution-markup.js";
 import type { Liquid, Template } from "liquidjs";
 import { css, html, LitElement, nothing, type PropertyValues } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, state } from "lit/decorators.js";
+import { property } from "../internal/property.js";
 
 import "../atoms/index.js";
+import type { ZlFieldInputDetail, ZlSubmitDetail } from "../atoms/index.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 
 import { emit } from "../internal/emit.js";
@@ -31,10 +32,10 @@ import { resolveLogoUrl } from "./branding.js";
 import type { ResolvedTheme } from "./theme-controller.js";
 import type { Branding } from "./branding.js";
 import { stampExportparts } from "./exportparts.js";
-import { createLiquidEngine, localiseFlowErrorKeys, parseSsoError } from "./liquid.js";
-import { en, builtinLocales, type Locale } from "./locales/index.js";
+import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
+import { en, builtinLocales, mergeLocale, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
-import { resolveApi, type ProjectAttrs } from "./resolve-api.js";
+import { resolveApi } from "./resolve-api.js";
 import { createSanitiser } from "./sanitiser.js";
 import { ZitadelSurface } from "./surface.js";
 import type { FlowError, FlowIdentity, LiquidContext } from "./template-context.js";
@@ -192,33 +193,6 @@ export class ZitadelLogin extends ZitadelSurface {
   @property({ type: String, attribute: "flow-name" }) accessor flowName = "";
 
   /**
-   * SDK project handle returned by `configureZitadel()`. Set from JS (or a
-   * framework binding). When set, takes precedence over both the
-   * `project-id`/`proxy-path`/`url` attributes and the global singleton from
-   * `getZitadelConfig()`.
-   */
-  @property({ attribute: false }) accessor project: ZitadelProject | undefined;
-
-  /**
-   * Project ID, set declaratively in HTML. Lets the component be configured on
-   * a plain page without JS or `configureZitadel()`. Ignored when the `project`
-   * property or a `configureZitadel()` global is set. See {@link projectAttrs}.
-   */
-  @property({ type: String, attribute: "project-id" }) accessor projectId = "";
-
-  /**
-   * Proxy path for API requests (e.g. `/__nextgen`), set declaratively in HTML.
-   * Defaults to `/__nextgen` when omitted, matching `configureZitadel()`.
-   */
-  @property({ type: String, attribute: "proxy-path" }) accessor proxyPath = "";
-
-  /**
-   * Full URL of the Zitadel auth backend, set declaratively in HTML. Optional —
-   * not needed in client-only setups.
-   */
-  @property({ type: String }) accessor url = "";
-
-  /**
    * URL to navigate to after a successful embedded sign-in. When set, the
    * orchestrator exchanges the terminal `handoff_token` via the generated
    * API client (setting the session cookie) and then performs a full
@@ -238,8 +212,26 @@ export class ZitadelLogin extends ZitadelSurface {
    * Leaving it empty falls back to the `flow` query parameter, which is how a
    * provider callback hands the flow back (see {@link flowIdFromLocation}), so
    * a host page needs no code of its own for external sign-in to finish.
+   * Unset, `null` or `""` all mean "no handle".
    */
-  @property({ type: String, attribute: "resume-flow-id" }) accessor resumeFlowId = "";
+  @property({ type: String, attribute: "resume-flow-id" })
+  get resumeFlowId(): string {
+    return this.#resumeFlowId;
+  }
+  set resumeFlowId(value: string | null | undefined) {
+    this.#resumeFlowId = value || "";
+  }
+  #resumeFlowId = "";
+
+  /**
+   * Hide the show/hide button on password fields. The button is shown by
+   * default — NIST SP 800-63B recommends offering it — so this is an opt-out,
+   * named negatively because a boolean attribute can only switch something
+   * on. Local to the embedding page, and applied to the rendered fields
+   * directly, so it holds for custom templates too.
+   */
+  @property({ type: Boolean, attribute: "suppress-password-toggle" })
+  accessor suppressPasswordToggle = false;
 
   /**
    * Preview mode, for an operator surface such as the console's branding
@@ -450,8 +442,10 @@ export class ZitadelLogin extends ZitadelSurface {
   /**
    * Resolves the effective locale dictionary. The built-in dictionary for the
    * resolved language is used as the base; entries from the `locales` map (if
-   * set) are spread on top so partial overrides work without importing and
-   * spreading the full base dictionary.
+   * set) are merged on top by {@link mergeLocale}, so partial overrides work
+   * without importing the full base dictionary. The merge also drops a
+   * built-in `<step>.description.sso` when the integrator rewrote that step's
+   * description without one, so their text is what the `t` fallback shows.
    *
    * Priority: explicit `lang` attr → `navigator.language` (user preference)
    * → `document.documentElement.lang` (page default) → English fallback.
@@ -466,13 +460,7 @@ export class ZitadelLogin extends ZitadelSurface {
     const custom = this.locales?.[primary];
     if (!custom) return builtin;
 
-    // Entries are Partial — merge key-by-key and skip explicit `undefined`
-    // values, which a plain spread would let shadow the built-in copy.
-    const merged: Locale = { ...builtin };
-    for (const [key, value] of Object.entries(custom)) {
-      if (value !== undefined) merged[key] = value;
-    }
-    return merged;
+    return mergeLocale(builtin, custom);
   }
 
   override willUpdate(changed: PropertyValues<this>): void {
@@ -502,6 +490,25 @@ export class ZitadelLogin extends ZitadelSurface {
     this.setAttribute("aria-busy", this.loading ? "true" : "false");
   }
 
+  /**
+   * Set on the fields rather than written by the template: the toggle is the
+   * embedding page's choice, not the flow's, so it reaches ejected templates
+   * without their cooperation. Runs before the fresh fields' first render, so
+   * the button never flashes in or out.
+   */
+  private applyPasswordToggle(root: ShadowRoot): void {
+    // Compared, not passed through: an unset framework prop arrives as
+    // `undefined`, which must keep the default (toggle shown).
+    const enabled = this.suppressPasswordToggle !== true;
+    // Every built-in dictionary carries the key, and a custom one can only
+    // override it, so the guard below only satisfies the index type.
+    const label = this.resolveLocale()["action.show_password"];
+    for (const field of root.querySelectorAll("zl-field")) {
+      field.passwordToggle = enabled;
+      if (label) field.passwordToggleLabel = label;
+    }
+  }
+
   override updated(changed: PropertyValues<this>): void {
     // Re-stamp part forwarding and widget-mode chrome on every commit:
     // `unsafeHTML` re-parses whenever the rendered string changes (step
@@ -528,11 +535,12 @@ export class ZitadelLogin extends ZitadelSurface {
         shell.toggleAttribute("data-suppress-header", this.suppressHeader === true);
       }
       // Stamped on the card too: its header REGION must leave the flex flow
-      // (card-host.css) or the card keeps a blank 32px header band — the
+      // (zl-card.css) or the card keeps a blank 32px header band — the
       // slotted headings alone going sr-only doesn't collapse the region.
       for (const card of this.shadowRoot.querySelectorAll("zl-card")) {
         card.toggleAttribute("data-suppress-header", this.suppressHeader === true);
       }
+      this.applyPasswordToggle(this.shadowRoot);
     }
     const previousTheme = this.lastRenderedTheme;
     this.lastRenderedTheme = this.themeController.theme;
@@ -665,9 +673,8 @@ export class ZitadelLogin extends ZitadelSurface {
   /**
    * Inject the attribution badge into the rendered template's
    * `<zl-page-shell>` footer slot. The attribution must live INSIDE the
-   * page-shell so it sits within the 100vh viewport rhythm (matching the
-   * Figma sign-in frame where the pill sits 24px below the card, both
-   * centred on the page). It can't be a sibling of the page-shell because
+   * page-shell so it sits within the 100vh viewport rhythm (the pill sits
+   * 24px below the card, both centred on the page). It can't be a sibling of the page-shell because
    * the page-shell already occupies the full viewport height.
    *
    * This markup is appended AFTER `renderStep` has sanitised the Liquid
@@ -741,11 +748,6 @@ export class ZitadelLogin extends ZitadelSurface {
     return `<div${slot} part="attribution" class="zl-attribution zl-trustmark">${mark}<slot name="attribution-trailing"></slot></div>`;
   }
 
-  /** Declarative config read from this element's attributes. */
-  private get projectAttrs(): ProjectAttrs {
-    return { projectId: this.projectId, proxyPath: this.proxyPath, url: this.url };
-  }
-
   /**
    * Set while a fresh flow replaces one the server refused to continue
    * (`flow.restart_required`). It bypasses the resume handle, puts the notice
@@ -776,7 +778,8 @@ export class ZitadelLogin extends ZitadelSurface {
           // forward, so start over. Logged so a host passing a wrong handle
           // does not get a silent restart.
           const gone =
-            error instanceof ApiError && (error.status === 400 || error.status === 404 || error.status === 410);
+            error instanceof ApiError &&
+            (error.status === 400 || error.status === 404 || error.status === 410);
           if (!gone) throw error;
           console.warn(`[zitadel-login] flow ${resumeId} no longer resolves; starting a new flow.`);
         }
@@ -1047,10 +1050,9 @@ export class ZitadelLogin extends ZitadelSurface {
     // `error.*` keys — the server's validation dialect
     // (`error.<field>_<rule>`, one key per violation, "; "-joined) —
     // localise via the catalog with generic per-rule fallbacks; anything
-    // else (outcome names, diagnostics) stays verbatim.
+    // else stays verbatim.
     const rawErrors: FlowError[] = step.error
-      ? (parseSsoError(step.error) ??
-        localiseFlowErrorKeys(step.error, {
+      ? (localiseFlowErrorKeys(step.error, {
           locale: this.resolveLocale(),
           stepName: step.name ?? "",
           // Inline-routed keys downgrade to a banner message when the
@@ -1244,7 +1246,7 @@ export class ZitadelLogin extends ZitadelSurface {
    */
   private stepErrorDismissed = false;
 
-  private handleAtomInput = (event: CustomEvent<{ name: string; value: string }>): void => {
+  private handleAtomInput = (event: CustomEvent<ZlFieldInputDetail>): void => {
     if (!event.detail) return;
     const { name, value } = event.detail;
     if (!name) return;
@@ -1318,7 +1320,7 @@ export class ZitadelLogin extends ZitadelSurface {
     }
   }
 
-  private handleAtomSubmit = (event: CustomEvent<{ action: string | null }>): void => {
+  private handleAtomSubmit = (event: CustomEvent<ZlSubmitDetail>): void => {
     if (this.loading) return;
     void this.submit(event.detail?.action ?? null);
   };

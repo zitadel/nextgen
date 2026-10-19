@@ -17,8 +17,7 @@ export function dockerRuntimeGuidance(
   cliVersion: string,
 ): DockerRuntimeGuidance {
   return {
-    hint:
-      "Docker is required only for the managed local runtime (`zitadel start` and `--server local`). Start Docker, then retry; or target a remote server with `--server <url>`.",
+    hint: "Docker is required only for the managed local runtime (`zitadel start` and `--server local`). Start Docker, then retry; or target a remote server with `--server <url>`.",
     nextActions: [
       "Start Docker Desktop, Docker Engine, or a Docker-compatible runtime such as Colima.",
       `Run \`docker version\`, then rerun \`${publicCliCommand(retryCommand, cliVersion)}\`.`,
