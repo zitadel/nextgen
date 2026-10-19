@@ -5,6 +5,7 @@ import { useRuntimeConfig } from "#imports";
 import {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
+  checkOpaqueSessionToken,
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
@@ -274,46 +275,6 @@ function isJwtShaped(token: string): boolean {
 }
 
 /**
- * Validates an opaque (non-JWT) session token by calling the backend's
- * `/sessions/me` endpoint. Returns the response JSON when the backend
- * confirms the session is live (HTTP 200), `null` otherwise.
- *
- * This is the fallback path for backends that issue encrypted opaque tokens
- * rather than self-contained JWTs.
- */
-async function validateOpaqueSessionToken(
-  token: string,
-  issuerUrl: string,
-  timeoutMs: number,
-): Promise<{
-  userId?: string;
-  identifier: string | null;
-  identifierProperty: string | null;
-  display: string | null;
-} | null> {
-  try {
-    const res = await fetch(`${issuerUrl}/sessions/me`, {
-      method: "GET",
-      headers: { cookie: `__nextgen_session=${token}` },
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    if (!res.ok) return null;
-    const body = (await res.json()) as {
-      user_id?: string;
-      user?: { identifier?: string; identifier_property?: string; display?: string };
-    };
-    return {
-      userId: body.user_id,
-      identifier: body.user?.identifier ?? null,
-      identifierProperty: body.user?.identifier_property ?? null,
-      display: body.user?.display ?? null,
-    };
-  } catch {
-    return null;
-  }
-}
-
-/**
  * Options passed internally to {@link handleAuth} after destructuring the
  * public-facing {@link NextgenMiddlewareOptions}.
  */
@@ -351,11 +312,14 @@ interface AuthHandlerOptions {
  * Verifies the session token and writes the auth result to `event.context`.
  * Deletes all `__nextgen*` cookies when the token is present but invalid.
  * Redirects to the login page on protected routes with no valid session.
+ * When the backend cannot say whether the session is live, the cookies stay
+ * and a protected route answers `503`.
  *
  * @param event - The current H3 event.
  * @param opts  - Auth handler options.
+ * @returns The body of a response this handler answers itself, if any.
  */
-async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<void> {
+async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<string | undefined> {
   const {
     url,
     protectedRoutes,
@@ -408,33 +372,44 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<voi
   // failed verification (bad sig, wrong typ/alg) must be rejected — never
   // accepted by a backend call that doesn't re-check the JWT claims.
   let liveAnonymousSession = false;
+  let undecided = false;
   if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
-    const opaqueResult = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
+    const check = await checkOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
     // A session without a user id is an anonymous session — the flow has not
     // verified a user factor yet. Treat it as unauthenticated rather than
     // inventing a placeholder identity that no route handler can resolve.
-    if (opaqueResult?.userId) {
+    if (check.verdict === "live" && check.session.userId) {
       event.context.nextgenAuth = {
         isAuthenticated: true,
         session: {
-          userId: opaqueResult.userId,
-          identifier: opaqueResult.identifier,
-          identifierProperty: opaqueResult.identifierProperty,
-          display: opaqueResult.display,
+          userId: check.session.userId,
+          identifier: check.session.identifier,
+          identifierProperty: check.session.identifierProperty,
+          display: check.session.display,
           token: cookieToken,
         },
       };
       return;
     }
-    liveAnonymousSession = opaqueResult !== null;
+    liveAnonymousSession = check.verdict === "live";
+    undecided = check.verdict === "undecided";
   }
 
   event.context.nextgenAuth = { isAuthenticated: false, session: null };
 
-  // Clearing cookies stops the browser from replaying dead credentials. A
-  // live anonymous session is not dead — the backend confirmed it above, and
-  // an in-progress login flow may still complete it — so its cookie stays.
-  if (!liveAnonymousSession) {
+  // The backend could not say whether the session is live. The user may well
+  // be signed in, so a protected route answers 503 rather than send them to
+  // the login page.
+  if (undecided && matchesRoutes(pathname, protectedRoutes)) {
+    setResponseStatus(event, 503);
+    return "Service Unavailable";
+  }
+
+  // Clearing cookies stops the browser from replaying dead credentials. Only
+  // the backend's refusal makes a cookie dead: a live anonymous session is not
+  // dead — the backend confirmed it above, and an in-progress login flow may
+  // still complete it — and a check without a verdict refused nothing.
+  if (!liveAnonymousSession && !undecided) {
     for (const name of Object.keys(parseCookies(event))) {
       if (name.startsWith("__nextgen")) {
         deleteCookie(event, name);
@@ -444,8 +419,8 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<voi
 
   if (matchesRoutes(pathname, protectedRoutes)) {
     await sendRedirect(event, loginRedirectUrl(loginPath, getRequestURL(event)).toString(), 302);
-    return;
   }
+  return undefined;
 }
 
 /**
