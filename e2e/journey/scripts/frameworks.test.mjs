@@ -11,7 +11,12 @@ import {
 } from "./frameworks.mjs";
 
 test("the CI matrix skips the meta-frameworks whose scaffolders track upstream releases", () => {
-  assert.deepEqual(ciExcludedFrameworkIds, ["sveltekit", "tanstack-start", "solid-start", "qwik-city"]);
+  assert.deepEqual(ciExcludedFrameworkIds, [
+    "sveltekit",
+    "tanstack-start",
+    "solid-start",
+    "qwik-city",
+  ]);
   assert.deepEqual(ciFrameworkIds, [
     "next",
     "nuxt",
