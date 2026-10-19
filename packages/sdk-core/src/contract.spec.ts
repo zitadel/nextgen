@@ -264,6 +264,8 @@ describe("widget loading ↔ SDK packages", () => {
     (file) => {
       const config = read(`${packagesDir}sdk-core/${file}`);
       for (const input of [
+        "packages/sdk-*/src/__tests__/*.test.ts",
+        "packages/sdk-*/src/__tests__/*/*.test.ts",
         "packages/sdk-*/package.json",
         "packages/sdk-*/README.md",
         "packages/sdk-*/skills/**/SKILL.md",
@@ -401,13 +403,15 @@ describe("SDK READMEs ↔ opening structure", () => {
 /**
  * The server SDKs' test titles.
  *
- * The four meta-framework SDKs test the same server behaviours, so their test
+ * The six meta-framework SDKs test the same server behaviours, so their test
  * files carry the same titles. A behaviour tested under another title, or left
  * untested in one SDK, then shows up here instead of drifting unnoticed.
  */
 describe("server SDK test titles", () => {
   const packagesPath = `${resolve(process.cwd(), "..")}/`;
   const TEST_FILES = {
+    "sdk-next": "sdk-next/src/__tests__/middleware.test.ts",
+    "sdk-nuxt": "sdk-nuxt/src/__tests__/server/middleware.test.ts",
     "sdk-sveltekit": "sdk-sveltekit/src/__tests__/handle.test.ts",
     "sdk-solid-start": "sdk-solid-start/src/__tests__/middleware.test.ts",
     "sdk-qwik-city": "sdk-qwik-city/src/__tests__/request-handler.test.ts",
@@ -441,6 +445,9 @@ describe("server SDK test titles", () => {
 
   // SvelteKit and SolidStart swallow a failed removal of the inbound header
   // instead of refusing the request, so neither has these two cases to test.
+  // Next.js never removes it from the incoming request: it builds a fresh,
+  // mutable header set with the header overwritten. Nuxt deletes it from the
+  // plain Node header object, which cannot refuse the deletion.
   const EXCEPTIONS: Record<keyof typeof TEST_FILES, readonly string[]> = {
     "sdk-sveltekit": [
       "refuses the request when the header cannot be removed",
@@ -452,6 +459,14 @@ describe("server SDK test titles", () => {
     ],
     "sdk-qwik-city": [],
     "sdk-tanstack-start": [],
+    "sdk-next": [
+      "refuses the request when the header cannot be removed",
+      "lets the request through when removal fails but the header is absent",
+    ],
+    "sdk-nuxt": [
+      "refuses the request when the header cannot be removed",
+      "lets the request through when removal fails but the header is absent",
+    ],
   };
 
   // Matches `it("title"` and the `it.each([...])("title"` form.
