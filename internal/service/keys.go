@@ -10,6 +10,8 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/oidc/v3/pkg/op"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // ---- Interface -------------------------------------------------------------
@@ -105,7 +107,9 @@ func (s *keyService) GetCrypter(ctx context.Context, keyID string, algorithm jos
 	ctx, end := startSpan(ctx, "KeyService.GetCrypter")
 	defer end(&err)
 
-	if crypter, ok := s.crypterCache.Get(CrypterCacheKey{KeyID: keyID, Algorithm: algorithm}); ok {
+	crypter, ok := s.crypterCache.Get(CrypterCacheKey{KeyID: keyID, Algorithm: algorithm})
+	setCacheHit(ctx, ok)
+	if ok {
 		return crypter, nil
 	}
 
@@ -142,10 +146,21 @@ func (s *keyService) GetProjectCrypter(ctx context.Context, projectID string, pu
 	if err != nil {
 		return nil, err
 	}
-	if crypter, ok := s.crypterCache.Get(CrypterCacheKey{KeyID: key.ID, Algorithm: key.Algorithm}); ok {
+	crypter, ok := s.crypterCache.Get(CrypterCacheKey{KeyID: key.ID, Algorithm: key.Algorithm})
+	setCacheHit(ctx, ok)
+	if ok {
 		return crypter, nil
 	}
 	return s.getCrypterOfKey(ctx, key)
+}
+
+// setCacheHit records on the span in ctx whether the crypter cache answered.
+// Only on a recording span: building the attribute allocates, and this runs on
+// every request.
+func setCacheHit(ctx context.Context, hit bool) {
+	if span := trace.SpanFromContext(ctx); span.IsRecording() {
+		span.SetAttributes(attribute.Bool("cache.hit", hit))
+	}
 }
 
 // getCrypterOfKey unwraps key and caches the result. It deliberately does not
@@ -167,8 +182,9 @@ func (s *keyService) getCrypterOfKey(ctx context.Context, key *domain.Encryption
 	// uncached, and the master key arm is the expensive one -- unwrapping under
 	// it is the RSA private-key operation this cache exists to avoid.
 	var kek crypto.Crypter
+	kind := "project"
 	if masterKey := s.masterKeys.GetByKeyID(jweHeader.KeyID); masterKey != nil {
-		kek = masterKey
+		kek, kind = masterKey, "master"
 	} else {
 		// A database read and a recursion, both of which the cache above spares
 		// every caller after the first.
@@ -179,7 +195,12 @@ func (s *keyService) getCrypterOfKey(ctx context.Context, key *domain.Encryption
 		kek = resolved
 	}
 
+	// kind "master" is the RSA unwrap under a master key, "project" the
+	// unwrap under a project KEK.
+	unwrapCtx, end := startSpan(ctx, "KeyService.unwrapKey")
+	trace.SpanFromContext(unwrapCtx).SetAttributes(attribute.String("key.kind", kind))
 	crypter, err := key.Crypter(kek)
+	end(&err)
 	if err != nil {
 		return nil, err
 	}
