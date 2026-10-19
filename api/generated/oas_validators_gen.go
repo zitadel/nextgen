@@ -582,6 +582,17 @@ func (s *AuthCheckFailedEvent) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if err := s.Payload.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "payload",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
@@ -631,6 +642,108 @@ func (s AuthCheckFailedEventDelegationType) Validate() error {
 	case "pat_shared":
 		return nil
 	case "exchanged":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s *AuthCheckPayload) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if value, ok := s.Reason.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "reason",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.Side.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "side",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s AuthCheckPayloadReason) Validate() error {
+	switch s {
+	case "provider_denied":
+		return nil
+	case "provider_error":
+		return nil
+	case "discovery_failed":
+		return nil
+	case "exchange_failed":
+		return nil
+	case "id_token_invalid":
+		return nil
+	case "userinfo_failed":
+		return nil
+	case "state_mismatch":
+		return nil
+	case "no_code":
+		return nil
+	case "connection_invalid":
+		return nil
+	case "secret_unavailable":
+		return nil
+	case "subject_invalid":
+		return nil
+	case "creation_disabled":
+		return nil
+	case "claim_rejected":
+		return nil
+	case "unroutable":
+		return nil
+	case "user_invalid":
+		return nil
+	case "other_schema":
+		return nil
+	case "handoff_failed":
+		return nil
+	case "internal":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s AuthCheckPayloadSide) Validate() error {
+	switch s {
+	case "provider":
+		return nil
+	case "journey":
 		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
@@ -698,6 +811,17 @@ func (s *AuthCheckSucceededEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "delegation_type",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.Payload.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "payload",
 			Error: err,
 		})
 	}
@@ -1088,6 +1212,17 @@ func (s *AuthSSOAuthorizationFailedEvent) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if err := s.Payload.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "payload",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
@@ -1204,6 +1339,17 @@ func (s *AuthSSOExchangeFailedEvent) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "delegation_type",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.Payload.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "payload",
 			Error: err,
 		})
 	}
@@ -1326,6 +1472,17 @@ func (s *AuthSSOExchangeSucceededEvent) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if err := s.Payload.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "payload",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
@@ -1367,6 +1524,248 @@ func (s AuthSSOExchangeSucceededEventCategory) Validate() error {
 }
 
 func (s AuthSSOExchangeSucceededEventDelegationType) Validate() error {
+	switch s {
+	case "direct":
+		return nil
+	case "delegated":
+		return nil
+	case "pat_shared":
+		return nil
+	case "exchanged":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s *AuthSSOFailurePayload) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Phase.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "phase",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.Reason.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "reason",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.Side.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "side",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s AuthSSOFailurePayloadPhase) Validate() error {
+	switch s {
+	case "resolved":
+		return nil
+	case "user_created":
+		return nil
+	case "handed_off":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s AuthSSOFailurePayloadReason) Validate() error {
+	switch s {
+	case "provider_denied":
+		return nil
+	case "provider_error":
+		return nil
+	case "discovery_failed":
+		return nil
+	case "exchange_failed":
+		return nil
+	case "id_token_invalid":
+		return nil
+	case "userinfo_failed":
+		return nil
+	case "state_mismatch":
+		return nil
+	case "no_code":
+		return nil
+	case "connection_invalid":
+		return nil
+	case "secret_unavailable":
+		return nil
+	case "subject_invalid":
+		return nil
+	case "creation_disabled":
+		return nil
+	case "claim_rejected":
+		return nil
+	case "unroutable":
+		return nil
+	case "user_invalid":
+		return nil
+	case "other_schema":
+		return nil
+	case "handoff_failed":
+		return nil
+	case "internal":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s AuthSSOFailurePayloadSide) Validate() error {
+	switch s {
+	case "provider":
+		return nil
+	case "journey":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s *AuthSSOResolutionFailedEvent) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.ProjectID.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.Category.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "category",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.ActorType.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "actor_type",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.DelegationType.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "delegation_type",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.Payload.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "payload",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s AuthSSOResolutionFailedEventActorType) Validate() error {
+	switch s {
+	case "human":
+		return nil
+	case "service":
+		return nil
+	case "system":
+		return nil
+	case "agent":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s AuthSSOResolutionFailedEventCategory) Validate() error {
+	switch s {
+	case "request":
+		return nil
+	case "auth":
+		return nil
+	case "session":
+		return nil
+	case "admin":
+		return nil
+	case "entity":
+		return nil
+	case "signal":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s AuthSSOResolutionFailedEventDelegationType) Validate() error {
 	switch s {
 	case "direct":
 		return nil
@@ -4887,6 +5286,11 @@ func (s Event) Validate() error {
 		return nil
 	case AuthSSOExchangeSucceededEventEvent:
 		if err := s.AuthSSOExchangeSucceededEvent.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case AuthSSOResolutionFailedEventEvent:
+		if err := s.AuthSSOResolutionFailedEvent.Validate(); err != nil {
 			return err
 		}
 		return nil

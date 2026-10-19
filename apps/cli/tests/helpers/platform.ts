@@ -19,6 +19,13 @@ export interface Captured<T> {
  * How a Google-shaped identity provider answers a connection. Each field
  * defaults to the answer under which the connection works.
  */
+/** An audit event the stream is arranged to hold: its type and what it names. */
+export interface RecordedEvent {
+  readonly event_type: string;
+  readonly entity_id?: string;
+  readonly payload?: Readonly<Record<string, unknown>>;
+}
+
 export interface ProviderBehaviour {
   /** The issuer the discovery document reports; Google's own unless a spec says otherwise. */
   readonly issuer?: string;
@@ -96,6 +103,13 @@ export interface PlatformMock {
    * is checked against.
    */
   hasOidcProvider(issuer: string): void;
+
+  /**
+   * Arranges the project's audit stream for a live sign-in: it is empty when
+   * the command first reads it, and holds `events` from the next read on, as
+   * if someone had signed in meanwhile.
+   */
+  recordsSignIn(events: ReadonlyArray<RecordedEvent>): void;
 
   /** Makes Google unreachable, as a provider that is down or a network that is cut would. */
   googleIsUnreachable(): void;
@@ -226,6 +240,31 @@ export function usePlatformMock(): PlatformMock {
             code_challenge_methods_supported: ["S256"],
           }),
         ),
+      );
+    },
+
+    recordsSignIn(events) {
+      const reads: true[] = [];
+      server.use(
+        http.get("*/events", () => {
+          reads.push(true);
+          const held = reads.length === 1 ? [] : events;
+          return HttpResponse.json({
+            data: held
+              .map((event, index) => ({
+                id: `evt_${index}`,
+                project_id: "proj",
+                event_type: event.event_type,
+                category: "auth",
+                occurred_at: "2026-10-19T00:00:00Z",
+                created_at: "2026-10-19T00:00:00Z",
+                client_id: "client",
+                entity_id: event.entity_id ?? null,
+                payload: event.payload ?? {},
+              }))
+              .reverse(),
+          });
+        }),
       );
     },
 

@@ -6,6 +6,7 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"fmt"
+	"github.com/zitadel/nextgen/internal/instrumentation/ssoevent"
 	"log/slog"
 	"strings"
 	"time"
@@ -123,6 +124,9 @@ type SSOCallbackResult struct {
 	// It is the only signal a later render reconciles a lost collision cookie
 	// from.
 	CollisionUserID string `json:"collision_user_id,omitempty"`
+	// FailureReason is why the ceremony failed, for the event the write emits.
+	// It is not stored with the record, which keeps only [ErrorKey].
+	FailureReason ssoevent.Reason `json:"-"`
 }
 
 // IsError reports whether the ceremony failed; see [SSOCallbackResult.ErrorKey].

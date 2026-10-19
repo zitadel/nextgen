@@ -34,7 +34,6 @@ const REASONS: Readonly<Record<string, string>> = {
   exchange_failed: "the provider refused the authorization code",
   id_token_invalid: "the provider's ID token did not verify",
   userinfo_failed: "the provider's user info could not be read",
-  state_invalid: "the sign-in state was unknown, used or expired",
   state_mismatch: "the redirect came back on another connection's path",
   no_code: "the redirect carried neither a code nor an error",
   connection_invalid: "the connection could not be served",
@@ -49,7 +48,7 @@ const REASONS: Readonly<Record<string, string>> = {
   internal: "the runtime failed",
 };
 
-const LOGS = 'Run zitadel logs and look for the lines saying "sso attempt"';
+const EVENTS = "Run zitadel events list and look for the auth.sso events of the attempt";
 
 /** What to do about a failed attempt: one action, chosen by the side that failed and the reason. */
 function recoveryFor(event: SignInEvent, context: IdpContext): string {
@@ -59,7 +58,6 @@ function recoveryFor(event: SignInEvent, context: IdpContext): string {
     return `Check the client ID, the secret and the redirect URI ${context.callbackUri} at ${where}`;
   }
   switch (event.reason) {
-    case "state_invalid":
     case "state_mismatch":
     case "no_code":
       return `Start again from ${context.live?.loginUrl}: the state is single-use and short-lived`;
@@ -76,7 +74,7 @@ function recoveryFor(event: SignInEvent, context: IdpContext): string {
     case "unroutable":
       return "Route sso_authenticated from the step that offers this provider in your login flow";
     default:
-      return LOGS;
+      return EVENTS;
   }
 }
 
@@ -174,13 +172,6 @@ export class LiveSignInCheck extends Check<IdpContext> {
     if (event.status === "failed") {
       return failure(event, context);
     }
-    if (event.phase === "resolved" && event.result === "existing_user") {
-      return {
-        status: "warn",
-        message:
-          "The provider's sign-in worked, but the identity matches an existing account, so the flow asks the person to prove it; this check cannot see that step finish",
-      };
-    }
     if (completes(event)) {
       return { status: "pass", message: `sign-in completed with ${context.slug}` };
     }
@@ -195,7 +186,7 @@ export class LiveSignInCheck extends Check<IdpContext> {
         last === undefined
           ? "no sign-in attempt seen"
           : `The sign-in started but did not finish: the last thing seen was ${PHASES[last.phase]}`,
-      recovery: LOGS,
+      recovery: EVENTS,
     };
   }
 }

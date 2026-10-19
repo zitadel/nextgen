@@ -69,8 +69,6 @@ export type SignInEvent = {
   readonly flowId: string;
   readonly phase: SignInPhase;
   readonly status: "ok" | "failed";
-  /** What a successful `resolved` settled on: `linked`, `existing_user`, `created` or `collect`. */
-  readonly result?: string;
   readonly reason?: string;
   readonly side?: "provider" | "journey";
 };

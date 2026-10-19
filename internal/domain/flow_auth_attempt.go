@@ -3,6 +3,8 @@ package domain
 import (
 	"context"
 	"time"
+
+	"github.com/zitadel/nextgen/internal/instrumentation/ssoevent"
 )
 
 // FlowAuthAttemptService is the [FlowStateMachine]'s narrow view of the
@@ -45,6 +47,19 @@ type FlowAuthAttemptService interface {
 	// Handoff mints the single-use token the client exchanges for a
 	// session. Called by the state machine on the terminal step.
 	Handoff(ctx context.Context, in FlowHandoffInput) (FlowHandoffOutput, error)
+	// RecordSSOFailure records that an SSO sign-in failed after its exchange,
+	// as an audit event. Best effort for the caller: the flow goes on
+	// whatever it returns.
+	RecordSSOFailure(ctx context.Context, in FlowSSOFailureInput) error
+}
+
+// FlowSSOFailureInput is one failure of an SSO sign-in after its exchange.
+type FlowSSOFailureInput struct {
+	ProjectID      string
+	AttemptID      string
+	ConnectionSlug string
+	Phase          ssoevent.Phase
+	Reason         ssoevent.Reason
 }
 
 // FlowCreateAttemptInput is the bootstrap input to

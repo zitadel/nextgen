@@ -104,10 +104,28 @@ type AuthAttemptCreatedPayload struct{}
 // AuthAttemptHandedOffPayload is empty; session_id lives on the event column.
 type AuthAttemptHandedOffPayload struct{}
 
+// AuthCheckPayload is the payload of the auth.check and auth.sso events. An
+// SSO event also names the connection, and a failed one the reason and whose
+// side it was, from the closed sets in the ssoevent package.
 type AuthCheckPayload struct {
-	CheckID       string `json:"check_id"`
-	CheckType     string `json:"check_type,omitempty"`
-	AuthAttemptID string `json:"auth_attempt_id,omitempty"`
+	CheckID        string `json:"check_id"`
+	CheckType      string `json:"check_type,omitempty"`
+	AuthAttemptID  string `json:"auth_attempt_id,omitempty"`
+	ConnectionSlug string `json:"connection_slug,omitempty"`
+	Reason         string `json:"reason,omitempty"`
+	Side           string `json:"side,omitempty"`
+}
+
+// AuthSSOFailurePayload is the payload of auth.sso.resolution.failed: an SSO
+// sign-in that failed after its code was exchanged, while the identity was
+// matched to a user, the user was created, or the attempt was handed off.
+type AuthSSOFailurePayload struct {
+	AuthAttemptID  string `json:"auth_attempt_id"`
+	ConnectionSlug string `json:"connection_slug"`
+	// Phase is where it failed: resolved, user_created or handed_off.
+	Phase  string `json:"phase"`
+	Reason string `json:"reason"`
+	Side   string `json:"side"`
 }
 
 type ClaimChallengeCreatedPayload struct{}

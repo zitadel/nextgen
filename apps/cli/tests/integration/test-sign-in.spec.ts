@@ -1,11 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { useLocalServers } from "../helpers/local-server";
 import { usePlatformMock } from "../helpers/platform";
 import { aSetUpApp, type CustomConnection } from "../helpers/project";
 
 const platform = usePlatformMock();
-useLocalServers();
 
 const CREDENTIALS = {
   clientId: "1234-abc.apps.googleusercontent.com",
@@ -118,7 +116,6 @@ describe("test sign-in", () => {
       it("refuses a live sign-in when the client secret variable is not a secret", async () => {
         const app = await aSetUpApp();
         await app.enableSso("google", CREDENTIALS);
-        await app.startLocalServer();
         await app.setVariable("GOOGLE_CLIENT_SECRET", "42");
         platform.hasGoogle();
 
@@ -132,6 +129,100 @@ describe("test sign-in", () => {
         ]);
 
         expect(result).toFailWith("E_CREDENTIAL_MISSING");
+      });
+    });
+
+    describe("--live", () => {
+      const ATTEMPT = { auth_attempt_id: "att_1", connection_slug: "google" };
+      const LIVE = [
+        "test",
+        "sign-in",
+        "--provider",
+        "google",
+        "--live",
+        "--timeout",
+        "10",
+        "--json",
+      ];
+
+      async function aSignedUpApp() {
+        const app = await aSetUpApp();
+        await app.enableSso("google", CREDENTIALS);
+        await app.apply();
+        platform.hasGoogle();
+        return app;
+      }
+
+      it("passes once the attempt has been handed off", async () => {
+        const app = await aSignedUpApp();
+        platform.recordsSignIn([
+          { event_type: "auth.attempt.created", entity_id: "att_1" },
+          { event_type: "auth.sso.exchange.succeeded", payload: ATTEMPT },
+          { event_type: "auth.attempt.handed_off", entity_id: "att_1" },
+        ]);
+
+        const result = await app.run(LIVE, { BROWSER: "none" });
+
+        expect(result).toSucceed();
+      });
+
+      it("fails a sign-in the provider refused, naming the callback URI to check", async () => {
+        const app = await aSignedUpApp();
+        platform.recordsSignIn([
+          { event_type: "auth.attempt.created", entity_id: "att_1" },
+          {
+            event_type: "auth.sso.authorization.failed",
+            payload: { ...ATTEMPT, reason: "provider_denied", side: "provider" },
+          },
+        ]);
+
+        const result = await app.run(LIVE, { BROWSER: "none" });
+
+        expect(result).toHintAt(CALLBACK_URI);
+      });
+
+      it("fails a handoff that did not happen, as the journey's", async () => {
+        const app = await aSignedUpApp();
+        platform.recordsSignIn([
+          { event_type: "auth.attempt.created", entity_id: "att_1" },
+          {
+            event_type: "auth.sso.resolution.failed",
+            payload: {
+              ...ATTEMPT,
+              phase: "handed_off",
+              reason: "handoff_failed",
+              side: "journey",
+            },
+          },
+        ]);
+
+        const result = await app.run(LIVE, { BROWSER: "none" });
+
+        expect(result).toHintAt("zitadel events list");
+      });
+
+      it("fails when nobody signs in, pointing at the events", async () => {
+        const app = await aSignedUpApp();
+        platform.recordsSignIn([]);
+
+        const result = await app.run(
+          ["test", "sign-in", "--provider", "google", "--live", "--timeout", "1", "--json"],
+          { BROWSER: "none" },
+        );
+
+        expect(result).toHintAt("zitadel events list");
+      });
+
+      it("shows the login URL on stderr while it waits, so an agent can pass it on", async () => {
+        const app = await aSignedUpApp();
+        platform.recordsSignIn([]);
+
+        const result = await app.run(
+          ["test", "sign-in", "--provider", "google", "--live", "--timeout", "1", "--json"],
+          { BROWSER: "none" },
+        );
+
+        expect(result.stderr).toContain("/login");
       });
     });
 
@@ -164,7 +255,6 @@ describe("test sign-in", () => {
 
       it("refuses a live sign-in, which is one provider's, without a name", async () => {
         const app = await anAppWithTwoProviders();
-        await app.startLocalServer();
 
         const result = await app.run(["test", "sign-in", "--live", "--json"]);
 

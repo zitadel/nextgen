@@ -15,6 +15,7 @@ import (
 	"github.com/zitadel/nextgen/internal/crypto"
 	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/ssoevent"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -503,7 +504,10 @@ func TestAuthAttemptService_IssueSSOState(t *testing.T) {
 // The ceremony's outcome is audited with its result, under the SSO check.
 func TestAuthAttemptService_SetSSOCallbackResult(t *testing.T) {
 	sessionID := "sess-1"
-	check := &domain.SSOCallbackCheck{ID: "chk-1", StateHash: "state-hash", AuthAttemptID: "att-1"}
+	check := &domain.SSOCallbackCheck{
+		ID: "chk-1", StateHash: "state-hash", AuthAttemptID: "att-1",
+		Pending: &domain.SSOStatePayload{ProviderSlug: "google"},
+	}
 	tests := []struct {
 		name     string
 		result   *domain.SSOCallbackResult
@@ -511,16 +515,26 @@ func TestAuthAttemptService_SetSSOCallbackResult(t *testing.T) {
 		wantErr  error
 		// eventType is passed in and must be emitted unchanged.
 		eventType domain.EventType
+		// wantPayload is what the event carries beyond the check and attempt.
+		wantPayload string
 	}{
 		{
-			name:      "a failed result emits the given event",
-			result:    &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOCancelled},
-			eventType: domain.EventTypeAuthSSOAuthorizationFailed,
+			name:        "a failed result emits the given event with the connection, the reason and whose side it was",
+			result:      &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOCancelled, FailureReason: ssoevent.ReasonProviderDenied},
+			eventType:   domain.EventTypeAuthSSOAuthorizationFailed,
+			wantPayload: `,"connection_slug":"google","reason":"provider_denied","side":"provider"`,
 		},
 		{
-			name:      "a successful result emits the given event",
-			result:    &domain.SSOCallbackResult{Subject: "sub-1"},
-			eventType: domain.EventTypeAuthSSOExchangeSucceeded,
+			name:        "a journey failure says so",
+			result:      &domain.SSOCallbackResult{ErrorKey: domain.FlowStepErrorSSOFailed, FailureReason: ssoevent.ReasonSecretMissing},
+			eventType:   domain.EventTypeAuthSSOExchangeFailed,
+			wantPayload: `,"connection_slug":"google","reason":"secret_unavailable","side":"journey"`,
+		},
+		{
+			name:        "a successful result emits the given event with the connection and no reason",
+			result:      &domain.SSOCallbackResult{Subject: "sub-1"},
+			eventType:   domain.EventTypeAuthSSOExchangeSucceeded,
+			wantPayload: `,"connection_slug":"google"`,
 		},
 		{
 			name:      "a refused write emits nothing",
@@ -567,9 +581,44 @@ func TestAuthAttemptService_SetSSOCallbackResult(t *testing.T) {
 			assert.Equal(t, "chk-1", *gotEvent.EntityID)
 			require.NotNil(t, gotEvent.SessionID)
 			assert.Equal(t, sessionID, *gotEvent.SessionID)
-			assert.JSONEq(t, `{"check_id":"chk-1","check_type":"SSOCallback","auth_attempt_id":"att-1"}`, string(gotEvent.Payload))
+			assert.JSONEq(t, `{"check_id":"chk-1","check_type":"SSOCallback","auth_attempt_id":"att-1"`+tt.wantPayload+`}`, string(gotEvent.Payload))
 		})
 	}
+}
+
+// A failure after the exchange is told of as an event of its own, naming the
+// attempt, the connection, the phase and the reason.
+func TestAuthAttemptService_RecordSSOFailure(t *testing.T) {
+	sessionID := "sess-1"
+	ctrl := gomock.NewController(t)
+	stmts := mocks.NewMockAllStatements(ctrl)
+	stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), "proj", "att-1").Return(&domain.AuthAttempt{ProjectID: "proj", ID: "att-1", SessionID: &sessionID}, nil)
+	var gotEvent *domain.Event
+	stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, ev *domain.Event) error {
+		gotEvent = ev
+		return nil
+	})
+	pool := mocks.NewMockPool(ctrl)
+	statementer := mocks.NewMockStatementer[service.AllStatements](ctrl)
+	pool.EXPECT().Transaction(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
+			return fn(ctx, statementer)
+		},
+	)
+	statementer.EXPECT().Statements().Return(stmts).AnyTimes()
+	svc := service.NewAuthAttemptService(service.NewPool(pool), nil, nil, nil)
+
+	err := svc.RecordSSOFailure(t.Context(), domain.FlowSSOFailureInput{
+		ProjectID: "proj", AttemptID: "att-1", ConnectionSlug: "google",
+		Phase: ssoevent.PhaseResolved, Reason: ssoevent.ReasonCreationDisabled,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, gotEvent)
+	assert.Equal(t, domain.EventTypeAuthSSOResolutionFailed, gotEvent.EventType)
+	require.NotNil(t, gotEvent.EntityID)
+	assert.Equal(t, "att-1", *gotEvent.EntityID)
+	assert.JSONEq(t, `{"auth_attempt_id":"att-1","connection_slug":"google","phase":"resolved","reason":"creation_disabled","side":"journey"}`, string(gotEvent.Payload))
 }
 
 func TestAuthAttemptService_VerifyProof(t *testing.T) {

@@ -277,7 +277,14 @@ func TestFlowSSOCallback_Process(t *testing.T) {
 
 			out, err := svc.Process(t.Context(), tt.in)
 
-			assert.Equal(t, tt.wantResult, attempts.setResult)
+			// The reason is asserted where each failure is listed, below.
+			var stored *domain.SSOCallbackResult
+			if attempts.setResult != nil {
+				withoutReason := *attempts.setResult
+				withoutReason.FailureReason = ""
+				stored = &withoutReason
+			}
+			assert.Equal(t, tt.wantResult, stored)
 			assert.Equal(t, tt.wantEvent, attempts.setResultEvent)
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
@@ -525,23 +532,6 @@ const (
 	canaryText   = "CANARY-PROVIDER-TEXT"
 )
 
-// ssoEventRecords returns the sso attempt events a JSON log holds.
-func ssoEventRecords(t *testing.T, logs []byte) []map[string]any {
-	t.Helper()
-	var events []map[string]any
-	for _, line := range bytes.Split(bytes.TrimSpace(logs), []byte("\n")) {
-		if len(line) == 0 {
-			continue
-		}
-		var record map[string]any
-		require.NoError(t, json.Unmarshal(line, &record))
-		if record["msg"] == ssoevent.Message {
-			events = append(events, record)
-		}
-	}
-	return events
-}
-
 // ssoCanaryProvider is a fake provider whose token endpoint either fails with
 // canary text or answers a signed id_token that carries the canary claim and
 // the canary access token. The connection maps the email claim.
@@ -591,133 +581,129 @@ func ssoCanaryProvider(t *testing.T, failExchange bool) []byte {
 	}`)
 }
 
-func TestFlowSSOCallback_Process_EmitsOneEventPerPhase(t *testing.T) {
-	t.Parallel()
-	type want struct {
-		phase, status, reason, side string
-	}
-	tests := []struct {
-		name       string
-		in         service.FlowSSOCallbackInput
-		consumeErr error
-		// revision is how the pinned revision is read; nil means it is not.
-		revision *revisionRead
-		// setResultErrs answers the store of the exchanged identity.
-		setResultErrs []error
-		want          []want
-	}{
-		{
-			name:     "a completed callback reports the callback and the exchange",
-			in:       service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"},
-			revision: &revisionRead{secret: &domain.Variable{Name: "GOOGLE_SECRET", Value: canarySecret, IsSecret: true}},
-			want:     []want{{"callback_received", "ok", "", ""}, {"exchange_finished", "ok", "", ""}},
-		},
-		{
-			name: "access_denied is the provider's",
-			in:   service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Error: "access_denied"},
-			want: []want{{"callback_received", "failed", "provider_denied", "provider"}},
-		},
-		{
-			name: "any other provider error is the provider's",
-			in:   service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Error: "server_error"},
-			want: []want{{"callback_received", "failed", "provider_error", "provider"}},
-		},
-		{
-			name: "a callback with neither code nor error is the journey's",
-			in:   service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState},
-			want: []want{{"callback_received", "failed", "no_code", "journey"}},
-		},
-		{
-			name: "another connection's path is the journey's",
-			in:   service.FlowSSOCallbackInput{ConnectionSlug: "other", State: ssoCallbackState, Code: "the-code"},
-			want: []want{{"callback_received", "failed", "state_mismatch", "journey"}},
-		},
-		{
-			name:       "an unknown state is the journey's",
-			in:         service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"},
-			consumeErr: domain.ErrSSOStateInvalid(),
-			want:       []want{{"callback_received", "failed", "state_invalid", "journey"}},
-		},
-		{
-			name: "a state without a project is the journey's",
-			in:   service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: "no-separator", Code: "the-code"},
-			want: []want{{"callback_received", "failed", "state_invalid", "journey"}},
-		},
-		{
-			name:     "a refused code exchange is the provider's",
-			in:       service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"},
-			revision: &revisionRead{failToken: true, secret: &domain.Variable{Name: "GOOGLE_SECRET", Value: canarySecret, IsSecret: true}},
-			want:     []want{{"callback_received", "ok", "", ""}, {"exchange_finished", "failed", "exchange_failed", "provider"}},
-		},
-		{
-			name:     "a secret that is not a secret variable is the journey's",
-			in:       service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"},
-			revision: &revisionRead{secret: &domain.Variable{Name: "GOOGLE_SECRET", Value: "plain"}},
-			want:     []want{{"callback_received", "ok", "", ""}, {"exchange_finished", "failed", "secret_unavailable", "journey"}},
-		},
-		{
-			name:          "a state replaced during the exchange is the journey's",
-			in:            service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"},
-			revision:      &revisionRead{secret: &domain.Variable{Name: "GOOGLE_SECRET", Value: canarySecret, IsSecret: true}},
-			setResultErrs: []error{domain.ErrSSOStateInvalid()},
-			want:          []want{{"callback_received", "ok", "", ""}, {"exchange_finished", "failed", "state_invalid", "journey"}},
-		},
-		{
-			name:     "a connection revision that cannot be read is the journey's",
-			in:       service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"},
-			revision: &revisionRead{err: errors.New("gone")},
-			want:     []want{{"callback_received", "ok", "", ""}, {"exchange_finished", "failed", "connection_invalid", "journey"}},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			var logs bytes.Buffer
-			ctx := zlog.WithLoggingContext(t.Context(), slog.New(slog.NewJSONHandler(&logs, nil)))
-			svc, attempts := newCallbackWithRevision(t, tt.revision, tt.consumeErr)
-			attempts.setResultErrs = tt.setResultErrs
-
-			_, _ = svc.Process(ctx, tt.in)
-
-			events := ssoEventRecords(t, logs.Bytes())
-			require.Len(t, events, len(tt.want))
-			for i, w := range tt.want {
-				assert.Equal(t, w.phase, events[i]["phase"])
-				assert.Equal(t, w.status, events[i]["status"])
-				if w.reason != "" {
-					assert.Equal(t, w.reason, events[i]["reason"])
-					assert.Equal(t, w.side, events[i]["side"])
-				} else {
-					assert.NotContains(t, events[i], "reason")
-				}
-				if attempts.consumeErr == nil && tt.in.State == ssoCallbackState {
-					assert.Equal(t, "att_1", events[i]["flow_id"])
-					assert.Equal(t, ssoCallbackSlug, events[i]["slug"])
-				}
-			}
-		})
-	}
-}
-
-// Whatever a phase meets, none of it reaches an event: not the code, the
-// state, the secret, the tokens, a claim value, nor the provider's own words
-// or the query string they arrive in.
-func TestFlowSSOCallback_Process_EventsCarryNoSecrets(t *testing.T) {
+// Every way a callback fails records why in the event its result write emits:
+// the type says whether a code arrived, and the reason says which failure it
+// was, from a closed set.
+func TestFlowSSOCallback_Process_RecordsWhyItFailed(t *testing.T) {
 	t.Parallel()
 	secret := &domain.Variable{Name: "GOOGLE_SECRET", Value: canarySecret, IsSecret: true}
 	tests := []struct {
 		name       string
 		in         service.FlowSSOCallbackInput
 		consumeErr error
+		// revision is how the pinned revision is read; nil means it is not.
 		revision   *revisionRead
-		wantClaims bool
+		wantEvent  domain.EventType
+		wantReason ssoevent.Reason
 	}{
 		{
-			name:       "a completed exchange",
-			in:         service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: canaryCode, BindingNonce: canaryState},
-			revision:   &revisionRead{secret: secret},
-			wantClaims: true,
+			name:      "a completed exchange records no failure",
+			in:        service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"},
+			revision:  &revisionRead{secret: secret},
+			wantEvent: domain.EventTypeAuthSSOExchangeSucceeded,
 		},
+		{
+			name:       "access_denied is the provider's",
+			in:         service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Error: "access_denied"},
+			wantEvent:  domain.EventTypeAuthSSOAuthorizationFailed,
+			wantReason: ssoevent.ReasonProviderDenied,
+		},
+		{
+			name:       "any other provider error is the provider's",
+			in:         service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Error: "server_error"},
+			wantEvent:  domain.EventTypeAuthSSOAuthorizationFailed,
+			wantReason: ssoevent.ReasonProviderError,
+		},
+		{
+			name:       "a callback with neither code nor error is the journey's",
+			in:         service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState},
+			wantEvent:  domain.EventTypeAuthSSOAuthorizationFailed,
+			wantReason: ssoevent.ReasonNoCode,
+		},
+		{
+			name:       "another connection's path is the journey's",
+			in:         service.FlowSSOCallbackInput{ConnectionSlug: "other", State: ssoCallbackState, Code: "the-code"},
+			wantEvent:  domain.EventTypeAuthSSOExchangeFailed,
+			wantReason: ssoevent.ReasonStateMismatch,
+		},
+		{
+			name:       "a refused code exchange is the provider's",
+			in:         service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"},
+			revision:   &revisionRead{failToken: true, secret: secret},
+			wantEvent:  domain.EventTypeAuthSSOExchangeFailed,
+			wantReason: ssoevent.ReasonExchangeFailed,
+		},
+		{
+			name:       "a secret that is not a secret variable is the journey's",
+			in:         service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"},
+			revision:   &revisionRead{secret: &domain.Variable{Name: "GOOGLE_SECRET", Value: "plain"}},
+			wantEvent:  domain.EventTypeAuthSSOExchangeFailed,
+			wantReason: ssoevent.ReasonSecretMissing,
+		},
+		{
+			name:       "a connection revision that cannot be read is the journey's",
+			in:         service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"},
+			revision:   &revisionRead{err: errors.New("gone")},
+			wantEvent:  domain.EventTypeAuthSSOExchangeFailed,
+			wantReason: ssoevent.ReasonConnectionBroken,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			svc, attempts := newCallbackWithRevision(t, tt.revision, tt.consumeErr)
+
+			_, _ = svc.Process(t.Context(), tt.in)
+
+			require.NotNil(t, attempts.setResult)
+			assert.Equal(t, tt.wantEvent, attempts.setResultEvent)
+			assert.Equal(t, tt.wantReason, attempts.setResult.FailureReason)
+		})
+	}
+}
+
+// A state the engine does not know has no attempt to attach an event to, so a
+// request that merely guesses one writes nothing.
+func TestFlowSSOCallback_Process_WritesNothingForAnUnknownState(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name       string
+		in         service.FlowSSOCallbackInput
+		consumeErr error
+	}{
+		{
+			name:       "a state the store does not hold",
+			in:         service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: "the-code"},
+			consumeErr: domain.ErrSSOStateInvalid(),
+		},
+		{
+			name: "a state without a project",
+			in:   service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: "no-separator", Code: "the-code"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			svc, attempts := newCallbackWithRevision(t, nil, tt.consumeErr)
+
+			_, err := svc.Process(t.Context(), tt.in)
+
+			require.Error(t, err)
+			assert.Nil(t, attempts.setResult)
+		})
+	}
+}
+
+// What a failed callback stores and emits is the error key and a reason from a
+// closed set: nothing the provider or the request said reaches it.
+func TestFlowSSOCallback_Process_FailureCarriesNoSecrets(t *testing.T) {
+	t.Parallel()
+	secret := &domain.Variable{Name: "GOOGLE_SECRET", Value: canarySecret, IsSecret: true}
+	tests := []struct {
+		name     string
+		in       service.FlowSSOCallbackInput
+		revision *revisionRead
+	}{
 		{
 			name:     "a refused exchange whose answer echoes the code and the secret",
 			in:       service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: ssoCallbackState, Code: canaryCode},
@@ -731,39 +717,24 @@ func TestFlowSSOCallback_Process_EventsCarryNoSecrets(t *testing.T) {
 			},
 		},
 		{
-			name:       "an unknown state",
-			in:         service.FlowSSOCallbackInput{ConnectionSlug: ssoCallbackSlug, State: canaryState, Code: canaryCode},
-			consumeErr: domain.ErrSSOStateInvalid(),
-		},
-		{
 			name: "a callback on another connection's path",
 			in:   service.FlowSSOCallbackInput{ConnectionSlug: "other", State: ssoCallbackState, Code: canaryCode, Issuer: "https://evil.example.test/?q=" + canaryText},
-		},
-		{
-			name:       "a callback path that is not a slug",
-			in:         service.FlowSSOCallbackInput{ConnectionSlug: canaryText + "?code=" + canaryCode, State: canaryState, Code: canaryCode},
-			consumeErr: domain.ErrSSOStateInvalid(),
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			var logs bytes.Buffer
-			ctx := zlog.WithLoggingContext(t.Context(), slog.New(slog.NewJSONHandler(&logs, nil)))
-			svc, _ := newCallbackWithRevision(t, tt.revision, tt.consumeErr)
+			svc, attempts := newCallbackWithRevision(t, tt.revision, nil)
 
-			_, _ = svc.Process(ctx, tt.in)
+			_, _ = svc.Process(t.Context(), tt.in)
 
-			events := ssoEventRecords(t, logs.Bytes())
-			require.NotEmpty(t, events)
-			out, err := json.Marshal(events)
-			require.NoError(t, err)
-			for _, canary := range []string{canaryCode, canaryState, canarySecret, canaryToken, canaryClaim, canaryText, "?"} {
-				assert.NotContains(t, string(out), canary)
+			require.NotNil(t, attempts.setResult)
+			stored := fmt.Sprintf("%+v", *attempts.setResult)
+			for _, canary := range []string{canaryCode, canaryState, canarySecret, canaryToken, canaryClaim, canaryText} {
+				assert.NotContains(t, stored, canary)
 			}
-			if tt.wantClaims {
-				assert.Equal(t, []any{"email"}, events[len(events)-1]["claims"])
-			}
+			assert.Empty(t, attempts.setResult.Subject)
+			assert.Empty(t, attempts.setResult.Claims)
 		})
 	}
 }

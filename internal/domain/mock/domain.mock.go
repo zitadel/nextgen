@@ -525,6 +525,44 @@ func (c *MockFlowAuthAttemptServiceIssuePasskeyRegistrationChallengeCall) DoAndR
 	return c
 }
 
+// RecordSSOFailure mocks base method.
+func (m *MockFlowAuthAttemptService) RecordSSOFailure(ctx context.Context, in domain.FlowSSOFailureInput) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RecordSSOFailure", ctx, in)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RecordSSOFailure indicates an expected call of RecordSSOFailure.
+func (mr *MockFlowAuthAttemptServiceMockRecorder) RecordSSOFailure(ctx, in any) *MockFlowAuthAttemptServiceRecordSSOFailureCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecordSSOFailure", reflect.TypeOf((*MockFlowAuthAttemptService)(nil).RecordSSOFailure), ctx, in)
+	return &MockFlowAuthAttemptServiceRecordSSOFailureCall{Call: call}
+}
+
+// MockFlowAuthAttemptServiceRecordSSOFailureCall wrap *gomock.Call
+type MockFlowAuthAttemptServiceRecordSSOFailureCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockFlowAuthAttemptServiceRecordSSOFailureCall) Return(arg0 error) *MockFlowAuthAttemptServiceRecordSSOFailureCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockFlowAuthAttemptServiceRecordSSOFailureCall) Do(f func(context.Context, domain.FlowSSOFailureInput) error) *MockFlowAuthAttemptServiceRecordSSOFailureCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockFlowAuthAttemptServiceRecordSSOFailureCall) DoAndReturn(f func(context.Context, domain.FlowSSOFailureInput) error) *MockFlowAuthAttemptServiceRecordSSOFailureCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // Start mocks base method.
 func (m *MockFlowAuthAttemptService) Start(ctx context.Context, in domain.FlowCreateAttemptInput) (string, error) {
 	m.ctrl.T.Helper()

@@ -114,29 +114,19 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 	// answered exactly like an unknown state.
 	projectID := domain.SSOStateProjectID(in.State)
 	if projectID == "" {
-		ssoevent.Emit(ctx, ssoevent.Event{Slug: in.ConnectionSlug, Phase: ssoevent.PhaseCallbackReceived, Reason: ssoevent.ReasonStateInvalid})
 		return FlowSSOCallbackOutput{}, domain.ErrSSOStateInvalid()
 	}
 	check, err := c.attempts.ConsumeSSOState(ctx, projectID, in.State, in.BindingNonce)
 	if err != nil {
-		reason := ssoevent.ReasonInternal
-		if errors.Is(err, domain.ErrSSOStateInvalid()) {
-			reason = ssoevent.ReasonStateInvalid
-		}
-		ssoevent.Emit(ctx, ssoevent.Event{Slug: in.ConnectionSlug, Phase: ssoevent.PhaseCallbackReceived, Reason: reason})
 		return FlowSSOCallbackOutput{}, err
 	}
 	// Bound only after the consume: until a record matches, the project
 	// comes from the query alone.
 	audit.BindPublicRequest(ctx, projectID, "", "")
 	pending := check.Pending
-	event := func(phase ssoevent.Phase, reason ssoevent.Reason) {
-		ssoevent.Emit(ctx, ssoevent.Event{Slug: pending.ProviderSlug, FlowID: check.AuthAttemptID, Phase: phase, Reason: reason})
-	}
 
 	if in.ConnectionSlug != pending.ProviderSlug {
-		event(ssoevent.PhaseCallbackReceived, ssoevent.ReasonStateMismatch)
-		return c.fail(ctx, projectID, check, fmt.Errorf("%w: the callback path names connection %q, the state pins %q", errSSOCallbackMixUp, in.ConnectionSlug, pending.ProviderSlug), refusedEventType(in))
+		return c.fail(ctx, projectID, check, fmt.Errorf("%w: the callback path names connection %q, the state pins %q", errSSOCallbackMixUp, in.ConnectionSlug, pending.ProviderSlug), refusedEventType(in), ssoevent.ReasonStateMismatch)
 	}
 
 	var conn idp.Connection
@@ -145,8 +135,7 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 		conn, connErr = c.pinnedConnection(ctx, projectID, pending)
 	}
 	if in.Issuer != "" && connErr == nil && in.Issuer != conn.OIDC.Issuer {
-		event(ssoevent.PhaseCallbackReceived, ssoevent.ReasonStateMismatch)
-		return c.fail(ctx, projectID, check, fmt.Errorf("%w: the callback's iss %q is not the issuer %q of connection %q", errSSOCallbackMixUp, in.Issuer, conn.OIDC.Issuer, pending.ProviderSlug), refusedEventType(in))
+		return c.fail(ctx, projectID, check, fmt.Errorf("%w: the callback's iss %q is not the issuer %q of connection %q", errSSOCallbackMixUp, in.Issuer, conn.OIDC.Issuer, pending.ProviderSlug), refusedEventType(in), ssoevent.ReasonStateMismatch)
 	}
 	if in.Error != "" {
 		if connErr != nil {
@@ -164,7 +153,6 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 			key = domain.FlowStepErrorSSOCancelled
 			reason = ssoevent.ReasonProviderDenied
 		}
-		event(ssoevent.PhaseCallbackReceived, reason)
 		// The description and URI are logged for the operator and never
 		// stored: the user sees only the localized key.
 		getLoggingContext(ctx, "flow").Warn("sso provider returned an error",
@@ -174,23 +162,19 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 			slog.String("error_description", in.ErrorDescription),
 			slog.String("error_uri", in.ErrorURI),
 		)
-		return c.park(ctx, projectID, check, key, domain.EventTypeAuthSSOAuthorizationFailed)
+		return c.park(ctx, projectID, check, key, domain.EventTypeAuthSSOAuthorizationFailed, reason)
 	}
 
 	if in.Code == "" {
-		event(ssoevent.PhaseCallbackReceived, ssoevent.ReasonNoCode)
-		return c.fail(ctx, projectID, check, errors.New("the callback carried neither a code nor an error"), domain.EventTypeAuthSSOAuthorizationFailed)
+		return c.fail(ctx, projectID, check, errors.New("the callback carried neither a code nor an error"), domain.EventTypeAuthSSOAuthorizationFailed, ssoevent.ReasonNoCode)
 	}
 
-	event(ssoevent.PhaseCallbackReceived, "")
 	if connErr != nil {
-		event(ssoevent.PhaseExchangeFinished, ssoevent.ReasonConnectionBroken)
-		return c.fail(ctx, projectID, check, connErr, domain.EventTypeAuthSSOExchangeFailed)
+		return c.fail(ctx, projectID, check, connErr, domain.EventTypeAuthSSOExchangeFailed, ssoevent.ReasonConnectionBroken)
 	}
 	identity, err := c.exchange(ctx, projectID, in.Code, pending, conn)
 	if err != nil {
-		event(ssoevent.PhaseExchangeFinished, exchangeFailure(err))
-		return c.fail(ctx, projectID, check, err, domain.EventTypeAuthSSOExchangeFailed)
+		return c.fail(ctx, projectID, check, err, domain.EventTypeAuthSSOExchangeFailed, exchangeFailure(err))
 	}
 	result := &domain.SSOCallbackResult{
 		Subject:              identity.Subject,
@@ -202,17 +186,10 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 		// The row was replaced or removed, so storing the error key would
 		// fail the same way.
 		if errors.Is(err, domain.ErrSSOStateInvalid()) {
-			event(ssoevent.PhaseExchangeFinished, ssoevent.ReasonStateInvalid)
 			return FlowSSOCallbackOutput{}, err
 		}
-		event(ssoevent.PhaseExchangeFinished, ssoevent.ReasonInternal)
-		return c.fail(ctx, projectID, check, domain.ErrInternal(err), domain.EventTypeAuthSSOExchangeFailed)
+		return c.fail(ctx, projectID, check, domain.ErrInternal(err), domain.EventTypeAuthSSOExchangeFailed, ssoevent.ReasonInternal)
 	}
-	claimNames := make([]string, 0, len(identity.Claims))
-	for name := range identity.Claims {
-		claimNames = append(claimNames, name)
-	}
-	ssoevent.Emit(ctx, ssoevent.Event{Slug: pending.ProviderSlug, FlowID: check.AuthAttemptID, Phase: ssoevent.PhaseExchangeFinished, ClaimNames: claimNames})
 	return FlowSSOCallbackOutput{ReturnTarget: pending.ReturnTarget}, nil
 }
 
@@ -283,7 +260,7 @@ func (c *FlowSSOCallback) resolveClientSecret(ctx context.Context, projectID str
 // key with eventType. An internal error is still stored, so the user can retry
 // from the step: the state is already consumed, and the error page has no way
 // back.
-func (c *FlowSSOCallback) fail(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, cause error, eventType domain.EventType) (FlowSSOCallbackOutput, error) {
+func (c *FlowSSOCallback) fail(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, cause error, eventType domain.EventType, reason ssoevent.Reason) (FlowSSOCallbackOutput, error) {
 	// A cancelled request is not the provider's fault, and the client is
 	// gone, so nothing is logged. A deadline is still logged.
 	if !errors.Is(ctx.Err(), context.Canceled) {
@@ -298,14 +275,14 @@ func (c *FlowSSOCallback) fail(ctx context.Context, projectID string, check *dom
 			slog.Any("error", cause),
 		)
 	}
-	return c.park(ctx, projectID, check, domain.FlowStepErrorSSOFailed, eventType)
+	return c.park(ctx, projectID, check, domain.FlowStepErrorSSOFailed, eventType, reason)
 }
 
 // park stores an error result on the consumed record, emitting eventType, and
 // sends the browser back to the return target, where the originating step
 // shows the key.
-func (c *FlowSSOCallback) park(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, key string, eventType domain.EventType) (FlowSSOCallbackOutput, error) {
-	result := &domain.SSOCallbackResult{ErrorKey: key}
+func (c *FlowSSOCallback) park(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, key string, eventType domain.EventType, reason ssoevent.Reason) (FlowSSOCallbackOutput, error) {
+	result := &domain.SSOCallbackResult{ErrorKey: key, FailureReason: reason}
 	if err := c.attempts.SetSSOCallbackResult(ctx, projectID, check, result, eventType); err != nil {
 		return FlowSSOCallbackOutput{}, err
 	}

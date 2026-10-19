@@ -97,7 +97,7 @@ export default class TestSignIn extends BaseCommand {
     }),
     live: Flags.boolean({
       description:
-        "After the checks, sign in through a browser and watch the runtime's log. Off by default.",
+        "After the checks, sign in through a browser and follow it through the project's audit events. Off by default.",
     }),
     timeout: Flags.integer({
       description: "Seconds to wait for the browser sign-in.",

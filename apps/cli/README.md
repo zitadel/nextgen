@@ -2891,7 +2891,7 @@ FLAGS
       --[no-]color             Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug                  Debug logging.
       --dry-run                Preview without mutating files or the platform.
-      --live                   After the checks, sign in through a browser and watch the runtime's log. Off by default.
+      --live                   After the checks, sign in through a browser and follow it through the project's audit events. Off by default.
       --provider=<value>       Connection to check. Defaults to every connection the Project has.
       --[no-]telemetry         Send anonymous usage analytics. Disable with --no-telemetry.
       --timeout=<value>        [default: 300] Seconds to wait for the browser sign-in.

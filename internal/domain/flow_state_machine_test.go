@@ -1,10 +1,9 @@
 package domain_test
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
-	"log/slog"
 	"maps"
 	"strings"
 	"testing"
@@ -19,7 +18,7 @@ import (
 	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 	"github.com/zitadel/nextgen/internal/domain"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
-	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
+	"github.com/zitadel/nextgen/internal/instrumentation/ssoevent"
 )
 
 func containsFieldName(fields []domain.FlowField, name string) bool {
@@ -74,6 +73,8 @@ type flowTestWorld struct {
 	ssoIdentities      *domainmock.MockFlowSSOIdentityService
 	ssoRedirects       *domainmock.MockFlowSSORedirectIssuer
 	sm                 *domain.FlowStateMachineRuntime
+	// ssoFailures are the failures of an SSO sign-in the machine recorded.
+	ssoFailures []domain.FlowSSOFailureInput
 }
 
 func newFlowTestWorld(t *testing.T) *flowTestWorld {
@@ -110,7 +111,7 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		now,
 	)
 
-	return &flowTestWorld{
+	w := &flowTestWorld{
 		mock:               mock,
 		hasher:             hasher,
 		schemaResolver:     schemaResolver,
@@ -121,6 +122,14 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		ssoRedirects:       ssoRedirects,
 		sm:                 sm,
 	}
+	authAttemptService.EXPECT().
+		RecordSSOFailure(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, in domain.FlowSSOFailureInput) error {
+			w.ssoFailures = append(w.ssoFailures, in)
+			return nil
+		}).
+		AnyTimes()
+	return w
 }
 
 // loginDefinition builds a single-step login flow: a `credentials`
@@ -7121,76 +7130,21 @@ func TestFlowStateMachine_Process_SSOCollectionRefusedSubmit(t *testing.T) {
 	}
 }
 
-// loggedEvent is one sso attempt event as the log carries it.
-type loggedEvent struct{ phase, status, result, reason, side string }
-
-// loggedEvents reads the sso attempt events out of a JSON log, checking that
-// each names the connection and the attempt.
-func loggedEvents(t *testing.T, logs []byte) []loggedEvent {
-	t.Helper()
-	var got []loggedEvent
-	for _, line := range bytes.Split(bytes.TrimSpace(logs), []byte("\n")) {
-		var record map[string]any
-		if len(line) == 0 || json.Unmarshal(line, &record) != nil || record["msg"] != "sso attempt" {
-			continue
-		}
-		assert.Equal(t, "google", record["slug"])
-		assert.Equal(t, "att-1", record["flow_id"])
-		e := loggedEvent{phase: record["phase"].(string), status: record["status"].(string)}
-		e.result, _ = record["result"].(string)
-		e.reason, _ = record["reason"].(string)
-		e.side, _ = record["side"].(string)
-		got = append(got, e)
-	}
-	return got
-}
-
-// A user created on the collection step is reported, and so is the handoff
-// that follows it, which is where the sign-in completes.
-func TestFlowStateMachine_Process_SSOCollectionReportsTheHandoff(t *testing.T) {
-	t.Parallel()
-	var logs bytes.Buffer
-	ctx := zlog.WithLoggingContext(t.Context(), slog.New(slog.NewJSONHandler(&logs, nil)))
-	w, def, state := submittableCollectionStepWorld(t)
-	parked := unlinkedParked(
-		map[string]any{"email": "alice@example.com", "badge": "b-7"},
-		map[string]bool{"email": true, "badge": true},
-	)
-	parked.ProviderSlug = "google"
-	w.expectCollected(parked, nil).Times(2)
-	w.expectOwner("badge", "b-7", "")
-	w.expectOwner("email", "alice@example.com", "")
-	w.expectOwner("username", "alice", "")
-	w.expectCreateLinked(map[string]any{
-		"email": "alice@example.com", "username": "alice", "given_name": "Alice", "family_name": "Liddell", "badge": "b-7",
-	}, "", "user-1", nil)
-	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).
-		Return(domain.FlowHandoffOutput{Token: "handoff-1", ExpiresAt: time.Unix(1700000060, 0).UTC()}, nil)
-
-	_, err := w.sm.Process(ctx, def, state, collectionSubmit(func(map[string]any) {}))
-
-	require.NoError(t, err)
-	assert.Equal(t, []loggedEvent{
-		{"user_created", "ok", "", "", ""},
-		{"handed_off", "ok", "", "", ""},
-	}, loggedEvents(t, logs.Bytes()))
-}
-
-// Each way a parked identity is settled leaves its event: the resolution, and
-// for a new user the creation, carrying the connection's slug and the attempt.
-func TestFlowStateMachine_Render_SSOEmitsResolutionEvents(t *testing.T) {
+// Each way an identity fails to settle records its failure, naming the
+// connection, the attempt, the phase and the reason; a settled one records
+// nothing, since its own events say so.
+func TestFlowStateMachine_Render_SSORecordsFailures(t *testing.T) {
 	t.Parallel()
 	claims, verified := completeClaims()
 	tests := []struct {
-		name   string
-		parked *domain.FlowSSOParkedIdentity
-		expect func(w *flowTestWorld)
-		// wantErr is a render that fails, as when the handoff is not delivered.
+		name    string
+		parked  *domain.FlowSSOParkedIdentity
+		expect  func(w *flowTestWorld)
 		wantErr bool
-		want    []loggedEvent
+		want    []domain.FlowSSOFailureInput
 	}{
 		{
-			name: "a linked identity is bound",
+			name: "a linked identity is bound and handed off without a failure",
 			parked: func() *domain.FlowSSOParkedIdentity {
 				p := linkedParked()
 				p.ProviderSlug = "google"
@@ -7201,7 +7155,6 @@ func TestFlowStateMachine_Render_SSOEmitsResolutionEvents(t *testing.T) {
 				w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).
 					Return(domain.FlowHandoffOutput{Token: "handoff-1", ExpiresAt: time.Unix(1700000060, 0).UTC()}, nil)
 			},
-			want: []loggedEvent{{"resolved", "ok", "linked", "", ""}, {"handed_off", "ok", "", "", ""}},
 		},
 		{
 			name: "a handoff that fails after the bind is the journey's",
@@ -7216,18 +7169,15 @@ func TestFlowStateMachine_Render_SSOEmitsResolutionEvents(t *testing.T) {
 					Return(domain.FlowHandoffOutput{}, errors.New("store unavailable"))
 			},
 			wantErr: true,
-			want: []loggedEvent{
-				{"resolved", "ok", "linked", "", ""},
-				{"handed_off", "failed", "", "handoff_failed", "journey"},
-			},
+			want:    []domain.FlowSSOFailureInput{{ConnectionSlug: "google", Phase: ssoevent.PhaseHandedOff, Reason: ssoevent.ReasonHandoffFailed}},
 		},
 		{
 			name:   "a connection that disallows creation is the journey's",
 			parked: &domain.FlowSSOParkedIdentity{CheckID: "ch-1", ConnectionID: "idp-1", ProviderSlug: "google", Subject: "sub-1", CreationDisabled: true},
-			want:   []loggedEvent{{"resolved", "failed", "", "creation_disabled", "journey"}},
+			want:   []domain.FlowSSOFailureInput{{ConnectionSlug: "google", Phase: ssoevent.PhaseResolved, Reason: ssoevent.ReasonCreationDisabled}},
 		},
 		{
-			name: "complete claims create a user",
+			name: "complete claims create a user and hand off without a failure",
 			parked: func() *domain.FlowSSOParkedIdentity {
 				p := unlinkedParked(claims, verified)
 				p.ProviderSlug = "google"
@@ -7239,28 +7189,20 @@ func TestFlowStateMachine_Render_SSOEmitsResolutionEvents(t *testing.T) {
 				w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).
 					Return(domain.FlowHandoffOutput{Token: "handoff-1", ExpiresAt: time.Unix(1700000060, 0).UTC()}, nil)
 			},
-			want: []loggedEvent{
-				{"user_created", "ok", "", "", ""},
-				{"resolved", "ok", "created", "", ""},
-				{"handed_off", "ok", "", "", ""},
-			},
 		},
 		{
-			name: "incomplete claims go to the collection step",
+			name: "incomplete claims go to the collection step without a failure",
 			parked: func() *domain.FlowSSOParkedIdentity {
 				p := unlinkedParked(map[string]any{"email": "alice@example.com"}, nil)
 				p.ProviderSlug = "google"
 				return p
 			}(),
 			expect: func(w *flowTestWorld) { w.expectOwner("email", "alice@example.com", "") },
-			want:   []loggedEvent{{"resolved", "ok", "collect", "", ""}},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			var logs bytes.Buffer
-			ctx := zlog.WithLoggingContext(t.Context(), slog.New(slog.NewJSONHandler(&logs, nil)))
 			w, def, state := ssoRenderWorld(t)
 			def.Steps[0].Transitions[domain.FlowImplicitOutcomeSSOAuthenticated] = domain.FlowStepTransition{Target: "done"}
 			w.expectParked(tt.parked, nil)
@@ -7268,15 +7210,48 @@ func TestFlowStateMachine_Render_SSOEmitsResolutionEvents(t *testing.T) {
 				tt.expect(w)
 			}
 
-			_, err := w.sm.Render(ctx, def, state)
+			_, err := w.sm.Render(t.Context(), def, state)
+
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
 			}
-
-			got := loggedEvents(t, logs.Bytes())
-			assert.Equal(t, tt.want, got)
+			want := make([]domain.FlowSSOFailureInput, len(tt.want))
+			for i, failure := range tt.want {
+				failure.ProjectID, failure.AttemptID = testProjectID, "att-1"
+				want[i] = failure
+			}
+			assert.ElementsMatch(t, want, append([]domain.FlowSSOFailureInput{}, w.ssoFailures...))
 		})
 	}
+}
+
+// A user created on the collection step is handed off, and a handoff that
+// fails there is recorded like one after a bind.
+func TestFlowStateMachine_Process_SSOCollectionRecordsAFailedHandoff(t *testing.T) {
+	t.Parallel()
+	w, def, state := submittableCollectionStepWorld(t)
+	parked := unlinkedParked(
+		map[string]any{"email": "alice@example.com", "badge": "b-7"},
+		map[string]bool{"email": true, "badge": true},
+	)
+	parked.ProviderSlug = "google"
+	w.expectCollected(parked, nil).Times(2)
+	w.expectOwner("badge", "b-7", "")
+	w.expectOwner("email", "alice@example.com", "")
+	w.expectOwner("username", "alice", "")
+	w.expectCreateLinked(map[string]any{
+		"email": "alice@example.com", "username": "alice", "given_name": "Alice", "family_name": "Liddell", "badge": "b-7",
+	}, "", "user-1", nil)
+	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).
+		Return(domain.FlowHandoffOutput{}, errors.New("store unavailable"))
+
+	_, err := w.sm.Process(t.Context(), def, state, collectionSubmit(func(map[string]any) {}))
+
+	require.Error(t, err)
+	assert.Equal(t, []domain.FlowSSOFailureInput{{
+		ProjectID: testProjectID, AttemptID: "att-1", ConnectionSlug: "google",
+		Phase: ssoevent.PhaseHandedOff, Reason: ssoevent.ReasonHandoffFailed,
+	}}, w.ssoFailures)
 }

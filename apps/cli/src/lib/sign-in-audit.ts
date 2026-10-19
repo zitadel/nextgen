@@ -1,4 +1,4 @@
-import type { SignInEvent } from "./checks/idp";
+import type { SignInEvent, SignInPhase } from "./checks/idp";
 
 /** The slice of an audit event, as `GET /events` serves it, that a sign-in is followed through. */
 export type AuditEvent = {
@@ -8,41 +8,55 @@ export type AuditEvent = {
   readonly payload?: Readonly<Record<string, unknown>>;
 };
 
-/**
- * What each audit event type tells about a sign-in. The stream names no
- * connection and gives no reason, so a failure is told apart only by the step
- * it happened at.
- */
-const MEANING: Readonly<Record<string, Pick<SignInEvent, "phase" | "status" | "reason" | "side">>> =
-  {
-    "auth.attempt.created": { phase: "ceremony_started", status: "ok" },
-    "auth.sso.authorization.failed": {
-      phase: "callback_received",
-      status: "failed",
-      reason: "provider_error",
-      side: "provider",
-    },
-    "auth.sso.exchange.failed": {
-      phase: "exchange_finished",
-      status: "failed",
-      reason: "exchange_failed",
-    },
-    "auth.sso.exchange.succeeded": { phase: "exchange_finished", status: "ok" },
-    "idp.identity_link.created": { phase: "user_created", status: "ok" },
-    "auth.attempt.handed_off": { phase: "handed_off", status: "ok" },
-  };
+/** What an audit event type means for a sign-in, before its payload says more. */
+const MEANING: Readonly<Record<string, Pick<SignInEvent, "phase" | "status">>> = {
+  "auth.attempt.created": { phase: "ceremony_started", status: "ok" },
+  "auth.sso.authorization.failed": { phase: "callback_received", status: "failed" },
+  "auth.sso.exchange.failed": { phase: "exchange_finished", status: "failed" },
+  "auth.sso.exchange.succeeded": { phase: "exchange_finished", status: "ok" },
+  "idp.identity_link.created": { phase: "user_created", status: "ok" },
+  "auth.attempt.handed_off": { phase: "handed_off", status: "ok" },
+};
 
-/** The sign-in event an audit event stands for, or `undefined` for any other event. */
+const PHASES: readonly string[] = [
+  "ceremony_started",
+  "callback_received",
+  "exchange_finished",
+  "resolved",
+  "user_created",
+  "handed_off",
+];
+
+const text = (value: unknown): string | undefined =>
+  typeof value === "string" ? value : undefined;
+
+/**
+ * The sign-in event an audit event stands for, or `undefined` when it is not
+ * about a sign-in or is about another connection than `slug`. An event that
+ * names no connection (the start of an attempt, its handoff, a link) is taken
+ * for `slug`'s: the attempt it belongs to is what the caller follows.
+ */
 export function signInEventOf(event: AuditEvent, slug: string): SignInEvent | undefined {
-  const meaning = MEANING[event.event_type];
-  if (meaning === undefined) {
+  const { payload } = event;
+  const connection = text(payload?.connection_slug);
+  if (connection !== undefined && connection !== slug) {
     return undefined;
   }
-  const fromPayload = event.payload?.auth_attempt_id;
+  const failure = event.event_type === "auth.sso.resolution.failed";
+  const phase = failure ? text(payload?.phase) : MEANING[event.event_type]?.phase;
+  const meaning = failure ? { status: "failed" as const } : MEANING[event.event_type];
+  if (meaning === undefined || phase === undefined || !PHASES.includes(phase)) {
+    return undefined;
+  }
+  const reason = text(payload?.reason);
+  const side = text(payload?.side);
   return {
     slug,
-    flowId: typeof fromPayload === "string" ? fromPayload : (event.entity_id ?? ""),
-    ...meaning,
+    flowId: text(payload?.auth_attempt_id) ?? event.entity_id ?? "",
+    phase: phase as SignInPhase,
+    status: meaning.status,
+    ...(reason === undefined ? {} : { reason }),
+    ...(side === "provider" || side === "journey" ? { side } : {}),
   };
 }
 

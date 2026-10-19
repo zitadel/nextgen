@@ -1,0 +1,53 @@
+title: AuthSsoFailurePayload
+type: object
+description: |
+  Payload for `auth.sso.resolution.failed`: an SSO sign-in that failed after
+  its code was exchanged, while the identity was matched to a user, the user
+  was created, or the attempt was handed off. It names the attempt and the
+  connection, and carries no claim, code or token.
+required:
+  - auth_attempt_id
+  - connection_slug
+  - phase
+  - reason
+  - side
+properties:
+  auth_attempt_id:
+    type: string
+  connection_slug:
+    type: string
+  phase:
+    type: string
+    description: Where it failed.
+    enum:
+      - resolved
+      - user_created
+      - handed_off
+  reason:
+    type: string
+    description: Why it failed. Never the provider's own text.
+    enum:
+      - provider_denied
+      - provider_error
+      - discovery_failed
+      - exchange_failed
+      - id_token_invalid
+      - userinfo_failed
+      - state_mismatch
+      - no_code
+      - connection_invalid
+      - secret_unavailable
+      - subject_invalid
+      - creation_disabled
+      - claim_rejected
+      - unroutable
+      - user_invalid
+      - other_schema
+      - handoff_failed
+      - internal
+  side:
+    type: string
+    description: Whose side it was.
+    enum:
+      - provider
+      - journey

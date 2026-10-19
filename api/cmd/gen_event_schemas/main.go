@@ -61,6 +61,7 @@ var payloadByEventType = map[string]string{
 	"auth.sso.authorization.failed": "auth-check-payload.yaml",
 	"auth.sso.exchange.succeeded":   "auth-check-payload.yaml",
 	"auth.sso.exchange.failed":      "auth-check-payload.yaml",
+	"auth.sso.resolution.failed":    "auth-sso-failure-payload.yaml",
 
 	"flowdef.created": "flowdef-payload.yaml",
 	"flowdef.updated": "flowdef-payload.yaml",
@@ -157,6 +158,10 @@ var webhookByEventType = map[string]webhookDoc{
 		"not a sign-in: the identity may still match no user."},
 	"auth.sso.exchange.failed": {description: "An SSO sign-in failed after its code arrived: the token " +
 		"exchange, the ID token or userinfo validation, or the connection's configuration failed."},
+
+	"auth.sso.resolution.failed": {description: "An SSO sign-in failed after its exchange: the identity " +
+		"could not be matched to a user, the user could not be created, or the attempt could not be " +
+		"handed off. The payload names the phase, the reason and whose side it was."},
 
 	"flowdef.created": {description: "A flow definition was created."},
 	"flowdef.updated": {description: "A flow definition was updated.", status: statusRetired},

@@ -41,6 +41,10 @@ type AuthSsoExchangeSucceededRes interface {
 	authSsoExchangeSucceededRes()
 }
 
+type AuthSsoResolutionFailedRes interface {
+	authSsoResolutionFailedRes()
+}
+
 type AuthTokenIssuedRes interface {
 	authTokenIssuedRes()
 }

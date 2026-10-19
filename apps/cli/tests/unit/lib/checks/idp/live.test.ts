@@ -112,7 +112,7 @@ describe("LiveSignInCheck", () => {
       event({ phase: "ceremony_started" }),
       event({ phase: "callback_received" }),
       event({ phase: "exchange_finished" }),
-      event({ phase: "resolved", result: "linked" }),
+      event({ phase: "resolved" }),
       event({ phase: "handed_off" }),
     ]);
 
@@ -120,7 +120,7 @@ describe("LiveSignInCheck", () => {
   });
 
   it.each([
-    ["the identity is bound to its user", event({ phase: "resolved", result: "linked" })],
+    ["the identity is bound to its user", event({ phase: "resolved" })],
     ["a user is created for the identity", event({ phase: "user_created" })],
   ])(
     "does not call the sign-in complete when %s but the handoff has not happened",
@@ -136,7 +136,7 @@ describe("LiveSignInCheck", () => {
 
   it("fails a handoff that did not happen, as the journey's", async () => {
     const { outcome } = run([
-      event({ phase: "resolved", result: "linked" }),
+      event({ phase: "resolved" }),
       event({
         phase: "handed_off",
         status: "failed",
@@ -153,7 +153,7 @@ describe("LiveSignInCheck", () => {
 
   it("keeps waiting after the collection step is asked for, and passes once the user is created", async () => {
     const { outcome } = run([
-      event({ phase: "resolved", result: "collect" }),
+      event({ phase: "exchange_finished" }),
       event({ phase: "user_created" }),
       event({ phase: "handed_off" }),
     ]);
@@ -191,8 +191,8 @@ describe("LiveSignInCheck", () => {
       "claim_rejected",
       "Fix claim_mapping and verified_claims in .zitadel/idps/acme.json, or the matching rule in your user schema",
     ],
-    ["state_invalid", `Start again from ${LOGIN_URL}: the state is single-use and short-lived`],
-    ["internal", 'Run zitadel logs and look for the lines saying "sso attempt"'],
+    ["state_mismatch", `Start again from ${LOGIN_URL}: the state is single-use and short-lived`],
+    ["internal", "Run zitadel events list and look for the auth.sso events of the attempt"],
   ])("fails a journey-side %s with the file or rule to fix", async (reason, recovery) => {
     const { outcome } = run([
       event({ phase: "resolved", status: "failed", reason, side: "journey" }),
@@ -221,16 +221,16 @@ describe("LiveSignInCheck", () => {
       event({ phase: "ceremony_started" }),
       event({
         flowId: "",
-        phase: "callback_received",
+        phase: "exchange_finished",
         status: "failed",
-        reason: "state_invalid",
-        side: "journey",
+        reason: "exchange_failed",
+        side: "provider",
       }),
     ]);
 
     expect(await outcome).toMatchObject({
       status: "fail",
-      message: expect.stringContaining("the sign-in state was unknown, used or expired"),
+      message: expect.stringContaining("the provider refused the authorization code"),
     });
   });
 
@@ -249,13 +249,13 @@ describe("LiveSignInCheck", () => {
     expect((await outcome).status).toBe("pass");
   });
 
-  it("fails with 'no sign-in attempt seen' and points at the logs when nothing happens", async () => {
+  it("fails with 'no sign-in attempt seen' and points at the events when nothing happens", async () => {
     const { outcome } = run([]);
 
     expect(await outcome).toEqual({
       status: "fail",
       message: "no sign-in attempt seen",
-      recovery: 'Run zitadel logs and look for the lines saying "sso attempt"',
+      recovery: "Run zitadel events list and look for the auth.sso events of the attempt",
     });
   });
 
@@ -285,18 +285,6 @@ describe("LiveSignInCheck", () => {
     expect(aborted).toEqual([true]);
   });
 
-  it("only warns when the identity belongs to an existing account, which still has to be proved", async () => {
-    const { outcome } = run([
-      event({ phase: "callback_received" }),
-      event({ phase: "resolved", result: "existing_user" }),
-    ]);
-
-    expect(await outcome).toMatchObject({
-      status: "warn",
-      message: expect.stringContaining("existing account"),
-    });
-  });
-
   it("opens the browser only once the log it compares against has been read", async () => {
     const steps: string[] = [];
     const base = aRuntime([event({ phase: "handed_off" })]).live;
@@ -321,10 +309,10 @@ describe("LiveSignInCheck", () => {
     const { outcome } = run([
       event({
         flowId: "",
-        phase: "callback_received",
+        phase: "exchange_finished",
         status: "failed",
-        reason: "state_invalid",
-        side: "journey",
+        reason: "exchange_failed",
+        side: "provider",
       }),
       event({ phase: "callback_received" }),
       event({ phase: "handed_off" }),
@@ -333,21 +321,21 @@ describe("LiveSignInCheck", () => {
     expect(await outcome).toMatchObject({ status: "pass" });
   });
 
-  it("counts a line with no flow id once the attempt has begun, as when its state expired", async () => {
+  it("counts a line with no flow id once the attempt has begun, as an event that names no attempt", async () => {
     const { outcome } = run([
       event({ phase: "ceremony_started" }),
       event({
         flowId: "",
-        phase: "callback_received",
+        phase: "exchange_finished",
         status: "failed",
-        reason: "state_invalid",
-        side: "journey",
+        reason: "exchange_failed",
+        side: "provider",
       }),
     ]);
 
     expect(await outcome).toMatchObject({
       status: "fail",
-      message: expect.stringContaining("expired"),
+      message: expect.stringContaining("code exchange"),
     });
   });
 });
@@ -356,16 +344,16 @@ const RUNTIME_EVENTS = readFileSync(
   new URL("../../../../../../../internal/instrumentation/ssoevent/ssoevent.go", import.meta.url),
   "utf8",
 );
-const REASONS_THE_RUNTIME_LOGS = [...RUNTIME_EVENTS.matchAll(/Reason\s+= "([a-z_]+)"/g)].map(
+const REASONS_THE_RUNTIME_RECORDS = [...RUNTIME_EVENTS.matchAll(/Reason\s+= "([a-z_]+)"/g)].map(
   (match) => match[1] ?? "",
 );
 
-describe("the reasons the runtime logs", () => {
+describe("the reasons the runtime records", () => {
   it("are found in the runtime's source, or the cases below prove nothing", () => {
-    expect(REASONS_THE_RUNTIME_LOGS.length).toBeGreaterThan(10);
+    expect(REASONS_THE_RUNTIME_RECORDS.length).toBeGreaterThan(10);
   });
 
-  it.each(REASONS_THE_RUNTIME_LOGS)(
+  it.each(REASONS_THE_RUNTIME_RECORDS)(
     "include %s, which the check describes in words",
     async (reason) => {
       const { outcome } = run([
