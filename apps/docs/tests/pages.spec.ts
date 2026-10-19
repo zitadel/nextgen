@@ -67,7 +67,8 @@ test("every page answers as HTML, titled and described", async ({ request }) => 
   const pages = await indexedPages(request);
 
   // One request a page: an API page's HTML is about 0.9 MB. A description the
-  // index has, the page has, as one line of plain text (lib/description.ts).
+  // index has, the page has, as one line of plain text (lib/description.ts);
+  // every operation and webhook has one (redocly.yaml).
   const results = await mapLimit(pages, concurrency, async ({ title, url, description }) => {
     const response = await request.get(url);
     const type = response.headers()["content-type"] ?? "";
@@ -77,7 +78,9 @@ test("every page answers as HTML, titled and described", async ({ request }) => 
     const expected = `<title>${escapeHtml(title)}</title>`;
     if (!html.includes(expected)) return `${url}: no ${expected}`;
     const meta = metaContent(html, "description");
-    if (meta === undefined) return description ? `${url}: no description` : null;
+    if (meta === undefined) {
+      return description || operationPage.test(url) ? `${url}: no description` : null;
+    }
     const problem = descriptionProblem(meta);
     if (problem) return `${url}: description "${meta}" has ${problem}`;
     return null;

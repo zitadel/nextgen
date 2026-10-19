@@ -11,6 +11,9 @@ rules:
   no-unused-components: error
   operation-2xx-response: error
   operation-4xx-response: off
+  # An operation's or a webhook's description is its API reference page's
+  # body, and its first sentence the page's description (api/openapi/AGENTS.md).
+  operation-description: error
   operation-operationId: error
   tag-description: error
 
