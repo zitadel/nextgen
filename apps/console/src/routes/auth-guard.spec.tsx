@@ -36,12 +36,14 @@ vi.mock("@/auth/session", async (importOriginal) => {
 vi.mock("@zitadel/sdk-react", () => ({
   ZitadelLogin: (props: {
     postSignInUrl?: string;
+    forcePostSignInUrl?: boolean;
     theme?: string;
     project?: { projectId?: string };
   }) => (
     <div
       data-testid="zitadel-login"
       data-post-sign-in-url={props.postSignInUrl}
+      data-force-post-sign-in-url={props.forcePostSignInUrl ? "" : undefined}
       data-project-id={props.project?.projectId}
       data-widget-theme={props.theme}
     />
@@ -98,6 +100,21 @@ describe("authentication guard", () => {
     // app-wide configureZitadel() call, whose project id is empty.
     expect(screen.getByTestId("zitadel-login")).toHaveAttribute("data-post-sign-in-url", "/users");
     expect(screen.getByTestId("zitadel-login")).toHaveAttribute("data-project-id", "proj_test");
+  });
+
+  /**
+   * The widget returns to the page's `?next=` by default, but the console's
+   * `next` is router-relative: followed as a document path it would land
+   * outside the deployment prefix. The post-sign-in URL already joins it with
+   * the prefix, so the widget must go there instead.
+   */
+  it("keeps the widget on the post-sign-in URL rather than the page's ?next=", async () => {
+    fetchSession.mockResolvedValue(null);
+    await renderAt("/users");
+
+    expect(await screen.findByTestId("zitadel-login")).toHaveAttribute(
+      "data-force-post-sign-in-url",
+    );
   });
 
   /**

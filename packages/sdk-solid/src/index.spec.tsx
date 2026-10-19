@@ -316,6 +316,7 @@ const loginConfig: Required<ZitadelLoginConfig> = {
   purpose: "register",
   flowName: "parity-flow",
   postSignInUrl: "/parity-after-login",
+  forcePostSignInUrl: true,
   resumeFlowId: "flow_parity",
   locales: { en: { "identifier.title": "Parity" } },
   lang: "de",

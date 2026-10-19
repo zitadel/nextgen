@@ -130,7 +130,7 @@ The TanStack Start SDK is a global request middleware that proxies and verifies 
 <Steps>
   <Step>The middleware proxies same-origin `/__nextgen/*` requests to the backend, attaching the project secret only to the session handoff.</Step>
   <Step>It verifies the session token and passes the result on as `nextgenAuth` in the request context, which server functions receive; read it with `getAuth(context)`.</Step>
-  <Step>It redirects unauthenticated document requests for `protectedRoutes` to `loginPath`. Routes guard client-side navigation in `beforeLoad`.</Step>
+  <Step>It redirects unauthenticated document requests for `protectedRoutes` to `loginPath`, with the requested path in `?next=`, where the login widget returns after sign-in. Routes guard client-side navigation in `beforeLoad`.</Step>
 </Steps>
 
 ## Verify

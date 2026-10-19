@@ -45,7 +45,7 @@ The hook runs on every request and does three things in one pass:
    never reaches the browser.
 2. **Verifies** the session JWT via JWKS using the Web Crypto API and writes the
    result to `event.locals.nextgenAuth`.
-3. **Redirects** unauthenticated requests to `loginPath` for protected routes.
+3. **Redirects** unauthenticated requests to `loginPath` for protected routes, with the requested path in `?next=`, where `<zitadel-login>` returns after sign-in.
 
 Compose it with your existing hooks via `sequence()`:
 

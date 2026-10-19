@@ -79,6 +79,7 @@ const LOGIN_CONFIG_KEYS = {
   purpose: true,
   flowName: true,
   postSignInUrl: true,
+  forcePostSignInUrl: true,
   resumeFlowId: true,
   locales: true,
   lang: true,
