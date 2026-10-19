@@ -147,6 +147,11 @@ export type PatchResult = Readonly<{
  *   retired sibling is removed by `--fix` before the current file is created;
  *   an edited or adopted one is a conflict the user must resolve, and the
  *   current file is *not* created next to it.
+ * - `outdatedContents` — maps a current marked file to the exact bytes older
+ *   templates wrote at the same path. `--fix` removes a copy that still holds
+ *   one of them before repairing, so the current template replaces it (a
+ *   restored page may rely on what the current file provides); a file that
+ *   differs is the user's and stays.
  */
 export type EjectActions = Readonly<{
   markedFiles: ReadonlyArray<string>;
@@ -159,6 +164,7 @@ export type EjectActions = Readonly<{
   fileClasses?: Readonly<Record<string, ScaffoldFileClass>>;
   conditionalFiles?: ReadonlyArray<string>;
   retiredAlternates?: Readonly<Record<string, ReadonlyArray<string>>>;
+  outdatedContents?: Readonly<Record<string, ReadonlyArray<string>>>;
 }>;
 
 /**

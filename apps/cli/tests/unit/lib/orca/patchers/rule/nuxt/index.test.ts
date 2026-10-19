@@ -6,6 +6,7 @@ import type {
   ScaffoldPlan,
 } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
 import { NuxtPatcher } from "../../../../../../../src/lib/orca/patchers/rule/nuxt";
+import { LEGACY_COMPONENTS_PLUGIN } from "../../../../../../../src/lib/orca/patchers/rule/nuxt/templates";
 import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
 
@@ -131,7 +132,7 @@ describe("NuxtPatcher.plan", () => {
   });
 
   it.each(["@zitadel/sdk-nuxt", "@zitadel/components"])(
-    "adds %s at the CLI's prerelease tag",
+    "adds %s at the CLI's exact version",
     (name) => {
       const dep = new NuxtPatcher()
         .plan(ctx())
@@ -139,7 +140,7 @@ describe("NuxtPatcher.plan", () => {
           (op): op is Extract<FileOp, { kind: "add-dep" }> =>
             op.kind === "add-dep" && op.name === name,
         );
-      expect(dep).toMatchObject({ version: "alpha" });
+      expect(dep).toMatchObject({ version: "0.1.0-alpha.0" });
     },
   );
 
@@ -155,6 +156,16 @@ describe("NuxtPatcher.plan", () => {
     expect(writeContents(plan, "app/plugins/zitadel-components.client.ts")).toContain(
       "provide: { zitadelBusinessLocales: businessLocales }",
     );
+  });
+
+  it("lists the plugin bytes older CLIs wrote, so --fix can refresh an unedited copy", () => {
+    const actions = new NuxtPatcher().artifacts({
+      framework: ctx().framework,
+      rendererId: ctx().rendererId,
+    });
+    expect(actions.outdatedContents).toEqual({
+      "app/plugins/zitadel-components.client.ts": [LEGACY_COMPONENTS_PLUGIN],
+    });
   });
 
   it("leaves seeding the auth state to the module's own plugin", () => {

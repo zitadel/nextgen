@@ -183,3 +183,16 @@ import "@zitadel/components";
 export default defineNuxtPlugin(() => {});
 `;
 }
+
+/**
+ * The client plugin older CLIs wrote: it registered the elements and provided
+ * nothing. `--fix` refreshes an unedited copy so a restored business page finds
+ * the locales provider it reads (see {@link componentsPluginTemplate}).
+ */
+export const LEGACY_COMPONENTS_PLUGIN = `${MANAGED_MARKER}
+// Register Lit custom elements on the client only. Importing @zitadel/components
+// from a page <script setup> would run during SSR and break the widgets.
+import "@zitadel/components";
+
+export default defineNuxtPlugin(() => {});
+`;

@@ -67,7 +67,7 @@ describe("QwikPatcher.plan", () => {
     const dep = new QwikPatcher()
       .plan(ctx())
       .ops.find((op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep");
-    expect(dep).toMatchObject({ name: "@zitadel/sdk-qwik", version: "alpha" });
+    expect(dep).toMatchObject({ name: "@zitadel/sdk-qwik", version: "0.1.0-alpha.0" });
   });
 
   it("exposes the project id through a VITE_-prefixed env var", () => {

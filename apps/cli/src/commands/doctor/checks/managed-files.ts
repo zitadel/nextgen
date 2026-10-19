@@ -184,6 +184,19 @@ export class ManagedFilesCheck implements SanityCheck {
         }
       }
     }
+    // Outdated plumbing: a file that still holds exactly the bytes an older
+    // template wrote is removed so the repair writes the current one; an edited
+    // file differs, so it is the user's and stays.
+    const refreshed: string[] = [];
+    if (!ctx.dryRun) {
+      for (const [path, olderBytes] of Object.entries(actions.outdatedContents ?? {})) {
+        const contents = await readIfExists(join(ctx.cwd, path));
+        if (contents !== undefined && olderBytes.includes(contents)) {
+          await rm(join(ctx.cwd, path), { force: true });
+          refreshed.push(path);
+        }
+      }
+    }
     await patcher.repair(patchCtx, {
       cwd: ctx.cwd,
       dryRun: ctx.dryRun,
@@ -198,7 +211,7 @@ export class ManagedFilesCheck implements SanityCheck {
       await materializeManifest(ctx, patchCtx);
       return;
     }
-    if (missingBefore.length === 0 && removed.length === 0) {
+    if (missingBefore.length === 0 && removed.length === 0 && refreshed.length === 0) {
       return;
     }
     // Reconcile the manifest with the current template set before rewriting
@@ -219,7 +232,7 @@ export class ManagedFilesCheck implements SanityCheck {
         continue; // retired by a template migration and gone from disk
       }
       files[path] =
-        contents !== undefined && missingBefore.includes(path)
+        contents !== undefined && (missingBefore.includes(path) || refreshed.includes(path))
           ? { ...entry, hash: hashScaffoldFile(contents) }
           : entry;
     }

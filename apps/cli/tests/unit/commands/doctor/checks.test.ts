@@ -22,6 +22,7 @@ import {
 import { loadPatchContext } from "../../../../src/commands/doctor/patch-context";
 import { createOrca } from "../../../../src/lib/orca";
 import { proxyConfTemplate } from "../../../../src/lib/orca/patchers/rule/angular/templates";
+import { LEGACY_COMPONENTS_PLUGIN } from "../../../../src/lib/orca/patchers/rule/nuxt/templates";
 import { MANAGED_MARKER } from "../../../../src/lib/paths";
 import { hashScaffoldFile } from "../../../../src/lib/scaffold-manifest";
 import type { ScaffoldManifest } from "../../../../src/lib/sync/types";
@@ -102,6 +103,41 @@ async function makeProject(): Promise<string> {
     `${MANAGED_MARKER}\nexport function middleware() {}\n`,
   );
   await writeFile(join(cwd, "custom-elements.d.ts"), `${MANAGED_MARKER}\nexport {};\n`);
+  return cwd;
+}
+
+/**
+ * A business-use-case Nuxt project whose `app/plugins` holds `plugin`, with the
+ * login page missing so `--fix` has a page to restore.
+ */
+async function makeNuxtBusinessProject(plugin: string): Promise<string> {
+  const cwd = await mkdtemp(join(tmpdir(), "zitadel-checks-nuxt-"));
+  tempDirs.push(cwd);
+  await mkdir(join(cwd, ".zitadel"), { recursive: true });
+  await mkdir(join(cwd, "app/plugins"), { recursive: true });
+  await mkdir(join(cwd, "app/pages"), { recursive: true });
+
+  await writeFile(
+    join(cwd, "package.json"),
+    JSON.stringify({
+      name: "demo",
+      dependencies: { nuxt: "^4", "@zitadel/sdk-nuxt": "latest", "@zitadel/components": "latest" },
+    }),
+  );
+  await writeFile(
+    join(cwd, "zitadel.json"),
+    JSON.stringify({
+      project: "proj-001",
+      server: "https://api.zitadel.cloud",
+      framework: { id: "nuxt" },
+      useCase: "business",
+      environments: { development: { issuer: "http://localhost:3000" } },
+    }),
+  );
+  await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
+  await chmod(join(cwd, ".zitadel/secret"), 0o600);
+  await writeFile(join(cwd, "nuxt.config.ts"), "export default defineNuxtConfig({});\n");
+  await writeFile(join(cwd, "app/plugins/zitadel-components.client.ts"), plugin);
   return cwd;
 }
 
@@ -885,6 +921,29 @@ function setBearer(proxyReq) {
     expect(scaffold.files).not.toHaveProperty("middleware.ts");
     expect(scaffold.files["proxy.ts"]?.class).toBe("infrastructure");
     expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("fix gives a restored business page the locales provider an older plugin lacks", async () => {
+    const cwd = await makeNuxtBusinessProject(LEGACY_COMPONENTS_PLUGIN);
+
+    await new ManagedFilesCheck().fix(ctxFor(cwd));
+
+    const plugin = await readFile(join(cwd, "app/plugins/zitadel-components.client.ts"), "utf8");
+    expect(plugin).toContain("provide: { zitadelBusinessLocales: businessLocales }");
+    expect(await readFile(join(cwd, "app/pages/login.vue"), "utf8")).toContain(
+      "$zitadelBusinessLocales",
+    );
+  });
+
+  it("fix leaves an edited components plugin as it is", async () => {
+    const edited = `${LEGACY_COMPONENTS_PLUGIN}// my own tweak\n`;
+    const cwd = await makeNuxtBusinessProject(edited);
+
+    await new ManagedFilesCheck().fix(ctxFor(cwd));
+
+    expect(await readFile(join(cwd, "app/plugins/zitadel-components.client.ts"), "utf8")).toBe(
+      edited,
+    );
   });
 
   it("refuses to create proxy.ts beside an edited middleware.ts and reports the conflict", async () => {

@@ -177,6 +177,7 @@ export abstract class AbstractRulePatcher implements Patcher {
       ),
       conditionalFiles: this.conditionallyScaffoldedFiles(view),
       retiredAlternates: this.retiredAlternateFiles(view),
+      outdatedContents: this.outdatedContents(view),
     };
   }
 
@@ -205,6 +206,14 @@ export abstract class AbstractRulePatcher implements Patcher {
    */
   protected infrastructureFiles(_view: PatchView): ReadonlyArray<string> {
     return [];
+  }
+
+  /**
+   * Bytes older templates wrote at a current marked file's path, so `--fix` can
+   * refresh an unedited copy (see {@link EjectActions}). Default: none.
+   */
+  protected outdatedContents(_view: PatchView): Readonly<Record<string, ReadonlyArray<string>>> {
+    return {};
   }
 
   /**
