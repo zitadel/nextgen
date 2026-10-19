@@ -28,14 +28,41 @@ export class DiscoveryReachableCheck extends Check<IdpContext> {
     if (found.ok && found.source === "connection") {
       return { status: "pass", message: "Using the endpoints written in the connection" };
     }
-    return found.ok
-      ? { status: "pass", message: `Fetched ${found.url}` }
-      : {
-          status: "fail",
-          message: found.reason,
-          recovery: `Check oidc.issuer in .zitadel/idps/${context.slug}.json`,
-        };
+    if (found.ok) {
+      const missing =
+        found.source === "discovery" ? unusableEndpoints(found.document, context) : [];
+      return missing.length === 0
+        ? { status: "pass", message: `Fetched ${found.url}` }
+        : {
+            status: "fail",
+            message: `The discovery document has no usable ${missing.join(", ")}`,
+            recovery: `Check oidc.issuer in .zitadel/idps/${context.slug}.json: the runtime needs an https endpoint for each of ${missing.join(", ")}`,
+          };
+    }
+    return {
+      status: "fail",
+      message: found.reason,
+      recovery: `Check oidc.issuer in .zitadel/idps/${context.slug}.json`,
+    };
   }
+}
+
+/** What the runtime accepts as an endpoint: https, or http on a loopback host. */
+const ENDPOINT =
+  /^(https:\/\/[^\s/?#]+|http:\/\/(localhost|127\.0\.0\.1)(:[0-9]+)?)([/?][^\s#]*)?$/;
+
+/** The endpoints the runtime needs from the document that are missing or not usable. */
+function unusableEndpoints(document: Discovery, context: IdpContext): readonly string[] {
+  const needed: ReadonlyArray<readonly [string, string | undefined]> = [
+    ["authorization_endpoint", document.authorization_endpoint],
+    ["token_endpoint", document.token_endpoint],
+    ...(context.idTokenMapping === true
+      ? []
+      : ([["userinfo_endpoint", document.userinfo_endpoint]] as const)),
+  ];
+  return needed.flatMap(([name, value]) =>
+    value !== undefined && ENDPOINT.test(value) ? [] : [name],
+  );
 }
 
 export class IssuerCheck extends DiscoveryCheck {
@@ -172,9 +199,20 @@ export class AuthorizeProbeCheck extends DiscoveryCheck {
     })) {
       url.searchParams.set(name, value);
     }
-    const response = await context.request(url.toString());
+    const asked = await context.request(url.toString()).then(
+      (response) => ({ response }),
+      (error: unknown) => ({ error }),
+    );
+    if ("error" in asked) {
+      const reason = asked.error instanceof Error ? asked.error.message : String(asked.error);
+      return {
+        status: "fail",
+        message: `The authorization endpoint could not be reached: ${reason}`,
+        recovery: `Check that ${url.origin} is reachable from this machine, then run the check again`,
+      };
+    }
     return outcomeOf(
-      context.probes.authorize(response),
+      context.probes.authorize(asked.response),
       context,
       "The provider accepts the client and the callback URI",
     );
