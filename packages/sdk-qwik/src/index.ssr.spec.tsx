@@ -27,6 +27,15 @@ async function serverAttributes(
   );
 }
 
+const standard = {
+  class: "probe",
+  id: "probe",
+  "data-testid": "probe",
+  "aria-label": "probe",
+  tabindex: 3,
+  hidden: true,
+} as const;
+
 describe("server-rendered widget config", () => {
   it("emits the login config in the server HTML", async () => {
     const attrs = await serverAttributes(
@@ -152,6 +161,22 @@ describe("server-rendered widget config", () => {
       "project-id": "proj-test",
       "proxy-path": "/__nextgen",
       purpose: "login",
+    });
+  });
+
+  it.each([
+    ["zitadel-login", () => <ZitadelLogin project={project} {...standard} />],
+    ["zitadel-logout", () => <ZitadelLogout project={project} {...standard} />],
+    ["zitadel-session", () => <ZitadelSession project={project} {...standard} />],
+  ] as const)("emits the standard attributes in the %s server HTML", async (tag, widget) => {
+    expect(await serverAttributes(tag, widget())).toMatchObject({
+      class: "probe",
+      id: "probe",
+      "data-testid": "probe",
+      "aria-label": "probe",
+      tabindex: "3",
+      hidden: "",
+      "project-id": "proj-test",
     });
   });
 });

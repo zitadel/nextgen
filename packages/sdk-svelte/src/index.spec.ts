@@ -25,6 +25,11 @@ import { createServer } from "vite";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { businessLocales } from "./lib/index";
+import type {
+  ZitadelLoginElementProps,
+  ZitadelLogoutElementProps,
+  ZitadelSessionElementProps,
+} from "./lib/types";
 import ZitadelLogin from "./lib/ZitadelLogin.svelte";
 import ZitadelLogout from "./lib/ZitadelLogout.svelte";
 import ZitadelSession from "./lib/ZitadelSession.svelte";
@@ -736,3 +741,122 @@ describe("server-rendered widget config", () => {
   });
 });
 // server-render-cases:end
+
+// The props type is the check: `svelte-check` fails here when a wrapper stops
+// accepting the element's own HTML attributes.
+describe("standard attribute props", () => {
+  const attributes = {
+    class: "probe",
+    style: "color: red",
+    id: "probe",
+    title: "probe",
+    slot: "probe",
+    hidden: true,
+    role: "region",
+    tabindex: 3,
+    "data-testid": "probe",
+    "aria-label": "probe",
+  } as const satisfies ZitadelLoginElementProps &
+    ZitadelLogoutElementProps &
+    ZitadelSessionElementProps;
+
+  it("are accepted by every wrapper's props type", () => {
+    const login = render(ZitadelLogin, { props: { project, ...attributes } });
+    const logout = render(ZitadelLogout, { props: { project, ...attributes } });
+    const session = render(ZitadelSession, { props: { project, ...attributes } });
+    for (const { container } of [login, logout, session]) {
+      expect(container.querySelectorAll("[data-testid=probe]")).toHaveLength(1);
+    }
+  });
+});
+
+type WidgetName = "ZitadelLogin" | "ZitadelLogout" | "ZitadelSession";
+
+// Mounts a widget with the given attributes (named as the markup names them) and
+// reaches its element through the component's `getElement()`, the way a consumer
+// does after `bind:this`.
+async function mountWidget(widget: WidgetName, attributes: Record<string, unknown>) {
+  const { hidden, ...rest } = attributes;
+  const Widget = { ZitadelLogin, ZitadelLogout, ZitadelSession }[widget] as unknown as Component<
+    Record<string, unknown>,
+    { getElement: () => HTMLElement | undefined }
+  >;
+  const { container, component } = render(Widget, {
+    props: { ...rest, ...(hidden === undefined ? {} : { hidden: true }) },
+  });
+  return { container, ref: () => component.getElement() };
+}
+
+// standard-attributes:begin
+const WIDGETS = ["ZitadelLogin", "ZitadelLogout", "ZitadelSession"] as const;
+const WIDGET_TAGS = {
+  ZitadelLogin: "zitadel-login",
+  ZitadelLogout: "zitadel-logout",
+  ZitadelSession: "zitadel-session",
+} as const;
+
+describe.each(WIDGETS)("%s standard attributes", (widget) => {
+  const tag = WIDGET_TAGS[widget];
+
+  it("forwards the class to the widget element", async () => {
+    const { container } = await mountWidget(widget, { class: "probe" });
+    expect(container.querySelector(tag)?.classList.contains("probe")).toBe(true);
+  });
+
+  it("forwards the style to the widget element", async () => {
+    const { container } = await mountWidget(widget, { style: "color: red" });
+    expect(container.querySelector<HTMLElement>(tag)?.style.color).toBe("red");
+  });
+
+  it("forwards the id to the widget element", async () => {
+    const { container } = await mountWidget(widget, { id: "probe" });
+    expect(container.querySelector(tag)?.id).toBe("probe");
+  });
+
+  it("forwards data attributes to the widget element", async () => {
+    const { container } = await mountWidget(widget, { "data-testid": "probe" });
+    expect(container.querySelector(tag)?.getAttribute("data-testid")).toBe("probe");
+  });
+
+  it("forwards aria attributes to the widget element", async () => {
+    const { container } = await mountWidget(widget, { "aria-label": "probe" });
+    expect(container.querySelector(tag)?.getAttribute("aria-label")).toBe("probe");
+  });
+
+  it("forwards the remaining standard attributes to the widget element", async () => {
+    const { container } = await mountWidget(widget, {
+      title: "probe",
+      role: "region",
+      tabindex: "3",
+      hidden: "",
+    });
+    const element = container.querySelector<HTMLElement>(tag);
+    expect(element?.title).toBe("probe");
+    expect(element?.getAttribute("role")).toBe("region");
+    expect(element?.getAttribute("tabindex")).toBe("3");
+    expect(element?.hidden).toBe(true);
+  });
+
+  it("forwards the slot to the widget element", async () => {
+    const { container } = await mountWidget(widget, { slot: "probe" });
+    expect(container.querySelector(tag)?.getAttribute("slot")).toBe("probe");
+  });
+
+  it("lets a widget prop win over a standard attribute of the same name", async () => {
+    const { container } = await mountWidget(widget, {
+      project: { projectId: "proj-test", url: "https://auth.example.com" },
+      url: "https://other.example.com",
+      id: "probe",
+    });
+    const element = container.querySelector<HTMLElement & { url?: string }>(tag);
+    expect(element?.url).toBe("https://auth.example.com");
+    expect(element?.id).toBe("probe");
+  });
+
+  it("gives access to the widget element through a ref", async () => {
+    const { container, ref } = await mountWidget(widget, {});
+    expect(ref()).toBe(container.querySelector(tag));
+    expect(ref()?.tagName.toLowerCase()).toBe(tag);
+  });
+});
+// standard-attributes:end

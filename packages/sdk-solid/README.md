@@ -74,6 +74,16 @@ Each widget event reaches the callback in the last column, which receives the ev
 <ZitadelLogin project={project} theme="light" onFlowComplete={(detail) => track(detail)} />
 ```
 
+## Standard HTML attributes
+
+`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` also take the standard HTML attributes (`class`, `style`, `id`, `title`, `slot`, `hidden`, `role`, `tabindex`, `data-*` and `aria-*`) and forward them to the widget element, so you can position, style and label the widget without an extra wrapper element. A widget prop wins over a standard attribute of the same name, and no other prop reaches the widget's configuration.
+
+```tsx
+<ZitadelLogin project={project} class="login" data-testid="login" aria-label="Sign in" />
+```
+
+Solid assigns a prop it does not know to a custom element as a property, so the wrapper writes the attributes as attributes. Anything that is not a standard attribute is left out, and the props types include the element's HTML attributes. A `ref` resolves to the widget element.
+
 ## Server rendering
 
 If your app renders on the server, mount the widget on the client only, after hydration, or pass `projectId` and `proxyPath` to the `ZitadelLogin` wrapper as strings (it writes them as the `project-id` and `proxy-path` attributes; use those hyphenated names only on a raw `<zitadel-login>` element), because a widget that starts before its configuration arrives shows an error instead of the flow.

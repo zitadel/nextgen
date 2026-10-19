@@ -19,8 +19,10 @@ import type {
   ZitadelLoginReactProps,
   ZitadelLogoutConfig,
   ZitadelLogoutProps,
+  ZitadelLogoutReactProps,
   ZitadelSessionConfig,
   ZitadelSessionProps,
+  ZitadelSessionReactProps,
   ZitadelSignoutDetail,
 } from "../react";
 import * as tanstackReact from "../react";
@@ -198,7 +200,9 @@ describe("@zitadel/sdk-tanstack-start/react", () => {
     expectTypeOf<ZitadelLoginProps>().toEqualTypeOf<sdkReact.ZitadelLoginProps>();
     expectTypeOf<ZitadelLoginReactProps>().toEqualTypeOf<sdkReact.ZitadelLoginReactProps>();
     expectTypeOf<ZitadelLogoutProps>().toEqualTypeOf<sdkReact.ZitadelLogoutProps>();
+    expectTypeOf<ZitadelLogoutReactProps>().toEqualTypeOf<sdkReact.ZitadelLogoutReactProps>();
     expectTypeOf<ZitadelSessionProps>().toEqualTypeOf<sdkReact.ZitadelSessionProps>();
+    expectTypeOf<ZitadelSessionReactProps>().toEqualTypeOf<sdkReact.ZitadelSessionReactProps>();
   });
 });
 

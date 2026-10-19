@@ -2,7 +2,7 @@
   import '@zitadel/components';
   import type { ZitadelSession as ZitadelSessionElement } from '@zitadel/components';
 
-  import type { ZitadelSessionProps, ZitadelSignoutDetail } from './types';
+  import type { ZitadelSessionElementProps, ZitadelSignoutDetail } from './types';
   import { assignGiven } from './given';
   import { onClient, proxyPathAttr } from './attributes';
 
@@ -17,7 +17,8 @@
     theme,
     suppressHeader,
     onSignout,
-  }: ZitadelSessionProps = $props();
+    ...attributes
+  }: ZitadelSessionElementProps = $props();
 
   let el: ZitadelSessionElement | undefined = $state();
 
@@ -53,6 +54,7 @@
 </script>
 
 <zitadel-session
+  {...attributes}
   bind:this={el}
   project={onClient(project)}
   project-id={project?.projectId ?? projectId}

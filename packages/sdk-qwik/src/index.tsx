@@ -16,7 +16,15 @@ import type {
 // of them can emit); keep it directly above the components import.
 import "./early-events";
 import "@zitadel/components";
-import { component$, useSignal, useVisibleTask$, type QRL, type Signal } from "@qwik.dev/core";
+import {
+  component$,
+  useSignal,
+  useVisibleTask$,
+  type ClassList,
+  type HTMLElementAttrs,
+  type QRL,
+  type Signal,
+} from "@qwik.dev/core";
 import {
   configureZitadel,
   getApi,
@@ -25,6 +33,7 @@ import {
   type ZitadelProject,
 } from "@zitadel/api/config";
 
+import { standardAttributes } from "./attributes";
 import { listenWithReplay, WRAPPER_MARKER } from "./early-events";
 
 export { configureZitadel, getApi, getZitadelConfig };
@@ -182,6 +191,18 @@ function bindSessionConfig(el: ZitadelSessionElement, props: ZitadelSessionProps
   setProp(el, "suppressHeader", props.suppressHeader);
 }
 
+/**
+ * The standard HTML attributes a widget wrapper accepts besides its own props
+ * (`class`, `style`, `id`, `title`, `slot`, `hidden`, `role`, `tabindex`,
+ * `data-*`, `aria-*`, …), spread onto the widget element. A widget prop of the
+ * same name wins, so those names are left out here rather than merged. Event
+ * handlers and `children` are not forwarded and not accepted.
+ */
+export type ZitadelWidgetAttributes<Own> = Omit<
+  HTMLElementAttrs,
+  keyof Own | "ref" | "children"
+> & { class?: ClassList };
+
 function eventDetail<T>(event: Event): T {
   return (event as CustomEvent<T>).detail;
 }
@@ -206,6 +227,7 @@ type Qrlify<H> = {
  * signal to obtain the underlying `<zitadel-login>` element imperatively.
  */
 export type ZitadelLoginProps = ZitadelLoginConfig &
+  ZitadelWidgetAttributes<ZitadelLoginConfig & Qrlify<ZitadelLoginHandlers>> &
   Qrlify<ZitadelLoginHandlers> & {
     /**
      * Optional signal populated with the underlying `<zitadel-login>` element
@@ -264,6 +286,7 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
         }
         bindLoginConfig(el, props);
       }}
+      {...standardAttributes(props)}
       {...loginAttrs(props)}
     />
   );
@@ -277,6 +300,7 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
  * signal to obtain the underlying `<zitadel-logout>` element imperatively.
  */
 export type ZitadelLogoutProps = ZitadelLogoutConfig &
+  ZitadelWidgetAttributes<ZitadelLogoutConfig & Qrlify<ZitadelLogoutHandlers>> &
   Qrlify<ZitadelLogoutHandlers> & {
     /**
      * Optional signal populated with the underlying `<zitadel-logout>` element
@@ -319,6 +343,7 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
         }
         bindLogoutConfig(el, props);
       }}
+      {...standardAttributes(props)}
       {...logoutAttrs(props)}
     />
   );
@@ -332,6 +357,7 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
  * `<zitadel-session>` element imperatively.
  */
 export type ZitadelSessionProps = ZitadelSessionConfig &
+  ZitadelWidgetAttributes<ZitadelSessionConfig & Qrlify<ZitadelSessionHandlers>> &
   Qrlify<ZitadelSessionHandlers> & {
     /**
      * Optional signal populated with the underlying `<zitadel-session>` element
@@ -374,6 +400,7 @@ export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
         }
         bindSessionConfig(el, props);
       }}
+      {...standardAttributes(props)}
       {...sessionAttrs(props)}
     />
   );

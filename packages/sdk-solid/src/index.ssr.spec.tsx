@@ -12,6 +12,15 @@ function serverAttributes(tag: string, html: string): Record<string, string> {
   );
 }
 
+const standard = {
+  class: "probe",
+  id: "probe",
+  "data-testid": "probe",
+  "aria-label": "probe",
+  tabindex: 3,
+  hidden: true,
+} as const;
+
 describe("server-rendered widget config", () => {
   const handle = { projectId: "proj-test", proxyPath: "/__nextgen", url: "http://auth.test" };
 
@@ -118,5 +127,21 @@ describe("server-rendered widget options", () => {
   it("leaves unset props out of the markup", () => {
     const html = renderToString(() => <ZitadelSession projectId="proj-test" />);
     expect(html).not.toContain("heading=");
+  });
+
+  it.each([
+    ["zitadel-login", () => <ZitadelLogin projectId="p1" {...standard} />],
+    ["zitadel-logout", () => <ZitadelLogout projectId="p1" {...standard} />],
+    ["zitadel-session", () => <ZitadelSession projectId="p1" {...standard} />],
+  ] as const)("puts the standard attributes into the %s server markup", (tag, widget) => {
+    expect(serverAttributes(tag, renderToString(widget))).toMatchObject({
+      class: expect.stringMatching(/^probe\s*$/),
+      id: "probe",
+      "data-testid": "probe",
+      "aria-label": "probe",
+      tabindex: "3",
+      hidden: "",
+      "project-id": "p1",
+    });
   });
 });

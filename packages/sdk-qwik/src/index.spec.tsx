@@ -5,7 +5,7 @@ import type {
 } from "@zitadel/components";
 
 import manifestJson from "../package.json";
-import { $, render, type Signal } from "@qwik.dev/core";
+import { $, render, type JSXOutput, type Signal } from "@qwik.dev/core";
 import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
@@ -25,7 +25,15 @@ import {
 import { PasswordToggleHarness, ResumeFlowIdHarness } from "./__tests__/login-prop-harness";
 import { UnsetPropHarness } from "./__tests__/unset-prop-harness";
 import { listenWithReplay, WRAPPER_MARKER } from "./early-events";
-import { businessLocales, ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
+import {
+  businessLocales,
+  ZitadelLogin,
+  type ZitadelLoginProps,
+  ZitadelLogout,
+  type ZitadelLogoutProps,
+  ZitadelSession,
+  type ZitadelSessionProps,
+} from "./index";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 
@@ -724,3 +732,120 @@ describe("wrapper config parity", () => {
     expect(elementValues(el!, logoutConfig)).toEqual(logoutConfig);
   });
 });
+
+// The props type is the check: `tsc` fails here when a wrapper stops accepting the
+// element's own HTML attributes.
+describe("standard attribute props", () => {
+  it("are accepted by every wrapper's props type", async () => {
+    const attributes = {
+      class: "probe",
+      style: "color: red",
+      id: "probe",
+      title: "probe",
+      slot: "probe",
+      hidden: true,
+      role: "region",
+      tabIndex: 3,
+      "aria-label": "probe",
+    } as const satisfies ZitadelLoginProps & ZitadelLogoutProps & ZitadelSessionProps;
+    const host = await renderWidget(
+      <>
+        <ZitadelLogin project={project} {...attributes} />
+        <ZitadelLogout project={project} {...attributes} />
+        <ZitadelSession project={project} {...attributes} />
+      </>,
+    );
+    expect(host.querySelectorAll("[aria-label=probe]")).toHaveLength(3);
+  });
+});
+
+type WidgetName = "ZitadelLogin" | "ZitadelLogout" | "ZitadelSession";
+
+// Mounts a widget with the given attributes (named as the markup names them) and
+// reaches its element through a `ref` signal, the way a consumer does.
+async function mountWidget(widget: WidgetName, attributes: Record<string, unknown>) {
+  const { hidden, ...rest } = attributes;
+  const Widget = { ZitadelLogin, ZitadelLogout, ZitadelSession }[widget] as unknown as (
+    props: Record<string, unknown>,
+  ) => JSXOutput;
+  const consumerRef = { value: undefined } as Signal<HTMLElement | undefined>;
+  const container = await renderWidget(
+    <Widget {...rest} {...(hidden === undefined ? {} : { hidden: true })} ref={consumerRef} />,
+  );
+  await macrotask();
+  return { container, ref: () => consumerRef.value };
+}
+
+// standard-attributes:begin
+const WIDGETS = ["ZitadelLogin", "ZitadelLogout", "ZitadelSession"] as const;
+const WIDGET_TAGS = {
+  ZitadelLogin: "zitadel-login",
+  ZitadelLogout: "zitadel-logout",
+  ZitadelSession: "zitadel-session",
+} as const;
+
+describe.each(WIDGETS)("%s standard attributes", (widget) => {
+  const tag = WIDGET_TAGS[widget];
+
+  it("forwards the class to the widget element", async () => {
+    const { container } = await mountWidget(widget, { class: "probe" });
+    expect(container.querySelector(tag)?.classList.contains("probe")).toBe(true);
+  });
+
+  it("forwards the style to the widget element", async () => {
+    const { container } = await mountWidget(widget, { style: "color: red" });
+    expect(container.querySelector<HTMLElement>(tag)?.style.color).toBe("red");
+  });
+
+  it("forwards the id to the widget element", async () => {
+    const { container } = await mountWidget(widget, { id: "probe" });
+    expect(container.querySelector(tag)?.id).toBe("probe");
+  });
+
+  it("forwards data attributes to the widget element", async () => {
+    const { container } = await mountWidget(widget, { "data-testid": "probe" });
+    expect(container.querySelector(tag)?.getAttribute("data-testid")).toBe("probe");
+  });
+
+  it("forwards aria attributes to the widget element", async () => {
+    const { container } = await mountWidget(widget, { "aria-label": "probe" });
+    expect(container.querySelector(tag)?.getAttribute("aria-label")).toBe("probe");
+  });
+
+  it("forwards the remaining standard attributes to the widget element", async () => {
+    const { container } = await mountWidget(widget, {
+      title: "probe",
+      role: "region",
+      tabindex: "3",
+      hidden: "",
+    });
+    const element = container.querySelector<HTMLElement>(tag);
+    expect(element?.title).toBe("probe");
+    expect(element?.getAttribute("role")).toBe("region");
+    expect(element?.getAttribute("tabindex")).toBe("3");
+    expect(element?.hidden).toBe(true);
+  });
+
+  it("forwards the slot to the widget element", async () => {
+    const { container } = await mountWidget(widget, { slot: "probe" });
+    expect(container.querySelector(tag)?.getAttribute("slot")).toBe("probe");
+  });
+
+  it("lets a widget prop win over a standard attribute of the same name", async () => {
+    const { container } = await mountWidget(widget, {
+      project: { projectId: "proj-test", url: "https://auth.example.com" },
+      url: "https://other.example.com",
+      id: "probe",
+    });
+    const element = container.querySelector<HTMLElement & { url?: string }>(tag);
+    expect(element?.url).toBe("https://auth.example.com");
+    expect(element?.id).toBe("probe");
+  });
+
+  it("gives access to the widget element through a ref", async () => {
+    const { container, ref } = await mountWidget(widget, {});
+    expect(ref()).toBe(container.querySelector(tag));
+    expect(ref()?.tagName.toLowerCase()).toBe(tag);
+  });
+});
+// standard-attributes:end

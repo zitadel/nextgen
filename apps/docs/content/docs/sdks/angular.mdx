@@ -115,6 +115,16 @@ Each widget event reaches the callback in the last column, which receives the ev
 <zitadel-auth-login [project]="project" theme="light" (flowComplete)="track($event)" />
 ```
 
+## Standard HTML attributes
+
+`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` also take the standard HTML attributes (`class`, `style`, `id`, `title`, `slot`, `hidden`, `role`, `tabindex`, `data-*` and `aria-*`) and forward them to the widget element, so you can position, style and label the widget without an extra wrapper element. A widget prop wins over a standard attribute of the same name, and no other prop reaches the widget's configuration.
+
+```html
+<zitadel-auth-login [project]="project" class="login" data-testid="login" aria-label="Sign in" />
+```
+
+Angular puts these on the wrapper's own tag, which is a different element from the widget, so the wrapper copies them to the widget element, once at start and again when the tag's attributes change, for plain attributes, bindings such as `[class.active]` and `[attr.aria-label]`, and `ngClass`. `id`, `title`, `hidden`, `role`, `tabindex`, `data-*` and `aria-*` are moved, so the page never holds two elements with the same `id` or `data-testid`; `class`, `style` and `slot` stay on the tag as well. The tag renders no box of its own (`display: contents`). A binding that later sets a moved attribute to `null` removes it from the tag, where nothing sees it go, so the widget element keeps its last value. `@ViewChild(ZitadelLoginComponent).element` is the widget element.
+
 ## Runtime model
 
 <Steps>

@@ -38,11 +38,13 @@ tasks:
     inputs:
       - "**/*"
       # contract.spec.ts reads these SDK specs to check their copied
-      # SERVER_RENDER_CASES tables for drift.
+      # SERVER_RENDER_CASES tables and standard-attribute test titles for drift.
       - "/packages/sdk-react/src/index.spec.tsx"
       - "/packages/sdk-vue/src/components.spec.ts"
       - "/packages/sdk-angular/src/lib/components.spec.ts"
       - "/packages/sdk-svelte/src/index.spec.ts"
+      - "/packages/sdk-solid/src/index.spec.tsx"
+      - "/packages/sdk-qwik/src/index.spec.tsx"
       # And the meta-framework SDKs' server tests, to check they share their titles.
       - "/packages/sdk-*/src/__tests__/*.test.ts"
       - "/packages/sdk-*/src/__tests__/*/*.test.ts"

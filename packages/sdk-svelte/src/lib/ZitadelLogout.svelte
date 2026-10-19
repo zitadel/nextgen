@@ -2,7 +2,7 @@
   import '@zitadel/components';
   import type { ZitadelLogout as ZitadelLogoutElement } from '@zitadel/components';
 
-  import type { ZitadelLogoutProps, ZitadelSignoutDetail } from './types';
+  import type { ZitadelLogoutElementProps, ZitadelSignoutDetail } from './types';
   import { assignGiven } from './given';
   import { onClient, proxyPathAttr } from './attributes';
 
@@ -13,7 +13,8 @@
     postSignOutUrl,
     theme,
     onSignout,
-  }: ZitadelLogoutProps = $props();
+    ...attributes
+  }: ZitadelLogoutElementProps = $props();
 
   let el: ZitadelLogoutElement | undefined = $state();
 
@@ -49,6 +50,7 @@
 </script>
 
 <zitadel-logout
+  {...attributes}
   bind:this={el}
   project={onClient(project)}
   project-id={project?.projectId ?? projectId}

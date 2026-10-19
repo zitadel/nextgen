@@ -2,10 +2,11 @@ import type { ZitadelProject } from "@zitadel/api/config";
 import type { ZitadelSession as ZitadelSessionElement } from "@zitadel/components";
 import type { ZitadelSignoutDetail } from "@zitadel/sdk-core/types";
 
-import { defineComponent, h, type PropType, ref, toRaw } from "vue";
+import { defineComponent, h, mergeProps, type PropType, ref, toRaw } from "vue";
 import "@zitadel/components";
 
 import { forceAttr } from "./forceAttr";
+import type { WithZitadelWidgetAttributes } from "./widgetAttributes";
 
 /**
  * Vue wrapper for the `<zitadel-session>` Lit web component — the post-sign-in
@@ -17,8 +18,12 @@ import { forceAttr } from "./forceAttr";
  * A Vue `ref` on this component resolves to the component *instance*; the
  * rendered `<zitadel-session>` DOM node is exposed as `element`.
  */
-export default defineComponent({
+const ZitadelSession = defineComponent({
   name: "ZitadelSession",
+  // The standard HTML attributes (class, style, id, data-*, aria-*, …) are merged
+  // onto the element below, under the widget's own bindings, rather than left to
+  // Vue's automatic fallthrough, which would let them overwrite those bindings.
+  inheritAttrs: false,
   props: {
     project: { type: Object as PropType<ZitadelProject>, default: undefined },
     projectId: { type: String, default: undefined },
@@ -31,41 +36,46 @@ export default defineComponent({
     suppressHeader: { type: Boolean, default: undefined },
   },
   emits: ["signout"],
-  setup(props, { emit, expose }) {
+  setup(props, { attrs, emit, expose }) {
     const element = ref<ZitadelSessionElement | null>(null);
     expose({ element });
 
     return () => {
       const attr = forceAttr();
-      return h("zitadel-session", {
-        ref: element,
-        // Hand the Lit element the raw SDK handle, not Vue's reactive proxy.
-        project: toRaw(props.project),
-        // Kebab-case attributes are what the element reads at upgrade, and the
-        // only form a server-rendered page carries (the camelCase keys below
-        // render as `projectid=`-style names the element never reads). The
-        // handle's fields are mirrored, and win over the discrete props as they
-        // do in the widget's `resolveApi`, so a page that passes only `project`
-        // is configured before hydration and both channels agree.
-        "project-id": props.project?.projectId ?? props.projectId,
-        "proxy-path": props.project?.proxyPath ?? props.proxyPath,
-        url: props.project?.url,
-        projectId: props.projectId,
-        proxyPath: props.proxyPath,
-        "post-sign-out-url": props.postSignOutUrl,
-        // A string prop with a default is bound as an attribute (the "^" prefix on
-        // the client, see `forceAttr`): Vue assigns an unset property as "", which
-        // the element cannot tell from an intended empty string, while an unset
-        // attribute is simply removed.
-        [`${attr}heading`]: props.heading,
-        [`${attr}logout-label`]: props.logoutLabel,
-        [`${attr}variant`]: props.variant,
-        [`${attr}theme`]: props.theme,
-        suppressHeader: props.suppressHeader,
-        onZitadelSignout: (event: CustomEvent<ZitadelSignoutDetail>) => {
-          emit("signout", event.detail);
-        },
-      });
+      return h(
+        "zitadel-session",
+        mergeProps(attrs, {
+          ref: element,
+          // Hand the Lit element the raw SDK handle, not Vue's reactive proxy.
+          project: toRaw(props.project),
+          // Kebab-case attributes are what the element reads at upgrade, and the
+          // only form a server-rendered page carries (the camelCase keys below
+          // render as `projectid=`-style names the element never reads). The
+          // handle's fields are mirrored, and win over the discrete props as they
+          // do in the widget's `resolveApi`, so a page that passes only `project`
+          // is configured before hydration and both channels agree.
+          "project-id": props.project?.projectId ?? props.projectId,
+          "proxy-path": props.project?.proxyPath ?? props.proxyPath,
+          url: props.project?.url,
+          projectId: props.projectId,
+          proxyPath: props.proxyPath,
+          "post-sign-out-url": props.postSignOutUrl,
+          // A string prop with a default is bound as an attribute (the "^" prefix on
+          // the client, see `forceAttr`): Vue assigns an unset property as "", which
+          // the element cannot tell from an intended empty string, while an unset
+          // attribute is simply removed.
+          [`${attr}heading`]: props.heading,
+          [`${attr}logout-label`]: props.logoutLabel,
+          [`${attr}variant`]: props.variant,
+          [`${attr}theme`]: props.theme,
+          suppressHeader: props.suppressHeader,
+          onZitadelSignout: (event: CustomEvent<ZitadelSignoutDetail>) => {
+            emit("signout", event.detail);
+          },
+        }),
+      );
     };
   },
 });
+
+export default ZitadelSession as WithZitadelWidgetAttributes<typeof ZitadelSession>;

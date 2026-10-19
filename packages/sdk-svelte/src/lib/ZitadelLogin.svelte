@@ -8,7 +8,7 @@
     ZitadelFlowInputDetail,
     ZitadelFlowRedirectDetail,
     ZitadelFlowStepDetail,
-    ZitadelLoginProps,
+    ZitadelLoginElementProps,
   } from './types';
   import { assignGiven } from './given';
   import { onClient, proxyPathAttr } from './attributes';
@@ -33,7 +33,8 @@
     onFlowComplete,
     onFlowRedirect,
     onFlowError,
-  }: ZitadelLoginProps = $props();
+    ...attributes
+  }: ZitadelLoginElementProps = $props();
 
   let el: ZitadelLoginElement | undefined = $state();
 
@@ -92,6 +93,7 @@
 </script>
 
 <zitadel-login
+  {...attributes}
   bind:this={el}
   project={onClient(project)}
   {purpose}

@@ -78,6 +78,16 @@ Each widget event reaches the callback in the last column, which receives the ev
 <ZitadelLogin project={project} theme="light" onFlowComplete$={(detail) => track(detail)} />
 ```
 
+## Standard HTML attributes
+
+`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` also take the standard HTML attributes (`class`, `style`, `id`, `title`, `slot`, `hidden`, `role`, `tabindex`, `data-*` and `aria-*`) and forward them to the widget element, so you can position, style and label the widget without an extra wrapper element. A widget prop wins over a standard attribute of the same name, and no other prop reaches the widget's configuration.
+
+```tsx
+<ZitadelLogin project={project} class="login" data-testid="login" aria-label="Sign in" />
+```
+
+The attributes are written ahead of the wrapper's own, so a widget prop wins, and the props types include the element's HTML attributes. Event handler props are not forwarded; use the `on…$` callbacks above. A `ref` signal receives the widget element.
+
 ## Server rendering
 
 If your app renders on the server, pass `projectId` and `proxyPath` to the `ZitadelLogin` wrapper as strings (it writes them as the `project-id` and `proxy-path` attributes; use those hyphenated names only on a raw `<zitadel-login>` element), because a widget that starts before its configuration arrives shows an error instead of the flow. `ZitadelLogout` and `ZitadelSession` do the same, and the other string and boolean options (`purpose`, `flowName`, `postSignInUrl`, `forcePostSignInUrl`, `resumeFlowId`, `postSignOutUrl`, `variant`, `theme`, `heading`, `logoutLabel`, `lang`, `suppressHeader`, `suppressPasswordToggle`) are written as attributes too. A `project` handle contributes its `projectId`, `proxyPath`, `url` and `publishableKey` as attributes; the rest of the handle, and `locales`, are set as element properties after hydration, so a widget that needs `locales` still gets them only on the client. The `on…$` callbacks are attached once the page is interactive, so the wrappers hold the widget's terminal events (`zitadel-flow-complete`, `zitadel-flow-redirect`, `zitadel-flow-error` and `zitadel-signout`, at most eight per widget) until then and replay them to the callbacks in order; a resumed flow that is already finished still reaches `onFlowComplete$`. Step and input events are never held, so field values are not retained, and a raw `<zitadel-login>` you render yourself is not buffered at all.

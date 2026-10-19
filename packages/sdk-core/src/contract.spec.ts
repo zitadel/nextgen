@@ -208,6 +208,82 @@ describe("server-render cases ↔ SDK specs", () => {
 });
 
 /**
+ * The standard-attribute tests.
+ *
+ * Every client SDK's wrapper forwards the element's standard HTML attributes to
+ * the widget element, and every SDK spec proves it with the same tests between
+ * two marker comments: the same titles, in the same order, with none missing and
+ * none extra, and the same bodies. Only the SDK's own `mountWidget` differs. A
+ * behaviour left untested in one SDK, or tested under another title, fails here
+ * instead of drifting unnoticed.
+ */
+describe("standard-attribute tests ↔ SDK specs", () => {
+  const SPECS = {
+    "sdk-react": "../../sdk-react/src/index.spec.tsx",
+    "sdk-vue": "../../sdk-vue/src/components.spec.ts",
+    "sdk-angular": "../../sdk-angular/src/lib/components.spec.ts",
+    "sdk-svelte": "../../sdk-svelte/src/index.spec.ts",
+    "sdk-solid": "../../sdk-solid/src/index.spec.tsx",
+    "sdk-qwik": "../../sdk-qwik/src/index.spec.tsx",
+  } as const;
+
+  const CANONICAL_TITLES = [
+    "%s standard attributes",
+    "forwards the class to the widget element",
+    "forwards the style to the widget element",
+    "forwards the id to the widget element",
+    "forwards data attributes to the widget element",
+    "forwards aria attributes to the widget element",
+    "forwards the remaining standard attributes to the widget element",
+    "forwards the slot to the widget element",
+    "lets a widget prop win over a standard attribute of the same name",
+    "gives access to the widget element through a ref",
+  ];
+
+  // Matches `it("title"` and the `describe.each(WIDGETS)("title"` form.
+  const TITLE = /(?:\bit\(|\bdescribe\.each\(\w+\)\()\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1/g;
+
+  const blockOf = (spec: string): string => {
+    const source = readFileSync(fileURLToPath(new URL(spec, import.meta.url)), "utf8");
+    const begin = source.indexOf("// standard-attributes:begin");
+    const end = source.indexOf("// standard-attributes:end");
+    expect(begin, `${spec} has no standard-attribute tests`).toBeGreaterThanOrEqual(0);
+    expect(end, `${spec} has an unterminated standard-attribute block`).toBeGreaterThan(begin);
+    return source.slice(begin, end);
+  };
+
+  const firstDifference = (titles: readonly string[]): string => {
+    const length = Math.max(titles.length, CANONICAL_TITLES.length);
+    for (let index = 0; index < length; index++) {
+      if (titles[index] !== CANONICAL_TITLES[index]) {
+        return `test ${index + 1} is ${JSON.stringify(titles[index])}, expected ${JSON.stringify(CANONICAL_TITLES[index])}`;
+      }
+    }
+    return "";
+  };
+
+  it.each(Object.entries(SPECS))(
+    "%s carries exactly the canonical tests, in order",
+    (sdk, spec) => {
+      const titles = [...blockOf(spec).matchAll(TITLE)].map((match) => match[2]!);
+      expect(
+        firstDifference(titles),
+        `${sdk} has ${titles.length} tests, expected ${CANONICAL_TITLES.length}`,
+      ).toBe("");
+    },
+  );
+
+  it.each(Object.entries(SPECS))(
+    "%s carries the same test bodies as the React spec",
+    (sdk, spec) => {
+      expect(blockOf(spec), `${sdk} differs from the React block`).toBe(
+        blockOf(SPECS["sdk-react"]),
+      );
+    },
+  );
+});
+
+/**
  * Apps go through their SDK. Each SDK that renders the widgets lists
  * `@zitadel/components` as its own dependency, so the elements load from the SDK
  * and the app never installs or imports `components` by name; no SDK's docs tell
@@ -265,6 +341,12 @@ describe("widget loading ↔ SDK packages", () => {
     (file) => {
       const config = read(`${packagesDir}sdk-core/${file}`);
       for (const input of [
+        "packages/sdk-react/src/index.spec.tsx",
+        "packages/sdk-vue/src/components.spec.ts",
+        "packages/sdk-angular/src/lib/components.spec.ts",
+        "packages/sdk-svelte/src/index.spec.ts",
+        "packages/sdk-solid/src/index.spec.tsx",
+        "packages/sdk-qwik/src/index.spec.tsx",
         "packages/sdk-*/src/__tests__/*.test.ts",
         "packages/sdk-*/src/__tests__/*/*.test.ts",
         "packages/sdk-*/package.json",

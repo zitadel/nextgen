@@ -57,12 +57,15 @@ export type {
   ZitadelLogoutEventMap,
   ZitadelLogoutHandlers,
   ZitadelLogoutProps,
+  ZitadelLogoutReactProps,
   ZitadelProject,
   ZitadelSessionConfig,
   ZitadelSessionEventMap,
   ZitadelSessionHandlers,
   ZitadelSessionProps,
+  ZitadelSessionReactProps,
   ZitadelSignoutDetail,
+  ZitadelWidgetAttributes,
 } from "@zitadel/sdk-react";
 
 const subscribeNever = () => () => {};

@@ -5,7 +5,7 @@ import type {
 } from "@zitadel/components";
 
 import "@zitadel/components";
-import type { JSX } from "solid-js";
+import { splitProps, type JSX } from "solid-js";
 
 import {
   configureZitadel,
@@ -15,6 +15,7 @@ import {
   type ZitadelProject,
 } from "@zitadel/api/config";
 
+import { asElementAttributes } from "./attributes";
 import type {
   ZitadelFlowCompleteDetail,
   ZitadelFlowRedirectDetail,
@@ -25,6 +26,7 @@ import type {
   ZitadelLogoutProps,
   ZitadelSessionProps,
   ZitadelSignoutDetail,
+  ZitadelWidgetAttributes,
 } from "./types";
 
 declare module "solid-js" {
@@ -101,6 +103,89 @@ function projectAttributes(props: {
   };
 }
 
+/** Props of {@link ZitadelLogin}: the widget's own plus the element's HTML attributes. */
+export type ZitadelLoginSolidProps = ZitadelLoginProps &
+  ZitadelWidgetAttributes<ZitadelLoginProps> & {
+    ref?: ZitadelLoginElement | ((el: ZitadelLoginElement) => void);
+  };
+
+/** Props of {@link ZitadelLogout}: the widget's own plus the element's HTML attributes. */
+export type ZitadelLogoutSolidProps = ZitadelLogoutProps &
+  ZitadelWidgetAttributes<ZitadelLogoutProps> & {
+    ref?: ZitadelLogoutElement | ((el: ZitadelLogoutElement) => void);
+  };
+
+/** Props of {@link ZitadelSession}: the widget's own plus the element's HTML attributes. */
+export type ZitadelSessionSolidProps = ZitadelSessionProps &
+  ZitadelWidgetAttributes<ZitadelSessionProps> & {
+    ref?: ZitadelSessionElement | ((el: ZitadelSessionElement) => void);
+  };
+
+/**
+ * The props each wrapper owns. Everything else a consumer passes (`class`,
+ * `style`, `id`, `title`, `slot`, `hidden`, `data-*`, `aria-*`, `role`,
+ * `tabindex`, …) is forwarded to the widget element, under the wrapper's own
+ * bindings, so a widget prop always wins over a standard attribute of the same
+ * name. Each list is checked against its props type, so a prop added there
+ * without being listed here fails `tsc` instead of leaking onto the element.
+ */
+const LOGIN_PROPS = [
+  "ref",
+  "project",
+  "projectId",
+  "proxyPath",
+  "variant",
+  "theme",
+  "suppressHeader",
+  "suppressPasswordToggle",
+  "purpose",
+  "flowName",
+  "postSignInUrl",
+  "forcePostSignInUrl",
+  "resumeFlowId",
+  "locales",
+  "lang",
+  "onFlowStep",
+  "onFlowInput",
+  "onFlowComplete",
+  "onFlowRedirect",
+  "onFlowError",
+] as const satisfies readonly (keyof ZitadelLoginSolidProps)[];
+
+const LOGOUT_PROPS = [
+  "ref",
+  "project",
+  "projectId",
+  "proxyPath",
+  "postSignOutUrl",
+  "theme",
+  "onSignout",
+] as const satisfies readonly (keyof ZitadelLogoutSolidProps)[];
+
+const SESSION_PROPS = [
+  "ref",
+  "project",
+  "projectId",
+  "proxyPath",
+  "postSignOutUrl",
+  "heading",
+  "logoutLabel",
+  "variant",
+  "theme",
+  "suppressHeader",
+  "onSignout",
+] as const satisfies readonly (keyof ZitadelSessionSolidProps)[];
+
+type Unlisted<Props, Listed> = Exclude<keyof Props, Listed>;
+const everyPropListed: [
+  Unlisted<ZitadelLoginProps, (typeof LOGIN_PROPS)[number]>,
+  Unlisted<ZitadelLogoutProps, (typeof LOGOUT_PROPS)[number]>,
+  Unlisted<ZitadelSessionProps, (typeof SESSION_PROPS)[number]>,
+] extends [never, never, never]
+  ? true
+  : never = true;
+void everyPropListed;
+
 export { configureZitadel, getApi, getZitadelConfig };
 export type { ZitadelConfig, ZitadelProject };
 export * from "./types";
@@ -118,13 +203,11 @@ export { businessLocales } from "@zitadel/components";
  * A forwarded `ref` resolves to the underlying `<zitadel-login>` DOM element,
  * so consumers can imperatively access the upgraded web component.
  */
-export function ZitadelLogin(
-  props: ZitadelLoginProps & {
-    ref?: ZitadelLoginElement | ((el: ZitadelLoginElement) => void);
-  },
-): JSX.Element {
+export function ZitadelLogin(props: ZitadelLoginSolidProps): JSX.Element {
+  const [, attributes] = splitProps(props, LOGIN_PROPS);
   return (
     <zitadel-login
+      {...asElementAttributes(attributes)}
       ref={props.ref}
       prop:project={props.project}
       prop:locales={props.locales}
@@ -157,13 +240,11 @@ export function ZitadelLogin(
  * A forwarded `ref` resolves to the underlying `<zitadel-logout>` DOM element,
  * so consumers can imperatively access the upgraded web component.
  */
-export function ZitadelLogout(
-  props: ZitadelLogoutProps & {
-    ref?: ZitadelLogoutElement | ((el: ZitadelLogoutElement) => void);
-  },
-): JSX.Element {
+export function ZitadelLogout(props: ZitadelLogoutSolidProps): JSX.Element {
+  const [, attributes] = splitProps(props, LOGOUT_PROPS);
   return (
     <zitadel-logout
+      {...asElementAttributes(attributes)}
       ref={props.ref}
       prop:project={props.project}
       {...projectAttributes(props)}
@@ -182,13 +263,11 @@ export function ZitadelLogout(
  *
  * A forwarded `ref` resolves to the underlying `<zitadel-session>` DOM element.
  */
-export function ZitadelSession(
-  props: ZitadelSessionProps & {
-    ref?: ZitadelSessionElement | ((el: ZitadelSessionElement) => void);
-  },
-): JSX.Element {
+export function ZitadelSession(props: ZitadelSessionSolidProps): JSX.Element {
+  const [, attributes] = splitProps(props, SESSION_PROPS);
   return (
     <zitadel-session
+      {...asElementAttributes(attributes)}
       ref={props.ref}
       prop:project={props.project}
       {...projectAttributes(props)}

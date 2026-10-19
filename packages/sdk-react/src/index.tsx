@@ -23,6 +23,7 @@ import type {
   ZitadelLogoutProps,
   ZitadelSessionProps,
   ZitadelSignoutDetail,
+  ZitadelWidgetAttributes,
 } from "./types";
 
 export { configureZitadel, getApi, getZitadelConfig };
@@ -155,16 +156,17 @@ const ZitadelSessionElementReact = createComponent({
  * React hosts need them: the widget exposes slots (`attribution-trailing`)
  * that are filled with light-DOM content.
  */
-export type ZitadelLoginReactProps = ZitadelLoginProps & {
-  children?: React.ReactNode;
-  /**
-   * Preview mode, for an operator surface: the flow starts as usual, then the
-   * element shows the served step in this state and submits nothing.
-   */
-  previewState?: ZitadelLoginElement["previewState"];
-  /** The terminal step the `success` preview paints; the element's `done` when unset. */
-  previewSuccessStep?: string;
-};
+export type ZitadelLoginReactProps = ZitadelLoginProps &
+  ZitadelWidgetAttributes<ZitadelLoginElement, ZitadelLoginProps> & {
+    children?: React.ReactNode;
+    /**
+     * Preview mode, for an operator surface: the flow starts as usual, then the
+     * element shows the served step in this state and submits nothing.
+     */
+    previewState?: ZitadelLoginElement["previewState"];
+    /** The terminal step the `success` preview paints; the element's `done` when unset. */
+    previewSuccessStep?: string;
+  };
 
 export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginReactProps>(
   function ZitadelLogin(
@@ -218,7 +220,10 @@ ZitadelLogin.displayName = "ZitadelLogin";
  * A forwarded `ref` resolves to the underlying `<zitadel-logout>` DOM element,
  * so consumers can imperatively access the upgraded web component.
  */
-export const ZitadelLogout = React.forwardRef<ZitadelLogoutElement, ZitadelLogoutProps>(
+export type ZitadelLogoutReactProps = ZitadelLogoutProps &
+  ZitadelWidgetAttributes<ZitadelLogoutElement, ZitadelLogoutProps>;
+
+export const ZitadelLogout = React.forwardRef<ZitadelLogoutElement, ZitadelLogoutReactProps>(
   function ZitadelLogout({ onSignout, ...props }, ref) {
     return (
       <ZitadelLogoutElementReact
@@ -242,7 +247,10 @@ ZitadelLogout.displayName = "ZitadelLogout";
  *
  * A forwarded `ref` resolves to the underlying `<zitadel-session>` DOM element.
  */
-export const ZitadelSession = React.forwardRef<ZitadelSessionElement, ZitadelSessionProps>(
+export type ZitadelSessionReactProps = ZitadelSessionProps &
+  ZitadelWidgetAttributes<ZitadelSessionElement, ZitadelSessionProps>;
+
+export const ZitadelSession = React.forwardRef<ZitadelSessionElement, ZitadelSessionReactProps>(
   function ZitadelSession({ onSignout, ...props }, ref) {
     return (
       <ZitadelSessionElementReact
