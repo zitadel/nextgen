@@ -46,9 +46,9 @@
 
 <zitadel-session
   bind:this={el}
-  onzitadel-signout={(event) =>
+  onzitadel-signout={(event: Event) =>
     onSignout?.((event as CustomEvent<ZitadelSignoutDetail>).detail)}
-  onzitadel-session-error={(event) =>
+  onzitadel-session-error={(event: Event) =>
     onSessionError?.((event as CustomEvent<ZitadelSessionErrorDetail>).detail)}
   project={onClient(project)}
   project-id={project?.projectId ?? projectId}

@@ -83,24 +83,14 @@ declare module "solid-js" {
 }
 
 /**
- * The project coordinates as attributes, so they are in the server markup. The
- * `project` handle stays a property too (it carries the publishable key and is
- * what the element prefers once Solid hydrates); its fields win over the
- * discrete props, as they do inside the widget. An empty proxy path is written
- * as `/`: the widget treats an empty `proxy-path` attribute as unset and falls
- * back to its default, while `/` normalizes to the site root.
+ * The `proxy-path` attribute for a proxy path. An empty path is written as `/`:
+ * the widget treats an empty `proxy-path` attribute as unset and falls back to
+ * its default, while `/` normalizes to the site root. The project coordinates are
+ * written as plain attributes on each element, so they are in the server markup
+ * and the compiler attaches the listeners before it runs `ref`.
  */
-function projectAttributes(props: {
-  readonly project?: ZitadelProject;
-  readonly projectId?: string;
-  readonly proxyPath?: string;
-}) {
-  const proxyPath = props.project?.proxyPath ?? props.proxyPath;
-  return {
-    "project-id": props.project?.projectId ?? props.projectId,
-    "proxy-path": proxyPath === "" ? "/" : proxyPath,
-    url: props.project?.url,
-  };
+function proxyPathAttribute(proxyPath: string | undefined): string | undefined {
+  return proxyPath === "" ? "/" : proxyPath;
 }
 
 export { configureZitadel, getApi, getZitadelConfig };
@@ -131,7 +121,9 @@ export function ZitadelLogin(
       prop:project={props.project}
       prop:locales={props.locales}
       prop:lang={props.lang}
-      {...projectAttributes(props)}
+      project-id={props.project?.projectId ?? props.projectId}
+      proxy-path={proxyPathAttribute(props.project?.proxyPath ?? props.proxyPath)}
+      url={props.project?.url}
       purpose={props.purpose ?? "login"}
       flow-name={props.flowName}
       post-sign-in-url={props.postSignInUrl}
@@ -167,7 +159,9 @@ export function ZitadelLogout(
     <zitadel-logout
       ref={props.ref}
       prop:project={props.project}
-      {...projectAttributes(props)}
+      project-id={props.project?.projectId ?? props.projectId}
+      proxy-path={proxyPathAttribute(props.project?.proxyPath ?? props.proxyPath)}
+      url={props.project?.url}
       post-sign-out-url={props.postSignOutUrl}
       theme={props.theme}
       on:zitadel-signout={(event) => props.onSignout?.(event.detail)}
@@ -194,7 +188,9 @@ export function ZitadelSession(
     <zitadel-session
       ref={props.ref}
       prop:project={props.project}
-      {...projectAttributes(props)}
+      project-id={props.project?.projectId ?? props.projectId}
+      proxy-path={proxyPathAttribute(props.project?.proxyPath ?? props.proxyPath)}
+      url={props.project?.url}
       post-sign-out-url={props.postSignOutUrl}
       heading={props.heading}
       logout-label={props.logoutLabel}
