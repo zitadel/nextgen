@@ -78,7 +78,8 @@ export function parseSignInEvent(line: string): SignInEvent | undefined {
  * this is called is the baseline, and the promise resolves only once it has
  * been read, so an attempt made before is never reported and one made after
  * the caller is told it may begin is not mistaken for old; each poll then
- * yields the lines it has not seen. Matching on the log's own lines needs no
+ * yields the lines the previous read did not hold. The log only grows, so a
+ * line that was in an older read and is gone from the last one cannot return. Matching on the log's own lines needs no
  * clock, and a line carries its timestamp, so two lines are never alike.
  */
 export async function watchSignInEvents(
@@ -87,7 +88,7 @@ export async function watchSignInEvents(
   pollMs: number,
   signal: AbortSignal,
 ): Promise<AsyncIterable<SignInEvent>> {
-  const poll = async function* (seen: ReadonlySet<string>): AsyncGenerator<SignInEvent> {
+  const poll = async function* (previous: ReadonlySet<string>): AsyncGenerator<SignInEvent> {
     if (signal.aborted) {
       return;
     }
@@ -95,9 +96,11 @@ export async function watchSignInEvents(
     if (signal.aborted) {
       return;
     }
-    const fresh = [...new Set((await read()).split("\n"))].filter((line) => !seen.has(line));
-    yield* fresh.flatMap((line) => parseSignInEvent(line) ?? []);
-    yield* poll(new Set([...seen, ...fresh]));
+    const lines = new Set((await read()).split("\n"));
+    yield* [...lines]
+      .filter((line) => !previous.has(line))
+      .flatMap((line) => parseSignInEvent(line) ?? []);
+    yield* poll(lines);
   };
   return poll(new Set((await read()).split("\n")));
 }
