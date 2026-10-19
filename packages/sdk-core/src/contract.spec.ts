@@ -424,6 +424,8 @@ describe("server SDK test titles", () => {
   const CANONICAL_TITLES = [
     "public route with no token continues as unauthenticated",
     "protected route with no token redirects to /login?next=/admin",
+    "protected route with a query string redirects to /login?next=/admin?tab=x",
+    "does not nest a next parameter the request already carries",
     "protected route requested with a trailing slash redirects to login",
     "protected route with a valid cookie token authenticates",
     "protected route with a valid Bearer token authenticates",

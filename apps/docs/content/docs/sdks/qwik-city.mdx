@@ -90,7 +90,7 @@ Install both packages as dev dependencies. Qwik bundles `devDependencies` into t
 <Steps>
   <Step>The plugin proxies same-origin `/__nextgen/*` requests to the backend, attaching the project secret only to the session handoff.</Step>
   <Step>It verifies the session token and stores the result on the request's `sharedMap`; read it with `getAuth(ev)` in a `routeLoader$`, action, or endpoint.</Step>
-  <Step>It redirects unauthenticated requests for `protectedRoutes` to `loginPath`, with the requested path in `?next=`, where the login widget returns after sign-in. A route matches with or without a trailing slash, since Qwik Router serves `/profile/` by default.</Step>
+  <Step>It redirects unauthenticated requests for `protectedRoutes` to `loginPath`, with the requested path and query string in `?next=`, where the login widget returns after sign-in. A route matches with or without a trailing slash, since Qwik Router serves `/profile/` by default.</Step>
 </Steps>
 
 ## Verify

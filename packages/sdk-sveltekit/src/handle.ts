@@ -5,6 +5,7 @@ import {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
   filterResponseHeaders,
+  loginRedirectUrl,
   matchesRoutes,
   requiresProjectSecret,
   validateOpaqueSessionToken,
@@ -316,9 +317,7 @@ async function handleAuth(
         .map((c) => c.name);
 
   if (matchesRoutes(pathname, protectedRoutes)) {
-    const loginUrl = new URL(loginPath, event.url);
-    loginUrl.searchParams.set("next", pathname);
-    const headers = new Headers({ location: loginUrl.toString() });
+    const headers = new Headers({ location: loginRedirectUrl(loginPath, event.url).toString() });
     for (const name of staleCookies) {
       headers.append("set-cookie", clearCookie(name));
     }

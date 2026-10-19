@@ -76,6 +76,49 @@ export function matchesRoutes(pathname: string, routes: readonly string[]): bool
   });
 }
 
+// ─── Login redirect ──────────────────────────────────────────────────────────
+
+/**
+ * The query parameter that brings a signed-out request's path to the login
+ * page, where `<zitadel-login>` returns after sign-in.
+ */
+const RETURN_PATH_PARAM = "next";
+
+/**
+ * Where a signed-out request for a protected route is sent: `loginPath`, with
+ * the requested path and query string in `next`, so `<zitadel-login>` returns
+ * to the page as it was asked for, filters and tabs included. The fragment
+ * never reaches the server, so it cannot be carried.
+ *
+ * A `next` the request carries itself is left out, so a redirect never nests
+ * an earlier one: should the login page be protected by mistake, each pass of
+ * the redirect loop would otherwise wrap the last and grow the URL. The rest
+ * of the query keeps the encoding it was sent with.
+ *
+ * Whatever query `loginPath` has of its own is kept, except a `next`, which
+ * this replaces.
+ *
+ * @param loginPath  - The login page, a path starting with a single `/`.
+ * @param requestUrl - The full URL of the signed-out request.
+ * @returns The URL to redirect to, on the request's origin.
+ */
+export function loginRedirectUrl(loginPath: string, requestUrl: string | URL): URL {
+  // A copy made from the whole URL, never the caller's `search`: SvelteKit
+  // makes `search` throw on the request event's URL while it prerenders.
+  const requested = new URL(requestUrl);
+  const query = requested.search
+    .slice(1)
+    .split("&")
+    .filter((pair) => !new URLSearchParams(pair).has(RETURN_PATH_PARAM))
+    .join("&");
+  const loginUrl = new URL(loginPath, requested);
+  loginUrl.searchParams.set(
+    RETURN_PATH_PARAM,
+    query === "" ? requested.pathname : `${requested.pathname}?${query}`,
+  );
+  return loginUrl;
+}
+
 // ─── Proxy credentials ───────────────────────────────────────────────────────
 
 /**
@@ -278,7 +321,8 @@ export type NextgenMiddlewareOptions = {
 
   /**
    * Pathname to redirect unauthenticated users to.
-   * A `next` query parameter is appended with the originally requested path.
+   * A `next` query parameter carries the requested path and query string,
+   * where `<zitadel-login>` returns after sign-in.
    * @default "/login"
    */
   loginPath?: string;
