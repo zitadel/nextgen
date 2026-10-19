@@ -102,6 +102,18 @@ export class IssuerCheck extends DiscoveryCheck {
   readonly title = "Issuer";
 
   protected inspect(context: IdpContext, document: Discovery): Outcome {
+    if (!ENDPOINT.test(context.issuer)) {
+      // The server refuses an issuer that is not https (or http on localhost), whether or not
+      // the endpoints come from the connection.
+      return {
+        status: "fail",
+        message:
+          context.issuer === ""
+            ? "The connection names no issuer"
+            : "The issuer is not an https URL",
+        recovery: `Set oidc.issuer in .zitadel/idps/${context.slug}.json to the provider's https issuer URL`,
+      };
+    }
     if (context.endpoints !== undefined) {
       return {
         status: "skipped",
