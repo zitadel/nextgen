@@ -10,6 +10,7 @@ import {
   _resetSessionForTesting,
   fetchSession,
   invalidateSessionCache,
+  sanitizeNextPath,
   sessionPage,
 } from "./session";
 import { makeTestSession } from "@/test/session.fixture";
@@ -311,5 +312,52 @@ describe("CSRF rejection", () => {
     expect(await rejected).toBeUndefined();
     expect(sessionPage.reload).toHaveBeenCalledOnce();
     expect(getApiCsrfToken()).toBeUndefined();
+  });
+});
+
+describe("sanitizeNextPath", () => {
+  it.each([
+    ["/", "/"],
+    ["/users", "/users"],
+    ["/users?tab=x", "/users?tab=x"],
+    ["/users?project=proj_test#top", "/users?project=proj_test#top"],
+    // Only where the browser goes is checked: a URL in the query stays the
+    // screen's own business.
+    ["/users?q=https://app.example", "/users?q=https://app.example"],
+  ])("keeps %s", (next, path) => {
+    expect(sanitizeNextPath(next)).toBe(path);
+  });
+
+  // The login screen joins the path with the deployment prefix, which a `..`
+  // left in place would climb out of.
+  it.each([
+    ["/users/../schemas", "/schemas"],
+    ["/../users", "/users"],
+    ["/./users?tab=x", "/users?tab=x"],
+  ])("collapses the dot segments in %s", (next, path) => {
+    expect(sanitizeNextPath(next)).toBe(path);
+  });
+
+  it.each([
+    ["no value", undefined],
+    ["an empty value", ""],
+    ["a path without a leading slash", "users"],
+    ["an absolute URL", "https://evil.example/phish"],
+    ["a protocol-relative URL", "//evil.example"],
+    // Browsers read `\` as `/`.
+    ["a backslash", "/\\evil.example"],
+    ["a backslash further in", "/users/\\evil.example"],
+    // Browsers drop tabs and newlines.
+    ["a tab", "/\t/evil.example"],
+    ["a newline", "/\n/evil.example"],
+    ["a carriage return", "/\r/evil.example"],
+    ["another control character", "/\u0000/evil.example"],
+    ["DEL", "/\u007f/evil.example"],
+    // Each of these collapses to //evil.example.
+    ["a dot segment before //", "/.//evil.example"],
+    ["a parent segment before //", "/users/..//evil.example"],
+    ["an encoded dot segment before //", "/%2e//evil.example"],
+  ])("refuses %s", (_, next) => {
+    expect(sanitizeNextPath(next)).toBeUndefined();
   });
 });
