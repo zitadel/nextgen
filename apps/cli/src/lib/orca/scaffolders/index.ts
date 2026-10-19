@@ -2,7 +2,7 @@ import { AngularScaffolder } from "./angular";
 import { NextScaffolder } from "./next";
 import { NuxtScaffolder } from "./nuxt";
 import { QwikScaffolder } from "./qwik";
-import { QwikCityScaffolder } from "./qwik-city";
+import { QwikRouterScaffolder } from "./qwik-router";
 import { ReactScaffolder } from "./react";
 import { SolidScaffolder } from "./solid";
 import { SolidStartScaffolder } from "./solid-start";
@@ -27,7 +27,7 @@ export const scaffolders = [
   new SolidScaffolder(),
   new SvelteKitScaffolder(),
   new SvelteScaffolder(),
-  new QwikCityScaffolder(),
+  new QwikRouterScaffolder(),
   new QwikScaffolder(),
   new AngularScaffolder(),
 ] as const satisfies ReadonlyArray<Scaffolder>;

@@ -16,7 +16,7 @@ import {
 
 /**
  * `process` is undefined in some edge/serverless runtimes; read env defensively
- * so the `process.env` fallback never throws a ReferenceError (Qwik City's
+ * so the `process.env` fallback never throws a ReferenceError (Qwik Router's
  * `ev.env` is the primary source).
  */
 const PROCESS_ENV: Record<string, string | undefined> =
@@ -49,7 +49,7 @@ export interface QwikRequestEvent {
   /** Returns a redirect marker to be thrown. */
   redirect(statusCode: number, url: string): unknown;
   /**
-   * Qwik City's platform env getter. This is how server env reaches the
+   * Qwik Router's platform env getter. This is how server env reaches the
    * handler: Vite/Qwik load `.env`/`.env.local` into `ev.env`, NOT into
    * `process.env`, so `ZITADEL_URL` / `ZITADEL_PROJECT_SECRET` are read here
    * (mirroring SvelteKit's `$env/dynamic/private`). Optional so unit-test mocks
@@ -227,13 +227,13 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
 }
 
 /**
- * Creates a Qwik City `RequestHandler` that handles proxying, JWT verification,
+ * Creates a Qwik Router `RequestHandler` that handles proxying, JWT verification,
  * and route protection in a single `onRequest` pass.
  *
  * Place it in a layout or root plugin, e.g. `src/routes/plugin@nextgen.ts`:
  *
  * ```ts
- * import { createNextgenOnRequest } from "@zitadel/sdk-qwik-city/server";
+ * import { createNextgenOnRequest } from "@zitadel/sdk-qwik-router/server";
  *
  * export const onRequest = createNextgenOnRequest({
  *   protectedRoutes: ["/admin*", "/dashboard*"],
@@ -248,7 +248,7 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
  *
  * @param options - Configuration. `projectSecret` is the project service-key
  *   sent as the bearer on the `POST /sessions/exchange` handoff only.
- * @returns A Qwik City `RequestHandler`.
+ * @returns A Qwik Router `RequestHandler`.
  */
 export function createNextgenOnRequest(
   options: NextgenMiddlewareOptions & { projectSecret?: string } = {},
@@ -290,7 +290,7 @@ export function createNextgenOnRequest(
     }
 
     // Resolve the backend URL and project secret per request. Precedence:
-    // explicit option > Qwik City's `ev.env` (which carries `.env.local`) >
+    // explicit option > Qwik Router's `ev.env` (which carries `.env.local`) >
     // `process.env` (set in production adapters) > localhost default. Qwik does
     // not surface `.env` files on `process.env`, so a factory-time read would
     // miss them and the proxy would fall back to :8080 ("fetch failed").
@@ -332,11 +332,11 @@ export function createNextgenOnRequest(
 }
 
 /**
- * Reads the auth state from a Qwik City request event after the handler has run.
+ * Reads the auth state from a Qwik Router request event after the handler has run.
  * Call it inside a `routeLoader$`, `routeAction$`, or endpoint:
  *
  * ```ts
- * import { getAuth } from "@zitadel/sdk-qwik-city/server";
+ * import { getAuth } from "@zitadel/sdk-qwik-router/server";
  *
  * export const useUser = routeLoader$((ev) => {
  *   const auth = getAuth(ev);
@@ -345,7 +345,7 @@ export function createNextgenOnRequest(
  * });
  * ```
  *
- * @param ev - The current Qwik City request event.
+ * @param ev - The current Qwik Router request event.
  * @returns The current {@link AuthResult}.
  */
 export function getAuth(ev: { sharedMap: Map<string, unknown> }): AuthResult {

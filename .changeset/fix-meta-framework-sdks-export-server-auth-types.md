@@ -1,7 +1,7 @@
 ---
 "@zitadel/sdk-sveltekit": patch
 "@zitadel/sdk-solid-start": patch
-"@zitadel/sdk-qwik-city": patch
+"@zitadel/sdk-qwik-router": patch
 "@zitadel/sdk-tanstack-start": patch
 ---
 

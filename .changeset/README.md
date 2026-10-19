@@ -142,10 +142,15 @@ rationale: [ADR 002](../docs/adrs/002-multi-package-release-strategy.md)
 Publishing uses **npm trusted publishing (OIDC)** — there is no `NPM_TOKEN`. Once
 per public package, a maintainer adds a trusted publisher on npmjs.com (Settings →
 Trusted Publishing): provider GitHub Actions, repo `zitadel/nextgen`, workflow
-`release-publish.yml`. The package must exist on npm first (publish `0.0.x` by
+`release-publish.yml`; with npm 11.15 or later, `npm trust github` does the same
+from a terminal. The package must exist on npm first (publish `0.0.x` by
 hand if needed); `release publish` stops before publishing a public package that
-npm has never seen and prints the placeholder publish to run. That check asks the npm registry before the dry-run branch, so an offline
-`release publish --dry-run` fails closed; this is intended. The release job runs on
+npm has never seen and prints the placeholder publish and the `npm trust` command
+to run. That check asks the npm registry before the dry-run branch, so an offline
+`release publish --dry-run` fails closed; this is intended. The version PR's
+`full-pr` runs the same check (`node scripts/release.mjs check-npm`), so a new
+public package fails the version PR instead of landing a version on `main` that
+cannot be published. The release job runs on
 Depot, which npm treats as self-hosted; keep `NPM_CONFIG_PROVENANCE=false` until npm
 provenance is supported for that runner environment or the publish job moves to
 GitHub-hosted runners.

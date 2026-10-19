@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-import { QwikCityScaffolder } from "../../../../../src/lib/orca/scaffolders/qwik-city";
+import { QwikRouterScaffolder } from "../../../../../src/lib/orca/scaffolders/qwik-router";
 import {
   SUPPORTED_NODE,
   describeNodeEngines,
@@ -28,11 +28,11 @@ beforeEach(() => {
   mockRm.mockResolvedValue(undefined);
 });
 
-describe("QwikCityScaffolder", () => {
+describe("QwikRouterScaffolder", () => {
   it("runs `create-qwik` then removes the starter index.tsx", async () => {
     mockSpawn.mockReturnValue(spawnOk());
 
-    await new QwikCityScaffolder(SUPPORTED_NODE).scaffold("/tmp/proj", "qwik-city");
+    await new QwikRouterScaffolder(SUPPORTED_NODE).scaffold("/tmp/proj", "qwik-router");
 
     const [command, args, opts] = scaffoldingCalls()[0] ?? [];
     expect(command).toBe("npx");
@@ -44,8 +44,8 @@ describe("QwikCityScaffolder", () => {
   });
 
   describeNodeEngines({
-    make: (node, platform) => new QwikCityScaffolder(node, platform),
-    framework: "qwik-city",
+    make: (node, platform) => new QwikRouterScaffolder(node, platform),
+    framework: "qwik-router",
     label: "create-qwik",
     spec: "create-qwik@2.0.0-rc.3",
     fallback: "^18.17.0 || ^20.3.0 || >=21.0.0",
@@ -55,9 +55,9 @@ describe("QwikCityScaffolder", () => {
     refused: [],
   });
 
-  it("only supports qwik-city", () => {
-    const scaffolder = new QwikCityScaffolder();
-    expect(scaffolder.canScaffold("qwik-city")).toBe(true);
+  it("only supports qwik-router", () => {
+    const scaffolder = new QwikRouterScaffolder();
+    expect(scaffolder.canScaffold("qwik-router")).toBe(true);
     expect(scaffolder.canScaffold("qwik")).toBe(false);
   });
 });

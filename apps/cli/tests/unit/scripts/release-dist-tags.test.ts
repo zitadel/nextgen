@@ -173,6 +173,7 @@ describe("release dist-tags preflight", () => {
     expect(message).toContain('"@zitadel/sdk-solid" "MIT" "@zitadel/sdk-solid@alpha"');
     expect(message).toContain('"@zitadel/server" "AGPL-3.0-only" "@zitadel/server@alpha"');
     expect(message).not.toContain("Trusted Publishing");
+    expect(message).not.toContain("npm trust");
   });
 
   it("tells the maintainer to bootstrap and add a trusted publisher for a never-published package", () => {
@@ -187,6 +188,30 @@ describe("release dist-tags preflight", () => {
       "add a trusted publisher for @zitadel/sdk-svelte on npmjs.com (package Settings → Trusted Publishing: GitHub Actions, repository zitadel/nextgen, workflow release-publish.yml)",
     );
     expect(message).toContain(".changeset/README.md");
+    expect(message).toContain(
+      "npm trust github @zitadel/sdk-svelte --repo zitadel/nextgen --file release-publish.yml --allow-publish --yes",
+    );
+  });
+
+  it("gives each never-published package its own trust command, and none to a prerelease-only one", () => {
+    const message = distTags.publishBlockersMessage(
+      {
+        unpublished: [
+          localPackage("@zitadel/sdk-sveltekit"),
+          localPackage("@zitadel/sdk-qwik-city"),
+        ],
+        prereleaseOnly: [localPackage("@zitadel/sdk-solid")],
+      },
+      "alpha",
+    );
+
+    expect(message.match(/npm publish --access public --tag bootstrap/g)).toHaveLength(3);
+    expect(message.match(/^npm trust github .*$/gm)).toEqual([
+      "npm trust github @zitadel/sdk-sveltekit --repo zitadel/nextgen --file release-publish.yml --allow-publish --yes",
+      "npm trust github @zitadel/sdk-qwik-city --repo zitadel/nextgen --file release-publish.yml --allow-publish --yes",
+    ]);
+    // Printed by the publish job and by the version PR's check alike.
+    expect(message.trimEnd().endsWith("Then rerun this job.")).toBe(true);
   });
 
   it("reads each package's name, version, and license", async () => {
