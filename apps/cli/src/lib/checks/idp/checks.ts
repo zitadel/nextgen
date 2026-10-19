@@ -24,15 +24,17 @@ export class DiscoveryReachableCheck extends Check<IdpContext> {
   readonly title = "Discovery document";
 
   async run(context: IdpContext): Promise<Outcome> {
-    const found = await context.discovery;
-    if (found.ok && found.source === "connection" && (context.missingEndpoints ?? []).length > 0) {
-      const missing = context.missingEndpoints ?? [];
+    const missing = context.missingEndpoints ?? [];
+    // The server refuses a partial set whether or not the issuer could supply the rest, so
+    // this is checked before discovery and not only when the connection names its own.
+    if (missing.length > 0) {
       return {
         status: "fail",
         message: `The connection names some endpoints but not ${missing.join(", ")}`,
         recovery: `Name every endpoint in oidc in .zitadel/idps/${context.slug}.json, or none and let the issuer's discovery document supply them`,
       };
     }
+    const found = await context.discovery;
     const unusable =
       found.ok && found.source === "connection"
         ? Object.entries(context.configuredEndpoints ?? {}).flatMap(([name, value]) =>

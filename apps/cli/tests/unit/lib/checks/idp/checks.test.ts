@@ -115,6 +115,15 @@ describe("IDP_CHECKS", () => {
     });
   });
 
+  it("fails a connection that names only some endpoints even when it names no authorization endpoint", async () => {
+    const { by } = await resultsFor({ missingEndpoints: ["authorization_endpoint", "jwks_uri"] });
+
+    expect(by("discovery")).toMatchObject({
+      status: "fail",
+      message: expect.stringContaining("authorization_endpoint"),
+    });
+  });
+
   it("fails a connection whose own endpoint is not https, as the server would", async () => {
     const { by } = await resultsFor({
       endpoints: { authorization: "https://issuer.example/authorize" },
