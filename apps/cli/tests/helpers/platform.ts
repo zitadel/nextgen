@@ -16,6 +16,23 @@ export interface Captured<T> {
 }
 
 /**
+ * How a Google-shaped identity provider answers a connection. Each field
+ * defaults to the answer under which the connection works.
+ */
+export interface ProviderBehaviour {
+  readonly callbackUri?: "registered" | "unregistered";
+  readonly client?: "known" | "unknown";
+  readonly secret?: "right" | "wrong";
+}
+
+const GOOGLE_ISSUER = "https://accounts.google.com";
+const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
+
+/** The cause Google puts in the URL of the error page it ends an authorization request on. */
+const refusalPage = (cause: string) =>
+  `${GOOGLE_ISSUER}/signin/oauth/error?authError=${Buffer.from(`\n\x10${cause}`).toString("base64url")}`;
+
+/**
  * The mock platform for one spec file, with the arrangements a spec is allowed
  * to make of it. A spec says what the platform should do in its own terms; the
  * HTTP it takes to arrange that stays in here.
@@ -65,6 +82,16 @@ export interface PlatformMock {
    * for the person who would finish it in a browser.
    */
   completesTheNextClaim(): void;
+
+  /**
+   * Serves Google as the provider behind the `google` connection: its
+   * discovery document, an authorization endpoint and a token endpoint that
+   * answer as `behaviour` says.
+   */
+  hasGoogle(behaviour?: ProviderBehaviour): void;
+
+  /** Makes Google unreachable, as a provider that is down or a network that is cut would. */
+  googleIsUnreachable(): void;
 
   /** Records every published branding revision, which the mock does not keep. */
   capturesBrandingPublishes(): Captured<Record<string, unknown>>;
@@ -154,6 +181,53 @@ export function usePlatformMock(): PlatformMock {
         }
       }, 20);
       watchers.push(watcher);
+    },
+
+    hasGoogle({ callbackUri = "registered", client = "known", secret = "right" } = {}) {
+      const authorizeTo =
+        client === "unknown"
+          ? refusalPage("invalid_client")
+          : callbackUri === "unregistered"
+            ? refusalPage("redirect_uri_mismatch")
+            : `${GOOGLE_ISSUER}/v3/signin/identifier`;
+      server.use(
+        http.get(`${GOOGLE_ISSUER}/.well-known/openid-configuration`, () =>
+          HttpResponse.json({
+            issuer: GOOGLE_ISSUER,
+            authorization_endpoint: `${GOOGLE_ISSUER}/o/oauth2/v2/auth`,
+            token_endpoint: GOOGLE_TOKEN_URL,
+            scopes_supported: ["openid", "email", "profile"],
+            claims_supported: ["sub", "email", "email_verified", "given_name", "family_name"],
+            code_challenge_methods_supported: ["plain", "S256"],
+          }),
+        ),
+        http.get(`${GOOGLE_ISSUER}/o/oauth2/v2/auth`, () =>
+          HttpResponse.redirect(authorizeTo, 302),
+        ),
+        http.get(`${GOOGLE_ISSUER}/v3/signin/identifier`, () => HttpResponse.html("sign in")),
+        http.get(`${GOOGLE_ISSUER}/signin/oauth/error`, () => HttpResponse.html("error")),
+        http.post(GOOGLE_TOKEN_URL, () =>
+          secret === "wrong"
+            ? HttpResponse.json(
+                {
+                  error: "invalid_client",
+                  error_description: "The provided client secret is invalid.",
+                },
+                { status: 401 },
+              )
+            : HttpResponse.json(
+                { error: "invalid_grant", error_description: "Malformed auth code." },
+                { status: 400 },
+              ),
+        ),
+      );
+    },
+
+    googleIsUnreachable() {
+      server.use(
+        http.all(`${GOOGLE_ISSUER}/*`, () => HttpResponse.error()),
+        http.all(GOOGLE_TOKEN_URL, () => HttpResponse.error()),
+      );
     },
 
     capturesBrandingPublishes() {

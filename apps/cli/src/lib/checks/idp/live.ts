@@ -1,0 +1,168 @@
+import { Check, type CheckResult, type Outcome } from "../check";
+import type { IdpContext, SignInEvent, SignInPhase } from "./context";
+
+const TIMED_OUT = Symbol("timed out");
+
+const PHASES: Readonly<Record<SignInPhase, string>> = {
+  ceremony_started: "sending the browser to the provider",
+  callback_received: "the provider's redirect back",
+  exchange_finished: "the code exchange",
+  resolved: "matching the identity to a user",
+  user_created: "creating the user",
+};
+
+const REASONS: Readonly<Record<string, string>> = {
+  provider_denied: "the sign-in was declined at the provider",
+  provider_error: "the provider answered with an error",
+  discovery_failed: "the provider's discovery document could not be fetched",
+  exchange_failed: "the provider refused the authorization code",
+  id_token_invalid: "the provider's ID token did not verify",
+  userinfo_failed: "the provider's user info could not be read",
+  state_invalid: "the sign-in state was unknown, used or expired",
+  state_mismatch: "the redirect came back on another connection's path",
+  no_code: "the redirect carried neither a code nor an error",
+  connection_invalid: "the connection could not be served",
+  secret_unavailable: "the client secret could not be read",
+  subject_invalid: "the subject claim is missing or not usable",
+  creation_disabled: "the connection does not create users and none is linked",
+  claim_rejected: "a verified claim is refused by the user schema",
+  unroutable: "the login flow does not route this outcome",
+  user_invalid: "the claims do not satisfy the user schema",
+  other_schema: "the identity belongs to a user of another schema",
+  internal: "the runtime failed",
+};
+
+const LOGS = 'Run zitadel logs and look for the lines saying "sso attempt"';
+
+/** What to do about a failed attempt: one action, chosen by the side that failed and the reason. */
+function recoveryFor(event: SignInEvent, context: IdpContext): string {
+  const file = `.zitadel/idps/${context.slug}.json`;
+  if (event.side === "provider") {
+    const where = context.consoleUrl ?? "the provider's console";
+    return `Check the client ID, the secret and the redirect URI ${context.callbackUri} at ${where}`;
+  }
+  switch (event.reason) {
+    case "state_invalid":
+    case "state_mismatch":
+    case "no_code":
+      return `Start again from ${context.live?.loginUrl}: the state is single-use and short-lived`;
+    case "connection_invalid":
+    case "subject_invalid":
+      return `Fix ${file}, then run zitadel apply`;
+    case "secret_unavailable":
+      return `Make client_secret in ${file} name a secret project variable, then run zitadel apply`;
+    case "creation_disabled":
+      return `Set provisioning.creation in ${file}, or sign in with a user that is already linked`;
+    case "claim_rejected":
+    case "user_invalid":
+      return `Fix claim_mapping and verified_claims in ${file}, or the matching rule in your user schema`;
+    case "unroutable":
+      return "Route sso_authenticated from the step that offers this provider in your login flow";
+    default:
+      return LOGS;
+  }
+}
+
+function failure(event: SignInEvent, context: IdpContext): Outcome {
+  const phase = PHASES[event.phase];
+  const reason = REASONS[event.reason ?? ""] ?? event.reason ?? "unknown reason";
+  return {
+    status: "fail",
+    message: `Failed at ${phase} (${event.side ?? "journey"} side): ${reason}`,
+    recovery: recoveryFor(event, context),
+  };
+}
+
+/** A sign-in is complete when the identity is bound to a user, or a user was created for it. */
+function completes(event: SignInEvent): boolean {
+  if (event.status !== "ok") {
+    return false;
+  }
+  return (
+    event.phase === "user_created" ||
+    (event.phase === "resolved" && (event.result === "linked" || event.result === "existing_user"))
+  );
+}
+
+/**
+ * Sends the developer through a real sign-in and follows the runtime's events
+ * for it.
+ *
+ * It follows the first attempt it sees for the connection to its end — a
+ * completed sign-in, a failure on the provider's side or the journey's, or the
+ * timeout — and says so when another attempt starts meanwhile, without
+ * following it. Attempts are matched by connection slug and by the moment
+ * watching began, which is enough for one developer on a local runtime; a
+ * nonce handed to the browser would be exact but needs a way to get it into a
+ * flow the browser starts.
+ *
+ * The browser starts the flow, not the CLI, so it is not a dry run: a sign-in
+ * that creates a user leaves that user behind.
+ */
+export class LiveSignInCheck extends Check<IdpContext> {
+  readonly name = "sign-in";
+  readonly title = "Live sign-in";
+
+  async run(context: IdpContext, earlier: readonly CheckResult[]): Promise<Outcome> {
+    const { live } = context;
+    if (live === undefined) {
+      return { status: "skipped", message: "Not run: a browser sign-in was not asked for" };
+    }
+    if (earlier.some((result) => result.status === "fail")) {
+      return { status: "skipped", message: "Not run: fix the checks that failed first" };
+    }
+
+    const stop = new AbortController();
+    try {
+      const timedOut = live
+        .sleep(live.timeoutMs, stop.signal)
+        .then((): typeof TIMED_OUT => TIMED_OUT);
+      const events = live.watch(stop.signal)[Symbol.asyncIterator]();
+      live.say(`Sign in with ${context.slug}: ${live.loginUrl}`);
+      await live.open(live.loginUrl);
+
+      let attempt: string | undefined;
+      let last: SignInEvent | undefined;
+      const ignored = new Set<string>();
+      for (;;) {
+        const next = await Promise.race([events.next(), timedOut]);
+        if (next === TIMED_OUT || next.done) {
+          return this.unfinished(last);
+        }
+        const event = next.value;
+        if (event.slug !== context.slug) {
+          continue;
+        }
+        attempt ??= event.flowId;
+        if (event.flowId !== "" && event.flowId !== attempt) {
+          if (!ignored.has(event.flowId)) {
+            ignored.add(event.flowId);
+            live.say(`Ignoring another sign-in attempt (${event.flowId})`);
+          }
+          continue;
+        }
+        last = event;
+        if (event.status === "failed") {
+          return failure(event, context);
+        }
+        if (completes(event)) {
+          return { status: "pass", message: `sign-in completed with ${context.slug}` };
+        }
+        live.say(`  ${PHASES[event.phase]}: ok`);
+      }
+    } finally {
+      stop.abort();
+    }
+  }
+
+  private unfinished(last: SignInEvent | undefined): Outcome {
+    return {
+      status: "fail",
+      message:
+        last === undefined
+          ? "no sign-in attempt seen"
+          : `The sign-in started but did not finish: the last thing seen was ${PHASES[last.phase]}`,
+      recovery: LOGS,
+    };
+  }
+}

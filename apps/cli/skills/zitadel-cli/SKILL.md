@@ -376,6 +376,19 @@ change. When a path or schema name would need shell quoting, `next_commands` is
 empty and `data.next_args` (or `details.suggested_args` on a refusal) holds the
 same commands as argument lists.
 
+After enabling a provider, `test sign-in --provider google` checks the setup
+without a browser: the provider's discovery document, the scopes and claims the
+connection asks for, whether the provider accepts the client and the callback
+URI, and (when `--client-secret-stdin` pipes it in) the client secret. The
+platform never reads a secret back, so without one that check is reported as
+`skipped`. Each entry of `data.checks` has a `status` of `pass`, `warn`, `fail`
+or `skipped`, and a `skipped` check is never a pass: it says the check could not
+tell. A failure exits `E_VALIDATION` with the one thing to do in `hint`. Add
+`--live` only when a person is at the machine: it opens the login page and waits
+for them to sign in, then reports from the runtime's log which phase failed and
+on which side. It needs the local runtime running and the files applied, and
+leaves any user it created in the project.
+
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
 then re-run `plan` and `apply`. See the reference below for driving the login UI
 and the config-sync details.

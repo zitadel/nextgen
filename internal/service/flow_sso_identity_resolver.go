@@ -97,6 +97,7 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 	parked := &domain.FlowSSOParkedIdentity{
 		CheckID:          check.ID,
 		ConnectionID:     connection.ID,
+		ProviderSlug:     connection.Slug,
 		Subject:          result.Subject,
 		Claims:           result.Claims,
 		Verified:         result.Verified,
@@ -183,6 +184,7 @@ func (r *FlowSSOIdentityResolver) LoadCollected(ctx context.Context, in domain.F
 	return &domain.FlowSSOParkedIdentity{
 		CheckID:      check.ID,
 		ConnectionID: connection.ID,
+		ProviderSlug: connection.Slug,
 		Subject:      result.Subject,
 		Claims:       result.Claims,
 		Verified:     result.Verified,
