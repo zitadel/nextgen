@@ -105,6 +105,15 @@ describe("test sign-in", () => {
         expect(result).toFailWith("E_VALIDATION");
       });
 
+      it("fails a provider whose discovery document is larger than the CLI will read", async () => {
+        const app = await anAppWithTwoProviders();
+        platform.hasOversizedDiscovery(ACME.issuer);
+
+        const result = await app.run(["test", "sign-in", "--provider", ACME.slug, "--json"]);
+
+        expect(result.stdout).toContain("more than");
+      });
+
       it("refuses a connection the project does not have", async () => {
         const app = await aSetUpApp();
 

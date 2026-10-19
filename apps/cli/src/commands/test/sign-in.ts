@@ -19,6 +19,7 @@ import { reportWarning } from "../../lib/warnings";
 import { readDevelopmentIssuer, readZitadelConfig, readZitadelSecret } from "../../lib/project";
 
 const REQUEST_TIMEOUT_MS = 10_000;
+const MAX_BODY_BYTES = 1_000_000;
 /** One GET, following redirects, bounded in time and in the body it keeps. */
 const send: Send = async (url) => {
   const response = await fetch(url, {
@@ -27,15 +28,40 @@ const send: Send = async (url) => {
   });
   // Only the discovery document is read; a page such as the provider's sign-in or error page is not.
   const isJson = (response.headers.get("content-type") ?? "").includes("json");
-  if (!isJson) {
-    response.body?.cancel().catch(() => undefined);
-  }
   return {
     status: response.status,
     url: response.url,
-    body: isJson ? (await response.text()).slice(0, 100_000) : "",
+    body: isJson ? await readBounded(response, MAX_BODY_BYTES) : "",
   };
 };
+
+/**
+ * The response body, read only up to `limit` bytes. A longer one is cancelled
+ * and refused rather than cut short, since a truncated document would read as
+ * malformed JSON and send the developer looking in the wrong place.
+ */
+async function readBounded(response: Response, limit: number): Promise<string> {
+  const reader = response.body?.getReader();
+  if (reader === undefined) {
+    return "";
+  }
+  const chunks: Uint8Array[] = [];
+  const read = async (size: number): Promise<number> => {
+    const { done, value } = await reader.read();
+    if (done) {
+      return size;
+    }
+    if (size + value.byteLength > limit) {
+      // Not awaited: cancelling waits on the sender, which is the very thing being cut off.
+      reader.cancel().catch(() => undefined);
+      throw new Error(`${response.url} answered with more than ${limit} bytes`);
+    }
+    chunks.push(value);
+    return read(size + value.byteLength);
+  };
+  await read(0);
+  return new TextDecoder().decode(Buffer.concat(chunks));
+}
 
 /**
  * `zitadel test sign-in` — check a sign-in provider's setup before the first
@@ -135,6 +161,7 @@ export default class TestSignIn extends BaseCommand {
       IDP_CHECKS,
       idpContext({
         slug,
+        idTokenMapping: oidc.id_token_mapping === true,
         issuer: typeof oidc.issuer === "string" ? oidc.issuer : "",
         clientId: await this.clientId(cwd, oidc.client_id),
         scopes: stringsIn(oidc.scopes),

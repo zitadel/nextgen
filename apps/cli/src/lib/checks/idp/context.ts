@@ -2,6 +2,8 @@
 export type Discovery = {
   readonly issuer?: string;
   readonly authorization_endpoint?: string;
+  readonly token_endpoint?: string;
+  readonly userinfo_endpoint?: string;
   readonly scopes_supported?: readonly string[];
   readonly claims_supported?: readonly string[];
   readonly code_challenge_methods_supported?: readonly string[];
@@ -26,6 +28,8 @@ export function discoveryOf(raw: unknown): Discovery {
   return {
     issuer: textOf(record.issuer),
     authorization_endpoint: textOf(record.authorization_endpoint),
+    token_endpoint: textOf(record.token_endpoint),
+    userinfo_endpoint: textOf(record.userinfo_endpoint),
     scopes_supported: textsOf(record.scopes_supported),
     claims_supported: textsOf(record.claims_supported),
     code_challenge_methods_supported: textsOf(record.code_challenge_methods_supported),
@@ -76,6 +80,8 @@ export interface ProviderProbes {
 }
 
 export type IdpContext = {
+  /** Whether the connection reads claims from the ID token, so needs no userinfo endpoint. */
+  readonly idTokenMapping?: boolean;
   /** The connection's slug, for messages that point at its file. */
   readonly slug: string;
   readonly issuer: string;
