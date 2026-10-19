@@ -61,7 +61,7 @@ The exchange that ends a sign-in decides the lifetime, once:
 
 The reads a renewal would ride on:
 
-- The middlewares of sdk-next, sdk-nuxt, sdk-qwik-city, sdk-solid-start,
+- The middlewares of sdk-next, sdk-nuxt, sdk-qwik-router, sdk-solid-start,
   sdk-sveltekit and sdk-tanstack-start call `GET /sessions/me` server to
   server on every request their matcher covers. A session token is a JWE,
   whose header names an `enc`, so `isJwtShaped` rejects it and this path

@@ -1,8 +1,8 @@
 {
-  "name": "@zitadel/sdk-qwik-city",
+  "name": "@zitadel/sdk-qwik-router",
   "version": "1.0.0-alpha.27",
-  "description": "Qwik City request handler and helpers for Nextgen Auth",
-  "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-qwik-city#readme",
+  "description": "Qwik Router request handler and helpers for Zitadel",
+  "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-qwik-router#readme",
   "bugs": {
     "url": "https://github.com/zitadel/nextgen/issues"
   },
@@ -10,7 +10,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/zitadel/nextgen.git",
-    "directory": "packages/sdk-qwik-city"
+    "directory": "packages/sdk-qwik-router"
   },
   "type": "module",
   "exports": {

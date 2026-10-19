@@ -417,7 +417,7 @@ describe("server SDK test titles", () => {
     "sdk-nuxt": "sdk-nuxt/src/__tests__/server/middleware.test.ts",
     "sdk-sveltekit": "sdk-sveltekit/src/__tests__/handle.test.ts",
     "sdk-solid-start": "sdk-solid-start/src/__tests__/middleware.test.ts",
-    "sdk-qwik-city": "sdk-qwik-city/src/__tests__/request-handler.test.ts",
+    "sdk-qwik-router": "sdk-qwik-router/src/__tests__/request-handler.test.ts",
     "sdk-tanstack-start": "sdk-tanstack-start/src/__tests__/middleware.test.ts",
   } as const;
 

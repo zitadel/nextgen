@@ -1,17 +1,17 @@
-# @zitadel/sdk-qwik-city
+# @zitadel/sdk-qwik-router
 
-Qwik City request handler and helpers for Nextgen Auth.
+Qwik Router request handler and helpers for Zitadel.
 
 > **Qwik 2 required.** This SDK peers Qwik 2 — `@qwik.dev/core` and
-> `@qwik.dev/router` (Qwik City's package was renamed from `@builder.io/qwik-city`
-> in Qwik 2), which run on Vite 8. A Qwik 1 app (`@builder.io/qwik`) is not
+> `@qwik.dev/router` (Qwik Router, which Qwik 2 renamed from Qwik City,
+> `@builder.io/qwik-city`), which run on Vite 8. A Qwik 1 app (`@builder.io/qwik`) is not
 > supported: the login widget comes from `@zitadel/sdk-qwik`, which requires
 > Qwik 2. Migrate the app to `@qwik.dev/*` first.
 
 ## Installation
 
 ```bash
-pnpm add -D @zitadel/sdk-qwik-city@alpha
+pnpm add -D @zitadel/sdk-qwik-router@alpha
 ```
 
 Install it as a dev dependency: Qwik bundles `devDependencies` into the server
@@ -32,7 +32,7 @@ TypeScript ≥ 5.0, the floor shared by every SDK; see the [compatibility notes]
 Add a root plugin, e.g. `src/routes/plugin@nextgen.ts`:
 
 ```ts
-import { createNextgenOnRequest } from '@zitadel/sdk-qwik-city/server';
+import { createNextgenOnRequest } from '@zitadel/sdk-qwik-router/server';
 
 export const onRequest = createNextgenOnRequest({
   protectedRoutes: ['/admin', '/dashboard*'],
@@ -41,7 +41,7 @@ export const onRequest = createNextgenOnRequest({
 ```
 
 `url` and `projectSecret` default to `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET`,
-read per request from Qwik City's `requestEvent.env` — which is where Vite loads
+read per request from Qwik Router's `requestEvent.env` — which is where Vite loads
 `.env` / `.env.local`, not `process.env` — falling back to `process.env`. Pass
 them explicitly only to override that.
 
@@ -54,7 +54,7 @@ The handler runs on every request and does three things in one pass:
    result on `requestEvent.sharedMap`.
 3. **Redirects** unauthenticated requests to `loginPath` for protected routes, with the requested path and query string in `?next=`, where `<zitadel-login>` returns after sign-in.
 
-To run alongside your own `onRequest`, export an array — Qwik City runs them in
+To run alongside your own `onRequest`, export an array — Qwik Router runs them in
 order:
 
 ```ts
@@ -65,7 +65,7 @@ export const onRequest = [createNextgenOnRequest({ /* … */ }), myOnRequest];
 
 ```ts
 import { routeLoader$ } from '@qwik.dev/router';
-import { getAuth } from '@zitadel/sdk-qwik-city/server';
+import { getAuth } from '@zitadel/sdk-qwik-router/server';
 
 export const useUser = routeLoader$((ev) => {
   const auth = getAuth(ev);
@@ -81,7 +81,7 @@ handler redirects before anything renders. Do not rely on it for client-side
 `postSignOutUrl`, so a signed-out visitor still ends at `/login`.
 
 To keep a route from rendering at all without a session, export a loader like
-the one above from the route itself. Qwik City runs a route's `routeLoader$` on
+the one above from the route itself. Qwik Router runs a route's `routeLoader$` on
 the server for a `<Link>` navigation too, so its redirect sends the visitor to
 `/login` before the route renders:
 
@@ -89,7 +89,7 @@ the server for a `<Link>` navigation too, so its redirect sends the visitor to
 // src/routes/profile/index.tsx
 import { component$ } from '@qwik.dev/core';
 import { routeLoader$ } from '@qwik.dev/router';
-import { getAuth } from '@zitadel/sdk-qwik-city/server';
+import { getAuth } from '@zitadel/sdk-qwik-router/server';
 
 export const useSession = routeLoader$((ev) => {
   const auth = getAuth(ev);
@@ -106,7 +106,7 @@ export default component$(() => {
 ### 3. Render the login widget
 
 Install the Qwik component library and render its `ZitadelLogin` component.
-`@zitadel/sdk-qwik-city` is server-only; the widget comes from `@zitadel/sdk-qwik`.
+`@zitadel/sdk-qwik-router` is server-only; the widget comes from `@zitadel/sdk-qwik`.
 Qwik bundles ecosystem packages, so install it as a dev dependency:
 
 ```bash

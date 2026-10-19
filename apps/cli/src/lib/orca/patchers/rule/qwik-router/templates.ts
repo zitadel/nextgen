@@ -8,17 +8,17 @@ import { PROXY_PATH } from "../proxy";
 const WIDGET_WRAP = "position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark";
 
 /**
- * `src/routes/plugin@nextgen.ts` — the Qwik City root `onRequest` plugin.
+ * `src/routes/plugin@nextgen.ts` — the Qwik Router root `onRequest` plugin.
  * `createNextgenOnRequest` proxies `/__nextgen/*` to the auth backend (attaching
  * the project service-key from `ZITADEL_PROJECT_SECRET`), verifies the session
  * JWT, and redirects unauthenticated requests away from protected routes. `url`
- * and `projectSecret` are read per request from Qwik City's `ev.env` (which
+ * and `projectSecret` are read per request from Qwik Router's `ev.env` (which
  * carries `.env.local`), so only the route policy is spelled out here. The
  * managed marker sits in a JS comment.
  */
 export function pluginTemplate(): string {
   return `${MANAGED_MARKER}
-import { createNextgenOnRequest } from "@zitadel/sdk-qwik-city/server";
+import { createNextgenOnRequest } from "@zitadel/sdk-qwik-router/server";
 
 export const onRequest = createNextgenOnRequest({
   protectedRoutes: ["/profile"],

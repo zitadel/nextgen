@@ -1,6 +1,6 @@
 # @zitadel/sdk-sveltekit
 
-SvelteKit handle hook and helpers for Nextgen Auth.
+SvelteKit handle hook and helpers for Zitadel.
 
 ## Installation
 

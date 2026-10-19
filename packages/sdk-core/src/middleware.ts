@@ -19,7 +19,7 @@ export const HOP_BY_HOP: ReadonlySet<string> = new Set([
   // the correct content-length itself. Forwarding the client's value is at best
   // redundant and at worst fatal — undici rejects a manually-set content-length
   // alongside a body with `UND_ERR_INVALID_ARG: invalid content-length header`,
-  // which surfaced as an opaque "fetch failed" in the Qwik City proxy.
+  // which surfaced as an opaque "fetch failed" in the Qwik Router proxy.
   "content-length",
   // host is not a hop-by-hop header per RFC 7230, but it must be stripped so
   // the fetch implementation derives the correct Host from the upstream URL

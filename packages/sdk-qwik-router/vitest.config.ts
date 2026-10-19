@@ -6,7 +6,7 @@ export default defineConfig({
   cacheDir: ".vitest",
   test: {
     ...baseTest,
-    name: "@zitadel/sdk-qwik-city",
+    name: "@zitadel/sdk-qwik-router",
     environment: "node",
   },
 });
