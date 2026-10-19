@@ -226,17 +226,32 @@ describe("IDP_CHECKS", () => {
     });
   });
 
-  it.each([
-    ["scopes", { scopes: [] }],
-    ["claims", { claims: [] }],
-  ])(
-    "skips %s when the connection names none, rather than passing an empty list",
-    async (name, overrides) => {
-      const { by } = await resultsFor(overrides);
+  it("skips claims when the connection maps none, rather than passing an empty list", async () => {
+    const { by } = await resultsFor({ claims: [] });
 
-      expect(by(name)?.status).toBe("skipped");
+    expect(by("claims")?.status).toBe("skipped");
+  });
+
+  it.each([[[]], [["email", "profile"]]])(
+    "fails scopes %j that lack openid, which the server refuses, though the provider lists them",
+    async (scopes) => {
+      const { by } = await resultsFor({ scopes });
+
+      expect(by("scopes")).toMatchObject({
+        status: "fail",
+        recovery: expect.stringContaining("Add openid"),
+      });
     },
   );
+
+  it("still fails scopes without openid for a provider that lists no scopes", async () => {
+    const { by } = await resultsFor(
+      { scopes: ["email"] },
+      { ...DOCUMENT, scopes_supported: undefined },
+    );
+
+    expect(by("scopes")?.status).toBe("fail");
+  });
 
   it.each(["scopes", "claims", "pkce"])(
     "skips %s for a provider that does not advertise it",

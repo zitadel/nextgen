@@ -115,6 +115,15 @@ describe("test sign-in", () => {
         expect(result).toHintAt("Name every endpoint");
       });
 
+      it("asks discovery when the authorization endpoint is written empty", async () => {
+        const app = await anAppWithTwoProviders();
+        await app.editOidc(ACME.slug, { authorization_endpoint: "" });
+
+        const result = await app.run(["test", "sign-in", "--provider", ACME.slug, "--json"]);
+
+        expect(result).toSucceed();
+      });
+
       it("fails a connection that names a token endpoint and nothing else", async () => {
         const app = await anAppWithTwoProviders();
         await app.editOidc(ACME.slug, { token_endpoint: `${ACME.issuer}/token` });

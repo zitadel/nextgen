@@ -484,7 +484,8 @@ function configuredEndpoints(oidc: Record<string, unknown>): Readonly<Record<str
 /** The authorization endpoint the connection names itself, which the server then uses without discovery. */
 function endpointsOf(oidc: Record<string, unknown>) {
   const { authorization_endpoint: authorization } = oidc;
-  return typeof authorization === "string" ? { authorization } : undefined;
+  // An empty string is unset, to the server as to the shared endpoint rule.
+  return typeof authorization === "string" && authorization !== "" ? { authorization } : undefined;
 }
 
 /** What the checks said about one connection. */
