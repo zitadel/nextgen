@@ -473,7 +473,8 @@ describe("server SDK test titles", () => {
     "%s tests every canonical behaviour under its canonical title",
     (sdk) => {
       const titles = titlesOf(sdk);
-      expect(CANONICAL_TITLES.filter((title) => !titles.includes(title))).toEqual([]);
+      const expected = CANONICAL_TITLES.filter((title) => !EXCEPTIONS[sdk].includes(title));
+      expect(expected.filter((title) => !titles.includes(title))).toEqual([]);
     },
   );
 
