@@ -3,6 +3,7 @@ export type Discovery = {
   readonly issuer?: string;
   readonly authorization_endpoint?: string;
   readonly token_endpoint?: string;
+  readonly jwks_uri?: string;
   readonly userinfo_endpoint?: string;
   readonly scopes_supported?: readonly string[];
   readonly claims_supported?: readonly string[];
@@ -29,6 +30,7 @@ export function discoveryOf(raw: unknown): Discovery {
     issuer: textOf(record.issuer),
     authorization_endpoint: textOf(record.authorization_endpoint),
     token_endpoint: textOf(record.token_endpoint),
+    jwks_uri: textOf(record.jwks_uri),
     userinfo_endpoint: textOf(record.userinfo_endpoint),
     scopes_supported: textsOf(record.scopes_supported),
     claims_supported: textsOf(record.claims_supported),
@@ -130,6 +132,8 @@ export type LiveSignIn = {
 };
 
 export type IdpContext = {
+  /** Endpoints the connection should name but does not: it names some, and the server refuses a partial set. */
+  readonly missingEndpoints?: readonly string[];
   /** Whether the connection reads claims from the ID token, so needs no userinfo endpoint. */
   readonly idTokenMapping?: boolean;
   /** The connection's slug, for messages that point at its file. */

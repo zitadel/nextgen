@@ -1,5 +1,10 @@
 import { Flags } from "@oclif/core";
-import { idpProvider, IDP_PROVIDERS, referencedVariable } from "@zitadel/config/idp";
+import {
+  idpProvider,
+  IDP_PROVIDERS,
+  missingEndpoints,
+  referencedVariable,
+} from "@zitadel/config/idp";
 import { consola } from "consola";
 
 import {
@@ -257,12 +262,16 @@ export default class TestSignIn extends BaseCommand {
     if (process.stdout.isTTY) {
       consola.info(`Callback  ${callbackUri}`);
     }
-    const catalogId = IDP_PROVIDERS.find((id) => id === slug);
+    // The profile follows the template the connection was made from, so a renamed Google
+    // connection is still Google; the slug stays for the callback URI and the report.
+    const kind = typeof connection.body.template === "string" ? connection.body.template : slug;
+    const catalogId = IDP_PROVIDERS.find((id) => id === kind);
     const results = await runChecks(
       IDP_CHECKS,
       idpContext({
         slug,
         idTokenMapping: oidc.id_token_mapping === true,
+        missingEndpoints: missingEndpoints(oidc),
         issuer: typeof oidc.issuer === "string" ? oidc.issuer : "",
         clientId: await this.clientId(cwd, oidc.client_id),
         scopes: stringsIn(oidc.scopes),
@@ -273,7 +282,7 @@ export default class TestSignIn extends BaseCommand {
         callbackUri,
         endpoints: endpointsOf(oidc),
         consoleUrl: catalogId === undefined ? undefined : idpProvider(catalogId).consoleUrl,
-        probes: PROVIDER_PROBES.get(slug),
+        probes: PROVIDER_PROBES.get(kind),
         request: send,
         ...(live
           ? {

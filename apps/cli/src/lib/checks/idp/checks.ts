@@ -25,6 +25,14 @@ export class DiscoveryReachableCheck extends Check<IdpContext> {
 
   async run(context: IdpContext): Promise<Outcome> {
     const found = await context.discovery;
+    if (found.ok && found.source === "connection" && (context.missingEndpoints ?? []).length > 0) {
+      const missing = context.missingEndpoints ?? [];
+      return {
+        status: "fail",
+        message: `The connection names some endpoints but not ${missing.join(", ")}`,
+        recovery: `Name every endpoint in oidc in .zitadel/idps/${context.slug}.json, or none and let the issuer's discovery document supply them`,
+      };
+    }
     if (found.ok && found.source === "connection") {
       return { status: "pass", message: "Using the endpoints written in the connection" };
     }
@@ -59,6 +67,8 @@ function unusableEndpoints(document: Discovery, context: IdpContext): readonly s
   const needed: ReadonlyArray<readonly [string, string | undefined]> = [
     ["authorization_endpoint", document.authorization_endpoint],
     ["token_endpoint", document.token_endpoint],
+    // Every ID token is verified against the keys it names, whatever supplies the claims.
+    ["jwks_uri", document.jwks_uri],
     ...(context.idTokenMapping === true
       ? []
       : ([["userinfo_endpoint", document.userinfo_endpoint]] as const)),
