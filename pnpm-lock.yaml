@@ -674,15 +674,6 @@ importers:
 
   apps/demo-next:
     dependencies:
-      '@zitadel/api':
-        specifier: workspace:*
-        version: link:../../packages/api
-      '@zitadel/components':
-        specifier: workspace:*
-        version: link:../../packages/components
-      '@zitadel/design-tokens':
-        specifier: workspace:*
-        version: link:../../packages/design-tokens
       '@zitadel/sdk-next':
         specifier: workspace:*
         version: link:../../packages/sdk-next
@@ -711,15 +702,6 @@ importers:
 
   apps/demo-nuxt:
     dependencies:
-      '@zitadel/api':
-        specifier: workspace:*
-        version: link:../../packages/api
-      '@zitadel/components':
-        specifier: workspace:*
-        version: link:../../packages/components
-      '@zitadel/design-tokens':
-        specifier: workspace:*
-        version: link:../../packages/design-tokens
       '@zitadel/sdk-nuxt':
         specifier: workspace:*
         version: link:../../packages/sdk-nuxt

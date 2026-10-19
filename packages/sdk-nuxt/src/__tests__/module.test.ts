@@ -85,6 +85,19 @@ describe("@zitadel/sdk-nuxt module", () => {
     expect(contents).not.toContain("@zitadel/components");
   });
 
+  // The widget packages load in the browser (client-only plugin) or run as
+  // plain ESM from node_modules on the server, so an app needs no
+  // `build.transpile` entry for them; the module adds none and leaves the
+  // app's own list alone.
+  it("adds no build.transpile entries of its own", async () => {
+    const build = { transpile: ["my-lib"] };
+    const nuxt = { options: { rootDir, nextgen: {}, runtimeConfig: { public: {} }, build } };
+
+    await nextgenModule({}, nuxt as unknown as Nuxt);
+
+    expect(build.transpile).toEqual(["my-lib"]);
+  });
+
   it("hands every middleware option to the server middleware", async () => {
     const options = {
       ignoredRoutes: ["/health"],

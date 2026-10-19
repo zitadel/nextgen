@@ -111,6 +111,14 @@ const project = useZitadelProject();
 </template>
 ```
 
+To call the Zitadel API from your own code, use the auto-imported `useZitadelApi()` composable in the browser (for example from `onMounted`). It returns the typed client of the project the plugin configured, so you do not install `@zitadel/api` either.
+
+```ts
+onMounted(async () => {
+  const session = await useZitadelApi().getMySession();
+});
+```
+
 ## Widget events
 
 The widgets are plain custom elements, so each event is a DOM `CustomEvent` that carries its payload in `detail`. The events and payloads are the same ones every SPA SDK exposes as callbacks.

@@ -238,6 +238,45 @@ describe("widget loading ↔ SDK packages", () => {
     expect(manifest.peerDependencies?.["@zitadel/components"]).toBeUndefined();
   });
 
+  // Apps go through their framework's SDK, which owns these packages as its own
+  // dependencies, so no demo declares or imports them.
+  const SDK_OWNED = ["@zitadel/components", "@zitadel/api", "@zitadel/design-tokens"];
+  const appsDir = `${resolve(process.cwd(), "../..")}/apps/`;
+  const demoDirs = readdirSync(appsDir).filter((dir) => dir.startsWith("demo-"));
+  const SKIPPED_DIRS = /^(node_modules|dist|\.output|\.next.*|\.nuxt.*)$/;
+  const SOURCE_FILE = /\.(?:[cm]?[jt]sx?|vue|svelte|astro)$/;
+  const SDK_OWNED_IMPORT =
+    /(?:from|import|require)\s*\(?\s*["'](@zitadel\/(?:components|api|design-tokens))(?:\/[^"']*)?["']/;
+
+  const sourceFiles = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      if (entry.isDirectory()) {
+        return SKIPPED_DIRS.test(entry.name) ? [] : sourceFiles(`${dir}/${entry.name}`);
+      }
+      return SOURCE_FILE.test(entry.name) ? [`${dir}/${entry.name}`] : [];
+    });
+
+  it("finds the in-repo demo apps", () => {
+    expect(demoDirs.length).toBeGreaterThan(0);
+  });
+
+  it.each(demoDirs)("%s does not declare the SDK-owned packages as dependencies", (dir) => {
+    const manifest = JSON.parse(read(`${appsDir}${dir}/package.json`)) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    const declared = Object.keys({ ...manifest.dependencies, ...manifest.devDependencies });
+    expect(declared.filter((name) => SDK_OWNED.includes(name))).toEqual([]);
+  });
+
+  it.each(demoDirs)("%s never imports the SDK-owned packages", (dir) => {
+    const offenders = sourceFiles(`${appsDir}${dir}`).flatMap((path) => {
+      const match = read(path).match(SDK_OWNED_IMPORT);
+      return match ? [`${path.slice(appsDir.length)} imports ${match[1]}`] : [];
+    });
+    expect(offenders).toEqual([]);
+  });
+
   it.each(sdkDirs)("%s docs never tell an app to install @zitadel/components", (dir) => {
     const skillsDir = `${packagesDir}${dir}/skills`;
     const docs = [
