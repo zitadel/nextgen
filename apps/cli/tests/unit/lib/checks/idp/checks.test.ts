@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { runChecks } from "../../../../../src/lib/checks/check";
-import { IDP_CHECKS, PROVIDER_PROBES } from "../../../../../src/lib/checks/idp";
+import { IDP_CHECKS } from "../../../../../src/lib/checks/idp";
 import {
   idpContext,
   type Discovery,
@@ -256,11 +256,5 @@ describe("IDP_CHECKS", () => {
       by("client-secret")?.status,
       sent.some((request) => request.url.endsWith("/token")),
     ]).toEqual(["skipped", false]);
-  });
-});
-
-describe("PROVIDER_PROBES", () => {
-  it("knows Google's wording", () => {
-    expect(Object.keys(PROVIDER_PROBES)).toEqual(["google"]);
   });
 });

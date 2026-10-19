@@ -287,4 +287,38 @@ describe("LiveSignInCheck", () => {
 
     expect(steps).toEqual(["baseline read", "opened"]);
   });
+
+  it("ignores a line with no flow id until an attempt has begun, since it is someone else's request", async () => {
+    const { outcome } = run([
+      event({
+        flowId: "",
+        phase: "callback_received",
+        status: "failed",
+        reason: "state_invalid",
+        side: "journey",
+      }),
+      event({ phase: "callback_received" }),
+      event({ phase: "resolved", result: "linked" }),
+    ]);
+
+    expect(await outcome).toMatchObject({ status: "pass" });
+  });
+
+  it("counts a line with no flow id once the attempt has begun, as when its state expired", async () => {
+    const { outcome } = run([
+      event({ phase: "ceremony_started" }),
+      event({
+        flowId: "",
+        phase: "callback_received",
+        status: "failed",
+        reason: "state_invalid",
+        side: "journey",
+      }),
+    ]);
+
+    expect(await outcome).toMatchObject({
+      status: "fail",
+      message: expect.stringContaining("expired"),
+    });
+  });
 });

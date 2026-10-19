@@ -62,10 +62,15 @@ const send: Send = async (url, init) => {
     redirect: init === undefined ? "follow" : "manual",
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
+  // Only the discovery document and the token answer are read; a page such as the provider's sign-in or error page is not.
+  const isJson = (response.headers.get("content-type") ?? "").includes("json");
+  if (!isJson) {
+    response.body?.cancel().catch(() => undefined);
+  }
   return {
     status: response.status,
     url: response.url,
-    body: (await response.text()).slice(0, 100_000),
+    body: isJson ? (await response.text()).slice(0, 100_000) : "",
   };
 };
 
@@ -258,7 +263,7 @@ export default class TestSignIn extends BaseCommand {
         throw error;
       },
     );
-    if (held === undefined || typeof held === "string") {
+    if (held === undefined || typeof held !== "object") {
       throw new ZitadelError(
         "E_CREDENTIAL_MISSING",
         `The client secret variable ${name} is ${held === undefined ? "not set" : "not a secret"}`,

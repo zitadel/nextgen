@@ -13,6 +13,18 @@ const CALLBACK_URI = "/__nextgen/idp/google/callback";
 
 describe("test sign-in", () => {
   describe("against an invalid server", () => {
+    describe("that is not a zitadel api", () => {
+      it("fails to read the client ID the connection names", async () => {
+        const app = await aSetUpApp();
+        await app.enableSso("google", CREDENTIALS);
+        platform.isNotZitadel();
+
+        const result = await app.run(["test", "sign-in", "--provider", "google", "--json"]);
+
+        expect(result).toFail();
+      });
+    });
+
     describe("that is down", () => {
       it("fails to read the client ID the connection names", async () => {
         const app = await aSetUpApp();
@@ -120,6 +132,25 @@ describe("test sign-in", () => {
         const result = await app.run(["test", "sign-in", "--provider", "google", "--json"]);
 
         expect(result).toExplain("No connection named google");
+      });
+
+      it("refuses a live sign-in when the client secret variable is not a secret", async () => {
+        const app = await aSetUpApp();
+        await app.enableSso("google", CREDENTIALS);
+        await app.startLocalServer();
+        await app.setVariable("GOOGLE_CLIENT_SECRET", "42");
+        platform.hasGoogle();
+
+        const result = await app.run([
+          "test",
+          "sign-in",
+          "--provider",
+          "google",
+          "--live",
+          "--json",
+        ]);
+
+        expect(result).toFailWith("E_CREDENTIAL_MISSING");
       });
 
       it("refuses a live sign-in when the local runtime has never been started", async () => {

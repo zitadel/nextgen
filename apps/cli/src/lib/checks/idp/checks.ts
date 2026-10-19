@@ -1,3 +1,5 @@
+import { isLoopbackIssuer } from "@zitadel/config/idp";
+
 import { Check, type Outcome } from "../check";
 import type { Discovery, IdpContext, Verdict } from "./context";
 
@@ -116,10 +118,11 @@ export class PkceCheck extends DiscoveryCheck {
   }
 }
 
-/** The server's own rule for an endpoint: HTTPS, or plain HTTP only to this machine. */
+/** The server's rule for an endpoint: HTTPS, or plain HTTP only to this machine. */
 function isSecureEndpoint(endpoint: string): boolean {
-  return /^(https:\/\/[^\s/?#]+|http:\/\/(localhost|127\.0\.0\.1)(:[0-9]+)?)([/?][^\s#]*)?$/.test(
-    endpoint,
+  return (
+    endpoint.startsWith("https://") ||
+    (endpoint.startsWith("http://") && isLoopbackIssuer(endpoint))
   );
 }
 

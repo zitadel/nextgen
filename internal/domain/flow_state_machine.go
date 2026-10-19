@@ -431,6 +431,11 @@ func (r *FlowStateMachineRuntime) Render(ctx context.Context, def *FlowDefinitio
 	return FlowStepResult{State: state, Step: step}, nil
 }
 
+// emitSSOEvent logs one phase of a social sign-in for the attempt in state.
+func emitSSOEvent(ctx context.Context, state *FlowState, slug string, phase ssoevent.Phase, result ssoevent.Result, reason ssoevent.Reason) {
+	ssoevent.Emit(ctx, ssoevent.Event{Slug: slug, FlowID: state.AuthAttemptID, Phase: phase, Result: result, Reason: reason})
+}
+
 // resolveSSOIdentity turns an external identity an SSO callback parked on the
 // attempt into an outcome on the current step. A branch that produces the
 // result always returns a step, and Render relies on that: a result without
@@ -444,10 +449,6 @@ func (r *FlowStateMachineRuntime) Render(ctx context.Context, def *FlowDefinitio
 //
 // The outcome is raised with an empty action, so an unwired transition
 // degrades to the step-error re-render, as a handler diversion does.
-func emitSSOEvent(ctx context.Context, state *FlowState, slug string, phase ssoevent.Phase, result ssoevent.Result, reason ssoevent.Reason) {
-	ssoevent.Emit(ctx, ssoevent.Event{Slug: slug, FlowID: state.AuthAttemptID, Phase: phase, Result: result, Reason: reason})
-}
-
 func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *FlowDefinition, state *FlowState) (FlowStepResult, bool, error) {
 	currentStep, ok := def.FindStep(state.CurrentStep)
 	if !ok {
