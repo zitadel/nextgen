@@ -131,6 +131,24 @@ describe("authentication guard", () => {
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/schemas"));
   });
 
+  it("keeps the requested path's query when it redirects a signed-in visitor", async () => {
+    fetchSession.mockResolvedValue(makeTestSession());
+    // Not the visitor's only project, which the guard would select by itself:
+    // this one can only come from `next`.
+    server.use(
+      http.get("*/api/projects/proj_other", () =>
+        HttpResponse.json({ id: "proj_other", name: "Other project" }),
+      ),
+    );
+    const router = await renderAt(
+      `/login?next=${encodeURIComponent("/schemas?project=proj_other")}`,
+    );
+
+    expect(await screen.findByRole("heading", { name: "User schemas" })).toBeInTheDocument();
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/schemas"));
+    expect(router.state.resolvedLocation?.search).toEqual({ project: "proj_other" });
+  });
+
   it("drops unsafe ?next= values instead of following them", async () => {
     fetchSession.mockResolvedValue(null);
     await renderAt("/login?next=https://evil.example/phish");
@@ -140,6 +158,25 @@ describe("authentication guard", () => {
       "/",
     );
   });
+
+  /**
+   * Each of these starts with a single `/` and still ends on `//evil.example`:
+   * the browser reads `\` as `/`, drops tabs, and collapses dot segments. The
+   * dev server has no deployment prefix, so the widget would send the browser
+   * to `next` just as it stands.
+   */
+  it.each(["/%5Cevil.example", "/%09/evil.example", "/.//evil.example"])(
+    "drops ?next=%s, which the browser reads as //evil.example",
+    async (next) => {
+      fetchSession.mockResolvedValue(null);
+      await renderAt(`/login?next=${next}`);
+
+      expect(await screen.findByTestId("zitadel-login")).toHaveAttribute(
+        "data-post-sign-in-url",
+        "/",
+      );
+    },
+  );
 
   it("shows the setup hint instead of the widget while no project exists", async () => {
     _resetRuntimeForTesting();

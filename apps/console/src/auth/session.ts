@@ -220,17 +220,35 @@ export async function signOut(): Promise<void> {
 }
 
 /**
- * Sanitizes a post-login redirect target. Only same-app, router-relative
- * paths pass (must start with a single `/`); anything absolute,
- * protocol-relative (`//`), or scheme-carrying is rejected so the `next`
- * search param cannot become an open redirect.
+ * The root router-relative paths resolve against: a placeholder origin, since
+ * `next` names a screen of this app, never a host.
+ */
+const ROUTER_ROOT = "http://console.invalid";
+
+/**
+ * Sanitizes a post-login redirect target: `next` as a router-relative path, or
+ * `undefined` when it is anything else.
+ *
+ * The value comes from the page URL, so whoever wrote the link chose it, and
+ * the login screen sends the browser there after sign-in: one that left this
+ * origin would make the sign-in page an open redirect. So it has to be a path:
+ * one `/` not followed by another, since `//evil.example` names another host,
+ * and no `\` or control character anywhere, since browsers read `\` as `/` and
+ * drop tabs and newlines, which turn `/\evil.example` and `/<tab>/evil.example`
+ * into `//evil.example`. What passes is resolved against the router's root,
+ * must keep its origin, and must still be a path once `.` and `..` segments
+ * collapse, which turns `/.//evil.example` into `//evil.example`. It comes back
+ * collapsed, so `..` cannot climb out of the deployment prefix the login screen
+ * joins it with.
  */
 export function sanitizeNextPath(next: string | undefined): string | undefined {
-  if (!next) return undefined;
-  if (!next.startsWith("/") || next.startsWith("//") || next.includes("://")) {
+  if (!next?.startsWith("/") || next.startsWith("//")) return undefined;
+  if ([...next].some((char) => char === "\\" || char < " " || char === "\u007f")) {
     return undefined;
   }
-  return next;
+  const url = new URL(next, ROUTER_ROOT);
+  const path = `${url.pathname}${url.search}${url.hash}`;
+  return url.origin === ROUTER_ROOT && !path.startsWith("//") ? path : undefined;
 }
 
 /** `validateSearch` for a route whose only search param is a sanitized `next`. */
