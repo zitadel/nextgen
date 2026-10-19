@@ -469,7 +469,7 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		if state.CollectedData.UserID != "" {
 			return FlowStepResult{}, false, nil
 		}
-		pc := &processCtx{ctx: ctx, def: def, state: state, currentStep: currentStep, ssoSlug: parked.ProviderSlug}
+		pc := &processCtx{ctx: ctx, def: def, state: state, currentStep: currentStep}
 		resolvedFields, err := r.resolveInputs(pc)
 		if err != nil {
 			return FlowStepResult{}, false, err
@@ -502,7 +502,7 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		default:
 			return FlowStepResult{}, false, ErrFlowRestartRequired()
 		}
-		pc := &processCtx{ctx: ctx, def: def, state: state, currentStep: currentStep, ssoSlug: parked.ProviderSlug}
+		pc := &processCtx{ctx: ctx, def: def, state: state, currentStep: currentStep}
 		resolvedFields, err := r.resolveInputs(pc)
 		if err != nil {
 			return FlowStepResult{}, false, err
@@ -514,6 +514,7 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 			return result, false, err
 		}
 		state.SSOResolvedCheckID = parked.CheckID
+		state.SSOProviderSlug = parked.ProviderSlug
 		recordResolvedUser(state, parked.CollisionUserID)
 		// The marker replaced the row a collection step creates from, so that
 		// step cannot be shown again. An entry step can: it starts a new ceremony.
@@ -525,7 +526,7 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		return FlowStepResult{}, false, nil
 	}
 
-	pc := &processCtx{ctx: ctx, def: def, state: state, currentStep: currentStep, ssoSlug: parked.ProviderSlug}
+	pc := &processCtx{ctx: ctx, def: def, state: state, currentStep: currentStep}
 	resolvedFields, err := r.resolveInputs(pc)
 	if err != nil {
 		return FlowStepResult{}, false, err
@@ -533,6 +534,7 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 	// Recorded before the branch work, so a failed branch is not retried on
 	// every reload, and a row left parked for collection is not resolved twice.
 	state.SSOResolvedCheckID = parked.CheckID
+	state.SSOProviderSlug = parked.ProviderSlug
 
 	// The ceremony failed at the provider or in the callback; the key is the
 	// step error. The row stays parked, as under creation disabled.
@@ -680,7 +682,11 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 		return FlowImplicitOutcomeSSOUserNotFound, nil
 	}
 	if err != nil {
-		r.recordSSOFailure(ctx, state, parked.ProviderSlug, ssoevent.PhaseUserCreated, ssoevent.ReasonInternal)
+		// A parked row another request already claimed is a race the caller settles by
+		// retrying from the bind, not a failure of this sign-in.
+		if !errors.Is(err, ErrSSOStateInvalid()) {
+			r.recordSSOFailure(ctx, state, parked.ProviderSlug, ssoevent.PhaseUserCreated, ssoevent.ReasonInternal)
+		}
 		return "", fmt.Errorf("flow state machine: create sso user: %w", err)
 	}
 	recordResolvedUser(state, userID)
@@ -1020,9 +1026,6 @@ type processCtx struct {
 	state       *FlowState
 	currentStep *FlowDefinitionStep
 	in          FlowSubmitInput
-	// ssoSlug is the connection of the sign-in this request settles; empty
-	// outside one, so the handoff reports itself only for a sign-in.
-	ssoSlug string
 }
 
 // Process advances the flow one step by dispatching the submission to
@@ -1451,7 +1454,7 @@ func (r *FlowStateMachineRuntime) processSSOCollection(pc *processCtx, resolved 
 	if collected == nil {
 		return r.resolveStaleSSOSubmit(pc, resolved, loadInput)
 	}
-	pc.ssoSlug = collected.ProviderSlug
+	state.SSOProviderSlug = collected.ProviderSlug
 	schema, err := r.schemas.Resolve(pc.ctx, r.schemaStore, state.ProjectID, state.UserSchemaURL, nil)
 	if err != nil {
 		return FlowStepResult{}, fmt.Errorf("flow state machine: load user schema for sso identity: %w", err)
@@ -2296,12 +2299,10 @@ func (r *FlowStateMachineRuntime) terminate(pc *processCtx, step *FlowDefinition
 	})
 	if err != nil {
 		// A concurrent request won the handoff and reports it itself.
-		if pc.ssoSlug != "" && !errors.Is(err, ErrAuthAttemptAlreadyHandedOff()) {
-			r.recordSSOFailure(pc.ctx, pc.state, pc.ssoSlug, ssoevent.PhaseHandedOff, ssoevent.ReasonHandoffFailed)
+		if slug := pc.state.SSOProviderSlug; slug != "" && !errors.Is(err, ErrAuthAttemptAlreadyHandedOff()) {
+			r.recordSSOFailure(pc.ctx, pc.state, slug, ssoevent.PhaseHandedOff, ssoevent.ReasonHandoffFailed)
 		}
 		return FlowStepResult{}, fmt.Errorf("flow state machine: handoff: %w", err)
-	}
-	if pc.ssoSlug != "" {
 	}
 	return FlowStepResult{
 		State:                 pc.state,

@@ -90,6 +90,12 @@ type FlowState struct {
 	// so a reload never resolves the same result twice. The id is re-minted on
 	// every SSO state issue, so a new provider round trip always resolves.
 	SSOResolvedCheckID string `json:",omitempty"`
+
+	// SSOProviderSlug is the connection of the SSO sign-in the engine resolved,
+	// kept so a later request on the same attempt, which no longer holds the
+	// parked row, can still say which connection a failure to hand off belongs
+	// to.
+	SSOProviderSlug string `json:",omitempty"`
 }
 
 // FlowPendingChallenge records the server-issued challenge the next

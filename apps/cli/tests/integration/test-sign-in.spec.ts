@@ -213,6 +213,42 @@ describe("test sign-in", () => {
         expect(result).toHintAt("zitadel events list");
       });
 
+      it("refuses an unclaimed project, whose events are hidden, before it opens anything", async () => {
+        const app = await aSignedUpApp();
+        platform.recordsSignIn([]);
+
+        const result = await app.runWithoutServer(LIVE, {
+          BROWSER: "none",
+          ZITADEL_API_BASE: "https://demo.zitadel.cloud",
+        });
+
+        expect(result).toHintAt("Claim it");
+      });
+
+      it("starts nothing on a dry run, since a sign-in can create a user", async () => {
+        const app = await aSignedUpApp();
+        platform.recordsSignIn([]);
+
+        const result = await app.run([...LIVE, "--dry-run"], { BROWSER: "none" });
+
+        expect(result).toBeSkipped();
+      });
+
+      it("does not take a password login for a sign-in with the connection", async () => {
+        const app = await aSignedUpApp();
+        platform.recordsSignIn([
+          { event_type: "auth.attempt.created", entity_id: "att_1" },
+          { event_type: "auth.attempt.handed_off", entity_id: "att_1" },
+        ]);
+
+        const result = await app.run(
+          ["test", "sign-in", "--provider", "google", "--live", "--timeout", "2", "--json"],
+          { BROWSER: "none" },
+        );
+
+        expect(result).toHintAt("zitadel events list");
+      });
+
       it("shows the login URL on stderr while it waits, so an agent can pass it on", async () => {
         const app = await aSignedUpApp();
         platform.recordsSignIn([]);

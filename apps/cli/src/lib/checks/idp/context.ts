@@ -65,8 +65,13 @@ export type SignInPhase =
  */
 export type SignInEvent = {
   readonly slug: string;
-  /** Identifies the attempt. Empty when the runtime could not tell which one a failure belongs to. */
+  /** Identifies the attempt. */
   readonly flowId: string;
+  /**
+   * Whether the event is about an SSO exchange with a named connection, which an
+   * attempt's start and handoff, shared by every kind of sign-in, are not.
+   */
+  readonly sso?: true;
   readonly phase: SignInPhase;
   readonly status: "ok" | "failed";
   readonly reason?: string;

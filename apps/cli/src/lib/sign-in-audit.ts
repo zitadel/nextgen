@@ -8,15 +8,32 @@ export type AuditEvent = {
   readonly payload?: Readonly<Record<string, unknown>>;
 };
 
-/** What an audit event type means for a sign-in, before its payload says more. */
-const MEANING: Readonly<Record<string, Pick<SignInEvent, "phase" | "status">>> = {
-  "auth.attempt.created": { phase: "ceremony_started", status: "ok" },
-  "auth.sso.authorization.failed": { phase: "callback_received", status: "failed" },
-  "auth.sso.exchange.failed": { phase: "exchange_finished", status: "failed" },
-  "auth.sso.exchange.succeeded": { phase: "exchange_finished", status: "ok" },
-  "idp.identity_link.created": { phase: "user_created", status: "ok" },
-  "auth.attempt.handed_off": { phase: "handed_off", status: "ok" },
+/** One page of `GET /events`, newest first. */
+export type AuditPage = {
+  readonly data: readonly AuditEvent[];
+  readonly next_page_token?: string | null;
 };
+
+/**
+ * What an audit event type means for a sign-in, before its payload says more.
+ * The start and the handoff of an attempt are shared by every kind of sign-in;
+ * the rest are about an exchange with a named connection.
+ */
+const MEANING: Readonly<
+  Record<string, Pick<SignInEvent, "phase" | "status"> & { readonly sso: boolean }>
+> = {
+  "auth.attempt.created": { phase: "ceremony_started", status: "ok", sso: false },
+  "auth.attempt.handed_off": { phase: "handed_off", status: "ok", sso: false },
+  "auth.sso.authorization.failed": { phase: "callback_received", status: "failed", sso: true },
+  "auth.sso.exchange.failed": { phase: "exchange_finished", status: "failed", sso: true },
+  "auth.sso.exchange.succeeded": { phase: "exchange_finished", status: "ok", sso: true },
+};
+
+/** The type of an SSO failure after the exchange, which names its own phase. */
+const RESOLUTION_FAILED = "auth.sso.resolution.failed";
+
+/** Every audit event type a sign-in is followed through, to ask the stream for nothing else. */
+export const SIGN_IN_EVENT_TYPES: readonly string[] = [...Object.keys(MEANING), RESOLUTION_FAILED];
 
 const PHASES: readonly string[] = [
   "ceremony_started",
@@ -33,8 +50,9 @@ const text = (value: unknown): string | undefined =>
 /**
  * The sign-in event an audit event stands for, or `undefined` when it is not
  * about a sign-in or is about another connection than `slug`. An event that
- * names no connection (the start of an attempt, its handoff, a link) is taken
- * for `slug`'s: the attempt it belongs to is what the caller follows.
+ * names no connection (the start of an attempt, its handoff) is taken for
+ * `slug`'s, and says so by not being marked `sso`: the follower decides which
+ * attempt it belongs to.
  */
 export function signInEventOf(event: AuditEvent, slug: string): SignInEvent | undefined {
   const { payload } = event;
@@ -42,9 +60,9 @@ export function signInEventOf(event: AuditEvent, slug: string): SignInEvent | un
   if (connection !== undefined && connection !== slug) {
     return undefined;
   }
-  const failure = event.event_type === "auth.sso.resolution.failed";
+  const failure = event.event_type === RESOLUTION_FAILED;
+  const meaning = failure ? { status: "failed" as const, sso: true } : MEANING[event.event_type];
   const phase = failure ? text(payload?.phase) : MEANING[event.event_type]?.phase;
-  const meaning = failure ? { status: "failed" as const } : MEANING[event.event_type];
   if (meaning === undefined || phase === undefined || !PHASES.includes(phase)) {
     return undefined;
   }
@@ -53,6 +71,7 @@ export function signInEventOf(event: AuditEvent, slug: string): SignInEvent | un
   return {
     slug,
     flowId: text(payload?.auth_attempt_id) ?? event.entity_id ?? "",
+    ...(meaning.sso ? { sso: true as const } : {}),
     phase: phase as SignInPhase,
     status: meaning.status,
     ...(reason === undefined ? {} : { reason }),
@@ -60,21 +79,47 @@ export function signInEventOf(event: AuditEvent, slug: string): SignInEvent | un
   };
 }
 
+/** How many pages one read follows back, so a busy project cannot make a poll unbounded. */
+const MAX_PAGES = 10;
+
 /**
- * Sign-in events as the project's audit stream records them from now on. What
- * the stream holds when this is called is the baseline, and the promise
- * resolves only once it has been read; each poll then yields the events the
- * previous read did not hold. `list` returns the most recent events, oldest
- * first.
+ * The events recorded since `known`, oldest first. Pages are read newest first
+ * until one holds an event already known, or the stream or `maxPages` runs
+ * out, so more events than fit in one page between two reads are all seen.
+ */
+export async function readNewAuditEvents(
+  fetchPage: (token: string | undefined) => Promise<AuditPage>,
+  known: ReadonlySet<string>,
+  maxPages: number,
+): Promise<readonly AuditEvent[]> {
+  const collect = async (
+    token: string | undefined,
+    pagesLeft: number,
+    taken: readonly AuditEvent[],
+  ): Promise<readonly AuditEvent[]> => {
+    const page = await fetchPage(token);
+    const fresh = page.data.filter((event) => !known.has(event.id));
+    const all = [...taken, ...fresh];
+    const reachedKnown = fresh.length < page.data.length;
+    const next = page.next_page_token;
+    return reachedKnown || !next || pagesLeft <= 1 ? all : collect(next, pagesLeft - 1, all);
+  };
+  return [...(await collect(undefined, maxPages, []))].reverse();
+}
+
+/**
+ * Sign-in events as the project's audit stream records them from now on. The
+ * newest page of the stream is the baseline, and the promise resolves only once
+ * it has been read; each poll then yields what was recorded since, in order.
  */
 export async function watchSignInAudit(
-  list: () => Promise<readonly AuditEvent[]>,
+  fetchPage: (token: string | undefined) => Promise<AuditPage>,
   slug: string,
   sleep: (ms: number, signal: AbortSignal) => Promise<void>,
   pollMs: number,
   signal: AbortSignal,
 ): Promise<AsyncIterable<SignInEvent>> {
-  const poll = async function* (previous: ReadonlySet<string>): AsyncGenerator<SignInEvent> {
+  const poll = async function* (known: ReadonlySet<string>): AsyncGenerator<SignInEvent> {
     if (signal.aborted) {
       return;
     }
@@ -82,11 +127,10 @@ export async function watchSignInAudit(
     if (signal.aborted) {
       return;
     }
-    const events = await list();
-    yield* events
-      .filter((event) => !previous.has(event.id))
-      .flatMap((event) => signInEventOf(event, slug) ?? []);
-    yield* poll(new Set(events.map((event) => event.id)));
+    const fresh = await readNewAuditEvents(fetchPage, known, MAX_PAGES);
+    yield* fresh.flatMap((event) => signInEventOf(event, slug) ?? []);
+    yield* poll(new Set([...known, ...fresh.map((event) => event.id)]));
   };
-  return poll(new Set((await list()).map((event) => event.id)));
+  const baseline = await readNewAuditEvents(fetchPage, new Set(), 1);
+  return poll(new Set(baseline.map((event) => event.id)));
 }

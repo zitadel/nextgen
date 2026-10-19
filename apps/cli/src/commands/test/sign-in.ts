@@ -16,6 +16,7 @@ import {
   runChecks,
   type Send,
 } from "../../lib/checks/idp";
+import { claimState } from "../../lib/claim-state";
 import { ZitadelError } from "../../lib/errors";
 import { type ConnectionFile, callbackUriFor, readConnectionFiles } from "../../lib/idp";
 import { isObject } from "../../lib/json";
@@ -24,7 +25,7 @@ import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from ".
 import { reportWarning } from "../../lib/warnings";
 import { readDevelopmentIssuer, readZitadelConfig, readZitadelSecret } from "../../lib/project";
 import { publicCliCommand } from "../../lib/public-cli";
-import { watchSignInAudit } from "../../lib/sign-in-audit";
+import { SIGN_IN_EVENT_TYPES, watchSignInAudit } from "../../lib/sign-in-audit";
 import { buildSyncPlan, enumeratePlanResources, makeSyncers } from "../../lib/sync";
 
 const REQUEST_TIMEOUT_MS = 10_000;
@@ -107,6 +108,18 @@ export default class TestSignIn extends BaseCommand {
     const { cwd } = this.meta;
 
     const connections = await this.connections(cwd, flags.provider);
+    if (live && this.meta.dryRun) {
+      // A live sign-in is started by a person in a browser and can create a user and a
+      // session, so a dry run stops before opening anything, as `claim` does.
+      return this.emit({
+        status: "skipped",
+        reason: "dry-run",
+        data: {
+          title: "The live sign-in was not started.",
+          would: `Open the login page and wait for a sign-in with ${connections.map(slugOf).join(", ")}, then report which phase failed and on which side.`,
+        },
+      });
+    }
     if (connections.length > 1 && live) {
       throw new ZitadelError("E_VALIDATION", "A live sign-in belongs to one provider", {
         hint: `Name one with --provider: ${connections.map(slugOf).join(", ")}`,
@@ -183,6 +196,7 @@ export default class TestSignIn extends BaseCommand {
     const oidc = isObject(connection.body.oidc) ? connection.body.oidc : {};
     const callbackUri = callbackUriFor(projectIssuer, slug);
     if (live) {
+      await this.requireClaimed(cwd);
       await this.requireSecretVariable(cwd, oidc.client_secret);
       await this.requireApplied(cwd);
     }
@@ -223,16 +237,14 @@ export default class TestSignIn extends BaseCommand {
                 watch: async (signal) => {
                   const { client, projectId } = await this.projectClient(cwd);
                   return watchSignInAudit(
-                    async () =>
-                      [
-                        ...(
-                          await client.listEvents({
-                            project_id: projectId,
-                            order: "desc",
-                            limit: AUDIT_PAGE,
-                          })
-                        ).data,
-                      ].reverse(),
+                    (pageToken) =>
+                      client.listEvents({
+                        project_id: projectId,
+                        order: "desc",
+                        limit: AUDIT_PAGE,
+                        event_type: [...SIGN_IN_EVENT_TYPES],
+                        ...(pageToken === undefined ? {} : { page_token: pageToken }),
+                      }),
                     slug,
                     wait,
                     POLL_MS,
@@ -257,6 +269,25 @@ export default class TestSignIn extends BaseCommand {
       skipped: count("skipped"),
       checks: results,
     };
+  }
+
+  /**
+   * The audit events are readable only once the project is claimed, so on an
+   * unclaimed one a sign-in would complete while the command waited for events
+   * it can never see.
+   */
+  private async requireClaimed(cwd: string): Promise<void> {
+    const secret = await readZitadelSecret(cwd);
+    if (claimState({ secret, server: this.meta.source }).kind === "detached") {
+      throw new ZitadelError(
+        "E_VALIDATION",
+        "The project is not claimed, so its events are hidden",
+        {
+          hint: "A live sign-in is followed through the project's audit events, which are readable once the project is claimed. Claim it, then try again.",
+          nextCommands: [publicCliCommand("claim", this.meta.cliVersion)],
+        },
+      );
+    }
   }
 
   /** The client secret is write-only, so the most that can be known is that the project holds one. */

@@ -155,13 +155,17 @@ export class LiveSignInCheck extends Check<IdpContext> {
     if (event.slug !== context.slug) {
       return this.follow(watching, progress);
     }
-    // A line without a flow id, such as a callback whose state was unknown, can only
-    // belong to an attempt that has begun; before that it is someone else's request.
-    if (event.flowId === "" && progress.attempt === undefined) {
+    // The start and the handoff of an attempt belong to every kind of sign-in, a password
+    // login included. Only an exchange with this connection says an attempt is the one
+    // being followed; until it does, the start is shown and anything else is not ours.
+    if (progress.attempt === undefined && event.sso !== true) {
+      if (event.phase === "ceremony_started") {
+        live.say(`${PHASES[event.phase]}: ok`);
+      }
       return this.follow(watching, progress);
     }
     const attempt = progress.attempt ?? event.flowId;
-    if (event.flowId !== "" && event.flowId !== attempt) {
+    if (event.flowId !== attempt) {
       if (!progress.ignored.has(event.flowId)) {
         live.say(`Ignoring another sign-in attempt (${event.flowId})`);
       }

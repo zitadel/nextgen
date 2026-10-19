@@ -79,6 +79,16 @@ const run = (events: readonly SignInEvent[], earlier: readonly CheckResult[] = [
   return { outcome, ...runtime };
 };
 
+/** An event about an exchange with the connection, which is what ties an attempt to it. */
+const sso = (overrides: Partial<SignInEvent>): SignInEvent => event({ sso: true, ...overrides });
+
+/** A sign-in the connection took part in, up to the point the app is handed the attempt. */
+const SIGNED_IN: readonly SignInEvent[] = [
+  event({ phase: "ceremony_started" }),
+  sso({ phase: "exchange_finished" }),
+  event({ phase: "handed_off" }),
+];
+
 describe("LiveSignInCheck", () => {
   it("is skipped, not passed, when no browser sign-in was asked for", async () => {
     const outcome = await new LiveSignInCheck().run(aContext(undefined), [PASSED]);
@@ -94,13 +104,13 @@ describe("LiveSignInCheck", () => {
   });
 
   it("is not blocked by an earlier check that could only skip", async () => {
-    const { outcome } = run([event({ phase: "handed_off" })], [{ ...PASSED, status: "skipped" }]);
+    const { outcome } = run(SIGNED_IN, [{ ...PASSED, status: "skipped" }]);
 
     expect((await outcome).status).toBe("pass");
   });
 
   it("prints the login URL and opens it", async () => {
-    const { outcome, said, opened } = run([event({ phase: "handed_off" })]);
+    const { outcome, said, opened } = run(SIGNED_IN);
     await outcome;
 
     expect(opened).toEqual([LOGIN_URL]);
@@ -108,41 +118,27 @@ describe("LiveSignInCheck", () => {
   });
 
   it("passes once the attempt has been handed over to the app", async () => {
-    const { outcome } = run([
-      event({ phase: "ceremony_started" }),
-      event({ phase: "callback_received" }),
-      event({ phase: "exchange_finished" }),
-      event({ phase: "resolved" }),
-      event({ phase: "handed_off" }),
-    ]);
+    const { outcome } = run(SIGNED_IN);
 
     expect(await outcome).toEqual({ status: "pass", message: "sign-in completed with acme" });
   });
 
-  it.each([
-    ["the identity is bound to its user", event({ phase: "resolved" })],
-    ["a user is created for the identity", event({ phase: "user_created" })],
-  ])(
-    "does not call the sign-in complete when %s but the handoff has not happened",
-    async (_name, last) => {
-      const { outcome } = run([event({ phase: "callback_received" }), last]);
+  it("does not call the sign-in complete after the exchange, before the handoff has happened", async () => {
+    const { outcome } = run([
+      event({ phase: "ceremony_started" }),
+      sso({ phase: "exchange_finished" }),
+    ]);
 
-      expect(await outcome).toMatchObject({
-        status: "fail",
-        message: expect.stringContaining("did not finish"),
-      });
-    },
-  );
+    expect(await outcome).toMatchObject({
+      status: "fail",
+      message: expect.stringContaining("did not finish"),
+    });
+  });
 
   it("fails a handoff that did not happen, as the journey's", async () => {
     const { outcome } = run([
-      event({ phase: "resolved" }),
-      event({
-        phase: "handed_off",
-        status: "failed",
-        reason: "handoff_failed",
-        side: "journey",
-      }),
+      sso({ phase: "exchange_finished" }),
+      sso({ phase: "handed_off", status: "failed", reason: "handoff_failed", side: "journey" }),
     ]);
 
     expect(await outcome).toMatchObject({
@@ -151,20 +147,10 @@ describe("LiveSignInCheck", () => {
     });
   });
 
-  it("keeps waiting after the collection step is asked for, and passes once the user is created", async () => {
-    const { outcome } = run([
-      event({ phase: "exchange_finished" }),
-      event({ phase: "user_created" }),
-      event({ phase: "handed_off" }),
-    ]);
-
-    expect((await outcome).status).toBe("pass");
-  });
-
   it("fails a provider-side failure with the console and the callback URI as its one action", async () => {
     const { outcome } = run([
-      event({ phase: "callback_received" }),
-      event({
+      event({ phase: "ceremony_started" }),
+      sso({
         phase: "callback_received",
         status: "failed",
         reason: "provider_denied",
@@ -195,17 +181,19 @@ describe("LiveSignInCheck", () => {
     ["internal", "Run zitadel events list and look for the auth.sso events of the attempt"],
   ])("fails a journey-side %s with the file or rule to fix", async (reason, recovery) => {
     const { outcome } = run([
-      event({ phase: "resolved", status: "failed", reason, side: "journey" }),
+      sso({ phase: "resolved", status: "failed", reason, side: "journey" }),
     ]);
 
     expect(await outcome).toMatchObject({ status: "fail", recovery });
     expect((await outcome).message).toContain("journey side");
   });
 
-  it("follows the first attempt and says it ignored a second", async () => {
+  it("follows the first attempt that exchanged with the connection and says it ignored a second", async () => {
     const { outcome, said } = run([
       event({ flowId: "att_1", phase: "ceremony_started" }),
       event({ flowId: "att_2", phase: "ceremony_started" }),
+      sso({ flowId: "att_1", phase: "exchange_finished" }),
+      sso({ flowId: "att_2", phase: "exchange_finished" }),
       event({ flowId: "att_2", phase: "handed_off" }),
       event({ flowId: "att_1", phase: "handed_off" }),
     ]);
@@ -216,34 +204,22 @@ describe("LiveSignInCheck", () => {
     ]);
   });
 
-  it("attributes a failure that names no attempt to the one it follows", async () => {
-    const { outcome } = run([
-      event({ phase: "ceremony_started" }),
-      event({
-        flowId: "",
-        phase: "exchange_finished",
-        status: "failed",
-        reason: "exchange_failed",
-        side: "provider",
-      }),
-    ]);
+  it("does not take a password login's start and handoff for a sign-in with the connection", async () => {
+    const { outcome } = run([event({ phase: "ceremony_started" }), event({ phase: "handed_off" })]);
 
-    expect(await outcome).toMatchObject({
-      status: "fail",
-      message: expect.stringContaining("the provider refused the authorization code"),
-    });
+    expect(await outcome).toMatchObject({ status: "fail", message: "no sign-in attempt seen" });
   });
 
   it("ignores events of other connections", async () => {
     const { outcome } = run([
-      event({
+      sso({
         slug: "other",
         phase: "resolved",
         status: "failed",
         reason: "internal",
         side: "journey",
       }),
-      event({ phase: "handed_off" }),
+      ...SIGNED_IN,
     ]);
 
     expect((await outcome).status).toBe("pass");
@@ -259,19 +235,18 @@ describe("LiveSignInCheck", () => {
     });
   });
 
-  it("fails when an attempt started and never finished, naming where it stopped", async () => {
-    const { outcome } = run([event({ phase: "ceremony_started" })]);
+  it("fails when an attempt began and never finished, naming where it stopped", async () => {
+    const { outcome } = run([sso({ phase: "exchange_finished" })]);
 
     expect(await outcome).toMatchObject({
       status: "fail",
-      message:
-        "The sign-in started but did not finish: the last thing seen was sending the browser to the provider",
+      message: "The sign-in started but did not finish: the last thing seen was the code exchange",
     });
   });
 
   it("stops watching and waiting when it finishes", async () => {
     const aborted: boolean[] = [];
-    const base = aRuntime([event({ phase: "handed_off" })]).live;
+    const base = aRuntime(SIGNED_IN).live;
     const live: LiveSignIn = {
       ...base,
       watch: async (signal) => {
@@ -285,9 +260,9 @@ describe("LiveSignInCheck", () => {
     expect(aborted).toEqual([true]);
   });
 
-  it("opens the browser only once the log it compares against has been read", async () => {
+  it("opens the browser only once the stream it compares against has been read", async () => {
     const steps: string[] = [];
-    const base = aRuntime([event({ phase: "handed_off" })]).live;
+    const base = aRuntime(SIGNED_IN).live;
     const live: LiveSignIn = {
       ...base,
       open: async () => {
@@ -303,40 +278,6 @@ describe("LiveSignInCheck", () => {
     await new LiveSignInCheck().run(aContext(live), [PASSED]);
 
     expect(steps).toEqual(["baseline read", "opened"]);
-  });
-
-  it("ignores a line with no flow id until an attempt has begun, since it is someone else's request", async () => {
-    const { outcome } = run([
-      event({
-        flowId: "",
-        phase: "exchange_finished",
-        status: "failed",
-        reason: "exchange_failed",
-        side: "provider",
-      }),
-      event({ phase: "callback_received" }),
-      event({ phase: "handed_off" }),
-    ]);
-
-    expect(await outcome).toMatchObject({ status: "pass" });
-  });
-
-  it("counts a line with no flow id once the attempt has begun, as an event that names no attempt", async () => {
-    const { outcome } = run([
-      event({ phase: "ceremony_started" }),
-      event({
-        flowId: "",
-        phase: "exchange_finished",
-        status: "failed",
-        reason: "exchange_failed",
-        side: "provider",
-      }),
-    ]);
-
-    expect(await outcome).toMatchObject({
-      status: "fail",
-      message: expect.stringContaining("code exchange"),
-    });
   });
 });
 

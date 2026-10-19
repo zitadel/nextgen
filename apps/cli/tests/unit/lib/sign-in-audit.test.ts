@@ -2,7 +2,14 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { type AuditEvent, signInEventOf, watchSignInAudit } from "../../../src/lib/sign-in-audit";
+import {
+  type AuditEvent,
+  type AuditPage,
+  readNewAuditEvents,
+  SIGN_IN_EVENT_TYPES,
+  signInEventOf,
+  watchSignInAudit,
+} from "../../../src/lib/sign-in-audit";
 
 const audit = (event_type: string, overrides: Partial<AuditEvent> = {}): AuditEvent => ({
   id: `evt_${event_type}`,
@@ -13,14 +20,29 @@ const audit = (event_type: string, overrides: Partial<AuditEvent> = {}): AuditEv
 
 describe("signInEventOf", () => {
   it.each([
-    ["auth.attempt.created", "ceremony_started", "ok"],
-    ["auth.sso.authorization.failed", "callback_received", "failed"],
-    ["auth.sso.exchange.failed", "exchange_finished", "failed"],
-    ["auth.sso.exchange.succeeded", "exchange_finished", "ok"],
-    ["idp.identity_link.created", "user_created", "ok"],
-    ["auth.attempt.handed_off", "handed_off", "ok"],
-  ])("reads %s as %s (%s)", (type, phase, status) => {
-    expect(signInEventOf(audit(type), "google")).toMatchObject({ slug: "google", phase, status });
+    ["auth.attempt.created", "ceremony_started", "ok", false],
+    ["auth.attempt.handed_off", "handed_off", "ok", false],
+    ["auth.sso.authorization.failed", "callback_received", "failed", true],
+    ["auth.sso.exchange.failed", "exchange_finished", "failed", true],
+    ["auth.sso.exchange.succeeded", "exchange_finished", "ok", true],
+  ])("reads %s as %s (%s), about an exchange: %s", (type, phase, status, isSso) => {
+    expect(signInEventOf(audit(type), "google")).toMatchObject({
+      slug: "google",
+      phase,
+      status,
+      ...(isSso ? { sso: true } : {}),
+    });
+  });
+
+  it("does not mark the start or the handoff of an attempt as about the connection", () => {
+    expect([
+      signInEventOf(audit("auth.attempt.created"), "google")?.sso,
+      signInEventOf(audit("auth.attempt.handed_off"), "google")?.sso,
+    ]).toEqual([undefined, undefined]);
+  });
+
+  it("does not read a link created for a user as part of an attempt, since it names none", () => {
+    expect(signInEventOf(audit("idp.identity_link.created"), "google")).toBeUndefined();
   });
 
   it("reads the phase of a failure after the exchange from its payload", () => {
@@ -37,6 +59,7 @@ describe("signInEventOf", () => {
     expect(signInEventOf(event, "google")).toEqual({
       slug: "google",
       flowId: "att_9",
+      sso: true,
       phase: "handed_off",
       status: "failed",
       reason: "handoff_failed",
@@ -101,8 +124,66 @@ describe("the SSO event types the runtime records", () => {
     expect(SSO_EVENT_TYPES_THE_RUNTIME_RECORDS.length).toBe(4);
   });
 
-  it.each(SSO_EVENT_TYPES_THE_RUNTIME_RECORDS)("include %s, which the check reads", (type) => {
-    expect(signInEventOf(audit(type, { payload: { phase: "resolved" } }), "google")).toBeDefined();
+  it.each(SSO_EVENT_TYPES_THE_RUNTIME_RECORDS)(
+    "include %s, which the check asks for and reads",
+    (type) => {
+      expect(SIGN_IN_EVENT_TYPES).toContain(type);
+      expect(
+        signInEventOf(audit(type, { payload: { phase: "resolved" } }), "google"),
+      ).toBeDefined();
+    },
+  );
+});
+
+const page = (ids: readonly string[], next?: string): AuditPage => ({
+  data: ids.map((id) => audit("auth.attempt.created", { id })),
+  ...(next === undefined ? {} : { next_page_token: next }),
+});
+
+/** A stream newest first, served `size` events to a page. */
+function aStream(ids: readonly string[], size: number) {
+  const asked: (string | undefined)[] = [];
+  const fetchPage = async (token: string | undefined): Promise<AuditPage> => {
+    asked.push(token);
+    const from = token === undefined ? 0 : Number(token);
+    const to = from + size;
+    return page(ids.slice(from, to), to < ids.length ? String(to) : undefined);
+  };
+  return { fetchPage, asked };
+}
+
+describe("readNewAuditEvents", () => {
+  it("returns what is new, oldest first", async () => {
+    const { fetchPage } = aStream(["e3", "e2", "e1"], 10);
+
+    const events = await readNewAuditEvents(fetchPage, new Set(["e1"]), 10);
+
+    expect(events.map((event) => event.id)).toEqual(["e2", "e3"]);
+  });
+
+  it("reads back through pages until it reaches an event it knows, so none between two reads is missed", async () => {
+    const { fetchPage, asked } = aStream(["e6", "e5", "e4", "e3", "e2", "e1"], 2);
+
+    const events = await readNewAuditEvents(fetchPage, new Set(["e3"]), 10);
+
+    expect([events.map((event) => event.id), asked]).toEqual([
+      ["e4", "e5", "e6"],
+      [undefined, "2"],
+    ]);
+  });
+
+  it("stops at the page limit rather than reading a stream without end", async () => {
+    const { fetchPage, asked } = aStream(["e6", "e5", "e4", "e3", "e2", "e1"], 2);
+
+    await readNewAuditEvents(fetchPage, new Set(), 2);
+
+    expect(asked).toEqual([undefined, "2"]);
+  });
+
+  it("returns nothing for an empty stream", async () => {
+    const { fetchPage } = aStream([], 2);
+
+    expect(await readNewAuditEvents(fetchPage, new Set(), 10)).toEqual([]);
   });
 });
 
@@ -111,12 +192,18 @@ describe("watchSignInAudit", () => {
 
   it("reports only events recorded after it began", async () => {
     const stop = new AbortController();
-    const before = audit("auth.attempt.created", { id: "evt_old" });
-    const after = audit("auth.sso.authorization.failed", { id: "evt_new" });
-    const reads = [[before], [before, after]];
-    const list = async () => reads.shift() ?? [before, after];
+    const reads = [
+      page(["evt_old"]),
+      {
+        data: [
+          audit("auth.sso.authorization.failed", { id: "evt_new" }),
+          audit("auth.attempt.created", { id: "evt_old" }),
+        ],
+      },
+    ];
+    const fetchPage = async (): Promise<AuditPage> => reads.shift() ?? { data: [] };
 
-    const events = (await watchSignInAudit(list, "google", instantly, 0, stop.signal))[
+    const events = (await watchSignInAudit(fetchPage, "google", instantly, 0, stop.signal))[
       Symbol.asyncIterator
     ]();
     const first = await events.next();
@@ -128,8 +215,8 @@ describe("watchSignInAudit", () => {
   it("resolves only once the stream it compares against has been read", async () => {
     const stop = new AbortController();
     const released = new AbortController();
-    const slowRead = new Promise<readonly AuditEvent[]>((resolve) =>
-      released.signal.addEventListener("abort", () => resolve([]), { once: true }),
+    const slowRead = new Promise<AuditPage>((resolve) =>
+      released.signal.addEventListener("abort", () => resolve({ data: [] }), { once: true }),
     );
 
     const watching = watchSignInAudit(() => slowRead, "google", instantly, 0, stop.signal);
@@ -148,7 +235,13 @@ describe("watchSignInAudit", () => {
     const stop = new AbortController();
     stop.abort();
 
-    const events = await watchSignInAudit(async () => [], "google", instantly, 0, stop.signal);
+    const events = await watchSignInAudit(
+      async () => ({ data: [] }),
+      "google",
+      instantly,
+      0,
+      stop.signal,
+    );
 
     expect(await events[Symbol.asyncIterator]().next()).toMatchObject({ done: true });
   });

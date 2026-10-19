@@ -5668,6 +5668,8 @@ func TestFlowStateMachine_Render_SSOStaleParkedRowProvisioningRendersStep(t *tes
 			assert.Nil(t, result.Step.Error)
 			assert.Empty(t, result.State.CollectedData.UserID)
 			assert.False(t, result.Reseal)
+			// Another request claimed the parked row: a race the render settles, not a failure.
+			assert.Empty(t, w.ssoFailures)
 		})
 	}
 }
@@ -7254,4 +7256,61 @@ func TestFlowStateMachine_Process_SSOCollectionRecordsAFailedHandoff(t *testing.
 		ProjectID: testProjectID, AttemptID: "att-1", ConnectionSlug: "google",
 		Phase: ssoevent.PhaseHandedOff, Reason: ssoevent.ReasonHandoffFailed,
 	}}, w.ssoFailures)
+}
+
+// A handoff that fails on a later request than the one that resolved the
+// identity is still told of, because the state remembers the connection; a
+// sign-in with no connection, such as a password registration, says nothing.
+func TestFlowStateMachine_Process_RecordsAFailedHandoffByTheConnectionTheStateKeeps(t *testing.T) {
+	t.Parallel()
+	for name, tc := range map[string]struct {
+		slug string
+		want []domain.FlowSSOFailureInput
+	}{
+		"an sso sign-in": {
+			slug: "google",
+			want: []domain.FlowSSOFailureInput{{
+				ProjectID: testProjectID, AttemptID: "att_1", ConnectionSlug: "google",
+				Phase: ssoevent.PhaseHandedOff, Reason: ssoevent.ReasonHandoffFailed,
+			}},
+		},
+		"a password registration": {slug: ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			w := newFlowTestWorld(t)
+			def := signupDefinition()
+			w.schemaResolver.EXPECT().
+				Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+				Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+				AnyTimes()
+			w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att_1", nil)
+			w.createUser.EXPECT().Handle(gomock.Any(), gomock.Any()).Return(domain.FlowOnSuccessResult{UserID: "user_01TEST"}, nil)
+			w.authAttemptService.EXPECT().
+				SubmitIdentifier(gomock.Any(), gomock.Any()).
+				Return("", domain.ErrAuthAttemptProofRejected(nil))
+			w.authAttemptService.EXPECT().
+				Handoff(gomock.Any(), gomock.Any()).
+				Return(domain.FlowHandoffOutput{}, errors.New("store unavailable"))
+			start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+				Definition:    def,
+				Purpose:       domain.FlowDefinitionPurposeRegister,
+				Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+				UserSchemaURL: defaultSchemaURL,
+			})
+			require.NoError(t, err)
+			start.State.SSOProviderSlug = tc.slug
+
+			_, err = w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+				Action: domain.FlowActionSubmit,
+				Fields: map[string]any{
+					"email":                   "alice@example.com",
+					"x-auth-methods#password": "correct-horse-battery-staple",
+				},
+			})
+
+			require.Error(t, err)
+			assert.Equal(t, tc.want, w.ssoFailures)
+		})
+	}
 }
