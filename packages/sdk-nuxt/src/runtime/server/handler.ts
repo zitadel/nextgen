@@ -2,6 +2,7 @@ import type { NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
 
 import { useRuntimeConfig } from "#imports";
 
+import { resolveUrl } from "../lib/settings";
 import { createNextgenMiddleware } from "./middleware";
 
 function nonEmptyString(value: unknown): string | undefined {
@@ -31,8 +32,7 @@ function finiteNumber(value: unknown): number | undefined {
  */
 export function middlewareOptions(nextgen: Record<string, unknown> = {}): NextgenMiddlewareOptions {
   return {
-    url:
-      nonEmptyString(nextgen.url) ?? nonEmptyString(nextgen.issuerUrl) ?? "http://localhost:8080",
+    url: resolveUrl(nextgen),
     proxyPath: nonEmptyString(nextgen.proxyPath) ?? "/__nextgen",
     loginPath: nonEmptyString(nextgen.loginPath) ?? "/login",
     protectedRoutes: stringList(nextgen.protectedRoutes) ?? [],

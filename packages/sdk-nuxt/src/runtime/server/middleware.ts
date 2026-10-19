@@ -24,6 +24,7 @@ import {
 } from "h3";
 
 import { verifyJwt, base64UrlDecode } from "../lib/jwt";
+import { resolveProjectSecret, resolveUrl } from "../lib/settings";
 
 declare module "h3" {
   interface H3EventContext {
@@ -108,7 +109,6 @@ function buildUpstreamHeaders(event: H3Event): Headers {
  */
 export function createNextgenMiddleware(options: NextgenMiddlewareOptions = {}): EventHandler {
   const {
-    url = process.env.ZITADEL_URL ?? "http://localhost:8080",
     proxyPath = "/__nextgen",
     protectedRoutes = [],
     ignoredRoutes = [],
@@ -121,6 +121,10 @@ export function createNextgenMiddleware(options: NextgenMiddlewareOptions = {}):
     proxyTimeoutMs = 5000,
     opaqueTokenTimeoutMs = 5000,
   } = options;
+
+  // An empty `url` (the module's runtime config holds `""` until a value is
+  // set) counts as unset, so it falls back to `ZITADEL_URL`, then the default.
+  const url = resolveUrl({ url: options.url });
 
   // Guard against open-redirect: loginPath must be a relative path. An absolute
   // URL (e.g. "https://evil.com/phish") or a protocol-relative URL
@@ -201,7 +205,9 @@ async function proxyRequest(
   // the future publishable-key exchange path.
   if (requiresProjectSecret(method, suffix) && !upstreamHeaders.has("authorization")) {
     const config = useRuntimeConfig();
-    const projectSecret = (config.nextgen as { projectSecret?: string } | undefined)?.projectSecret;
+    const projectSecret = resolveProjectSecret(
+      config.nextgen as Record<string, unknown> | undefined,
+    );
     if (projectSecret) {
       upstreamHeaders.set("authorization", `Bearer ${projectSecret}`);
     }
