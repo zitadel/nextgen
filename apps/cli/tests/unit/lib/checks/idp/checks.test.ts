@@ -193,6 +193,24 @@ describe("IDP_CHECKS", () => {
     ]);
   });
 
+  it.each([
+    ["", "no issuer"],
+    ["http://idp.example", "not an https URL"],
+  ])(
+    "fails the issuer %j of a connection that names its own endpoints, as the server would",
+    async (issuer, wording) => {
+      const { by } = await resultsFor({
+        issuer,
+        endpoints: { authorization: "https://idp.example/authorize" },
+      });
+
+      expect(by("issuer")).toMatchObject({
+        status: "fail",
+        message: expect.stringContaining(wording),
+      });
+    },
+  );
+
   it("fails an issuer the provider does not report, naming the one it does", async () => {
     const { by } = await resultsFor({}, { ...DOCUMENT, issuer: "https://other.example" });
 
