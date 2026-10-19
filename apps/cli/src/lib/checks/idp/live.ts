@@ -113,6 +113,8 @@ function completes(event: SignInEvent): boolean {
  * that creates a user leaves that user behind.
  */
 export class LiveSignInCheck extends Check<IdpContext> {
+  // The event that an attempt began names no provider, so the first attempt seen is the one
+  // followed; on a server where someone else logs in meanwhile, it can be theirs.
   readonly name = "sign-in";
   readonly title = "Live sign-in";
 

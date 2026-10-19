@@ -393,7 +393,9 @@ server the project is on, needs the files applied, and leaves any user it
 created in the project. A sign-in that fails before the person leaves the login
 page, such as a connection the server cannot build the redirect from, records no
 event, so the check ends with "no sign-in attempt seen"; the checks that run
-without `--live` catch the usual causes of that.
+without `--live` catch the usual causes of that. The event that an attempt began
+does not name a provider, so `--live` follows the first attempt it sees; on a
+server where someone else logs in at the same time, it can follow theirs.
 
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
 then re-run `plan` and `apply`. See the reference below for driving the login UI
