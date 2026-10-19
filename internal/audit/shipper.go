@@ -198,6 +198,7 @@ func (s *Shipper) shipProject(sink *domain.EventSink, projectID string) {
 
 	for {
 		if err := ctx.Err(); err != nil {
+			failJobSpan(ctx, err)
 			return
 		}
 		batch, err := s.src.ListEventsAfterCursor(ctx, projectID, cursor.LastCreatedAt, cursor.LastEventID, shipPageSize)
