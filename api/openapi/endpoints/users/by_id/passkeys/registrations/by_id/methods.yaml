@@ -11,17 +11,8 @@ post:
   tags:
     - Users
   parameters:
-    - name: user_id
-      in: path
-      required: true
-      schema:
-        $ref: ../../../../../../components/schemas/user-id.yaml
-    - name: registration_id
-      in: path
-      required: true
-      schema:
-        type: string
-        description: The ceremony identifier returned by begin.
+    - $ref: ../../../../../../components/parameters/user-id.yaml
+    - $ref: ../../../../../../components/parameters/passkey-registration-id.yaml
   security:
     - oauth2:
         - user.write

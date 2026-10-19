@@ -116,6 +116,10 @@ export default function Login() {
 `ZitadelSession` (with `postSignOutUrl="/login"`) and `ZitadelLogout` load the
 same way.
 
+## Widget props and events
+
+This SDK is server-only. The widgets come from `@zitadel/sdk-solid`, so read its skill for the widget props and events.
+
 ## Read these, don't guess
 
 The package README at `node_modules/@zitadel/sdk-solid-start/README.md` and the

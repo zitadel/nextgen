@@ -19,6 +19,10 @@ catalog:
   "@clack/prompts": ^1.2.0
   "@faker-js/faker": ^10.5.0
   '@fontsource/arimo': ^5.2.8
+  # The sampler fumadocs-openapi builds an operation's default request with.
+  # The docs build that request again, for an operation's Markdown and the
+  # check of its TypeScript sample, so keep it on fumadocs-openapi's range.
+  "@fumadocs/json-schema": ^0.3.2
   "@modelcontextprotocol/server": ^2.3.1
   "@moonrepo/cli": ^2.6.1
   "@mswjs/http-middleware": ^0.10.3
@@ -78,7 +82,7 @@ catalog:
   express: ^4.18.2
   fumadocs-core: ^16.17.1
   fumadocs-mdx: ^15.4.7
-  fumadocs-openapi: ^12.4.1
+  fumadocs-openapi: ^12.5.2
   # The Base UI flavour, which Fumadocs' own templates install as fumadocs-ui.
   fumadocs-ui: npm:@fumadocs/base-ui@^16.17.1
   jsdom: ^29.0.2
@@ -99,6 +103,7 @@ catalog:
   radix-ui: ^1.6.4
   react: ^19.2.8
   react-dom: ^19.2.8
+  remark: ^15.0.1
   rosie-skills: ^0.8.5
   safe-stable-stringify: ^2.5.0
   sanitize-html: ^2.18.0

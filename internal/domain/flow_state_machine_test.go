@@ -41,11 +41,13 @@ func attemptFor(projectID, sessionID string) gomock.Matcher {
 }
 
 // identifiedBy matches an identifier submission against the attempt it lands
-// on and the value it carries, so a test pinning rotation cannot pass on a
+// on, the value it carries and the flow's bound schema (every caller starts
+// the flow on defaultSchemaURL), so a test pinning rotation cannot pass on a
 // call that went to the wrong attempt.
 func identifiedBy(attemptID, attribute, value string) gomock.Matcher {
 	return gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
-		return in.AttemptID == attemptID && in.AttributeName == attribute && in.Value == value
+		return in.AttemptID == attemptID && in.AttributeName == attribute && in.Value == value &&
+			in.UserSchemaURL == defaultSchemaURL
 	})
 }
 
@@ -2693,7 +2695,8 @@ func TestFlowStateMachine_Process_PasskeyRegisterConflictPinsExistingUser(t *tes
 	w.authAttemptService.EXPECT().
 		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
 			return assert.Equal(t, "email", in.AttributeName) &&
-				assert.Equal(t, email, in.Value)
+				assert.Equal(t, email, in.Value) &&
+				assert.Equal(t, defaultSchemaURL, in.UserSchemaURL)
 		})).
 		Return(existingUserID, nil)
 

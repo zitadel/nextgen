@@ -257,15 +257,16 @@ type Proof interface {
 // UserProof identifies the user by login name.
 //
 // AttributeName names the property the login name is a value of. The flow path
-// sets it from the step it rendered, whose field must be the bound schema's
-// designated identifier. Left empty — the direct-API path, which renders
-// nothing — the login name resolves against the designated identifier of every
+// sets it from the step it rendered, and sets UserSchemaURL to the schema the
+// flow is bound to: the login name then matches only users of that schema's
+// revisions (ADR 058 §5). Left empty, the direct-API path, which renders
+// nothing, resolves the login name against the designated identifier of every
 // user schema in the project instead, and must match exactly one user. A
-// direct-API caller never chooses the property. See resolveIdentifier for how
-// the two paths are scoped today.
+// direct-API caller never chooses the property. See resolveIdentifier.
 type UserProof struct {
 	AttributeName string
 	LoginName     string
+	UserSchemaURL string
 }
 
 func (UserProof) proofCheckType() domain.AuthCheckType { return domain.AuthCheckTypeUser }
@@ -311,7 +312,7 @@ type SessionResolver interface {
 }
 
 type UserLookup interface {
-	GetByAttributes(ctx context.Context, projectID string, attrs []domain.Attribute) (*domain.User, error)
+	GetByAttributes(ctx context.Context, projectID string, schemaURLs []string, attrs []domain.Attribute) (*domain.User, error)
 }
 
 // ---- Implementation ----------------------------------------------------------
@@ -341,6 +342,9 @@ func NewAuthAttemptService(
 // If input.SessionID is set, the existing session's verified checks are copied
 // into the attempt for step-up auth — no new session is created.
 func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttemptInput) (res *domain.AuthAttempt, err error) {
+	ctx, end := startSpan(ctx, "AuthAttemptService.Create")
+	defer end(&err)
+
 	requiredChecks := input.RequiredChecks
 	if requiredChecks == nil {
 		// TODO: load project default required checks
@@ -387,7 +391,10 @@ func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttempt
 }
 
 // GetByID retrieves an auth attempt by its ID and all its factors and challenges.
-func (s *authAttemptService) GetByID(ctx context.Context, projectID, attemptID string) (*domain.AuthAttempt, error) {
+func (s *authAttemptService) GetByID(ctx context.Context, projectID, attemptID string) (_ *domain.AuthAttempt, err error) {
+	ctx, end := startSpan(ctx, "AuthAttemptService.GetByID")
+	defer end(&err)
+
 	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, projectID, attemptID)
 	if err != nil {
 		if errors.Is(err, domain.ErrAuthAttemptNotFound()) {
@@ -400,7 +407,10 @@ func (s *authAttemptService) GetByID(ctx context.Context, projectID, attemptID s
 
 // IssueChallenge issues a challenge for the given check type on an existing attempt.
 // For passkey, the user check must already be verified so the user ID is known.
-func (s *authAttemptService) IssueChallenge(ctx context.Context, input IssueChallengeInput) (*domain.AuthAttempt, error) {
+func (s *authAttemptService) IssueChallenge(ctx context.Context, input IssueChallengeInput) (_ *domain.AuthAttempt, err error) {
+	ctx, end := startSpan(ctx, "AuthAttemptService.IssueChallenge")
+	defer end(&err)
+
 	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, input.ProjectID, input.AttemptID)
 	if err != nil {
 		return nil, err
@@ -421,7 +431,10 @@ func (s *authAttemptService) IssueChallenge(ctx context.Context, input IssueChal
 // IssueSSOState mints the state record on an existing attempt. The attempt
 // is guarded the way a challenge issue is: expired or handed off attempts
 // cannot start an external sign-in.
-func (s *authAttemptService) IssueSSOState(ctx context.Context, input IssueSSOStateInput) (*domain.SSOState, error) {
+func (s *authAttemptService) IssueSSOState(ctx context.Context, input IssueSSOStateInput) (res *domain.SSOState, err error) {
+	ctx, end := startSpan(ctx, "AuthAttemptService.IssueSSOState")
+	defer end(&err)
+
 	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, input.ProjectID, input.AttemptID)
 	if err != nil {
 		return nil, err
@@ -441,13 +454,19 @@ func (s *authAttemptService) IssueSSOState(ctx context.Context, input IssueSSOSt
 
 // ConsumeSSOState implements [AuthAttemptService]. The record is stored under
 // the state's hash, so the plain state is hashed here and never compared raw.
-func (s *authAttemptService) ConsumeSSOState(ctx context.Context, projectID, state, bindingNonce string) (*domain.SSOCallbackCheck, error) {
+func (s *authAttemptService) ConsumeSSOState(ctx context.Context, projectID, state, bindingNonce string) (_ *domain.SSOCallbackCheck, err error) {
+	ctx, end := startSpan(ctx, "AuthAttemptService.ConsumeSSOState")
+	defer end(&err)
+
 	return s.stmts.Statements().ConsumeSSOState(ctx, projectID, domain.HashSecret(state), bindingNonce)
 }
 
 // SetSSOCallbackResult implements [AuthAttemptService]. check is the record
 // ConsumeSSOState returned.
-func (s *authAttemptService) SetSSOCallbackResult(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, result *domain.SSOCallbackResult, eventType domain.EventType) error {
+func (s *authAttemptService) SetSSOCallbackResult(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, result *domain.SSOCallbackResult, eventType domain.EventType) (err error) {
+	ctx, end := startSpan(ctx, "AuthAttemptService.SetSSOCallbackResult")
+	defer end(&err)
+
 	return s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		if err := tx.Statements().SetSSOCallbackResult(ctx, projectID, check.StateHash, result); err != nil {
 			return err
@@ -478,6 +497,9 @@ func (s *authAttemptService) SetSSOCallbackResult(ctx context.Context, projectID
 // required checks are now satisfied.
 // On failure, it records the failed attempt for rate-limiting purposes.
 func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofInput) (res *domain.AuthAttempt, err error) {
+	ctx, end := startSpan(ctx, "AuthAttemptService.VerifyProof")
+	defer end(&err)
+
 	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, input.ProjectID, input.AttemptID)
 	if err != nil {
 		return nil, err
@@ -523,7 +545,10 @@ func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofI
 
 // Handoff mints a single-use handoff token for a completed attempt.
 // The client exchanges the token at POST /sessions/exchange.
-func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (*domain.AuthAttempt, error) {
+func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (_ *domain.AuthAttempt, err error) {
+	ctx, end := startSpan(ctx, "AuthAttemptService.Handoff")
+	defer end(&err)
+
 	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, input.ProjectID, input.AttemptID)
 	if err != nil {
 		return nil, err
@@ -711,21 +736,37 @@ func (s *authAttemptService) buildChallenge(ctx context.Context, attempt *domain
 
 // resolveIdentifier finds the user a login name identifies.
 //
-// With an attribute name — the flow path — it looks the value up in that
-// property across the project. That lookup is not yet scoped to the flow's
-// bound schema, which ADR 058 §5 asks for so a same-named team-unique property
-// on another schema cannot collide with it; that predates this resolution and
-// is left for a follow-up.
+// With an attribute name, the flow path, it looks the value up in that
+// property among the users of every revision of the flow's bound schema (ADR
+// 058 §5). Users keep the revision they were created under while the flow runs
+// on the newest one, and a same-named property on another schema can neither
+// match nor collide. The bound schema comes from the stored flow, so one the
+// project does not hold is an internal error, not a rejected proof. So is a
+// users read that fails for any reason other than finding no user or several.
 //
-// Without one — the direct-API path — the value resolves against the project's
-// designated identifiers. Any status, as the flow path: whether a login may
-// reach an inactive user is decided with status enforcement, not here.
+// Without one, the direct-API path, the value resolves against the designated
+// identifiers of every schema in the project. Any status, as the flow path:
+// whether a login may reach an inactive user is decided with status
+// enforcement, not here.
 func (s *authAttemptService) resolveIdentifier(ctx context.Context, projectID string, p UserProof) (*domain.User, error) {
 	if p.AttributeName != "" {
-		return s.users.GetByAttributes(ctx, projectID, []domain.Attribute{{
+		schemaURLs, err := userSchemaRevisionURLs(ctx, s.stmts.Statements(), projectID, p.UserSchemaURL)
+		if errors.Is(err, domain.ErrJSONSchemaNotFound()) {
+			return nil, domain.ErrInternal(err).WithMessage("user schema revision not found")
+		}
+		if err != nil {
+			return nil, err
+		}
+		user, err := s.users.GetByAttributes(ctx, projectID, schemaURLs, []domain.Attribute{{
 			Key:   domain.AttributeKey(p.AttributeName),
 			Value: p.LoginName,
 		}})
+		_, noRow := errors.AsType[*database.NoRowFoundError](err)
+		_, manyRows := errors.AsType[*database.MultipleRowsFoundError](err)
+		if err != nil && !noRow && !manyRows {
+			return nil, domain.ErrInternal(err).WithMessage("failed to look up the user")
+		}
+		return user, err
 	}
 	return resolveDesignatedUser(ctx, s.stmts.Statements(), projectID, p.LoginName, false, "auth_attempt")
 }
@@ -742,6 +783,11 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 			return nil, nil, nil, err
 		}
 		user, err := s.resolveIdentifier(ctx, attempt.ProjectID, p)
+		if errors.Is(err, domain.ErrInternal(nil)) {
+			// A fault on the server's side says nothing about the login name:
+			// no failed check, and the flow must not route it as user not found.
+			return nil, nil, nil, err
+		}
 		if err != nil {
 			return userChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
@@ -759,8 +805,13 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		if err != nil {
 			return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
-		if err := password.Verify(p.Password, s.passwordVerifier); err != nil {
-			return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
+		// A variable of its own: err is returned as is above, and the error
+		// response generator would count a wrong password as returnable there.
+		_, end := startSpan(ctx, "password.Verify")
+		verifyErr := password.Verify(p.Password, s.passwordVerifier)
+		end(&verifyErr)
+		if verifyErr != nil {
+			return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(verifyErr)
 		}
 		return passwordChallenge, attempt.SetPasswordFactor(), nil, nil
 
@@ -899,7 +950,10 @@ func (s *authAttemptService) recordProofFailure(ctx context.Context, attempt *do
 
 // BeginPasskeyEnrollment starts a management-plane enrollment ceremony on an
 // internal attempt (see the interface doc).
-func (s *authAttemptService) BeginPasskeyEnrollment(ctx context.Context, input BeginPasskeyEnrollmentInput) (*BeginPasskeyEnrollmentOutput, error) {
+func (s *authAttemptService) BeginPasskeyEnrollment(ctx context.Context, input BeginPasskeyEnrollmentInput) (_ *BeginPasskeyEnrollmentOutput, err error) {
+	ctx, end := startSpan(ctx, "AuthAttemptService.BeginPasskeyEnrollment")
+	defer end(&err)
+
 	attempt, err := s.Create(ctx, CreateAuthAttemptInput{ProjectID: input.ProjectID, Internal: true})
 	if err != nil {
 		return nil, err
@@ -946,7 +1000,10 @@ func (s *authAttemptService) BeginPasskeyEnrollment(ctx context.Context, input B
 
 // FinishPasskeyEnrollment verifies the attestation and consumes the internal
 // attempt atomically (see the interface doc).
-func (s *authAttemptService) FinishPasskeyEnrollment(ctx context.Context, input FinishPasskeyEnrollmentInput) (*FinishPasskeyEnrollmentOutput, error) {
+func (s *authAttemptService) FinishPasskeyEnrollment(ctx context.Context, input FinishPasskeyEnrollmentInput) (_ *FinishPasskeyEnrollmentOutput, err error) {
+	ctx, end := startSpan(ctx, "AuthAttemptService.FinishPasskeyEnrollment")
+	defer end(&err)
+
 	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, input.ProjectID, input.RegistrationID)
 	if err != nil {
 		return nil, err

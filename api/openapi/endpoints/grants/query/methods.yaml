@@ -1,5 +1,6 @@
 post:
   operationId: queryGrants
+  x-zitadel-cli: grants list
   summary: Query grants
   description: |
     Returns the collaboration grants of a project, paginated with a cursor.

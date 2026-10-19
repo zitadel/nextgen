@@ -10,7 +10,9 @@ pnpm add @zitadel/sdk-solid@alpha
 
 ## Requirements
 
-TypeScript ≥ 5.0 — the published type definitions re-export with `export type *`, which TypeScript introduced in 5.0.
+Peer dependencies: `solid-js >=1.6`.
+
+TypeScript ≥ 5.0, the floor shared by every SDK; see the [compatibility notes](https://github.com/zitadel/nextgen/blob/main/packages/AGENTS.md).
 
 ## Usage
 

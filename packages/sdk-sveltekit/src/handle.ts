@@ -246,18 +246,6 @@ async function handleAuth(
   } = opts;
   const { pathname } = event.url;
 
-  // Strip any client-supplied x-nextgen-auth-token from the inbound request so
-  // load functions and endpoints cannot observe an attacker-controlled value by
-  // reading the raw request headers. The canonical auth state is
-  // event.locals.nextgenAuth; consumers should call getAuth(event) instead.
-  // Request headers may be immutable on some adapters — guard the delete.
-  try {
-    event.request.headers.delete("x-nextgen-auth-token");
-  } catch {
-    // Immutable headers: nothing to strip beyond what the proxy path already
-    // drops via INTERNAL_HEADERS before forwarding upstream.
-  }
-
   const authHeader = event.request.headers.get("authorization");
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
   const cookieToken = event.cookies.get("__nextgen_session") ?? null;
@@ -407,13 +395,13 @@ export function createNextgenHandle(
   return async ({ event, resolve }) => {
     const { pathname } = event.url;
 
+    // Clients never send x-nextgen-auth-token: it is an internal channel. Refuse any
+    // request that carries it, on every route, before anything else runs.
+    if (event.request.headers.has("x-nextgen-auth-token")) {
+      return new Response("Bad Request", { status: 400 });
+    }
+
     if (matchesRoutes(pathname, ignoredRoutes)) {
-      // Neutralise any client-supplied x-nextgen-auth-token on ignored routes.
-      try {
-        event.request.headers.delete("x-nextgen-auth-token");
-      } catch {
-        // Immutable headers on this adapter — nothing to strip.
-      }
       return resolve(event);
     }
 

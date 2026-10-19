@@ -107,7 +107,7 @@ const validateOpaqueSession = cache(
  *   `cache()`.
  *
  * The header alone is never proof of anything: on routes the middleware
- * `matcher` does not cover, the middleware cannot neutralise a forged
+ * `matcher` does not cover, the middleware cannot refuse a forged
  * client-supplied header, so `auth()` re-verifies every value it reads.
  * A header value that fails verification is treated as signed out.
  *

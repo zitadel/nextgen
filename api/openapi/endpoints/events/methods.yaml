@@ -1,5 +1,6 @@
 get:
   operationId: listEvents
+  x-zitadel-cli: events list
   summary: List events
   description: |
     Returns project-scoped audit events, newest-first by keyset on

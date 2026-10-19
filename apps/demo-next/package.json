@@ -21,9 +21,6 @@
     "lint": "biome check ."
   },
   "dependencies": {
-    "@zitadel/api": "workspace:*",
-    "@zitadel/components": "workspace:*",
-    "@zitadel/design-tokens": "workspace:*",
     "@zitadel/sdk-next": "workspace:*",
     "next": "^16.3.8",
     "react": "catalog:",

@@ -1,5 +1,6 @@
 get:
   operationId: getFlowDefinition
+  x-zitadel-cli: flow-definitions get
   summary: Get a flow definition by id
   description: Get a flow definition by id
   tags:

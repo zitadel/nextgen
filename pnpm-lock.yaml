@@ -24,6 +24,9 @@ catalogs:
     '@fontsource/arimo':
       specifier: ^5.2.8
       version: 5.3.0
+    '@fumadocs/json-schema':
+      specifier: ^0.3.2
+      version: 0.3.2
     '@modelcontextprotocol/server':
       specifier: ^2.3.1
       version: 2.3.1
@@ -184,8 +187,8 @@ catalogs:
       specifier: ^15.4.7
       version: 15.4.7
     fumadocs-openapi:
-      specifier: ^12.4.1
-      version: 12.4.1
+      specifier: ^12.5.2
+      version: 12.5.2
     fumadocs-ui:
       specifier: npm:@fumadocs/base-ui@^16.17.1
       version: 16.17.1
@@ -243,6 +246,9 @@ catalogs:
     react-dom:
       specifier: ^19.2.8
       version: 19.2.8
+    remark:
+      specifier: ^15.0.1
+      version: 15.0.1
     rosie-skills:
       specifier: ^0.8.5
       version: 0.8.5
@@ -671,15 +677,6 @@ importers:
 
   apps/demo-next:
     dependencies:
-      '@zitadel/api':
-        specifier: workspace:*
-        version: link:../../packages/api
-      '@zitadel/components':
-        specifier: workspace:*
-        version: link:../../packages/components
-      '@zitadel/design-tokens':
-        specifier: workspace:*
-        version: link:../../packages/design-tokens
       '@zitadel/sdk-next':
         specifier: workspace:*
         version: link:../../packages/sdk-next
@@ -708,15 +705,6 @@ importers:
 
   apps/demo-nuxt:
     dependencies:
-      '@zitadel/api':
-        specifier: workspace:*
-        version: link:../../packages/api
-      '@zitadel/components':
-        specifier: workspace:*
-        version: link:../../packages/components
-      '@zitadel/design-tokens':
-        specifier: workspace:*
-        version: link:../../packages/design-tokens
       '@zitadel/sdk-nuxt':
         specifier: workspace:*
         version: link:../../packages/sdk-nuxt
@@ -742,6 +730,9 @@ importers:
 
   apps/docs:
     dependencies:
+      '@fumadocs/json-schema':
+        specifier: 'catalog:'
+        version: 0.3.2(@types/react@19.2.14)(json-schema-typed@8.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@modelcontextprotocol/server':
         specifier: 'catalog:'
         version: 2.3.1
@@ -762,7 +753,7 @@ importers:
         version: 15.4.7(@types/mdast@4.0.4)(@types/mdx@2.0.14)(@types/react@19.2.14)(fumadocs-core@16.17.1(@mdx-js/mdx@3.1.1)(@modelcontextprotocol/server@2.3.1)(@tanstack/react-router@1.170.44(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/estree-jsx@1.0.5)(@types/hast@3.0.5)(@types/mdast@4.0.4)(@types/react@19.2.14)(flexsearch@0.8.212)(lucide-react@1.20.0(react@19.2.8))(next@16.4.1(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(@types/node@24.19.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.104.1))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(zod@4.4.3))(next@16.4.1(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(@types/node@24.19.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.104.1))(react@19.2.8)(rolldown@1.2.12)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))
       fumadocs-openapi:
         specifier: 'catalog:'
-        version: 12.4.1(91a00250cfc541f3c9572e7689623e39)
+        version: 12.5.2(91a00250cfc541f3c9572e7689623e39)
       fumadocs-ui:
         specifier: 'catalog:'
         version: '@fumadocs/base-ui@16.17.1(@types/mdx@2.0.14)(@types/react@19.2.14)(fumadocs-core@16.17.1(@mdx-js/mdx@3.1.1)(@modelcontextprotocol/server@2.3.1)(@tanstack/react-router@1.170.44(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/estree-jsx@1.0.5)(@types/hast@3.0.5)(@types/mdast@4.0.4)(@types/react@19.2.14)(flexsearch@0.8.212)(lucide-react@1.20.0(react@19.2.8))(next@16.4.1(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(@types/node@24.19.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.104.1))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(zod@4.4.3))(next@16.4.1(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(@types/node@24.19.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.104.1))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(tailwindcss@4.2.4)(takumi-js@1.8.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8))'
@@ -778,6 +769,9 @@ importers:
       react-dom:
         specifier: 'catalog:'
         version: 19.2.8(react@19.2.8)
+      remark:
+        specifier: 'catalog:'
+        version: 15.0.1
       shiki:
         specifier: 'catalog:'
         version: 4.2.0
@@ -806,6 +800,9 @@ importers:
       '@types/react-dom':
         specifier: 'catalog:'
         version: 19.2.3(@types/react@19.2.14)
+      '@zitadel/api':
+        specifier: workspace:*
+        version: link:../../packages/api
       tailwindcss:
         specifier: 'catalog:'
         version: 4.2.4
@@ -3197,8 +3194,8 @@ packages:
       takumi-js:
         optional: true
 
-  '@fumadocs/json-schema@0.3.0':
-    resolution: {integrity: sha512-EWQKJs5WPotQg4mLb8TcYX8IKyVsCeODlmLlBdOvPTCsXvkYXFtDdnfDMIFuyCa95rp1fPoGpK9Vicjh0xHZ1A==}
+  '@fumadocs/json-schema@0.3.2':
+    resolution: {integrity: sha512-Oe+uL6chwGybh56dVLAugaHGYBDRfa0auYBUB9u0b5NIpm7C5gmgqnKi6THHjBrhwJSzbM5XRcw++Ah+rX3naA==}
     peerDependencies:
       json-schema-typed: '*'
       react: ^19.2.0
@@ -3227,8 +3224,8 @@ packages:
       json-schema-typed:
         optional: true
 
-  '@fumari/stf@1.1.1':
-    resolution: {integrity: sha512-W0ISkQFwwX438CYlBxAe3OdCdPRSlHWVNizB1q4ICzrQKR9AYhGZuvKYo+HukSpgaMCUt++cM7VEa4VtSA8rhg==}
+  '@fumari/stf@1.1.2':
+    resolution: {integrity: sha512-8PuvETmnMRJjof6BJLFNJBKq9at6Ar1oJWRkedSJ0K/GJ73QPHVSZqTkgXh3hb6uXkQhbbWkv+5WD0Fh50YUGA==}
     peerDependencies:
       '@types/react': ^19.2.14
       react: ^19.2.0
@@ -10518,8 +10515,8 @@ packages:
       vite:
         optional: true
 
-  fumadocs-openapi@12.4.1:
-    resolution: {integrity: sha512-fFDvQkWem2kp4Tr0w2ynOPZ2A75jBKmPD+34mox7HAFKzOzEMZ99i1goHrOOxKJuDKvv/WptF1Np/C+vtOohqg==}
+  fumadocs-openapi@12.5.2:
+    resolution: {integrity: sha512-Dg0OOBGEcL6eCMAG9+wK9agUbCD86ABeZBMBZIVRkVzLYQ3lYuNvIkAbJ2y51k13C4rlvibQ7SaCMMz3zxaiQg==}
     peerDependencies:
       '@scalar/api-client-react': ^2.0.20
       '@types/react': ^19.2.14
@@ -17192,7 +17189,7 @@ snapshots:
       - supports-color
       - tailwindcss
 
-  '@fumadocs/json-schema@0.3.0(@types/react@19.2.14)(json-schema-typed@8.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+  '@fumadocs/json-schema@0.3.2(@types/react@19.2.14)(json-schema-typed@8.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
       '@fuma-translate/react': 1.0.2(@types/react@19.2.14)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@scalar/json-magic': 0.15.7
@@ -17213,7 +17210,7 @@ snapshots:
     optionalDependencies:
       json-schema-typed: 8.0.2
 
-  '@fumari/stf@1.1.1(@types/react@19.2.14)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+  '@fumari/stf@1.1.2(@types/react@19.2.14)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
@@ -25232,13 +25229,13 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  fumadocs-openapi@12.4.1(91a00250cfc541f3c9572e7689623e39):
+  fumadocs-openapi@12.5.2(91a00250cfc541f3c9572e7689623e39):
     dependencies:
       '@base-ui/react': 1.9.0(@types/react@19.2.14)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@fuma-translate/react': 1.0.2(@types/react@19.2.14)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@fumadocs/json-schema': 0.3.0(@types/react@19.2.14)(json-schema-typed@8.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@fumadocs/json-schema': 0.3.2(@types/react@19.2.14)(json-schema-typed@8.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@fumari/json-schema-ts': 1.0.2(json-schema-typed@8.0.2)
-      '@fumari/stf': 1.1.1(@types/react@19.2.14)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@fumari/stf': 1.1.2(@types/react@19.2.14)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@scalar/json-magic': 0.15.7
       '@scalar/openapi-upgrader': 0.4.4
       chokidar: 5.0.0
@@ -25254,6 +25251,7 @@ snapshots:
       remark: 15.0.1
       remark-rehype: 11.1.2
       shiki: 4.5.0
+      undici: 7.29.1
       yaml: 2.9.1
     optionalDependencies:
       '@scalar/api-client-react': 2.0.26(change-case@5.4.4)(react@19.2.8)(tailwindcss@4.2.4)(typescript@6.0.3)
