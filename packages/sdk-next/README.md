@@ -16,6 +16,8 @@ on self-hosted deployments would let any request past `protectedRoutes`.
 
 Peer dependencies: `next >=15.2.3`, `react >=18` and `react-dom >=18`.
 
+TypeScript ≥ 5.0, the floor shared by every SDK; see the [compatibility notes](https://github.com/zitadel/nextgen/blob/main/packages/AGENTS.md).
+
 ## Entry points
 
 | Import                         | Runs in                          | Provides                                         |

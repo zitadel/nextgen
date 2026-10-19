@@ -12,6 +12,8 @@ pnpm add @zitadel/sdk-solid-start@alpha
 
 Peer dependencies: `@solidjs/start ^2.0.0` and `solid-js ^1.8.0`.
 
+TypeScript ≥ 5.0, the floor shared by every SDK; see the [compatibility notes](https://github.com/zitadel/nextgen/blob/main/packages/AGENTS.md).
+
 ## Setup
 
 ### 1. Middleware

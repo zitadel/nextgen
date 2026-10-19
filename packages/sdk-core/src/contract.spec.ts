@@ -335,6 +335,32 @@ describe("SDK READMEs ↔ opening structure", () => {
     expect(readmeDirs).toHaveLength(12);
   });
 
+  // The TypeScript floor is stated once, in packages/AGENTS.md; every README links it
+  // instead of restating the reason, so six copies cannot drift.
+  it.each(readmeDirs)(
+    "%s README lists its peer dependencies as the manifest declares them",
+    (dir) => {
+      const readme = readFileSync(`${packagesDir}${dir}/README.md`, "utf8");
+      const requirements = readme.slice(readme.indexOf("## Requirements"));
+      const peers = JSON.parse(readFileSync(`${packagesDir}${dir}/package.json`, "utf8")) as {
+        peerDependencies?: Record<string, string>;
+      };
+      expect(requirements).toContain("Peer dependencies:");
+      for (const name of Object.keys(peers.peerDependencies ?? {})) {
+        expect(requirements, `${dir} README does not mention ${name}`).toContain(name);
+      }
+    },
+  );
+
+  it.each(readmeDirs)("%s README links the shared TypeScript floor", (dir) => {
+    const readme = readFileSync(`${packagesDir}${dir}/README.md`, "utf8");
+    const requirements = readme.slice(readme.indexOf("## Requirements"));
+    expect(requirements).toContain(
+      "TypeScript ≥ 5.0, the floor shared by every SDK; see the [compatibility notes](https://github.com/zitadel/nextgen/blob/main/packages/AGENTS.md).",
+    );
+    expect(readme).not.toContain("export type *");
+  });
+
   it.each(readmeDirs)("%s README opens with its title, Installation and Requirements", (dir) => {
     const { title, sections } = headings(dir);
     expect(title[0]).toBe(`@zitadel/${dir}`);

@@ -16,6 +16,8 @@ for hand-rolled setups.
 
 Peer dependencies: `nuxt >=4` and `h3 >=1`.
 
+TypeScript ≥ 5.0, the floor shared by every SDK; see the [compatibility notes](https://github.com/zitadel/nextgen/blob/main/packages/AGENTS.md).
+
 ## Surface 1 — the Nuxt module (recommended, CLI-scaffolded)
 
 Register the module under the `nextgen` config key:

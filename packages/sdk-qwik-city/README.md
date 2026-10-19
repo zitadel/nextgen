@@ -23,6 +23,8 @@ both sections.
 
 Peer dependencies: `@qwik.dev/core` and `@qwik.dev/router`, both `^2.0.0-beta.45`.
 
+TypeScript ≥ 5.0, the floor shared by every SDK; see the [compatibility notes](https://github.com/zitadel/nextgen/blob/main/packages/AGENTS.md).
+
 ## Setup
 
 ### 1. Request handler
