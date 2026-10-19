@@ -101,10 +101,11 @@ async function arrivalOf(received: readonly unknown[]): Promise<void> {
 }
 
 /**
- * Makes the first `zitadel-signout` / `zitadel-session-error` listener added to
- * a `<tag>` a no-op, as on a page Qwik resumed from server-rendered markup: the
- * `ref` callback that registers the first one does not run there, so only the
- * `document-ready` task registers listeners. Returns the restore function.
+ * Makes the first `zitadel-session-error` listener added to a `<tag>` a no-op,
+ * as on a page Qwik resumed from server-rendered markup: the `ref` callback that
+ * registers it does not run there, so only the `document-ready` task registers
+ * listeners. (`zitadel-signout` is registered by the task alone.) Returns the
+ * restore function.
  */
 function dropRefCallbackListeners(tag: string): () => void {
   const original = EventTarget.prototype.addEventListener;
@@ -115,9 +116,7 @@ function dropRefCallbackListeners(tag: string): () => void {
     ...rest: [EventListenerOrEventListenerObject | null, (boolean | AddEventListenerOptions)?]
   ): void {
     const watched =
-      this instanceof Element &&
-      this.localName === tag &&
-      (type === "zitadel-signout" || type === "zitadel-session-error");
+      this instanceof Element && this.localName === tag && type === "zitadel-session-error";
     const key = `${tag}:${type}`;
     if (watched && !seen.has(key)) {
       seen.add(key);

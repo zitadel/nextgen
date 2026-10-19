@@ -25,6 +25,8 @@ import {
   type ZitadelProject,
 } from "@zitadel/api/config";
 
+import { isServer } from "@qwik.dev/core/build";
+
 import { listenWithReplay, WRAPPER_MARKER } from "./early-events";
 
 export { configureZitadel, getApi, getZitadelConfig };
@@ -200,6 +202,11 @@ function forwardSessionError(
   el: Element,
   props: { onSessionError$?: QRL<(detail: never) => void> },
 ): () => void {
+  if (isServer) {
+    // Server rendering calls `ref` with a stand-in that has no event API, and
+    // nothing can emit there; the browser registers the listener.
+    return () => undefined;
+  }
   sessionForwarders.get(el)?.();
   const onSessionError = (event: Event): void =>
     void props.onSessionError$?.(eventDetail<never>(event));
