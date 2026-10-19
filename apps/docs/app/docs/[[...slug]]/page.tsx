@@ -13,7 +13,7 @@ import { notFound } from "next/navigation";
 import { OpenAPIPage } from "@/components/api-page";
 import { getMDXComponents } from "@/components/mdx";
 import { getPageImageUrl, getPageMarkdownUrl, gitConfig } from "@/lib/shared";
-import { source } from "@/lib/source";
+import { openapiPageProps, source } from "@/lib/source";
 
 export default async function Page(props: PageProps<"/docs/[[...slug]]">) {
   const params = await props.params;
@@ -50,7 +50,7 @@ export default async function Page(props: PageProps<"/docs/[[...slug]]">) {
       <DocsPage full>
         {header}
         <DocsBody>
-          <OpenAPIPage {...page.data.getOpenAPIPageProps()} />
+          <OpenAPIPage {...openapiPageProps(page)} />
         </DocsBody>
       </DocsPage>
     );

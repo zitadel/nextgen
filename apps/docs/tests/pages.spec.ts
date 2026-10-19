@@ -185,6 +185,24 @@ test("every API operation shows its call through @zitadel/api and its CLI comman
   expect(failures(results), "operations without their @zitadel/api call").toEqual([]);
 });
 
+test("an API page carries its own part of the OpenAPI document, not all of it", async ({
+  request,
+}) => {
+  test.setTimeout(120_000);
+  const pages = (await indexedPages(request)).filter((page) => operationPage.test(page.url));
+
+  // Fumadocs hands each page the whole document, which put every operation
+  // and schema of the API, about 900 KB of HTML, on every one of them;
+  // lib/source.ts passes the page its operations and what they reference, and
+  // the largest page is now about 300 KB.
+  const budget = 500_000;
+  const results = await mapLimit(pages, concurrency, async ({ url }) => {
+    const { length } = await (await request.get(url)).body();
+    return length > budget ? `${url}: ${length} bytes` : null;
+  });
+  expect(failures(results), `API pages over ${budget} bytes`).toEqual([]);
+});
+
 test("a page that does not exist is a 404, as HTML and as Markdown", async ({ request }) => {
   expect((await request.get("/docs/no-such-page")).status()).toBe(404);
   expect((await request.get("/docs/no-such-page.md")).status()).toBe(404);

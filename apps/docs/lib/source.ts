@@ -68,6 +68,38 @@ ${page.type === "openapi" ? operationText(page) : await page.data.getText("proce
 
 type OpenAPIPage = Extract<(typeof source)["$inferPage"], { type: "openapi" }>;
 
+// The props of an operation's or a webhook's page, a client component.
+// Fumadocs hands each page the whole document, so every page carried every
+// operation and schema of the API, about 720 KB. The page gets the part it
+// renders: its operations or webhooks, every component they reference, and the
+// security schemes, which an operation names rather than references.
+export function openapiPageProps(page: OpenAPIPage) {
+  const props = page.data.getOpenAPIPageProps();
+  const { operations = [], webhooks = [], payload } = props;
+  const {
+    paths,
+    webhooks: hooks,
+    components,
+  } = openapiFragment(payload.bundled, operations, webhooks);
+  const { paths: _paths, webhooks: _webhooks, components: all, ...document } = payload.bundled;
+
+  return {
+    ...props,
+    payload: {
+      ...payload,
+      bundled: {
+        ...document,
+        ...(paths && { paths }),
+        ...(hooks && { webhooks: hooks }),
+        components: {
+          ...components,
+          ...(all?.securitySchemes && { securitySchemes: all.securitySchemes }),
+        },
+      } as OpenAPIV3_2.Document,
+    },
+  };
+}
+
 // An operation or webhook page has no Markdown of its own. Its text is its
 // endpoints, an operation's call through @zitadel/api and its CLI command,
 // which the page shows too, and the part of the OpenAPI document they need,
