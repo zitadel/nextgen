@@ -77,6 +77,9 @@ export class DiscoveryReachableCheck extends Check<IdpContext> {
 const ENDPOINT =
   /^(https:\/\/[^\s/?#]+|http:\/\/(localhost|127\.0\.0\.1)(:[0-9]+)?)([/?][^\s#]*)?$/;
 
+/** What the server accepts as an issuer: an endpoint without a query or fragment. */
+const ISSUER = /^(https:\/\/[^\s/?#]+|http:\/\/(localhost|127\.0\.0\.1)(:[0-9]+)?)(\/[^\s?#]*)?$/;
+
 /** The endpoints the runtime needs from the document that are missing or not usable. */
 function unusableEndpoints(document: Discovery, context: IdpContext): readonly string[] {
   const needed: ReadonlyArray<readonly [string, string | undefined]> = [
@@ -102,7 +105,7 @@ export class IssuerCheck extends DiscoveryCheck {
   readonly title = "Issuer";
 
   protected inspect(context: IdpContext, document: Discovery): Outcome {
-    if (!ENDPOINT.test(context.issuer)) {
+    if (!ISSUER.test(context.issuer)) {
       // The server refuses an issuer that is not https (or http on localhost), whether or not
       // the endpoints come from the connection.
       return {

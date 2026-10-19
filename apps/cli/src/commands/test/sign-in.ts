@@ -16,7 +16,7 @@ import {
   runChecks,
   type Send,
 } from "../../lib/checks/idp";
-import { ZitadelError } from "../../lib/errors";
+import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { type ConnectionFile, callbackUriFor, readConnectionFiles } from "../../lib/idp";
 import { isObject } from "../../lib/json";
 import { wrapForBox } from "../../lib/box";
@@ -188,6 +188,30 @@ export default class TestSignIn extends BaseCommand {
     // connection is still Google; the slug stays for the callback URI and the report.
     const kind = typeof connection.body.template === "string" ? connection.body.template : slug;
     const catalogId = IDP_PROVIDERS.find((id) => id === kind);
+    const clientId = await this.clientId(cwd, oidc.client_id).then(
+      (value) => ({ value }),
+      (error: unknown) => ({ error: toZitadelError(error) }),
+    );
+    if ("error" in clientId) {
+      // Only this connection is broken: say so as its result and go on to the others.
+      const unresolved: CheckResult = {
+        name: "client-id",
+        title: "Client ID",
+        status: "fail",
+        message: clientId.error.message,
+        ...(clientId.error.hint === undefined ? {} : { recovery: clientId.error.hint }),
+      };
+      report(unresolved);
+      return {
+        provider: slug,
+        callback_uri: callbackUri,
+        passed: 0,
+        warned: 0,
+        failed: 1,
+        skipped: 0,
+        checks: [unresolved],
+      };
+    }
     const results = await runChecks(
       IDP_CHECKS,
       idpContext({
@@ -196,7 +220,7 @@ export default class TestSignIn extends BaseCommand {
         missingEndpoints: missingEndpoints(oidc),
         configuredEndpoints: configuredEndpoints(oidc),
         issuer: typeof oidc.issuer === "string" ? oidc.issuer : "",
-        clientId: await this.clientId(cwd, oidc.client_id),
+        clientId: clientId.value,
         scopes: stringList(oidc.scopes),
         claims: [
           ...stringsIn(connection.body.claim_mapping),
@@ -261,7 +285,7 @@ export default class TestSignIn extends BaseCommand {
       project_id: secret.project_id,
       kind: "primary",
     });
-    if (typeof primary !== "string") {
+    if (typeof primary !== "string" || primary === "") {
       throw new ZitadelError("E_NOT_FOUND", `Variable ${name} has no value`, {
         hint: `Publish it with: zitadel variables set ${name} --project-level`,
       });
