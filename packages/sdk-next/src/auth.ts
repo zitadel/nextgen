@@ -179,8 +179,11 @@ export async function auth(options: AuthOptions = {}): Promise<AuthResult> {
     return { isAuthenticated: false, session: null };
   }
 
+  // A refused session, an anonymous one and one of another project read as
+  // signed out here. So does a check without a verdict, which
+  // `checkOpaqueSessionToken` logs with its cause.
   const check = await checkOpaqueSession(token, url, opaqueTokenTimeoutMs, projectId);
-  if (check.state === "live" && check.session.userId) {
+  if (check.verdict === "live" && check.session.userId) {
     return {
       isAuthenticated: true,
       session: {
@@ -191,18 +194,6 @@ export async function auth(options: AuthOptions = {}): Promise<AuthResult> {
         token,
       },
     };
-  }
-  // A dead session, an anonymous one and one of another project are the
-  // backend's definitive "not signed in here". No verdict is worth a warning.
-  if (check.state === "unknown") {
-    console.warn(
-      check.status === null
-        ? `[nextgen] auth(): could not reach ${url}/sessions/me to validate the ` +
-            `session token — treating as signed out.`
-        : `[nextgen] auth(): session validation failed with HTTP ${check.status} from ` +
-            `${url}/sessions/me — treating as signed out. If this persists, the ` +
-            `backend URL is likely misconfigured (ZITADEL_URL or the \`url\` option).`,
-    );
   }
   return { isAuthenticated: false, session: null };
 }

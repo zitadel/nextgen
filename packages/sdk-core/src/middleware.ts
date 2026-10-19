@@ -80,6 +80,49 @@ export function matchesRoutes(pathname: string, routes: readonly string[]): bool
   });
 }
 
+// ─── Login redirect ──────────────────────────────────────────────────────────
+
+/**
+ * The query parameter that brings a signed-out request's path to the login
+ * page, where `<zitadel-login>` returns after sign-in.
+ */
+const RETURN_PATH_PARAM = "next";
+
+/**
+ * Where a signed-out request for a protected route is sent: `loginPath`, with
+ * the requested path and query string in `next`, so `<zitadel-login>` returns
+ * to the page as it was asked for, filters and tabs included. The fragment
+ * never reaches the server, so it cannot be carried.
+ *
+ * A `next` the request carries itself is left out, so a redirect never nests
+ * an earlier one: should the login page be protected by mistake, each pass of
+ * the redirect loop would otherwise wrap the last and grow the URL. The rest
+ * of the query keeps the encoding it was sent with.
+ *
+ * Whatever query `loginPath` has of its own is kept, except a `next`, which
+ * this replaces.
+ *
+ * @param loginPath  - The login page, a path starting with a single `/`.
+ * @param requestUrl - The full URL of the signed-out request.
+ * @returns The URL to redirect to, on the request's origin.
+ */
+export function loginRedirectUrl(loginPath: string, requestUrl: string | URL): URL {
+  // A copy made from the whole URL, never the caller's `search`: SvelteKit
+  // makes `search` throw on the request event's URL while it prerenders.
+  const requested = new URL(requestUrl);
+  const query = requested.search
+    .slice(1)
+    .split("&")
+    .filter((pair) => !new URLSearchParams(pair).has(RETURN_PATH_PARAM))
+    .join("&");
+  const loginUrl = new URL(loginPath, requested);
+  loginUrl.searchParams.set(
+    RETURN_PATH_PARAM,
+    query === "" ? requested.pathname : `${requested.pathname}?${query}`,
+  );
+  return loginUrl;
+}
+
 // ─── Proxy credentials ───────────────────────────────────────────────────────
 
 /**
@@ -284,6 +327,11 @@ export type NextgenMiddlewareOptions = {
    * Pathnames that require a valid session. Requests to these routes without
    * a valid token are redirected to {@link loginPath}.
    * Entries ending with `*` match any sub-path (e.g. `"/admin*"`).
+   *
+   * When the backend cannot say whether a session cookie is live (it answers
+   * `5xx`, does not answer in time, or cannot be reached), the route answers
+   * `503 Service Unavailable` instead: the user may well be signed in, and the
+   * login page would tell them they are not.
    * @default []
    */
   protectedRoutes?: string[];
@@ -300,7 +348,8 @@ export type NextgenMiddlewareOptions = {
 
   /**
    * Pathname to redirect unauthenticated users to.
-   * A `next` query parameter is appended with the originally requested path.
+   * A `next` query parameter carries the requested path and query string,
+   * where `<zitadel-login>` returns after sign-in.
    * @default "/login"
    */
   loginPath?: string;
@@ -357,8 +406,10 @@ export type NextgenMiddlewareOptions = {
 
   /**
    * Timeout in milliseconds for opaque (non-JWT) session token validation
-   * via the backend's `GET /sessions/me` endpoint. Tokens that cannot be
-   * validated within this window are treated as invalid.
+   * via the backend's `GET /sessions/me` endpoint. A token the backend does
+   * not answer for within this window is not refused: the request counts as
+   * signed out, its session cookie is kept, and a protected route answers
+   * `503` (see {@link protectedRoutes}).
    * @default 5000
    */
   opaqueTokenTimeoutMs?: number;
@@ -391,32 +442,39 @@ export interface OpaqueSession {
  */
 export const SESSION_PROJECT_MISMATCH = "sess.project_mismatch";
 
+/** The code the backend answers `GET /sessions/me` with when the session is gone. */
+const SESSION_NOT_FOUND = "sess.not_found";
+
 /** A live session that names no user of this app's project. */
 function noUser(): OpaqueSession {
   return { userId: null, identifier: null, identifierProperty: null, display: null };
 }
 
 /**
- * What the backend answers about an opaque session token:
+ * The backend's verdict on an opaque session token, from
+ * {@link checkOpaqueSessionToken}.
  *
- * - `live`: it holds a live session for the token. `session.userId` is `null`
- *   when the session names no user of this app's project (an anonymous
- *   session, or a session of another project), so it signs no one in here.
- * - `dead`: it holds no live session for the token (`401` or `404`), so a
- *   cookie carrying the token can go.
- * - `unknown`: there is no verdict: a timeout, a network error, a `5xx` or any
- *   other answer, or an unreadable body. The session may well be live, so a
- *   cookie carrying it stays. `status` is the answer's HTTP status, or `null`
- *   when there was no usable answer.
+ * - `live`: the backend holds a live session for the token. Its `userId` is
+ *   `null` when the session names no user of this app's project: an anonymous
+ *   session, or a session of another project (see {@link OpaqueSession}).
+ * - `refused`: the backend judged the token and refused it (`401`), or found
+ *   the session it names gone (`404` with the `sess.not_found` code). Only
+ *   this verdict makes the cookie dead.
+ * - `undecided`: the backend gave no verdict: a `5xx` or any other answer, no
+ *   answer in time, a network error, or a body that cannot be read. The
+ *   backend answers `500`, never `401`, when it cannot decide (its token or
+ *   key store failed), so that an outage does not sign its users out. The
+ *   request counts as signed out, but the cookie is kept.
  */
 export type OpaqueSessionCheck =
-  | { readonly state: "live"; readonly session: OpaqueSession }
-  | { readonly state: "dead" }
-  | { readonly state: "unknown"; readonly status: number | null };
+  | { readonly verdict: "live"; readonly session: OpaqueSession }
+  | { readonly verdict: "refused" }
+  | { readonly verdict: "undecided" };
 
 /**
  * Asks the backend (`GET {issuerUrl}/sessions/me?project_id={projectId}`)
- * whether an opaque session token names a live session of this app's project.
+ * whether an opaque session token names a live session of this app's project,
+ * telling a refusal apart from no verdict.
  *
  * A live session of another project comes back with no user, like an
  * anonymous one: it signs no one in here, and its cookie is not dead. The
@@ -424,15 +482,21 @@ export type OpaqueSessionCheck =
  * project its answer names is checked as well, because a backend that predates
  * the parameter answers for any project.
  *
- * Only a `401` or a `404` is a dead session. The server answers `500`, not
- * `401`, when it cannot judge a token, so an outage never reads as a sign-out.
+ * A `404` is a refusal only with the `sess.not_found` code. Without it, the
+ * answer came from something in front of the backend (a proxy, a `url` with
+ * the wrong path), which judged nothing.
+ *
+ * When there is no verdict, it logs why: the request it was asked for then
+ * renders signed out, or answers `503` on a protected route, and nothing else
+ * would say what went wrong.
  *
  * @param token     - The opaque session token from the `__nextgen_session` cookie.
  * @param issuerUrl - Base URL of the auth backend.
  * @param timeoutMs - How long to wait for the backend before giving up.
  * @param projectId - The project this app signs its users in to. Without one,
- *   no session can be shown to belong here: the answer is a live session that
+ *   no session can be shown to belong here: the verdict is a live session that
  *   names no user, and the backend is not asked.
+ * @returns The backend's {@link OpaqueSessionCheck | verdict}.
  */
 export async function checkOpaqueSessionToken(
   token: string,
@@ -441,46 +505,51 @@ export async function checkOpaqueSessionToken(
   projectId: string,
 ): Promise<OpaqueSessionCheck> {
   if (!projectId) {
-    return { state: "live", session: noUser() };
+    return { verdict: "live", session: noUser() };
   }
-  let res: Response;
+  const endpoint = `${issuerUrl}/sessions/me`;
   try {
-    res = await fetch(`${issuerUrl}/sessions/me?project_id=${encodeURIComponent(projectId)}`, {
+    const res = await fetch(`${endpoint}?project_id=${encodeURIComponent(projectId)}`, {
       method: "GET",
       headers: { cookie: `__nextgen_session=${token}` },
       signal: AbortSignal.timeout(timeoutMs),
     });
-  } catch {
-    return { state: "unknown", status: null };
+    if (res.status === 401) {
+      return { verdict: "refused" };
+    }
+    if (res.status === 404 && (await errorCode(res)) === SESSION_NOT_FOUND) {
+      return { verdict: "refused" };
+    }
+    if (res.status === 403 && (await errorCode(res)) === SESSION_PROJECT_MISMATCH) {
+      return { verdict: "live", session: noUser() };
+    }
+    if (!res.ok) {
+      return undecided(endpoint, `HTTP ${res.status}`);
+    }
+    return { verdict: "live", session: sessionInProject(await res.json(), projectId) };
+  } catch (err) {
+    return undecided(endpoint, failureCause(err, timeoutMs));
   }
-  if (res.status === 401 || res.status === 404) {
-    return { state: "dead" };
-  }
-  if (res.status === 403 && (await errorCode(res)) === SESSION_PROJECT_MISMATCH) {
-    return { state: "live", session: noUser() };
-  }
-  if (!res.ok) {
-    return { state: "unknown", status: res.status };
-  }
-  let body: unknown;
-  try {
-    body = await res.json();
-  } catch {
-    return { state: "unknown", status: null };
-  }
-  return { state: "live", session: sessionInProject(body, projectId) };
 }
 
 /**
- * Validates an opaque session token: {@link checkOpaqueSessionToken}, reduced
- * to the live session (with a `null` `userId` when it names no user of this
- * project) or `null` when the backend confirmed no live session, because the
- * session is dead or because there was no verdict.
+ * Validates an opaque session token by asking the backend
+ * (`GET {issuerUrl}/sessions/me?project_id={projectId}`) whether the session is
+ * live in this app's project.
+ *
+ * `null` folds a refusal and no verdict together, so it says whether the
+ * request is signed in, not whether the cookie is dead: clearing the cookie on
+ * `null` signs users out whenever the backend fails. To decide that, use
+ * {@link checkOpaqueSessionToken}.
  *
  * @param token     - The opaque session token from the `__nextgen_session` cookie.
  * @param issuerUrl - Base URL of the auth backend.
  * @param timeoutMs - How long to wait for the backend before giving up.
- * @param projectId - The project this app signs its users in to.
+ * @param projectId - The project this app signs its users in to; see
+ *   {@link checkOpaqueSessionToken}.
+ * @returns The live session — with a `null` `userId` when it names no user of
+ *   this project — or `null` when the backend did not confirm one: it refused
+ *   the token, or gave no verdict.
  */
 export async function validateOpaqueSessionToken(
   token: string,
@@ -489,7 +558,7 @@ export async function validateOpaqueSessionToken(
   projectId: string,
 ): Promise<OpaqueSession | null> {
   const check = await checkOpaqueSessionToken(token, issuerUrl, timeoutMs, projectId);
-  return check.state === "live" ? check.session : null;
+  return check.verdict === "live" ? check.session : null;
 }
 
 /**
@@ -523,6 +592,25 @@ async function errorCode(res: Response): Promise<string | undefined> {
   } catch {
     return undefined;
   }
+}
+
+/** Why a session check failed, for the log. */
+function failureCause(err: unknown, timeoutMs: number): string {
+  if ((err as { name?: unknown } | null)?.name === "TimeoutError") {
+    return `no answer within ${timeoutMs} ms`;
+  }
+  // A failed fetch says only "fetch failed"; what failed is in its cause.
+  const cause = (err as { cause?: unknown } | null)?.cause;
+  return cause instanceof Error ? `${String(err)}: ${cause.message}` : String(err);
+}
+
+/** Logs why the backend gave no verdict on a session cookie, and returns that. */
+function undecided(endpoint: string, cause: string): OpaqueSessionCheck {
+  console.warn(
+    `[nextgen] Could not check the session cookie against ${endpoint} (${cause}). ` +
+      "That is not a refusal: the request counts as signed out, and the cookie is kept.",
+  );
+  return { verdict: "undecided" };
 }
 
 /**
@@ -566,13 +654,20 @@ export interface ResolvedSession {
   /**
    * Whether the response should clear the request's `__nextgen*` cookies so
    * the browser stops sending a dead session. Only the session cookie's own
-   * verdict decides. It is dead when the backend answered that its session is
-   * gone, or when it is a JWT that fails verification or names no user of this
-   * project. It stays when its session is live (signed in, anonymous, or
-   * another project's), when the backend gave no verdict, and when a Bearer
-   * token signed the request in and the cookie was never judged.
+   * verdict decides. It is dead when the backend refused it (see
+   * {@link OpaqueSessionCheck}), or when it is a JWT that fails verification
+   * or names no user of this project. It stays when its session is live
+   * (signed in, anonymous, or another project's), when the backend gave no
+   * verdict, and when a Bearer token signed the request in and the cookie was
+   * never judged.
    */
   readonly clearCookies: boolean;
+  /**
+   * Whether the backend gave no verdict on the session cookie. The request
+   * counts as signed out, but its user may well be signed in, so a protected
+   * route answers `503` rather than send them to sign in.
+   */
+  readonly undecided: boolean;
 }
 
 function signedOut(): UnauthState {
@@ -615,11 +710,11 @@ async function judgeJwt(
       })
     : null;
   if (!payload) {
-    return { auth: signedOut(), clearCookies: true };
+    return { auth: signedOut(), clearCookies: true, undecided: false };
   }
   const namesProject = jwtNamesProject(payload, projectId);
   if (!payload.sub || !namesProject) {
-    return { auth: signedOut(), clearCookies: namesProject };
+    return { auth: signedOut(), clearCookies: namesProject, undecided: false };
   }
   return {
     auth: {
@@ -633,6 +728,7 @@ async function judgeJwt(
       },
     },
     clearCookies: false,
+    undecided: false,
   };
 }
 
@@ -650,6 +746,8 @@ async function judgeJwt(
  *   ({@link checkOpaqueSessionToken}) and signs its user in when the session is
  *   live in this project.
  * - Only a cookie judged dead is cleared; see {@link ResolvedSession.clearCookies}.
+ *   A cookie the backend gave no verdict on stays, and the request is
+ *   {@link ResolvedSession.undecided | undecided}.
  * - Without a project nothing signs in, and no cookie is cleared.
  */
 export async function resolveSession(
@@ -659,26 +757,26 @@ export async function resolveSession(
   const { url, projectId, opaqueTokenTimeoutMs } = options;
   if (!projectId) {
     warnMissingProject();
-    return { auth: signedOut(), clearCookies: false };
+    return { auth: signedOut(), clearCookies: false, undecided: false };
   }
 
   if (tokens.bearer !== null) {
     const bearer = await judgeJwt(tokens.bearer, projectId, options);
     if (bearer.auth.isAuthenticated) {
-      return { auth: bearer.auth, clearCookies: false };
+      return { auth: bearer.auth, clearCookies: false, undecided: false };
     }
   }
 
   const cookie = tokens.cookie;
   if (cookie === null) {
-    return { auth: signedOut(), clearCookies: false };
+    return { auth: signedOut(), clearCookies: false, undecided: false };
   }
   if (isJwtShaped(cookie)) {
     return judgeJwt(cookie, projectId, options);
   }
 
   const check = await checkOpaqueSessionToken(cookie, url, opaqueTokenTimeoutMs, projectId);
-  if (check.state === "live" && check.session.userId) {
+  if (check.verdict === "live" && check.session.userId) {
     return {
       auth: {
         isAuthenticated: true,
@@ -691,7 +789,12 @@ export async function resolveSession(
         },
       },
       clearCookies: false,
+      undecided: false,
     };
   }
-  return { auth: signedOut(), clearCookies: check.state === "dead" };
+  return {
+    auth: signedOut(),
+    clearCookies: check.verdict === "refused",
+    undecided: check.verdict === "undecided",
+  };
 }

@@ -42,13 +42,16 @@ async function install(
     nextgen?: Record<string, unknown>;
     publicRuntimeConfig?: Record<string, unknown>;
     envLocal?: string;
+    dev?: boolean;
   } = {},
 ): Promise<ModuleRuntimeConfig> {
   if (app.envLocal !== undefined) {
     writeFileSync(join(rootDir, ".env.local"), app.envLocal);
   }
   const runtimeConfig = { public: { ...app.publicRuntimeConfig } };
-  const nuxt = { options: { rootDir, nextgen: app.nextgen ?? {}, runtimeConfig } };
+  const nuxt = {
+    options: { rootDir, dev: app.dev ?? false, nextgen: app.nextgen ?? {}, runtimeConfig },
+  };
   await nextgenModule({}, nuxt as unknown as Nuxt);
   return runtimeConfig as unknown as ModuleRuntimeConfig;
 }
@@ -91,7 +94,9 @@ describe("@zitadel/sdk-nuxt module", () => {
   // app's own list alone.
   it("adds no build.transpile entries of its own", async () => {
     const build = { transpile: ["my-lib"] };
-    const nuxt = { options: { rootDir, nextgen: {}, runtimeConfig: { public: {} }, build } };
+    const nuxt = {
+      options: { rootDir, dev: false, nextgen: {}, runtimeConfig: { public: {} }, build },
+    };
 
     await nextgenModule({}, nuxt as unknown as Nuxt);
 
@@ -127,24 +132,16 @@ describe("@zitadel/sdk-nuxt module", () => {
   it("defaults to the local server and the /__nextgen prefix", async () => {
     const runtime = await install();
 
-    expect(runtime.nextgen.url).toBe("http://localhost:8080");
+    expect(runtime.nextgen.url).toBe("");
     expect(runtime.nextgen.proxyPath).toBe("/__nextgen");
-    expect(runtime.nextgen.projectSecret).toBeUndefined();
+    expect(runtime.nextgen.projectSecret).toBe("");
     expect(runtime.public.zitadelProjectId).toBe("");
   });
 
-  it("reads the URL, the project id and the secret from .env.local", async () => {
-    const runtime = await install({
-      envLocal: [
-        "ZITADEL_URL=https://zitadel.example",
-        "NUXT_PUBLIC_ZITADEL_PROJECT_ID=proj_local",
-        "ZITADEL_PROJECT_SECRET=sk_local",
-      ].join("\n"),
-    });
+  it("reads the project id from .env.local", async () => {
+    const runtime = await install({ envLocal: "NUXT_PUBLIC_ZITADEL_PROJECT_ID=proj_local\n" });
 
-    expect(runtime.nextgen.url).toBe("https://zitadel.example");
     expect(runtime.public.zitadelProjectId).toBe("proj_local");
-    expect(runtime.nextgen.projectSecret).toBe("sk_local");
   });
 
   // A build must not pin the project sessions are held to: the public project
@@ -160,22 +157,75 @@ describe("@zitadel/sdk-nuxt module", () => {
     expect(named.nextgen.projectId).toBe("proj_config");
   });
 
-  it("prefers the environment over .env.local", async () => {
-    vi.stubEnv("ZITADEL_URL", "https://env.example");
+  it("prefers the environment over .env.local for the project id", async () => {
     vi.stubEnv("NUXT_PUBLIC_ZITADEL_PROJECT_ID", "proj_env");
-    vi.stubEnv("ZITADEL_PROJECT_SECRET", "sk_env");
 
-    const runtime = await install({
-      envLocal: [
-        "ZITADEL_URL=https://zitadel.example",
-        "NUXT_PUBLIC_ZITADEL_PROJECT_ID=proj_local",
-        "ZITADEL_PROJECT_SECRET=sk_local",
-      ].join("\n"),
+    const runtime = await install({ envLocal: "NUXT_PUBLIC_ZITADEL_PROJECT_ID=proj_local\n" });
+
+    expect(runtime.public.zitadelProjectId).toBe("proj_env");
+  });
+
+  // `nuxt build` writes the runtime config into `.output/`, so whatever the
+  // module puts there ends up on disk and can no longer change per deployment.
+  describe("in a production build", () => {
+    it("does not bake ZITADEL_PROJECT_SECRET from the environment into the runtime config", async () => {
+      vi.stubEnv("ZITADEL_PROJECT_SECRET", "sk_env");
+
+      const runtime = await install();
+
+      expect(runtime.nextgen.projectSecret).toBe("");
+      expect(JSON.stringify(runtime)).not.toContain("sk_env");
     });
 
-    expect(runtime.nextgen.url).toBe("https://env.example");
-    expect(runtime.public.zitadelProjectId).toBe("proj_env");
-    expect(runtime.nextgen.projectSecret).toBe("sk_env");
+    it("does not bake ZITADEL_PROJECT_SECRET from .env.local into the runtime config", async () => {
+      const runtime = await install({ envLocal: "ZITADEL_PROJECT_SECRET=sk_local\n" });
+
+      expect(runtime.nextgen.projectSecret).toBe("");
+      expect(JSON.stringify(runtime)).not.toContain("sk_local");
+    });
+
+    it("does not bake ZITADEL_URL from the environment or .env.local into the runtime config", async () => {
+      vi.stubEnv("ZITADEL_URL", "https://env.example");
+
+      const runtime = await install({ envLocal: "ZITADEL_URL=https://zitadel.example\n" });
+
+      expect(runtime.nextgen.url).toBe("");
+    });
+
+    it("keeps no secret in the public runtime config", async () => {
+      vi.stubEnv("ZITADEL_PROJECT_SECRET", "sk_env");
+
+      const runtime = await install();
+
+      expect(JSON.stringify(runtime.public)).not.toContain("sk_env");
+    });
+  });
+
+  // `nuxt dev` writes no build output, and its server does not see
+  // `.env.local`, so the module hands it the values.
+  describe("in nuxt dev", () => {
+    it("reads the URL and the secret from .env.local", async () => {
+      const runtime = await install({
+        dev: true,
+        envLocal: "ZITADEL_URL=https://zitadel.example\nZITADEL_PROJECT_SECRET=sk_local\n",
+      });
+
+      expect(runtime.nextgen.url).toBe("https://zitadel.example");
+      expect(runtime.nextgen.projectSecret).toBe("sk_local");
+    });
+
+    it("prefers the environment over .env.local", async () => {
+      vi.stubEnv("ZITADEL_URL", "https://env.example");
+      vi.stubEnv("ZITADEL_PROJECT_SECRET", "sk_env");
+
+      const runtime = await install({
+        dev: true,
+        envLocal: "ZITADEL_URL=https://zitadel.example\nZITADEL_PROJECT_SECRET=sk_local\n",
+      });
+
+      expect(runtime.nextgen.url).toBe("https://env.example");
+      expect(runtime.nextgen.projectSecret).toBe("sk_env");
+    });
   });
 
   it("keeps a URL and a project id set in nuxt.config", async () => {
@@ -193,6 +243,7 @@ describe("@zitadel/sdk-nuxt module", () => {
 
   it("parses .env.local like dotenv", async () => {
     const runtime = await install({
+      dev: true,
       envLocal: [
         "# written by zitadel setup",
         "ZITADEL_URL=",
@@ -202,7 +253,7 @@ describe("@zitadel/sdk-nuxt module", () => {
     });
 
     // An empty value counts as unset.
-    expect(runtime.nextgen.url).toBe("http://localhost:8080");
+    expect(runtime.nextgen.url).toBe("");
     expect(runtime.public.zitadelProjectId).toBe("proj #1");
     expect(runtime.nextgen.projectSecret).toBe("sk_#1");
   });

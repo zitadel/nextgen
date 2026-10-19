@@ -40,16 +40,16 @@ as signed out. Signing out with `<zitadel-logout>` or `<zitadel-session>` no
 longer ends another project's session. The `AGENTS.md` guidance that
 `zitadel setup` writes now tells agents to read the session this way.
 
-A session cookie is cleared only when the backend answers that its session is
-gone. A backend that is down, slow or answers anything else no longer signs
-users out, and a Bearer token that is not this app's no longer clears the
-session cookie that came with it.
+A Bearer token that is not this app's no longer decides what happens to the
+session cookie that came with it: the cookie is judged, and cleared only when
+the backend refuses it, on its own.
 
 In `@zitadel/api`, `getMySession()` now takes its query parameters first: call
 `getMySession(undefined, init)` where you called `getMySession(init)`. In
-`@zitadel/sdk-core`, `validateOpaqueSessionToken()` takes the project id as a
-fourth argument, and `checkOpaqueSessionToken()` also tells a dead session from
-a backend that gave no answer.
+`@zitadel/sdk-core`, `checkOpaqueSessionToken()` and
+`validateOpaqueSessionToken()` take the project id as a fourth argument, and
+`resolveSession()` is the one implementation of these rules behind every server
+SDK's middleware.
 
 The `@zitadel/sdk-next` middleware also no longer lets a session that has not
 finished signing in through `protectedRoutes`.

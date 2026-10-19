@@ -6,6 +6,7 @@ import {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
   filterResponseHeaders,
+  loginRedirectUrl,
   matchesRoutes,
   requiresProjectSecret,
   resolveSession,
@@ -175,7 +176,7 @@ async function proxyRequest(
   // upstream auth server sees the full proxy path. We never skip this even when
   // a chain is already present — a CDN or load balancer may have set XFF before
   // the request reached this edge node, and our hop must still be recorded.
-  const directIp = (req as unknown as { ip?: string }).ip ?? req.headers.get("x-real-ip");
+  const directIp = (req as unknown as { ip?: string }).ip;
   if (directIp) {
     const existingXff = upstreamHeaders.get("x-forwarded-for");
     upstreamHeaders.set("x-forwarded-for", existingXff ? `${existingXff}, ${directIp}` : directIp);
@@ -246,10 +247,12 @@ interface AuthHandlerOptions extends ResolveSessionOptions {
  * Judges the session and tunnels the token of a signed-in user to server
  * components via a request header, where `auth()` verifies it again.
  * Redirects to the login page when nobody is signed in on a protected route.
+ * When the backend cannot say whether the session is live, the cookies stay
+ * and a protected route answers `503`.
  *
  * @param req  - The incoming edge request.
  * @param opts - Auth handler options.
- * @returns A `NextResponse` to continue or redirect.
+ * @returns A `NextResponse` to continue, redirect, or answer `503`.
  */
 async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<NextResponse> {
   const { protectedRoutes, loginPath, pathname, ...verification } = opts;
@@ -257,7 +260,7 @@ async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<N
   const authHeader = req.headers.get("authorization");
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
   const cookieToken = req.cookies.get("__nextgen_session")?.value ?? null;
-  const { auth, clearCookies } = await resolveSession(
+  const { auth, clearCookies, undecided } = await resolveSession(
     { bearer: bearerToken, cookie: cookieToken },
     verification,
   );
@@ -267,18 +270,23 @@ async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<N
     return NextResponse.next({ request: { headers: tunnelled } });
   }
 
+  // The backend could not say whether the session is live. The user may well
+  // be signed in, so a protected route answers 503 rather than send them to
+  // the login page.
+  if (undecided && matchesRoutes(pathname, protectedRoutes)) {
+    return new NextResponse("Service Unavailable", { status: 503 });
+  }
+
   const tunnelled = tunnelHeaders(req, { "x-nextgen-auth-token": "" });
   // Dead credentials are cleared so the browser stops replaying them. A live
   // session that signs no one in here (an anonymous one, or one of another
-  // project) keeps its cookie.
+  // project) keeps its cookie, and so does one the backend gave no verdict on.
   const staleNextgenCookies = clearCookies
     ? req.cookies.getAll().filter((c: { name: string }) => c.name.startsWith("__nextgen"))
     : [];
 
   if (matchesRoutes(pathname, protectedRoutes)) {
-    const loginUrl = new URL(loginPath, req.url);
-    loginUrl.searchParams.set("next", pathname);
-    const redirect = NextResponse.redirect(loginUrl, { status: 302 });
+    const redirect = NextResponse.redirect(loginRedirectUrl(loginPath, req.url), { status: 302 });
     for (const cookie of staleNextgenCookies) {
       redirect.cookies.delete(cookie.name);
     }

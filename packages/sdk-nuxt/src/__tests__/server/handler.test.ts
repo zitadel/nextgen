@@ -35,6 +35,32 @@ async function moduleHandler(
 describe("module server handler", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("proxies to the ZITADEL_URL the server runs with when the build fixed no URL", async () => {
+    vi.stubEnv("ZITADEL_URL", "http://runtime.test");
+    const upstream = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", upstream);
+    const handle = await moduleHandler({ url: "" });
+
+    await handle(new Request("http://localhost:3000/__nextgen/flow"));
+
+    expect(upstream).toHaveBeenCalledWith("http://runtime.test/flow", expect.anything());
+  });
+
+  it("sends the ZITADEL_PROJECT_SECRET the server runs with on the session exchange", async () => {
+    vi.stubEnv("ZITADEL_PROJECT_SECRET", "sk_runtime");
+    const upstream = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", upstream);
+    const handle = await moduleHandler({ url: "http://zitadel.test", projectSecret: "" });
+
+    await handle(
+      new Request("http://localhost:3000/__nextgen/sessions/exchange", { method: "POST" }),
+    );
+
+    const init = upstream.mock.calls[0]?.[1] as RequestInit;
+    expect((init.headers as Headers).get("authorization")).toBe("Bearer sk_runtime");
   });
 
   it("proxies the proxyPath the module configured", async () => {
@@ -141,7 +167,9 @@ describe("middlewareOptions", () => {
     ["the stored project", { projectId: "proj_server" }, "proj_server"],
     ["the public project id", { projectId: "" }, "proj_public"],
   ])("holds sessions to %s", (_label, nextgen, expected) => {
-    expect(middlewareOptions(nextgen, { zitadelProjectId: "proj_public" }).projectId).toBe(expected);
+    expect(middlewareOptions(nextgen, { zitadelProjectId: "proj_public" }).projectId).toBe(
+      expected,
+    );
   });
 
   it("leaves the options Nitro stored as empty strings to the middleware's defaults", () => {

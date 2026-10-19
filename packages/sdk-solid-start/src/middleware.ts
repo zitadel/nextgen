@@ -8,6 +8,7 @@ import {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
   filterResponseHeaders,
+  loginRedirectUrl,
   matchesRoutes,
   requiresProjectSecret,
   resolveSession,
@@ -175,7 +176,8 @@ interface AuthHandlerOptions extends ResolveSessionOptions {
  * Judges the session, writes the auth result to `event.locals`, and returns a
  * redirect `Response` on a protected route when nobody is signed in (otherwise
  * `undefined` to continue). Stale `__nextgen*` cookies are cleared when they
- * hold dead credentials.
+ * hold dead credentials. When the backend cannot say whether the session is
+ * live, the cookies stay and a protected route answers `503`.
  */
 async function handleAuth(
   event: SolidFetchEvent,
@@ -189,7 +191,7 @@ async function handleAuth(
   const authHeader = event.request.headers.get("authorization");
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
   const cookieToken = cookies.get("__nextgen_session") ?? null;
-  const { auth, clearCookies } = await resolveSession(
+  const { auth, clearCookies, undecided } = await resolveSession(
     { bearer: bearerToken, cookie: cookieToken },
     verification,
   );
@@ -199,18 +201,24 @@ async function handleAuth(
     return;
   }
 
+  // The backend could not say whether the session is live. The user may well
+  // be signed in, so a protected route answers 503 rather than send them to
+  // the login page.
+  if (undecided && matchesRoutes(pathname, protectedRoutes)) {
+    return new Response("Service Unavailable", { status: 503 });
+  }
+
   // Dead credentials are cleared on every unauthenticated response so the
-  // browser stops replaying them (each replay costs a backend session check);
-  // a live session that signs no one in here (an anonymous one, whose sign-in
-  // may still complete, or one of another project) keeps its cookie.
+  // browser stops replaying them (each replay costs a backend session check).
+  // A live session that signs no one in here (an anonymous one, whose sign-in
+  // may still complete, or one of another project) keeps its cookie, and so
+  // does one the backend gave no verdict on.
   const staleCookies = clearCookies
     ? [...cookies.keys()].filter((name) => name.startsWith("__nextgen"))
     : [];
 
   if (matchesRoutes(pathname, protectedRoutes)) {
-    const loginUrl = new URL(loginPath, url2);
-    loginUrl.searchParams.set("next", pathname);
-    const headers = new Headers({ location: loginUrl.toString() });
+    const headers = new Headers({ location: loginRedirectUrl(loginPath, url2).toString() });
     for (const name of staleCookies) {
       headers.append("set-cookie", clearCookie(name));
     }

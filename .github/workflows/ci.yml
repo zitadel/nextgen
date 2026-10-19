@@ -52,6 +52,19 @@ jobs:
         with:
           fetch-depth: 0
 
+      # The queue squashes a version PR onto the PRs queued ahead of it, and
+      # while it waits GitHub refuses release-publish's refresh of
+      # changeset-release/main. A changeset one of those PRs adds would land
+      # unrecorded in .changeset/pre.json, and release-publish's preflight
+      # would then refuse to publish the version. Running that preflight here
+      # drops the stale version PR from the queue instead; release-publish
+      # refreshes it once the PRs ahead land. Any other merge group skips.
+      - name: Check a queued version PR is current
+        if: ${{ github.event_name == 'merge_group' }}
+        env:
+          BASE_SHA: ${{ github.event.merge_group.base_sha }}
+        run: node scripts/release-automation.mjs publish --base "$BASE_SHA"
+
       # The postgres lane (server:test-postgres) starts its databases through
       # testcontainers, and every package of the lane waits while the first
       # one pulls the image: 6-8 s on Depot's microVMs, 11-12 s on its EC2

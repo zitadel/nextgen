@@ -310,7 +310,9 @@ describe("auth()", () => {
 
     const auth = await importAuth();
     expect(await auth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("could not reach"));
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining("Could not check the session cookie"),
+    );
   });
 
   it("aborts opaque validation after opaqueTokenTimeoutMs and fails closed", async () => {
@@ -330,7 +332,9 @@ describe("auth()", () => {
     const result = await auth({ ...OPTIONS, opaqueTokenTimeoutMs: 5 });
 
     expect(result).toEqual({ isAuthenticated: false, session: null });
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("could not reach"));
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining("Could not check the session cookie"),
+    );
   });
 
   it("falls back to the ZITADEL_URL environment variable for the backend URL", async () => {
