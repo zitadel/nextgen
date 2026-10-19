@@ -7,8 +7,9 @@
 > `session.default_ttl` defaulted to the lifetime of an anonymous shell.
 > [PR #2060](https://github.com/zitadel/nextgen/pull/2060) gives signed-in
 > sessions a 24-hour default of their own and keeps that lifetime absolute,
-> because no ADR or design note describes renewal. This ADR decides what
-> follows.
+> because no ADR or design note describes renewal. That 24-hour absolute
+> default is confirmed there and is this ADR's baseline, not one of its
+> choices. This ADR decides what to add on top of it.
 >
 > **Builds on:** [ADR 010](010-session-auth-attempt-check-model.md) (sessions,
 > attempts and checks), [ADR 037](037-token-lifecycle.md) (opaque,
@@ -129,6 +130,13 @@ sign-in, not use, is what renews it.
 Idle only is out: NIST asks for an overall timeout at every AAL, and a stolen
 cookie in use would never expire. Absolute only stays available as the case of
 an unset idle timeout.
+
+Sliding renewal stays within `max_ttl`: the idle deadline slides with use but
+never past the session's absolute deadline, and that deadline is never more
+than `max_ttl` after the authentication. The 24-hour default stays absolute. A
+server that wants sessions kept alive by use for up to 30 days sets
+`session.default_ttl` to `max_ttl` and an idle timeout below it; nothing does
+so by default.
 
 ### 2. A renewal extends the token in place and never mints a new one
 
@@ -284,19 +292,24 @@ carries an assurance level.
   keyword per level is out of scope.
 - Until assurance levels and step-up exist (`sessionToAPI` still serves no
   `assurance_levels`), a session's age is the only freshness a sensitive
-  operation gets, the console's included. That is why §6 keeps the default
-  where #2060 put it.
+  operation gets, the console's included. That is one more reason §6 leaves
+  the idle timeout off and longer lifetimes to an explicit choice.
 
-### 6. Defaults
+### 6. Defaults: nothing changes unless configured
 
-| Option                                  | Absolute     | Idle | What it gives                                                                                                                      |
-|-----------------------------------------|--------------|------|------------------------------------------------------------------------------------------------------------------------------------|
-| **(a) #2060, recommended for now**      | 24h          | none | A sign-in a day, and an unused session lives 24h. Within NIST's overall ceilings for AAL1 and AAL2, without AAL2's idle timeout.   |
-| (b) Tighter                             | 24h          | 1h   | NIST's AAL2 recommendations. Signs a user out over lunch.                                                                          |
-| (c) Signed in for as long as it is used | 7 to 30 days | 24h  | Daily use keeps the session. As the server-wide default it needs step-up first, or a sign-in days old authorizes console administration. |
+The absolute default stays 24 hours (#2060). What this ADR adds is off by
+default: `session.idle_timeout` is unset, so no session renews and the probe
+never writes until an operator, and once §4 lands a project, turns it on. The
+configurations that opens:
 
-The server-wide default stays (a). An operator, and once §4 lands a project,
-can pick (b) or (c). The default is revisited once step-up exists.
+| Configuration                       | Absolute        | Idle | What it gives                                                                                                                    |
+|-------------------------------------|-----------------|------|----------------------------------------------------------------------------------------------------------------------------------|
+| **The default (#2060)**             | 24h             | none | A sign-in a day, and an unused session lives 24h. Within NIST's overall ceilings for AAL1 and AAL2, without AAL2's idle timeout. |
+| Tighter                             | 24h             | 1h   | NIST's AAL2 recommendations. Signs a user out over lunch.                                                                        |
+| Signed in for as long as it is used | up to `max_ttl` | 24h  | Daily use keeps a session for up to 30 days. For the console's platform project, only after step-up, or a sign-in days old authorizes console administration. |
+
+Whether an idle timeout should be on by default is revisited once assurance
+levels and step-up exist.
 
 ### 7. API, mock and docs
 
@@ -343,7 +356,8 @@ can pick (b) or (c). The default is revisited once step-up exists.
 7. Measure the probe with an idle timeout set, with renewal due and not due.
 8. Per-project values once the settings mechanism lands, frozen into each
    session at the exchange. The platform project picks the console's.
-9. Revisit the default (§6) once assurance levels and step-up ship.
+9. Once assurance levels and step-up ship, revisit whether an idle timeout is
+   on by default (§6).
 
 Nothing is implemented before this ADR is accepted.
 
@@ -393,5 +407,6 @@ Nothing is implemented before this ADR is accepted.
   every cookie-authenticated request pays a second read to spare a rare second
   write.
 - **Reading `default_ttl` as the idle timeout and `max_ttl` as the absolute
-  cap:** no new key, but it silently loosens every server whose `default_ttl`
-  was set as an absolute lifetime.
+  cap:** no new key, but it turns the 24-hour absolute default confirmed on
+  #2060 into an idle timeout, and silently loosens every server whose
+  `default_ttl` was set as an absolute lifetime.
