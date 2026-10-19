@@ -389,7 +389,9 @@ there are several) only when a person is at the machine: it opens the login page
 and waits for them to sign in, then reports from the project's audit events
 (`zitadel events list`) which phase failed and on which side, provider or
 journey; a wrong secret shows up there as a provider-side failure at the
-exchange. It works against any server the project is on, but the project must be
+exchange. The live check's `details` hold the attempt id, the phase it ended
+in, the reason and side, and every phase seen with its time, so read those
+rather than the message. It works against any server the project is on, but the project must be
 claimed (`zitadel claim`), because a project that is not claimed hides its events,
 and the files must be applied. A `--dry-run` starts nothing, since a sign-in can
 create a user and `--live` leaves any user it created in the project. It follows

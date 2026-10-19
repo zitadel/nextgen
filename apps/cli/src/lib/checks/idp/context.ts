@@ -107,6 +107,8 @@ export type SignInEvent = {
   readonly status: "ok" | "failed";
   readonly reason?: string;
   readonly side?: "provider" | "journey";
+  /** When the runtime recorded it. */
+  readonly at?: string;
 };
 
 /**

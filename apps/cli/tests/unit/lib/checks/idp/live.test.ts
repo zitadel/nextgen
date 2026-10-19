@@ -120,7 +120,52 @@ describe("LiveSignInCheck", () => {
   it("passes once the attempt has been handed over to the app", async () => {
     const { outcome } = run(SIGNED_IN);
 
-    expect(await outcome).toEqual({ status: "pass", message: "sign-in completed with acme" });
+    expect(await outcome).toMatchObject({
+      status: "pass",
+      message: "sign-in completed with acme",
+    });
+  });
+
+  it("gives the attempt, its phases and when each happened as data, not only as words", async () => {
+    const { outcome } = run([
+      event({ phase: "ceremony_started" }),
+      sso({ phase: "exchange_finished", at: "2026-10-19T00:00:01Z" }),
+      sso({
+        phase: "resolved",
+        status: "failed",
+        reason: "creation_disabled",
+        side: "journey",
+        at: "2026-10-19T00:00:02Z",
+      }),
+    ]);
+
+    expect((await outcome).details).toEqual({
+      attempt_id: "att_1",
+      phase: "resolved",
+      status: "failed",
+      reason: "creation_disabled",
+      side: "journey",
+      events: [
+        { phase: "exchange_finished", status: "ok", at: "2026-10-19T00:00:01Z" },
+        { phase: "resolved", status: "failed", at: "2026-10-19T00:00:02Z" },
+      ],
+    });
+  });
+
+  it("names the attempt and its phases for a completed sign-in too", async () => {
+    const { outcome } = run(SIGNED_IN);
+
+    expect((await outcome).details).toMatchObject({
+      attempt_id: "att_1",
+      phase: "handed_off",
+      events: [{ phase: "exchange_finished" }, { phase: "handed_off" }],
+    });
+  });
+
+  it("gives no attempt when none was seen", async () => {
+    const { outcome } = run([]);
+
+    expect((await outcome).details).toEqual({ events: [] });
   });
 
   it("does not call the sign-in complete after the exchange, before the handoff has happened", async () => {
@@ -158,7 +203,7 @@ describe("LiveSignInCheck", () => {
       }),
     ]);
 
-    expect(await outcome).toEqual({
+    expect(await outcome).toMatchObject({
       status: "fail",
       message:
         "Failed at the provider's redirect back (provider side): the sign-in was declined at the provider",
@@ -255,7 +300,7 @@ describe("LiveSignInCheck", () => {
   it("fails with 'no sign-in attempt seen' and points at the events when nothing happens", async () => {
     const { outcome } = run([]);
 
-    expect(await outcome).toEqual({
+    expect(await outcome).toMatchObject({
       status: "fail",
       message: "no sign-in attempt seen",
       recovery: "Run zitadel events list and look for the auth.sso events of the attempt",

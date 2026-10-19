@@ -6,6 +6,8 @@ export type AuditEvent = {
   readonly event_type: string;
   readonly entity_id?: string | null;
   readonly payload?: Readonly<Record<string, unknown>>;
+  /** When the event was recorded. */
+  readonly occurred_at?: string | null;
 };
 
 /** One page of `GET /events`, newest first. */
@@ -79,14 +81,15 @@ export function signInEventOf(event: AuditEvent, slug: string): SignInEvent | un
     ...(meaning.sso ? { sso: true as const } : {}),
     phase: phase as SignInPhase,
     status: meaning.status,
+    ...(typeof event.occurred_at === "string" ? { at: event.occurred_at } : {}),
     ...(reason === undefined ? {} : { reason }),
     ...(side === "provider" || side === "journey" ? { side } : {}),
   };
 }
 
-/** How many pages one read follows back, so a busy project cannot make a poll unbounded. */
 /** Reads in a row that may fail before the watcher gives up and says so. */
 const MAX_CONSECUTIVE_FAILURES = 5;
+/** How many pages one read follows back, so a busy project cannot make a poll unbounded. */
 const MAX_PAGES = 10;
 
 /**

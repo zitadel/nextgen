@@ -18,6 +18,8 @@ export type Outcome = {
   readonly message: string;
   /** The one thing to do about a `warn` or `fail`. */
   readonly recovery?: string;
+  /** What the check observed, for a reader that wants data and not prose (`--json`). */
+  readonly details?: Readonly<Record<string, unknown>>;
 };
 
 export type CheckResult = Outcome & {

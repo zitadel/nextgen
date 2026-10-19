@@ -15,6 +15,8 @@ type Watching = {
 type Progress = {
   readonly attempt: string | undefined;
   readonly last: SignInEvent | undefined;
+  /** Every event of the followed attempt so far, for the structured result. */
+  readonly seen: readonly SignInEvent[];
   readonly ignored: ReadonlySet<string>;
 };
 
@@ -89,6 +91,25 @@ function recoveryFor(event: SignInEvent, context: IdpContext): string {
   }
 }
 
+/** The structured account of an attempt: which one, where it ended, and every phase seen with its time. */
+function detailsOf(
+  attempt: string | undefined,
+  seen: readonly SignInEvent[],
+  last: SignInEvent | undefined,
+): Readonly<Record<string, unknown>> {
+  return {
+    ...(attempt === undefined ? {} : { attempt_id: attempt }),
+    ...(last === undefined ? {} : { phase: last.phase, status: last.status }),
+    ...(last?.reason === undefined ? {} : { reason: last.reason }),
+    ...(last?.side === undefined ? {} : { side: last.side }),
+    events: seen.map((entry) => ({
+      phase: entry.phase,
+      status: entry.status,
+      ...(entry.at === undefined ? {} : { at: entry.at }),
+    })),
+  };
+}
+
 function failure(event: SignInEvent, context: IdpContext): Outcome {
   const phase = PHASES[event.phase];
   const reason = REASONS[event.reason ?? ""] ?? event.reason ?? "unknown reason";
@@ -150,7 +171,7 @@ export class LiveSignInCheck extends Check<IdpContext> {
         .then((): typeof TIMED_OUT => TIMED_OUT);
       return await this.follow(
         { context, live, events, timedOut },
-        { attempt: undefined, last: undefined, ignored: new Set() },
+        { attempt: undefined, last: undefined, seen: [], ignored: new Set() },
       );
     } finally {
       stop.abort();
@@ -162,7 +183,7 @@ export class LiveSignInCheck extends Check<IdpContext> {
     const { context, live, events, timedOut } = watching;
     const next = await Promise.race([events.next(), timedOut]);
     if (next === TIMED_OUT || next.done) {
-      return this.unfinished(progress.last);
+      return this.unfinished(progress);
     }
     const event = next.value;
     if (event.slug !== context.slug) {
@@ -188,14 +209,19 @@ export class LiveSignInCheck extends Check<IdpContext> {
         ignored: new Set([...progress.ignored, event.flowId]),
       });
     }
+    const seen = [...progress.seen, event];
     if (event.status === "failed") {
-      return failure(event, context);
+      return { ...failure(event, context), details: detailsOf(attempt, seen, event) };
     }
     if (completes(event)) {
-      return { status: "pass", message: `sign-in completed with ${context.slug}` };
+      return {
+        status: "pass",
+        message: `sign-in completed with ${context.slug}`,
+        details: detailsOf(attempt, seen, event),
+      };
     }
     live.say(`${PHASES[event.phase]}: ok`);
-    return this.follow(watching, { ...progress, attempt, last: event });
+    return this.follow(watching, { ...progress, attempt, last: event, seen });
   }
 
   /**
@@ -203,9 +229,11 @@ export class LiveSignInCheck extends Check<IdpContext> {
    * the login page: the server records no event for that, and the checks that run before
    * the live one are what catch its usual causes.
    */
-  private unfinished(last: SignInEvent | undefined): Outcome {
+  private unfinished(progress: Progress): Outcome {
+    const { last } = progress;
     return {
       status: "fail",
+      details: detailsOf(progress.attempt, progress.seen, last),
       message:
         last === undefined
           ? "no sign-in attempt seen"

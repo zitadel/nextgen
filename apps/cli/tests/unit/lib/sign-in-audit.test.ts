@@ -35,6 +35,15 @@ describe("signInEventOf", () => {
     });
   });
 
+  it("keeps when the event was recorded", () => {
+    expect(
+      signInEventOf(
+        audit("auth.attempt.created", { occurred_at: "2026-10-19T00:00:00Z" }),
+        "google",
+      ),
+    ).toMatchObject({ at: "2026-10-19T00:00:00Z" });
+  });
+
   it("does not mark the start or the handoff of an attempt as about the connection", () => {
     expect([
       signInEventOf(audit("auth.attempt.created"), "google")?.sso,

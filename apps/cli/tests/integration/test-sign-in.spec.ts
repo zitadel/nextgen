@@ -231,6 +231,19 @@ describe("test sign-in", () => {
         expect(result).toSucceed();
       });
 
+      it("gives the attempt and its phases as data in the JSON", async () => {
+        const app = await aSignedUpApp();
+        platform.recordsSignIn([
+          { event_type: "auth.attempt.created", entity_id: "att_1" },
+          { event_type: "auth.sso.exchange.succeeded", payload: ATTEMPT },
+          { event_type: "auth.attempt.handed_off", entity_id: "att_1" },
+        ]);
+
+        const result = await app.run(LIVE, { BROWSER: "none" });
+
+        expect(result.stdout).toContain('"attempt_id": "att_1"');
+      });
+
       it("fails a sign-in the provider refused, naming the callback URI to check", async () => {
         const app = await aSignedUpApp();
         platform.recordsSignIn([
