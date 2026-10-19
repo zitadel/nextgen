@@ -111,7 +111,7 @@ const project = useZitadelProject();
 </template>
 ```
 
-To call the Zitadel API from your own code, use the auto-imported `useZitadelApi()` composable in the browser (for example from `onMounted`). It returns the typed client of the project the plugin configured, so you do not install `@zitadel/api` either.
+To call the Zitadel API from your own code, use the auto-imported `useZitadelApi()` composable (for example from `onMounted`). It returns the typed client of the project the plugin configured from your project id, and throws if no project id is set, so you do not install `@zitadel/api` either.
 
 ```ts
 onMounted(async () => {
