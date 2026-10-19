@@ -2,6 +2,7 @@ import type { Nuxt } from "@nuxt/schema";
 import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { addPlugin, addTypeTemplate } from "@nuxt/kit";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import nextgenModule from "../module";
@@ -13,6 +14,7 @@ vi.mock("@nuxt/kit", async (importOriginal) => ({
   addPlugin: vi.fn(),
   addServerHandler: vi.fn(),
   addImportsDir: vi.fn(),
+  addTypeTemplate: vi.fn(),
 }));
 
 interface ModuleRuntimeConfig {
@@ -58,6 +60,29 @@ describe("@zitadel/sdk-nuxt module", () => {
     expect(runtime.nextgen.proxyPath).toBe("/auth");
     expect(runtime.public.zitadelProxyPath).toBe("/auth");
     expect(runtime.public.nextgenProxyPath).toBe("/auth");
+  });
+
+  it("loads the widget elements in the browser only", async () => {
+    await install();
+
+    expect(addPlugin).toHaveBeenCalledWith({
+      src: expect.stringMatching(/runtime[\\/]components\.client$/),
+      mode: "client",
+    });
+  });
+
+  it("types the business locales the client plugin provides", async () => {
+    await install();
+
+    const [template] = vi.mocked(addTypeTemplate).mock.calls[0] ?? [];
+    expect(template?.filename).toBe("types/zitadel-business-locales.d.ts");
+    const contents = String(
+      (template as { getContents: (data: unknown) => string }).getContents({}),
+    );
+    expect(contents).toContain("$zitadelBusinessLocales: ZitadelBusinessLocales");
+    expect(contents).toContain('declare module "#app"');
+    // The app does not install @zitadel/components, so the types must not import it.
+    expect(contents).not.toContain("@zitadel/components");
   });
 
   it("hands every middleware option to the server middleware", async () => {
@@ -154,6 +179,15 @@ describe("@zitadel/sdk-nuxt module", () => {
     expect(runtime.nextgen.url).toBe("http://localhost:8080");
     expect(runtime.public.zitadelProjectId).toBe("proj #1");
     expect(runtime.nextgen.projectSecret).toBe("sk_#1");
+  });
+});
+
+// The module registers `runtime/components.client` from the published dist, so
+// a build that leaves it out breaks every app that loads the module.
+describe("client plugin", () => {
+  it("ships the widget-loading plugin in the built runtime directory", () => {
+    const built = join(import.meta.dirname, "../../dist/runtime");
+    expect(existsSync(join(built, "components.client.js"))).toBe(true);
   });
 });
 
