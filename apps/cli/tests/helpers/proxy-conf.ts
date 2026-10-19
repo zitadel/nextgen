@@ -3,7 +3,7 @@ import { SESSION_COOKIE_MARKER } from "../../src/lib/orca/patchers/rule/session-
 
 /**
  * The managed `proxy.conf.cjs` as setup wrote it before it carried the
- * session-cookie hooks (ADR 072): the current template without the hook
+ * session-cookie hooks (ADR 073): the current template without the hook
  * functions, its entry attaching the bearer hook alone.
  */
 export function bearerOnlyProxyConf(current: string = proxyConfTemplate()): string {

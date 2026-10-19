@@ -66,7 +66,7 @@ shares a host's cookies across every port, so under that name alone the Console
 of a local server and every app on `localhost` would keep their sessions in one
 slot and sign each other out. An app with a server SDK therefore keeps its
 session in a cookie of its own, `sessionCookieName(projectId)`:
-`__nextgen_session_<projectId>` (ADR 072).
+`__nextgen_session_<projectId>` (ADR 073).
 
 - **The proxy** (`proxySessionCookies`) renames the server's `Set-Cookie` to the
   app's name on the way to the browser, and on the way to the server sends the

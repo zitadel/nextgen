@@ -200,7 +200,7 @@ describe("session cookie names", () => {
     expect(SESSION_COOKIE_NAME).toBe("__nextgen_session");
   });
 
-  // A server SDK keeps the session under its project's name (ADR 072), as
+  // A server SDK keeps the session under its project's name (ADR 073), as
   // `sessionCookieName` in @zitadel/sdk-core spells it.
   it.each([
     ["proj_01K7ZD3E", "__nextgen_session_proj_01K7ZD3E"],

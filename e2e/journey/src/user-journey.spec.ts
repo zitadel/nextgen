@@ -177,7 +177,7 @@ async function expectSignedIn(page: Page): Promise<void> {
 /**
  * The cookie the app keeps its session in: every scaffold's proxy, a server
  * SDK's or the dev proxy setup writes for an SPA, keeps it under the app's
- * project's name (ADR 072). setup records the project in `.zitadel/secret`.
+ * project's name (ADR 073). setup records the project in `.zitadel/secret`.
  */
 async function appSessionCookieName(): Promise<string> {
   const secret = JSON.parse(

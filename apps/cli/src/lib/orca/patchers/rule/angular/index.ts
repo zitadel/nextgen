@@ -107,7 +107,7 @@ export class AngularPatcher extends AbstractRulePatcher {
         kind: "edit",
         path: "proxy.conf.cjs",
         edit: proxyConfSessionCookieEdit(),
-        // A session cookie per project (ADR 072) keeps the Console and the app
+        // A session cookie per project (ADR 073) keeps the Console and the app
         // from signing each other out on localhost. Sign-in works without it,
         // so the doctor only warns while it is missing.
         wiring: "convenience",

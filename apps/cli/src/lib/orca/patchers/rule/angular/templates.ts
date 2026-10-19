@@ -124,7 +124,7 @@ export function appTemplateHtml(ctx: PatchContext): string {
  * backend by its own name (`changeOrigin`), which a remote https server
  * requires, and forwards the app's origin in `X-Forwarded-Host` and
  * `X-Forwarded-Proto` (`xfwd`), and it keeps the session cookie under the
- * app's project's name in the browser (`ZITADEL_PROJECT_ID`, ADR 072).
+ * app's project's name in the browser (`ZITADEL_PROJECT_ID`, ADR 073).
  */
 export function proxyConfTemplate(): string {
   return `${MANAGED_MARKER}
@@ -191,7 +191,7 @@ function setBearer(proxyReq) {
   }
 }`;
 
-/** The session-cookie hooks' functions, after the bearer hook (ADR 072). */
+/** The session-cookie hooks' functions, after the bearer hook (ADR 073). */
 const SESSION_COOKIE_FUNCTIONS = indented(proxyConfSessionCookieStatements(), "");
 
 /** How the managed entry attached its hooks before it carried the session-cookie ones. */
@@ -255,7 +255,7 @@ export function proxyConfEdit(): (source: string | undefined) => string {
 }
 
 /**
- * Gives the managed proxy the session-cookie hooks (ADR 072) when it is the
+ * Gives the managed proxy the session-cookie hooks (ADR 073) when it is the
  * exact file an earlier CLI wrote: the hook functions go after the bearer hook,
  * and the entry attaches them beside it. A file that carries them already, an
  * unmanaged one, and a managed one whose hooks were changed by hand are left as

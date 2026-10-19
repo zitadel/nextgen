@@ -35,7 +35,7 @@ import {
  * browser's `Origin`, which the proxy passes on untouched.
  *
  * The session cookie travels under the app's project's name in the browser and
- * the server's name upstream ({@link viteSessionCookieStatements}, ADR 072).
+ * the server's name upstream ({@link viteSessionCookieStatements}, ADR 073).
  */
 function proxyEntryCode(server: string): string {
   return `/* ${PROXY_CREDENTIAL_POLICY_MARKER} */ {
@@ -248,7 +248,7 @@ function cliConfigureStatements(
 
 /**
  * Builds the `edit` transform that gives the CLI's own `/__nextgen` entry the
- * session-cookie hooks (ADR 072), for apps set up before the entry carried
+ * session-cookie hooks (ADR 073), for apps set up before the entry carried
  * them: the hooks go after the last statement of its `configure(proxy)` body,
  * at that statement's indentation, and nothing else in the file changes. A
  * config whose entry carries them already, a hand-written entry, and one whose
@@ -317,7 +317,7 @@ export function buildViteSessionCookieOp(): FileOp {
     kind: "edit",
     path: [...VITE_CONFIG_PATHS],
     edit: viteSessionCookieEdit(),
-    // A session cookie per project (ADR 072) keeps the Console and the app
+    // A session cookie per project (ADR 073) keeps the Console and the app
     // from signing each other out on localhost. Sign-in works without it, so
     // the doctor only warns while it is missing.
     wiring: "convenience",

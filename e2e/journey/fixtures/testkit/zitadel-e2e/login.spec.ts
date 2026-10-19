@@ -12,7 +12,7 @@ test("a seeded user signs in with their password", async ({ page, seed, zitadel 
   await loginWithPassword(page, user);
 
   await page.waitForURL(/\/profile(?:[/?#]|$)/, { timeout: 30_000 });
-  // The SDK keeps the session under the project's name (ADR 072).
+  // The SDK keeps the session under the project's name (ADR 073).
   const session = (await page.context().cookies()).find(
     (cookie) => cookie.name === sessionCookieName(zitadel.handle.projectId),
   );

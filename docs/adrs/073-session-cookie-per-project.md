@@ -1,4 +1,4 @@
-# ADR 072: A Session Cookie per Project on a Shared Host
+# ADR 073: A Session Cookie per Project on a Shared Host
 
 > **Status:** Accepted
 > **Date:** 2026-10-19

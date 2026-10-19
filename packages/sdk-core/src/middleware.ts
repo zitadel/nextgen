@@ -187,7 +187,7 @@ const PROJECT_SESSION_COOKIE_PREFIX = `${SERVER_SESSION_COOKIE}_`;
 
 /**
  * The cookie an app keeps its project's session in: the server's name with the
- * project id appended (ADR 072). A browser shares one cookie jar across every
+ * project id appended (ADR 073). A browser shares one cookie jar across every
  * port of a host, so under the server's name alone the Console of a local
  * server and every app on `localhost` would hold their sessions in one slot and
  * replace each other's.
@@ -345,7 +345,7 @@ export interface ProxiedSessionCookies {
 }
 
 /**
- * The session cookies of a call the app proxies to the server (ADR 072). The
+ * The session cookies of a call the app proxies to the server (ADR 073). The
  * server knows one session cookie, `__nextgen_session`; the app keeps its
  * project's session in {@link sessionCookieName}, so it neither replaces nor
  * reads the session of another app or of the Console on the same host.
@@ -354,7 +354,7 @@ export interface ProxiedSessionCookies {
  *   and every other session cookie stays behind. Other cookies pass unchanged.
  * - On the way back, a `Set-Cookie` of the server's session cookie, which sets
  *   or clears it, is renamed to the app's.
- * - A session kept under the server's name before ADR 072 goes up to one call
+ * - A session kept under the server's name before ADR 073 goes up to one call
  *   only, the session probe `GET /sessions/me?project_id=<project>`, which the
  *   server refuses for another project's session. When the answer signs a user
  *   of this project in, the session moves to the app's cookie.
@@ -522,7 +522,7 @@ export type NextgenMiddlewareOptions = {
    * The app keeps its session in a cookie of its own,
    * `__nextgen_session_<projectId>` ({@link sessionCookieName}), so signing in
    * here neither replaces nor reads the session of another app or of the
-   * Console on the same host (ADR 072).
+   * Console on the same host (ADR 073).
    *
    * An opaque session token is checked by the backend
    * (`GET /sessions/me?project_id=…`) and against the project its answer names;
@@ -824,7 +824,7 @@ function warnMissingProject(): void {
 /**
  * The cookie a request's session is read from: the project's own
  * ({@link sessionCookieName}), else the server's `__nextgen_session`, where
- * this app kept its sessions before ADR 072 and where, on `localhost`, the
+ * this app kept its sessions before ADR 073 and where, on `localhost`, the
  * Console keeps its own.
  */
 function storedSession(

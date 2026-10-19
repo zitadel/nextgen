@@ -1,6 +1,6 @@
 /**
  * The session-cookie hooks of the dev proxies the CLI writes for the SPA
- * frameworks (ADR 072). The server sets and reads one session cookie,
+ * frameworks (ADR 073). The server sets and reads one session cookie,
  * `__nextgen_session`; a browser shares a host's cookies across every port, so
  * under that name alone an SPA on `localhost` and the Console of a local server
  * would keep their sessions in one slot and sign each other out. The hooks keep
@@ -23,7 +23,7 @@ export const SESSION_COOKIE_MARKER = "zitadel:session-cookie:v1";
 const EXPLANATION = [
   `/* ${SESSION_COOKIE_MARKER} */`,
   "// The browser keeps this app's session in a cookie named after its project,",
-  "// the server in __nextgen_session (ADR 072). Without a project id, cookies",
+  "// the server in __nextgen_session (ADR 073). Without a project id, cookies",
   "// pass through.",
 ];
 

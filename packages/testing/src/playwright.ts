@@ -110,7 +110,7 @@ export const test = base.extend<ZitadelTestFixtures, ZitadelWorkerFixtures>({
     // `addCookies` takes either url or domain/path; url derives the rest. The
     // session goes in under both names, so it signs the app in whichever its
     // proxy reads: a server SDK and the dev proxy setup writes read the
-    // project's cookie (ADR 072), a proxy that passes the server's cookie
+    // project's cookie (ADR 073), a proxy that passes the server's cookie
     // through reads that one.
     const { path: _path, ...cookie } = session.cookie;
     await context.addCookies([

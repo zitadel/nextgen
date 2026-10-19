@@ -957,7 +957,7 @@ describe("ManagedFilesCheck", () => {
     expect(outcome.message).toContain("angular.json");
   });
 
-  // Sign-in works without the session-cookie hooks (ADR 072); without them the
+  // Sign-in works without the session-cookie hooks (ADR 073); without them the
   // Console and the app share one session cookie on localhost.
   it("warns while the managed proxy lacks the session-cookie hooks, and --fix adds them", async () => {
     const cwd = await makeAngularProject();

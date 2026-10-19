@@ -67,12 +67,12 @@ const PROJECT = "proj_app";
  */
 const OTHER_PROJECT = "proj_other";
 
-/** The cookie this app keeps its project's session in (ADR 072). */
+/** The cookie this app keeps its project's session in (ADR 073). */
 const SESSION = `__nextgen_session_${PROJECT}`;
 
 /**
  * The cookie the server sets, which every project on a host shared before
- * ADR 072, and where the Console of a local server still keeps its session.
+ * ADR 073, and where the Console of a local server still keeps its session.
  */
 const SHARED = "__nextgen_session";
 
@@ -522,7 +522,7 @@ describe("server middleware", () => {
     expect(calls[0]?.headers.get("cookie")).toBe("_zflow=f");
   });
 
-  // A session kept under the shared name before ADR 072 reaches the backend
+  // A session kept under the shared name before ADR 073 reaches the backend
   // only where the backend holds it to this project.
   it("sends the shared session cookie only to this project's session probe", async () => {
     const calls = captureFetch();
@@ -789,7 +789,7 @@ describe("server middleware", () => {
     expect(served.headers.get("set-cookie")).toBeNull();
   });
 
-  // A session this app's users signed in to before ADR 072 sits under the
+  // A session this app's users signed in to before ADR 073 sits under the
   // shared name; it moves the first time the app reads it.
   it("moves this project's session out of the shared cookie", async () => {
     sessionsMe(
