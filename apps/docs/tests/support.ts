@@ -40,6 +40,22 @@ export function escapeHtml(text: string): string {
     .replace(/'/g, "&#x27;");
 }
 
+/** The text React escaped into an attribute, unescaped. */
+function unescapeHtml(text: string): string {
+  return text
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
+
+/** The content of a page's `<meta>` tag, by its `name` or `property`, if it has one. */
+export function metaContent(html: string, key: string): string | undefined {
+  const tag = html.match(new RegExp(`<meta (?:name|property)="${key}" content="([^"]*)"`));
+  return tag ? unescapeHtml(tag[1] ?? "") : undefined;
+}
+
 /** Runs `fn` over `items`, at most `limit` at a time, keeping the order of the results. */
 export async function mapLimit<T, R>(
   items: readonly T[],

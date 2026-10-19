@@ -6,6 +6,7 @@ import {
   type IndexedPage,
   mapLimit,
   markdownUrl,
+  metaContent,
   parseIndex,
   siteLinks,
 } from "./support";
@@ -70,6 +71,38 @@ test("every page answers as HTML, titled", async ({ request }) => {
     return null;
   });
   expect(failures(results), "pages whose HTML is wrong").toEqual([]);
+});
+
+test("the index gives each page one line", async ({ request }) => {
+  const index = await (await request.get("/docs/llms.txt")).text();
+
+  // An entry is `- [title](url): description`. An operation's OpenAPI
+  // description is Markdown of several paragraphs; the page's own is its first
+  // sentence (lib/description.ts), or it would break out of the list.
+  const strays = index
+    .split("\n")
+    .filter((line) => line.trim() !== "" && !/^(?:# |> |\s*- )/.test(line));
+  expect(strays, "lines of the index that are not an entry").toEqual([]);
+});
+
+test("every page is described in a line of plain text", async ({ request }) => {
+  test.setTimeout(120_000);
+  const pages = await indexedPages(request);
+
+  // The metadata and the Open Graph image get the page's description. An API
+  // operation's or webhook's page has the first sentence of its OpenAPI
+  // description, without the Markdown; the body shows the whole of it.
+  const results = await mapLimit(pages, concurrency, async ({ url }) => {
+    const html = await (await request.get(url)).text();
+    const description = metaContent(html, "description");
+    if (description === undefined) return null;
+    if (/[`\n]/.test(description)) return `${url}: description "${description}"`;
+    if (description.length > 160) return `${url}: description of ${description.length} characters`;
+    const og = metaContent(html, "og:description");
+    if (og !== undefined && og !== description) return `${url}: og:description "${og}"`;
+    return null;
+  });
+  expect(failures(results), "pages whose description is not a line of text").toEqual([]);
 });
 
 test("every page has a Markdown twin whose links resolve", async ({ request }) => {

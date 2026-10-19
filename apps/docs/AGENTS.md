@@ -74,6 +74,12 @@ So the template's root routes live under `/docs` here:
   are in `content/docs/reference/api/`; a page per operation, and per webhook
   (one per event type, under `event-webhooks/`), comes from the OpenAPI
   document (`lib/source.ts`).
+- An operation's or a webhook's OpenAPI `description` is Markdown for the
+  body of its page, which shows all of it; the page's header is its title.
+  The page's own description, in its metadata, on its Open Graph image and in
+  `llms.txt`, is the first sentence of it as plain text
+  (`lib/description.ts`), so that sentence should say on its own what the
+  operation does.
 - `moon run docs:generate` bundles `api/openapi` into `.generated/openapi.mjs`,
   which `lib/openapi.ts` imports. The content needs no generation step.
 - A page's Markdown (`/docs/cli.md`, or `/docs/cli` with `Accept:
