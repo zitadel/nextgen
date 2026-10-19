@@ -92,6 +92,13 @@ const nextgenModule: NuxtModule<NextgenMiddlewareOptions> =
         // so `NUXT_NEXTGEN_URL` can set it at runtime; `ZITADEL_URL` is read by
         // the running server and never baked into the build.
         url: options.url || (nuxt.options.dev ? setting("ZITADEL_URL") : undefined) || "",
+        // The project a session must belong to for its user to count as signed
+        // in, when set here or through NUXT_NEXTGEN_PROJECT_ID. Unset, the
+        // handler takes the public project id the widgets sign users in to,
+        // which NUXT_PUBLIC_ZITADEL_PROJECT_ID sets at runtime, then
+        // ZITADEL_PROJECT_ID at runtime. Nothing is read from the build's
+        // environment here, so a built server is not pinned to it.
+        projectId: options.projectId,
         // The server middleware proxies this prefix; the plugin hands the same
         // one to the widgets, so the browser calls the path the server serves.
         proxyPath,

@@ -170,6 +170,7 @@ work-email copy for a business audience.
 | ------------------- | -------------------- | -------------------- | ---------------------------------------------------------------------------------------------- |
 | `url`               | `string`             | `ZITADEL_URL` env    | Full URL of the Zitadel auth backend                                                           |
 | `projectSecret`     | `string`             | `ZITADEL_PROJECT_SECRET` env | Project secret, sent as the bearer on the handoff exchange only (server-only)               |
+| `projectId`         | `string`             | `ZITADEL_PROJECT_ID`, else `VITE_ZITADEL_PROJECT_ID` env | The project this app signs its users in to. A session of any other project on the server reads as signed out and keeps its cookie; with no project, no session counts |
 | `proxyPath`         | `string`             | `"/__nextgen"`       | Path prefix proxied to the auth backend                                                        |
 | `protectedRoutes`   | `string[]`           | `[]`                 | Paths requiring a valid session. Trailing `*` matches sub-paths                                |
 | `ignoredRoutes`     | `string[]`           | `[]`                 | Paths skipped entirely — no JWT check. Trailing `*` matches sub-paths                          |

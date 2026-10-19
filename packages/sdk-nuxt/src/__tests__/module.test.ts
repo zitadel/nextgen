@@ -144,6 +144,19 @@ describe("@zitadel/sdk-nuxt module", () => {
     expect(runtime.public.zitadelProjectId).toBe("proj_local");
   });
 
+  // A build must not pin the project sessions are held to: the public project
+  // id (NUXT_PUBLIC_ZITADEL_PROJECT_ID at runtime) decides unless the app names
+  // one, and the runtime ZITADEL_PROJECT_ID is the last fallback.
+  it("leaves the session project to runtime unless nuxt.config names one", async () => {
+    vi.stubEnv("ZITADEL_PROJECT_ID", "proj_build_env");
+
+    const unnamed = await install({ envLocal: "ZITADEL_PROJECT_ID=proj_local\n" });
+    const named = await install({ nextgen: { projectId: "proj_config" } });
+
+    expect(unnamed.nextgen).toHaveProperty("projectId", undefined);
+    expect(named.nextgen.projectId).toBe("proj_config");
+  });
+
   it("prefers the environment over .env.local for the project id", async () => {
     vi.stubEnv("NUXT_PUBLIC_ZITADEL_PROJECT_ID", "proj_env");
 

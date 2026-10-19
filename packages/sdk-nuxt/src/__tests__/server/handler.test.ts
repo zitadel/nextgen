@@ -131,6 +131,7 @@ describe("middlewareOptions", () => {
     expect(
       middlewareOptions({
         url: "http://zitadel.test",
+        projectId: "proj_app",
         proxyPath: "/auth",
         loginPath: "/sign-in",
         protectedRoutes: ["/admin*"],
@@ -145,6 +146,7 @@ describe("middlewareOptions", () => {
       }),
     ).toEqual({
       url: "http://zitadel.test",
+      projectId: "proj_app",
       proxyPath: "/auth",
       loginPath: "/sign-in",
       protectedRoutes: ["/admin*"],
@@ -157,6 +159,17 @@ describe("middlewareOptions", () => {
       proxyTimeoutMs: 3000,
       opaqueTokenTimeoutMs: 4000,
     });
+  });
+
+  // The widgets sign users in to the public project id, so sessions are held
+  // to it when the module stored no server-side project.
+  it.each([
+    ["the stored project", { projectId: "proj_server" }, "proj_server"],
+    ["the public project id", { projectId: "" }, "proj_public"],
+  ])("holds sessions to %s", (_label, nextgen, expected) => {
+    expect(middlewareOptions(nextgen, { zitadelProjectId: "proj_public" }).projectId).toBe(
+      expected,
+    );
   });
 
   it("leaves the options Nitro stored as empty strings to the middleware's defaults", () => {

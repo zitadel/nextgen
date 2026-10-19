@@ -13,8 +13,17 @@ export {
   requiresProjectSecret,
   checkOpaqueSessionToken,
   validateOpaqueSessionToken,
+  jwtNamesProject,
+  resolveSession,
+  SESSION_PROJECT_MISMATCH,
 } from "./middleware.js";
-export type { OpaqueSession, OpaqueSessionCheck } from "./middleware.js";
+export type {
+  OpaqueSession,
+  OpaqueSessionCheck,
+  SessionTokens,
+  ResolveSessionOptions,
+  ResolvedSession,
+} from "./middleware.js";
 export {
   verifyJwt,
   decodeJwt,

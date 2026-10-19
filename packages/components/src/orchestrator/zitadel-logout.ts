@@ -201,7 +201,7 @@ export class ZitadelLogout extends ZitadelConfigured {
   // Re-projects once identity settles so template-mode markup shows it.
   private readonly session = new SessionController(
     this,
-    () => resolveApi(this.project, this.projectAttrs, "<zitadel-logout>").api,
+    () => resolveApi(this.project, this.projectAttrs, "<zitadel-logout>"),
     () => this.projectTemplate(),
   );
 
