@@ -478,7 +478,7 @@ describe("server middleware", () => {
   it("omits X-Forwarded-For when no client IP is available", async () => {
     const calls = captureFetch();
 
-    await serve(`${ORIGIN}/__nextgen/v1/flow`, {}, PROXY);
+    await serve(`${ORIGIN}/__nextgen/v1/flow`, { headers: { "x-real-ip": "10.9.9.9" } }, PROXY);
 
     expect(calls[0]?.headers.has("x-forwarded-for")).toBe(false);
   });

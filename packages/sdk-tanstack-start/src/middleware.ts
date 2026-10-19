@@ -43,7 +43,10 @@ export type NextgenRequestDecision =
 export type NextgenRequestOptions = NextgenMiddlewareOptions & {
   /** Project secret, sent as the bearer on the `POST /sessions/exchange` handoff only. */
   readonly projectSecret?: string;
-  /** Direct client address appended to the `X-Forwarded-For` chain. */
+  /**
+   * Direct client address appended to the `X-Forwarded-For` chain. Supply the
+   * address your server runtime provides; a request header is never used.
+   */
   readonly clientAddress?: string;
 };
 
@@ -61,7 +64,7 @@ function buildUpstreamHeaders(
     headers.set(key, value);
   }
 
-  const clientIp = clientAddress ?? request.headers.get("x-real-ip") ?? undefined;
+  const clientIp = clientAddress;
   if (clientIp) {
     const existingXff = headers.get("x-forwarded-for");
     headers.set("x-forwarded-for", existingXff ? `${existingXff}, ${clientIp}` : clientIp);
@@ -356,8 +359,7 @@ export function createNextgenRequestMiddleware(
   options: NextgenRequestOptions = {},
 ): (ctx: RequestMiddlewareContext) => Promise<Response> {
   return async ({ request, next }: RequestMiddlewareContext): Promise<Response> => {
-    const clientAddress = options.clientAddress ?? request.headers.get("x-real-ip") ?? undefined;
-    const decision = await handleNextgenRequest(request, { ...options, clientAddress });
+    const decision = await handleNextgenRequest(request, options);
 
     if (decision.type === "continue") {
       const result = await next({ context: { [CONTEXT_KEY]: decision.auth } });
