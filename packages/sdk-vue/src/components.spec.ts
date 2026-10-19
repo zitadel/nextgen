@@ -5,7 +5,8 @@ import type {
   ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
 
-import { render } from "@testing-library/vue";
+import { render, waitFor } from "@testing-library/vue";
+import { _resetConfigForTesting, configureZitadel } from "@zitadel/api/config";
 import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
@@ -15,7 +16,7 @@ import {
   type ZitadelLogoutConfig,
   type ZitadelSessionConfig,
 } from "@zitadel/sdk-core/types";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSSRApp, defineComponent, h, shallowRef, type Ref } from "vue";
 import { renderToString } from "vue/server-renderer";
 
@@ -237,6 +238,43 @@ describe("ZitadelSession", () => {
     expect(element).not.toBeNull();
     expect(element!.tagName.toLowerCase()).toBe("zitadel-session");
     expect(element).toBe(container.querySelector("zitadel-session"));
+  });
+});
+
+describe("hydrating a server-rendered login", () => {
+  afterEach(() => {
+    _resetConfigForTesting();
+    vi.restoreAllMocks();
+  });
+
+  it("starts its first flow with the purpose the server rendered", async () => {
+    const globalProject = configureZitadel({
+      projectId: "proj-global",
+      proxyPath: "https://flow.test.invalid",
+    });
+    const fetched = vi.spyOn(globalThis, "fetch");
+    const app = () =>
+      createSSRApp({
+        render: () => h(ZitadelLogin, { project: globalProject, purpose: "register" }),
+      });
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    host.innerHTML = await renderToString(app());
+
+    app().mount(host);
+
+    await waitFor(() => expect(fetched).toHaveBeenCalled());
+    const bodies = await Promise.all(
+      fetched.mock.calls.map(async ([input, init]) =>
+        JSON.parse(
+          String(init?.body ?? (input instanceof Request ? await input.clone().text() : "null")),
+        ),
+      ),
+    );
+    const created = bodies.filter((body) => body?.project_id);
+    expect(created).toHaveLength(1);
+    expect(created[0]).toMatchObject({ purpose: "register" });
+    host.remove();
   });
 });
 

@@ -169,6 +169,17 @@ describe("NextPatcher.plan", () => {
     expect(dep).toMatchObject({ name: "@zitadel/sdk-next", version: "0.1.0-alpha.0" });
   });
 
+  it.each([
+    ["1.2.0", "latest"],
+    ["2.0.0-beta.3", "beta"],
+  ])("pins the SDK for CLI %s at %s", (cliVersion, expected) => {
+    const plan = new NextPatcher().plan({ ...ctxFor("app"), cliVersion });
+    const dep = plan.ops.find(
+      (op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep",
+    );
+    expect(dep?.version).toBe(expected);
+  });
+
   it("leaves schema and flow files for setup's resource materializer", () => {
     const plan = new NextPatcher().plan(ctxFor("app"));
     expect(writeContents(plan, ".zitadel/schemas/user.json")).toBeUndefined();

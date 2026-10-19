@@ -105,3 +105,21 @@ describe("server-rendered widget config", () => {
     expect(serverAttributes(tag, component, { project: handle })).not.toHaveProperty("project");
   });
 });
+
+describe("server-rendered widget options", () => {
+  it("puts the resume flow id and post-sign-in URL into the login markup", () => {
+    expect(
+      serverAttributes("zitadel-login", ZitadelLogin, {
+        projectId: "proj-test",
+        resumeFlowId: "flow_123",
+        postSignInUrl: "/home",
+      }),
+    ).toMatchObject({ "resume-flow-id": "flow_123", "post-sign-in-url": "/home" });
+  });
+
+  it("leaves unset props out of the session markup", () => {
+    expect(
+      serverAttributes("zitadel-session", ZitadelSession, { projectId: "proj-test" }),
+    ).not.toHaveProperty("heading");
+  });
+});

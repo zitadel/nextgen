@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import { npmDistTagForCliVersion } from "../../../../public-cli";
+import { sdkVersionForCli } from "../../../../public-cli";
 import { configCandidates } from "../config-paths";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
@@ -72,7 +72,7 @@ export class NuxtPatcher extends AbstractRulePatcher {
       {
         kind: "add-dep",
         name: SDK_DEPENDENCY,
-        version: npmDistTagForCliVersion(ctx.cliVersion),
+        version: sdkVersionForCli(ctx.cliVersion),
       },
       // `nuxt dev` takes its port from the command line only, so without this
       // the app can serve a port the project does not allow as an origin.
