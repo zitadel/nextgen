@@ -222,6 +222,10 @@ describe("release artifact helpers", () => {
 
     let running = 0;
     let mostRunning = 0;
+    let everyoneStarted: () => void = () => undefined;
+    const allStarted = new Promise<void>((resolve) => {
+      everyoneStarted = resolve;
+    });
     const { archives, checksumPath } = await createArchives({
       repoRoot,
       outDir,
@@ -234,7 +238,10 @@ describe("release artifact helpers", () => {
         }
         running += 1;
         mostRunning = Math.max(mostRunning, running);
-        await new Promise((resolve) => setTimeout(resolve, 20));
+        if (running === SERVER_PLATFORMS.length) {
+          everyoneStarted();
+        }
+        await allStarted;
         await writeFile(archivePath, `archive ${basename(archivePath)}`);
         running -= 1;
       },

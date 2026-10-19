@@ -22,13 +22,19 @@ export const idValue = <Ctx>(resource: ResourceDescriptor<Ctx>, args: Json): str
   String(args[idName(resource)]);
 
 /**
+ * Words spelled with a vowel but said with a "yoo" sound, so they take "a":
+ * "a user", "a unique id". Add one here when a resource noun needs it.
+ */
+const YOO_SOUND = /^(?:user|unique|unit|usage)/i;
+
+/**
  * The indefinite article for a noun phrase, so a generated description reads
  * as English: "an identity provider connection", not "a identity provider
- * connection". Vowel letter rather than vowel sound, which is right for every
- * resource noun here and wrong only for words like "hour".
+ * connection". A vowel letter takes "an", except a word in {@link YOO_SOUND}.
+ * A silent "h" ("an hour") is not handled; no resource noun starts with one.
  */
 export const article = (phrase: string): string =>
-  "aeiou".includes(phrase[0]?.toLowerCase() ?? "") ? "an" : "a";
+  /^[aeiou]/i.test(phrase) && !YOO_SOUND.test(phrase) ? "an" : "a";
 
 export const capitalize = (word: string): string => word.charAt(0).toUpperCase() + word.slice(1);
 

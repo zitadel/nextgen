@@ -46,9 +46,20 @@ func releasePointers(revision string) []domain.ReleasePointer {
 	}
 }
 
+// releaseContent holds the revisions [releasePointers] describes.
+func releaseContent(revision string) domain.ReleaseContent {
+	return domain.ReleaseContent{
+		Schemas: []*domain.JSONSchema{
+			{URL: "https://example.com/schemas/human-user.json?v=" + revision, ObjectType: new("human-user")},
+		},
+		FlowDefinitions: []*domain.FlowDefinition{{ID: "flowdef_" + revision, Name: "default-login"}},
+		Branding:        &domain.Branding{ID: "brnd_" + revision},
+	}
+}
+
 func createRelease(t *testing.T, stmts service.AllStatements, projectID, revision string, metadata domain.ReleaseMetadata) *domain.Release {
 	t.Helper()
-	entity, err := domain.NewRelease(projectID, releasePointers(revision), metadata)
+	entity, err := domain.NewRelease(projectID, releaseContent(revision), metadata)
 	require.NoError(t, err)
 	require.NoError(t, stmts.CreateRelease(t.Context(), entity))
 	scope, err := stmts.GetResourceScopeInProject(t.Context(), domain.ResourceKindRelease, projectID, entity.ID)
@@ -151,7 +162,7 @@ func TestReleaseStatements_ContentHashUniquePerProject(t *testing.T) {
 
 		// Same pinned set, different metadata: metadata is excluded from the
 		// hash, so this collides.
-		dup, err := domain.NewRelease(projectID, releasePointers("0001"), domain.ReleaseMetadata{Message: new("second")})
+		dup, err := domain.NewRelease(projectID, releaseContent("0001"), domain.ReleaseMetadata{Message: new("second")})
 		require.NoError(t, err)
 		err = d.stmts.CreateRelease(t.Context(), dup)
 		assert.ErrorIs(t, err, new(database.IntegrityViolationError))

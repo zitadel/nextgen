@@ -109,6 +109,15 @@ type JSONSchema struct {
 	Schema     []byte
 }
 
+// Document parses the stored schema document.
+func (s *JSONSchema) Document() (*jsonschema.Schema, error) {
+	var document *jsonschema.Schema
+	if err := json.Unmarshal(s.Schema, &document); err != nil {
+		return nil, err
+	}
+	return document, nil
+}
+
 // JSONSchemaField enumerates the fields of JSONSchema which can be used for
 // filtering and ordering in list operations.
 type JSONSchemaField uint8

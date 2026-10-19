@@ -5,11 +5,16 @@
 # created first; see apps/cloud/launcher/database.go).
 #
 # The console is not embedded: it is a service of its own, and the launcher
-# turns the server's console off. Migrations run here, before the deployment
-# goes live, never when a function starts. A failed migration fails the
-# build and the previous deployment keeps serving, so every migration must
-# leave the schema readable by the deployment still serving
-# (expand/contract).
+# turns the server's console off. The services build one after another in
+# one checkout, and the console service's build lands in the server's embed
+# directory (internal/staticui/console/dist), so the launcher is compiled
+# with -tags noconsole; without it, the function would carry the console
+# whenever that service built first.
+#
+# Migrations run here, before the deployment goes live, never when a
+# function starts. A failed migration fails the build and the previous
+# deployment keeps serving, so every migration must leave the schema
+# readable by the deployment still serving (expand/contract).
 #
 # Output: $VERCEL_OUTPUT_FILE on Vercel, dist/nextgen-launcher locally.
 set -eu
@@ -32,7 +37,7 @@ date="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 out="${VERCEL_OUTPUT_FILE:-dist/nextgen-launcher}"
 mkdir -p "$(dirname "$out")"
 
-CGO_ENABLED=0 go build -trimpath \
+CGO_ENABLED=0 go build -trimpath -tags noconsole \
   -ldflags "-s -w \
     -X github.com/zitadel/nextgen/internal/build.version=${version}+cloud \
     -X github.com/zitadel/nextgen/internal/build.commit=${commit} \

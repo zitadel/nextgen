@@ -308,6 +308,22 @@ func TestVercelJSONServesTheConsoleAtConsolePath(t *testing.T) {
 	assert.Equal(t, []string{"/console/runtime.json → server", consolePath + "/(.*) → console"}, routes)
 }
 
+// The console service builds into the server's embed directory in the same
+// checkout, so the function is compiled without it; a plain build would
+// carry the console whenever that service built first.
+func TestBuildScriptLeavesTheConsoleOut(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "build.sh"))
+	require.NoError(t, err)
+	var builds []string
+	for _, line := range strings.Split(string(raw), "\n") {
+		if strings.Contains(line, "go build") && !strings.HasPrefix(strings.TrimSpace(line), "#") {
+			builds = append(builds, line)
+		}
+	}
+	require.Len(t, builds, 1, "build.sh compiles the function once")
+	assert.Contains(t, builds[0], "-tags noconsole")
+}
+
 func TestPrepareServerKeepsExplicitDefaults(t *testing.T) {
 	setLauncherEnv(t, t.TempDir())
 	t.Setenv("VERCEL_ENV", "production")
