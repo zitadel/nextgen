@@ -82,7 +82,8 @@ func TestRetentionJob_runIsTraced(t *testing.T) {
 
 type tracedExportSource struct {
 	*fakeExportSource
-	list, project trace.SpanContext
+	list     trace.SpanContext
+	projects map[string]trace.SpanContext
 }
 
 func (s *tracedExportSource) ListClaimedProjectIDs(ctx context.Context) ([]string, error) {
@@ -91,19 +92,70 @@ func (s *tracedExportSource) ListClaimedProjectIDs(ctx context.Context) ([]strin
 }
 
 func (s *tracedExportSource) GetEventSinkCursor(ctx context.Context, sinkID, projectID string) (*domain.EventSinkCursor, error) {
-	s.project = trace.SpanContextFromContext(ctx)
+	s.projects[projectID] = trace.SpanContextFromContext(ctx)
 	return s.fakeExportSource.GetEventSinkCursor(ctx, sinkID, projectID)
 }
 
+// rootSpans returns the exported root spans named name.
+func rootSpans(name string) []tracetest.SpanStub {
+	var found []tracetest.SpanStub
+	for _, s := range spanExporter.GetSpans() {
+		if s.Name == name && !s.Parent.IsValid() {
+			found = append(found, s)
+		}
+	}
+	return found
+}
+
+// A tick lists the projects under a short span of its own, and ships each
+// project to each sink under its own root, so one trace stays small however
+// many projects there are.
 func TestShipper_runIsTraced(t *testing.T) {
 	spanExporter.Reset()
-	src := &tracedExportSource{fakeExportSource: newFakeExportSource([]string{"proj_a"}, nil)}
+	t0 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	src := &tracedExportSource{
+		fakeExportSource: newFakeExportSource([]string{"proj_a", "proj_b"}, map[string][]*domain.Event{
+			"proj_b": {{ProjectID: "proj_b", ID: "evt_1", CreatedAt: t0, EventType: domain.EventTypeUserCreated, Category: domain.EventCategoryEntity}},
+		}),
+		projects: map[string]trace.SpanContext{},
+	}
 	s := NewShipper(src, ExportConfig{Enabled: true, Interval: time.Hour})
-	s.sinks = []*domain.EventSink{{ID: "sink_stdout", Type: domain.EventSinkTypeStdout, Enabled: true}}
+	// The sink type is unknown to deliver, so delivering proj_b's event fails.
+	s.sinks = []*domain.EventSink{{ID: "sink_x", Type: "unknown", Enabled: true}}
 
 	s.shipOnce()
 
-	span := jobSpan(t, "audit.ShipEvents")
-	assert.Equal(t, span.SpanContext, src.list, "the project list runs under the job span")
-	assert.Equal(t, span.SpanContext, src.project, "each project is shipped under the job span")
+	list := jobSpan(t, "audit.ListClaimedProjects")
+	assert.Equal(t, list.SpanContext, src.list, "the project list runs under the list span")
+
+	ships := rootSpans("audit.ShipEvents")
+	require.Len(t, ships, 2, "one root per sink and project")
+	for _, span := range ships {
+		attrs := attribute.NewSet(span.Attributes...)
+		project, _ := attrs.Value("zitadel.project.id")
+		sink, _ := attrs.Value("zitadel.event_sink.id")
+		assert.Equal(t, "sink_x", sink.AsString())
+		assert.True(t, attrs.HasValue(zotel.JobRoot.Key))
+		assert.True(t, span.SpanContext.IsSampled())
+		assert.Equal(t, span.SpanContext, src.projects[project.AsString()], "the project is shipped under its own root")
+		wantStatus := codes.Unset
+		if project.AsString() == "proj_b" {
+			wantStatus = codes.Error
+		}
+		assert.Equal(t, wantStatus, span.Status.Code, "a failed delivery fails the root of %s", project.AsString())
+	}
+}
+
+// Without sinks there is nothing to ship, so no loop runs and no project list
+// is read every interval.
+func TestShipper_StartWithoutSinksRunsNoLoop(t *testing.T) {
+	s := NewShipper(newFakeExportSource([]string{"proj_a"}, nil), ExportConfig{Enabled: true, Interval: time.Millisecond})
+	require.NoError(t, s.Start(t.Context()))
+	t.Cleanup(s.Close)
+
+	select {
+	case <-s.done:
+	default:
+		t.Fatal("the shipper started a loop without sinks")
+	}
 }
