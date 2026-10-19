@@ -7,6 +7,31 @@ export type Discovery = {
   readonly code_challenge_methods_supported?: readonly string[];
 };
 
+const textOf = (value: unknown): string | undefined =>
+  typeof value === "string" ? value : undefined;
+
+const textsOf = (value: unknown): readonly string[] | undefined =>
+  Array.isArray(value) && value.every((item) => typeof item === "string") ? value : undefined;
+
+/**
+ * Keeps only the fields that have the type the checks rely on, so a provider
+ * that answers `"scopes_supported": "openid email"` reads as not saying, never
+ * as a list the checks would search by substring.
+ */
+export function discoveryOf(raw: unknown): Discovery {
+  const record =
+    typeof raw === "object" && raw !== null
+      ? (raw as Partial<Record<keyof Discovery, unknown>>)
+      : {};
+  return {
+    issuer: textOf(record.issuer),
+    authorization_endpoint: textOf(record.authorization_endpoint),
+    scopes_supported: textsOf(record.scopes_supported),
+    claims_supported: textsOf(record.claims_supported),
+    code_challenge_methods_supported: textsOf(record.code_challenge_methods_supported),
+  };
+}
+
 /** Never rejects: a provider that cannot be reached is a result, not a crash. */
 export type DiscoveryResult =
   | {
@@ -154,7 +179,7 @@ export function idpContext(input: Omit<IdpContext, "discovery">): IdpContext {
           ok: true,
           url,
           source: "discovery",
-          document: JSON.parse(response.body) as Discovery,
+          document: discoveryOf(JSON.parse(response.body)),
         };
       } catch {
         return { ok: false, url, reason: `${url} did not return JSON` };
