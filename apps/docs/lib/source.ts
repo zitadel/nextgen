@@ -1,4 +1,4 @@
-import { llms, loader } from "fumadocs-core/source";
+import { llms, loader, update } from "fumadocs-core/source";
 import { lucideIconsPlugin } from "fumadocs-core/source/lucide-icons";
 import { metaSchema, pageSchema } from "fumadocs-core/source/schema";
 import { applyMdxPreset } from "fumadocs-mdx/config";
@@ -7,6 +7,7 @@ import type { OpenAPIV3_2, OperationItem, WebhookItem } from "fumadocs-openapi";
 
 import { codeThemes } from "./code-theme";
 import { defaultRequest, withRefValues } from "./default-request";
+import { shortDescription } from "./description";
 import { openapi } from "./openapi";
 import { sdkSample } from "./sdk-sample";
 import { docsRoute } from "./shared";
@@ -32,11 +33,25 @@ export const source = loader(
   {
     docs: docs.toFumadocsSource(),
     // A page per operation of the server's API, beside the reference's own
-    // pages in content/docs/reference/api.
-    openapi: await openapi.staticSource({
-      baseDir: "reference/api",
-      groupBy: "tag",
-    }),
+    // pages in content/docs/reference/api. Fumadocs makes the operation's
+    // whole description the page's description; the page keeps its first
+    // sentence, as plain text (lib/description.ts), and the body shows the
+    // whole of it.
+    openapi: update(
+      await openapi.staticSource({
+        baseDir: "reference/api",
+        groupBy: "tag",
+      }),
+    )
+      .page((page) =>
+        page.data.description === undefined
+          ? page
+          : {
+              ...page,
+              data: { ...page.data, description: shortDescription(page.data.description) },
+            },
+      )
+      .build(),
   },
   {
     baseUrl: docsRoute,
@@ -60,6 +75,19 @@ function operationText(page: OpenAPIPage) {
   const { operations = [], webhooks = [] } = page.data.getOpenAPIPageProps();
   const { bundled } = page.data.getSchema();
   const fragment = openapiFragment(bundled, operations, webhooks);
+  // The whole description, from the document: the page's own is a sentence.
+  const descriptions = [
+    ...operations.map(({ path, method }) => {
+      const item = bundled.paths?.[path];
+      return item?.[method]?.description ?? item?.description;
+    }),
+    ...webhooks.map(({ name, method }) => {
+      const item = bundled.webhooks?.[name];
+      return item && !("$ref" in item)
+        ? (item[method]?.description ?? item.description)
+        : undefined;
+    }),
+  ];
   const endpoints = [
     ...operations.map(({ method, path }) => `\`${method.toUpperCase()} ${path}\``),
     ...webhooks.map(({ method, name }) => `\`${method.toUpperCase()}\` webhook \`${name}\``),
@@ -70,7 +98,7 @@ function operationText(page: OpenAPIPage) {
   });
 
   return [
-    page.data.description,
+    ...descriptions,
     endpoints.join("\n"),
     samples.length > 0 &&
       "Called through [`@zitadel/api`](/docs/sdks/api-client), with the request the page shows:",

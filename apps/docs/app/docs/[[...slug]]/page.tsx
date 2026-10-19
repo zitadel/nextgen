@@ -24,7 +24,12 @@ export default async function Page(props: PageProps<"/docs/[[...slug]]">) {
   const header = (
     <>
       <DocsTitle>{page.data.title}</DocsTitle>
-      <DocsDescription className="mb-0">{page.data.description}</DocsDescription>
+      {/* An operation's or a webhook's body shows its whole description,
+          formatted, so its header is the title, as in Fumadocs' OpenAPI recipe.
+          The page's own description is a sentence of it (lib/source.ts). */}
+      {page.type === "docs" && (
+        <DocsDescription className="mb-0">{page.data.description}</DocsDescription>
+      )}
       <div className="flex flex-row gap-2 items-center border-b pb-6">
         <MarkdownCopyButton markdownUrl={markdownUrl} />
         <ViewOptionsPopover
