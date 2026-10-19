@@ -49,7 +49,7 @@
       "root": "apps/website",
       "framework": "nextjs",
       "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
-      "buildCommand": "pnpm run build"
+      "buildCommand": "turbo run build --filter=@zitadel/components && pnpm run build"
     }
   },
   "redirects": [
@@ -125,6 +125,12 @@
     },
     {
       "source": "/favicons/(.*)",
+      "destination": {
+        "service": "website"
+      }
+    },
+    {
+      "source": "/llms.txt",
       "destination": {
         "service": "website"
       }
