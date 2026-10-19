@@ -56,6 +56,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /v1/children", s.handleDeleteChild)
 	s.registerProjectRoutes(mux)
 	s.registerGrantRoutes(mux)
+	s.registerTeamRoutes(mux)
 	s.registerAuthRoutes(mux)
 	s.registerFGARoutes(mux)
 	s.registerLifecycleRoutes(mux)

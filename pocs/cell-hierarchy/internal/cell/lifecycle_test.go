@@ -191,30 +191,54 @@ func TestDeleteRemovesSubscriberTuplesAndTombstonesLookup(t *testing.T) {
 		t.Fatal("must not push lifecycle events to cells without interests")
 	}
 
-	// Direct grant on us gone.
+	// Direct grant on us tombstoned (still listed, Auth/FGA ignore).
 	tuples := getJSON(t, us, "/v1/projects/us/tuples")
 	defer tuples.Body.Close()
 	var usTuples struct {
 		Tuples []cell.TupleView `json:"tuples"`
 	}
 	decode(t, tuples, &usTuples)
+	foundUSJoe := false
 	for _, tup := range usTuples.Tuples {
 		if tup.UserKey == "joe@example.com" {
-			t.Fatalf("us still has joe tuple: %+v", tup)
+			foundUSJoe = true
+			if !tup.Tombstoned {
+				t.Fatalf("us joe tuple must be tombstoned: %+v", tup)
+			}
 		}
 	}
+	if !foundUSJoe {
+		t.Fatal("expected tombstoned joe tuple still listed on us")
+	}
 
-	// Home group membership gone → expand finds no joe.
+	fga := postJSON(t, us, "/v1/fga/check", map[string]any{
+		"project_id": "us", "object": "app:chat", "relation": "viewer", "user_key": "joe@example.com",
+	})
+	defer fga.Body.Close()
+	var fgaBody cell.FGACheckResponse
+	decode(t, fga, &fgaBody)
+	if fgaBody.Allowed {
+		t.Fatal("fga check must deny after grant tombstone")
+	}
+
+	// Home group membership tombstoned → expand finds no joe.
 	homeTuples := getJSON(t, eu2, "/v1/projects/team-eu-2/tuples")
 	defer homeTuples.Body.Close()
 	var eu2Tuples struct {
 		Tuples []cell.TupleView `json:"tuples"`
 	}
 	decode(t, homeTuples, &eu2Tuples)
+	foundHomeJoe := false
 	for _, tup := range eu2Tuples.Tuples {
 		if tup.UserKey == "joe@example.com" {
-			t.Fatalf("home still has joe tuple: %+v", tup)
+			foundHomeJoe = true
+			if !tup.Tombstoned {
+				t.Fatalf("home joe tuple must be tombstoned: %+v", tup)
+			}
 		}
+	}
+	if !foundHomeJoe {
+		t.Fatal("expected tombstoned joe group membership still listed on home")
 	}
 
 	// Interests unregistered on home.
@@ -313,4 +337,3 @@ func TestBlockFanOutOnlyToInterestedCells(t *testing.T) {
 		t.Fatalf("fan-out leaked to non-subscribers: %v", eventCells)
 	}
 }
-

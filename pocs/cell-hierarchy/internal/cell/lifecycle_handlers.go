@@ -23,10 +23,11 @@ type LifecycleEventRequest struct {
 }
 
 type LifecycleEventResponse struct {
-	OK            bool   `json:"ok"`
-	Type          string `json:"type"`
-	TuplesRemoved int64  `json:"tuples_removed,omitempty"`
-	Denylist      bool   `json:"denylist,omitempty"`
+	OK               bool   `json:"ok"`
+	Type             string `json:"type"`
+	TuplesRemoved    int64  `json:"tuples_removed,omitempty"` // tombstoned count (compat name)
+	TuplesTombstoned int64  `json:"tuples_tombstoned,omitempty"`
+	Denylist         bool   `json:"denylist,omitempty"`
 }
 
 type BlockUserResponse struct {
@@ -142,9 +143,9 @@ func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var trace []TraceHop
-	// Remove local user-subject tuples (e.g. group:A#member@joe) so expand fails.
+	// Tombstone local user-subject tuples (e.g. group:A#member@joe) so expand ignores them.
 	start := time.Now()
-	nLocal, err := s.Store.DeleteLocalUserTuples(key)
+	nLocal, err := s.Store.TombstoneLocalUserTuples(key, now)
 	trace = append(trace, TraceHop{
 		Cell: meta.URL, Method: "local tuple cleanup",
 		Ms: time.Since(start).Milliseconds(),
@@ -152,7 +153,7 @@ func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				return "error: " + err.Error()
 			}
-			return "removed=" + itoa64(nLocal)
+			return "tombstoned=" + itoa64(nLocal)
 		}(),
 	})
 
@@ -260,37 +261,40 @@ func (s *Server) handleLifecycleEvent(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, http.StatusOK, LifecycleEventResponse{OK: true, Type: req.Type, Denylist: true})
 	case EventUserDeleted:
-		var removed int64
+		var tombstoned int64
+		now := s.Now()
 		projectID := strings.TrimSpace(req.SubscriberProjectID)
 		if req.TupleID != "" {
-			err := s.Store.DeleteTupleByID(req.TupleID)
+			err := s.Store.TombstoneTupleByID(req.TupleID, now)
 			if err != nil && !errors.Is(err, ErrTupleNotFound) {
 				writeErr(w, http.StatusInternalServerError, err.Error())
 				return
 			}
 			if err == nil {
-				removed = 1
+				tombstoned = 1
 			}
 		}
-		// Also sweep any remaining user-subject grants for this principal on the
+		// Also sweep any remaining active user-subject grants for this principal on the
 		// subscriber project (or all local projects if unspecified).
 		if projectID != "" {
-			n, err := s.Store.DeleteTuplesForPrincipal(projectID, key)
+			n, err := s.Store.TombstoneTuplesForPrincipal(projectID, key, now)
 			if err != nil {
 				writeErr(w, http.StatusInternalServerError, err.Error())
 				return
 			}
-			removed += n
+			tombstoned += n
 		} else if req.TupleID == "" {
-			n, err := s.Store.DeleteLocalUserTuples(key)
+			n, err := s.Store.TombstoneLocalUserTuples(key, now)
 			if err != nil {
 				writeErr(w, http.StatusInternalServerError, err.Error())
 				return
 			}
-			removed += n
+			tombstoned += n
 		}
 		s.denylist.Clear(projectID, key)
-		writeJSON(w, http.StatusOK, LifecycleEventResponse{OK: true, Type: req.Type, TuplesRemoved: removed})
+		writeJSON(w, http.StatusOK, LifecycleEventResponse{
+			OK: true, Type: req.Type, TuplesRemoved: tombstoned, TuplesTombstoned: tombstoned,
+		})
 	default:
 		writeErr(w, http.StatusBadRequest, ErrEventUnknown.Error())
 	}

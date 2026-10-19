@@ -47,6 +47,11 @@ type Tuple struct {
 	HomeProjectID string
 	HomeCellURL   string
 	CreatedAt     time.Time
+	TombstonedAt  *time.Time
+}
+
+func (t Tuple) IsTombstoned() bool {
+	return t.TombstonedAt != nil
 }
 
 func (t Tuple) Kind() string {
@@ -119,7 +124,13 @@ CREATE TABLE IF NOT EXISTS interests (
 	if err != nil {
 		return err
 	}
-	return s.ensureColumn("tuples", "subject_kind", "TEXT NOT NULL DEFAULT 'user'")
+	if err := s.ensureColumn("tuples", "subject_kind", "TEXT NOT NULL DEFAULT 'user'"); err != nil {
+		return err
+	}
+	if err := s.ensureColumn("tuples", "tombstoned_at", "TEXT"); err != nil {
+		return err
+	}
+	return s.migrateTeams()
 }
 
 func (s *Store) CreateApp(a App) error {
@@ -267,15 +278,18 @@ func (s *Store) CreateTuple(t Tuple) error {
 	return err
 }
 
+const tupleSelectCols = `id, project_id, object, relation, subject_kind, user_key, home_project_id, home_cell_url, created_at, tombstoned_at`
+
 func scanTuple(scanner interface {
 	Scan(dest ...any) error
 }) (Tuple, error) {
 	var t Tuple
 	var created string
 	var kind sql.NullString
+	var tombstoned sql.NullString
 	err := scanner.Scan(
 		&t.ID, &t.ProjectID, &t.Object, &t.Relation, &kind,
-		&t.UserKey, &t.HomeProjectID, &t.HomeCellURL, &created,
+		&t.UserKey, &t.HomeProjectID, &t.HomeCellURL, &created, &tombstoned,
 	)
 	if err != nil {
 		return Tuple{}, err
@@ -286,13 +300,22 @@ func scanTuple(scanner interface {
 		t.SubjectKind = SubjectKindUser
 	}
 	t.CreatedAt, err = time.Parse(time.RFC3339Nano, created)
-	return t, err
+	if err != nil {
+		return Tuple{}, err
+	}
+	if tombstoned.Valid && tombstoned.String != "" {
+		ts, err := time.Parse(time.RFC3339Nano, tombstoned.String)
+		if err != nil {
+			return Tuple{}, err
+		}
+		t.TombstonedAt = &ts
+	}
+	return t, nil
 }
 
 func (s *Store) GetTuple(id string) (Tuple, error) {
 	row := s.db.QueryRow(
-		`SELECT id, project_id, object, relation, subject_kind, user_key, home_project_id, home_cell_url, created_at
-		 FROM tuples WHERE id = ?`, id,
+		`SELECT `+tupleSelectCols+` FROM tuples WHERE id = ?`, id,
 	)
 	t, err := scanTuple(row)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -303,8 +326,7 @@ func (s *Store) GetTuple(id string) (Tuple, error) {
 
 func (s *Store) ListTuples(projectID string) ([]Tuple, error) {
 	rows, err := s.db.Query(
-		`SELECT id, project_id, object, relation, subject_kind, user_key, home_project_id, home_cell_url, created_at
-		 FROM tuples WHERE project_id = ? ORDER BY object, relation, user_key`,
+		`SELECT `+tupleSelectCols+` FROM tuples WHERE project_id = ? ORDER BY object, relation, user_key`,
 		projectID,
 	)
 	if err != nil {
@@ -322,11 +344,12 @@ func (s *Store) ListTuples(projectID string) ([]Tuple, error) {
 	return out, rows.Err()
 }
 
-// ListTuplesForRelation returns local tuples for object#relation on a project.
+// ListTuplesForRelation returns active (non-tombstoned) local tuples for object#relation.
 func (s *Store) ListTuplesForRelation(projectID, object, relation string) ([]Tuple, error) {
 	rows, err := s.db.Query(
-		`SELECT id, project_id, object, relation, subject_kind, user_key, home_project_id, home_cell_url, created_at
-		 FROM tuples WHERE project_id = ? AND object = ? AND relation = ?
+		`SELECT `+tupleSelectCols+` FROM tuples
+		 WHERE project_id = ? AND object = ? AND relation = ?
+		   AND (tombstoned_at IS NULL OR tombstoned_at = '')
 		 ORDER BY subject_kind, user_key`,
 		projectID, strings.TrimSpace(object), strings.TrimSpace(relation),
 	)
@@ -343,6 +366,43 @@ func (s *Store) ListTuplesForRelation(projectID, object, relation string) ([]Tup
 		out = append(out, t)
 	}
 	return out, rows.Err()
+}
+
+// ReviveTombstonedTuple clears tombstoned_at on a matching row and refreshes home fields.
+func (s *Store) ReviveTombstonedTuple(projectID, object, relation, kind, key, homeProjectID, homeCellURL string, at time.Time) (Tuple, bool, error) {
+	row := s.db.QueryRow(
+		`SELECT `+tupleSelectCols+` FROM tuples
+		 WHERE project_id = ? AND object = ? AND relation = ? AND user_key = ?`,
+		projectID, strings.TrimSpace(object), strings.TrimSpace(relation), NormalizeSubjectKey(kind, key),
+	)
+	t, err := scanTuple(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Tuple{}, false, nil
+	}
+	if err != nil {
+		return Tuple{}, false, err
+	}
+	if !t.IsTombstoned() {
+		return Tuple{}, false, nil
+	}
+	kindNorm, err := NormalizeSubjectKind(kind)
+	if err != nil {
+		return Tuple{}, false, err
+	}
+	_, err = s.db.Exec(
+		`UPDATE tuples SET subject_kind = ?, home_project_id = ?, home_cell_url = ?, tombstoned_at = NULL, created_at = ?
+		 WHERE id = ?`,
+		kindNorm, homeProjectID, NormalizeURL(homeCellURL), at.UTC().Format(time.RFC3339Nano), t.ID,
+	)
+	if err != nil {
+		return Tuple{}, false, err
+	}
+	t.SubjectKind = kindNorm
+	t.HomeProjectID = homeProjectID
+	t.HomeCellURL = NormalizeURL(homeCellURL)
+	t.TombstonedAt = nil
+	t.CreatedAt = at
+	return t, true, nil
 }
 
 func (s *Store) CreateInterest(i Interest) error {
@@ -428,7 +488,10 @@ func (s *Store) CountUsers(projectID string) (int, error) {
 
 func (s *Store) CountTuples(projectID string) (int, error) {
 	var n int
-	err := s.db.QueryRow(`SELECT COUNT(*) FROM tuples WHERE project_id = ?`, projectID).Scan(&n)
+	err := s.db.QueryRow(
+		`SELECT COUNT(*) FROM tuples WHERE project_id = ? AND (tombstoned_at IS NULL OR tombstoned_at = '')`,
+		projectID,
+	).Scan(&n)
 	return n, err
 }
 

@@ -211,6 +211,11 @@ func (s *Server) handleGetProject(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	teams, err := s.Store.ListTeams(id)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	interests, err := s.Store.ListInterestsForProject(id)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
@@ -233,6 +238,10 @@ func (s *Server) handleGetProject(w http.ResponseWriter, r *http.Request) {
 	for _, t := range tuples {
 		tv = append(tv, tupleView(t))
 	}
+	tev := make([]TeamView, 0, len(teams))
+	for _, t := range teams {
+		tev = append(tev, teamView(t))
+	}
 	iv := make([]InterestView, 0, len(interests))
 	for _, i := range interests {
 		iv = append(iv, interestView(i))
@@ -242,6 +251,7 @@ func (s *Server) handleGetProject(w http.ResponseWriter, r *http.Request) {
 		"users":     uv,
 		"lookup":    lv,
 		"apps":      av,
+		"teams":     tev,
 		"tuples":    tv,
 		"interests": iv,
 	})

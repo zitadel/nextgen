@@ -1,0 +1,102 @@
+{{define "create"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{{.Title}} · cell hierarchy</title>
+  <style>
+    :root { --bg:#0f1419; --panel:#1a222c; --text:#e7ecf1; --muted:#8b9aab; --accent:#3d9cf0; --ok:#3ecf8e; --bad:#f07178; --border:#2a3542; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:ui-sans-serif,system-ui,sans-serif; background:var(--bg); color:var(--text); line-height:1.45; }
+    header { display:flex; gap:1rem; align-items:center; padding:0.75rem 1.25rem; border-bottom:1px solid var(--border); background:var(--panel); }
+    header a { color:var(--muted); text-decoration:none; margin-right:0.75rem; }
+    header a:hover { color:var(--accent); }
+    main { padding:1.25rem; max-width:960px; margin:0 auto; }
+    .panel { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:1rem; margin-bottom:1rem; }
+    .muted { color:var(--muted); font-size:0.875rem; }
+    .flash-ok { color:var(--ok); margin-bottom:0.75rem; }
+    .flash-err { color:var(--bad); margin-bottom:0.75rem; }
+    label { display:block; margin:0.5rem 0 0.25rem; color:var(--muted); font-size:0.875rem; }
+    input, select, button { font:inherit; padding:0.45rem 0.6rem; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text); }
+    input, select { width:100%; }
+    button { background:var(--accent); border-color:var(--accent); color:#041018; font-weight:600; cursor:pointer; margin-top:0.5rem; }
+    .check { display:flex; align-items:center; gap:0.4rem; margin-top:0.5rem; }
+    .check input { width:auto; }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>cell hierarchy</strong>
+    <nav><a href="/">Tree</a><a href="/create">Create</a><a href="/join">Join</a><a href="/scenarios">Scenarios</a></nav>
+  </header>
+  <main>
+    <h1>Create resources</h1>
+    <p class="muted">Operators create projects, teams, and apps on the correct host cell. Projects are discovered by listing each cell’s <code>/v1/projects</code>.</p>
+    {{if .Flash}}<div class="flash-ok">{{.Flash}}</div>{{end}}
+    {{if .FlashErr}}<div class="flash-err">{{.FlashErr}}</div>{{end}}
+
+    <div class="panel">
+      <h2 style="font-size:1rem;margin:0 0 0.5rem">Project / sub-project</h2>
+      <p class="muted">POST create on the selected host cell, then attach if a parent project is set.</p>
+      <form method="post" action="/create/project">
+        <label for="host_cell">Host cell</label>
+        <select id="host_cell" name="host_cell" required>
+          {{range .Cells}}
+          <option value="{{.Label}}">{{.Label}}</option>
+          {{end}}
+        </select>
+        <label for="proj_id">ID (optional)</label>
+        <input id="proj_id" name="id" placeholder="my-project"/>
+        <label for="proj_name">Name</label>
+        <input id="proj_name" name="name" required placeholder="My project"/>
+        <label class="check"><input type="checkbox" name="is_parent" value="1"/> is_parent</label>
+        <label class="check"><input type="checkbox" name="lookup_enabled" value="1"/> lookup_enabled</label>
+        <label for="parent_project_id">Parent project (optional — across cells)</label>
+        <select id="parent_project_id" name="parent_project_id">
+          <option value="">— none —</option>
+          {{range .Projects}}
+          <option value="{{.ID}}">{{.ID}} ({{.Name}}) · {{.HostLabel}}</option>
+          {{end}}
+        </select>
+        <button type="submit">Create project</button>
+      </form>
+    </div>
+
+    <div class="panel">
+      <h2 style="font-size:1rem;margin:0 0 0.5rem">Team / sub-team</h2>
+      <p class="muted">Teams live under a project (<code>GET/POST /v1/projects/{id}/teams</code>). Optional parent team must be in the same project.</p>
+      <form method="post" action="/create/team">
+        <label for="team_project">Project</label>
+        <select id="team_project" name="project_id" required>
+          {{range .Projects}}
+          <option value="{{.ID}}">{{.ID}} ({{.Name}}) · {{.HostLabel}}</option>
+          {{end}}
+        </select>
+        <label for="team_name">Name</label>
+        <input id="team_name" name="name" required placeholder="Engineering"/>
+        <label for="parent_team_id">Parent team id (optional, same project)</label>
+        <input id="parent_team_id" name="parent_team_id" placeholder=""/>
+        <button type="submit">Create team</button>
+      </form>
+    </div>
+
+    <div class="panel">
+      <h2 style="font-size:1rem;margin:0 0 0.5rem">App</h2>
+      <p class="muted">Creates an app on the project’s host cell via <code>POST /v1/projects/{id}/apps</code>.</p>
+      <form method="post" action="/create/app">
+        <label for="app_project">Project</label>
+        <select id="app_project" name="project_id" required>
+          {{range .Projects}}
+          <option value="{{.ID}}">{{.ID}} ({{.Name}}) · {{.HostLabel}}</option>
+          {{end}}
+        </select>
+        <label for="app_name">Name</label>
+        <input id="app_name" name="name" required placeholder="chat"/>
+        <button type="submit">Create app</button>
+      </form>
+    </div>
+  </main>
+</body>
+</html>
+{{end}}

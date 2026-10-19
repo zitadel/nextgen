@@ -12,7 +12,8 @@ import (
 )
 
 type PeerClient struct {
-	HTTP *http.Client
+	HTTP       *http.Client
+	ExtraDelay time.Duration // optional sleep before each outbound HTTP (UI scenario strip)
 }
 
 func NewPeerClient() *PeerClient {
@@ -259,6 +260,9 @@ func (c *PeerClient) CreateTuple(ctx context.Context, cellURL, projectID string,
 
 // doJSONAllowError unmarshals the body even when status >= 300 so callers can keep traces.
 func (c *PeerClient) doJSONAllowError(ctx context.Context, method, url string, body any, out any) error {
+	if err := c.applyExtraDelay(ctx); err != nil {
+		return err
+	}
 	var rdr io.Reader
 	if body != nil {
 		b, err := json.Marshal(body)
@@ -302,6 +306,20 @@ func (c *PeerClient) doJSONAllowError(ctx context.Context, method, url string, b
 func (c *PeerClient) CreateApp(ctx context.Context, cellURL, projectID string, body map[string]any) (AppView, error) {
 	var out AppView
 	err := c.doJSON(ctx, http.MethodPost, NormalizeURL(cellURL)+"/v1/projects/"+projectID+"/apps", body, "", &out)
+	return out, err
+}
+
+func (c *PeerClient) ListTeams(ctx context.Context, cellURL, projectID string) ([]TeamView, error) {
+	var out struct {
+		Teams []TeamView `json:"teams"`
+	}
+	err := c.doJSON(ctx, http.MethodGet, NormalizeURL(cellURL)+"/v1/projects/"+projectID+"/teams", nil, "", &out)
+	return out.Teams, err
+}
+
+func (c *PeerClient) CreateTeam(ctx context.Context, cellURL, projectID string, body map[string]any) (TeamView, error) {
+	var out TeamView
+	err := c.doJSON(ctx, http.MethodPost, NormalizeURL(cellURL)+"/v1/projects/"+projectID+"/teams", body, "", &out)
 	return out, err
 }
 
@@ -398,7 +416,24 @@ func (c *PeerClient) DeleteUser(ctx context.Context, cellURL, projectID, key str
 	return out, err
 }
 
+func (c *PeerClient) applyExtraDelay(ctx context.Context) error {
+	if c == nil || c.ExtraDelay <= 0 {
+		return nil
+	}
+	t := time.NewTimer(c.ExtraDelay)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-t.C:
+		return nil
+	}
+}
+
 func (c *PeerClient) doJSON(ctx context.Context, method, url string, body any, bearer string, out any) error {
+	if err := c.applyExtraDelay(ctx); err != nil {
+		return err
+	}
 	var rdr io.Reader
 	if body != nil {
 		b, err := json.Marshal(body)

@@ -17,6 +17,8 @@
     .flash-err { color:var(--bad); }
     .badge { display:inline-block; font-size:0.7rem; padding:0.1rem 0.4rem; border-radius:4px; border:1px solid var(--border); color:var(--muted); margin-left:0.35rem; }
     .badge.lookup { color:var(--ok); border-color:var(--ok); }
+    .badge.tombstone { color:var(--muted); border-color:var(--muted); text-decoration:line-through; }
+    tr.tombstoned td { opacity:0.55; text-decoration:line-through; }
     table { width:100%; border-collapse:collapse; }
     th, td { text-align:left; padding:0.4rem 0.5rem; border-bottom:1px solid var(--border); font-size:0.9rem; }
     code { font-size:0.8rem; color:var(--muted); }
@@ -25,7 +27,7 @@
 <body>
   <header>
     <strong>cell hierarchy</strong>
-    <nav><a href="/">Tree</a><a href="/join">Join</a><a href="/scenarios">Scenarios</a></nav>
+    <nav><a href="/">Tree</a><a href="/create">Create</a><a href="/join">Join</a><a href="/scenarios">Scenarios</a></nav>
   </header>
   <main>
     <h1>{{.Title}}</h1>
@@ -65,6 +67,26 @@
         {{end}}
       </div>
       <div class="panel">
+        <h2 style="font-size:1rem;margin:0 0 0.5rem">Teams</h2>
+        {{if .Teams}}
+        <table>
+          <thead><tr><th>Name</th><th>ID</th><th>Parent</th><th>Created</th></tr></thead>
+          <tbody>
+          {{range .Teams}}
+            <tr>
+              <td>{{.Name}}</td>
+              <td><code>{{.ID}}</code></td>
+              <td class="muted">{{if .ParentTeamID}}{{.ParentTeamID}}{{else}}—{{end}}</td>
+              <td class="muted">{{.CreatedAt}}</td>
+            </tr>
+          {{end}}
+          </tbody>
+        </table>
+        {{else}}
+        <p class="muted">No teams on this project. Create one via <a href="/create">Create</a>.</p>
+        {{end}}
+      </div>
+      <div class="panel">
         <h2 style="font-size:1rem;margin:0 0 0.5rem">Apps</h2>
         {{if .Apps}}
         <table>
@@ -83,15 +105,16 @@
         <h2 style="font-size:1rem;margin:0 0 0.5rem">Tuples (grants)</h2>
         {{if .Tuples}}
         <table>
-          <thead><tr><th>Object</th><th>Relation</th><th>Kind</th><th>Subject</th><th>Home</th></tr></thead>
+          <thead><tr><th>Object</th><th>Relation</th><th>Kind</th><th>Subject</th><th>Home</th><th>Status</th></tr></thead>
           <tbody>
           {{range .Tuples}}
-            <tr>
+            <tr{{if .Tombstoned}} class="tombstoned"{{end}}>
               <td><code>{{.Object}}</code></td>
               <td>{{.Relation}}</td>
               <td class="muted">{{.SubjectKind}}</td>
               <td><code>{{.Subject}}</code></td>
               <td class="muted">{{.HomeProjectID}}</td>
+              <td>{{if .Tombstoned}}<span class="badge tombstone">tombstone</span>{{else}}<span class="muted">active</span>{{end}}</td>
             </tr>
           {{end}}
           </tbody>
@@ -102,7 +125,7 @@
       </div>
       <div class="panel">
         <h2 style="font-size:1rem;margin:0 0 0.5rem">Interests (home of principals)</h2>
-        <p class="muted">Interests registered when another cell grants a principal whose home is this project.</p>
+        <p class="muted">Interests registered when another cell grants a principal whose home is this project. <strong>Why this matters:</strong> when this principal is deleted, home pushes <code>user.deleted</code> here → subscriber tombstones the grant (row stays visible with a tombstone badge; auth/FGA ignore it).</p>
         {{if .Interests}}
         <table>
           <thead><tr><th>Principal</th><th>Object</th><th>Relation</th><th>Subscriber</th><th>Tuple</th></tr></thead>

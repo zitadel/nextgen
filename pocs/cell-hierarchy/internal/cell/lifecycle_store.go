@@ -245,7 +245,62 @@ func (s *Store) DeleteInterestsForPrincipal(homeProjectID, principalKey string) 
 	return res.RowsAffected()
 }
 
+// TombstoneTuplesForPrincipal marks user-subject tuples for this principal as tombstoned.
+func (s *Store) TombstoneTuplesForPrincipal(projectID, principalKey string, at time.Time) (int64, error) {
+	atStr := at.UTC().Format(time.RFC3339Nano)
+	res, err := s.db.Exec(
+		`UPDATE tuples SET tombstoned_at = ?
+		 WHERE project_id = ? AND subject_kind = ? AND user_key = ?
+		   AND (tombstoned_at IS NULL OR tombstoned_at = '')`,
+		atStr, projectID, SubjectKindUser, NormalizeKey(principalKey),
+	)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+// TombstoneTupleByID marks one tuple as tombstoned (subscriber cleans a known grant).
+func (s *Store) TombstoneTupleByID(id string, at time.Time) error {
+	atStr := at.UTC().Format(time.RFC3339Nano)
+	res, err := s.db.Exec(
+		`UPDATE tuples SET tombstoned_at = ?
+		 WHERE id = ? AND (tombstoned_at IS NULL OR tombstoned_at = '')`,
+		atStr, id,
+	)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		// Already tombstoned or missing — treat missing as not found.
+		_, err := s.GetTuple(id)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	return nil
+}
+
+// TombstoneLocalUserTuples tombstones every active user-subject tuple for principal
+// across all projects on this cell (home-side group memberships + any local grants).
+func (s *Store) TombstoneLocalUserTuples(principalKey string, at time.Time) (int64, error) {
+	atStr := at.UTC().Format(time.RFC3339Nano)
+	res, err := s.db.Exec(
+		`UPDATE tuples SET tombstoned_at = ?
+		 WHERE subject_kind = ? AND user_key = ?
+		   AND (tombstoned_at IS NULL OR tombstoned_at = '')`,
+		atStr, SubjectKindUser, NormalizeKey(principalKey),
+	)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
 // DeleteTuplesForPrincipal removes user-subject tuples for this principal on a project.
+// Prefer TombstoneTuplesForPrincipal for interest fan-out demos.
 func (s *Store) DeleteTuplesForPrincipal(projectID, principalKey string) (int64, error) {
 	res, err := s.db.Exec(
 		`DELETE FROM tuples WHERE project_id = ? AND subject_kind = ? AND user_key = ?`,
@@ -257,7 +312,7 @@ func (s *Store) DeleteTuplesForPrincipal(projectID, principalKey string) (int64,
 	return res.RowsAffected()
 }
 
-// DeleteTupleByID removes one tuple by id (subscriber cleans a known grant).
+// DeleteTupleByID removes one tuple by id.
 func (s *Store) DeleteTupleByID(id string) error {
 	res, err := s.db.Exec(`DELETE FROM tuples WHERE id = ?`, id)
 	if err != nil {
@@ -270,8 +325,7 @@ func (s *Store) DeleteTupleByID(id string) error {
 	return nil
 }
 
-// DeleteLocalUserTuples removes every user-subject tuple for principal across all
-// projects on this cell (home-side group memberships + any local grants).
+// DeleteLocalUserTuples removes every user-subject tuple for principal across all projects.
 func (s *Store) DeleteLocalUserTuples(principalKey string) (int64, error) {
 	res, err := s.db.Exec(
 		`DELETE FROM tuples WHERE subject_kind = ? AND user_key = ?`,

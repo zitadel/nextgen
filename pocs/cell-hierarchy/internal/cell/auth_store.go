@@ -150,6 +150,9 @@ func (s *Store) FindGrant(projectID, object, relation, userKey, homeProjectID, h
 	homeCellURL = NormalizeURL(homeCellURL)
 	wantSubject := FormatSubject(key, homeProjectID, homeCellURL)
 	for _, t := range tuples {
+		if t.IsTombstoned() {
+			continue
+		}
 		if t.Object != object || t.Relation != relation {
 			continue
 		}

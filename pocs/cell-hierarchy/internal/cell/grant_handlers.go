@@ -18,16 +18,18 @@ type AppView struct {
 }
 
 type TupleView struct {
-	ID            string `json:"id"`
-	ProjectID     string `json:"project_id"`
-	Object        string `json:"object"`
-	Relation      string `json:"relation"`
-	SubjectKind   string `json:"subject_kind"`
-	UserKey       string `json:"user_key"`
-	HomeProjectID string `json:"home_project_id"`
-	HomeCellURL   string `json:"home_cell_url"`
-	Subject       string `json:"subject"`
-	CreatedAt     string `json:"created_at"`
+	ID            string  `json:"id"`
+	ProjectID     string  `json:"project_id"`
+	Object        string  `json:"object"`
+	Relation      string  `json:"relation"`
+	SubjectKind   string  `json:"subject_kind"`
+	UserKey       string  `json:"user_key"`
+	HomeProjectID string  `json:"home_project_id"`
+	HomeCellURL   string  `json:"home_cell_url"`
+	Subject       string  `json:"subject"`
+	CreatedAt     string  `json:"created_at"`
+	Tombstoned    bool    `json:"tombstoned"`
+	TombstonedAt  *string `json:"tombstoned_at,omitempty"`
 }
 
 type InterestView struct {
@@ -50,12 +52,18 @@ func appView(a App) AppView {
 }
 
 func tupleView(t Tuple) TupleView {
-	return TupleView{
+	v := TupleView{
 		ID: t.ID, ProjectID: t.ProjectID, Object: t.Object, Relation: t.Relation,
 		SubjectKind: t.Kind(), UserKey: t.UserKey,
 		HomeProjectID: t.HomeProjectID, HomeCellURL: t.HomeCellURL,
 		Subject: t.Subject(), CreatedAt: t.CreatedAt.UTC().Format(time.RFC3339Nano),
+		Tombstoned: t.IsTombstoned(),
 	}
+	if t.TombstonedAt != nil {
+		s := t.TombstonedAt.UTC().Format(time.RFC3339Nano)
+		v.TombstonedAt = &s
+	}
+	return v
 }
 
 func interestView(i Interest) InterestView {
@@ -305,16 +313,30 @@ func (s *Server) handleCreateTuple(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	if err := s.Store.CreateTuple(t); err != nil {
 		if errors.Is(err, ErrTupleExists) {
-			writeErr(w, http.StatusConflict, err.Error())
+			revived, ok, revErr := s.Store.ReviveTombstonedTuple(p.ID, object, relation, kind, key, homeProjectID, homeCellURL, now)
+			if revErr != nil {
+				writeErr(w, http.StatusInternalServerError, revErr.Error())
+				return
+			}
+			if !ok {
+				writeErr(w, http.StatusConflict, err.Error())
+				return
+			}
+			t = revived
+			trace = append(trace, TraceHop{
+				Cell: meta.URL, Method: "local tuple write",
+				Ms: time.Since(start).Milliseconds(), Result: "revived@" + p.ID,
+			})
+		} else {
+			writeErr(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		writeErr(w, http.StatusBadRequest, err.Error())
-		return
+	} else {
+		trace = append(trace, TraceHop{
+			Cell: meta.URL, Method: "local tuple write",
+			Ms: time.Since(start).Milliseconds(), Result: "created@" + p.ID,
+		})
 	}
-	trace = append(trace, TraceHop{
-		Cell: meta.URL, Method: "local tuple write",
-		Ms: time.Since(start).Milliseconds(), Result: "created@" + p.ID,
-	})
 
 	if !req.SkipInterest && kind == SubjectKindUser {
 		hopStart := time.Now()

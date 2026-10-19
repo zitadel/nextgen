@@ -1,6 +1,6 @@
-# Cell hierarchy POC (Phase 1–6)
+# Cell hierarchy POC (Phase 1–6 + UX)
 
-Greenfield multi-container Go cells with SQLite membership, join/heartbeat, project attach, user lookup float-up, regional apps/grants with home-cell interest registration, inspectable home-issued JWTs (Ed25519 / JWKS), resource-cell auth checks, cross-cell group Expand/Check with hop traces, **user block/delete with epoch + interest fan-out**, and an HTMX UI.
+Greenfield multi-container Go cells with SQLite membership, join/heartbeat, project attach, user lookup float-up, regional apps/grants with home-cell interest registration, inspectable home-issued JWTs (Ed25519 / JWKS), resource-cell auth checks, cross-cell group Expand/Check with hop traces, **user block/delete with epoch + interest fan-out (grant tombstones)**, operator **Create** forms, scenario entry-cell/delay controls, and an HTMX UI.
 
 Lives under `pocs/cell-hierarchy/` as a nested Go module (not wired into Moon/CI).
 
@@ -62,17 +62,38 @@ cd pocs/cell-hierarchy
 - Cells: http://localhost:8100–8106
 - Bootstrap runs joins then `scripts/bootstrap-projects.sh` (projects, attach, seed users with float, seed `chat` app on `us`, seed Phase 5 group chain).
 
+## Create page + teams
+
+UI → **Create** (`/create`):
+
+| Form | Behavior |
+|---|---|
+| Project / sub-project | Pick **host cell**, id/name/flags; optional parent project (listed across all cells). `POST` create on host, then `attach` if parent set. |
+| Team / sub-team | Pick project (across cells), name, optional parent team id (same project). `GET/POST /v1/projects/{id}/teams`. Shown on project detail. |
+| App | Pick project + name → `POST /v1/projects/{id}/apps` on that project’s host cell. |
+
+## Scenario shared controls
+
+On `/scenarios`, the top strip sets:
+
+- **Entry cell** — which cell’s project the scenario uses (`projectOnCell`: prefer project id == cell label, else first local project). Defaults: lookup/grant/sign-in auth/group/block-delete resource → `us`; create-user → `eu-2`. Changing the strip overrides every form.
+- **Inter-cell delay (ms)** 0–200 — sets `PeerClient.ExtraDelay` for the run (sleep before each outbound HTTP). Group check also passes the same value as FGA `delay_ms`.
+
+## Tombstoned grants (interests)
+
+`user.deleted` no longer hard-deletes subscriber tuples. The subscriber sets `tombstoned_at` on matching grants; `ListTuples` still returns them with `tombstoned: true`. Auth check and FGA check/expand ignore tombstoned rows. Project detail shows a **tombstone** badge. Interests copy explains: home pushes `user.deleted` → subscriber tombstones the grant.
+
 ## Phase 6 scenarios
 
 | Scenario | How |
 |---|---|
 | Block Joe | UI → Scenarios → **Block Joe**. Home bumps epoch, sets blocked, pushes `user.blocked` to interest subscribers (us). Trace lists only those cells. |
 | Online deny / offline allow | Same scenario shows auth offline **allowed** (JWT still valid) and online **denied** (`principal_inactive` / denylist / epoch). Wait ~60s or simulate `exp` → offline would then deny with `token_expired`. |
-| Delete Joe | UI → Scenarios → **Delete Joe**. Fans out `user.deleted` → us drops direct joe tuples; home clears local user-subject tuples (group memberships); lookup floats tombstone; interests unregistered. Group FGA check fails; lookup returns tombstone/miss. |
+| Delete Joe | UI → Scenarios → **Delete Joe**. Fans out `user.deleted` → resource cell **tombstones** the direct grant (still listed); home tombstones local user-subject tuples; lookup floats tombstone; interests unregistered after fan-out. Result panel shows interests notified, active→tombstoned counts, and tombstoned subjects. |
 | Fan-out scope | Trace after block/delete shows `POST /v1/events/user` only to cells with registered interests — not aus/platform/eu. |
 | Home down (optional) | Stop eu-2: event push errors (fail-closed); online `principal/check` fails closed. Offline still uses local JWT+grant until exp. |
 
-After delete, Joe’s home row is a tombstone (same email cannot be recreated) — re-run `./scripts/run-local.sh` for a fresh demo.
+After delete, Joe’s home **user** row is a tombstone (same email cannot be recreated) — re-run `./scripts/run-local.sh` for a fresh demo. Grant rows remain as tuple tombstones.
 
 Manual curl (after bootstrap + Phase 3 grant):
 
@@ -210,9 +231,10 @@ Optional demo delay: set `FLOAT_DELAY_MS` on a cell so each float push sleeps (m
 |---|---|---|
 | `POST` | `/v1/projects/{id}/users/{key}/block` | Increment epoch, set blocked; push `user.blocked` to each interest subscriber |
 | `POST` | `/v1/users/{project}/{key}/block` | Alias of the above |
-| `POST` | `/v1/projects/{id}/users/{key}/delete` | Tombstone user; clear local user tuples; fan-out `user.deleted`; float lookup tombstone; unregister interests |
+| `POST` | `/v1/projects/{id}/users/{key}/delete` | Tombstone user; tombstone local user tuples; fan-out `user.deleted`; float lookup tombstone; unregister interests |
 | `POST` | `/v1/users/{project}/{key}/delete` | Alias of the above |
-| `POST` | `/v1/events/user` | Subscriber: `user.blocked` → denylist (TTL ≈ token TTL); `user.deleted` → delete matching tuples |
+| `POST` | `/v1/events/user` | Subscriber: `user.blocked` → denylist (TTL ≈ token TTL); `user.deleted` → **tombstone** matching tuples |
+| `GET/POST` | `/v1/projects/{id}/teams` | List / create teams (`parent_team_id` optional, same project) |
 | `POST` | `/v1/lifecycle/push` | Alias of `/v1/events/user` |
 | `POST` | `/v1/lookup/tombstone` | Ancestor receives floated tombstone row |
 
@@ -298,7 +320,8 @@ JWT claims: `sub`, `home_cell`, `home_project`, `aud`, `epoch`, `exp` (60s TTL),
 5. **Sign in on us as Joe** — JWT + online/offline auth (Phase 4)
 6. **Seed group chain → Group check** — cross-cell expand latency (Phase 5)
 7. **Block Joe** — online deny, offline allow until exp (Phase 6)
-8. **Delete Joe** — us grant gone, group check fails, lookup tombstone; re-bootstrap to repeat
+8. **Delete Joe** — us grant tombstoned (badge on project detail), group check fails, lookup tombstone; inspect interests-notified + active/tombstoned counts; re-bootstrap to repeat
+9. **Create** — add a team under `us`, or a sub-project attached to `eu`
 
 ## Tests
 

@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -71,6 +70,10 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("GET /tree", a.handleTree)
 	mux.HandleFunc("GET /join", a.handleJoinForm)
 	mux.HandleFunc("POST /join", a.handleJoinSubmit)
+	mux.HandleFunc("GET /create", a.handleCreateForm)
+	mux.HandleFunc("POST /create/project", a.handleCreateProject)
+	mux.HandleFunc("POST /create/team", a.handleCreateTeam)
+	mux.HandleFunc("POST /create/app", a.handleCreateAppForm)
 	mux.HandleFunc("GET /cells/{label}", a.handleCellDetail)
 	mux.HandleFunc("GET /projects/{id}", a.handleProjectDetail)
 	mux.HandleFunc("GET /scenarios", a.handleScenarios)
@@ -123,6 +126,7 @@ type pageData struct {
 	ProjectTree []*projectNode
 	Parents     []CellRef
 	UnjoinedO   []CellRef
+	Cells       []CellRef
 	Detail      *cellDetail
 	Project     *projectDetail
 	Trace       []traceEntry
@@ -135,23 +139,30 @@ type pageData struct {
 }
 
 type lifecycleResult struct {
-	Action         string
-	Epoch          int
-	Blocked        bool
-	Deleted        bool
-	OnlineAllowed  bool
-	OnlineReason   string
-	OfflineAllowed bool
-	OfflineReason  string
-	Token          string
-	USTuplesBefore int
-	USTuplesAfter  int
-	GroupAllowed   *bool
-	GroupReason    string
-	LookupHit      bool
-	LookupState    string
-	Note           string
-	Hops           []cell.TraceHop
+	Action                  string
+	Epoch                   int
+	Blocked                 bool
+	Deleted                 bool
+	OnlineAllowed           bool
+	OnlineReason            string
+	OfflineAllowed          bool
+	OfflineReason           string
+	Token                   string
+	USTuplesBefore          int // active before
+	USTuplesAfter           int // active after (compat)
+	USTuplesActiveAfter     int
+	USTuplesTombstonedAfter int
+	TombstonedSubjects      []string
+	InterestsBefore         int
+	InterestsNotified       []string
+	ResourceCell            string
+	ResourceProject         string
+	GroupAllowed            *bool
+	GroupReason             string
+	LookupHit               bool
+	LookupState             string
+	Note                    string
+	Hops                    []cell.TraceHop
 }
 
 type signInResult struct {
@@ -190,6 +201,7 @@ type projectDetail struct {
 	Users     []userRow
 	Lookup    []lookupRow
 	Apps      []cell.AppView
+	Teams     []cell.TeamView
 	Tuples    []cell.TupleView
 	Interests []cell.InterestView
 	Error     string
@@ -329,6 +341,7 @@ func (a *App) handleProjectDetail(w http.ResponseWriter, r *http.Request) {
 		Users     []userRow           `json:"users"`
 		Lookup    []lookupRow         `json:"lookup"`
 		Apps      []cell.AppView      `json:"apps"`
+		Teams     []cell.TeamView     `json:"teams"`
 		Tuples    []cell.TupleView    `json:"tuples"`
 		Interests []cell.InterestView `json:"interests"`
 	}
@@ -338,6 +351,7 @@ func (a *App) handleProjectDetail(w http.ResponseWriter, r *http.Request) {
 		detail.Users = raw.Users
 		detail.Lookup = raw.Lookup
 		detail.Apps = raw.Apps
+		detail.Teams = raw.Teams
 		detail.Tuples = raw.Tuples
 		detail.Interests = raw.Interests
 	}
@@ -347,6 +361,7 @@ func (a *App) handleProjectDetail(w http.ResponseWriter, r *http.Request) {
 func (a *App) handleScenarios(w http.ResponseWriter, r *http.Request) {
 	a.render(w, "scenarios", pageData{
 		Title:       "Scenarios",
+		Cells:       a.Cells,
 		Trace:       a.copyTrace(),
 		ScenarioOK:  r.URL.Query().Get("ok"),
 		ScenarioErr: r.URL.Query().Get("err"),
@@ -366,15 +381,18 @@ func (a *App) handleScenarioCreateUser(w http.ResponseWriter, r *http.Request) {
 		email = fmt.Sprintf("demo-%d@example.com", time.Now().Unix()%100000)
 	}
 	deferFloat := r.FormValue("defer_float") == "1"
+	entryCell := a.parseEntryCell(r.FormValue("entry_cell"), "eu-2")
+	delayMs := parseDelayMs(r.FormValue("delay_ms"))
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
-	host, err := a.cellURLByLabel("eu-2")
+	defer a.withPeerDelay(delayMs)()
+	host, projectID, err := a.projectOnCell(ctx, entryCell)
 	if err != nil {
 		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
-	out, err := a.Peer.CreateUser(ctx, host, "team-eu-2", email, deferFloat)
-	note := "create " + email + " on team-eu-2"
+	out, err := a.Peer.CreateUser(ctx, host, projectID, email, deferFloat)
+	note := "create " + email + " on " + projectID + "@" + entryCell
 	if deferFloat {
 		note += " (defer float)"
 	}
@@ -384,7 +402,7 @@ func (a *App) handleScenarioCreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.appendTrace(note, out.Trace, "created")
-	http.Redirect(w, r, "/scenarios?ok="+url.QueryEscape("created "+email), http.StatusSeeOther)
+	http.Redirect(w, r, "/scenarios?ok="+url.QueryEscape("created "+email+" on "+projectID), http.StatusSeeOther)
 }
 
 func (a *App) handleScenarioLookup(w http.ResponseWriter, r *http.Request) {
@@ -396,16 +414,19 @@ func (a *App) handleScenarioLookup(w http.ResponseWriter, r *http.Request) {
 	if key == "" {
 		key = "joe@example.com"
 	}
+	entryCell := a.parseEntryCell(r.FormValue("entry_cell"), "us")
+	delayMs := parseDelayMs(r.FormValue("delay_ms"))
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
-	host, err := a.cellURLByLabel("us")
+	defer a.withPeerDelay(delayMs)()
+	host, projectID, err := a.projectOnCell(ctx, entryCell)
 	if err != nil {
 		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
-	res, hops, err := a.Peer.LookupWalk(ctx, host, "us", key)
+	res, hops, err := a.Peer.LookupWalk(ctx, host, projectID, key)
 	if err != nil {
-		a.appendTrace("lookup walk from us: "+key, hops, err.Error())
+		a.appendTrace("lookup walk from "+projectID+": "+key, hops, err.Error())
 		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
@@ -413,19 +434,27 @@ func (a *App) handleScenarioLookup(w http.ResponseWriter, r *http.Request) {
 	if res.Hit {
 		note = "hit home=" + res.HomeProjectID + " at=" + res.FoundAtProjectID
 	}
-	a.appendTrace("lookup walk from us: "+key, hops, note)
-	msg := note
-	http.Redirect(w, r, "/scenarios?ok="+url.QueryEscape(msg), http.StatusSeeOther)
+	a.appendTrace("lookup walk from "+projectID+": "+key, hops, note)
+	http.Redirect(w, r, "/scenarios?ok="+url.QueryEscape(note), http.StatusSeeOther)
 }
 
 func (a *App) handleScenarioGrantJoe(w http.ResponseWriter, r *http.Request) {
+	_ = r.ParseForm()
+	entryCell := a.parseEntryCell(r.FormValue("entry_cell"), "us")
+	delayMs := parseDelayMs(r.FormValue("delay_ms"))
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
-	if _, err := a.ensureJoeGrant(ctx); err != nil {
+	defer a.withPeerDelay(delayMs)()
+	host, projectID, err := a.projectOnCell(ctx, entryCell)
+	if err != nil {
 		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
-	http.Redirect(w, r, "/scenarios?ok="+url.QueryEscape("granted joe viewer on us/chat"), http.StatusSeeOther)
+	if _, err := a.ensureJoeGrantOn(ctx, host, projectID); err != nil {
+		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, "/scenarios?ok="+url.QueryEscape("granted joe viewer on "+projectID+"/chat"), http.StatusSeeOther)
 }
 
 func (a *App) handleScenarioSignInJoe(w http.ResponseWriter, r *http.Request) {
@@ -435,10 +464,12 @@ func (a *App) handleScenarioSignInJoe(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape("invalid form"), http.StatusSeeOther)
 		return
 	}
-	// Checkbox only posts when checked.
 	autoGrant := r.FormValue("auto_grant") == "1"
+	entryCell := a.parseEntryCell(r.FormValue("entry_cell"), "us")
+	delayMs := parseDelayMs(r.FormValue("delay_ms"))
+	defer a.withPeerDelay(delayMs)()
 
-	usHost, err := a.cellURLByLabel("us")
+	resourceHost, resourceProject, err := a.projectOnCell(ctx, entryCell)
 	if err != nil {
 		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
@@ -446,8 +477,8 @@ func (a *App) handleScenarioSignInJoe(w http.ResponseWriter, r *http.Request) {
 	key := "joe@example.com"
 	var allHops []cell.TraceHop
 
-	// 1) Lookup walk from us → home.
-	res, hops, err := a.Peer.LookupWalk(ctx, usHost, "us", key)
+	// 1) Lookup walk from resource project → Joe's home.
+	res, hops, err := a.Peer.LookupWalk(ctx, resourceHost, resourceProject, key)
 	allHops = append(allHops, hops...)
 	if err != nil {
 		a.appendTrace("sign-in joe: lookup", allHops, err.Error())
@@ -456,20 +487,23 @@ func (a *App) handleScenarioSignInJoe(w http.ResponseWriter, r *http.Request) {
 	}
 	if !res.Hit {
 		a.appendTrace("sign-in joe: lookup", allHops, "miss — run grant / seed float first")
-		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape("lookup miss for joe@example.com from us (float may be pending)"), http.StatusSeeOther)
+		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape("lookup miss for joe@example.com from "+resourceProject), http.StatusSeeOther)
 		return
 	}
 	a.appendTrace("sign-in joe: lookup", hops, "hit home="+res.HomeProjectID+" cell="+res.HomeCellURL)
 
-	// 2) Optionally ensure grant exists (Phase 3) before auth check.
+	// 2) Optionally ensure grant exists on the resource project before auth check.
 	autoGranted := false
-	tuples, err := a.Peer.ListTuples(ctx, usHost, "us")
+	tuples, err := a.Peer.ListTuples(ctx, resourceHost, resourceProject)
 	if err != nil {
 		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
 	hasGrant := false
 	for _, tup := range tuples {
+		if tup.Tombstoned {
+			continue
+		}
 		if tup.Object == "app:chat" && tup.Relation == "viewer" && tup.UserKey == key {
 			hasGrant = true
 			break
@@ -477,18 +511,18 @@ func (a *App) handleScenarioSignInJoe(w http.ResponseWriter, r *http.Request) {
 	}
 	if !hasGrant {
 		if !autoGrant {
-			a.appendTrace("sign-in joe: grant", nil, "missing — run Phase 3 grant scenario first")
-			http.Redirect(w, r, "/scenarios?err="+url.QueryEscape("no grant for joe on us/chat — run Grant Joe scenario or enable auto-grant"), http.StatusSeeOther)
+			a.appendTrace("sign-in joe: grant", nil, "missing — run grant scenario first")
+			http.Redirect(w, r, "/scenarios?err="+url.QueryEscape("no grant for joe on "+resourceProject+"/chat — run Grant Joe or enable auto-grant"), http.StatusSeeOther)
 			return
 		}
-		if _, err := a.ensureJoeGrant(ctx); err != nil {
+		if _, err := a.ensureJoeGrantOn(ctx, resourceHost, resourceProject); err != nil {
 			http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 			return
 		}
 		autoGranted = true
 	}
 
-	// 3) Issue token at home cell.
+	// 3) Issue token at Joe's home (still eu-2 / team-eu-2).
 	issued, err := a.Peer.IssueToken(ctx, res.HomeCellURL, cell.IssueTokenRequest{
 		ProjectID: res.HomeProjectID,
 		Sub:       key,
@@ -514,9 +548,9 @@ func (a *App) handleScenarioSignInJoe(w http.ResponseWriter, r *http.Request) {
 		HomeCell:    res.HomeCellURL,
 	}
 
-	// 4) Auth check on us — offline then online.
-	offline, err := a.Peer.AuthCheck(ctx, usHost, cell.AuthCheckRequest{
-		Token: issued.Token, ProjectID: "us", Object: "app:chat", Relation: "viewer", Online: false,
+	// 4) Auth check on selected resource cell — offline then online.
+	offline, err := a.Peer.AuthCheck(ctx, resourceHost, cell.AuthCheckRequest{
+		Token: issued.Token, ProjectID: resourceProject, Object: "app:chat", Relation: "viewer", Online: false,
 	})
 	if err != nil {
 		a.appendTrace("sign-in joe: auth offline", offline.Trace, err.Error())
@@ -527,8 +561,8 @@ func (a *App) handleScenarioSignInJoe(w http.ResponseWriter, r *http.Request) {
 	result.ReasonOffline = offline.Reason
 	a.appendTrace("sign-in joe: auth offline", offline.Trace, offline.Reason)
 
-	online, err := a.Peer.AuthCheck(ctx, usHost, cell.AuthCheckRequest{
-		Token: issued.Token, ProjectID: "us", Object: "app:chat", Relation: "viewer", Online: true,
+	online, err := a.Peer.AuthCheck(ctx, resourceHost, cell.AuthCheckRequest{
+		Token: issued.Token, ProjectID: resourceProject, Object: "app:chat", Relation: "viewer", Online: true,
 	})
 	if err != nil {
 		a.appendTrace("sign-in joe: auth online", online.Trace, err.Error())
@@ -540,7 +574,7 @@ func (a *App) handleScenarioSignInJoe(w http.ResponseWriter, r *http.Request) {
 	a.appendTrace("sign-in joe: auth online", online.Trace, online.Reason)
 
 	a.setSignIn(result)
-	msg := "signed in joe on us"
+	msg := "signed in joe · auth on " + resourceProject
 	if autoGranted {
 		msg += " (auto-granted)"
 	}
@@ -567,21 +601,12 @@ func (a *App) handleScenarioGroupCheckJoe(w http.ResponseWriter, r *http.Request
 		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape("invalid form"), http.StatusSeeOther)
 		return
 	}
-	delayMs := 0
-	if v := strings.TrimSpace(r.FormValue("delay_ms")); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			delayMs = n
-		}
-	}
-	if delayMs < 0 {
-		delayMs = 0
-	}
-	if delayMs > 500 {
-		delayMs = 500
-	}
+	delayMs := parseDelayMs(r.FormValue("delay_ms"))
+	entryCell := a.parseEntryCell(r.FormValue("entry_cell"), "us")
 	autoSeed := r.FormValue("auto_seed") == "1"
+	defer a.withPeerDelay(delayMs)()
 
-	usHost, err := a.cellURLByLabel("us")
+	host, projectID, err := a.projectOnCell(ctx, entryCell)
 	if err != nil {
 		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
@@ -596,21 +621,21 @@ func (a *App) handleScenarioGroupCheckJoe(w http.ResponseWriter, r *http.Request
 		seeded = true
 	}
 
-	res, err := a.Peer.FGACheck(ctx, usHost, cell.FGACheckRequest{
-		ProjectID: "us",
+	res, err := a.Peer.FGACheck(ctx, host, cell.FGACheckRequest{
+		ProjectID: projectID,
 		Object:    "app:chat",
 		Relation:  "viewer",
 		UserKey:   "joe@example.com",
 		DelayMs:   &delayMs,
 	})
 	if err != nil {
-		a.appendTrace("group check joe → app:chat", res.Trace, err.Error())
+		a.appendTrace("group check joe → app:chat@"+projectID, res.Trace, err.Error())
 		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
-	note := fmt.Sprintf("allowed=%v total_ms=%d cross_cell_hops=%d delay_ms=%d",
-		res.Allowed, res.TotalMs, res.CrossCellHops, delayMs)
-	a.appendTrace("group check joe → app:chat", res.Trace, note)
+	note := fmt.Sprintf("allowed=%v total_ms=%d cross_cell_hops=%d delay_ms=%d entry=%s",
+		res.Allowed, res.TotalMs, res.CrossCellHops, delayMs, entryCell)
+	a.appendTrace("group check joe → app:chat@"+projectID, res.Trace, note)
 
 	result := &groupCheckResult{
 		Allowed:       res.Allowed,
@@ -620,11 +645,11 @@ func (a *App) handleScenarioGroupCheckJoe(w http.ResponseWriter, r *http.Request
 		CrossCellHops: res.CrossCellHops,
 		Hops:          res.Trace,
 		Seeded:        seeded,
-		Note:          "Compare with Phase 3/4 flattened direct grant (app:chat#viewer@user:joe) — one local hop, no cross-cell expand.",
+		Note:          "Compare with Phase 3/4 flattened direct grant (app:chat#viewer@user:joe) — one local hop, no cross-cell expand. Inter-cell ExtraDelay also applies to peer hops.",
 	}
 	a.setGroupCheck(result)
 
-	msg := fmt.Sprintf("group check: %s · %dms · %d cross-cell hops", res.Reason, res.TotalMs, res.CrossCellHops)
+	msg := fmt.Sprintf("group check @%s: %s · %dms · %d cross-cell hops", projectID, res.Reason, res.TotalMs, res.CrossCellHops)
 	if !res.Allowed {
 		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(msg), http.StatusSeeOther)
 		return
@@ -708,6 +733,9 @@ func (a *App) ensureGroupChain(ctx context.Context) error {
 		}
 		found := false
 		for _, tup := range existing {
+			if tup.Tombstoned {
+				continue
+			}
 			if tup.Object == wantObj && tup.Relation == wantRel &&
 				tup.SubjectKind == wantKind && tup.UserKey == wantKey {
 				found = true
@@ -749,9 +777,13 @@ func (a *App) copyGroupCheck() *groupCheckResult {
 }
 
 func (a *App) handleScenarioBlockJoe(w http.ResponseWriter, r *http.Request) {
+	_ = r.ParseForm()
+	entryCell := a.parseEntryCell(r.FormValue("entry_cell"), "us")
+	delayMs := parseDelayMs(r.FormValue("delay_ms"))
 	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
 	defer cancel()
-	result, err := a.runLifecycleScenario(ctx, "block")
+	defer a.withPeerDelay(delayMs)()
+	result, err := a.runLifecycleScenario(ctx, "block", entryCell)
 	if err != nil {
 		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
@@ -763,66 +795,81 @@ func (a *App) handleScenarioBlockJoe(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleScenarioDeleteJoe(w http.ResponseWriter, r *http.Request) {
+	_ = r.ParseForm()
+	entryCell := a.parseEntryCell(r.FormValue("entry_cell"), "us")
+	delayMs := parseDelayMs(r.FormValue("delay_ms"))
 	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
 	defer cancel()
-	result, err := a.runLifecycleScenario(ctx, "delete")
+	defer a.withPeerDelay(delayMs)()
+	result, err := a.runLifecycleScenario(ctx, "delete", entryCell)
 	if err != nil {
 		http.Redirect(w, r, "/scenarios?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
 	a.setLifecycle(result)
-	msg := fmt.Sprintf("deleted joe · us tuples %d→%d · lookup=%s · group=%s",
-		result.USTuplesBefore, result.USTuplesAfter, result.LookupState, result.GroupReason)
+	msg := fmt.Sprintf("deleted joe · %s tuples active %d→%d (tombstoned %d) · interests notified=%d · lookup=%s",
+		result.ResourceProject, result.USTuplesBefore, result.USTuplesActiveAfter,
+		result.USTuplesTombstonedAfter, len(result.InterestsNotified), result.LookupState)
 	http.Redirect(w, r, "/scenarios?ok="+url.QueryEscape(msg), http.StatusSeeOther)
 }
 
-func (a *App) runLifecycleScenario(ctx context.Context, action string) (*lifecycleResult, error) {
+func (a *App) runLifecycleScenario(ctx context.Context, action, resourceCellLabel string) (*lifecycleResult, error) {
 	eu2Host, err := a.cellURLByLabel("eu-2")
 	if err != nil {
 		return nil, err
 	}
-	usHost, err := a.cellURLByLabel("us")
+	resourceHost, resourceProject, err := a.projectOnCell(ctx, resourceCellLabel)
 	if err != nil {
 		return nil, err
 	}
 	key := "joe@example.com"
 
-	// Recreate Joe when missing; refuse if already deleted (needs re-bootstrap).
-	// Blocked is ok for delete; for block we refuse so the demo stays clear.
 	if err := a.ensureJoeAlive(ctx, action); err != nil {
 		return nil, err
 	}
-	// Ensure direct grant + group chain exist so before/after is meaningful.
-	if _, err := a.ensureJoeGrant(ctx); err != nil {
+	if _, err := a.ensureJoeGrantOn(ctx, resourceHost, resourceProject); err != nil {
 		return nil, err
 	}
 	if err := a.ensureGroupChain(ctx); err != nil {
 		return nil, err
 	}
 
-	tuplesBefore, err := a.Peer.ListTuples(ctx, usHost, "us")
+	interestsBefore, err := a.Peer.ListInterests(ctx, eu2Host, "team-eu-2")
 	if err != nil {
 		return nil, err
 	}
-	joeBefore := countJoeTuples(tuplesBefore)
+	joeInterestCount := 0
+	for _, i := range interestsBefore {
+		if i.PrincipalKey == key {
+			joeInterestCount++
+		}
+	}
+
+	tuplesBefore, err := a.Peer.ListTuples(ctx, resourceHost, resourceProject)
+	if err != nil {
+		return nil, err
+	}
+	joeBefore := countActiveJoeTuples(tuplesBefore)
 
 	var hops []cell.TraceHop
 	result := &lifecycleResult{
-		Action:         action,
-		USTuplesBefore: joeBefore,
+		Action:          action,
+		USTuplesBefore:  joeBefore,
+		InterestsBefore: joeInterestCount,
+		ResourceCell:    resourceCellLabel,
+		ResourceProject: resourceProject,
 		Note: "Online auth/check fails immediately after block (epoch/blocked). " +
 			"Offline (online=false) still allows until JWT exp (~60s). " +
-			"Delete fans out user.deleted only to interest subscribers; home group memberships are cleared so FGA expand misses Joe. " +
+			"Delete fans out user.deleted only to interest subscribers; subscribers tombstone grants (rows remain visible). " +
+			"Home tombstones local user-subject tuples so FGA expand misses Joe. " +
 			"If home is stopped, event push errors (fail-closed) and online principal/check also fails closed.",
 	}
 
-	// Issue a fresh token while Joe is still active so offline can demonstrate stale allow.
 	var token string
 	issued, err := a.Peer.IssueToken(ctx, eu2Host, cell.IssueTokenRequest{
 		ProjectID: "team-eu-2", Sub: key, Aud: "app:chat",
 	})
 	if err != nil {
-		// Already blocked (delete-after-block): skip offline/online token demo.
 		a.appendTrace("lifecycle: issue before "+action, nil, err.Error())
 		result.OfflineReason = "no_token:" + err.Error()
 		result.OnlineReason = "no_token:" + err.Error()
@@ -858,10 +905,11 @@ func (a *App) runLifecycleScenario(ctx context.Context, action string) (*lifecyc
 		return nil, fmt.Errorf("unknown action %q", action)
 	}
 	result.Hops = hops
+	result.InterestsNotified = interestsFromDeleteTrace(hops)
 
 	if token != "" {
-		offline, err := a.Peer.AuthCheck(ctx, usHost, cell.AuthCheckRequest{
-			Token: token, ProjectID: "us", Object: "app:chat", Relation: "viewer", Online: false,
+		offline, err := a.Peer.AuthCheck(ctx, resourceHost, cell.AuthCheckRequest{
+			Token: token, ProjectID: resourceProject, Object: "app:chat", Relation: "viewer", Online: false,
 		})
 		if err != nil {
 			return nil, err
@@ -870,8 +918,8 @@ func (a *App) runLifecycleScenario(ctx context.Context, action string) (*lifecyc
 		result.OfflineReason = offline.Reason
 		a.appendTrace("lifecycle: auth offline after "+action, offline.Trace, offline.Reason)
 
-		online, err := a.Peer.AuthCheck(ctx, usHost, cell.AuthCheckRequest{
-			Token: token, ProjectID: "us", Object: "app:chat", Relation: "viewer", Online: true,
+		online, err := a.Peer.AuthCheck(ctx, resourceHost, cell.AuthCheckRequest{
+			Token: token, ProjectID: resourceProject, Object: "app:chat", Relation: "viewer", Online: true,
 		})
 		if err != nil {
 			return nil, err
@@ -881,15 +929,18 @@ func (a *App) runLifecycleScenario(ctx context.Context, action string) (*lifecyc
 		a.appendTrace("lifecycle: auth online after "+action, online.Trace, online.Reason)
 	}
 
-	tuplesAfter, err := a.Peer.ListTuples(ctx, usHost, "us")
+	tuplesAfter, err := a.Peer.ListTuples(ctx, resourceHost, resourceProject)
 	if err != nil {
 		return nil, err
 	}
-	result.USTuplesAfter = countJoeTuples(tuplesAfter)
+	result.USTuplesActiveAfter = countActiveJoeTuples(tuplesAfter)
+	result.USTuplesTombstonedAfter = countTombstonedJoeTuples(tuplesAfter)
+	result.USTuplesAfter = result.USTuplesActiveAfter
+	result.TombstonedSubjects = joeTombstonedSubjects(tuplesAfter)
 
 	if action == "delete" {
-		group, err := a.Peer.FGACheck(ctx, usHost, cell.FGACheckRequest{
-			ProjectID: "us", Object: "app:chat", Relation: "viewer", UserKey: key,
+		group, err := a.Peer.FGACheck(ctx, resourceHost, cell.FGACheckRequest{
+			ProjectID: resourceProject, Object: "app:chat", Relation: "viewer", UserKey: key,
 		})
 		if err != nil {
 			return nil, err
@@ -899,7 +950,7 @@ func (a *App) runLifecycleScenario(ctx context.Context, action string) (*lifecyc
 		result.GroupReason = group.Reason
 		a.appendTrace("lifecycle: group check after delete", group.Trace, group.Reason)
 
-		look, hops, err := a.Peer.LookupWalk(ctx, usHost, "us", key)
+		look, lookHops, err := a.Peer.LookupWalk(ctx, resourceHost, resourceProject, key)
 		if err != nil {
 			return nil, err
 		}
@@ -911,19 +962,9 @@ func (a *App) runLifecycleScenario(ctx context.Context, action string) (*lifecyc
 		} else {
 			result.LookupState = "miss"
 		}
-		a.appendTrace("lifecycle: lookup after delete", hops, result.LookupState)
+		a.appendTrace("lifecycle: lookup after delete", lookHops, result.LookupState)
 	}
 	return result, nil
-}
-
-func countJoeTuples(tuples []cell.TupleView) int {
-	n := 0
-	for _, tup := range tuples {
-		if tup.UserKey == "joe@example.com" && tup.SubjectKind == cell.SubjectKindUser {
-			n++
-		}
-	}
-	return n
 }
 
 // ensureJoeAlive recreates joe@example.com on team-eu-2 when missing.
@@ -976,6 +1017,12 @@ func (a *App) copyLifecycle() *lifecycleResult {
 		cp.Hops = make([]cell.TraceHop, len(a.lifecycle.Hops))
 		copy(cp.Hops, a.lifecycle.Hops)
 	}
+	if a.lifecycle.TombstonedSubjects != nil {
+		cp.TombstonedSubjects = append([]string(nil), a.lifecycle.TombstonedSubjects...)
+	}
+	if a.lifecycle.InterestsNotified != nil {
+		cp.InterestsNotified = append([]string(nil), a.lifecycle.InterestsNotified...)
+	}
 	return &cp
 }
 
@@ -984,7 +1031,11 @@ func (a *App) ensureJoeGrant(ctx context.Context) (cell.CreateTupleResponse, err
 	if err != nil {
 		return cell.CreateTupleResponse{}, err
 	}
-	apps, err := a.Peer.ListApps(ctx, usHost, "us")
+	return a.ensureJoeGrantOn(ctx, usHost, "us")
+}
+
+func (a *App) ensureJoeGrantOn(ctx context.Context, hostURL, projectID string) (cell.CreateTupleResponse, error) {
+	apps, err := a.Peer.ListApps(ctx, hostURL, projectID)
 	if err != nil {
 		return cell.CreateTupleResponse{}, err
 	}
@@ -996,27 +1047,29 @@ func (a *App) ensureJoeGrant(ctx context.Context) (cell.CreateTupleResponse, err
 		}
 	}
 	if !hasChat {
-		if _, err := a.Peer.CreateApp(ctx, usHost, "us", map[string]any{"name": "chat"}); err != nil {
+		if _, err := a.Peer.CreateApp(ctx, hostURL, projectID, map[string]any{"name": "chat"}); err != nil {
 			return cell.CreateTupleResponse{}, err
 		}
 	}
-	// Idempotent: if tuple already exists, treat as success.
-	tuples, err := a.Peer.ListTuples(ctx, usHost, "us")
+	tuples, err := a.Peer.ListTuples(ctx, hostURL, projectID)
 	if err != nil {
 		return cell.CreateTupleResponse{}, err
 	}
 	for _, tup := range tuples {
+		if tup.Tombstoned {
+			continue
+		}
 		if tup.Object == "app:chat" && tup.Relation == "viewer" && tup.UserKey == "joe@example.com" {
-			a.appendTrace("grant joe viewer on us/app:chat", nil, "already exists tuple="+tup.ID)
+			a.appendTrace("grant joe viewer on "+projectID+"/app:chat", nil, "already exists tuple="+tup.ID)
 			return cell.CreateTupleResponse{Tuple: tup}, nil
 		}
 	}
-	out, err := a.Peer.CreateTuple(ctx, usHost, "us", map[string]any{
+	out, err := a.Peer.CreateTuple(ctx, hostURL, projectID, map[string]any{
 		"object":   "app:chat",
 		"relation": "viewer",
 		"user_key": "joe@example.com",
 	})
-	note := "grant joe viewer on us/app:chat"
+	note := "grant joe viewer on " + projectID + "/app:chat"
 	if err != nil {
 		a.appendTrace(note, out.Trace, err.Error())
 		return out, err
@@ -1274,7 +1327,7 @@ func (a *App) fetchChildren(ctx context.Context, baseURL string) ([]childRow, er
 	return out.Children, err
 }
 
-func (a *App) render(w http.ResponseWriter, name string, data pageData) {
+func (a *App) render(w http.ResponseWriter, name string, data any) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := a.tmpl.ExecuteTemplate(w, name, data); err != nil {
 		a.Log.Printf("template %s: %v", name, err)
