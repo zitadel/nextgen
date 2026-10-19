@@ -37,14 +37,6 @@ type ConnectOptions = {
   lookup?: net.LookupFunction;
 };
 
-/** `[options, callback]`, as `net.connect` passes them on. */
-type NormalizedArgs = [ConnectOptions, unknown];
-
-/** `net.connect`'s own overload resolution, which `@types/node` leaves out. */
-const { _normalizeArgs: normalizeArgs } = net as unknown as {
-  _normalizeArgs(args: unknown[]): NormalizedArgs;
-};
-
 /** The connections refused since the last check, shared by every file a worker runs. */
 type Offline = { readonly refused: string[] };
 
@@ -113,13 +105,10 @@ function installOnce(): Offline {
     };
 
   net.Socket.prototype.connect = function (this: net.Socket, ...args: unknown[]) {
-    // `net.connect` hands its arguments on already resolved; anything else is
-    // one of the public overloads.
-    const normalized = Array.isArray(args[0]) ? (args[0] as NormalizedArgs) : normalizeArgs(args);
-    const [options] = normalized;
+    const [options, callback] = connectArgs(args);
     // A pipe or a Unix socket is on this machine by construction.
     if (options.path) {
-      return Reflect.apply(connect, this, [normalized]) as net.Socket;
+      return Reflect.apply(connect, this, args) as net.Socket;
     }
     // `||`, as `connect` itself defaults it: an empty host is localhost too.
     const host = (options.host || "localhost").replace(/^\[(.*)\]$/, "$1");
@@ -135,13 +124,35 @@ function installOnce(): Offline {
       process.nextTick(() => this.destroy(error));
       return this;
     }
-    if (named) {
-      normalized[0] = { ...options, lookup: answeringLocally(lookup, options.port) };
+    if (!named) {
+      return Reflect.apply(connect, this, args) as net.Socket;
     }
-    return Reflect.apply(connect, this, [normalized]) as net.Socket;
+    const checked = { ...options, lookup: answeringLocally(lookup, options.port) };
+    return Reflect.apply(connect, this, callback ? [checked, callback] : [checked]) as net.Socket;
   } as typeof connect;
 
   return state;
+}
+
+/**
+ * `connect`'s arguments as `[options, callback]`, resolving its documented
+ * overloads the way Node does: `(options[, cb])`, `(path[, cb])` and
+ * `(port[, host][, cb])`.
+ */
+function connectArgs(args: unknown[]): [ConnectOptions, (() => void) | undefined] {
+  // `net.connect` hands them on already resolved, as `[options, callback]`.
+  const [first, second] = Array.isArray(args[0]) ? (args[0] as unknown[]) : args;
+  const last = Array.isArray(args[0]) ? second : args.at(-1);
+  const callback = typeof last === "function" ? (last as () => void) : undefined;
+  if (typeof first === "object" && first !== null) {
+    return [first as ConnectOptions, callback];
+  }
+  // A string that is not a port number is a pipe's path.
+  if (typeof first === "string" && !(Number(first) >= 0)) {
+    return [{ path: first }, callback];
+  }
+  const host = typeof second === "string" ? second : undefined;
+  return [{ port: first as number | string, host }, callback];
 }
 
 function isLocalAddress(address: string): boolean {
