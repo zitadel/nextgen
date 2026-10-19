@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -41,10 +42,29 @@ func (h Handler) CreateSession(ctx context.Context, req *api.CreateSessionReques
 }
 
 func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, params api.ExchangeHandoffParams) (api.ExchangeHandoffRes, error) {
+	scopeCtx, ok := GetScopeContext(ctx)
+	if !ok {
+		return nil, domain.ErrAuthUnauthorized(nil)
+	}
+	queryProjectID := string(params.ProjectID)
+	if queryProjectID != "" && queryProjectID != scopeCtx.ProjectID {
+		return nil, domain.ErrProjectMismatch()
+	}
+
+	// Same interim as createAuthAttempt: no Origin → skip resolve until #1616.
+	ctx, err := h.resolveAppRuntime(ctx, scopeCtx.ProjectID, "")
+	if err != nil {
+		return nil, err
+	}
+	if err := h.refuseRevokedHandoff(ctx, scopeCtx.ProjectID, req.HandoffToken); err != nil {
+		return nil, err
+	}
+
 	input, err := exchangeInputFromRequest(req, params)
 	if err != nil {
 		return nil, err
 	}
+	input.ProjectID = scopeCtx.ProjectID
 	session, err := h.sessionService.Exchange(ctx, input)
 	if err != nil {
 		return nil, err
@@ -96,6 +116,25 @@ func exchangeInputFromRequest(req *api.ExchangeRequest, params api.ExchangeHando
 		input.TTL = new(time.Duration(ttl))
 	}
 	return input, nil
+}
+
+// refuseRevokedHandoff loads the attempt named by the handoff token and
+// refuses when its sealed release was revoked. An unknown token is left for
+// Exchange to answer with sess.invalid_handoff_token.
+func (h *Handler) refuseRevokedHandoff(ctx context.Context, projectID, handoffToken string) error {
+	if h.pool == nil || handoffToken == "" {
+		return nil
+	}
+	sum := sha256.Sum256([]byte(handoffToken))
+	attempt, err := h.pool.Statements().GetAuthAttemptByHandoffToken(ctx, projectID, sum[:])
+	if err != nil {
+		if errors.Is(err, domain.ErrAuthAttemptNotFound()) {
+			return nil
+		}
+		return err
+	}
+	_, err = h.withAttemptSealedRelease(ctx, attempt)
+	return err
 }
 
 func (h Handler) GetSession(ctx context.Context, params api.GetSessionParams) (api.GetSessionRes, error) {

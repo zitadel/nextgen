@@ -11,8 +11,25 @@ import (
 )
 
 func (h Handler) CreateAuthAttempt(ctx context.Context, req *api.CreateAuthAttemptRequest) (api.CreateAuthAttemptRes, error) {
+	scopeCtx, ok := GetScopeContext(ctx)
+	if !ok {
+		return nil, domain.ErrAuthUnauthorized(nil)
+	}
+	bodyProjectID := string(req.GetProjectID())
+	if bodyProjectID != "" && bodyProjectID != scopeCtx.ProjectID {
+		return nil, domain.ErrProjectMismatch()
+	}
+
+	// App-plane calls carry no browser Origin today. Until the project
+	// default target lands, skip resolution so create still works; seal
+	// only when a resolution is already on the context (e.g. flow start).
+	ctx, err := h.resolveAppRuntime(ctx, scopeCtx.ProjectID, "")
+	if err != nil {
+		return nil, err
+	}
+
 	input := service.CreateAuthAttemptInput{
-		ProjectID: string(req.GetProjectID()),
+		ProjectID: scopeCtx.ProjectID,
 	}
 	sessionID, err := h.provenSessionID(ctx, input.ProjectID,
 		string(req.GetSessionID().Or("")), string(req.GetSessionToken().Or("")),
@@ -21,6 +38,14 @@ func (h Handler) CreateAuthAttempt(ctx context.Context, req *api.CreateAuthAttem
 		return nil, err
 	}
 	input.SessionID = sessionID
+	if resolution := service.RuntimeResolutionFromContext(ctx); resolution != nil {
+		if resolution.Deployment != nil {
+			input.DeploymentID = resolution.Deployment.ID
+		}
+		if resolution.Release != nil {
+			input.ReleaseID = resolution.Release.ID
+		}
+	}
 	// TODO: handle challenge nonce in the future
 
 	attempt, err := h.authAttemptService.Create(ctx, input)
@@ -41,11 +66,18 @@ func (h Handler) GetAuthAttempt(ctx context.Context, params api.GetAuthAttemptPa
 		// attempt-surface resource: it stays invisible here.
 		return nil, domain.ErrAuthAttemptNotFound()
 	}
+	if _, err := h.withAttemptSealedRelease(ctx, attempt); err != nil {
+		return nil, err
+	}
 	return authAttemptToAPI(attempt), nil
 }
 
 func (h Handler) IssueChallenge(ctx context.Context, req *api.IssueChallengeRequest, params api.IssueChallengeParams) (api.IssueChallengeRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
+
+	if err := h.refuseRevokedAttempt(ctx, scopeCtx.ProjectID, string(params.AttemptID)); err != nil {
+		return nil, err
+	}
 
 	challenge, err := challengeRequestToChallenge(req)
 	if err != nil {
@@ -71,6 +103,10 @@ func (h Handler) IssueChallenge(ctx context.Context, req *api.IssueChallengeRequ
 func (h Handler) VerifyChallengeProof(ctx context.Context, req *api.VerifyChallengeRequest, params api.VerifyChallengeProofParams) (api.VerifyChallengeProofRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
 
+	if err := h.refuseRevokedAttempt(ctx, scopeCtx.ProjectID, string(params.AttemptID)); err != nil {
+		return nil, err
+	}
+
 	proof, err := verifyRequestToProof(req)
 	if err != nil {
 		return nil, err
@@ -89,6 +125,9 @@ func (h Handler) VerifyChallengeProof(ctx context.Context, req *api.VerifyChalle
 
 func (h Handler) CreateHandoff(ctx context.Context, params api.CreateHandoffParams) (api.CreateHandoffRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
+	if err := h.refuseRevokedAttempt(ctx, scopeCtx.ProjectID, string(params.AttemptID)); err != nil {
+		return nil, err
+	}
 	input := service.HandoffInput{
 		ProjectID: scopeCtx.ProjectID,
 		AttemptID: string(params.AttemptID),
@@ -104,6 +143,57 @@ func (h Handler) CreateHandoff(ctx context.Context, params api.CreateHandoffPara
 		HandoffToken: attempt.HandoffToken.Plain(),
 		ExpiresAt:    attempt.HandoffToken.ExpiresAt(attempt.HandedOffAt),
 	}, nil
+}
+
+// resolveAppRuntime decides which release serves an app-plane op. A missing
+// Origin keeps the pre-resolution path until the project default target
+// lands; a present Origin is resolved and sealed onto the attempt.
+func (h *Handler) resolveAppRuntime(ctx context.Context, projectID, origin string) (context.Context, error) {
+	if h.runtime == nil || origin == "" {
+		return ctx, nil
+	}
+	resolution, err := h.runtime.Resolve(ctx, projectID, origin)
+	if err != nil {
+		return ctx, err
+	}
+	return service.WithRuntimeResolution(ctx, resolution), nil
+}
+
+// withAttemptSealedRelease refuses when the attempt's sealed release was
+// revoked since create. No-op when nothing was sealed.
+func (h *Handler) withAttemptSealedRelease(ctx context.Context, attempt *domain.AuthAttempt) (context.Context, error) {
+	if attempt == nil || attempt.ReleaseID == "" || h.releaseService == nil {
+		return ctx, nil
+	}
+	release, err := h.releaseService.Get(ctx, attempt.ProjectID, attempt.ReleaseID)
+	if err != nil {
+		return ctx, err
+	}
+	if release.Revoked() {
+		return ctx, domain.ErrReleaseRevoked()
+	}
+	resolution := &service.RuntimeResolution{Release: release}
+	if attempt.DeploymentID != "" && h.pool != nil {
+		dep, depErr := h.pool.Statements().GetDeploymentByID(ctx, attempt.ProjectID, attempt.DeploymentID)
+		if depErr == nil {
+			resolution.Deployment = dep
+		}
+	}
+	return service.WithRuntimeResolution(ctx, resolution), nil
+}
+
+// refuseRevokedAttempt loads the attempt and refuses when its sealed release
+// was revoked. Missing attempts are left for the caller to surface.
+func (h *Handler) refuseRevokedAttempt(ctx context.Context, projectID, attemptID string) error {
+	if h.authAttemptService == nil {
+		return nil
+	}
+	attempt, err := h.authAttemptService.GetByID(ctx, projectID, attemptID)
+	if err != nil {
+		return err
+	}
+	_, err = h.withAttemptSealedRelease(ctx, attempt)
+	return err
 }
 
 // challengeRequestToChallenge maps the API oneOf challenge to the service Challenge discriminated union.

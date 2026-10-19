@@ -96,6 +96,13 @@ type AuthAttempt struct {
 	// passkey enrollment, ADR 056) whose attempt row is only a state carrier:
 	// it must never be handed off, exchanged, or read through the attempt API.
 	Internal bool
+
+	// DeploymentID and ReleaseID are what createAuthAttempt (or a flow start
+	// that creates the attempt) resolved to. Later attempt ops and handoff
+	// exchange reuse them so a mid-attempt deploy does not change the release
+	// under the caller; empty until a resolution seals them.
+	DeploymentID string
+	ReleaseID    string
 }
 
 const AuthAttemptTTL = 15 * time.Minute
