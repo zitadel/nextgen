@@ -390,7 +390,10 @@ and waits for them to sign in, then reports from the project's audit events
 (`zitadel events list`) which phase failed and on which side; a wrong secret
 shows up there as a provider-side failure at the exchange. It works against any
 server the project is on, needs the files applied, and leaves any user it
-created in the project.
+created in the project. A sign-in that fails before the person leaves the login
+page, such as a connection the server cannot build the redirect from, records no
+event, so the check ends with "no sign-in attempt seen"; the checks that run
+without `--live` catch the usual causes of that.
 
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
 then re-run `plan` and `apply`. See the reference below for driving the login UI

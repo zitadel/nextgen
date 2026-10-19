@@ -179,6 +179,11 @@ export class LiveSignInCheck extends Check<IdpContext> {
     return this.follow(watching, { ...progress, attempt, last: event });
   }
 
+  /**
+   * "No sign-in attempt seen" also covers a sign-in that failed before the person left
+   * the login page: the server records no event for that, and the checks that run before
+   * the live one are what catch its usual causes.
+   */
   private unfinished(last: SignInEvent | undefined): Outcome {
     return {
       status: "fail",
