@@ -540,12 +540,13 @@ type Invoker interface {
 	//
 	// Returns the current state of the current session including its factors and all currently
 	// satisfied assurance levels.
+	// With `project_id`, the session is returned only when it belongs to that project.
 	// `assurance_levels[]` may shrink over time as factor freshness windows expire,
 	// without the session itself expiring. Use step-up authentication (a new `auth_attempt`
 	// against the same `session_id`) to restore a dropped assurance level.
 	//
 	// GET /sessions/me
-	GetMySession(ctx context.Context) (GetMySessionRes, error)
+	GetMySession(ctx context.Context, params GetMySessionParams) (GetMySessionRes, error)
 	// GetMySessionCsrfToken invokes getMySessionCsrfToken operation.
 	//
 	// Returns the session-bound token for cross-site request forgery protection
@@ -6574,17 +6575,18 @@ func (c *Client) sendGetLive(ctx context.Context) (res GetLiveRes, err error) {
 //
 // Returns the current state of the current session including its factors and all currently
 // satisfied assurance levels.
+// With `project_id`, the session is returned only when it belongs to that project.
 // `assurance_levels[]` may shrink over time as factor freshness windows expire,
 // without the session itself expiring. Use step-up authentication (a new `auth_attempt`
 // against the same `session_id`) to restore a dropped assurance level.
 //
 // GET /sessions/me
-func (c *Client) GetMySession(ctx context.Context) (GetMySessionRes, error) {
-	res, err := c.sendGetMySession(ctx)
+func (c *Client) GetMySession(ctx context.Context, params GetMySessionParams) (GetMySessionRes, error) {
+	res, err := c.sendGetMySession(ctx, params)
 	return res, err
 }
 
-func (c *Client) sendGetMySession(ctx context.Context) (res GetMySessionRes, err error) {
+func (c *Client) sendGetMySession(ctx context.Context, params GetMySessionParams) (res GetMySessionRes, err error) {
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("getMySession"),
 		semconv.HTTPRequestMethodKey.String("GET"),
@@ -6624,6 +6626,30 @@ func (c *Client) sendGetMySession(ctx context.Context) (res GetMySessionRes, err
 	var pathParts [1]string
 	pathParts[0] = "/sessions/me"
 	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ProjectID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "GET", u)

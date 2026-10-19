@@ -13,6 +13,7 @@ import {
   sanitizeNextPath,
   sessionPage,
 } from "./session";
+import { _resetRuntimeForTesting, _setRuntimeForTesting } from "@/runtime/runtime";
 import { makeTestSession } from "@/test/session.fixture";
 import { server } from "@/test/msw";
 
@@ -22,6 +23,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   setApiCsrfToken(undefined);
+  _resetRuntimeForTesting();
   vi.useRealTimers();
   vi.restoreAllMocks();
 });
@@ -214,6 +216,49 @@ describe("fetchSession", () => {
   });
 });
 
+// On localhost the console and the apps share one cookie jar, so the cookie may
+// hold an app's session. It signs no one in to the console.
+describe("fetchSession, held to the console's project", () => {
+  beforeEach(() => {
+    _setRuntimeForTesting({ mode: "standalone", console_project_id: "proj_platform" });
+  });
+
+  it("names the console's project in the session read", async () => {
+    const urls: string[] = [];
+    server.use(
+      http.get("*/sessions/me", ({ request }) => {
+        urls.push(request.url);
+        return HttpResponse.json(makeTestSession({ project_id: "proj_platform" }));
+      }),
+    );
+    stubCsrf(token("tok"));
+
+    expect(await fetchSession()).toMatchObject({ project_id: "proj_platform" });
+    expect(new URL(urls[0] ?? "").searchParams.get("project_id")).toBe("proj_platform");
+  });
+
+  it.each([
+    [
+      "the server refuses it",
+      () =>
+        HttpResponse.json(
+          { code: "sess.project_mismatch", message: "different project" },
+          { status: 403 },
+        ),
+    ],
+    [
+      "an older server answers for it",
+      () => HttpResponse.json(makeTestSession({ project_id: "proj_app" })),
+    ],
+  ])("reports no session for an app's session when %s", async (_label, respond) => {
+    server.use(http.get("*/sessions/me", respond));
+    const calls = stubCsrf(failing);
+
+    expect(await fetchSession()).toBeNull();
+    expect(calls()).toBe(0);
+  });
+});
+
 describe("CSRF rejection", () => {
   it("hands back a fresh token when the same person is still signed in", async () => {
     stubSession("user_a");
@@ -266,6 +311,24 @@ describe("CSRF rejection", () => {
     await fetchSession();
 
     stubSession("unreachable");
+    expect(await rejectWrite()).toBeUndefined();
+
+    expect(sessionPage.reload).not.toHaveBeenCalled();
+    expect(getApiCsrfToken()).toBe("tok_a");
+  });
+
+  // Only the server's project-mismatch answer means another project's session.
+  // Any other 403 on the re-check (a proxy, a firewall) is an unreadable
+  // session, which must not cost the person their page.
+  it("keeps the page when the re-check is refused for another reason", async () => {
+    _setRuntimeForTesting({ mode: "standalone", console_project_id: "proj_test" });
+    stubSession("user_a");
+    stubCsrf(token("tok_a"));
+    await fetchSession();
+
+    server.use(
+      http.get("*/sessions/me", () => HttpResponse.text("<html>Forbidden</html>", { status: 403 })),
+    );
     expect(await rejectWrite()).toBeUndefined();
 
     expect(sessionPage.reload).not.toHaveBeenCalled();
