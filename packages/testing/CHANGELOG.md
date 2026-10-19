@@ -1,5 +1,14 @@
 # @zitadel/testing
 
+## 1.0.0-alpha.27
+
+### Patch Changes
+
+- Updated dependencies [[`de6f94b`](https://github.com/zitadel/nextgen/commit/de6f94b608e6831b57a46555eaa9cac282b9a47d), [`67dac68`](https://github.com/zitadel/nextgen/commit/67dac68bff6059f8efe208870ecbbbf3fd786534), [`3f81a75`](https://github.com/zitadel/nextgen/commit/3f81a75352439fcccdeada4eac9173e42ca75ae2)]:
+  - @zitadel/cli@1.0.0-alpha.27
+  - @zitadel/api@1.0.0-alpha.27
+  - @zitadel/config@1.0.0-alpha.27
+
 ## 1.0.0-alpha.26
 
 ### Minor Changes
