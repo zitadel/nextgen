@@ -256,6 +256,25 @@ describe("widget loading ↔ SDK packages", () => {
       return SOURCE_FILE.test(entry.name) ? [`${dir}/${entry.name}`] : [];
     });
 
+  // The checks above read files outside this package, so both runners must list
+  // them as test inputs; otherwise a change there neither reruns the test nor
+  // invalidates its cached result.
+  it.each(["moon.yml", "turbo.json"])(
+    "%s lists the files the checks read as test inputs",
+    (file) => {
+      const config = read(`${packagesDir}sdk-core/${file}`);
+      for (const input of [
+        "packages/sdk-*/package.json",
+        "packages/sdk-*/README.md",
+        "packages/sdk-*/skills/**/SKILL.md",
+        "apps/demo-*/package.json",
+        "apps/demo-*/**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts,vue,svelte,astro}",
+      ]) {
+        expect(config, `${file} has no test input ${input}`).toContain(input);
+      }
+    },
+  );
+
   it("finds the in-repo demo apps", () => {
     expect(demoDirs.length).toBeGreaterThan(0);
   });
