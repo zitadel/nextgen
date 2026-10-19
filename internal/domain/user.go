@@ -294,6 +294,11 @@ func NewPatchUser(params PatchUserParams) (*PatchUser, error) {
 	}, nil
 }
 
+// validateAndFlattenAttributes validates the document against the schema and
+// flattens it into attribute rows. A document that flattens to no rows is
+// refused with emptyMessage: a user is stored as its attribute rows, so with
+// none there is nothing to write. The dialects refuse it too, so catching it
+// here answers 400 instead of 500.
 func validateAndFlattenAttributes(schema []byte, doc map[string]any, emptyMessage string) (CreateAttributes, error) {
 	var jschema jsonschema.Schema
 	if err := json.Unmarshal(schema, &jschema); err != nil {
