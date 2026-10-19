@@ -78,7 +78,7 @@ func TestPasswordLoginFlow(t *testing.T) {
 	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeLogin,
-	})
+	}, api.CreateFlowParams{})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, createResp, helpers.MustMarshal(t, createResp))
 	flowHeaders := createResp.(*api.FlowResponseHeaders)
@@ -147,7 +147,7 @@ func TestPasswordLoginFlow_UnknownEmail(t *testing.T) {
 	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeLogin,
-	})
+	}, api.CreateFlowParams{})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, createResp, helpers.MustMarshal(t, createResp))
 	flowHeaders := createResp.(*api.FlowResponseHeaders)
@@ -198,7 +198,7 @@ func TestPasswordRegisterFlow(t *testing.T) {
 	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeRegister,
-	})
+	}, api.CreateFlowParams{})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, createResp, helpers.MustMarshal(t, createResp))
 	flowHeaders := createResp.(*api.FlowResponseHeaders)
@@ -353,7 +353,7 @@ func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
 	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeRegister,
-	})
+	}, api.CreateFlowParams{})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, createResp, helpers.MustMarshal(t, createResp))
 	flowHeaders := createResp.(*api.FlowResponseHeaders)

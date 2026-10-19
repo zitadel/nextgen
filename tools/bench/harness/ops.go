@@ -59,7 +59,7 @@ func Login(ctx context.Context, c *api.Client, t Target) (LoginResult, error) {
 	created, err := c.CreateFlow(WithOp(ctx, OpCreateFlow), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(t.ProjectID),
 		Purpose:   api.CreateFlowRequestPurposeLogin,
-	})
+	}, api.CreateFlowParams{})
 	if err != nil {
 		return LoginResult{}, Classify(OpCreateFlow, err)
 	}

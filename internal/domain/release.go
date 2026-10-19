@@ -72,6 +72,20 @@ func ErrReleaseUnresolvedReference() Error {
 	return newError(PrefixRelease.ErrorCodePrefix("unresolved_reference"), "release: handle is not in the release", nil, nil)
 }
 
+// ErrReleaseRevoked reports a release that was revoked and can no longer be
+// served or deployed. The message is what the login surface shows when an
+// in-flight attempt discovers the revocation.
+func ErrReleaseRevoked() Error {
+	return newError(PrefixRelease.ErrorCodePrefix("revoked"), "the release this attempt runs on was revoked", nil, nil)
+}
+
+// ErrReleaseNotDeployed reports that nothing is deployed to the target the
+// request resolved to. Callers that name the origin in the message use
+// WithMessage so the login surface can show it.
+func ErrReleaseNotDeployed(details any) Error {
+	return newError(PrefixRelease.ErrorCodePrefix("not_deployed"), "nothing is deployed to this origin", details, nil)
+}
+
 // ReleasePointer pins one revision of one resource. Handle names the resource
 // and RevisionID the revision of it, so two revisions of the same resource
 // share a handle and cannot both appear in a release.

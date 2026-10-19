@@ -25,8 +25,11 @@ const (
 	flowCookieMaxAgeSeconds = 600
 )
 
-func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (api.CreateFlowRes, error) {
+func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest, _ api.CreateFlowParams) (api.CreateFlowRes, error) {
 	audit.BindPublicRequest(ctx, string(req.ProjectID), "", "")
+	// Origin on CreateFlowParams selects the deployment once runtime
+	// resolution lands; this PR documents the contract only.
+
 	purpose, err := domain.FlowDefinitionPurposeString(string(req.Purpose))
 	if err != nil {
 		return nil, domain.ErrFlowInvalidPurpose().WithMessage(fmt.Sprintf("unknown purpose %q", req.Purpose))
