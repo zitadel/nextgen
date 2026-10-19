@@ -114,6 +114,10 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	if state.ID != params.ID {
 		return nil, domain.ErrFlowNotFound()
 	}
+	ctx, err = h.withSealedRelease(ctx, state)
+	if err != nil {
+		return nil, err
+	}
 
 	submitReq := service.SubmitFlowRequest{
 		State:  state,
@@ -270,6 +274,10 @@ func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams)
 	if state.ID != params.ID {
 		return mapFlowGetError(domain.ErrFlowNotFound())
 	}
+	ctx, err = h.withSealedRelease(ctx, state)
+	if err != nil {
+		return mapFlowGetError(err)
+	}
 
 	result, err := h.flowService.GetStep(ctx, service.GetFlowStepRequest{State: state})
 	if err != nil {
@@ -329,6 +337,47 @@ func (h *Handler) resolveRuntime(ctx context.Context, projectID string, params a
 		return ctx, nil
 	}
 	return service.WithRuntimeResolution(ctx, resolution), nil
+}
+
+// withSealedRelease puts the release the attempt started on back on the
+// context and refuses when it has been revoked since.
+func (h *Handler) withSealedRelease(ctx context.Context, state *domain.FlowState) (context.Context, error) {
+	if state == nil || state.ReleaseID == "" || h.releaseService == nil {
+		return ctx, nil
+	}
+	release, err := h.releaseService.Get(ctx, state.ProjectID, state.ReleaseID)
+	if err != nil {
+		return ctx, err
+	}
+	if release.Revoked() {
+		return ctx, domain.ErrReleaseRevoked()
+	}
+	resolution := &service.RuntimeResolution{Release: release}
+	if state.DeploymentID != "" && h.pool != nil {
+		dep, depErr := h.pool.Statements().GetDeploymentByID(ctx, state.ProjectID, state.DeploymentID)
+		if depErr == nil {
+			resolution.Deployment = dep
+		}
+	}
+	return service.WithRuntimeResolution(ctx, resolution), nil
+}
+
+// admitOrigin refuses a request Origin the project does not admit. Prefer the
+// shared runtime gate when wired; otherwise fall back to the legacy primary
+// allowlist check.
+func (h *Handler) admitOrigin(ctx context.Context, projectID, origin string) error {
+	project, err := h.projectService.Get(ctx, projectID)
+	if err != nil {
+		return domain.ErrInternal(err)
+	}
+	if h.runtime != nil {
+		_, err := h.runtime.Gate(ctx, project, origin)
+		return err
+	}
+	if err := validateOriginAgainstProject(origin, project); err != nil {
+		return domain.ErrRequestInvalid().WithMessage(err.Error())
+	}
+	return nil
 }
 
 func (h *Handler) openState(ctx context.Context, raw string) (*domain.FlowState, error) {
@@ -755,6 +804,9 @@ func mapFlowGetError(err error) (api.GetFlowStepRes, error) {
 		return &gone, nil
 	case errors.Is(err, domain.ErrFlowRestartRequired()):
 		conflict := api.GetFlowStepConflict(domainErrorDetails(domain.ErrFlowRestartRequired()))
+		return &conflict, nil
+	case errors.Is(err, domain.ErrReleaseRevoked()):
+		conflict := api.GetFlowStepConflict(domainErrorDetails(domain.ErrReleaseRevoked()))
 		return &conflict, nil
 	}
 	return nil, err
