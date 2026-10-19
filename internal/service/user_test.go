@@ -411,8 +411,8 @@ func TestUserService_PatchUser_ConflictAfterRetriesExhausted(t *testing.T) {
 	statementer.EXPECT().Statements().Return(stmts).AnyTimes()
 
 	schemaStore := domainmock.NewMockJSONSchemaStore(ctrl)
-	schemaStore.EXPECT().GetJSONSchemaByID(gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(&domain.JSONSchema{Schema: []byte(schemaJSON)}, nil).AnyTimes()
+	schemaStore.EXPECT().GetJSONSchemaByID(gomock.Any(), gomock.Any(), "https://example.test/schema.json").
+		Return(&domain.JSONSchema{URL: "https://example.test/schema.json", Schema: []byte(schemaJSON)}, nil).AnyTimes()
 	stmts.EXPECT().GetUserUniqueAttributeScopes(gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(map[domain.AttributeKey]string{}, nil).AnyTimes()
 

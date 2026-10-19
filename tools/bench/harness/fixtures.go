@@ -46,7 +46,7 @@ type FixtureUser struct {
 
 // DefaultBuiltinSchemaBase mirrors the server's schema.builtin_public_base
 // default; a lane running a server with another base sets user.schema.
-const DefaultBuiltinSchemaBase = "https://nextgen.com/api/schemas"
+const DefaultBuiltinSchemaBase = "https://preview.zitadel.com/schemas/v1"
 
 // LoadFixture reads and validates a fixture file.
 func LoadFixture(path string) (Fixture, error) {

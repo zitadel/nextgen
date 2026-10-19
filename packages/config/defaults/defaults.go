@@ -4,7 +4,7 @@ package defaults
 import _ "embed"
 
 // DefaultFlowSchemaURI is the canonical flow definition authoring schema URI.
-const DefaultFlowSchemaURI = "https://nextgen.com/flow-definition.json"
+const DefaultFlowSchemaURI = "https://preview.zitadel.com/schemas/v1/flow-definition.json"
 
 //go:embed default-human-user.json
 var defaultHumanUserSchema []byte

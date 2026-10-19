@@ -87,7 +87,7 @@ describe("SchemaSyncer", () => {
       schema.validate({
         kind: "user-schema",
         objectType: "human-user",
-        metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+        metaSchema: "https://preview.zitadel.com/schemas/v1/user-schema.json",
         "x-auth-methods": { password: { enabled: true } },
         properties: { email: { type: "string" } },
       }),
@@ -221,7 +221,7 @@ describe("SchemaSyncer", () => {
   // encoding now (#1272); this syncer used to pre-encode, which sent `%25` for
   // every delimiter once the client started encoding too.
   it("fetch sends a URL id encoded exactly once", async () => {
-    const id = "https://nextgen.com/api/schemas/default-human-user.json";
+    const id = "https://preview.zitadel.com/schemas/v1/default-human-user.json";
     let path = "";
     server.use(
       http.get(`${BASE}/schemas/:id`, ({ request }) => {

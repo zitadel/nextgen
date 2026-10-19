@@ -17,7 +17,7 @@ import (
 
 var tenantUserSchema = []byte(`{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "metaSchema": "https://nextgen.com/schemas/user-meta-schema.json",
+  "metaSchema": "https://example.test/schemas/user-meta-schema.json",
   "$id": "https://tenant.com/schemas/my-user.json",
   "kind": "user-schema",
   "type": "object",

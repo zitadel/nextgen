@@ -183,7 +183,6 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 
 	// ── Repositories ─────────────────
 	serviceDBPool := service.NewPool(pool.(service.Pool))
-	schemaStore := serviceDBPool.Statements()
 	sessionResolver := service.SessionStatementsResolver{Pool: serviceDBPool}
 
 	// ── Schema Stuff ─────────────────
@@ -214,6 +213,10 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	if err != nil {
 		return fmt.Errorf("failed to build schema validator: %w", err)
 	}
+	// Users and flows name their schema by URL, and a document naming the
+	// default schema under a legacy base must find the row a project seeded
+	// under the current one (and the other way round).
+	schemaStore := domain.WithBuiltinSchemaAliases(serviceDBPool.Statements(), schemaValidator.BuiltinBases())
 
 	userLookup := service.UserStatementsLookup{Pool: serviceDBPool}
 	userRefs := service.StatementsUserRefResolver{Pool: serviceDBPool}
@@ -262,7 +265,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		return fmt.Errorf("failed to bootstrap platform project: %w", err)
 	}
 
-	if err := users.Import(ctx, serviceDBPool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), userFiles); err != nil {
+	if err := users.Import(ctx, serviceDBPool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), schemaValidator.BuiltinBases(), userFiles); err != nil {
 		return fmt.Errorf("failed to bootstrap users: %w", err)
 	}
 
@@ -568,7 +571,11 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("schema.lru_cache_size", 1000) // todo: temp, review
 	v.SetDefault("keys.crypter_lru_cache_size", 1000)
 	v.SetDefault("keys.signing_key_lru_cache_size", 1000)
-	v.SetDefault("schema.builtin_public_base", "https://nextgen.com/api/schemas") // todo: temp, review
+	// An identifier namespace, not an address: it is stamped into documents
+	// and stored rows, so moving it keeps the old base in
+	// domain.LegacyBuiltinSchemaBases. It moves to zitadel.com when the
+	// preview does.
+	v.SetDefault("schema.builtin_public_base", "https://preview.zitadel.com/schemas/v1")
 	v.SetDefault("schema.resolve_timeout", domain.DefaultJSONSchemaResolveTimeout)
 	// Egress policy for user-injectable URLs (ADR 061). The deny list
 	// blocks by default; allow_list carves exceptions out of it, e.g.

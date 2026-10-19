@@ -339,6 +339,8 @@ func TestJSONSchemaResolver_BuiltinEmbedded(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		store := domainmock.NewMockJSONSchemaStore(ctrl)
 		store.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj-1", "https://example.test/app/schemas/unknown/v.json").Return(nil, database.NewNoRowFoundError(nil))
+		// The same path under the legacy base names the same document.
+		store.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj-1", "https://nextgen.com/api/schemas/unknown/v.json").Return(nil, database.NewNoRowFoundError(nil))
 		r := domain.NewJSONSchemaResolver(mustJSONSchemaCache(t, 128), 0, 0, nil, base)
 		_, err := r.Resolve(ctx, store, "proj-1", "https://example.test/app/schemas/unknown/v.json", nil)
 		require.Error(t, err)

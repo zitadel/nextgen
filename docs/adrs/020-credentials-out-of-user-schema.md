@@ -64,7 +64,7 @@ The validator cross-checks every reference against the user schema's
 $id: https://acme.com/schemas/users/v1
 $schema: https://json-schema.org/draft/2020-12/schema
 kind: user-schema
-metaSchema: https://nextgen.com/api/schemas/user-schema-v1.0.json
+metaSchema: https://preview.zitadel.com/schemas/v1/user-schema-v1.0.json
 x-auth-methods:
   password: { enabled: true }
   passkey:  { enabled: true }
@@ -83,7 +83,7 @@ properties:
 $id: https://acme.com/schemas/users/v2
 $schema: https://json-schema.org/draft/2020-12/schema
 kind: user-schema
-metaSchema: https://nextgen.com/api/schemas/user-schema-v1.1.json
+metaSchema: https://preview.zitadel.com/schemas/v1/user-schema-v1.1.json
 x-auth-methods:
   password: { enabled: true }
   passkey:  { enabled: true }

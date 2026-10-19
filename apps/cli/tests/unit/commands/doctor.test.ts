@@ -18,7 +18,7 @@ const servers: Server[] = [];
 const VALID_USER_SCHEMA = {
   kind: "user-schema",
   objectType: "human-user",
-  metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+  metaSchema: "https://preview.zitadel.com/schemas/v1/user-schema.json",
   "x-auth-methods": { password: { enabled: true } },
   properties: { email: { type: "string" } },
 };

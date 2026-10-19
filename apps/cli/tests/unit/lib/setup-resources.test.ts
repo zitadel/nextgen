@@ -143,7 +143,7 @@ describe("materializeSetupResources", () => {
   // generated client owns the encoding now (#1272), so pre-encoding here sent
   // `%25` for every delimiter in a `$id` URL and the fetch 404'd.
   it("fetches the created schema by its id verbatim, leaving encoding to the client", async () => {
-    const id = "https://nextgen.com/api/schemas/default-human-user.json";
+    const id = "https://preview.zitadel.com/schemas/v1/default-human-user.json";
     const getSchemaById = vi.fn().mockResolvedValue({
       id,
       schema: { objectType: "human-user", kind: "user-schema", title: "T" },

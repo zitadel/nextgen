@@ -36,7 +36,7 @@ const { values } = parseArgs({
     "team-id": { type: "string", default: "team_platformadmin" },
     "schema-url": {
       type: "string",
-      default: "https://nextgen.com/api/schemas/default-human-user.json",
+      default: "https://preview.zitadel.com/schemas/v1/default-human-user.json",
     },
   },
 });

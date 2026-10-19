@@ -14,6 +14,7 @@ vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clac
 import { cancel, confirm, isCancel } from "@clack/prompts";
 
 import VariablesDelete from "../../../src/commands/variables/delete";
+import { DEFAULT_SERVER } from "../../../src/lib/server";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
 import { asTerminal as asPerson } from "../../helpers/terminal";
 
@@ -26,7 +27,7 @@ afterEach(() => {
   resetPlatformStore();
 });
 
-const SERVER = "https://api.zitadel.cloud";
+const SERVER = DEFAULT_SERVER;
 
 async function makeProject(): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-variables-"));

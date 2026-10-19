@@ -187,14 +187,14 @@ func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, input CreateSchem
 		return nil, domain.ErrInternal(err).WithMessage("failed to commit transaction")
 	}
 
-	return s.v2Pool.Statements().GetJSONSchemaByID(ctx, input.ProjectID, strURI)
+	return s.schemaValidator.BuiltinBases().GetJSONSchema(ctx, s.v2Pool.Statements(), input.ProjectID, strURI)
 }
 
 func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID string, schemaID string) (_ *domain.JSONSchema, err error) {
 	ctx, end := startSpan(ctx, "SchemaService.GetSchema")
 	defer end(&err)
 
-	schema, err := s.v2Pool.Statements().GetJSONSchemaByID(ctx, projectID, schemaID)
+	schema, err := s.schemaValidator.BuiltinBases().GetJSONSchema(ctx, s.v2Pool.Statements(), projectID, schemaID)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrJSONSchemaNotFound()

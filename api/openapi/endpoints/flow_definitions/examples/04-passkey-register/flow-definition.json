@@ -1,6 +1,6 @@
 {
   "project_id": "${PROJECT_ID}",
-  "schema_uri": "https://nextgen.com/flow-definition.json",
+  "schema_uri": "https://preview.zitadel.com/schemas/v1/flow-definition.json",
   "flow_definition": {
     "name": "passkey-register",
     "status": "active",

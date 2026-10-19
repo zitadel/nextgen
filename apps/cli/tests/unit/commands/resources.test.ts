@@ -1554,7 +1554,7 @@ describe("a schema or flow is addressable by name as well as by id", () => {
   // 404s — the bug behind #1272.
   it("encodes a revision id that is a URL", async () => {
     const cwd = await makeProject();
-    const id = "https://nextgen.com/api/schemas/default-human-user.json";
+    const id = "https://preview.zitadel.com/schemas/v1/default-human-user.json";
     let path = "";
     server.use(
       http.get(`${SERVER}/schemas/:id`, ({ request }) => {

@@ -19,8 +19,8 @@ import passkeyFirstLoginFlowTemplate from "../defaults/presets/passkey-first/log
 
 export { brandingReadmeContent, flowsReadmeContent, schemasReadmeContent } from "./readmes.js";
 
-export const DEFAULT_BUILTIN_SCHEMA_BASE = "https://nextgen.com/api/schemas";
-export const DEFAULT_FLOW_SCHEMA_URI = "https://nextgen.com/flow-definition.json";
+export const DEFAULT_BUILTIN_SCHEMA_BASE = "https://preview.zitadel.com/schemas/v1";
+export const DEFAULT_FLOW_SCHEMA_URI = `${DEFAULT_BUILTIN_SCHEMA_BASE}/flow-definition.json`;
 export const DEFAULT_SCHEMA_CONFIG_PATH = ".zitadel/schemas/default-human-user.json";
 export const DEFAULT_FLOW_CONFIG_PATH = ".zitadel/flows/default-login.json";
 export const DEFAULT_BRANDING_CONFIG_PATH = ".zitadel/branding/branding.json";
