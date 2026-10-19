@@ -16,6 +16,7 @@ import {
   type ZitadelLoginConfig,
   type ZitadelLogoutConfig,
   type ZitadelSessionConfig,
+  widgetTags,
 } from "./types.js";
 
 /**
@@ -48,6 +49,26 @@ describe("SPA widget contract ↔ @zitadel/components", () => {
       const names = Object.values(handlers);
       expect(new Set(names).size).toBe(names.length);
     }
+  });
+});
+
+/**
+ * The tag names. `@zitadel/components` cannot depend on this package, so the
+ * check lives here, where both are visible: the elements register under exactly
+ * the names {@link widgetTags} defines, which every SDK reads instead of
+ * spelling them out.
+ */
+describe("widget tags ↔ @zitadel/components", () => {
+  it.each([
+    ["login", ZitadelLogin],
+    ["logout", ZitadelLogout],
+    ["session", ZitadelSession],
+  ] as const)("registers the %s element under its tag", (widget, element) => {
+    expect(customElements.get(widgetTags[widget])).toBe(element);
+  });
+
+  it("names exactly the three widgets", () => {
+    expect(Object.keys(widgetTags)).toEqual(["login", "logout", "session"]);
   });
 });
 
@@ -142,9 +163,9 @@ function publicProperties(ctor: ElementCtor, tag: string): string[] {
 
 describe("config types ↔ element properties", () => {
   describe.each([
-    ["zitadel-login", ZitadelLogin, LOGIN_CONFIG_KEYS, LOGIN_ELEMENT_ONLY],
-    ["zitadel-session", ZitadelSession, SESSION_CONFIG_KEYS, SESSION_ELEMENT_ONLY],
-    ["zitadel-logout", ZitadelLogout, LOGOUT_CONFIG_KEYS, LOGOUT_ELEMENT_ONLY],
+    [widgetTags.login, ZitadelLogin, LOGIN_CONFIG_KEYS, LOGIN_ELEMENT_ONLY],
+    [widgetTags.session, ZitadelSession, SESSION_CONFIG_KEYS, SESSION_ELEMENT_ONLY],
+    [widgetTags.logout, ZitadelLogout, LOGOUT_CONFIG_KEYS, LOGOUT_ELEMENT_ONLY],
   ] as const)("<%s>", (tag, ctor, configKeys, elementOnly) => {
     const properties = publicProperties(ctor as ElementCtor, tag);
 

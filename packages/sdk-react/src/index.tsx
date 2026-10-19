@@ -11,7 +11,7 @@ import {
   ZitadelLogout as ZitadelLogoutElement,
   ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
-import { standardAttributes } from "@zitadel/sdk-core/types";
+import { standardAttributes, widgetTags } from "@zitadel/sdk-core/types";
 import * as React from "react";
 
 import type {
@@ -104,7 +104,7 @@ function projectAttributes(props: {
 
 const ZitadelLoginElementReact = createComponent({
   react: React,
-  tagName: "zitadel-login",
+  tagName: widgetTags.login,
   elementClass: asAttributes(
     ZitadelLoginElement,
     "purpose",
@@ -127,7 +127,7 @@ const ZitadelLoginElementReact = createComponent({
 
 const ZitadelLogoutElementReact = createComponent({
   react: React,
-  tagName: "zitadel-logout",
+  tagName: widgetTags.logout,
   elementClass: asAttributes(ZitadelLogoutElement, "url"),
   events: {
     onZitadelSignout: "zitadel-signout" as EventName<CustomEvent<ZitadelSignoutDetail>>,
@@ -136,7 +136,7 @@ const ZitadelLogoutElementReact = createComponent({
 
 const ZitadelSessionElementReact = createComponent({
   react: React,
-  tagName: "zitadel-session",
+  tagName: widgetTags.session,
   elementClass: asAttributes(ZitadelSessionElement, "url"),
   events: {
     onZitadelSignout: "zitadel-signout" as EventName<CustomEvent<ZitadelSignoutDetail>>,

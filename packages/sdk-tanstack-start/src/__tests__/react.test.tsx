@@ -27,6 +27,7 @@ import type {
 } from "../react";
 import * as tanstackReact from "../react";
 import { ZitadelLogin, ZitadelLogout, ZitadelSession } from "../react";
+import { widgetTags } from "@zitadel/sdk-core/types";
 
 // React only flushes effects synchronously inside act() when it knows it runs
 // under a test.
@@ -141,7 +142,7 @@ describe("@zitadel/sdk-tanstack-start/react", () => {
     });
     await settle();
 
-    const element = container.querySelector("zitadel-login") as HTMLElement & {
+    const element = container.querySelector(widgetTags.login) as HTMLElement & {
       purpose: string;
       variant: string;
     };
@@ -159,9 +160,9 @@ describe("@zitadel/sdk-tanstack-start/react", () => {
   });
 
   it.each([
-    ["ZitadelLogin", ZitadelLogin, "zitadel-login"],
-    ["ZitadelLogout", ZitadelLogout, "zitadel-logout"],
-    ["ZitadelSession", ZitadelSession, "zitadel-session"],
+    ["ZitadelLogin", ZitadelLogin, widgetTags.login],
+    ["ZitadelLogout", ZitadelLogout, widgetTags.logout],
+    ["ZitadelSession", ZitadelSession, widgetTags.session],
   ])("forwards a ref on %s to the element", async (_name, Widget, tag) => {
     const ref = createRef<HTMLElement>();
     await act(async () => {
@@ -251,9 +252,9 @@ const elementValues = (el: object, config: object): Record<string, unknown> =>
 
 describe("wrapper config parity", () => {
   it.each([
-    ["ZitadelLoginConfig", "zitadel-login", ZitadelLogin, loginConfig],
-    ["ZitadelSessionConfig", "zitadel-session", ZitadelSession, sessionConfig],
-    ["ZitadelLogoutConfig", "zitadel-logout", ZitadelLogout, logoutConfig],
+    ["ZitadelLoginConfig", widgetTags.login, ZitadelLogin, loginConfig],
+    ["ZitadelSessionConfig", widgetTags.session, ZitadelSession, sessionConfig],
+    ["ZitadelLogoutConfig", widgetTags.logout, ZitadelLogout, logoutConfig],
   ])("forwards every %s key to <%s>", async (_name, tag, Widget, config) => {
     await act(async () => {
       root = createRoot(container);

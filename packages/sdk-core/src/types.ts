@@ -343,3 +343,17 @@ export function forwardStandardAttributes(from: Element, to: Element): void {
     if (name.toLowerCase() !== "slot") from.removeAttribute(name);
   }
 }
+
+/**
+ * The tag names of the widget elements, defined once. The elements register
+ * under these names, and every SDK wrapper, spec and guard reads them from here
+ * rather than spelling them out.
+ */
+export const widgetTags = {
+  login: "zitadel-login",
+  logout: "zitadel-logout",
+  session: "zitadel-session",
+} as const;
+
+/** One of the widget element tag names. */
+export type WidgetTag = (typeof widgetTags)[keyof typeof widgetTags];

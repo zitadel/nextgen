@@ -9,7 +9,7 @@ import type {
   ZitadelFlowStepDetail,
 } from "@zitadel/sdk-core/types";
 
-import { standardAttributes } from "@zitadel/sdk-core/types";
+import { standardAttributes, widgetTags } from "@zitadel/sdk-core/types";
 import { defineComponent, h, mergeProps, type PropType, ref, toRaw } from "vue";
 // Registers <zitadel-login> / <zitadel-logout> with the browser. Imported at
 // module load (before render) so the element is upgraded by the time Vue
@@ -81,7 +81,7 @@ const ZitadelLogin = defineComponent({
       const attributes = standardAttributes(attrs);
       const attr = forceAttr();
       return h(
-        "zitadel-login",
+        widgetTags.login,
         mergeProps(attrs, attributes, {
           ref: element,
           // Hand the Lit element the raw SDK handle, not Vue's reactive proxy:

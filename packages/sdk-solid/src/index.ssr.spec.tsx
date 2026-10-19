@@ -2,6 +2,7 @@ import { renderToString } from "solid-js/web";
 import { describe, expect, it } from "vitest";
 
 import { ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
+import { widgetTags } from "@zitadel/sdk-core/types";
 
 /** The attributes of the first `<tag>` in server-rendered HTML. */
 function serverAttributes(tag: string, html: string): Record<string, string> {
@@ -27,7 +28,7 @@ describe("server-rendered widget config", () => {
   it("puts the login flow config into the server markup", () => {
     expect(
       serverAttributes(
-        "zitadel-login",
+        widgetTags.login,
         renderToString(() => (
           <ZitadelLogin project={handle} purpose="register" flowName="signup" />
         )),
@@ -44,7 +45,7 @@ describe("server-rendered widget config", () => {
   it("puts the discrete project props into the login markup", () => {
     expect(
       serverAttributes(
-        "zitadel-login",
+        widgetTags.login,
         renderToString(() => <ZitadelLogin projectId="p1" proxyPath="/px" />),
       ),
     ).toMatchObject({ purpose: "login", "project-id": "p1", "proxy-path": "/px" });
@@ -53,7 +54,7 @@ describe("server-rendered widget config", () => {
   it("puts the session config into the server markup", () => {
     expect(
       serverAttributes(
-        "zitadel-session",
+        widgetTags.session,
         renderToString(() => <ZitadelSession project={handle} postSignOutUrl="/bye" />),
       ),
     ).toMatchObject({
@@ -67,7 +68,7 @@ describe("server-rendered widget config", () => {
   it("puts the logout config into the server markup", () => {
     expect(
       serverAttributes(
-        "zitadel-logout",
+        widgetTags.logout,
         renderToString(() => <ZitadelLogout project={handle} postSignOutUrl="/bye" />),
       ),
     ).toMatchObject({
@@ -79,9 +80,9 @@ describe("server-rendered widget config", () => {
   });
 
   it.each([
-    ["zitadel-login", (p: object) => <ZitadelLogin {...p} />],
-    ["zitadel-session", (p: object) => <ZitadelSession {...p} />],
-    ["zitadel-logout", (p: object) => <ZitadelLogout {...p} />],
+    [widgetTags.login, (p: object) => <ZitadelLogin {...p} />],
+    [widgetTags.session, (p: object) => <ZitadelSession {...p} />],
+    [widgetTags.logout, (p: object) => <ZitadelLogout {...p} />],
   ])("lets the project handle win over discrete props in %s", (tag, widget) => {
     expect(
       serverAttributes(
@@ -92,9 +93,9 @@ describe("server-rendered widget config", () => {
   });
 
   it.each([
-    ["zitadel-login", (p: object) => <ZitadelLogin {...p} />],
-    ["zitadel-session", (p: object) => <ZitadelSession {...p} />],
-    ["zitadel-logout", (p: object) => <ZitadelLogout {...p} />],
+    [widgetTags.login, (p: object) => <ZitadelLogin {...p} />],
+    [widgetTags.session, (p: object) => <ZitadelSession {...p} />],
+    [widgetTags.logout, (p: object) => <ZitadelLogout {...p} />],
   ])("writes an empty proxy path as / in %s", (tag, widget) => {
     expect(
       serverAttributes(
@@ -109,7 +110,7 @@ describe("server-rendered widget options", () => {
   it("puts the resume flow id into the login markup", () => {
     expect(
       serverAttributes(
-        "zitadel-login",
+        widgetTags.login,
         renderToString(() => <ZitadelLogin projectId="proj-test" resumeFlowId="flow_123" />),
       ),
     ).toMatchObject({ "resume-flow-id": "flow_123" });
@@ -118,7 +119,7 @@ describe("server-rendered widget options", () => {
   it("puts the session heading into the server markup", () => {
     expect(
       serverAttributes(
-        "zitadel-session",
+        widgetTags.session,
         renderToString(() => <ZitadelSession projectId="proj-test" heading="Hi" />),
       ),
     ).toMatchObject({ heading: "Hi" });
@@ -130,9 +131,9 @@ describe("server-rendered widget options", () => {
   });
 
   it.each([
-    ["zitadel-login", () => <ZitadelLogin projectId="p1" {...standard} />],
-    ["zitadel-logout", () => <ZitadelLogout projectId="p1" {...standard} />],
-    ["zitadel-session", () => <ZitadelSession projectId="p1" {...standard} />],
+    [widgetTags.login, () => <ZitadelLogin projectId="p1" {...standard} />],
+    [widgetTags.logout, () => <ZitadelLogout projectId="p1" {...standard} />],
+    [widgetTags.session, () => <ZitadelSession projectId="p1" {...standard} />],
   ] as const)("puts the standard attributes into the %s server markup", (tag, widget) => {
     expect(serverAttributes(tag, renderToString(widget))).toMatchObject({
       class: expect.stringMatching(/^probe\s*$/),

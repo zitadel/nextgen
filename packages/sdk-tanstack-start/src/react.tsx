@@ -38,6 +38,8 @@ export type {
   CreateFlowBodyPurpose,
   forwardStandardAttributes,
   standardAttributes,
+  WidgetTag,
+  widgetTags,
   ZITADEL_LOGIN_EVENT_HANDLERS,
   ZITADEL_LOGIN_EVENTS,
   ZITADEL_LOGOUT_EVENT_HANDLERS,
