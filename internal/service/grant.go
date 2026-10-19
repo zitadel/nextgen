@@ -68,7 +68,10 @@ type CreateGrantInput struct {
 	CallerUserID string
 }
 
-func (s *GrantService) Create(ctx context.Context, input CreateGrantInput) (*Grant, error) {
+func (s *GrantService) Create(ctx context.Context, input CreateGrantInput) (_ *Grant, err error) {
+	ctx, end := startSpan(ctx, "GrantService.Create")
+	defer end(&err)
+
 	input.UserID = strings.TrimSpace(input.UserID)
 	input.Identifier = strings.TrimSpace(input.Identifier)
 	input.TeamID = strings.TrimSpace(input.TeamID)
@@ -181,7 +184,10 @@ func mapGrantWriteError(err error) error {
 	return domain.ErrInternal(err).WithMessage("failed to create grant")
 }
 
-func (s *GrantService) Get(ctx context.Context, projectID, id string, includePrincipal bool) (*Grant, error) {
+func (s *GrantService) Get(ctx context.Context, projectID, id string, includePrincipal bool) (_ *Grant, err error) {
+	ctx, end := startSpan(ctx, "GrantService.Get")
+	defer end(&err)
+
 	asgn, err := s.v2Pool.Statements().GetAuthzAssignment(ctx, projectID, id)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -199,8 +205,11 @@ func (s *GrantService) Get(ctx context.Context, projectID, id string, includePri
 	return grants[0], nil
 }
 
-func (s *GrantService) Revoke(ctx context.Context, projectID, id string) error {
-	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+func (s *GrantService) Revoke(ctx context.Context, projectID, id string) (err error) {
+	ctx, end := startSpan(ctx, "GrantService.Revoke")
+	defer end(&err)
+
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		asgn, err := tx.Statements().GetAuthzAssignment(ctx, projectID, id)
 		if err != nil {
 			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -483,7 +492,10 @@ type ListGrantsResponse struct {
 
 // List returns unrevoked managed grants of a project, ordered and paginated
 // with an opaque cursor. Principal refs are hydrated in one batch per page.
-func (s *GrantService) List(ctx context.Context, req ListGrantsRequest) (*ListGrantsResponse, error) {
+func (s *GrantService) List(ctx context.Context, req ListGrantsRequest) (_ *ListGrantsResponse, err error) {
+	ctx, end := startSpan(ctx, "GrantService.List")
+	defer end(&err)
+
 	if req.ProjectID == "" {
 		return nil, domain.ErrGrantInvalid().WithDetails("project_id is required")
 	}

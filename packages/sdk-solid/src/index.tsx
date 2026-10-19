@@ -41,6 +41,7 @@ declare module "solid-js" {
         purpose?: string;
         "flow-name"?: string;
         "post-sign-in-url"?: string;
+        "prop:forcePostSignInUrl"?: boolean;
         variant?: "widget" | "page";
         theme?: "light" | "dark" | "auto";
         "prop:suppressHeader"?: boolean;
@@ -132,6 +133,7 @@ export function ZitadelLogin(
       purpose={props.purpose ?? "login"}
       flow-name={props.flowName}
       post-sign-in-url={props.postSignInUrl}
+      prop:forcePostSignInUrl={props.forcePostSignInUrl}
       resume-flow-id={props.resumeFlowId}
       variant={props.variant}
       theme={props.theme}

@@ -13,7 +13,10 @@ import (
 // AddOrigin validates and stores one origin pattern on the project.
 // Adding the same {pattern, kind} again is idempotent. The same pattern with a
 // different kind is rejected with origin.kind_conflict.
-func (s *projectService) AddOrigin(ctx context.Context, projectID string, origin domain.Origin) (*domain.Origin, error) {
+func (s *projectService) AddOrigin(ctx context.Context, projectID string, origin domain.Origin) (_ *domain.Origin, err error) {
+	ctx, end := startSpan(ctx, "ProjectService.AddOrigin")
+	defer end(&err)
+
 	if projectID == "" {
 		return nil, domain.ErrProjectMissingID()
 	}
@@ -23,7 +26,7 @@ func (s *projectService) AddOrigin(ctx context.Context, projectID string, origin
 	}
 
 	var stored domain.Origin
-	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		inserted, err := tx.Statements().InsertOrigin(ctx, projectID, origin)
 		if err != nil {
 			if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
@@ -91,7 +94,10 @@ func (s *projectService) originAfterUniqueConflict(ctx context.Context, projectI
 
 // RemoveOrigin deletes one origin pattern. Removing a missing pattern is
 // idempotent (no error). Project existence is gated by authz on the HTTP path.
-func (s *projectService) RemoveOrigin(ctx context.Context, projectID, pattern string) error {
+func (s *projectService) RemoveOrigin(ctx context.Context, projectID, pattern string) (err error) {
+	ctx, end := startSpan(ctx, "ProjectService.RemoveOrigin")
+	defer end(&err)
+
 	if projectID == "" {
 		return domain.ErrProjectMissingID()
 	}

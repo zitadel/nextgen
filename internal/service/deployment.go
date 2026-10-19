@@ -70,7 +70,10 @@ const maxDeployAttempts = 3
 // what each origin serves and writes without holding a lock, and a concurrent
 // deploy to one of the origins makes the write fail. A guarded deploy then
 // answers a conflict with the winner; an unguarded one retries on top of it.
-func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentInput) (*CreateDeploymentOutput, error) {
+func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentInput) (_ *CreateDeploymentOutput, err error) {
+	ctx, end := startSpan(ctx, "DeploymentService.Create")
+	defer end(&err)
+
 	actor, _ := audit.ActorFromContext(ctx)
 	entity, err := domain.NewDeployment(input.ProjectID, input.ReleaseID, input.OriginKind, input.Origins, domain.DeploymentMetadata{
 		Reason:         input.Reason,
@@ -189,7 +192,10 @@ func emitDeploymentCreated(ctx context.Context, stmts EventStatements, entity *d
 	})
 }
 
-func (s *DeploymentService) Get(ctx context.Context, projectID, id string) (*domain.Deployment, error) {
+func (s *DeploymentService) Get(ctx context.Context, projectID, id string) (_ *domain.Deployment, err error) {
+	ctx, end := startSpan(ctx, "DeploymentService.Get")
+	defer end(&err)
+
 	entity, err := s.v2Pool.Statements().GetDeploymentByID(ctx, projectID, id)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -202,7 +208,10 @@ func (s *DeploymentService) Get(ctx context.Context, projectID, id string) (*dom
 
 // GetByIDs reads the named deployments keyed by id. Ids nothing answers to
 // are simply absent.
-func (s *DeploymentService) GetByIDs(ctx context.Context, projectID string, ids []string) (map[string]*domain.Deployment, error) {
+func (s *DeploymentService) GetByIDs(ctx context.Context, projectID string, ids []string) (_ map[string]*domain.Deployment, err error) {
+	ctx, end := startSpan(ctx, "DeploymentService.GetByIDs")
+	defer end(&err)
+
 	if len(ids) == 0 {
 		return nil, nil
 	}
@@ -217,7 +226,10 @@ func (s *DeploymentService) GetByIDs(ctx context.Context, projectID string, ids 
 	return byID, nil
 }
 
-func (s *DeploymentService) List(ctx context.Context, input ListDeploymentsInput) (*ListDeploymentsOutput, error) {
+func (s *DeploymentService) List(ctx context.Context, input ListDeploymentsInput) (_ *ListDeploymentsOutput, err error) {
+	ctx, end := startSpan(ctx, "DeploymentService.List")
+	defer end(&err)
+
 	opts := deployment.ListOptions(input.ProjectID, input.Origin, uint32(normalizeLimit(input.Limit)))
 	opts.Pagination.Cursor = []byte(input.PageToken)
 

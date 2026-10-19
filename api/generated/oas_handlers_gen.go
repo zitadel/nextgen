@@ -2528,7 +2528,11 @@ func (s *Server) handleCreateIdpRequest(args [0]string, argsEscaped bool, w http
 
 // handleCreateProjectRequest handles createProject operation.
 //
-// Create project.
+// Creates a project and returns its project secret and preview secret, which no
+// other endpoint returns.
+// The request needs no credential and is rate-limited. Unless `seed_defaults` is
+// `false`, the project starts with a default user schema and flow; the CLI turns
+// that off and uploads its own from `.zitadel/`.
 //
 // POST /projects
 func (s *Server) handleCreateProjectRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -3304,7 +3308,9 @@ func (s *Server) handleCreateSessionRequest(args [0]string, argsEscaped bool, w 
 
 // handleCreateTeamRequest handles createTeam operation.
 //
-// Create team.
+// Creates a team in the project, with a name no other team in the project has.
+// A taken name is refused with `409 team.already_exists`. The new team has no
+// members yet.
 //
 // POST /teams
 func (s *Server) handleCreateTeamRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -3524,7 +3530,10 @@ func (s *Server) handleCreateTeamRequest(args [0]string, argsEscaped bool, w htt
 
 // handleCreateUserRequest handles createUser operation.
 //
-// Create user.
+// Creates a user whose attributes satisfy the user schema the request names.
+// The server assigns the user's id. With `team_id`, the user also becomes an
+// active member of that team. A value the schema marks unique that another
+// user already holds is refused with `409`.
 //
 // POST /users
 func (s *Server) handleCreateUserRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -4159,7 +4168,10 @@ func (s *Server) handleDeleteTeamRequest(args [1]string, argsEscaped bool, w htt
 
 // handleDeleteUserByIDRequest handles DeleteUserByID operation.
 //
-// Delete user by ID.
+// Deletes a user and removes them from every team they belong to.
+// The user is removed, not deactivated, and the deletion emits `user.deleted`.
+// With a project secret the request is idempotent: deleting a user that exists
+// in no project succeeds without changing anything.
 //
 // DELETE /users/{user_id}
 func (s *Server) handleDeleteUserByIDRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -7553,6 +7565,7 @@ func (s *Server) handleGetLiveRequest(args [0]string, argsEscaped bool, w http.R
 //
 // Returns the current state of the current session including its factors and all currently
 // satisfied assurance levels.
+// With `project_id`, the session is returned only when it belongs to that project.
 // `assurance_levels[]` may shrink over time as factor freshness windows expire,
 // without the session itself expiring. Use step-up authentication (a new `auth_attempt`
 // against the same `session_id`) to restore a dropped assurance level.
@@ -7673,6 +7686,16 @@ func (s *Server) handleGetMySessionRequest(args [0]string, argsEscaped bool, w h
 			return
 		}
 	}
+	params, err := decodeGetMySessionParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
 
 	var rawBody []byte
 
@@ -7685,13 +7708,18 @@ func (s *Server) handleGetMySessionRequest(args [0]string, argsEscaped bool, w h
 			OperationID:      "getMySession",
 			Body:             nil,
 			RawBody:          rawBody,
-			Params:           middleware.Parameters{},
-			Raw:              r,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+			},
+			Raw: r,
 		}
 
 		type (
 			Request  = struct{}
-			Params   = struct{}
+			Params   = GetMySessionParams
 			Response = GetMySessionRes
 		)
 		response, err = middleware.HookMiddleware[
@@ -7701,14 +7729,14 @@ func (s *Server) handleGetMySessionRequest(args [0]string, argsEscaped bool, w h
 		](
 			m,
 			mreq,
-			nil,
+			unpackGetMySessionParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.GetMySession(ctx)
+				response, err = s.h.GetMySession(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.GetMySession(ctx)
+		response, err = s.h.GetMySession(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -7905,7 +7933,9 @@ func (s *Server) handleGetMySessionCsrfTokenRequest(args [0]string, argsEscaped 
 
 // handleGetMyUserRequest handles getMyUser operation.
 //
-// Get my user information.
+// Returns the user signed in to the session that authenticates the request.
+// The project and the user both come from the session cookie, so a caller only
+// ever reads their own user.
 //
 // GET /users/me
 func (s *Server) handleGetMyUserRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -9223,7 +9253,9 @@ func (s *Server) handleGetTeamRequest(args [1]string, argsEscaped bool, w http.R
 
 // handleGetUserByIDRequest handles GetUserByID operation.
 //
-// Get user by ID.
+// Returns a user by its id, with the attributes its schema defines.
+// With `team_id`, the user is returned only while they are an active member of
+// that team.
 //
 // GET /users/{user_id}
 func (s *Server) handleGetUserByIDRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -12383,7 +12415,10 @@ func (s *Server) handleListUserIdentityLinksRequest(args [1]string, argsEscaped 
 
 // handleListUserPasskeysRequest handles listUserPasskeys operation.
 //
-// List user passkeys.
+// Returns the passkeys registered for a user, newest first, paginated with a
+// cursor.
+// Each passkey carries its id, its name and when it was registered, never the
+// credential itself.
 //
 // GET /users/{user_id}/passkeys
 func (s *Server) handleListUserPasskeysRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -13865,7 +13900,11 @@ func (s *Server) handleQueryIdpsRequest(args [0]string, argsEscaped bool, w http
 
 // handleQueryProjectsRequest handles queryProjects operation.
 //
-// Query projects.
+// Returns the project the project secret belongs to, as a page of at most one
+// project.
+// A credential is scoped to one project until ADR 036 widens it, so the filters
+// and sorting apply to that project alone. The projects a signed-in person can
+// act on are listed by `GET /users/me/projects`.
 //
 // POST /projects/query
 func (s *Server) handleQueryProjectsRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -15917,7 +15956,10 @@ func (s *Server) handleRollbackDeploymentRequest(args [1]string, argsEscaped boo
 
 // handleSetUserPasswordRequest handles setUserPassword operation.
 //
-// Set user password.
+// Sets a user's password, hashed with the project's current password hashing
+// policy.
+// The new password replaces the current one, and setting it emits
+// `auth.factor.password.set`.
 //
 // PUT /users/{user_id}/password
 func (s *Server) handleSetUserPasswordRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {

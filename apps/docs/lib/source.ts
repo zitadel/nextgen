@@ -1,4 +1,5 @@
-import { llms, loader } from "fumadocs-core/source";
+import type { AdvancedIndex } from "fumadocs-core/search/server";
+import { llms, loader, update } from "fumadocs-core/source";
 import { lucideIconsPlugin } from "fumadocs-core/source/lucide-icons";
 import { metaSchema, pageSchema } from "fumadocs-core/source/schema";
 import { applyMdxPreset } from "fumadocs-mdx/config";
@@ -6,7 +7,11 @@ import { defineDocs } from "fumadocs-mdx/macro";
 import type { OpenAPIV3_2, OperationItem, WebhookItem } from "fumadocs-openapi";
 
 import { codeThemes } from "./code-theme";
+import { cliSample } from "./cli-sample";
+import { defaultRequest, withRefValues } from "./default-request";
+import { firstSentence, shortDescription } from "./description";
 import { openapi } from "./openapi";
+import { sdkSample } from "./sdk-sample";
 import { docsRoute } from "./shared";
 
 const docs = defineDocs({
@@ -30,11 +35,29 @@ export const source = loader(
   {
     docs: docs.toFumadocsSource(),
     // A page per operation of the server's API, beside the reference's own
-    // pages in content/docs/reference/api.
-    openapi: await openapi.staticSource({
-      baseDir: "reference/api",
-      groupBy: "tag",
-    }),
+    // pages in content/docs/reference/api. Fumadocs makes the operation's
+    // whole description the page's description; the page's own is a line of
+    // plain text, and `markdownDescription` keeps the whole (lib/description.ts).
+    openapi: update(
+      await openapi.staticSource({
+        baseDir: "reference/api",
+        groupBy: "tag",
+      }),
+    )
+      .page((page) => {
+        // The document is data: a description that is not a string is none.
+        const description: unknown = page.data.description;
+        const markdown = typeof description === "string" ? description : undefined;
+        return {
+          ...page,
+          data: {
+            ...page.data,
+            description: markdown === undefined ? undefined : shortDescription(markdown),
+            markdownDescription: markdown,
+          },
+        };
+      })
+      .build(),
   },
   {
     baseUrl: docsRoute,
@@ -42,33 +65,114 @@ export const source = loader(
   },
 );
 
+type Page = (typeof source)["$inferPage"];
+type OpenAPIPage = Extract<Page, { type: "openapi" }>;
+
+// llms.txt and MCP's list_pages have room for an operation's whole first
+// sentence (lib/description.ts); otherwise Fumadocs' own description.
 export const docsLlms = llms(source, {
+  renderDescription: (node) => {
+    const data =
+      node.type === "page" ? source.getNodePage(node)?.data : source.getNodeMeta(node)?.data;
+    if (data && "markdownDescription" in data) return firstSentence(data.markdownDescription ?? "");
+    return data?.description || (typeof node.description === "string" ? node.description : "");
+  },
   renderPage: async (page) => `# ${page.data.title} (${page.url})
 
 ${page.type === "openapi" ? operationText(page) : await page.data.getText("processed")}`,
 });
 
-type OpenAPIPage = Extract<(typeof source)["$inferPage"], { type: "openapi" }>;
+// The props of an operation's or a webhook's page, a client component.
+// Fumadocs hands each page the whole document, so every page carried every
+// operation and schema of the API, about 720 KB. The page gets the part it
+// renders: its operations or webhooks, every component they reference, and the
+// security schemes, which an operation names rather than references.
+export function openapiPageProps(page: OpenAPIPage) {
+  const props = page.data.getOpenAPIPageProps();
+  const { operations = [], webhooks = [], payload } = props;
+  const {
+    paths,
+    webhooks: hooks,
+    components,
+  } = openapiFragment(payload.bundled, operations, webhooks);
+  const { paths: _paths, webhooks: _webhooks, components: all, ...document } = payload.bundled;
+
+  return {
+    ...props,
+    payload: {
+      ...payload,
+      bundled: {
+        ...document,
+        ...(paths && { paths }),
+        ...(hooks && { webhooks: hooks }),
+        components: {
+          ...components,
+          ...(all?.securitySchemes && { securitySchemes: all.securitySchemes }),
+        },
+      } as OpenAPIV3_2.Document,
+    },
+  };
+}
 
 // An operation or webhook page has no Markdown of its own. Its text is its
-// endpoints and the part of the OpenAPI document they need, the operations or
-// webhooks and every component they reference, so the page stands on its own.
+// endpoints, an operation's call through @zitadel/api and its CLI command,
+// which the page shows too, and the part of the OpenAPI document they need,
+// the operations or webhooks and every component they reference, so the page
+// stands on its own.
 function operationText(page: OpenAPIPage) {
   const { operations = [], webhooks = [] } = page.data.getOpenAPIPageProps();
-  const fragment = openapiFragment(page.data.getSchema().bundled, operations, webhooks);
+  const { bundled } = page.data.getSchema();
+  const fragment = openapiFragment(bundled, operations, webhooks);
   const endpoints = [
     ...operations.map(({ method, path }) => `\`${method.toUpperCase()} ${path}\``),
     ...webhooks.map(({ method, name }) => `\`${method.toUpperCase()}\` webhook \`${name}\``),
   ];
+  const samples = operations.flatMap(({ method, path }) => {
+    const sample = operationSamples(bundled, path, method);
+    if (!sample) return [];
+    return [
+      "Called through [`@zitadel/api`](/docs/sdks/api-client), with the request the page shows:",
+      `\`\`\`ts\n${sample.typescript}\n\`\`\``,
+      ...(sample.cli
+        ? ["Run with [the CLI](/docs/cli):", `\`\`\`bash\n${sample.cli}\n\`\`\``]
+        : []),
+    ];
+  });
 
   return [
-    page.data.description,
+    page.data.markdownDescription,
     endpoints.join("\n"),
+    ...samples,
     `The ${webhooks.length > 0 ? "webhook" : "operation"} and every component it references, as OpenAPI:`,
     `\`\`\`json\n${JSON.stringify(fragment, null, 2)}\n\`\`\``,
   ]
     .filter(Boolean)
     .join("\n\n");
+}
+
+const resolvable = new WeakMap<OpenAPIV3_2.Document, OpenAPIV3_2.Document>();
+
+// The page's TypeScript and CLI samples (lib/sdk-sample.ts, lib/cli-sample.ts)
+// with the operation's default request: the Markdown has no example selector
+// or playground.
+function operationSamples(
+  document: OpenAPIV3_2.Document,
+  path: string,
+  method: OperationItem["method"],
+) {
+  let withRefs = resolvable.get(document);
+  if (!withRefs) {
+    withRefs = withRefValues(document);
+    resolvable.set(document, withRefs);
+  }
+  const pathItem = withRefs.paths?.[path];
+  const operation = pathItem?.[method];
+  if (!pathItem || !operation) return undefined;
+  const request = defaultRequest(operation, pathItem, method);
+  return {
+    typescript: sdkSample(operation, path, pathItem, request),
+    cli: cliSample(operation, path, request),
+  };
 }
 
 function openapiFragment(
@@ -126,4 +230,19 @@ function refsIn(value: unknown): string[] {
   return Object.entries(value).flatMap(([key, child]) =>
     key === "$ref" && typeof child === "string" ? [child] : refsIn(child),
   );
+}
+
+// Fumadocs' default search index, with an API page's whole description:
+// fumadocs-openapi indexes an operation's own as the page's text, so the short
+// one would be a second hit, and one inherited from the path item is only
+// here (lib/description.ts).
+export function searchIndex(page: Page): AdvancedIndex {
+  return {
+    title: page.data.title ?? page.slugs.at(-1) ?? "",
+    description:
+      "markdownDescription" in page.data ? page.data.markdownDescription : page.data.description,
+    url: page.url,
+    id: page.url,
+    structuredData: page.data.structuredData,
+  };
 }

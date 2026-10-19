@@ -67,6 +67,18 @@ So the template's root routes live under `/docs` here:
 - The favicons are the one exception: `app/layout.tsx` links the cloud's, which
   the website serves at `/favicons/`
   ([`apps/website/AGENTS.md`](../website/AGENTS.md#the-logo-and-the-favicons)).
+- The sidebar's title is the website's header: its animated logo
+  (`components/logo.tsx`, a copy of `apps/website/app/logo.tsx`, with its
+  motion in `app/global.css`) and, in place of the website's Preview label, a
+  Docs pill in the same style (`lib/layout.shared.tsx`). Change the copies
+  together. The logo plays while the pointer is on it or its link, as on the
+  website, and never on its own.
+- The sidebar links the website at `/` above the pages
+  (`lib/layout.shared.tsx`); the storybook goes unlinked, as in the website's
+  header. The website is a deployment of its own, so the link is a plain
+  `<a>`: a custom item, styled as the layout's own items. A link item would go
+  through `next/link`, which prefetches from this app and routes there in it,
+  or, marked external, opens a new tab.
 
 ## Content
 
@@ -74,14 +86,40 @@ So the template's root routes live under `/docs` here:
   are in `content/docs/reference/api/`; a page per operation, and per webhook
   (one per event type, under `event-webhooks/`), comes from the OpenAPI
   document (`lib/source.ts`).
+- An operation's or a webhook's OpenAPI `description` is Markdown for the
+  body of its page, which shows all of it; the page's header is its title.
+  Everything else (the metadata, the Open Graph image, `llms.txt`, search)
+  gets its first sentence as plain text or the whole of it, as
+  `lib/description.ts` explains. The spec's side of that, a first sentence
+  that stands on its own, is in
+  [`api/openapi/AGENTS.md`](../../api/openapi/AGENTS.md#descriptions--the-first-sentence-stands-alone).
+- An operation's or a webhook's page is a client component, and Fumadocs
+  hands it the whole OpenAPI document. `openapiPageProps` (`lib/source.ts`)
+  hands it its operations or webhooks, the components they reference and the
+  security schemes instead, so a page is about 250 KB of HTML, not 900 KB.
+  Render one through it, never `getOpenAPIPageProps()` directly.
 - `moon run docs:generate` bundles `api/openapi` into `.generated/openapi.mjs`,
   which `lib/openapi.ts` imports. The content needs no generation step.
 - A page's Markdown (`/docs/cli.md`, or `/docs/cli` with `Accept:
   text/markdown`) is its processed Markdown; an operation's or a webhook's is
-  the operation or webhook with every schema it references (`docsLlms` in
+  the operation or webhook with every schema it references, an operation's
+  with its call through `@zitadel/api` and its CLI command too (`docsLlms` in
   `lib/source.ts`). `llms-full.txt` leaves the operations and webhooks out,
   and its test fails on a Markdown link to one of them, so prose links to
   their section's page (a section page's `<Card>` is fine).
+- An operation's samples are its call through `@zitadel/api`, its `zitadel`
+  command where the spec names one (`x-zitadel-cli`, `lib/cli-sample.ts`), then
+  cURL (`components/api-page.tsx`), not Fumadocs' plain HTTP in languages
+  Zitadel ships no SDK for; a webhook's page shows its payload, not a call.
+  `lib/sdk-sample.ts` writes the call as orval generates the client, picking
+  the credential from the operation's security; the page calls it with the
+  request the reader is looking at, the Markdown with the default request
+  (`lib/default-request.ts`, with Fumadocs' own sampler).
+- `typecheck` compiles every operation's sample against `@zitadel/api`
+  (`scripts/sdk-samples.ts`, `tsconfig.samples.json`): a renamed operation, a
+  changed argument order or an example the schema rejects fails it. A new
+  security scheme fails it too, until `lib/sdk-sample.ts` knows how to
+  authenticate with it.
 
 ## Checks
 

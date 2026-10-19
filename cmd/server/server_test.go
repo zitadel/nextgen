@@ -12,6 +12,7 @@ import (
 	"github.com/zitadel/passwap/argon2"
 	"github.com/zitadel/passwap/bcrypt"
 
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/instrumentation"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 )
@@ -81,6 +82,28 @@ func TestLoadConfigServerPublicBase(t *testing.T) {
 	cfg, err = loadConfig(configPath)
 	require.NoError(t, err)
 	assert.Equal(t, "http://localhost:9999", cfg.Server.PublicBase)
+}
+
+// TestLoadConfigSessionDefaults pins the session lifetimes of a server started
+// with no session settings. session.default_ttl used to default to the
+// anonymous shell's 10 minutes, which signed every user out 10 minutes after
+// they signed in.
+func TestLoadConfigSessionDefaults(t *testing.T) {
+	t.Setenv("NEXTGEN_SERVER_DATA_DIR", t.TempDir())
+	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
+
+	cfg, err := loadConfig(configPath)
+	require.NoError(t, err)
+	assert.Equal(t, domain.SessionDefaultTTL, cfg.Session.DefaultTTL)
+	assert.Equal(t, 720*time.Hour, cfg.Session.MaxTTL)
+	assert.Greater(t, cfg.Session.DefaultTTL, domain.SessionAnonymousTTL,
+		"a signed-in session must outlive an anonymous shell")
+
+	t.Setenv("NEXTGEN_SESSION_DEFAULT_TTL", "168h")
+	cfg, err = loadConfig(configPath)
+	require.NoError(t, err)
+	assert.Equal(t, 168*time.Hour, cfg.Session.DefaultTTL)
 }
 
 // TestLoadConfigDefaultsToArgon2id locks in the ADR 029 default: with no

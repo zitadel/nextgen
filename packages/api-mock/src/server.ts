@@ -378,9 +378,24 @@ export function createMockApp(options: { issuer: string }): express.Express {
   app.get("/sessions/me", (req: express.Request, res: express.Response) => {
     // Both the session and the 401 are session state: neither may be stored.
     res.setHeader("Cache-Control", "private, no-store");
+    // Mirrors the server, which validates a present project_id against the
+    // project-id pattern before it reads the session.
+    const projectParam = req.query.project_id;
+    if (projectParam !== undefined && !/^[a-zA-Z0-9_-]+$/.test(String(projectParam))) {
+      res.status(400).json(errorBody("req.invalid", "project_id is not a valid project id."));
+      return;
+    }
     const found = lookupSession(req);
     if (found.status !== "active") {
       res.status(401).json(noSessionBody());
+      return;
+    }
+    // Mirrors the server: a read that names a project refuses a session of any
+    // other project, the way an app on a shared host sees one.
+    if (typeof projectParam === "string" && found.session.project_id !== projectParam) {
+      res
+        .status(403)
+        .json(errorBody("sess.project_mismatch", "The session belongs to a different project."));
       return;
     }
     res.json(found.session);

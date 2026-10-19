@@ -115,7 +115,7 @@ export class ZitadelSession extends ZitadelSurface {
 
   private readonly session = new SessionController(
     this,
-    () => resolveApi(this.project, this.projectAttrs, "<zitadel-session>").api,
+    () => resolveApi(this.project, this.projectAttrs, "<zitadel-session>"),
     { onSessionMissing: () => this.leave() },
   );
 

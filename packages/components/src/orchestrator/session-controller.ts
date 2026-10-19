@@ -6,7 +6,7 @@ import { getSession, revokeSession, type SessionIdentity } from "./api-client.js
 import type { resolveApi } from "./resolve-api.js";
 import { emit } from "../internal/emit.js";
 
-type Api = ReturnType<typeof resolveApi>["api"];
+type Resolved = ReturnType<typeof resolveApi>;
 
 /**
  * What the host knows about the visitor's session:
@@ -75,17 +75,21 @@ export class SessionController implements ReactiveController {
   // so it is replayed once the host is back.
   private missedSessionMissing = false;
 
+  // The cookie holds a live session of another project: not this app's to
+  // revoke. On a shared host (localhost) it is, for example, the Console's.
+  private otherProjectSession = false;
+
   private readonly host: ReactiveControllerHost & HTMLElement;
-  private readonly resolve: () => Api;
+  private readonly resolve: () => Resolved;
   private readonly options: SessionControllerOptions;
 
   /**
-   * @param resolve Returns the host's API handle, throwing while no project is
-   *   resolvable.
+   * @param resolve Returns the host's project and API handle, throwing while no
+   *   project is resolvable.
    */
   constructor(
     host: ReactiveControllerHost & HTMLElement,
-    resolve: () => Api,
+    resolve: () => Resolved,
     options: SessionControllerOptions = {},
   ) {
     this.host = host;
@@ -122,7 +126,9 @@ export class SessionController implements ReactiveController {
    * backend answering that there is no session (see {@link isNoSession}) means
    * it is already gone, which is what signing out asks for, so it succeeds the
    * same way. Any other failure, a gateway's 401 or 404 included, revoked
-   * nothing: it sets `errorMessage` and resolves `false`.
+   * nothing: it sets `errorMessage` and resolves `false`. When the identity read
+   * found a session of another project, nobody is signed in here: that session
+   * is left alone and sign-out completes without a revoke.
    */
   async signOut(onRevoked?: () => void): Promise<boolean> {
     this.loading = true;
@@ -130,7 +136,9 @@ export class SessionController implements ReactiveController {
     this.host.requestUpdate();
 
     try {
-      await revokeSession(this.resolve());
+      if (!this.otherProjectSession) {
+        await revokeSession(this.resolve().api);
+      }
     } catch (error) {
       if (!isNoSession(error)) {
         const message = error instanceof Error ? error.message : "";
@@ -150,30 +158,37 @@ export class SessionController implements ReactiveController {
 
   private maybeLoadIdentity(): void {
     if (this.identityRequested) return;
-    let api: Api;
+    let resolved: Resolved;
     try {
-      api = this.resolve();
+      resolved = this.resolve();
     } catch {
       return;
     }
     this.identityRequested = true;
-    void this.loadIdentity(api);
+    void this.loadIdentity(resolved);
   }
 
-  private async loadIdentity(api: Api): Promise<void> {
+  private async loadIdentity({ api, project }: Resolved): Promise<void> {
     let missing: boolean;
     try {
-      const session = (await getSession(api)) as Partial<SessionIdentity> | null;
-      // A 200 without the session JSON's `session_id` (an SPA host's `index.html`
-      // served for an unrewritten proxy path) did not come from the backend.
-      if (typeof session?.session_id !== "string") {
-        throw new Error("Could not load the session: the response is not a session.");
+      const session = (await getSession(api, project.projectId)) as Partial<SessionIdentity> | null;
+      if (session === null) {
+        // A live session of another project: not this app's to show or revoke,
+        // and not an answer that nobody is signed in, so the surface stays.
+        this.otherProjectSession = true;
+        missing = false;
+      } else {
+        // A 200 without the session JSON's `session_id` (an SPA host's `index.html`
+        // served for an unrewritten proxy path) did not come from the backend.
+        if (typeof session.session_id !== "string") {
+          throw new Error("Could not load the session: the response is not a session.");
+        }
+        this.display = session.user?.display ?? "";
+        this.identifier = session.user?.identifier ?? "";
+        this.userId = session.user_id ?? "";
+        missing = !this.userId;
+        this.state = missing ? "signed-out" : "signed-in";
       }
-      this.display = session.user?.display ?? "";
-      this.identifier = session.user?.identifier ?? "";
-      this.userId = session.user_id ?? "";
-      missing = !this.userId;
-      this.state = missing ? "signed-out" : "signed-in";
     } catch (error) {
       missing = isNoSession(error);
       if (missing) {
@@ -186,7 +201,10 @@ export class SessionController implements ReactiveController {
     }
     this.host.requestUpdate();
     this.options.onIdentitySettled?.();
-    if (!missing) return;
+    if (missing) this.notifyMissing();
+  }
+
+  private notifyMissing(): void {
     if (this.host.isConnected) this.options.onSessionMissing?.();
     else this.missedSessionMissing = true;
   }

@@ -208,3 +208,83 @@ func TestGetMySession_ExpiredSessionIsSignedOut(t *testing.T) {
 	require.Equal(t, "auth.unauthorized", got.Code)
 	require.Equal(t, "Missing or invalid session token.", got.Message)
 }
+
+// TestGetMySession_HoldsTheSessionToTheNamedProject pins the server side of
+// project-bound session reads: with project_id, a live session of another
+// project on the same server is refused with 403 sess.project_mismatch, so an
+// app never reads it as one of its users. Its own project reads it as before.
+func TestGetMySession_HoldsTheSessionToTheNamedProject(t *testing.T) {
+	t.Parallel()
+
+	testServer := harness.EnsureTestServer(t)
+	projects := harness.EnsureProjectService(t)
+
+	project, err := projects.Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	otherProject, err := projects.Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	projectSecret, err := harness.EnsureTokenService(t).GenerateJWE(t.Context(), project.Token())
+	require.NoError(t, err)
+
+	attempt := &domain.AuthAttempt{ProjectID: project.ID}
+	stmts := harness.EnsureServiceDB(t)
+	require.NoError(t, stmts.Statements().CreateAuthAttempt(t.Context(), attempt))
+	const plainToken = "handoff_session_me_project_test"
+	sum := sha256.Sum256([]byte(plainToken))
+	attempt.HandoffToken = &domain.HandoffToken{TokenHash: sum[:]}
+	require.NoError(t, stmts.Statements().HandoffAuthAttempt(t.Context(), attempt))
+
+	exchangeBody, err := json.Marshal(map[string]string{"handoff_token": plainToken})
+	require.NoError(t, err)
+	exchangeReq, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
+		testServer.URL+"/sessions/exchange?project_id="+project.ID, bytes.NewReader(exchangeBody))
+	require.NoError(t, err)
+	exchangeReq.Header.Set("Content-Type", "application/json")
+	exchangeReq.Header.Set("Authorization", "Bearer "+projectSecret)
+
+	exchangeResp, err := testServer.Client().Do(exchangeReq)
+	require.NoError(t, err)
+	defer func() { _ = exchangeResp.Body.Close() }()
+	if exchangeResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(exchangeResp.Body)
+		t.Fatalf("exchange returned %d: %s", exchangeResp.StatusCode, body)
+	}
+
+	var sessionCookie *http.Cookie
+	for _, cookie := range exchangeResp.Cookies() {
+		if cookie.Name == "__nextgen_session" {
+			sessionCookie = cookie
+		}
+	}
+	require.NotNil(t, sessionCookie, "exchange must set the __nextgen_session cookie")
+
+	readAs := func(projectID string) *http.Response {
+		t.Helper()
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet,
+			testServer.URL+"/sessions/me?project_id="+projectID, nil)
+		require.NoError(t, err)
+		req.AddCookie(sessionCookie)
+		resp, err := testServer.Client().Do(req)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = resp.Body.Close() })
+		return resp
+	}
+
+	refused := readAs(otherProject.ID)
+	require.Equal(t, http.StatusForbidden, refused.StatusCode)
+	require.Equal(t, "private, no-store", refused.Header.Get("Cache-Control"))
+	var refusal struct {
+		Code string `json:"code"`
+	}
+	require.NoError(t, json.NewDecoder(refused.Body).Decode(&refusal))
+	require.Equal(t, "sess.project_mismatch", refusal.Code)
+
+	served := readAs(project.ID)
+	require.Equal(t, http.StatusOK, served.StatusCode)
+	var session struct {
+		ProjectID string `json:"project_id"`
+	}
+	require.NoError(t, json.NewDecoder(served.Body).Decode(&session))
+	require.Equal(t, project.ID, session.ProjectID)
+}
