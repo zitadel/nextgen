@@ -51,9 +51,7 @@ export class DependencyVersionCheck implements SanityCheck {
       ...(pkg.devDependencies ?? {}),
     }).filter(([name]) => name.startsWith("@zitadel/"));
     const exact = declared.filter(([, version]) => semver.valid(version.trim()) !== null);
-    const mismatched = exact.filter(
-      ([, version]) => !semver.eq(version.trim(), ctx.cliVersion),
-    );
+    const mismatched = exact.filter(([, version]) => !semver.eq(version.trim(), ctx.cliVersion));
     if (mismatched.length > 0) {
       // Repair with the project's own package manager and an exact-save flag:
       // a bare `npm install` would switch managers on a pnpm/yarn/bun project

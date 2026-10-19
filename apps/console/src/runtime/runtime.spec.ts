@@ -23,14 +23,10 @@ beforeEach(() => {
   _resetRuntimeForTesting();
   fetchMock.mockReset();
   vi.stubGlobal("fetch", fetchMock);
-  // Re-applied per test: `unstubAllEnvs` below drops `test-setup.ts`'s
-  // hermetic defaults along with each test's own stubs.
-  vi.stubEnv("VITE_CONSOLE_RUNTIME_FALLBACK", "");
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
 
@@ -174,7 +170,9 @@ describe("retryRuntime", () => {
     fetchMock.mockRejectedValueOnce(new TypeError("network down"));
     expect(await initRuntime()).toMatchObject({ ok: false });
 
-    fetchMock.mockResolvedValue(jsonResponse({ mode: "standalone", console_project_id: "proj_up" }));
+    fetchMock.mockResolvedValue(
+      jsonResponse({ mode: "standalone", console_project_id: "proj_up" }),
+    );
 
     expect(await retryRuntime()).toEqual({
       ok: true,

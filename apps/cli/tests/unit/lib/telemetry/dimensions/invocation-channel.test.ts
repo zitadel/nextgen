@@ -8,7 +8,9 @@ describe("invocationChannel", () => {
       "pnpm",
     );
     expect(invocationChannel.value({ npm_config_user_agent: "npm/10 node/v24" })).toBe("npm");
-    expect(invocationChannel.value({ npm_config_user_agent: "yarn/4 npm/? node/v24" })).toBe("yarn");
+    expect(invocationChannel.value({ npm_config_user_agent: "yarn/4 npm/? node/v24" })).toBe(
+      "yarn",
+    );
     expect(invocationChannel.value({})).toBe("unknown");
   });
 });

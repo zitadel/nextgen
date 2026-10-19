@@ -118,17 +118,6 @@ var brandingAccess = resourceAccess{
 	denied:    domain.ErrBrandingPermissionDenied,
 }
 
-// environmentAccess gates the project's runtime slots (ADR 035, #534).
-// Reads are project-scoped: the list carries a project_id and the get
-// addresses an environment by name, so no route resolves a path id through
-// RSI and the kind is only used to narrow a partial-access list.
-var environmentAccess = resourceAccess{
-	kind:      domain.ResourceKindEnvironment,
-	readMiss:  domain.ErrEnvironmentNotFound,
-	writeMiss: domain.ErrEnvironmentProjectNotFound,
-	denied:    domain.ErrEnvironmentPermissionDenied,
-}
-
 // variableAccess gates the project's variables and secrets (ADR 062). Like
 // grants and events, a variable has no minted id and no resource_scope_index
 // row — it is addressed by name under the project_id the request carries — so
@@ -173,6 +162,15 @@ var deploymentAccess = resourceAccess{
 	readMiss:  domain.ErrDeploymentNotFound,
 	writeMiss: domain.ErrEnvironmentProjectNotFound,
 	denied:    domain.ErrDeploymentPermissionDenied,
+}
+
+// originAccess gates add/remove of project origin patterns. Origins have no
+// minted id and no RSI row — they are addressed by pattern under the
+// project_id the request carries — so every op is project-scoped.
+var originAccess = resourceAccess{
+	readMiss:  domain.ErrOriginNotFound,
+	writeMiss: domain.ErrOriginNotFound,
+	denied:    domain.ErrOriginPermissionDenied,
 }
 
 // eventsAccess gates the operator audit stream (ADR 049). List/get are
@@ -443,6 +441,38 @@ func requireExpandScope(ctx context.Context, scope string, denied func() domain.
 	return denied().WithMessage(msg)
 }
 
+// userReadsProject reports whether the credential is a user principal (the
+// Console session) with read on the whole of projectID, which stands in for the
+// team_membership.read / team.read scopes such a principal never mints. The
+// system catalog has no finer read permission than the project viewer role
+// (ADR 054 §5). For an operation that has no list check whose decision it can
+// use (GET /users/{id}?team_id=), it asks the resolver.
+func (h *Handler) userReadsProject(ctx context.Context, projectID string) (bool, error) {
+	sc, ok := GetScopeContext(ctx)
+	if !ok || sc.PrincipalType != domain.AuthzPrincipalTypeUser {
+		return false, nil
+	}
+	if h == nil || h.pool == nil {
+		return false, domain.ErrInternal(errors.New("authz statements not configured"))
+	}
+	dec, err := checkProjectAccess(ctx, resolver.New(), h.pool.Statements(), projectID, opRead, nil)
+	if err != nil {
+		return false, err
+	}
+	return dec == resolver.DecisionAllow, nil
+}
+
+// requireMembershipReadUnless is requireMembershipRead, waived when the caller
+// is a session with read on the whole project (userReadsProject, or the list
+// check's project-wide decision): the gate POST /users/query and
+// GET /users/{id}?team_id= share.
+func requireMembershipReadUnless(ctx context.Context, sessionReadsProject bool) error {
+	if sessionReadsProject {
+		return nil
+	}
+	return requireMembershipRead(ctx)
+}
+
 func requireMembershipRead(ctx context.Context) error {
 	return requireExpandScope(ctx, "team_membership.read", domain.ErrUserPermissionDenied,
 		"reading a user's team memberships requires team_membership.read")
@@ -456,11 +486,6 @@ func requireTeamRead(ctx context.Context) error {
 func requireReleaseRead(ctx context.Context) error {
 	return requireExpandScope(ctx, "release.read", domain.ErrDeploymentPermissionDenied,
 		"expanding a deployment's release requires release.read")
-}
-
-func requireEnvironmentRead(ctx context.Context) error {
-	return requireExpandScope(ctx, "environment.read", domain.ErrDeploymentPermissionDenied,
-		"filtering deployments by environment name requires environment.read")
 }
 
 func mapAuthzDecision(dec resolver.Decision, res resourceAccess, op accessOp) error {
@@ -479,29 +504,32 @@ func mapAuthzDecision(dec resolver.Decision, res resourceAccess, op accessOp) er
 // requireProjectListAccess gates a management list and attaches the list
 // context: Allow stamps a one-shot EXISTS skip (consumed by the next
 // compileList / ListUsers); Forbidden attaches the EXISTS predicate via
-// the same Resolver used for Check; NotFound 404s.
-func (h *Handler) requireProjectListAccess(ctx context.Context, projectID string, res resourceAccess, kind domain.ResourceKind) (context.Context, error) {
+// the same Resolver used for Check; NotFound 404s. The bool reports whether
+// the access is project-wide (Allow) rather than partial (a foothold narrowed
+// by the filter).
+func (h *Handler) requireProjectListAccess(ctx context.Context, projectID string, res resourceAccess, kind domain.ResourceKind) (context.Context, bool, error) {
 	if h == nil || h.pool == nil {
-		return ctx, domain.ErrInternal(errors.New("authz statements not configured"))
+		return ctx, false, domain.ErrInternal(errors.New("authz statements not configured"))
 	}
 	return requireProjectListAccess(ctx, h.pool.Statements(), projectID, res, kind)
 }
 
-func requireProjectListAccess(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, kind domain.ResourceKind) (context.Context, error) {
+func requireProjectListAccess(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, kind domain.ResourceKind) (context.Context, bool, error) {
 	r := resolver.New()
 	dec, err := checkProjectAccess(ctx, r, stmts, projectID, opRead, nil)
 	if err != nil {
-		return ctx, mapCeilingError(err, res, opRead, nil)
+		return ctx, false, mapCeilingError(err, res, opRead, nil)
 	}
 	switch dec {
 	case resolver.DecisionAllow:
-		return service.WithAuthzListSkipOnce(ctx), nil
+		return service.WithAuthzListSkipOnce(ctx), true, nil
 	case resolver.DecisionForbidden:
-		return withAuthzListFilter(ctx, r, stmts, projectID, kind, opRead)
+		ctx, err := withAuthzListFilter(ctx, r, stmts, projectID, kind, opRead)
+		return ctx, false, err
 	case resolver.DecisionNotFound, resolver.DecisionUnspecified:
-		return ctx, res.miss(opRead)
+		return ctx, false, res.miss(opRead)
 	default:
-		return ctx, res.miss(opRead)
+		return ctx, false, res.miss(opRead)
 	}
 }
 

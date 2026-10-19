@@ -32,9 +32,7 @@ const identifierStep: CreateFlow201 = {
   step: {
     name: "identifier",
     texts: { title_key: "identifier.title" },
-    fields: [
-      { name: "email", type: "email", text_key: "identifier.field.email", required: true },
-    ],
+    fields: [{ name: "email", type: "email", text_key: "identifier.field.email", required: true }],
     actions: [{ name: "submit", kind: "submit", text_key: "submit.continue", primary: true }],
     gates: {},
   },
@@ -66,7 +64,11 @@ function installFlowFetchStub(response: CreateFlow201): { restore: () => void } 
         headers: { "content-type": "application/json" },
       }),
   ) as unknown as typeof fetch;
-  return { restore: () => void (globalThis.fetch = original) };
+  return {
+    restore: () => {
+      globalThis.fetch = original;
+    },
+  };
 }
 
 async function waitFor<T>(probe: () => T | null | undefined, timeout = 3000): Promise<T> {
@@ -137,9 +139,7 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
     const element = await mount(identifierStep);
 
     // On the host element itself.
-    expect(getComputedStyle(element).getPropertyValue("--zl-foreground")).toBe(
-      HOST_RED,
-    );
+    expect(getComputedStyle(element).getPropertyValue("--zl-foreground")).toBe(HOST_RED);
     // Boundary 1: chrome the orchestrator renders in its own shadow root.
     const title = element.shadowRoot?.querySelector(".zl-card-title") as HTMLElement;
     expect(title).toBeTruthy();
@@ -162,7 +162,7 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
   });
 
   it("the primary button consumes the --zl-primary pair from the host", async () => {
-    // The semantic brand knob: setting the Figma `primary` pair on the host
+    // The semantic brand knob: setting the `primary` pair on the host
     // element restyles the primary CTA through both shadow boundaries.
     const HOST_BLUE = "rgb(0, 0, 255)";
     appStylesheet(
@@ -198,8 +198,7 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
   });
 
   it("tenant palette.link recolors card links and nothing else", async () => {
-    // Regression for the broken bridge: `palette.link` used to target the
-    // pill token while the links kept a hard-coded purple accent.
+    // `palette.link` sets `--zl-link`; only links take it.
     const linkedStep = {
       ...identifierStep,
       step: {

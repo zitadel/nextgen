@@ -21,7 +21,7 @@ func SeedProjectsTiedAt(ctx context.Context, pool database.Pool, ids []string, c
 	nanos := createdAt.UnixNano()
 	for _, id := range ids {
 		_, err := p.sqlDB.ExecContext(ctx,
-			`INSERT INTO projects (id, name, preview_origins, created_at, updated_at) VALUES (?, ?, '[]', ?, ?)`,
+			`INSERT INTO projects (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)`,
 			id, "project-"+id, nanos, nanos,
 		)
 		if err != nil {
@@ -71,6 +71,22 @@ func InsertFlowDefinitionAt(ctx context.Context, pool database.Pool, projectID, 
 	_, err := p.sqlDB.ExecContext(ctx,
 		`INSERT INTO flow_definitions (project_id, id, name, schema_version, status, purposes, definition, created_at, updated_at) VALUES (?, ?, ?, '1.0.0', 'draft', '[]', '{}', ?, ?)`,
 		projectID, id, name, createdAt.UnixNano(), createdAt.UnixNano(),
+	)
+	return wrapError(err)
+}
+
+// InsertUserPasswordAt inserts a user_passwords row at an exact created_at.
+// SetUserPassword never accepts a caller-supplied created_at, so a test that
+// needs a newest password the clock has not reached yet has to write the row
+// itself.
+func InsertUserPasswordAt(ctx context.Context, pool database.Pool, projectID, id, userID, encodedHash string, createdAt time.Time) error {
+	p, ok := pool.(*Pool)
+	if !ok {
+		return fmt.Errorf("sqlite.InsertUserPasswordAt: expected *Pool, got %T", pool)
+	}
+	_, err := p.sqlDB.ExecContext(ctx,
+		`INSERT INTO user_passwords (project_id, id, user_id, encoded_hash, created_at) VALUES (?, ?, ?, ?, ?)`,
+		projectID, id, userID, encodedHash, createdAt.UnixNano(),
 	)
 	return wrapError(err)
 }

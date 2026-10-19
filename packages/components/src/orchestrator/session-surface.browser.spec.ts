@@ -11,8 +11,7 @@ import type { ZitadelSession } from "./zitadel-session.js";
  * `variant="widget"` is content-sized and transparent through every layer
  * (host, `zl-page-shell` host, inner `.zr-page-shell`), while
  * `variant="page"` claims the viewport and paints the surface — on the
- * internal page shell, since the session host itself no longer carries the
- * page paint. Theme resolution reaches real pixels the same way as the
+ * internal page shell: the session host carries no page paint. Theme resolution reaches real pixels the same way as the
  * login surface.
  */
 
@@ -48,7 +47,11 @@ function installSessionFetchStub(): { restore: () => void } {
   );
   const original = globalThis.fetch;
   globalThis.fetch = fetchStub as unknown as typeof fetch;
-  return { restore: () => void (globalThis.fetch = original) };
+  return {
+    restore: () => {
+      globalThis.fetch = original;
+    },
+  };
 }
 
 async function waitFor<T>(probe: () => T | null | undefined, timeout = 3000): Promise<T> {
@@ -136,9 +139,7 @@ describe("<zitadel-session> surface (chromium)", () => {
     const shell = element.shadowRoot?.querySelector("zl-page-shell") as HTMLElement;
     expect(shell.hasAttribute("data-widget")).toBe(false);
     // The page paint lives on the internal page shell, not the session host.
-    expect(element.getBoundingClientRect().height).toBeGreaterThanOrEqual(
-      window.innerHeight - 1,
-    );
+    expect(element.getBoundingClientRect().height).toBeGreaterThanOrEqual(window.innerHeight - 1);
     const surface = shell.shadowRoot?.querySelector(".zr-page-shell") as HTMLElement;
     expect(luminance(getComputedStyle(surface).backgroundColor)).toBeLessThan(60);
 

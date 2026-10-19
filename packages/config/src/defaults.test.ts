@@ -13,7 +13,7 @@ describe("default config rendering", () => {
     );
   });
 
-  it("substitutes the builtin base and schema URL through default documents", () => {
+  it("substitutes the builtin base and names the schema by objectType in the flow", () => {
     const schema = getDefaultHumanUserSchema({
       builtinSchemaBase: "https://example.test/api/schemas/",
     });
@@ -24,18 +24,10 @@ describe("default config rendering", () => {
     expect(schema).toMatchObject({
       title: "DefaultHumanUserSchema",
       metaSchema: "https://example.test/api/schemas/user-schema.json",
-      "$id": "https://example.test/api/schemas/default-human-user.json",
+      $id: "https://example.test/api/schemas/default-human-user.json",
       objectType: "human-user",
     });
-    expect(flow.user_schema).toBe(
-      "https://example.test/api/schemas/default-human-user.json",
-    );
-  });
-
-  it("pins the flow to a server-assigned schema id when one is provided", () => {
-    const flow = getDefaultLoginFlow({ userSchemaUrl: "schema_abc123" });
-
-    expect(flow.user_schema).toBe("schema_abc123");
+    expect(flow.user_schema).toBe("human-user");
     expect(flow.status).toBe("active");
   });
 });

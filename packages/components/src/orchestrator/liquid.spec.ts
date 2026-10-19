@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createLiquidEngine, localiseFlowErrorKeys, parseSsoError } from "./liquid.js";
+import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
 import { en as fullLocale } from "./locales/en.js";
+import { builtinLocales } from "./locales/index.js";
 import { mandatoryGatesMarkerComment } from "./mandatory-gates.js";
 import { TEMPLATE_NAMES } from "./template-names.js";
 
@@ -51,7 +52,9 @@ describe("LiquidJS engine", () => {
   it("warns once per missing key, and never for fallback-served or empty keys", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     try {
-      const engine = createLiquidEngine({ locale: { ...locale, "action.back": "Back" } });
+      const engine = createLiquidEngine({
+        locale: { ...locale, "action.back": "Back", "identifier.description": "Email" },
+      });
       // Raw-key miss: warns on first render only.
       engine.parseAndRenderSync("{{ key | t }}", { key: "unknown.key" });
       engine.parseAndRenderSync("{{ key | t }}", { key: "unknown.key" });
@@ -62,6 +65,7 @@ describe("LiquidJS engine", () => {
       // Served by the injected-key and field-label fallbacks: no warning.
       engine.parseAndRenderSync("{{ key | t }}", { key: "custom-step.action.back" });
       engine.parseAndRenderSync("{{ key | t }}", { key: "register.field.givenName" });
+      engine.parseAndRenderSync("{{ key | t }}", { key: "identifier.description.sso" });
       // Undefined text_key stringifies to "": no warning.
       engine.parseAndRenderSync("{{ key | t }}", { key: undefined });
       expect(warn).toHaveBeenCalledTimes(1);
@@ -93,6 +97,41 @@ describe("LiquidJS engine", () => {
     const result = engine.parseAndRenderSync("{{ key | t }}", { key: "custom.action.back" });
     expect(result).toBe("custom.action.back");
   });
+
+  it("the | t filter falls back from a step's SSO description to its plain one", () => {
+    // The engine asks for `<step>.description.sso` once the step offers providers
+    // (flow_state_machine.go buildStep); only some steps need their own wording.
+    const engine = createLiquidEngine({ locale: { ...locale, "identifier.description": "Email" } });
+    const result = engine.parseAndRenderSync("{{ key | t }}", {
+      key: "identifier.description.sso",
+    });
+    expect(result).toBe("Email");
+  });
+
+  it("a step's own SSO description wins over its plain one", () => {
+    const engine = createLiquidEngine({
+      locale: {
+        ...locale,
+        "password.description": "Password",
+        "password.description.sso": "Password or provider",
+      },
+    });
+    const result = engine.parseAndRenderSync("{{ key | t }}", { key: "password.description.sso" });
+    expect(result).toBe("Password or provider");
+  });
+
+  it("an SSO description with no plain one shows the plain key, which is the one to add", () => {
+    const engine = createLiquidEngine({ locale });
+    const result = engine.parseAndRenderSync("{{ key | t }}", { key: "custom.description.sso" });
+    expect(result).toBe("custom.description");
+  });
+
+  it.each(Object.entries(builtinLocales))(
+    "the builtin %s password step has its own wording when it offers providers",
+    (_lang, dictionary) => {
+      expect(dictionary["password.description.sso"]).not.toBe(dictionary["password.description"]);
+    },
+  );
 
   it("the builtin locales ship the generic action.back", () => {
     expect(fullLocale["action.back"]).toBe("Back");
@@ -699,93 +738,17 @@ describe("provider names are server data", () => {
 
 /** Undo the entity escaping the engine applies, as a browser would. */
 function decodeEntities(value: string): string {
-  return value
-    .replaceAll("&#34;", '"')
-    .replaceAll("&#39;", "'")
-    .replaceAll("&lt;", "<")
-    .replaceAll("&gt;", ">")
-    // Unescape &amp; last: decoding it first could turn "&amp;lt;" into "<"
-    // by re-interpreting the revealed "&" as the start of another entity.
-    .replaceAll("&amp;", "&");
+  return (
+    value
+      .replaceAll("&#34;", '"')
+      .replaceAll("&#39;", "'")
+      .replaceAll("&lt;", "<")
+      .replaceAll("&gt;", ">")
+      // Unescape &amp; last: decoding it first could turn "&amp;lt;" into "<"
+      // by re-interpreting the revealed "&" as the start of another entity.
+      .replaceAll("&amp;", "&")
+  );
 }
-
-
-describe("parseSsoError", () => {
-  const tag = (obj: Record<string, string>) => "sso_error:" + btoa(JSON.stringify(obj));
-
-  it("returns null for a payload without the tag, so the catalog path handles it", () => {
-    expect(parseSsoError("error.invalid_credentials")).toBeNull();
-    expect(parseSsoError("user_not_found")).toBeNull();
-  });
-
-  it("unpacks code, description and uri into one form-level error", () => {
-    const errors = parseSsoError(
-      tag({
-        code: "access_denied",
-        description: "The user cancelled the sign-in.",
-        uri: "https://provider.example/errors/access_denied",
-      }),
-    );
-    expect(errors).toEqual([
-      {
-        text_key: "error.sso_cancelled",
-        code: "access_denied",
-        detail: "The user cancelled the sign-in.",
-        uri: "https://provider.example/errors/access_denied",
-      },
-    ]);
-    // No field, so the template renders it in the form-level banner.
-    expect(errors?.[0]?.field).toBeUndefined();
-  });
-
-  it("omits the optional fields the provider left out", () => {
-    // description and error_uri are optional in RFC 6749; a bare code is valid.
-    const errors = parseSsoError(tag({ code: "access_denied" }));
-    expect(errors?.[0]?.detail).toBeUndefined();
-    expect(errors?.[0]?.uri).toBeUndefined();
-  });
-
-  it("keeps a non-ascii description intact, as the server encoded it", () => {
-    // The server marshals JSON as UTF-8 before base64. Reading that back with
-    // `atob` alone gives one character per byte, so the provider's own words
-    // arrive as mojibake -- which is most providers, in most languages.
-    const utf8Tag = (obj: Record<string, string>) =>
-      "sso_error:" +
-      btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(obj))));
-
-    const errors = parseSsoError(
-      utf8Tag({ code: "access_denied", description: "Anmeldung abgebrochen — über Google" }),
-    );
-
-    expect(errors?.[0]?.detail).toBe("Anmeldung abgebrochen — über Google");
-  });
-
-  it("only calls it cancelled when the provider says access_denied", () => {
-    // Telling someone they cancelled a sign-in they did not cancel sends them
-    // looking for a mistake they never made; a provider outage is not a
-    // decision the user took.
-    expect(parseSsoError(tag({ code: "access_denied" }))?.[0]?.text_key).toBe(
-      "error.sso_cancelled",
-    );
-    for (const code of ["server_error", "temporarily_unavailable", "invalid_client"]) {
-      expect(parseSsoError(tag({ code }))?.[0]?.text_key, code).toBe("error.sso_failed");
-    }
-  });
-
-  it("keeps the provider's own code on a failure, so support can act on it", () => {
-    const errors = parseSsoError(tag({ code: "server_error", description: "Upstream is down" }));
-
-    expect(errors?.[0]).toMatchObject({
-      text_key: "error.sso_failed",
-      code: "server_error",
-      detail: "Upstream is down",
-    });
-  });
-
-  it("degrades a corrupt payload to a generic failure rather than leaking it", () => {
-    expect(parseSsoError("sso_error:not-valid-base64!!")).toEqual([{ text_key: "error.sso_failed" }]);
-  });
-});
 
 describe("provider error renders in the alert", () => {
   const render = (errors: unknown) => {
@@ -911,11 +874,11 @@ describe("localiseFlowErrorKeys", () => {
   });
 
   it("returns null for anything that is not an error.* key payload", () => {
-    // Outcome tokens stay verbatim with the caller.
-    expect(localiseFlowErrorKeys("user_not_found", ctx)).toBeNull();
+    // Any other payload stays verbatim with the caller.
+    expect(localiseFlowErrorKeys("not_a_key", ctx)).toBeNull();
     expect(localiseFlowErrorKeys("", ctx)).toBeNull();
     // A single non-key segment rejects the whole payload.
-    expect(localiseFlowErrorKeys("error.email_required; user_not_found", ctx)).toBeNull();
+    expect(localiseFlowErrorKeys("error.email_required; not_a_key", ctx)).toBeNull();
   });
 
   it("survives a locale without the generic keys via the hardcoded fallback", () => {

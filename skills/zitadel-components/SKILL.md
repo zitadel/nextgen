@@ -28,7 +28,7 @@ is the component itself: attributes, tokens, parts, events, shadow-DOM hooks.
 ## Install / use
 
 ```sh
-corepack pnpm add @zitadel/components
+corepack pnpm add @zitadel/components@alpha
 ```
 
 `lit`, `liquidjs`, `dompurify` are externalised peer/runtime deps (consumers
@@ -84,6 +84,9 @@ Theming levers (strongest-first resolution, documented in the README):
 - **`suppress-header`** (boolean attribute, reflected) hides the widget's own
   heading — use it when the host page already shows a title and you want to
   avoid a duplicate. Otherwise control chrome through `variant` and tokens.
+- **`suppress-password-toggle`** (boolean attribute) hides the show/hide button
+  the login shows on password fields by default. It applies to custom Liquid
+  templates too; templates have nothing to wire.
 
 Automation hooks (stable `data-testid`s the default template emits): host atoms
 `zitadel-field-email` / `zitadel-field-password` / `zitadel-action-submit`;
@@ -91,7 +94,12 @@ native shadow controls `zitadel-input-email` / `zitadel-input-password` /
 `zitadel-action-submit-button`. Hooks are method-named even when the flow engine
 names a credential field `x-auth-methods#<method>` — the `name` attribute keeps
 the raw wire key; only the hook is normalised (`hookName` in
-`src/internal/hook-name.ts`). For sign-out, pierce to `.signout-btn`.
+`src/internal/hook-name.ts`). For sign-out, the button inside `<zitadel-session>`
+(the signed-in card setup's profile pages render) carries
+`zitadel-session-logout`, and its native button `zitadel-session-logout-button`.
+`<zitadel-logout>` has no hook: open its avatar menu ("Open user menu"), then
+pierce to `.signout-btn`. Given a `<template>` child, it shows no menu, and the
+element marked `data-action="logout"` signs out.
 
 ## Read these, don't guess
 
@@ -112,6 +120,7 @@ these before writing it — don't reproduce a catalogue from memory.
 
 ## Gotchas
 
+- **Server rendering.** If your app renders on the server, mount the widget on the client only, after hydration, or give a raw `<zitadel-login>` element `project-id` and `proxy-path` as attributes, because a widget that starts before its configuration arrives shows an error instead of the flow.
 - **Open shadow roots, nested.** The automation hooks sit inside nested shadow
   roots, so a flat `document.querySelector('[data-testid="zitadel-input-email"]')`
   misses them. Use a shadow-aware locator (Playwright) or recurse through

@@ -2,7 +2,6 @@ package spanner
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"cloud.google.com/go/spanner"
@@ -15,14 +14,27 @@ import (
 )
 
 const (
-	deploymentTable      = "deployments"
-	createDeploymentStmt = `INSERT INTO deployments` +
-		` (project_id, id, environment_id, release_id, metadata)` +
-		` VALUES (@p1, @p2, @p3, @p4, @p5) THEN RETURN deployed_at`
-	setEnvironmentCurrentDeploymentStmt = `UPDATE environments SET current_deployment_id = @p3` +
-		` WHERE project_id = @p1 AND id = @p2`
-	deploymentQuery = `SELECT project_id, id, environment_id, release_id, metadata, deployed_at` +
-		` FROM deployments`
+	deploymentTable = "deployments"
+	originsTable    = "deployment_origins"
+	previewTable    = "previews"
+
+	deploymentQuery = `SELECT project_id, id, release_id, origin_kind, metadata, deployed_at FROM deployments`
+)
+
+var (
+	deploymentSchema = deployment.NewSchema(deploymentTable, originsTable, previewTable)
+
+	deploymentColumns = []string{"project_id", "id", "release_id", "origin_kind", "metadata", "deployed_at"}
+	originColumns     = []string{"project_id", "deployment_id", "origin", "release_id", "origin_kind", "deployed_at", "seq"}
+
+	originsQuery        = deployment.OriginsSelect(originsTable) + ` WHERE t.project_id = @p1 AND t.deployment_id IN UNNEST(@p2)`
+	newestPerOriginStmt = deployment.OriginsSelect(originsTable) +
+		` WHERE t.project_id = @p1 AND t.origin IN UNNEST(@p2) AND NOT ` + deployment.NewerOriginRowExists(originsTable)
+	liveOriginsStmt = originsQuery + ` AND NOT ` + deployment.NewerOriginRowExists(originsTable) +
+		` AND ` + deployment.OriginServes(previewTable, "@p3")
+	liveDeploymentStmt = deploymentQuery + ` WHERE project_id = @p1 AND id = (SELECT t.deployment_id FROM ` + originsTable + ` t` +
+		` WHERE t.project_id = @p1 AND t.origin = @p2 AND NOT ` + deployment.NewerOriginRowExists(originsTable) +
+		` AND ` + deployment.OriginServes(previewTable, "@p3") + `)`
 )
 
 type deploymentStatements struct{ statement }
@@ -31,112 +43,48 @@ func newDeploymentStatements(db queryExecutor) deploymentStatements {
 	return deploymentStatements{statement: statement{db: db}}
 }
 
+// GetNewestPerOrigin implements [service.DeploymentStatements].
+func (ds deploymentStatements) GetNewestPerOrigin(ctx context.Context, projectID string, origins []string) ([]domain.OriginDeployment, error) {
+	return ds.collectOrigins(ctx, newestPerOriginStmt, projectID, origins)
+}
+
 // CreateDeployment implements [service.DeploymentStatements].
-//
-// The read-write transaction serializes concurrent deploys to the same
-// environment: the ReadRow of the pointer acquires a lock on the environment
-// row, so the second deploy waits for the first and then sees its deployment
-// as current.
-func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *domain.Deployment, expectedCurrentDeploymentID *string) (created bool, err error) {
+func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *domain.Deployment, read []domain.OriginDeployment) error {
 	if err := ensureManagedID(&entity.ID, domain.PrefixDeployment); err != nil {
-		return false, err
+		return err
 	}
 	rawMetadata, err := deployment.MarshalMetadata(entity.Metadata)
 	if err != nil {
-		return false, err
+		return err
 	}
 	metadata, err := encodeNullJSON(rawMetadata)
 	if err != nil {
-		return false, err
+		return err
 	}
-	// The idempotent answer is staged here and copied onto the entity only
-	// after the transaction commits: ReadWriteTransaction retries aborted
-	// attempts without undoing the callback's side effects, so overwriting
-	// the entity inside an attempt that later aborts would make the retry
-	// compare — and insert — with another deployment's values.
-	var existing *domain.Deployment
+	var deployedAt time.Time
 	err = withTransaction(ctx, ds.db, func(ctx context.Context, tx queryExecutor) error {
-		// Reset per attempt: ReadWriteTransaction retries aborted attempts,
-		// and a retry that finds the release already current takes the
-		// idempotent branch — it must not report the aborted attempt's
-		// insert.
-		created = false
-		existing = nil
-		row, err := tx.ReadRow(ctx, "environments", spanner.Key{entity.ProjectID, entity.EnvironmentID},
-			[]string{"current_deployment_id"})
-		if err != nil {
+		deployedAt = deployment.Stamp(time.Now())
+		mutations := []*spanner.Mutation{
+			spanner.Insert(deploymentTable, deploymentColumns, []any{
+				entity.ProjectID, entity.ID, entity.ReleaseID, entity.OriginKind.String(), metadata, deployedAt,
+			}),
+		}
+		origins := entity.Origins()
+		for i, seq := range deployment.NextSeqs(origins, read) {
+			mutations = append(mutations, spanner.Insert(originsTable, originColumns,
+				[]any{entity.ProjectID, entity.ID, origins[i], entity.ReleaseID, entity.OriginKind.String(), deployedAt, seq}))
+		}
+		if err := tx.BufferWrite(ctx, mutations); err != nil {
 			return err
 		}
-		var currentID spanner.NullString
-		if err := row.Columns(&currentID); err != nil {
-			return wrapError(err)
-		}
-		// The current row is read whole because both branches below need it:
-		// the guard's conflict details, and the idempotent answer's record.
-		// A pointer whose row is gone — a release delete cascaded the
-		// deployment away — reads as nothing running, so the environment
-		// heals on the next deploy instead of wedging on a hard error.
-		var current *domain.Deployment
-		if currentID.Valid {
-			currentRow, err := tx.ReadRow(ctx, deploymentTable,
-				spanner.Key{entity.ProjectID, currentID.StringVal}, deploymentColumns)
-			switch {
-			case err == nil:
-				current, err = scanDeployment(currentRow)
-				if err != nil {
-					return wrapError(err)
-				}
-			case errors.Is(err, new(database.NoRowFoundError)):
-				// nothing runs; heal below
-			default:
-				return err
-			}
-		}
-		if err := deployment.CheckExpectedCurrent(current, expectedCurrentDeploymentID); err != nil {
-			return err
-		}
-		// Idempotent on the running release: deploying what already runs is
-		// answered with the deployment that made it live, and nothing is
-		// written.
-		if current != nil && current.ReleaseID == entity.ReleaseID {
-			existing = current
-			return nil
-		}
-
-		insert := buildStatement(createDeploymentStmt,
-			entity.ProjectID,
-			entity.ID,
-			entity.EnvironmentID,
-			entity.ReleaseID,
-			metadata,
-		).statement()
-		if err := tx.Write(ctx, insert, func(iter *spanner.RowIterator) error {
-			_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
-				if err := row.Columns(&entity.DeployedAt); err != nil {
-					return struct{}{}, err
-				}
-				entity.DeployedAt = entity.DeployedAt.UTC()
-				return struct{}{}, nil
-			})
-			return err
-		}); err != nil {
-			return err
-		}
-
-		update := buildStatement(setEnvironmentCurrentDeploymentStmt,
-			entity.ProjectID, entity.EnvironmentID, entity.ID).statement()
-		if _, err := tx.Update(ctx, update); err != nil {
-			return err
-		}
-
-		created = true
 		rsi := newResourceScopeStatements(tx)
 		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindDeployment, entity.ProjectID, entity.ID))
 	})
-	if err == nil && existing != nil {
-		*entity = *existing
+	if err != nil {
+		return err
 	}
-	return created, err
+	entity.DeployedAt = deployedAt
+	return nil
 }
 
 // GetDeploymentByID implements [service.DeploymentStatements].
@@ -145,7 +93,30 @@ func (ds deploymentStatements) GetDeploymentByID(ctx context.Context, projectID,
 	if err != nil {
 		return nil, err
 	}
-	return scanDeployment(row)
+	entity, err := scanDeployment(row)
+	if err != nil {
+		return nil, err
+	}
+	if err := ds.attachTargets(ctx, projectID, []*domain.Deployment{entity}, nil); err != nil {
+		return nil, err
+	}
+	return entity, nil
+}
+
+// GetLiveDeployment implements [service.DeploymentStatements].
+func (ds deploymentStatements) GetLiveDeployment(ctx context.Context, projectID, origin string, now time.Time) (*domain.Deployment, error) {
+	var entity *domain.Deployment
+	if err := ds.db.Query(ctx, buildStatement(liveDeploymentStmt, projectID, origin, now).statement(), func(iter *spanner.RowIterator) error {
+		var err error
+		entity, err = collectOneRow(iter, scanDeployment)
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	if err := ds.attachTargets(ctx, projectID, []*domain.Deployment{entity}, &now); err != nil {
+		return nil, err
+	}
+	return entity, nil
 }
 
 // GetDeploymentsByIDs implements [service.DeploymentStatements].
@@ -156,12 +127,52 @@ func (ds deploymentStatements) GetDeploymentsByIDs(ctx context.Context, projectI
 	var compiler statementCompiler
 	if err := compileRead(&compiler, deploymentQuery, &database.ListOptions[domain.DeploymentField]{
 		Filter: deployment.ByIDs(projectID, ids),
-	}, deployment.Schema); err != nil {
+	}, deploymentSchema); err != nil {
 		return nil, err
 	}
+	items, err := ds.collect(ctx, compiler.statement())
+	if err != nil {
+		return nil, err
+	}
+	if err := ds.attachTargets(ctx, projectID, items, nil); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
 
+// ListDeployments implements [service.DeploymentStatements].
+func (ds deploymentStatements) ListDeployments(ctx context.Context, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error) {
+	return ds.list(ctx, filter, nil)
+}
+
+// ListLiveDeployments implements [service.DeploymentStatements].
+func (ds deploymentStatements) ListLiveDeployments(ctx context.Context, now time.Time, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error) {
+	return ds.list(ctx, deployment.LiveAt(filter, now), &now)
+}
+
+func (ds deploymentStatements) list(ctx context.Context, filter *database.ListOptions[domain.DeploymentField], liveAt *time.Time) (*database.ListResult[*domain.Deployment], error) {
+	items, nextCursor, err := pagination.Page(filter.Pagination, deploymentSchema, func(limit uint32) ([]*domain.Deployment, error) {
+		filter := filter.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileList(ctx, &compiler, deploymentQuery, filter, deploymentSchema, deploymentTable, "id"); err != nil {
+			return nil, err
+		}
+		return ds.collect(ctx, compiler.statement())
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(items) > 0 {
+		if err := ds.attachTargets(ctx, items[0].ProjectID, items, liveAt); err != nil {
+			return nil, err
+		}
+	}
+	return &database.ListResult[*domain.Deployment]{Items: items, NextCursor: nextCursor}, nil
+}
+
+func (ds deploymentStatements) collect(ctx context.Context, stmt spanner.Statement) ([]*domain.Deployment, error) {
 	var items []*domain.Deployment
-	if err := ds.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+	if err := ds.db.Query(ctx, stmt, func(iter *spanner.RowIterator) error {
 		var err error
 		items, err = collectRows(iter, scanDeployment)
 		return err
@@ -171,34 +182,39 @@ func (ds deploymentStatements) GetDeploymentsByIDs(ctx context.Context, projectI
 	return items, nil
 }
 
-// ListDeployments implements [service.DeploymentStatements].
-func (ds deploymentStatements) ListDeployments(ctx context.Context, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error) {
-	var compiler statementCompiler
-	if err := compileList(ctx, &compiler, deploymentQuery, filter, deployment.Schema, deploymentTable, "id"); err != nil {
-		return nil, err
+func (ds deploymentStatements) attachTargets(ctx context.Context, projectID string, items []*domain.Deployment, liveAt *time.Time) error {
+	query, args := originsQuery, []any{projectID, deployment.DeploymentIDs(items)}
+	if liveAt != nil {
+		query, args = liveOriginsStmt, append(args, *liveAt)
 	}
+	rows, err := ds.collectOrigins(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+	deployment.AttachTargets(items, rows)
+	return nil
+}
 
-	var items []*domain.Deployment
-	if err := ds.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+func (ds deploymentStatements) collectOrigins(ctx context.Context, query string, args ...any) ([]domain.OriginDeployment, error) {
+	var items []domain.OriginDeployment
+	if err := ds.db.Query(ctx, buildStatement(query, args...).statement(), func(iter *spanner.RowIterator) error {
 		var err error
-		items, err = collectRows(iter, scanDeployment)
+		items, err = collectRows(iter, func(row *spanner.Row) (domain.OriginDeployment, error) {
+			var (
+				scanned domain.OriginDeployment
+				kind    string
+			)
+			if err := row.Columns(&scanned.Origin, &scanned.DeploymentID, &scanned.ReleaseID, &kind, &scanned.DeployedAt, &scanned.Seq); err != nil {
+				return scanned, err
+			}
+			scanned.DeployedAt = scanned.DeployedAt.UTC()
+			return deployment.WithKind(scanned, kind)
+		})
 		return err
 	}); err != nil {
 		return nil, err
 	}
-
-	nextCursor := pagination.MarshalNext(
-		filter.Pagination.OrderBy,
-		items,
-		deployment.Schema,
-		filter.Pagination.Limit,
-	)
-
-	return &database.ListResult[*domain.Deployment]{Items: items, NextCursor: nextCursor}, nil
-}
-
-var deploymentColumns = []string{
-	"project_id", "id", "environment_id", "release_id", "metadata", "deployed_at",
+	return items, nil
 }
 
 func scanDeployment(row *spanner.Row) (*domain.Deployment, error) {
@@ -210,8 +226,8 @@ func scanDeployment(row *spanner.Row) (*domain.Deployment, error) {
 	if err := row.Columns(
 		&scanned.ProjectID,
 		&scanned.ID,
-		&scanned.EnvironmentID,
 		&scanned.ReleaseID,
+		&scanned.OriginKind,
 		&metadataJSON,
 		&deployedAt,
 	); err != nil {

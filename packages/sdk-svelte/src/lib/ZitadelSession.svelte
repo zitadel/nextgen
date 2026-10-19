@@ -3,6 +3,8 @@
   import type { ZitadelSession as ZitadelSessionElement } from '@zitadel/components';
 
   import type { ZitadelSessionProps, ZitadelSignoutDetail } from './types';
+  import { assignGiven } from './given';
+  import { onClient, proxyPathAttr } from './attributes';
 
   let {
     project,
@@ -28,6 +30,14 @@
     return el;
   }
 
+  // Props the element has defaults for are assigned only when given; a
+  // binding would assign `undefined` and overwrite the default.
+  $effect(() => {
+    if (el) {
+      assignGiven(el, { heading, logoutLabel, variant, theme, suppressHeader });
+    }
+  });
+
   $effect(() => {
     const node = el;
     if (!node) {
@@ -44,13 +54,9 @@
 
 <zitadel-session
   bind:this={el}
-  {project}
-  project-id={projectId}
-  proxy-path={proxyPath}
+  project={onClient(project)}
+  project-id={project?.projectId ?? projectId}
+  proxy-path={proxyPathAttr(project?.proxyPath ?? proxyPath)}
+  url={project?.url}
   post-sign-out-url={postSignOutUrl}
-  {heading}
-  logout-label={logoutLabel}
-  {variant}
-  {theme}
-  {suppressHeader}
 ></zitadel-session>

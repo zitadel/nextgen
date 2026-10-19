@@ -1,0 +1,18 @@
+---
+title: Flow definitions
+description: OpenAPI operations for flow definition templates.
+---
+
+import { Card, Cards } from "fumadocs-ui/components/card";
+
+Flow definitions are templates for user journeys such as login, registration,
+and recovery. They describe the ordered capabilities a flow should resolve and
+execute at runtime. Each create publishes a new revision under the flow's name.
+A start request that names the flow runs its newest active revision; one
+without a name chooses among all active revisions in the project.
+
+<Cards>
+  <Card title="List flow definitions" href="/docs/reference/api/flow-definitions/listFlowDefinitions" />
+  <Card title="Create a new flow definition" href="/docs/reference/api/flow-definitions/createFlowDefinition" />
+  <Card title="Get a flow definition by id" href="/docs/reference/api/flow-definitions/getFlowDefinition" />
+</Cards>

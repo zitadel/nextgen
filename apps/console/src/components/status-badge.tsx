@@ -21,9 +21,8 @@ import { cn } from "@/lib/utils";
  * team detail reads the same field — showing two words for one state would be
  * the console inventing vocabulary the API does not have.
  *
- * `bg-success` rather than Tailwind's own `green-500`: v4 moved its palette to
- * oklch, so `green-500` renders `(0,201,80)` where the design system's value is
- * `(34,197,94)`. The utility no longer matches the token it is named after.
+ * `bg-success`, not `green-500`: Tailwind's oklch green renders `(0,201,80)`,
+ * the design-system value is `(34,197,94)`.
  */
 const DOT = "size-2.5 shrink-0 rounded-full";
 

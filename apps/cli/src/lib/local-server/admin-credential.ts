@@ -1,12 +1,19 @@
 import { pbkdf2Sync, randomBytes } from "node:crypto";
 import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 
 import { defaultHumanUserSchemaUrl } from "@zitadel/config";
 
 import { ZitadelError } from "../errors";
 import { isObject } from "../json";
-import { LOCAL_RUNTIME_DIR, PLATFORM_PROJECT_ID } from "./runtime";
+import {
+  findUpward,
+  LOCAL_RUNTIME_DIR,
+  PLATFORM_PROJECT_ID,
+  readRuntimeMetadata,
+  sameLocalServer,
+} from "./runtime";
 
 /**
  * The local admin's two files under `.zitadel/local/` (gitignored):
@@ -35,6 +42,33 @@ export type LocalAdmin = {
   user_id: string;
   team_id: string;
 };
+
+/** The directory holding the local admin: `cwd`, or the nearest parent `zitadel start` ran in. */
+export function findLocalAdminDir(cwd: string): Promise<string | undefined> {
+  return findUpward(cwd, LOCAL_ADMIN_FILE);
+}
+
+/**
+ * The local admin of the server at `serverUrl`: the nearest one, from `cwd`
+ * upward, whose `start` recorded that server beside it. An admin beside another
+ * server's metadata holds a password this server never imported, so it is
+ * passed over.
+ */
+export async function findLocalAdminFor(
+  cwd: string,
+  serverUrl: string,
+): Promise<LocalAdmin | undefined> {
+  for (let from = cwd; ; ) {
+    const dir = await findLocalAdminDir(from);
+    if (!dir) return undefined;
+    const runtime = await readRuntimeMetadata(dir).catch(() => undefined);
+    if (runtime && sameLocalServer(runtime.server_url, serverUrl)) {
+      return readLocalAdmin(dir);
+    }
+    if (dir === homedir() || dirname(dir) === dir) return undefined;
+    from = dirname(dir);
+  }
+}
 
 /** Reads the local admin credential, or `undefined` when `start` never wrote one. */
 export async function readLocalAdmin(cwd: string): Promise<LocalAdmin | undefined> {
@@ -85,7 +119,9 @@ function malformedAdminFile(cause?: unknown): ZitadelError {
   return new ZitadelError("E_VALIDATION", `${LOCAL_ADMIN_FILE} is malformed`, {
     hint: `Delete ${LOCAL_ADMIN_FILE} and run \`zitadel reset --force\`, then \`zitadel start\`. Both are needed: reset keeps ${LOCAL_ADMIN_FILE}, and deleting it alone leaves the server holding the old password.`,
     nextCommands: [`rm ${LOCAL_ADMIN_FILE}`, "zitadel reset --force", "zitadel start"],
-    ...(cause ? { details: { cause: cause instanceof Error ? cause.message : String(cause) } } : {}),
+    ...(cause
+      ? { details: { cause: cause instanceof Error ? cause.message : String(cause) } }
+      : {}),
   });
 }
 
@@ -120,9 +156,13 @@ export async function ensureLocalAdmin(
   // Unique per write, not per process: two starts in one process (or a retry)
   // must not rename each other's staging file away.
   const staging = `${userFile}.${randomBytes(6).toString("hex")}.tmp`;
-  await writeFile(staging, `${JSON.stringify(bootstrapUserDocument(admin, schemaUrl), null, 2)}\n`, {
-    mode: 0o644,
-  });
+  await writeFile(
+    staging,
+    `${JSON.stringify(bootstrapUserDocument(admin, schemaUrl), null, 2)}\n`,
+    {
+      mode: 0o644,
+    },
+  );
   await chmod(staging, 0o644).catch(() => undefined);
   await rename(staging, userFile);
 

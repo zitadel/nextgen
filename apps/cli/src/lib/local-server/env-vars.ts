@@ -60,7 +60,7 @@ export const loadEnvFiles = async (
 ): Promise<Readonly<Record<string, string>>> => {
   const parsed = await Promise.all(files.map((file) => readEnvFile(join(cwd, file))));
   return parsed.reduceRight<Record<string, string>>(
-    (merged, source) => ({ ...merged, ...source }),
+    (merged, source) => Object.assign(merged, source),
     {},
   );
 };

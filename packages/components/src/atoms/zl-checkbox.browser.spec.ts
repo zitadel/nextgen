@@ -89,6 +89,37 @@ describe("<zl-checkbox> form participation (chromium)", () => {
     expect(checkbox.checked).toBe(true);
   });
 
+  it("keeps the default from its first connect when moved in the DOM", async () => {
+    // `checked` reflects to the attribute, so re-reading the markup on every
+    // connect would turn the user's tick into the default.
+    const { form, checkbox } = mount(
+      `<form><div class="a"><zl-checkbox name="terms"></zl-checkbox></div><div class="b"></div></form>`,
+    );
+    await checkbox.updateComplete;
+    checkbox.checked = true;
+    await checkbox.updateComplete;
+    (form.querySelector(".b") as HTMLDivElement).append(checkbox);
+    await checkbox.updateComplete;
+    form.reset();
+    await checkbox.updateComplete;
+    expect(checkbox.checked).toBe(false);
+  });
+
+  it("is disabled by an enclosing fieldset", async () => {
+    const { form, checkbox } = mount(
+      `<form><fieldset disabled><zl-checkbox name="terms" checked></zl-checkbox></fieldset></form>`,
+    );
+    await checkbox.updateComplete;
+    const input = checkbox.shadowRoot?.querySelector("input") as HTMLInputElement;
+    expect(input.disabled).toBe(true);
+    expect(new FormData(form).get("terms")).toBeNull();
+
+    (form.querySelector("fieldset") as HTMLFieldSetElement).disabled = false;
+    await checkbox.updateComplete;
+    expect(input.disabled).toBe(false);
+    expect(new FormData(form).get("terms")).toBe("on");
+  });
+
   it("delegates focus from the host to the inner input", async () => {
     const { checkbox } = mount(`<form><zl-checkbox name="terms"></zl-checkbox></form>`);
     await checkbox.updateComplete;

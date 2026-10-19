@@ -1,14 +1,28 @@
 import { ZitadelError } from "../../../../errors";
 import { isObject, parseJsonObject, setTopLevelJsonKey } from "../../../../json";
-import { npmDistTagForCliVersion } from "../../../../public-cli";
+import { sdkVersionForCli } from "../../../../public-cli";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
+import { angularEntry, assertMountsRootComponent, type RootMount } from "../root-component";
 import { angularProxyEdit } from "./angular-json";
 import { angularRoutesEdit } from "./angular-routes";
 import { appComponentTemplate, appTemplateHtml, proxyConfEdit } from "./templates";
 
 const SDK_DEPENDENCY = "@zitadel/sdk-angular";
+
+/**
+ * The managed root component, in the layout Angular 20 generates, and how
+ * `main.ts` bootstraps it. Angular 17–19 keep theirs in `app.component.ts`,
+ * and a module-based app bootstraps an `AppModule`.
+ */
+const ROOT: RootMount = {
+  path: "src/app/app.ts",
+  binding: { name: "App", named: true },
+  extension: false,
+  calls: ["bootstrapApplication", "bootstrapModule"],
+  mounts: "argument",
+};
 
 /**
  * Adds a `dev: "ng serve"` script only when the project does not already define
@@ -57,11 +71,15 @@ export class AngularPatcher extends AbstractRulePatcher {
     return framework === "angular";
   }
 
+  protected override async preflight(_ctx: PatchContext, cwd: string): Promise<void> {
+    await assertMountsRootComponent(cwd, await angularEntry(cwd), ROOT);
+  }
+
   protected routeOps(ctx: PatchContext): FileOp[] {
     return [
       {
         kind: "write",
-        path: "src/app/app.ts",
+        path: ROOT.path,
         contents: appComponentTemplate(ctx),
       },
       { kind: "write", path: "src/app/app.html", contents: appTemplateHtml(ctx) },
@@ -98,13 +116,13 @@ export class AngularPatcher extends AbstractRulePatcher {
       {
         kind: "add-dep",
         name: SDK_DEPENDENCY,
-        version: npmDistTagForCliVersion(ctx.cliVersion),
+        version: sdkVersionForCli(ctx.cliVersion),
       },
     ];
   }
 
   protected routeFiles(_view: PatchView): ReadonlyArray<string> {
-    return ["src/app/app.ts", "src/app/app.html", "proxy.conf.cjs"];
+    return [ROOT.path, "src/app/app.html", "proxy.conf.cjs"];
   }
 
   protected override infrastructureFiles(_view: PatchView): ReadonlyArray<string> {

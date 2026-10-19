@@ -262,7 +262,9 @@ Keep private mocks aligned with public CLI behavior.
 `,
       },
       runChangesetStatus: async () => {
-        throw new Error("Found mixed changeset mixed: ignored @zitadel/api-mock and not ignored @zitadel/cli");
+        throw new Error(
+          "Found mixed changeset mixed: ignored @zitadel/api-mock and not ignored @zitadel/cli",
+        );
       },
     });
 
@@ -312,7 +314,11 @@ This package is private.
     const report = await checkChangesetsStatus({
       entries: [{ status: "M", file: "docs/release.md" }],
       config: {
-        fixed: [publicPackages.map((pkg) => pkg.name).filter((name) => name !== "@zitadel/server-linux-x64")],
+        fixed: [
+          publicPackages
+            .map((pkg) => pkg.name)
+            .filter((name) => name !== "@zitadel/server-linux-x64"),
+        ],
       },
     });
 
@@ -515,12 +521,12 @@ describe("release publish guard", () => {
     const { shouldFailManualPublishSkip } = await loadReleaseModule();
     const workflowDispatchEnv = { GITHUB_EVENT_NAME: "workflow_dispatch" } as NodeJS.ProcessEnv;
 
-    expect(shouldFailManualPublishSkip({ dryRun: false, recoverVersion: "" }, workflowDispatchEnv)).toBe(
-      true,
-    );
-    expect(shouldFailManualPublishSkip({ dryRun: true, recoverVersion: "" }, workflowDispatchEnv)).toBe(
-      false,
-    );
+    expect(
+      shouldFailManualPublishSkip({ dryRun: false, recoverVersion: "" }, workflowDispatchEnv),
+    ).toBe(true);
+    expect(
+      shouldFailManualPublishSkip({ dryRun: true, recoverVersion: "" }, workflowDispatchEnv),
+    ).toBe(false);
     expect(
       shouldFailManualPublishSkip(
         { dryRun: false, recoverVersion: "0.1.0-alpha.14" },
@@ -534,19 +540,15 @@ describe("release publish guard", () => {
     ).toBe(false);
   });
 
-  it("forces production telemetry while publishing npm packages", async () => {
+  it("merges overrides onto the process env for the publish step", async () => {
     const { releasePublishEnv } = await loadReleaseModule();
     const originalBase = process.env.ZITADEL_RELEASE_TEST_BASE;
     process.env.ZITADEL_RELEASE_TEST_BASE = "preserved";
     try {
-      const env = releasePublishEnv({
-        ZITADEL_RELEASE_TEST_OVERRIDE: "included",
-        ZITADEL_TELEMETRY_BUILD_CHANNEL: "development",
-      });
+      const env = releasePublishEnv({ ZITADEL_RELEASE_TEST_OVERRIDE: "included" });
 
       expect(env.ZITADEL_RELEASE_TEST_BASE).toBe("preserved");
       expect(env.ZITADEL_RELEASE_TEST_OVERRIDE).toBe("included");
-      expect(env.ZITADEL_TELEMETRY_BUILD_CHANNEL).toBe("production");
     } finally {
       if (originalBase === undefined) {
         delete process.env.ZITADEL_RELEASE_TEST_BASE;

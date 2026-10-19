@@ -8,14 +8,25 @@ export default async function AdminPage() {
 
   return (
     <main style={{ padding: "48px", maxWidth: "600px", margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "24px" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: "24px",
+        }}
+      >
         <h1 style={{ fontSize: "24px", fontWeight: 700, margin: 0 }}>Admin</h1>
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <UserBadge />
           <LogoutWidget />
         </div>
       </div>
-      {session.isAuthenticated ? <SessionDetails /> : <p style={{ color: "#6b7280" }}>Not signed in</p>}
+      {session.isAuthenticated ? (
+        <SessionDetails />
+      ) : (
+        <p style={{ color: "#6b7280" }}>Not signed in</p>
+      )}
     </main>
   );
 }

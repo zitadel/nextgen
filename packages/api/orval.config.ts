@@ -27,7 +27,6 @@ export default defineConfig({
         runtime: "getProxyPath()",
         imports: [{ name: "getProxyPath", importPath: "../../runtime/base-url" }],
       },
-      formatter: "oxfmt",
       override: {
         fetch: {
           includeHttpResponseReturnType: false,
@@ -54,7 +53,6 @@ export default defineConfig({
       client: "zod",
       target: "./src/generated/endpoints",
       fileExtension: ".zod.ts",
-      formatter: "oxfmt",
       clean: ["!**/*", "./src/generated/endpoints/**/*.zod.ts"],
       override: {
         zod: {

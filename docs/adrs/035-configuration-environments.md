@@ -586,3 +586,30 @@ and are resolved to ids once, at creation; the stored record carries
 above — payload fields, `409` on a failed `expected_current_deployment_id`
 check, newest-first ordering — are unchanged; this amendment moves the paths,
 not the model. `rolled_back_from` was dropped from the payload by #532.
+
+## Amendment (2026-10-08): environments are removed; a deployment targets origins
+
+The environment entity this ADR introduced under [Environments](#environments)
+is withdrawn by the spike behind #1389
+([PR #1427](https://github.com/zitadel/nextgen/pull/1427)) and
+[ADR 068](068-project-is-the-data-boundary.md). What stands from this ADR is
+the release: an immutable bundle of resource revisions, idempotent on content,
+with its audit metadata. What changes is where a release runs.
+
+- A deployment targets origins: the project default, the hostnames the
+  project allows, or a preview URL. There is no environments resource, and
+  nothing on a deployment names one.
+- Which release serves a request follows from the origin the request comes
+  from.
+- `promote` has no server surface: it is `deploy` against another project
+  with a content-digest assertion. `releases create` and `status` are
+  withdrawn from the CLI; `deploy`, `preview`, `deployment list` and
+  `deployment rollback` replace the loop described under [CLI](#cli).
+
+Of the items this ADR left [out of scope](#out-of-scope), lifecycle has no
+subject, data isolation is ADR 068, per-environment values stay with
+[ADR 062](062-per-environment-variables-and-secrets.md) and #1566, and the
+rest are settled in the spike's design documents.
+
+The amendments of 2026-09-02 and 2026-09-11 above still apply to releases.
+What they say about environments goes with the entity.

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { FRAMEWORK_IDS } from "../../../../../../helpers/framework-ids";
 import type {
   FileOp,
   ScaffoldPlan,
@@ -20,7 +21,7 @@ function ctxFor(
       id: "proj-1",
       project_secret: "sk_proj_full",
       preview_secret: "sk_proj_preview",
-      preview_origins: [],
+      origins: [],
       created_at: "2026-01-01T00:00:00.000Z",
     },
     issuer: "http://localhost:3000",
@@ -168,17 +169,34 @@ describe("NextPatcher.plan", () => {
     expect(dep).toMatchObject({ name: "@zitadel/sdk-next", version: "0.1.0-alpha.0" });
   });
 
+  it.each([
+    ["1.2.0", "latest"],
+    ["2.0.0-beta.3", "beta"],
+  ])("pins the SDK for CLI %s at %s", (cliVersion, expected) => {
+    const plan = new NextPatcher().plan({ ...ctxFor("app"), cliVersion });
+    const dep = plan.ops.find(
+      (op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep",
+    );
+    expect(dep?.version).toBe(expected);
+  });
+
   it("leaves schema and flow files for setup's resource materializer", () => {
     const plan = new NextPatcher().plan(ctxFor("app"));
     expect(writeContents(plan, ".zitadel/schemas/user.json")).toBeUndefined();
     expect(writeContents(plan, ".zitadel/flows/default.json")).toBeUndefined();
   });
 
-  it("writes preview issuer_pattern as the raw origins, not a doubled scheme", () => {
+  it("writes preview issuer_pattern from preview origins only, not a doubled scheme", () => {
     const base = ctxFor("app");
     const ctx = {
       ...base,
-      project: { ...base.project, preview_origins: ["https://nextgen.dev.mrida.ng"] },
+      project: {
+        ...base.project,
+        origins: [
+          { pattern: "https://app.example.com", kind: "primary" as const },
+          { pattern: "https://nextgen.dev.mrida.ng", kind: "preview" as const },
+        ],
+      },
     };
     const zitadelJson = JSON.parse(
       writeContents(new NextPatcher().plan(ctx), "zitadel.json") ?? "{}",
@@ -229,5 +247,11 @@ describe("NextPatcher.artifacts", () => {
     });
     expect(artifacts.markedFiles).toContain("proxy.ts");
     expect(artifacts.markedFiles).not.toContain("middleware.ts");
+  });
+});
+
+describe("NextPatcher.canPatch", () => {
+  it.each(FRAMEWORK_IDS)("matches %s only when it is its own framework", (id) => {
+    expect(new NextPatcher().canPatch(id)).toBe(id === "next");
   });
 });

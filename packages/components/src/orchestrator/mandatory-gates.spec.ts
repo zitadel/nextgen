@@ -1,4 +1,4 @@
-import type { CreateFlow201Step } from "@zitadel/api/generated/model";
+import type { CreateFlow201Step, CreateFlow201StepFieldsItem } from "@zitadel/api/generated/model";
 import { describe, expect, it } from "vitest";
 
 import { mandatoryGatesMarkerComment, patchMandatoryGates } from "./mandatory-gates.js";
@@ -8,14 +8,17 @@ const locale: Record<string, string> = {
   "submit.continue": "Continue",
 };
 
+const emailField: CreateFlow201StepFieldsItem = {
+  name: "email",
+  type: "email",
+  text_key: "identifier.field.email",
+  required: true,
+};
+
 const step: CreateFlow201Step = {
   name: "identifier",
-  fields: [
-    { name: "email", type: "email", text_key: "identifier.field.email", required: true },
-  ],
-  actions: [
-    { name: "submit", kind: "submit", text_key: "submit.continue", primary: true },
-  ],
+  fields: [emailField],
+  actions: [{ name: "submit", kind: "submit", text_key: "submit.continue", primary: true }],
   gates: {},
 };
 
@@ -27,6 +30,16 @@ describe("patchMandatoryGates", () => {
     expect(out).toContain('<zl-field name="email"');
     expect(out).toContain('label="Work email"');
     expect(out).toContain("required");
+  });
+
+  it("keeps a missing required field read-only", () => {
+    const locked: CreateFlow201Step = {
+      ...step,
+      fields: [{ ...emailField, read_only: true }],
+    };
+    const out = patchMandatoryGates(mandatoryGatesMarkerComment, locked, locale);
+    const field = new DOMParser().parseFromString(out, "text/html").querySelector("zl-field");
+    expect(field?.hasAttribute("readonly")).toBe(true);
   });
 
   it("appends a missing primary submit button at the marker", () => {
@@ -64,7 +77,9 @@ describe("patchMandatoryGates", () => {
     // field (with a raw text_key label) at the bottom of the form.
     const selectStep: CreateFlow201Step = {
       ...step,
-      fields: [{ name: "country", type: "select", text_key: "register.field.country", required: true }],
+      fields: [
+        { name: "country", type: "select", text_key: "register.field.country", required: true },
+      ],
     };
     const html =
       `<zl-select name="country"></zl-select>` +
@@ -78,7 +93,9 @@ describe("patchMandatoryGates", () => {
   it("does not duplicate a required checkbox already rendered as <zl-checkbox>", () => {
     const checkboxStep: CreateFlow201Step = {
       ...step,
-      fields: [{ name: "terms", type: "checkbox", text_key: "register.field.terms", required: true }],
+      fields: [
+        { name: "terms", type: "checkbox", text_key: "register.field.terms", required: true },
+      ],
     };
     const html =
       `<zl-checkbox name="terms"></zl-checkbox>` +

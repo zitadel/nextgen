@@ -62,6 +62,16 @@ const (
 	EventTypeAuthCheckFailed      EventType = "auth.check.failed"
 	EventTypeAuthCheckSucceeded   EventType = "auth.check.succeeded"
 
+	// The SSO callback's outcome, separate from auth.check.*: a succeeded
+	// exchange is not a sign-in, since the identity may still match no account.
+	// An authorization failure is the provider's error response, or a callback
+	// with no code; an exchange failure is anything after a code arrived. A
+	// callback refused before its exchange, on another connection's path or
+	// with a foreign `iss`, follows the same split.
+	EventTypeAuthSSOAuthorizationFailed EventType = "auth.sso.authorization.failed"
+	EventTypeAuthSSOExchangeSucceeded   EventType = "auth.sso.exchange.succeeded"
+	EventTypeAuthSSOExchangeFailed      EventType = "auth.sso.exchange.failed"
+
 	EventTypeFlowdefCreated EventType = "flowdef.created"
 	// Retired, no producer. Kept so stored rows decode.
 	// TODO(grvijayan): remove both, their OpenAPI event types and the
@@ -73,9 +83,8 @@ const (
 
 	EventTypeBrandingCreated EventType = "branding.created"
 
-	EventTypeEnvironmentCreated EventType = "environment.created"
-
 	EventTypeReleaseCreated EventType = "release.created"
+	EventTypeReleaseRevoked EventType = "release.revoked"
 
 	EventTypeIDPCreated EventType = "idp.created"
 	EventTypeIDPUpdated EventType = "idp.updated"
@@ -83,6 +92,12 @@ const (
 	EventTypeIDPIdentityLinkCreated EventType = "idp.identity_link.created"
 
 	EventTypeDeploymentCreated EventType = "deployment.created"
+
+	EventTypeOriginAdded   EventType = "origin.added"
+	EventTypeOriginRemoved EventType = "origin.removed"
+
+	EventTypeVariableSet     EventType = "variable.set"
+	EventTypeVariableRemoved EventType = "variable.removed"
 
 	EventTypeAuthzGranted EventType = "authz.granted"
 	EventTypeAuthzRevoked EventType = "authz.revoked"

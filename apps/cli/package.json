@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/cli",
-  "version": "1.0.0-alpha.24",
+  "version": "1.0.0-alpha.25",
   "description": "Agent-friendly Zitadel CLI",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/cli#readme",
   "bugs": {
@@ -72,21 +72,32 @@
       "branding": {
         "description": "Work with login branding revisions."
       },
-      "sso": {
-        "description": "Manage the identity providers users can sign in with."
+      "auth-method": {
+        "description": "Turn sign-in methods on or off for a user schema."
+      },
+      "auth-method:password": {
+        "description": "Turn password sign-in on or off."
+      },
+      "auth-method:passkey": {
+        "description": "Turn passkey sign-in on or off."
+      },
+      "auth-method:sso": {
+        "description": "Add or remove identity providers."
       }
     }
   },
   "type": "module",
   "scripts": {
     "build": "tsdown",
-    "typecheck": "tsc --build tsconfig.app.json",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json",
     "pretest": "pnpm run build",
     "test": "vitest run",
     "test:all": "pnpm run test",
     "readme": "oclif readme",
-    "prepack": "tsdown && oclif manifest",
-    "postpack": "rm -f oclif.manifest.json"
+    "prepack": "tsdown && oclif manifest && publint --strict",
+    "postpack": "rm -f oclif.manifest.json",
+    "lint": "biome check .",
+    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build"
   },
   "dependencies": {
     "@clack/prompts": "catalog:",
@@ -107,10 +118,11 @@
     "mixpanel": "^0.18.1",
     "safe-stable-stringify": "catalog:",
     "semver": "catalog:",
-    "undici": "^7.24.7",
+    "undici": "^7.29.1",
     "wrap-ansi": "^7.0.0",
     "zod": "catalog:",
-    "picocolors": "^1.1.1"
+    "picocolors": "^1.1.1",
+    "rosie-skills": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
@@ -121,7 +133,9 @@
     "@zitadel/sdk-next": "workspace:*",
     "msw": "catalog:",
     "oclif": "catalog:",
-    "tsdown": "^0.21.10",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
     "vitest": "catalog:"
   }
 }

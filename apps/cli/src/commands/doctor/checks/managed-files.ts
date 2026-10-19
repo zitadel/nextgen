@@ -68,9 +68,7 @@ export class ManagedFilesCheck implements SanityCheck {
     const { mode, rows } = evaluated;
     const wiring = await probeConfigWiring(ctx);
     const actions = await resolveArtifacts(ctx);
-    const boundaries = actions
-      ? await detectBoundaryConflicts(actions, ctx.cwd, manifest)
-      : [];
+    const boundaries = actions ? await detectBoundaryConflicts(actions, ctx.cwd, manifest) : [];
     const missing = rows.filter((row) => row.state === "missing");
     const missingInfrastructure = missing.filter((row) => row.class === "infrastructure");
     const detachedInfrastructure = wiring.filter(
@@ -97,9 +95,7 @@ export class ManagedFilesCheck implements SanityCheck {
     }
     if (detachedInfrastructure.length > 0) {
       failures.push(
-        `detached managed config wiring: ${detachedInfrastructure
-          .map((s) => s.path)
-          .join(", ")}`,
+        `detached managed config wiring: ${detachedInfrastructure.map((s) => s.path).join(", ")}`,
       );
     }
     for (const conflict of conflicts) {
@@ -140,7 +136,9 @@ export class ManagedFilesCheck implements SanityCheck {
       name: this.name,
       status: "pass",
       message: `Scaffolded app files are present (${rows.length} tracked${
-        wiring.length > 0 ? `, ${wiring.length} wiring${wiring.length === 1 ? "" : "s"} verified` : ""
+        wiring.length > 0
+          ? `, ${wiring.length} wiring${wiring.length === 1 ? "" : "s"} verified`
+          : ""
       }${mode === "template" ? ", from templates" : ""})`,
       details,
     };
@@ -209,13 +207,15 @@ export class ManagedFilesCheck implements SanityCheck {
     // *new* boundary, so a retired entry whose file stays absent must be
     // dropped — keeping it would fail doctor forever, since setup skips
     // initialized projects. Paths the repair newly introduced are adopted
-    // with their class and on-disk hash.
+    // with their class and on-disk hash. A conditional path the repair did
+    // not bring back is one the current plan does not write for this app
+    // (Nuxt's retired plugins), so it is dropped the same way.
     const current = new Set(actions.markedFiles);
     const conditional = new Set(actions.conditionalFiles ?? []);
     const files: ScaffoldManifest["files"] = {};
     for (const [path, entry] of Object.entries(manifest.files)) {
       const contents = await readIfExists(join(ctx.cwd, path));
-      if (contents === undefined && !current.has(path)) {
+      if (contents === undefined && (!current.has(path) || conditional.has(path))) {
         continue; // retired by a template migration and gone from disk
       }
       files[path] =
@@ -283,14 +283,10 @@ async function detectBoundaryConflicts(
  * framework — the probe is skipped silently and the responsible check
  * reports the real problem.
  */
-async function probeConfigWiring(
-  ctx: CheckContext,
-): Promise<ReadonlyArray<ConfigWiringStatus>> {
+async function probeConfigWiring(ctx: CheckContext): Promise<ReadonlyArray<ConfigWiringStatus>> {
   try {
     const patchCtx = await loadPatchContext(ctx.cwd, ctx.orca, ctx.cliVersion);
-    return await ctx.orca
-      .patcherFor(patchCtx.framework.id)
-      .verify(patchCtx, { cwd: ctx.cwd });
+    return await ctx.orca.patcherFor(patchCtx.framework.id).verify(patchCtx, { cwd: ctx.cwd });
   } catch {
     return [];
   }
@@ -392,7 +388,7 @@ async function evaluateTemplates(
  * config, or an unresolvable renderer are reported by their own checks —
  * this one only degrades to "cannot enumerate".
  */
-async function resolveArtifacts(ctx: CheckContext): Promise<EjectActions | undefined> {
+export async function resolveArtifacts(ctx: CheckContext): Promise<EjectActions | undefined> {
   const framework = await ctx.orca.tryDetect(ctx.cwd);
   if (!framework) {
     return undefined;

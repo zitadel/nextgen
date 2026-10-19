@@ -4,6 +4,7 @@ import { customElement, property } from "lit/decorators.js";
 import ssoStyles from "./zl-sso-providers.css?inline";
 
 import { emit } from "../internal/emit.js";
+import { parseJsonAttribute } from "../internal/json-attribute.js";
 import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";
 
@@ -74,7 +75,8 @@ export class ZlSsoProviders extends LitElement {
    * already localised; the fallback is English so a template that forgets it
    * still renders a sentence rather than a key.
    */
-  @property({ attribute: "label-format" }) accessor labelFormat = `Continue with ${NAME_PLACEHOLDER}`;
+  @property({ attribute: "label-format" }) accessor labelFormat =
+    `Continue with ${NAME_PLACEHOLDER}`;
 
   /** Text for the rule above the buttons. Omitted renders no rule. */
   @property({ attribute: "divider-label" }) accessor dividerLabel: string | undefined = undefined;
@@ -97,11 +99,13 @@ export class ZlSsoProviders extends LitElement {
     // caught at the boundary and `zl-sso-select` is emitted in its place.
     return html`
       <div class="zr-sso" part="root" @zl-submit=${stopInnerSubmit}>
-        ${this.dividerLabel
-          ? html`<div class="zr-sso__divider" part="divider" role="separator" aria-label=${this.dividerLabel}>
+        ${
+          this.dividerLabel
+            ? html`<div class="zr-sso__divider" part="divider" role="separator" aria-label=${this.dividerLabel}>
               <span aria-hidden="true">${this.dividerLabel}</span>
             </div>`
-          : nothing}
+            : nothing
+        }
         <div class="zr-sso__list" part="list">
           ${providers.map((provider) => this.renderProvider(provider))}
         </div>
@@ -125,11 +129,13 @@ export class ZlSsoProviders extends LitElement {
         ?disabled=${this.disabled}
         @click=${() => this.choose(provider)}
       >
-        ${mark
-          ? html`<span slot="leading" class="zr-sso__mark"
+        ${
+          mark
+            ? html`<span slot="leading" class="zr-sso__mark"
               ><zl-icon name=${mark} size="16" decorative></zl-icon
             ></span>`
-          : nothing}
+            : nothing
+        }
         <span class="zr-sso__label">${this.labelFor(provider)}</span>
       </zl-button>
     `;
@@ -157,7 +163,6 @@ export class ZlSsoProviders extends LitElement {
       name: provider.name,
     });
   }
-
 }
 
 /**
@@ -174,15 +179,8 @@ function stopInnerSubmit(event: Event): void {
  * payload must not take the whole sign-in screen down with it.
  */
 function parseProviders(value: string | null): readonly SsoProvider[] {
-  if (!value) {
-    return [];
-  }
-  try {
-    const parsed: unknown = JSON.parse(value);
-    return Array.isArray(parsed) ? (parsed as SsoProvider[]).filter(isRenderable) : [];
-  } catch {
-    return [];
-  }
+  const parsed = parseJsonAttribute(value);
+  return Array.isArray(parsed) ? (parsed as SsoProvider[]).filter(isRenderable) : [];
 }
 
 /** An entry with no id cannot be submitted, and one with no name has nothing to show. */

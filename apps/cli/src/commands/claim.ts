@@ -12,6 +12,7 @@ import { ZitadelError } from "../lib/errors";
 import { isObject } from "../lib/json";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { readZitadelSecret, writeZitadelSecret, type ZitadelSecret } from "../lib/project";
+import { reportWarning } from "../lib/warnings";
 
 /**
  * Poll cadence while a human completes the browser step. Starts responsive so
@@ -125,7 +126,8 @@ export default class Claim extends BaseCommand {
         data: {
           title: "Zitadel claim was not started.",
           project_id: secret.project_id,
-          would: "Open a browser to claim this project, then record the owning team in .zitadel/secret.",
+          would:
+            "Open a browser to claim this project, then record the owning team in .zitadel/secret.",
         },
         nextCommands: ["zitadel claim"],
       });
@@ -136,7 +138,7 @@ export default class Claim extends BaseCommand {
       token: secret.project_secret,
     });
 
-    let challenge;
+    let challenge: Awaited<ReturnType<typeof client.initClaim>>;
     try {
       challenge = await client.initClaim(secret.project_id);
     } catch (error) {
@@ -162,7 +164,7 @@ export default class Claim extends BaseCommand {
     // servers legitimately use a console origin different from the API one,
     // so only a loopback API paired with a non-loopback claim page warns.
     if (isLoopbackUrl(this.meta.source) && !isLoopbackUrl(challenge.claim_url)) {
-      consola.warn(
+      reportWarning(
         `The server at ${this.meta.source} advertised a claim page on ${new URL(challenge.claim_url).origin}. ` +
           "If you started that server yourself, set NEXTGEN_SERVER_PUBLIC_BASE to its reachable origin (e.g. http://localhost:8080).",
       );

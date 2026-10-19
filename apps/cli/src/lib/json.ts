@@ -50,7 +50,8 @@ export function setTopLevelJsonKey(
         : `${eol}${indentString(indent)}${JSON.stringify(key)}: ${rendered}${eol}`;
     next = `${source.slice(0, layout.open + 1)}${inner}${source.slice(layout.close)}`;
   } else {
-    const last = layout.members[layout.members.length - 1]!;
+    const last = layout.members.at(-1);
+    if (!last) throw new Error(`refusing to write ${path}: the JSON layout scan found no members`);
     const inner =
       indent === 0
         ? `,${JSON.stringify(key)}:${rendered}`
@@ -112,7 +113,7 @@ function scanTopLevel(source: string): TopLevelLayout {
   let index = 0;
 
   while (index < source.length) {
-    const char = source[index]!;
+    const char = source.charAt(index);
     if (char === '"') {
       const start = index;
       index = skipString(source, index);
@@ -121,7 +122,7 @@ function scanTopLevel(source: string): TopLevelLayout {
         // Skip to the value after the colon.
         while (source[index] !== ":") index += 1;
         index += 1;
-        while (index < source.length && isWhitespace(source[index]!)) index += 1;
+        while (index < source.length && isWhitespace(source.charAt(index))) index += 1;
         const valueStart = index;
         index = skipValue(source, index);
         members.push({ key, valueStart, valueEnd: index });
@@ -147,7 +148,7 @@ function scanTopLevel(source: string): TopLevelLayout {
 /** True when the string starting at `start` is a top-level key, not a value. */
 function isKeyPosition(source: string, start: number): boolean {
   for (let index = start - 1; index >= 0; index -= 1) {
-    const char = source[index]!;
+    const char = source.charAt(index);
     if (isWhitespace(char)) continue;
     return char === "{" || char === ",";
   }
@@ -156,7 +157,7 @@ function isKeyPosition(source: string, start: number): boolean {
 
 /** Returns the index just past the value starting at `index`. */
 function skipValue(source: string, index: number): number {
-  const char = source[index]!;
+  const char = source.charAt(index);
   if (char === '"') {
     return skipString(source, index);
   }
@@ -164,7 +165,7 @@ function skipValue(source: string, index: number): number {
     let depth = 0;
     let cursor = index;
     while (cursor < source.length) {
-      const current = source[cursor]!;
+      const current = source.charAt(cursor);
       if (current === '"') {
         cursor = skipString(source, cursor);
         continue;
@@ -180,7 +181,11 @@ function skipValue(source: string, index: number): number {
   }
   // Primitive: number, boolean, null — runs until a structural delimiter.
   let cursor = index;
-  while (cursor < source.length && !",}]".includes(source[cursor]!) && !isWhitespace(source[cursor]!)) {
+  while (
+    cursor < source.length &&
+    !",}]".includes(source.charAt(cursor)) &&
+    !isWhitespace(source.charAt(cursor))
+  ) {
     cursor += 1;
   }
   return cursor;
@@ -190,7 +195,7 @@ function skipValue(source: string, index: number): number {
 function skipString(source: string, index: number): number {
   let cursor = index + 1;
   while (cursor < source.length) {
-    const char = source[cursor]!;
+    const char = source.charAt(cursor);
     if (char === "\\") {
       cursor += 2;
       continue;

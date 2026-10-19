@@ -1,0 +1,25 @@
+---
+title: Users
+description: OpenAPI operations for user lifecycle and account data.
+---
+
+import { Card, Cards } from "fumadocs-ui/components/card";
+
+Users are identity records with profile data, credentials, and account state.
+Use these endpoints to create, query, read, update, and delete users, set
+passwords, register passkeys, and list a user's teams.
+
+<Cards>
+  <Card title="Create user" href="/docs/reference/api/users/createUser" />
+  <Card title="Query users" href="/docs/reference/api/users/queryUsers" />
+  <Card title="Get user by ID" href="/docs/reference/api/users/GetUserByID" />
+  <Card title="Update user by ID" href="/docs/reference/api/users/PatchUserByID" />
+  <Card title="Delete user by ID" href="/docs/reference/api/users/DeleteUserByID" />
+  <Card title="Get my user information" href="/docs/reference/api/users/getMyUser" />
+  <Card title="Update my user information" href="/docs/reference/api/users/patchMyUser" />
+  <Card title="Set user password" href="/docs/reference/api/users/setUserPassword" />
+  <Card title="List user passkeys" href="/docs/reference/api/users/listUserPasskeys" />
+  <Card title="Begin passkey registration" href="/docs/reference/api/users/beginUserPasskeyRegistration" />
+  <Card title="Finish passkey registration" href="/docs/reference/api/users/finishUserPasskeyRegistration" />
+  <Card title="List the teams a user belongs to" href="/docs/reference/api/users/listUserTeams" />
+</Cards>

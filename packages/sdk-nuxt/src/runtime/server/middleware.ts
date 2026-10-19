@@ -7,6 +7,7 @@ import {
   INTERNAL_HEADERS,
   filterResponseHeaders,
   matchesRoutes,
+  requiresProjectSecret,
 } from "@zitadel/sdk-core/middleware";
 import {
   defineEventHandler,
@@ -23,7 +24,12 @@ import { verifyJwt, base64UrlDecode } from "../lib/jwt";
 
 declare module "h3" {
   interface H3EventContext {
-    nextgenAuth: AuthResult;
+    /**
+     * Set by the middleware on every request it runs for. Absent where it did
+     * not run (an ignored route, a handler outside its reach), so read it
+     * through {@link getAuth}, which answers signed out then.
+     */
+    nextgenAuth?: AuthResult;
   }
 }
 
@@ -234,10 +240,6 @@ async function proxyRequest(
   }
 
   return response.body;
-}
-
-function requiresProjectSecret(method: string, pathname: string): boolean {
-  return method.toUpperCase() === "POST" && pathname === "/sessions/exchange";
 }
 
 const DECODER = new TextDecoder();

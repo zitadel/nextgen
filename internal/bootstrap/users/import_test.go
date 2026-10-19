@@ -73,6 +73,44 @@ func TestImport_loadAndSkip(t *testing.T) {
 	require.NoError(t, users.Import(ctx, v2Pool, hasher, "postgres", []string{path}))
 }
 
+// Replicas that start together all import the same document: on a serverless
+// platform a cold burst brings up one process per request. Every one of them
+// must start, and the user exists once.
+func TestImport_concurrentReplicas(t *testing.T) {
+	ctx := t.Context()
+	hasher := testHasher(t)
+	v2Pool := testPool(t)
+	stmts := v2Pool.Statements()
+
+	suffix := rand.Text()
+	projectID := "proj_" + suffix
+	userID := "user_" + suffix
+	t.Cleanup(func() { _, _ = stmts.DeleteProjectByID(context.Background(), projectID) })
+
+	path := writeUserFile(t, projectID, "team_"+suffix, userID)
+
+	const replicas = 8
+	errs := make(chan error, replicas)
+	start := make(chan struct{})
+	for range replicas {
+		go func() {
+			<-start
+			errs <- users.Import(ctx, v2Pool, hasher, "postgres", []string{path})
+		}()
+	}
+	close(start)
+	for range replicas {
+		require.NoError(t, <-errs)
+	}
+
+	got, err := stmts.GetUser(ctx, database.And(
+		database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+		database.Equal(database.Col(domain.UserFieldID), userID),
+	), service.UserQueryOptions{})
+	require.NoError(t, err)
+	require.Equal(t, userID, got.ID)
+}
+
 func TestImport_spannerRejected(t *testing.T) {
 	err := users.Import(t.Context(), testPool(t), testHasher(t), "spanner", []string{"any.json"})
 	require.Error(t, err)
@@ -89,9 +127,9 @@ func TestImport_teamPlaceholderNameTaken(t *testing.T) {
 	teamID := "team_" + suffix
 
 	require.NoError(t, stmts.CreateProject(ctx, &domain.Project{
-		ID:             projectID,
-		Name:           "project-" + projectID,
-		PreviewOrigins: []string{},
+		ID:      projectID,
+		Name:    "project-" + projectID,
+		Origins: []domain.Origin{},
 	}))
 	t.Cleanup(func() { _, _ = stmts.DeleteProjectByID(context.Background(), projectID) })
 
@@ -125,9 +163,9 @@ func TestImport_uniqueAttributesFollowSchema(t *testing.T) {
 	projectID := "proj_" + suffix
 	userID := "user_" + suffix
 	require.NoError(t, stmts.CreateProject(ctx, &domain.Project{
-		ID:             projectID,
-		Name:           "project-" + projectID,
-		PreviewOrigins: []string{},
+		ID:      projectID,
+		Name:    "project-" + projectID,
+		Origins: []domain.Origin{},
 	}))
 	t.Cleanup(func() { _, _ = stmts.DeleteProjectByID(context.Background(), projectID) })
 

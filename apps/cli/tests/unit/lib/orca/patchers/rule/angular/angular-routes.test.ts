@@ -6,7 +6,9 @@ const edit = angularRoutesEdit();
 
 describe("angularRoutesEdit", () => {
   it("adds componentless auth routes to the default Angular route table", () => {
-    const out = edit("import { Routes } from '@angular/router';\n\nexport const routes: Routes = [];\n");
+    const out = edit(
+      "import { Routes } from '@angular/router';\n\nexport const routes: Routes = [];\n",
+    );
     expect(out).toContain('path: "login"');
     expect(out).toContain('path: "register"');
     expect(out).toContain('path: "profile"');

@@ -30,13 +30,7 @@
  * the browser can skip authenticators that are not currently reachable (e.g.
  * hiding a USB security-key entry on a device without USB ports).
  */
-export type AuthenticatorTransport =
-  | "usb"
-  | "nfc"
-  | "ble"
-  | "smart-card"
-  | "hybrid"
-  | "internal";
+export type AuthenticatorTransport = "usb" | "nfc" | "ble" | "smart-card" | "hybrid" | "internal";
 
 /**
  * A single registered WebAuthn credential, mirroring the columns a production
@@ -278,9 +272,7 @@ export class AuthnStore {
       return null;
     }
     const transports: AuthenticatorTransport[] =
-      proof.authenticatorAttachment === "cross-platform"
-        ? ["usb", "ble", "nfc"]
-        : ["internal"];
+      proof.authenticatorAttachment === "cross-platform" ? ["usb", "ble", "nfc"] : ["internal"];
     return this.register(userHandle, proof.id, transports);
   }
 

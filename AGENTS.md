@@ -57,21 +57,29 @@ Product surfaces (`apps/`):
   wrapper and its per-platform binary packages (one per OS/arch).
 - `apps/console/` and `apps/login-ui/` — the two SPAs embedded into the Go
   server at `/ui/console/` and `/ui/login/`.
-- `apps/docs/` — the Fumapress/Fumadocs documentation site.
+- `apps/docs/` — the documentation site: Fumadocs on Next.js, served under
+  `/docs`, in the hosted cloud too.
+- `apps/website/` — the hosted cloud's coming-soon page at `/`: Next.js in
+  the new zitadel.com's look, the seed of the public website.
 
 Development and test surfaces (`apps/`):
 
-- `apps/storybook/` — the single component workbench for the shared UI
-  packages.
+- `apps/storybook/` — the component workbench for the login surface
+  (`@zitadel/components`), served by the hosted cloud at `/storybook/`.
 - `apps/demo-next/` and `apps/demo-nuxt/` — reference integrations of the
   embedded sign-in component on each framework.
-- `apps/*-e2e/` — Playwright projects: one per demo (real framework
-  middleware against the api-mock server), `console-e2e/` for the console,
-  and `cli-journey-e2e/` for the fresh consumer journey (CLI setup plus real
-  registration/login flows, installing local package tarballs through a
-  temporary registry).
+- `e2e/` — the single root-level end-to-end project (a system test of the
+  assembled product). Subfolders `console/`, `demo-next/`, `demo-nuxt/` and
+  `journey/` hold the lanes; the journey covers the fresh consumer path (CLI
+  setup plus real registration/login, installing local package tarballs through
+  a temporary registry). CI runs the whole suite through `e2e:all`; `:test`
+  stays unit tests.
 - `apps/mock-zitadel/` — thin deployment wrapper that serves
   `packages/api-mock` as a live per-PR preview endpoint.
+- `apps/cloud/` — deployment wrapper of the hosted cloud: `main` on Vercel
+  with PlanetScale Postgres, a preview with a database of its own per branch.
+  The repo-root `vercel.json` defines its services; operations live in
+  [docs/runbooks/cloud.md](docs/runbooks/cloud.md).
 
 Published libraries (`packages/`):
 
@@ -110,10 +118,12 @@ Repo tooling:
 | Try the local Zitadel CLI          | `moon run workspace:cli -- --help`       |
 | Preview the docs site              | `moon run docs:dev`                      |
 | Run the server from source         | `moon run workspace:server -- --help`    |
-| Test the fresh-app onboarding path | `moon run workspace:journey`             |
+| Test the fresh-app onboarding path | `moon run e2e:journey`             |
 | Run normal local checks            | `moon ci :lint :typecheck :build :test`  |
 | Mirror CI locally                  | `moon run workspace:check -- --full`     |
 | Rerun one failed task              | `moon run <project>:<task>`              |
+| Run the hosted cloud locally       | `moon run workspace:cloud`               |
+| Check a deployment of the cloud    | `CLOUD_URL=<url> pnpm check:cloud`       |
 
 ### I am adding Zitadel to my app
 
@@ -175,26 +185,28 @@ scripts so server processes are signaled and cleaned up directly.
 startup, then runs `go run .`. Direct `go run .` callers must build the embedded
 UI surfaces themselves or disable both embedded UI surfaces.
 
-Checked-in end-to-end tests are **opt-in for local runs** — they are not part
-of the default `moon ci :lint :typecheck :build :test` invocation because they
-boot real dev servers and need browsers installed. CI does run selected lanes:
-their tasks carry `runInCI: false` only to keep them out of moon's automatic
-selection, and the `full-pr` job runs the real-instance and embedded-surface
-lanes through explicit workflow steps — the canonical statement of that
-interaction is in
+Checked-in end-to-end tests run in CI as one moon target: the root `e2e`
+project's `all` task depends on every lane (console
+smoke/real/embedded/platform, demo mock/real, the CLI journey matrix, and the
+kit's real-instance suite), and ci.yml runs `e2e:all` in a step of its own
+after the build-and-test graph, whenever moon finds it affected. A plain
+`:test` (and `pnpm run check`) stays unit tests; `moon run e2e:all` runs the
+whole suite locally, which boots real servers and needs browsers installed; the
+journey lane also needs prebuilt tarballs (`moon run release:pack`, then
+`JOURNEY_TARBALLS_DIR`). The canonical details are in
 [packages/testing/AGENTS.md](packages/testing/AGENTS.md). (More in
 [CONTRIBUTING.md](CONTRIBUTING.md#running-integration-and-end-to-end-tests)):
 
 ```sh
-corepack pnpm --filter @zitadel/demo-next-e2e exec playwright install
-moon run demo-next-e2e:e2e
-moon run demo-nuxt-e2e:e2e
+corepack pnpm --filter @zitadel/e2e exec playwright install
+moon run e2e:demo-next-mock
+moon run e2e:demo-nuxt-mock
 ```
 
 The local reproduction command for the fresh-app consumer journey gate is:
 
 ```sh
-moon run workspace:journey
+moon run e2e:journey
 ```
 
 It proves the fresh-app path end to end and does not require Docker by
@@ -209,8 +221,11 @@ In CI the branch-protection check is the GitHub Actions context `full-pr`,
 shown in the pull request UI as `ci / full-pr`; it consumes the workflow's
 packed npm tarballs instead of public Zitadel packages. Changesets PR comments
 are informational release-intent feedback and are not branch-protection
-requirements. Mirror the gate locally with
-`moon run workspace:check -- --full`; the full step list is in
+requirements. Pull requests land through the merge queue, which runs
+`full-pr` again on the latest `main`, so merge `main` into a branch only to
+resolve a conflict or pick up a change it needs, never just to keep it
+current ([CONTRIBUTING.md](CONTRIBUTING.md#merging)). Mirror the gate
+locally with `moon run workspace:check -- --full`; the full step list is in
 [CONTRIBUTING.md](CONTRIBUTING.md#what-ci-runs).
 
 ### Interactive demo verification
@@ -242,16 +257,22 @@ upward**. When deciding where a new test belongs:
    `*.browser.spec.ts`.
 3. **End-to-end (Playwright)** — full HTTP path through framework
    middleware, the `/__nextgen` proxy, real `Set-Cookie` round-trip,
-   and full-page navigation. Owned by the `apps/*-e2e/` projects: the demo
-   projects (`demo-next-e2e`, `demo-nuxt-e2e` — each with a mock lane and,
-   for next, an `e2e-real` lane on `@zitadel/testing`), `console-e2e`
-   (shell smoke, dev-proxy real-instance, and binary-served embedded lanes),
-   and `cli-journey-e2e` (the framework matrix across all 8 SDKs).
-   Middleware-owning SDKs get their own e2e project because
+   and full-page navigation. Owned by the single root-level `e2e/` project, as
+   lanes: demo-next/demo-nuxt (each a mock lane and, for next, a real lane on
+   `@zitadel/testing`), console (shell smoke, dev-proxy real-instance,
+   binary-served embedded, and platform-project lanes), and the journey (the
+   framework matrix across all 8 SDKs). Middleware-owning SDKs get their own
+   lane because
    the proxy and route-protection layers are framework-specific.
+   The docs site's suite is the one that lives beside its app,
+   `apps/docs/tests/`: written against a URL, it runs on the local build
+   (`docs:e2e`) and on every deployment of the hosted cloud
+   (`docs:e2e-deployment`; `pnpm check:cloud` runs it beside the console's
+   deployment suite, see
+   [docs/runbooks/cloud.md](docs/runbooks/cloud.md#deployment-checks)).
 
 The consumer journey suite is the exception to the checked-in demo ownership
-rule: it belongs in `apps/cli-journey-e2e/` and must exercise a freshly
+rule: it belongs in `e2e/journey/` and must exercise a freshly
 generated app because it protects the customer local setup path.
 
 A new test belongs at e2e level only when the boundary it covers is
@@ -289,15 +310,14 @@ building any UI under `apps/console/**` or
 
 Both surfaces are theme-portable: tokens are authored as `{ dark, light }` pairs
 and flip via `[data-theme="light"]` (amended ADR 014 §5). When adding atom CSS,
-never reach for the raw `--zl-color-gray-*` ramp — it is mode-independent by
-design; use the semantic tokens.
+never hardcode a colour; use the semantic `--zl-*` roles.
 
 Where the component lives decides the iteration tool: console UI iterates on the
 console dev server, verified at light/dark and each breakpoint; login atoms
 iterate in Storybook. A missing visual value is a **new token** in
 `@zitadel/design-tokens`, never a magic value — except licensed brand assets
-(e.g. display fonts), which stay in the consuming app because
-`@zitadel/design-tokens` ships as a public npm package.
+(e.g. display fonts), which stay in the consuming app because the tokens are
+inlined into the public `@zitadel/components` bundle.
 
 ## Resource identifiers
 
@@ -411,10 +431,18 @@ verify with `corepack pnpm exec changeset status --since origin/main`.
   `moon ci`, `moon run <project>:<task>`, and release tasks under
   `moon run release:*`.
 - Keep direct underlying tools for implementation details: `vite`, `vitest`,
-  `tsc`, `playwright`, `oxlint`, `go`, `docker buildx`, and `changeset`.
+  `tsc`, `playwright`, `biome`, `go`, `docker buildx`, and `changeset`.
 - Do not reintroduce Nx or GoReleaser without updating the ADRs first.
 - When unsure about Moon flags, check `moon --help` or the task definition in
   the nearest `moon.yml` before guessing.
+- Before editing a `moon.yml` or `.moon/`, read
+  [.moon/AGENTS.md](.moon/AGENTS.md): the shared tasks, the inputs rule and the
+  dependency rules, and the `moon run workspace:check-moon-graph` check to run
+  afterwards.
+- Turborepo runs the same tasks beside moon during the migration
+  ([docs/design/build/turborepo.md](docs/design/build/turborepo.md)): a task
+  change goes into `moon.yml` and the package's `turbo.json`, and the command
+  is a `package.json` script.
 
 ## Ephemeral Development Environments
 
@@ -426,6 +454,31 @@ is tool-specific.
 The repo requires the Node.js version from `.nvmrc`; sandbox images often
 ship an older default. Ensure the `.nvmrc` version is first on `$PATH` (for
 example via nvm) before running any `corepack` or `pnpm` command.
+
+`.nvmrc` names only the Node.js major (`24`), and every runtime in the repo
+uses that major. Minor and patch versions do not matter, so never pin one:
+
+- `.devcontainer/devcontainer.json` (the `node` feature `version`)
+- `apps/cli-skill-e2e/scripts/run.mjs` (the `node:<major>` image)
+- the Vercel-deployed apps (`console`, `docs`, `mock-zitadel`, `storybook`)
+  set `engines.node` to `<major>.x`
+- CI workflows read `.nvmrc` through `node-version-file`; never hard-code a
+  `node-version`
+
+`@types/node` in the pnpm catalog tracks the `.nvmrc` major, so code cannot
+type-check against APIs the runtime lacks. When the major changes, bump all
+of these together.
+
+The same rule holds for dependencies:
+
+- Use caret ranges (`^1.2.3`), not exact versions. An exact pin needs a
+  comment next to it saying why (see `@redocly/openapi-core` in
+  `pnpm-workspace.yaml`).
+- A dependency used by more than one package lives in the pnpm catalog and
+  is referenced as `catalog:`, so the whole workspace resolves one version
+  of it.
+- Peer dependency ranges of the published SDKs stay wide (`>=18`); they
+  describe what consumers may install, not what the repo uses.
 
 ### Playwright browser install gotcha
 

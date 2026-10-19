@@ -4,6 +4,9 @@ import type {
   ListFlowDefinitions200FlowDefinitionsItemFlowDefinitionStepsItem,
 } from "@zitadel/api/generated/model";
 
+import { api } from "@/api/zitadel";
+import { readAllPages } from "./paging";
+
 /**
  * Display strings for the login-flow screens. Read-only: flow definitions are
  * configuration applied through the CLI (decisions log D0a).
@@ -20,6 +23,19 @@ export type FlowDefinition = ListFlowDefinitions200FlowDefinitionsItemFlowDefini
 
 /** One step of a definition. */
 export type FlowStep = ListFlowDefinitions200FlowDefinitionsItemFlowDefinitionStepsItem;
+
+/** Every login flow in the project, at its latest revision. */
+export async function fetchAllFlows(projectId: string): Promise<FlowDefinitionEntry[]> {
+  return readAllPages(async (pageToken) => {
+    const page = await api.listFlowDefinitions({
+      project_id: projectId,
+      revisions: "latest",
+      limit: 100,
+      page_token: pageToken,
+    });
+    return { items: page.flow_definitions, next: page.next_page_token };
+  });
+}
 
 /** Fixed order, not the JSON's, so two rows stay comparable at a glance. */
 const PURPOSE_ORDER = ["login", "register", "recovery", "reauth", "profiling", "link_account"];
@@ -41,7 +57,9 @@ export function flowPurposeSummary(definition: FlowDefinition): string {
   const purposes = Object.keys(definition.purposes ?? {});
   const known = PURPOSE_ORDER.filter((purpose) => purposes.includes(purpose));
   const rest = purposes.filter((purpose) => !PURPOSE_ORDER.includes(purpose)).sort();
-  return [...known, ...rest].map((purpose) => PURPOSE_LABELS[purpose] ?? humanise(purpose)).join(" + ");
+  return [...known, ...rest]
+    .map((purpose) => PURPOSE_LABELS[purpose] ?? humanise(purpose))
+    .join(" + ");
 }
 
 /** `default-login` → `Default login`. The API has no display-name field. */

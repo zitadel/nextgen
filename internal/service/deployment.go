@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -12,29 +13,23 @@ import (
 
 // ---- Input / output types ---------------------------------------------------
 
-// CreateDeploymentInput carries resolved ids: the API edge turns environment
-// names into ids before calling the service, so a rename between request and
-// record is impossible.
+// CreateDeploymentInput carries a resolved release id and exact origins.
 type CreateDeploymentInput struct {
-	ProjectID     string
-	EnvironmentID string
-	ReleaseID     string
-	Reason        domain.DeploymentReason
-	// Message is the caller's summary of why this deployment happened.
-	Message *string
-	// SourceEnvironmentID records where a promotion came from. Required with
-	// reason promote, rejected otherwise. SourceEnvironmentName is its name
-	// as it stood, snapshotted for reading the history.
-	SourceEnvironmentID   *string
-	SourceEnvironmentName *string
-	// ExpectedCurrentDeploymentID makes the swap conditional. Not persisted.
-	ExpectedCurrentDeploymentID *string
+	ProjectID  string
+	ReleaseID  string
+	OriginKind domain.DeploymentOriginKind
+	Origins    []string
+	Reason     domain.DeploymentReason
+	Message    *string
+	RollbackTo *string
+	// ExpectedDeploymentID makes the write conditional. Not persisted.
+	ExpectedDeploymentID *string
+	// PreviewTTL is the lifetime of the previews a preview deploy renews.
+	PreviewTTL time.Duration
 }
 
-// CreateDeploymentOutput distinguishes a new deployment from the idempotent
-// answer: deploying the release the environment already runs returns the
-// deployment that made it live, which the caller answers 200 to rather than
-// 201.
+// CreateDeploymentOutput reports Created false when nothing was written and
+// Deployment is the newest deployment to the origins.
 type CreateDeploymentOutput struct {
 	Deployment *domain.Deployment
 	Created    bool
@@ -42,9 +37,8 @@ type CreateDeploymentOutput struct {
 
 type ListDeploymentsInput struct {
 	ProjectID string
-	// EnvironmentID narrows the list to one environment's history. Nil lists
-	// the whole project, every environment interleaved.
-	EnvironmentID *string
+	// Origin narrows the list to one origin's history.
+	Origin *string
 	// IncludeReleases embeds the release each deployment made live (ADR 059).
 	IncludeReleases bool
 	PageToken       string
@@ -68,63 +62,123 @@ func NewDeploymentService(v2Pool *DB) *DeploymentService {
 	return &DeploymentService{v2Pool: v2Pool}
 }
 
-// Create makes a release live on an environment by recording a deployment.
-// The record and the environment's pointer move in one transaction: on any
-// failure the environment keeps running what it ran and no row is written.
-//
-// Idempotent on the running release: deploying what the environment already
-// runs writes nothing and returns the deployment that made it live. Anything
-// else appends — each row is one act of making a release live.
+// maxDeployAttempts bounds how often an unguarded deploy retries after losing
+// the optimistic lock.
+const maxDeployAttempts = 3
+
+// Create deploys a release to its origins with optimistic locking: it reads
+// what each origin serves and writes without holding a lock, and a concurrent
+// deploy to one of the origins makes the write fail. A guarded deploy then
+// answers a conflict with the winner; an unguarded one retries on top of it.
 func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentInput) (_ *CreateDeploymentOutput, err error) {
 	ctx, end := startSpan(ctx, "DeploymentService.Create")
 	defer end(&err)
 
 	actor, _ := audit.ActorFromContext(ctx)
-	entity, err := domain.NewDeployment(input.ProjectID, input.EnvironmentID, input.ReleaseID, domain.DeploymentMetadata{
-		Reason:                input.Reason,
-		Message:               input.Message,
-		SourceEnvironmentID:   input.SourceEnvironmentID,
-		SourceEnvironmentName: input.SourceEnvironmentName,
-		DeployedBy:            actor.ActorID,
-		DeployedByType:        actor.ActorType,
+	entity, err := domain.NewDeployment(input.ProjectID, input.ReleaseID, input.OriginKind, input.Origins, domain.DeploymentMetadata{
+		Reason:         input.Reason,
+		Message:        input.Message,
+		RollbackTo:     input.RollbackTo,
+		DeployedBy:     actor.ActorID,
+		DeployedByType: actor.ActorType,
 	})
 	if err != nil {
 		return nil, err
 	}
+	if entity.OriginKind == domain.DeploymentOriginKindPreview && input.PreviewTTL <= 0 {
+		return nil, domain.ErrDeploymentInvalid("a deployment to preview URLs needs a ttl", nil)
+	}
 
-	var created bool
-	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		var err error
-		created, err = tx.Statements().CreateDeployment(ctx, entity, input.ExpectedCurrentDeploymentID)
+	for attempt := 1; ; attempt++ {
+		output, err := s.create(ctx, entity, input)
+		if _, lost := errors.AsType[*database.UniqueError](err); lost {
+			if input.ExpectedDeploymentID == nil && attempt < maxDeployAttempts {
+				continue
+			}
+			return nil, s.conflict(ctx, entity)
+		}
+		if err != nil {
+			if de, ok := errors.AsType[domain.Error](err); ok {
+				return nil, de
+			}
+			return nil, domain.ErrInternal(err).WithMessage("failed to create deployment")
+		}
+		return output, nil
+	}
+}
+
+// conflict answers a deploy that lost the optimistic lock with the newest
+// deployment to its origins.
+func (s *DeploymentService) conflict(ctx context.Context, entity *domain.Deployment) error {
+	_, current, err := servedBy(ctx, s.v2Pool.Statements(), entity)
+	if err != nil {
+		return domain.ErrInternal(err).WithMessage("failed to read the newest deployment")
+	}
+	return domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{Deployment: current})
+}
+
+// servedBy reads what entity's origins serve, and the newest deployment to
+// them, nil when nothing was deployed there.
+func servedBy(ctx context.Context, stmts AllStatements, entity *domain.Deployment) ([]domain.OriginDeployment, *domain.Deployment, error) {
+	read, err := stmts.GetNewestPerOrigin(ctx, entity.ProjectID, entity.Origins())
+	if err != nil {
+		return nil, nil, err
+	}
+	newest := domain.NewestOriginDeployment(read)
+	if newest == nil {
+		return read, nil, nil
+	}
+	current, err := stmts.GetDeploymentByID(ctx, entity.ProjectID, newest.DeploymentID)
+	return read, current, err
+}
+
+// create is one attempt of Create, in one transaction.
+func (s *DeploymentService) create(ctx context.Context, entity *domain.Deployment, input CreateDeploymentInput) (*CreateDeploymentOutput, error) {
+	var output *CreateDeploymentOutput
+	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		output = nil
+		stmts := tx.Statements()
+		if _, err := stmts.GetReleaseByID(ctx, entity.ProjectID, entity.ReleaseID); err != nil {
+			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+				return domain.ErrReleaseNotFound()
+			}
+			return err
+		}
+		read, current, err := servedBy(ctx, stmts, entity)
 		if err != nil {
 			return err
 		}
-		// The idempotent answer changed nothing, so there is nothing to
-		// audit: the event of the deployment being returned was emitted when
-		// it was created.
-		if !created {
+		if err := domain.CheckExpectedDeployment(current, input.ExpectedDeploymentID); err != nil {
+			return err
+		}
+		if entity.Unchanged(read) {
+			output = &CreateDeploymentOutput{Deployment: current}
 			return nil
 		}
-		return emitDeploymentCreated(ctx, tx.Statements(), entity)
+
+		// A copy per attempt: each one mints its own id and stamp.
+		written := *entity
+		if err := stmts.CreateDeployment(ctx, &written, read); err != nil {
+			// The release was read above, so the only reference left to
+			// trip is the project.
+			if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
+				return domain.ErrProjectNotFound()
+			}
+			return err
+		}
+		if written.OriginKind == domain.DeploymentOriginKindPreview {
+			if err := stmts.UpsertPreviews(ctx, written.ProjectID, written.Origins(),
+				written.DeployedAt.Add(input.PreviewTTL), written.DeployedAt); err != nil {
+				return err
+			}
+		}
+		if err := emitDeploymentCreated(ctx, stmts, &written); err != nil {
+			return err
+		}
+		output = &CreateDeploymentOutput{Deployment: &written, Created: true}
+		return nil
 	})
-	if err != nil {
-		// The environment is read inside the transaction, so a missing one
-		// surfaces here rather than as a constraint violation.
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-			return nil, domain.ErrEnvironmentNotFound()
-		}
-		// The release reference is the one remaining foreign key a caller
-		// can trip: the environment was already read, and the project is
-		// resolved from the request before anything is built.
-		if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
-			return nil, domain.ErrDeploymentInvalid("release not found in this project", err)
-		}
-		if de, ok := errors.AsType[domain.Error](err); ok {
-			return nil, de
-		}
-		return nil, domain.ErrInternal(err).WithMessage("failed to create deployment")
-	}
-	return &CreateDeploymentOutput{Deployment: entity, Created: created}, nil
+	return output, err
 }
 
 func emitDeploymentCreated(ctx context.Context, stmts EventStatements, entity *domain.Deployment) error {
@@ -152,9 +206,8 @@ func (s *DeploymentService) Get(ctx context.Context, projectID, id string) (_ *d
 	return entity, nil
 }
 
-// GetByIDs reads the named deployments keyed by id, for hydrating
-// current_deployment on environment reads. Ids nothing answers to are simply
-// absent: the caller hydrates whatever pointers it holds.
+// GetByIDs reads the named deployments keyed by id. Ids nothing answers to
+// are simply absent.
 func (s *DeploymentService) GetByIDs(ctx context.Context, projectID string, ids []string) (_ map[string]*domain.Deployment, err error) {
 	ctx, end := startSpan(ctx, "DeploymentService.GetByIDs")
 	defer end(&err)
@@ -177,7 +230,7 @@ func (s *DeploymentService) List(ctx context.Context, input ListDeploymentsInput
 	ctx, end := startSpan(ctx, "DeploymentService.List")
 	defer end(&err)
 
-	opts := deployment.ListOptions(input.ProjectID, input.EnvironmentID, uint32(normalizeLimit(input.Limit)))
+	opts := deployment.ListOptions(input.ProjectID, input.Origin, uint32(normalizeLimit(input.Limit)))
 	opts.Pagination.Cursor = []byte(input.PageToken)
 
 	result, err := s.v2Pool.Statements().ListDeployments(ctx, opts)

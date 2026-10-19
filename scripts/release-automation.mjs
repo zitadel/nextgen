@@ -57,7 +57,9 @@ export async function detectReleaseAutomation(options) {
   const pendingChangesets = options.pendingChangesets ?? (await readPendingChangesets(root));
   const releasePendingChangesets =
     options.releasePendingChangesets ??
-    (options.pendingChangesets ? pendingChangesets : await readReleaseChangesets(root, pendingChangesets));
+    (options.pendingChangesets
+      ? pendingChangesets
+      : await readReleaseChangesets(root, pendingChangesets));
   const prereleaseChangesetIds = normalizeChangesetIdSet(
     options.prereleaseChangesetIds ?? (await readPrereleaseChangesetIds(root)),
   );
@@ -86,7 +88,8 @@ export async function detectReleaseAutomation(options) {
     errors.push("version package commit changed files outside Changesets version output");
   }
 
-  const shouldRun = versionCommit && unrecordedPendingChangesets.length === 0 && analysis.versionOnly;
+  const shouldRun =
+    versionCommit && unrecordedPendingChangesets.length === 0 && analysis.versionOnly;
   return {
     ok: errors.length === 0,
     mode,
@@ -191,7 +194,9 @@ export async function main(args = forwardedArgs(), options = {}) {
     return 1;
   }
 
-  console.log(`release ${result.mode} automation: ${result.shouldRun ? "run" : "skip"} - ${result.reason}`);
+  console.log(
+    `release ${result.mode} automation: ${result.shouldRun ? "run" : "skip"} - ${result.reason}`,
+  );
   return 0;
 }
 

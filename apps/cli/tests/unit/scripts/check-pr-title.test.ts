@@ -27,6 +27,7 @@ type CheckPrTitleModule = {
 };
 
 const load = async (): Promise<CheckPrTitleModule> =>
+  // @ts-expect-error -- the script is a plain .mjs with no declaration file
   (await import("../../../../../scripts/check-pr-title.mjs")) as unknown as CheckPrTitleModule;
 
 const config = {
@@ -114,7 +115,7 @@ describe("isNonShippingFile", () => {
     ".nvmrc",
     "apps/console/AGENTS.md",
     "apps/console/docs/styling.md",
-    "apps/console-e2e/tests/users.spec.ts",
+    "e2e/console/tests/users.spec.ts",
     "apps/demo-next/next-env.d.ts",
     "apps/storybook/main.ts",
     "packages/api-mock/src/handlers.ts",
@@ -143,7 +144,7 @@ describe("checkPrTitle", () => {
       title: "feat: extend the api-mock flow fixtures",
       files: [
         "packages/api-mock/src/handlers.ts",
-        "apps/console-e2e/playwright.real.config.mts",
+        "e2e/console/playwright.real.config.mts",
         "apps/demo-next/next-env.d.ts",
       ],
       config,
@@ -161,7 +162,7 @@ describe("checkPrTitle", () => {
       files: [
         "packages/testing/src/passkey.ts",
         "packages/testing/tests/unit/passkey.test.ts",
-        "apps/demo-next-e2e/src-real/passkey.spec.ts",
+        "e2e/demo-next/src-real/passkey.spec.ts",
       ],
       config,
     });
@@ -322,7 +323,7 @@ describe("checkPrTitle", () => {
 
 describe("suggestType", () => {
   it.each([
-    [["packages/api-mock/src/x.ts", "apps/console-e2e/a.spec.ts"], "test"],
+    [["packages/api-mock/src/x.ts", "e2e/console/a.spec.ts"], "test"],
     [[".github/workflows/ci.yml"], "ci"],
     [["docs/adrs/030.md", "AGENTS.md"], "docs"],
     [["packages/design-tokens/scripts/build.ts", ".github/workflows/sync.yml"], "build"],

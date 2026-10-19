@@ -16,14 +16,14 @@ const ctx: PatchContext = {
     id: "proj_test",
     project_secret: "sk",
     preview_secret: "pk",
-    preview_origins: [],
+    origins: [],
     created_at: "2026-01-01T00:00:00Z",
   },
   issuer: "http://localhost:3000",
   server: "http://localhost:8080",
   cliVersion: "0.1.0-alpha.15",
   preset: "passkey-first",
-} as PatchContext;
+} as unknown as PatchContext;
 
 describe("upsertGuidanceSection", () => {
   const section = "## Authentication (Zitadel)\n\nbody";
@@ -118,6 +118,7 @@ describe("guidance content", () => {
 
   it("gives the README the human journey with pinned CLI commands", () => {
     const readme = readmeGuidanceSection(ctx);
+    expect(readme).toContain("from a second terminal in this directory");
     expect(readme).toContain("register a user, sign out, and sign in again");
     expect(readme).toContain("npx @zitadel/cli@0.1.0-alpha.15 apply");
   });

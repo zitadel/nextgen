@@ -13,9 +13,8 @@
   display: none;
 }
 
-/* Atom playground only — `data-state` on `<zl-field>` documents the Figma state
-   columns without needing a real pointer or focus. Not product API. */
-:host([data-state="hovered"]:not([disabled])) .zr-field:not(.zr-field--invalid):not(.zr-field--success)
+/* Stories only: `data-state` forces an interaction state. Not product API. */
+:host([data-state="hovered"]:not([disabled]):not([readonly])) .zr-field:not(.zr-field--invalid):not(.zr-field--success)
   .zr-field__wrap:not(:focus-within) {
   border-color: var(--zl-ring);
 }
@@ -65,14 +64,12 @@
   line-height: var(--zl-text-sm-leading);
   color: inherit;
   text-decoration: none;
-  text-underline-offset: 4px;
+  text-underline-offset: var(--zl-spacing-1);
 }
 .zr-field__link:hover {
   text-decoration: underline;
 }
 .zr-field__link:focus-visible {
-  outline: var(--zl-focus-width) solid var(--zl-ring);
-  outline-offset: var(--zl-focus-offset);
   border-radius: var(--zl-radius-xs);
 }
 .zr-field__required {
@@ -102,7 +99,7 @@
 .zr-field__wrap--trailing {
   padding-inline-end: var(--zl-spacing-8);
 }
-.zr-field:not(.zr-field--disabled) .zr-field__wrap:hover:not(:focus-within) {
+.zr-field:not(.zr-field--disabled):not(.zr-field--readonly) .zr-field__wrap:hover:not(:focus-within) {
   border-color: var(--zl-ring);
 }
 /* One ring, drawn outside the border, plus the control's own elevation. */
@@ -132,6 +129,11 @@
 .zr-field--disabled .zr-field__wrap:hover {
   border-color: var(--zl-input);
 }
+/* Read-only is a value the user submits, not an unavailable control: the
+   muted fill marks it as fixed, but the text keeps full contrast. */
+.zr-field--readonly .zr-field__wrap {
+  background: var(--zl-muted);
+}
 
 .zr-field__input {
   flex: 1 1 auto;
@@ -148,7 +150,7 @@
   font-weight: var(--zl-font-weight-normal);
 }
 .zr-field__input[type="password"] {
-  letter-spacing: 0.125rem;
+  letter-spacing: var(--zl-spacing-0-5);
 }
 .zr-field__input::placeholder {
   color: var(--zl-muted-foreground);
@@ -160,6 +162,9 @@
 }
 .zr-field__input:disabled {
   cursor: not-allowed;
+}
+.zr-field__input[readonly] {
+  cursor: default;
 }
 
 .zr-field__trailing {
@@ -187,8 +192,6 @@
   line-height: 0;
 }
 .zr-field__trailing-action:focus-visible {
-  outline: var(--zl-focus-width) solid var(--zl-ring);
-  outline-offset: var(--zl-focus-offset);
   border-radius: var(--zl-radius-xs);
 }
 .zr-field__trailing-action:disabled {
@@ -200,9 +203,19 @@
 .zr-field--success .zr-field__trailing {
   color: var(--zl-success);
 }
+/* The show/hide toggle is a control, not a status mark, so it keeps the muted
+   tone in every state — the edge and the message already carry the error. */
+.zr-field .zr-field__trailing--toggle {
+  color: var(--zl-muted-foreground);
+}
+/* Edge paints its own reveal button on password inputs; with ours present
+   the field would show two. */
+.zr-field__wrap--toggle .zr-field__input::-ms-reveal {
+  display: none;
+}
 
-/* Description and validation copy all sit at the control's own text size — the
-   sign-up frame's password hint is 14/20, not a smaller caption. */
+/* Description and validation copy sit at the control's own text size, not a
+   smaller caption. */
 .zr-field__help {
   font-size: var(--zl-text-sm-size);
   line-height: var(--zl-text-sm-leading);
@@ -212,9 +225,4 @@
   font-size: var(--zl-text-sm-size);
   line-height: var(--zl-text-sm-leading);
   color: var(--zl-success);
-}
-.zr-field__error {
-  font-size: var(--zl-text-sm-size);
-  line-height: var(--zl-text-sm-leading);
-  color: var(--zl-destructive);
 }

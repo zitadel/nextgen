@@ -61,6 +61,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
+				"objectType": "human-user",
 				"title": "My User",
 				"x-auth-methods": {
 					"passkey": { "enabled": true }
@@ -73,6 +74,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
+				"objectType": "human-user",
 				"title": "My User",
 				"description": "A user schema",
 				"x-auth-methods": {
@@ -90,6 +92,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind":    "user-schema",
+				"objectType": "human-user",
 				"title":   "My User",
 				"x-auth-methods": {
 					"passkey": { "enabled": true }
@@ -111,6 +114,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
+				"objectType": "human-user",
 				"title": "My User",
 				"x-auth-methods": {
 					"password": { "enabled": true }
@@ -129,6 +133,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
+				"objectType": "human-user",
 				"title": "My User",
 				"x-auth-methods": {
 					"password": { "enabled": true }
@@ -158,6 +163,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
+				"objectType": "human-user",
 				"title": "My User",
 				"x-auth-methods": {
 					"password": { "enabled": true }
@@ -183,6 +189,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
+				"objectType": "human-user",
 				"title": "My User",
 				"x-auth-methods": {
 					"password": { "enabled": true }
@@ -203,6 +210,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
+				"objectType": "human-user",
 				"title": "My User",
 				"x-auth-methods": {
 					"passkey": { "enabled": true }
@@ -222,6 +230,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 			input: []byte(`{
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
+				"objectType": "human-user",
 				"title": "My User",
 				"x-auth-methods": {
 					"password": { "enabled": true }
@@ -245,6 +254,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
+				"objectType": "human-user",
 				"title": "My User"
 			}`),
 			wantErr: domain.ErrSchemaValidationFailed,
@@ -253,11 +263,29 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 			},
 		},
 		{
+			// Flow definitions name a user schema by its objectType.
+			name: "missing required objectType",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"title": "My User",
+				"x-auth-methods": {
+					"password": { "enabled": true }
+				}
+			}`),
+			wantErr: domain.ErrSchemaValidationFailed,
+			wantValidationErrors: map[string]string{
+				"/required/objectType": `missing required field "objectType"`,
+			},
+		},
+		{
 			name: "invalid auth method — missing enabled",
 			input: []byte(`{
 				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
+				"objectType": "human-user",
 				"title": "My User",
 				"x-auth-methods": {
 					"password": {}
@@ -274,6 +302,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
+				"objectType": "human-user",
 				"title": "My User",
 				"x-auth-methods": {
 					"totp": { "enabled": true }
@@ -290,6 +319,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
+				"objectType": "human-user",
 				"title": "My User",
 				"x-auth-methods": {
 					"password": { "enabled": true, "position": 0 }
@@ -306,6 +336,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
+				"objectType": "human-user",
 				"title": "My User",
 				"x-auth-methods": {
 					"sso": { "enabled": true, "providers": ["google"] }
@@ -318,6 +349,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
+				"objectType": "human-user",
 				"title": "My User",
 				"x-auth-methods": {
 					"sso": { "enabled": false }
@@ -330,6 +362,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
+				"objectType": "human-user",
 				"title": "My User",
 				"x-auth-methods": {
 					"sso": { "enabled": true }
@@ -343,6 +376,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
+				"objectType": "human-user",
 				"title": "My User",
 				"x-auth-methods": {
 					"sso": { "enabled": false, "providers": ["google"] }
@@ -356,6 +390,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
+				"objectType": "human-user",
 				"title": "My User",
 				"x-auth-methods": {
 					"sso": { "enabled": true, "providers": ["Google"] }
@@ -464,6 +499,7 @@ func TestTenantSchemaValidator_UserSchemaDesignations(t *testing.T) {
 			"metaSchema": "` + testBuiltinBase + `/user-schema.json",
 			"$id": "https://example.test/schemas/my-user.json",
 			"kind": "user-schema",
+			"objectType": "human-user",
 			"title": "My User",
 			` + body + `}`)
 	}

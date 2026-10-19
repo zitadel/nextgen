@@ -11,6 +11,23 @@ interface ResourceRow {
   readonly verbs?: string[];
 }
 
+const ACME_CONNECTION_FLAGS = [
+  "--slug",
+  "acme-sso",
+  "--protocol",
+  "oidc",
+  "--display-name",
+  "Acme SSO",
+  "--oidc-issuer",
+  "https://sso.acme.example",
+  "--oidc-client-id",
+  "abc123",
+  "--oidc-client-secret",
+  "${{ ACME_SSO_CLIENT_SECRET }}",
+  "--oidc-scopes",
+  "openid",
+];
+
 describe("resources", () => {
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
@@ -92,6 +109,28 @@ describe("resources", () => {
         expect(data.resources.map((row) => row.topic)).toEqual(
           expect.arrayContaining(["users", "teams", "sessions", "idps", "schemas"]),
         );
+      });
+
+      it.each([
+        ["users", "delete", "user_1"],
+        ["teams", "deactivate", "team_1"],
+        ["sessions", "revoke", "sess_1"],
+      ])("refuses %s %s without --force when no one can be asked", async (topic, verb, id) => {
+        const app = await aSetUpApp();
+
+        const result = await app.run([topic, verb, id, "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toHintAt("--force");
+        expect(result).toSuggest(`${topic} ${verb} ${id} --force`);
+      });
+
+      it("registers a connection made from its nested fields", async () => {
+        const app = await aSetUpApp();
+
+        await app.run(["idps", "create", ...ACME_CONNECTION_FLAGS, "--json"]);
+
+        expect((await app.registeredIdps()).map((idp) => idp.slug)).toContain("acme-sso");
       });
 
       it("says what can be done to each topic", async () => {

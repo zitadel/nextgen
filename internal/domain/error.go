@@ -149,7 +149,6 @@ var serverFaultCodes = map[string]bool{
 	ErrIDPDiscoveryFailed(nil).Code:          true,
 	ErrIDPExchangeFailed(nil).Code:           true,
 	ErrIDPUserinfoFailed(nil).Code:           true,
-	ErrIDPSupplementaryFetchFailed(nil).Code: true,
 	ErrIDPIDTokenInvalid(nil).Code:           true,
 	ErrIDPSubjectInvalid(nil).Code:           true,
 }

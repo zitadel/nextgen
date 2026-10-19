@@ -78,6 +78,7 @@ export type RendererSpec = {
   displayName: string;
   status: RendererStatus;
   frameworks: string[];
-  dependency: { name: string; version: string };
+  /** The SDK package; its version is the CLI's own pin (`sdkVersionForCli`). */
+  dependency: { name: string };
   templates: RendererTemplates;
 };

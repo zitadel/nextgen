@@ -480,10 +480,79 @@ func TestSetUserPassword(t *testing.T) {
 				project.ID, userEmail, originalPassword)
 			assert.ErrorAs(t, err, new(domain.ErrAuthAttemptProofRejected(nil)))
 		})
+
+		t.Run("64 characters", func(t *testing.T) {
+			t.Parallel()
+
+			params, userEmail := createUser(t, "testsetuserpassword.max@example.com")
+
+			password := strings.Repeat("a", domain.MaxPasswordLength)
+			resp, err := client.SetUserPassword(t.Context(), &api.SetUserPasswordRequest{Password: password}, params)
+			assert.NoError(t, err)
+			assert.IsType(t, &api.SetUserPasswordNoContent{}, resp, helpers.MustMarshal(t, resp))
+
+			_, err = helpers.CreateSessionUsingPassword(t,
+				harness.EnsureAuthAttemptService(t),
+				harness.EnsureSessionService(t),
+				project.ID, userEmail, password)
+			assert.NoError(t, err)
+		})
+
+		t.Run("either composition of the same characters signs in", func(t *testing.T) {
+			t.Parallel()
+
+			params, userEmail := createUser(t, "testsetuserpassword.nfc@example.com")
+
+			const (
+				decomposed = "cafe\u0301-au-lait" // e + combining acute accent
+				composed   = "caf\u00e9-au-lait"  // é as one code point
+			)
+			resp, err := client.SetUserPassword(t.Context(), &api.SetUserPasswordRequest{Password: decomposed}, params)
+			assert.NoError(t, err)
+			assert.IsType(t, &api.SetUserPasswordNoContent{}, resp, helpers.MustMarshal(t, resp))
+
+			for _, typed := range []string{composed, decomposed} {
+				_, err = helpers.CreateSessionUsingPassword(t,
+					harness.EnsureAuthAttemptService(t),
+					harness.EnsureSessionService(t),
+					project.ID, userEmail, typed)
+				assert.NoError(t, err, "%+q", typed)
+			}
+		})
 	})
 
 	t.Run("error", func(t *testing.T) {
 		t.Parallel()
+
+		badRequest := func(t *testing.T, password string, code string) {
+			t.Helper()
+			params, _ := createUser(t, "testsetuserpassword."+code+"@example.com")
+			resp, err := client.SetUserPassword(t.Context(), &api.SetUserPasswordRequest{Password: password}, params)
+			assert.NoError(t, err)
+			require.IsType(t, &api.SetUserPasswordBadRequest{}, resp, helpers.MustMarshal(t, resp))
+			assert.Equal(t, code, string(resp.(*api.SetUserPasswordBadRequest).Code))
+		}
+
+		t.Run("longer than 64 characters", func(t *testing.T) {
+			t.Parallel()
+			badRequest(t, strings.Repeat("a", domain.MaxPasswordLength+1), domain.ErrUserPasswordTooLong().Code)
+		})
+
+		t.Run("empty", func(t *testing.T) {
+			t.Parallel()
+			badRequest(t, "", domain.ErrUserPasswordEmpty().Code)
+		})
+
+		t.Run("more bytes than bcrypt takes", func(t *testing.T) {
+			t.Parallel()
+			// The harness hashes with bcrypt, which stops at 72 bytes: 64
+			// code points pass the length rule but are 128 bytes here.
+			params, _ := createUser(t, "testsetuserpassword.bcrypt@example.com")
+			resp, err := client.SetUserPassword(t.Context(), &api.SetUserPasswordRequest{Password: strings.Repeat("ü", domain.MaxPasswordLength)}, params)
+			assert.NoError(t, err)
+			require.IsType(t, &api.SetUserPasswordBadRequest{}, resp, helpers.MustMarshal(t, resp))
+			assert.Equal(t, domain.ErrUserPasswordTooLong().Code, string(resp.(*api.SetUserPasswordBadRequest).Code))
+		})
 
 		t.Run("user not found", func(t *testing.T) {
 			t.Parallel()
@@ -1013,6 +1082,19 @@ func TestListPasskeys(t *testing.T) {
 		})
 	})
 
+	t.Run("a malformed page token is the caller's error", func(t *testing.T) {
+		t.Parallel()
+
+		_, user, client := dependencies(t)
+		resp, err := client.ListUserPasskeys(t.Context(), api.ListUserPasskeysParams{
+			UserID:    api.UserID(user.ID),
+			PageToken: api.NewOptPageToken("not-a-token"),
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListUserPasskeysBadRequest{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("req.invalid"), resp.(*api.ListUserPasskeysBadRequest).Code)
+	})
+
 	t.Run("unknown user returns 404", func(t *testing.T) {
 		t.Parallel()
 
@@ -1028,5 +1110,114 @@ func TestListPasskeys(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.IsType(t, &api.ListUserPasskeysNotFound{}, resp, helpers.MustMarshal(t, resp))
+	})
+}
+
+func TestListUserIdentityLinks(t *testing.T) {
+	t.Parallel()
+
+	dependencies := func(t *testing.T) (fixture idpFixture, user *domain.User) {
+		fixture = newIdpFixture(t)
+		user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+			ProjectID:  fixture.project.ID,
+			SchemaURL:  test_data.UserSchemaURL,
+			Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, "linked@example.com"),
+		})
+		require.NoError(t, err)
+		return fixture, user
+	}
+
+	link := func(t *testing.T, projectID, connectionID, subject, userID string) *domain.IDPIdentityLink {
+		t.Helper()
+		link := &domain.IDPIdentityLink{ProjectID: projectID, ConnectionID: connectionID, Subject: subject, UserID: userID}
+		require.NoError(t, harness.EnsureServiceDB(t).Statements().CreateIDPIdentityLink(t.Context(), link))
+		return link
+	}
+
+	t.Run("lists the linked accounts oldest first, without the subject", func(t *testing.T) {
+		t.Parallel()
+
+		fixture, user := dependencies(t)
+		google := fixture.create(t, helpers.OIDCConnection("google"))
+		github := fixture.create(t, helpers.OIDCConnection("github"))
+		first := link(t, fixture.project.ID, google.ID, "google-subject", user.ID)
+		second := link(t, fixture.project.ID, github.ID, "github-subject", user.ID)
+
+		resp, err := fixture.client.ListUserIdentityLinks(t.Context(), api.ListUserIdentityLinksParams{UserID: api.UserID(user.ID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListUserIdentityLinksResponse{}, resp, helpers.MustMarshal(t, resp))
+		links := resp.(*api.ListUserIdentityLinksResponse).IdentityLinks
+		require.Len(t, links, 2)
+		assert.Equal(t, first.ID, links[0].ID)
+		assert.Equal(t, google.ID, links[0].ConnectionID)
+		assert.Equal(t, second.ID, links[1].ID)
+		assert.Equal(t, github.ID, links[1].ConnectionID)
+		assert.False(t, links[0].CreatedAt.IsZero())
+		assert.NotContains(t, helpers.MustMarshal(t, resp), "google-subject")
+	})
+
+	t.Run("pages", func(t *testing.T) {
+		t.Parallel()
+
+		fixture, user := dependencies(t)
+		google := fixture.create(t, helpers.OIDCConnection("google"))
+		github := fixture.create(t, helpers.OIDCConnection("github"))
+		link(t, fixture.project.ID, google.ID, "google-subject", user.ID)
+		link(t, fixture.project.ID, github.ID, "github-subject", user.ID)
+
+		resp, err := fixture.client.ListUserIdentityLinks(t.Context(), api.ListUserIdentityLinksParams{
+			UserID: api.UserID(user.ID),
+			Limit:  api.NewOptLimit(1),
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListUserIdentityLinksResponse{}, resp, helpers.MustMarshal(t, resp))
+		page := resp.(*api.ListUserIdentityLinksResponse)
+		require.Len(t, page.IdentityLinks, 1)
+		require.True(t, page.NextPageToken.IsSet())
+
+		resp, err = fixture.client.ListUserIdentityLinks(t.Context(), api.ListUserIdentityLinksParams{
+			UserID:    api.UserID(user.ID),
+			Limit:     api.NewOptLimit(1),
+			PageToken: api.NewOptPageToken(page.NextPageToken.Value),
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListUserIdentityLinksResponse{}, resp, helpers.MustMarshal(t, resp))
+		next := resp.(*api.ListUserIdentityLinksResponse)
+		require.Len(t, next.IdentityLinks, 1)
+		assert.NotEqual(t, page.IdentityLinks[0].ID, next.IdentityLinks[0].ID)
+		assert.False(t, next.NextPageToken.IsSet())
+	})
+
+	t.Run("no links", func(t *testing.T) {
+		t.Parallel()
+
+		fixture, user := dependencies(t)
+		resp, err := fixture.client.ListUserIdentityLinks(t.Context(), api.ListUserIdentityLinksParams{UserID: api.UserID(user.ID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListUserIdentityLinksResponse{}, resp, helpers.MustMarshal(t, resp))
+		assert.Empty(t, resp.(*api.ListUserIdentityLinksResponse).IdentityLinks)
+	})
+
+	t.Run("unknown user returns 404", func(t *testing.T) {
+		t.Parallel()
+
+		fixture := newIdpFixture(t)
+		resp, err := fixture.client.ListUserIdentityLinks(t.Context(), api.ListUserIdentityLinksParams{UserID: "user_does_not_exist"})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListUserIdentityLinksNotFound{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("user.not_found"), resp.(*api.ListUserIdentityLinksNotFound).Code)
+	})
+
+	t.Run("a malformed page token is the caller's error", func(t *testing.T) {
+		t.Parallel()
+
+		fixture, user := dependencies(t)
+		resp, err := fixture.client.ListUserIdentityLinks(t.Context(), api.ListUserIdentityLinksParams{
+			UserID:    api.UserID(user.ID),
+			PageToken: api.NewOptPageToken("not-a-token"),
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListUserIdentityLinksBadRequest{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("req.invalid"), resp.(*api.ListUserIdentityLinksBadRequest).Code)
 	})
 }

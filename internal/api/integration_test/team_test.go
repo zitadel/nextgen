@@ -936,12 +936,16 @@ func TestQueryTeams(t *testing.T) {
 				Direction: api.SortDirectionAsc,
 			}),
 		}
-		for range 2 {
+		for i := range 2 {
 			page := queryTeams(t, req)
 			require.Len(t, page.Teams, 1)
 			paged = append(paged, page.Teams[0].ID)
 			token, ok := page.NextPageToken.Get()
-			require.True(t, ok, "a full page carries a cursor")
+			if i == 1 {
+				assert.False(t, ok, "the final page carries no cursor (#849)")
+				break
+			}
+			require.True(t, ok, "a non-final full page carries a cursor")
 			req.PageToken = api.NewOptNilPageToken(token)
 		}
 		assert.Equal(t, []string{active.ID, deactivated.ID}, paged)
@@ -960,12 +964,9 @@ func TestQueryTeams(t *testing.T) {
 		require.Len(t, secondPage.Teams, 1)
 		assert.NotEqual(t, firstPage.Teams[0].ID, secondPage.Teams[0].ID)
 
-		lastToken, ok := secondPage.NextPageToken.Get()
-		require.True(t, ok, "a full page carries a cursor even when it is the last one")
-		req.PageToken = api.NewOptNilPageToken(lastToken)
-		thirdPage := queryTeams(t, req)
-		assert.Empty(t, thirdPage.Teams)
-		assert.False(t, thirdPage.NextPageToken.IsSet())
+		// The second page is the last: look-ahead sees no further row, so it
+		// carries no cursor and there is no trailing empty page (#849).
+		assert.False(t, secondPage.NextPageToken.IsSet(), "the final page carries no cursor")
 	})
 
 	t.Run("error", func(t *testing.T) {
@@ -1097,4 +1098,68 @@ func TestUpdateTeamRawRequest(t *testing.T) {
 			assert.Equal(t, api.ErrorCode("req.invalid"), details.Code)
 		})
 	}
+}
+
+// TestQueryTeamsPageTokenRequiresMatchingSorting proves a page token validates
+// its OrderBy: a DESC page-1 token is rejected when page 2 omits sorting
+// (default ASC) and accepted when the same DESC sorting is repeated. Two teams
+// give a genuine next page, so page 1 mints a real cursor (relocated from the
+// projects suite, where a secret sees only one project — #849).
+func TestQueryTeamsPageTokenRequiresMatchingSorting(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, _ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), project.ID)
+	})
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+	params := api.QueryTeamsParams{ProjectID: api.ProjectID(project.ID)}
+
+	for _, name := range []string{"Alpha Team", "Beta Team"} {
+		_, err = harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
+			ProjectID: project.ID,
+			Name:      name,
+		})
+		require.NoError(t, err)
+	}
+
+	sorting := api.NewOptQueryTeamsRequestSorting(api.QueryTeamsRequestSorting{
+		Field:     api.TeamFilterFieldName,
+		Direction: api.SortDirectionDesc,
+	})
+	first, err := client.QueryTeams(t.Context(), &api.QueryTeamsRequest{
+		Limit:   api.NewOptLimit(1),
+		Sorting: sorting,
+	}, params)
+	require.NoError(t, err)
+	require.IsType(t, &api.QueryTeamsResponse{}, first, helpers.MustMarshal(t, first))
+	firstPage := first.(*api.QueryTeamsResponse)
+	require.Len(t, firstPage.Teams, 1)
+	pageToken, ok := firstPage.NextPageToken.Get()
+	require.True(t, ok, "two teams give a genuine next page, so page 1 carries a cursor")
+
+	mismatch, err := client.QueryTeams(t.Context(), &api.QueryTeamsRequest{
+		Limit:     api.NewOptLimit(1),
+		PageToken: api.NewOptNilPageToken(pageToken),
+	}, params)
+	require.NoError(t, err)
+	require.IsType(t, &api.QueryTeamsBadRequest{}, mismatch, helpers.MustMarshal(t, mismatch))
+	bad := mismatch.(*api.QueryTeamsBadRequest)
+	assert.Equal(t, api.ErrorCode(domain.ErrRequestInvalid().Code), bad.Code)
+	assert.Contains(t, string(helpers.MustMarshal(t, bad)), "page token does not match the requested sorting")
+
+	matched, err := client.QueryTeams(t.Context(), &api.QueryTeamsRequest{
+		Limit:     api.NewOptLimit(1),
+		PageToken: api.NewOptNilPageToken(pageToken),
+		Sorting:   sorting,
+	}, params)
+	require.NoError(t, err)
+	require.IsType(t, &api.QueryTeamsResponse{}, matched, helpers.MustMarshal(t, matched))
+	matchedPage := matched.(*api.QueryTeamsResponse)
+	require.Len(t, matchedPage.Teams, 1)
+	assert.False(t, matchedPage.NextPageToken.IsSet(), "the second page is the last and carries no cursor")
 }

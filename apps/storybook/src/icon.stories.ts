@@ -1,25 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/web-components-vite";
-import type { IconName, IconSize, IconTone } from "@zitadel/components";
+import {
+  SHIPPED_ICON_NAMES,
+  type IconName,
+  type IconSize,
+  type IconTone,
+} from "@zitadel/components";
 import { html, nothing } from "lit";
 
 import "@zitadel/components/atoms";
-
-const ICON_NAMES: IconName[] = [
-  "plus",
-  "arrow-right",
-  "arrow-left",
-  "spinner",
-  "check",
-  "cross",
-  "warning",
-  "alert-circle",
-  "info",
-  "passkey",
-  "user",
-  "eye",
-  "eye-off",
-  "brand-google",
-];
 
 interface IconArgs {
   name: IconName;
@@ -43,12 +31,18 @@ const meta: Meta<IconArgs> = {
   tags: ["autodocs"],
   args: { name: "user", size: "24", tone: "default", spin: false, decorative: false, label: "" },
   argTypes: {
-    name: { control: "select", options: ICON_NAMES },
+    name: { control: "select", options: [...SHIPPED_ICON_NAMES] },
     size: { control: "inline-radio", options: ["16", "24"] },
     tone: { control: "inline-radio", options: ["default", "error", "success", "disabled"] },
     spin: { control: "boolean" },
-    decorative: { control: "boolean", description: "Force aria-hidden (use next to a visible label)." },
-    label: { control: "text", description: "Accessible name override; falls back to the glyph default." },
+    decorative: {
+      control: "boolean",
+      description: "Force aria-hidden (use next to a visible label).",
+    },
+    label: {
+      control: "text",
+      description: "Accessible name override; falls back to the glyph default.",
+    },
   },
 };
 

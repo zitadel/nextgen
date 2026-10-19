@@ -190,7 +190,9 @@ export function findFileReferences(document: unknown): Array<{ path: Path; ref: 
     if (isFileReference(node)) {
       found.push({ path, ref: node[FILE_REFERENCE_KEY] });
     } else if (Array.isArray(node)) {
-      node.forEach((item, index) => walk(item, [...path, index]));
+      node.forEach((item, index) => {
+        walk(item, [...path, index]);
+      });
     } else if (isPlainObject(node)) {
       for (const [key, value] of Object.entries(node)) {
         walk(value, [...path, key]);

@@ -39,11 +39,15 @@ Where does the component live?
 | CSS var | `--zl-background`, `--zl-card` | Generated from `figma-export/` (dark `:root`, light `[data-theme="light"]`) |
 
 Do **not** hardcode hex values. Do **not** reintroduce the retired console
-semantic names (`bg-zl-surface-base`, `text-zl-text-primary`, …). Legacy
-`--zl-color-*` tokens remain for the login atoms only.
+semantic names (`bg-zl-surface-base`, `text-zl-text-primary`, …).
 
 Light canvas is `#fafafa` (`background`); elevated surfaces (`card`, `popover`)
 are `#ffffff`. Dark canvas is `#050505`; cards are `#121212`.
+
+Corners are `rounded-md` (8px) on every console surface: cards, tables, panels,
+dialogs, drawers, alerts and tab strips (D18). Do not reach for `rounded-lg`,
+`rounded-xl` or `rounded-2xl`; the shadcn defaults that ship with them are
+overridden in `src/components/ui/`.
 
 ## Component resolution (design → code)
 
@@ -109,27 +113,39 @@ Canonical examples:
 | Panel around a screen's content | `Card` |
 | Attribute chip / CLI command in prose | `InlineCode` |
 | Any searchable picker | `Combobox` (`src/components/ui/combobox.tsx`) |
-| Field with a leading icon or inline addon | `InputGroup` (`src/components/ui/input-group.tsx`) |
 | Labelled form control | `Field` + `FieldLabel` (+ `FieldError` for invalid) |
+| Create or edit drawer | `FormSheet` (`src/components/form-sheet.tsx`) |
+| Mutation error inside a form or card | `FormError` (`src/components/form-error.tsx`) |
+| Button that is submitting | `Button` with `loading` |
+| Row actions menu | `RowMenu` (`src/components/resource-list.tsx`) |
+| Screen outside the app shell (sign-in, claim, server unavailable) | `StandaloneScreen` + `StandaloneMessage` (`src/components/standalone-screen.tsx`) |
+
+Shared text styles (`PAGE_TITLE`, `OVERLINE`, `EYEBROW`, the panel table cells)
+live in `src/components/typography.ts`. A mutation's pending and error state
+comes from `useSubmit` (`src/hooks/use-submit.ts`), and cursor paging from
+`useLoadMore` (`src/hooks/use-load-more.ts`) with the `LoadMore` button.
 
 ## Resource list layout — one shell for every list screen
 
-Every list frame draws the same shell, and each screen had grown its own version
-of it: different page gutters, different cell padding, and a header label wrapped
-in a ghost-button-shaped span on one screen but not the others. The shared
-geometry now lives in `src/components/resource-list.tsx` — compose it rather than
-restating the numbers per screen.
+Every list frame draws the same shell: one page gutter, one cell padding, one
+header label. The shared geometry lives in `src/components/resource-list.tsx` —
+compose it rather than restating the numbers per screen.
 
-**The page shell applies to every list screen; the table geometry only to those
-that are tables.** User schemas is a `Card` of rows rather than a table (D0a —
-resources and schemas are different page patterns; D7 — the list stays small
-enough not to need a dense one), so it takes `RESOURCE_PAGE` and
-`RESOURCE_HEADER` and nothing else.
+Every list screen is a table on this shell, User schemas and Login flows
+included (D17; the earlier card of rows broke on narrow widths). A screen
+composes `ResourcePage`, `ResourceTitle` (with the Add button as its `action`,
+beside the title at every width, D19), then `ResourceHeaderRow` +
+`ResourceHeadCell`, `ResourceRow`, `ResourceEmptyRow` and `LoadMore`. A
+fractional grid takes `RESOURCE_TABLE_FIXED`, which scrolls the table inside
+its card below 576px rather than squeezing the cells.
 
 | Region | Value |
 | --- | --- |
 | Page gutter | 16px — the same inset as the table |
-| Header gutter | 24px — the page gutter plus 8px |
+| Page top | 20px at `lg`, 16px below — the page-header block |
+| Header gutter | 24px at `lg`, the page gutter plus 8px; 16px below it |
+| Title row | 24px, or 36px with the Add button beside the title |
+| Table top | 20px under the title row at `lg`, 16px below |
 | Table head | 56px tall, 24px leading / 16px trailing inset |
 | Table cell | 56px tall, 24px inset, 8px block padding |
 | Head label | display face, 12/16, 0.72px tracking, `foreground` |
@@ -140,15 +156,15 @@ Two things are deliberately **not** shared, because the designs genuinely differ
 - **Column widths.** Teams sits on a fixed 248px grid, Projects on thirds, and
   the Users table is schema-driven and scrolls horizontally, so it has no fixed
   grid to share.
-- **Vertical rhythm above the table.** Each frame places its own header block, so
-  the page's top padding and the table's top margin stay with the screen.
+- **The header block above the table.** Each frame places its own toolbar, so
+  the table's top margin stays with the screen.
 
 Where a design reserves a trailing column for a row menu, keep the column even if
 the menu is not built — dropping it re-spreads every other column and moves them
 off the design's grid.
 
-Two values here look like something they are not, and a pixel diff is what caught
-both: the head label is `foreground`, not the `muted-foreground` it resembles at a
+Two values here look like something they are not: the head label is
+`foreground`, not the `muted-foreground` it resembles at a
 glance; and the design's Lucide glyphs are drawn at **stroke 1.5**, where
 `lucide-react` defaults to 2 — a glyph at the default weight reads heavier than
 the design even though its box measures correctly.
@@ -159,9 +175,13 @@ Detail screens come in three compositions, and each has one shell:
 
 - **Resource detail** (Users, Teams, Project settings): a title row over body
   cards. Compose `DetailPage` + `DetailHeader` from
-  `src/components/detail-page.tsx`, then put the body under `DETAIL_BODY`.
+  `src/components/detail-page.tsx`, then put the body under `DETAIL_BODY`. A
+  body card with a titled section is a `DetailSection`; a single name field with
+  its Save button is a `RenameCard` (`src/components/rename-card.tsx`).
 - **Configuration panel** (User schemas, Login flows): the whole screen is one
-  panel card inside `DETAIL_PANEL_PAGE` (`src/components/layout.tsx`).
+  `DetailPanel` headed by a `PanelTitle` (both in
+  `src/components/detail-page.tsx`), inside `DETAIL_PANEL_PAGE`
+  (`src/components/layout.tsx`).
 - **Settings** (Profile): a bare title over one card of labelled rows, in a
   centred column `--zl-container-settings` wide. Compose `DetailPage` +
   `SettingsColumn` (`src/components/layout.tsx`), a `DETAIL_TITLE` heading with
@@ -169,32 +189,30 @@ Detail screens come in three compositions, and each has one shell:
   holding `Field` rows: 24px inset, 20px block, 16px between rows. No icon tile
   and no header card: a settings screen is not a resource with an id.
 
-The first two share the icon tile (`ICON_PLATE`). The header card (`MetaCard`,
-holding `MetaValue`s split by `MetaRule`) is on every resource detail and on
-Login flows; User schemas carries none, because its lockup names the schema
-without its id.
+The first two share the icon tile (`ICON_PLATE`) and the header card
+(`MetaCard`, holding `MetaValue`s split by `MetaRule`): the resource id,
+copyable, and the created date.
 
 | Region        | Value                                                 |
 | ------------- | ----------------------------------------------------- |
 | Page gutter   | 16px, 22px from the navbar — as the list shell        |
 | Header gutter | 24px — the page gutter plus 8px                        |
 | Title lockup  | 36px icon tile, 12px to a 24/24 display-face title     |
-| Header card   | 20px inset, 12px block, values centred on the rule     |
+| Header card   | 20px inset, 14px block, values centred on the rule     |
 | Body          | 24px under the header row                              |
 
 The title's icon is the glyph the resource's sidebar entry carries, at stroke
 1.5. Tabs are the body's first element when a resource has more than one
 section (Users: Overview / Authentication); a single-section resource renders
 its cards directly. A new resource's detail screen composes this shell rather
-than measuring its own frame: the three screens that did landed on three
-different page tops (36, 22 and 18px) and three body offsets.
+than measuring its own frame.
 
 ## Traps that have already cost time
 
 - **A registry default is not our design system.** `components/ui/*` arrives from
   the shadcn registry with the registry's own values, and where ours differ the
-  fix belongs in that file, once — not re-applied per screen. `Input` is the case
-  that kept coming back: stock shadcn is `bg-transparent`, so a field takes on
+  fix belongs in that file, once — not re-applied per screen. `Input` is the
+  recurring case: stock shadcn is `bg-transparent`, so a field takes on
   whatever surface it sits on. On the page that happens to look right; on a
   `Card` — every detail screen — it reads as the card and looks wrong. Our design
   fills an input with `background`, a surface of its own. If a control looks
