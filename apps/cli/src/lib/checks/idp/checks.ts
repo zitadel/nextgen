@@ -1,5 +1,3 @@
-import { isLoopbackIssuer } from "@zitadel/config/idp";
-
 import { Check, type Outcome } from "../check";
 import type { Discovery, IdpContext, Verdict } from "./context";
 
@@ -124,24 +122,14 @@ export class PkceCheck extends DiscoveryCheck {
   }
 }
 
-/** The server's rule for an endpoint: HTTPS, or plain HTTP only to this machine. */
-function isSecureEndpoint(endpoint: string): boolean {
-  return (
-    endpoint.startsWith("https://") ||
-    (endpoint.startsWith("http://") && isLoopbackIssuer(endpoint))
-  );
-}
-
 /** What to do about a rejection, in the provider's own console. */
-function recoveryFor(problem: "client" | "redirect_uri" | "secret", context: IdpContext): string {
+function recoveryFor(problem: "client" | "redirect_uri", context: IdpContext): string {
   const where = context.consoleUrl ?? "the provider's console";
   switch (problem) {
     case "redirect_uri":
       return `Register ${context.callbackUri} as a redirect URI at ${where}`;
     case "client":
       return `Check the client ID against the client registered at ${where}`;
-    case "secret":
-      return `Create a new client secret at ${where} and store it as the connection's secret`;
   }
 }
 
@@ -189,65 +177,6 @@ export class AuthorizeProbeCheck extends DiscoveryCheck {
       context.probes.authorize(response),
       context,
       "The provider accepts the client and the callback URI",
-    );
-  }
-}
-
-/** Sends a code the provider never issued, to learn whether it accepts the client secret. */
-export class SecretProbeCheck extends DiscoveryCheck {
-  readonly name = "client-secret";
-  readonly title = "Client secret";
-
-  protected async inspect(context: IdpContext, document: Discovery): Promise<Outcome> {
-    if (context.probes === undefined || document.token_endpoint === undefined) {
-      return { status: "skipped", message: "No probe exists for this provider" };
-    }
-    if (context.clientSecret === undefined) {
-      return {
-        status: "skipped",
-        message: "The secret is write-only, so it cannot be read back; supply it to check it",
-      };
-    }
-    if (!isSecureEndpoint(document.token_endpoint)) {
-      return {
-        status: "fail",
-        message: `The token endpoint ${document.token_endpoint} is not HTTPS, so the secret was not sent`,
-        recovery: "Use an https:// token endpoint; plain http is only allowed for localhost",
-      };
-    }
-    const grant = {
-      grant_type: "authorization_code",
-      code: "zitadel-check",
-      redirect_uri: context.callbackUri,
-    };
-    // As the engine does: the Authorization header for client_secret_basic, whose
-    // credentials are form-encoded before they are base64-encoded (RFC 6749 2.3.1),
-    // or the form body for client_secret_post.
-    const response = await context.request(
-      document.token_endpoint,
-      context.tokenAuthMethod === "client_secret_basic"
-        ? {
-            method: "POST",
-            headers: {
-              authorization: `Basic ${Buffer.from(
-                `${encodeURIComponent(context.clientId)}:${encodeURIComponent(context.clientSecret)}`,
-              ).toString("base64")}`,
-            },
-            body: new URLSearchParams(grant),
-          }
-        : {
-            method: "POST",
-            body: new URLSearchParams({
-              ...grant,
-              client_id: context.clientId,
-              client_secret: context.clientSecret,
-            }),
-          },
-    );
-    return outcomeOf(
-      context.probes.token(response),
-      context,
-      "The provider accepts the client secret",
     );
   }
 }

@@ -2,7 +2,6 @@
 export type Discovery = {
   readonly issuer?: string;
   readonly authorization_endpoint?: string;
-  readonly token_endpoint?: string;
   readonly scopes_supported?: readonly string[];
   readonly claims_supported?: readonly string[];
   readonly code_challenge_methods_supported?: readonly string[];
@@ -38,21 +37,17 @@ export type Verdict =
   | { readonly kind: "unknown" }
   | {
       readonly kind: "rejected";
-      readonly problem: "client" | "redirect_uri" | "secret";
+      readonly problem: "client" | "redirect_uri";
       readonly reason: string;
     };
 
 /**
- * How one provider words its refusals. Providers differ here — Google answers
- * a bad client with an error page and a bad secret with `invalid_client`,
- * another answers neither the same way — so the knowledge lives with the
- * provider and a provider without a profile gets no probes.
+ * How one provider words its refusals. Providers differ here, so the knowledge
+ * lives with the provider and a provider without a profile gets no probes.
  */
 export interface ProviderProbes {
   /** The provider's answer to an authorization request made without a user. */
   authorize(response: HttpResponse): Verdict;
-  /** The provider's answer to a token request carrying a code it never issued. */
-  token(response: HttpResponse): Verdict;
 }
 
 export type SignInPhase =
@@ -107,19 +102,15 @@ export type IdpContext = {
   readonly slug: string;
   readonly issuer: string;
   readonly clientId: string;
-  /** Absent when the caller did not supply it: the platform never reads a secret back. */
-  readonly clientSecret: string | undefined;
   readonly scopes: readonly string[];
   /** The provider's own claim names the connection's mappings read. */
   readonly claims: readonly string[];
   readonly callbackUri: string;
-  /** How the engine presents the client secret at the token endpoint; the probe does the same. */
-  readonly tokenAuthMethod: "client_secret_basic" | "client_secret_post";
   /**
    * The endpoints the connection names itself, as the server uses them without
    * reading a discovery document; `undefined` when it names none.
    */
-  readonly endpoints: { readonly authorization: string; readonly token: string } | undefined;
+  readonly endpoints: { readonly authorization: string } | undefined;
   readonly consoleUrl: string | undefined;
   readonly probes: ProviderProbes | undefined;
   readonly discovery: Promise<DiscoveryResult>;
@@ -128,19 +119,8 @@ export type IdpContext = {
   readonly live?: LiveSignIn;
 };
 
-/**
- * The one way a check reaches the network. A POST carries the client secret,
- * so it is never forwarded to wherever a redirect points: a redirect answer is
- * returned as it is.
- */
-export type Send = (
-  url: string,
-  init?: {
-    readonly method: "POST";
-    readonly body: URLSearchParams;
-    readonly headers?: Readonly<Record<string, string>>;
-  },
-) => Promise<HttpResponse>;
+/** The one way a check reaches the network: a GET that follows redirects. */
+export type Send = (url: string) => Promise<HttpResponse>;
 
 /**
  * Build the context for one connection, starting the discovery fetch once so
@@ -156,7 +136,6 @@ export function idpContext(input: Omit<IdpContext, "discovery">): IdpContext {
         source: "connection",
         document: {
           authorization_endpoint: input.endpoints.authorization,
-          token_endpoint: input.endpoints.token,
         },
       }),
     };

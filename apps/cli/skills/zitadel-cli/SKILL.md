@@ -380,18 +380,17 @@ same commands as argument lists.
 After enabling a provider, `test sign-in` checks the setup without a browser. It
 checks every connection the project has, one block each, and `--provider google`
 checks just one: the provider's discovery document, the scopes and claims the
-connection asks for, whether the provider accepts the client and the callback
-URI, and (when `--client-secret-stdin` pipes it in) the client secret. The
-platform never reads a secret back, so without one that check is reported as
-`skipped`; the secret belongs to one provider, so with several connections
-`--client-secret-stdin` needs `--provider`. Each entry of
-`data.providers[].checks` has a `status` of `pass`, `warn`, `fail` or `skipped`, and a `skipped` check is never a pass: it says the check could not
-tell. A failure exits `E_VALIDATION` naming the providers that failed, with the
-one thing to do in `hint`. Add `--live` (with `--provider` when there are
-several) only when a person is at the machine: it opens the login page and waits
-for them to sign in, then reports from the runtime's log which phase failed and
-on which side. It needs the local runtime running and the files applied, and
-leaves any user it created in the project.
+connection asks for, and whether the provider accepts the client and the
+callback URI. It never needs the client secret, which the platform stores
+write-only. Each entry of `data.providers[].checks` has a `status` of `pass`,
+`warn`, `fail` or `skipped`, and a `skipped` check is never a pass: it says the
+check could not tell. A failure exits `E_VALIDATION` naming the providers that
+failed, with the one thing to do in `hint`. Add `--live` (with `--provider` when
+there are several) only when a person is at the machine: it opens the login page
+and waits for them to sign in, then reports from the runtime's log which phase
+failed and on which side; a wrong secret shows up there as a provider-side
+failure at the exchange. It needs the local runtime running and the files
+applied, and leaves any user it created in the project.
 
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
 then re-run `plan` and `apply`. See the reference below for driving the login UI

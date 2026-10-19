@@ -2,26 +2,13 @@ import type { HttpResponse, ProviderProbes, Verdict } from "./context";
 
 const UNKNOWN: Verdict = { kind: "unknown" };
 
-type TokenAnswer = { readonly error?: string; readonly error_description?: string };
-
-/** The token endpoint's answer, or `undefined` when it is not JSON. */
-function tokenAnswerOf(body: string): TokenAnswer | undefined {
-  try {
-    return JSON.parse(body) as TokenAnswer;
-  } catch {
-    return undefined;
-  }
-}
-
 /** Where Google sends a request it accepts, when nobody is signed in. */
 const SIGN_IN_PAGE = "/v3/signin/identifier";
 
 /**
  * Google's wording, read off its live endpoints: an unregistered redirect URI
  * and an unknown client both end on an error page whose URL names the cause in
- * `authError`, and a good request ends on a sign-in page. A token request with a made-up code
- * answers `invalid_grant` once the client and secret are accepted, and
- * `invalid_client` when either is not.
+ * `authError`, and a good request ends on a sign-in page.
  */
 export const GOOGLE_PROBES: ProviderProbes = {
   authorize({ status, url }: HttpResponse): Verdict {
@@ -46,29 +33,5 @@ export const GOOGLE_PROBES: ProviderProbes = {
     return status === 200 && hostname === "accounts.google.com" && pathname === SIGN_IN_PAGE
       ? { kind: "accepted" }
       : UNKNOWN;
-  },
-
-  token({ body }: HttpResponse): Verdict {
-    const answer = tokenAnswerOf(body);
-    if (answer === undefined) {
-      return UNKNOWN;
-    }
-    if (answer.error === "invalid_grant") {
-      return { kind: "accepted" };
-    }
-    if (answer.error !== "invalid_client") {
-      return UNKNOWN;
-    }
-    return /not found/i.test(answer.error_description ?? "")
-      ? {
-          kind: "rejected",
-          problem: "client",
-          reason: "Google does not know this client ID (invalid_client)",
-        }
-      : {
-          kind: "rejected",
-          problem: "secret",
-          reason: "Google rejected the client secret (invalid_client)",
-        };
   },
 };

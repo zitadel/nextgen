@@ -67,16 +67,6 @@ describe("test sign-in", () => {
         expect(result).toSucceed();
       });
 
-      it("passes when the provider also accepts the client secret", async () => {
-        const app = await aSetUpApp();
-        await app.enableSso("google", CREDENTIALS);
-        platform.hasGoogle();
-
-        const result = await app.testSignInWithSecret(CREDENTIALS.secret, ["--provider", "google"]);
-
-        expect(result).toSucceed();
-      });
-
       it("fails when the provider does not know the callback URI", async () => {
         const app = await aSetUpApp();
         await app.enableSso("google", CREDENTIALS);
@@ -103,16 +93,6 @@ describe("test sign-in", () => {
         platform.hasGoogle({ client: "unknown" });
 
         const result = await app.run(["test", "sign-in", "--provider", "google", "--json"]);
-
-        expect(result).toFailWith("E_VALIDATION");
-      });
-
-      it("fails when the provider rejects the client secret", async () => {
-        const app = await aSetUpApp();
-        await app.enableSso("google", CREDENTIALS);
-        platform.hasGoogle({ secret: "wrong" });
-
-        const result = await app.testSignInWithSecret("not-the-secret", ["--provider", "google"]);
 
         expect(result).toFailWith("E_VALIDATION");
       });
@@ -229,14 +209,6 @@ describe("test sign-in", () => {
         expect(result.stdout).not.toContain("accounts.google.com");
       });
 
-      it("refuses a client secret, which belongs to one provider, without a name", async () => {
-        const app = await anAppWithTwoProviders();
-
-        const result = await app.testSignInWithSecret(CREDENTIALS.secret);
-
-        expect(result).toHintAt("--provider");
-      });
-
       it("refuses a live sign-in, which is one provider's, without a name", async () => {
         const app = await anAppWithTwoProviders();
         await app.startLocalServer();
@@ -278,16 +250,6 @@ describe("test sign-in", () => {
         const result = await app.run(["test", "sign-in", "--provider", "google"]);
 
         expect(result.stdout).not.toContain("\u001b]0;");
-      });
-
-      it("says the client secret was not checked when none was supplied", async () => {
-        const app = await aSetUpApp();
-        await app.enableSso("google", CREDENTIALS);
-        platform.hasGoogle();
-
-        const result = await app.run(["test", "sign-in", "--provider", "google"]);
-
-        expect(result).toPrint("The secret is write-only, so it cannot be read back");
       });
 
       it("says the browser sign-in was not asked for", async () => {
