@@ -386,7 +386,7 @@ async function evaluateTemplates(
  * config, or an unresolvable renderer are reported by their own checks —
  * this one only degrades to "cannot enumerate".
  */
-async function resolveArtifacts(ctx: CheckContext): Promise<EjectActions | undefined> {
+export async function resolveArtifacts(ctx: CheckContext): Promise<EjectActions | undefined> {
   const framework = await ctx.orca.tryDetect(ctx.cwd);
   if (!framework) {
     return undefined;

@@ -389,6 +389,72 @@ describe("DependencyCheck", () => {
     expect((await new DependencyCheck().run(ctxFor(cwd))).status).toBe("fail");
   });
 
+  it("fails when the only @zitadel package is not the SDK the app imports", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { next: "^15" },
+        devDependencies: { "@zitadel/cli": "0.1.0-alpha.0" },
+      }),
+    );
+    const outcome = await new DependencyCheck().run(ctxFor(cwd));
+    expect(outcome).toMatchObject({
+      status: "fail",
+      message: "package.json does not declare @zitadel/sdk-next, which the app imports",
+    });
+  });
+
+  it("fails a meta-framework app that lacks the widget SDK its pages import", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { "@sveltejs/kit": "^3", svelte: "^5", "@zitadel/sdk-sveltekit": "latest" },
+      }),
+    );
+    const outcome = await new DependencyCheck().run(ctxFor(cwd));
+    expect(outcome.message).toBe(
+      "package.json does not declare @zitadel/sdk-svelte, which the app imports",
+    );
+  });
+
+  it("passes a meta-framework app that declares both of its SDKs", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: {
+          "@sveltejs/kit": "^3",
+          svelte: "^5",
+          "@zitadel/sdk-sveltekit": "latest",
+          "@zitadel/sdk-svelte": "latest",
+        },
+      }),
+    );
+    expect((await new DependencyCheck().run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("fix re-adds the SDK an app kept only the CLI in place of", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { next: "^15" },
+        devDependencies: { "@zitadel/cli": "0.1.0-alpha.0" },
+      }),
+    );
+    const check = new DependencyCheck();
+
+    await check.fix(ctxFor(cwd));
+
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+  });
+
   it("fix re-adds the SDK dependency via the patcher", async () => {
     const cwd = await makeProject();
     await writeFile(
