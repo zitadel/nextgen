@@ -133,6 +133,26 @@ describe("test sign-in", () => {
         expect(result).toHintAt("Add openid");
       });
 
+      it("fails a connection with no client ID and still checks the others", async () => {
+        const app = await anAppWithTwoProviders();
+        platform.hasGoogle();
+        await app.editOidc(ACME.slug, { client_id: "" });
+
+        const result = await app.run(["test", "sign-in", "--json"]);
+
+        expect(result.stdout).toContain('"provider": "google"');
+      });
+
+      it("names the missing client ID as that connection's failure", async () => {
+        const app = await anAppWithTwoProviders();
+        platform.hasGoogle();
+        await app.editOidc(ACME.slug, { client_id: "" });
+
+        const result = await app.run(["test", "sign-in", "--json"]);
+
+        expect(result).toExplain("acme-sso");
+      });
+
       it("fails a connection that names a token endpoint and nothing else", async () => {
         const app = await anAppWithTwoProviders();
         await app.editOidc(ACME.slug, { token_endpoint: `${ACME.issuer}/token` });
