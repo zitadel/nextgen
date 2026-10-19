@@ -40,16 +40,33 @@ middleware runs (`verifyJwt`):
 8. `exp` must be present and in the future (with `clockSkewMs` tolerance) —
    tokens without an expiry are rejected.
 9. `nbf` and `iat` are validated with `clockSkewMs` tolerance when present.
+10. `aud` must name the app's project (`projectId`).
 
 Opaque (non-JWT) session tokens are validated against the backend's
-`GET /sessions/me` instead, bounded by `opaqueTokenTimeoutMs`
-(`checkOpaqueSessionToken`). Only the backend's refusal makes the session
-cookie dead, and only then does the middleware clear the `__nextgen*`
-cookies: a `401`, or a `404` with the `sess.not_found` code for a session
-that is gone. Any other outcome (a `5xx`, no answer in time, a network error)
-is not a refusal: the request counts as signed out, the cookies stay, and a
-protected route answers `503 Service Unavailable` rather than send a user who
-may well be signed in to the login page.
+`GET /sessions/me?project_id=…` instead, bounded by `opaqueTokenTimeoutMs`
+(`checkOpaqueSessionToken`).
+
+A session belongs to one project, while a browser sends the session cookie
+to every app on the same host, including the Console of a local server. So a
+session counts as signed in only in the app's own project: `projectId`, which
+each SDK otherwise reads from `ZITADEL_PROJECT_ID` (then its framework's public
+project id variable, as `zitadel setup` writes both). The backend refuses an
+opaque session of another project (`403 sess.project_mismatch`), and the SDK
+checks the project the answer names as well. A session of another project
+reads as signed out and keeps its cookie, since it is live in its own app.
+With no project configured, no session counts as signed in.
+
+Only the backend's refusal makes the session cookie dead, and only then does
+the middleware clear the `__nextgen*` cookies: a `401`, or a `404` with the
+`sess.not_found` code for a session that is gone. A JWT session cookie is dead
+when it fails verification. Any other outcome (a `5xx`, no answer in time, a
+network error) is not a refusal: the request counts as signed out, the cookies
+stay, and a protected route answers `503 Service Unavailable` rather than send
+a user who may well be signed in to the login page. A Bearer token that signs
+no one in here leaves the cookie to be judged on its own.
+
+`resolveSession` is the one implementation of these rules; every server SDK's
+middleware calls it.
 
 Framework-specific steps (header tunnelling, `auth()` re-verification) are
 documented in each framework SDK's README on top of this pipeline.

@@ -112,7 +112,7 @@ The SolidStart SDK is request middleware that proxies and verifies sessions on t
   <Step>It redirects unauthenticated requests for `protectedRoutes` to `loginPath`, with the requested path and query string in `?next=`, where the login widget returns after sign-in.</Step>
 </Steps>
 
-Nitro loads `.env` and `.env.local` into `process.env` in development, so the middleware finds `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET` there. Only `VITE_`-prefixed variables reach the browser.
+Nitro loads `.env` and `.env.local` into `process.env` in development, so the middleware finds `ZITADEL_URL`, `ZITADEL_PROJECT_SECRET`, and `ZITADEL_PROJECT_ID` there. Only `VITE_`-prefixed variables reach the browser.
 
 ## Verify
 
