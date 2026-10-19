@@ -95,13 +95,12 @@ describe("patcher file classification", () => {
     expect(actions.fileClasses!["src/app/app.html"]).toBe("presentation");
   });
 
-  it("Nuxt marks the auth and component plugins as infrastructure", () => {
+  it("Nuxt has no infrastructure files: the SDK module owns the plumbing", () => {
     const actions = new NuxtPatcher().artifacts({
       framework: facts("nuxt", "app"),
       rendererId: "react",
     });
-    expect(actions.fileClasses!["app/plugins/auth.server.ts"]).toBe("infrastructure");
-    expect(actions.fileClasses!["app/plugins/zitadel-components.client.ts"]).toBe("infrastructure");
+    expect(Object.values(actions.fileClasses!)).not.toContain("infrastructure");
     expect(actions.fileClasses!["app/pages/login.vue"]).toBe("presentation");
   });
 

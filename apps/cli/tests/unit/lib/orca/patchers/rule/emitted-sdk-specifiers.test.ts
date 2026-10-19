@@ -15,8 +15,6 @@ import {
 import { reactRenderer } from "../../../../../../src/lib/orca/patchers/rule/next/renderers/react";
 import {
   appVueTemplate,
-  authPluginTemplate,
-  componentsPluginTemplate,
   indexPageTemplate,
   loginPageTemplate,
   profilePageTemplate,
@@ -113,12 +111,7 @@ function emittedCorpus(): string[] {
     }
   }
   corpus.push(reactRenderer.templates.customElementsDts!().contents);
-  corpus.push(
-    appVueTemplate(),
-    indexPageTemplate(),
-    componentsPluginTemplate(),
-    authPluginTemplate(),
-  );
+  corpus.push(appVueTemplate(), indexPageTemplate());
   for (const frameworkId of FRAMEWORK_IDS) {
     for (const posture of postures) {
       for (const preset of ["password-first", "passkey-first"]) {

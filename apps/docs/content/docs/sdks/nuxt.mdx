@@ -38,14 +38,12 @@ The Nuxt SDK registers server middleware and plugins so Nuxt pages can read Zita
 
 <Tabs items={["CLI generated", "Manual"]}>
   <Tab>
-    The CLI adds pages, plugins, module config, environment files, and the SDK package. On the Nuxt 4 layout, pages and plugins go under `app/`.
+    The CLI adds pages, module config, environment files, and the SDK package, and nothing else: the SDK loads the web components and exposes the auth state itself. On the Nuxt 4 layout, pages go under `app/`.
 
     <Files>
       <File name="app/pages/login.vue" />
       <File name="app/pages/register.vue" />
       <File name="app/pages/profile.vue" />
-      <File name="app/plugins/zitadel-components.client.ts" />
-      <File name="app/plugins/auth.server.ts" />
       <File name="nuxt.config.ts" />
       <File name=".env.local" />
       <File name=".env.example" />
