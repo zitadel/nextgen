@@ -116,6 +116,22 @@ describe("IDP_CHECKS", () => {
     });
   });
 
+  it("fails a connection whose own endpoint is not https, as the server would", async () => {
+    const { by } = await resultsFor({
+      endpoints: { authorization: "https://issuer.example/authorize" },
+      configuredEndpoints: {
+        authorization_endpoint: "https://issuer.example/authorize",
+        token_endpoint: "http://idp.example/token",
+      },
+    });
+
+    expect(by("discovery")).toMatchObject({
+      status: "fail",
+      message: expect.stringContaining("token_endpoint"),
+      recovery: expect.stringContaining("oidc.token_endpoint"),
+    });
+  });
+
   it("does not need a userinfo endpoint from a connection that reads claims from the ID token", async () => {
     const { by } = await resultsFor(
       { idTokenMapping: true },
