@@ -2,6 +2,7 @@ import {
   idpProvider,
   IDP_PROVIDERS,
   missingEndpoints,
+  OIDC_ENDPOINTS,
   referencedVariable,
 } from "@zitadel/config/idp";
 import { consola } from "consola";
@@ -193,6 +194,7 @@ export default class TestSignIn extends BaseCommand {
         slug,
         idTokenMapping: oidc.id_token_mapping === true,
         missingEndpoints: missingEndpoints(oidc),
+        configuredEndpoints: configuredEndpoints(oidc),
         issuer: typeof oidc.issuer === "string" ? oidc.issuer : "",
         clientId: await this.clientId(cwd, oidc.client_id),
         scopes: stringsIn(oidc.scopes),
@@ -266,6 +268,16 @@ export default class TestSignIn extends BaseCommand {
     }
     return primary;
   }
+}
+
+/** Every endpoint the connection writes down, so each can be held to the server's rule. */
+function configuredEndpoints(oidc: Record<string, unknown>): Readonly<Record<string, string>> {
+  return Object.fromEntries(
+    OIDC_ENDPOINTS.flatMap((name) => {
+      const value = oidc[name];
+      return typeof value === "string" && value !== "" ? [[name, value] as const] : [];
+    }),
+  );
 }
 
 /** The authorization endpoint the connection names itself, which the server then uses without discovery. */
