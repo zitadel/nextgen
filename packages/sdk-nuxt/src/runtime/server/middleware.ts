@@ -134,13 +134,21 @@ export function createNextgenMiddleware(options: NextgenMiddlewareOptions = {}):
     const urlObj = getRequestURL(event);
     const { pathname } = urlObj;
 
+    // Strip any client-supplied x-nextgen-auth-token so downstream server code
+    // cannot read an attacker-controlled value; getAuth() is canonical.
+    // If the adapter's headers are immutable the value cannot be removed, so
+    // refuse the request rather than let it reach downstream handlers.
+    const inboundHeaders = event.node.req.headers as Record<string, string | string[] | undefined>;
+    try {
+      delete inboundHeaders["x-nextgen-auth-token"];
+    } catch {
+      if (inboundHeaders["x-nextgen-auth-token"] !== undefined) {
+        event.node.res.statusCode = 400;
+        return "Bad Request";
+      }
+    }
+
     if (matchesRoutes(pathname, ignoredRoutes)) {
-      // Neutralise any client-supplied x-nextgen-auth-token on ignored routes.
-      // handleAuth is skipped for ignored routes, so we must strip the header
-      // here to prevent a forged value from reaching downstream route handlers.
-      delete (event.node.req.headers as Record<string, string | string[] | undefined>)[
-        "x-nextgen-auth-token"
-      ];
       return;
     }
 
@@ -365,16 +373,6 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<voi
     opaqueTokenTimeoutMs,
     pathname,
   } = opts;
-
-  // Strip any client-supplied x-nextgen-auth-token from the inbound request so
-  // route handlers cannot observe an attacker-controlled value by reading the
-  // raw request headers. The canonical auth state is event.context.nextgenAuth;
-  // handlers should call getAuth(event) rather than reading this header directly.
-  // In sdk-next the equivalent protection is provided by tunnelHeaders, which
-  // always overwrites the header value via Next.js's header-override mechanism.
-  delete (event.node.req.headers as Record<string, string | string[] | undefined>)[
-    "x-nextgen-auth-token"
-  ];
 
   const authHeader = getRequestHeader(event, "authorization");
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;

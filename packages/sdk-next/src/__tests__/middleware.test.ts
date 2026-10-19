@@ -488,6 +488,57 @@ describe("nextgenMiddleware", () => {
     expect(res.status).not.toBe(302);
   });
 
+  it("refuses the request when the header cannot be removed", async () => {
+    const req = new NextRequest("http://localhost:3000/", {
+      headers: { "x-nextgen-auth-token": "forged-session-token" },
+    });
+    vi.spyOn(req.headers, "delete").mockImplementation(() => {
+      throw new TypeError("immutable");
+    });
+
+    const res = await nextgenMiddleware(req, { url: "http://localhost:4000" });
+
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("Bad Request");
+  });
+
+  it("lets the request through when removal fails but the header is absent", async () => {
+    const req = makeRequest("http://localhost:3000/");
+    vi.spyOn(req.headers, "delete").mockImplementation(() => {
+      throw new TypeError("immutable");
+    });
+
+    const res = await nextgenMiddleware(req, { url: "http://localhost:4000" });
+
+    expect(res.status).toBe(200);
+  });
+
+  it("refuses a proxied request when the header cannot be removed", async () => {
+    const upstreamFetch = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", upstreamFetch);
+    const req = new NextRequest("http://localhost:3000/__nextgen/v1/flow", {
+      headers: { "x-nextgen-auth-token": "forged-session-token" },
+    });
+    vi.spyOn(req.headers, "delete").mockImplementation(() => {
+      throw new TypeError("immutable");
+    });
+
+    const res = await nextgenMiddleware(req, { url: "http://localhost:4000" });
+
+    expect(res.status).toBe(400);
+    expect(upstreamFetch).not.toHaveBeenCalled();
+  });
+
+  it("removes the header from the incoming request", async () => {
+    const req = new NextRequest("http://localhost:3000/", {
+      headers: { "x-nextgen-auth-token": "forged-session-token" },
+    });
+
+    await nextgenMiddleware(req, { url: "http://localhost:4000" });
+
+    expect(req.headers.has("x-nextgen-auth-token")).toBe(false);
+  });
+
   it("invalid token on a protected route redirects to the login path", async () => {
     const kid = nextKid();
     const exp = Math.floor(Date.now() / 1000) + 3600;

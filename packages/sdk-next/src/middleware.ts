@@ -103,10 +103,23 @@ export async function nextgenMiddleware(
 
   const { pathname } = new URL(req.url);
 
+  // Strip any client-supplied x-nextgen-auth-token so downstream server code
+  // cannot read an attacker-controlled value; getAuth() is canonical.
+  // If the adapter's headers are immutable the value cannot be removed, so
+  // refuse the request rather than let it reach downstream handlers.
+  // The header override in tunnelHeaders stays as well: Next.js hands server
+  // components the override list, not this request object.
+  try {
+    req.headers.delete("x-nextgen-auth-token");
+  } catch {
+    if (req.headers.has("x-nextgen-auth-token")) {
+      return new Response("Bad Request", { status: 400 });
+    }
+  }
+
   if (matchesRoutes(pathname, ignoredRoutes)) {
-    // Neutralise any client-supplied x-nextgen-auth-token on ignored routes.
-    // handleAuth is skipped for ignored routes, so we must strip the header
-    // here to prevent a forged value from reaching server components.
+    // handleAuth is skipped for ignored routes, so the override that shields
+    // server components from a forged value must be applied here too.
     const headers = tunnelHeaders(req, { "x-nextgen-auth-token": "" });
     return NextResponse.next({ request: { headers } });
   }

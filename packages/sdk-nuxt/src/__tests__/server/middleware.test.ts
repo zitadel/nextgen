@@ -661,6 +661,63 @@ describe("createNextgenMiddleware (H3)", () => {
     expect(capturedAuth).toBeUndefined();
   });
 
+  it("refuses the request when the header cannot be removed", async () => {
+    const app = createApp();
+    app.use((event) => {
+      event.node.req.headers = Object.freeze({ ...event.node.req.headers });
+    });
+    app.use(createNextgenMiddleware({ url: "http://localhost:4000" }));
+
+    let reachedHandler = false;
+    app.use("/", () => {
+      reachedHandler = true;
+      return { ok: true };
+    });
+
+    const res = await toWebHandler(app)(
+      new Request("http://localhost:3000/", {
+        headers: { "x-nextgen-auth-token": "forged-session-token" },
+      }),
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.text()).toBe("Bad Request");
+    expect(reachedHandler).toBe(false);
+  });
+
+  it("lets the request through when removal fails but the header is absent", async () => {
+    const app = createApp();
+    app.use((event) => {
+      event.node.req.headers = Object.freeze({ ...event.node.req.headers });
+    });
+    app.use(createNextgenMiddleware({ url: "http://localhost:4000" }));
+    app.use("/", () => ({ ok: true }));
+
+    const res = await toWebHandler(app)(makeWebRequest("http://localhost:3000/"));
+
+    expect(res.status).toBe(200);
+  });
+
+  it("refuses a proxied request when the header cannot be removed", async () => {
+    const upstreamFetch = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", upstreamFetch);
+
+    const app = createApp();
+    app.use((event) => {
+      event.node.req.headers = Object.freeze({ ...event.node.req.headers });
+    });
+    app.use(createNextgenMiddleware({ url: "http://localhost:4000" }));
+
+    const res = await toWebHandler(app)(
+      new Request("http://localhost:3000/__nextgen/v1/flow", {
+        headers: { "x-nextgen-auth-token": "forged-session-token" },
+      }),
+    );
+
+    expect(res.status).toBe(400);
+    expect(upstreamFetch).not.toHaveBeenCalled();
+  });
+
   it("token without sub on public route sets nextgenAuth to unauthenticated", async () => {
     const kid = nextKid();
     const exp = Math.floor(Date.now() / 1000) + 3600;
