@@ -20,7 +20,7 @@ not run them.
 
 ## Layout
 
-One Vercel deployment, five [services](https://vercel.com/docs/services):
+One Vercel deployment, six [services](https://vercel.com/docs/services):
 
 | Service | Built by | Serves |
 |---|---|---|
@@ -29,6 +29,7 @@ One Vercel deployment, five [services](https://vercel.com/docs/services):
 | `storybook` | Storybook; `turbo run build` | `/storybook/*` (bare `/storybook` redirects to the slash form) |
 | `docs` | Next.js; `apps/docs`' own `pnpm run build`, without a task runner: moon cannot archive the symlinks Vercel's Next.js adapter writes, and turbo could never reuse a build, whose cache key holds the deployment's ID under Skew Protection | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
 | `website` | Next.js; `turbo run build --filter=@zitadel/components`, for the atoms its showcase renders, then `apps/website`'s own `pnpm run build`, without a task runner, as the docs' | `/`, the front page, and its assets at `/_next/*`; the host's `/llms.txt`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link |
+| `schemas` | Static files: Node runs [`scripts/render-builtin-schemas.mjs`](../../scripts/render-builtin-schemas.mjs), which needs no install, into `dist/cloud-schemas`. The service is rooted at `apps/cloud`, which holds no `package.json`, so Vercel detects no framework | `/schemas/v1/*`: the [built-in schemas](#built-in-schemas), as `application/schema+json`, fresh for an hour and readable from any origin |
 
 The console lives on the same origin, at `/console/` rather than a
 self-hosted server's `/ui/console/`. The server's own console is switched
@@ -50,6 +51,40 @@ The launcher pins what follows from this layout (listen address from
 `PORT`, console off with its links at `/console`, login UI on) and defaults the rest
 (platform project bootstrapped, JSON logs, public base from Vercel's URL).
 Any `NEXTGEN_*` variable overrides a default.
+
+## Built-in schemas
+
+The server names its built-in schemas (the user schema, the flow definition,
+the IdP connection, branding and the documents they `$ref`) by URL under its
+`schema.builtin_public_base`, `https://preview.zitadel.com/schemas/v1`. The
+base is an identifier namespace: the server resolves these documents from the
+copies it embeds and never fetches them. The `schemas` service makes each
+identifier resolve for editors and people:
+`https://preview.zitadel.com/schemas/v1/user-schema.json` answers with the
+document whose `$id` it is.
+
+- **The build** renders every file in `api/openapi/endpoints/schemas/` the
+  way the server renders it for its own validator
+  (`domain.WriteBuiltinJSONSchema`): `$id` set to the document's URL, every
+  relative `$ref` resolved against it, nothing else changed. It fails when a
+  `$ref` names a document under the base that is no built-in, so an editor
+  that follows one never meets a 404. The renderer is Node rather than the
+  server's Go because only a Go service's build has a Go toolchain on Vercel,
+  and the services build in no fixed order. A change to one renderer belongs
+  in the other.
+- **The routes:** the top-level rewrite sends `/schemas/v1/*` to the service,
+  ahead of the server's catch-all; a name that is no built-in is the
+  service's 404. The API keeps `/schemas` and `/schemas/{id}`: a schema id
+  never holds a slash.
+- **Previews** serve the same documents. One fetched from
+  `cloud-….vercel.app` still says it is
+  `https://preview.zitadel.com/schemas/v1/<name>`, and its `$ref`s lead there.
+- **Moving the namespace** to `https://zitadel.com/schemas/v1`, when the
+  preview moves: change `HOSTED_BASE` in the renderer together with the
+  server's default base, and let zitadel.com, also on Vercel, serve the same
+  files, by running
+  `node scripts/render-builtin-schemas.mjs --base https://zitadel.com/schemas/v1`
+  in its build or by rewriting `/schemas/v1/:path*` to this project.
 
 ## Database
 
@@ -224,22 +259,28 @@ Every deployment is tested once Vercel built it, on its own URL
 (`cloud-<hash>-zitadel.vercel.app`, never a production alias):
 [`deployment-checks.yml`](../../.github/workflows/deployment-checks.yml) runs each
 service's contract suite against the deployment, today the docs'
-([`apps/docs/AGENTS.md`](../../apps/docs/AGENTS.md)) and the console's
-([`e2e/console/README.md`](../../e2e/console/README.md)), as the turbo tasks
+([`apps/docs/AGENTS.md`](../../apps/docs/AGENTS.md)), the console's
+([`e2e/console/README.md`](../../e2e/console/README.md)) and the built-in
+schemas' ([`e2e/schemas/`](../../e2e/schemas/)), as the turbo tasks
 `pnpm check:cloud` runs [by hand](#checking-a-deployment-by-hand). The console's
 signs nobody in: it checks how `vercel.json` routes the console's paths and
 that the signed-out console comes up, down to the login widget's first step,
-which needs the server and its database behind it.
+which needs the server and its database behind it. The schemas' fetches every
+built-in from `/schemas/v1/` and compares it with the deployed commit's own
+rendering, checks the headers `vercel.json` gives them, and that `/schemas`
+still reaches the API; it needs no browser.
 What starts it, and where the result lands, depends on the environment:
 
 - **A preview:** the `deployment_status` event Vercel posts to GitHub. The
-  checks land on the pull request: `deployment-checks / docs (Preview)` and
-  `deployment-checks / console (Preview)`.
+  checks land on the pull request: `deployment-checks / docs (Preview)`,
+  `deployment-checks / console (Preview)` and
+  `deployment-checks / schemas (Preview)`.
 - **Production:** [`production-checks.yml`](../../.github/workflows/production-checks.yml),
   on the `vercel.deployment.ready` dispatch Vercel sends once the deployment
   is built, before its Deployment Checks run. It calls the same jobs and sets
-  one commit status per suite on the deployed commit, `docs (Production)` and
-  `console (Production)`. A dispatch runs the workflow as it is on `main`: a
+  one commit status per suite on the deployed commit, `docs (Production)`,
+  `console (Production)` and `schemas (Production)`. A deployed commit from
+  before the schemas service passes the last with nothing to check. A dispatch runs the workflow as it is on `main`: a
   change to it takes effect once merged.
 - The suites reach the protected deployment with the project's Protection
   Bypass for Automation secret, which the workflow expects as the repository
@@ -271,18 +312,19 @@ What starts it, and where the result lands, depends on the environment:
   name the failing contract (the test's title) and list every URL that
   failed; the run's summary names the deployment and the command that
   reproduces the run; a failed browser test's screenshots are the
-  `docs-deployment-screenshots` or `console-deployment-screenshots` artifact.
+  `docs-deployment-screenshots` or `console-deployment-screenshots` artifact
+  (the schemas' suite runs no browser and uploads nothing).
   A flaky production run is run
   again from that run's page: it reports on the same commit again.
 - `gh workflow run deployment-checks.yml --ref <branch> -f url=https://cloud-….vercel.app`
-  runs the workflow without a new deployment; it reports `docs (dispatch)`
-  and `console (dispatch)`, never production's statuses. A change to
+  runs the workflow without a new deployment; it reports `docs (dispatch)`,
+  `console (dispatch)` and `schemas (dispatch)`, never production's statuses. A change to
   `deployment-checks.yml` needs no dispatch: a `deployment_status` run uses
   the file as it is on the deployed commit, so the branch's own preview
   checks it.
 - **Holding production back on it:** in the project's Build & Deployment
-  settings, Deployment Checks, add the GitHub checks `docs (Production)` and
-  `console (Production)` and let them block. Vercel then assigns the
+  settings, Deployment Checks, add the GitHub checks `docs (Production)`,
+  `console (Production)` and `schemas (Production)` and let them block. Vercel then assigns the
   production domains only once the statuses pass, so a red deployment never
   replaces the one serving (Force
   Promote on the deployment's page bypasses it). Until then a red status
@@ -306,8 +348,9 @@ export VERCEL_AUTOMATION_BYPASS_SECRET="$(npx -y vercel@63.1.2 api "/v9/projects
 CLOUD_URL=https://cloud-….vercel.app pnpm check:cloud
 ```
 
-`--filter=@zitadel/docs` or `--filter=@zitadel/e2e` runs one suite; that is
-the command a red check's summary names. A new suite is a turbo task that
+`--filter=@zitadel/docs` runs the docs' suite, `--filter=@zitadel/e2e` the
+console's and the schemas'; a red check's summary names the command that runs
+its suite alone. A new suite is a turbo task that
 `check:cloud` lists, a job in `deployment-checks.yml` and a status in
 `production-checks.yml`'s `SUITES`.
 
@@ -345,6 +388,9 @@ not use:
   `moon run console:dev-real` and `moon run storybook:dev`. `NODE_ENV` is set
   because `vercel dev` runs dev commands under `development`, which makes
   `vite build` a development build.
+- The `schemas` service's `devCommand` renders the built-in schemas and serves
+  them (`--serve`): `vercel dev` wants a dev server for every service, a
+  static one too, and refuses to start without one.
 - The console's fallback to its `index.html` leaves `assets/` out. `vercel dev`
   cannot see a service's files, so a fallback for every path would answer the
   console's scripts with the page. A deployment answers a missing asset with a
@@ -360,9 +406,10 @@ Where it differs from a deployment:
   `/ui/console/claim?challenge_id=…` link arrives without its challenge; open
   `/console/claim?…` instead.
 - `CLOUD_URL=http://localhost:3000 pnpm check:cloud` runs the deployment
-  checks against it. Two fail by design: the redirect's query above, and the
+  checks against it. Three fail by design: the redirect's query above; the
   docs' assets, which `next dev` serves without the deployment's immutable
-  caching.
+  caching; and the schemas' headers, which `vercel dev` replaces with its own
+  (`application/json`, revalidated on every request).
 - Services is a beta of the Vercel CLI, and `vercel dev` changes from one
   major to the next. The script drives a `vercel` on `PATH` of the major it
   pins and otherwise runs the pinned version through npx; its first lines say

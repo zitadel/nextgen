@@ -411,6 +411,9 @@ func loadBuiltinSchemaBytes(relPath, canonicalSchemaURL string) ([]byte, error) 
 // when the public base is https://iam.example.com/schema).
 // canonicalDocumentURL must be the absolute schema URL used as JSON Schema $id and for resolution
 // (typically the request URL used to serve this document).
+//
+// The hosted cloud publishes the built-ins rendered the same way, by
+// scripts/render-builtin-schemas.mjs; a change here belongs there too.
 func WriteBuiltinJSONSchema(w io.Writer, schemaPath string, canonicalDocumentURL string) error {
 	raw, ok := builtinSchemas[schemaPath]
 	if !ok {
