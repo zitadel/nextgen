@@ -10,6 +10,7 @@ import (
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/idp"
+	"github.com/zitadel/nextgen/internal/instrumentation/ssoevent"
 )
 
 // FlowSSORedirectIssuer implements [domain.FlowSSORedirectIssuer] over the
@@ -46,16 +47,16 @@ func (i *FlowSSORedirectIssuer) Issue(ctx context.Context, in domain.FlowIssueSS
 	// engine's codes on the submit endpoint, where unavailable hides them.
 	conn, parseErr := idp.ParseConnection(connection.RevisionID, connection.Document)
 	if parseErr != nil {
-		return domain.FlowSSORedirectOutput{}, i.unavailable(ctx, in, parseErr)
+		return domain.FlowSSORedirectOutput{}, i.unavailable(ctx, in, parseErr, ssoevent.ReasonConnectionBroken)
 	}
 	// The client secret is not read here: the authorize request does not
 	// use it.
 	if resolveErr := resolveSSOClientID(ctx, i.variables, in.ProjectID, &conn); resolveErr != nil {
-		return domain.FlowSSORedirectOutput{}, i.unavailable(ctx, in, resolveErr)
+		return domain.FlowSSORedirectOutput{}, i.unavailable(ctx, in, resolveErr, ssoevent.ReasonConnectionBroken)
 	}
 	client, clientErr := idp.NewOIDCClient(ctx, conn, in.RedirectURI, i.httpClient)
 	if clientErr != nil {
-		return domain.FlowSSORedirectOutput{}, i.unavailable(ctx, in, clientErr)
+		return domain.FlowSSORedirectOutput{}, i.unavailable(ctx, in, clientErr, ssoevent.ReasonDiscoveryFailed)
 	}
 	var encrypter crypto.Encrypter
 	if conn.OIDC.PKCEEnabled {
@@ -85,6 +86,7 @@ func (i *FlowSSORedirectIssuer) Issue(ctx context.Context, in domain.FlowIssueSS
 	if err != nil {
 		return domain.FlowSSORedirectOutput{}, err
 	}
+	ssoevent.Emit(ctx, ssoevent.Event{Slug: in.ProviderSlug, FlowID: in.AttemptID, Phase: ssoevent.PhaseCeremonyStarted})
 	return domain.FlowSSORedirectOutput{RedirectURL: redirect.URL, BindingNonce: state.BindingNonce}, nil
 }
 
@@ -123,7 +125,7 @@ func resolveSSOClientID(ctx context.Context, variables VariableService, projectI
 // internal error is a bug in this process, not the provider, and stays
 // internal; it is wrapped rather than passed so the error analysis does not
 // put the engine's codes on the submit endpoint.
-func (i *FlowSSORedirectIssuer) unavailable(ctx context.Context, in domain.FlowIssueSSORedirectInput, err error) error {
+func (i *FlowSSORedirectIssuer) unavailable(ctx context.Context, in domain.FlowIssueSSORedirectInput, err error, reason ssoevent.Reason) error {
 	if errors.Is(err, domain.ErrInternal(nil)) {
 		return domain.ErrInternal(err)
 	}
@@ -131,6 +133,7 @@ func (i *FlowSSORedirectIssuer) unavailable(ctx context.Context, in domain.FlowI
 	// provider's fault, and the client is gone, so no warning. A deadline is
 	// still logged.
 	if !errors.Is(ctx.Err(), context.Canceled) {
+		ssoevent.Emit(ctx, ssoevent.Event{Slug: in.ProviderSlug, FlowID: in.AttemptID, Phase: ssoevent.PhaseCeremonyStarted, Reason: reason})
 		getLoggingContext(ctx, "flow").Warn("sso provider unavailable",
 			slog.String("project_id", in.ProjectID),
 			slog.String("slug", in.ProviderSlug),

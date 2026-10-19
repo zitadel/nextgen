@@ -1,8 +1,10 @@
 package domain_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"maps"
 	"strings"
 	"testing"
@@ -17,6 +19,7 @@ import (
 	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 	"github.com/zitadel/nextgen/internal/domain"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 )
 
 func containsFieldName(fields []domain.FlowField, name string) bool {
@@ -7114,6 +7117,97 @@ func TestFlowStateMachine_Process_SSOCollectionRefusedSubmit(t *testing.T) {
 
 			_, err := w.sm.Process(t.Context(), def, state, in)
 			require.ErrorIs(t, err, tc.wantErr)
+		})
+	}
+}
+
+// Each way a parked identity is settled leaves its event: the resolution, and
+// for a new user the creation, carrying the connection's slug and the attempt.
+func TestFlowStateMachine_Render_SSOEmitsResolutionEvents(t *testing.T) {
+	t.Parallel()
+	type event struct{ phase, status, result, reason, side string }
+	claims, verified := completeClaims()
+	tests := []struct {
+		name   string
+		parked *domain.FlowSSOParkedIdentity
+		expect func(w *flowTestWorld)
+		want   []event
+	}{
+		{
+			name: "a linked identity is bound",
+			parked: func() *domain.FlowSSOParkedIdentity {
+				p := linkedParked()
+				p.ProviderSlug = "google"
+				return p
+			}(),
+			expect: func(w *flowTestWorld) {
+				w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Return(nil)
+				w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).
+					Return(domain.FlowHandoffOutput{Token: "handoff-1", ExpiresAt: time.Unix(1700000060, 0).UTC()}, nil)
+			},
+			want: []event{{"resolved", "ok", "linked", "", ""}},
+		},
+		{
+			name:   "a connection that disallows creation is the journey's",
+			parked: &domain.FlowSSOParkedIdentity{CheckID: "ch-1", ConnectionID: "idp-1", ProviderSlug: "google", Subject: "sub-1", CreationDisabled: true},
+			want:   []event{{"resolved", "failed", "", "creation_disabled", "journey"}},
+		},
+		{
+			name: "complete claims create a user",
+			parked: func() *domain.FlowSSOParkedIdentity {
+				p := unlinkedParked(claims, verified)
+				p.ProviderSlug = "google"
+				return p
+			}(),
+			expect: func(w *flowTestWorld) {
+				w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(3)
+				w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Return("user-new", nil)
+				w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).
+					Return(domain.FlowHandoffOutput{Token: "handoff-1", ExpiresAt: time.Unix(1700000060, 0).UTC()}, nil)
+			},
+			want: []event{{"user_created", "ok", "", "", ""}, {"resolved", "ok", "created", "", ""}},
+		},
+		{
+			name: "incomplete claims go to the collection step",
+			parked: func() *domain.FlowSSOParkedIdentity {
+				p := unlinkedParked(map[string]any{"email": "alice@example.com"}, nil)
+				p.ProviderSlug = "google"
+				return p
+			}(),
+			expect: func(w *flowTestWorld) { w.expectOwner("email", "alice@example.com", "") },
+			want:   []event{{"resolved", "ok", "collect", "", ""}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var logs bytes.Buffer
+			ctx := zlog.WithLoggingContext(t.Context(), slog.New(slog.NewJSONHandler(&logs, nil)))
+			w, def, state := ssoRenderWorld(t)
+			def.Steps[0].Transitions[domain.FlowImplicitOutcomeSSOAuthenticated] = domain.FlowStepTransition{Target: "done"}
+			w.expectParked(tt.parked, nil)
+			if tt.expect != nil {
+				tt.expect(w)
+			}
+
+			_, err := w.sm.Render(ctx, def, state)
+			require.NoError(t, err)
+
+			var got []event
+			for _, line := range bytes.Split(bytes.TrimSpace(logs.Bytes()), []byte("\n")) {
+				var record map[string]any
+				if len(line) == 0 || json.Unmarshal(line, &record) != nil || record["msg"] != "sso attempt" {
+					continue
+				}
+				assert.Equal(t, "google", record["slug"])
+				assert.Equal(t, "att-1", record["flow_id"])
+				e := event{phase: record["phase"].(string), status: record["status"].(string)}
+				e.result, _ = record["result"].(string)
+				e.reason, _ = record["reason"].(string)
+				e.side, _ = record["side"].(string)
+				got = append(got, e)
+			}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

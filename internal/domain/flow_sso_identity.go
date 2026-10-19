@@ -73,6 +73,9 @@ type FlowSSOParkedIdentity struct {
 	ErrorKey string
 	// ConnectionID is the connection's stable id, never the revision id.
 	ConnectionID string
+	// ProviderSlug is the connection's slug, which the sso attempt events
+	// carry.
+	ProviderSlug string
 	Subject      string
 	// Claims are keyed by user-schema property.
 	Claims map[string]any

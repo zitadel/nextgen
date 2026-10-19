@@ -1,0 +1,8 @@
+---
+"@zitadel/cli": minor
+"@zitadel/server": patch
+---
+
+Add `zitadel test sign-in --provider <slug>`, which checks that a sign-in provider is set up correctly before anyone signs in. It reads the provider's discovery document and checks the issuer, the scopes and the claims the connection asks for, asks the provider whether it accepts the client and the callback URI, and, when the client secret is piped in with `--client-secret-stdin`, whether it accepts the secret. These checks make plain HTTP requests and need no browser. Each prints as it finishes and ends in `pass`, `warn`, `fail` or `skipped`; a check that cannot tell is `skipped`, never a pass, and a failure exits with `E_VALIDATION` and the one thing to do about it. The provider answers are known for Google today; any other provider runs the discovery checks only.
+
+`--live` adds a real sign-in: it opens the login page, waits for you to sign in, and reports from the runtime's log which phase failed and on which side, provider or journey. It is off by default. To support it the server now logs one event for each phase of a social sign-in, with the connection, the flow and the phase, and on failure a reason and the side that failed. The events never carry authorization codes, tokens, secrets or claim values.
