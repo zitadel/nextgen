@@ -1,5 +1,5 @@
 -- +goose Up
--- See the postgres peer (000029_drop_resource_scope_kind_project_index.sql).
+-- See the postgres peer (000034_drop_resource_scope_kind_project_index.sql).
 -- SQLite backs the composite primary key with its own unique index on
 -- (resource_kind, project_id, resource_id), which serves the same lookups.
 -- +goose StatementBegin

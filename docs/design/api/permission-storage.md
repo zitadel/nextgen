@@ -199,7 +199,7 @@ CREATE INDEX idx_resource_scope_index_resource
 
 The primary key serves lookups by kind and project. A separate
 `(resource_kind, project_id)` index repeated its leading columns and was
-dropped (Postgres migration 000029).
+dropped (Postgres migration 000034).
 
 **Dual-write contract:** every globally addressable create/update/delete
 (project, team, user, schema, branding, flow_definition, session, …) updates
