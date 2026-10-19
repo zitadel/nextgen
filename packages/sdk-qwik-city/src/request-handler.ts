@@ -340,17 +340,11 @@ export function createNextgenOnRequest(
   return async (ev: QwikRequestEvent): Promise<void> => {
     const { pathname } = ev.url;
 
-    // Strip any client-supplied x-nextgen-auth-token so downstream server code
-    // cannot read an attacker-controlled value; getAuth() is canonical.
-    // If the adapter's headers are immutable the value cannot be removed, so
-    // refuse the request rather than let it reach downstream handlers.
-    try {
-      ev.request.headers.delete("x-nextgen-auth-token");
-    } catch {
-      if (ev.request.headers.has("x-nextgen-auth-token")) {
-        ev.send(new Response("Bad Request", { status: 400 }));
-        return;
-      }
+    // Clients never send x-nextgen-auth-token: it is an internal channel. Refuse any
+    // request that carries it, on every route, before anything else runs.
+    if (ev.request.headers.has("x-nextgen-auth-token")) {
+      ev.send(new Response("Bad Request", { status: 400 }));
+      return;
     }
 
     // Resolve the backend URL and project secret per request. Precedence:

@@ -188,5 +188,6 @@ Both surfaces take these options: the module under `nextgen` in
 
 The verification pipeline is shared across SDKs and documented once in
 [`@zitadel/sdk-core`](https://github.com/zitadel/nextgen/tree/main/packages/sdk-core#how-jwt-verification-works).
-On top of it, the Nitro middleware strips the `x-nextgen-auth-token` header
-from all proxied requests to prevent internal state leakage.
+On top of it, the Nitro middleware refuses with a 400 any request that carries
+an `x-nextgen-auth-token` header: that header is an internal channel, so a
+client never sends it.
