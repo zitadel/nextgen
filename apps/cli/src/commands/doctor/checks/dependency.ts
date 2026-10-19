@@ -1,8 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { loadPatchContext } from "../patch-context";
-import { resolveArtifacts } from "./managed-files";
+import { ManagedFilesCheck, resolveArtifacts } from "./managed-files";
 import { AbstractSanityCheck, type CheckContext } from "./types";
 
 /**
@@ -42,22 +41,16 @@ export class DependencyCheck extends AbstractSanityCheck {
   }
 
   /**
-   * Repairs by re-applying the patcher's managed artifacts: rebuilds the
-   * `PatchContext` from disk and calls `patcher.repair`, which re-adds the
-   * SDK dependencies via their `add-dep` ops. The exact package names are
-   * framework + renderer specific and known only to the patcher (which
-   * deliberately hides its file-op plan behind the family-neutral `Patcher`
-   * interface), so going through `repair` is the only sanctioned path.
-   * Missing-only: the repair restores absent managed files as a side effect
-   * but never overwrites an existing one, edited or not.
+   * Repairs through the managed-files repair, which re-applies the patcher's
+   * managed artifacts: its `add-dep` ops re-add the SDK dependencies. The exact
+   * package names are framework + renderer specific and known only to the
+   * patcher (which deliberately hides its file-op plan behind the
+   * family-neutral `Patcher` interface), so going through `repair` is the only
+   * sanctioned path. Delegating to the managed-files check keeps its boundary
+   * handling: a restored Next 16 `proxy.ts` is never created beside an edited
+   * `middleware.ts`, however the repair was started.
    */
   override async fix(ctx: CheckContext): Promise<void> {
-    const patchCtx = await loadPatchContext(ctx.cwd, ctx.orca, ctx.cliVersion);
-    await ctx.orca.patcherFor(patchCtx.framework.id).repair(patchCtx, {
-      cwd: ctx.cwd,
-      dryRun: ctx.dryRun,
-      force: false,
-      missingOnly: true,
-    });
+    await new ManagedFilesCheck().fix(ctx);
   }
 }

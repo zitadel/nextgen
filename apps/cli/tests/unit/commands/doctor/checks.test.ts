@@ -517,6 +517,31 @@ describe("DependencyCheck", () => {
     expect((await check.run(ctxFor(cwd))).status).toBe("pass");
   });
 
+  it("fix does not create proxy.ts beside an edited middleware.ts when the SDK is missing", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { next: "^16" },
+        devDependencies: { "@zitadel/cli": "0.1.0-alpha.0" },
+      }),
+    );
+    const editedMiddleware = `${MANAGED_MARKER}\nexport function middleware() { /* custom */ }\n`;
+    await writeFile(join(cwd, "middleware.ts"), editedMiddleware);
+    await writeScaffoldState(cwd, {
+      files: { "middleware.ts": { hash: "0".repeat(64), class: "infrastructure" } },
+    });
+
+    await new DependencyCheck().fix(ctxFor(cwd));
+
+    expect(await readFile(join(cwd, "package.json"), "utf8")).toContain("@zitadel/sdk-next");
+    expect(await readFile(join(cwd, "middleware.ts"), "utf8")).toBe(editedMiddleware);
+    await expect(readFile(join(cwd, "proxy.ts"), "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+  });
+
   it("fix reclaims proxy.ts for Next 16 projects", async () => {
     const cwd = await makeProject();
     await writeFile(
