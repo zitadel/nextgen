@@ -82,6 +82,8 @@ export interface ProviderProbes {
 }
 
 export type IdpContext = {
+  /** Every endpoint the connection names itself, by field, so each can be checked as the server does. */
+  readonly configuredEndpoints?: Readonly<Record<string, string>>;
   /** Endpoints the connection should name but does not: it names some, and the server refuses a partial set. */
   readonly missingEndpoints?: readonly string[];
   /** Whether the connection reads claims from the ID token, so needs no userinfo endpoint. */

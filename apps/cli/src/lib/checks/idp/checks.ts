@@ -33,6 +33,19 @@ export class DiscoveryReachableCheck extends Check<IdpContext> {
         recovery: `Name every endpoint in oidc in .zitadel/idps/${context.slug}.json, or none and let the issuer's discovery document supply them`,
       };
     }
+    const unusable =
+      found.ok && found.source === "connection"
+        ? Object.entries(context.configuredEndpoints ?? {}).flatMap(([name, value]) =>
+            ENDPOINT.test(value) ? [] : [name],
+          )
+        : [];
+    if (unusable.length > 0) {
+      return {
+        status: "fail",
+        message: `The connection's ${unusable.join(", ")} is not an https endpoint`,
+        recovery: `Use an https URL (or http on localhost) for ${unusable.map((name) => `oidc.${name}`).join(", ")} in .zitadel/idps/${context.slug}.json`,
+      };
+    }
     if (found.ok && found.source === "connection") {
       return { status: "pass", message: "Using the endpoints written in the connection" };
     }

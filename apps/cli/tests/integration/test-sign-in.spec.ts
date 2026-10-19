@@ -115,6 +115,20 @@ describe("test sign-in", () => {
         expect(result).toHintAt("Name every endpoint");
       });
 
+      it("fails a connection whose own endpoint is not https", async () => {
+        const app = await anAppWithTwoProviders();
+        await app.editOidc(ACME.slug, {
+          authorization_endpoint: "https://sso.acme.example/authorize",
+          token_endpoint: "http://sso.acme.example/token",
+          jwks_uri: "https://sso.acme.example/jwks",
+          userinfo_endpoint: "https://sso.acme.example/userinfo",
+        });
+
+        const result = await app.run(["test", "sign-in", "--provider", ACME.slug, "--json"]);
+
+        expect(result).toHintAt("oidc.token_endpoint");
+      });
+
       it("fails when the provider does not know the client", async () => {
         const app = await aSetUpApp();
         await app.enableSso("google", CREDENTIALS);
