@@ -196,7 +196,10 @@ export default class TestSignIn extends BaseCommand {
                 open: async (url) => {
                   await openInBrowser(url);
                 },
-                say: (message) => consola.log(message),
+                // Under --json consola is silent, so the login URL a person has to open would reach
+                // nobody; stderr keeps stdout clean for the envelope and still shows it.
+                say: (message) =>
+                  this.jsonEnabled() ? process.stderr.write(`${message}\n`) : consola.log(message),
                 watch: (signal) =>
                   watchSignInEvents(
                     async () => (await server.logs({ tail: LOG_TAIL })).logs,
