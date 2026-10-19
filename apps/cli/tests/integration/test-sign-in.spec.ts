@@ -153,6 +153,17 @@ describe("test sign-in", () => {
         expect(result).toExplain("acme-sso");
       });
 
+      it("refuses a connection file whose slug could carry a second command", async () => {
+        const app = await anAppWithTwoProviders();
+        await app.editConnection(ACME.slug, (connection) => {
+          connection.slug = "acme; printf INJECTED";
+        });
+
+        const result = await app.run(["test", "sign-in", "--json"]);
+
+        expect(result).toHintAt("slug");
+      });
+
       it("fails a connection that names a token endpoint and nothing else", async () => {
         const app = await anAppWithTwoProviders();
         await app.editOidc(ACME.slug, { token_endpoint: `${ACME.issuer}/token` });
