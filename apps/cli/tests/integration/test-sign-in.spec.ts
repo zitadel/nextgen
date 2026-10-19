@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { useLocalServers } from "../helpers/local-server";
 import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp } from "../helpers/project";
+import { aSetUpApp, type CustomConnection } from "../helpers/project";
 
 const platform = usePlatformMock();
 useLocalServers();
@@ -12,6 +12,21 @@ const CREDENTIALS = {
   secret: "the-client-secret",
 };
 const CALLBACK_URI = "/__nextgen/idp/google/callback";
+const ACME: CustomConnection = {
+  slug: "acme-sso",
+  displayName: "Acme SSO",
+  issuer: "https://sso.acme.example",
+};
+const ACME_CREDENTIALS = { clientId: "acme-client-id", secret: "acme-client-secret" };
+
+/** A project with two providers, both served by the mock. */
+async function anAppWithTwoProviders() {
+  const app = await aSetUpApp();
+  await app.enableSso("google", CREDENTIALS);
+  await app.enableCustomSso(ACME, ACME_CREDENTIALS);
+  platform.hasOidcProvider(ACME.issuer);
+  return app;
+}
 
 describe("test sign-in", () => {
   describe("against an invalid server", () => {
@@ -57,15 +72,7 @@ describe("test sign-in", () => {
         await app.enableSso("google", CREDENTIALS);
         platform.hasGoogle();
 
-        const result = await app.run([
-          "test",
-          "sign-in",
-          "--provider",
-          "google",
-          "--client-secret",
-          CREDENTIALS.secret,
-          "--json",
-        ]);
+        const result = await app.testSignInWithSecret(CREDENTIALS.secret, ["--provider", "google"]);
 
         expect(result).toSucceed();
       });
@@ -105,15 +112,7 @@ describe("test sign-in", () => {
         await app.enableSso("google", CREDENTIALS);
         platform.hasGoogle({ secret: "wrong" });
 
-        const result = await app.run([
-          "test",
-          "sign-in",
-          "--provider",
-          "google",
-          "--client-secret",
-          "not-the-secret",
-          "--json",
-        ]);
+        const result = await app.testSignInWithSecret("not-the-secret", ["--provider", "google"]);
 
         expect(result).toFailWith("E_VALIDATION");
       });
@@ -203,6 +202,63 @@ describe("test sign-in", () => {
       });
     });
 
+    describe("with several providers", () => {
+      it("checks every provider the project has", async () => {
+        const app = await anAppWithTwoProviders();
+        platform.hasGoogle();
+
+        const result = await app.run(["test", "sign-in", "--json"]);
+
+        expect(result).toSucceed();
+      });
+
+      it("fails when one of them fails, and names it", async () => {
+        const app = await anAppWithTwoProviders();
+        platform.hasGoogle({ callbackUri: "unregistered" });
+
+        const result = await app.run(["test", "sign-in", "--json"]);
+
+        expect(result).toExplain("google");
+      });
+
+      it("checks only the one named", async () => {
+        const app = await anAppWithTwoProviders();
+
+        const result = await app.run(["test", "sign-in", "--provider", ACME.slug]);
+
+        expect(result.stdout).not.toContain("accounts.google.com");
+      });
+
+      it("refuses a client secret, which belongs to one provider, without a name", async () => {
+        const app = await anAppWithTwoProviders();
+
+        const result = await app.testSignInWithSecret(CREDENTIALS.secret);
+
+        expect(result).toHintAt("--provider");
+      });
+
+      it("refuses a live sign-in, which is one provider's, without a name", async () => {
+        const app = await anAppWithTwoProviders();
+        await app.startLocalServer();
+
+        const result = await app.run(["test", "sign-in", "--live", "--json"]);
+
+        expect(result).toHintAt("--provider");
+      });
+
+      it("shows each provider under its own heading", async () => {
+        const app = await anAppWithTwoProviders();
+        platform.hasGoogle();
+
+        const result = await app.run(["test", "sign-in"]);
+
+        expect([result.stdout.includes("acme-sso"), result.stdout.includes("google")]).toEqual([
+          true,
+          true,
+        ]);
+      });
+    });
+
     describe("rendered for a terminal", () => {
       it("prints each check as it ran", async () => {
         const app = await aSetUpApp();
@@ -212,6 +268,16 @@ describe("test sign-in", () => {
         const result = await app.run(["test", "sign-in", "--provider", "google"]);
 
         expect(result).toPrint("Discovery document");
+      });
+
+      it("shows what the provider reported without letting it drive the terminal", async () => {
+        const app = await aSetUpApp();
+        await app.enableSso("google", CREDENTIALS);
+        platform.hasGoogle({ issuer: "https://evil.example\u001b]0;pwned\u0007" });
+
+        const result = await app.run(["test", "sign-in", "--provider", "google"]);
+
+        expect(result.stdout).not.toContain("\u001b]0;");
       });
 
       it("says the client secret was not checked when none was supplied", async () => {

@@ -172,14 +172,19 @@ export class AuthorizeProbeCheck extends DiscoveryCheck {
     if (context.probes === undefined || document.authorization_endpoint === undefined) {
       return { status: "skipped", message: "No probe exists for this provider" };
     }
-    const query = new URLSearchParams({
+    // The endpoint may already carry a query (prompt=consent, say), so the probe's
+    // parameters join it instead of opening a second one.
+    const url = new URL(document.authorization_endpoint);
+    for (const [name, value] of Object.entries({
       client_id: context.clientId,
       redirect_uri: context.callbackUri,
       response_type: "code",
       scope: context.scopes.join(" "),
       state: "zitadel-check",
-    });
-    const response = await context.request(`${document.authorization_endpoint}?${query}`);
+    })) {
+      url.searchParams.set(name, value);
+    }
+    const response = await context.request(url.toString());
     return outcomeOf(
       context.probes.authorize(response),
       context,

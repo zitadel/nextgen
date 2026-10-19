@@ -14,11 +14,13 @@
 // token, a secret, a claim value or a query string has no field to travel in,
 // and the provider's own error text never reaches an event.
 //
-// A sign-in is complete at the first of these: a [PhaseResolved] success whose
-// result is [ResultLinked], or a [PhaseUserCreated] success. Neither
-// [ResultCollect] nor [ResultExistingUser] is an end: the user still fills the
-// collection step, which ends in [PhaseUserCreated], or proves they own the
-// account the identity was bound to, which no event reports.
+// A sign-in is complete at a [PhaseHandedOff] success, which follows the
+// handoff itself: resolving the identity or creating its user can still be
+// followed by a failure to hand the attempt off, and that is reported as a
+// [PhaseHandedOff] failure. Neither [ResultCollect] nor [ResultExistingUser] is
+// an end: the user still fills the collection step, or proves they own the
+// account the identity was bound to, and no event reports the end of the
+// second.
 package ssoevent
 
 import (
@@ -47,6 +49,9 @@ const (
 	PhaseResolved Phase = "resolved"
 	// PhaseUserCreated is the user and its identity link being created.
 	PhaseUserCreated Phase = "user_created"
+	// PhaseHandedOff is the attempt being handed off to the application, which
+	// is the sign-in completing.
+	PhaseHandedOff Phase = "handed_off"
 )
 
 // Result is what a [PhaseResolved] success settled on.
@@ -98,6 +103,7 @@ const (
 	ReasonUnroutable       Reason = "unroutable"
 	ReasonUserInvalid      Reason = "user_invalid"
 	ReasonOtherSchema      Reason = "other_schema"
+	ReasonHandoffFailed    Reason = "handoff_failed"
 	ReasonInternal         Reason = "internal"
 )
 

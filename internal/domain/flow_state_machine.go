@@ -475,7 +475,7 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		if state.CollectedData.UserID != "" {
 			return FlowStepResult{}, false, nil
 		}
-		pc := &processCtx{ctx: ctx, def: def, state: state, currentStep: currentStep}
+		pc := &processCtx{ctx: ctx, def: def, state: state, currentStep: currentStep, ssoSlug: parked.ProviderSlug}
 		resolvedFields, err := r.resolveInputs(pc)
 		if err != nil {
 			return FlowStepResult{}, false, err
@@ -508,7 +508,7 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		default:
 			return FlowStepResult{}, false, ErrFlowRestartRequired()
 		}
-		pc := &processCtx{ctx: ctx, def: def, state: state, currentStep: currentStep}
+		pc := &processCtx{ctx: ctx, def: def, state: state, currentStep: currentStep, ssoSlug: parked.ProviderSlug}
 		resolvedFields, err := r.resolveInputs(pc)
 		if err != nil {
 			return FlowStepResult{}, false, err
@@ -531,7 +531,7 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 		return FlowStepResult{}, false, nil
 	}
 
-	pc := &processCtx{ctx: ctx, def: def, state: state, currentStep: currentStep}
+	pc := &processCtx{ctx: ctx, def: def, state: state, currentStep: currentStep, ssoSlug: parked.ProviderSlug}
 	resolvedFields, err := r.resolveInputs(pc)
 	if err != nil {
 		return FlowStepResult{}, false, err
@@ -1034,6 +1034,9 @@ type processCtx struct {
 	state       *FlowState
 	currentStep *FlowDefinitionStep
 	in          FlowSubmitInput
+	// ssoSlug is the connection of the sign-in this request settles; empty
+	// outside one, so the handoff reports itself only for a sign-in.
+	ssoSlug string
 }
 
 // Process advances the flow one step by dispatching the submission to
@@ -1462,6 +1465,7 @@ func (r *FlowStateMachineRuntime) processSSOCollection(pc *processCtx, resolved 
 	if collected == nil {
 		return r.resolveStaleSSOSubmit(pc, resolved, loadInput)
 	}
+	pc.ssoSlug = collected.ProviderSlug
 	schema, err := r.schemas.Resolve(pc.ctx, r.schemaStore, state.ProjectID, state.UserSchemaURL, nil)
 	if err != nil {
 		return FlowStepResult{}, fmt.Errorf("flow state machine: load user schema for sso identity: %w", err)
@@ -2306,7 +2310,14 @@ func (r *FlowStateMachineRuntime) terminate(pc *processCtx, step *FlowDefinition
 		AttemptID: pc.state.AuthAttemptID,
 	})
 	if err != nil {
+		// A concurrent request won the handoff and reports it itself.
+		if pc.ssoSlug != "" && !errors.Is(err, ErrAuthAttemptAlreadyHandedOff()) {
+			emitSSOEvent(pc.ctx, pc.state, pc.ssoSlug, ssoevent.PhaseHandedOff, "", ssoevent.ReasonHandoffFailed)
+		}
 		return FlowStepResult{}, fmt.Errorf("flow state machine: handoff: %w", err)
+	}
+	if pc.ssoSlug != "" {
+		emitSSOEvent(pc.ctx, pc.state, pc.ssoSlug, ssoevent.PhaseHandedOff, "", "")
 	}
 	return FlowStepResult{
 		State:                 pc.state,

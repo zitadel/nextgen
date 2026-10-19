@@ -2881,20 +2881,19 @@ Check that a sign-in provider is set up correctly.
 ```
 USAGE
   $ zitadel test sign-in [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [--provider <value>] [--client-secret <value>] [--client-secret-stdin] [--live] [--timeout <value>]
+    [--telemetry] [--provider <value>] [--client-secret-stdin] [--live] [--timeout <value>]
 
 FLAGS
   -c, --cwd=<value>            Project directory to operate on.
   -n, --non-interactive        Disable prompts. Required when scripting or running as an agent.
   -s, --server=<value>         Override the resolved server URL.
   -v, --verbose                Verbose logging.
-      --client-secret=<value>  The provider's client secret, to check it. Prefer --client-secret-stdin.
       --client-secret-stdin    Read the provider's client secret, to check it, from stdin.
       --[no-]color             Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug                  Debug logging.
       --dry-run                Preview without mutating files or the platform.
       --live                   After the checks, sign in through a browser and watch the runtime's log. Off by default.
-      --provider=<value>       Connection to check. Defaults to the Project's only connection.
+      --provider=<value>       Connection to check. Defaults to every connection the Project has.
       --[no-]telemetry         Send anonymous usage analytics. Disable with --no-telemetry.
       --timeout=<value>        [default: 300] Seconds to wait for the browser sign-in.
 

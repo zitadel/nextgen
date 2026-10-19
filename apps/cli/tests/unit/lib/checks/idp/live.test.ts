@@ -96,40 +96,68 @@ describe("LiveSignInCheck", () => {
   });
 
   it("is not blocked by an earlier check that could only skip", async () => {
-    const { outcome } = run(
-      [event({ phase: "resolved", result: "linked" })],
-      [{ ...PASSED, status: "skipped" }],
-    );
+    const { outcome } = run([event({ phase: "handed_off" })], [{ ...PASSED, status: "skipped" }]);
 
     expect((await outcome).status).toBe("pass");
   });
 
   it("prints the login URL and opens it", async () => {
-    const { outcome, said, opened } = run([event({ phase: "resolved", result: "linked" })]);
+    const { outcome, said, opened } = run([event({ phase: "handed_off" })]);
     await outcome;
 
     expect(opened).toEqual([LOGIN_URL]);
     expect(said[0]).toContain(LOGIN_URL);
   });
 
-  it.each([
-    ["a known identity bound to its user", event({ phase: "resolved", result: "linked" })],
-    ["a user created for the identity", event({ phase: "user_created" })],
-  ])("passes on %s", async (_name, last) => {
+  it("passes once the attempt has been handed over to the app", async () => {
     const { outcome } = run([
       event({ phase: "ceremony_started" }),
       event({ phase: "callback_received" }),
       event({ phase: "exchange_finished" }),
-      last,
+      event({ phase: "resolved", result: "linked" }),
+      event({ phase: "handed_off" }),
     ]);
 
     expect(await outcome).toEqual({ status: "pass", message: "sign-in completed with acme" });
+  });
+
+  it.each([
+    ["the identity is bound to its user", event({ phase: "resolved", result: "linked" })],
+    ["a user is created for the identity", event({ phase: "user_created" })],
+  ])(
+    "does not call the sign-in complete when %s but the handoff has not happened",
+    async (_name, last) => {
+      const { outcome } = run([event({ phase: "callback_received" }), last]);
+
+      expect(await outcome).toMatchObject({
+        status: "fail",
+        message: expect.stringContaining("did not finish"),
+      });
+    },
+  );
+
+  it("fails a handoff that did not happen, as the journey's", async () => {
+    const { outcome } = run([
+      event({ phase: "resolved", result: "linked" }),
+      event({
+        phase: "handed_off",
+        status: "failed",
+        reason: "handoff_failed",
+        side: "journey",
+      }),
+    ]);
+
+    expect(await outcome).toMatchObject({
+      status: "fail",
+      message: expect.stringContaining("journey side"),
+    });
   });
 
   it("keeps waiting after the collection step is asked for, and passes once the user is created", async () => {
     const { outcome } = run([
       event({ phase: "resolved", result: "collect" }),
       event({ phase: "user_created" }),
+      event({ phase: "handed_off" }),
     ]);
 
     expect((await outcome).status).toBe("pass");
@@ -180,8 +208,8 @@ describe("LiveSignInCheck", () => {
     const { outcome, said } = run([
       event({ flowId: "att_1", phase: "ceremony_started" }),
       event({ flowId: "att_2", phase: "ceremony_started" }),
-      event({ flowId: "att_2", phase: "resolved", result: "linked" }),
-      event({ flowId: "att_1", phase: "resolved", result: "linked" }),
+      event({ flowId: "att_2", phase: "handed_off" }),
+      event({ flowId: "att_1", phase: "handed_off" }),
     ]);
 
     expect((await outcome).status).toBe("pass");
@@ -217,7 +245,7 @@ describe("LiveSignInCheck", () => {
         reason: "internal",
         side: "journey",
       }),
-      event({ phase: "resolved", result: "linked" }),
+      event({ phase: "handed_off" }),
     ]);
 
     expect((await outcome).status).toBe("pass");
@@ -245,7 +273,7 @@ describe("LiveSignInCheck", () => {
 
   it("stops watching and waiting when it finishes", async () => {
     const aborted: boolean[] = [];
-    const base = aRuntime([event({ phase: "resolved", result: "linked" })]).live;
+    const base = aRuntime([event({ phase: "handed_off" })]).live;
     const live: LiveSignIn = {
       ...base,
       watch: async (signal) => {
@@ -273,7 +301,7 @@ describe("LiveSignInCheck", () => {
 
   it("opens the browser only once the log it compares against has been read", async () => {
     const steps: string[] = [];
-    const base = aRuntime([event({ phase: "resolved", result: "linked" })]).live;
+    const base = aRuntime([event({ phase: "handed_off" })]).live;
     const live: LiveSignIn = {
       ...base,
       open: async () => {
@@ -301,7 +329,7 @@ describe("LiveSignInCheck", () => {
         side: "journey",
       }),
       event({ phase: "callback_received" }),
-      event({ phase: "resolved", result: "linked" }),
+      event({ phase: "handed_off" }),
     ]);
 
     expect(await outcome).toMatchObject({ status: "pass" });
