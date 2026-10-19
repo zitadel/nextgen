@@ -124,6 +124,15 @@ describe("test sign-in", () => {
         expect(result).toSucceed();
       });
 
+      it("fails scopes written as something other than a list of strings", async () => {
+        const app = await anAppWithTwoProviders();
+        await app.editOidc(ACME.slug, { scopes: ["openid", 42] });
+
+        const result = await app.run(["test", "sign-in", "--provider", ACME.slug, "--json"]);
+
+        expect(result).toHintAt("Add openid");
+      });
+
       it("fails a connection that names a token endpoint and nothing else", async () => {
         const app = await anAppWithTwoProviders();
         await app.editOidc(ACME.slug, { token_endpoint: `${ACME.issuer}/token` });
