@@ -465,9 +465,9 @@ describe("DependencyCheck", () => {
       "@zitadel/sdk-solid-start, @zitadel/sdk-solid",
     ],
     [
-      "qwik-city",
+      "qwik-router",
       { "@qwik.dev/core": "^2.0.0-beta.45", "@qwik.dev/router": "^2.0.0-beta.45" },
-      "@zitadel/sdk-qwik-city, @zitadel/sdk-qwik",
+      "@zitadel/sdk-qwik-router, @zitadel/sdk-qwik",
     ],
   ])("requires the %s SDK package, not just the CLI", async (_framework, dependencies, missing) => {
     const cwd = await makeProject();

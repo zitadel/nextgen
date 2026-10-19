@@ -4,13 +4,13 @@ import type {
   FileOp,
   ScaffoldPlan,
 } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
-import { QwikCityPatcher } from "../../../../../../../src/lib/orca/patchers/rule/qwik-city";
+import { QwikRouterPatcher } from "../../../../../../../src/lib/orca/patchers/rule/qwik-router";
 import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
 
 function ctx(appDir = "src"): PatchContext {
   return {
-    framework: { id: "qwik-city", appDir, devPort: 5173, url: "http://localhost:5173" },
+    framework: { id: "qwik-router", appDir, devPort: 5173, url: "http://localhost:5173" },
     rendererId: "qwik",
     project: {
       id: "proj-1",
@@ -33,13 +33,13 @@ function writeContents(plan: ScaffoldPlan, path: string): string | undefined {
   return op?.contents;
 }
 
-describe("QwikCityPatcher.plan", () => {
+describe("QwikRouterPatcher.plan", () => {
   it("writes the onRequest plugin and file-based routes under src/", () => {
-    const plan = new QwikCityPatcher().plan(ctx());
+    const plan = new QwikRouterPatcher().plan(ctx());
 
     expect(writeContents(plan, "src/routes/plugin@nextgen.ts")).toContain(MANAGED_MARKER);
     expect(writeContents(plan, "src/routes/plugin@nextgen.ts")).toContain(
-      "@zitadel/sdk-qwik-city/server",
+      "@zitadel/sdk-qwik-router/server",
     );
     expect(writeContents(plan, "src/routes/plugin@nextgen.ts")).toContain("createNextgenOnRequest");
 
@@ -60,7 +60,7 @@ describe("QwikCityPatcher.plan", () => {
     "src/routes/register/index.tsx",
     "src/routes/profile/index.tsx",
   ])("imports %s's component$ from Qwik 2's @qwik.dev/core", (path) => {
-    expect(writeContents(new QwikCityPatcher().plan(ctx()), path)).toContain(
+    expect(writeContents(new QwikRouterPatcher().plan(ctx()), path)).toContain(
       'import { component$ } from "@qwik.dev/core";',
     );
   });
@@ -72,11 +72,11 @@ describe("QwikCityPatcher.plan", () => {
     "src/routes/register/index.tsx",
     "src/routes/profile/index.tsx",
   ])("references no Qwik 1 @builder.io package in %s", (path) => {
-    expect(writeContents(new QwikCityPatcher().plan(ctx()), path)).not.toContain("@builder.io");
+    expect(writeContents(new QwikRouterPatcher().plan(ctx()), path)).not.toContain("@builder.io");
   });
 
   it("seeds the public project id and edits no config but the dev script", () => {
-    const plan = new QwikCityPatcher().plan(ctx());
+    const plan = new QwikRouterPatcher().plan(ctx());
     const envOp = plan.ops.find(
       (op): op is Extract<FileOp, { kind: "merge-env" }> =>
         op.kind === "merge-env" &&
@@ -97,13 +97,13 @@ describe("QwikCityPatcher.plan", () => {
   });
 
   it("adds both SDKs as devDependencies at the CLI's exact version", () => {
-    const deps = new QwikCityPatcher()
+    const deps = new QwikRouterPatcher()
       .plan(ctx())
       .ops.filter((op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep");
     // Qwik bundles devDependencies into the server build; ecosystem packages go there.
     expect(deps).toContainEqual(
       expect.objectContaining({
-        name: "@zitadel/sdk-qwik-city",
+        name: "@zitadel/sdk-qwik-router",
         version: "0.1.0-alpha.0",
         dev: true,
       }),
@@ -117,12 +117,14 @@ describe("QwikCityPatcher.plan", () => {
 
   // Minimal and consumer scaffolds keep the widget's neutral built-in copy.
   it.each(businessPages)("keeps the neutral copy in %s by default", (path) => {
-    expect(writeContents(new QwikCityPatcher().plan(ctx()), path)).not.toContain("businessLocales");
+    expect(writeContents(new QwikRouterPatcher().plan(ctx()), path)).not.toContain(
+      "businessLocales",
+    );
   });
 
   it.each(businessPages)("keeps the neutral copy in %s for consumer projects", (path) => {
     expect(
-      writeContents(new QwikCityPatcher().plan({ ...ctx(), useCase: "consumer" }), path),
+      writeContents(new QwikRouterPatcher().plan({ ...ctx(), useCase: "consumer" }), path),
     ).not.toContain("businessLocales");
   });
 
@@ -130,7 +132,7 @@ describe("QwikCityPatcher.plan", () => {
     "imports the business copy overlay in %s for business projects",
     (path) => {
       expect(
-        writeContents(new QwikCityPatcher().plan({ ...ctx(), useCase: "business" }), path),
+        writeContents(new QwikRouterPatcher().plan({ ...ctx(), useCase: "business" }), path),
       ).toContain(
         'import { ZitadelLogin, businessLocales, configureZitadel } from "@zitadel/sdk-qwik";',
       );
@@ -139,36 +141,36 @@ describe("QwikCityPatcher.plan", () => {
 
   it.each(businessPages)("passes the business copy overlay in %s for business projects", (path) => {
     expect(
-      writeContents(new QwikCityPatcher().plan({ ...ctx(), useCase: "business" }), path),
+      writeContents(new QwikRouterPatcher().plan({ ...ctx(), useCase: "business" }), path),
     ).toContain("locales={businessLocales}");
   });
 });
 
-describe("QwikCityPatcher.artifacts", () => {
+describe("QwikRouterPatcher.artifacts", () => {
   it("lists the routes + plugin as managed, the SDK as a dependency, no config edits", () => {
-    const artifacts = new QwikCityPatcher().artifacts({
-      framework: { id: "qwik-city", appDir: "src", devPort: 5173, url: "http://localhost:5173" },
+    const artifacts = new QwikRouterPatcher().artifacts({
+      framework: { id: "qwik-router", appDir: "src", devPort: 5173, url: "http://localhost:5173" },
       rendererId: "qwik",
     });
     expect(artifacts.markedFiles).toContain("src/routes/plugin@nextgen.ts");
     expect(artifacts.markedFiles).toContain("src/routes/login/index.tsx");
-    expect(artifacts.dependencies).toEqual(["@zitadel/sdk-qwik-city", "@zitadel/sdk-qwik"]);
+    expect(artifacts.dependencies).toEqual(["@zitadel/sdk-qwik-router", "@zitadel/sdk-qwik"]);
     expect(artifacts.configEdits).toEqual(["package.json"]);
   });
 });
 
-describe("QwikCityPatcher.canPatch", () => {
-  it("matches qwik-city only", () => {
-    const patcher = new QwikCityPatcher();
-    expect(patcher.canPatch("qwik-city")).toBe(true);
+describe("QwikRouterPatcher.canPatch", () => {
+  it("matches qwik-router only", () => {
+    const patcher = new QwikRouterPatcher();
+    expect(patcher.canPatch("qwik-router")).toBe(true);
     expect(patcher.canPatch("qwik")).toBe(false);
   });
 });
 
-describe("QwikCityPatcher dev server port", () => {
+describe("QwikRouterPatcher dev server port", () => {
   // Setup registers one origin; a dev server on any other port is refused.
   it("pins the dev script to the registered port, strictly", () => {
-    const op = new QwikCityPatcher()
+    const op = new QwikRouterPatcher()
       .plan(ctx())
       .ops.find(
         (candidate): candidate is Extract<FileOp, { kind: "edit" }> =>

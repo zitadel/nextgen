@@ -11,5 +11,5 @@ export const FRAMEWORK_IDS = [
   "sveltekit",
   "tanstack-start",
   "solid-start",
-  "qwik-city",
+  "qwik-router",
 ] as const;

@@ -13,28 +13,28 @@ import {
   registerPageTemplate,
 } from "./templates";
 
-const SDK_DEPENDENCY = "@zitadel/sdk-qwik-city";
+const SDK_DEPENDENCY = "@zitadel/sdk-qwik-router";
 /**
  * The idiomatic Qwik component library that ships the `<ZitadelLogin>` /
  * `<ZitadelSession>` Qwik components the routes render. The server SDK above is
- * plumbing only; the widget comes from here, so a Qwik City app gets the native
+ * plumbing only; the widget comes from here, so a Qwik Router app gets the native
  * Qwik component (typed props, callback events) rather than the bare element.
  */
 const COMPONENT_DEPENDENCY = "@zitadel/sdk-qwik";
 
 /**
- * Rule-based patcher for a Qwik City app. Like Next.js and SvelteKit, Qwik City
+ * Rule-based patcher for a Qwik Router app. Like Next.js and SvelteKit, Qwik Router
  * proxies the backend and verifies the session through a server entrypoint —
- * here the `@zitadel/sdk-qwik-city` `onRequest` plugin in
+ * here the `@zitadel/sdk-qwik-router` `onRequest` plugin in
  * `src/routes/plugin@nextgen.ts`. Contributes the landing/login/register/profile
  * file-based routes (the idiomatic `<ZitadelLogin>`/`<ZitadelSession>` Qwik
  * components from `@zitadel/sdk-qwik`), the public project-id env var, and both
  * deps. No config edit is needed — the plugin is a plain route file, so (like
  * Next) every managed file carries the marker.
  */
-export class QwikCityPatcher extends AbstractRulePatcher {
+export class QwikRouterPatcher extends AbstractRulePatcher {
   canPatch(framework: string): boolean {
-    return framework === "qwik-city";
+    return framework === "qwik-router";
   }
 
   protected routeOps(ctx: PatchContext): FileOp[] {
@@ -111,9 +111,9 @@ export class QwikCityPatcher extends AbstractRulePatcher {
 
   protected summary(_ctx: PatchContext): { title: string; detail: string } {
     return {
-      title: "Qwik City integration",
+      title: "Qwik Router integration",
       detail:
-        "Wrote src/routes/plugin@nextgen.ts (@zitadel/sdk-qwik-city onRequest) plus landing/login/register/profile routes using @zitadel/sdk-qwik.",
+        "Wrote src/routes/plugin@nextgen.ts (@zitadel/sdk-qwik-router onRequest) plus landing/login/register/profile routes using @zitadel/sdk-qwik.",
     };
   }
 }

@@ -43,7 +43,7 @@ tasks:
       - "sdk-qwik:build-release"
       - "sdk-sveltekit:build-release"
       - "sdk-solid-start:build-release"
-      - "sdk-qwik-city:build-release"
+      - "sdk-qwik-router:build-release"
       - "sdk-tanstack-start:build-release"
       - "testing:build-release"
     options:

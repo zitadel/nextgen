@@ -1,6 +1,6 @@
 # @zitadel/sdk-tanstack-start
 
-TanStack Start request middleware and helpers for Nextgen Auth.
+TanStack Start request middleware and helpers for Zitadel.
 
 ## Installation
 
