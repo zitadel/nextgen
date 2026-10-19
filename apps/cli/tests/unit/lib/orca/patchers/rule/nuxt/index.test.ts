@@ -132,7 +132,7 @@ describe("NuxtPatcher.plan", () => {
     const dep = new NuxtPatcher()
       .plan(ctx())
       .ops.find((op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep");
-    expect(dep).toMatchObject({ name: "@zitadel/sdk-nuxt", version: "alpha" });
+    expect(dep).toMatchObject({ name: "@zitadel/sdk-nuxt", version: "0.1.0-alpha.0" });
   });
 });
 

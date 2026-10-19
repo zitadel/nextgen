@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import { npmSelectorForCliVersion } from "../../../../public-cli";
+import { sdkVersionForCli } from "../../../../public-cli";
 import { configCandidates } from "../config-paths";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
@@ -69,12 +69,12 @@ export class SolidStartPatcher extends AbstractRulePatcher {
       {
         kind: "add-dep",
         name: SDK_DEPENDENCY,
-        version: npmSelectorForCliVersion(ctx.cliVersion),
+        version: sdkVersionForCli(ctx.cliVersion),
       },
       {
         kind: "add-dep",
         name: COMPONENT_DEPENDENCY,
-        version: npmSelectorForCliVersion(ctx.cliVersion),
+        version: sdkVersionForCli(ctx.cliVersion),
       },
     ];
   }
