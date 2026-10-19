@@ -34,6 +34,8 @@ function tunnelHeaders(req: NextRequest, extra: Readonly<Record<string, string>>
 
   const injectedNames = [];
 
+  // This is the only writer of x-nextgen-auth-token: it injects the verified
+  // value for server components, and a client-sent one never reaches here.
   for (const [name, value] of Object.entries(extra)) {
     headers.set(name, value);
     headers.set(`x-middleware-request-${name}`, value);
@@ -101,14 +103,16 @@ export async function nextgenMiddleware(
     );
   }
 
+  // Clients never send x-nextgen-auth-token: it is an internal channel. Refuse any
+  // request that carries it, on every route, before anything else runs.
+  if (req.headers.has("x-nextgen-auth-token")) {
+    return new Response("Bad Request", { status: 400 });
+  }
+
   const { pathname } = new URL(req.url);
 
   if (matchesRoutes(pathname, ignoredRoutes)) {
-    // Neutralise any client-supplied x-nextgen-auth-token on ignored routes.
-    // handleAuth is skipped for ignored routes, so we must strip the header
-    // here to prevent a forged value from reaching server components.
-    const headers = tunnelHeaders(req, { "x-nextgen-auth-token": "" });
-    return NextResponse.next({ request: { headers } });
+    return NextResponse.next();
   }
 
   if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {

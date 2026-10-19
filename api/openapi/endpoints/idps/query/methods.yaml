@@ -1,5 +1,6 @@
 post:
   operationId: queryIdps
+  x-zitadel-cli: idps list
   summary: Query identity provider connections
   description: |
     Returns the identity provider connections of a project, paginated with a

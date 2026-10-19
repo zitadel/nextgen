@@ -66,6 +66,36 @@ function mockJwks(kid: string): ReturnType<typeof vi.fn> {
   return vi.fn().mockResolvedValue(new Response(JSON.stringify(jwks), { status: 200 }));
 }
 
+type ServeOptions = NonNullable<Parameters<typeof nextgenMiddleware>[1]>;
+interface ServeInit {
+  readonly method?: string;
+  readonly headers?: Record<string, string>;
+}
+
+// A refusal or a proxied answer comes back as `response`; a request the
+// middleware lets through to the app carries `x-middleware-next` and yields none.
+async function serve(
+  url: string,
+  init: ServeInit = {},
+  options: ServeOptions = {},
+): Promise<{ response?: Response; request: NextRequest }> {
+  const request = new NextRequest(url, init);
+  const response = await nextgenMiddleware(request, options);
+  return { response: response.headers.has("x-middleware-next") ? undefined : response, request };
+}
+
+function captureFetch(response: () => Response = () => new Response("{}", { status: 200 })) {
+  const calls: { url: string; headers: Headers }[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockImplementation((url: string, init: RequestInit) => {
+      calls.push({ url: String(url), headers: new Headers(init?.headers) });
+      return Promise.resolve(response());
+    }),
+  );
+  return calls;
+}
+
 describe("nextgenMiddleware", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -75,7 +105,7 @@ describe("nextgenMiddleware", () => {
     vi.unstubAllEnvs();
   });
 
-  it("public route with no token passes through with empty x-nextgen-auth-token", async () => {
+  it("public route with no token continues as unauthenticated", async () => {
     const req = makeRequest("http://localhost:3000/");
     const res = await nextgenMiddleware(req, {
       url: "http://localhost:4000",
@@ -103,22 +133,7 @@ describe("nextgenMiddleware", () => {
     expect(location).toContain("next=%2Fadmin");
   });
 
-  it("redirect preserves existing query params in loginPath", async () => {
-    const req = makeRequest("http://localhost:3000/admin");
-    const res = await nextgenMiddleware(req, {
-      url: "http://localhost:4000",
-      protectedRoutes: ["/admin"],
-      loginPath: "/login?tab=sso",
-    });
-
-    expect(res.status).toBe(302);
-    const location = res.headers.get("location") ?? "";
-    const parsed = new URL(location, "http://localhost:3000");
-    expect(parsed.searchParams.get("tab")).toBe("sso");
-    expect(parsed.searchParams.get("next")).toBe("/admin");
-  });
-
-  it("protected route with valid cookie passes through with token tunnelled", async () => {
+  it("protected route with a valid cookie token authenticates", async () => {
     const kid = nextKid();
     const exp = Math.floor(Date.now() / 1000) + 3600;
     const token = makeJwt(
@@ -145,7 +160,7 @@ describe("nextgenMiddleware", () => {
     expect(tunnelledToken).toBe(token);
   });
 
-  it("protected route with valid Bearer token passes through", async () => {
+  it("protected route with a valid Bearer token authenticates", async () => {
     const kid = nextKid();
     const exp = Math.floor(Date.now() / 1000) + 3600;
     const token = makeJwt(
@@ -172,7 +187,7 @@ describe("nextgenMiddleware", () => {
     expect(tunnelledToken).toBe(token);
   });
 
-  it("Bearer token takes precedence over session cookie when both are present (R-1)", async () => {
+  it("Bearer token takes precedence over the session cookie", async () => {
     const kid = nextKid();
     const exp = Math.floor(Date.now() / 1000) + 3600;
     const bearerToken = makeJwt(
@@ -214,189 +229,7 @@ describe("nextgenMiddleware", () => {
     expect(tunnelled).not.toBe(cookieToken);
   });
 
-  it("redirect response includes Set-Cookie to clear stale session cookie", async () => {
-    const kid = nextKid();
-    const exp = Math.floor(Date.now() / 1000) + 3600;
-    const validToken = makeJwt({ sub: "user-123", email: "user@example.com", exp }, kid);
-    const parts = validToken.split(".");
-    const tamperedToken = `${parts[0]}.${parts[1]}.invalidsignatureXXX`;
-
-    vi.stubGlobal("fetch", mockJwks(kid));
-
-    const req = makeRequest("http://localhost:3000/admin", `__nextgen_session=${tamperedToken}`);
-    const res = await nextgenMiddleware(req, {
-      url: "http://localhost:4000",
-      protectedRoutes: ["/admin"],
-      loginPath: "/login",
-    });
-
-    expect(res.status).toBe(302);
-    const setCookie = res.headers.get("set-cookie") ?? "";
-    expect(setCookie).toMatch(/__nextgen_session=/);
-    expect(setCookie).toMatch(/Max-Age=0|expires=.*1970/i);
-  });
-
-  it("token with disallowed typ is rejected on protected route", async () => {
-    const kid = nextKid();
-    const exp = Math.floor(Date.now() / 1000) + 3600;
-    const token = makeJwt(
-      { sub: "user-123", email: "user@example.com", exp },
-      kid,
-      "refresh_token",
-    );
-
-    vi.stubGlobal("fetch", mockJwks(kid));
-
-    const req = makeRequest("http://localhost:3000/admin", `__nextgen_session=${token}`);
-    const res = await nextgenMiddleware(req, {
-      url: "http://localhost:4000",
-      protectedRoutes: ["/admin"],
-      allowedTokenTypes: ["JWT", "at+JWT"],
-    });
-
-    expect(res.status).toBe(302);
-  });
-
-  it("token with disallowed algorithm is rejected on protected route", async () => {
-    const kid = nextKid();
-    const exp = Math.floor(Date.now() / 1000) + 3600;
-    const token = makeJwt({ sub: "user-123", email: "user@example.com", exp }, kid);
-
-    vi.stubGlobal("fetch", mockJwks(kid));
-
-    const req = makeRequest("http://localhost:3000/admin", `__nextgen_session=${token}`);
-    const res = await nextgenMiddleware(req, {
-      url: "http://localhost:4000",
-      protectedRoutes: ["/admin"],
-      allowedAlgorithms: ["ES256"],
-    });
-
-    expect(res.status).toBe(302);
-  });
-
-  it("strips x-nextgen-auth-token from proxied requests", async () => {
-    let capturedHeaders: Headers | undefined;
-    const upstreamFetch = vi.fn().mockImplementation((_url: string, init: RequestInit) => {
-      capturedHeaders = init.headers as Headers;
-      return Promise.resolve(new Response("{}", { status: 200 }));
-    });
-    vi.stubGlobal("fetch", upstreamFetch);
-
-    const req = new NextRequest("http://localhost:3000/__nextgen/v1/flow", {
-      method: "GET",
-      headers: {
-        "x-nextgen-auth-token": "secret-session-token",
-        "content-type": "application/json",
-      },
-    });
-    await nextgenMiddleware(req, { url: "http://localhost:4000" });
-
-    expect(capturedHeaders).toBeDefined();
-    expect((capturedHeaders as Headers).has("x-nextgen-auth-token")).toBe(false);
-    expect((capturedHeaders as Headers).get("content-type")).toBe("application/json");
-  });
-
-  it("accepts RS256 tokens by default (allowedAlgorithms defaults to RS256/ES256)", async () => {
-    const kid = nextKid();
-    const exp = Math.floor(Date.now() / 1000) + 3600;
-    const token = makeJwt(
-      {
-        sub: "user-123",
-        email: "user@example.com",
-        iss: "http://localhost:4000",
-        exp,
-      },
-      kid,
-    );
-
-    vi.stubGlobal("fetch", mockJwks(kid));
-
-    const req = makeRequest("http://localhost:3000/admin", `__nextgen_session=${token}`);
-    // No allowedAlgorithms specified — defaults to ['RS256', 'ES256']
-    const res = await nextgenMiddleware(req, {
-      url: "http://localhost:4000",
-      protectedRoutes: ["/admin"],
-    });
-
-    expect(res.status).not.toBe(302);
-  });
-
-  it("protected route with invalid token clears cookie and redirects", async () => {
-    const kid = nextKid();
-    const exp = Math.floor(Date.now() / 1000) + 3600;
-    const validToken = makeJwt({ sub: "user-123", email: "user@example.com", exp }, kid);
-    const parts = validToken.split(".");
-    const tamperedToken = `${parts[0]}.${parts[1]}.invalidsignatureXXX`;
-
-    vi.stubGlobal("fetch", mockJwks(kid));
-
-    const req = makeRequest("http://localhost:3000/admin", `__nextgen_session=${tamperedToken}`);
-    const res = await nextgenMiddleware(req, {
-      url: "http://localhost:4000",
-      protectedRoutes: ["/admin"],
-      loginPath: "/login",
-    });
-
-    expect(res.status).toBe(302);
-    const location = res.headers.get("location") ?? "";
-    expect(location).toContain("/login");
-  });
-
-  it('token with alg "none" is rejected on a protected route', async () => {
-    const kid = nextKid();
-    const exp = Math.floor(Date.now() / 1000) + 3600;
-    const token = makeJwt(
-      {
-        sub: "user-123",
-        email: "user@example.com",
-        iss: "http://localhost:4000",
-        exp,
-      },
-      kid,
-      "JWT",
-      "none",
-    );
-
-    vi.stubGlobal("fetch", vi.fn());
-
-    const req = makeRequest("http://localhost:3000/admin", `__nextgen_session=${token}`);
-    const res = await nextgenMiddleware(req, {
-      url: "http://localhost:4000",
-      protectedRoutes: ["/admin"],
-      loginPath: "/login",
-    });
-
-    expect(res.status).toBe(302);
-    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
-  });
-
-  it("token without sub claim is rejected on a protected route", async () => {
-    const kid = nextKid();
-    const exp = Math.floor(Date.now() / 1000) + 3600;
-    const token = makeJwt(
-      {
-        email: "user@example.com",
-        iss: "http://localhost:4000",
-        exp,
-      },
-      kid,
-    );
-
-    vi.stubGlobal("fetch", mockJwks(kid));
-
-    const req = makeRequest("http://localhost:3000/admin", `__nextgen_session=${token}`);
-    const res = await nextgenMiddleware(req, {
-      url: "http://localhost:4000",
-      protectedRoutes: ["/admin"],
-      loginPath: "/login",
-    });
-
-    expect(res.status).toBe(302);
-    const location = res.headers.get("location") ?? "";
-    expect(location).toContain("/login");
-  });
-
-  it("token without sub on public route passes through as unauthenticated", async () => {
+  it("token with no sub claim is treated as unauthenticated", async () => {
     const kid = nextKid();
     const exp = Math.floor(Date.now() / 1000) + 3600;
     const token = makeJwt(
@@ -424,23 +257,290 @@ describe("nextgenMiddleware", () => {
     expect(authToken).toBe("");
   });
 
-  describe("proxy: cookie forwarding", () => {
-    it("forwards upstream Set-Cookie headers as-is", async () => {
-      const upstreamHeaders = new Headers();
-      upstreamHeaders.append("set-cookie", "__nextgen_session=abc; HttpOnly; SameSite=Lax");
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockResolvedValue(new Response("{}", { status: 200, headers: upstreamHeaders })),
-      );
+  it("token with a disallowed typ is rejected", async () => {
+    const kid = nextKid();
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const token = makeJwt(
+      { sub: "user-123", email: "user@example.com", exp },
+      kid,
+      "refresh_token",
+    );
 
-      const req = new NextRequest("http://localhost:3000/__nextgen/v1/flow");
-      const res = await nextgenMiddleware(req, {
-        url: "http://localhost:4000",
-      });
+    vi.stubGlobal("fetch", mockJwks(kid));
 
-      const setCookie = res.headers.get("set-cookie") ?? "";
-      expect(setCookie).toBe("__nextgen_session=abc; HttpOnly; SameSite=Lax");
+    const req = makeRequest("http://localhost:3000/admin", `__nextgen_session=${token}`);
+    const res = await nextgenMiddleware(req, {
+      url: "http://localhost:4000",
+      protectedRoutes: ["/admin"],
+      allowedTokenTypes: ["JWT", "at+JWT"],
     });
+
+    expect(res.status).toBe(302);
+  });
+
+  it("token with a disallowed algorithm is rejected", async () => {
+    const kid = nextKid();
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const token = makeJwt({ sub: "user-123", email: "user@example.com", exp }, kid);
+
+    vi.stubGlobal("fetch", mockJwks(kid));
+
+    const req = makeRequest("http://localhost:3000/admin", `__nextgen_session=${token}`);
+    const res = await nextgenMiddleware(req, {
+      url: "http://localhost:4000",
+      protectedRoutes: ["/admin"],
+      allowedAlgorithms: ["ES256"],
+    });
+
+    expect(res.status).toBe(302);
+  });
+
+  it('token with alg "none" is rejected without fetching JWKS', async () => {
+    const kid = nextKid();
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const token = makeJwt(
+      {
+        sub: "user-123",
+        email: "user@example.com",
+        iss: "http://localhost:4000",
+        exp,
+      },
+      kid,
+      "JWT",
+      "none",
+    );
+
+    vi.stubGlobal("fetch", vi.fn());
+
+    const req = makeRequest("http://localhost:3000/admin", `__nextgen_session=${token}`);
+    const res = await nextgenMiddleware(req, {
+      url: "http://localhost:4000",
+      protectedRoutes: ["/admin"],
+      loginPath: "/login",
+    });
+
+    expect(res.status).toBe(302);
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+
+  it("RS256 tokens are accepted by default", async () => {
+    const kid = nextKid();
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const token = makeJwt(
+      {
+        sub: "user-123",
+        email: "user@example.com",
+        iss: "http://localhost:4000",
+        exp,
+      },
+      kid,
+    );
+
+    vi.stubGlobal("fetch", mockJwks(kid));
+
+    const req = makeRequest("http://localhost:3000/admin", `__nextgen_session=${token}`);
+    // No allowedAlgorithms specified — defaults to ['RS256', 'ES256']
+    const res = await nextgenMiddleware(req, {
+      url: "http://localhost:4000",
+      protectedRoutes: ["/admin"],
+    });
+
+    expect(res.status).not.toBe(302);
+  });
+
+  it("redirect preserves existing query params in loginPath", async () => {
+    const req = makeRequest("http://localhost:3000/admin");
+    const res = await nextgenMiddleware(req, {
+      url: "http://localhost:4000",
+      protectedRoutes: ["/admin"],
+      loginPath: "/login?tab=sso",
+    });
+
+    expect(res.status).toBe(302);
+    const location = res.headers.get("location") ?? "";
+    const parsed = new URL(location, "http://localhost:3000");
+    expect(parsed.searchParams.get("tab")).toBe("sso");
+    expect(parsed.searchParams.get("next")).toBe("/admin");
+  });
+
+  it("invalid token clears the stale session cookie and redirects", async () => {
+    const kid = nextKid();
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const validToken = makeJwt({ sub: "user-123", email: "user@example.com", exp }, kid);
+    const parts = validToken.split(".");
+    const tamperedToken = `${parts[0]}.${parts[1]}.invalidsignatureXXX`;
+
+    vi.stubGlobal("fetch", mockJwks(kid));
+
+    const req = makeRequest("http://localhost:3000/admin", `__nextgen_session=${tamperedToken}`);
+    const res = await nextgenMiddleware(req, {
+      url: "http://localhost:4000",
+      protectedRoutes: ["/admin"],
+      loginPath: "/login",
+    });
+
+    expect(res.status).toBe(302);
+    const setCookie = res.headers.get("set-cookie") ?? "";
+    expect(setCookie).toMatch(/__nextgen_session=/);
+    expect(setCookie).toMatch(/Max-Age=0|expires=.*1970/i);
+  });
+
+  it("absolute loginPath throws", async () => {
+    await expect(
+      nextgenMiddleware(makeRequest("http://localhost:3000/admin"), {
+        url: "http://localhost:4000",
+        protectedRoutes: ["/admin"],
+        loginPath: "https://evil.example.com/phish",
+      }),
+    ).rejects.toThrow(/loginPath must be a relative path/i);
+  });
+
+  it("protocol-relative loginPath throws", async () => {
+    await expect(
+      nextgenMiddleware(makeRequest("http://localhost:3000/admin"), {
+        url: "http://localhost:4000",
+        protectedRoutes: ["/admin"],
+        loginPath: "//evil.example.com/phish",
+      }),
+    ).rejects.toThrow(/loginPath must be a relative path/i);
+  });
+
+  it("forwards upstream Set-Cookie headers", async () => {
+    const upstreamHeaders = new Headers();
+    upstreamHeaders.append("set-cookie", "__nextgen_session=abc; HttpOnly; SameSite=Lax");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response("{}", { status: 200, headers: upstreamHeaders })),
+    );
+
+    const req = new NextRequest("http://localhost:3000/__nextgen/v1/flow");
+    const res = await nextgenMiddleware(req, {
+      url: "http://localhost:4000",
+    });
+
+    const setCookie = res.headers.get("set-cookie") ?? "";
+    expect(setCookie).toBe("__nextgen_session=abc; HttpOnly; SameSite=Lax");
+  });
+
+  it("appends the client IP to an existing X-Forwarded-For chain", async () => {
+    let capturedHeaders: Headers | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+        capturedHeaders = init.headers as Headers;
+        return Promise.resolve(new Response("{}", { status: 200 }));
+      }),
+    );
+
+    const req = new NextRequest("http://localhost:3000/__nextgen/v1/flow", {
+      method: "GET",
+      headers: {
+        "x-forwarded-for": "10.0.0.1",
+        "x-real-ip": "192.168.1.1",
+      },
+    });
+    await nextgenMiddleware(req, { url: "http://localhost:4000" });
+
+    expect(capturedHeaders).toBeDefined();
+    const xff = (capturedHeaders as Headers).get("x-forwarded-for") ?? "";
+    // Both the original chain and the new hop must appear
+    expect(xff).toContain("10.0.0.1");
+    expect(xff).toContain("192.168.1.1");
+  });
+
+  it("sets X-Forwarded-For from the client IP when no chain exists", async () => {
+    let capturedHeaders: Headers | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+        capturedHeaders = init.headers as Headers;
+        return Promise.resolve(new Response("{}", { status: 200 }));
+      }),
+    );
+
+    const req = new NextRequest("http://localhost:3000/__nextgen/v1/flow", {
+      method: "GET",
+      headers: { "x-real-ip": "192.168.1.1" },
+    });
+    await nextgenMiddleware(req, { url: "http://localhost:4000" });
+
+    expect((capturedHeaders as Headers).get("x-forwarded-for")).toBe("192.168.1.1");
+  });
+
+  it("omits X-Forwarded-For when no client IP is available", async () => {
+    let capturedHeaders: Headers | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+        capturedHeaders = init.headers as Headers;
+        return Promise.resolve(new Response("{}", { status: 200 }));
+      }),
+    );
+
+    const req = new NextRequest("http://localhost:3000/__nextgen/v1/flow", {
+      method: "GET",
+      // No x-forwarded-for, no x-real-ip
+    });
+    await nextgenMiddleware(req, { url: "http://localhost:4000" });
+
+    expect((capturedHeaders as Headers).has("x-forwarded-for")).toBe(false);
+  });
+
+  it("skips auth handling on an ignored route", async () => {
+    const res = await nextgenMiddleware(makeRequest("http://localhost:3000/health"), {
+      url: "http://localhost:4000",
+      protectedRoutes: ["/health"],
+      ignoredRoutes: ["/health"],
+    });
+
+    expect(res.status).not.toBe(302);
+  });
+
+  it("invalid token on a protected route redirects to the login path", async () => {
+    const kid = nextKid();
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const validToken = makeJwt({ sub: "user-123", email: "user@example.com", exp }, kid);
+    const parts = validToken.split(".");
+    const tamperedToken = `${parts[0]}.${parts[1]}.invalidsignatureXXX`;
+
+    vi.stubGlobal("fetch", mockJwks(kid));
+
+    const req = makeRequest("http://localhost:3000/admin", `__nextgen_session=${tamperedToken}`);
+    const res = await nextgenMiddleware(req, {
+      url: "http://localhost:4000",
+      protectedRoutes: ["/admin"],
+      loginPath: "/login",
+    });
+
+    expect(res.status).toBe(302);
+    const location = res.headers.get("location") ?? "";
+    expect(location).toContain("/login");
+  });
+
+  it("token without sub claim is rejected on a protected route", async () => {
+    const kid = nextKid();
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const token = makeJwt(
+      {
+        email: "user@example.com",
+        iss: "http://localhost:4000",
+        exp,
+      },
+      kid,
+    );
+
+    vi.stubGlobal("fetch", mockJwks(kid));
+
+    const req = makeRequest("http://localhost:3000/admin", `__nextgen_session=${token}`);
+    const res = await nextgenMiddleware(req, {
+      url: "http://localhost:4000",
+      protectedRoutes: ["/admin"],
+      loginPath: "/login",
+    });
+
+    expect(res.status).toBe(302);
+    const location = res.headers.get("location") ?? "";
+    expect(location).toContain("/login");
   });
 
   describe("proxy: credential planes", () => {
@@ -579,26 +679,6 @@ describe("nextgenMiddleware", () => {
   });
 
   describe("loginPath validation (P-3)", () => {
-    it("throws when loginPath is an absolute URL", async () => {
-      await expect(
-        nextgenMiddleware(makeRequest("http://localhost:3000/admin"), {
-          url: "http://localhost:4000",
-          protectedRoutes: ["/admin"],
-          loginPath: "https://evil.example.com/phish",
-        }),
-      ).rejects.toThrow(/loginPath must be a relative path/i);
-    });
-
-    it("throws when loginPath is a protocol-relative URL", async () => {
-      await expect(
-        nextgenMiddleware(makeRequest("http://localhost:3000/admin"), {
-          url: "http://localhost:4000",
-          protectedRoutes: ["/admin"],
-          loginPath: "//evil.example.com/phish",
-        }),
-      ).rejects.toThrow(/loginPath must be a relative path/i);
-    });
-
     it("accepts a relative loginPath and redirects correctly", async () => {
       const req = makeRequest("http://localhost:3000/admin");
       const res = await nextgenMiddleware(req, {
@@ -608,72 +688,6 @@ describe("nextgenMiddleware", () => {
       });
       expect(res.status).toBe(302);
       expect(res.headers.get("location")).toContain("/custom-login");
-    });
-  });
-
-  describe("proxy: X-Forwarded-For append (P-4)", () => {
-    it("appends x-real-ip to an existing X-Forwarded-For chain", async () => {
-      let capturedHeaders: Headers | undefined;
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockImplementation((_url: string, init: RequestInit) => {
-          capturedHeaders = init.headers as Headers;
-          return Promise.resolve(new Response("{}", { status: 200 }));
-        }),
-      );
-
-      const req = new NextRequest("http://localhost:3000/__nextgen/v1/flow", {
-        method: "GET",
-        headers: {
-          "x-forwarded-for": "10.0.0.1",
-          "x-real-ip": "192.168.1.1",
-        },
-      });
-      await nextgenMiddleware(req, { url: "http://localhost:4000" });
-
-      expect(capturedHeaders).toBeDefined();
-      const xff = (capturedHeaders as Headers).get("x-forwarded-for") ?? "";
-      // Both the original chain and the new hop must appear
-      expect(xff).toContain("10.0.0.1");
-      expect(xff).toContain("192.168.1.1");
-    });
-
-    it("sets X-Forwarded-For from x-real-ip when no chain exists", async () => {
-      let capturedHeaders: Headers | undefined;
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockImplementation((_url: string, init: RequestInit) => {
-          capturedHeaders = init.headers as Headers;
-          return Promise.resolve(new Response("{}", { status: 200 }));
-        }),
-      );
-
-      const req = new NextRequest("http://localhost:3000/__nextgen/v1/flow", {
-        method: "GET",
-        headers: { "x-real-ip": "192.168.1.1" },
-      });
-      await nextgenMiddleware(req, { url: "http://localhost:4000" });
-
-      expect((capturedHeaders as Headers).get("x-forwarded-for")).toBe("192.168.1.1");
-    });
-
-    it("omits X-Forwarded-For when no IP source is available", async () => {
-      let capturedHeaders: Headers | undefined;
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockImplementation((_url: string, init: RequestInit) => {
-          capturedHeaders = init.headers as Headers;
-          return Promise.resolve(new Response("{}", { status: 200 }));
-        }),
-      );
-
-      const req = new NextRequest("http://localhost:3000/__nextgen/v1/flow", {
-        method: "GET",
-        // No x-forwarded-for, no x-real-ip
-      });
-      await nextgenMiddleware(req, { url: "http://localhost:4000" });
-
-      expect((capturedHeaders as Headers).has("x-forwarded-for")).toBe(false);
     });
   });
 
@@ -714,77 +728,47 @@ describe("nextgenMiddleware", () => {
     });
   });
 
-  describe("inbound header override: x-nextgen-auth-token (T-1)", () => {
-    it("overwrites client-supplied x-nextgen-auth-token with the verified value (empty for unauthenticated)", async () => {
-      const req = new NextRequest("http://localhost:3000/", {
-        headers: { "x-nextgen-auth-token": "forged-session-token" },
-      });
-      const res = await nextgenMiddleware(req, {
-        url: "http://localhost:4000",
-        protectedRoutes: ["/admin"],
-      });
-
-      // tunnelHeaders always overwrites x-nextgen-auth-token with the
-      // middleware-determined value (empty string when unauthenticated).
-      // The client's forged value must not survive into server components.
-      const tunnelled =
-        res.headers.get("x-nextgen-auth-token") ??
-        res.headers.get("x-middleware-request-x-nextgen-auth-token");
-      expect(tunnelled).toBe("");
-      expect(tunnelled).not.toBe("forged-session-token");
-    });
-
-    it("overwrites client-supplied x-nextgen-auth-token with the real token when authenticated", async () => {
-      const kid = nextKid();
-      const exp = Math.floor(Date.now() / 1000) + 3600;
-      const token = makeJwt(
-        {
-          sub: "user-123",
-          email: "user@example.com",
-          iss: "http://localhost:4000",
-          exp,
-        },
-        kid,
+  describe("inbound x-nextgen-auth-token", () => {
+    it("refuses a request that carries the auth header", async () => {
+      const { response } = await serve(
+        "http://localhost:3000/admin",
+        { headers: { "x-nextgen-auth-token": "forged" } },
+        { protectedRoutes: ["/admin"] },
       );
-      vi.stubGlobal("fetch", mockJwks(kid));
 
-      const req = makeRequest("http://localhost:3000/admin", `__nextgen_session=${token}`);
-      // Inject a fake x-nextgen-auth-token alongside the real cookie
-      Object.defineProperty(req, "headers", {
-        value: new Headers({
-          cookie: `__nextgen_session=${token}`,
-          "x-nextgen-auth-token": "forged-session-token",
-        }),
-        writable: false,
-      });
-
-      const res = await nextgenMiddleware(req, {
-        url: "http://localhost:4000",
-        protectedRoutes: ["/admin"],
-      });
-
-      // The tunnelled value must be the real verified token, not the forged one
-      const tunnelled =
-        res.headers.get("x-nextgen-auth-token") ??
-        res.headers.get("x-middleware-request-x-nextgen-auth-token");
-      expect(tunnelled).toBe(token);
-      expect(tunnelled).not.toBe("forged-session-token");
+      expect(response?.status).toBe(400);
+      expect(await response?.text()).toBe("Bad Request");
     });
 
-    it("neutralises client-supplied x-nextgen-auth-token on ignored routes (R-3)", async () => {
-      const req = new NextRequest("http://localhost:3000/health", {
-        headers: { "x-nextgen-auth-token": "forged-session-token" },
-      });
-      const res = await nextgenMiddleware(req, {
-        url: "http://localhost:4000",
-        ignoredRoutes: ["/health"],
-      });
+    it("refuses a request that carries the auth header on an ignored route", async () => {
+      const { response } = await serve(
+        "http://localhost:3000/health",
+        { headers: { "x-nextgen-auth-token": "forged" } },
+        { ignoredRoutes: ["/health"] },
+      );
 
-      const tunnelled =
-        res.headers.get("x-nextgen-auth-token") ??
-        res.headers.get("x-middleware-request-x-nextgen-auth-token");
-      expect(tunnelled).toBe("");
-      expect(tunnelled).not.toBe("forged-session-token");
+      expect(response?.status).toBe(400);
+      expect(await response?.text()).toBe("Bad Request");
+    });
+
+    it("refuses a request that carries the auth header on the proxy path", async () => {
+      const calls = captureFetch();
+
+      const { response } = await serve(
+        "http://localhost:3000/__nextgen/v1/flow",
+        { headers: { "x-nextgen-auth-token": "forged" } },
+        { url: "http://localhost:4000" },
+      );
+
+      expect(response?.status).toBe(400);
+      expect(await response?.text()).toBe("Bad Request");
+      expect(calls).toHaveLength(0);
+    });
+
+    it("lets a request without the auth header through", async () => {
+      const { response } = await serve("http://localhost:3000/");
+
+      expect(response).toBeUndefined();
     });
   });
 });

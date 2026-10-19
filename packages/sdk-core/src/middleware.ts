@@ -341,3 +341,63 @@ export type NextgenMiddlewareOptions = {
    */
   opaqueTokenTimeoutMs?: number;
 };
+
+// ─── Opaque session tokens ───────────────────────────────────────────────────
+
+/**
+ * What the backend reports for an opaque (non-JWT) session token.
+ *
+ * `userId` is `null` for an anonymous session: `CreateSession` sets the
+ * session cookie before any user factor is verified, so an abandoned or
+ * in-progress sign-in holds a live session that names no user. Such a session
+ * is **not** signed in, but it is not dead either — its flow may still
+ * complete — so callers keep its cookie instead of clearing it.
+ */
+export interface OpaqueSession {
+  readonly userId: string | null;
+  readonly identifier: string | null;
+  readonly identifierProperty: string | null;
+  readonly display: string | null;
+}
+
+/**
+ * Validates an opaque session token by asking the backend
+ * (`GET {issuerUrl}/sessions/me`) whether the session is live.
+ *
+ * @param token     - The opaque session token from the `__nextgen_session` cookie.
+ * @param issuerUrl - Base URL of the auth backend.
+ * @param timeoutMs - How long to wait for the backend before giving up.
+ * @returns The live session — with a `null` `userId` when it is anonymous — or
+ *   `null` when the backend does not hold a live session for the token (any
+ *   non-2xx answer, a timeout, a network error, or an unreadable body).
+ */
+export async function validateOpaqueSessionToken(
+  token: string,
+  issuerUrl: string,
+  timeoutMs: number,
+): Promise<OpaqueSession | null> {
+  try {
+    const res = await fetch(`${issuerUrl}/sessions/me`, {
+      method: "GET",
+      headers: { cookie: `__nextgen_session=${token}` },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res.ok) {
+      return null;
+    }
+    const body = (await res.json()) as {
+      user_id?: unknown;
+      user?: { identifier?: unknown; identifier_property?: unknown; display?: unknown };
+    };
+    const text = (value: unknown): string | null =>
+      typeof value === "string" && value !== "" ? value : null;
+    return {
+      userId: text(body.user_id),
+      identifier: text(body.user?.identifier),
+      identifierProperty: text(body.user?.identifier_property),
+      display: text(body.user?.display),
+    };
+  } catch {
+    return null;
+  }
+}

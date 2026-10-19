@@ -221,7 +221,7 @@ function setBearer(proxyReq) {
     const dep = new AngularPatcher()
       .plan(ctx())
       .ops.find((op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep");
-    expect(dep).toMatchObject({ name: "@zitadel/sdk-angular", version: "alpha" });
+    expect(dep).toMatchObject({ name: "@zitadel/sdk-angular", version: "0.1.0-alpha.0" });
   });
 });
 
