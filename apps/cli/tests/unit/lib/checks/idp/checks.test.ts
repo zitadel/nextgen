@@ -14,6 +14,7 @@ const DOCUMENT: Discovery = {
   issuer: "https://issuer.example",
   authorization_endpoint: "https://issuer.example/authorize",
   token_endpoint: "https://issuer.example/token",
+  jwks_uri: "https://issuer.example/jwks",
   userinfo_endpoint: "https://issuer.example/userinfo",
   scopes_supported: ["openid", "email"],
   claims_supported: ["sub", "email"],
@@ -80,6 +81,8 @@ describe("IDP_CHECKS", () => {
   it.each([
     ["token_endpoint", { ...DOCUMENT, token_endpoint: undefined }],
     ["authorization_endpoint", { ...DOCUMENT, authorization_endpoint: undefined }],
+    ["jwks_uri", { ...DOCUMENT, jwks_uri: undefined }],
+    ["jwks_uri", { ...DOCUMENT, jwks_uri: "http://issuer.example/jwks" }],
     ["token_endpoint", { ...DOCUMENT, token_endpoint: "http://issuer.example/token" }],
   ])(
     "fails a discovery document with no usable %s, as the runtime would",
@@ -93,6 +96,24 @@ describe("IDP_CHECKS", () => {
       });
     },
   );
+
+  it("still needs the keys of a connection that reads claims from the ID token", async () => {
+    const { by } = await resultsFor({ idTokenMapping: true }, { ...DOCUMENT, jwks_uri: undefined });
+
+    expect(by("discovery")?.status).toBe("fail");
+  });
+
+  it("fails a connection that names some of its endpoints but not the rest, as the server would", async () => {
+    const { by } = await resultsFor({
+      endpoints: { authorization: "https://issuer.example/authorize" },
+      missingEndpoints: ["jwks_uri", "token_endpoint", "userinfo_endpoint"],
+    });
+
+    expect(by("discovery")).toMatchObject({
+      status: "fail",
+      message: expect.stringContaining("token_endpoint"),
+    });
+  });
 
   it("does not need a userinfo endpoint from a connection that reads claims from the ID token", async () => {
     const { by } = await resultsFor(
