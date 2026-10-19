@@ -784,8 +784,6 @@ describe("server-rendered widget config", () => {
 });
 // server-render-cases:end
 
-type WidgetName = "ZitadelLogin" | "ZitadelLogout" | "ZitadelSession";
-
 type StandardAttributes = {
   className: string;
   style: React.CSSProperties;
@@ -802,12 +800,6 @@ type WidgetProps = {
   ZitadelLogin: ZitadelLoginReactProps;
   ZitadelLogout: ZitadelLogoutReactProps;
   ZitadelSession: ZitadelSessionReactProps;
-};
-
-type StandardProps = {
-  [W in WidgetName]: {
-    [K in keyof StandardAttributes]?: K extends keyof WidgetProps[W] ? WidgetProps[W][K] : never;
-  };
 };
 
 // Mounts a widget with the given attributes (named as the markup names them) and
@@ -838,6 +830,14 @@ async function mountWidget(widget: WidgetName, attributes: Record<string, unknow
 }
 
 // standard-attributes:begin
+type WidgetName = "ZitadelLogin" | "ZitadelLogout" | "ZitadelSession";
+
+type StandardProps = {
+  [W in WidgetName]: {
+    [K in keyof StandardAttributes]?: K extends keyof WidgetProps[W] ? WidgetProps[W][K] : never;
+  };
+};
+
 const WIDGETS = ["ZitadelLogin", "ZitadelLogout", "ZitadelSession"] as const;
 const WIDGET_TAGS = {
   ZitadelLogin: "zitadel-login",

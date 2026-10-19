@@ -2,6 +2,7 @@ import type { ZitadelProject } from "@zitadel/api/config";
 import type { ZitadelLogout as ZitadelLogoutElement } from "@zitadel/components";
 import type { ZitadelSignoutDetail } from "@zitadel/sdk-core/types";
 
+import { standardAttributes } from "@zitadel/sdk-core/types";
 import { defineComponent, h, mergeProps, type PropType, ref, toRaw } from "vue";
 import "@zitadel/components";
 
@@ -43,10 +44,12 @@ const ZitadelLogout = defineComponent({
     expose({ element });
 
     return () => {
+      // The standard HTML attributes come first, so a widget prop wins over one of the same name.
+      const attributes = standardAttributes(attrs);
       const attr = forceAttr();
       return h(
         "zitadel-logout",
-        mergeProps(attrs, {
+        mergeProps(attrs, attributes, {
           ref: element,
           // Hand the Lit element the raw SDK handle, not Vue's reactive proxy:
           // the widget does identity checks on it (and `render` from test-utils

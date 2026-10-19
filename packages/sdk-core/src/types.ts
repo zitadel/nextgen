@@ -306,7 +306,8 @@ export type ZitadelSessionProps = ZitadelSessionConfig & ZitadelSessionHandlers;
  * widget's own props (Solid, Qwik, Angular).
  * ───────────────────────────────────────────────────────────────────────── */
 
-const STANDARD_ATTRIBUTE = /^(?:class|style|id|title|slot|hidden|role|tabindex|data-.+|aria-.+)$/i;
+const STANDARD_ATTRIBUTE =
+  /^(?:class|classname|style|id|title|slot|hidden|role|tabindex|data-.+|aria-.+)$/i;
 
 /**
  * The standard HTML attributes among the given props: `class`, `style`, `id`,
@@ -314,11 +315,16 @@ const STANDARD_ATTRIBUTE = /^(?:class|style|id|title|slot|hidden|role|tabindex|d
  * element takes these as plain DOM attributes, and none of them is a widget
  * prop, so a wrapper can pass the result to the element ahead of its own
  * attributes. Anything else is left out, so no stray prop can reach the
- * widget's configuration.
+ * widget's configuration. A value of `undefined`, `null` or `false` is left out
+ * too, since it means no attribute. A framework that needs the names marked
+ * (Solid writes `attr:id` as an attribute) passes the `prefix` to put before
+ * each.
  */
-export function standardAttributes(props: object): Record<string, unknown> {
+export function standardAttributes(props: object, prefix = ""): Record<string, unknown> {
   return Object.fromEntries(
-    Object.entries(props).filter(([name]) => STANDARD_ATTRIBUTE.test(name)),
+    Object.entries(props)
+      .filter(([name, value]) => STANDARD_ATTRIBUTE.test(name) && value != null && value !== false)
+      .map(([name, value]) => [`${prefix}${name}`, value]),
   );
 }
 

@@ -91,8 +91,6 @@ Each widget event reaches the callback in the last column, which receives the ev
 <ZitadelLogin project={project} className="login" data-testid="login" aria-label="Sign in" />
 ```
 
-A `ref` resolves to the widget element, and the props types include the element's HTML attributes, so TypeScript accepts them.
-
 ## Server rendering
 
 If your app renders on the server, mount the widget on the client only, after hydration, or pass `project-id` and `proxy-path` to the `ZitadelLogin` wrapper as strings (they are written into the server markup as attributes), because a widget that starts before its configuration arrives shows an error instead of the flow.

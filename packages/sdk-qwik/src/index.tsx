@@ -248,6 +248,8 @@ export type ZitadelLoginProps = ZitadelLoginConfig &
  * declarative `useOn` does not catch.
  */
 export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
+  // The standard HTML attributes come first, so a widget prop wins over one of the same name.
+  const attributes = standardAttributes(props);
   const host = useSignal<ZitadelLoginElement>();
   // biome-ignore lint/correctness/noQwikUseVisibleTask: wrapping a web component needs an imperative mount task to set DOM properties and wire native listeners Qwik's declarative APIs cannot express.
   useVisibleTask$(
@@ -286,7 +288,7 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
         }
         bindLoginConfig(el, props);
       }}
-      {...standardAttributes(props)}
+      {...attributes}
       {...loginAttrs(props)}
     />
   );
@@ -318,6 +320,8 @@ export type ZitadelLogoutProps = ZitadelLogoutConfig &
  * forwards the widget's `zitadel-signout` event as an optional callback.
  */
 export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
+  // The standard HTML attributes come first, so a widget prop wins over one of the same name.
+  const attributes = standardAttributes(props);
   const host = useSignal<ZitadelLogoutElement>();
   // biome-ignore lint/correctness/noQwikUseVisibleTask: wrapping a web component needs an imperative mount task to set DOM properties and wire native listeners Qwik's declarative APIs cannot express.
   useVisibleTask$(
@@ -343,7 +347,7 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
         }
         bindLogoutConfig(el, props);
       }}
-      {...standardAttributes(props)}
+      {...attributes}
       {...logoutAttrs(props)}
     />
   );
@@ -375,6 +379,8 @@ export type ZitadelSessionProps = ZitadelSessionConfig &
  * `zitadel-signout` event as an optional callback.
  */
 export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
+  // The standard HTML attributes come first, so a widget prop wins over one of the same name.
+  const attributes = standardAttributes(props);
   const host = useSignal<ZitadelSessionElement>();
   // biome-ignore lint/correctness/noQwikUseVisibleTask: wrapping a web component needs an imperative mount task to set DOM properties and wire native listeners Qwik's declarative APIs cannot express.
   useVisibleTask$(
@@ -400,7 +406,7 @@ export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
         }
         bindSessionConfig(el, props);
       }}
-      {...standardAttributes(props)}
+      {...attributes}
       {...sessionAttrs(props)}
     />
   );

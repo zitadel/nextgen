@@ -60,6 +60,7 @@ export class ZitadelLogoutComponent implements AfterViewInit {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   ngAfterViewInit(): void {
+    // The standard HTML attributes come first, so a widget prop wins over one of the same name.
     const element = this.element;
     if (element) forwardStandardAttributes(this.host.nativeElement, element);
   }

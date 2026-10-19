@@ -1,5 +1,6 @@
 <script lang="ts">
   import '@zitadel/components';
+  import { standardAttributes } from '@zitadel/sdk-core/types';
   import type { ZitadelSession as ZitadelSessionElement } from '@zitadel/components';
 
   import type { ZitadelSessionElementProps, ZitadelSignoutDetail } from './types';
@@ -17,8 +18,11 @@
     theme,
     suppressHeader,
     onSignout,
-    ...attributes
+    ...rest
   }: ZitadelSessionElementProps = $props();
+
+  // The standard HTML attributes come first, so a widget prop wins over one of the same name.
+  const attributes = $derived(standardAttributes(rest));
 
   let el: ZitadelSessionElement | undefined = $state();
 

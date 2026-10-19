@@ -6,6 +6,7 @@ import type {
 
 import "@zitadel/components";
 import type { JSX } from "solid-js";
+import { isServer } from "solid-js/web";
 
 import { standardAttributes } from "@zitadel/sdk-core/types";
 import {
@@ -121,21 +122,6 @@ export type ZitadelSessionSolidProps = ZitadelSessionProps &
     ref?: ZitadelSessionElement | ((el: ZitadelSessionElement) => void);
   };
 
-/**
- * The standard HTML attributes among a wrapper's props, for the widget element.
- * Solid assigns a prop it does not know to a custom element as a property, which
- * is not what `data-testid` or `tabindex` mean there, so every one but `class`
- * and `style` goes under Solid's `attr:` prefix, which writes an attribute.
- */
-function elementAttributes(props: object) {
-  return Object.fromEntries(
-    Object.entries(standardAttributes(props)).map(([name, value]) => [
-      name === "class" || name === "style" ? name : `attr:${name}`,
-      value === true ? "" : value === false ? undefined : value,
-    ]),
-  );
-}
-
 export { configureZitadel, getApi, getZitadelConfig };
 export type { ZitadelConfig, ZitadelProject };
 export * from "./types";
@@ -154,9 +140,12 @@ export { businessLocales } from "@zitadel/components";
  * so consumers can imperatively access the upgraded web component.
  */
 export function ZitadelLogin(props: ZitadelLoginSolidProps): JSX.Element {
+  // The standard HTML attributes come first, so a widget prop wins over one of the same name.
+  // Solid would assign them to a custom element as properties, so in the browser they take its `attr:` prefix.
+  const attributes = () => standardAttributes(props, isServer ? "" : "attr:");
   return (
     <zitadel-login
-      {...elementAttributes(props)}
+      {...attributes()}
       ref={props.ref}
       prop:project={props.project}
       prop:locales={props.locales}
@@ -190,9 +179,12 @@ export function ZitadelLogin(props: ZitadelLoginSolidProps): JSX.Element {
  * so consumers can imperatively access the upgraded web component.
  */
 export function ZitadelLogout(props: ZitadelLogoutSolidProps): JSX.Element {
+  // The standard HTML attributes come first, so a widget prop wins over one of the same name.
+  // Solid would assign them to a custom element as properties, so in the browser they take its `attr:` prefix.
+  const attributes = () => standardAttributes(props, isServer ? "" : "attr:");
   return (
     <zitadel-logout
-      {...elementAttributes(props)}
+      {...attributes()}
       ref={props.ref}
       prop:project={props.project}
       {...projectAttributes(props)}
@@ -212,9 +204,12 @@ export function ZitadelLogout(props: ZitadelLogoutSolidProps): JSX.Element {
  * A forwarded `ref` resolves to the underlying `<zitadel-session>` DOM element.
  */
 export function ZitadelSession(props: ZitadelSessionSolidProps): JSX.Element {
+  // The standard HTML attributes come first, so a widget prop wins over one of the same name.
+  // Solid would assign them to a custom element as properties, so in the browser they take its `attr:` prefix.
+  const attributes = () => standardAttributes(props, isServer ? "" : "attr:");
   return (
     <zitadel-session
-      {...elementAttributes(props)}
+      {...attributes()}
       ref={props.ref}
       prop:project={props.project}
       {...projectAttributes(props)}

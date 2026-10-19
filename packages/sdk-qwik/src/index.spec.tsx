@@ -733,8 +733,6 @@ describe("wrapper config parity", () => {
   });
 });
 
-type WidgetName = "ZitadelLogin" | "ZitadelLogout" | "ZitadelSession";
-
 type StandardAttributes = {
   class: string;
   style: string;
@@ -753,12 +751,6 @@ type WidgetProps = {
   ZitadelSession: ZitadelSessionProps;
 };
 
-type StandardProps = {
-  [W in WidgetName]: {
-    [K in keyof StandardAttributes]?: K extends keyof WidgetProps[W] ? WidgetProps[W][K] : never;
-  };
-};
-
 // Mounts a widget with the given attributes (named as the markup names them) and
 // reaches its element through a `ref` signal, the way a consumer does.
 async function mountWidget(widget: WidgetName, attributes: Record<string, unknown>) {
@@ -775,6 +767,14 @@ async function mountWidget(widget: WidgetName, attributes: Record<string, unknow
 }
 
 // standard-attributes:begin
+type WidgetName = "ZitadelLogin" | "ZitadelLogout" | "ZitadelSession";
+
+type StandardProps = {
+  [W in WidgetName]: {
+    [K in keyof StandardAttributes]?: K extends keyof WidgetProps[W] ? WidgetProps[W][K] : never;
+  };
+};
+
 const WIDGETS = ["ZitadelLogin", "ZitadelLogout", "ZitadelSession"] as const;
 const WIDGET_TAGS = {
   ZitadelLogin: "zitadel-login",

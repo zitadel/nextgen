@@ -11,6 +11,7 @@ import {
   ZitadelLogout as ZitadelLogoutElement,
   ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
+import { standardAttributes } from "@zitadel/sdk-core/types";
 import * as React from "react";
 
 import type {
@@ -183,6 +184,8 @@ export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginRe
     },
     ref,
   ) {
+    // The standard HTML attributes come first, so a widget prop wins over one of the same name.
+    const attributes = standardAttributes(props);
     const keyed = Boolean(props.project?.publishableKey);
     const [mounted, setMounted] = React.useState(false);
     React.useEffect(() => setMounted(true), []);
@@ -192,6 +195,7 @@ export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginRe
     if (keyed && !mounted) return null;
     return (
       <ZitadelLoginElementReact
+        {...attributes}
         {...props}
         ref={ref}
         purpose={purpose ?? "login"}
@@ -225,8 +229,11 @@ export type ZitadelLogoutReactProps = ZitadelLogoutProps &
 
 export const ZitadelLogout = React.forwardRef<ZitadelLogoutElement, ZitadelLogoutReactProps>(
   function ZitadelLogout({ onSignout, ...props }, ref) {
+    // The standard HTML attributes come first, so a widget prop wins over one of the same name.
+    const attributes = standardAttributes(props);
     return (
       <ZitadelLogoutElementReact
+        {...attributes}
         {...props}
         {...projectAttributes(props)}
         post-sign-out-url={props.postSignOutUrl}
@@ -252,8 +259,11 @@ export type ZitadelSessionReactProps = ZitadelSessionProps &
 
 export const ZitadelSession = React.forwardRef<ZitadelSessionElement, ZitadelSessionReactProps>(
   function ZitadelSession({ onSignout, ...props }, ref) {
+    // The standard HTML attributes come first, so a widget prop wins over one of the same name.
+    const attributes = standardAttributes(props);
     return (
       <ZitadelSessionElementReact
+        {...attributes}
         {...props}
         {...projectAttributes(props)}
         post-sign-out-url={props.postSignOutUrl}

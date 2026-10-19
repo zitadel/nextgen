@@ -1,5 +1,6 @@
 <script lang="ts">
   import '@zitadel/components';
+  import { standardAttributes } from '@zitadel/sdk-core/types';
   import type { ZitadelLogin as ZitadelLoginElement } from '@zitadel/components';
 
   import type {
@@ -33,8 +34,11 @@
     onFlowComplete,
     onFlowRedirect,
     onFlowError,
-    ...attributes
+    ...rest
   }: ZitadelLoginElementProps = $props();
+
+  // The standard HTML attributes come first, so a widget prop wins over one of the same name.
+  const attributes = $derived(standardAttributes(rest));
 
   let el: ZitadelLoginElement | undefined = $state();
 

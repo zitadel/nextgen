@@ -92,7 +92,7 @@ Each widget event reaches the callback in the last column, which receives the ev
 <zitadel-auth-login [project]="project" class="login" data-testid="login" aria-label="Sign in" />
 ```
 
-Angular puts these on the wrapper's own tag, which is a different element from the widget, so the wrapper moves them to the widget element once, when the view is ready (`slot` is copied and stays, because the parent's shadow root reads it on the tag). That covers plain attributes such as `class="login"`; a binding on the tag that changes later, such as `[class.active]` or `[attr.aria-label]`, is not carried over. `@ViewChild(ZitadelLoginComponent).element` is the widget element.
+Angular templates carry no prop types, and the attributes land on the wrapper's own tag, so they are moved to the widget element once, when the view is ready; a binding on the tag that changes later is not carried over.
 
 ## Server rendering
 

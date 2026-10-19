@@ -120,8 +120,6 @@ Each widget event reaches the callback in the last column, which receives the ev
 <ZitadelLogin :project="project" class="login" data-testid="login" aria-label="Sign in" />
 ```
 
-The component declares `inheritAttrs: false` and merges the attributes onto the widget element itself, under its own bindings, so a widget prop always wins. A template `ref` resolves to the component instance, whose `element` is the widget element.
-
 ## Runtime model
 
 <Steps>

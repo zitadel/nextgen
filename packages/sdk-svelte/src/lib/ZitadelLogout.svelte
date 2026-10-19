@@ -1,5 +1,6 @@
 <script lang="ts">
   import '@zitadel/components';
+  import { standardAttributes } from '@zitadel/sdk-core/types';
   import type { ZitadelLogout as ZitadelLogoutElement } from '@zitadel/components';
 
   import type { ZitadelLogoutElementProps, ZitadelSignoutDetail } from './types';
@@ -13,8 +14,11 @@
     postSignOutUrl,
     theme,
     onSignout,
-    ...attributes
+    ...rest
   }: ZitadelLogoutElementProps = $props();
+
+  // The standard HTML attributes come first, so a widget prop wins over one of the same name.
+  const attributes = $derived(standardAttributes(rest));
 
   let el: ZitadelLogoutElement | undefined = $state();
 

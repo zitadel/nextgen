@@ -806,8 +806,6 @@ describe("server-rendered widget config", () => {
 });
 // server-render-cases:end
 
-type WidgetName = "ZitadelLogin" | "ZitadelLogout" | "ZitadelSession";
-
 type StandardAttributes = {
   class: string;
   style: string;
@@ -822,12 +820,6 @@ type StandardAttributes = {
 
 // A template attribute is not typed, so there is no props type to check against.
 type WidgetProps = Record<WidgetName, Partial<StandardAttributes>>;
-
-type StandardProps = {
-  [W in WidgetName]: {
-    [K in keyof StandardAttributes]?: K extends keyof WidgetProps[W] ? WidgetProps[W][K] : never;
-  };
-};
 
 // Mounts a widget with the given attributes (named as the markup names them) and
 // reaches its element through the component's `element`, the way a consumer does
@@ -863,6 +855,14 @@ async function mountWidget(widget: WidgetName, attributes: Record<string, unknow
 }
 
 // standard-attributes:begin
+type WidgetName = "ZitadelLogin" | "ZitadelLogout" | "ZitadelSession";
+
+type StandardProps = {
+  [W in WidgetName]: {
+    [K in keyof StandardAttributes]?: K extends keyof WidgetProps[W] ? WidgetProps[W][K] : never;
+  };
+};
+
 const WIDGETS = ["ZitadelLogin", "ZitadelLogout", "ZitadelSession"] as const;
 const WIDGET_TAGS = {
   ZitadelLogin: "zitadel-login",

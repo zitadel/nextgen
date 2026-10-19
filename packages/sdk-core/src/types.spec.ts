@@ -14,10 +14,21 @@ describe("standardAttributes", () => {
       hidden: true,
       role: "region",
       tabIndex: 3,
+      className: "g",
       "data-testid": "e",
       "aria-label": "f",
     };
     expect(standardAttributes(attributes)).toEqual(attributes);
+  });
+
+  it("leaves out a value that means no attribute", () => {
+    expect(
+      standardAttributes({ id: undefined, title: null, hidden: false, role: "region" }),
+    ).toEqual({ role: "region" });
+  });
+
+  it("puts the prefix before each name", () => {
+    expect(standardAttributes({ id: "a", project: {} }, "attr:")).toEqual({ "attr:id": "a" });
   });
 
   it("leaves out everything else", () => {

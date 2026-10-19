@@ -213,9 +213,13 @@ describe("server-render cases ↔ SDK specs", () => {
  * Every client SDK's wrapper forwards the element's standard HTML attributes to
  * the widget element, and every SDK spec proves it with the same tests between
  * two marker comments: the same titles, in the same order, with none missing and
- * none extra, and the same bodies. Only the SDK's own `mountWidget` differs. A
- * behaviour left untested in one SDK, or tested under another title, fails here
- * instead of drifting unnoticed.
+ * none extra, and the same bodies, byte for byte. Only the glue above each block
+ * (`mountWidget` and the two props type aliases) differs. A behaviour left
+ * untested in one SDK, or tested under another title, fails here instead of
+ * drifting unnoticed.
+ *
+ * One documented exception: an Angular template attribute has no props type, so
+ * the type-level test there checks against a loose type and cannot fail.
  */
 describe("standard-attribute tests ↔ SDK specs", () => {
   const SPECS = {
