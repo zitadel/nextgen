@@ -439,21 +439,6 @@ describe("server SDK test titles", () => {
     "lets the request through when removal fails but the header is absent",
   ];
 
-  // SvelteKit and SolidStart swallow a failed removal of the inbound header
-  // instead of refusing the request, so neither has these two cases to test.
-  const EXCEPTIONS: Record<keyof typeof TEST_FILES, readonly string[]> = {
-    "sdk-sveltekit": [
-      "refuses the request when the header cannot be removed",
-      "lets the request through when removal fails but the header is absent",
-    ],
-    "sdk-solid-start": [
-      "refuses the request when the header cannot be removed",
-      "lets the request through when removal fails but the header is absent",
-    ],
-    "sdk-qwik-city": [],
-    "sdk-tanstack-start": [],
-  };
-
   // Matches `it("title"` and the `it.each([...])("title"` form.
   const TITLE = /(?:\bit\(|\]\)\()\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1/g;
 
@@ -466,8 +451,7 @@ describe("server SDK test titles", () => {
     "%s tests every canonical behaviour under its canonical title",
     (sdk) => {
       const titles = titlesOf(sdk);
-      const expected = CANONICAL_TITLES.filter((title) => !EXCEPTIONS[sdk].includes(title));
-      expect(expected.filter((title) => !titles.includes(title))).toEqual([]);
+      expect(CANONICAL_TITLES.filter((title) => !titles.includes(title))).toEqual([]);
     },
   );
 
