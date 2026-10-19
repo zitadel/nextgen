@@ -95,6 +95,26 @@ describe("test sign-in", () => {
         expect(result).toSuggest("test sign-in --provider google");
       });
 
+      it("asks the provider about a Google connection that has been given another name", async () => {
+        const app = await aSetUpApp();
+        await app.enableSso("google", CREDENTIALS);
+        await app.reslugConnection("google", "google-work");
+        platform.hasGoogle({ client: "unknown" });
+
+        const result = await app.run(["test", "sign-in", "--provider", "google-work", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it("fails a connection that names only some of its endpoints", async () => {
+        const app = await anAppWithTwoProviders();
+        await app.editOidc(ACME.slug, { authorization_endpoint: `${ACME.issuer}/authorize` });
+
+        const result = await app.run(["test", "sign-in", "--provider", ACME.slug, "--json"]);
+
+        expect(result).toHintAt("Name every endpoint");
+      });
+
       it("fails when the provider does not know the client", async () => {
         const app = await aSetUpApp();
         await app.enableSso("google", CREDENTIALS);
