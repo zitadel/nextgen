@@ -64,8 +64,8 @@ func TestRetentionJob_runIsTraced(t *testing.T) {
 		wantStatus codes.Code
 		wantAttrs  []attribute.KeyValue
 	}{
-		{name: "success"},
-		{name: "failure", err: errors.New("x@y"), wantStatus: codes.Error, wantAttrs: []attribute.KeyValue{attribute.String("error.type", "*errors.errorString")}},
+		{name: "success", wantAttrs: []attribute.KeyValue{zotel.JobRoot}},
+		{name: "failure", err: errors.New("x@y"), wantStatus: codes.Error, wantAttrs: []attribute.KeyValue{zotel.JobRoot, attribute.String("error.type", "*errors.errorString")}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			spanExporter.Reset()
