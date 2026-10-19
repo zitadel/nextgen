@@ -173,7 +173,7 @@ async function proxyRequest(
   // upstream auth server sees the full proxy path. We never skip this even when
   // a chain is already present — a CDN or load balancer may have set XFF before
   // the request reached this edge node, and our hop must still be recorded.
-  const directIp = (req as unknown as { ip?: string }).ip ?? req.headers.get("x-real-ip");
+  const directIp = (req as unknown as { ip?: string }).ip;
   if (directIp) {
     const existingXff = upstreamHeaders.get("x-forwarded-for");
     upstreamHeaders.set("x-forwarded-for", existingXff ? `${existingXff}, ${directIp}` : directIp);

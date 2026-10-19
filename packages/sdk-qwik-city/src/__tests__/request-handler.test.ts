@@ -533,9 +533,33 @@ describe("server middleware", () => {
   it("omits X-Forwarded-For when no client IP is available", async () => {
     const calls = captureFetch();
 
-    await serve(`${ORIGIN}/__nextgen/v1/flow`, {}, PROXY);
+    await serve(`${ORIGIN}/__nextgen/v1/flow`, { headers: { "x-real-ip": "10.9.9.9" } }, PROXY);
 
     expect(calls[0]?.headers.has("x-forwarded-for")).toBe(false);
+  });
+
+  it("ignores a client-supplied x-real-ip when the runtime provides an address", async () => {
+    const calls = captureFetch();
+
+    await serve(
+      `${ORIGIN}/__nextgen/v1/flow`,
+      { headers: { "x-real-ip": "10.9.9.9" }, clientIp: "10.0.0.2" },
+      PROXY,
+    );
+
+    expect(calls[0]?.headers.get("x-forwarded-for")).toBe("10.0.0.2");
+  });
+
+  it("ignores a client-supplied x-real-ip when an X-Forwarded-For chain exists", async () => {
+    const calls = captureFetch();
+
+    await serve(
+      `${ORIGIN}/__nextgen/v1/flow`,
+      { headers: { "x-forwarded-for": "10.0.0.1", "x-real-ip": "10.9.9.9" }, clientIp: "10.0.0.2" },
+      PROXY,
+    );
+
+    expect(calls[0]?.headers.get("x-forwarded-for")).toBe("10.0.0.1, 10.0.0.2");
   });
 
   it("does not proxy a path that only shares the prefix without a separator", async () => {

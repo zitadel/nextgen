@@ -449,6 +449,8 @@ describe("server SDK test titles", () => {
     "appends the client IP to an existing X-Forwarded-For chain",
     "sets X-Forwarded-For from the client IP when no chain exists",
     "omits X-Forwarded-For when no client IP is available",
+    "ignores a client-supplied x-real-ip when the runtime provides an address",
+    "ignores a client-supplied x-real-ip when an X-Forwarded-For chain exists",
     "does not proxy a path that only shares the prefix without a separator",
     "skips auth handling on an ignored route",
     "hands the auth result to the next handler when the request continues",
