@@ -10,8 +10,10 @@ import {
   INTERNAL_HEADERS,
   filterResponseHeaders,
   matchesRoutes,
+  proxySessionCookies,
   requiresProjectSecret,
   resolveSession,
+  serializeSessionCookie,
 } from "@zitadel/sdk-core/middleware";
 
 /**
@@ -103,19 +105,23 @@ function buildUpstreamHeaders(event: RequestEvent): Headers {
 
 /**
  * Forwards a `/__nextgen/*` request to the upstream auth backend and returns
- * the upstream response verbatim, including `Set-Cookie` headers. Hop-by-hop
- * headers are stripped in both directions, and a `location` is kept only as a
- * redirect onto this app.
+ * the upstream response, including its `Set-Cookie` headers. Hop-by-hop
+ * headers are stripped in both directions, a `location` is kept only as a
+ * redirect onto this app, and the session cookie travels under this project's
+ * name in the browser and the server's name upstream
+ * ({@link proxySessionCookies}).
  *
  * @param event     - The current SvelteKit request event.
  * @param authUrl   - Base URL of the auth backend.
  * @param proxyPath - The path prefix being proxied (e.g. `"/__nextgen"`).
+ * @param projectId - The project this app signs its users in to.
  * @returns The proxied upstream `Response`.
  */
 async function proxyRequest(
   event: RequestEvent,
   authUrl: string,
   proxyPath: string,
+  projectId: string | undefined,
   projectSecret: string | undefined,
   proxyTimeoutMs: number,
 ): Promise<Response> {
@@ -131,6 +137,21 @@ async function proxyRequest(
   const body = hasBody ? await event.request.arrayBuffer() : undefined;
 
   const upstreamHeaders = buildUpstreamHeaders(event);
+  const sessionCookies = proxySessionCookies(
+    {
+      method,
+      path: suffix,
+      search: url.search,
+      cookie: event.request.headers.get("cookie"),
+      requestUrl: url,
+    },
+    projectId,
+  );
+  if (sessionCookies.upstreamCookie === null) {
+    upstreamHeaders.delete("cookie");
+  } else {
+    upstreamHeaders.set("cookie", sessionCookies.upstreamCookie);
+  }
 
   // ADR 036: attach the project secret only to the handoff exchange — on every
   // operation it would make this public boundary an open relay with project
@@ -155,12 +176,12 @@ async function proxyRequest(
   // base a relative one resolves against (the IdP callback's 303 needs it).
   const responseHeaders = filterResponseHeaders(upstream.headers, url.toString());
 
-  const setCookies = upstream.headers.getSetCookie?.() ?? [];
-  for (const cookie of setCookies) {
+  const answer = await sessionCookies.toBrowser(upstream);
+  for (const cookie of answer.setCookies) {
     responseHeaders.append("set-cookie", cookie);
   }
 
-  return new Response(upstream.body, {
+  return new Response(answer.body, {
     status: upstream.status,
     headers: responseHeaders,
   });
@@ -177,19 +198,10 @@ interface AuthHandlerOptions extends ResolveSessionOptions {
 }
 
 /**
- * Builds a `Set-Cookie` header value that clears `name` on the root path.
- * Used to evict stale `__nextgen*` cookies when a session token is present
- * but no longer valid.
- */
-function clearCookie(name: string): string {
-  return `${name}=; Path=/; Max-Age=0`;
-}
-
-/**
  * Verifies the session token, writes the auth result to `event.locals`, and
  * either continues the request (`resolve`) or redirects to the login page on a
- * protected route with no valid session. Stale `__nextgen*` cookies are cleared
- * when the token is present but invalid.
+ * protected route with no valid session. Either way the response carries the
+ * session cookies the judgement asks for.
  *
  * @param event   - The current SvelteKit request event.
  * @param resolve - The downstream resolver from the `handle` hook.
@@ -206,42 +218,43 @@ async function handleAuth(
 
   const authHeader = event.request.headers.get("authorization");
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  const cookieToken = event.cookies.get("__nextgen_session") ?? null;
-  const { auth, clearCookies } = await resolveSession(
-    { bearer: bearerToken, cookie: cookieToken },
+  const { auth, cookies: sessionCookies } = await resolveSession(
+    { bearer: bearerToken, cookie: (name) => event.cookies.get(name), requestUrl: event.url },
     verification,
   );
 
   event.locals.nextgenAuth = auth;
-  if (auth.isAuthenticated) {
-    return resolve(event);
-  }
-
-  // Dead credentials are cleared so the browser stops replaying them; a live
-  // session that signs no one in here (an anonymous one, whose sign-in may
-  // still complete, or one of another project) keeps its cookie.
-  const staleCookies = clearCookies
-    ? event.cookies
-        .getAll()
-        .filter((c) => c.name.startsWith("__nextgen"))
-        .map((c) => c.name)
-    : [];
-
-  if (matchesRoutes(pathname, protectedRoutes)) {
+  // A dead session's cookie is cleared so the browser stops replaying it, and a
+  // session of this project still under the shared name moves to the project's
+  // own cookie. A live session that signs no one in here (an anonymous one,
+  // whose sign-in may still complete, or one of another project) keeps its
+  // cookie.
+  if (!auth.isAuthenticated && matchesRoutes(pathname, protectedRoutes)) {
     const loginUrl = new URL(loginPath, event.url);
     loginUrl.searchParams.set("next", pathname);
     const headers = new Headers({ location: loginUrl.toString() });
-    for (const name of staleCookies) {
-      headers.append("set-cookie", clearCookie(name));
+    for (const cookie of sessionCookies) {
+      headers.append("set-cookie", serializeSessionCookie(cookie));
     }
     return new Response(null, { status: 302, headers });
   }
 
-  // Clear stale cookies on the continued response too. SvelteKit applies
-  // `event.cookies` mutations to the response produced by `resolve`, so deleting
-  // here propagates the clearing Set-Cookie headers.
-  for (const name of staleCookies) {
-    event.cookies.delete(name, { path: "/" });
+  // SvelteKit applies `event.cookies` changes to the response `resolve`
+  // produces, whose headers may be immutable.
+  for (const cookie of sessionCookies) {
+    if (cookie.maxAge === 0) {
+      event.cookies.delete(cookie.name, { path: "/" });
+    } else {
+      event.cookies.set(cookie.name, cookie.value, {
+        path: "/",
+        httpOnly: true,
+        sameSite: "lax",
+        secure: cookie.secure,
+        ...(cookie.maxAge === undefined ? {} : { maxAge: cookie.maxAge }),
+        // The value is the server's token, sent back as the server sent it.
+        encode: (value) => value,
+      });
+    }
   }
   return resolve(event);
 }
@@ -321,7 +334,7 @@ export function createNextgenHandle(
     }
 
     if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-      return proxyRequest(event, url, proxyPath, projectSecret, proxyTimeoutMs);
+      return proxyRequest(event, url, proxyPath, projectId, projectSecret, proxyTimeoutMs);
     }
 
     return handleAuth(event, resolve, {

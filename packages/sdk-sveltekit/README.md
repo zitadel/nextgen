@@ -184,7 +184,7 @@ work-email copy for a business audience.
 
 ## How JWT verification works
 
-1. Bearer token from `Authorization` header is checked first; `__nextgen_session` cookie is the fallback
+1. Bearer token from `Authorization` header is checked first; the app's session cookie, `__nextgen_session_<projectId>`, is the fallback
 2. Tokens with an `alg` not in `allowedAlgorithms` (`RS256`, `ES256` by default) are rejected before any JWKS fetch
 3. Tokens with a `typ` not in `allowedTokenTypes` are rejected immediately
 4. The public key is fetched from `{url}/auth/keys` (JWKS) via the Web Crypto API, cached for 5 minutes per `kid`

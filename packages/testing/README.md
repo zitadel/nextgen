@@ -92,7 +92,13 @@ export default defineConfig({
 
 Most app tests don't want to re-test login. `authenticatedPage` seeds a user,
 drives the real login flow headlessly (the same Flow API the login UI renders),
-and injects the resulting session cookie into a dedicated browser context:
+and injects the resulting session cookie into a dedicated browser context. It
+injects it under both names a session cookie can have on an app's origin, so it
+works for any app: an app with a server SDK (Next.js, Nuxt, SvelteKit,
+SolidStart, TanStack Start, Qwik City) keeps its session in
+`sessionCookieName(projectId)`, `__nextgen_session_<projectId>`, so that the
+apps and the Console on one host each keep their own; an SPA keeps the server's
+`SESSION_COOKIE_NAME`, which its dev proxy passes through:
 
 ```ts
 test("member sees the dashboard", async ({ authenticatedPage }) => {
@@ -104,7 +110,8 @@ test("member sees the dashboard", async ({ authenticatedPage }) => {
 Underneath sits `seed.session()`, whose `sessionToken` also drives session
 APIs without any browser — backend tests call the instance directly with the
 cookie header (`cookie: __nextgen_session=<sessionToken>`, the SDK
-middleware's own headless pattern; `SESSION_COOKIE_NAME` holds the name).
+middleware's own headless pattern; `SESSION_COOKIE_NAME` holds the name, which
+is the server's).
 Scope: password flows (the shipped `password-first` presets). A flow step
 demanding anything beyond the user's email and password — a challenge,
 another factor — fails with the step name; log in through the UI for those.
@@ -194,7 +201,8 @@ import {
   connectZitadel,    // attach to an existing instance via its handle
   writeHandshake, readHandshakeSync, waitForHandshake,
   identity,          // unused { email, password }, no instance needed
-  SESSION_COOKIE_NAME, // "__nextgen_session"
+  SESSION_COOKIE_NAME, // "__nextgen_session", the server's name
+  sessionCookieName,   // (projectId) => "__nextgen_session_<projectId>", a server SDK's
 } from "@zitadel/testing";
 
 const z = await startLocalZitadel({
@@ -229,8 +237,8 @@ per test, `zitadel` per worker, `passkey` on demand), the flow ceremonies
 `withZitadel(options)` returning `{ webServer }` for the config,
 `enableVirtualPasskey(page)` for non-fixture pages, and
 `nextAppEnv`/`applyAppEnvTemplate` for the env-template mechanism described
-above. `identity()` and `SESSION_COOKIE_NAME` are on both entry points, so a
-Playwright spec imports everything from this one.
+above. `identity()`, `SESSION_COOKIE_NAME` and `sessionCookieName` are on
+both entry points, so a Playwright spec imports everything from this one.
 
 ## How it works
 

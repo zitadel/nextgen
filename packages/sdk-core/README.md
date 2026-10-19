@@ -14,7 +14,7 @@ building your own middleware or need the types without a framework wrapper.
 | `@zitadel/sdk-core` | The middleware, JWT, and runtime-resolution exports in one namespace. The `/types` widget contract is **not** re-exported from the root — import it from `@zitadel/sdk-core/types` |
 | `@zitadel/sdk-core/types` | The SPA widget contract (`ZitadelFlowStepDetail` and the other widget event/config/handler/props types the SPA SDKs re-export) |
 | `@zitadel/sdk-core/jwt` | `verifyJwt`, `decodeJwt`, `isJwtShaped`, `JWKS_TTL_MS` |
-| `@zitadel/sdk-core/middleware` | The middleware layer: `NextgenSession`, `AuthResult`, `NextgenMiddlewareOptions`, route matching (`matchesRoutes`), response-header filtering (`filterResponseHeaders`, `HOP_BY_HOP`) |
+| `@zitadel/sdk-core/middleware` | The middleware layer: `NextgenSession`, `AuthResult`, `NextgenMiddlewareOptions`, route matching (`matchesRoutes`), response-header filtering (`filterResponseHeaders`, `HOP_BY_HOP`), session judgement (`resolveSession`), and the session cookie per project (`sessionCookieName`, `proxySessionCookies`, `serializeSessionCookie`) |
 
 It also exports `resolveZitadelRuntime` / `resolveZitadelRuntimeEnv` and
 `ZitadelRuntimeError` for resolving the runtime environment
@@ -26,7 +26,8 @@ This is the canonical description of the verification pipeline every SDK
 middleware runs (`verifyJwt`):
 
 1. The bearer token from the `Authorization` header is checked first; the
-   `__nextgen_session` cookie is the fallback.
+   session cookie is the fallback (see
+   [The session cookie](#the-session-cookie)).
 2. The JWT header is decoded to extract `kid` and `alg`.
 3. Tokens with an `alg` not in `allowedAlgorithms` (`RS256`, `ES256` by
    default) are rejected immediately — no JWKS fetch.
@@ -57,6 +58,28 @@ With no project configured, no session counts as signed in.
 
 `resolveSession` is the one implementation of these rules; every server SDK's
 middleware calls it.
+
+## The session cookie
+
+The server sets and reads one session cookie, `__nextgen_session`. A browser
+shares a host's cookies across every port, so under that name alone the Console
+of a local server and every app on `localhost` would keep their sessions in one
+slot and sign each other out. An app with a server SDK therefore keeps its
+session in a cookie of its own, `sessionCookieName(projectId)`:
+`__nextgen_session_<projectId>` (ADR 072).
+
+- **The proxy** (`proxySessionCookies`) renames the server's `Set-Cookie` to the
+  app's name on the way to the browser, and on the way to the server sends the
+  app's cookie under the server's name. No other session cookie, the
+  Console's or another app's, goes up.
+- **The middleware** (`resolveSession`) reads the app's cookie, and clears only
+  that cookie when it holds a dead session.
+- **A session kept under the server's name** before the change, by this app or,
+  on `localhost`, by the Console, is read only where the server holds it to the
+  app's project: by the middleware, and by the proxy for the session probe
+  `GET /sessions/me?project_id=…`. A session that signs a user of this project
+  in moves to the app's cookie; any other stays where it is.
+- **Without a project**, the proxy passes the cookies through unchanged.
 
 Framework-specific steps (header tunnelling, `auth()` re-verification) are
 documented in each framework SDK's README on top of this pipeline.

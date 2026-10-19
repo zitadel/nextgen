@@ -23,8 +23,10 @@ The mock lane covers the boundary that Vitest cannot reach:
 - `<zitadel-login>` mounted inside Next.js `dynamic({ ssr: false })`.
 - The Lit orchestrator's internal `POST /sessions/exchange` traversing
   the Next.js `/__nextgen` proxy installed by `@zitadel/sdk-next`.
-- The `__nextgen_session` cookie being set on the demo origin and
-  surviving the full-page navigation triggered by `post-sign-in-url`.
+- The demo project's session cookie (`__nextgen_session_proj_demo`, the
+  server's cookie renamed by the SDK proxy, ADR 072) being set on the demo
+  origin and surviving the full-page navigation triggered by
+  `post-sign-in-url`.
 - `nextgenMiddleware` accepting that cookie on the next request and
   bouncing unauthenticated traffic back to `/login`.
 

@@ -9,6 +9,7 @@ import {
   INTERNAL_HEADERS,
   filterResponseHeaders,
   matchesRoutes,
+  proxySessionCookies,
   requiresProjectSecret,
   resolveSession,
 } from "@zitadel/sdk-core/middleware";
@@ -33,6 +34,15 @@ export interface QwikCookieValue {
   readonly value: string;
 }
 
+/** The options of `ev.cookie.set` this handler passes. */
+export interface QwikCookieOptions {
+  readonly path?: string;
+  readonly httpOnly?: boolean;
+  readonly sameSite?: "lax";
+  readonly secure?: boolean;
+  readonly maxAge?: number;
+}
+
 export interface QwikRequestEvent {
   readonly request: Request;
   readonly url: URL;
@@ -41,6 +51,7 @@ export interface QwikRequestEvent {
   readonly cookie: {
     get(name: string): QwikCookieValue | null;
     getAll(): Record<string, QwikCookieValue>;
+    set(name: string, value: string, options?: QwikCookieOptions): void;
     delete(name: string, options?: { path?: string }): void;
   };
   /** Sends a custom response and ends the chain. */
@@ -106,14 +117,16 @@ function buildUpstreamHeaders(ev: QwikRequestEvent): Headers {
 
 /**
  * Forwards a `/__nextgen/*` request to the upstream auth backend and returns the
- * upstream response verbatim, including `Set-Cookie` headers. Hop-by-hop
- * headers are stripped in both directions, and a `location` is kept only as a
- * redirect onto this app.
+ * upstream response, including its `Set-Cookie` headers. Hop-by-hop headers are
+ * stripped in both directions, a `location` is kept only as a redirect onto this
+ * app, and the session cookie travels under this project's name in the browser
+ * and the server's name upstream ({@link proxySessionCookies}).
  */
 async function proxyResponse(
   ev: QwikRequestEvent,
   authUrl: string,
   proxyPath: string,
+  projectId: string | undefined,
   projectSecret: string | undefined,
   proxyTimeoutMs: number,
 ): Promise<Response> {
@@ -125,6 +138,21 @@ async function proxyResponse(
   const body = hasBody ? await ev.request.arrayBuffer() : undefined;
 
   const upstreamHeaders = buildUpstreamHeaders(ev);
+  const sessionCookies = proxySessionCookies(
+    {
+      method,
+      path: suffix,
+      search: ev.url.search,
+      cookie: ev.request.headers.get("cookie"),
+      requestUrl: ev.url,
+    },
+    projectId,
+  );
+  if (sessionCookies.upstreamCookie === null) {
+    upstreamHeaders.delete("cookie");
+  } else {
+    upstreamHeaders.set("cookie", sessionCookies.upstreamCookie);
+  }
 
   // ADR 036: attach the project secret only to the handoff exchange — on every
   // operation it would make this public boundary an open relay with project
@@ -148,12 +176,12 @@ async function proxyResponse(
   // The app's own request URL: the origin a proxied redirect may name, and the
   // base a relative one resolves against (the IdP callback's 303 needs it).
   const responseHeaders = filterResponseHeaders(upstream.headers, ev.url.toString());
-  const setCookies = upstream.headers.getSetCookie?.() ?? [];
-  for (const cookie of setCookies) {
+  const answer = await sessionCookies.toBrowser(upstream);
+  for (const cookie of answer.setCookies) {
     responseHeaders.append("set-cookie", cookie);
   }
 
-  return new Response(upstream.body, {
+  return new Response(answer.body, {
     status: upstream.status,
     headers: responseHeaders,
   });
@@ -172,10 +200,9 @@ interface AuthHandlerOptions extends ResolveSessionOptions {
 }
 
 /**
- * Judges the session and writes the auth result to `ev.sharedMap`. Clears
- * `__nextgen*` cookies that hold dead credentials, and on a protected route
- * with nobody signed in throws `ev.redirect(...)` to send the browser to the
- * login page.
+ * Judges the session and writes the auth result to `ev.sharedMap`. Sets the
+ * session cookies the judgement asks for, and on a protected route with nobody
+ * signed in throws `ev.redirect(...)` to send the browser to the login page.
  */
 async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promise<void> {
   const { protectedRoutes, loginPath, ...verification } = opts;
@@ -184,32 +211,37 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
   const cookies = parseCookieHeader(ev.request.headers.get("cookie"));
   const authHeader = ev.request.headers.get("authorization");
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  const cookieToken =
-    ev.cookie.get("__nextgen_session")?.value ?? cookies.get("__nextgen_session") ?? null;
-  const { auth, clearCookies } = await resolveSession(
-    { bearer: bearerToken, cookie: cookieToken },
+  const { auth, cookies: sessionCookies } = await resolveSession(
+    {
+      bearer: bearerToken,
+      cookie: (name) => ev.cookie.get(name)?.value ?? cookies.get(name),
+      requestUrl: ev.url,
+    },
     verification,
   );
 
   ev.sharedMap.set(SHARED_MAP_KEY, auth);
-  if (auth.isAuthenticated) {
-    return;
-  }
-
-  // Dead credentials are cleared on every unauthenticated response so the
-  // browser stops replaying them (each replay costs a backend session check);
-  // a live session that signs no one in here (an anonymous one, whose sign-in
-  // may still complete, or one of another project) keeps its cookie. Qwik
-  // applies the deletion to whichever response goes out.
-  if (clearCookies) {
-    for (const name of Object.keys(ev.cookie.getAll())) {
-      if (name.startsWith("__nextgen")) {
-        ev.cookie.delete(name, { path: "/" });
-      }
+  // A dead session's cookie is cleared so the browser stops replaying it (each
+  // replay costs a backend session check), and a session of this project still
+  // under the shared name moves to the project's own cookie. A live session that
+  // signs no one in here (an anonymous one, whose sign-in may still complete, or
+  // one of another project) keeps its cookie. Qwik applies the changes to
+  // whichever response goes out.
+  for (const cookie of sessionCookies) {
+    if (cookie.maxAge === 0) {
+      ev.cookie.delete(cookie.name, { path: "/" });
+    } else {
+      ev.cookie.set(cookie.name, cookie.value, {
+        path: "/",
+        httpOnly: true,
+        sameSite: "lax",
+        secure: cookie.secure,
+        ...(cookie.maxAge === undefined ? {} : { maxAge: cookie.maxAge }),
+      });
     }
   }
 
-  if (matchesRoutes(pathname, protectedRoutes)) {
+  if (!auth.isAuthenticated && matchesRoutes(pathname, protectedRoutes)) {
     const loginUrl = new URL(loginPath, ev.url);
     loginUrl.searchParams.set("next", pathname);
     throw ev.redirect(302, `${loginUrl.pathname}${loginUrl.search}`);
@@ -302,7 +334,7 @@ export function createNextgenOnRequest(
     }
 
     if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-      ev.send(await proxyResponse(ev, url, proxyPath, projectSecret, proxyTimeoutMs));
+      ev.send(await proxyResponse(ev, url, proxyPath, projectId, projectSecret, proxyTimeoutMs));
       return;
     }
 

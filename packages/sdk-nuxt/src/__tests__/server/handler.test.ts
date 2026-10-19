@@ -141,7 +141,9 @@ describe("middlewareOptions", () => {
     ["the stored project", { projectId: "proj_server" }, "proj_server"],
     ["the public project id", { projectId: "" }, "proj_public"],
   ])("holds sessions to %s", (_label, nextgen, expected) => {
-    expect(middlewareOptions(nextgen, { zitadelProjectId: "proj_public" }).projectId).toBe(expected);
+    expect(middlewareOptions(nextgen, { zitadelProjectId: "proj_public" }).projectId).toBe(
+      expected,
+    );
   });
 
   it("leaves the options Nitro stored as empty strings to the middleware's defaults", () => {

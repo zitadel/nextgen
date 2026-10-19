@@ -11,8 +11,10 @@ This project covers the boundary that Vitest cannot reach:
 - `<zitadel-login>` mounted inside Nuxt's `<ClientOnly>` after the SSR pass.
 - The Lit orchestrator's internal `POST /sessions/exchange` traversing
   the Nitro `/__nextgen` proxy installed by `@zitadel/sdk-nuxt`.
-- The `__nextgen_session` cookie being set on the demo origin and
-  surviving the full-page navigation triggered by `post-sign-in-url`.
+- The demo project's session cookie (`__nextgen_session_proj_demo`, the
+  server's cookie renamed by the SDK proxy, ADR 072) being set on the demo
+  origin and surviving the full-page navigation triggered by
+  `post-sign-in-url`.
 - The Nitro auth middleware accepting that cookie on the next request
   and bouncing unauthenticated traffic back to `/login`.
 

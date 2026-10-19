@@ -177,6 +177,266 @@ export function filterResponseHeaders(upstream: Headers, selfUrl?: string): Head
   return filtered;
 }
 
+// ─── Session cookies ─────────────────────────────────────────────────────────
+
+/** The cookie the server sets a session in and reads it from. */
+export const SERVER_SESSION_COOKIE = "__nextgen_session";
+
+/** Every app's own session cookie starts with this. */
+const PROJECT_SESSION_COOKIE_PREFIX = `${SERVER_SESSION_COOKIE}_`;
+
+/**
+ * The cookie an app keeps its project's session in: the server's name with the
+ * project id appended (ADR 072). A browser shares one cookie jar across every
+ * port of a host, so under the server's name alone the Console of a local
+ * server and every app on `localhost` would hold their sessions in one slot and
+ * replace each other's.
+ *
+ * Every byte of the id outside `[A-Za-z0-9_-]` is percent-encoded, so any
+ * configured id makes a valid cookie name. Ids the server mints need none.
+ */
+export function sessionCookieName(projectId: string): string {
+  let name = PROJECT_SESSION_COOKIE_PREFIX;
+  for (const byte of new TextEncoder().encode(projectId)) {
+    const char = String.fromCharCode(byte);
+    name += /[A-Za-z0-9_-]/.test(char)
+      ? char
+      : `%${byte.toString(16).toUpperCase().padStart(2, "0")}`;
+  }
+  return name;
+}
+
+/** Whether `name` is a session cookie: the server's, or any app's own. */
+function isSessionCookie(name: string): boolean {
+  return name === SERVER_SESSION_COOKIE || name.startsWith(PROJECT_SESSION_COOKIE_PREFIX);
+}
+
+/**
+ * A session cookie a response sets. An empty `value` with `maxAge: 0` clears
+ * it.
+ */
+export interface SessionCookie {
+  readonly name: string;
+  readonly value: string;
+  /** Seconds the browser keeps it, or `undefined` for the browser session. */
+  readonly maxAge: number | undefined;
+  readonly secure: boolean;
+}
+
+/**
+ * The `Set-Cookie` value for `cookie`, with the attributes the server gives its
+ * own session cookie: `Path=/`, `HttpOnly`, `SameSite=Lax`.
+ */
+export function serializeSessionCookie(cookie: SessionCookie): string {
+  const attributes = [`${cookie.name}=${cookie.value}`, "Path=/"];
+  if (cookie.maxAge !== undefined) {
+    attributes.push(`Max-Age=${cookie.maxAge}`);
+  }
+  attributes.push("HttpOnly", "SameSite=Lax");
+  if (cookie.secure) {
+    attributes.push("Secure");
+  }
+  return attributes.join("; ");
+}
+
+/**
+ * Whether a session cookie this app sets needs `Secure`, by the rule the server
+ * applies to its own: always, except over plain http to a loopback host, where
+ * Safari would drop a `Secure` cookie.
+ */
+function secureFor(requestUrl: string | URL): boolean {
+  let url: URL;
+  try {
+    url = new URL(requestUrl);
+  } catch {
+    return true;
+  }
+  if (url.protocol !== "http:") {
+    return true;
+  }
+  const host = url.hostname.toLowerCase();
+  return !(host === "localhost" || host === "[::1]" || /^127(?:\.\d{1,3}){3}$/.test(host));
+}
+
+/** Seconds from now until `epochMs`, at least one, or `undefined` when unknown. */
+function secondsUntil(epochMs: number): number | undefined {
+  return Number.isFinite(epochMs)
+    ? Math.max(1, Math.floor((epochMs - Date.now()) / 1000))
+    : undefined;
+}
+
+/** Clears the cookie `name`. */
+function clearedCookie(name: string, secure: boolean): SessionCookie {
+  return { name, value: "", maxAge: 0, secure };
+}
+
+/**
+ * Moves a session of this project out of the server's cookie into the
+ * project's own. The server's cookie held this project's session, so clearing
+ * it costs no other app its sign-in.
+ */
+function movedToProjectCookie(
+  token: string,
+  projectId: string,
+  maxAge: number | undefined,
+  secure: boolean,
+): SessionCookie[] {
+  return [
+    { name: sessionCookieName(projectId), value: token, maxAge, secure },
+    clearedCookie(SERVER_SESSION_COOKIE, secure),
+  ];
+}
+
+/** The pieces of a `Cookie` header, each with the name it carries. */
+function cookiePieces(header: string | null): { name: string; piece: string }[] {
+  const pieces: { name: string; piece: string }[] = [];
+  for (const raw of (header ?? "").split(";")) {
+    const piece = raw.trim();
+    if (piece !== "") {
+      const index = piece.indexOf("=");
+      pieces.push({ name: (index === -1 ? piece : piece.slice(0, index)).trim(), piece });
+    }
+  }
+  return pieces;
+}
+
+/** The value of the first cookie named `name`, or `null` when it is absent or empty. */
+function cookieValue(pieces: { name: string; piece: string }[], name: string): string | null {
+  const found = pieces.find((candidate) => candidate.name === name);
+  const value = found ? found.piece.slice(found.piece.indexOf("=") + 1).trim() : "";
+  return value === "" ? null : value;
+}
+
+/** The name a `Set-Cookie` value sets. */
+function setCookieName(setCookie: string): string {
+  const index = setCookie.indexOf("=");
+  return index === -1 ? "" : setCookie.slice(0, index).trim();
+}
+
+/** What a proxied request carries that decides its session cookies. */
+export interface ProxiedRequest {
+  readonly method: string;
+  /** The path after the proxy prefix, e.g. `/sessions/me`. */
+  readonly path: string;
+  /** The query string, with its leading `?`, or `""`. */
+  readonly search: string;
+  /** The request's `Cookie` header, or `null`. */
+  readonly cookie: string | null;
+  /** The app's own request URL, which decides whether a cookie needs `Secure`. */
+  readonly requestUrl: string | URL;
+}
+
+/** What a proxied answer sends the browser. */
+export interface ProxiedAnswer {
+  readonly setCookies: string[];
+  readonly body: ReadableStream<Uint8Array> | string | null;
+}
+
+/** A proxied call's session cookies, on the way up and on the way back. */
+export interface ProxiedSessionCookies {
+  /** The `Cookie` header to send upstream, or `null` to send none. */
+  readonly upstreamCookie: string | null;
+  /**
+   * The upstream answer's way back to the browser: the `Set-Cookie` values and
+   * the body to send. Send this body, never the upstream response's own, which
+   * this may have read.
+   */
+  toBrowser(upstream: Response): Promise<ProxiedAnswer>;
+}
+
+/**
+ * The session cookies of a call the app proxies to the server (ADR 072). The
+ * server knows one session cookie, `__nextgen_session`; the app keeps its
+ * project's session in {@link sessionCookieName}, so it neither replaces nor
+ * reads the session of another app or of the Console on the same host.
+ *
+ * - On the way up, the app's own session cookie goes under the server's name,
+ *   and every other session cookie stays behind. Other cookies pass unchanged.
+ * - On the way back, a `Set-Cookie` of the server's session cookie, which sets
+ *   or clears it, is renamed to the app's.
+ * - A session kept under the server's name before ADR 072 goes up to one call
+ *   only, the session probe `GET /sessions/me?project_id=<project>`, which the
+ *   server refuses for another project's session. When the answer signs a user
+ *   of this project in, the session moves to the app's cookie.
+ * - Without a project the cookies pass as they are: nothing says which session
+ *   is the app's.
+ *
+ * @param request   - The proxied request.
+ * @param projectId - The project this app signs its users in to.
+ */
+export function proxySessionCookies(
+  request: ProxiedRequest,
+  projectId: string | undefined,
+): ProxiedSessionCookies {
+  if (!projectId) {
+    return {
+      upstreamCookie: request.cookie,
+      toBrowser: async (upstream) => ({
+        setCookies: upstream.headers.getSetCookie?.() ?? [],
+        body: upstream.body,
+      }),
+    };
+  }
+
+  const ownName = sessionCookieName(projectId);
+  const pieces = cookiePieces(request.cookie);
+  const own = cookieValue(pieces, ownName);
+  const isProbe =
+    request.method.toUpperCase() === "GET" &&
+    request.path === "/sessions/me" &&
+    new URLSearchParams(request.search).get("project_id") === projectId;
+  // A session kept under the server's name, which goes up to the probe only.
+  const probed = own === null && isProbe ? cookieValue(pieces, SERVER_SESSION_COOKIE) : null;
+
+  const upstream = pieces.filter(({ name }) => !isSessionCookie(name)).map(({ piece }) => piece);
+  const session = own ?? probed;
+  if (session !== null) {
+    upstream.push(`${SERVER_SESSION_COOKIE}=${session}`);
+  }
+
+  return {
+    upstreamCookie: upstream.length > 0 ? upstream.join("; ") : null,
+    async toBrowser(answer) {
+      const setCookies = (answer.headers.getSetCookie?.() ?? []).map((setCookie) =>
+        setCookieName(setCookie) === SERVER_SESSION_COOKIE
+          ? `${ownName}${setCookie.slice(setCookie.indexOf("="))}`
+          : setCookie,
+      );
+      if (probed === null || answer.status !== 200) {
+        return { setCookies, body: answer.body };
+      }
+      const body = await answer.text();
+      const signedIn = sessionAnswer(parsedJson(body), projectId);
+      if (
+        signedIn.userId &&
+        !setCookies.some((setCookie) => setCookieName(setCookie) === ownName)
+      ) {
+        const maxAge = signedIn.expiresAt
+          ? secondsUntil(Date.parse(signedIn.expiresAt))
+          : undefined;
+        for (const cookie of movedToProjectCookie(
+          probed,
+          projectId,
+          maxAge,
+          secureFor(request.requestUrl),
+        )) {
+          setCookies.push(serializeSessionCookie(cookie));
+        }
+      }
+      return { setCookies, body };
+    },
+  };
+}
+
+/** `text` as JSON, or `undefined` when it is not JSON. */
+function parsedJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
 // ─── Middleware types ──────────────────────────────────────────────────────────
 
 /**
@@ -259,14 +519,19 @@ export type NextgenMiddlewareOptions = {
    * to every port of a shared host) reads as signed out, and its cookie is left
    * alone.
    *
+   * The app keeps its session in a cookie of its own,
+   * `__nextgen_session_<projectId>` ({@link sessionCookieName}), so signing in
+   * here neither replaces nor reads the session of another app or of the
+   * Console on the same host (ADR 072).
+   *
    * An opaque session token is checked by the backend
    * (`GET /sessions/me?project_id=…`) and against the project its answer names;
    * a JWT must name the project in its `aud` claim.
    *
-   * Required: with no project, no session counts as signed in. Each SDK falls
-   * back to the `ZITADEL_PROJECT_ID` environment variable, then to its
-   * framework's public project id variable, which `zitadel setup` writes to
-   * `.env.local`.
+   * Required: with no project, no session counts as signed in, and the proxy
+   * passes the server's session cookie through unchanged. Each SDK falls back
+   * to the `ZITADEL_PROJECT_ID` environment variable, then to its framework's
+   * public project id variable, which `zitadel setup` writes to `.env.local`.
    */
   projectId?: string;
 
@@ -383,6 +648,8 @@ export interface OpaqueSession {
   readonly identifier: string | null;
   readonly identifierProperty: string | null;
   readonly display: string | null;
+  /** When the session expires, as the backend reports it, or `null`. */
+  readonly expiresAt: string | null;
 }
 
 /**
@@ -393,7 +660,39 @@ export const SESSION_PROJECT_MISMATCH = "sess.project_mismatch";
 
 /** A live session that names no user of this app's project. */
 function noUser(): OpaqueSession {
-  return { userId: null, identifier: null, identifierProperty: null, display: null };
+  return {
+    userId: null,
+    identifier: null,
+    identifierProperty: null,
+    display: null,
+    expiresAt: null,
+  };
+}
+
+/**
+ * What a `GET /sessions/me` answer says about this app's project. A session of
+ * another project names no user here: a backend that predates `project_id`
+ * answers for any project, so the project the answer names is checked too.
+ */
+function sessionAnswer(body: unknown, projectId: string): OpaqueSession {
+  const answer = (typeof body === "object" && body !== null ? body : {}) as {
+    project_id?: unknown;
+    user_id?: unknown;
+    expires_at?: unknown;
+    user?: { identifier?: unknown; identifier_property?: unknown; display?: unknown };
+  };
+  if (answer.project_id !== projectId) {
+    return noUser();
+  }
+  const text = (value: unknown): string | null =>
+    typeof value === "string" && value !== "" ? value : null;
+  return {
+    userId: text(answer.user_id),
+    identifier: text(answer.user?.identifier),
+    identifierProperty: text(answer.user?.identifier_property),
+    display: text(answer.user?.display),
+    expiresAt: text(answer.expires_at),
+  };
 }
 
 /**
@@ -407,7 +706,7 @@ function noUser(): OpaqueSession {
  * project its answer names is checked as well, because a backend that predates
  * the parameter answers for any project.
  *
- * @param token     - The opaque session token from the `__nextgen_session` cookie.
+ * @param token     - The opaque session token from the app's session cookie.
  * @param issuerUrl - Base URL of the auth backend.
  * @param timeoutMs - How long to wait for the backend before giving up.
  * @param projectId - The project this app signs its users in to. Without one,
@@ -431,7 +730,7 @@ export async function validateOpaqueSessionToken(
       `${issuerUrl}/sessions/me?project_id=${encodeURIComponent(projectId)}`,
       {
         method: "GET",
-        headers: { cookie: `__nextgen_session=${token}` },
+        headers: { cookie: `${SERVER_SESSION_COOKIE}=${token}` },
         signal: AbortSignal.timeout(timeoutMs),
       },
     );
@@ -441,22 +740,7 @@ export async function validateOpaqueSessionToken(
     if (!res.ok) {
       return null;
     }
-    const body = (await res.json()) as {
-      project_id?: unknown;
-      user_id?: unknown;
-      user?: { identifier?: unknown; identifier_property?: unknown; display?: unknown };
-    };
-    if (body.project_id !== projectId) {
-      return noUser();
-    }
-    const text = (value: unknown): string | null =>
-      typeof value === "string" && value !== "" ? value : null;
-    return {
-      userId: text(body.user_id),
-      identifier: text(body.user?.identifier),
-      identifierProperty: text(body.user?.identifier_property),
-      display: text(body.user?.display),
-    };
+    return sessionAnswer(await res.json(), projectId);
   } catch {
     return null;
   }
@@ -483,12 +767,14 @@ export function jwtNamesProject(payload: JwtPayload, projectId: string): boolean
 
 // ─── Session resolution ──────────────────────────────────────────────────────
 
-/** The session tokens a request carries. */
-export interface SessionTokens {
+/** What a request carries that decides its session. */
+export interface SessionRequest {
   /** The `Authorization: Bearer` token, which takes precedence, or `null`. */
   readonly bearer: string | null;
-  /** The `__nextgen_session` cookie, or `null`. */
-  readonly cookie: string | null;
+  /** Reads one of the request's cookies by name. */
+  readonly cookie: (name: string) => string | null | undefined;
+  /** The app's own request URL, which decides whether a cookie needs `Secure`. */
+  readonly requestUrl: string | URL;
 }
 
 /** The settings {@link resolveSession} judges a request's session by. */
@@ -508,12 +794,13 @@ export interface ResolveSessionOptions {
 export interface ResolvedSession {
   readonly auth: AuthResult;
   /**
-   * Whether the response should clear the request's `__nextgen*` cookies so
-   * the browser stops sending dead credentials. A session cookie that is live
-   * but signs no one in here (an anonymous session, or a session of another
-   * project) is kept.
+   * The session cookies the response sets. A cookie holding a dead session is
+   * cleared so the browser stops sending it; a session of this project found
+   * in the server's cookie moves to the project's own. No other cookie is
+   * touched: a session that is live but signs no one in here (an anonymous
+   * one, or one of another project) keeps its cookie.
    */
-  readonly clearCookies: boolean;
+  readonly cookies: readonly SessionCookie[];
 }
 
 function signedOut(): UnauthState {
@@ -535,6 +822,25 @@ function warnMissingProject(): void {
 }
 
 /**
+ * The cookie a request's session is read from: the project's own
+ * ({@link sessionCookieName}), else the server's `__nextgen_session`, where
+ * this app kept its sessions before ADR 072 and where, on `localhost`, the
+ * Console keeps its own.
+ */
+function storedSession(
+  cookie: SessionRequest["cookie"],
+  projectId: string,
+): { readonly name: string; readonly token: string } | null {
+  for (const name of [sessionCookieName(projectId), SERVER_SESSION_COOKIE]) {
+    const token = cookie(name);
+    if (token) {
+      return { name, token };
+    }
+  }
+  return null;
+}
+
+/**
  * Judges which user, if any, a request is signed in as in this app's project.
  * The one implementation behind every server SDK's middleware, so they cannot
  * drift on who counts as signed in.
@@ -546,19 +852,35 @@ function warnMissingProject(): void {
  *   session is live in this project. A JWT-shaped token that failed
  *   verification never reaches the backend: the backend does not re-check JWT
  *   claims.
- * - Without a project nothing signs in, and no cookie is cleared.
+ * - The session cookie is the project's own, else the server's. A session of
+ *   this project found in the server's cookie moves to the project's own.
+ * - Only a cookie that held a dead session is cleared.
+ * - Without a project nothing signs in, and no cookie is touched.
  */
 export async function resolveSession(
-  tokens: SessionTokens,
+  request: SessionRequest,
   options: ResolveSessionOptions,
 ): Promise<ResolvedSession> {
   const { url, projectId, opaqueTokenTimeoutMs } = options;
   if (!projectId) {
     warnMissingProject();
-    return { auth: signedOut(), clearCookies: false };
+    return { auth: signedOut(), cookies: [] };
   }
 
-  const token = tokens.bearer ?? tokens.cookie;
+  const secure = secureFor(request.requestUrl);
+  const stored = storedSession(request.cookie, projectId);
+  // The cookie's session moves to the project's own cookie once it signs a
+  // user in; a session already there stays where it is.
+  const moved = (maxAge: number | undefined): SessionCookie[] =>
+    stored && stored.name === SERVER_SESSION_COOKIE
+      ? movedToProjectCookie(stored.token, projectId, maxAge, secure)
+      : [];
+  const cleared = (): SessionCookie[] => (stored ? [clearedCookie(stored.name, secure)] : []);
+
+  const token = request.bearer ?? stored?.token ?? null;
+  // Whether the token judged is the cookie's: only then does the cookie move,
+  // or get cleared when the token is dead.
+  const fromCookie = request.bearer === null && stored !== null;
   const payload = token
     ? await verifyJwt(token, {
         issuerUrl: url,
@@ -583,17 +905,22 @@ export async function resolveSession(
             token,
           },
         },
-        clearCookies: false,
+        cookies: fromCookie
+          ? moved(payload.exp === undefined ? undefined : secondsUntil(payload.exp * 1000))
+          : [],
       };
     }
-    // A JWT of another project is live there: a cookie holding it stays.
-    const otherProjectCookie = token === tokens.cookie && !jwtNamesProject(payload, projectId);
-    return { auth: signedOut(), clearCookies: !otherProjectCookie };
+    // A JWT of another project is live there, so a cookie holding it stays. One
+    // of this project that names no user is dead.
+    return {
+      auth: signedOut(),
+      cookies: fromCookie && jwtNamesProject(payload, projectId) ? cleared() : [],
+    };
   }
 
-  if (tokens.cookie && !isJwtShaped(tokens.cookie)) {
+  if (stored && !isJwtShaped(stored.token)) {
     const opaque = await validateOpaqueSessionToken(
-      tokens.cookie,
+      stored.token,
       url,
       opaqueTokenTimeoutMs,
       projectId,
@@ -607,14 +934,16 @@ export async function resolveSession(
             identifier: opaque.identifier,
             identifierProperty: opaque.identifierProperty,
             display: opaque.display,
-            token: tokens.cookie,
+            token: stored.token,
           },
         },
-        clearCookies: false,
+        cookies: moved(opaque.expiresAt ? secondsUntil(Date.parse(opaque.expiresAt)) : undefined),
       };
     }
-    return { auth: signedOut(), clearCookies: opaque === null };
+    return { auth: signedOut(), cookies: opaque === null ? cleared() : [] };
   }
 
-  return { auth: signedOut(), clearCookies: true };
+  // A JWT cookie that failed verification is dead. Behind a Bearer token that
+  // failed, the cookie was never judged, so it stays.
+  return { auth: signedOut(), cookies: fromCookie ? cleared() : [] };
 }

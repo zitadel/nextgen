@@ -66,6 +66,15 @@ const PROJECT = "proj_app";
  */
 const OTHER_PROJECT = "proj_other";
 
+/** The cookie this app keeps its project's session in (ADR 072). */
+const SESSION = `__nextgen_session_${PROJECT}`;
+
+/**
+ * The cookie the server sets, which every project on a host shared before
+ * ADR 072, and where the Console of a local server still keeps its session.
+ */
+const SHARED = "__nextgen_session";
+
 /** Publishes the test key as the JWKS and returns a signer for tokens it verifies. */
 function signer() {
   const kid = nextKid();
@@ -107,6 +116,25 @@ function sessionsMe(response: Response): void {
   );
 }
 
+/**
+ * Asserts that an answer moved this project's session `token` out of the shared
+ * cookie: it sets the app's own cookie, HttpOnly, for the session's lifetime,
+ * and clears the shared one.
+ */
+function expectMoved(headers: Headers, token: string): void {
+  const setCookies = headers.getSetCookie();
+  const moved = setCookies.find((cookie) => cookie.startsWith(`${SESSION}=`));
+  const cleared = setCookies.find((cookie) => cookie.startsWith(`${SHARED}=`));
+  expect(setCookies).toHaveLength(2);
+  expect(moved).toMatch(new RegExp(`^${SESSION}=${token};`));
+  expect(moved).toMatch(/; Path=\/(;|$)/i);
+  expect(moved).toMatch(/; Max-Age=[1-9]\d*(;|$)/i);
+  expect(moved).toMatch(/; HttpOnly(;|$)/i);
+  expect(moved).toMatch(/; SameSite=Lax(;|$)/i);
+  expect(cleared).toMatch(new RegExp(`^${SHARED}=;`));
+  expect(cleared).toMatch(/Max-Age=0|expires=.*1970/i);
+}
+
 type ServeOptions = NextgenMiddlewareOptions & { projectSecret?: string };
 
 interface ServeInit {
@@ -124,6 +152,8 @@ interface Served {
   readonly auth: AuthResult | undefined;
   /** The request headers a downstream handler sees. */
   readonly inbound: Headers;
+  /** The answer's body. */
+  readonly body: string;
 }
 
 // ---- SDK glue: how a request reaches this SDK's handler and how the answer is read.
@@ -140,17 +170,21 @@ async function serve(
     const idx = part.indexOf("=");
     if (idx !== -1) jar.set(part.slice(0, idx).trim(), part.slice(idx + 1).trim());
   }
-  const deleted: string[] = [];
+  // The `Set-Cookie` values SvelteKit adds to the response `resolve` produces.
+  const written: string[] = [];
   const event = {
     url: new URL(url),
     request: new Request(url, { method: init.method ?? "GET", headers: init.headers }),
     cookies: {
       get: (name: string) => jar.get(name),
       getAll: () => [...jar.entries()].map(([name, value]) => ({ name, value })),
-      set: (name: string, value: string) => jar.set(name, value),
-      delete: (name: string) => {
-        deleted.push(name);
+      set: (name: string, value: string, opts: CookieOptions) => {
+        jar.set(name, value);
+        written.push(serializeCookie(name, value, opts));
+      },
+      delete: (name: string, opts: CookieOptions) => {
         jar.delete(name);
+        written.push(`${name}=; Path=${opts.path}; Max-Age=0`);
       },
     },
     locals: {} as Record<string, unknown>,
@@ -165,8 +199,8 @@ async function serve(
     resolve,
   } as unknown as Parameters<Handle>[0])) as Response;
   const headers = new Headers(response.headers);
-  for (const name of deleted) {
-    headers.append("set-cookie", `${name}=; Path=/; Max-Age=0`);
+  for (const cookie of written) {
+    headers.append("set-cookie", cookie);
   }
   return {
     answered: resolve.mock.calls.length === 0,
@@ -174,7 +208,28 @@ async function serve(
     headers,
     auth: event.locals.nextgenAuth as AuthResult | undefined,
     inbound: event.request.headers,
+    body: await response.text(),
   };
+}
+
+/** The options `event.cookies.set` and `delete` take. */
+interface CookieOptions {
+  readonly path: string;
+  readonly httpOnly?: boolean;
+  readonly sameSite?: string;
+  readonly secure?: boolean;
+  readonly maxAge?: number;
+  readonly encode?: (value: string) => string;
+}
+
+/** The `Set-Cookie` value SvelteKit writes for `event.cookies.set(name, value, opts)`. */
+function serializeCookie(name: string, value: string, opts: CookieOptions): string {
+  const attributes = [`${name}=${(opts.encode ?? encodeURIComponent)(value)}`, `Path=${opts.path}`];
+  if (opts.maxAge !== undefined) attributes.push(`Max-Age=${opts.maxAge}`);
+  if (opts.httpOnly) attributes.push("HttpOnly");
+  if (opts.sameSite) attributes.push(`SameSite=${opts.sameSite}`);
+  if (opts.secure) attributes.push("Secure");
+  return attributes.join("; ");
 }
 
 function configureSecret(configured?: string, environment?: string): ServeOptions {
@@ -206,6 +261,9 @@ const OPTIONS: ServeOptions = {
 const PROXY: ServeOptions = { url: "http://localhost:4000" };
 
 describe("server middleware", () => {
+  /** The proxy of an app that knows its project. */
+  const APP_PROXY: ServeOptions = { ...PROXY, projectId: PROJECT };
+
   beforeEach(() => {
     vi.restoreAllMocks();
     resetSdk();
@@ -250,7 +308,7 @@ describe("server middleware", () => {
 
     const served = await serve(
       `${ORIGIN}/admin`,
-      { headers: { cookie: `__nextgen_session=${token}` } },
+      { headers: { cookie: `${SESSION}=${token}` } },
       OPTIONS,
     );
 
@@ -279,7 +337,7 @@ describe("server middleware", () => {
 
     const served = await serve(
       `${ORIGIN}/`,
-      { headers: { authorization: `Bearer ${bearer}`, cookie: `__nextgen_session=${cookie}` } },
+      { headers: { authorization: `Bearer ${bearer}`, cookie: `${SESSION}=${cookie}` } },
       OPTIONS,
     );
 
@@ -292,7 +350,7 @@ describe("server middleware", () => {
 
     const served = await serve(
       `${ORIGIN}/admin`,
-      { headers: { cookie: `__nextgen_session=${token}` } },
+      { headers: { cookie: `${SESSION}=${token}` } },
       OPTIONS,
     );
 
@@ -305,7 +363,7 @@ describe("server middleware", () => {
 
     const served = await serve(
       `${ORIGIN}/admin`,
-      { headers: { cookie: `__nextgen_session=${token}` } },
+      { headers: { cookie: `${SESSION}=${token}` } },
       OPTIONS,
     );
 
@@ -318,7 +376,7 @@ describe("server middleware", () => {
 
     const served = await serve(
       `${ORIGIN}/`,
-      { headers: { cookie: `__nextgen_session=${token}` } },
+      { headers: { cookie: `${SESSION}=${token}` } },
       OPTIONS,
     );
 
@@ -332,7 +390,7 @@ describe("server middleware", () => {
 
     const served = await serve(
       `${ORIGIN}/admin`,
-      { headers: { cookie: `__nextgen_session=${token}` } },
+      { headers: { cookie: `${SESSION}=${token}` } },
       { ...OPTIONS, allowedTokenTypes: ["JWT", "at+JWT"] },
     );
 
@@ -345,7 +403,7 @@ describe("server middleware", () => {
 
     const served = await serve(
       `${ORIGIN}/admin`,
-      { headers: { cookie: `__nextgen_session=${token}` } },
+      { headers: { cookie: `${SESSION}=${token}` } },
       { ...OPTIONS, allowedAlgorithms: ["ES256"] },
     );
 
@@ -358,7 +416,7 @@ describe("server middleware", () => {
 
     const served = await serve(
       `${ORIGIN}/admin`,
-      { headers: { cookie: `__nextgen_session=${token}` } },
+      { headers: { cookie: `${SESSION}=${token}` } },
       OPTIONS,
     );
 
@@ -372,7 +430,7 @@ describe("server middleware", () => {
 
     const served = await serve(
       `${ORIGIN}/admin`,
-      { headers: { cookie: `__nextgen_session=${token}` } },
+      { headers: { cookie: `${SESSION}=${token}` } },
       OPTIONS,
     );
 
@@ -396,12 +454,12 @@ describe("server middleware", () => {
 
     const served = await serve(
       `${ORIGIN}/admin`,
-      { headers: { cookie: `__nextgen_session=${tampered}` } },
+      { headers: { cookie: `${SESSION}=${tampered}` } },
       OPTIONS,
     );
 
     expect(served.status).toBe(302);
-    expect(served.headers.get("set-cookie")).toMatch(/__nextgen_session=/);
+    expect(served.headers.get("set-cookie")).toMatch(new RegExp(`^${SESSION}=;`));
     expect(served.headers.get("set-cookie")).toMatch(/Max-Age=0|expires=.*1970/i);
   });
 
@@ -439,12 +497,99 @@ describe("server middleware", () => {
 
   it("forwards upstream Set-Cookie headers", async () => {
     const upstream = new Headers();
-    upstream.append("set-cookie", "__nextgen_session=abc; HttpOnly; SameSite=Lax");
+    upstream.append("set-cookie", `${SHARED}=abc; HttpOnly; SameSite=Lax`);
     captureFetch(() => new Response("{}", { status: 200, headers: upstream }));
 
     const served = await serve(`${ORIGIN}/__nextgen/v1/flow`, {}, PROXY);
 
-    expect(served.headers.get("set-cookie")).toBe("__nextgen_session=abc; HttpOnly; SameSite=Lax");
+    expect(served.headers.get("set-cookie")).toBe(`${SHARED}=abc; HttpOnly; SameSite=Lax`);
+  });
+
+  it("passes cookies through to the backend when no project is configured", async () => {
+    const calls = captureFetch();
+
+    await serve(
+      `${ORIGIN}/__nextgen/sessions/me`,
+      { headers: { cookie: `${SHARED}=tok; theme=dark` } },
+      { ...PROXY, ...configureProject(undefined, undefined) },
+    );
+
+    expect(calls[0]?.headers.get("cookie")).toBe(`${SHARED}=tok; theme=dark`);
+  });
+
+  it("names a proxied session cookie for this app's project", async () => {
+    const upstream = new Headers();
+    upstream.append("set-cookie", `${SHARED}=abc; Path=/; HttpOnly; SameSite=Lax`);
+    captureFetch(() => new Response("{}", { status: 200, headers: upstream }));
+
+    const served = await serve(
+      `${ORIGIN}/__nextgen/sessions/exchange`,
+      { method: "POST" },
+      APP_PROXY,
+    );
+
+    expect(served.headers.get("set-cookie")).toBe(`${SESSION}=abc; Path=/; HttpOnly; SameSite=Lax`);
+  });
+
+  it("sends this project's session cookie upstream under the server's name", async () => {
+    const calls = captureFetch();
+
+    await serve(
+      `${ORIGIN}/__nextgen/users/me`,
+      { headers: { cookie: `theme=dark; ${SESSION}=mine` } },
+      APP_PROXY,
+    );
+
+    expect(calls[0]?.headers.get("cookie")).toBe(`theme=dark; ${SHARED}=mine`);
+  });
+
+  // The shared cookie may hold the Console's session, and another app's cookie
+  // holds that app's: neither is this app's to use.
+  it("keeps other projects' session cookies from the backend", async () => {
+    const calls = captureFetch();
+
+    await serve(
+      `${ORIGIN}/__nextgen/sessions/me`,
+      {
+        method: "DELETE",
+        headers: {
+          cookie: `${SHARED}=console; __nextgen_session_${OTHER_PROJECT}=other; _zflow=f`,
+        },
+      },
+      APP_PROXY,
+    );
+
+    expect(calls[0]?.headers.get("cookie")).toBe("_zflow=f");
+  });
+
+  // A session kept under the shared name before ADR 072 reaches the backend
+  // only where the backend holds it to this project.
+  it("sends the shared session cookie only to this project's session probe", async () => {
+    const calls = captureFetch();
+    const headers = { cookie: `${SHARED}=old` };
+
+    await serve(`${ORIGIN}/__nextgen/sessions/me?project_id=${PROJECT}`, { headers }, APP_PROXY);
+    await serve(`${ORIGIN}/__nextgen/sessions/me`, { method: "DELETE", headers }, APP_PROXY);
+
+    expect(calls.map((call) => call.headers.get("cookie"))).toEqual([`${SHARED}=old`, null]);
+  });
+
+  it("moves this project's session out of the shared cookie on the session probe", async () => {
+    const answer = {
+      project_id: PROJECT,
+      user_id: "u1",
+      expires_at: new Date(Date.now() + 3_600_000).toISOString(),
+    };
+    captureFetch(() => Response.json(answer));
+
+    const served = await serve(
+      `${ORIGIN}/__nextgen/sessions/me?project_id=${PROJECT}`,
+      { headers: { cookie: `${SHARED}=old` } },
+      APP_PROXY,
+    );
+
+    expect(JSON.parse(served.body)).toEqual(answer);
+    expectMoved(served.headers, "old");
   });
 
   // The IdP callback answers 303 back to the page sign-in started on: a
@@ -528,7 +673,7 @@ describe("server middleware", () => {
 
     const served = await serve(
       `${ORIGIN}/admin`,
-      { headers: { cookie: `__nextgen_session=${token}` } },
+      { headers: { cookie: `${SESSION}=${token}` } },
       OPTIONS,
     );
 
@@ -566,7 +711,7 @@ describe("server middleware", () => {
 
     const served = await serve(
       `${ORIGIN}/admin`,
-      { headers: { cookie: "__nextgen_session=opaque-session-token" } },
+      { headers: { cookie: `${SESSION}=opaque-session-token` } },
       OPTIONS,
     );
 
@@ -584,7 +729,7 @@ describe("server middleware", () => {
 
     const served = await serve(
       `${ORIGIN}/admin`,
-      { headers: { cookie: "__nextgen_session=opaque-session-token" } },
+      { headers: { cookie: `${SESSION}=opaque-session-token` } },
       OPTIONS,
     );
 
@@ -596,7 +741,7 @@ describe("server middleware", () => {
 
     const served = await serve(
       `${ORIGIN}/admin`,
-      { headers: { cookie: "__nextgen_session=opaque-session-token" } },
+      { headers: { cookie: `${SESSION}=opaque-session-token` } },
       OPTIONS,
     );
 
@@ -608,11 +753,11 @@ describe("server middleware", () => {
 
     const served = await serve(
       `${ORIGIN}/`,
-      { headers: { cookie: "__nextgen_session=opaque-session-token" } },
+      { headers: { cookie: `${SESSION}=opaque-session-token` } },
       OPTIONS,
     );
 
-    expect(served.headers.get("set-cookie")).toMatch(/__nextgen_session=/);
+    expect(served.headers.get("set-cookie")).toMatch(new RegExp(`^${SESSION}=;`));
     expect(served.headers.get("set-cookie")).toMatch(/Max-Age=0|expires=.*1970/i);
   });
 
@@ -621,7 +766,7 @@ describe("server middleware", () => {
 
     const served = await serve(
       `${ORIGIN}/admin`,
-      { headers: { cookie: "__nextgen_session=opaque-session-token" } },
+      { headers: { cookie: `${SHARED}=opaque-session-token` } },
       OPTIONS,
     );
 
@@ -634,7 +779,7 @@ describe("server middleware", () => {
 
     const served = await serve(
       `${ORIGIN}/`,
-      { headers: { cookie: "__nextgen_session=opaque-session-token" } },
+      { headers: { cookie: `${SHARED}=opaque-session-token` } },
       OPTIONS,
     );
 
@@ -649,11 +794,82 @@ describe("server middleware", () => {
 
     const served = await serve(
       `${ORIGIN}/`,
-      { headers: { cookie: "__nextgen_session=opaque-session-token" } },
+      { headers: { cookie: `${SHARED}=opaque-session-token` } },
       OPTIONS,
     );
 
     expect(served.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("reads the session from this project's cookie before the shared one", async () => {
+    const calls = captureFetch(() => Response.json({ project_id: PROJECT, user_id: "u1" }));
+
+    const served = await serve(
+      `${ORIGIN}/admin`,
+      { headers: { cookie: `${SHARED}=console; ${SESSION}=mine` } },
+      OPTIONS,
+    );
+
+    expect(served.auth).toMatchObject({ isAuthenticated: true, session: { token: "mine" } });
+    expect(calls[0]?.headers.get("cookie")).toBe(`${SHARED}=mine`);
+    expect(served.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("ignores the session cookie of another project's app", async () => {
+    const calls = captureFetch();
+
+    const served = await serve(
+      `${ORIGIN}/`,
+      { headers: { cookie: `__nextgen_session_${OTHER_PROJECT}=other` } },
+      OPTIONS,
+    );
+
+    expect(served.auth?.isAuthenticated).toBe(false);
+    expect(calls).toHaveLength(0);
+    expect(served.headers.get("set-cookie")).toBeNull();
+  });
+
+  // A session this app's users signed in to before ADR 072 sits under the
+  // shared name; it moves the first time the app reads it.
+  it("moves this project's session out of the shared cookie", async () => {
+    sessionsMe(
+      Response.json({
+        project_id: PROJECT,
+        user_id: "u1",
+        expires_at: new Date(Date.now() + 3_600_000).toISOString(),
+      }),
+    );
+
+    const served = await serve(
+      `${ORIGIN}/admin`,
+      { headers: { cookie: `${SHARED}=opaque-session-token` } },
+      OPTIONS,
+    );
+
+    expect(served.auth).toMatchObject({
+      isAuthenticated: true,
+      session: { token: "opaque-session-token" },
+    });
+    expectMoved(served.headers, "opaque-session-token");
+  });
+
+  it("clears only this project's dead session cookie", async () => {
+    sessionsMe(new Response(null, { status: 401 }));
+
+    const served = await serve(
+      `${ORIGIN}/`,
+      {
+        headers: {
+          cookie: `${SHARED}=console; __nextgen_session_${OTHER_PROJECT}=other; ${SESSION}=dead`,
+        },
+      },
+      OPTIONS,
+    );
+
+    const cleared = served.headers.getSetCookie();
+    expect(cleared).toHaveLength(1);
+    expect(cleared[0]).toMatch(new RegExp(`^${SESSION}=;`));
+    expect(cleared[0]).toMatch(/Max-Age=0|expires=.*1970/i);
   });
 
   it("asks the backend for the session in this app's project", async () => {
@@ -661,7 +877,7 @@ describe("server middleware", () => {
 
     await serve(
       `${ORIGIN}/admin`,
-      { headers: { cookie: "__nextgen_session=opaque-session-token" } },
+      { headers: { cookie: `${SESSION}=opaque-session-token` } },
       OPTIONS,
     );
 
@@ -678,7 +894,7 @@ describe("server middleware", () => {
 
     const served = await serve(
       `${ORIGIN}/admin`,
-      { headers: { cookie: "__nextgen_session=opaque-session-token" } },
+      { headers: { cookie: `${SHARED}=opaque-session-token` } },
       OPTIONS,
     );
 
@@ -695,7 +911,7 @@ describe("server middleware", () => {
 
     const served = await serve(
       `${ORIGIN}/admin`,
-      { headers: { cookie: `__nextgen_session=${token}` } },
+      { headers: { cookie: `${SHARED}=${token}` } },
       OPTIONS,
     );
 
@@ -721,7 +937,7 @@ describe("server middleware", () => {
 
     const served = await serve(
       `${ORIGIN}/`,
-      { headers: { cookie: `__nextgen_session=${token}` } },
+      { headers: { cookie: `${SHARED}=${token}` } },
       OPTIONS,
     );
 
@@ -734,7 +950,7 @@ describe("server middleware", () => {
 
     const served = await serve(
       `${ORIGIN}/admin`,
-      { headers: { cookie: `__nextgen_session=${token}` } },
+      { headers: { cookie: `${SESSION}=${token}` } },
       OPTIONS,
     );
 
@@ -748,7 +964,7 @@ describe("server middleware", () => {
 
     const served = await serve(
       `${ORIGIN}/admin`,
-      { headers: { cookie: "__nextgen_session=opaque-session-token" } },
+      { headers: { cookie: `${SHARED}=opaque-session-token` } },
       { ...OPTIONS, ...configureProject(undefined, undefined) },
     );
 
@@ -763,7 +979,7 @@ describe("server middleware", () => {
 
     const served = await serve(
       `${ORIGIN}/admin`,
-      { headers: { cookie: "__nextgen_session=opaque-session-token" } },
+      { headers: { cookie: `${SESSION}=opaque-session-token` } },
       { ...OPTIONS, ...configureProject(configured, environment) },
     );
 

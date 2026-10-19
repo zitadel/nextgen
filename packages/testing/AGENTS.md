@@ -137,9 +137,10 @@ Consequences for changes here:
   automation principal, a boot-minted operator session) join as optional
   fields when their ADRs land — never pre-frozen, and never with an invented
   wire prefix in code or fixtures. Serialize only non-derivable state: a
-  session cookie is rebuilt from its token (`SESSION_COOKIE_NAME` +
-  constants), so a future serialized session is `{ sessionToken, expiresAt }`,
-  not a stored cookie object.
+  session cookie is rebuilt from its token (`SESSION_COOKIE_NAME`, or
+  `sessionCookieName(projectId)` on a server-SDK app's origin, + constants), so
+  a future serialized session is `{ sessionToken, expiresAt }`, not a stored
+  cookie object.
 - Dev loops feed from boot output: `console:dev-real` uses
   `handle.projectSecret` server-side only, to seed and to grant the dev user
   access; the console itself signs in with that user's session cookie (#1300).

@@ -9,8 +9,10 @@ import {
   INTERNAL_HEADERS,
   filterResponseHeaders,
   matchesRoutes,
+  proxySessionCookies,
   requiresProjectSecret,
   resolveSession,
+  serializeSessionCookie,
 } from "@zitadel/sdk-core/middleware";
 
 /**
@@ -36,7 +38,7 @@ export interface SolidFetchEvent {
   readonly clientAddress?: string;
   /**
    * The response stub SolidStart merges into the response it eventually sends;
-   * a middleware that continues sets headers (here, clearing cookies) on it.
+   * a middleware that continues sets headers (here, session cookies) on it.
    */
   readonly response?: { readonly headers: Headers };
 }
@@ -103,15 +105,17 @@ function buildUpstreamHeaders(event: SolidFetchEvent, url: URL): Headers {
 
 /**
  * Forwards a `/__nextgen/*` request to the upstream auth backend and returns the
- * upstream response verbatim, including `Set-Cookie` headers. Hop-by-hop
- * headers are stripped in both directions, and a `location` is kept only as a
- * redirect onto this app.
+ * upstream response, including its `Set-Cookie` headers. Hop-by-hop headers are
+ * stripped in both directions, a `location` is kept only as a redirect onto this
+ * app, and the session cookie travels under this project's name in the browser
+ * and the server's name upstream ({@link proxySessionCookies}).
  */
 async function proxyRequest(
   event: SolidFetchEvent,
   url: URL,
   authUrl: string,
   proxyPath: string,
+  projectId: string | undefined,
   projectSecret: string | undefined,
   proxyTimeoutMs: number,
 ): Promise<Response> {
@@ -123,6 +127,21 @@ async function proxyRequest(
   const body = hasBody ? await event.request.arrayBuffer() : undefined;
 
   const upstreamHeaders = buildUpstreamHeaders(event, url);
+  const sessionCookies = proxySessionCookies(
+    {
+      method,
+      path: suffix,
+      search: url.search,
+      cookie: event.request.headers.get("cookie"),
+      requestUrl: url,
+    },
+    projectId,
+  );
+  if (sessionCookies.upstreamCookie === null) {
+    upstreamHeaders.delete("cookie");
+  } else {
+    upstreamHeaders.set("cookie", sessionCookies.upstreamCookie);
+  }
 
   // ADR 036: attach the project secret only to the handoff exchange — on every
   // operation it would make this public boundary an open relay with project
@@ -146,20 +165,15 @@ async function proxyRequest(
   // The app's own request URL: the origin a proxied redirect may name, and the
   // base a relative one resolves against (the IdP callback's 303 needs it).
   const responseHeaders = filterResponseHeaders(upstream.headers, url.toString());
-  const setCookies = upstream.headers.getSetCookie?.() ?? [];
-  for (const cookie of setCookies) {
+  const answer = await sessionCookies.toBrowser(upstream);
+  for (const cookie of answer.setCookies) {
     responseHeaders.append("set-cookie", cookie);
   }
 
-  return new Response(upstream.body, {
+  return new Response(answer.body, {
     status: upstream.status,
     headers: responseHeaders,
   });
-}
-
-/** A `Set-Cookie` value that clears `name` on the root path. */
-function clearCookie(name: string): string {
-  return `${name}=; Path=/; Max-Age=0`;
 }
 
 /**
@@ -174,8 +188,8 @@ interface AuthHandlerOptions extends ResolveSessionOptions {
 /**
  * Judges the session, writes the auth result to `event.locals`, and returns a
  * redirect `Response` on a protected route when nobody is signed in (otherwise
- * `undefined` to continue). Stale `__nextgen*` cookies are cleared when they
- * hold dead credentials.
+ * `undefined` to continue). Either way the response carries the session
+ * cookies the judgement asks for.
  */
 async function handleAuth(
   event: SolidFetchEvent,
@@ -188,39 +202,33 @@ async function handleAuth(
   const cookies = parseCookieHeader(event.request.headers.get("cookie"));
   const authHeader = event.request.headers.get("authorization");
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  const cookieToken = cookies.get("__nextgen_session") ?? null;
-  const { auth, clearCookies } = await resolveSession(
-    { bearer: bearerToken, cookie: cookieToken },
+  const { auth, cookies: sessionCookies } = await resolveSession(
+    { bearer: bearerToken, cookie: (name) => cookies.get(name), requestUrl: url2 },
     verification,
   );
 
   event.locals.nextgenAuth = auth;
-  if (auth.isAuthenticated) {
-    return;
-  }
+  // A dead session's cookie is cleared so the browser stops replaying it (each
+  // replay costs a backend session check), and a session of this project still
+  // under the shared name moves to the project's own cookie. A live session that
+  // signs no one in here (an anonymous one, whose sign-in may still complete, or
+  // one of another project) keeps its cookie.
+  const setCookies = sessionCookies.map(serializeSessionCookie);
 
-  // Dead credentials are cleared on every unauthenticated response so the
-  // browser stops replaying them (each replay costs a backend session check);
-  // a live session that signs no one in here (an anonymous one, whose sign-in
-  // may still complete, or one of another project) keeps its cookie.
-  const staleCookies = clearCookies
-    ? [...cookies.keys()].filter((name) => name.startsWith("__nextgen"))
-    : [];
-
-  if (matchesRoutes(pathname, protectedRoutes)) {
+  if (!auth.isAuthenticated && matchesRoutes(pathname, protectedRoutes)) {
     const loginUrl = new URL(loginPath, url2);
     loginUrl.searchParams.set("next", pathname);
     const headers = new Headers({ location: loginUrl.toString() });
-    for (const name of staleCookies) {
-      headers.append("set-cookie", clearCookie(name));
+    for (const cookie of setCookies) {
+      headers.append("set-cookie", cookie);
     }
     return new Response(null, { status: 302, headers });
   }
 
-  // Unprotected route: continue the SolidStart pipeline, which merges the
-  // response stub's headers into the response it sends.
-  for (const name of staleCookies) {
-    event.response?.headers.append("set-cookie", clearCookie(name));
+  // Continue the SolidStart pipeline, which merges the response stub's headers
+  // into the response it sends.
+  for (const cookie of setCookies) {
+    event.response?.headers.append("set-cookie", cookie);
   }
   return undefined;
 }
@@ -304,7 +312,7 @@ export function createNextgenMiddleware(
     }
 
     if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-      return proxyRequest(event, url2, url, proxyPath, projectSecret, proxyTimeoutMs);
+      return proxyRequest(event, url2, url, proxyPath, projectId, projectSecret, proxyTimeoutMs);
     }
 
     return handleAuth(event, url2, {

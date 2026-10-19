@@ -12,7 +12,7 @@ import {
  * E2E coverage for the embedded sign-in path:
  *
  *   demo-next /login → <zitadel-login> → /__nextgen proxy
- *                    → api-mock TCP server → __nextgen_session cookie
+ *                    → api-mock TCP server → the project's session cookie
  *                    → /admin (server-rendered, authenticated)
  *
  * This is the integration gap that Vitest cannot reach: real Next

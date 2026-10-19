@@ -11,14 +11,15 @@ import {
   INTERNAL_HEADERS,
   filterResponseHeaders,
   matchesRoutes,
+  proxySessionCookies,
   requiresProjectSecret,
   resolveSession,
+  serializeSessionCookie,
 } from "@zitadel/sdk-core/middleware";
 import {
   defineEventHandler,
   getCookie,
-  parseCookies,
-  deleteCookie,
+  appendResponseHeader,
   sendRedirect,
   getRequestURL,
   getRequestHeader,
@@ -154,7 +155,7 @@ export function createNextgenMiddleware(options: NextgenMiddlewareOptions = {}):
     }
 
     if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-      return proxyRequest(event, url, proxyPath, urlObj, proxyTimeoutMs);
+      return proxyRequest(event, url, proxyPath, urlObj, projectId, proxyTimeoutMs);
     }
 
     return handleAuth(event, {
@@ -175,13 +176,16 @@ export function createNextgenMiddleware(options: NextgenMiddlewareOptions = {}):
 
 /**
  * Forwards a `/__nextgen/*` request to the upstream auth backend and streams
- * the response back verbatim, including `Set-Cookie` headers.
- * Hop-by-hop headers are stripped in both directions.
+ * the response back, including its `Set-Cookie` headers. Hop-by-hop headers are
+ * stripped in both directions, and the session cookie travels under this
+ * project's name in the browser and the server's name upstream
+ * ({@link proxySessionCookies}).
  *
  * @param event      - The current H3 event.
  * @param authUrl    - Base URL of the auth backend.
  * @param proxyPath  - The path prefix being proxied (e.g. `"/__nextgen"`).
  * @param url        - The parsed request URL.
+ * @param projectId  - The project this app signs its users in to.
  * @returns The upstream response body stream.
  */
 async function proxyRequest(
@@ -189,6 +193,7 @@ async function proxyRequest(
   authUrl: string,
   proxyPath: string,
   url: URL,
+  projectId: string | undefined,
   proxyTimeoutMs: number,
 ): Promise<ReadableStream<Uint8Array> | null> {
   const suffix = url.pathname.slice(proxyPath.length);
@@ -200,6 +205,21 @@ async function proxyRequest(
   const body = rawBody != null ? new Uint8Array(rawBody) : undefined;
 
   const upstreamHeaders = buildUpstreamHeaders(event);
+  const sessionCookies = proxySessionCookies(
+    {
+      method,
+      path: suffix,
+      search: url.search,
+      cookie: getRequestHeader(event, "cookie") ?? null,
+      requestUrl: url,
+    },
+    projectId,
+  );
+  if (sessionCookies.upstreamCookie === null) {
+    upstreamHeaders.delete("cookie");
+  } else {
+    upstreamHeaders.set("cookie", sessionCookies.upstreamCookie);
+  }
 
   // ADR 036: the current browser flow needs the confidential project secret
   // only for the handoff exchange. Never make the public proxy an
@@ -227,12 +247,12 @@ async function proxyRequest(
   // the base a relative one resolves against.
   const responseHeaders = filterResponseHeaders(upstream.headers, getRequestURL(event).toString());
 
-  const setCookieHeaders = upstream.headers.getSetCookie?.() ?? [];
-  for (const cookie of setCookieHeaders) {
+  const answer = await sessionCookies.toBrowser(upstream);
+  for (const cookie of answer.setCookies) {
     responseHeaders.append("set-cookie", cookie);
   }
 
-  const response = new Response(upstream.body, {
+  const response = new Response(answer.body, {
     status: upstream.status,
     headers: responseHeaders,
   });
@@ -264,9 +284,9 @@ interface AuthHandlerOptions extends ResolveSessionOptions {
 }
 
 /**
- * Judges the session and writes the auth result to `event.context`. Deletes
- * all `__nextgen*` cookies when they hold dead credentials. Redirects to the
- * login page on protected routes when nobody is signed in.
+ * Judges the session and writes the auth result to `event.context`, sets the
+ * session cookies the judgement asks for, and redirects to the login page on
+ * protected routes when nobody is signed in.
  *
  * @param event - The current H3 event.
  * @param opts  - Auth handler options.
@@ -276,33 +296,29 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<voi
 
   const authHeader = getRequestHeader(event, "authorization");
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  const cookieToken = getCookie(event, "__nextgen_session") ?? null;
-  const { auth, clearCookies } = await resolveSession(
-    { bearer: bearerToken, cookie: cookieToken },
+  const { auth, cookies } = await resolveSession(
+    {
+      bearer: bearerToken,
+      cookie: (name) => getCookie(event, name),
+      requestUrl: getRequestURL(event),
+    },
     verification,
   );
 
   event.context.nextgenAuth = auth;
-  if (auth.isAuthenticated) {
-    return;
+  // A dead session's cookie is cleared so the browser stops replaying it, and a
+  // session of this project still under the shared name moves to the project's
+  // own cookie. A live session that signs no one in here (an anonymous one,
+  // whose sign-in may still complete, or one of another project) keeps its
+  // cookie.
+  for (const cookie of cookies) {
+    appendResponseHeader(event, "set-cookie", serializeSessionCookie(cookie));
   }
 
-  // Clearing cookies stops the browser from replaying dead credentials. A live
-  // session that signs no one in here (an anonymous one, whose sign-in may
-  // still complete, or one of another project) keeps its cookie.
-  if (clearCookies) {
-    for (const name of Object.keys(parseCookies(event))) {
-      if (name.startsWith("__nextgen")) {
-        deleteCookie(event, name);
-      }
-    }
-  }
-
-  if (matchesRoutes(pathname, protectedRoutes)) {
+  if (!auth.isAuthenticated && matchesRoutes(pathname, protectedRoutes)) {
     const loginUrl = new URL(loginPath, getRequestURL(event));
     loginUrl.searchParams.set("next", pathname);
     await sendRedirect(event, loginUrl.toString(), 302);
-    return;
   }
 }
 
