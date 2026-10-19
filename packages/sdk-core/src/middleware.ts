@@ -305,6 +305,11 @@ export type NextgenMiddlewareOptions = {
    * Pathnames that require a valid session. Requests to these routes without
    * a valid token are redirected to {@link loginPath}.
    * Entries ending with `*` match any sub-path (e.g. `"/admin*"`).
+   *
+   * When the backend cannot say whether a session cookie is live (it answers
+   * `5xx`, does not answer in time, or cannot be reached), the route answers
+   * `503 Service Unavailable` instead: the user may well be signed in, and the
+   * login page would tell them they are not.
    * @default []
    */
   protectedRoutes?: string[];
@@ -379,8 +384,10 @@ export type NextgenMiddlewareOptions = {
 
   /**
    * Timeout in milliseconds for opaque (non-JWT) session token validation
-   * via the backend's `GET /sessions/me` endpoint. Tokens that cannot be
-   * validated within this window are treated as invalid.
+   * via the backend's `GET /sessions/me` endpoint. A token the backend does
+   * not answer for within this window is not refused: the request counts as
+   * signed out, its session cookie is kept, and a protected route answers
+   * `503` (see {@link protectedRoutes}).
    * @default 5000
    */
   opaqueTokenTimeoutMs?: number;
@@ -405,29 +412,65 @@ export interface OpaqueSession {
 }
 
 /**
- * Validates an opaque session token by asking the backend
- * (`GET {issuerUrl}/sessions/me`) whether the session is live.
+ * The backend's verdict on an opaque session token, from
+ * {@link checkOpaqueSessionToken}.
+ *
+ * - `live`: the backend holds a live session for the token. Its `userId` is
+ *   `null` when the session is anonymous (see {@link OpaqueSession}).
+ * - `refused`: the backend judged the token and refused it (`401`), or found
+ *   the session it names gone (`404` with the `sess.not_found` code). Only
+ *   this verdict makes the cookie dead.
+ * - `undecided`: the backend gave no verdict: a `5xx` or any other answer, no
+ *   answer in time, a network error, or a body that cannot be read. The
+ *   backend answers `500`, never `401`, when it cannot decide (its token or
+ *   key store failed), so that an outage does not sign its users out. The
+ *   request counts as signed out, but the cookie is kept.
+ */
+export type OpaqueSessionCheck =
+  | { readonly verdict: "live"; readonly session: OpaqueSession }
+  | { readonly verdict: "refused" }
+  | { readonly verdict: "undecided" };
+
+/** The code the backend answers `GET /sessions/me` with when the session is gone. */
+const SESSION_NOT_FOUND = "sess.not_found";
+
+/**
+ * Asks the backend (`GET {issuerUrl}/sessions/me`) whether an opaque session
+ * token names a live session, telling a refusal apart from no verdict.
+ *
+ * A `404` is a refusal only with the `sess.not_found` code. Without it, the
+ * answer came from something in front of the backend (a proxy, a `url` with
+ * the wrong path), which judged nothing.
+ *
+ * When there is no verdict, it logs why: the request it was asked for then
+ * renders signed out, or answers `503` on a protected route, and nothing else
+ * would say what went wrong.
  *
  * @param token     - The opaque session token from the `__nextgen_session` cookie.
  * @param issuerUrl - Base URL of the auth backend.
  * @param timeoutMs - How long to wait for the backend before giving up.
- * @returns The live session — with a `null` `userId` when it is anonymous — or
- *   `null` when the backend does not hold a live session for the token (any
- *   non-2xx answer, a timeout, a network error, or an unreadable body).
+ * @returns The backend's {@link OpaqueSessionCheck | verdict}.
  */
-export async function validateOpaqueSessionToken(
+export async function checkOpaqueSessionToken(
   token: string,
   issuerUrl: string,
   timeoutMs: number,
-): Promise<OpaqueSession | null> {
+): Promise<OpaqueSessionCheck> {
+  const endpoint = `${issuerUrl}/sessions/me`;
   try {
-    const res = await fetch(`${issuerUrl}/sessions/me`, {
+    const res = await fetch(endpoint, {
       method: "GET",
       headers: { cookie: `__nextgen_session=${token}` },
       signal: AbortSignal.timeout(timeoutMs),
     });
+    if (res.status === 401) {
+      return { verdict: "refused" };
+    }
+    if (res.status === 404 && (await errorCode(res)) === SESSION_NOT_FOUND) {
+      return { verdict: "refused" };
+    }
     if (!res.ok) {
-      return null;
+      return undecided(endpoint, `HTTP ${res.status}`);
     }
     const body = (await res.json()) as {
       user_id?: unknown;
@@ -436,12 +479,69 @@ export async function validateOpaqueSessionToken(
     const text = (value: unknown): string | null =>
       typeof value === "string" && value !== "" ? value : null;
     return {
-      userId: text(body.user_id),
-      identifier: text(body.user?.identifier),
-      identifierProperty: text(body.user?.identifier_property),
-      display: text(body.user?.display),
+      verdict: "live",
+      session: {
+        userId: text(body.user_id),
+        identifier: text(body.user?.identifier),
+        identifierProperty: text(body.user?.identifier_property),
+        display: text(body.user?.display),
+      },
     };
-  } catch {
-    return null;
+  } catch (err) {
+    return undecided(endpoint, failureCause(err, timeoutMs));
   }
+}
+
+/**
+ * Validates an opaque session token by asking the backend
+ * (`GET {issuerUrl}/sessions/me`) whether the session is live.
+ *
+ * `null` folds a refusal and no verdict together, so it says whether the
+ * request is signed in, not whether the cookie is dead: clearing the cookie on
+ * `null` signs users out whenever the backend fails. To decide that, use
+ * {@link checkOpaqueSessionToken}.
+ *
+ * @param token     - The opaque session token from the `__nextgen_session` cookie.
+ * @param issuerUrl - Base URL of the auth backend.
+ * @param timeoutMs - How long to wait for the backend before giving up.
+ * @returns The live session — with a `null` `userId` when it is anonymous — or
+ *   `null` when the backend did not confirm one: it refused the token, or gave
+ *   no verdict.
+ */
+export async function validateOpaqueSessionToken(
+  token: string,
+  issuerUrl: string,
+  timeoutMs: number,
+): Promise<OpaqueSession | null> {
+  const check = await checkOpaqueSessionToken(token, issuerUrl, timeoutMs);
+  return check.verdict === "live" ? check.session : null;
+}
+
+/** The `code` of an error envelope, or `undefined` when the body is not one. */
+async function errorCode(res: Response): Promise<string | undefined> {
+  try {
+    const body = (await res.json()) as { code?: unknown };
+    return typeof body.code === "string" ? body.code : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Why a session check failed, for the log. */
+function failureCause(err: unknown, timeoutMs: number): string {
+  if ((err as { name?: unknown } | null)?.name === "TimeoutError") {
+    return `no answer within ${timeoutMs} ms`;
+  }
+  // A failed fetch says only "fetch failed"; what failed is in its cause.
+  const cause = (err as { cause?: unknown } | null)?.cause;
+  return cause instanceof Error ? `${String(err)}: ${cause.message}` : String(err);
+}
+
+/** Logs why the backend gave no verdict on a session cookie, and returns that. */
+function undecided(endpoint: string, cause: string): OpaqueSessionCheck {
+  console.warn(
+    `[nextgen] Could not check the session cookie against ${endpoint} (${cause}). ` +
+      "That is not a refusal: the request counts as signed out, and the cookie is kept.",
+  );
+  return { verdict: "undecided" };
 }

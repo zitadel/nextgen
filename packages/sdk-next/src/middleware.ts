@@ -5,6 +5,7 @@ import type { NextRequest } from "next/server";
 import {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
+  checkOpaqueSessionToken,
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
@@ -132,31 +133,6 @@ export async function nextgenMiddleware(
     opaqueTokenTimeoutMs,
     pathname,
   });
-}
-
-/**
- * Validates an opaque (non-JWT) session token by calling the backend's
- * `/sessions/me` endpoint. Returns `true` when the backend confirms the
- * session is live (HTTP 200), `false` otherwise.
- *
- * This is the fallback path for backends that issue encrypted opaque tokens
- * rather than self-contained JWTs.
- */
-async function validateOpaqueSessionToken(
-  token: string,
-  issuerUrl: string,
-  timeoutMs: number,
-): Promise<boolean> {
-  try {
-    const res = await fetch(`${issuerUrl}/sessions/me`, {
-      method: "GET",
-      headers: { cookie: `__nextgen_session=${token}` },
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
 }
 
 /**
@@ -294,11 +270,12 @@ interface AuthHandlerOptions {
 /**
  * Verifies the session token and tunnels the result to server components via
  * a request header. Redirects to the login page when the token is absent or
- * invalid on a protected route.
+ * invalid on a protected route. When the backend cannot say whether the
+ * session is live, the cookies stay and a protected route answers `503`.
  *
  * @param req  - The incoming edge request.
  * @param opts - Auth handler options.
- * @returns A `NextResponse` to continue or redirect.
+ * @returns A `NextResponse` to continue, redirect, or answer `503`.
  */
 async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<NextResponse> {
   const {
@@ -343,20 +320,32 @@ async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<N
   // not a JWT (non-JSON segments). A token with a valid JWT structure that
   // failed verification (bad sig, wrong typ/alg) must be rejected — never
   // accepted by a backend call that doesn't re-check the JWT claims.
+  let undecided = false;
   if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
-    const isValid = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
-    if (isValid) {
+    const check = await checkOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
+    if (check.verdict === "live") {
       const tunnelled = tunnelHeaders(req, {
         "x-nextgen-auth-token": cookieToken,
       });
       return NextResponse.next({ request: { headers: tunnelled } });
     }
+    undecided = check.verdict === "undecided";
+  }
+
+  // The backend could not say whether the session is live. The user may well
+  // be signed in, so a protected route answers 503 rather than send them to
+  // the login page.
+  if (undecided && matchesRoutes(pathname, protectedRoutes)) {
+    return new NextResponse("Service Unavailable", { status: 503 });
   }
 
   const tunnelled = tunnelHeaders(req, { "x-nextgen-auth-token": "" });
-  const staleNextgenCookies = req.cookies
-    .getAll()
-    .filter((c: { name: string }) => c.name.startsWith("__nextgen"));
+  // Dead credentials are cleared so the browser stops replaying them. Only the
+  // backend's refusal makes a cookie dead: a check without a verdict refused
+  // nothing, so its cookie stays and the request renders signed out.
+  const staleNextgenCookies = undecided
+    ? []
+    : req.cookies.getAll().filter((c: { name: string }) => c.name.startsWith("__nextgen"));
 
   if (matchesRoutes(pathname, protectedRoutes)) {
     const redirect = NextResponse.redirect(loginRedirectUrl(loginPath, req.url), { status: 302 });
