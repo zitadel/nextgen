@@ -7,7 +7,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-func (h *Harness) EnsureServiceDB(t *testing.T) *service.DB {
+func (h *Harness) EnsureServiceDB(t testing.TB) *service.DB {
 	t.Helper()
 	require.NotNil(t, h.DB)
 	return h.DB

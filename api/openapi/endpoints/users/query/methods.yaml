@@ -1,5 +1,6 @@
 post:
   operationId: queryUsers
+  x-zitadel-cli: users list
   summary: Query users
   description: |
     Returns the users of a project, paginated with a cursor.

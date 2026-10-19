@@ -1,5 +1,6 @@
 post:
   operationId: querySessions
+  x-zitadel-cli: sessions list
   summary: Query sessions
   description: |
     Returns the sessions of a project, paginated with a cursor.

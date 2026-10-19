@@ -45,6 +45,7 @@ post:
 
 get:
   operationId: listBranding
+  x-zitadel-cli: branding list
   summary: List branding revisions
   description: |
     Lists branding revisions for the project, newest first, capped at the

@@ -139,7 +139,7 @@ export class ZitadelSession extends ZitadelSurface {
 
   private readonly session = new SessionController(
     this,
-    () => resolveApi(this.project, this.projectAttrs, "<zitadel-session>").api,
+    () => resolveApi(this.project, this.projectAttrs, "<zitadel-session>"),
     // A card on the page its `post-sign-out-url` names ("sign out and come
     // back here") would otherwise reload that page on every signed-out visit,
     // and find no session again each time.

@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/cli",
-  "version": "1.0.0-alpha.25",
+  "version": "1.0.0-alpha.27",
   "description": "Agent-friendly Zitadel CLI",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/cli#readme",
   "bugs": {
@@ -93,6 +93,7 @@
     "pretest": "pnpm run build",
     "test": "vitest run",
     "test:all": "pnpm run test",
+    "check-advisories": "vitest run --config vitest.advisories.config.ts",
     "readme": "oclif readme",
     "prepack": "tsdown && oclif manifest && publint --strict",
     "postpack": "rm -f oclif.manifest.json",

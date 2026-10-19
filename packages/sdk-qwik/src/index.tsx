@@ -108,6 +108,7 @@ function loginAttrs(props: ZitadelLoginProps): Attrs {
     purpose: props.purpose ?? "login",
     "flow-name": props.flowName,
     "post-sign-in-url": props.postSignInUrl,
+    "force-post-sign-in-url": flag(props.forcePostSignInUrl),
     // Without it a resumed widget would boot with no handle and start a new flow.
     "resume-flow-id": props.resumeFlowId ?? undefined,
     variant: props.variant,
@@ -146,6 +147,8 @@ function bindLoginConfig(el: ZitadelLoginElement, props: ZitadelLoginProps): voi
   setProp(el, "purpose", props.purpose ?? "login");
   setProp(el, "flowName", props.flowName);
   setProp(el, "postSignInUrl", props.postSignInUrl);
+  // A concrete boolean, for the reason `suppressPasswordToggle` gives below.
+  setProp(el, "forcePostSignInUrl", props.forcePostSignInUrl === true);
   // A concrete string, not the raw prop: `setProp` skips `undefined`, so
   // going from a handle back to unset would otherwise keep the old handle.
   setProp(el, "resumeFlowId", props.resumeFlowId ?? "");

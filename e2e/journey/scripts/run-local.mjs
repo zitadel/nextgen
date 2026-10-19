@@ -6,7 +6,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 
-import { frameworkForId, frameworkIds } from "./frameworks.mjs";
+import { ciFrameworkIds, frameworkForId } from "./frameworks.mjs";
 import { remoteHostEnv, startHttpsEdge } from "./https-edge.mjs";
 import { errorMessage, packageName, parsePort } from "./lib.mjs";
 import {
@@ -233,7 +233,7 @@ function buildJourneyVariants() {
       preset: "",
       preexistingApp: false,
       remote: false,
-      frameworkIds: options.matrix === "single" ? ["next"] : [...frameworkIds],
+      frameworkIds: options.matrix === "single" ? ["next"] : [...ciFrameworkIds],
     },
     {
       id: "passkey",
