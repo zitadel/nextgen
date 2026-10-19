@@ -107,6 +107,13 @@ describe("NuxtPatcher.plan", () => {
     expect(writeContents(plan, "pages/login.vue")).toContain(MANAGED_MARKER);
   });
 
+  it("gives the redirecting home page a template so Vue does not warn in dev", () => {
+    const page = writeContents(new NuxtPatcher().plan(ctx("app")), "app/pages/index.vue");
+    expect(page).toContain(MANAGED_MARKER);
+    expect(page).toContain('await navigateTo("/login", { replace: true });');
+    expect(page).toMatch(/<template>[\s\S]*<\/template>/);
+  });
+
   it("keeps a pre-existing app's shell and homepage (ADR 044)", () => {
     // Only fresh scaffolds get the CLI's app.vue and the /login redirect —
     // writing them into an existing app would stomp (or conflict with) the
