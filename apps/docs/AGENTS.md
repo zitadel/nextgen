@@ -81,6 +81,11 @@ So the template's root routes live under `/docs` here:
   `lib/description.ts` explains. The spec's side of that, a first sentence
   that stands on its own, is in
   [`api/openapi/AGENTS.md`](../../api/openapi/AGENTS.md#descriptions--the-first-sentence-stands-alone).
+- An operation's or a webhook's page is a client component, and Fumadocs
+  hands it the whole OpenAPI document. `openapiPageProps` (`lib/source.ts`)
+  hands it its operations or webhooks, the components they reference and the
+  security schemes instead, so a page is about 250 KB of HTML, not 900 KB.
+  Render one through it, never `getOpenAPIPageProps()` directly.
 - `moon run docs:generate` bundles `api/openapi` into `.generated/openapi.mjs`,
   which `lib/openapi.ts` imports. The content needs no generation step.
 - A page's Markdown (`/docs/cli.md`, or `/docs/cli` with `Accept:
