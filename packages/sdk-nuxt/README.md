@@ -48,7 +48,10 @@ environment has none:
 | `NUXT_PUBLIC_ZITADEL_PROJECT_ID` | `runtimeConfig.public.zitadelProjectId`, unless `nuxt.config.ts` sets it | the plugin skips `configureZitadel()`, `useZitadelProject()` returns `null`, and the login widget cannot initialize |
 | `ZITADEL_PROJECT_SECRET` | the server-only secret, unless `NUXT_NEXTGEN_PROJECT_SECRET` sets it | sign-in cannot finish: the session exchange has no credential |
 
-A built server reads `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET` from its own
+The backend URL and the project secret default to `ZITADEL_URL` and
+`ZITADEL_PROJECT_SECRET` from the server environment; set `nextgen.url` or the
+`NUXT_NEXTGEN_*` variables only to override. A built server reads `ZITADEL_URL`
+and `ZITADEL_PROJECT_SECRET` from its own
 runtime environment when it starts, and takes `NUXT_NEXTGEN_URL` and
 `NUXT_NEXTGEN_PROJECT_SECRET` ahead of them, so one build runs against any
 backend. `nuxt build` never copies the URL or the secret from its environment
@@ -178,7 +181,7 @@ Both surfaces take these options: the module under `nextgen` in
 
 | Option              | Type                 | Default                  | Description                                                                                                                |
 | ------------------- | -------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| `url`                 | `string`             | `ZITADEL_URL` env (the module also reads `.env.local`), else `http://localhost:8080` | Full URL of the Zitadel auth backend                                                                                       |
+| `url`                 | `string`             | `ZITADEL_URL` env, read when the server starts (`nuxt dev` also reads `.env.local`), else `http://localhost:8080` | Full URL of the Zitadel auth backend                                                                                       |
 | `proxyPath`         | `string`             | `"/__nextgen"`           | Path prefix proxied to the auth backend. Sign-in with an external provider currently requires the default: the provider returns to `/__nextgen/idp/{slug}/callback` |
 | `protectedRoutes`   | `string[]`           | `[]`                     | Paths requiring a valid session. Trailing `*` matches sub-paths                                                            |
 | `ignoredRoutes`     | `string[]`           | `[]`                     | Paths skipped entirely — no JWT check, no tunnelling. Useful for webhooks or health checks. Trailing `*` matches sub-paths |

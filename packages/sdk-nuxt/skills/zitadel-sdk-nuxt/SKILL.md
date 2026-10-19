@@ -51,8 +51,9 @@ The module registers the Nitro middleware and auth plugin and auto-imports the
 composables — no manual `server/middleware/auth.ts`. It reads `ZITADEL_URL`,
 `NUXT_PUBLIC_ZITADEL_PROJECT_ID`, and the server-only `ZITADEL_PROJECT_SECRET`
 from the environment, or in `nuxt dev` from `.env.local` when the environment
-has none (Nuxt itself loads only `.env`). A built server reads `ZITADEL_URL` and
-`ZITADEL_PROJECT_SECRET` from its own runtime environment (`NUXT_NEXTGEN_URL`
+has none (Nuxt itself loads only `.env`). `url` and the project secret default to `ZITADEL_URL` and
+`ZITADEL_PROJECT_SECRET`; pass `nextgen.url` only to override. A built server
+reads `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET` from its own runtime environment (`NUXT_NEXTGEN_URL`
 and `NUXT_NEXTGEN_PROJECT_SECRET` take precedence) and never has them baked
 into `.output/`. A `nextgen.url` or `runtimeConfig.public.zitadelProjectId` in
 `nuxt.config.ts` wins over the variables.
