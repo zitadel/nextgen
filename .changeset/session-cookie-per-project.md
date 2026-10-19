@@ -21,7 +21,7 @@ other project's session cookie on. Users who signed in before the upgrade stay
 signed in: the first time the middleware, or the widgets' session check, finds
 that the old cookie holds a session of the app's project, the session moves to
 the new cookie. With no project configured, the proxy passes cookies through
-unchanged. The dev proxies of the SPA scaffolds keep Zitadel's cookie name.
+unchanged.
 
 `@zitadel/testing` adds `sessionCookieName(projectId)`, the cookie a server-SDK
 app keeps its session in, and `authenticatedPage` now signs its browser context
