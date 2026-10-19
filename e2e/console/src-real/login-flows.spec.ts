@@ -1,6 +1,7 @@
 import { expect, test } from "@zitadel/testing/playwright";
 
-import { expectNoErrorBoundary, signIn } from "./support";
+import { expectNoErrorBoundary } from "../support/screens";
+import { signIn } from "../support/sign-in";
 
 /**
  * The login-flow screens against a real instance.
@@ -15,7 +16,7 @@ import { expectNoErrorBoundary, signIn } from "./support";
  */
 
 test("lists the seeded flow with a resolved schema name", async ({ page, zitadel, seed }) => {
-  await signIn(page, zitadel.handle, await seed.user());
+  await signIn(page, zitadel, await seed.user());
 
   await page.goto("/flow-definitions");
 
@@ -34,7 +35,7 @@ test("lists the seeded flow with a resolved schema name", async ({ page, zitadel
 });
 
 test("opens a flow and shows its steps and definition", async ({ page, zitadel, seed }) => {
-  await signIn(page, zitadel.handle, await seed.user());
+  await signIn(page, zitadel, await seed.user());
 
   await page.goto("/flow-definitions");
   await page.getByRole("link", { name: "Default login" }).click();

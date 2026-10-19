@@ -5,24 +5,30 @@
 # created first; see apps/cloud/launcher/database.go).
 #
 # The console is not embedded: it is a service of its own, and the launcher
-# turns the server's console off. Migrations run here, before the deployment
-# goes live, never when a function starts. A failed migration fails the
-# build and the previous deployment keeps serving, so every migration must
-# leave the schema readable by the deployment still serving
-# (expand/contract).
+# turns the server's console off. The services build one after another in
+# one checkout, and the console service's build lands in the server's embed
+# directory (internal/staticui/console/dist), so the launcher is compiled
+# with -tags noconsole; without it, the function would carry the console
+# whenever that service built first.
+#
+# Migrations run here, before the deployment goes live, never when a
+# function starts. A failed migration fails the build and the previous
+# deployment keeps serving, so every migration must leave the schema
+# readable by the deployment still serving (expand/contract).
 #
 # Output: $VERCEL_OUTPUT_FILE on Vercel, dist/nextgen-launcher locally.
 set -eu
 cd "$(dirname "$0")/../.."
 
-# The other services' installs normally ran already; the Go preset does not
-# run this service's installCommand, so install when nothing is there.
-[ -x node_modules/.bin/turbo ] || sh apps/cloud/install.sh
-# The login UI through turbo, with the remote-cache policy every service
-# shares (turbo-build.sh: previews restore, production only uploads).
-sh apps/cloud/turbo-build.sh @zitadel/login-ui
+# The Go preset runs no installCommand, so the install the other services
+# declare in vercel.json runs here; pnpm skips it once a service built
+# earlier in the deployment has installed.
+pnpm install --os=current --cpu=current --optimistic-repeat-install
+# turbo's own binary: through `pnpm exec`, every task's `pnpm run` would
+# re-check the workspace and warn about each other platform's package.
+node_modules/.bin/turbo run build --filter=@zitadel/login-ui
 
-version="$(sed -n 's/^  "version": *"\([^"]*\)".*/\1/p' apps/server/package.json | head -1)"
+version="$(node -p 'require("./apps/server/package.json").version')"
 commit="${VERCEL_GIT_COMMIT_SHA:-$(git rev-parse HEAD 2>/dev/null || echo unknown)}"
 # The branch picks a preview's database; stamped in so the serving function
 # knows it even where Vercel exposes no Git metadata at runtime.
@@ -31,7 +37,7 @@ date="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 out="${VERCEL_OUTPUT_FILE:-dist/nextgen-launcher}"
 mkdir -p "$(dirname "$out")"
 
-CGO_ENABLED=0 go build -trimpath \
+CGO_ENABLED=0 go build -trimpath -tags noconsole \
   -ldflags "-s -w \
     -X github.com/zitadel/nextgen/internal/build.version=${version}+cloud \
     -X github.com/zitadel/nextgen/internal/build.commit=${commit} \

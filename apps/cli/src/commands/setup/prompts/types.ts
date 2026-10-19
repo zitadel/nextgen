@@ -45,8 +45,8 @@ export type SsoDraft = {
  * stores `${{ NAME }}` references, and the engine resolves them from the
  * project's variables, so a missing value fails at the provider with
  * `invalid_client` long after setup reported success. Declining the provider is
- * the answer for "not now" — `sso enable` adds it once the OAuth application
- * exists.
+ * the answer for "not now" — `auth-method sso enable` adds it once the OAuth
+ * application exists.
  *
  * Neither value is ever written to a `.zitadel/` file.
  */
@@ -80,8 +80,8 @@ export type SetupAnswers = {
   /**
    * Social providers to enable while scaffolding, empty for email sign-in
    * only. Chosen by {@link import("./social-sign-in").SocialSignInPrompt};
-   * `sso enable` adds one to an existing Project later, so this is never the
-   * only way in.
+   * `auth-method sso enable` adds one to an existing Project later, so this is
+   * never the only way in.
    *
    * A list because a project may offer several at once, and the schema and
    * flow already carry `sso_providers` as a list of slugs — one answer per

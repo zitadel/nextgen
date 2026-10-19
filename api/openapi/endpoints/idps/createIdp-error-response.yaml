@@ -10,6 +10,7 @@ content:
         - $ref: '../../components/schemas/errors/idp-not_found.yaml'
         - $ref: '../../components/schemas/errors/idp-permission_denied.yaml'
         - $ref: '../../components/schemas/errors/idp-revision_conflict.yaml'
+        - $ref: '../../components/schemas/errors/idp-endpoints_partial.yaml'
         - $ref: '../../components/schemas/errors/internal.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
       discriminator:
@@ -21,6 +22,7 @@ content:
           idp.not_found: '../../components/schemas/errors/idp-not_found.yaml'
           idp.permission_denied: '../../components/schemas/errors/idp-permission_denied.yaml'
           idp.revision_conflict: '../../components/schemas/errors/idp-revision_conflict.yaml'
+          idp.endpoints_partial: '../../components/schemas/errors/idp-endpoints_partial.yaml'
           internal: '../../components/schemas/errors/internal.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
     examples:
@@ -54,6 +56,11 @@ content:
         value:
           code: idp.revision_conflict
           message: 'identity provider connection: another revision of the same connection was created at the same instant'
+      idp.endpoints_partial:
+        summary: idp.endpoints_partial
+        value:
+          code: idp.endpoints_partial
+          message: 'identity provider connection: the endpoints are partially set'
       internal:
         summary: internal
         value:

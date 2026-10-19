@@ -1,8 +1,15 @@
 import { join } from "node:path";
 
-import { defineConfig, devices } from "@playwright/test";
+import { defineConfig } from "@playwright/test";
 import { withZitadel } from "@zitadel/testing/playwright";
-import { e2eActionTimeouts, e2eTimeouts, e2eTrace } from "../playwright.shared";
+import {
+  chromiumProjects,
+  e2eActionTimeouts,
+  e2eTimeouts,
+  e2eTrace,
+  inRepoZitadel,
+  realLaneDefaults,
+} from "../playwright.shared";
 
 /**
  * The embedded surfaces, served the way a customer gets them.
@@ -25,7 +32,6 @@ import { e2eActionTimeouts, e2eTimeouts, e2eTrace } from "../playwright.shared";
  * No `app` entry: the instance is the app server (see `withZitadel`).
  */
 const appDir = import.meta.dirname;
-const workspaceRoot = join(appDir, "../..");
 // A fixed pin, deliberately outside the deferred-bind blocks (22000-23999
 // journey runner / 24000-31999 embedded-pg — doctrine in
 // e2e/journey/scripts/ports.mjs): withZitadel() needs the port while
@@ -38,11 +44,8 @@ const origin = `http://localhost:${zitadelPort}`;
 export default defineConfig({
   ...e2eTimeouts,
   testDir: "./src-embedded",
-  fullyParallel: true,
-  workers: 2,
+  ...realLaneDefaults("embedded"),
   retries: process.env.CI ? 1 : 0,
-  outputDir: "test-results/embedded",
-  reporter: [["list"], ["html", { open: "never", outputFolder: "playwright-report/embedded" }]],
   use: {
     ...e2eActionTimeouts,
     baseURL: origin,
@@ -63,20 +66,7 @@ export default defineConfig({
     // concurrent run of both lanes must not have one supervisor delete and
     // rewrite the other's live handshake.
     handshakePath: join(appDir, ".zitadel-testing", "handshake-embedded.json"),
-    zitadel: {
-      // In-repo runs use the source-built binary; run `moon run server:build`
-      // first (the moon task wires this env var). That build embeds the
-      // current console and login-ui dists, so this suite always tests the
-      // working tree's UI, not a stale one.
-      serverBinary:
-        process.env.ZITADEL_SERVER_BINARY ?? join(workspaceRoot, "dist", "server", "nextgen"),
-      serverBinaryHint: "run `moon run server:build` first.",
-    },
+    zitadel: inRepoZitadel,
   }),
-  projects: [
-    {
-      name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
-    },
-  ],
+  projects: chromiumProjects,
 });

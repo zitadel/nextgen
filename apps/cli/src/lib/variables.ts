@@ -16,23 +16,35 @@ export type VariableRow = {
   value?: string | number | boolean;
 };
 
+/** One value on the wire: a bare scalar, or `{"secret": true}` for a secret. */
+export type VariableValue = NonNullable<GetVariable200["primary"]>;
+
+/** The primary values of a read, keyed by name. */
+export function primaryValues(body: GetVariables200): Record<string, VariableValue> {
+  return Object.fromEntries(
+    Object.entries(body).flatMap(([name, byKind]) =>
+      byKind.primary === undefined ? [] : [[name, byKind.primary]],
+    ),
+  );
+}
+
 /**
  * Project one wire value into a row. Both endpoints answer in the same two
  * forms — a bare scalar for a non-secret, `{"secret": true}` for a secret — so
  * the collection and the single-name read share this.
  */
-export function toVariableRow(name: string, value: GetVariable200): VariableRow {
+export function toVariableRow(name: string, value: VariableValue): VariableRow {
   return typeof value === "object" && value !== null
     ? { name, secret: true }
     : { name, secret: false, value };
 }
 
 /**
- * Project the wire map into rows, sorted by name so output is stable between
+ * Project the values into rows, sorted by name so output is stable between
  * runs.
  */
-export function toVariableRows(body: GetVariables200): VariableRow[] {
-  return Object.entries(body)
+export function toVariableRows(values: Record<string, VariableValue>): VariableRow[] {
+  return Object.entries(values)
     .map(([name, value]) => toVariableRow(name, value))
     .sort((a, b) => a.name.localeCompare(b.name));
 }

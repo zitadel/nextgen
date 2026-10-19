@@ -1,0 +1,9 @@
+name: challenge_id
+in: query
+required: true
+description: |
+  The challenge minted by the matching claim init, as the claim URL carries
+  it.
+schema:
+  $ref: '../schemas/challenge-id.yaml'
+example: ch_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C

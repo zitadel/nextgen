@@ -100,10 +100,11 @@ func createFullErrDetailsDetailsMap(err error) any {
 }
 
 func errorResponse(err error) *api.ErrorDetailsStatusCode {
-	var e domain.Error
-	if !errors.As(err, &e) {
-		return internalErrorResponse(err)
+	if domain.IsServerFault(err) {
+		return serverFaultResponse(err)
 	}
+	var e domain.Error
+	errors.As(err, &e)
 	switch {
 	case e.Code == domain.ErrAuthUnauthorized(nil).Code:
 		return errorResponseWithStatusCode(http.StatusUnauthorized, e)
@@ -127,6 +128,8 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return idpErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixDeployment.ErrorCodePrefix("")):
 		return deploymentErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixOrigin.ErrorCodePrefix("")):
+		return originErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixEvent.ErrorCodePrefix("")):
 		return eventErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixVariable.ErrorCodePrefix("")):
@@ -142,12 +145,26 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 	case strings.HasPrefix(e.Code, domain.PrefixClaimChallenge.ErrorCodePrefix("")),
 		strings.HasPrefix(e.Code, domain.PrefixClaim.ErrorCodePrefix("")):
 		return claimErrorResponse(e)
-	case e.Code == domain.ErrNotImplemented().Code:
-		return errorResponseWithStatusCode(http.StatusNotImplemented, e)
-	case e.Code == domain.ErrUnavailable().Code:
-		return errorResponseWithStatusCode(http.StatusServiceUnavailable, e)
 	case e.Code == domain.ErrRequestInvalid().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, e)
+	default:
+		return internalErrorResponse(err)
+	}
+}
+
+// serverFaultResponse answers a [domain.IsServerFault] error: 501 for a
+// feature that is not implemented, 503 for a transient failure worth retrying,
+// and 500 for everything else. Only the outermost domain error counts, the
+// one whose code the body carries: an internal error that wraps an
+// unavailable one is a 500.
+func serverFaultResponse(err error) *api.ErrorDetailsStatusCode {
+	var e domain.Error
+	errors.As(err, &e)
+	switch e.Code {
+	case domain.ErrNotImplemented().Code:
+		return errorResponseWithStatusCode(http.StatusNotImplemented, err)
+	case domain.ErrUnavailable().Code:
+		return errorResponseWithStatusCode(http.StatusServiceUnavailable, err)
 	default:
 		return internalErrorResponse(err)
 	}
@@ -178,11 +195,15 @@ func OgenErrorHandler(ctx context.Context, w http.ResponseWriter, _ *http.Reques
 
 	switch {
 	case isSecurityInternalError(err):
-		// The security handler could not decide (CSRF request state missing):
-		// a server fault, not a refused credential. The client gets the generic
+		// The security handler could not decide (CSRF request state missing, or
+		// the token store unreachable while introspecting the credential): a
+		// server fault, not a refused credential. The client gets the generic
 		// internal answer; the cause goes to the log, where a wiring mistake
 		// that makes every cookie request fail has to be findable.
-		slog.ErrorContext(ctx, "security handler could not reach a decision", "error", err)
+		// Logged as a domain.Error too, so its parent (the actual cause) is kept.
+		var cause domain.Error
+		_ = errors.As(err, &cause)
+		slog.ErrorContext(ctx, "security handler could not reach a decision", "error", err, "cause", cause)
 		status = http.StatusInternalServerError
 		details = domainErrorDetails(domain.ErrInternal(nil))
 

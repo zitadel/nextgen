@@ -35,14 +35,52 @@ jobs:
       # test output is left in the log.
       NO_COLOR: ""
     steps:
+      # Depot runs some jobs on plain EC2 instances, whose root disk is an EBS
+      # volume that writes about 250 MB/s. Linux writes dirty pages back only
+      # once they are 30 s old or 10 % of the memory (6-12 GB there), so that
+      # disk idles while the job unpacks its caches, and the backlog grows to
+      # several GB. A sync waits for all of it, and Docker syncs the root
+      # filesystem on every container create (it unmounts the container's
+      # init layer, an overlay): the postgres lane's first testcontainer
+      # waited 22-29 s there, 2-4 s on Depot's microVMs. With writeback from
+      # 64 MB on, it waited 8-22 s. The cost: writers get throttled from
+      # about 10 % of the memory dirty instead of 15 %.
+      - name: Write dirty pages back early
+        run: sudo sysctl -w vm.dirty_background_bytes=67108864
+
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
+      # The postgres lane (server:test-postgres) starts its databases through
+      # testcontainers, and every package of the lane waits while the first
+      # one pulls the image: 6-8 s on Depot's microVMs, 11-12 s on its EC2
+      # runners. Pull it now, in the background while the job installs, so
+      # the lane finds it there. The image name comes from the testdb package,
+      # so the two cannot drift; the output goes to a file, so the step
+      # returns at once.
+      - name: Pull the postgres lane's image
+        run: |
+          image="$(sed -n 's/^const containerImage = "\(.*\)"$/\1/p' internal/storage/testdb/postgres.go)"
+          if [ -z "$image" ]; then
+            echo "::warning::internal/storage/testdb/postgres.go has no containerImage constant; nothing to pull"
+            exit 0
+          fi
+          nohup docker pull --quiet "$image" </dev/null >"$RUNNER_TEMP/postgres-image-pull.log" 2>&1 &
+
+      # Keyed on both modules' go.sum (tools/bench is a module of its own)
+      # instead of setup-go's default, go.mod. ci-turbo.yml shared the go.mod
+      # key until it got a cache of its own, and its entry there for Go 1.26.8
+      # holds Go's own cache files. On Depot this job builds through GOCACHEPROG
+      # (`depot gocache`, which keeps depot-* files in GOCACHE), so it cannot
+      # use them.
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
+          cache-dependency-path: |
+            go.sum
+            tools/bench/go.sum
 
       - uses: pnpm/action-setup@v5
         with:
@@ -94,7 +132,7 @@ jobs:
       # `install-browsers` dep; this covers the Playwright e2e specs.
       - name: Cache Playwright browsers
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
@@ -105,13 +143,20 @@ jobs:
 
       - name: Keep Docker's interface churn away from Chromium
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        # Every container the Go integration suites start or stop adds or removes
-        # a host veth interface. With IPv6 on, the kernel gives it a link-local
-        # address, and Chromium aborts every in-flight request when the host's
-        # addresses change (ERR_NETWORK_CHANGED), failing whichever browser-mode
-        # suite is loading at that moment. Disable IPv6 on newly created
-        # interfaces only; loopback and the runner's NIC keep it. (#1490)
-        run: sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
+        # Chromium aborts every in-flight request when the host gains or loses
+        # an IP address (ERR_NETWORK_CHANGED), failing whichever browser-mode
+        # suite is loading a module at that moment. The containers the Go
+        # integration suites start add addresses in two ways: with IPv6 on, the
+        # kernel gives each container's host veth interface a link-local
+        # address, and the job's first container brings up the docker0 bridge,
+        # which then gets one too. Disable IPv6 on interfaces created from here
+        # on and on docker0, which already exists; loopback and the runner's
+        # NIC keep it. (#1490)
+        run: |
+          sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
+          if [ -d /proc/sys/net/ipv6/conf/docker0 ]; then
+            sudo sysctl -w net.ipv6.conf.docker0.disable_ipv6=1
+          fi
 
       # Builds, lint, typecheck and unit tests. `:test` is unit tests here as in
       # a local `pnpm run check`; the e2e suite runs in its own step below.
@@ -123,19 +168,27 @@ jobs:
         # depends on a changed one, so an api change re-tests its consumers.
         run: moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph --downstream deep --include-relations
 
-      # The Go database lanes depend on the console and login UI builds their
-      # binary embeds, so `moon ci` above also runs them whenever one of those
-      # builds is affected, and these steps then run them a second time.
-      # Folding them into the graph step (and dropping these) is a follow-up.
-      - name: Run Go integration tests (postgres)
+      # The graph step above runs the Go database lanes whenever moon finds
+      # them affected, as dependents of the console and login UI builds their
+      # binary embeds. When ci-mode forces a full run for files neither lane
+      # lists as input (a workflow-only edit, say), go_tests is on but moon
+      # finds the lanes unaffected, so the two steps below are their only run.
+      # This step reads the graph's report, so those steps run only the lanes
+      # it did not.
+      - name: Find the Go database lanes the graph ran
+        id: graph-lanes
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
+        run: node scripts/ci-mode.mjs --ran-in-graph postgres=server:test-postgres sqlite=server:test-sqlite
+
+      - name: Run Go integration tests (postgres)
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' && steps.graph-lanes.outputs.postgres != 'true' }}
         run: moon run server:test-postgres
 
       # The Spanner emulator lane is not part of this job: it runs in
       # spanner.yml (nightly and on demand) and is not a required check.
 
       - name: Run Go integration tests (sqlite)
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' && steps.graph-lanes.outputs.sqlite != 'true' }}
         run: moon run server:test-sqlite
 
       # Build the journey's release tarballs outside any moon graph, then hand
@@ -153,24 +206,35 @@ jobs:
 
       # Verdaccio proxies every public framework package the journey scaffolds
       # pull from npmjs; persisting its storage turns a dozen cold npm installs
-      # into warm ones. The key is per-run so each save adds newly seen
-      # packages and restore-keys pulls the most recent prior store. The journey
-      # always republishes the @zitadel packages fresh (local-registry.mjs), so
-      # a stale store is still valid.
-      - name: Cache journey registry packages
+      # into warm ones. restore-keys pulls the newest saved store (on Depot
+      # runners from any branch: Depot's cache has no branch scopes); the key is
+      # per attempt, so a re-run starts from the newest store too, not from its
+      # first attempt's. The journey always republishes the @zitadel packages
+      # fresh (local-registry.mjs), so a stale store is still valid. The steps
+      # after the e2e suites save it again only when the journey fetched new
+      # tarballs into it.
+      - name: Restore journey registry packages
+        id: journey-registry
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v5
         with:
           path: ${{ runner.temp }}/journey-verdaccio-storage
-          key: journey-verdaccio-${{ runner.os }}-${{ github.run_id }}
+          key: journey-verdaccio-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
             journey-verdaccio-${{ runner.os }}-
+
+      - name: List restored journey registry packages
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
+        run: >-
+          node e2e/journey/scripts/registry-cache.mjs list
+          "$RUNNER_TEMP/journey-verdaccio-storage" "$RUNNER_TEMP/journey-verdaccio-restored.txt"
 
       # The e2e suite, after the graph rather than inside it: run alongside the
       # unit suites, its browsers and dev servers slowed both sides into
       # timeouts (run 38496066612). `e2e:all` depends on every lane (console
       # smoke/real/embedded/platform, demo mock/real, the CLI journey matrix,
-      # the kit's real-instance suite) and moon orders them through the DAG.
+      # the kit's real-instance suite), and moon runs them side by side: only
+      # the two demo-next lanes share a mutex (e2e/moon.yml).
       # The lanes are `runInCI: "skip"`, which keeps them out of the graph step
       # above; `--ignore-ci-checks` runs them here. ci-mode's `e2e` gate says
       # when: moon finds e2e:all affected, or the run is forced full (a
@@ -180,15 +244,39 @@ jobs:
       - name: Run e2e suites
         id: moon-e2e
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.e2e == 'true' }}
-        run: moon exec e2e:all --ignore-ci-checks --on-failure continue
+        # Streamed rather than buffered: buffered, a task's output reached the
+        # log only when the task ended, every line under one timestamp (run
+        # 38585094551). Each line still names its task, and MOON_SUMMARY still
+        # replays the failed tasks' output after the run.
+        run: moon exec e2e:all --ignore-ci-checks --on-failure continue --output-style stream
         env:
           # The journey's options, as ci-turbo.yml passes them: the work dir the
           # diagnostics upload below reads, ci-mode's framework scope (`single`
           # unless an SDK, the CLI, the test kit or the journey's own files
-          # moved), and the Verdaccio storage the cache step above restores.
+          # moved), and the Verdaccio storage the restore step above fills.
           JOURNEY_WORK_DIR: ${{ runner.temp }}/ci-journey
           JOURNEY_MATRIX: ${{ steps.ci-mode.outputs.journey_matrix }}
           JOURNEY_REGISTRY_STORAGE: ${{ runner.temp }}/journey-verdaccio-storage
+
+      # Saves the store only when the journey changed what a later run gets from
+      # it: new npmjs tarballs, or packuments it refreshed when local-registry.mjs
+      # keeps them for longer than Verdaccio's 2-minute default
+      # (registry-cache.mjs says why). An unchanged store would upload the same
+      # ~700 MB again, about 8 s of every run. Only after green e2e suites, as
+      # the cache action's post step did.
+      - name: Look for journey registry changes
+        id: journey-registry-changes
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.snapshot == 'true' }}
+        run: >-
+          node e2e/journey/scripts/registry-cache.mjs compare
+          "$RUNNER_TEMP/journey-verdaccio-storage" "$RUNNER_TEMP/journey-verdaccio-restored.txt"
+
+      - name: Save journey registry packages
+        if: ${{ steps.journey-registry-changes.outputs.save == 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ runner.temp }}/journey-verdaccio-storage
+          key: ${{ steps.journey-registry.outputs.cache-primary-key }}
 
       # Reads moon's newest run report, so it names the failures of whichever
       # moon step failed.
@@ -212,7 +300,7 @@ jobs:
 
       - name: Upload journey diagnostics
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: journey-diagnostics
           path: ${{ runner.temp }}/ci-journey/diagnostics
@@ -224,7 +312,7 @@ jobs:
       # the project secret and sits beside them in .zitadel-testing/.
       - name: Upload e2e diagnostics
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-diagnostics
           path: |

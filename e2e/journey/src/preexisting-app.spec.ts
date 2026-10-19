@@ -3,6 +3,8 @@ import { join } from "node:path";
 
 import { expect, test } from "@playwright/test";
 
+import { requiredEnv } from "./support";
+
 test.describe.configure({ mode: "serial" });
 
 // The pre-existing-app lane (ADR 044): setup met a host app it did not
@@ -30,7 +32,28 @@ const filesByFramework: Record<string, { authPages: string[]; homepage: string; 
   },
 };
 
-if (preexisting) {
+// Frameworks that deliberately have no pre-existing-app fixture. The lane
+// covers the route-based frameworks only (ADR 044, e2e/journey/AGENTS.md): a
+// single-page app has one root component and no routes of its own, so setup
+// keeps the page posture there and there is no host shell or homepage to
+// preserve. A framework in neither table is a typo or a new framework nobody
+// decided about, and that still fails loudly.
+const SPA_REASON =
+  "single-page apps keep the page posture (ADR 044), so there is no host shell or homepage to preserve";
+const skippedFrameworks: Record<string, string> = {
+  react: SPA_REASON,
+  vue: SPA_REASON,
+  solid: SPA_REASON,
+  svelte: SPA_REASON,
+  qwik: SPA_REASON,
+  angular: SPA_REASON,
+};
+
+if (preexisting && skippedFrameworks[framework]) {
+  test(`a pre-existing ${framework} app is not part of this lane`, () => {
+    test.skip(true, skippedFrameworks[framework]);
+  });
+} else if (preexisting) {
   const files = filesByFramework[framework];
   if (!files) {
     throw new Error(`no pre-existing-app expectations for framework "${framework}"`);
@@ -102,10 +125,4 @@ if (preexisting) {
       );
     }
   });
-}
-
-function requiredEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`${name} is required`);
-  return value;
 }

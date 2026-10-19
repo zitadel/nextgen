@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import { ZitadelError } from "../../../../../src/lib/errors";
 import { VueDetector } from "../../../../../src/lib/orca/detectors/vue";
 
 const dirs: string[] = [];
@@ -40,5 +41,21 @@ describe("VueDetector", () => {
 
   it("returns null without vue", async () => {
     expect(await new VueDetector().detect(await project({ vite: "^5" }))).toBeNull();
+  });
+
+  it("refuses Vue 3.1, below the 3.2 floor", async () => {
+    let caught: unknown;
+    try {
+      await new VueDetector().detect(await project({ vue: "~3.1.0", vite: "^5" }));
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ZitadelError);
+    expect((caught as ZitadelError).code).toBe("E_UNSUPPORTED_PROJECT_SHAPE");
+  });
+
+  it("accepts Vue 3.2", async () => {
+    const facts = await new VueDetector().detect(await project({ vue: "^3.2.0", vite: "^5" }));
+    expect(facts?.id).toBe("vue");
   });
 });

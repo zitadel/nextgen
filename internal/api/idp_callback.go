@@ -9,6 +9,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -30,7 +31,7 @@ type ssoCallbackProcessor interface {
 	Process(ctx context.Context, in service.FlowSSOCallbackInput) (service.FlowSSOCallbackOutput, error)
 }
 
-// IDPCallbackHandler answers the provider's redirect on [IDPCallbackPath]. It
+// IDPCallbackHandler answers the provider's redirect on [IDPCallbackPattern]. It
 // is a plain net/http handler, not an API operation: the request shape is
 // RFC 6749's, the browser arriving here carries no API credential, and the
 // response is a redirect or an error page, never JSON.
@@ -53,11 +54,13 @@ func (h *IDPCallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	query := r.URL.Query()
 	in := service.FlowSSOCallbackInput{
+		ConnectionSlug:   r.PathValue(idpCallbackSlugWildcard),
 		State:            query.Get("state"),
 		Code:             query.Get("code"),
 		Error:            query.Get("error"),
 		ErrorDescription: query.Get("error_description"),
 		ErrorURI:         query.Get("error_uri"),
+		Issuer:           query.Get("iss"),
 	}
 	// The cookie name depends on the scheme of this request, the same way the
 	// submit chose it (see ssoBindingCookieName); a missing cookie stays "",
@@ -80,6 +83,15 @@ func (h *IDPCallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if !errors.Is(ctx.Err(), context.Canceled) {
 			zlog.GetLoggingContext(ctx).Error("sso callback processing failed", slog.Any("error", err))
 		}
+		writeIDPCallbackErrorPage(w, http.StatusInternalServerError)
+		return
+	}
+	// The target was checked when the sign-in started. It is checked again
+	// where it is used, so a target stored before the check was as strict as it
+	// is now can never be redirected to.
+	if _, err := httputil.ParseRedirectTarget(out.ReturnTarget); err != nil {
+		zlog.GetLoggingContext(ctx).Error("sso callback return target refused",
+			slog.String("return_target", out.ReturnTarget), slog.Any("error", err))
 		writeIDPCallbackErrorPage(w, http.StatusInternalServerError)
 		return
 	}

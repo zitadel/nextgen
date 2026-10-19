@@ -4,40 +4,52 @@
     "server": {
       "root": ".",
       "framework": "go",
-      "installCommand": "sh apps/cloud/install.sh",
+      "entrypoint": "apps/cloud/launcher/main.go",
       "buildCommand": "sh apps/cloud/build.sh"
     },
     "console": {
       "root": "apps/console",
       "framework": "vite",
-      "installCommand": "sh ../cloud/install.sh",
-      "buildCommand": "cd ../.. && CONSOLE_BASE_PATH=/console/ CONSOLE_VERCEL_INSIGHTS=1 sh apps/cloud/turbo-build.sh @zitadel/console && rm -rf apps/console/dist && mkdir -p apps/console/dist/console && cp -R internal/staticui/console/dist/. apps/console/dist/console/",
-      "outputDirectory": "dist",
+      "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
+      "buildCommand": "CONSOLE_BASE_PATH=/console/ CONSOLE_VERCEL_INSIGHTS=1 turbo run build",
+      "devCommand": "NODE_ENV=production CONSOLE_BASE_PATH=/console/ vite build --outDir node_modules/.cloud-dev && vite preview --outDir node_modules/.cloud-dev --base / --port $PORT --strictPort",
+      "outputDirectory": "../../internal/staticui/console/dist",
       "rewrites": [
         {
-          "source": "/console/(.*)",
-          "destination": "/console/index.html"
+          "source": "/console/:path(.*)?",
+          "destination": "/:path"
+        },
+        {
+          "source": "/((?!assets/).*)",
+          "destination": "/index.html"
         }
       ]
     },
     "storybook": {
       "root": "apps/storybook",
       "framework": "storybook",
-      "installCommand": "sh ../cloud/install.sh",
-      "buildCommand": "cd ../.. && sh apps/cloud/turbo-build.sh @zitadel/storybook && cd apps/storybook && mv dist storybook && mkdir dist && mv storybook dist/",
-      "outputDirectory": "dist"
+      "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
+      "buildCommand": "turbo run build",
+      "devCommand": "NODE_ENV=production storybook build --output-dir node_modules/.cloud-dev --quiet && vite preview --outDir node_modules/.cloud-dev --base / --port $PORT --strictPort",
+      "outputDirectory": "dist",
+      "rewrites": [
+        {
+          "source": "/storybook/:path(.*)?",
+          "destination": "/:path"
+        }
+      ]
     },
     "docs": {
       "root": "apps/docs",
       "framework": "nextjs",
-      "installCommand": "sh ../cloud/install.sh",
-      "buildCommand": "corepack pnpm run build"
+      "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
+      "buildCommand": "pnpm run build"
     },
     "website": {
       "root": "apps/website",
       "framework": "nextjs",
-      "installCommand": "sh ../cloud/install.sh",
-      "buildCommand": "corepack pnpm run build"
+      "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
+      "buildCommand": "pnpm run build"
     }
   },
   "redirects": [

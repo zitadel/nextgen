@@ -31,7 +31,8 @@
     "test": "vitest run",
     "test:all": "pnpm run test",
     "lint": "biome check .",
-    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build"
+    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build",
+    "prepack": "publint --strict"
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",
@@ -49,7 +50,7 @@
     "@zitadel/api-mock": "workspace:*",
     "jsdom": "catalog:",
     "msw": "catalog:",
-    "solid-js": "^1.9.12",
+    "solid-js": "^1.9.16",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plugin-dts": "catalog:",

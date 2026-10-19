@@ -19,7 +19,7 @@ verification into an App Router app.
 Use this when adding or customizing Zitadel auth in an **existing or custom**
 Next.js app, or when you need to understand how the pieces fit together.
 
-For a brand-new app, prefer the CLI: `zitadel setup --framework next` scaffolds
+For a brand-new app, prefer the CLI: `npx @zitadel/cli@alpha setup --framework next` scaffolds
 the whole integration (middleware, login page, env) and wires it for you. Reach
 for this skill when that scaffold already exists and you are editing it, or when
 the app is bespoke and you are integrating by hand.
@@ -27,10 +27,10 @@ the app is bespoke and you are integrating by hand.
 ## Install
 
 ```bash
-pnpm add @zitadel/sdk-next
+pnpm add @zitadel/sdk-next@alpha
 ```
 
-Peer deps the package expects: `next >=15`, `react >=18`, `react-dom >=18`.
+Peer deps the package expects: `next >=15.2.3`, `react >=18`, `react-dom >=18`.
 TypeScript `>=5.0` (the SDK consumer floor; the package is built against a
 newer TypeScript, but that does not raise the floor for your project).
 
@@ -101,6 +101,34 @@ from `@zitadel/sdk-next/client` inside the dynamic import, and set the
 `post-sign-in-url` attribute. `<zitadel-logout>` and `<zitadel-session>` exist
 for logout and profile UI. Sign-in/out navigate to `post-sign-in-url` /
 `post-sign-out-url`, so chrome re-reads on the next page load.
+
+## Widget props and events
+
+The widgets are rendered as raw custom elements, so set their props as the element's own kebab-case attributes (`post-sign-in-url`, `project-id`); `@zitadel/sdk-next/jsx` types them. The `@zitadel/sdk-react` skill lists each prop under its wrapper name in camelCase. The table below lists the events.
+
+The widgets are plain custom elements, so each event is a DOM `CustomEvent` that carries its payload in `detail`. The events and payloads are the same ones every SPA SDK exposes as callbacks.
+
+| Widget event | Fires when | Detail | Widgets |
+| --- | --- | --- | --- |
+| `zitadel-flow-step` | Login shows a step, the first one included. | `{ step }` | Login |
+| `zitadel-flow-input` | The visitor edits a field. | `{ name, value }` | Login |
+| `zitadel-flow-complete` | The flow reaches a terminal step. | `{ behavior, redirect_uri?, handoff_token?, handoff_token_expires_at? }` | Login |
+| `zitadel-flow-redirect` | The widget hands the browser to an identity provider; nobody is signed in yet. | `{ redirect_url, step }` | Login |
+| `zitadel-flow-error` | The flow reports an error. | `{ message }` | Login |
+| `zitadel-signout` | The user signs out. | `{ display, identifier }` | Logout, Session |
+
+```tsx
+const ref = useRef<HTMLElementTagNameMap['zitadel-login']>(null);
+
+useEffect(() => {
+  const login = ref.current;
+  const onComplete = (event: Event) => track((event as CustomEvent).detail);
+  login?.addEventListener('zitadel-flow-complete', onComplete);
+  return () => login?.removeEventListener('zitadel-flow-complete', onComplete);
+}, []);
+
+return <zitadel-login ref={ref} post-sign-in-url="/admin" />;
+```
 
 ## Read these, don't guess
 

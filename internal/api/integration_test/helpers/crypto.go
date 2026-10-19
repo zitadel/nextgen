@@ -11,7 +11,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-func (h *Harness) EnsureSigningKey(t *testing.T) *rsa.PrivateKey {
+func (h *Harness) EnsureSigningKey(t testing.TB) *rsa.PrivateKey {
 	t.Helper()
 	h.signingKey.mutex.Lock()
 	defer h.signingKey.mutex.Unlock()
@@ -24,32 +24,32 @@ func (h *Harness) EnsureSigningKey(t *testing.T) *rsa.PrivateKey {
 	return h.signingKey.value
 }
 
-func (h *Harness) EnsureHasher(t *testing.T) crypto.Hasher {
+func (h *Harness) EnsureHasher(t testing.TB) crypto.Hasher {
 	t.Helper()
 	return h.ensureHasher(t)
 }
 
-func (h *Harness) EnsureHashVerifier(t *testing.T) crypto.HashVerifier {
+func (h *Harness) EnsureHashVerifier(t testing.TB) crypto.HashVerifier {
 	t.Helper()
 	return h.ensureHasher(t)
 }
 
-func (h *Harness) EnsureHashValidator(t *testing.T) crypto.HashValidator {
+func (h *Harness) EnsureHashValidator(t testing.TB) crypto.HashValidator {
 	t.Helper()
 	return h.ensureHasher(t)
 }
 
-func (h *Harness) ensureHasher(t *testing.T) *crypto.PasswapHasher {
+func (h *Harness) ensureHasher(t testing.TB) *crypto.PasswapHasher {
 	t.Helper()
 	return h.EnsureHasherFactory(t).Default()
 }
 
-func (h *Harness) EnsureProjectHashers(t *testing.T) service.ProjectHasherResolver {
+func (h *Harness) EnsureProjectHashers(t testing.TB) service.ProjectHasherResolver {
 	t.Helper()
 	return service.NewProjectHasherResolver(h.EnsureServiceDB(t), h.EnsureHasherFactory(t))
 }
 
-func (h *Harness) EnsureHasherFactory(t *testing.T) *crypto.HasherFactory {
+func (h *Harness) EnsureHasherFactory(t testing.TB) *crypto.HasherFactory {
 	t.Helper()
 	h.hasherFactory.mutex.Lock()
 	defer h.hasherFactory.mutex.Unlock()
@@ -60,7 +60,7 @@ func (h *Harness) EnsureHasherFactory(t *testing.T) *crypto.HasherFactory {
 	return h.hasherFactory.value
 }
 
-func createNewHasherFactory(t *testing.T) *crypto.HasherFactory {
+func createNewHasherFactory(t testing.TB) *crypto.HasherFactory {
 	cfg := crypto.HashConfig{
 		Verifiers: []crypto.HashName{crypto.HashNameBcrypt, crypto.HashNameArgon2},
 		Hasher: crypto.HasherConfig{
@@ -86,7 +86,7 @@ func createNewHasherFactory(t *testing.T) *crypto.HasherFactory {
 	return factory
 }
 
-func (h *Harness) EnsureMasterKey(t *testing.T) *domain.MasterKeys {
+func (h *Harness) EnsureMasterKey(t testing.TB) *domain.MasterKeys {
 	t.Helper()
 	h.masterKeys.mutex.Lock()
 	defer h.masterKeys.mutex.Unlock()

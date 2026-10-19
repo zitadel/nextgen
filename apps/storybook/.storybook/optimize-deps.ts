@@ -1,3 +1,5 @@
+import apiPackage from "@zitadel/api/package.json" with { type: "json" };
+
 /**
  * Shared Vite dep-optimizer config for both the Storybook server
  * (`.storybook/main.ts`) and the `@storybook/addon-vitest` browser run
@@ -21,7 +23,6 @@
 export const optimizeDepsExclude = [
   "@zitadel/components",
   "@zitadel/design-tokens",
-  "@zitadel/api",
   "@zitadel/api-mock",
 ];
 
@@ -52,3 +53,24 @@ export const optimizeDepsInclude = [
   "xstate",
   "@faker-js/faker",
 ];
+
+/**
+ * The generated `@zitadel/api` client, pre-bundled for the Vitest browser run
+ * only. From source it is ~1,260 modules, one per generated model type, and
+ * every story file runs in a fresh iframe that loads all of them again.
+ * Pre-bundled, it is a handful of files.
+ *
+ * Every subpath the package exports is listed, so whichever one a story, an atom
+ * or the mock imports comes from the same bundle. A subpath loaded from source
+ * would bring a second copy of the client's module state: the proxy path
+ * `configureZitadel` sets, the `ApiError` class the orchestrator checks for.
+ *
+ * Vite keys its pre-bundle cache on the lockfile and config, not on the files of
+ * a linked workspace package, so a cached bundle goes stale after
+ * `api:generate`. The Storybook server therefore keeps loading the client from
+ * source (Vite pre-bundles a linked package only when it is listed), and the
+ * Vitest run re-bundles on every start (`optimizeDeps.force`).
+ */
+export const apiClientInclude = Object.keys(apiPackage.exports)
+  .filter((subpath) => subpath !== "./package.json")
+  .map((subpath) => `@zitadel/api${subpath.slice(1)}`);

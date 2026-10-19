@@ -8,4 +8,4 @@ description: |
   when a flow pivot or pop occurs — always use the `id` from the latest response.
 schema:
   type: string
-  example: flow_01H8Z
+example: flow_01KWH8Q5NZT7F0N9WD3P2E4YM7

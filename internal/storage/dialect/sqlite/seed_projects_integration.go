@@ -21,7 +21,7 @@ func SeedProjectsTiedAt(ctx context.Context, pool database.Pool, ids []string, c
 	nanos := createdAt.UnixNano()
 	for _, id := range ids {
 		_, err := p.sqlDB.ExecContext(ctx,
-			`INSERT INTO projects (id, name, preview_origins, created_at, updated_at) VALUES (?, ?, '[]', ?, ?)`,
+			`INSERT INTO projects (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)`,
 			id, "project-"+id, nanos, nanos,
 		)
 		if err != nil {

@@ -1,6 +1,11 @@
 get:
   operationId: getMyUser
   summary: Get my user information
+  description: |
+    Returns the user signed in to the session that authenticates the request.
+
+    The project and the user both come from the session cookie, so a caller only
+    ever reads their own user.
   tags:
     - Users
   security:

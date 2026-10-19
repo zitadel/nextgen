@@ -15,23 +15,38 @@
     // listed here. The other workspace
     // packages the console imports resolve from source; sdk-react has no
     // `@zitadel/source` entry.
+    //
+    // vite.config.ts reads the same variables from the package's .env files
+    // too, and the bundle inlines the VITE_ ones it finds there. Git ignores
+    // those files, so the default inputs leave them out and a changed
+    // .env.local would restore a build made without it; they are listed.
     "build": {
       "dependsOn": ["@zitadel/sdk-react#build"],
       "env": ["CONSOLE_BASE_PATH", "CONSOLE_VERCEL_INSIGHTS", "CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": ["$TURBO_ROOT$/internal/staticui/console/dist/**"]
     },
     // The release UI build consumes the package release output and runs after
-    // the public packages' release builds (tools/release/turbo.json).
+    // the public packages' release builds (tools/release/turbo.json). It
+    // bundles the dist of sdk-react and components; sdk-react's release build
+    // reaches components'.
     "build-release": {
-      "dependsOn": ["@zitadel/api#build-release", "@zitadel/sdk-react#build", "@zitadel/release#build-public-packages"],
+      "dependsOn": ["@zitadel/sdk-react#build-release", "@zitadel/release#build-public-packages"],
       "env": ["CONSOLE_BASE_PATH", "CONSOLE_VERCEL_INSIGHTS", "CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE"],
       "outputs": ["$TURBO_ROOT$/internal/staticui/console/dist/**"]
     },
     "test": {
       "dependsOn": ["build"]
     },
+    // The dev servers and the preview are not cached, and the console's own
+    // CONSOLE_* variables pass through to them: strict mode would hide them,
+    // and each would quietly fall back to its default (the dev proxy's
+    // CONSOLE_BACKEND_URL to :8080, the dev loops' CONSOLE_DEV_* in
+    // scripts/dev-real.mts, the preview's CONSOLE_BASE_PATH to /ui/console/
+    // while its build dependency was made for another base).
     "dev": {
-      "dependsOn": ["@zitadel/sdk-react#build"]
+      "dependsOn": ["@zitadel/sdk-react#build"],
+      "passThroughEnv": ["CONSOLE_*"]
     },
     // Real-data dev loop: boots a seeded ephemeral instance through the built
     // CLI, then the dev server against it (scripts/dev-real.mts builds the
@@ -41,16 +56,17 @@
       "cache": false,
       "persistent": true,
       "dependsOn": ["@zitadel/sdk-react#build", "@zitadel/cli#build"],
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "GOFLAGS"]
+      "passThroughEnv": ["CONSOLE_*", "ZITADEL_*", "NEXTGEN_*", "GOFLAGS"]
     },
     "dev:claim": {
       "cache": false,
       "persistent": true,
       "dependsOn": ["@zitadel/sdk-react#build", "@zitadel/cli#build"],
-      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "GOFLAGS"]
+      "passThroughEnv": ["CONSOLE_*", "ZITADEL_*", "NEXTGEN_*", "GOFLAGS"]
     },
     "preview": {
-      "dependsOn": ["build"]
+      "dependsOn": ["build"],
+      "passThroughEnv": ["CONSOLE_*"]
     }
   }
 }
