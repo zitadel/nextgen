@@ -395,6 +395,17 @@ func TestErrorResponseInternalStays500(t *testing.T) {
 		"only transient failures may claim 503")
 }
 
+// The status follows the outermost domain code, the one the body carries: an
+// internal error that wraps an unavailable one is still a 500.
+func TestErrorResponseInternalWrappingUnavailableStays500(t *testing.T) {
+	t.Parallel()
+
+	got := errorResponse(domain.ErrInternal(domain.ErrUnavailable()))
+
+	require.Equal(t, http.StatusInternalServerError, got.StatusCode)
+	require.Equal(t, api.ErrorCode("internal"), got.Response.Code)
+}
+
 func TestDomainErrorDetails_requestInvalidField(t *testing.T) {
 	t.Parallel()
 
@@ -472,6 +483,13 @@ var unmappedClientCodes = map[string]bool{
 	"user.password_invalid":       true,
 }
 
+// serverFaultStatus is the status each server-fault code is answered with.
+// A code missing here is answered with a 500.
+var serverFaultStatus = map[string]int{
+	domain.ErrNotImplemented().Code: http.StatusNotImplemented,
+	domain.ErrUnavailable().Code:    http.StatusServiceUnavailable,
+}
+
 // TestErrorResponse_serverFaultsAre5xx keeps the HTTP status and
 // domain.IsServerFault, which a service span reads, from drifting apart: every
 // code in the generated error catalog that gets a 5xx must be a server fault,
@@ -490,11 +508,19 @@ func TestErrorResponse_serverFaultsAre5xx(t *testing.T) {
 		require.NotNil(t, m, "no code in %s", file)
 		code := string(m[1])
 
-		e := domain.Error{Code: code}
-		is5xx := errorResponse(e).StatusCode >= http.StatusInternalServerError
+		// The parent carries another server-fault code, so a status read from
+		// the parent instead of the body code fails here.
+		e := domain.Error{Code: code, Parent: domain.ErrUnavailable()}
+		resp := errorResponse(e)
+		is5xx := resp.StatusCode >= http.StatusInternalServerError
 		switch {
 		case domain.IsServerFault(e):
-			require.True(t, is5xx, "%s is a server fault but not answered with a 5xx", code)
+			require.Equal(t, api.ErrorCode(code), resp.Response.Code)
+			want, ok := serverFaultStatus[code]
+			if !ok {
+				want = http.StatusInternalServerError
+			}
+			require.Equal(t, want, resp.StatusCode, "%s is a server fault answered with the wrong status", code)
 		case unmappedClientCodes[code]:
 			require.True(t, is5xx, "%s is mapped now: remove it from unmappedClientCodes", code)
 		default:
