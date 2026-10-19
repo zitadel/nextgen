@@ -15,9 +15,10 @@
 // and the provider's own error text never reaches an event.
 //
 // A sign-in is complete at the first of these: a [PhaseResolved] success whose
-// result is [ResultLinked] or [ResultExistingUser], or a [PhaseUserCreated]
-// success. [ResultCollect] is not an end: the user still fills the collection
-// step, which ends in [PhaseUserCreated].
+// result is [ResultLinked], or a [PhaseUserCreated] success. Neither
+// [ResultCollect] nor [ResultExistingUser] is an end: the user still fills the
+// collection step, which ends in [PhaseUserCreated], or proves they own the
+// account the identity was bound to, which no event reports.
 package ssoevent
 
 import (

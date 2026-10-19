@@ -71,6 +71,9 @@ export class ScopesCheck extends DiscoveryCheck {
     if (supported === undefined) {
       return { status: "skipped", message: "The provider does not list the scopes it supports" };
     }
+    if (context.scopes.length === 0) {
+      return { status: "skipped", message: "The connection asks for no scopes" };
+    }
     const unlisted = context.scopes.filter((scope) => !supported.includes(scope));
     return unlisted.length === 0
       ? { status: "pass", message: `${context.scopes.join(", ")} are all listed by the provider` }
@@ -91,6 +94,9 @@ export class ClaimsCheck extends DiscoveryCheck {
     const advertised = document.claims_supported;
     if (advertised === undefined) {
       return { status: "skipped", message: "The provider does not list the claims it sends" };
+    }
+    if (context.claims.length === 0) {
+      return { status: "skipped", message: "The connection maps no claims" };
     }
     const unlisted = context.claims.filter((claim) => !advertised.includes(claim));
     return unlisted.length === 0
