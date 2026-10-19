@@ -1,11 +1,12 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
+import { DEFAULT_SETUP_PRESET, DEFAULT_SETUP_USE_CASE } from "@zitadel/config/defaults";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
 
@@ -14,7 +15,7 @@ vi.mock("../../../src/commands/setup/prompts", async (importOriginal) => ({
   askCustomSettings: vi.fn(),
 }));
 
-import { confirm } from "@clack/prompts";
+import { confirm, intro, isCancel, multiselect, select, text } from "@clack/prompts";
 
 import { customExample, SETUP_FLAG_NAMES } from "../../../src/lib/idp";
 import {
@@ -27,6 +28,7 @@ import { askCustomSettings } from "../../../src/commands/setup/prompts";
 import type { Asker } from "../../../src/lib/input";
 import { writeRuntimeMetadata } from "../../../src/lib/local-server/runtime";
 import Setup from "../../../src/commands/setup";
+import { aFakeAppGeneratorPath } from "../../helpers/app-generator";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
 import { asTerminal } from "../../helpers/terminal";
 
@@ -63,6 +65,18 @@ async function recordStartedServer(dir: string, serverUrl: string): Promise<void
     cli_version: "0.0.0-test",
   });
 }
+
+/** An empty directory named as npm requires a package to be, which a new app's must be. */
+async function makeNewAppDirectory(): Promise<string> {
+  const parent = await mkdtemp(join(tmpdir(), "zitadel-setup-new-"));
+  tempDirs.push(parent);
+  const cwd = join(parent, "my-app");
+  await mkdir(cwd);
+  return cwd;
+}
+
+/** What a prompt answers when the person cancels it; the clack double's `isCancel` knows it. */
+const CANCELLED = Symbol("cancelled");
 
 /** A minimal detectable Next.js App Router project (no Zitadel files yet). */
 async function makeNextProject(): Promise<string> {
@@ -1049,5 +1063,56 @@ describe("setup asked on a terminal", () => {
     await expect(settingUp(cwd)).rejects.toThrow();
 
     await expect(readFile(join(cwd, "zitadel.json"), "utf8")).rejects.toThrow();
+  });
+
+  describe("in a directory without an app", () => {
+    beforeEach(async () => {
+      vi.stubEnv("PATH", await aFakeAppGeneratorPath());
+      vi.mocked(isCancel).mockImplementation((value) => value === CANCELLED);
+      vi.mocked(text).mockClear();
+      vi.mocked(intro).mockClear();
+    });
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    /** Picks Next.js to scaffold, then answers every question after it. */
+    function answeringEveryQuestion(): void {
+      vi.mocked(select)
+        .mockResolvedValueOnce("next" as never)
+        .mockResolvedValueOnce(DEFAULT_SETUP_USE_CASE as never)
+        .mockResolvedValueOnce(DEFAULT_SETUP_PRESET as never);
+      vi.mocked(text).mockResolvedValueOnce("3000" as never);
+      vi.mocked(multiselect).mockResolvedValueOnce([] as never);
+    }
+
+    it("creates no app when a question after the framework is cancelled", async () => {
+      const cwd = await makeNewAppDirectory();
+      vi.mocked(select).mockResolvedValueOnce("next" as never);
+      vi.mocked(text).mockResolvedValueOnce(CANCELLED as never);
+
+      await expect(settingUp(cwd)).rejects.toThrow();
+
+      expect(text).toHaveBeenCalledWith(expect.objectContaining({ message: "Dev server port" }));
+      expect(await readdir(cwd)).toEqual([]);
+    });
+
+    it("creates the app once every question is answered", async () => {
+      const cwd = await makeNewAppDirectory();
+      answeringEveryQuestion();
+
+      await settingUp(cwd, "--skip-install");
+
+      expect(await readdir(cwd)).toEqual(expect.arrayContaining(["app", "zitadel.json"]));
+    });
+
+    it("asks every question under the heading the framework question opened", async () => {
+      const cwd = await makeNewAppDirectory();
+      answeringEveryQuestion();
+
+      await settingUp(cwd, "--skip-install");
+
+      expect(intro).toHaveBeenCalledTimes(1);
+    });
   });
 });

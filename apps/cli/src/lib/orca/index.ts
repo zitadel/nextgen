@@ -4,6 +4,7 @@ import { basename, dirname, join } from "node:path";
 import { ZitadelError } from "../errors";
 import { LOCAL_RUNTIME_DIR } from "../local-server/runtime";
 import { detectors } from "./detectors";
+import { detectDevPort } from "./detectors/port";
 import type { Detector, FrameworkFacts } from "./detectors/types";
 import { patchers } from "./patchers";
 import type { Patcher } from "./patchers/types";
@@ -20,6 +21,17 @@ export type ScaffoldTarget = Readonly<{
   scaffoldable: boolean;
   reason?: string;
   entries: ReadonlyArray<string>;
+}>;
+
+/** A new app {@link Orca.scaffold} can create, as far as it is known before it exists. */
+export type PlannedApp = Readonly<{
+  framework: string;
+  /**
+   * The dev port to offer for the app. It has no `dev` script yet to read one
+   * from, so this is the port a `.env` file in the directory declares, which
+   * the scaffold keeps, else the default.
+   */
+  devPort: number;
 }>;
 
 type ScaffoldStash = Readonly<{
@@ -117,6 +129,20 @@ export class Orca {
   /** Whether `cwd` is safe for an in-place framework scaffold. */
   async isFreshScaffoldTarget(cwd: string): Promise<boolean> {
     return (await inspectScaffoldTarget(cwd)).scaffoldable;
+  }
+
+  /**
+   * Describes the new `framework` app {@link scaffold} would create in `cwd`,
+   * without touching the directory, so a caller can ask its questions first and
+   * create the app only once it has every answer. Refuses up front what would
+   * stop the app later: a directory name npm does not accept, or a framework
+   * no scaffolder can create or no patcher can integrate.
+   */
+  async planScaffold(cwd: string, framework: string): Promise<PlannedApp> {
+    assertNpmSafeScaffoldDirectoryName(cwd);
+    this.scaffolderFor(framework);
+    this.patcherFor(framework);
+    return { framework, devPort: await detectDevPort(cwd, {}) };
   }
 
   /**

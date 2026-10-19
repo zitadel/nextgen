@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -8,6 +8,7 @@ import { ZitadelError } from "../../../../src/lib/errors";
 import { inspectScaffoldTarget, Orca } from "../../../../src/lib/orca";
 import type { Detector } from "../../../../src/lib/orca";
 import { detectors } from "../../../../src/lib/orca/detectors";
+import { DEFAULT_DEV_PORT } from "../../../../src/lib/orca/detectors/port";
 import { patchers } from "../../../../src/lib/orca/patchers";
 import { scaffolders } from "../../../../src/lib/orca/scaffolders";
 import type { Scaffolder } from "../../../../src/lib/orca/scaffolders/types";
@@ -344,5 +345,43 @@ describe("Orca.scaffold", () => {
       }),
     });
     expect(scaffold).not.toHaveBeenCalled();
+  });
+});
+
+describe("Orca.planScaffold", () => {
+  it("describes the new app without touching the directory", async () => {
+    const cwd = await tmpPackageSafe();
+
+    await expect(orca.planScaffold(cwd, "next")).resolves.toEqual({
+      framework: "next",
+      devPort: DEFAULT_DEV_PORT,
+    });
+    await expect(readdir(cwd)).resolves.toEqual([]);
+  });
+
+  it("offers the dev port a .env file in the directory declares", async () => {
+    const cwd = await tmpPackageSafe();
+    await writeFile(join(cwd, ".env.local"), "PORT=4321\n");
+
+    await expect(orca.planScaffold(cwd, "next")).resolves.toMatchObject({ devPort: 4321 });
+  });
+
+  it("refuses a directory name npm does not accept", async () => {
+    const parent = await mkdtemp(join(tmpdir(), "zitadel-orca-invalid-"));
+    dirs.push(parent);
+    const cwd = join(parent, "Zitadel-Orca-Bad");
+    await mkdir(cwd);
+
+    await expect(orca.planScaffold(cwd, "next")).rejects.toMatchObject({ code: "E_VALIDATION" });
+  });
+
+  it("refuses a framework it could create but not integrate", async () => {
+    const cwd = await tmpPackageSafe();
+    const withoutPatchers = new Orca(detectors, scaffolders, []);
+
+    await expect(withoutPatchers.planScaffold(cwd, "next")).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: 'No patcher supports "next"',
+    });
   });
 });
