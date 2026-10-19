@@ -13,6 +13,19 @@ export const frameworkIds = [
   "qwik-city",
 ];
 
+/**
+ * Frameworks whose scaffolds and journey definitions are kept, and which can still
+ * be run by hand (`--framework sveltekit`), but which the CI fresh-app matrix
+ * intentionally skips: their `create-*@latest` scaffolders pull an upstream
+ * release the day it ships (SolidStart 2, Qwik 2 already broke the journey once),
+ * and a red lane for a reason outside a PR would flake the whole team. Take an id
+ * off this list once its scaffold is pinned and has been stable.
+ */
+export const ciExcludedFrameworkIds = ["sveltekit", "tanstack-start", "solid-start", "qwik-city"];
+
+/** The frameworks the CI fresh-app matrix runs. */
+export const ciFrameworkIds = frameworkIds.filter((id) => !ciExcludedFrameworkIds.includes(id));
+
 const viteDevArgs = (port) => ["run", "dev", "--", "--host", "localhost", "--port", String(port)];
 
 export const frameworks = [

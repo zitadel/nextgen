@@ -1,7 +1,32 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 
-import { appPortFromUrl, frameworkForId, frameworkIds, frameworks } from "./frameworks.mjs";
+import {
+  appPortFromUrl,
+  ciExcludedFrameworkIds,
+  ciFrameworkIds,
+  frameworkForId,
+  frameworkIds,
+  frameworks,
+} from "./frameworks.mjs";
+
+test("the CI matrix skips the meta-frameworks whose scaffolders track upstream releases", () => {
+  assert.deepEqual(ciExcludedFrameworkIds, ["sveltekit", "tanstack-start", "solid-start", "qwik-city"]);
+  assert.deepEqual(ciFrameworkIds, [
+    "next",
+    "nuxt",
+    "react",
+    "vue",
+    "angular",
+    "solid",
+    "svelte",
+    "qwik",
+  ]);
+  // Excluded from CI, not removed: each stays a registered target that can be run by hand.
+  for (const id of ciExcludedFrameworkIds) {
+    assert.equal(frameworkForId(id).id, id);
+  }
+});
 
 test("framework registry lists every CLI journey target", () => {
   assert.deepEqual(

@@ -111,7 +111,10 @@ its CLI steps in `timings.json` in the lane's work dir, which the runner reads.
 ## CI gate
 
 The required PR CI job runs the framework matrix against the default binary
-runtime. It does not use public Zitadel packages or GHCR images; it publishes
+runtime. The matrix skips SvelteKit, TanStack Start, SolidStart and Qwik City
+(`ciExcludedFrameworkIds` in `scripts/frameworks.mjs`): their scaffolders track
+upstream `create-*@latest` releases, so a red lane could come from outside the PR.
+They stay registered and run by hand with `--framework`. It does not use public Zitadel packages or GHCR images; it publishes
 the current workflow's package tarballs to Verdaccio and runs the same `npx`
 local setup flow against the generated app. The Docker fallback journey remains
 an opt-in local/manual check via
