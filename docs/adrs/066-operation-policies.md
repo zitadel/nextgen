@@ -71,6 +71,32 @@ that operation. A setting is bounded only where the server has a technical
 limit. What the server enforces regardless of any policy (the maximum
 password length, for one) is a guard in the domain, not a policy.
 
+#### No server defaults
+
+Decided on 2026-10-15, revising #898's "defaults to 15 characters".
+
+- The product does not teach a project what is best for it. Requirements
+  legitimately differ between projects, so Zitadel enforces what a project
+  configures and does not grade it: no recommended values, no warnings below
+  a threshold, no product floor beyond what the server technically needs.
+- Nothing opinionated is hidden in the server. A value Zitadel chose on the
+  project's behalf would be enforced without appearing anywhere the project
+  can read or review.
+- Everything that is enforced is visible in the project's own
+  configuration: the instance file in `.zitadel/policies/`, versioned and
+  reviewed with the rest of the release.
+- Overrides stay simple. A later audience or hierarchy model resolves
+  between instances that exist, not between instances and a hidden default.
+
+Projects still start from a sensible policy. `zitadel setup` scaffolds a
+starter instance for `auth.factor.password.set` with `min_length: 15`, the
+NIST SP 800-63B minimum for a password used as a single factor
+([#1450](https://github.com/zitadel/nextgen/issues/1450)). #898's default
+therefore lives on as the starter's value, not as server behaviour. A project
+that skips the starter, or later removes the file or its `min_length`, has no
+length policy; the domain guards (non-empty, at most 64 code points) still
+apply. NIST alignment holds for projects that keep the starter.
+
 ### Terminology
 
 - Operation: a domain action that can carry a policy, such as `auth.factor.password.set`. Zitadel defines the list.

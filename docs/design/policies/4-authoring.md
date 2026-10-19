@@ -6,10 +6,22 @@ Instances are files the developer owns: `.zitadel/policies/<operation>.json`,
 one per guarded operation, with the editor `$schema` pointing at the
 `policy.json` meta-schema generated from the OpenAPI component.
 
-- `zitadel setup` offers a starter `auth.factor.password.set` instance. Its values
-  are the CLI's suggestion, not a server default, and a developer who skips
-  it has no password policy: only the domain guards (non-empty, at most 64
-  code points) apply.
+- `zitadel setup` offers a starter `auth.factor.password.set` instance
+  ([#1450](https://github.com/zitadel/nextgen/issues/1450)):
+
+  ```json
+  {
+    "kind": "policy",
+    "operation": "auth.factor.password.set",
+    "config": { "min_length": 15 }
+  }
+  ```
+
+  15 is the NIST SP 800-63B minimum for a single-factor password, and #898's
+  former server default ([ADR 066, No server defaults](../../adrs/066-operation-policies.md#no-server-defaults)).
+  Its values are the CLI's suggestion, not a server default, and a developer
+  who skips it has no password policy: only the domain guards (non-empty, at
+  most 64 code points) apply.
 - `zitadel plan` diffs the file against the stored revision and
   `zitadel apply` publishes a new one through `POST /policies`. Both run the
   same sync engine as schemas, flows and branding, with the `policy` kind
