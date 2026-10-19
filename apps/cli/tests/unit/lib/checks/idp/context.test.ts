@@ -10,6 +10,7 @@ const base = (request: Send): Omit<IdpContext, "discovery"> => ({
   scopes: ["openid"],
   claims: [],
   callbackUri: "http://localhost:3000/cb",
+  tokenAuthMethod: "client_secret_basic",
   endpoints: undefined,
   consoleUrl: undefined,
   probes: undefined,

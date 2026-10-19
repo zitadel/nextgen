@@ -180,6 +180,10 @@ export default class TestSignIn extends BaseCommand {
           ...stringsIn(connection.body.verified_claims),
         ],
         callbackUri,
+        tokenAuthMethod:
+          oidc.token_endpoint_auth_method === "client_secret_post"
+            ? "client_secret_post"
+            : "client_secret_basic",
         endpoints: endpointsOf(oidc),
         consoleUrl: catalogId === undefined ? undefined : idpProvider(catalogId).consoleUrl,
         probes: PROVIDER_PROBES[slug],

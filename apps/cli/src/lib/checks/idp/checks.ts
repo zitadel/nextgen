@@ -210,16 +210,35 @@ export class SecretProbeCheck extends DiscoveryCheck {
         recovery: "Use an https:// token endpoint; plain http is only allowed for localhost",
       };
     }
-    const response = await context.request(document.token_endpoint, {
-      method: "POST",
-      body: new URLSearchParams({
-        grant_type: "authorization_code",
-        client_id: context.clientId,
-        client_secret: context.clientSecret,
-        code: "zitadel-check",
-        redirect_uri: context.callbackUri,
-      }),
-    });
+    const grant = {
+      grant_type: "authorization_code",
+      code: "zitadel-check",
+      redirect_uri: context.callbackUri,
+    };
+    // As the engine does: the Authorization header for client_secret_basic, whose
+    // credentials are form-encoded before they are base64-encoded (RFC 6749 2.3.1),
+    // or the form body for client_secret_post.
+    const response = await context.request(
+      document.token_endpoint,
+      context.tokenAuthMethod === "client_secret_basic"
+        ? {
+            method: "POST",
+            headers: {
+              authorization: `Basic ${Buffer.from(
+                `${encodeURIComponent(context.clientId)}:${encodeURIComponent(context.clientSecret)}`,
+              ).toString("base64")}`,
+            },
+            body: new URLSearchParams(grant),
+          }
+        : {
+            method: "POST",
+            body: new URLSearchParams({
+              ...grant,
+              client_id: context.clientId,
+              client_secret: context.clientSecret,
+            }),
+          },
+    );
     return outcomeOf(
       context.probes.token(response),
       context,
