@@ -11,28 +11,16 @@ import { baseHostStyles, t } from "../styles/index.js";
 import "../atoms/index.js";
 
 /**
- * A page's identity for the same-page and referrer checks. Two URLs get the same
- * key when they name the same page: a trailing slash (hosts add or strip it with a
- * redirect), the order of the query parameters and the fragment do not matter
- * (assigning a fragment does not reload). `www.` and tracking parameters do, so
- * they are kept.
+ * How two URLs are compared to tell whether they name the same page: a trailing
+ * slash (hosts add or strip it with a redirect), the order of the query
+ * parameters and the fragment do not matter (assigning a fragment does not
+ * reload). `www.` and tracking parameters do, so they are kept.
  */
-function pageKey(url: URL): string {
-  return normalizeUrl(url.href, {
-    stripHash: true,
-    stripWWW: false,
-    removeQueryParameters: false,
-  });
-}
-
-/** Parses a URL, or returns `undefined` when `value` is not one. */
-function parseUrl(value: string, base?: string): URL | undefined {
-  try {
-    return new URL(value, base);
-  } catch {
-    return undefined;
-  }
-}
+const SAME_PAGE = {
+  stripHash: true,
+  stripWWW: false,
+  removeQueryParameters: false,
+} as const;
 
 /**
  * `<zitadel-session>` — the "signed in" card.
@@ -178,23 +166,20 @@ export class ZitadelSession extends ZitadelSurface {
     if (this.postSignOutUrl && typeof window !== "undefined") {
       // `location.assign()` resolves a relative URL against the document base
       // (a `<base href>`), not the page's own URL, so the check must too.
-      const target = parseUrl(this.postSignOutUrl, document.baseURI);
-      const here = parseUrl(window.location.href);
-
-      if (target !== undefined && here !== undefined) {
+      if (URL.canParse(this.postSignOutUrl, document.baseURI)) {
+        const target = normalizeUrl(new URL(this.postSignOutUrl, document.baseURI).href, SAME_PAGE);
+        const here = normalizeUrl(window.location.href, SAME_PAGE);
         // An empty or unreadable referrer proves nothing about where the visitor was.
-        const referrer = document.referrer === "" ? undefined : parseUrl(document.referrer);
+        const referrer = URL.canParse(document.referrer)
+          ? normalizeUrl(document.referrer, SAME_PAGE)
+          : undefined;
 
-        const targetKey = pageKey(target);
-        const hereKey = pageKey(here);
-        const referrerKey = referrer === undefined ? undefined : pageKey(referrer);
-
-        if (targetKey === hereKey) {
+        if (target === here) {
           // Stay: the sign-out page is this page, so navigating would reload it forever.
-        } else if (referrerKey === hereKey) {
+        } else if (referrer === here) {
           // Stay: the visitor was sent here from this page, so a redirect brought
           // them straight back and another hop would loop.
-        } else if (referrerKey === targetKey) {
+        } else if (referrer === target) {
           // Stay: the visitor was sent here from the sign-out page, which redirected
           // back to this page, so another hop would loop.
         } else {
