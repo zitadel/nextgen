@@ -177,7 +177,7 @@ export class LiveSignInCheck extends Check<IdpContext> {
     if (completes(event)) {
       return { status: "pass", message: `sign-in completed with ${context.slug}` };
     }
-    live.say(`  ${PHASES[event.phase]}: ok`);
+    live.say(`${PHASES[event.phase]}: ok`);
     return this.follow(watching, { ...progress, attempt, last: event });
   }
 
