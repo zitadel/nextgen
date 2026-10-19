@@ -1,4 +1,5 @@
 import type {
+  StandardAttributeProps,
   ZitadelLoginProps,
   ZitadelLogoutProps,
   ZitadelSessionProps,
@@ -16,21 +17,17 @@ import type { HTMLAttributes } from "svelte/elements";
 export type * from "@zitadel/sdk-core/types";
 
 /**
- * The standard HTML attributes a widget wrapper accepts besides its own props
- * (`class`, `style`, `id`, `title`, `slot`, `hidden`, `role`, `tabindex`,
- * `data-*`, `aria-*`, …), spread onto the widget element. A widget prop of the
- * same name wins, so those names are left out here rather than merged.
+ * The standard HTML attributes a widget wrapper accepts besides its own props,
+ * and nothing else, so no prop the type accepts is dropped. They are passed to
+ * the widget element.
  */
-export type ZitadelWidgetAttributes<Own> = Omit<HTMLAttributes<HTMLElement>, keyof Own>;
+export type ZitadelWidgetAttributes = StandardAttributeProps<HTMLAttributes<HTMLElement>>;
 
 /** Props of `ZitadelLogin`: the widget's own plus the element's HTML attributes. */
-export type ZitadelLoginElementProps = ZitadelLoginProps &
-  ZitadelWidgetAttributes<ZitadelLoginProps>;
+export type ZitadelLoginSvelteProps = ZitadelLoginProps & ZitadelWidgetAttributes;
 
 /** Props of `ZitadelLogout`: the widget's own plus the element's HTML attributes. */
-export type ZitadelLogoutElementProps = ZitadelLogoutProps &
-  ZitadelWidgetAttributes<ZitadelLogoutProps>;
+export type ZitadelLogoutSvelteProps = ZitadelLogoutProps & ZitadelWidgetAttributes;
 
 /** Props of `ZitadelSession`: the widget's own plus the element's HTML attributes. */
-export type ZitadelSessionElementProps = ZitadelSessionProps &
-  ZitadelWidgetAttributes<ZitadelSessionProps>;
+export type ZitadelSessionSvelteProps = ZitadelSessionProps & ZitadelWidgetAttributes;

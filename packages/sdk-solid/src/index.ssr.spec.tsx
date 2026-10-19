@@ -1,3 +1,4 @@
+import type { JSX } from "solid-js";
 import { renderToString } from "solid-js/web";
 import { describe, expect, it } from "vitest";
 
@@ -12,15 +13,6 @@ function serverAttributes(tag: string, html: string): Record<string, string> {
     [...(open?.[1] ?? "").matchAll(/([a-z][\w-]*)(?:="([^"]*)")?/g)].map((m) => [m[1], m[2] ?? ""]),
   );
 }
-
-const standard = {
-  class: "probe",
-  id: "probe",
-  "data-testid": "probe",
-  "aria-label": "probe",
-  tabindex: 3,
-  hidden: true,
-} as const;
 
 describe("server-rendered widget config", () => {
   const handle = { projectId: "proj-test", proxyPath: "/__nextgen", url: "http://auth.test" };
@@ -129,20 +121,62 @@ describe("server-rendered widget options", () => {
     const html = renderToString(() => <ZitadelSession projectId="proj-test" />);
     expect(html).not.toContain("heading=");
   });
+});
 
-  it.each([
-    [widgetTags.login, () => <ZitadelLogin projectId="p1" {...standard} />],
-    [widgetTags.logout, () => <ZitadelLogout projectId="p1" {...standard} />],
-    [widgetTags.session, () => <ZitadelSession projectId="p1" {...standard} />],
-  ] as const)("puts the standard attributes into the %s server markup", (tag, widget) => {
-    expect(serverAttributes(tag, renderToString(widget))).toMatchObject({
-      class: expect.stringMatching(/^probe\s*$/),
+type WidgetName = keyof typeof widgetTags;
+
+const WIDGETS = ["login", "logout", "session"] as const satisfies readonly WidgetName[];
+
+// The attributes are open-ended, so the component is seen through a loose props type.
+function looseComponent(widget: WidgetName): (props: Record<string, unknown>) => JSX.Element {
+  return { login: ZitadelLogin, logout: ZitadelLogout, session: ZitadelSession }[widget] as (
+    props: Record<string, unknown>,
+  ) => JSX.Element;
+}
+
+/** The attributes on the widget's element in the markup a server would send. */
+async function renderAttributes(
+  widget: WidgetName,
+  props: Readonly<Record<string, unknown>>,
+): Promise<Record<string, string>> {
+  const Widget = looseComponent(widget);
+  return serverAttributes(
+    widgetTags[widget],
+    renderToString(() => <Widget {...props} />),
+  );
+}
+
+// standard-attributes-server:begin
+describe.each(WIDGETS)("%s server-rendered standard attributes", (widget) => {
+  it("puts the standard attributes into the server markup", async () => {
+    const attributes = await renderAttributes(widget, {
       id: "probe",
+      title: "probe",
+      slot: "probe",
+      role: "region",
       "data-testid": "probe",
       "aria-label": "probe",
-      tabindex: "3",
-      hidden: "",
-      "project-id": "p1",
+    });
+    expect(attributes).toMatchObject({
+      id: "probe",
+      title: "probe",
+      slot: "probe",
+      role: "region",
+      "data-testid": "probe",
+      "aria-label": "probe",
     });
   });
+
+  it("leaves props outside the standard set out of the server markup", async () => {
+    const attributes = await renderAttributes(widget, {
+      srcdoc: "probe",
+      onclick: "probe",
+      part: "probe",
+      dir: "probe",
+    });
+    for (const name of ["srcdoc", "onclick", "part", "dir"]) {
+      expect(attributes).not.toHaveProperty(name);
+    }
+  });
 });
+// standard-attributes-server:end

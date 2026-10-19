@@ -114,7 +114,7 @@ Each widget event reaches the callback in the last column, which receives the ev
 
 ## Standard HTML attributes
 
-`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` also take the standard HTML attributes (`class`, `style`, `id`, `title`, `slot`, `hidden`, `role`, `tabindex`, `data-*` and `aria-*`) and forward them to the widget element, so you can position, style and label the widget without an extra wrapper element. A widget prop wins over a standard attribute of the same name, and no other prop reaches the widget's configuration.
+`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` also take the standard HTML attributes (`class`, `style`, `id`, `title`, `slot`, `hidden`, `role`, `tabindex`, `data-*` and `aria-*`) and pass them to the widget element, so you can position, style and label the widget without an extra wrapper element. Nothing else reaches the element: any other prop is ignored.
 
 ```vue
 <ZitadelLogin :project="project" class="login" data-testid="login" aria-label="Sign in" />

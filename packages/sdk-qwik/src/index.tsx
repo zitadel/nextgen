@@ -25,7 +25,7 @@ import {
   type QRL,
   type Signal,
 } from "@qwik.dev/core";
-import { standardAttributes } from "@zitadel/sdk-core/types";
+import { type StandardAttributeProps, standardAttributes } from "@zitadel/sdk-core/types";
 import {
   configureZitadel,
   getApi,
@@ -192,16 +192,13 @@ function bindSessionConfig(el: ZitadelSessionElement, props: ZitadelSessionProps
 }
 
 /**
- * The standard HTML attributes a widget wrapper accepts besides its own props
- * (`class`, `style`, `id`, `title`, `slot`, `hidden`, `role`, `tabindex`,
- * `data-*`, `aria-*`, …), spread onto the widget element. A widget prop of the
- * same name wins, so those names are left out here rather than merged. Event
- * handlers and `children` are not forwarded and not accepted.
+ * The standard HTML attributes a widget wrapper accepts besides its own props,
+ * and nothing else, so no prop the type accepts is dropped. They are passed to
+ * the widget element.
  */
-export type ZitadelWidgetAttributes<Own> = Omit<
-  HTMLElementAttrs,
-  keyof Own | "ref" | "children"
-> & { class?: ClassList };
+export type ZitadelWidgetAttributes = StandardAttributeProps<
+  HTMLElementAttrs & { class?: ClassList }
+>;
 
 function eventDetail<T>(event: Event): T {
   return (event as CustomEvent<T>).detail;
@@ -227,7 +224,7 @@ type Qrlify<H> = {
  * signal to obtain the underlying `<zitadel-login>` element imperatively.
  */
 export type ZitadelLoginProps = ZitadelLoginConfig &
-  ZitadelWidgetAttributes<ZitadelLoginConfig & Qrlify<ZitadelLoginHandlers>> &
+  ZitadelWidgetAttributes &
   Qrlify<ZitadelLoginHandlers> & {
     /**
      * Optional signal populated with the underlying `<zitadel-login>` element
@@ -248,7 +245,7 @@ export type ZitadelLoginProps = ZitadelLoginConfig &
  * declarative `useOn` does not catch.
  */
 export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
-  // The standard HTML attributes come first, so a widget prop wins over one of the same name.
+  // The standard HTML attributes are the only extra props the element takes.
   const attributes = standardAttributes(props);
   const host = useSignal<ZitadelLoginElement>();
   // biome-ignore lint/correctness/noQwikUseVisibleTask: wrapping a web component needs an imperative mount task to set DOM properties and wire native listeners Qwik's declarative APIs cannot express.
@@ -302,7 +299,7 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
  * signal to obtain the underlying `<zitadel-logout>` element imperatively.
  */
 export type ZitadelLogoutProps = ZitadelLogoutConfig &
-  ZitadelWidgetAttributes<ZitadelLogoutConfig & Qrlify<ZitadelLogoutHandlers>> &
+  ZitadelWidgetAttributes &
   Qrlify<ZitadelLogoutHandlers> & {
     /**
      * Optional signal populated with the underlying `<zitadel-logout>` element
@@ -320,7 +317,7 @@ export type ZitadelLogoutProps = ZitadelLogoutConfig &
  * forwards the widget's `zitadel-signout` event as an optional callback.
  */
 export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
-  // The standard HTML attributes come first, so a widget prop wins over one of the same name.
+  // The standard HTML attributes are the only extra props the element takes.
   const attributes = standardAttributes(props);
   const host = useSignal<ZitadelLogoutElement>();
   // biome-ignore lint/correctness/noQwikUseVisibleTask: wrapping a web component needs an imperative mount task to set DOM properties and wire native listeners Qwik's declarative APIs cannot express.
@@ -361,7 +358,7 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
  * `<zitadel-session>` element imperatively.
  */
 export type ZitadelSessionProps = ZitadelSessionConfig &
-  ZitadelWidgetAttributes<ZitadelSessionConfig & Qrlify<ZitadelSessionHandlers>> &
+  ZitadelWidgetAttributes &
   Qrlify<ZitadelSessionHandlers> & {
     /**
      * Optional signal populated with the underlying `<zitadel-session>` element
@@ -379,7 +376,7 @@ export type ZitadelSessionProps = ZitadelSessionConfig &
  * `zitadel-signout` event as an optional callback.
  */
 export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
-  // The standard HTML attributes come first, so a widget prop wins over one of the same name.
+  // The standard HTML attributes are the only extra props the element takes.
   const attributes = standardAttributes(props);
   const host = useSignal<ZitadelSessionElement>();
   // biome-ignore lint/correctness/noQwikUseVisibleTask: wrapping a web component needs an imperative mount task to set DOM properties and wire native listeners Qwik's declarative APIs cannot express.

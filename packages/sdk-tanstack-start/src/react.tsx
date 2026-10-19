@@ -36,7 +36,10 @@ export { businessLocales } from "@zitadel/sdk-react";
 // shipping them. react.test.tsx fails when this list and sdk-react's drift.
 export type {
   CreateFlowBodyPurpose,
-  forwardStandardAttributes,
+  isStandardAttributeName,
+  StandardAttributeName,
+  StandardAttributeProps,
+  StandardAttributes,
   standardAttributes,
   WidgetTag,
   widgetTags,

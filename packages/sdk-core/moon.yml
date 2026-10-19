@@ -44,7 +44,9 @@ tasks:
       - "/packages/sdk-angular/src/lib/components.spec.ts"
       - "/packages/sdk-svelte/src/index.spec.ts"
       - "/packages/sdk-solid/src/index.spec.tsx"
+      - "/packages/sdk-solid/src/index.ssr.spec.tsx"
       - "/packages/sdk-qwik/src/index.spec.tsx"
+      - "/packages/sdk-qwik/src/index.ssr.spec.tsx"
       # And the meta-framework SDKs' server tests, to check they share their titles.
       - "/packages/sdk-*/src/__tests__/*.test.ts"
       - "/packages/sdk-*/src/__tests__/*/*.test.ts"

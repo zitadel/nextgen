@@ -16,6 +16,7 @@ import {
   type ZitadelLoginConfig,
   type ZitadelLogoutConfig,
   type ZitadelSessionConfig,
+  standardAttributes,
   widgetTags,
 } from "./types.js";
 
@@ -229,30 +230,57 @@ describe("server-render cases ↔ SDK specs", () => {
 });
 
 /**
+ * The standard attributes and the widget props are disjoint by construction: a
+ * wrapper hands the element the standard attributes besides its own props, so
+ * if a widget prop shared a name with one, the wrapper would shadow it.
+ */
+describe("standard attributes ↔ widget props", () => {
+  it.each([
+    ["ZitadelLogin", LOGIN_CONFIG_KEYS, ZITADEL_LOGIN_EVENT_HANDLERS],
+    ["ZitadelLogout", LOGOUT_CONFIG_KEYS, ZITADEL_LOGOUT_EVENT_HANDLERS],
+    ["ZitadelSession", SESSION_CONFIG_KEYS, ZITADEL_SESSION_EVENT_HANDLERS],
+  ] as const)("%s has no prop that is a standard attribute", (_widget, configKeys, handlers) => {
+    const props = {
+      ...configKeys,
+      ...Object.fromEntries(Object.values(handlers).map((n) => [n, true])),
+    };
+    expect(standardAttributes(props)).toEqual({});
+  });
+});
+
+/**
  * The standard-attribute tests.
  *
- * Every client SDK's wrapper forwards the element's standard HTML attributes to
+ * Every SPA SDK except Angular passes the element's standard HTML attributes to
  * the widget element, and every SDK spec proves it with the same tests between
- * two marker comments: the same titles, in the same order, with none missing and
- * none extra, and the same bodies, byte for byte. Only the glue above each block
- * (`mountWidget` and the two props type aliases) differs. A behaviour left
- * untested in one SDK, or tested under another title, fails here instead of
- * drifting unnoticed.
+ * marker comments: the same titles, in the same order, with none missing, none
+ * extra and none unmarked inside the block, and the same bodies, byte for byte.
+ * Only the glue above each block (`mountWidget`, `renderAttributes` and the two
+ * props type aliases) differs. A behaviour left untested in one SDK, or tested
+ * under another title, fails here instead of drifting unnoticed.
  *
- * One documented exception: an Angular template attribute has no props type, so
- * the type-level test there checks against a loose type and cannot fail.
+ * One documented exception: Angular's component tag already is the element that
+ * carries the standard attributes, so its wrapper does not forward anything and
+ * its spec has no block.
  */
 describe("standard-attribute tests ↔ SDK specs", () => {
-  const SPECS = {
+  const CLIENT_SPECS = {
     "sdk-react": "../../sdk-react/src/index.spec.tsx",
     "sdk-vue": "../../sdk-vue/src/components.spec.ts",
-    "sdk-angular": "../../sdk-angular/src/lib/components.spec.ts",
     "sdk-svelte": "../../sdk-svelte/src/index.spec.ts",
     "sdk-solid": "../../sdk-solid/src/index.spec.tsx",
     "sdk-qwik": "../../sdk-qwik/src/index.spec.tsx",
   } as const;
 
-  const CANONICAL_TITLES = [
+  const SERVER_SPECS = {
+    "sdk-react": "../../sdk-react/src/index.spec.tsx",
+    "sdk-vue": "../../sdk-vue/src/components.spec.ts",
+    "sdk-svelte": "../../sdk-svelte/src/index.spec.ts",
+    "sdk-solid": "../../sdk-solid/src/index.ssr.spec.tsx",
+    "sdk-qwik": "../../sdk-qwik/src/index.ssr.spec.tsx",
+  } as const;
+
+  const CLIENT_TITLES = [
     "%s standard attributes",
     "forwards the class to the widget element",
     "forwards the style to the widget element",
@@ -261,52 +289,131 @@ describe("standard-attribute tests ↔ SDK specs", () => {
     "forwards aria attributes to the widget element",
     "forwards the remaining standard attributes to the widget element",
     "forwards the slot to the widget element",
-    "lets a widget prop win over a standard attribute of the same name",
+    "renders a false aria or data attribute as the string false",
+    "leaves out an attribute whose value is false, null or undefined",
+    "does not forward props outside the standard set",
     "gives access to the widget element through a ref",
     "accepts the standard attributes in its props",
+    "rejects the attributes it does not forward in its props",
   ];
 
-  // Matches `it("title"` and the `describe.each(WIDGETS)("title"` form.
-  const TITLE = /(?:\bit\(|\bdescribe\.each\(\w+\)\()\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1/g;
+  const SERVER_TITLES = [
+    "%s server-rendered standard attributes",
+    "puts the standard attributes into the server markup",
+    "leaves props outside the standard set out of the server markup",
+  ];
 
-  const blockOf = (spec: string): string => {
-    const source = readFileSync(fileURLToPath(new URL(spec, import.meta.url)), "utf8");
-    const begin = source.indexOf("// standard-attributes:begin");
-    const end = source.indexOf("// standard-attributes:end");
-    expect(begin, `${spec} has no standard-attribute tests`).toBeGreaterThanOrEqual(0);
-    expect(end, `${spec} has an unterminated standard-attribute block`).toBeGreaterThan(begin);
-    return source.slice(begin, end);
+  // Matches `it("title"`, `it.each(…)("title"`, `describe("title"` and `describe.each(…)("title"`.
+  const TITLE = /\b(?:it|describe)(?:\.each\([^)]*\))?\(\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1/g;
+
+  const blockIn = (source: string, name: string): string | undefined => {
+    const begin = source.indexOf(`// ${name}:begin`);
+    const end = source.indexOf(`// ${name}:end`);
+    return begin >= 0 && end > begin ? source.slice(begin, end) : undefined;
   };
 
-  const firstDifference = (titles: readonly string[]): string => {
-    const length = Math.max(titles.length, CANONICAL_TITLES.length);
+  const titlesIn = (block: string): string[] =>
+    Array.from(block.matchAll(TITLE), (match) => match[2] ?? "");
+
+  const firstDifference = (titles: readonly string[], canonical: readonly string[]): string => {
+    const length = Math.max(titles.length, canonical.length);
     for (let index = 0; index < length; index++) {
-      if (titles[index] !== CANONICAL_TITLES[index]) {
-        return `test ${index + 1} is ${JSON.stringify(titles[index])}, expected ${JSON.stringify(CANONICAL_TITLES[index])}`;
+      if (titles[index] !== canonical[index]) {
+        return `test ${index + 1} is ${JSON.stringify(titles[index])}, expected ${JSON.stringify(canonical[index])}`;
       }
     }
     return "";
   };
 
-  it.each(Object.entries(SPECS))(
-    "%s carries exactly the canonical tests, in order",
-    (sdk, spec) => {
-      const titles = [...blockOf(spec).matchAll(TITLE)].map((match) => match[2]!);
-      expect(
-        firstDifference(titles),
-        `${sdk} has ${titles.length} tests, expected ${CANONICAL_TITLES.length}`,
-      ).toBe("");
-    },
-  );
+  const read = (spec: string): string =>
+    readFileSync(fileURLToPath(new URL(spec, import.meta.url)), "utf8");
 
-  it.each(Object.entries(SPECS))(
-    "%s carries the same test bodies as the React spec",
-    (sdk, spec) => {
-      expect(blockOf(spec), `${sdk} differs from the React block`).toBe(
-        blockOf(SPECS["sdk-react"]),
+  describe.each([
+    ["standard-attributes", CLIENT_SPECS, CLIENT_TITLES],
+    ["standard-attributes-server", SERVER_SPECS, SERVER_TITLES],
+  ] as const)("the %s block", (name, specs, canonical) => {
+    it.each(Object.entries(specs))(
+      "%s carries exactly the canonical tests, in order",
+      (sdk, spec) => {
+        const block = blockIn(read(spec), name);
+        expect(block, `${sdk} has no ${name} block`).toBeDefined();
+        const titles = titlesIn(block ?? "");
+        expect(
+          firstDifference(titles, canonical),
+          `${sdk} has ${titles.length} tests, expected ${canonical.length}`,
+        ).toBe("");
+      },
+    );
+
+    it.each(Object.entries(specs))(
+      "%s carries the same test bodies as the React spec",
+      (sdk, spec) => {
+        expect(blockIn(read(spec), name), `${sdk} differs from the React block`).toBe(
+          blockIn(read(specs["sdk-react"]), name),
+        );
+      },
+    );
+  });
+
+  // The guard's own logic, on blocks it is made to reject.
+  describe("the guard", () => {
+    const block = [
+      "// x:begin",
+      'describe.each(WIDGETS)("%s group", (widget) => {',
+      '  it("first", () => {});',
+      '  it.each([1, 2])("second", () => {});',
+      "});",
+      "// x:end",
+    ].join("\n");
+    const canonical = ["%s group", "first", "second"];
+    const titles = (source: string): string[] => titlesIn(blockIn(source, "x") ?? "");
+
+    it("reads it, it.each and describe.each titles", () => {
+      expect(titles(block)).toEqual(canonical);
+    });
+
+    it("sees a dropped title", () => {
+      expect(
+        firstDifference(titles(block.replace('  it("first", () => {});\n', "")), canonical),
+      ).not.toBe("");
+    });
+
+    it("sees a renamed title", () => {
+      expect(firstDifference(titles(block.replace('"first"', '"primary"')), canonical)).not.toBe(
+        "",
       );
-    },
-  );
+    });
+
+    it("sees a reordered title", () => {
+      const swapped = block
+        .replace('  it("first", () => {});\n', "")
+        .replace(
+          '  it.each([1, 2])("second", () => {});',
+          '  it.each([1, 2])("second", () => {});\n  it("first", () => {});',
+        );
+      expect(firstDifference(titles(swapped), canonical)).not.toBe("");
+    });
+
+    it("sees an extra test inside the block", () => {
+      expect(
+        firstDifference(
+          titles(block.replace("});\n// x:end", '  it("extra", () => {});\n});\n// x:end')),
+          canonical,
+        ),
+      ).not.toBe("");
+    });
+
+    it("sees a changed body, which the byte comparison catches", () => {
+      expect(blockIn(block.replace("() => {}", "() => { run(); }"), "x")).not.toBe(
+        blockIn(block, "x"),
+      );
+    });
+
+    it("finds no block that is missing or unterminated", () => {
+      expect(blockIn("nothing here", "x")).toBeUndefined();
+      expect(blockIn("// x:begin\nno end", "x")).toBeUndefined();
+    });
+  });
 });
 
 /**
@@ -372,7 +479,9 @@ describe("widget loading ↔ SDK packages", () => {
         "packages/sdk-angular/src/lib/components.spec.ts",
         "packages/sdk-svelte/src/index.spec.ts",
         "packages/sdk-solid/src/index.spec.tsx",
+        "packages/sdk-solid/src/index.ssr.spec.tsx",
         "packages/sdk-qwik/src/index.spec.tsx",
+        "packages/sdk-qwik/src/index.ssr.spec.tsx",
         "packages/sdk-*/src/__tests__/*.test.ts",
         "packages/sdk-*/src/__tests__/*/*.test.ts",
         "packages/sdk-*/package.json",

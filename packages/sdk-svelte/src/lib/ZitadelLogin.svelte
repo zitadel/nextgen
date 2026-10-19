@@ -9,7 +9,7 @@
     ZitadelFlowInputDetail,
     ZitadelFlowRedirectDetail,
     ZitadelFlowStepDetail,
-    ZitadelLoginElementProps,
+    ZitadelLoginSvelteProps,
   } from './types';
   import { assignGiven } from './given';
   import { onClient, proxyPathAttr } from './attributes';
@@ -35,9 +35,9 @@
     onFlowRedirect,
     onFlowError,
     ...rest
-  }: ZitadelLoginElementProps = $props();
+  }: ZitadelLoginSvelteProps = $props();
 
-  // The standard HTML attributes come first, so a widget prop wins over one of the same name.
+  // The standard HTML attributes are the only extra props the element takes.
   const attributes = $derived(standardAttributes(rest));
 
   let el: ZitadelLoginElement | undefined = $state();

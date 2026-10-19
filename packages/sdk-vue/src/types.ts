@@ -1,3 +1,4 @@
+import type { StandardAttributeProps } from "@zitadel/sdk-core/types";
 import type { HTMLAttributes } from "vue";
 
 /**
@@ -11,19 +12,22 @@ import type { HTMLAttributes } from "vue";
 export type * from "@zitadel/sdk-core/types";
 
 /**
- * A widget component's type with the element's standard HTML attributes added
- * to its props (`id`, `title`, `slot`, `hidden`, `role`, `tabindex`, `aria-*`, …;
- * `class` and `style` Vue already allows, as it does any `data-*`). They are
- * merged onto the rendered widget element, and the widget's own props win over
- * any of the same name, so those are left out of the attribute type.
+ * The standard HTML attributes a widget wrapper accepts besides its own props,
+ * and nothing else, so no prop the type accepts is dropped. They are passed to
+ * the widget element. `class` and `style` are left out, since Vue types them on
+ * every component. `data-*` is not declared: a prop pattern like that breaks
+ * Vue's own overloads, and a template accepts a `data-*` attribute anyway
+ * (`strictTemplates` is the exception, and rejects it).
  */
-export type WithZitadelWidgetAttributes<
-  Component extends abstract new (
-    ...args: never
-  ) => { $props: object },
-> = Component &
-  (new (
-    ...args: never
-  ) => {
-    $props: Omit<HTMLAttributes & { slot?: string }, keyof InstanceType<Component>["$props"]>;
-  });
+export type ZitadelWidgetAttributes = StandardAttributeProps<
+  Omit<HTMLAttributes, "class" | "style"> & { slot?: string }
+>;
+
+/** A widget component's type with {@link ZitadelWidgetAttributes} added to its props. */
+export type WithZitadelWidgetAttributes<Component extends abstract new (...args: never) => object> =
+  Component &
+    (new (
+      ...args: never
+    ) => {
+      $props: ZitadelWidgetAttributes;
+    });

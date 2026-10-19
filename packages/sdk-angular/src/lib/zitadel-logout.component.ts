@@ -1,17 +1,14 @@
+import type { ElementRef } from "@angular/core";
 import type { ZitadelLogout as ZitadelLogoutElement } from "@zitadel/components";
 import type { ZitadelSignoutDetail } from "@zitadel/sdk-core/types";
-import { forwardStandardAttributes } from "@zitadel/sdk-core/types";
 
 import {
   Component,
   CUSTOM_ELEMENTS_SCHEMA,
-  ElementRef,
   EventEmitter,
-  inject,
   Input,
   Output,
   ViewChild,
-  type AfterViewInit,
 } from "@angular/core";
 
 import type { ZitadelProject } from "./config";
@@ -47,7 +44,7 @@ import "@zitadel/components";
     (zitadel-signout)="onSignout($event)"
   ></zitadel-logout>`,
 })
-export class ZitadelLogoutComponent implements AfterViewInit {
+export class ZitadelLogoutComponent {
   @Input() project?: ZitadelProject;
   @Input() projectId?: string;
   @Input() proxyPath?: string;
@@ -56,14 +53,6 @@ export class ZitadelLogoutComponent implements AfterViewInit {
   @Output() signout = new EventEmitter<ZitadelSignoutDetail>();
 
   @ViewChild("el") private elementRef?: ElementRef<ZitadelLogoutElement>;
-
-  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
-
-  ngAfterViewInit(): void {
-    // The standard HTML attributes come first, so a widget prop wins over one of the same name.
-    const element = this.element;
-    if (element) forwardStandardAttributes(this.host.nativeElement, element);
-  }
 
   /** The underlying `<zitadel-logout>` custom element, or `null` before view init. */
   get element(): ZitadelLogoutElement | null {

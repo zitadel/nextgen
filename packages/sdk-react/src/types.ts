@@ -1,3 +1,4 @@
+import type { StandardAttributeProps } from "@zitadel/sdk-core/types";
 import type * as React from "react";
 
 /**
@@ -11,12 +12,8 @@ import type * as React from "react";
 export type * from "@zitadel/sdk-core/types";
 
 /**
- * The standard HTML attributes a widget wrapper accepts besides its own props
- * (`className`, `style`, `id`, `title`, `slot`, `hidden`, `role`, `tabIndex`,
- * `data-*`, `aria-*`, …), forwarded to the widget element. A widget prop of the
- * same name wins, so those names are left out here rather than merged.
+ * The standard HTML attributes a widget wrapper accepts besides its own props,
+ * and nothing else, so no prop the type accepts is dropped. They are passed to
+ * the widget element.
  */
-export type ZitadelWidgetAttributes<Element extends HTMLElement, Own> = Omit<
-  React.HTMLAttributes<Element>,
-  keyof Own | "children"
->;
+export type ZitadelWidgetAttributes = StandardAttributeProps<React.HTMLAttributes<HTMLElement>>;

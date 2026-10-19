@@ -5,15 +5,16 @@ import type {
 } from "@zitadel/components";
 
 import manifestJson from "../package.json";
-import { $, render, type JSXOutput, type Signal } from "@qwik.dev/core";
+import { $, createSignal, render, type JSXOutput, type Signal } from "@qwik.dev/core";
 import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
   ZITADEL_LOGOUT_EVENT_HANDLERS,
   ZITADEL_SESSION_EVENT_HANDLERS,
+  type WidgetTag,
   widgetTags,
 } from "@zitadel/sdk-core/types";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, expectTypeOf, it, vi } from "vitest";
 
 import {
   LoginConfigHarness,
@@ -410,7 +411,7 @@ describe("businessLocales", () => {
 describe("ZitadelLogin suppressPasswordToggle", () => {
   it("returns to the default when the prop goes from true back to unset", async () => {
     const host = await renderWidget(<PasswordToggleHarness />);
-    const el = () => host.querySelector<ZitadelLoginElement>(widgetTags.login)!;
+    const el = () => widgetIn(host, widgetTags.login);
     await expect.poll(() => el().suppressPasswordToggle).toBe(true);
 
     await expect.poll(() => window.__unsetSuppressPasswordToggle).toBeTypeOf("function");
@@ -591,7 +592,7 @@ describe("unset props keep the element's defaults", () => {
     const host = await renderWidget(<ZitadelSession project={project} />);
     await macrotask();
 
-    expect(host.querySelector<ZitadelSessionElement>(widgetTags.session)![prop]).toBe(expected);
+    expect(widgetIn(host, widgetTags.session)[prop]).toBe(expected);
   });
 
   it.each([
@@ -604,14 +605,14 @@ describe("unset props keep the element's defaults", () => {
     const host = await renderWidget(<ZitadelLogin project={project} />);
     await macrotask();
 
-    expect(host.querySelector<ZitadelLoginElement>(widgetTags.login)![prop]).toBe(expected);
+    expect(widgetIn(host, widgetTags.login)[prop]).toBe(expected);
   });
 
   it("ZitadelLogout keeps the default theme", async () => {
     const host = await renderWidget(<ZitadelLogout project={project} />);
     await macrotask();
 
-    expect(host.querySelector<ZitadelLogoutElement>(widgetTags.logout)!.theme).toBe("");
+    expect(widgetIn(host, widgetTags.logout).theme).toBe("");
   });
 });
 
@@ -626,7 +627,7 @@ describe("props that become unset restore the element's defaults", () => {
     const host = await renderWidget(
       <UnsetPropHarness widget="session" prop={prop} given={given} />,
     );
-    const el = () => host.querySelector<ZitadelSessionElement>(widgetTags.session)!;
+    const el = () => widgetIn(host, widgetTags.session);
     await expect.poll(() => el()[prop]).toBe(given);
 
     await expect.poll(() => window.__unsetProp).toBeTypeOf("function");
@@ -642,7 +643,7 @@ describe("props that become unset restore the element's defaults", () => {
     ["suppressPasswordToggle", true, false],
   ] as const)("ZitadelLogin restores the default %s", async (prop, given, expected) => {
     const host = await renderWidget(<UnsetPropHarness widget="login" prop={prop} given={given} />);
-    const el = () => host.querySelector<ZitadelLoginElement>(widgetTags.login)!;
+    const el = () => widgetIn(host, widgetTags.login);
     await expect.poll(() => el()[prop]).toBe(given);
 
     await expect.poll(() => window.__unsetProp).toBeTypeOf("function");
@@ -654,7 +655,7 @@ describe("props that become unset restore the element's defaults", () => {
     const host = await renderWidget(
       <UnsetPropHarness widget="logout" prop="theme" given="light" />,
     );
-    const el = () => host.querySelector<ZitadelLogoutElement>(widgetTags.logout)!;
+    const el = () => widgetIn(host, widgetTags.logout);
     await expect.poll(() => el().theme).toBe("light");
 
     await expect.poll(() => window.__unsetProp).toBeTypeOf("function");
@@ -701,7 +702,7 @@ describe("package manifest", () => {
 describe("ZitadelLogin resumeFlowId", () => {
   it("drops the handle when the prop goes from a value back to unset", async () => {
     const host = await renderWidget(<ResumeFlowIdHarness />);
-    const el = () => host.querySelector<ZitadelLoginElement>(widgetTags.login)!;
+    const el = () => widgetIn(host, widgetTags.login);
     await expect.poll(() => el().resumeFlowId).toBe("flow_123");
 
     await expect.poll(() => window.__unsetResumeFlowId).toBeTypeOf("function");
@@ -752,31 +753,56 @@ type WidgetProps = {
   session: ZitadelSessionProps;
 };
 
-// Mounts a widget with the given attributes (named as the markup names them) and
-// reaches its element through a `ref` signal, the way a consumer does.
-async function mountWidget(widget: WidgetName, attributes: Record<string, unknown>) {
-  const { hidden, ...rest } = attributes;
-  const Widget = { login: ZitadelLogin, logout: ZitadelLogout, session: ZitadelSession }[
+type WidgetName = keyof typeof widgetTags;
+
+const WIDGETS = ["login", "logout", "session"] as const satisfies readonly WidgetName[];
+
+type Attributes = {
+  readonly [name: string]: string | boolean | null | undefined;
+};
+
+// The attributes are open-ended, so the component is seen through a loose props type.
+function looseComponent(widget: WidgetName): (props: Record<string, unknown>) => JSXOutput {
+  return { login: ZitadelLogin, logout: ZitadelLogout, session: ZitadelSession }[
     widget
   ] as unknown as (props: Record<string, unknown>) => JSXOutput;
-  const consumerRef = { value: undefined } as Signal<HTMLElement | undefined>;
+}
+
+// Mounts a widget with the given attributes (named as the markup names them) and
+// reaches its element through a `ref` signal, the way a consumer does.
+async function mountWidget(widget: WidgetName, attributes: Attributes) {
+  const { style, hidden, ...rest } = attributes;
+  const Widget = looseComponent(widget);
+  const consumerRef = createSignal<HTMLElement | undefined>(undefined);
   const container = await renderWidget(
-    <Widget {...rest} {...(hidden === undefined ? {} : { hidden: true })} ref={consumerRef} />,
+    <Widget
+      {...rest}
+      {...(hidden === undefined ? {} : { hidden: hidden === "" })}
+      {...(typeof style === "string" ? { style: cssProperties(style) } : {})}
+      ref={consumerRef}
+    />,
   );
   await macrotask();
   return { container, ref: () => consumerRef.value };
 }
 
 // standard-attributes:begin
-type WidgetName = keyof typeof widgetTags;
-
 type StandardProps = {
   [W in WidgetName]: {
     [K in keyof StandardAttributes]?: K extends keyof WidgetProps[W] ? WidgetProps[W][K] : never;
   };
 };
 
-const WIDGETS = Object.keys(widgetTags) as WidgetName[];
+function widgetIn<Tag extends WidgetTag>(root: ParentNode, tag: Tag): HTMLElementTagNameMap[Tag] {
+  const element = root.querySelector(tag);
+  if (!element) throw new Error(`no <${tag}> was rendered`);
+  return element;
+}
+
+function cssProperties(style: string): Record<string, string> {
+  const [property = "", value = ""] = style.split(":").map((part) => part.trim());
+  return { [property]: value };
+}
 
 describe.each(WIDGETS)("%s standard attributes", (widget) => {
   const tag = widgetTags[widget];
@@ -788,7 +814,7 @@ describe.each(WIDGETS)("%s standard attributes", (widget) => {
 
   it("forwards the style to the widget element", async () => {
     const { container } = await mountWidget(widget, { style: "color: red" });
-    expect(container.querySelector<HTMLElement>(tag)?.style.color).toBe("red");
+    expect(container.querySelector(tag)?.style.color).toBe("red");
   });
 
   it("forwards the id to the widget element", async () => {
@@ -813,7 +839,7 @@ describe.each(WIDGETS)("%s standard attributes", (widget) => {
       tabindex: "3",
       hidden: "",
     });
-    const element = container.querySelector<HTMLElement>(tag);
+    const element = container.querySelector(tag);
     expect(element?.title).toBe("probe");
     expect(element?.getAttribute("role")).toBe("region");
     expect(element?.getAttribute("tabindex")).toBe("3");
@@ -825,15 +851,33 @@ describe.each(WIDGETS)("%s standard attributes", (widget) => {
     expect(container.querySelector(tag)?.getAttribute("slot")).toBe("probe");
   });
 
-  it("lets a widget prop win over a standard attribute of the same name", async () => {
+  it("renders a false aria or data attribute as the string false", async () => {
+    const { container } = await mountWidget(widget, { "aria-hidden": false, "data-open": false });
+    expect(container.querySelector(tag)?.getAttribute("aria-hidden")).toBe("false");
+    expect(container.querySelector(tag)?.getAttribute("data-open")).toBe("false");
+  });
+
+  it("leaves out an attribute whose value is false, null or undefined", async () => {
     const { container } = await mountWidget(widget, {
-      project: { projectId: "proj-test", url: "https://auth.example.com" },
-      url: "https://other.example.com",
-      id: "probe",
+      hidden: false,
+      title: undefined,
+      role: null,
     });
-    const element = container.querySelector<HTMLElement & { url?: string }>(tag);
-    expect(element?.url).toBe("https://auth.example.com");
-    expect(element?.id).toBe("probe");
+    expect(container.querySelector(tag)?.hidden).toBe(false);
+    expect(container.querySelector(tag)?.hasAttribute("title")).toBe(false);
+    expect(container.querySelector(tag)?.hasAttribute("role")).toBe(false);
+  });
+
+  it("does not forward props outside the standard set", async () => {
+    const { container } = await mountWidget(widget, {
+      srcdoc: "probe",
+      onclick: "probe",
+      part: "probe",
+      dir: "probe",
+    });
+    for (const name of ["srcdoc", "onclick", "part", "dir"]) {
+      expect(container.querySelector(tag)?.hasAttribute(name)).toBe(false);
+    }
   });
 
   it("gives access to the widget element through a ref", async () => {
@@ -841,9 +885,17 @@ describe.each(WIDGETS)("%s standard attributes", (widget) => {
     expect(ref()).toBe(container.querySelector(tag));
     expect(ref()?.tagName.toLowerCase()).toBe(tag);
   });
+
   it("accepts the standard attributes in its props", () => {
-    const accepted: StandardProps = {} as Record<WidgetName, Partial<StandardAttributes>>;
+    const attributes: Partial<StandardAttributes> = {};
+    const accepted: StandardProps = { login: attributes, logout: attributes, session: attributes };
     expect(accepted).toBeDefined();
+  });
+
+  it("rejects the attributes it does not forward in its props", () => {
+    expectTypeOf<
+      Extract<"dir" | "classList" | "onClick", keyof WidgetProps[WidgetName]>
+    >().toBeNever();
   });
 });
 // standard-attributes:end

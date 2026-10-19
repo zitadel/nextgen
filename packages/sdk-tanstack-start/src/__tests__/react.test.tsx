@@ -142,11 +142,8 @@ describe("@zitadel/sdk-tanstack-start/react", () => {
     });
     await settle();
 
-    const element = container.querySelector(widgetTags.login) as HTMLElement & {
-      purpose: string;
-      variant: string;
-    };
-    expect([element.purpose, element.variant]).toEqual(["register", "page"]);
+    const element = container.querySelector(widgetTags.login);
+    expect([element?.purpose, element?.variant]).toEqual(["register", "page"]);
   });
 
   it("mounts at once on a client render", async () => {

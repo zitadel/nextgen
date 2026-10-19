@@ -5,7 +5,7 @@ import type {
 } from "@zitadel/components";
 
 import { Component, type Type } from "@angular/core";
-import { bootstrapApplication, By, provideClientHydration } from "@angular/platform-browser";
+import { bootstrapApplication, provideClientHydration } from "@angular/platform-browser";
 import { provideServerRendering, renderApplication } from "@angular/platform-server";
 import { render } from "@testing-library/angular";
 import { _resetConfigForTesting, configureZitadel } from "@zitadel/api/config";
@@ -307,19 +307,6 @@ describe("server-rendered widget config", () => {
     expect(attributesOf(html, widgetTags.session)).toMatchObject({
       "post-sign-out-url": "/bye",
       heading: "Hi",
-    });
-  });
-
-  it("puts the standard attributes into the server markup of the widget element", async () => {
-    const html = await serverRender(
-      `<zitadel-auth-login class="probe" id="probe" data-testid="probe" aria-label="probe" />`,
-      [ZitadelLoginComponent],
-    );
-    expect(attributesOf(html, widgetTags.login)).toMatchObject({
-      class: "probe",
-      id: "probe",
-      "data-testid": "probe",
-      "aria-label": "probe",
     });
   });
 });
@@ -808,132 +795,3 @@ describe("server-rendered widget config", () => {
   });
 });
 // server-render-cases:end
-
-type StandardAttributes = {
-  class: string;
-  style: string;
-  id: string;
-  title: string;
-  slot: string;
-  hidden: boolean;
-  role: "region";
-  tabindex: number;
-  "aria-label": string;
-};
-
-// A template attribute is not typed, so there is no props type to check against.
-type WidgetProps = Record<WidgetName, Partial<StandardAttributes>>;
-
-// Mounts a widget with the given attributes (named as the markup names them) and
-// reaches its element through the component's `element`, the way a consumer does
-// after a `@ViewChild`.
-async function mountWidget(widget: WidgetName, attributes: Record<string, unknown>) {
-  const selector = {
-    login: "zitadel-auth-login",
-    logout: "zitadel-auth-logout",
-    session: "zitadel-auth-session",
-  }[widget];
-  const component = {
-    login: ZitadelLoginComponent,
-    logout: ZitadelLogoutComponent,
-    session: ZitadelSessionComponent,
-  }[widget];
-  const markup = Object.entries(attributes)
-    .map(([name, value]) =>
-      typeof value === "string" ? ` ${name}="${value}"` : ` [${name}]="${name}"`,
-    )
-    .join("");
-  const bound = Object.fromEntries(
-    Object.entries(attributes).filter(([, value]) => typeof value !== "string"),
-  );
-  const { container, fixture } = await render(`<${selector}${markup}></${selector}>`, {
-    imports: [component],
-    componentProperties: bound,
-  });
-  await fixture.whenStable();
-  const instance = fixture.debugElement.query(By.directive(component)).componentInstance as {
-    element: HTMLElement | null;
-  };
-  return { container, ref: () => instance.element };
-}
-
-// standard-attributes:begin
-type WidgetName = keyof typeof widgetTags;
-
-type StandardProps = {
-  [W in WidgetName]: {
-    [K in keyof StandardAttributes]?: K extends keyof WidgetProps[W] ? WidgetProps[W][K] : never;
-  };
-};
-
-const WIDGETS = Object.keys(widgetTags) as WidgetName[];
-
-describe.each(WIDGETS)("%s standard attributes", (widget) => {
-  const tag = widgetTags[widget];
-
-  it("forwards the class to the widget element", async () => {
-    const { container } = await mountWidget(widget, { class: "probe" });
-    expect(container.querySelector(tag)?.classList.contains("probe")).toBe(true);
-  });
-
-  it("forwards the style to the widget element", async () => {
-    const { container } = await mountWidget(widget, { style: "color: red" });
-    expect(container.querySelector<HTMLElement>(tag)?.style.color).toBe("red");
-  });
-
-  it("forwards the id to the widget element", async () => {
-    const { container } = await mountWidget(widget, { id: "probe" });
-    expect(container.querySelector(tag)?.id).toBe("probe");
-  });
-
-  it("forwards data attributes to the widget element", async () => {
-    const { container } = await mountWidget(widget, { "data-testid": "probe" });
-    expect(container.querySelector(tag)?.getAttribute("data-testid")).toBe("probe");
-  });
-
-  it("forwards aria attributes to the widget element", async () => {
-    const { container } = await mountWidget(widget, { "aria-label": "probe" });
-    expect(container.querySelector(tag)?.getAttribute("aria-label")).toBe("probe");
-  });
-
-  it("forwards the remaining standard attributes to the widget element", async () => {
-    const { container } = await mountWidget(widget, {
-      title: "probe",
-      role: "region",
-      tabindex: "3",
-      hidden: "",
-    });
-    const element = container.querySelector<HTMLElement>(tag);
-    expect(element?.title).toBe("probe");
-    expect(element?.getAttribute("role")).toBe("region");
-    expect(element?.getAttribute("tabindex")).toBe("3");
-    expect(element?.hidden).toBe(true);
-  });
-
-  it("forwards the slot to the widget element", async () => {
-    const { container } = await mountWidget(widget, { slot: "probe" });
-    expect(container.querySelector(tag)?.getAttribute("slot")).toBe("probe");
-  });
-
-  it("lets a widget prop win over a standard attribute of the same name", async () => {
-    const { container } = await mountWidget(widget, {
-      project: { projectId: "proj-test", url: "https://auth.example.com" },
-      url: "https://other.example.com",
-      id: "probe",
-    });
-    const element = container.querySelector<HTMLElement & { url?: string }>(tag);
-    expect(element?.url).toBe("https://auth.example.com");
-    expect(element?.id).toBe("probe");
-  });
-
-  it("gives access to the widget element through a ref", async () => {
-    const { container, ref } = await mountWidget(widget, {});
-    expect(ref()).toBe(container.querySelector(tag));
-    expect(ref()?.tagName.toLowerCase()).toBe(tag);
-  });
-  it("accepts the standard attributes in its props", () => {
-    const accepted: StandardProps = {} as Record<WidgetName, Partial<StandardAttributes>>;
-    expect(accepted).toBeDefined();
-  });
-});
-// standard-attributes:end

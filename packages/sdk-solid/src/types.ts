@@ -1,3 +1,4 @@
+import type { StandardAttributeProps } from "@zitadel/sdk-core/types";
 import type { JSX } from "solid-js";
 
 /**
@@ -11,10 +12,8 @@ import type { JSX } from "solid-js";
 export type * from "@zitadel/sdk-core/types";
 
 /**
- * The standard HTML attributes a widget wrapper accepts besides its own props
- * (`class`, `classList`, `style`, `id`, `title`, `slot`, `hidden`, `role`,
- * `tabindex`, `data-*`, `aria-*`, …), forwarded to the widget element. A widget
- * prop of the same name wins, so those names are left out here rather than
- * merged.
+ * The standard HTML attributes a widget wrapper accepts besides its own props,
+ * and nothing else, so no prop the type accepts is dropped. They are passed to
+ * the widget element.
  */
-export type ZitadelWidgetAttributes<Own> = Omit<JSX.HTMLAttributes<HTMLElement>, keyof Own | "ref">;
+export type ZitadelWidgetAttributes = StandardAttributeProps<JSX.HTMLAttributes<HTMLElement>>;

@@ -3,7 +3,7 @@
   import { standardAttributes } from '@zitadel/sdk-core/types';
   import type { ZitadelSession as ZitadelSessionElement } from '@zitadel/components';
 
-  import type { ZitadelSessionElementProps, ZitadelSignoutDetail } from './types';
+  import type { ZitadelSessionSvelteProps, ZitadelSignoutDetail } from './types';
   import { assignGiven } from './given';
   import { onClient, proxyPathAttr } from './attributes';
 
@@ -19,9 +19,9 @@
     suppressHeader,
     onSignout,
     ...rest
-  }: ZitadelSessionElementProps = $props();
+  }: ZitadelSessionSvelteProps = $props();
 
-  // The standard HTML attributes come first, so a widget prop wins over one of the same name.
+  // The standard HTML attributes are the only extra props the element takes.
   const attributes = $derived(standardAttributes(rest));
 
   let el: ZitadelSessionElement | undefined = $state();

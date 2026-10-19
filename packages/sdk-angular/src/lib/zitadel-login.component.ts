@@ -1,3 +1,4 @@
+import type { ElementRef } from "@angular/core";
 import type { ZitadelLogin as ZitadelLoginElement } from "@zitadel/components";
 import type {
   CreateFlowBodyPurpose,
@@ -7,18 +8,14 @@ import type {
   ZitadelFlowInputDetail,
   ZitadelFlowStepDetail,
 } from "@zitadel/sdk-core/types";
-import { forwardStandardAttributes } from "@zitadel/sdk-core/types";
 
 import {
   Component,
   CUSTOM_ELEMENTS_SCHEMA,
-  ElementRef,
   EventEmitter,
-  inject,
   Input,
   Output,
   ViewChild,
-  type AfterViewInit,
 } from "@angular/core";
 
 import type { ZitadelProject } from "./config";
@@ -79,7 +76,7 @@ import "@zitadel/components";
     (zitadel-flow-error)="onFlowError($event)"
   ></zitadel-login>`,
 })
-export class ZitadelLoginComponent implements AfterViewInit {
+export class ZitadelLoginComponent {
   @Input() project?: ZitadelProject;
   @Input() projectId?: string;
   @Input() proxyPath?: string;
@@ -102,14 +99,6 @@ export class ZitadelLoginComponent implements AfterViewInit {
   @Output() flowError = new EventEmitter<ZitadelFlowErrorDetail>();
 
   @ViewChild("el") private elementRef?: ElementRef<ZitadelLoginElement>;
-
-  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
-
-  ngAfterViewInit(): void {
-    // The standard HTML attributes come first, so a widget prop wins over one of the same name.
-    const element = this.element;
-    if (element) forwardStandardAttributes(this.host.nativeElement, element);
-  }
 
   /** The underlying `<zitadel-login>` custom element, or `null` before view init. */
   get element(): ZitadelLoginElement | null {

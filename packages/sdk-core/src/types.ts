@@ -301,47 +301,105 @@ export type ZitadelLogoutProps = ZitadelLogoutConfig & ZitadelLogoutHandlers;
 export type ZitadelSessionProps = ZitadelSessionConfig & ZitadelSessionHandlers;
 
 /* ───────────────────────  Standard element attributes  ───────────────────────
- * The one definition, shared by the SDKs whose framework cannot spread a
- * component's remaining props onto the widget element without clobbering the
- * widget's own props (Solid, Qwik, Angular).
+ * The one definition of which props a wrapper hands to the widget element
+ * besides its own, shared by every SPA SDK except Angular (whose component tag
+ * already carries them). The set and every widget prop are disjoint, which the
+ * contract spec checks, so a wrapper can pass the result to the element without
+ * a widget prop ever being shadowed.
  * ───────────────────────────────────────────────────────────────────────── */
 
-const STANDARD_ATTRIBUTE =
-  /^(?:class|classname|style|id|title|slot|hidden|role|tabindex|data-.+|aria-.+)$/i;
+const STANDARD_NAMES = [
+  "class",
+  "className",
+  "style",
+  "id",
+  "title",
+  "slot",
+  "hidden",
+  "role",
+  "tabindex",
+  "tabIndex",
+] as const;
+
+/**
+ * The name of a standard HTML attribute: the fixed ones (`className` and
+ * `tabIndex` are the spellings React and Qwik use), `data-*` and `aria-*`.
+ * Matching is exact and case-sensitive.
+ */
+export type StandardAttributeName =
+  | (typeof STANDARD_NAMES)[number]
+  | `data-${string}`
+  | `aria-${string}`;
+
+type NativeName = "class" | "className" | "style";
+
+/**
+ * The standard attributes among the props `Props`, each name with `Prefix`
+ * before it, except `class`, `className` and `style`. Every value keeps the type it has in `Props`.
+ */
+export type StandardAttributes<Props extends object, Prefix extends string = ""> = {
+  [Name in keyof Props & StandardAttributeName as Name extends NativeName
+    ? Name
+    : `${Prefix}${Name}`]?: Props[Name];
+};
+
+/**
+ * What a wrapper's props type adds to the widget's own: the standard attributes
+ * of the framework's element attributes type `Attributes`, and nothing else, so
+ * no prop the type accepts is dropped.
+ */
+export type StandardAttributeProps<Attributes extends object> = Pick<
+  Attributes,
+  Extract<keyof Attributes, StandardAttributeName>
+>;
+
+export function isStandardAttributeName(name: string): name is StandardAttributeName {
+  return (
+    STANDARD_NAMES.some((standard) => standard === name) ||
+    (name.startsWith("data-") && name.length > "data-".length) ||
+    (name.startsWith("aria-") && name.length > "aria-".length)
+  );
+}
+
+const isEnumerated = (name: string): boolean =>
+  name.startsWith("aria-") || name.startsWith("data-");
+
+// Only a boolean attribute is absent when false; `aria-hidden="false"` and `data-open="false"` mean something.
+const isOmitted = (name: string, value: unknown): boolean =>
+  value == null || (value === false && !isEnumerated(name));
+
+// The one cast: TypeScript cannot follow a record built key by key to its mapped type.
+function asStandardAttributes<Props extends object, Prefix extends string>(
+  record: Record<string, unknown>,
+): StandardAttributes<Props, Prefix> {
+  return record as StandardAttributes<Props, Prefix>;
+}
 
 /**
  * The standard HTML attributes among the given props: `class`, `style`, `id`,
  * `title`, `slot`, `hidden`, `role`, `tabindex`, `data-*` and `aria-*`. A widget
- * element takes these as plain DOM attributes, and none of them is a widget
- * prop, so a wrapper can pass the result to the element ahead of its own
- * attributes. Anything else is left out, so no stray prop can reach the
- * widget's configuration. A value of `undefined`, `null` or `false` is left out
- * too, since it means no attribute. A framework that needs the names marked
- * (Solid writes `attr:id` as an attribute) passes the `prefix` to put before
- * each.
+ * element takes these as plain DOM attributes, so a wrapper passes the result to
+ * the element. Anything else is left out, so no stray prop can reach the
+ * widget's configuration. A value of `undefined` or `null` is left out, and so
+ * is `false` except for `aria-*` and `data-*`, which render as the string
+ * `"false"`. A framework that needs the names marked (Solid writes `attr:id` as
+ * an attribute) passes the `prefix` to put before each name except `class`,
+ * `className` and `style`, which every framework applies to an element itself.
  */
-export function standardAttributes(props: object, prefix = ""): Record<string, unknown> {
-  return Object.fromEntries(
-    Object.entries(props)
-      .filter(([name, value]) => STANDARD_ATTRIBUTE.test(name) && value != null && value !== false)
-      .map(([name, value]) => [`${prefix}${name}`, value]),
-  );
-}
-
-/**
- * Moves the standard attributes (see {@link standardAttributes}) from one
- * element to another, once. For a wrapper whose own tag receives the attributes
- * a consumer wrote, but whose widget is a different element inside it. `slot`
- * is copied and stays, because the parent's shadow root reads it on the tag.
- */
-export function forwardStandardAttributes(from: Element, to: Element): void {
-  const attributes = Object.fromEntries(
-    Array.from(from.attributes, (attribute) => [attribute.name, attribute.value]),
-  );
-  for (const [name, value] of Object.entries(standardAttributes(attributes))) {
-    to.setAttribute(name, String(value));
-    if (name.toLowerCase() !== "slot") from.removeAttribute(name);
+export function standardAttributes<Props extends object, Prefix extends string = "">(
+  props: Props,
+  prefix?: Prefix,
+): StandardAttributes<Props, Prefix> {
+  const record: Record<string, unknown> = {};
+  for (const [name, value] of Object.entries(props)) {
+    if (isStandardAttributeName(name) && !isOmitted(name, value)) {
+      const native = name === "class" || name === "className" || name === "style";
+      // An `aria-*` or `data-*` boolean is written out, since not every framework renders `false`.
+      record[native ? name : `${prefix ?? ""}${name}`] =
+        typeof value === "boolean" && isEnumerated(name) ? String(value) : value;
+    }
   }
+  return asStandardAttributes(record);
 }
 
 /**

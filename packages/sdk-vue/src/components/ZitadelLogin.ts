@@ -9,16 +9,16 @@ import type {
   ZitadelFlowStepDetail,
 } from "@zitadel/sdk-core/types";
 
-import { standardAttributes, widgetTags } from "@zitadel/sdk-core/types";
-import { defineComponent, h, mergeProps, type PropType, ref, toRaw } from "vue";
+import { standardAttributes } from "@zitadel/sdk-core/types";
+import { defineComponent, h, type PropType, ref, toRaw } from "vue";
 // Registers <zitadel-login> / <zitadel-logout> with the browser. Imported at
 // module load (before render) so the element is upgraded by the time Vue
 // patches it — which means Vue binds `project` as a DOM *property* (not a
 // stringified attribute).
 import "@zitadel/components";
 
-import { forceAttr } from "./forceAttr";
 import type { WithZitadelWidgetAttributes } from "../types";
+import { forceAttr } from "./forceAttr";
 
 /**
  * Vue wrapper for the `<zitadel-login>` Lit web component.
@@ -43,9 +43,7 @@ import type { WithZitadelWidgetAttributes } from "../types";
  */
 const ZitadelLogin = defineComponent({
   name: "ZitadelLogin",
-  // The standard HTML attributes (class, style, id, data-*, aria-*, …) are merged
-  // onto the element below, under the widget's own bindings, rather than left to
-  // Vue's automatic fallthrough, which would let them overwrite those bindings.
+  // The element takes only the standard attributes (see below), never the rest of `attrs`.
   inheritAttrs: false,
   props: {
     project: { type: Object as PropType<ZitadelProject>, default: undefined },
@@ -77,62 +75,60 @@ const ZitadelLogin = defineComponent({
     expose({ element });
 
     return () => {
-      // The standard HTML attributes come first, so a widget prop wins over one of the same name.
+      // The standard HTML attributes are the only extra props the element takes.
       const attributes = standardAttributes(attrs);
       const attr = forceAttr();
-      return h(
-        widgetTags.login,
-        mergeProps(attrs, attributes, {
-          ref: element,
-          // Hand the Lit element the raw SDK handle, not Vue's reactive proxy:
-          // the widget does identity checks on it (and `render` from test-utils
-          // would otherwise pass a wrapped clone).
-          project: toRaw(props.project),
-          // Kebab-case attributes are what the element reads at upgrade, and the
-          // only form a server-rendered page carries (the camelCase keys below
-          // render as `projectid=`-style names the element never reads). The
-          // handle's fields are mirrored, and win over the discrete props as they
-          // do in the widget's `resolveApi`, so a page that passes only `project`
-          // is configured before hydration and both channels agree.
-          "project-id": props.project?.projectId ?? props.projectId,
-          "proxy-path": props.project?.proxyPath ?? props.proxyPath,
-          url: props.project?.url,
-          projectId: props.projectId,
-          proxyPath: props.proxyPath,
-          purpose: props.purpose,
-          "post-sign-in-url": props.postSignInUrl,
-          forcePostSignInUrl: props.forcePostSignInUrl,
-          "resume-flow-id": props.resumeFlowId,
-          // Same raw-unwrap rationale as `project`: hand the widget the plain
-          // dictionaries, not Vue's reactive proxy.
-          locales: props.locales === undefined ? undefined : toRaw(props.locales),
-          "flow-name": props.flowName,
-          // A string prop with a default is bound as an attribute (the "^" prefix on
-          // the client, see `forceAttr`): Vue assigns an unset property as "", which
-          // the element cannot tell from an intended empty string, while an unset
-          // attribute is simply removed.
-          [`${attr}lang`]: props.lang,
-          [`${attr}variant`]: props.variant,
-          [`${attr}theme`]: props.theme,
-          suppressHeader: props.suppressHeader,
-          suppressPasswordToggle: props.suppressPasswordToggle,
-          onZitadelFlowStep: (event: CustomEvent<ZitadelFlowStepDetail>) => {
-            emit("flowStep", event.detail);
-          },
-          onZitadelFlowInput: (event: CustomEvent<ZitadelFlowInputDetail>) => {
-            emit("flowInput", event.detail);
-          },
-          onZitadelFlowComplete: (event: CustomEvent<ZitadelFlowCompleteDetail>) => {
-            emit("flowComplete", event.detail);
-          },
-          onZitadelFlowRedirect: (event: CustomEvent<ZitadelFlowRedirectDetail>) => {
-            emit("flowRedirect", event.detail);
-          },
-          onZitadelFlowError: (event: CustomEvent<ZitadelFlowErrorDetail>) => {
-            emit("flowError", event.detail);
-          },
-        }),
-      );
+      return h("zitadel-login", {
+        ...attributes,
+        ref: element,
+        // Hand the Lit element the raw SDK handle, not Vue's reactive proxy:
+        // the widget does identity checks on it (and `render` from test-utils
+        // would otherwise pass a wrapped clone).
+        project: toRaw(props.project),
+        // Kebab-case attributes are what the element reads at upgrade, and the
+        // only form a server-rendered page carries (the camelCase keys below
+        // render as `projectid=`-style names the element never reads). The
+        // handle's fields are mirrored, and win over the discrete props as they
+        // do in the widget's `resolveApi`, so a page that passes only `project`
+        // is configured before hydration and both channels agree.
+        "project-id": props.project?.projectId ?? props.projectId,
+        "proxy-path": props.project?.proxyPath ?? props.proxyPath,
+        url: props.project?.url,
+        projectId: props.projectId,
+        proxyPath: props.proxyPath,
+        purpose: props.purpose,
+        "post-sign-in-url": props.postSignInUrl,
+        forcePostSignInUrl: props.forcePostSignInUrl,
+        "resume-flow-id": props.resumeFlowId,
+        // Same raw-unwrap rationale as `project`: hand the widget the plain
+        // dictionaries, not Vue's reactive proxy.
+        locales: props.locales === undefined ? undefined : toRaw(props.locales),
+        "flow-name": props.flowName,
+        // A string prop with a default is bound as an attribute (the "^" prefix on
+        // the client, see `forceAttr`): Vue assigns an unset property as "", which
+        // the element cannot tell from an intended empty string, while an unset
+        // attribute is simply removed.
+        [`${attr}lang`]: props.lang,
+        [`${attr}variant`]: props.variant,
+        [`${attr}theme`]: props.theme,
+        suppressHeader: props.suppressHeader,
+        suppressPasswordToggle: props.suppressPasswordToggle,
+        onZitadelFlowStep: (event: CustomEvent<ZitadelFlowStepDetail>) => {
+          emit("flowStep", event.detail);
+        },
+        onZitadelFlowInput: (event: CustomEvent<ZitadelFlowInputDetail>) => {
+          emit("flowInput", event.detail);
+        },
+        onZitadelFlowComplete: (event: CustomEvent<ZitadelFlowCompleteDetail>) => {
+          emit("flowComplete", event.detail);
+        },
+        onZitadelFlowRedirect: (event: CustomEvent<ZitadelFlowRedirectDetail>) => {
+          emit("flowRedirect", event.detail);
+        },
+        onZitadelFlowError: (event: CustomEvent<ZitadelFlowErrorDetail>) => {
+          emit("flowError", event.detail);
+        },
+      });
     };
   },
 });

@@ -86,13 +86,11 @@ Each widget event reaches the callback in the last column, which receives the ev
 
 ## Standard HTML attributes
 
-`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` also take the standard HTML attributes (`class`, `style`, `id`, `title`, `slot`, `hidden`, `role`, `tabindex`, `data-*` and `aria-*`) and forward them to the widget element, so you can position, style and label the widget without an extra wrapper element. A widget prop wins over a standard attribute of the same name, and no other prop reaches the widget's configuration.
+The Angular components are tags (`zitadel-auth-login`, `zitadel-auth-logout` and `zitadel-auth-session`), and a tag already carries the standard HTML attributes: put `class`, `style`, `id`, `data-*` or `aria-*` on it and Angular applies them to the tag, not to the widget inside it.
 
 ```html
 <zitadel-auth-login [project]="project" class="login" data-testid="login" aria-label="Sign in" />
 ```
-
-Angular templates carry no prop types, and the attributes land on the wrapper's own tag, so they are moved to the widget element once, when the view is ready; a binding on the tag that changes later is not carried over.
 
 ## Server rendering
 
