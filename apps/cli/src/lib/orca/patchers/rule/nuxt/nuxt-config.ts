@@ -39,9 +39,10 @@ export function nuxtConfigEdit(): (source: string | undefined) => string {
       changed = true;
     }
 
-    // The Lit components and their style/token deps must be transpiled for SSR
-    // (matching the repo's own demo-nuxt config) or the build fails on the
-    // untranspiled ESM those transitive packages ship.
+    // The SDK module's Lit components and their style/token deps must be
+    // transpiled for SSR (matching the repo's own demo-nuxt config) or the build
+    // fails on the untranspiled ESM those transitive packages ship. Nuxt matches
+    // these entries by package name, so the app does not declare or import them.
     const build = ensureEditableObject(config, "build");
     for (const dep of ["@zitadel/api", "@zitadel/components", "@zitadel/design-tokens"]) {
       if (ensureArrayItem(build, "transpile", dep)) {
