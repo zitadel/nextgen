@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import { parseSignInEvent, watchSignInEvents } from "../../../src/lib/sign-in-events";
@@ -159,5 +161,23 @@ describe("watchSignInEvents", () => {
     const events = await watchSignInEvents(async () => "", instantly, 0, stop.signal);
 
     expect(await events[Symbol.asyncIterator]().next()).toMatchObject({ done: true });
+  });
+});
+
+const RUNTIME_EVENTS = readFileSync(
+  new URL("../../../../../internal/instrumentation/ssoevent/ssoevent.go", import.meta.url),
+  "utf8",
+);
+const PHASES_THE_RUNTIME_LOGS = [...RUNTIME_EVENTS.matchAll(/\sPhase = "([a-z_]+)"/g)].map(
+  (match) => match[1] ?? "",
+);
+
+describe("the phases the runtime logs", () => {
+  it("are found in the runtime's source, or the cases below prove nothing", () => {
+    expect(PHASES_THE_RUNTIME_LOGS.length).toBe(5);
+  });
+
+  it.each(PHASES_THE_RUNTIME_LOGS)("include %s, which is parsed", (phase) => {
+    expect(parseSignInEvent(json({ ...OK, phase }))).toMatchObject({ phase });
   });
 });

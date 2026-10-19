@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import { useLocalServers } from "../helpers/local-server";
 import { usePlatformMock } from "../helpers/platform";
 import { aSetUpApp } from "../helpers/project";
 
 const platform = usePlatformMock();
+useLocalServers();
 
 const CREDENTIALS = {
   clientId: "1234-abc.apps.googleusercontent.com",

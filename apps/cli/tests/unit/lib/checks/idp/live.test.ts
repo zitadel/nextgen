@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import type { CheckResult } from "../../../../../src/lib/checks/check";
@@ -321,4 +323,29 @@ describe("LiveSignInCheck", () => {
       message: expect.stringContaining("expired"),
     });
   });
+});
+
+const RUNTIME_EVENTS = readFileSync(
+  new URL("../../../../../../../internal/instrumentation/ssoevent/ssoevent.go", import.meta.url),
+  "utf8",
+);
+const REASONS_THE_RUNTIME_LOGS = [...RUNTIME_EVENTS.matchAll(/Reason\s+= "([a-z_]+)"/g)].map(
+  (match) => match[1] ?? "",
+);
+
+describe("the reasons the runtime logs", () => {
+  it("are found in the runtime's source, or the cases below prove nothing", () => {
+    expect(REASONS_THE_RUNTIME_LOGS.length).toBeGreaterThan(10);
+  });
+
+  it.each(REASONS_THE_RUNTIME_LOGS)(
+    "include %s, which the check describes in words",
+    async (reason) => {
+      const { outcome } = run([
+        event({ phase: "callback_received", status: "failed", reason, side: "journey" }),
+      ]);
+
+      expect((await outcome).message).not.toContain(reason);
+    },
+  );
 });
