@@ -80,7 +80,6 @@ describe("IDP_CHECKS", () => {
   it.each([
     ["token_endpoint", { ...DOCUMENT, token_endpoint: undefined }],
     ["authorization_endpoint", { ...DOCUMENT, authorization_endpoint: undefined }],
-    ["userinfo_endpoint", { ...DOCUMENT, userinfo_endpoint: undefined }],
     ["token_endpoint", { ...DOCUMENT, token_endpoint: "http://issuer.example/token" }],
   ])(
     "fails a discovery document with no usable %s, as the runtime would",
@@ -121,6 +120,30 @@ describe("IDP_CHECKS", () => {
       message: expect.stringContaining("timed out"),
       recovery: expect.stringContaining("https://issuer.example"),
     });
+  });
+
+  it("tells a connection whose provider lists no userinfo endpoint to read claims from the ID token", async () => {
+    const { by } = await resultsFor({}, { ...DOCUMENT, userinfo_endpoint: undefined });
+
+    expect(by("discovery")?.recovery).toContain("id_token_mapping");
+  });
+
+  it("explains a templated issuer instead of telling the developer to copy it", async () => {
+    const { by } = await resultsFor(
+      {},
+      { ...DOCUMENT, issuer: "https://login.example/{tenantid}/v2.0" },
+    );
+
+    expect(by("issuer")?.recovery).toContain("templated issuer");
+  });
+
+  it("words a single scope or claim in the singular", async () => {
+    const { by } = await resultsFor({ scopes: ["openid"], claims: ["email"] });
+
+    expect([by("scopes")?.message, by("claims")?.message]).toEqual([
+      "openid is listed by the provider",
+      "email is listed by the provider",
+    ]);
   });
 
   it("fails an issuer the provider does not report, naming the one it does", async () => {

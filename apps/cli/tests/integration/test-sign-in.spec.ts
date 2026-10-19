@@ -85,6 +85,16 @@ describe("test sign-in", () => {
         expect(result).toHintAt(CALLBACK_URI);
       });
 
+      it("points at the command to run next", async () => {
+        const app = await aSetUpApp();
+        await app.enableSso("google", CREDENTIALS);
+        platform.hasGoogle({ client: "unknown" });
+
+        const result = await app.run(["test", "sign-in", "--provider", "google", "--json"]);
+
+        expect(result).toSuggest("test sign-in --provider google");
+      });
+
       it("fails when the provider does not know the client", async () => {
         const app = await aSetUpApp();
         await app.enableSso("google", CREDENTIALS);
@@ -165,6 +175,16 @@ describe("test sign-in", () => {
     });
 
     describe("rendered for a terminal", () => {
+      it("opens with the project and the server, like the other commands", async () => {
+        const app = await aSetUpApp();
+        await app.enableSso("google", CREDENTIALS);
+        platform.hasGoogle();
+
+        const result = await app.run(["test", "sign-in", "--provider", "google"]);
+
+        expect(result).toPrint("Server");
+      });
+
       it("prints each check as it ran", async () => {
         const app = await aSetUpApp();
         await app.enableSso("google", CREDENTIALS);
