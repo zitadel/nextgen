@@ -62,19 +62,26 @@ test("the index lists every section, each page once, under /docs", async ({ requ
   expect(indexStrays(index), "lines of the index where the page tree puts none").toEqual([]);
 });
 
-test("every page answers as HTML, titled and described", async ({ request }) => {
+test("every page answers as HTML, titled, described and in its size", async ({ request }) => {
   test.setTimeout(120_000);
   const pages = await indexedPages(request);
 
-  // One request a page: an API page's HTML is about 0.9 MB. A description the
-  // index has, the page has, as one line of plain text (lib/description.ts);
-  // every operation and webhook has one (redocly.yaml).
+  // One request a page, for all the checks a page's HTML answers. A
+  // description the index has, the page has, as one line of plain text
+  // (lib/description.ts); every operation and webhook has one (redocly.yaml).
+  // Fumadocs hands each API page the whole OpenAPI document, which put every
+  // operation and schema of the API, about 900 KB of HTML, on every one of
+  // them; lib/source.ts passes the page its operations and what they
+  // reference, and the largest page is now about 300 KB.
+  const budget = 500_000;
   const results = await mapLimit(pages, concurrency, async ({ title, url, description }) => {
     const response = await request.get(url);
     const type = response.headers()["content-type"] ?? "";
     if (response.status() !== 200) return `${url}: ${response.status()}`;
     if (!type.startsWith("text/html")) return `${url}: ${type}`;
-    const html = await response.text();
+    const body = await response.body();
+    if (operationPage.test(url) && body.length > budget) return `${url}: ${body.length} bytes`;
+    const html = body.toString("utf8");
     const expected = `<title>${escapeHtml(title)}</title>`;
     if (!html.includes(expected)) return `${url}: no ${expected}`;
     const meta = metaContent(html, "description");
@@ -166,24 +173,6 @@ test("every API operation shows its call through @zitadel/api and its CLI comman
   });
   expect(operations).toBeGreaterThan(0);
   expect(failures(results), "operations without their @zitadel/api call").toEqual([]);
-});
-
-test("an API page carries its own part of the OpenAPI document, not all of it", async ({
-  request,
-}) => {
-  test.setTimeout(120_000);
-  const pages = (await indexedPages(request)).filter((page) => operationPage.test(page.url));
-
-  // Fumadocs hands each page the whole document, which put every operation
-  // and schema of the API, about 900 KB of HTML, on every one of them;
-  // lib/source.ts passes the page its operations and what they reference, and
-  // the largest page is now about 300 KB.
-  const budget = 500_000;
-  const results = await mapLimit(pages, concurrency, async ({ url }) => {
-    const { length } = await (await request.get(url)).body();
-    return length > budget ? `${url}: ${length} bytes` : null;
-  });
-  expect(failures(results), `API pages over ${budget} bytes`).toEqual([]);
 });
 
 test("a page that does not exist is a 404, as HTML and as Markdown", async ({ request }) => {
