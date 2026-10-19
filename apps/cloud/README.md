@@ -7,7 +7,7 @@ except the Changesets version PR's `changeset-release/*` branch and the merge
 queue's `gh-readonly-queue/**` branches.
 
 The repo-root [`vercel.json`](../../vercel.json) defines the Vercel
-deployment as five [services](https://vercel.com/docs/services):
+deployment as six [services](https://vercel.com/docs/services):
 
 | Service | Root | What it is | Paths |
 |---|---|---|---|
@@ -16,6 +16,7 @@ deployment as five [services](https://vercel.com/docs/services):
 | `storybook` | `apps/storybook` | the component workbench, a static build | `/storybook/*` |
 | `docs` | `apps/docs` | the docs site, Fumadocs on Next.js, with Vercel Web Analytics and Speed Insights | `/docs`, `/docs/*` |
 | `website` | `apps/website` | the front page, on Next.js, with Vercel Web Analytics and Speed Insights | `/`, `/llms.txt`, `/_next/*`, `/favicon.ico`, `/favicons/*` |
+| `schemas` | `apps/cloud` | the built-in schemas, static files that [`scripts/render-builtin-schemas.mjs`](../../scripts/render-builtin-schemas.mjs) renders from the server's embedded copies | `/schemas/v1/*` |
 
 The console is served on the same origin, so the session cookie and CSRF work
 unchanged, but at `/console/` rather than a self-hosted server's
@@ -28,7 +29,12 @@ under `/docs` ([`apps/docs/AGENTS.md`](../docs/AGENTS.md)). The website's
 scripts, styles and fonts load from `/_next/`; a page of its own beyond `/`
 needs a rewrite of its own. Its favicons are the host's: the console, the
 login UI and the docs link the same set at `/favicons/`
-([`apps/website/AGENTS.md`](../website/AGENTS.md)).
+([`apps/website/AGENTS.md`](../website/AGENTS.md)). The `schemas` service makes
+the URLs the server names its built-in schemas with resolve:
+`https://preview.zitadel.com/schemas/v1/user-schema.json` answers with the
+document whose `$id` it is, while the API keeps `/schemas` and `/schemas/{id}`
+(the runbook's
+[Built-in schemas](../../docs/runbooks/cloud.md#built-in-schemas)).
 
 The services install and build from `vercel.json` itself. The install
 leaves out the other platforms' native packages, so Vercel's build cache
@@ -37,7 +43,9 @@ in the deployment has installed (`--optimistic-repeat-install`). The console
 and the storybook build with `turbo run build`, which reads and writes the
 team's remote cache as Vercel sets it up; the docs and the website run their
 own `pnpm run build`, the website after `@zitadel/components` has built
-through turbo, since its showcase renders the package's atoms.
+through turbo, since its showcase renders the package's atoms. The schemas
+need no install: their build is one Node script, and the service is rooted
+here, where no `package.json` makes Vercel detect a framework.
 
 | File | Role |
 |---|---|
