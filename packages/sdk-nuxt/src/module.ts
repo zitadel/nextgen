@@ -104,6 +104,10 @@ const nextgenModule: NuxtModule<NextgenMiddlewareOptions> =
       publicConfig.zitadelProjectId ||= setting("NUXT_PUBLIC_ZITADEL_PROJECT_ID") ?? "";
 
       addPlugin(resolve("./runtime/plugin"));
+      // Loads the widget elements in the browser, so the app does not depend on
+      // `@zitadel/components` itself. Client-only: registering custom elements
+      // during SSR would break.
+      addPlugin({ src: resolve("./runtime/components.client"), mode: "client" });
       addServerHandler({
         middleware: true,
         handler: resolve("./runtime/server/handler"),

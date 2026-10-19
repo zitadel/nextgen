@@ -88,23 +88,12 @@ export default defineEventHandler((event) => {
 
 ### Login page
 
-Register the shared components in a client-only plugin
-(`plugins/zitadel-components.client.ts` — do **not** import
-`@zitadel/components` from page `<script setup>`, that runs during SSR).
-Under strict package managers (pnpm, Yarn PnP) `@zitadel/components` is not
-resolvable as a transitive dependency, so declare it in your app first:
+The module loads the widget elements in the browser for you, through a
+client-only plugin, and provides the business copy overlay as
+`useNuxtApp().$zitadelBusinessLocales`. There is nothing to install or register
+beyond `@zitadel/sdk-nuxt`; do not import `@zitadel/components` yourself.
 
-```bash
-pnpm add @zitadel/components@alpha
-```
-
-```ts
-import "@zitadel/components";
-
-export default defineNuxtPlugin(() => {});
-```
-
-Then render `<zitadel-login>` inside `<ClientOnly>`, binding the project
+Render `<zitadel-login>` inside `<ClientOnly>`, binding the project
 handle from the auto-imported `useZitadelProject()` composable — there is no
 `api-base` attribute:
 
