@@ -1,5 +1,12 @@
 # @zitadel/website
 
+## 0.0.1-alpha.1
+
+### Patch Changes
+
+- Updated dependencies [[`bdf4347`](https://github.com/zitadel/nextgen/commit/bdf4347950868e3c35d3e6109d48f16dbe17781d)]:
+  - @zitadel/components@1.0.0-alpha.27
+
 ## 0.0.1-alpha.0
 
 ### Patch Changes
