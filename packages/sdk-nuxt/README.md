@@ -37,20 +37,27 @@ seeds server-side auth state, hydrates it on the client, and calls
 `configureZitadel()` from runtime config), and auto-imports the
 composables — no `server/middleware/auth.ts`, no manual plugin.
 
-It takes three settings from the environment, or from `.env.local` when the
-environment has none. Nuxt itself loads only `.env`; `zitadel setup` writes
-all three to `.env.local` and the module registration to `nuxt.config.ts`:
+It takes three settings. Nuxt itself loads only `.env`; `zitadel setup` writes
+all three to `.env.local` and the module registration to `nuxt.config.ts`.
+`nuxt dev` reads them from the environment, or from `.env.local` when the
+environment has none:
 
 | Variable | Sets | Without it |
 | --- | --- | --- |
-| `ZITADEL_URL` | `nextgen.url`, unless `nuxt.config.ts` sets it | `http://localhost:8080` |
+| `ZITADEL_URL` | the backend URL, unless `nextgen.url` or `NUXT_NEXTGEN_URL` sets it | `http://localhost:8080` |
 | `NUXT_PUBLIC_ZITADEL_PROJECT_ID` | `runtimeConfig.public.zitadelProjectId`, unless `nuxt.config.ts` sets it | the plugin skips `configureZitadel()`, `useZitadelProject()` returns `null`, and the login widget cannot initialize |
-| `ZITADEL_PROJECT_SECRET` | the server-only `runtimeConfig.nextgen.projectSecret` | sign-in cannot finish: the session exchange has no credential |
+| `ZITADEL_PROJECT_SECRET` | the server-only secret, unless `NUXT_NEXTGEN_PROJECT_SECRET` sets it | sign-in cannot finish: the session exchange has no credential |
 
-The module reads them when `nuxt dev` or `nuxt build` runs, and a build keeps
-what it found. For a built server, set `NUXT_NEXTGEN_URL`,
-`NUXT_PUBLIC_ZITADEL_PROJECT_ID`, and `NUXT_NEXTGEN_PROJECT_SECRET` in its
-runtime environment instead.
+A built server reads `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET` from its own
+runtime environment when it starts, and takes `NUXT_NEXTGEN_URL` and
+`NUXT_NEXTGEN_PROJECT_SECRET` ahead of them, so one build runs against any
+backend. `nuxt build` never copies the URL or the secret from its environment
+or from `.env.local` into `.output/`, so the secret exists only where the
+server runs; `.env.local` is not read by a built server. A `nextgen.url` in
+`nuxt.config.ts` is the exception: you wrote it into the config, so it is part
+of the build. `NUXT_PUBLIC_ZITADEL_PROJECT_ID` is public and is still read when
+`nuxt build` runs; set it in the runtime environment to change it per
+deployment.
 
 ### Module options
 

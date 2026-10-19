@@ -23,6 +23,7 @@ import {
 } from "h3";
 
 import { verifyJwt, base64UrlDecode } from "../lib/jwt";
+import { resolveProjectSecret } from "../lib/settings";
 
 declare module "h3" {
   interface H3EventContext {
@@ -200,7 +201,9 @@ async function proxyRequest(
   // the future publishable-key exchange path.
   if (requiresProjectSecret(method, suffix) && !upstreamHeaders.has("authorization")) {
     const config = useRuntimeConfig();
-    const projectSecret = (config.nextgen as { projectSecret?: string } | undefined)?.projectSecret;
+    const projectSecret = resolveProjectSecret(
+      config.nextgen as Record<string, unknown> | undefined,
+    );
     if (projectSecret) {
       upstreamHeaders.set("authorization", `Bearer ${projectSecret}`);
     }
