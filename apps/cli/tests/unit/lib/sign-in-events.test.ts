@@ -83,26 +83,28 @@ describe("parseSignInEvent", () => {
 describe("watchSignInEvents", () => {
   const instantly = async () => {};
 
+  /** Answers each read with the next of `answers`, and the last one for every read after. */
+  function readsOf(answers: readonly string[]): () => Promise<string> {
+    const log = (function* () {
+      yield* answers.slice(0, -1);
+      while (true) {
+        yield answers.at(-1) ?? "";
+      }
+    })();
+    return async () => log.next().value ?? "";
+  }
+
   async function collect(
     reads: readonly string[],
     count: number,
   ): Promise<readonly { slug: string; phase: string }[]> {
     const stop = new AbortController();
-    let index = 0;
-    const events = await watchSignInEvents(
-      async () => reads[Math.min(index++, reads.length - 1)] ?? "",
-      instantly,
-      0,
-      stop.signal,
-    );
-    const seen: { slug: string; phase: string }[] = [];
-    for await (const event of events) {
-      seen.push(event);
-      if (seen.length === count) {
-        stop.abort();
-      }
-    }
-    return seen;
+    const events = (await watchSignInEvents(readsOf(reads), instantly, 0, stop.signal))[
+      Symbol.asyncIterator
+    ]();
+    const taken = await Promise.all(Array.from({ length: count }, () => events.next()));
+    stop.abort();
+    return taken.flatMap((step) => (step.done ? [] : [step.value]));
   }
 
   it("reports only what is logged after it began", async () => {
@@ -124,46 +126,30 @@ describe("watchSignInEvents", () => {
   });
 
   it("takes its baseline when called, before anything is iterated", async () => {
-    const stop = new AbortController();
-    let reads = 0;
     const late = json({ ...OK, phase: "callback_received" });
 
-    const events = await watchSignInEvents(
-      async () => (reads++ === 0 ? "" : late),
-      instantly,
-      0,
-      stop.signal,
-    );
-    const [first] = await (async () => {
-      const seen = [];
-      for await (const event of events) {
-        seen.push(event);
-        stop.abort();
-      }
-      return seen;
-    })();
+    const [first] = await collect(["", late], 1);
 
     expect(first).toMatchObject({ phase: "callback_received" });
   });
 
   it("resolves only once the log it compares against has been read", async () => {
     const stop = new AbortController();
-    let release: () => void = () => {};
-    const slowRead = new Promise<string>((resolve) => {
-      release = () => resolve("");
-    });
-    let resolved = false;
+    const released = new AbortController();
+    const slowRead = new Promise<string>((resolve) =>
+      released.signal.addEventListener("abort", () => resolve(""), { once: true }),
+    );
 
-    const watching = watchSignInEvents(() => slowRead, instantly, 0, stop.signal).then(() => {
-      resolved = true;
-    });
-    await new Promise<void>((resolve) => setTimeout(resolve, 5));
-    const beforeTheReadFinished = resolved;
-    release();
+    const watching = watchSignInEvents(() => slowRead, instantly, 0, stop.signal);
+    const early = await Promise.race([
+      watching.then(() => "resolved"),
+      Promise.resolve("still reading"),
+    ]);
+    released.abort();
     await watching;
     stop.abort();
 
-    expect([beforeTheReadFinished, resolved]).toEqual([false, true]);
+    expect(early).toBe("still reading");
   });
 
   it("ends when the signal aborts", async () => {

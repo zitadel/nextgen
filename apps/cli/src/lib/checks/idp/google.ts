@@ -2,6 +2,17 @@ import type { HttpResponse, ProviderProbes, Verdict } from "./context";
 
 const UNKNOWN: Verdict = { kind: "unknown" };
 
+type TokenAnswer = { readonly error?: string; readonly error_description?: string };
+
+/** The token endpoint's answer, or `undefined` when it is not JSON. */
+function tokenAnswerOf(body: string): TokenAnswer | undefined {
+  try {
+    return JSON.parse(body) as TokenAnswer;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Where Google sends a request it accepts, when nobody is signed in. */
 const SIGN_IN_PAGE = "/v3/signin/identifier";
 
@@ -38,10 +49,8 @@ export const GOOGLE_PROBES: ProviderProbes = {
   },
 
   token({ body }: HttpResponse): Verdict {
-    let answer: { error?: string; error_description?: string };
-    try {
-      answer = JSON.parse(body) as typeof answer;
-    } catch {
+    const answer = tokenAnswerOf(body);
+    if (answer === undefined) {
       return UNKNOWN;
     }
     if (answer.error === "invalid_grant") {
