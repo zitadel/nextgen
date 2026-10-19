@@ -384,4 +384,14 @@ describe("server SDK test titles", () => {
       expect(expected.filter((title) => !titles.includes(title))).toEqual([]);
     },
   );
+
+  it.each(Object.keys(TEST_FILES) as (keyof typeof TEST_FILES)[])(
+    "%s lists the canonical titles in the canonical order",
+    (sdk) => {
+      const titles = titlesOf(sdk);
+      const listed = CANONICAL_TITLES.filter((title) => titles.includes(title));
+      const inFile = titles.filter((title) => CANONICAL_TITLES.includes(title));
+      expect(inFile).toEqual(listed);
+    },
+  );
 });
