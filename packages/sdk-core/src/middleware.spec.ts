@@ -1,7 +1,8 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   HOP_BY_HOP,
+  checkOpaqueSessionToken,
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
@@ -225,7 +226,7 @@ describe("requiresProjectSecret", () => {
   });
 });
 
-describe("validateOpaqueSessionToken", () => {
+describe("opaque session tokens", () => {
   function backend(response: Response | Error) {
     const fetchMock = vi.fn(async () => {
       if (response instanceof Error) throw response;
@@ -235,57 +236,155 @@ describe("validateOpaqueSessionToken", () => {
     return fetchMock;
   }
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
+  /** A backend that never answers: the request ends only when its signal aborts. */
+  function silentBackend() {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        (_url: string, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+          }),
+      ),
+    );
+  }
+
+  let warn: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    warn = vi.spyOn(console, "warn").mockImplementation(() => {});
   });
 
-  it("returns the signed-in user of a live session", async () => {
-    backend(
-      Response.json({
-        user_id: "u1",
-        user: { identifier: "a@b.c", identifier_property: "email", display: "Ada" },
-      }),
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  describe("checkOpaqueSessionToken", () => {
+    it("returns the signed-in user of a live session", async () => {
+      backend(
+        Response.json({
+          user_id: "u1",
+          user: { identifier: "a@b.c", identifier_property: "email", display: "Ada" },
+        }),
+      );
+
+      expect(await checkOpaqueSessionToken("tok", "http://auth.test", 1000)).toEqual({
+        verdict: "live",
+        session: { userId: "u1", identifier: "a@b.c", identifierProperty: "email", display: "Ada" },
+      });
+    });
+
+    it("asks the backend for the session the cookie names", async () => {
+      const fetchMock = backend(Response.json({ user_id: "u1" }));
+
+      await checkOpaqueSessionToken("tok", "http://auth.test", 1000);
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        "http://auth.test/sessions/me",
+        expect.objectContaining({ headers: { cookie: "__nextgen_session=tok" } }),
+      );
+    });
+
+    // CreateSession sets the cookie before any factor is verified.
+    it.each([[{}], [{ user_id: "" }]])(
+      "reports a live session without a user (%j) as anonymous",
+      async (body) => {
+        backend(Response.json(body));
+
+        expect(await checkOpaqueSessionToken("tok", "http://auth.test", 1000)).toMatchObject({
+          verdict: "live",
+          session: { userId: null },
+        });
+      },
     );
 
-    expect(await validateOpaqueSessionToken("tok", "http://auth.test", 1000)).toEqual({
-      userId: "u1",
-      identifier: "a@b.c",
-      identifierProperty: "email",
-      display: "Ada",
+    it.each([
+      ["a 401", new Response(null, { status: 401 })],
+      [
+        "a 404 for a session that is gone",
+        Response.json(
+          { code: "sess.not_found", message: "The session was not found" },
+          { status: 404 },
+        ),
+      ],
+    ])("reports the cookie as refused for %s", async (_label, response) => {
+      backend(response);
+
+      expect(await checkOpaqueSessionToken("tok", "http://auth.test", 1000)).toEqual({
+        verdict: "refused",
+      });
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    // The backend answers 500, never 401, when it cannot decide, so that an
+    // outage does not sign every user out.
+    it.each([
+      ["a 500", new Response(null, { status: 500 })],
+      ["a 503", new Response(null, { status: 503 })],
+      ["a 429", new Response(null, { status: 429 })],
+      ["a 404 the backend did not give", new Response("Not Found", { status: 404 })],
+      ["an unreadable body", new Response("not json", { status: 200 })],
+      ["a network error", new TypeError("fetch failed")],
+    ])("gives no verdict for %s", async (_label, response) => {
+      backend(response);
+
+      expect(await checkOpaqueSessionToken("tok", "http://auth.test", 1000)).toEqual({
+        verdict: "undecided",
+      });
+    });
+
+    it("gives no verdict when the backend does not answer in time", async () => {
+      silentBackend();
+
+      expect(await checkOpaqueSessionToken("tok", "http://auth.test", 10)).toEqual({
+        verdict: "undecided",
+      });
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("no answer within 10 ms"));
+    });
+
+    it("logs why there is no verdict, with what made the fetch fail", async () => {
+      backend(
+        new TypeError("fetch failed", { cause: new Error("connect ECONNREFUSED 127.0.0.1:4000") }),
+      );
+
+      await checkOpaqueSessionToken("tok", "http://auth.test", 1000);
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "http://auth.test/sessions/me (TypeError: fetch failed: connect ECONNREFUSED 127.0.0.1:4000)",
+        ),
+      );
+    });
+
+    it("logs the status of an answer that is no verdict", async () => {
+      backend(new Response(null, { status: 502 }));
+
+      await checkOpaqueSessionToken("tok", "http://auth.test", 1000);
+
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("(HTTP 502)"));
     });
   });
 
-  it("asks the backend for the session the cookie names", async () => {
-    const fetchMock = backend(Response.json({ user_id: "u1" }));
+  describe("validateOpaqueSessionToken", () => {
+    it("returns the user of a live session", async () => {
+      backend(Response.json({ user_id: "u1", user: { identifier: "a@b.c" } }));
 
-    await validateOpaqueSessionToken("tok", "http://auth.test", 1000);
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      "http://auth.test/sessions/me",
-      expect.objectContaining({ headers: { cookie: "__nextgen_session=tok" } }),
-    );
-  });
-
-  // CreateSession sets the cookie before any factor is verified.
-  it.each([[{}], [{ user_id: "" }]])(
-    "reports a live session without a user (%j) as anonymous",
-    async (body) => {
-      backend(Response.json(body));
-
-      expect(await validateOpaqueSessionToken("tok", "http://auth.test", 1000)).toMatchObject({
-        userId: null,
+      expect(await validateOpaqueSessionToken("tok", "http://auth.test", 1000)).toEqual({
+        userId: "u1",
+        identifier: "a@b.c",
+        identifierProperty: null,
+        display: null,
       });
-    },
-  );
+    });
 
-  it.each([
-    ["a 401", new Response(null, { status: 401 })],
-    ["a 404", new Response(null, { status: 404 })],
-    ["an unreadable body", new Response("not json", { status: 200 })],
-    ["a network error", new Error("ECONNREFUSED")],
-  ])("reports no live session for %s", async (_label, response) => {
-    backend(response);
+    it.each([
+      ["a refusal", new Response(null, { status: 401 })],
+      ["no verdict", new Response(null, { status: 500 })],
+    ])("reports no live session for %s", async (_label, response) => {
+      backend(response);
 
-    expect(await validateOpaqueSessionToken("tok", "http://auth.test", 1000)).toBeNull();
+      expect(await validateOpaqueSessionToken("tok", "http://auth.test", 1000)).toBeNull();
+    });
   });
 });
