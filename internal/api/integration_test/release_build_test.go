@@ -143,6 +143,7 @@ func TestBuildRelease(t *testing.T) {
 		require.True(t, body.Details.Set)
 		require.NotEmpty(t, body.Details.Value.Resources)
 		assert.Equal(t, api.ReleasePointerKindFlowDefinition, body.Details.Value.Resources[0].Kind)
+		assert.Equal(t, api.ErrorCode(domain.ErrReleaseUnresolvedReference().Code), body.Details.Value.Resources[0].Code)
 	})
 
 	t.Run("allocates a new branding revision only when content changes", func(t *testing.T) {
@@ -182,6 +183,23 @@ func TestBuildRelease(t *testing.T) {
 		brndV2 := v2.Pointers[indexOfKind(v2.Pointers, api.ReleasePointerKindBranding)].RevisionID
 		assert.NotEqual(t, v1.ID, v2.ID)
 		assert.NotEqual(t, brndV1, brndV2)
+
+		// A→B→A: rebuilding the original branding reuses the first release
+		// and allocates no new branding revision.
+		again, err := ownClient.BuildRelease(t.Context(), &api.BuildReleaseRequest{
+			Bundle: api.ConfigurationBundle{
+				Branding: api.NewOptBranding(api.Branding{
+					Layout:         api.NewOptBrandingLayout(api.BrandingLayoutCentered),
+					LiquidTemplate: api.NewOptString(template),
+				}),
+			},
+			Message: api.NewOptString("branding v1 again"),
+		}, ownParams)
+		require.NoError(t, err)
+		require.IsType(t, &api.BuildReleaseOK{}, again, helpers.MustMarshal(t, again))
+		reused := api.Release(*again.(*api.BuildReleaseOK))
+		assert.Equal(t, v1.ID, reused.ID)
+		assert.Equal(t, brndV1, reused.Pointers[indexOfKind(reused.Pointers, api.ReleasePointerKindBranding)].RevisionID)
 	})
 }
 

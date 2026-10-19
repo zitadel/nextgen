@@ -66,7 +66,7 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionR
 		}
 		return nil, domain.ErrSchemaFetchFailed("failed to fetch user schema", err)
 	}
-	flowDefinition, err := fd.prepareFlowDefinition(ctx, stmts, req, userSchema)
+	flowDefinition, err := fd.prepareFlowDefinition(ctx, stmts, req, userSchema, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -88,11 +88,14 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionR
 
 // prepareFlowDefinition validates and builds a flow definition without writing.
 // userSchema is the schema the flow operates on — callers resolve the handle.
+// bundleFlows names other flows in the same Build bundle (active ones only)
+// so pivoting can target a sibling that is not yet persisted.
 func (fd *flowDefinitionService) prepareFlowDefinition(
 	ctx context.Context,
 	stmts AllStatements,
 	req FlowDefinitionRequest,
 	userSchema *domain.JSONSchema,
+	bundleFlows map[string]bool,
 ) (*domain.FlowDefinition, error) {
 	purposes, err := mapPurposesToDomain(req.Purposes)
 	if err != nil {
@@ -119,7 +122,7 @@ func (fd *flowDefinitionService) prepareFlowDefinition(
 	if err != nil {
 		return nil, err
 	}
-	if err := fd.validate(ctx, stmts, flowDefinition, userSchema); err != nil {
+	if err := fd.validate(ctx, stmts, flowDefinition, userSchema, bundleFlows); err != nil {
 		return nil, err
 	}
 	return flowDefinition, nil
@@ -140,20 +143,20 @@ func (fd *flowDefinitionService) createFlowDefinition(ctx context.Context, stmts
 	})
 }
 
-// resolveOrCreateFlow reuses the project's newest revision of the flow name
-// when content matches, otherwise inserts the prepared definition.
+// resolveOrCreateFlow reuses any existing revision of the flow name whose
+// content matches (preferring the newest match), otherwise inserts.
 func (fd *flowDefinitionService) resolveOrCreateFlow(
 	ctx context.Context,
 	stmts AllStatements,
 	projectID string,
 	definition *domain.FlowDefinition,
 ) (*domain.FlowDefinition, error) {
-	latest, err := latestFlowByName(ctx, stmts, projectID, definition.Name)
+	match, err := matchingFlowByName(ctx, stmts, projectID, definition)
 	if err != nil {
 		return nil, err
 	}
-	if latest != nil && definition.Equal(latest) {
-		return latest, nil
+	if match != nil {
+		return match, nil
 	}
 	if err := fd.createFlowDefinition(ctx, stmts, definition); err != nil {
 		return nil, err
@@ -161,24 +164,44 @@ func (fd *flowDefinitionService) resolveOrCreateFlow(
 	return definition, nil
 }
 
-func latestFlowByName(ctx context.Context, stmts AllStatements, projectID, name string) (*domain.FlowDefinition, error) {
+// matchingFlowByName returns the newest revision of name whose content equals
+// want, or nil when none match. Scanning every revision lets Build reuse an
+// older revision when the newest has diverged (A→B→A content-hash reuse).
+func matchingFlowByName(ctx context.Context, stmts AllStatements, projectID string, want *domain.FlowDefinition) (*domain.FlowDefinition, error) {
 	result, err := stmts.ListFlowDefinitions(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.FlowDefinitionField]{
 		Filter: database.And(
 			database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
-			database.Equal(database.Col(domain.FlowDefinitionFieldName), name),
+			database.Equal(database.Col(domain.FlowDefinitionFieldName), want.Name),
 		),
-		Pagination: database.Page[domain.FlowDefinitionField]{Limit: 1},
-	}, FlowDefinitionQueryOptions{LatestRevisionPerName: true})
+		Pagination: database.Page[domain.FlowDefinitionField]{
+			Limit: maxHistoricalRevisions,
+			OrderBy: database.OrderBy[domain.FlowDefinitionField]{
+				Columns: []database.Column[domain.FlowDefinitionField]{
+					database.Col(domain.FlowDefinitionFieldCreatedAt),
+					database.Col(domain.FlowDefinitionFieldID),
+				},
+				Direction: database.OrderDesc,
+			},
+		},
+	}, FlowDefinitionQueryOptions{})
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to list flow definitions")
 	}
-	if len(result.Items) == 0 {
-		return nil, nil
+	for _, item := range result.Items {
+		if want.Equal(item) {
+			return item, nil
+		}
 	}
-	return result.Items[0], nil
+	return nil, nil
 }
 
-func (fd *flowDefinitionService) validate(ctx context.Context, stmts AllStatements, flowDefinition *domain.FlowDefinition, sch *domain.JSONSchema) error {
+func (fd *flowDefinitionService) validate(
+	ctx context.Context,
+	stmts AllStatements,
+	flowDefinition *domain.FlowDefinition,
+	sch *domain.JSONSchema,
+	bundleFlows map[string]bool,
+) error {
 	userSchema, err := sch.Document()
 	if err != nil {
 		return domain.ErrSchemaFetchFailed("failed to unmarshal user schema", err)
@@ -189,14 +212,23 @@ func (fd *flowDefinitionService) validate(ctx context.Context, stmts AllStatemen
 		return err
 	}
 
-	return fd.validatePivotingTargets(ctx, stmts, pivotingTargets, flowDefinition.ProjectID)
+	return fd.validatePivotingTargets(ctx, stmts, pivotingTargets, flowDefinition.ProjectID, bundleFlows)
 }
 
-func (fd *flowDefinitionService) validatePivotingTargets(ctx context.Context, stmts AllStatements, pivotingTargets []domain.PivotingTarget, projectID string) error {
+func (fd *flowDefinitionService) validatePivotingTargets(
+	ctx context.Context,
+	stmts AllStatements,
+	pivotingTargets []domain.PivotingTarget,
+	projectID string,
+	bundleFlows map[string]bool,
+) error {
 	if len(pivotingTargets) == 0 {
 		return nil
 	}
 	for _, target := range pivotingTargets {
+		if bundleFlows[target.Name] {
+			continue
+		}
 		defs, err := stmts.ListFlowDefinitions(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.FlowDefinitionField]{
 			Filter: database.And(
 				database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
@@ -214,6 +246,11 @@ func (fd *flowDefinitionService) validatePivotingTargets(ctx context.Context, st
 	}
 	return nil
 }
+
+// maxHistoricalRevisions caps how far Build looks for a content match when
+// reusing an older revision. Revisions accumulate forever; the cap covers
+// normal authoring without unbounded scans.
+const maxHistoricalRevisions = 100
 
 func mapPurposesToDomain(reqPurposes map[string]string) (map[domain.FlowDefinitionPurpose]string, error) {
 	purposes := make(map[domain.FlowDefinitionPurpose]string, len(reqPurposes))

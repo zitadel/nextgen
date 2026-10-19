@@ -92,25 +92,41 @@ func (s *BrandingService) createBranding(ctx context.Context, stmts AllStatement
 	})
 }
 
-// resolveOrCreateBranding reuses the project's newest branding when content
-// matches, otherwise inserts the prepared revision.
+// resolveOrCreateBranding reuses any existing branding revision whose content
+// matches (preferring the newest match), otherwise inserts the prepared revision.
 func (s *BrandingService) resolveOrCreateBranding(
 	ctx context.Context,
 	stmts AllStatements,
 	projectID string,
 	prepared *domain.Branding,
 ) (*domain.Branding, error) {
-	latest, err := latestBranding(ctx, stmts, projectID)
+	match, err := matchingBranding(ctx, stmts, projectID, prepared)
 	if err != nil {
 		return nil, err
 	}
-	if latest != nil && prepared.Equal(latest) {
-		return latest, nil
+	if match != nil {
+		return match, nil
 	}
 	if err := s.createBranding(ctx, stmts, prepared); err != nil {
 		return nil, err
 	}
 	return prepared, nil
+}
+
+// matchingBranding returns the newest revision whose content equals want, or
+// nil when none match. Scanning history lets Build reuse an older revision
+// when the newest has diverged (A→B→A content-hash reuse).
+func matchingBranding(ctx context.Context, stmts AllStatements, projectID string, want *domain.Branding) (*domain.Branding, error) {
+	result, err := stmts.ListBrandings(WithAuthzListUnrestricted(ctx), branding.ListOptions(projectID, maxHistoricalRevisions))
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to list branding")
+	}
+	for _, item := range result.Items {
+		if want.Equal(item) {
+			return item, nil
+		}
+	}
+	return nil, nil
 }
 
 func latestBranding(ctx context.Context, stmts AllStatements, projectID string) (*domain.Branding, error) {

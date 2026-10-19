@@ -57,10 +57,12 @@ func TestBuildRelease_DuplicateSchemaHandle(t *testing.T) {
 		},
 	})
 	require.Error(t, err)
-	var de domain.Error
-	require.ErrorAs(t, err, &de)
-	assert.Equal(t, domain.ErrReleaseInvalid(nil, nil).Code, de.Code)
-	assert.Contains(t, de.Details.(string), "appears twice")
+	var bundleErr *service.BundleValidationError
+	require.ErrorAs(t, err, &bundleErr)
+	require.Len(t, bundleErr.Resources, 2)
+	assert.Equal(t, domain.ReleasePointerKindSchema, bundleErr.Resources[0].Kind)
+	assert.Contains(t, bundleErr.Resources[0].Err.Details.(string), "appears twice")
+	assert.Contains(t, bundleErr.Resources[1].Err.Details.(string), "appears twice")
 }
 
 func TestBuildRelease_SchemaIDRefused(t *testing.T) {
@@ -72,10 +74,11 @@ func TestBuildRelease_SchemaIDRefused(t *testing.T) {
 		Schemas:   []service.BuildSchema{{Index: 0, Document: doc}},
 	})
 	require.Error(t, err)
-	var de domain.Error
-	require.ErrorAs(t, err, &de)
-	assert.Equal(t, domain.ErrReleaseInvalid(nil, nil).Code, de.Code)
-	assert.Contains(t, de.Details.(string), "$id")
+	var bundleErr *service.BundleValidationError
+	require.ErrorAs(t, err, &bundleErr)
+	require.Len(t, bundleErr.Resources, 1)
+	assert.Equal(t, domain.ReleasePointerKindSchema, bundleErr.Resources[0].Kind)
+	assert.Contains(t, bundleErr.Resources[0].Err.Details.(string), "$id")
 }
 
 func TestBuildRelease_DuplicateFlowName(t *testing.T) {
@@ -89,9 +92,11 @@ func TestBuildRelease_DuplicateFlowName(t *testing.T) {
 		},
 	})
 	require.Error(t, err)
-	var de domain.Error
-	require.ErrorAs(t, err, &de)
-	assert.Contains(t, de.Details.(string), "appears twice")
+	var bundleErr *service.BundleValidationError
+	require.ErrorAs(t, err, &bundleErr)
+	require.Len(t, bundleErr.Resources, 2)
+	assert.Equal(t, domain.ReleasePointerKindFlowDefinition, bundleErr.Resources[0].Kind)
+	assert.Contains(t, bundleErr.Resources[0].Err.Details.(string), "appears twice")
 }
 
 func TestBuildRelease_InvalidBrandingAggregates(t *testing.T) {

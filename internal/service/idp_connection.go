@@ -102,25 +102,7 @@ func (s *idpConnectionService) CreateOrRevise(ctx context.Context, projectID str
 func (s *idpConnectionService) resolveOrCreate(ctx context.Context, stmts AllStatements, projectID, slug string, document []byte) (*CreateIDPConnectionOutput, error) {
 	existing, err := stmts.GetIDPConnection(ctx, idpConnectionBy(projectID, domain.IDPConnectionFieldSlug, slug))
 	if err == nil {
-		same, eqErr := domain.JSONEqual(existing.Document, document)
-		if eqErr != nil {
-			return nil, domain.ErrInternal(eqErr).WithMessage("failed to compare identity provider documents")
-		}
-		if same {
-			return &CreateIDPConnectionOutput{Connection: existing}, nil
-		}
-		if err := stmts.LockIDPConnection(ctx, projectID, existing.ID); err != nil {
-			return nil, err
-		}
-		current, err := stmts.GetIDPConnection(ctx, idpConnectionBy(projectID, domain.IDPConnectionFieldID, existing.ID))
-		if err != nil {
-			return nil, err
-		}
-		entity, reviseErr := s.revise(ctx, stmts, current, document)
-		if reviseErr != nil {
-			return nil, reviseErr
-		}
-		return &CreateIDPConnectionOutput{Connection: entity}, nil
+		return s.resolveExistingIDP(ctx, stmts, existing, document)
 	}
 	if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
 		return nil, domain.ErrInternal(err).WithMessage("failed to look up identity provider connection")
@@ -128,19 +110,89 @@ func (s *idpConnectionService) resolveOrCreate(ctx context.Context, stmts AllSta
 	entity := &domain.IDPConnection{ProjectID: projectID, Slug: slug, Document: document}
 	if err := s.create(ctx, stmts, entity); err != nil {
 		if errors.Is(err, errIDPSlugTaken) {
+			// Another caller won the slug; reuse or revise through the same
+			// locked path so content reuse and event deltas stay correct.
 			existing, getErr := stmts.GetIDPConnection(ctx, idpConnectionBy(projectID, domain.IDPConnectionFieldSlug, slug))
 			if getErr != nil {
 				return nil, getErr
 			}
-			revised, reviseErr := s.revise(ctx, stmts, existing, document)
-			if reviseErr != nil {
-				return nil, reviseErr
-			}
-			return &CreateIDPConnectionOutput{Connection: revised}, nil
+			return s.resolveExistingIDP(ctx, stmts, existing, document)
 		}
 		return nil, err
 	}
 	return &CreateIDPConnectionOutput{Connection: entity, Created: true}, nil
+}
+
+// resolveExistingIDP reuses a matching revision of existing when document
+// matches any historical revision (preferring the newest match), otherwise
+// locks and revises. Equality is checked again after the lock so a concurrent
+// winner that already wrote the same document is not revised again.
+func (s *idpConnectionService) resolveExistingIDP(
+	ctx context.Context,
+	stmts AllStatements,
+	existing *domain.IDPConnection,
+	document []byte,
+) (*CreateIDPConnectionOutput, error) {
+	match, err := matchingIDPRevision(ctx, stmts, existing, document)
+	if err != nil {
+		return nil, err
+	}
+	if match != nil {
+		return &CreateIDPConnectionOutput{Connection: match}, nil
+	}
+	if err := stmts.LockIDPConnection(ctx, existing.ProjectID, existing.ID); err != nil {
+		return nil, err
+	}
+	current, err := stmts.GetIDPConnection(ctx, idpConnectionBy(existing.ProjectID, domain.IDPConnectionFieldID, existing.ID))
+	if err != nil {
+		return nil, err
+	}
+	same, err := domain.JSONEqual(current.Document, document)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to compare identity provider documents")
+	}
+	if same {
+		return &CreateIDPConnectionOutput{Connection: current}, nil
+	}
+	entity, err := s.revise(ctx, stmts, current, document)
+	if err != nil {
+		return nil, err
+	}
+	return &CreateIDPConnectionOutput{Connection: entity}, nil
+}
+
+// matchingIDPRevision returns the newest revision of connection whose document
+// equals want, or nil when none match.
+func matchingIDPRevision(
+	ctx context.Context,
+	stmts AllStatements,
+	connection *domain.IDPConnection,
+	want []byte,
+) (*domain.IDPConnection, error) {
+	same, err := domain.JSONEqual(connection.Document, want)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to compare identity provider documents")
+	}
+	if same {
+		return connection, nil
+	}
+	result, err := stmts.ListIDPConnectionRevisions(ctx, connection.ProjectID, connection.ID, database.Page[domain.IDPConnectionField]{
+		Limit:   maxHistoricalRevisions,
+		OrderBy: idpconnection.RevisionsNewestFirst(),
+	})
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to list identity provider connection revisions")
+	}
+	for _, item := range result.Items {
+		same, eqErr := domain.JSONEqual(item.Document, want)
+		if eqErr != nil {
+			return nil, domain.ErrInternal(eqErr).WithMessage("failed to compare identity provider documents")
+		}
+		if same {
+			return item, nil
+		}
+	}
+	return nil, nil
 }
 
 // errIDPSlugTaken reports that create lost the race for a slug to another

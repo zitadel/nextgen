@@ -201,9 +201,10 @@ func (s *SchemaService) createSchemaByURL(ctx context.Context, stmts AllStatemen
 	return nil
 }
 
-// resolveOrCreateSchema reuses the project's newest revision of objectType when
-// document matches it (ignoring $id), otherwise inserts the prepared model.
-// When schemaURL is set, the project's copy of that URL is reused or fetched.
+// resolveOrCreateSchema reuses any existing revision of objectType whose
+// document matches (ignoring $id; preferring the newest match), otherwise
+// inserts the prepared model. When schemaURL is set, the project's copy of
+// that URL is reused or fetched.
 func (s *SchemaService) resolveOrCreateSchema(
 	ctx context.Context,
 	stmts AllStatements,
@@ -213,40 +214,79 @@ func (s *SchemaService) resolveOrCreateSchema(
 	schemaURL string,
 ) (*domain.JSONSchema, error) {
 	if schemaURL != "" {
-		existing, err := stmts.GetJSONSchemaByID(ctx, projectID, schemaURL)
-		if err == nil {
-			return existing, nil
-		}
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
-			return nil, domain.ErrInternal(err).WithMessage("failed to look up schema by url")
-		}
-		if err := s.createSchemaByURL(ctx, stmts, projectID, schemaURL); err != nil {
-			return nil, err
-		}
-		return stmts.GetJSONSchemaByID(ctx, projectID, schemaURL)
+		return s.resolveOrCreateSchemaURL(ctx, stmts, projectID, schemaURL)
 	}
 
 	handle := ""
 	if prepared.ObjectType != nil {
 		handle = *prepared.ObjectType
 	}
-	latest, err := latestSchemaByObjectType(ctx, stmts, projectID, handle)
+	match, err := matchingSchemaByObjectType(ctx, stmts, projectID, handle, document)
 	if err != nil {
 		return nil, err
 	}
-	if latest != nil {
-		same, eqErr := domain.JSONEqual(document, latest.Schema, "$id")
-		if eqErr != nil {
-			return nil, domain.ErrInternal(eqErr).WithMessage("failed to compare schema documents")
-		}
-		if same {
-			return latest, nil
-		}
+	if match != nil {
+		return match, nil
 	}
 	if err := s.createSchema(ctx, stmts, prepared); err != nil {
 		return nil, err
 	}
 	return prepared, nil
+}
+
+func (s *SchemaService) resolveOrCreateSchemaURL(
+	ctx context.Context,
+	stmts AllStatements,
+	projectID, schemaURL string,
+) (*domain.JSONSchema, error) {
+	existing, err := stmts.GetJSONSchemaByID(ctx, projectID, schemaURL)
+	if err == nil {
+		return existing, nil
+	}
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
+		return nil, domain.ErrInternal(err).WithMessage("failed to look up schema by url")
+	}
+	if err := s.createSchemaByURL(ctx, stmts, projectID, schemaURL); err != nil {
+		return nil, err
+	}
+	return stmts.GetJSONSchemaByID(ctx, projectID, schemaURL)
+}
+
+// matchingSchemaByObjectType returns the newest revision of objectType whose
+// document equals want (ignoring $id), or nil when none match.
+func matchingSchemaByObjectType(ctx context.Context, stmts AllStatements, projectID, objectType string, want []byte) (*domain.JSONSchema, error) {
+	if objectType == "" {
+		return nil, nil
+	}
+	result, err := stmts.ListJSONSchemas(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.JSONSchemaField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID),
+			database.Equal(database.Col(domain.JSONSchemaFieldObjectType), objectType),
+		),
+		Pagination: database.Page[domain.JSONSchemaField]{
+			Limit: maxHistoricalRevisions,
+			OrderBy: database.OrderBy[domain.JSONSchemaField]{
+				Columns: []database.Column[domain.JSONSchemaField]{
+					database.Col(domain.JSONSchemaFieldCreatedAt),
+					database.Col(domain.JSONSchemaFieldURL),
+				},
+				Direction: database.OrderDesc,
+			},
+		},
+	}, JSONSchemaQueryOptions{})
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to list schemas")
+	}
+	for _, item := range result.Items {
+		same, eqErr := domain.JSONEqual(want, item.Schema, "$id")
+		if eqErr != nil {
+			return nil, domain.ErrInternal(eqErr).WithMessage("failed to compare schema documents")
+		}
+		if same {
+			return item, nil
+		}
+	}
+	return nil, nil
 }
 
 func latestSchemaByObjectType(ctx context.Context, stmts AllStatements, projectID, objectType string) (*domain.JSONSchema, error) {

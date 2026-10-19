@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -46,24 +45,32 @@ type BuildReleaseInput struct {
 }
 
 type preparedIDP struct {
+	index    int
 	slug     string
 	document []byte
 }
 
 type preparedSchema struct {
-	model *domain.JSONSchema // nil for schema-url until resolved/created
+	model *domain.JSONSchema // set for inline after prepare; for URL after in-tx resolve
 	url   string
+	index int
 }
 
 // Build turns a configuration bundle into a release in one transaction:
-// unchanged resources reuse their newest revision, changed ones allocate, and
-// the release is created or the existing content-hash match is returned.
+// unchanged resources reuse a matching revision (any age), changed ones
+// allocate, and the release is created or the existing content-hash match is
+// returned.
 func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (*CreateReleaseOutput, error) {
-	if err := s.validateBundleShape(input); err != nil {
-		return nil, err
+	shapeInput := bundleShapeInput(input)
+	if domain.BundleEmpty(shapeInput) {
+		return nil, domain.ErrReleaseInvalid("the bundle is empty", nil)
 	}
 
 	failures := &BundleValidationError{}
+	for _, failure := range domain.ValidateBundleShape(shapeInput) {
+		failures.add(failure.Kind, failure.Index, failure.Handle, failure.Err)
+	}
+
 	preparedSchemas, schemaByHandle := s.prepareBundleSchemas(input, failures)
 	preparedIDPs := s.prepareBundleIDPs(input, failures)
 	var preparedBranding *domain.Branding
@@ -74,9 +81,11 @@ func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (*C
 			failures.add(domain.ReleasePointerKindBranding, 0, domain.ReleaseBrandingHandle, err)
 		}
 	}
-	// Pure prepares finished. When the bundle has no flows, there is nothing
-	// left that needs stmts — surface those failures without opening a tx.
-	if len(input.FlowDefinitions) == 0 && len(failures.Resources) > 0 {
+	// In-tx checks (flows, schema-URL resolve, IDP immutables) can still add
+	// to the bag. When nothing in-tx can run, surface pure-prepare failures
+	// without opening a transaction.
+	needsInTxChecks := len(input.FlowDefinitions) > 0 || hasSchemaURL(input.Schemas) || len(preparedIDPs) > 0
+	if !needsInTxChecks && len(failures.Resources) > 0 {
 		return nil, failures
 	}
 
@@ -87,21 +96,36 @@ func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (*C
 	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		stmts := tx.Statements()
 
-		// Prepare flows on the build transaction so schema/pivoting lookups
-		// share the same stmts as the writes that follow. Append into the
-		// same failures bag as the pure prepares above so every bad resource
-		// is reported at once; return before any write so the tx rolls back.
-		preparedFlows := s.prepareBundleFlows(ctx, stmts, input, schemaByHandle, failures)
+		// Resolve schema-URL entries before flows so their objectTypes enter
+		// schemaByHandle and Pointers() cannot panic on a nil ObjectType.
+		if err := s.resolveBundleSchemaURLs(ctx, stmts, input.ProjectID, preparedSchemas, schemaByHandle, failures); err != nil {
+			return err
+		}
+
+		preparedFlows, err := s.prepareBundleFlows(ctx, stmts, input, schemaByHandle, failures)
+		if err != nil {
+			return err
+		}
+		if err := s.checkBundleIDPImmutables(ctx, stmts, input.ProjectID, preparedIDPs, failures); err != nil {
+			return err
+		}
 		if len(failures.Resources) > 0 {
 			return failures
 		}
 
 		content := domain.ReleaseContent{}
 		for i, prepared := range preparedSchemas {
-			schema, err := s.schemas.resolveOrCreateSchema(
-				ctx, stmts, input.ProjectID,
-				input.Schemas[i].Document, prepared.model, prepared.url,
-			)
+			var schema *domain.JSONSchema
+			var err error
+			if prepared.url != "" {
+				// Already resolved into prepared.model above.
+				schema = prepared.model
+			} else {
+				schema, err = s.schemas.resolveOrCreateSchema(
+					ctx, stmts, input.ProjectID,
+					input.Schemas[i].Document, prepared.model, "",
+				)
+			}
 			if err != nil {
 				return err
 			}
@@ -137,8 +161,10 @@ func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (*C
 			return err
 		}
 		if len(pointers) > maxReleasePointers {
-			return domain.ErrReleaseInvalid(
-				fmt.Sprintf("a release may pin at most %d resources", maxReleasePointers), nil)
+			capErr := &BundleValidationError{}
+			capErr.add(domain.ReleasePointerKindSchema, 0, "",
+				domain.ErrReleaseInvalid(fmt.Sprintf("a release may pin at most %d resources", maxReleasePointers), nil))
+			return capErr
 		}
 		if err := domain.ValidateRelease(content); err != nil {
 			return err
@@ -173,67 +199,43 @@ func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (*C
 	return out, nil
 }
 
-func (s *releaseService) validateBundleShape(input BuildReleaseInput) error {
-	total := len(input.Schemas) + len(input.FlowDefinitions) + len(input.IDPs)
-	if input.Branding != nil {
-		total++
+func bundleShapeInput(input BuildReleaseInput) domain.BundleShapeInput {
+	schemas := make([]domain.BundleShapeSchema, len(input.Schemas))
+	for i, schema := range input.Schemas {
+		schemas[i] = domain.BundleShapeSchema{Index: schema.Index, Document: schema.Document, URL: schema.URL}
 	}
-	if total == 0 {
-		return domain.ErrReleaseInvalid("the bundle is empty", nil)
+	flows := make([]domain.BundleShapeFlow, len(input.FlowDefinitions))
+	for i, flow := range input.FlowDefinitions {
+		flows[i] = domain.BundleShapeFlow{Index: flow.Index, Name: flow.Request.Name}
 	}
+	idps := make([]domain.BundleShapeIDP, len(input.IDPs))
+	for i, idp := range input.IDPs {
+		idps[i] = domain.BundleShapeIDP{Index: idp.Index, Document: idp.Document}
+	}
+	return domain.BundleShapeInput{
+		Schemas:     schemas,
+		Flows:       flows,
+		IDPs:        idps,
+		HasBranding: input.Branding != nil,
+	}
+}
 
-	seenSchema := map[string]int{}
-	for _, schema := range input.Schemas {
+func hasSchemaURL(schemas []BuildSchema) bool {
+	for _, schema := range schemas {
 		if schema.URL != "" {
-			continue
-		}
-		handle, err := schemaObjectType(schema.Document)
-		if err != nil {
-			return domain.ErrReleaseInvalid(err.Error(), err)
-		}
-		if handle == "" {
-			return domain.ErrReleaseInvalid("every bundled schema needs an objectType", nil)
-		}
-		if prev, ok := seenSchema[handle]; ok {
-			return domain.ErrReleaseInvalid(
-				fmt.Sprintf("schema %q appears twice (indices %d and %d)", handle, prev, schema.Index), nil)
-		}
-		seenSchema[handle] = schema.Index
-		if hasTopLevelID(schema.Document) {
-			return domain.ErrReleaseInvalid(
-				fmt.Sprintf("schema %q must not declare $id", handle), nil)
+			return true
 		}
 	}
+	return false
+}
 
-	seenFlow := map[string]int{}
-	for _, flow := range input.FlowDefinitions {
-		name := strings.TrimSpace(flow.Request.Name)
-		if name == "" {
-			return domain.ErrReleaseInvalid("every bundled flow definition needs a name", nil)
+func shapeFailed(failures *BundleValidationError, kind domain.ReleasePointerKind, index int) bool {
+	for _, r := range failures.Resources {
+		if r.Kind == kind && r.Index == index {
+			return true
 		}
-		if prev, ok := seenFlow[name]; ok {
-			return domain.ErrReleaseInvalid(
-				fmt.Sprintf("flow_definition %q appears twice (indices %d and %d)", name, prev, flow.Index), nil)
-		}
-		seenFlow[name] = flow.Index
 	}
-
-	seenIDP := map[string]int{}
-	for _, idp := range input.IDPs {
-		slug, err := idpSlug(idp.Document)
-		if err != nil {
-			return domain.ErrReleaseInvalid(err.Error(), err)
-		}
-		if slug == "" {
-			return domain.ErrReleaseInvalid("every bundled idp needs a slug", nil)
-		}
-		if prev, ok := seenIDP[slug]; ok {
-			return domain.ErrReleaseInvalid(
-				fmt.Sprintf("idp %q appears twice (indices %d and %d)", slug, prev, idp.Index), nil)
-		}
-		seenIDP[slug] = idp.Index
-	}
-	return nil
+	return false
 }
 
 func (s *releaseService) prepareBundleSchemas(
@@ -243,8 +245,12 @@ func (s *releaseService) prepareBundleSchemas(
 	prepared := make([]preparedSchema, len(input.Schemas))
 	byHandle := make(map[string]*domain.JSONSchema, len(input.Schemas))
 	for i, schema := range input.Schemas {
+		prepared[i].index = schema.Index
 		if schema.URL != "" {
-			prepared[i] = preparedSchema{url: schema.URL}
+			prepared[i].url = schema.URL
+			continue
+		}
+		if shapeFailed(failures, domain.ReleasePointerKindSchema, schema.Index) {
 			continue
 		}
 		model, err := s.schemas.prepareSchema(CreateSchemaInput{
@@ -252,16 +258,52 @@ func (s *releaseService) prepareBundleSchemas(
 			Schema:    schema.Document,
 		})
 		if err != nil {
-			handle, _ := schemaObjectType(schema.Document)
+			handle, _ := domain.SchemaDocumentObjectType(schema.Document)
 			failures.add(domain.ReleasePointerKindSchema, schema.Index, handle, err)
 			continue
 		}
-		prepared[i] = preparedSchema{model: model}
+		prepared[i].model = model
 		if model.ObjectType != nil {
 			byHandle[*model.ObjectType] = model
 		}
 	}
 	return prepared, byHandle
+}
+
+// resolveBundleSchemaURLs fetches or reuses each schema-URL entry on stmts and
+// registers its objectType in schemaByHandle for flow prepare.
+func (s *releaseService) resolveBundleSchemaURLs(
+	ctx context.Context,
+	stmts AllStatements,
+	projectID string,
+	prepared []preparedSchema,
+	schemaByHandle map[string]*domain.JSONSchema,
+	failures *BundleValidationError,
+) error {
+	for i := range prepared {
+		if prepared[i].url == "" {
+			continue
+		}
+		if shapeFailed(failures, domain.ReleasePointerKindSchema, prepared[i].index) {
+			continue
+		}
+		schema, err := s.schemas.resolveOrCreateSchemaURL(ctx, stmts, projectID, prepared[i].url)
+		if err != nil {
+			if isBundleResourceFailure(err) {
+				failures.add(domain.ReleasePointerKindSchema, prepared[i].index, "", err)
+				continue
+			}
+			return err
+		}
+		if schema.ObjectType == nil || *schema.ObjectType == "" {
+			failures.add(domain.ReleasePointerKindSchema, prepared[i].index, "",
+				domain.ErrReleaseRevisionUnpinnable(fmt.Sprintf("schema url %q declares no objectType", prepared[i].url)))
+			continue
+		}
+		prepared[i].model = schema
+		schemaByHandle[*schema.ObjectType] = schema
+	}
+	return nil
 }
 
 func (s *releaseService) prepareBundleFlows(
@@ -270,29 +312,61 @@ func (s *releaseService) prepareBundleFlows(
 	input BuildReleaseInput,
 	bundleSchemas map[string]*domain.JSONSchema,
 	failures *BundleValidationError,
-) []*domain.FlowDefinition {
+) ([]*domain.FlowDefinition, error) {
+	bundleFlows := activeBundleFlowNames(input.FlowDefinitions)
 	prepared := make([]*domain.FlowDefinition, 0, len(input.FlowDefinitions))
 	for _, flow := range input.FlowDefinitions {
+		if shapeFailed(failures, domain.ReleasePointerKindFlowDefinition, flow.Index) {
+			continue
+		}
 		req := flow.Request
 		req.ProjectID = input.ProjectID
 		userSchema, err := resolveBundleOrProjectSchema(ctx, stmts, input.ProjectID, req.UserSchema, bundleSchemas)
 		if err != nil {
 			if errors.Is(err, domain.ErrJSONSchemaNotFound()) {
-				err = domain.ErrFlowDefinitionInvalid(fmt.Sprintf("user schema %q not found", req.UserSchema), err)
-			} else if _, ok := errors.AsType[domain.Error](err); !ok {
-				err = domain.ErrSchemaFetchFailed("failed to fetch user schema", err)
+				failures.add(domain.ReleasePointerKindFlowDefinition, flow.Index, req.Name,
+					domain.ErrReleaseUnresolvedReference().WithMessage(
+						fmt.Sprintf("%s %s: user_schema %s not found",
+							domain.ReleasePointerKindFlowDefinition, req.Name, req.UserSchema)))
+				continue
 			}
-			failures.add(domain.ReleasePointerKindFlowDefinition, flow.Index, req.Name, err)
-			continue
+			if isBundleResourceFailure(err) {
+				failures.add(domain.ReleasePointerKindFlowDefinition, flow.Index, req.Name, err)
+				continue
+			}
+			return nil, err
 		}
-		definition, err := s.flows.prepareFlowDefinition(ctx, stmts, req, userSchema)
+		definition, err := s.flows.prepareFlowDefinition(ctx, stmts, req, userSchema, bundleFlows)
 		if err != nil {
-			failures.add(domain.ReleasePointerKindFlowDefinition, flow.Index, req.Name, err)
-			continue
+			if isBundleResourceFailure(err) {
+				failures.add(domain.ReleasePointerKindFlowDefinition, flow.Index, req.Name, err)
+				continue
+			}
+			return nil, err
 		}
 		prepared = append(prepared, definition)
 	}
-	return prepared
+	return prepared, nil
+}
+
+// activeBundleFlowNames maps flow names in the bundle that are active, so
+// pivoting can target a sibling that is not yet persisted.
+func activeBundleFlowNames(flows []BuildFlowDefinition) map[string]bool {
+	out := make(map[string]bool, len(flows))
+	for _, flow := range flows {
+		name := strings.TrimSpace(flow.Request.Name)
+		if name == "" {
+			continue
+		}
+		status, err := domain.FlowDefinitionStatusString(flow.Request.Status)
+		if err != nil {
+			continue
+		}
+		if status == domain.FlowDefinitionStatusActive {
+			out[name] = true
+		}
+	}
+	return out
 }
 
 func resolveBundleOrProjectSchema(
@@ -310,18 +384,69 @@ func resolveBundleOrProjectSchema(
 func (s *releaseService) prepareBundleIDPs(input BuildReleaseInput, failures *BundleValidationError) []preparedIDP {
 	docs := make([]preparedIDP, 0, len(input.IDPs))
 	for _, idp := range input.IDPs {
+		if shapeFailed(failures, domain.ReleasePointerKindIDP, idp.Index) {
+			continue
+		}
 		slug, err := s.idps.validate(idp.Document)
 		if err != nil {
 			failures.add(domain.ReleasePointerKindIDP, idp.Index, slug, err)
 			continue
 		}
-		docs = append(docs, preparedIDP{slug: slug, document: idp.Document})
+		docs = append(docs, preparedIDP{index: idp.Index, slug: slug, document: idp.Document})
 	}
 	return docs
 }
 
+// checkBundleIDPImmutables runs the immutable-field check for each bundled
+// IDP that already exists, so every violation lands in the failures bag
+// before any write.
+func (s *releaseService) checkBundleIDPImmutables(
+	ctx context.Context,
+	stmts AllStatements,
+	projectID string,
+	prepared []preparedIDP,
+	failures *BundleValidationError,
+) error {
+	for _, idp := range prepared {
+		existing, err := stmts.GetIDPConnection(ctx, idpConnectionBy(projectID, domain.IDPConnectionFieldSlug, idp.slug))
+		if err != nil {
+			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+				continue
+			}
+			return domain.ErrInternal(err).WithMessage("failed to look up identity provider connection")
+		}
+		changed, err := domain.IDPConnectionImmutableFieldsChanged(existing.Document, idp.document)
+		if err != nil {
+			if isBundleResourceFailure(err) {
+				failures.add(domain.ReleasePointerKindIDP, idp.index, idp.slug, err)
+				continue
+			}
+			return err
+		}
+		if len(changed) > 0 {
+			failures.add(domain.ReleasePointerKindIDP, idp.index, idp.slug,
+				domain.ErrIDPConnectionFieldImmutable(map[string][]string{"fields": changed}))
+		}
+	}
+	return nil
+}
+
+// isBundleResourceFailure reports whether err is a per-resource validation
+// failure that belongs in the Build bag. Infrastructure errors (internal,
+// aborted transactions, raw storage) must bubble so the caller can retry or
+// answer with the real status.
+func isBundleResourceFailure(err error) bool {
+	de, ok := errors.AsType[domain.Error](err)
+	if !ok {
+		return false
+	}
+	return de.Code != domain.ErrInternal(nil).Code
+}
+
 // autoPinReferences adds project revisions for handles named by the bundle
 // but not carried in it. A handle neither holds is left for ValidateRelease.
+// Schema pins run first; IDP needs are collected afterwards so providers
+// named only by an auto-pinned schema are still included.
 func (s *releaseService) autoPinReferences(
 	ctx context.Context,
 	stmts AllStatements,
@@ -342,11 +467,25 @@ func (s *releaseService) autoPinReferences(
 	}
 
 	needSchema := map[string]struct{}{}
-	needIDP := map[string]struct{}{}
 	for _, flow := range content.FlowDefinitions {
 		if !included[key{domain.ReleasePointerKindSchema, flow.UserSchema}] {
 			needSchema[flow.UserSchema] = struct{}{}
 		}
+	}
+
+	for handle := range needSchema {
+		latest, err := latestSchemaByObjectType(ctx, stmts, projectID, handle)
+		if err != nil {
+			return err
+		}
+		if latest != nil {
+			content.Schemas = append(content.Schemas, latest)
+			included[key{domain.ReleasePointerKindSchema, handle}] = true
+		}
+	}
+
+	needIDP := map[string]struct{}{}
+	for _, flow := range content.FlowDefinitions {
 		for _, step := range flow.Steps {
 			for _, slug := range step.SSOProviders {
 				if !included[key{domain.ReleasePointerKindIDP, slug}] {
@@ -371,16 +510,6 @@ func (s *releaseService) autoPinReferences(
 		}
 	}
 
-	for handle := range needSchema {
-		latest, err := latestSchemaByObjectType(ctx, stmts, projectID, handle)
-		if err != nil {
-			return err
-		}
-		if latest != nil {
-			content.Schemas = append(content.Schemas, latest)
-			included[key{domain.ReleasePointerKindSchema, handle}] = true
-		}
-	}
 	for slug := range needIDP {
 		connection, err := stmts.GetIDPConnection(ctx, idpConnectionBy(projectID, domain.IDPConnectionFieldSlug, slug))
 		if err != nil {
@@ -393,33 +522,4 @@ func (s *releaseService) autoPinReferences(
 		included[key{domain.ReleasePointerKindIDP, slug}] = true
 	}
 	return nil
-}
-
-func schemaObjectType(document []byte) (string, error) {
-	var doc struct {
-		ObjectType string `json:"objectType"`
-	}
-	if err := json.Unmarshal(document, &doc); err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(doc.ObjectType), nil
-}
-
-func hasTopLevelID(document []byte) bool {
-	var doc map[string]any
-	if err := json.Unmarshal(document, &doc); err != nil {
-		return false
-	}
-	_, ok := doc["$id"]
-	return ok
-}
-
-func idpSlug(document []byte) (string, error) {
-	var doc struct {
-		Slug string `json:"slug"`
-	}
-	if err := json.Unmarshal(document, &doc); err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(doc.Slug), nil
 }
