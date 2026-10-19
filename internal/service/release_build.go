@@ -60,7 +60,10 @@ type preparedSchema struct {
 // unchanged resources reuse a matching revision (any age), changed ones
 // allocate, and the release is created or the existing content-hash match is
 // returned.
-func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (*CreateReleaseOutput, error) {
+func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (_ *CreateReleaseOutput, err error) {
+	ctx, end := startSpan(ctx, "ReleaseService.Build")
+	defer end(&err)
+
 	shapeInput := bundleShapeInput(input)
 	if domain.BundleEmpty(shapeInput) {
 		return nil, domain.ErrReleaseInvalid("the bundle is empty", nil)
@@ -93,7 +96,7 @@ func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (*C
 		out         *CreateReleaseOutput
 		contentHash string
 	)
-	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		stmts := tx.Statements()
 
 		// Resolve schema-URL entries before flows so their objectTypes enter

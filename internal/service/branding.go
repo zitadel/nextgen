@@ -37,7 +37,10 @@ func NewBrandingService(v2Pool *DB) *BrandingService {
 }
 
 // Create validates and publishes a new branding revision.
-func (s *BrandingService) Create(ctx context.Context, input CreateBrandingInput) (*domain.Branding, error) {
+func (s *BrandingService) Create(ctx context.Context, input CreateBrandingInput) (_ *domain.Branding, err error) {
+	ctx, end := startSpan(ctx, "BrandingService.Create")
+	defer end(&err)
+
 	entity, err := prepareBranding(input)
 	if err != nil {
 		return nil, err
@@ -141,7 +144,10 @@ func latestBranding(ctx context.Context, stmts AllStatements, projectID string) 
 }
 
 // Get returns a single revision by id.
-func (s *BrandingService) Get(ctx context.Context, projectID, id string) (*domain.Branding, error) {
+func (s *BrandingService) Get(ctx context.Context, projectID, id string) (_ *domain.Branding, err error) {
+	ctx, end := startSpan(ctx, "BrandingService.Get")
+	defer end(&err)
+
 	entity, err := s.v2Pool.Statements().GetBrandingByID(ctx, projectID, id)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -154,7 +160,10 @@ func (s *BrandingService) Get(ctx context.Context, projectID, id string) (*domai
 
 // GetLatest returns the newest revision for the project, or nil (no error)
 // when the project has none — callers fall back to built-in defaults.
-func (s *BrandingService) GetLatest(ctx context.Context, projectID string) (*domain.Branding, error) {
+func (s *BrandingService) GetLatest(ctx context.Context, projectID string) (_ *domain.Branding, err error) {
+	ctx, end := startSpan(ctx, "BrandingService.GetLatest")
+	defer end(&err)
+
 	result, err := s.v2Pool.Statements().ListBrandings(WithAuthzListUnrestricted(ctx), branding.ListOptions(projectID, 1))
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to resolve latest branding revision")
@@ -173,7 +182,10 @@ const maxBrandingListRevisions = 100
 
 // List returns the newest revisions for the project, newest first, capped at
 // maxBrandingListRevisions.
-func (s *BrandingService) List(ctx context.Context, projectID string) ([]*domain.Branding, error) {
+func (s *BrandingService) List(ctx context.Context, projectID string) (_ []*domain.Branding, err error) {
+	ctx, end := startSpan(ctx, "BrandingService.List")
+	defer end(&err)
+
 	result, err := s.v2Pool.Statements().ListBrandings(ctx, branding.ListOptions(projectID, maxBrandingListRevisions))
 	if err != nil {
 		return nil, mapListError(err, "failed to list branding revisions")

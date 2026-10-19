@@ -7,6 +7,7 @@ import (
 
 	google_trace "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace"
 	"go.opentelemetry.io/contrib/exporters/autoexport"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
@@ -21,21 +22,35 @@ func NewTracerProvider(ctx context.Context, cfg ExporterConfig, traceIDRatio flo
 		return nil, fmt.Errorf("trace exporter: %w", err)
 	}
 
-	fraction := trace.TraceIDRatioBased(traceIDRatio)
-	sampler := trace.ParentBased(
-		spanKindBased(fraction, trace2.SpanKindServer),
-		trace.WithRemoteParentNotSampled(fraction),
-	)
-
 	opts := []trace.TracerProviderOption{
 		trace.WithResource(resource),
-		trace.WithSampler(sampler),
+		trace.WithSampler(NewSampler(traceIDRatio)),
 	}
 	if exporter != nil {
 		opts = append(opts, trace.WithBatcher(exporter, trace.WithBatchTimeout(cfg.BatchDuration)))
 	}
 	tracerProvider := trace.NewTracerProvider(opts...)
 	return tracerProvider, nil
+}
+
+// JobRoot marks the root span of one run of a background job. Pass it with
+// trace.WithAttributes, together with the Internal kind, when starting that
+// span: the sampler samples an Internal root only when it carries JobRoot, so
+// the root spans libraries start from background work do not become traces.
+var JobRoot = attribute.Bool("zitadel.job.root", true)
+
+// NewSampler returns the same sampler that [NewTracerProvider] builds, for
+// tests that set up their own provider. A Server root (a request) and an
+// Internal root that carries [JobRoot] (a run of a background job) are sampled
+// at fraction. A Consumer root linked to a sampled span is always sampled, so
+// work done later for a sampled request (the audit flush) stays in the trace.
+// Any other root is dropped. A child follows its parent.
+func NewSampler(fraction float64) trace.Sampler {
+	ratio := trace.TraceIDRatioBased(fraction)
+	return trace.ParentBased(
+		spanKindBased(ratio, trace2.SpanKindServer, trace2.SpanKindInternal),
+		trace.WithRemoteParentNotSampled(ratio),
+	)
 }
 
 func (cfg ExporterConfig) tracing(ctx context.Context) (_ trace.SpanExporter, err error) {

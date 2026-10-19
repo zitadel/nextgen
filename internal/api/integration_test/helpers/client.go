@@ -113,7 +113,7 @@ func (c csrfTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 // ProjectSecret mints the project's bearer, for tests that send a raw request
 // instead of going through the generated client.
-func (h *Harness) ProjectSecret(t *testing.T, project *domain.Project) string {
+func (h *Harness) ProjectSecret(t testing.TB, project *domain.Project) string {
 	t.Helper()
 
 	secret, err := h.EnsureTokenService(t).GenerateJWE(t.Context(), project.Token())
@@ -122,7 +122,7 @@ func (h *Harness) ProjectSecret(t *testing.T, project *domain.Project) string {
 	return secret
 }
 
-func (h *Harness) SetProjectSecretOnApiClient(t *testing.T, client *ApiClient, project *domain.Project) {
+func (h *Harness) SetProjectSecretOnApiClient(t testing.TB, client *ApiClient, project *domain.Project) {
 	t.Helper()
 
 	client.SetToken(h.ProjectSecret(t, project))
@@ -132,7 +132,7 @@ func (h *Harness) SetProjectSecretOnApiClient(t *testing.T, client *ApiClient, p
 // Production only mints project and preview secrets, so this is the only way
 // for a test to hold a finer scope like session.read until ADR 036's
 // credential planes mint such tokens for real.
-func (h *Harness) SetScopedTokenOnApiClient(t *testing.T, client *ApiClient, project *domain.Project, scopes ...string) {
+func (h *Harness) SetScopedTokenOnApiClient(t testing.TB, client *ApiClient, project *domain.Project, scopes ...string) {
 	t.Helper()
 
 	tok := project.Token()
@@ -143,7 +143,7 @@ func (h *Harness) SetScopedTokenOnApiClient(t *testing.T, client *ApiClient, pro
 	client.SetToken(secret)
 }
 
-func (h *Harness) SetPreviewSecretOnApiClient(t *testing.T, client *ApiClient, project *domain.Project) {
+func (h *Harness) SetPreviewSecretOnApiClient(t testing.TB, client *ApiClient, project *domain.Project) {
 	t.Helper()
 
 	token := project.PreviewToken()
