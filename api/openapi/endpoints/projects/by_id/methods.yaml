@@ -7,11 +7,7 @@ get:
   tags:
     - Projects
   parameters:
-    - name: project_id
-      in: path
-      required: true
-      schema:
-        $ref: ../../../components/schemas/project-id.yaml
+    - $ref: ../../../components/parameters/project-id-path.yaml
   security:
     - oauth2:
         # project.write, not project.read: project.read is carried by the
@@ -54,11 +50,7 @@ patch:
   tags:
     - Projects
   parameters:
-    - name: project_id
-      in: path
-      required: true
-      schema:
-        $ref: ../../../components/schemas/project-id.yaml
+    - $ref: ../../../components/parameters/project-id-path.yaml
   security:
     - oauth2:
         - project.write

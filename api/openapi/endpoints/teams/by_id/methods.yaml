@@ -7,11 +7,7 @@ get:
   tags:
     - Teams
   parameters:
-    - name: team_id
-      in: path
-      required: true
-      schema:
-        $ref: ../../../components/schemas/team-id.yaml
+    - $ref: ../../../components/parameters/team-id-path.yaml
   security:
     - oauth2:
         - team.read
@@ -63,11 +59,7 @@ delete:
   tags:
     - Teams
   parameters:
-    - name: team_id
-      in: path
-      required: true
-      schema:
-        $ref: ../../../components/schemas/team-id.yaml
+    - $ref: ../../../components/parameters/team-id-path.yaml
   security:
     - oauth2:
         - team.delete
@@ -116,11 +108,7 @@ patch:
   tags:
     - Teams
   parameters:
-    - name: team_id
-      in: path
-      required: true
-      schema:
-        $ref: ../../../components/schemas/team-id.yaml
+    - $ref: ../../../components/parameters/team-id-path.yaml
   security:
     - oauth2:
         - team.write

@@ -10,11 +10,7 @@ get:
         - branding.read
     - nextgenSession: []
   parameters:
-    - name: id
-      in: path
-      required: true
-      schema:
-        type: string
+    - $ref: ../../../components/parameters/branding-id.yaml
   responses:
     '200':
       description: The branding revision was retrieved successfully.

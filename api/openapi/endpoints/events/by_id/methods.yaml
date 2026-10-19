@@ -14,12 +14,7 @@ get:
     - oauth2:
         - events.read
   parameters:
-    - name: id
-      in: path
-      required: true
-      schema:
-        type: string
-      description: Managed event id (`evt_<opaque>`).
+    - $ref: ../../../components/parameters/event-id.yaml
     - $ref: ../../../components/parameters/project-id.yaml
   responses:
     '200':

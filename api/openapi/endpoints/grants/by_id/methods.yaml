@@ -26,12 +26,7 @@ get:
         - project.read
     - nextgenSession: []
   parameters:
-    - name: id
-      in: path
-      required: true
-      schema:
-        type: string
-      description: Managed assignment id (`asgn_<opaque>`).
+    - $ref: ../../../components/parameters/grant-id.yaml
     - $ref: ../../../components/parameters/project-id.yaml
     - name: expand
       in: query
@@ -94,12 +89,7 @@ delete:
         - project.write
     - nextgenSession: []
   parameters:
-    - name: id
-      in: path
-      required: true
-      schema:
-        type: string
-      description: Managed assignment id (`asgn_<opaque>`).
+    - $ref: ../../../components/parameters/grant-id.yaml
     - $ref: ../../../components/parameters/project-id.yaml
   responses:
     '204':

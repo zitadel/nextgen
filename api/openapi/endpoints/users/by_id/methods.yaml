@@ -29,11 +29,7 @@ get:
         Otherwise the answer is `403 user.permission_denied`.
       schema:
         $ref: ../../../components/schemas/team-id.yaml
-    - name: user_id
-      in: path
-      required: true
-      schema:
-        $ref: ../../../components/schemas/user-id.yaml
+    - $ref: ../../../components/parameters/user-id.yaml
   security:
     - oauth2:
         - user.read
@@ -72,11 +68,7 @@ patch:
   tags:
     - Users
   parameters:
-    - name: user_id
-      in: path
-      required: true
-      schema:
-        $ref: ../../../components/schemas/user-id.yaml
+    - $ref: ../../../components/parameters/user-id.yaml
   security:
     - oauth2:
         - user.write
@@ -136,11 +128,7 @@ delete:
     tags:
       - Users
     parameters:
-      - name: user_id
-        in: path
-        required: true
-        schema:
-          $ref: ../../../components/schemas/user-id.yaml
+      - $ref: ../../../components/parameters/user-id.yaml
     security:
       - oauth2:
           - user.delete
