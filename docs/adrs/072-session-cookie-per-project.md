@@ -9,8 +9,10 @@
 > proxy), [ADR 053](053-cross-project-principals.md) §5 (the Console's
 > first-party session cookie)
 > **Implementation:** ships with this ADR in sdk-core, the six server SDKs and
-> `@zitadel/testing`. The SPA dev proxies are a follow-up (see
-> [Not covered](#not-covered)).
+> `@zitadel/testing`.
+> **Amended 2026-10-19:** the dev proxies the CLI writes for the SPA scaffolds
+> keep a cookie per project too (see
+> [SPA dev proxies](#spa-dev-proxies-amended-2026-10-19)).
 
 ## TL;DR
 
@@ -20,6 +22,8 @@
   `__nextgen_session_<project id>`. Their proxy under `/__nextgen` renames the
   server's cookie on the way to the browser and back on the way to the server,
   and never forwards another project's session cookie.
+- The dev proxies the CLI writes for the SPA scaffolds do the same (amended
+  2026-10-19).
 - The Console, which the server serves on its own origin, keeps
   `__nextgen_session`. The Console and the apps, and apps of different
   projects, stop overwriting each other's session.
@@ -153,17 +157,54 @@ included. Upgrading it ends that.
   so it works on either kind of app.
 - **e2e lanes**: `e2e/demo-next` (mock and real lanes) and `e2e/demo-nuxt` look
   for the demo project's cookie after sign-in. `e2e/journey` and the testkit
-  suite it scaffolds look for the project's cookie on the server-SDK
-  frameworks and the server's on the SPAs, after sign-in and after sign-out.
+  suite it scaffolds look for the project's cookie on every framework, after
+  sign-in and after sign-out.
   `e2e/console` signs in through the UI and names no cookie.
 - **Docs**: the SDK proxy page says which cookie holds an app's session, and
   why; the testing kit's README names both cookies.
 
+### SPA dev proxies (amended 2026-10-19)
+
+The SPA scaffolds have no server SDK. In development the CLI writes a
+`/__nextgen` proxy into the app: an entry in `vite.config.*` for React, Vue,
+Solid, Svelte and Qwik, and `proxy.conf.cjs` for Angular. Both passed cookies
+through, so on `localhost` an SPA and the Console still shared a slot.
+
+- **The same mapping, in the generated code.** The generated proxy gets a
+  request hook, which sends the app's cookie upstream under the server's name
+  and keeps every other session cookie back, and a response hook, which renames
+  the server's `Set-Cookie` to the app's name. Vite's proxy (`http-proxy-3`)
+  runs both hooks before the request leaves and before the response headers are
+  written. The project is `ZITADEL_PROJECT_ID` from `.env.local`, which setup
+  writes for every framework, read the way the project secret already is.
+  Without it the proxy passes cookies through.
+- **Not a published helper.** A dev-proxy helper exported from sdk-core would
+  turn future proxy changes into a version bump instead of a config migration.
+  It would also need a Node-side public entry point, and a direct
+  `@zitadel/sdk-core` dependency in every SPA app, since pnpm does not expose
+  transitive dependencies to the app. Angular's CommonJS `proxy.conf.cjs`
+  would have to `require` an ESM-only package, or move to `.mjs` with an
+  `angular.json` migration. Existing apps would still need the migration below.
+  The generated code keeps the exchange-only bearer policy in the same place,
+  where `doctor` reviews it. The helper can come with ADR 036's publishable key,
+  which rewrites these proxies anyway.
+- **No move of old sessions.** Moving a session out of the shared cookie needs
+  the probe's answer before the response headers go out (`selfHandleResponse`).
+  Only the developer's own dev session sits under the old name, so they sign in
+  to the SPA once more. Production SPAs, behind a proxy of their own, keep the
+  server's name: a production host serves one project, and the SPA never reads
+  the cookie.
+- **Existing apps.** Setup and `doctor --fix` recognize the proxy the CLI wrote
+  and add the two cookie hooks next to its bearer hook, leaving the user's
+  changes elsewhere alone: in `vite.config.*`, the `/__nextgen` entry with the
+  `zitadel:proxy:v2` marker and the generated bearer hook, however a formatter
+  laid it out since; in `proxy.conf.cjs`, the managed file with its generated
+  hooks. It is a `convenience` wiring: until it is applied, `doctor` warns
+  instead of failing, because sign-in works without it. A proxy the CLI does not
+  recognize is left alone and keeps the shared cookie.
+
 ### Not covered
 
-- **SPA dev proxies** keep the server's name, so on `localhost` an SPA and the
-  Console still share a slot. The follow-up is a dev proxy the SDK ships, using
-  the same sdk-core mapping, in place of the code the CLI writes into the app.
 - **`_zflow` and `_zsso`** stay one per host: of two sign-ins in progress at
   once on one host, in the Console and in an app, the one whose flow cookie the
   other replaced fails and has to start again. A flow cookie lives ten minutes.

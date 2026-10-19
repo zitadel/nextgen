@@ -33,7 +33,7 @@ Zitadel sets and reads one session cookie, `__nextgen_session`. Under that name 
 
 A user who signed in before an app moved to this cookie holds the session under `__nextgen_session`. The first time the middleware or the session check of the widgets reads it, and it signs in a user of the app's project, it moves to the app's cookie. A session of another project in that cookie stays where it is. With no project configured, the proxy passes the cookies through unchanged.
 
-The SPAs' dev proxies pass Zitadel's cookie through, so on `localhost` an SPA and the Console still share one.
+The dev proxies the CLI writes for single-page apps keep the session the same way, reading the project from `ZITADEL_PROJECT_ID` in `.env.local`. They do not move a session kept under `__nextgen_session`, so a developer who was signed in to an SPA signs in once more after the upgrade. `zitadel setup` and `zitadel doctor --fix` add this to a dev proxy an earlier setup wrote, and `zitadel doctor` warns until then. In production, an SPA's own proxy passes `__nextgen_session` through, which is fine there: a production host serves one project.
 
 ## SPAs in production
 

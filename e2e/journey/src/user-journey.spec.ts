@@ -13,7 +13,6 @@ import {
   loginWithPassword,
   registerWithPasskey,
   registerWithPassword,
-  SESSION_COOKIE_NAME,
   sessionCookieName,
   type ProfileEntry,
 } from "@zitadel/testing/playwright";
@@ -176,14 +175,11 @@ async function expectSignedIn(page: Page): Promise<void> {
 }
 
 /**
- * The cookie the app keeps its session in: a server SDK's proxy keeps it under
- * the app's project's name (ADR 072), an SPA's dev proxy passes the server's
- * through. setup records the project in `.zitadel/secret`.
+ * The cookie the app keeps its session in: every scaffold's proxy, a server
+ * SDK's or the dev proxy setup writes for an SPA, keeps it under the app's
+ * project's name (ADR 072). setup records the project in `.zitadel/secret`.
  */
 async function appSessionCookieName(): Promise<string> {
-  if (frameworkForId(framework).sessionCookie === "server") {
-    return SESSION_COOKIE_NAME;
-  }
   const secret = JSON.parse(
     await readFile(join(requiredEnv("JOURNEY_APP_DIR"), ".zitadel/secret"), "utf8"),
   ) as { project_id: string };

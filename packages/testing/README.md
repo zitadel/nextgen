@@ -94,11 +94,12 @@ Most app tests don't want to re-test login. `authenticatedPage` seeds a user,
 drives the real login flow headlessly (the same Flow API the login UI renders),
 and injects the resulting session cookie into a dedicated browser context. It
 injects it under both names a session cookie can have on an app's origin, so it
-works for any app: an app with a server SDK (Next.js, Nuxt, SvelteKit,
-SolidStart, TanStack Start, Qwik City) keeps its session in
-`sessionCookieName(projectId)`, `__nextgen_session_<projectId>`, so that the
-apps and the Console on one host each keep their own; an SPA keeps the server's
-`SESSION_COOKIE_NAME`, which its dev proxy passes through:
+works for any app. Behind a server SDK (Next.js, Nuxt, SvelteKit, SolidStart,
+TanStack Start, Qwik City), and behind the dev proxy `zitadel setup` writes for
+an SPA, the session is in `sessionCookieName(projectId)`,
+`__nextgen_session_<projectId>`, so that the apps and the Console on one host
+each keep their own. Behind a proxy that passes the server's cookie through, it
+is the server's `SESSION_COOKIE_NAME`:
 
 ```ts
 test("member sees the dashboard", async ({ authenticatedPage }) => {
@@ -202,7 +203,7 @@ import {
   writeHandshake, readHandshakeSync, waitForHandshake,
   identity,          // unused { email, password }, no instance needed
   SESSION_COOKIE_NAME, // "__nextgen_session", the server's name
-  sessionCookieName,   // (projectId) => "__nextgen_session_<projectId>", a server SDK's
+  sessionCookieName,   // (projectId) => "__nextgen_session_<projectId>", an app's
 } from "@zitadel/testing";
 
 const z = await startLocalZitadel({

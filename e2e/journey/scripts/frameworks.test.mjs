@@ -82,26 +82,6 @@ test.each([
   assert.equal(frameworkForId(id).expectsProtectedRouteRedirect, expected);
 });
 
-// A server SDK keeps the session under the app's project's name (ADR 072); an
-// SPA's dev proxy passes the server's cookie through. The user journey reads
-// this to know which cookie to look for.
-test.each([
-  ["next", "project"],
-  ["nuxt", "project"],
-  ["sveltekit", "project"],
-  ["tanstack-start", "project"],
-  ["solid-start", "project"],
-  ["qwik-city", "project"],
-  ["react", "server"],
-  ["vue", "server"],
-  ["angular", "server"],
-  ["solid", "server"],
-  ["svelte", "server"],
-  ["qwik", "server"],
-])("framework registry says %s keeps its session in the %s cookie", (id, expected) => {
-  assert.equal(frameworkForId(id).sessionCookie, expected);
-});
-
 test("frameworkForId rejects unsupported frameworks", () => {
   assert.throws(() => frameworkForId("ember"), /unsupported journey framework/);
 });

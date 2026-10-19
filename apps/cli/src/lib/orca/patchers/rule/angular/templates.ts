@@ -5,6 +5,11 @@ import {
   assertNoUnreviewedProjectSecretProxy,
   PROXY_CREDENTIAL_POLICY_MARKER,
 } from "../proxy-credential-policy";
+import {
+  indented,
+  proxyConfSessionCookieStatements,
+  SESSION_COOKIE_MARKER,
+} from "../session-cookie";
 
 /**
  * The managed root component `src/app/app.ts`: a standalone component that
@@ -118,7 +123,8 @@ export function appTemplateHtml(ctx: PatchContext): string {
  * dev server uses. Like the Vite proxy (`vite-support.ts`), it addresses the
  * backend by its own name (`changeOrigin`), which a remote https server
  * requires, and forwards the app's origin in `X-Forwarded-Host` and
- * `X-Forwarded-Proto` (`xfwd`).
+ * `X-Forwarded-Proto` (`xfwd`), and it keeps the session cookie under the
+ * app's project's name in the browser (`ZITADEL_PROJECT_ID`, ADR 072).
  */
 export function proxyConfTemplate(): string {
   return `${MANAGED_MARKER}
@@ -151,6 +157,8 @@ const bearer = \`Bearer \${secret}\`;
 
 ${EXCHANGE_ONLY_BEARER}
 
+${SESSION_COOKIE_FUNCTIONS}
+
 function stripPrefix(path) {
   return path.replace(/^\\${PROXY_PATH}/, "").replace(/^(?!\\/)/, "/");
 }
@@ -162,9 +170,7 @@ module.exports = {
     xfwd: true,
     pathRewrite: stripPrefix,
     rewrite: stripPrefix,
-    onProxyReq: setBearer,
-    configure: (proxy) => proxy.on("proxyReq", setBearer),
-  },
+${SESSION_COOKIE_HOOKS}  },
 };
 `;
 }
@@ -184,6 +190,27 @@ function setBearer(proxyReq) {
     proxyReq.setHeader("authorization", bearer);
   }
 }`;
+
+/** The session-cookie hooks' functions, after the bearer hook (ADR 072). */
+const SESSION_COOKIE_FUNCTIONS = indented(proxyConfSessionCookieStatements(), "");
+
+/** How the managed entry attached its hooks before it carried the session-cookie ones. */
+const BEARER_ONLY_HOOKS = `    onProxyReq: setBearer,
+    configure: (proxy) => proxy.on("proxyReq", setBearer),
+`;
+
+/** How the managed entry attaches the bearer and the session-cookie hooks. */
+const SESSION_COOKIE_HOOKS = `    onProxyReq: (proxyReq) => {
+      setBearer(proxyReq);
+      forwardSessionCookie(proxyReq, appCookie);
+    },
+    onProxyRes: (proxyRes) => renameSessionCookie(proxyRes, appCookie),
+    configure: (proxy) => {
+      proxy.on("proxyReq", setBearer);
+      proxy.on("proxyReq", (proxyReq) => forwardSessionCookie(proxyReq, appCookie));
+      proxy.on("proxyRes", (proxyRes) => renameSessionCookie(proxyRes, appCookie));
+    },
+`;
 
 /**
  * The managed entry as emitted before it forwarded the app's origin, and what
@@ -224,5 +251,32 @@ export function proxyConfEdit(): (source: string | undefined) => string {
     }
     assertNoUnreviewedProjectSecretProxy(source, "proxy.conf.cjs");
     return source.includes(MANAGED_MARKER) ? forwardAppOrigin(source) : source;
+  };
+}
+
+/**
+ * Gives the managed proxy the session-cookie hooks (ADR 072) when it is the
+ * exact file an earlier CLI wrote: the hook functions go after the bearer hook,
+ * and the entry attaches them beside it. A file that carries them already, an
+ * unmanaged one, and a managed one whose hooks were changed by hand are left as
+ * they are. Creates the managed proxy when it is absent, as
+ * {@link proxyConfEdit} does.
+ */
+export function proxyConfSessionCookieEdit(): (source: string | undefined) => string {
+  return (source) => {
+    if (source === undefined) {
+      return proxyConfTemplate();
+    }
+    if (
+      !source.includes(MANAGED_MARKER) ||
+      source.includes(SESSION_COOKIE_MARKER) ||
+      !source.includes(EXCHANGE_ONLY_BEARER) ||
+      !source.includes(BEARER_ONLY_HOOKS)
+    ) {
+      return source;
+    }
+    return source
+      .replace(EXCHANGE_ONLY_BEARER, `${EXCHANGE_ONLY_BEARER}\n\n${SESSION_COOKIE_FUNCTIONS}`)
+      .replace(BEARER_ONLY_HOOKS, SESSION_COOKIE_HOOKS);
   };
 }

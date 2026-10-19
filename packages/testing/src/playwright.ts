@@ -35,8 +35,8 @@ export interface ZitadelTestFixtures {
    * Start the test authenticated: a fresh user, a real session minted through
    * the flow API, and its cookie injected into a dedicated browser context,
    * under the server's name and under the project's ({@link sessionCookieName}),
-   * so it signs in an SPA and a server-SDK app alike. The default `page` stays
-   * signed out for login-flow tests. Requires `use.baseURL` (every withZitadel
+   * so it signs the app in whichever cookie its proxy reads. The default `page`
+   * stays signed out for login-flow tests. Requires `use.baseURL` (every withZitadel
    * consumer sets it).
    */
   authenticatedPage: AuthenticatedPage;
@@ -108,9 +108,10 @@ export const test = base.extend<ZitadelTestFixtures, ZitadelWorkerFixtures>({
     const session = await zitadel.seedSession({ origin: baseURL });
     const context = await browser.newContext({ baseURL });
     // `addCookies` takes either url or domain/path; url derives the rest. The
-    // session goes in under both names, so it signs in either kind of app: a
-    // server SDK reads its project's cookie (ADR 072), and an SPA's dev proxy
-    // passes the server's through.
+    // session goes in under both names, so it signs the app in whichever its
+    // proxy reads: a server SDK and the dev proxy setup writes read the
+    // project's cookie (ADR 072), a proxy that passes the server's cookie
+    // through reads that one.
     const { path: _path, ...cookie } = session.cookie;
     await context.addCookies([
       { ...cookie, url: baseURL },

@@ -6,16 +6,17 @@ import type { InstanceHandle, MintedSession, SeededUser } from "./types";
 
 /**
  * Mirrors the server's session cookie (internal/api/session.go): the name a
- * direct call to the server sends, and the one an SPA app keeps, since its dev
- * proxy passes the server's cookie through.
+ * direct call to the server sends, and the one an app keeps behind a proxy that
+ * passes the server's cookie through, such as an SPA's in production.
  */
 export const SESSION_COOKIE_NAME = "__nextgen_session";
 
 /**
- * The cookie an app with a server SDK (Next.js, Nuxt, SvelteKit, SolidStart,
- * TanStack Start, Qwik City) keeps its session in on its own origin:
- * `__nextgen_session_<projectId>`. The SDK's proxy renames the server's cookie,
- * so the apps and the Console on one host keep a session each (ADR 072).
+ * The cookie an app keeps its session in on its own origin behind a server SDK
+ * (Next.js, Nuxt, SvelteKit, SolidStart, TanStack Start, Qwik City) or the dev
+ * proxy `zitadel setup` writes for an SPA: `__nextgen_session_<projectId>`. The
+ * proxy renames the server's cookie, so the apps and the Console on one host
+ * keep a session each (ADR 072).
  *
  * Mirrors `sessionCookieName` in `@zitadel/sdk-core`, including the
  * percent-encoding of every byte outside `[A-Za-z0-9_-]`.

@@ -28,12 +28,6 @@ export const ciFrameworkIds = frameworkIds.filter((id) => !ciExcludedFrameworkId
 
 const viteDevArgs = (port) => ["run", "dev", "--", "--host", "localhost", "--port", String(port)];
 
-/**
- * The journey's frameworks. `sessionCookie` says which cookie the app keeps its
- * session in: `project`, `__nextgen_session_<project id>`, for the server SDKs,
- * whose proxy renames the server's cookie (ADR 072); `server`,
- * `__nextgen_session`, for the SPAs, whose dev proxy passes it through.
- */
 export const frameworks = [
   {
     id: "next",
@@ -41,7 +35,6 @@ export const frameworks = [
     sdkPackageDir: "packages/sdk-next",
     readyPath: "/login",
     expectsProtectedRouteRedirect: true,
-    sessionCookie: "project",
     devServerArgs: (port) => [
       "run",
       "dev",
@@ -58,7 +51,6 @@ export const frameworks = [
     sdkPackageDir: "packages/sdk-nuxt",
     readyPath: "/login",
     expectsProtectedRouteRedirect: true,
-    sessionCookie: "project",
     devServerArgs: viteDevArgs,
   },
   {
@@ -67,7 +59,6 @@ export const frameworks = [
     sdkPackageDir: "packages/sdk-react",
     readyPath: "/login",
     expectsProtectedRouteRedirect: false,
-    sessionCookie: "server",
     devServerArgs: viteDevArgs,
   },
   {
@@ -76,7 +67,6 @@ export const frameworks = [
     sdkPackageDir: "packages/sdk-vue",
     readyPath: "/login",
     expectsProtectedRouteRedirect: false,
-    sessionCookie: "server",
     devServerArgs: viteDevArgs,
   },
   {
@@ -85,7 +75,6 @@ export const frameworks = [
     sdkPackageDir: "packages/sdk-angular",
     readyPath: "/login",
     expectsProtectedRouteRedirect: false,
-    sessionCookie: "server",
     devServerArgs: viteDevArgs,
   },
   {
@@ -94,7 +83,6 @@ export const frameworks = [
     sdkPackageDir: "packages/sdk-solid",
     readyPath: "/login",
     expectsProtectedRouteRedirect: false,
-    sessionCookie: "server",
     devServerArgs: viteDevArgs,
   },
   {
@@ -103,7 +91,6 @@ export const frameworks = [
     sdkPackageDir: "packages/sdk-svelte",
     readyPath: "/login",
     expectsProtectedRouteRedirect: false,
-    sessionCookie: "server",
     devServerArgs: viteDevArgs,
   },
   {
@@ -112,7 +99,6 @@ export const frameworks = [
     sdkPackageDir: "packages/sdk-qwik",
     readyPath: "/login",
     expectsProtectedRouteRedirect: false,
-    sessionCookie: "server",
     devServerArgs: viteDevArgs,
   },
   {
@@ -121,7 +107,6 @@ export const frameworks = [
     sdkPackageDir: "packages/sdk-sveltekit",
     readyPath: "/login",
     expectsProtectedRouteRedirect: true,
-    sessionCookie: "project",
     devServerArgs: viteDevArgs,
   },
   {
@@ -130,7 +115,6 @@ export const frameworks = [
     sdkPackageDir: "packages/sdk-tanstack-start",
     readyPath: "/login",
     expectsProtectedRouteRedirect: true,
-    sessionCookie: "project",
     devServerArgs: viteDevArgs,
   },
   {
@@ -139,7 +123,6 @@ export const frameworks = [
     sdkPackageDir: "packages/sdk-solid-start",
     readyPath: "/login",
     expectsProtectedRouteRedirect: true,
-    sessionCookie: "project",
     devServerArgs: viteDevArgs,
   },
   {
@@ -148,7 +131,6 @@ export const frameworks = [
     sdkPackageDir: "packages/sdk-qwik-city",
     readyPath: "/login",
     expectsProtectedRouteRedirect: true,
-    sessionCookie: "project",
     devServerArgs: viteDevArgs,
   },
 ];
