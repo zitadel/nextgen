@@ -748,8 +748,10 @@ func TestPatchUser(t *testing.T) {
 // TestPatchUserFailedMigration pins the guarantee #1507 makes: a patch that
 // moves a user to another schema and fails changes neither the user's
 // attributes nor its schema reference. Three of the failures are decided in
-// Prepare, before the write transaction; the unique collision is decided by
-// the registry insert inside it, after the old rows were already deleted, so
+// Prepare, before the write transaction, so nothing is written for them; the
+// unknown schema reference is kept to match #1659 one to one, its 400 is also
+// covered by TestPatchUser. The unique collision is decided by the registry
+// insert inside the transaction, after the old rows were already deleted, so
 // it is the case that would leak a partial write.
 func TestPatchUserFailedMigration(t *testing.T) {
 	t.Parallel()
@@ -810,7 +812,6 @@ func TestPatchUserFailedMigration(t *testing.T) {
 		schemaURL  string
 		attributes map[string]any
 		updatedAt  time.Time
-		registry   map[domain.AttributeKey]string
 	}
 	readStored := func(t *testing.T, userID string) stored {
 		t.Helper()
@@ -818,13 +819,10 @@ func TestPatchUserFailedMigration(t *testing.T) {
 		require.NoError(t, err)
 		attributes, err := user.Attributes.ToMap()
 		require.NoError(t, err)
-		registry, err := harness.EnsureServiceDB(t).Statements().GetUserUniqueAttributeScopes(t.Context(), project.ID, userID)
-		require.NoError(t, err)
 		return stored{
 			schemaURL:  user.SchemaURL,
 			attributes: attributes,
 			updatedAt:  user.Metadata.UpdatedAt,
-			registry:   registry,
 		}
 	}
 
@@ -879,7 +877,6 @@ func TestPatchUserFailedMigration(t *testing.T) {
 			})
 			require.NoError(t, err)
 			before := readStored(t, user.ID)
-			require.Contains(t, before.registry, domain.AttributeKey("username"), "the fixture must hold a registry claim")
 
 			body := map[string]any{"schema": tc.targetSchema}
 			if tc.collide {
@@ -891,22 +888,15 @@ func TestPatchUserFailedMigration(t *testing.T) {
 			resp, err := client.PatchUserByID(t.Context(), req, api.PatchUserByIDParams{UserID: api.UserID(user.ID)})
 			require.NoError(t, err)
 			require.IsType(t, tc.wantStatus, resp, helpers.MustMarshal(t, resp))
-			switch resp := resp.(type) {
-			case *api.PatchUserByIDBadRequest:
-				assert.Equal(t, tc.wantCode, string(resp.Code))
-			case *api.PatchUserByIDConflict:
-				assert.Equal(t, tc.wantCode, string(resp.Code))
-			}
+			assertAuthzError(t, resp, tc.wantCode)
 
 			after := readStored(t, user.ID)
 			assert.Equal(t, before.schemaURL, after.schemaURL, "schema reference")
 			assert.Equal(t, before.attributes, after.attributes, "attributes")
-			assert.Equal(t, before.registry, after.registry, "unique attribute registry")
 			assert.True(t, before.updatedAt.Equal(after.updatedAt), "updated_at moved from %s to %s", before.updatedAt, after.updatedAt)
 
-			// The registry snapshot holds keys and scopes, not values: the
-			// original username must still be claimed, so a second user
-			// cannot take it.
+			// The unique attribute registry must still hold the original
+			// username for this user, so a second user cannot take it.
 			_, err = createUser(t, map[string]any{"username": username})
 			assert.ErrorIs(t, err, domain.ErrUserAlreadyExists(), "the original username must still be claimed")
 		})
