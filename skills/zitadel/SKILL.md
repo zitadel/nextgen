@@ -5,7 +5,8 @@ description: >-
   any Zitadel task — it routes to the right skill: the `zitadel` CLI for creating
   projects, scaffolding, config, deploys, and the local server, and the
   per-framework SDK skills for integrating the auth UI into a Next.js, React,
-  Angular, Nuxt, Vue, Solid, Svelte, or Qwik app. Also use to answer questions
+  Angular, Nuxt, Vue, Solid, Svelte, Qwik, SvelteKit, SolidStart, Qwik City, or
+  TanStack Start app. Also use to answer questions
   about Zitadel — its concepts, configuration, CLI, SDKs, or API — from the
   official docs. Use whenever the user mentions Zitadel, adding
   login/registration/sessions, or authentication in their app.
@@ -35,6 +36,10 @@ that way to get the CLI and per-framework skills alongside this router.
   - Solid → **`zitadel-sdk-solid`**
   - Svelte → **`zitadel-sdk-svelte`**
   - Qwik → **`zitadel-sdk-qwik`**
+  - SvelteKit → **`zitadel-sdk-sveltekit`**
+  - SolidStart → **`zitadel-sdk-solid-start`**
+  - Qwik City → **`zitadel-sdk-qwik-city`**
+  - TanStack Start → **`zitadel-sdk-tanstack-start`**
 
 - **Embed, theme, or drive the `<zitadel-login>` web component directly** → use
   **`zitadel-components`**.
