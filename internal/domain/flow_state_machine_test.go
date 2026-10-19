@@ -7068,6 +7068,19 @@ func TestFlowStateMachine_Process_SSOCollectionRecordsAnUncreatableUser(t *testi
 // that exchanged with it must not be the one the person finishes another way.
 func TestFlowStateMachine_Process_BackFromCollectionRotatesTheAttempt(t *testing.T) {
 	t.Parallel()
+	for name, offersIdentifier := range map[string]bool{
+		"to a step that collects an identifier": true,
+		"to a picker with no field":             false,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			rotatesOnBack(t, offersIdentifier)
+		})
+	}
+}
+
+func rotatesOnBack(t *testing.T, offersIdentifier bool) {
+	t.Helper()
 	w := newFlowTestWorld(t)
 	def := purposeNavDefinition()
 	w.schemaResolver.EXPECT().
@@ -7091,6 +7104,9 @@ func TestFlowStateMachine_Process_BackFromCollectionRotatesTheAttempt(t *testing
 		Fields: map[string]any{"email": "alice@example.com"},
 	})
 	require.NoError(t, err)
+	if !offersIdentifier {
+		def.Steps[0].Fields = nil
+	}
 	// The connection exchanged, but no user was resolved from it.
 	next.State.CollectedData.UserID = ""
 	next.State.SSOProviderSlug = "google"

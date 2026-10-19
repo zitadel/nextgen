@@ -2285,10 +2285,15 @@ func (r *FlowStateMachineRuntime) processBack(pc *processCtx) (FlowStepResult, e
 	collectsIdentifier := slices.ContainsFunc(resolved.Fields, func(f FlowField) bool {
 		return f.Challenge == FlowFieldChallengeIdentifier
 	})
-	if collectsIdentifier {
+	// Back from an SSO exchange leaves the attempt, and the connection it exchanged with, whatever
+	// the step it returns to collects: finishing another way on it would hand off an attempt the
+	// connection no longer stands behind.
+	if collectsIdentifier || pc.state.SSOProviderSlug != "" {
 		if err := r.dropResolvedUser(pc, "back to identification"); err != nil {
 			return FlowStepResult{}, err
 		}
+	}
+	if collectsIdentifier {
 		// The password belongs to the identity being dropped, and
 		// [mergeCollected] banks it before the proof is ever checked, so a
 		// rejected password would otherwise reach create_user for whoever the
