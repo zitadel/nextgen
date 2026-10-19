@@ -2,6 +2,11 @@ get:
   operationId: GetUserByID
   x-zitadel-cli: users get
   summary: Get user by ID
+  description: |
+    Returns a user by its id, with the attributes its schema defines.
+
+    With `team_id`, the user is returned only while they are an active member of
+    that team.
   tags:
     - Users
   parameters:
@@ -125,6 +130,12 @@ delete:
     operationId: DeleteUserByID
     x-zitadel-cli: users delete
     summary: Delete user by ID
+    description: |
+      Deletes a user and removes them from every team they belong to.
+
+      The user is removed, not deactivated, and the deletion emits `user.deleted`.
+      With a project secret the request is idempotent: deleting a user that exists
+      in no project succeeds without changing anything.
     tags:
       - Users
     parameters:

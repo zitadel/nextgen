@@ -31,6 +31,7 @@
     "next": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
+    "remark": "catalog:",
     "shiki": "catalog:",
     "zod": "catalog:"
   },

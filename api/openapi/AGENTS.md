@@ -67,3 +67,18 @@ operation's Markdown carries it for agents. The CLI's
 [`api-coverage` test](../../apps/cli/tests/unit/commands/api-coverage.test.ts)
 fails until every command names exactly one operation it calls, and on a name
 no command answers to, so a new resource verb comes with its line here.
+
+## Descriptions — the first sentence stands alone
+
+Every operation and webhook has a `description` (Redocly's
+`operation-description`): it is the body of its API reference page, which
+shows all of it. Its first sentence, as plain text, is the page's
+description everywhere else: the metadata and the Open Graph image (cut at a
+word past 160 characters), `llms.txt` and the MCP server's page list
+([`apps/docs/lib/description.ts`](../../apps/docs/lib/description.ts)). So the
+first sentence says on its own what the operation does, in 160 characters or
+fewer, and the description opens with it:
+`rule/operation-description-opens-with-sentence` in
+[`redocly.yaml`](../../redocly.yaml) rejects a description that starts with a
+heading, a quote (a `> **Deprecated**` note goes after the sentence), a list, a
+table, a code fence or HTML.

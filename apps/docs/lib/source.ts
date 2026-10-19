@@ -1,3 +1,4 @@
+import type { AdvancedIndex } from "fumadocs-core/search/server";
 import { llms, loader, update } from "fumadocs-core/source";
 import { lucideIconsPlugin } from "fumadocs-core/source/lucide-icons";
 import { metaSchema, pageSchema } from "fumadocs-core/source/schema";
@@ -8,7 +9,7 @@ import type { OpenAPIV3_2, OperationItem, WebhookItem } from "fumadocs-openapi";
 import { codeThemes } from "./code-theme";
 import { cliSample } from "./cli-sample";
 import { defaultRequest, withRefValues } from "./default-request";
-import { shortDescription } from "./description";
+import { firstSentence, shortDescription } from "./description";
 import { openapi } from "./openapi";
 import { sdkSample } from "./sdk-sample";
 import { docsRoute } from "./shared";
@@ -35,23 +36,27 @@ export const source = loader(
     docs: docs.toFumadocsSource(),
     // A page per operation of the server's API, beside the reference's own
     // pages in content/docs/reference/api. Fumadocs makes the operation's
-    // whole description the page's description; the page keeps its first
-    // sentence, as plain text (lib/description.ts), and the body shows the
-    // whole of it.
+    // whole description the page's description; the page's own is a line of
+    // plain text, and `markdownDescription` keeps the whole (lib/description.ts).
     openapi: update(
       await openapi.staticSource({
         baseDir: "reference/api",
         groupBy: "tag",
       }),
     )
-      .page((page) =>
-        page.data.description === undefined
-          ? page
-          : {
-              ...page,
-              data: { ...page.data, description: shortDescription(page.data.description) },
-            },
-      )
+      .page((page) => {
+        // The document is data: a description that is not a string is none.
+        const description: unknown = page.data.description;
+        const markdown = typeof description === "string" ? description : undefined;
+        return {
+          ...page,
+          data: {
+            ...page.data,
+            description: markdown === undefined ? undefined : shortDescription(markdown),
+            markdownDescription: markdown,
+          },
+        };
+      })
       .build(),
   },
   {
@@ -60,13 +65,22 @@ export const source = loader(
   },
 );
 
+type Page = (typeof source)["$inferPage"];
+type OpenAPIPage = Extract<Page, { type: "openapi" }>;
+
+// llms.txt and MCP's list_pages have room for an operation's whole first
+// sentence (lib/description.ts); otherwise Fumadocs' own description.
 export const docsLlms = llms(source, {
+  renderDescription: (node) => {
+    const data =
+      node.type === "page" ? source.getNodePage(node)?.data : source.getNodeMeta(node)?.data;
+    if (data && "markdownDescription" in data) return firstSentence(data.markdownDescription ?? "");
+    return data?.description || (typeof node.description === "string" ? node.description : "");
+  },
   renderPage: async (page) => `# ${page.data.title} (${page.url})
 
 ${page.type === "openapi" ? operationText(page) : await page.data.getText("processed")}`,
 });
-
-type OpenAPIPage = Extract<(typeof source)["$inferPage"], { type: "openapi" }>;
 
 // The props of an operation's or a webhook's page, a client component.
 // Fumadocs hands each page the whole document, so every page carried every
@@ -109,19 +123,6 @@ function operationText(page: OpenAPIPage) {
   const { operations = [], webhooks = [] } = page.data.getOpenAPIPageProps();
   const { bundled } = page.data.getSchema();
   const fragment = openapiFragment(bundled, operations, webhooks);
-  // The whole description, from the document: the page's own is a sentence.
-  const descriptions = [
-    ...operations.map(({ path, method }) => {
-      const item = bundled.paths?.[path];
-      return item?.[method]?.description ?? item?.description;
-    }),
-    ...webhooks.map(({ name, method }) => {
-      const item = bundled.webhooks?.[name];
-      return item && !("$ref" in item)
-        ? (item[method]?.description ?? item.description)
-        : undefined;
-    }),
-  ];
   const endpoints = [
     ...operations.map(({ method, path }) => `\`${method.toUpperCase()} ${path}\``),
     ...webhooks.map(({ method, name }) => `\`${method.toUpperCase()}\` webhook \`${name}\``),
@@ -139,7 +140,7 @@ function operationText(page: OpenAPIPage) {
   });
 
   return [
-    ...descriptions,
+    page.data.markdownDescription,
     endpoints.join("\n"),
     ...samples,
     `The ${webhooks.length > 0 ? "webhook" : "operation"} and every component it references, as OpenAPI:`,
@@ -229,4 +230,19 @@ function refsIn(value: unknown): string[] {
   return Object.entries(value).flatMap(([key, child]) =>
     key === "$ref" && typeof child === "string" ? [child] : refsIn(child),
   );
+}
+
+// Fumadocs' default search index, with an API page's whole description:
+// fumadocs-openapi indexes an operation's own as the page's text, so the short
+// one would be a second hit, and one inherited from the path item is only
+// here (lib/description.ts).
+export function searchIndex(page: Page): AdvancedIndex {
+  return {
+    title: page.data.title ?? page.slugs.at(-1) ?? "",
+    description:
+      "markdownDescription" in page.data ? page.data.markdownDescription : page.data.description,
+    url: page.url,
+    id: page.url,
+    structuredData: page.data.structuredData,
+  };
 }

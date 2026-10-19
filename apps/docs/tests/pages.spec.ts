@@ -1,9 +1,11 @@
 import { type APIRequestContext, expect, test } from "@playwright/test";
 
 import {
+  descriptionProblem,
   escapeHtml,
   failures,
   type IndexedPage,
+  indexStrays,
   mapLimit,
   markdownUrl,
   metaContent,
@@ -54,55 +56,43 @@ test("the index lists every section, each page once, under /docs", async ({ requ
     "index entries outside /docs",
   ).toEqual([]);
   expect(new Set(urls).size).toBe(urls.length);
+
+  // An entry is one line: an API page's OpenAPI description, of several
+  // paragraphs, is not its description (lib/description.ts).
+  expect(indexStrays(index), "lines of the index where the page tree puts none").toEqual([]);
 });
 
-test("every page answers as HTML, titled", async ({ request }) => {
+test("every page answers as HTML, titled, described and in its size", async ({ request }) => {
   test.setTimeout(120_000);
   const pages = await indexedPages(request);
 
-  const results = await mapLimit(pages, concurrency, async ({ title, url }) => {
+  // One request a page, for all the checks a page's HTML answers. A
+  // description the index has, the page has, as one line of plain text
+  // (lib/description.ts); every operation and webhook has one (redocly.yaml).
+  // Fumadocs hands each API page the whole OpenAPI document, which put every
+  // operation and schema of the API, about 900 KB of HTML, on every one of
+  // them; lib/source.ts passes the page its operations and what they
+  // reference, and the largest page is now about 300 KB.
+  const budget = 500_000;
+  const results = await mapLimit(pages, concurrency, async ({ title, url, description }) => {
     const response = await request.get(url);
     const type = response.headers()["content-type"] ?? "";
     if (response.status() !== 200) return `${url}: ${response.status()}`;
     if (!type.startsWith("text/html")) return `${url}: ${type}`;
-    const html = await response.text();
+    const body = await response.body();
+    if (operationPage.test(url) && body.length > budget) return `${url}: ${body.length} bytes`;
+    const html = body.toString("utf8");
     const expected = `<title>${escapeHtml(title)}</title>`;
     if (!html.includes(expected)) return `${url}: no ${expected}`;
+    const meta = metaContent(html, "description");
+    if (meta === undefined) {
+      return description || operationPage.test(url) ? `${url}: no description` : null;
+    }
+    const problem = descriptionProblem(meta);
+    if (problem) return `${url}: description "${meta}" has ${problem}`;
     return null;
   });
   expect(failures(results), "pages whose HTML is wrong").toEqual([]);
-});
-
-test("the index gives each page one line", async ({ request }) => {
-  const index = await (await request.get("/docs/llms.txt")).text();
-
-  // An entry is `- [title](url): description`. An operation's OpenAPI
-  // description is Markdown of several paragraphs; the page's own is its first
-  // sentence (lib/description.ts), or it would break out of the list.
-  const strays = index
-    .split("\n")
-    .filter((line) => line.trim() !== "" && !/^(?:# |> |\s*- )/.test(line));
-  expect(strays, "lines of the index that are not an entry").toEqual([]);
-});
-
-test("every page is described in a line of plain text", async ({ request }) => {
-  test.setTimeout(120_000);
-  const pages = await indexedPages(request);
-
-  // The metadata and the Open Graph image get the page's description. An API
-  // operation's or webhook's page has the first sentence of its OpenAPI
-  // description, without the Markdown; the body shows the whole of it.
-  const results = await mapLimit(pages, concurrency, async ({ url }) => {
-    const html = await (await request.get(url)).text();
-    const description = metaContent(html, "description");
-    if (description === undefined) return null;
-    if (/[`\n]/.test(description)) return `${url}: description "${description}"`;
-    if (description.length > 160) return `${url}: description of ${description.length} characters`;
-    const og = metaContent(html, "og:description");
-    if (og !== undefined && og !== description) return `${url}: og:description "${og}"`;
-    return null;
-  });
-  expect(failures(results), "pages whose description is not a line of text").toEqual([]);
 });
 
 test("every page has a Markdown twin whose links resolve", async ({ request }) => {
@@ -183,24 +173,6 @@ test("every API operation shows its call through @zitadel/api and its CLI comman
   });
   expect(operations).toBeGreaterThan(0);
   expect(failures(results), "operations without their @zitadel/api call").toEqual([]);
-});
-
-test("an API page carries its own part of the OpenAPI document, not all of it", async ({
-  request,
-}) => {
-  test.setTimeout(120_000);
-  const pages = (await indexedPages(request)).filter((page) => operationPage.test(page.url));
-
-  // Fumadocs hands each page the whole document, which put every operation
-  // and schema of the API, about 900 KB of HTML, on every one of them;
-  // lib/source.ts passes the page its operations and what they reference, and
-  // the largest page is now about 300 KB.
-  const budget = 500_000;
-  const results = await mapLimit(pages, concurrency, async ({ url }) => {
-    const { length } = await (await request.get(url)).body();
-    return length > budget ? `${url}: ${length} bytes` : null;
-  });
-  expect(failures(results), `API pages over ${budget} bytes`).toEqual([]);
 });
 
 test("a page that does not exist is a 404, as HTML and as Markdown", async ({ request }) => {
