@@ -4,11 +4,7 @@ put:
   tags:
     - Users
   parameters:
-    - name: user_id
-      in: path
-      required: true
-      schema:
-        $ref: ../../../../components/schemas/user-id.yaml
+    - $ref: ../../../../components/parameters/user-id.yaml
   security:
     - oauth2:
         - user.write
