@@ -1,5 +1,6 @@
 get:
   operationId: getBrandingById
+  x-zitadel-cli: branding get
   summary: Get a branding revision by ID
   description: Retrieves a single branding revision, including its stored configuration.
   tags:

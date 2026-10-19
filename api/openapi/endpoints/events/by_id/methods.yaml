@@ -1,5 +1,6 @@
 get:
   operationId: getEvent
+  x-zitadel-cli: events get
   summary: Get event by ID
   description: |
     Loads a single event by `(project_id, id)`. Requires `events.read`.

@@ -153,7 +153,7 @@ test("every page negotiates Markdown through Accept", async ({ request }) => {
   expect(failures(results), "pages that do not negotiate Markdown").toEqual([]);
 });
 
-test("every API operation shows its call through @zitadel/api, as HTML and as Markdown", async ({
+test("every API operation shows its call through @zitadel/api and its CLI command", async ({
   request,
 }) => {
   test.setTimeout(120_000);
@@ -171,6 +171,12 @@ test("every API operation shows its call through @zitadel/api, as HTML and as Ma
     if (!markdown.includes("The operation and every component it references")) return null;
     operations++;
     if (!call.test(markdown)) return `${markdownUrl(url)}: no call through @zitadel/api`;
+    // An operation the spec names a CLI command for (`x-zitadel-cli`, which
+    // its OpenAPI shows) is also run with that command (lib/cli-sample.ts).
+    const command = /"x-zitadel-cli": "([^"]+)"/.exec(markdown)?.[1];
+    if (command && !markdown.includes(`npx @zitadel/cli@alpha ${command}`)) {
+      return `${markdownUrl(url)}: no \`${command}\` command`;
+    }
     const html = await (await request.get(url)).text();
     if (!html.includes("@zitadel/api/")) return `${url}: no @zitadel/api sample`;
     return null;

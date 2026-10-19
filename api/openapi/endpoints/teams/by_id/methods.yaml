@@ -1,5 +1,6 @@
 get:
   operationId: getTeam
+  x-zitadel-cli: teams get
   summary: Get team
   description: |
     Returns a Team by its id.
@@ -39,6 +40,7 @@ get:
 
 delete:
   operationId: deleteTeam
+  x-zitadel-cli: teams deactivate
   summary: Delete team
   description: |
     Deactivates the team.
@@ -99,6 +101,7 @@ delete:
 
 patch:
   operationId: updateTeam
+  x-zitadel-cli: teams update
   summary: Update team
   description: |
     Update team. Only active teams can be updated.
