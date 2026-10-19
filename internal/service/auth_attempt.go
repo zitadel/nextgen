@@ -341,6 +341,9 @@ func NewAuthAttemptService(
 // If input.SessionID is set, the existing session's verified checks are copied
 // into the attempt for step-up auth — no new session is created.
 func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttemptInput) (res *domain.AuthAttempt, err error) {
+	ctx, end := startSpan(ctx, "AuthAttemptService.Create")
+	defer end(&err)
+
 	requiredChecks := input.RequiredChecks
 	if requiredChecks == nil {
 		// TODO: load project default required checks
@@ -387,7 +390,10 @@ func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttempt
 }
 
 // GetByID retrieves an auth attempt by its ID and all its factors and challenges.
-func (s *authAttemptService) GetByID(ctx context.Context, projectID, attemptID string) (*domain.AuthAttempt, error) {
+func (s *authAttemptService) GetByID(ctx context.Context, projectID, attemptID string) (_ *domain.AuthAttempt, err error) {
+	ctx, end := startSpan(ctx, "AuthAttemptService.GetByID")
+	defer end(&err)
+
 	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, projectID, attemptID)
 	if err != nil {
 		if errors.Is(err, domain.ErrAuthAttemptNotFound()) {
@@ -400,7 +406,10 @@ func (s *authAttemptService) GetByID(ctx context.Context, projectID, attemptID s
 
 // IssueChallenge issues a challenge for the given check type on an existing attempt.
 // For passkey, the user check must already be verified so the user ID is known.
-func (s *authAttemptService) IssueChallenge(ctx context.Context, input IssueChallengeInput) (*domain.AuthAttempt, error) {
+func (s *authAttemptService) IssueChallenge(ctx context.Context, input IssueChallengeInput) (_ *domain.AuthAttempt, err error) {
+	ctx, end := startSpan(ctx, "AuthAttemptService.IssueChallenge")
+	defer end(&err)
+
 	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, input.ProjectID, input.AttemptID)
 	if err != nil {
 		return nil, err
@@ -421,7 +430,10 @@ func (s *authAttemptService) IssueChallenge(ctx context.Context, input IssueChal
 // IssueSSOState mints the state record on an existing attempt. The attempt
 // is guarded the way a challenge issue is: expired or handed off attempts
 // cannot start an external sign-in.
-func (s *authAttemptService) IssueSSOState(ctx context.Context, input IssueSSOStateInput) (*domain.SSOState, error) {
+func (s *authAttemptService) IssueSSOState(ctx context.Context, input IssueSSOStateInput) (res *domain.SSOState, err error) {
+	ctx, end := startSpan(ctx, "AuthAttemptService.IssueSSOState")
+	defer end(&err)
+
 	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, input.ProjectID, input.AttemptID)
 	if err != nil {
 		return nil, err
@@ -441,13 +453,19 @@ func (s *authAttemptService) IssueSSOState(ctx context.Context, input IssueSSOSt
 
 // ConsumeSSOState implements [AuthAttemptService]. The record is stored under
 // the state's hash, so the plain state is hashed here and never compared raw.
-func (s *authAttemptService) ConsumeSSOState(ctx context.Context, projectID, state, bindingNonce string) (*domain.SSOCallbackCheck, error) {
+func (s *authAttemptService) ConsumeSSOState(ctx context.Context, projectID, state, bindingNonce string) (_ *domain.SSOCallbackCheck, err error) {
+	ctx, end := startSpan(ctx, "AuthAttemptService.ConsumeSSOState")
+	defer end(&err)
+
 	return s.stmts.Statements().ConsumeSSOState(ctx, projectID, domain.HashSecret(state), bindingNonce)
 }
 
 // SetSSOCallbackResult implements [AuthAttemptService]. check is the record
 // ConsumeSSOState returned.
-func (s *authAttemptService) SetSSOCallbackResult(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, result *domain.SSOCallbackResult, eventType domain.EventType) error {
+func (s *authAttemptService) SetSSOCallbackResult(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, result *domain.SSOCallbackResult, eventType domain.EventType) (err error) {
+	ctx, end := startSpan(ctx, "AuthAttemptService.SetSSOCallbackResult")
+	defer end(&err)
+
 	return s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		if err := tx.Statements().SetSSOCallbackResult(ctx, projectID, check.StateHash, result); err != nil {
 			return err
@@ -478,6 +496,9 @@ func (s *authAttemptService) SetSSOCallbackResult(ctx context.Context, projectID
 // required checks are now satisfied.
 // On failure, it records the failed attempt for rate-limiting purposes.
 func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofInput) (res *domain.AuthAttempt, err error) {
+	ctx, end := startSpan(ctx, "AuthAttemptService.VerifyProof")
+	defer end(&err)
+
 	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, input.ProjectID, input.AttemptID)
 	if err != nil {
 		return nil, err
@@ -523,7 +544,10 @@ func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofI
 
 // Handoff mints a single-use handoff token for a completed attempt.
 // The client exchanges the token at POST /sessions/exchange.
-func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (*domain.AuthAttempt, error) {
+func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (_ *domain.AuthAttempt, err error) {
+	ctx, end := startSpan(ctx, "AuthAttemptService.Handoff")
+	defer end(&err)
+
 	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, input.ProjectID, input.AttemptID)
 	if err != nil {
 		return nil, err
@@ -899,7 +923,10 @@ func (s *authAttemptService) recordProofFailure(ctx context.Context, attempt *do
 
 // BeginPasskeyEnrollment starts a management-plane enrollment ceremony on an
 // internal attempt (see the interface doc).
-func (s *authAttemptService) BeginPasskeyEnrollment(ctx context.Context, input BeginPasskeyEnrollmentInput) (*BeginPasskeyEnrollmentOutput, error) {
+func (s *authAttemptService) BeginPasskeyEnrollment(ctx context.Context, input BeginPasskeyEnrollmentInput) (_ *BeginPasskeyEnrollmentOutput, err error) {
+	ctx, end := startSpan(ctx, "AuthAttemptService.BeginPasskeyEnrollment")
+	defer end(&err)
+
 	attempt, err := s.Create(ctx, CreateAuthAttemptInput{ProjectID: input.ProjectID, Internal: true})
 	if err != nil {
 		return nil, err
@@ -946,7 +973,10 @@ func (s *authAttemptService) BeginPasskeyEnrollment(ctx context.Context, input B
 
 // FinishPasskeyEnrollment verifies the attestation and consumes the internal
 // attempt atomically (see the interface doc).
-func (s *authAttemptService) FinishPasskeyEnrollment(ctx context.Context, input FinishPasskeyEnrollmentInput) (*FinishPasskeyEnrollmentOutput, error) {
+func (s *authAttemptService) FinishPasskeyEnrollment(ctx context.Context, input FinishPasskeyEnrollmentInput) (_ *FinishPasskeyEnrollmentOutput, err error) {
+	ctx, end := startSpan(ctx, "AuthAttemptService.FinishPasskeyEnrollment")
+	defer end(&err)
+
 	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, input.ProjectID, input.RegistrationID)
 	if err != nil {
 		return nil, err

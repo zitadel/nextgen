@@ -16,9 +16,13 @@ type spanKindSampler struct {
 // ShouldSample implements the [sdk_trace.Sampler] interface.
 // It will not sample any spans which do not match the configured span kinds.
 // For spans which do match, the decorated sampler is used to make the sampling decision.
+// An Internal span also needs the [JobRoot] attribute: libraries start
+// Internal roots from their own background work, and only a job run should
+// start a trace.
 func (sk spanKindSampler) ShouldSample(p tracesdk.SamplingParameters) tracesdk.SamplingResult {
 	psc := trace.SpanContextFromContext(p.ParentContext)
-	if !slices.Contains(sk.kinds, p.Kind) {
+	if !slices.Contains(sk.kinds, p.Kind) ||
+		p.Kind == trace.SpanKindInternal && !slices.Contains(p.Attributes, JobRoot) {
 		return tracesdk.SamplingResult{
 			Decision:   tracesdk.Drop,
 			Tracestate: psc.TraceState(),

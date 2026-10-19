@@ -64,7 +64,10 @@ type SigningKeyCacheKey struct {
 // ENCRYPTION KEYS
 // ------------------------------------------------------
 
-func (s *keyService) SaveEncryptionKey(ctx context.Context, stmts AllStatements, key *domain.EncryptionKey) error {
+func (s *keyService) SaveEncryptionKey(ctx context.Context, stmts AllStatements, key *domain.EncryptionKey) (err error) {
+	ctx, end := startSpan(ctx, "KeyService.SaveEncryptionKey")
+	defer end(&err)
+
 	if err := stmts.CreateEncryptionKey(ctx, key); err != nil {
 		if mapped := mapStorageError(err); mapped != err {
 			return mapped
@@ -76,7 +79,10 @@ func (s *keyService) SaveEncryptionKey(ctx context.Context, stmts AllStatements,
 	return nil
 }
 
-func (s *keyService) GetEncryptionKey(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (*domain.EncryptionKey, error) {
+func (s *keyService) GetEncryptionKey(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (_ *domain.EncryptionKey, err error) {
+	ctx, end := startSpan(ctx, "KeyService.GetEncryptionKey")
+	defer end(&err)
+
 	key, err := s.db.Statements().GetEncryptionKey(ctx, database.And(
 		database.Equal(database.Col(domain.EncryptionKeyFieldID), keyID),
 		database.Equal(database.Col(domain.EncryptionKeyFieldAlgorithm), algorithm),
@@ -95,7 +101,10 @@ func (s *keyService) GetEncryptionKey(ctx context.Context, keyID string, algorit
 //
 // This is the per-request path: every authenticated request decrypts its bearer
 // credential through here, so a hit has to cost neither a read nor an unwrap.
-func (s *keyService) GetCrypter(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (op.Crypto, error) {
+func (s *keyService) GetCrypter(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (_ op.Crypto, err error) {
+	ctx, end := startSpan(ctx, "KeyService.GetCrypter")
+	defer end(&err)
+
 	if crypter, ok := s.crypterCache.Get(CrypterCacheKey{KeyID: keyID, Algorithm: algorithm}); ok {
 		return crypter, nil
 	}
@@ -107,7 +116,10 @@ func (s *keyService) GetCrypter(ctx context.Context, keyID string, algorithm jos
 	return s.getCrypterOfKey(ctx, key)
 }
 
-func (s *keyService) GetProjectEncryptionKey(ctx context.Context, projectID string, purpose domain.EncryptionKeyPurpose) (*domain.EncryptionKey, error) {
+func (s *keyService) GetProjectEncryptionKey(ctx context.Context, projectID string, purpose domain.EncryptionKeyPurpose) (_ *domain.EncryptionKey, err error) {
+	ctx, end := startSpan(ctx, "KeyService.GetProjectEncryptionKey")
+	defer end(&err)
+
 	key, err := s.db.Statements().GetEncryptionKey(ctx, database.And(
 		database.Equal(database.Col(domain.EncryptionKeyFieldProjectID), projectID),
 		database.Equal(database.Col(domain.EncryptionKeyFieldState), domain.KeyStateActive),
@@ -122,7 +134,10 @@ func (s *keyService) GetProjectEncryptionKey(ctx context.Context, projectID stri
 	return key, nil
 }
 
-func (s *keyService) GetProjectCrypter(ctx context.Context, projectID string, purpose domain.EncryptionKeyPurpose) (op.Crypto, error) {
+func (s *keyService) GetProjectCrypter(ctx context.Context, projectID string, purpose domain.EncryptionKeyPurpose) (_ op.Crypto, err error) {
+	ctx, end := startSpan(ctx, "KeyService.GetProjectCrypter")
+	defer end(&err)
+
 	key, err := s.GetProjectEncryptionKey(ctx, projectID, purpose)
 	if err != nil {
 		return nil, err
@@ -177,7 +192,10 @@ func (s *keyService) getCrypterOfKey(ctx context.Context, key *domain.Encryption
 // SIGNING KEYS
 // ------------------------------------------------------
 
-func (s *keyService) SaveSigningKey(ctx context.Context, stmts AllStatements, key *domain.SigningKey) error {
+func (s *keyService) SaveSigningKey(ctx context.Context, stmts AllStatements, key *domain.SigningKey) (err error) {
+	ctx, end := startSpan(ctx, "KeyService.SaveSigningKey")
+	defer end(&err)
+
 	if err := stmts.CreateSigningKey(ctx, key); err != nil {
 		if mapped := mapStorageError(err); mapped != err {
 			return mapped
@@ -189,7 +207,10 @@ func (s *keyService) SaveSigningKey(ctx context.Context, stmts AllStatements, ke
 	return nil
 }
 
-func (s *keyService) GetProjectSigningKey(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (*domain.SigningKey, error) {
+func (s *keyService) GetProjectSigningKey(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (_ *domain.SigningKey, err error) {
+	ctx, end := startSpan(ctx, "KeyService.GetProjectSigningKey")
+	defer end(&err)
+
 	if key, ok := s.signingKeyCache.Get(SigningKeyCacheKey{ProjectID: projectID, Purpose: purpose}); ok {
 		return new(key), nil
 	}
@@ -210,7 +231,10 @@ func (s *keyService) GetProjectSigningKey(ctx context.Context, projectID string,
 	return key, nil
 }
 
-func (s *keyService) GetProjectSigner(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (jose.Signer, error) {
+func (s *keyService) GetProjectSigner(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (_ jose.Signer, err error) {
+	ctx, end := startSpan(ctx, "KeyService.GetProjectSigner")
+	defer end(&err)
+
 	key, err := s.GetProjectSigningKey(ctx, projectID, purpose)
 	if err != nil {
 		return nil, err
@@ -231,11 +255,17 @@ func (s *keyService) GetProjectSigner(ctx context.Context, projectID string, pur
 // MASTER KEYS
 // ------------------------------------------------------
 
-func (s *keyService) GetMasterKeyCrypter(context.Context) (op.Crypto, error) {
+func (s *keyService) GetMasterKeyCrypter(ctx context.Context) (_ op.Crypto, err error) {
+	_, end := startSpan(ctx, "KeyService.GetMasterKeyCrypter")
+	defer end(&err)
+
 	return s.masterKeys, nil
 }
 
-func (s *keyService) MigrateToLatestMasterKey(ctx context.Context) error {
+func (s *keyService) MigrateToLatestMasterKey(ctx context.Context) (err error) {
+	ctx, end := startSpan(ctx, "KeyService.MigrateToLatestMasterKey")
+	defer end(&err)
+
 	opts := &database.ListOptions[domain.EncryptionKeyField]{
 		Pagination: database.Page[domain.EncryptionKeyField]{
 			Limit: 100,
