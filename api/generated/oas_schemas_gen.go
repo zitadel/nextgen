@@ -9587,6 +9587,7 @@ type BuildReleaseErrorResponse struct {
 	Type                     BuildReleaseErrorResponseType // switch on this field
 	AuthUnauthorized         AuthUnauthorized
 	EvtInvalid               EvtInvalid
+	FlowdefInvalid           FlowdefInvalid
 	IdpFieldImmutable        IdpFieldImmutable
 	IdpNotFound              IdpNotFound
 	Internal                 Internal
@@ -9595,12 +9596,15 @@ type BuildReleaseErrorResponse struct {
 	SchFetchTimeout          SchFetchTimeout
 	SchFetchTooLarge         SchFetchTooLarge
 	SchFetchTooManyRedirects SchFetchTooManyRedirects
+	SchNotFound              SchNotFound
 	RelInvalid               RelInvalid
 	RelNotFound              RelNotFound
 	RelPermissionDenied      RelPermissionDenied
 	RelProjectNotFound       RelProjectNotFound
+	RelRevisionUnpinnable    RelRevisionUnpinnable
 	RelUnresolvedReference   RelUnresolvedReference
 	ReqInvalid               ReqInvalid
+	FlowdefSchemaFetchFailed FlowdefSchemaFetchFailed
 }
 
 // BuildReleaseErrorResponseType is oneOf type of BuildReleaseErrorResponse.
@@ -9610,6 +9614,7 @@ type BuildReleaseErrorResponseType string
 const (
 	AuthUnauthorizedBuildReleaseErrorResponse         BuildReleaseErrorResponseType = "auth.unauthorized"
 	EvtInvalidBuildReleaseErrorResponse               BuildReleaseErrorResponseType = "evt.invalid"
+	FlowdefInvalidBuildReleaseErrorResponse           BuildReleaseErrorResponseType = "flowdef.invalid"
 	IdpFieldImmutableBuildReleaseErrorResponse        BuildReleaseErrorResponseType = "idp.field_immutable"
 	IdpNotFoundBuildReleaseErrorResponse              BuildReleaseErrorResponseType = "idp.not_found"
 	InternalBuildReleaseErrorResponse                 BuildReleaseErrorResponseType = "internal"
@@ -9618,12 +9623,15 @@ const (
 	SchFetchTimeoutBuildReleaseErrorResponse          BuildReleaseErrorResponseType = "sch.fetch_timeout"
 	SchFetchTooLargeBuildReleaseErrorResponse         BuildReleaseErrorResponseType = "sch.fetch_too_large"
 	SchFetchTooManyRedirectsBuildReleaseErrorResponse BuildReleaseErrorResponseType = "sch.fetch_too_many_redirects"
+	SchNotFoundBuildReleaseErrorResponse              BuildReleaseErrorResponseType = "sch.not_found"
 	RelInvalidBuildReleaseErrorResponse               BuildReleaseErrorResponseType = "rel.invalid"
 	RelNotFoundBuildReleaseErrorResponse              BuildReleaseErrorResponseType = "rel.not_found"
 	RelPermissionDeniedBuildReleaseErrorResponse      BuildReleaseErrorResponseType = "rel.permission_denied"
 	RelProjectNotFoundBuildReleaseErrorResponse       BuildReleaseErrorResponseType = "rel.project_not_found"
+	RelRevisionUnpinnableBuildReleaseErrorResponse    BuildReleaseErrorResponseType = "rel.revision_unpinnable"
 	RelUnresolvedReferenceBuildReleaseErrorResponse   BuildReleaseErrorResponseType = "rel.unresolved_reference"
 	ReqInvalidBuildReleaseErrorResponse               BuildReleaseErrorResponseType = "req.invalid"
+	FlowdefSchemaFetchFailedBuildReleaseErrorResponse BuildReleaseErrorResponseType = "flowdef.schema_fetch_failed"
 )
 
 // IsAuthUnauthorized reports whether BuildReleaseErrorResponse is AuthUnauthorized.
@@ -9634,6 +9642,11 @@ func (s BuildReleaseErrorResponse) IsAuthUnauthorized() bool {
 // IsEvtInvalid reports whether BuildReleaseErrorResponse is EvtInvalid.
 func (s BuildReleaseErrorResponse) IsEvtInvalid() bool {
 	return s.Type == EvtInvalidBuildReleaseErrorResponse
+}
+
+// IsFlowdefInvalid reports whether BuildReleaseErrorResponse is FlowdefInvalid.
+func (s BuildReleaseErrorResponse) IsFlowdefInvalid() bool {
+	return s.Type == FlowdefInvalidBuildReleaseErrorResponse
 }
 
 // IsIdpFieldImmutable reports whether BuildReleaseErrorResponse is IdpFieldImmutable.
@@ -9676,6 +9689,11 @@ func (s BuildReleaseErrorResponse) IsSchFetchTooManyRedirects() bool {
 	return s.Type == SchFetchTooManyRedirectsBuildReleaseErrorResponse
 }
 
+// IsSchNotFound reports whether BuildReleaseErrorResponse is SchNotFound.
+func (s BuildReleaseErrorResponse) IsSchNotFound() bool {
+	return s.Type == SchNotFoundBuildReleaseErrorResponse
+}
+
 // IsRelInvalid reports whether BuildReleaseErrorResponse is RelInvalid.
 func (s BuildReleaseErrorResponse) IsRelInvalid() bool {
 	return s.Type == RelInvalidBuildReleaseErrorResponse
@@ -9696,6 +9714,11 @@ func (s BuildReleaseErrorResponse) IsRelProjectNotFound() bool {
 	return s.Type == RelProjectNotFoundBuildReleaseErrorResponse
 }
 
+// IsRelRevisionUnpinnable reports whether BuildReleaseErrorResponse is RelRevisionUnpinnable.
+func (s BuildReleaseErrorResponse) IsRelRevisionUnpinnable() bool {
+	return s.Type == RelRevisionUnpinnableBuildReleaseErrorResponse
+}
+
 // IsRelUnresolvedReference reports whether BuildReleaseErrorResponse is RelUnresolvedReference.
 func (s BuildReleaseErrorResponse) IsRelUnresolvedReference() bool {
 	return s.Type == RelUnresolvedReferenceBuildReleaseErrorResponse
@@ -9704,6 +9727,11 @@ func (s BuildReleaseErrorResponse) IsRelUnresolvedReference() bool {
 // IsReqInvalid reports whether BuildReleaseErrorResponse is ReqInvalid.
 func (s BuildReleaseErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidBuildReleaseErrorResponse
+}
+
+// IsFlowdefSchemaFetchFailed reports whether BuildReleaseErrorResponse is FlowdefSchemaFetchFailed.
+func (s BuildReleaseErrorResponse) IsFlowdefSchemaFetchFailed() bool {
+	return s.Type == FlowdefSchemaFetchFailedBuildReleaseErrorResponse
 }
 
 // SetAuthUnauthorized sets BuildReleaseErrorResponse to AuthUnauthorized.
@@ -9745,6 +9773,27 @@ func (s BuildReleaseErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
 func NewEvtInvalidBuildReleaseErrorResponse(v EvtInvalid) BuildReleaseErrorResponse {
 	var s BuildReleaseErrorResponse
 	s.SetEvtInvalid(v)
+	return s
+}
+
+// SetFlowdefInvalid sets BuildReleaseErrorResponse to FlowdefInvalid.
+func (s *BuildReleaseErrorResponse) SetFlowdefInvalid(v FlowdefInvalid) {
+	s.Type = FlowdefInvalidBuildReleaseErrorResponse
+	s.FlowdefInvalid = v
+}
+
+// GetFlowdefInvalid returns FlowdefInvalid and true boolean if BuildReleaseErrorResponse is FlowdefInvalid.
+func (s BuildReleaseErrorResponse) GetFlowdefInvalid() (v FlowdefInvalid, ok bool) {
+	if !s.IsFlowdefInvalid() {
+		return v, false
+	}
+	return s.FlowdefInvalid, true
+}
+
+// NewFlowdefInvalidBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from FlowdefInvalid.
+func NewFlowdefInvalidBuildReleaseErrorResponse(v FlowdefInvalid) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetFlowdefInvalid(v)
 	return s
 }
 
@@ -9916,6 +9965,27 @@ func NewSchFetchTooManyRedirectsBuildReleaseErrorResponse(v SchFetchTooManyRedir
 	return s
 }
 
+// SetSchNotFound sets BuildReleaseErrorResponse to SchNotFound.
+func (s *BuildReleaseErrorResponse) SetSchNotFound(v SchNotFound) {
+	s.Type = SchNotFoundBuildReleaseErrorResponse
+	s.SchNotFound = v
+}
+
+// GetSchNotFound returns SchNotFound and true boolean if BuildReleaseErrorResponse is SchNotFound.
+func (s BuildReleaseErrorResponse) GetSchNotFound() (v SchNotFound, ok bool) {
+	if !s.IsSchNotFound() {
+		return v, false
+	}
+	return s.SchNotFound, true
+}
+
+// NewSchNotFoundBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from SchNotFound.
+func NewSchNotFoundBuildReleaseErrorResponse(v SchNotFound) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetSchNotFound(v)
+	return s
+}
+
 // SetRelInvalid sets BuildReleaseErrorResponse to RelInvalid.
 func (s *BuildReleaseErrorResponse) SetRelInvalid(v RelInvalid) {
 	s.Type = RelInvalidBuildReleaseErrorResponse
@@ -10000,6 +10070,27 @@ func NewRelProjectNotFoundBuildReleaseErrorResponse(v RelProjectNotFound) BuildR
 	return s
 }
 
+// SetRelRevisionUnpinnable sets BuildReleaseErrorResponse to RelRevisionUnpinnable.
+func (s *BuildReleaseErrorResponse) SetRelRevisionUnpinnable(v RelRevisionUnpinnable) {
+	s.Type = RelRevisionUnpinnableBuildReleaseErrorResponse
+	s.RelRevisionUnpinnable = v
+}
+
+// GetRelRevisionUnpinnable returns RelRevisionUnpinnable and true boolean if BuildReleaseErrorResponse is RelRevisionUnpinnable.
+func (s BuildReleaseErrorResponse) GetRelRevisionUnpinnable() (v RelRevisionUnpinnable, ok bool) {
+	if !s.IsRelRevisionUnpinnable() {
+		return v, false
+	}
+	return s.RelRevisionUnpinnable, true
+}
+
+// NewRelRevisionUnpinnableBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from RelRevisionUnpinnable.
+func NewRelRevisionUnpinnableBuildReleaseErrorResponse(v RelRevisionUnpinnable) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetRelRevisionUnpinnable(v)
+	return s
+}
+
 // SetRelUnresolvedReference sets BuildReleaseErrorResponse to RelUnresolvedReference.
 func (s *BuildReleaseErrorResponse) SetRelUnresolvedReference(v RelUnresolvedReference) {
 	s.Type = RelUnresolvedReferenceBuildReleaseErrorResponse
@@ -10039,6 +10130,27 @@ func (s BuildReleaseErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidBuildReleaseErrorResponse(v ReqInvalid) BuildReleaseErrorResponse {
 	var s BuildReleaseErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetFlowdefSchemaFetchFailed sets BuildReleaseErrorResponse to FlowdefSchemaFetchFailed.
+func (s *BuildReleaseErrorResponse) SetFlowdefSchemaFetchFailed(v FlowdefSchemaFetchFailed) {
+	s.Type = FlowdefSchemaFetchFailedBuildReleaseErrorResponse
+	s.FlowdefSchemaFetchFailed = v
+}
+
+// GetFlowdefSchemaFetchFailed returns FlowdefSchemaFetchFailed and true boolean if BuildReleaseErrorResponse is FlowdefSchemaFetchFailed.
+func (s BuildReleaseErrorResponse) GetFlowdefSchemaFetchFailed() (v FlowdefSchemaFetchFailed, ok bool) {
+	if !s.IsFlowdefSchemaFetchFailed() {
+		return v, false
+	}
+	return s.FlowdefSchemaFetchFailed, true
+}
+
+// NewFlowdefSchemaFetchFailedBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from FlowdefSchemaFetchFailed.
+func NewFlowdefSchemaFetchFailedBuildReleaseErrorResponse(v FlowdefSchemaFetchFailed) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetFlowdefSchemaFetchFailed(v)
 	return s
 }
 

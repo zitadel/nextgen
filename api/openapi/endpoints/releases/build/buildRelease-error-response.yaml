@@ -6,6 +6,7 @@ content:
       oneOf:
         - $ref: '../../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../../components/schemas/errors/evt-invalid.yaml'
+        - $ref: '../../../components/schemas/errors/flowdef-invalid.yaml'
         - $ref: '../../../components/schemas/errors/idp-field_immutable.yaml'
         - $ref: '../../../components/schemas/errors/idp-not_found.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
@@ -14,17 +15,21 @@ content:
         - $ref: '../../../components/schemas/errors/sch-fetch_timeout.yaml'
         - $ref: '../../../components/schemas/errors/sch-fetch_too_large.yaml'
         - $ref: '../../../components/schemas/errors/sch-fetch_too_many_redirects.yaml'
+        - $ref: '../../../components/schemas/errors/sch-not_found.yaml'
         - $ref: '../../../components/schemas/errors/rel-invalid.yaml'
         - $ref: '../../../components/schemas/errors/rel-not_found.yaml'
         - $ref: '../../../components/schemas/errors/rel-permission_denied.yaml'
         - $ref: '../../../components/schemas/errors/rel-project_not_found.yaml'
+        - $ref: '../../../components/schemas/errors/rel-revision_unpinnable.yaml'
         - $ref: '../../../components/schemas/errors/rel-unresolved_reference.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
+        - $ref: '../../../components/schemas/errors/flowdef-schema_fetch_failed.yaml'
       discriminator:
         propertyName: code
         mapping:
           auth.unauthorized: '../../../components/schemas/errors/auth-unauthorized.yaml'
           evt.invalid: '../../../components/schemas/errors/evt-invalid.yaml'
+          flowdef.invalid: '../../../components/schemas/errors/flowdef-invalid.yaml'
           idp.field_immutable: '../../../components/schemas/errors/idp-field_immutable.yaml'
           idp.not_found: '../../../components/schemas/errors/idp-not_found.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
@@ -33,12 +38,15 @@ content:
           sch.fetch_timeout: '../../../components/schemas/errors/sch-fetch_timeout.yaml'
           sch.fetch_too_large: '../../../components/schemas/errors/sch-fetch_too_large.yaml'
           sch.fetch_too_many_redirects: '../../../components/schemas/errors/sch-fetch_too_many_redirects.yaml'
+          sch.not_found: '../../../components/schemas/errors/sch-not_found.yaml'
           rel.invalid: '../../../components/schemas/errors/rel-invalid.yaml'
           rel.not_found: '../../../components/schemas/errors/rel-not_found.yaml'
           rel.permission_denied: '../../../components/schemas/errors/rel-permission_denied.yaml'
           rel.project_not_found: '../../../components/schemas/errors/rel-project_not_found.yaml'
+          rel.revision_unpinnable: '../../../components/schemas/errors/rel-revision_unpinnable.yaml'
           rel.unresolved_reference: '../../../components/schemas/errors/rel-unresolved_reference.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
+          flowdef.schema_fetch_failed: '../../../components/schemas/errors/flowdef-schema_fetch_failed.yaml'
     examples:
       auth.unauthorized:
         summary: auth.unauthorized
@@ -50,6 +58,11 @@ content:
         value:
           code: evt.invalid
           message: 'event: invalid'
+      flowdef.invalid:
+        summary: flowdef.invalid
+        value:
+          code: flowdef.invalid
+          message: 'flow definition: invalid'
       idp.field_immutable:
         summary: idp.field_immutable
         value:
@@ -90,6 +103,11 @@ content:
         value:
           code: sch.fetch_too_many_redirects
           message: 'fetching the schema URL exceeded the redirect limit'
+      sch.not_found:
+        summary: sch.not_found
+        value:
+          code: sch.not_found
+          message: 'schema not found'
       rel.invalid:
         summary: rel.invalid
         value:
@@ -110,6 +128,11 @@ content:
         value:
           code: rel.project_not_found
           message: 'release: project not found'
+      rel.revision_unpinnable:
+        summary: rel.revision_unpinnable
+        value:
+          code: rel.revision_unpinnable
+          message: 'release: pinned revision declares no handle'
       rel.unresolved_reference:
         summary: rel.unresolved_reference
         value:
@@ -120,3 +143,8 @@ content:
         value:
           code: req.invalid
           message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
+      flowdef.schema_fetch_failed:
+        summary: flowdef.schema_fetch_failed
+        value:
+          code: flowdef.schema_fetch_failed
+          message: 'flow definition: failed to fetch schema'
