@@ -32,6 +32,8 @@
     "journey/scripts/**/*.mjs",
     "journey/src/**/*.ts",
     "journey/fixtures/testkit/**/*.mts",
-    "journey/fixtures/testkit/**/*.ts"
+    "journey/fixtures/testkit/**/*.ts",
+    "schemas/playwright*.config.mts",
+    "schemas/src-deployment/**/*.ts"
   ]
 }
