@@ -16,8 +16,6 @@ for hand-rolled setups.
 
 Peer dependencies: `nuxt >=4` and `h3 >=1`.
 
-TypeScript ≥ 5.0 — the published type definitions re-export with `export type *`, which TypeScript introduced in 5.0.
-
 ## Surface 1 — the Nuxt module (recommended, CLI-scaffolded)
 
 Register the module under the `nextgen` config key:

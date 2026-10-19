@@ -12,8 +12,6 @@ pnpm add @zitadel/sdk-sveltekit@alpha
 
 Peer dependencies: `@sveltejs/kit ^2.0.0 || ^3.0.0` and `svelte ^5.0.0`.
 
-TypeScript ≥ 5.0 — the published type definitions re-export with `export type *`, which TypeScript introduced in 5.0.
-
 ## Setup
 
 ### 1. Server hook

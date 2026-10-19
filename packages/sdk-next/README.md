@@ -16,8 +16,6 @@ on self-hosted deployments would let any request past `protectedRoutes`.
 
 Peer dependencies: `next >=15.2.3`, `react >=18` and `react-dom >=18`.
 
-TypeScript ≥ 5.0 — the published type definitions re-export with `export type *`, which TypeScript introduced in 5.0.
-
 ## Entry points
 
 | Import                         | Runs in                          | Provides                                         |
