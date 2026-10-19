@@ -4,4 +4,4 @@ required: true
 description: The unique identifier of the session.
 schema:
   $ref: '../schemas/session-id.yaml'
-
+example: sess_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C

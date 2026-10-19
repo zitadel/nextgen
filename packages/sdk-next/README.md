@@ -12,6 +12,12 @@ Requires Next.js 15.2.3 or later. Earlier 15.x releases skip middleware for a
 request that sends an `x-middleware-subrequest` header (CVE-2025-29927), which
 on self-hosted deployments would let any request past `protectedRoutes`.
 
+## Requirements
+
+Peer dependencies: `next >=15.2.3`, `react >=18` and `react-dom >=18`.
+
+TypeScript ≥ 5.0, the floor shared by every SDK; see the [compatibility notes](https://github.com/zitadel/nextgen/blob/main/packages/AGENTS.md).
+
 ## Entry points
 
 | Import                         | Runs in                          | Provides                                         |
@@ -286,5 +292,5 @@ The verification pipeline is shared across SDKs and documented once in
 [`@zitadel/sdk-core`](https://github.com/zitadel/nextgen/tree/main/packages/sdk-core#how-jwt-verification-works).
 On top of that pipeline, the Next.js middleware adds:
 
-1. The `x-nextgen-auth-token` header is stripped from all proxied requests to prevent internal state leakage
+1. A request that carries an `x-nextgen-auth-token` header is refused with a 400 on every route, including ignored routes and the proxy path: the header is an internal channel that only the middleware writes, so a client never sends it
 2. `auth()` re-applies the same verification to the tunnelled token in the server runtime — the header alone is never treated as proof of a session

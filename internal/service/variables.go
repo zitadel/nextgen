@@ -101,7 +101,10 @@ func clearsPreview(kind *domain.DeploymentOriginKind, isSecret bool) bool {
 	return kind == nil && isSecret
 }
 
-func (s *variableService) GetVariables(ctx context.Context, owner domain.VariableOwner, kind *domain.DeploymentOriginKind, names ...string) ([]*domain.Variable, error) {
+func (s *variableService) GetVariables(ctx context.Context, owner domain.VariableOwner, kind *domain.DeploymentOriginKind, names ...string) (_ []*domain.Variable, err error) {
+	ctx, end := startSpan(ctx, "VariableService.GetVariables")
+	defer end(&err)
+
 	var variables []*domain.Variable
 	for _, kind := range selectedKinds(kind) {
 		rows, err := s.v2Pool.Statements().GetVariables(ctx, owner, kind, names...)
@@ -113,7 +116,10 @@ func (s *variableService) GetVariables(ctx context.Context, owner domain.Variabl
 	return variables, nil
 }
 
-func (s *variableService) GetDecryptedVariables(ctx context.Context, owner domain.VariableOwner, kind *domain.DeploymentOriginKind, names ...string) ([]*domain.Variable, error) {
+func (s *variableService) GetDecryptedVariables(ctx context.Context, owner domain.VariableOwner, kind *domain.DeploymentOriginKind, names ...string) (_ []*domain.Variable, err error) {
+	ctx, end := startSpan(ctx, "VariableService.GetDecryptedVariables")
+	defer end(&err)
+
 	variables, err := s.GetVariables(ctx, owner, kind, names...)
 	if err != nil {
 		return nil, err
@@ -153,13 +159,15 @@ type variableRemoval struct {
 	kind domain.DeploymentOriginKind
 }
 
-func (s *variableService) SetVariables(ctx context.Context, owner domain.VariableOwner, kind *domain.DeploymentOriginKind, variablesToSet []VariableToSet) error {
+func (s *variableService) SetVariables(ctx context.Context, owner domain.VariableOwner, kind *domain.DeploymentOriginKind, variablesToSet []VariableToSet) (err error) {
+	ctx, end := startSpan(ctx, "VariableService.SetVariables")
+	defer end(&err)
+
 	if len(variablesToSet) == 0 {
 		return nil
 	}
 
 	var crypter crypto.Crypter
-	var err error
 
 	containsSecret := slices.ContainsFunc(variablesToSet, func(set VariableToSet) bool {
 		return set.IsSecret
@@ -315,9 +323,12 @@ func setVariableError(err error) error {
 	return domain.ErrInternal(err).WithMessage("failed to write variable to database")
 }
 
-func (s *variableService) DeleteVariable(ctx context.Context, owner domain.VariableOwner, kind *domain.DeploymentOriginKind, name string) error {
+func (s *variableService) DeleteVariable(ctx context.Context, owner domain.VariableOwner, kind *domain.DeploymentOriginKind, name string) (err error) {
+	ctx, end := startSpan(ctx, "VariableService.DeleteVariable")
+	defer end(&err)
+
 	kinds := selectedKinds(kind)
-	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		stmts := tx.Statements()
 		// Without a kind the name is gone from both kinds afterwards, and it
 		// is "not found" only when neither held it: a row for one kind alone
@@ -379,7 +390,10 @@ func emitVariableRemoved(ctx context.Context, stmts EventStatements, owner domai
 	})
 }
 
-func (s *variableService) ReplaceVariablesInPlace(ctx context.Context, owner domain.VariableOwner, doc map[string]any) error {
+func (s *variableService) ReplaceVariablesInPlace(ctx context.Context, owner domain.VariableOwner, doc map[string]any) (err error) {
+	ctx, end := startSpan(ctx, "VariableService.ReplaceVariablesInPlace")
+	defer end(&err)
+
 	placeholders, err := domain.ScanDocumentForVariables(doc)
 	if err != nil {
 		return err

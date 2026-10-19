@@ -9,6 +9,7 @@ import {
   optionArgs,
   portableCommands,
   publicCliCommand,
+  sdkVersionForCli,
 } from "../../../src/lib/public-cli";
 
 describe("public CLI command formatting", () => {
@@ -16,6 +17,15 @@ describe("public CLI command formatting", () => {
     expect(npmDistTagForCliVersion("0.1.0-alpha.1")).toBe("alpha");
     expect(npmSelectorForCliVersion("0.1.0-alpha.1")).toBe("0.1.0-alpha.1");
     expect(publicCliCommand("start", "0.1.0-alpha.1")).toBe("npx @zitadel/cli@0.1.0-alpha.1 start");
+  });
+
+  it.each([
+    ["1.0.0-alpha.25", "1.0.0-alpha.25"],
+    ["v1.0.0-alpha.25", "1.0.0-alpha.25"],
+    ["1.0.0", "latest"],
+    ["1.0.0-beta.2", "beta"],
+  ])("pins scaffolded SDKs for CLI %s at %s", (cliVersion, expected) => {
+    expect(sdkVersionForCli(cliVersion)).toBe(expected);
   });
 
   it("uses latest for stable versions", () => {
