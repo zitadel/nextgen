@@ -1,16 +1,13 @@
 get:
   operationId: getTeam
+  x-zitadel-cli: teams get
   summary: Get team
   description: |
     Returns a Team by its id.
   tags:
     - Teams
   parameters:
-    - name: team_id
-      in: path
-      required: true
-      schema:
-        $ref: ../../../components/schemas/team-id.yaml
+    - $ref: ../../../components/parameters/team-id-path.yaml
   security:
     - oauth2:
         - team.read
@@ -43,6 +40,7 @@ get:
 
 delete:
   operationId: deleteTeam
+  x-zitadel-cli: teams deactivate
   summary: Delete team
   description: |
     Deactivates the team.
@@ -61,11 +59,7 @@ delete:
   tags:
     - Teams
   parameters:
-    - name: team_id
-      in: path
-      required: true
-      schema:
-        $ref: ../../../components/schemas/team-id.yaml
+    - $ref: ../../../components/parameters/team-id-path.yaml
   security:
     - oauth2:
         - team.delete
@@ -107,17 +101,14 @@ delete:
 
 patch:
   operationId: updateTeam
+  x-zitadel-cli: teams update
   summary: Update team
   description: |
     Update team. Only active teams can be updated.
   tags:
     - Teams
   parameters:
-    - name: team_id
-      in: path
-      required: true
-      schema:
-        $ref: ../../../components/schemas/team-id.yaml
+    - $ref: ../../../components/parameters/team-id-path.yaml
   security:
     - oauth2:
         - team.write

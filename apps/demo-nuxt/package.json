@@ -21,14 +21,12 @@
     "lint": "biome check ."
   },
   "dependencies": {
-    "@zitadel/api": "workspace:*",
     "@zitadel/sdk-nuxt": "workspace:*",
-    "@zitadel/components": "workspace:*",
-    "@zitadel/design-tokens": "workspace:*",
     "nuxt": "catalog:",
     "vue": "catalog:"
   },
   "devDependencies": {
+    "@babel/core": "catalog:",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vue-tsc": "catalog:"

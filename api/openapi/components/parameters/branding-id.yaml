@@ -1,0 +1,7 @@
+name: id
+in: path
+required: true
+description: The unique identifier of the branding revision.
+schema:
+  type: string
+example: brnd_01KWH1P4MYS7F0N9WD3P2E4YM5

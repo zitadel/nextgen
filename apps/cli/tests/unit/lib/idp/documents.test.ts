@@ -8,7 +8,13 @@ import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/
 import { slug } from "../../../helpers/idp-values";
 import { ZitadelError } from "../../../../src/lib/errors";
 import { serverCanonicalFlow } from "@zitadel/api-mock";
-import { applySsoToFlow, applySsoToSchema, ssoEditRefusal } from "../../../../src/lib/idp";
+import {
+  applySsoToFlow,
+  applySsoToSchema,
+  removeSsoFromFlow,
+  removeSsoFromSchema,
+  ssoEditRefusal,
+} from "../../../../src/lib/idp";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../../../../../..");
 
@@ -209,7 +215,7 @@ describe("applySsoToFlow", () => {
   });
 
   it("leaves out the sign-in escape on a flow that does not serve login", () => {
-    // `sso enable` edits every flow bound to the schema, and a register-only
+    // `auth-method sso enable` edits every flow bound to the schema, and a register-only
     // flow has nowhere to send someone who wants to sign in — the validator
     // rejects a transition that re-purposes to a purpose the flow lacks.
     const registerOnly = {
@@ -237,6 +243,63 @@ describe("applySsoToFlow", () => {
     expect(second.changed).toBe(false);
     expect(second.skipped).toEqual([]);
     expect(second.document).toEqual(first.document);
+  });
+
+  it.each([
+    { from: { password: true, passkey: false }, to: { password: true, passkey: true } },
+    { from: { password: true, passkey: true }, to: { password: false, passkey: true } },
+    { from: { password: false, passkey: false }, to: { password: true, passkey: false } },
+    { from: { password: false, passkey: true }, to: { password: true, passkey: true } },
+  ])(
+    "brings a step the generator wrote for other methods up to date ($from -> $to)",
+    ({ from, to }) => {
+      const first = applySsoToFlow(shippedFlow(), slug("google"), from);
+
+      const second = applySsoToFlow(first.document, slug("google"), to);
+      const fresh = applySsoToFlow(shippedFlow(), slug("google"), to);
+
+      expect(second.skipped).toEqual([]);
+      expect(second.changed).toBe(true);
+      const conflict = (document: object) =>
+        (document as { steps: Array<Record<string, unknown>> }).steps.find(
+          (s) => s.name === "sso-conflict",
+        );
+      expect(conflict(second.document)).toEqual(conflict(fresh.document));
+    },
+  );
+
+  it("keeps the providers and the position of a step it brings up to date", () => {
+    const first = applySsoToFlow(shippedFlow(), slug("google"), {
+      password: true,
+      passkey: false,
+    });
+    const names = (document: object) =>
+      (document as { steps: Array<Record<string, unknown>> }).steps.map((s) => s.name);
+
+    const second = applySsoToFlow(first.document, slug("github"), bothMethods);
+
+    expect(names(second.document)).toEqual(names(first.document));
+    const conflict = (second.document as { steps: Array<Record<string, unknown>> }).steps.find(
+      (s) => s.name === "sso-conflict",
+    );
+    expect(conflict?.sso_providers).toEqual(["google", "github"]);
+  });
+
+  it("still leaves a step that matches no combination of methods alone", () => {
+    const first = applySsoToFlow(shippedFlow(), slug("google"), {
+      password: true,
+      passkey: false,
+    });
+    const edited = structuredClone(first.document) as { steps: Array<Record<string, unknown>> };
+    const conflict = edited.steps.find((s) => s.name === "sso-conflict");
+    (conflict as Record<string, unknown>).fields = ["email"];
+
+    const second = applySsoToFlow(edited, slug("google"), bothMethods);
+
+    expect(second.changed).toBe(false);
+    expect(second.skipped).toEqual([
+      { step: "sso-conflict", region: "steps.sso-conflict", reason: "hand-edited" },
+    ]);
   });
 
   it("leaves a hand-edited step alone and reports it", () => {
@@ -741,9 +804,24 @@ describe("refusing a document the editors would overwrite", () => {
     expect(ssoEditRefusal({ "x-auth-methods": { sso: true } }, "schema")).toBe(
       "x-auth-methods.sso is not an object",
     );
-    expect(ssoEditRefusal({ "x-auth-methods": { sso: { providers: "google" } } }, "schema")).toBe(
-      "x-auth-methods.sso.providers is not a list",
+    expect(
+      ssoEditRefusal(
+        { "x-auth-methods": { sso: { enabled: true, providers: "google" } } },
+        "schema",
+      ),
+    ).toBe("x-auth-methods.sso.providers is not a list");
+  });
+
+  it("refuses an sso entry without a boolean enabled", () => {
+    expect(ssoEditRefusal({ "x-auth-methods": { sso: { providers: ["google"] } } }, "schema")).toBe(
+      "x-auth-methods.sso.enabled is not a boolean",
     );
+    expect(
+      ssoEditRefusal(
+        { "x-auth-methods": { sso: { enabled: "true", providers: ["google"] } } },
+        "schema",
+      ),
+    ).toBe("x-auth-methods.sso.enabled is not a boolean");
   });
 
   it("still gains a second provider after the server dropped its default primary: false", () => {
@@ -796,6 +874,144 @@ describe("refusing a document the editors would overwrite", () => {
     });
 
     expect(skipped.map((entry) => entry.region)).toContain("steps.sso-conflict");
+  });
+});
+
+/** A schema's `x-auth-methods`, typed for reading in the tests below. */
+function methodsOf(schema: object): Record<string, unknown> {
+  return (schema as { "x-auth-methods": Record<string, unknown> })["x-auth-methods"];
+}
+
+describe("removeSsoFromSchema", () => {
+  const withProviders = (providers: string[]) => ({
+    ...getDefaultHumanUserSchema(),
+    "x-auth-methods": {
+      password: { enabled: true },
+      passkey: { enabled: false },
+      sso: { enabled: true, providers },
+    },
+  });
+
+  it("takes one provider out and keeps the rest", () => {
+    const { document, changed } = removeSsoFromSchema(
+      withProviders(["google", "github"]),
+      "google",
+    );
+
+    expect(changed).toBe(true);
+    expect(methodsOf(document).sso).toEqual({
+      enabled: true,
+      providers: ["github"],
+    });
+  });
+
+  it("turns SSO off when the last provider goes", () => {
+    const { document } = removeSsoFromSchema(withProviders(["google"]), "google");
+
+    expect(methodsOf(document).sso).toEqual({ enabled: false });
+  });
+
+  it("leaves password and passkey as they are", () => {
+    const { document } = removeSsoFromSchema(withProviders(["google"]), "google");
+
+    expect(methodsOf(document).password).toEqual({ enabled: true });
+    expect(methodsOf(document).passkey).toEqual({ enabled: false });
+  });
+
+  it("does not change the schema it was given", () => {
+    const schema = withProviders(["google"]);
+    const copy = structuredClone(schema);
+
+    removeSsoFromSchema(schema, "google");
+
+    expect(schema).toEqual(copy);
+  });
+
+  it("changes nothing for a provider the schema does not offer", () => {
+    const schema = withProviders(["github"]);
+
+    expect(removeSsoFromSchema(schema, "google")).toEqual({
+      document: schema,
+      changed: false,
+      skipped: [],
+    });
+  });
+});
+
+describe("removeSsoFromFlow", () => {
+  /** The shipped flow after `auth-method sso enable` added these providers. */
+  function enabled(...slugs: string[]): Record<string, unknown> {
+    let flow: object = shippedFlow();
+    for (const name of slugs) {
+      flow = applySsoToFlow(flow, slug(name), bothMethods).document;
+    }
+    return flow as Record<string, unknown>;
+  }
+
+  it("does not change the flow it was given", () => {
+    const flow = enabled("google");
+    const copy = structuredClone(flow);
+
+    removeSsoFromFlow(flow, "google");
+
+    expect(flow).toEqual(copy);
+  });
+
+  it("takes the provider off every step that offered it", () => {
+    const { document, changed } = removeSsoFromFlow(enabled("google"), "google");
+
+    expect(changed).toBe(true);
+    const offering = (document as { steps: Array<{ sso_providers?: string[] }> }).steps.filter(
+      (step) => step.sso_providers !== undefined,
+    );
+    expect(offering).toEqual([]);
+  });
+
+  it.each(["passkey-first", "password-first"] as const)(
+    "takes the provider off the password step of the %s flow, which enabling also offers it on",
+    (preset) => {
+      const flow = applySsoToFlow(getDefaultLoginFlow({ preset }), slug("google"), bothMethods)
+        .document as Record<string, unknown>;
+      expect(stepNamed(flow, "password").sso_providers).toEqual(["google"]);
+
+      const { document } = removeSsoFromFlow(flow, "google");
+
+      expect(stepNamed(document, "password").sso_providers).toBeUndefined();
+    },
+  );
+
+  it("leaves the password step as enabling reads the shipped one, so enabling again edits it", () => {
+    const { document } = removeSsoFromFlow(enabled("google"), "google");
+
+    const again = applySsoToFlow(document, slug("google"), bothMethods);
+
+    expect(again.skipped).toEqual([]);
+    expect(stepNamed(again.document, "password").sso_providers).toEqual(["google"]);
+  });
+
+  it("keeps the other providers on each step", () => {
+    const { document } = removeSsoFromFlow(enabled("google", "github"), "google");
+
+    expect(stepNamed(document, "identifier").sso_providers).toEqual(["github"]);
+  });
+
+  it("keeps the routes and steps sso enable added", () => {
+    const before = enabled("google");
+
+    const { document } = removeSsoFromFlow(before, "google");
+
+    expect(targetsOf(document, "identifier")).toEqual(targetsOf(before, "identifier"));
+    expect(stepNamed(document, "sso-conflict")).toBeDefined();
+  });
+
+  it("changes nothing for a provider the flow does not offer", () => {
+    const flow = enabled("github");
+
+    expect(removeSsoFromFlow(flow, "google")).toEqual({
+      document: flow,
+      changed: false,
+      skipped: [],
+    });
   });
 });
 

@@ -295,6 +295,9 @@ func (s authzAssignmentStatements) ListAuthorizedProjects(ctx context.Context, h
 	if err != nil {
 		return nil, err
 	}
+	if err := newProjectStatements(s.db).hydrateOrigins(ctx, projects...); err != nil {
+		return nil, err
+	}
 	return &database.ListResult[*domain.Project]{
 		Items:      projects,
 		NextCursor: nextCursor,

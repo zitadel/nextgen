@@ -1,4 +1,5 @@
 import { CommandGroups, type JsonEnvelope, nonBlankArg, OwnerCommand } from "../../lib/oclif";
+import { ZitadelError } from "../../lib/errors";
 import { renderDetail } from "../../lib/oclif/crud/table";
 import { assertVariableName, toVariableRow, variableCells } from "../../lib/variables";
 
@@ -30,7 +31,11 @@ export default class VariablesGet extends OwnerCommand {
 
     // The single-name endpoint answers in the same two forms the collection
     // does, so the row projection is shared rather than duplicated.
-    const row = toVariableRow(name, await client.getVariable(name, scope));
+    const { primary } = await client.getVariable(name, { ...scope, kind: "primary" });
+    if (primary === undefined) {
+      throw new ZitadelError("E_NOT_FOUND", `Variable ${name} has no primary value.`);
+    }
+    const row = toVariableRow(name, primary);
     this.recordTelemetry({ is_secret: row.secret });
 
     const data = row;

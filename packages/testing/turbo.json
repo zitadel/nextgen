@@ -8,10 +8,9 @@
     "build": {
       "dependsOn": ["@zitadel/config#build"]
     },
-    // The last of the release builds (tools/release/turbo.json). tsdown
-    // bundles api and config's release dist into the CJS entries.
+    // tsdown bundles api and config's release dist into the CJS entries.
     "build-release": {
-      "dependsOn": ["@zitadel/config#build-release", "@zitadel/sdk-qwik#build-release"]
+      "dependsOn": ["@zitadel/config#build-release"]
     },
     "test": {
       "dependsOn": ["build"]

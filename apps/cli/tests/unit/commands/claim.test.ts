@@ -16,12 +16,12 @@ import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
-  localContainerName,
   localRuntimePaths,
   writeRuntimeMetadata,
   type RuntimeMetadata,
 } from "../../../src/lib/local-server/runtime";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { aBinaryRecord } from "../../helpers/runtime-record";
 
 /**
  * `zitadel claim` against the api-mock, which is the only working claim
@@ -70,7 +70,7 @@ async function makeProject(overrides: Record<string, unknown> = {}): Promise<{
   const response = await fetch(`${SERVER}/projects`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name: "demo", preview_origins: [] }),
+    body: JSON.stringify({ name: "demo", origins: [] }),
   });
   const project = (await response.json()) as Project;
   // Fail loudly rather than writing `undefined` into the secret: a renamed
@@ -85,6 +85,7 @@ async function makeProject(overrides: Record<string, unknown> = {}): Promise<{
     project_id: project.id,
     project_secret: project.project_secret,
     preview_secret: "sk_preview_test",
+    primary_origins: [],
     preview_origins: [],
     created_at: "2026-01-01T00:00:00.000Z",
     ...overrides,
@@ -198,6 +199,7 @@ describe("claim", () => {
       project_id: "proj-local",
       project_secret: "sk_proj_local",
       preview_secret: "sk_preview_local",
+      primary_origins: [],
       preview_origins: [],
       created_at: "2026-01-01T00:00:00.000Z",
       claimed_at: "2026-02-02T00:00:00.000Z",
@@ -472,17 +474,14 @@ async function startClaimServer(claimUrl = "http://localhost/claim/ch_localstub"
   return `http://localhost:${String(address.port)}`;
 }
 
+/** A runtime record of a server that is running: this process, answering at `serverUrl`. */
 function runtimeFor(cwd: string, serverUrl: string): RuntimeMetadata {
-  return {
-    schema_version: 1,
-    backend: "docker",
-    container_name: localContainerName(cwd),
-    container_id: "container-test-id",
-    image: "ghcr.io/zitadel/nextgen:test",
+  return aBinaryRecord({
+    pid: process.pid,
+    command: process.execPath,
+    log_path: localRuntimePaths(cwd).logFile,
     port: Number(new URL(serverUrl).port),
     server_url: serverUrl,
     data_dir: localRuntimePaths(cwd).dataDir,
-    created_at: "2026-06-09T00:00:00.000Z",
-    cli_version: "0.0.0-test",
-  };
+  });
 }

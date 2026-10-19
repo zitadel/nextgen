@@ -23,10 +23,10 @@ type stubProjectService struct {
 	created *domain.Project
 }
 
-func (s stubProjectService) Create(context.Context, string, []string, bool) (*domain.Project, error) {
+func (s stubProjectService) Create(context.Context, string, []domain.Origin, bool) (*domain.Project, error) {
 	return s.created, nil
 }
-func (s stubProjectService) CreateWithID(context.Context, string, string, []string, bool) (*domain.Project, error) {
+func (s stubProjectService) CreateWithID(context.Context, string, string, []domain.Origin, bool) (*domain.Project, error) {
 	return s.created, nil
 }
 func (stubProjectService) Get(context.Context, string, service.ProjectQueryOptions) (*domain.Project, error) {
@@ -45,6 +45,12 @@ func (stubProjectService) ListAuthorized(context.Context, service.ListAuthorized
 	return nil, domain.ErrSessionTokenInvalid()
 }
 func (stubProjectService) Delete(context.Context, string) error { return nil }
+func (stubProjectService) AddOrigin(context.Context, string, domain.Origin) (*domain.Origin, error) {
+	return nil, domain.ErrNotImplemented()
+}
+func (stubProjectService) RemoveOrigin(context.Context, string, string) error {
+	return domain.ErrNotImplemented()
+}
 
 var _ service.ProjectService = stubProjectService{}
 
@@ -115,7 +121,7 @@ func TestProjectDetailResponseCarriesProjectResponse(t *testing.T) {
 	project := &domain.Project{
 		ID:             "proj_detail",
 		Name:           "Acme",
-		PreviewOrigins: []string{"https://preview.example.com"},
+		Origins:        []domain.Origin{{Pattern: "https://preview.example.com", Kind: domain.OriginKindPreview}},
 		CreatedAt:      now.Add(-time.Hour),
 		UpdatedAt:      now,
 		PasswordHashPolicy: &domain.PasswordHashPolicy{

@@ -4,6 +4,7 @@ package integration_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -117,6 +118,52 @@ func (f *ssoResolutionFixture) createStaffSchema(t *testing.T) string {
 	}`)
 }
 
+// ssoRevisionedObjectType is the objectType of the schema the revision tests
+// republish.
+const ssoRevisionedObjectType = "sso-revisioned-user"
+
+// publishRevisionedSchema publishes revision n of the ssoRevisionedObjectType
+// schema and returns its id. Every revision after the first adds an optional
+// property, the smallest change a republish carries.
+func (f *ssoResolutionFixture) publishRevisionedSchema(t *testing.T, n int) string {
+	t.Helper()
+	properties := map[string]any{"email": map[string]any{"type": "string", "x-unique": "project"}}
+	for i := 2; i <= n; i++ {
+		properties[fmt.Sprintf("nickname%d", i)] = map[string]any{"type": "string"}
+	}
+	doc, err := json.Marshal(map[string]any{
+		"title":          "SSORevisionedUser",
+		"metaSchema":     "https://test.example.schemas.com/schemas/user-schema.json",
+		"$id":            fmt.Sprintf("https://sso-revisioned.example.com/schemas/user-v%d.json", n),
+		"kind":           "user-schema",
+		"objectType":     ssoRevisionedObjectType,
+		"type":           "object",
+		"x-identifier":   "email",
+		"x-auth-methods": map[string]any{"password": map[string]any{"enabled": true}},
+		"properties":     properties,
+	})
+	require.NoError(t, err)
+	return harness.CreateUserSchema(t, f.project, string(doc))
+}
+
+// useRevisionedSchema starts flows on a definition that names the
+// ssoRevisionedObjectType schema by objectType, so they run against its newest
+// revision, and returns the id of its first revision.
+func (f *ssoResolutionFixture) useRevisionedSchema(t *testing.T) string {
+	t.Helper()
+	first := f.publishRevisionedSchema(t, 1)
+	definition := ssoLoginFlowDefinition(ssoRevisionedObjectType)
+	definition.Name = "sso-revisioned-login"
+	resp, err := f.client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+		ProjectID:      f.projectID(),
+		FlowDefinition: definition,
+	})
+	require.NoError(t, err)
+	require.IsType(t, &api.FlowDefinitionResponse{}, resp, helpers.MustMarshal(t, resp))
+	f.definitionName = definition.Name
+	return first
+}
+
 // link pins subject on connectionID to userID and returns the link.
 func (f *ssoResolutionFixture) link(t *testing.T, connectionID, subject, userID string) *domain.IDPIdentityLink {
 	t.Helper()
@@ -137,7 +184,7 @@ func (f *ssoResolutionFixture) attempt(t *testing.T, flow ssoFlow) *domain.AuthA
 func parkSSOResult(t *testing.T, projectID, attemptID, revisionID, subject string, claims map[string]any, verified map[string]bool) {
 	t.Helper()
 	stmts := harness.EnsureServiceDB(t).Statements()
-	sso, err := domain.NewSSOState(projectID, "google", revisionID, "https://auth.example.com/__nextgen/idp/callback", "/after-login", nil)
+	sso, err := domain.NewSSOState(projectID, "google", revisionID, "https://auth.example.com/__nextgen/idp/google/callback", "/after-login", nil)
 	require.NoError(t, err)
 	require.NoError(t, stmts.IssueSSOState(t.Context(), projectID, attemptID, sso.Check))
 	_, err = stmts.ConsumeSSOState(t.Context(), projectID, sso.Check.StateHash, sso.BindingNonce)
@@ -325,6 +372,53 @@ func TestSSOResolutionOtherSchemaReturns409(t *testing.T) {
 	for _, leaked := range []string{staffSchemaURL, defaultSchemaURL(), "sub-1", "alice@example.com", f.connection.ID} {
 		assert.False(t, strings.Contains(body, leaked), "the response must not carry %q: %s", leaked, body)
 	}
+}
+
+// A user keeps the schema revision it was created under. Republishing the
+// schema must not lock the users already linked to a provider out.
+func TestSSOResolutionLinkedUserOnOlderSchemaRevisionRoutesAuthenticated(t *testing.T) {
+	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
+	firstRevision := f.useRevisionedSchema(t)
+	userID := f.createUser(t, firstRevision)
+	f.link(t, f.connection.ID, "sub-1", userID)
+	require.NotEqual(t, firstRevision, f.publishRevisionedSchema(t, 2))
+	flow := f.startFlow(t, "")
+	parkSSOResult(t, f.project.ID, flow.attemptID, f.connection.RevisionID, "sub-1", emailClaims(), map[string]bool{"email": true})
+
+	requireAuthenticated(t, f.getStep(t, flow))
+
+	userFactor, ok := domain.CheckAs[*domain.AuthFactorUser](f.attempt(t, flow), domain.AuthCheckTypeUser)
+	require.True(t, ok)
+	assert.Equal(t, userID, userFactor.UserID)
+	user, err := harness.EnsureUserFixture(t).GetByID(t.Context(), f.project.ID, userID)
+	require.NoError(t, err)
+	assert.Equal(t, firstRevision, user.SchemaURL, "signing in does not move the user to the newer revision")
+}
+
+// The owner of a claimed unique value created under an older revision of the
+// flow's schema is a collision to sign in, not a user of another schema.
+func TestSSOResolutionCollisionWithOwnerOnOlderSchemaRevisionBinds(t *testing.T) {
+	f := newSSOResolutionFixture(t, helpers.OIDCConnection("google"))
+	firstRevision := f.useRevisionedSchema(t)
+	email := helpers.RandString(8) + "@example.com"
+	ownerID := "user_" + helpers.RandString(8)
+	createAttemptUser(t, f.project, f.team, firstRevision, ownerID, map[string]string{"email": email})
+	f.publishRevisionedSchema(t, 2)
+	flow := f.startFlow(t, "")
+	parkSSOResult(t, f.project.ID, flow.attemptID, f.connection.RevisionID, "sub-new", map[string]any{"email": email}, map[string]bool{"email": true})
+
+	resp := f.getStep(t, flow)
+	require.IsType(t, &api.FlowResponseHeaders{}, resp, helpers.MustMarshal(t, resp))
+	assert.Equal(t, "identifier", resp.(*api.FlowResponseHeaders).Response.Step.Name)
+	userFactor, ok := domain.CheckAs[*domain.AuthFactorUser](f.attempt(t, flow), domain.AuthCheckTypeUser)
+	require.True(t, ok)
+	assert.Equal(t, ownerID, userFactor.UserID, "the attempt is bound to the existing user")
+	_, err := f.linkFor(t, "sub-new")
+	require.ErrorAs(t, err, new(*database.NoRowFoundError), "a collision links nothing")
+	owner, err := f.userByEmail(t, email)
+	require.NoError(t, err)
+	assert.Equal(t, ownerID, owner.ID, "no second user was created")
+	assert.Equal(t, firstRevision, owner.SchemaURL, "the owner stays on its revision")
 }
 
 func TestSSOResolutionCreationDisabledRerendersWithError(t *testing.T) {

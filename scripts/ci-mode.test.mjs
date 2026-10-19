@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "vitest";
 
 import {
@@ -6,6 +9,8 @@ import {
   computeMode,
   forceFullReason,
   queryAffectedTargets,
+  ranInGraph,
+  readCiReport,
   resolveGates,
 } from "./ci-mode.mjs";
 
@@ -739,4 +744,55 @@ test("queryAffectedTargets under turbo fails open on garbage output and nonzero 
     query({ stdout: JSON.stringify(turboGraph()) }, ["apps/console/src/main.tsx"]).sort(),
     ["console:build", "server:test"],
   );
+});
+
+// A trimmed `moon ci` report (.moon/cache/ciReport.json, moon 2.6.1): sync
+// actions carry no target, a task's target sits under node.params.
+function ciReport(...tasks) {
+  return {
+    actions: [
+      { label: "SyncWorkspace", node: { action: "sync-workspace" }, status: "passed" },
+      ...tasks.map(([target, status]) => ({
+        label: `RunTask(${target})`,
+        node: { action: "run-task", params: { target } },
+        status,
+      })),
+    ],
+    status: "completed",
+  };
+}
+
+const DB_LANES = ["server:test-postgres", "server:test-sqlite"];
+
+test("ranInGraph names the lanes the graph ran to a pass", () => {
+  const report = ciReport(
+    ["console:build", "cached"],
+    ["server:test-sqlite", "passed"],
+    ["server:test-postgres", "passed"],
+  );
+  assert.deepEqual(ranInGraph(report, DB_LANES), DB_LANES);
+  assert.deepEqual(ranInGraph(report, ["server:test-postgres"]), ["server:test-postgres"]);
+});
+
+test("ranInGraph leaves out a lane the graph skipped, replayed from cache or never reached", () => {
+  // Each of these sends the lane to its own step.
+  const report = ciReport(["server:test-postgres", "skipped"], ["server:test-sqlite", "cached"]);
+  assert.deepEqual(ranInGraph(report, DB_LANES), []);
+  assert.deepEqual(ranInGraph(ciReport(["server:test", "passed"]), DB_LANES), []);
+});
+
+test("no readable ci report counts as a graph that ran nothing", () => {
+  // `moon ci` writes no report when it finds no task affected, as on a run
+  // forced full by a workflow-only diff (run 38509559030): its own steps are
+  // then the lanes' only run.
+  const dir = mkdtempSync(join(tmpdir(), "ci-mode-"));
+  assert.equal(readCiReport(join(dir, "ciReport.json")), null);
+  writeFileSync(join(dir, "garbage.json"), "not json");
+  assert.equal(readCiReport(join(dir, "garbage.json")), null);
+  assert.deepEqual(ranInGraph(null, DB_LANES), []);
+  assert.deepEqual(ranInGraph({ actions: "garbage" }, DB_LANES), []);
+
+  const report = ciReport(["server:test-postgres", "passed"]);
+  writeFileSync(join(dir, "report.json"), JSON.stringify(report));
+  assert.deepEqual(readCiReport(join(dir, "report.json")), report);
 });

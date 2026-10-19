@@ -14,7 +14,7 @@ import (
 	storageproject "github.com/zitadel/nextgen/internal/storage/project"
 )
 
-const createProjectStmt = `INSERT INTO zitadel_nextgen.projects (id, name, preview_origins, password_hash_policy) VALUES ($1, $2, $3, $4) RETURNING id, created_at, updated_at`
+const createProjectStmt = `INSERT INTO zitadel_nextgen.projects (id, name, password_hash_policy) VALUES ($1, $2, $3) RETURNING id, created_at, updated_at`
 
 type projectStatements struct{ statement }
 
@@ -31,25 +31,35 @@ func (ps projectStatements) CreateProject(ctx context.Context, project *domain.P
 	if err := ensureManagedID(&project.ID, domain.PrefixProject); err != nil {
 		return err
 	}
-	origins := project.PreviewOrigins
-	if origins == nil {
-		origins = []string{}
-	}
 	policy, err := storageproject.MarshalPasswordHashPolicy(project.PasswordHashPolicy)
 	if err != nil {
 		return err
 	}
+	origins := domain.NormalizeOrigins(project.Origins)
 	return withTransaction(ctx, ps.client, func(ctx context.Context, tx queryExecutor) error {
-		if err := wrapError(tx.QueryRow(ctx, createProjectStmt, project.ID, project.Name, origins, policy).
+		if err := wrapError(tx.QueryRow(ctx, createProjectStmt, project.ID, project.Name, policy).
 			Scan(&project.ID, &project.CreatedAt, &project.UpdatedAt)); err != nil {
 			return err
 		}
 		rsi := newResourceScopeStatements(tx)
-		return rsi.UpsertResourceScope(ctx, domain.NewProjectResourceScope(project.ID))
+		if err := rsi.UpsertResourceScope(ctx, domain.NewProjectResourceScope(project.ID)); err != nil {
+			return err
+		}
+		originsStmts := newOriginStatements(tx)
+		for _, origin := range origins {
+			if _, err := originsStmts.InsertOrigin(ctx, project.ID, origin); err != nil {
+				return err
+			}
+		}
+		project.Origins = origins
+		return nil
 	})
 }
 
-const deleteByIDProjectStmt = `DELETE FROM zitadel_nextgen.projects WHERE id = $1`
+const (
+	deleteByIDProjectStmt = `DELETE FROM zitadel_nextgen.projects WHERE id = $1`
+	projectQuery          = "SELECT id, name, password_hash_policy, created_at, updated_at FROM zitadel_nextgen.projects"
+)
 
 // DeleteProjectByID implements [service.ProjectStatements].
 // resource_scope_index rows for this project cascade via the project_id FK.
@@ -60,8 +70,6 @@ func (ps projectStatements) DeleteProjectByID(ctx context.Context, id string) (b
 	}
 	return tag.RowsAffected() > 0, nil
 }
-
-const projectQuery = "SELECT id, name, preview_origins, password_hash_policy, created_at, updated_at FROM zitadel_nextgen.projects"
 
 // GetProjectByID implements [service.ProjectStatements].
 func (ps projectStatements) GetProjectByID(ctx context.Context, id string) (*domain.Project, error) {
@@ -80,20 +88,24 @@ func (ps projectStatements) GetProjectByID(ctx context.Context, id string) (*dom
 	if err != nil {
 		return nil, wrapError(err)
 	}
+	if err := ps.hydrateOrigins(ctx, project); err != nil {
+		return nil, err
+	}
 	return project, nil
 }
 
-const updateProjectStmt = `UPDATE zitadel_nextgen.projects SET name = $2, updated_at = now() WHERE id = $1 RETURNING id, name, preview_origins, password_hash_policy, created_at, updated_at`
-
-const setProjectPasswordHashPolicyStmt = `UPDATE zitadel_nextgen.projects SET password_hash_policy = $2, updated_at = now() WHERE id = $1 RETURNING updated_at`
+const (
+	updateProjectStmt                = `UPDATE zitadel_nextgen.projects SET name = $2, updated_at = now() WHERE id = $1 RETURNING id, name, password_hash_policy, created_at, updated_at`
+	setProjectPasswordHashPolicyStmt = `UPDATE zitadel_nextgen.projects SET password_hash_policy = $2, updated_at = now() WHERE id = $1 RETURNING updated_at`
+)
 
 // UpdateProject implements [service.ProjectStatements].
-// Only the name is updated; preview origins are left untouched. The whole row is
+// Only the name is updated; origins are left untouched. The whole row is
 // read back onto the project.
 func (ps projectStatements) UpdateProject(ctx context.Context, project *domain.Project) error {
 	var policy []byte
 	if err := wrapError(ps.client.QueryRow(ctx, updateProjectStmt, project.ID, project.Name).
-		Scan(&project.ID, &project.Name, &project.PreviewOrigins, &policy, &project.CreatedAt, &project.UpdatedAt)); err != nil {
+		Scan(&project.ID, &project.Name, &policy, &project.CreatedAt, &project.UpdatedAt)); err != nil {
 		return err
 	}
 	decoded, err := storageproject.UnmarshalPasswordHashPolicy(policy)
@@ -101,7 +113,7 @@ func (ps projectStatements) UpdateProject(ctx context.Context, project *domain.P
 		return err
 	}
 	project.PasswordHashPolicy = decoded
-	return nil
+	return ps.hydrateOrigins(ctx, project)
 }
 
 // SetProjectPasswordHashPolicy implements [service.ProjectStatements].
@@ -140,10 +152,29 @@ func (ps projectStatements) ListProjects(ctx context.Context, filter *database.L
 	if err != nil {
 		return nil, err
 	}
+	if err := ps.hydrateOrigins(ctx, projects...); err != nil {
+		return nil, err
+	}
 	return &database.ListResult[*domain.Project]{
 		Items:      projects,
 		NextCursor: nextCursor,
 	}, nil
+}
+
+func (ps projectStatements) hydrateOrigins(ctx context.Context, projects ...*domain.Project) error {
+	if len(projects) == 0 {
+		return nil
+	}
+	ids := make([]string, len(projects))
+	for i, p := range projects {
+		ids[i] = p.ID
+	}
+	listed, err := newOriginStatements(ps.client).ListOrigins(ctx, storageproject.ListOriginsOptions(ids))
+	if err != nil {
+		return err
+	}
+	storageproject.AssignOrigins(projects, listed.Items)
+	return nil
 }
 
 func (ps projectStatements) scanProject(row pgx.CollectableRow) (*domain.Project, error) {
@@ -154,7 +185,7 @@ func (ps projectStatements) scanProject(row pgx.CollectableRow) (*domain.Project
 func (ps projectStatements) scanProjectWith(row pgx.CollectableRow, extra ...any) (*domain.Project, error) {
 	project := new(domain.Project)
 	var policy []byte
-	if err := row.Scan(append([]any{&project.ID, &project.Name, &project.PreviewOrigins, &policy, &project.CreatedAt, &project.UpdatedAt}, extra...)...); err != nil {
+	if err := row.Scan(append([]any{&project.ID, &project.Name, &policy, &project.CreatedAt, &project.UpdatedAt}, extra...)...); err != nil {
 		return nil, err
 	}
 	decoded, err := storageproject.UnmarshalPasswordHashPolicy(policy)
@@ -162,6 +193,7 @@ func (ps projectStatements) scanProjectWith(row pgx.CollectableRow, extra ...any
 		return nil, err
 	}
 	project.PasswordHashPolicy = decoded
+	project.Origins = []domain.Origin{}
 	return project, nil
 }
 
@@ -169,7 +201,7 @@ func (ps projectStatements) scanProjectWith(row pgx.CollectableRow, extra ...any
 // column, in one round trip. GetProject runs it only when asked for the owning
 // team: GetProjectByID runs on hot paths and stays a plain read.
 func writeProjectWithOwningTeam(c *statementCompiler, id string) {
-	c.WriteString("SELECT id, name, preview_origins, password_hash_policy, created_at, updated_at, (")
+	c.WriteString("SELECT id, name, password_hash_policy, created_at, updated_at, (")
 	authz.WriteActiveOwningTeamID(c, postgresAuthzEnv(), func(w authz.ArgWriter) { w.WriteString("projects.id") })
 	c.WriteString(") FROM zitadel_nextgen.projects WHERE id = ")
 	c.WriteArg(id)
@@ -192,6 +224,9 @@ func (ps projectStatements) GetProject(ctx context.Context, id string, opts serv
 	})
 	if err != nil {
 		return nil, wrapError(err)
+	}
+	if err := ps.hydrateOrigins(ctx, project); err != nil {
+		return nil, err
 	}
 	if owningTeamID != nil {
 		project.OwningTeamID = *owningTeamID
@@ -221,10 +256,5 @@ var projectSchema = database.NewSchema(map[domain.ProjectField]database.FieldBin
 		SQLName:  "updated_at",
 		Accessor: func(p *domain.Project) any { return p.UpdatedAt },
 		Coerce:   database.CoerceTime,
-	},
-	domain.ProjectFieldPreviewOrigins: {
-		SQLName:  "preview_origins",
-		Accessor: func(p *domain.Project) any { return p.PreviewOrigins },
-		Coerce:   database.CoerceSliceAsAny(database.CoerceStringValue),
 	},
 })

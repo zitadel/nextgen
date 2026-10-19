@@ -61,6 +61,7 @@ post:
 
 get:
   operationId: listSchemas
+  x-zitadel-cli: schemas list
   summary: List all schemas
   description: |
     Retrieve a list of all schemas available in the system. This endpoint 

@@ -66,6 +66,7 @@ func createMockedProjectService(t *testing.T) (svc service.ProjectService,
 		schemaValidator,
 		keyService,
 		testHasherFactory(t),
+		domain.DefaultSharedHosts,
 	)
 
 	return
@@ -96,19 +97,19 @@ func TestProjectService_Create(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name                   string
-		projectName            string
-		previewOrigins         []string
-		seedDefaults           bool
-		setupMocks             func(masterKey *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements)
-		wantErr                error
-		expectedPreviewOrigins []string
+		name            string
+		projectName     string
+		origins         []domain.Origin
+		seedDefaults    bool
+		setupMocks      func(masterKey *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements)
+		wantErr         error
+		expectedOrigins []domain.Origin
 	}{
 		{
-			name:           "ok — no preview origins",
-			projectName:    "test",
-			previewOrigins: nil,
-			seedDefaults:   true,
+			name:         "ok — no preview origins",
+			projectName:  "test",
+			origins:      nil,
+			seedDefaults: true,
 			setupMocks: func(masterKey *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements) {
 				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any()).DoAndReturn(
 					func(_ context.Context, p *domain.Project) error {
@@ -133,13 +134,16 @@ func TestProjectService_Create(t *testing.T) {
 				statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any())
 				statements.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any())
 			},
-			expectedPreviewOrigins: make([]string, 0),
+			expectedOrigins: make([]domain.Origin, 0),
 		},
 		{
-			name:           "ok — with preview origins",
-			projectName:    "test",
-			previewOrigins: []string{"*.vercel.app", "*.netlify.app"},
-			seedDefaults:   true,
+			name:        "ok — with preview origins",
+			projectName: "test",
+			origins: []domain.Origin{
+				{Pattern: "https://*-acme.vercel.app", Kind: domain.OriginKindPreview},
+				{Pattern: "https://*--acme.netlify.app", Kind: domain.OriginKindPreview},
+			},
+			seedDefaults: true,
 			setupMocks: func(masterKey *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements) {
 				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any()).DoAndReturn(
 					func(_ context.Context, p *domain.Project) error {
@@ -156,7 +160,10 @@ func TestProjectService_Create(t *testing.T) {
 				statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any())
 				statements.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any())
 			},
-			expectedPreviewOrigins: []string{"*.vercel.app", "*.netlify.app"},
+			expectedOrigins: []domain.Origin{
+				{Pattern: "https://*-acme.vercel.app", Kind: domain.OriginKindPreview},
+				{Pattern: "https://*--acme.netlify.app", Kind: domain.OriginKindPreview},
+			},
 		},
 		{
 			name:         "ok — skip fallback defaults",
@@ -179,7 +186,7 @@ func TestProjectService_Create(t *testing.T) {
 				statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any()).Times(0)
 				statements.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any()).Times(0)
 			},
-			expectedPreviewOrigins: make([]string, 0),
+			expectedOrigins: make([]domain.Origin, 0),
 		},
 		{
 			name:        "project creation error should bubble up",
@@ -205,7 +212,7 @@ func TestProjectService_Create(t *testing.T) {
 			svc, _, _, _, _, masterKey, _, _, _, statements := createMockedProjectService(t)
 			tc.setupMocks(masterKey, statements)
 
-			got, err := svc.Create(context.Background(), tc.projectName, tc.previewOrigins, tc.seedDefaults)
+			got, err := svc.Create(context.Background(), tc.projectName, tc.origins, tc.seedDefaults)
 			if tc.wantErr != nil {
 				require.ErrorIs(t, err, tc.wantErr)
 				assert.Nil(t, got)
@@ -213,7 +220,7 @@ func TestProjectService_Create(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			if assert.NotNil(t, got) {
-				assert.Equal(t, tc.expectedPreviewOrigins, got.PreviewOrigins)
+				assert.Equal(t, tc.expectedOrigins, got.Origins)
 			}
 		})
 	}
@@ -224,11 +231,11 @@ func TestProjectService_Get(t *testing.T) {
 
 	now := time.Now().UTC()
 	project := &domain.Project{
-		ID:             "proj_aaa",
-		Name:           "project aaa",
-		CreatedAt:      now,
-		UpdatedAt:      now,
-		PreviewOrigins: []string{"myapp.example.com"},
+		ID:        "proj_aaa",
+		Name:      "project aaa",
+		CreatedAt: now,
+		UpdatedAt: now,
+		Origins:   []domain.Origin{{Pattern: "https://myapp.example.com", Kind: domain.OriginKindPreview}},
 	}
 
 	tests := []struct {
@@ -874,10 +881,10 @@ func TestProjectService_DefaultProject(t *testing.T) {
 		t.Parallel()
 
 		first := &domain.Project{
-			ID:             "proj_first",
-			CreatedAt:      time.Now().UTC(),
-			UpdatedAt:      time.Now().UTC(),
-			PreviewOrigins: []string{},
+			ID:        "proj_first",
+			CreatedAt: time.Now().UTC(),
+			UpdatedAt: time.Now().UTC(),
+			Origins:   []domain.Origin{},
 		}
 
 		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
@@ -906,8 +913,8 @@ func TestProjectService_DefaultProject(t *testing.T) {
 	t.Run("skips the platform project even when it is the oldest row", func(t *testing.T) {
 		t.Parallel()
 
-		platform := &domain.Project{ID: domain.PlatformProjectID, PreviewOrigins: []string{}}
-		real := &domain.Project{ID: "proj_real", PreviewOrigins: []string{}}
+		platform := &domain.Project{ID: domain.PlatformProjectID, Origins: []domain.Origin{}}
+		real := &domain.Project{ID: "proj_real", Origins: []domain.Origin{}}
 
 		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 
@@ -924,7 +931,7 @@ func TestProjectService_DefaultProject(t *testing.T) {
 	t.Run("returns nil when only the platform project exists", func(t *testing.T) {
 		t.Parallel()
 
-		platform := &domain.Project{ID: domain.PlatformProjectID, PreviewOrigins: []string{}}
+		platform := &domain.Project{ID: domain.PlatformProjectID, Origins: []domain.Origin{}}
 
 		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 
@@ -943,7 +950,7 @@ func TestProjectService_DefaultProject(t *testing.T) {
 	t.Run("a configured platform project id is honored", func(t *testing.T) {
 		t.Parallel()
 
-		platform := &domain.Project{ID: domain.PlatformProjectID, PreviewOrigins: []string{}}
+		platform := &domain.Project{ID: domain.PlatformProjectID, Origins: []domain.Origin{}}
 
 		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 
@@ -975,7 +982,7 @@ func TestProjectService_DefaultProject(t *testing.T) {
 	t.Run("returns the configured project when it exists", func(t *testing.T) {
 		t.Parallel()
 
-		configured := &domain.Project{ID: "proj_custom", PreviewOrigins: []string{}}
+		configured := &domain.Project{ID: "proj_custom", Origins: []domain.Origin{}}
 
 		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 

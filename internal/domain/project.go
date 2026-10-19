@@ -65,9 +65,9 @@ type Project struct {
 	Name      string
 	CreatedAt time.Time
 	UpdatedAt time.Time
-	// PreviewOrigins are the allowed origins for the preview secret.
-	// Callers must set this field before the project is persisted.
-	PreviewOrigins []string
+	// Origins are the project's origin patterns. Callers must set this field
+	// before the project is persisted.
+	Origins []Origin
 	// PasswordHashPolicy is the hashing method this project's passwords are
 	// written with. Nil means the deployment default, which is what a project
 	// runs on until an admin chooses otherwise. See [PasswordHashPolicy].
@@ -77,19 +77,19 @@ type Project struct {
 	OwningTeamID string
 }
 
-func NewProject(name string, previewOrigins []string) (*Project, error) {
+func NewProject(name string, origins []Origin) (*Project, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, ErrProjectNameInvalid()
 	}
-
-	if previewOrigins == nil {
-		previewOrigins = []string{}
+	normalized := NormalizeOrigins(origins)
+	if err := (OriginValidator{SharedHosts: DefaultSharedHosts}).ValidateAll(normalized); err != nil {
+		return nil, err
 	}
 
 	return &Project{
-		Name:           name,
-		PreviewOrigins: previewOrigins,
+		Name:    name,
+		Origins: CompactOrigins(normalized),
 	}, nil
 }
 
@@ -166,7 +166,6 @@ const (
 	ProjectFieldName
 	ProjectFieldCreatedAt
 	ProjectFieldUpdatedAt
-	ProjectFieldPreviewOrigins
 )
 
 type ProjectKeySet struct {

@@ -19,10 +19,10 @@
     "test": {
       "dependsOn": ["generate"]
     },
-    // Release builds run in the order tools/release/moon.yml lists them
-    // (moon: runDepsInParallel: false). The order starts after cli:test,
-    // which imports this package's dist at runtime: the clean step must not
-    // run while it does (moon: the `public-dist` mutex).
+    // The release builds start after cli:test, which imports this package's
+    // dist at runtime: the clean step must not run while it does (moon: the
+    // `public-dist` mutex). Every other release build depends on this one
+    // through its package edges, so they all wait for cli:test.
     "build-release": {
       "dependsOn": ["generate", "@zitadel/cli#test"]
     }
