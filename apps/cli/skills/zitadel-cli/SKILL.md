@@ -378,8 +378,8 @@ same commands as argument lists.
 
 After enabling a provider, `test sign-in` checks the setup without a browser. It
 checks every connection the project has, one block each, and `--provider google`
-checks just one: the provider's discovery document, the scopes and claims the
-connection asks for, and whether the provider accepts the client and the
+checks just one: the provider's discovery document (and the endpoints the runtime needs
+from it), the scopes and claims the connection asks for, and whether the provider accepts the client and the
 callback URI. It never needs the client secret, which the platform stores
 write-only. Each entry of `data.providers[].checks` has a `status` of `pass`,
 `warn`, `fail` or `skipped`, and a `skipped` check is never a pass: it says the
@@ -387,15 +387,18 @@ check could not tell. A failure exits `E_VALIDATION` naming the providers that
 failed, with the one thing to do in `hint`. Add `--live` (with `--provider` when
 there are several) only when a person is at the machine: it opens the login page
 and waits for them to sign in, then reports from the project's audit events
-(`zitadel events list`) which phase failed and on which side; a wrong secret
-shows up there as a provider-side failure at the exchange. It works against any
-server the project is on, needs the files applied, and leaves any user it
-created in the project. A sign-in that fails before the person leaves the login
-page, such as a connection the server cannot build the redirect from, records no
-event, so the check ends with "no sign-in attempt seen"; the checks that run
-without `--live` catch the usual causes of that. The event that an attempt began
-does not name a provider, so `--live` follows the first attempt it sees; on a
-server where someone else logs in at the same time, it can follow theirs.
+(`zitadel events list`) which phase failed and on which side, provider or
+journey; a wrong secret shows up there as a provider-side failure at the
+exchange. It works against any server the project is on, but the project must be
+claimed (`zitadel claim`), because the events of an unclaimed project are hidden,
+and the files must be applied. A `--dry-run` starts nothing, since a sign-in can
+create a user and `--live` leaves any user it created in the project. It follows
+the first attempt that exchanges with the named connection and ignores the
+others, so a password login in the meantime does not count. A sign-in that fails
+before the person leaves the login page, such as a connection the server cannot
+build the redirect from, records no event, so the check ends with "no sign-in
+attempt seen"; the checks that run without `--live` catch the usual causes of
+that.
 
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
 then re-run `plan` and `apply`. See the reference below for driving the login UI
