@@ -35,17 +35,22 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// jobSpan returns the one exported span named name, which must be a root.
-func jobSpan(t *testing.T, name string) tracetest.SpanStub {
-	t.Helper()
+// rootSpans returns the exported root spans named name.
+func rootSpans(name string) []tracetest.SpanStub {
 	var found []tracetest.SpanStub
 	for _, s := range spanExporter.GetSpans() {
-		if s.Name == name {
+		if s.Name == name && !s.Parent.IsValid() {
 			found = append(found, s)
 		}
 	}
-	require.Len(t, found, 1)
-	assert.False(t, found[0].Parent.IsValid(), "a job run is a root")
+	return found
+}
+
+// jobSpan returns the one exported root span named name, which must be sampled.
+func jobSpan(t *testing.T, name string) tracetest.SpanStub {
+	t.Helper()
+	found := rootSpans(name)
+	require.Len(t, found, 1, "one root named %s", name)
 	assert.True(t, found[0].SpanContext.IsSampled())
 	return found[0]
 }
@@ -83,31 +88,77 @@ func TestRetentionJob_runIsTraced(t *testing.T) {
 	}
 }
 
+// tracedExportSource records the span each call runs under, and fails a call
+// when its error is set.
 type tracedExportSource struct {
 	*fakeExportSource
 	list     trace.SpanContext
 	projects map[string]trace.SpanContext
+
+	listErr, cursorErr, afterErr, upsertErr error
 }
 
 func (s *tracedExportSource) ListClaimedProjectIDs(ctx context.Context) ([]string, error) {
 	s.list = trace.SpanContextFromContext(ctx)
+	if s.listErr != nil {
+		return nil, s.listErr
+	}
 	return s.fakeExportSource.ListClaimedProjectIDs(ctx)
 }
 
 func (s *tracedExportSource) GetEventSinkCursor(ctx context.Context, sinkID, projectID string) (*domain.EventSinkCursor, error) {
 	s.projects[projectID] = trace.SpanContextFromContext(ctx)
+	if s.cursorErr != nil {
+		return nil, s.cursorErr
+	}
 	return s.fakeExportSource.GetEventSinkCursor(ctx, sinkID, projectID)
 }
 
-// rootSpans returns the exported root spans named name.
-func rootSpans(name string) []tracetest.SpanStub {
-	var found []tracetest.SpanStub
-	for _, s := range spanExporter.GetSpans() {
-		if s.Name == name && !s.Parent.IsValid() {
-			found = append(found, s)
-		}
+func (s *tracedExportSource) ListEventsAfterCursor(ctx context.Context, projectID string, afterCreatedAt time.Time, afterID string, limit int) ([]*domain.Event, error) {
+	if s.afterErr != nil {
+		return nil, s.afterErr
 	}
-	return found
+	return s.fakeExportSource.ListEventsAfterCursor(ctx, projectID, afterCreatedAt, afterID, limit)
+}
+
+func (s *tracedExportSource) UpsertEventSinkCursor(ctx context.Context, cursor *domain.EventSinkCursor) error {
+	if s.upsertErr != nil {
+		return s.upsertErr
+	}
+	return s.fakeExportSource.UpsertEventSinkCursor(ctx, cursor)
+}
+
+// Every failure of a step fails the span it runs under: the list span for the
+// project list, the root of the (sink, project) pair for the rest.
+func TestShipper_failedStepFailsItsSpan(t *testing.T) {
+	failed := errors.New("x@y")
+	for _, tt := range []struct {
+		name     string
+		src      tracedExportSource
+		wantSpan string
+	}{
+		{name: "project list", src: tracedExportSource{listErr: failed}, wantSpan: "audit.ListClaimedProjects"},
+		{name: "cursor read", src: tracedExportSource{cursorErr: failed}, wantSpan: "audit.ShipEvents"},
+		{name: "event list", src: tracedExportSource{afterErr: failed}, wantSpan: "audit.ShipEvents"},
+		{name: "cursor write", src: tracedExportSource{upsertErr: failed}, wantSpan: "audit.ShipEvents"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			spanExporter.Reset()
+			src := tt.src
+			src.fakeExportSource = newFakeExportSource([]string{"proj_a"}, map[string][]*domain.Event{
+				"proj_a": {{ProjectID: "proj_a", ID: "evt_1", CreatedAt: time.Now(), EventType: domain.EventTypeUserCreated, Category: domain.EventCategoryEntity}},
+			})
+			src.projects = map[string]trace.SpanContext{}
+			s := NewShipper(&src, ExportConfig{Enabled: true, Interval: time.Hour})
+			s.sinks = []*domain.EventSink{{ID: "sink_stdout", Type: domain.EventSinkTypeStdout, Enabled: true}}
+
+			s.shipOnce()
+
+			span := jobSpan(t, tt.wantSpan)
+			assert.Equal(t, codes.Error, span.Status.Code)
+			assert.Contains(t, span.Attributes, attribute.String("error.type", "*errors.errorString"))
+		})
+	}
 }
 
 // A tick lists the projects under a short span of its own, and ships each

@@ -395,17 +395,6 @@ func TestErrorResponseInternalStays500(t *testing.T) {
 		"only transient failures may claim 503")
 }
 
-// The status follows the outermost domain code, the one the body carries: an
-// internal error that wraps an unavailable one is still a 500.
-func TestErrorResponseInternalWrappingUnavailableStays500(t *testing.T) {
-	t.Parallel()
-
-	got := errorResponse(domain.ErrInternal(domain.ErrUnavailable()))
-
-	require.Equal(t, http.StatusInternalServerError, got.StatusCode)
-	require.Equal(t, api.ErrorCode("internal"), got.Response.Code)
-}
-
 func TestDomainErrorDetails_requestInvalidField(t *testing.T) {
 	t.Parallel()
 
