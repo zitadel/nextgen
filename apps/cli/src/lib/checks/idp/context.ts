@@ -60,7 +60,8 @@ export type SignInPhase =
   | "callback_received"
   | "exchange_finished"
   | "resolved"
-  | "user_created";
+  | "user_created"
+  | "handed_off";
 
 /**
  * One phase of one sign-in attempt, as the runtime reports it. It carries ids

@@ -174,7 +174,7 @@ const PHASES_THE_RUNTIME_LOGS = [...RUNTIME_EVENTS.matchAll(/\sPhase = "([a-z_]+
 
 describe("the phases the runtime logs", () => {
   it("are found in the runtime's source, or the cases below prove nothing", () => {
-    expect(PHASES_THE_RUNTIME_LOGS.length).toBe(5);
+    expect(PHASES_THE_RUNTIME_LOGS.length).toBe(6);
   });
 
   it.each(PHASES_THE_RUNTIME_LOGS)("include %s, which is parsed", (phase) => {

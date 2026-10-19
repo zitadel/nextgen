@@ -7121,17 +7121,73 @@ func TestFlowStateMachine_Process_SSOCollectionRefusedSubmit(t *testing.T) {
 	}
 }
 
+// loggedEvent is one sso attempt event as the log carries it.
+type loggedEvent struct{ phase, status, result, reason, side string }
+
+// loggedEvents reads the sso attempt events out of a JSON log, checking that
+// each names the connection and the attempt.
+func loggedEvents(t *testing.T, logs []byte) []loggedEvent {
+	t.Helper()
+	var got []loggedEvent
+	for _, line := range bytes.Split(bytes.TrimSpace(logs), []byte("\n")) {
+		var record map[string]any
+		if len(line) == 0 || json.Unmarshal(line, &record) != nil || record["msg"] != "sso attempt" {
+			continue
+		}
+		assert.Equal(t, "google", record["slug"])
+		assert.Equal(t, "att-1", record["flow_id"])
+		e := loggedEvent{phase: record["phase"].(string), status: record["status"].(string)}
+		e.result, _ = record["result"].(string)
+		e.reason, _ = record["reason"].(string)
+		e.side, _ = record["side"].(string)
+		got = append(got, e)
+	}
+	return got
+}
+
+// A user created on the collection step is reported, and so is the handoff
+// that follows it, which is where the sign-in completes.
+func TestFlowStateMachine_Process_SSOCollectionReportsTheHandoff(t *testing.T) {
+	t.Parallel()
+	var logs bytes.Buffer
+	ctx := zlog.WithLoggingContext(t.Context(), slog.New(slog.NewJSONHandler(&logs, nil)))
+	w, def, state := submittableCollectionStepWorld(t)
+	parked := unlinkedParked(
+		map[string]any{"email": "alice@example.com", "badge": "b-7"},
+		map[string]bool{"email": true, "badge": true},
+	)
+	parked.ProviderSlug = "google"
+	w.expectCollected(parked, nil).Times(2)
+	w.expectOwner("badge", "b-7", "")
+	w.expectOwner("email", "alice@example.com", "")
+	w.expectOwner("username", "alice", "")
+	w.expectCreateLinked(map[string]any{
+		"email": "alice@example.com", "username": "alice", "given_name": "Alice", "family_name": "Liddell", "badge": "b-7",
+	}, "", "user-1", nil)
+	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).
+		Return(domain.FlowHandoffOutput{Token: "handoff-1", ExpiresAt: time.Unix(1700000060, 0).UTC()}, nil)
+
+	_, err := w.sm.Process(ctx, def, state, collectionSubmit(func(map[string]any) {}))
+
+	require.NoError(t, err)
+	assert.Equal(t, []loggedEvent{
+		{"user_created", "ok", "", "", ""},
+		{"handed_off", "ok", "", "", ""},
+	}, loggedEvents(t, logs.Bytes()))
+}
+
 // Each way a parked identity is settled leaves its event: the resolution, and
 // for a new user the creation, carrying the connection's slug and the attempt.
 func TestFlowStateMachine_Render_SSOEmitsResolutionEvents(t *testing.T) {
 	t.Parallel()
-	type event struct{ phase, status, result, reason, side string }
 	claims, verified := completeClaims()
 	tests := []struct {
 		name   string
 		parked *domain.FlowSSOParkedIdentity
 		expect func(w *flowTestWorld)
-		want   []event
+		// wantErr is a render that fails, as when the handoff is not delivered.
+		wantErr bool
+		want    []loggedEvent
 	}{
 		{
 			name: "a linked identity is bound",
@@ -7145,12 +7201,30 @@ func TestFlowStateMachine_Render_SSOEmitsResolutionEvents(t *testing.T) {
 				w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).
 					Return(domain.FlowHandoffOutput{Token: "handoff-1", ExpiresAt: time.Unix(1700000060, 0).UTC()}, nil)
 			},
-			want: []event{{"resolved", "ok", "linked", "", ""}},
+			want: []loggedEvent{{"resolved", "ok", "linked", "", ""}, {"handed_off", "ok", "", "", ""}},
+		},
+		{
+			name: "a handoff that fails after the bind is the journey's",
+			parked: func() *domain.FlowSSOParkedIdentity {
+				p := linkedParked()
+				p.ProviderSlug = "google"
+				return p
+			}(),
+			expect: func(w *flowTestWorld) {
+				w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Return(nil)
+				w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).
+					Return(domain.FlowHandoffOutput{}, errors.New("store unavailable"))
+			},
+			wantErr: true,
+			want: []loggedEvent{
+				{"resolved", "ok", "linked", "", ""},
+				{"handed_off", "failed", "", "handoff_failed", "journey"},
+			},
 		},
 		{
 			name:   "a connection that disallows creation is the journey's",
 			parked: &domain.FlowSSOParkedIdentity{CheckID: "ch-1", ConnectionID: "idp-1", ProviderSlug: "google", Subject: "sub-1", CreationDisabled: true},
-			want:   []event{{"resolved", "failed", "", "creation_disabled", "journey"}},
+			want:   []loggedEvent{{"resolved", "failed", "", "creation_disabled", "journey"}},
 		},
 		{
 			name: "complete claims create a user",
@@ -7165,7 +7239,11 @@ func TestFlowStateMachine_Render_SSOEmitsResolutionEvents(t *testing.T) {
 				w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).
 					Return(domain.FlowHandoffOutput{Token: "handoff-1", ExpiresAt: time.Unix(1700000060, 0).UTC()}, nil)
 			},
-			want: []event{{"user_created", "ok", "", "", ""}, {"resolved", "ok", "created", "", ""}},
+			want: []loggedEvent{
+				{"user_created", "ok", "", "", ""},
+				{"resolved", "ok", "created", "", ""},
+				{"handed_off", "ok", "", "", ""},
+			},
 		},
 		{
 			name: "incomplete claims go to the collection step",
@@ -7175,7 +7253,7 @@ func TestFlowStateMachine_Render_SSOEmitsResolutionEvents(t *testing.T) {
 				return p
 			}(),
 			expect: func(w *flowTestWorld) { w.expectOwner("email", "alice@example.com", "") },
-			want:   []event{{"resolved", "ok", "collect", "", ""}},
+			want:   []loggedEvent{{"resolved", "ok", "collect", "", ""}},
 		},
 	}
 	for _, tt := range tests {
@@ -7191,22 +7269,13 @@ func TestFlowStateMachine_Render_SSOEmitsResolutionEvents(t *testing.T) {
 			}
 
 			_, err := w.sm.Render(ctx, def, state)
-			require.NoError(t, err)
-
-			var got []event
-			for _, line := range bytes.Split(bytes.TrimSpace(logs.Bytes()), []byte("\n")) {
-				var record map[string]any
-				if len(line) == 0 || json.Unmarshal(line, &record) != nil || record["msg"] != "sso attempt" {
-					continue
-				}
-				assert.Equal(t, "google", record["slug"])
-				assert.Equal(t, "att-1", record["flow_id"])
-				e := event{phase: record["phase"].(string), status: record["status"].(string)}
-				e.result, _ = record["result"].(string)
-				e.reason, _ = record["reason"].(string)
-				e.side, _ = record["side"].(string)
-				got = append(got, e)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
 			}
+
+			got := loggedEvents(t, logs.Bytes())
 			assert.Equal(t, tt.want, got)
 		})
 	}

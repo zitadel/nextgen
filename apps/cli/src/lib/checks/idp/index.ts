@@ -34,5 +34,11 @@ export const IDP_CHECKS: readonly Check<IdpContext>[] = [
   new LiveSignInCheck(),
 ];
 
-/** The providers whose wording of a refusal is known, by connection slug. */
-export const PROVIDER_PROBES: Readonly<Record<string, ProviderProbes>> = { google: GOOGLE_PROBES };
+/**
+ * The providers whose wording of a refusal is known, by connection slug. A map,
+ * not an object, so a slug such as `constructor` finds nothing instead of
+ * something inherited.
+ */
+export const PROVIDER_PROBES: ReadonlyMap<string, ProviderProbes> = new Map([
+  ["google", GOOGLE_PROBES],
+]);

@@ -4,8 +4,15 @@ import { IDP_CHECKS, PROVIDER_PROBES } from "../../../../../src/lib/checks/idp";
 
 describe("PROVIDER_PROBES", () => {
   it("knows Google's wording", () => {
-    expect(Object.keys(PROVIDER_PROBES)).toEqual(["google"]);
+    expect([...PROVIDER_PROBES.keys()]).toEqual(["google"]);
   });
+
+  it.each(["constructor", "toString", "__proto__"])(
+    "finds nothing for a slug that is a name every object inherits: %s",
+    (slug) => {
+      expect(PROVIDER_PROBES.get(slug)).toBeUndefined();
+    },
+  );
 });
 
 describe("IDP_CHECKS", () => {

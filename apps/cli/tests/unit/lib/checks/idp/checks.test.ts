@@ -193,6 +193,22 @@ describe("IDP_CHECKS", () => {
   const tokenRequestOf = (sent: readonly Sent[]) =>
     sent.find((request) => request.url.endsWith("/token"));
 
+  it("adds its parameters to an authorization endpoint that already has a query", async () => {
+    const { sent } = await resultsFor({
+      endpoints: {
+        authorization: "https://idp.example/authorize?prompt=consent",
+        token: "https://idp.example/token",
+      },
+    });
+
+    const asked = new URL(sent.find((request) => request.url.includes("/authorize"))?.url ?? "");
+
+    expect([asked.searchParams.get("prompt"), asked.searchParams.get("client_id")]).toEqual([
+      "consent",
+      "the-client",
+    ]);
+  });
+
   it("sends the secret in the Authorization header when the connection authenticates with client_secret_basic", async () => {
     const { sent } = await resultsFor({ tokenAuthMethod: "client_secret_basic" });
 

@@ -20,6 +20,8 @@ export interface Captured<T> {
  * defaults to the answer under which the connection works.
  */
 export interface ProviderBehaviour {
+  /** The issuer the discovery document reports; Google's own unless a spec says otherwise. */
+  readonly issuer?: string;
   readonly callbackUri?: "registered" | "unregistered";
   readonly client?: "known" | "unknown";
   readonly secret?: "right" | "wrong";
@@ -89,6 +91,13 @@ export interface PlatformMock {
    * answer as `behaviour` says.
    */
   hasGoogle(behaviour?: ProviderBehaviour): void;
+
+  /**
+   * Serves a plain OpenID provider at `issuer`: a discovery document naming
+   * endpoints beneath it, which is all a connection without a known provider
+   * is checked against.
+   */
+  hasOidcProvider(issuer: string): void;
 
   /** Makes Google unreachable, as a provider that is down or a network that is cut would. */
   googleIsUnreachable(): void;
@@ -183,7 +192,12 @@ export function usePlatformMock(): PlatformMock {
       watchers.push(watcher);
     },
 
-    hasGoogle({ callbackUri = "registered", client = "known", secret = "right" } = {}) {
+    hasGoogle({
+      callbackUri = "registered",
+      client = "known",
+      secret = "right",
+      issuer = GOOGLE_ISSUER,
+    } = {}) {
       const authorizeTo =
         client === "unknown"
           ? refusalPage("invalid_client")
@@ -193,7 +207,7 @@ export function usePlatformMock(): PlatformMock {
       server.use(
         http.get(`${GOOGLE_ISSUER}/.well-known/openid-configuration`, () =>
           HttpResponse.json({
-            issuer: GOOGLE_ISSUER,
+            issuer,
             authorization_endpoint: `${GOOGLE_ISSUER}/o/oauth2/v2/auth`,
             token_endpoint: GOOGLE_TOKEN_URL,
             scopes_supported: ["openid", "email", "profile"],
@@ -219,6 +233,20 @@ export function usePlatformMock(): PlatformMock {
                 { error: "invalid_grant", error_description: "Malformed auth code." },
                 { status: 400 },
               ),
+        ),
+      );
+    },
+
+    hasOidcProvider(issuer) {
+      server.use(
+        http.get(`${issuer}/.well-known/openid-configuration`, () =>
+          HttpResponse.json({
+            issuer,
+            authorization_endpoint: `${issuer}/authorize`,
+            token_endpoint: `${issuer}/token`,
+            scopes_supported: ["openid", "profile", "email"],
+            code_challenge_methods_supported: ["S256"],
+          }),
         ),
       );
     },

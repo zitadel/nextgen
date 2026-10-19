@@ -547,6 +547,13 @@ export class ScaffoldedApp {
     return result;
   }
 
+  /** `test sign-in` with the client secret piped in as the command asks. */
+  testSignInWithSecret(secret: string, extraArgs: string[] = []): Promise<CliResult> {
+    return this.pipingStdin(secret, () =>
+      this.cli(["test", "sign-in", "--client-secret-stdin", "--json", ...extraArgs]),
+    );
+  }
+
   /** Sets a project variable, whose value is piped rather than passed as a flag. */
   setVariable(name: string, value: string, { secret = false } = {}): Promise<CliResult> {
     return this.pipingStdin(value, () =>

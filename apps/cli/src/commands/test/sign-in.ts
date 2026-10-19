@@ -3,7 +3,11 @@ import { idpProvider, IDP_PROVIDERS, referencedVariable } from "@zitadel/config/
 import { consola } from "consola";
 import pc from "picocolors";
 
-import { createZitadelClient, type ZitadelClient } from "../../lib/api-client";
+import {
+  createZitadelClient,
+  escapeControlCharacters,
+  type ZitadelClient,
+} from "../../lib/api-client";
 import { openInBrowser } from "../../lib/browser";
 import {
   type CheckResult,
@@ -14,7 +18,7 @@ import {
   type Send,
 } from "../../lib/checks/idp";
 import { ZitadelError } from "../../lib/errors";
-import { callbackUriFor, readConnectionFiles } from "../../lib/idp";
+import { type ConnectionFile, callbackUriFor, readConnectionFiles } from "../../lib/idp";
 import { isObject } from "../../lib/json";
 import { DEFAULT_LOCAL_SERVER_URL, readRuntimeMetadata } from "../../lib/local-server/runtime";
 import { LocalServer } from "../../lib/local-server/server";
@@ -94,10 +98,7 @@ export default class TestSignIn extends BaseCommand {
   ];
   static override flags = {
     provider: nonBlankString({
-      description: "Connection to check. Defaults to the Project's only connection.",
-    }),
-    "client-secret": nonBlankString({
-      description: "The provider's client secret, to check it. Prefer --client-secret-stdin.",
+      description: "Connection to check. Defaults to every connection the Project has.",
     }),
     "client-secret-stdin": Flags.boolean({
       description: "Read the provider's client secret, to check it, from stdin.",
@@ -133,35 +134,105 @@ export default class TestSignIn extends BaseCommand {
       await this.requireRunning(server);
     }
 
-    const connection = await this.connection(cwd, flags.provider);
-    const slug = String(connection.body.slug);
-    const oidc = isObject(connection.body.oidc) ? connection.body.oidc : {};
-    const issuer = typeof oidc.issuer === "string" ? oidc.issuer : "";
+    const connections = await this.connections(cwd, flags.provider);
+    if (connections.length > 1 && (live || flags["client-secret-stdin"])) {
+      throw new ZitadelError(
+        "E_VALIDATION",
+        `${live ? "A live sign-in" : "A client secret"} belongs to one provider`,
+        { hint: `Name one with --provider: ${connections.map(slugOf).join(", ")}` },
+      );
+    }
     const projectIssuer = readDevelopmentIssuer(await readZitadelConfig(cwd));
     if (projectIssuer === undefined) {
       throw new ZitadelError("E_VALIDATION", "zitadel.json names no development issuer", {
         hint: "The callback URI is built from it; run zitadel setup first.",
       });
     }
-    const callbackUri = callbackUriFor(projectIssuer, slug);
-
     const suppliedSecret = await this.input({
       kind: "secret",
       name: "client secret",
       message: "Client secret",
-      flag: "--client-secret",
-      given: flags["client-secret"],
+      flag: "--client-secret-stdin",
       stdin: flags["client-secret-stdin"],
       optional: true,
       parse: (raw) => ({ ok: true, value: raw.trim() }),
     });
-    const clientSecret = suppliedSecret === "" ? undefined : suppliedSecret;
+
+    const providers = await connections.reduce<Promise<readonly ProviderReport[]>>(
+      async (done, connection) => [
+        ...(await done),
+        await this.checkProvider({
+          connection,
+          projectIssuer,
+          server,
+          live,
+          timeoutSeconds: flags.timeout,
+          clientSecret: suppliedSecret === "" ? undefined : suppliedSecret,
+          heading: connections.length > 1,
+        }),
+      ],
+      Promise.resolve([]),
+    );
+
+    const total = (key: "passed" | "warned" | "failed" | "skipped") =>
+      providers.reduce((sum, report) => sum + report[key], 0);
+    const data = {
+      title: "Sign-in provider checks.",
+      passed: total("passed"),
+      warned: total("warned"),
+      failed: total("failed"),
+      skipped: total("skipped"),
+      providers,
+    };
+    const summary = `${data.passed} passed, ${data.warned} warned, ${data.failed} failed, ${data.skipped} skipped`;
+    const broken = providers.filter((report) => report.failed > 0);
+    const [first] = broken;
+    if (first !== undefined) {
+      const recovery = first.checks.find((check) => check.status === "fail")?.recovery;
+      throw new ZitadelError(
+        "E_VALIDATION",
+        `Sign-in checks failed for ${broken.map((report) => report.provider).join(", ")}: ${summary}`,
+        {
+          hint:
+            recovery === undefined
+              ? undefined
+              : escaped(providers.length > 1 ? `${first.provider}: ${recovery}` : recovery),
+          details: data,
+        },
+      );
+    }
+    return this.emit({
+      status: "ok",
+      data,
+      pretty: live
+        ? `\n${summary}. A sign-in that created a user left it in the project.`
+        : `\n${summary}. A real sign-in is the only check that proves the whole journey: add --live to try one.`,
+    });
+  }
+
+  /** Runs the battery for one connection, printing each check as it finishes. */
+  private async checkProvider(options: {
+    readonly connection: ConnectionFile;
+    readonly projectIssuer: string;
+    readonly server: LocalServer;
+    readonly live: boolean;
+    readonly timeoutSeconds: number;
+    readonly clientSecret: string | undefined;
+    readonly heading: boolean;
+  }): Promise<ProviderReport> {
+    const { connection, projectIssuer, server, live, clientSecret } = options;
+    const { cwd } = this.meta;
+    const slug = slugOf(connection);
+    const oidc = isObject(connection.body.oidc) ? connection.body.oidc : {};
+    const callbackUri = callbackUriFor(projectIssuer, slug);
     if (live) {
       await this.requireSecretVariable(cwd, oidc.client_secret);
       await this.requireApplied(cwd);
     }
 
-    if (process.stdout.isTTY) {
+    if (options.heading) {
+      consola.log(`\n${pc.bold(slug)}`);
+    } else if (process.stdout.isTTY) {
       consola.info(`Provider  ${slug}`);
       consola.info(`Callback  ${callbackUri}`);
       consola.log("");
@@ -171,7 +242,7 @@ export default class TestSignIn extends BaseCommand {
       IDP_CHECKS,
       idpContext({
         slug,
-        issuer,
+        issuer: typeof oidc.issuer === "string" ? oidc.issuer : "",
         clientId: await this.clientId(cwd, oidc.client_id),
         clientSecret,
         scopes: stringsIn(oidc.scopes),
@@ -186,13 +257,13 @@ export default class TestSignIn extends BaseCommand {
             : "client_secret_basic",
         endpoints: endpointsOf(oidc),
         consoleUrl: catalogId === undefined ? undefined : idpProvider(catalogId).consoleUrl,
-        probes: PROVIDER_PROBES[slug],
+        probes: PROVIDER_PROBES.get(slug),
         request: send,
         ...(live
           ? {
               live: {
                 loginUrl: `${projectIssuer.replace(/\/$/, "")}/login`,
-                timeoutMs: flags.timeout * 1000,
+                timeoutMs: options.timeoutSeconds * 1000,
                 open: async (url) => {
                   await openInBrowser(url);
                 },
@@ -214,11 +285,9 @@ export default class TestSignIn extends BaseCommand {
       }),
       (result) => consola.log(line(result)),
     );
-
     const count = (status: CheckResult["status"]) =>
-      results.filter((r) => r.status === status).length;
-    const data = {
-      title: "Sign-in provider checks.",
+      results.filter((result) => result.status === status).length;
+    return {
       provider: slug,
       callback_uri: callbackUri,
       passed: count("pass"),
@@ -227,21 +296,6 @@ export default class TestSignIn extends BaseCommand {
       skipped: count("skipped"),
       checks: results,
     };
-    const summary = `${data.passed} passed, ${data.warned} warned, ${data.failed} failed, ${data.skipped} skipped`;
-    const failure = results.find((result) => result.status === "fail");
-    if (failure !== undefined) {
-      throw new ZitadelError("E_VALIDATION", `Sign-in checks for ${slug} failed: ${summary}`, {
-        hint: failure.recovery,
-        details: data,
-      });
-    }
-    return this.emit({
-      status: "ok",
-      data,
-      pretty: live
-        ? `\n${summary}. A sign-in that created a user left it in the project.`
-        : `\n${summary}. A real sign-in is the only check that proves the whole journey: add --live to try one.`,
-    });
   }
 
   /** A sign-in needs the runtime it is watching, so a stopped one is refused before anything opens. */
@@ -322,23 +376,27 @@ export default class TestSignIn extends BaseCommand {
     };
   }
 
-  private async connection(cwd: string, provider: string | undefined) {
+  /** The connection named with --provider, or every connection the project has. */
+  private async connections(
+    cwd: string,
+    provider: string | undefined,
+  ): Promise<readonly ConnectionFile[]> {
     const files = await readConnectionFiles(cwd);
     const wanted =
-      provider === undefined ? files : files.filter((file) => file.body.slug === provider);
-    const [only] = wanted;
-    if (only === undefined || wanted.length > 1) {
+      provider === undefined ? files : files.filter((file) => slugOf(file) === provider);
+    if (wanted.length === 0) {
       throw new ZitadelError(
         "E_VALIDATION",
-        wanted.length === 0
-          ? `No connection${provider === undefined ? "" : ` named ${provider}`} in .zitadel/idps/`
-          : "More than one connection: name one with --provider",
+        `No connection${provider === undefined ? "" : ` named ${provider}`} in .zitadel/idps/`,
         {
-          hint: `Connections: ${files.map((file) => String(file.body.slug)).join(", ") || "none"}`,
+          hint:
+            files.length === 0
+              ? "Add one with: zitadel auth-method sso enable --provider google"
+              : `Connections: ${files.map(slugOf).join(", ")}`,
         },
       );
     }
-    return only;
+    return wanted;
   }
 
   /** The client ID: written in the file, or a project variable the file references. */
@@ -373,6 +431,19 @@ function endpointsOf(oidc: Record<string, unknown>) {
     : undefined;
 }
 
+/** What the checks said about one connection. */
+type ProviderReport = {
+  readonly provider: string;
+  readonly callback_uri: string;
+  readonly passed: number;
+  readonly warned: number;
+  readonly failed: number;
+  readonly skipped: number;
+  readonly checks: readonly CheckResult[];
+};
+
+const slugOf = (file: ConnectionFile) => String(file.body.slug);
+
 /** The string members of an array or the string values of an object; anything else has none. */
 function stringsIn(value: unknown): string[] {
   return typeof value === "object" && value !== null
@@ -380,7 +451,14 @@ function stringsIn(value: unknown): string[] {
     : [];
 }
 
+/**
+ * One result for a terminal. A message can carry what the provider's discovery
+ * document said, which nobody here vouches for, so a control character in it is
+ * shown escaped instead of reaching the terminal.
+ */
 function line({ status, title, message, recovery }: CheckResult): string {
-  const row = `  ${GLYPHS[status]} ${title.padEnd(TITLE_WIDTH)}${pc.dim(message)}`;
-  return recovery === undefined ? row : `${row}\n    ${pc.cyan("→")} ${recovery}`;
+  const row = `  ${GLYPHS[status]} ${title.padEnd(TITLE_WIDTH)}${pc.dim(escaped(message))}`;
+  return recovery === undefined ? row : `${row}\n    ${pc.cyan("→")} ${escaped(recovery)}`;
 }
+
+const escaped = (text: string) => escapeControlCharacters(text, { keepLayout: false });

@@ -10,6 +10,7 @@ const PHASES: readonly string[] = [
   "exchange_finished",
   "resolved",
   "user_created",
+  "handed_off",
 ];
 
 /**

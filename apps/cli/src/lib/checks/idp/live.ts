@@ -24,6 +24,7 @@ const PHASES: Readonly<Record<SignInPhase, string>> = {
   exchange_finished: "the code exchange",
   resolved: "matching the identity to a user",
   user_created: "creating the user",
+  handed_off: "handing the sign-in over to the app",
 };
 
 const REASONS: Readonly<Record<string, string>> = {
@@ -44,6 +45,7 @@ const REASONS: Readonly<Record<string, string>> = {
   unroutable: "the login flow does not route this outcome",
   user_invalid: "the claims do not satisfy the user schema",
   other_schema: "the identity belongs to a user of another schema",
+  handoff_failed: "the sign-in could not be handed over to the app",
   internal: "the runtime failed",
 };
 
@@ -88,14 +90,13 @@ function failure(event: SignInEvent, context: IdpContext): Outcome {
   };
 }
 
-/** A sign-in is complete when the identity is bound to a user, or a user was created for it. */
+/**
+ * A sign-in is complete once the attempt has been handed over to the app. Binding
+ * the identity or creating its user comes first and can still be followed by a
+ * handoff that fails, so neither is the end.
+ */
 function completes(event: SignInEvent): boolean {
-  if (event.status !== "ok") {
-    return false;
-  }
-  return (
-    event.phase === "user_created" || (event.phase === "resolved" && event.result === "linked")
-  );
+  return event.status === "ok" && event.phase === "handed_off";
 }
 
 /**
