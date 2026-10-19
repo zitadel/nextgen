@@ -77,14 +77,14 @@ func TestFlowDefinition_Equal(t *testing.T) {
 		t.Parallel()
 		a := *base
 		a.Steps = []domain.FlowDefinitionStep{{
-			Name:    "done",
-			Actions: nil,
+			Name:     "done",
+			Actions:  nil,
 			Complete: new(domain.FlowStepCompleteRedirect),
 		}}
 		b := *base
 		b.Steps = []domain.FlowDefinitionStep{{
-			Name:    "done",
-			Actions: []domain.FlowStepAction{},
+			Name:     "done",
+			Actions:  []domain.FlowStepAction{},
 			Complete: new(domain.FlowStepCompleteRedirect),
 		}}
 		assert.True(t, a.Equal(&b))
