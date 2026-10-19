@@ -1,5 +1,6 @@
 import { css, html, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, state } from "lit/decorators.js";
+import { property } from "../internal/property.js";
 
 import { applyBaseTokens, applyBrandingTokens } from "./branding-to-tokens.js";
 import { resolveApi } from "./resolve-api.js";

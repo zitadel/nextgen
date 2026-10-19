@@ -36,6 +36,10 @@
         "@zitadel/sdk-solid#build-release",
         "@zitadel/sdk-svelte#build-release",
         "@zitadel/sdk-qwik#build-release",
+        "@zitadel/sdk-sveltekit#build-release",
+        "@zitadel/sdk-solid-start#build-release",
+        "@zitadel/sdk-qwik-city#build-release",
+        "@zitadel/sdk-tanstack-start#build-release",
         "@zitadel/testing#build-release"
       ]
     },

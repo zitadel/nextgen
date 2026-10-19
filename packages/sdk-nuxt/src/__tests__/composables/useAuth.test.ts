@@ -1,3 +1,7 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import ts from "typescript";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import type { AuthResult } from "../../runtime/types";
@@ -42,5 +46,58 @@ describe("useAuth composable", () => {
       expect(result.session.userId).toBe("nuxt-user");
       expect(result.session.identifier).toBe("nuxt@example.com");
     }
+  });
+});
+
+// What an app's page sees: Nuxt declares the auto-import as
+// `typeof import("<dist>/runtime/composables/useAuth").useAuth` and compiles
+// with `allowJs` and `skipLibCheck`. `sdk-nuxt:test` runs after the build.
+describe("useAuth as an app sees it", () => {
+  function diagnostics(probe: string): string[] {
+    const built = join(import.meta.dirname, "../../../dist/runtime/composables/useAuth");
+    const dir = mkdtempSync(join(tmpdir(), "sdk-nuxt-use-auth-"));
+    try {
+      const file = join(dir, "page.ts");
+      writeFileSync(
+        file,
+        `declare const useAuth: typeof import(${JSON.stringify(built)}).useAuth;\n${probe}\n`,
+      );
+      const program = ts.createProgram([file], {
+        strict: true,
+        noEmit: true,
+        allowJs: true,
+        skipLibCheck: true,
+        target: ts.ScriptTarget.ES2022,
+        module: ts.ModuleKind.ESNext,
+        moduleResolution: ts.ModuleResolutionKind.Bundler,
+        types: [],
+      });
+      return ts
+        .getPreEmitDiagnostics(program, program.getSourceFile(file))
+        .map((d) => ts.flattenDiagnosticMessageText(d.messageText, "\n"));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  it("types the result as the client auth state", () => {
+    expect(
+      diagnostics(
+        "const auth = useAuth();\n" +
+          "const signedIn: boolean = auth.isAuthenticated;\n" +
+          "const none: null = auth.isAuthenticated ? null : auth.session;\n" +
+          "const display: string | null = auth.isAuthenticated ? auth.session.display : null;",
+      ),
+    ).toEqual([]);
+  });
+
+  it("is not assignable to an unrelated type", () => {
+    expect(diagnostics("const n: number = useAuth();")).not.toEqual([]);
+  });
+
+  it("carries no session token", () => {
+    expect(
+      diagnostics("const auth = useAuth();\nif (auth.isAuthenticated) auth.session.token;"),
+    ).not.toEqual([]);
   });
 });

@@ -122,6 +122,7 @@ Repo tooling:
 | Run normal local checks            | `moon ci :lint :typecheck :build :test`  |
 | Mirror CI locally                  | `moon run workspace:check -- --full`     |
 | Rerun one failed task              | `moon run <project>:<task>`              |
+| Run the hosted cloud locally       | `moon run workspace:cloud`               |
 | Check a deployment of the cloud    | `CLOUD_URL=<url> pnpm check:cloud`       |
 
 ### I am adding Zitadel to my app

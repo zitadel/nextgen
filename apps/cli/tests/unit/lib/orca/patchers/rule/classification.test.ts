@@ -5,9 +5,13 @@ import { AngularPatcher } from "../../../../../../src/lib/orca/patchers/rule/ang
 import { NextPatcher } from "../../../../../../src/lib/orca/patchers/rule/next";
 import { NuxtPatcher } from "../../../../../../src/lib/orca/patchers/rule/nuxt";
 import { QwikPatcher } from "../../../../../../src/lib/orca/patchers/rule/qwik";
+import { QwikCityPatcher } from "../../../../../../src/lib/orca/patchers/rule/qwik-city";
 import { ReactPatcher } from "../../../../../../src/lib/orca/patchers/rule/react";
 import { SolidPatcher } from "../../../../../../src/lib/orca/patchers/rule/solid";
+import { SolidStartPatcher } from "../../../../../../src/lib/orca/patchers/rule/solid-start";
 import { SveltePatcher } from "../../../../../../src/lib/orca/patchers/rule/svelte";
+import { SvelteKitPatcher } from "../../../../../../src/lib/orca/patchers/rule/sveltekit";
+import { TanStackStartPatcher } from "../../../../../../src/lib/orca/patchers/rule/tanstack-start";
 import { VuePatcher } from "../../../../../../src/lib/orca/patchers/rule/vue";
 import type { Patcher } from "../../../../../../src/lib/orca/patchers/types";
 
@@ -41,6 +45,22 @@ const PATCHERS: Array<{
     view: { framework: facts("svelte", "src"), rendererId: "react" },
   },
   { patcher: new QwikPatcher(), view: { framework: facts("qwik", "src"), rendererId: "react" } },
+  {
+    patcher: new SvelteKitPatcher(),
+    view: { framework: facts("sveltekit", "src"), rendererId: "react" },
+  },
+  {
+    patcher: new SolidStartPatcher(),
+    view: { framework: facts("solid-start", "src"), rendererId: "react" },
+  },
+  {
+    patcher: new QwikCityPatcher(),
+    view: { framework: facts("qwik-city", "src"), rendererId: "react" },
+  },
+  {
+    patcher: new TanStackStartPatcher(),
+    view: { framework: facts("tanstack-start", "src"), rendererId: "react" },
+  },
 ];
 
 describe("patcher file classification", () => {
@@ -94,5 +114,18 @@ describe("patcher file classification", () => {
       expect(classes).not.toContain("infrastructure");
       expect(actions.configEdits.length).toBeGreaterThan(0);
     }
+  });
+
+  // The meta-frameworks' auth boundary (proxy, session check, route guard) is
+  // a plain file; losing it breaks auth, so doctor must fail, not warn.
+  it.each([
+    ["sveltekit", "src/hooks.server.ts"],
+    ["solid-start", "src/middleware.ts"],
+    ["qwik-city", "src/routes/plugin@nextgen.ts"],
+    ["tanstack-start", "src/start.ts"],
+  ])("%s marks its auth boundary %s as infrastructure", (id, boundary) => {
+    const { patcher, view } = PATCHERS.find((entry) => entry.view.framework.id === id)!;
+
+    expect(patcher.artifacts(view).fileClasses![boundary]).toBe("infrastructure");
   });
 });

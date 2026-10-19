@@ -87,10 +87,14 @@ describe("Orca selection", () => {
     expect(orca.availableFrameworks().map((choice) => choice.id)).toEqual([
       "next",
       "nuxt",
+      "tanstack-start",
       "react",
       "vue",
+      "solid-start",
       "solid",
+      "sveltekit",
       "svelte",
+      "qwik-city",
       "qwik",
       "angular",
     ]);
@@ -205,6 +209,9 @@ describe("Orca.scaffold", () => {
   // re-detect) without spawning a real project generator.
   const fakeDetector: Detector = {
     framework: "fake",
+    displayName: "Fake",
+    versionPackage: "fake",
+    versionFloor: "1",
     async detect(cwd) {
       try {
         await readFile(join(cwd, "package.json"), "utf8");
