@@ -4,6 +4,7 @@ import {
   IDP_PROVIDERS,
   missingEndpoints,
   OIDC_ENDPOINTS,
+  parseConnectionSlug,
   referencedVariable,
 } from "@zitadel/config/idp";
 import { consola } from "consola";
@@ -270,6 +271,10 @@ export default class TestSignIn extends BaseCommand {
       (value) => ({ value }),
       (error: unknown) => ({ error: toZitadelError(error) }),
     );
+    if ("error" in clientId && clientId.error.code === "E_CANCELLED") {
+      // A cancelled request is the developer stopping the command, not this connection failing.
+      throw clientId.error;
+    }
     if ("error" in clientId) {
       // Only this connection is broken: say so as its result and go on to the others.
       const unresolved: CheckResult = {
@@ -454,6 +459,14 @@ export default class TestSignIn extends BaseCommand {
     provider: string | undefined,
   ): Promise<readonly ConnectionFile[]> {
     const files = await readConnectionFiles(cwd);
+    // A slug ends up in a command the output suggests running, so a file may not smuggle
+    // anything into it; the reader only checks that a file holds an object.
+    const unsafe = files.find((file) => !parseConnectionSlug(String(file.body.slug)).ok);
+    if (unsafe !== undefined) {
+      throw new ZitadelError("E_VALIDATION", "A connection file has a slug that is not valid", {
+        hint: `Fix slug in ${unsafe.path}: it must match the connection schema's pattern`,
+      });
+    }
     const wanted =
       provider === undefined ? files : files.filter((file) => slugOf(file) === provider);
     if (wanted.length === 0) {
