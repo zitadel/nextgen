@@ -743,16 +743,10 @@ func TestPatchUser(t *testing.T) {
 		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
 		return resp.(*api.User)
 	}
-	invalidFields := func(t *testing.T, resp api.PatchUserByIDRes) []string {
+	requireUserInvalid := func(t *testing.T, resp api.PatchUserByIDRes) {
 		t.Helper()
 		require.IsType(t, &api.PatchUserByIDBadRequest{}, resp, helpers.MustMarshal(t, resp))
-		invalid := resp.(*api.PatchUserByIDBadRequest)
-		require.Equal(t, api.ErrorCode(domain.ErrRequestInvalid().Code), invalid.Code)
-		var details struct {
-			Fields []string `json:"fields"`
-		}
-		require.NoError(t, json.Unmarshal(invalid.Details.Value["details"], &details))
-		return details.Fields
+		assert.Equal(t, api.ErrorCode(domain.ErrUserInvalid().Code), resp.(*api.PatchUserByIDBadRequest).Code)
 	}
 
 	t.Run("a schema of another objectType is refused", func(t *testing.T) {
@@ -786,7 +780,10 @@ func TestPatchUser(t *testing.T) {
 			"schema": revisionV2,
 		}), params)
 		require.NoError(t, err)
-		assert.ElementsMatch(t, []string{"attributes.country", "attributes.nickname"}, invalidFields(t, resp))
+		requireUserInvalid(t, resp)
+		unchanged := getUser(t, user.ID)
+		assert.Equal(t, revisionV1, unchanged.Schema)
+		assert.Equal(t, "Nick", userProp(t, *unchanged, "nickname"))
 
 		resp, err = client.PatchUserByID(t.Context(), patchReq(t, map[string]any{
 			"schema":     revisionV2,
@@ -802,8 +799,8 @@ func TestPatchUser(t *testing.T) {
 			"schema": revisionV1,
 		}), params)
 		require.NoError(t, err)
-		assert.ElementsMatch(t, []string{"attributes.country"}, invalidFields(t, resp))
-		unchanged := getUser(t, user.ID)
+		requireUserInvalid(t, resp)
+		unchanged = getUser(t, user.ID)
 		assert.Equal(t, revisionV2, unchanged.Schema)
 		assert.Equal(t, "CH", userProp(t, *unchanged, "country"))
 
