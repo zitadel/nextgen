@@ -79,6 +79,10 @@ document whose `$id` it is.
 - **Previews** serve the same documents. One fetched from
   `cloud-….vercel.app` still says it is
   `https://preview.zitadel.com/schemas/v1/<name>`, and its `$ref`s lead there.
+- **Versions:** through alpha, `/schemas/v1/` serves main's latest, while
+  editors validate against the copies `zitadel setup` writes into a project's
+  `.zitadel/meta/`. What `v1` promises across releases is decided before 1.0
+  ([schema versioning](../design/schema-engine/versioning.md#published-copies)).
 - **Moving the namespace** to `https://zitadel.com/schemas/v1`, when the
   preview moves: change `HOSTED_BASE` in the renderer together with the
   server's default base, and let zitadel.com, also on Vercel, serve the same
