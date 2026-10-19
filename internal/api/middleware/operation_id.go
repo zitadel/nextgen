@@ -19,14 +19,21 @@ type operationIDWrapper struct {
 	serverSpan trace.SpanContext
 }
 
-// AddOperationIdToContext fills the holder with the operation ID and the
-// server span context. It runs inside the server span.
+// AddOperationIdToContext fills the holder with the operation ID.
 func AddOperationIdToContext() oasapi.Middleware {
 	return func(req middleware.Request, next middleware.Next) (middleware.Response, error) {
-		ctx := WithOperationIDContext(req.Context, req.OperationID)
-		ctx.Value(operationIDContextKey{}).(*operationIDWrapper).serverSpan = trace.SpanContextFromContext(ctx)
-		req.SetContext(ctx)
+		req.SetContext(WithOperationIDContext(req.Context, req.OperationID))
 		return next(req)
+	}
+}
+
+// SetServerSpanContext stores the span context of the ogen server span in the
+// holder [WithLogging] put on ctx. The ogen tracer calls it when it starts
+// that span, before security and decoding run, so a request that fails there
+// is still linked to it. Without a holder it does nothing.
+func SetServerSpanContext(ctx context.Context, sc trace.SpanContext) {
+	if wrapper, ok := ctx.Value(operationIDContextKey{}).(*operationIDWrapper); ok {
+		wrapper.serverSpan = sc
 	}
 }
 

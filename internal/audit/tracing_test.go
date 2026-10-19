@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	ogenmiddleware "github.com/ogen-go/ogen/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
@@ -166,9 +165,10 @@ func TestShipper_StartWithoutSinksRunsNoLoop(t *testing.T) {
 
 // serveTracedRequest sends one request through the audit middleware the way
 // the server does: the logging middleware plants the operation ID holder
-// outside it, and the ogen middleware fills the holder inside the server span.
-// A sampled request gets a real server span; an unsampled one carries a span
-// context that is valid but not sampled.
+// outside it, and the ogen tracer stores the server span context in it when it
+// starts that span. A sampled request gets a real server span; an unsampled
+// one carries a span context that is valid but not sampled. The whole chain of
+// the server is covered in cmd/server.
 func serveTracedRequest(t *testing.T, buf *RequestBuffer, sampled bool) trace.SpanContext {
 	t.Helper()
 	var server trace.SpanContext
@@ -183,14 +183,10 @@ func serveTracedRequest(t *testing.T, buf *RequestBuffer, sampled bool) trace.Sp
 			defer span.End()
 		}
 		server = trace.SpanContextFromContext(ctx)
-		_, err := middleware.AddOperationIdToContext()(ogenmiddleware.Request{Context: ctx, OperationID: "PatchUserByID"},
-			func(req ogenmiddleware.Request) (ogenmiddleware.Response, error) {
-				ac, ok := ActorSlotFromContext(req.Context)
-				require.True(t, ok)
-				ac.ProjectID = "proj_1"
-				return ogenmiddleware.Response{}, nil
-			})
-		require.NoError(t, err)
+		middleware.SetServerSpanContext(ctx, server)
+		ac, ok := ActorSlotFromContext(ctx)
+		require.True(t, ok)
+		ac.ProjectID = "proj_1"
 		w.WriteHeader(http.StatusOK)
 	}))
 	r := httptest.NewRequest(http.MethodPatch, "/users/u1", nil)

@@ -68,8 +68,8 @@ func WithRequestEventMiddleware(buf *RequestBuffer, next http.Handler) http.Hand
 			return
 		}
 		// This middleware runs outside the server span, so the enqueue span
-		// starts as its child from the context the ogen middleware left behind,
-		// after the server span has ended.
+		// starts as its child from the span context the ogen tracer stored in
+		// the holder WithLogging planted, after the server span has ended.
 		if server := middleware.GetServerSpanContext(ctx); server.IsSampled() {
 			var span trace.Span
 			ctx, span = tracer.Start(trace.ContextWithSpanContext(ctx, server), "audit.EnqueueRequestEvent")

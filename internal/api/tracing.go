@@ -4,10 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 
+	"go.opentelemetry.io/otel/codes"
 	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
@@ -31,6 +34,9 @@ type ogenTracer struct{ trace.Tracer }
 
 func (t ogenTracer) Start(ctx context.Context, name string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
 	ctx, span := t.Tracer.Start(ctx, name, opts...)
+	if cfg := trace.NewSpanStartConfig(opts...); cfg.SpanKind() == trace.SpanKindServer {
+		middleware.SetServerSpanContext(ctx, span.SpanContext())
+	}
 	if !span.IsRecording() {
 		return ctx, span
 	}
@@ -38,6 +44,29 @@ func (t ogenTracer) Start(ctx context.Context, name string, opts ...trace.SpanSt
 }
 
 type ogenSpan struct{ trace.Span }
+
+// clientErrorTexts are the status texts of the 4xx codes.
+var clientErrorTexts = func() map[string]bool {
+	texts := map[string]bool{}
+	for code := 400; code < 500; code++ {
+		if text := http.StatusText(code); text != "" {
+			texts[text] = true
+		}
+	}
+	return texts
+}()
+
+// SetStatus drops the Error status ogen's response encoders set, with the
+// status text as description, for a typed 4xx response. HTTP server semantic
+// conventions leave a 4xx Unset on a server span, as a 4xx answered through
+// OgenErrorHandler already is. Everything else passes through, such as the
+// Error with a stage name ogen sets when a request fails.
+func (s ogenSpan) SetStatus(code codes.Code, description string) {
+	if code == codes.Error && clientErrorTexts[description] {
+		return
+	}
+	s.Span.SetStatus(code, description)
+}
 
 func (s ogenSpan) RecordError(err error, _ ...trace.EventOption) {
 	if err == nil {
