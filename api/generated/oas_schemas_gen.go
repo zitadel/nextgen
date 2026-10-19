@@ -23416,7 +23416,11 @@ type FlowSubmitRequest struct {
 	SessionToken OptString `json:"session_token"`
 	// Which action to take. Must be a key from the step's `actions` dictionary:
 	// - A regular action (e.g., "submit", "register", "back")
-	// - The reserved value "sso" — triggers SSO redirect (requires `sso_provider_id`).
+	// - The reserved value "sso" — triggers SSO redirect (requires `sso_provider_id`)
+	// A name the current step does not declare is refused with 400
+	// (`flow.invalid_action`). That includes the outcome names the engine
+	// routes on its own (`user_not_found`, `user_already_exists`,
+	// `sso_user_not_found`, `sso_authenticated`), which are never actions.
 	Action string `json:"action"`
 	// User input values. Keys match field names from the step's `fields` dictionary.
 	Fields OptFlowSubmitRequestFields `json:"fields"`
