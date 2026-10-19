@@ -6,6 +6,7 @@ import {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
   filterResponseHeaders,
+  loginRedirectUrl,
   matchesRoutes,
   requiresProjectSecret,
 } from "@zitadel/sdk-core/middleware";
@@ -358,9 +359,7 @@ async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<N
     .filter((c: { name: string }) => c.name.startsWith("__nextgen"));
 
   if (matchesRoutes(pathname, protectedRoutes)) {
-    const loginUrl = new URL(loginPath, req.url);
-    loginUrl.searchParams.set("next", pathname);
-    const redirect = NextResponse.redirect(loginUrl, { status: 302 });
+    const redirect = NextResponse.redirect(loginRedirectUrl(loginPath, req.url), { status: 302 });
     for (const cookie of staleNextgenCookies) {
       redirect.cookies.delete(cookie.name);
     }
