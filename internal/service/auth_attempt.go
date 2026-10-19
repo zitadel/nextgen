@@ -504,12 +504,9 @@ func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofI
 		return emitAuthCheck(ctx, tx.Statements(), attempt, challenge, true)
 	})
 	if err != nil {
-		if txExtra != nil {
-			for _, action := range txExtra.actions {
-				if actionErr := action.Err(ctx, s.stmts.Statements()); actionErr != nil {
-					err = actionErr
-					break
-				}
+		if txExtra != nil && txExtra.failed != nil {
+			if actionErr := txExtra.failed.Err(ctx, s.stmts.Statements()); actionErr != nil {
+				err = actionErr
 			}
 		}
 		// A provisional registration's create-user action can lose the
@@ -743,9 +740,9 @@ type verifyTx struct {
 	// apply writes inside the transaction, e.g. registration persists the
 	// user row and credential.
 	apply func(ctx context.Context, stmts AllStatements) error
-	// actions are the user actions apply runs. They translate their recorded
-	// errors after the transaction.
-	actions []UserAction
+	// failed is the user action whose Apply failed in apply's last run. It
+	// translates its recorded error after the transaction.
+	failed UserAction
 }
 
 // verify dispatches proof verification to the appropriate secondary port.
@@ -861,9 +858,12 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		_, hadUserFactor := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser)
 		factor := attempt.SetPasskeyRegistrationFactor(newPasskey)
 		userFactor := attempt.SetUserFactor(&domain.User{ID: registrationChallenge.UserID})
-		apply := func(ctx context.Context, stmts AllStatements) error {
+		writes := &verifyTx{}
+		writes.apply = func(ctx context.Context, stmts AllStatements) error {
+			writes.failed = nil
 			for _, action := range createActions {
 				if err := action.Apply(ctx, stmts); err != nil {
+					writes.failed = action
 					return err
 				}
 			}
@@ -892,7 +892,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 				},
 			})
 		}
-		return registrationChallenge, factor, &verifyTx{apply: apply, actions: createActions}, nil
+		return registrationChallenge, factor, writes, nil
 
 	default:
 		return nil, nil, nil, domain.ErrAuthAttemptInvalidRequest().WithMessage("unsupported proof type")

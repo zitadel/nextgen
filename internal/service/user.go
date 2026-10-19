@@ -184,23 +184,23 @@ func (s *userService) ApplyActions(ctx context.Context, actions ...UserAction) (
 		}
 	}
 
+	var failed UserAction
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		failed = nil
 		for _, action := range actions {
 			if err := action.Apply(ctx, tx.Statements()); err != nil {
+				failed = action
 				return err
 			}
 		}
 		return nil
 	})
-	if err != nil {
-		// An error the failed action recorded takes precedence: the
-		// transaction stops at the first failing action, so at most one did.
-		for _, action := range actions {
-			if actionErr := action.Err(ctx, s.v2Pool.Statements()); actionErr != nil {
-				err = actionErr
-				break
-			}
+	if failed != nil {
+		if actionErr := failed.Err(ctx, s.v2Pool.Statements()); actionErr != nil {
+			err = actionErr
 		}
+	}
+	if err != nil {
 		if de, ok := errors.AsType[domain.Error](err); ok {
 			return de
 		}
