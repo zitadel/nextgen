@@ -16,6 +16,9 @@ if (sampleRate && !(Number(sampleRate) >= 0 && Number(sampleRate) <= 1)) {
 // prefix: its other assets already load from /_next/.
 const config: NextConfig = {
   reactStrictMode: true,
+  // Keeps `next dev` from writing Next's agent rules into AGENTS.md when an
+  // AI coding agent runs it (apps/AGENTS.md).
+  agentRules: false,
   turbopack: {
     // Turbopack reads no size from an AVIF and warns on every build, but
     // emits the file unchanged: the page takes only its URL (page.tsx).
