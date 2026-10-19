@@ -65,6 +65,7 @@ function aContext(live: LiveSignIn | undefined, overrides: Partial<IdpContext> =
     scopes: ["openid"],
     claims: [],
     callbackUri: "http://localhost:3000/__nextgen/idp/acme/callback",
+    tokenAuthMethod: "client_secret_basic",
     endpoints: undefined,
     consoleUrl: "https://console.example",
     probes: undefined,

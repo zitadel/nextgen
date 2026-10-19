@@ -24,7 +24,11 @@ const ACCEPTING: ProviderProbes = {
   token: () => ({ kind: "accepted" }),
 };
 
-type Sent = { readonly url: string; readonly body?: string };
+type Sent = {
+  readonly url: string;
+  readonly body?: string;
+  readonly authorization?: string;
+};
 
 /** A provider that serves `document`, records what it was sent, and answers probes with `{ status: 200 }`. */
 function aContext(
@@ -40,11 +44,17 @@ function aContext(
     scopes: ["openid", "email"],
     claims: ["email"],
     callbackUri: "http://localhost:3000/__nextgen/idp/acme/callback",
+    tokenAuthMethod: "client_secret_basic",
     endpoints: undefined,
     consoleUrl: "https://console.example",
     probes: ACCEPTING,
     request: async (url, init): Promise<HttpResponse> => {
-      sent.push({ url, ...(init === undefined ? {} : { body: init.body.toString() }) });
+      sent.push({
+        url,
+        ...(init === undefined
+          ? {}
+          : { body: init.body.toString(), authorization: init.headers?.authorization }),
+      });
       return url.endsWith("/.well-known/openid-configuration")
         ? { status: document === null ? 404 : 200, url, body: JSON.stringify(document ?? {}) }
         : { status: 200, url, body: "" };
@@ -180,14 +190,42 @@ describe("IDP_CHECKS", () => {
     );
   });
 
-  it("sends the secret with a code the provider never issued", async () => {
+  const tokenRequestOf = (sent: readonly Sent[]) =>
+    sent.find((request) => request.url.endsWith("/token"));
+
+  it("sends the secret in the Authorization header when the connection authenticates with client_secret_basic", async () => {
+    const { sent } = await resultsFor({ tokenAuthMethod: "client_secret_basic" });
+
+    expect([
+      tokenRequestOf(sent)?.authorization,
+      new URLSearchParams(tokenRequestOf(sent)?.body).get("client_secret"),
+    ]).toEqual([`Basic ${Buffer.from("the-client:the-secret").toString("base64")}`, null]);
+  });
+
+  it("form-encodes the credentials before the header carries them", async () => {
+    const { sent } = await resultsFor({
+      tokenAuthMethod: "client_secret_basic",
+      clientSecret: "a b:c",
+    });
+
+    expect(tokenRequestOf(sent)?.authorization).toBe(
+      `Basic ${Buffer.from("the-client:a%20b%3Ac").toString("base64")}`,
+    );
+  });
+
+  it("sends the secret in the body when the connection authenticates with client_secret_post", async () => {
+    const { sent } = await resultsFor({ tokenAuthMethod: "client_secret_post" });
+
+    expect([
+      tokenRequestOf(sent)?.authorization,
+      new URLSearchParams(tokenRequestOf(sent)?.body).get("client_secret"),
+    ]).toEqual([undefined, "the-secret"]);
+  });
+
+  it("sends a code the provider never issued", async () => {
     const { sent } = await resultsFor();
 
-    expect(
-      new URLSearchParams(sent.find((request) => request.url.endsWith("/token"))?.body).get(
-        "client_secret",
-      ),
-    ).toBe("the-secret");
+    expect(new URLSearchParams(tokenRequestOf(sent)?.body).get("code")).toBe("zitadel-check");
   });
 
   it.each([

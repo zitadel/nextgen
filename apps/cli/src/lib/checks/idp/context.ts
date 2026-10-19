@@ -112,6 +112,8 @@ export type IdpContext = {
   /** The provider's own claim names the connection's mappings read. */
   readonly claims: readonly string[];
   readonly callbackUri: string;
+  /** How the engine presents the client secret at the token endpoint; the probe does the same. */
+  readonly tokenAuthMethod: "client_secret_basic" | "client_secret_post";
   /**
    * The endpoints the connection names itself, as the server uses them without
    * reading a discovery document; `undefined` when it names none.
@@ -132,7 +134,11 @@ export type IdpContext = {
  */
 export type Send = (
   url: string,
-  init?: { readonly method: "POST"; readonly body: URLSearchParams },
+  init?: {
+    readonly method: "POST";
+    readonly body: URLSearchParams;
+    readonly headers?: Readonly<Record<string, string>>;
+  },
 ) => Promise<HttpResponse>;
 
 /**
