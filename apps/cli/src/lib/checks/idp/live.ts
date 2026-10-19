@@ -85,7 +85,7 @@ function failure(event: SignInEvent, context: IdpContext): Outcome {
   const reason = REASONS[event.reason ?? ""] ?? event.reason ?? "unknown reason";
   return {
     status: "fail",
-    message: `Failed at ${phase} (${event.side ?? "journey"} side): ${reason}`,
+    message: `Failed at ${phase}${event.side === undefined ? "" : ` (${event.side} side)`}: ${reason}`,
     recovery: recoveryFor(event, context),
   };
 }

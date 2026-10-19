@@ -20,13 +20,10 @@ import {
 import { ZitadelError } from "../../lib/errors";
 import { type ConnectionFile, callbackUriFor, readConnectionFiles } from "../../lib/idp";
 import { isObject } from "../../lib/json";
-import { DEFAULT_LOCAL_SERVER_URL, readRuntimeMetadata } from "../../lib/local-server/runtime";
-import { LocalServer } from "../../lib/local-server/server";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { readDevelopmentIssuer, readZitadelConfig, readZitadelSecret } from "../../lib/project";
-import { resolveCwd } from "../../lib/paths";
 import { publicCliCommand } from "../../lib/public-cli";
-import { watchSignInEvents } from "../../lib/sign-in-events";
+import { watchSignInAudit } from "../../lib/sign-in-audit";
 import { buildSyncPlan, enumeratePlanResources, makeSyncers } from "../../lib/sync";
 
 const GLYPHS = {
@@ -38,9 +35,9 @@ const GLYPHS = {
 const TITLE_WIDTH = 26;
 const REQUEST_TIMEOUT_MS = 10_000;
 const DEFAULT_TIMEOUT_SECONDS = 300;
-const LOG_POLL_MS = 1_000;
-/** How much of the log's end one poll reads; a sign-in writes a few lines. */
-const LOG_TAIL = 2_000;
+const POLL_MS = 1_000;
+/** How many of the newest audit events one poll reads; a sign-in writes a handful. */
+const AUDIT_PAGE = 100;
 /** The resource kinds a sign-in depends on: the connection, the user schema and the login flow. */
 const SIGN_IN_KINDS = ["idp", "schema", "flow"];
 
@@ -112,22 +109,8 @@ export default class TestSignIn extends BaseCommand {
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(TestSignIn);
     const live = flags.live;
-    if (live) {
-      const runtime = await readRuntimeMetadata(
-        resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined),
-      );
-      await this.toMeta(flags, {
-        resolveServer: false,
-        source: runtime?.server_url ?? DEFAULT_LOCAL_SERVER_URL,
-      });
-    } else {
-      await this.toMeta(flags);
-    }
+    await this.toMeta(flags);
     const { cwd } = this.meta;
-    const server = LocalServer.at(cwd, { cliVersion: this.meta.cliVersion });
-    if (live) {
-      await this.requireRunning(server);
-    }
 
     const connections = await this.connections(cwd, flags.provider);
     if (connections.length > 1 && live) {
@@ -147,7 +130,6 @@ export default class TestSignIn extends BaseCommand {
         await this.checkProvider({
           connection,
           projectIssuer,
-          server,
           live,
           timeoutSeconds: flags.timeout,
           heading: connections.length > 1,
@@ -196,12 +178,11 @@ export default class TestSignIn extends BaseCommand {
   private async checkProvider(options: {
     readonly connection: ConnectionFile;
     readonly projectIssuer: string;
-    readonly server: LocalServer;
     readonly live: boolean;
     readonly timeoutSeconds: number;
     readonly heading: boolean;
   }): Promise<ProviderReport> {
-    const { connection, projectIssuer, server, live } = options;
+    const { connection, projectIssuer, live } = options;
     const { cwd } = this.meta;
     const slug = slugOf(connection);
     const oidc = isObject(connection.body.oidc) ? connection.body.oidc : {};
@@ -247,13 +228,25 @@ export default class TestSignIn extends BaseCommand {
                 // nobody; stderr keeps stdout clean for the envelope and still shows it.
                 say: (message) =>
                   this.jsonEnabled() ? process.stderr.write(`${message}\n`) : consola.log(message),
-                watch: (signal) =>
-                  watchSignInEvents(
-                    async () => (await server.logs({ tail: LOG_TAIL })).logs,
+                watch: async (signal) => {
+                  const { client, projectId } = await this.projectClient(cwd);
+                  return watchSignInAudit(
+                    async () =>
+                      [
+                        ...(
+                          await client.listEvents({
+                            project_id: projectId,
+                            order: "desc",
+                            limit: AUDIT_PAGE,
+                          })
+                        ).data,
+                      ].reverse(),
+                    slug,
                     wait,
-                    LOG_POLL_MS,
+                    POLL_MS,
                     signal,
-                  ),
+                  );
+                },
                 sleep: wait,
               },
             }
@@ -272,16 +265,6 @@ export default class TestSignIn extends BaseCommand {
       skipped: count("skipped"),
       checks: results,
     };
-  }
-
-  /** A sign-in needs the runtime it is watching, so a stopped one is refused before anything opens. */
-  private async requireRunning(server: LocalServer): Promise<void> {
-    if ((await server.status()).lifecycle !== "running") {
-      throw new ZitadelError("E_VALIDATION", "The local Zitadel runtime is not running", {
-        hint: "A live sign-in is watched through the runtime's log. Start it, or run without --live.",
-        nextCommands: [publicCliCommand("start", this.meta.cliVersion)],
-      });
-    }
   }
 
   /** The client secret is write-only, so the most that can be known is that the project holds one. */

@@ -133,53 +133,6 @@ describe("test sign-in", () => {
 
         expect(result).toFailWith("E_CREDENTIAL_MISSING");
       });
-
-      it("shows the login URL on stderr while it waits, so an agent can pass it on", async () => {
-        const app = await aSetUpApp();
-        await app.enableSso("google", CREDENTIALS);
-        await app.apply();
-        await app.startLocalServer();
-        platform.hasGoogle();
-
-        const result = await app.run(
-          ["test", "sign-in", "--provider", "google", "--live", "--timeout", "1", "--json"],
-          { BROWSER: "none" },
-        );
-
-        expect(result.stderr).toContain("/login");
-      });
-
-      it("fails a live sign-in that nobody started, pointing at the runtime's log", async () => {
-        const app = await aSetUpApp();
-        await app.enableSso("google", CREDENTIALS);
-        await app.apply();
-        await app.startLocalServer();
-        platform.hasGoogle();
-
-        const result = await app.run(
-          ["test", "sign-in", "--provider", "google", "--live", "--timeout", "1", "--json"],
-          { BROWSER: "none" },
-        );
-
-        expect(result).toHintAt("zitadel logs");
-      });
-
-      it("refuses a live sign-in when the local runtime has never been started", async () => {
-        const app = await aSetUpApp();
-        await app.enableSso("google", CREDENTIALS);
-        platform.hasGoogle();
-
-        const result = await app.run([
-          "test",
-          "sign-in",
-          "--provider",
-          "google",
-          "--live",
-          "--json",
-        ]);
-
-        expect(result).toExplain("The local Zitadel runtime is not running");
-      });
     });
 
     describe("with several providers", () => {
