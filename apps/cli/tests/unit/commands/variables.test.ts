@@ -930,7 +930,14 @@ describe("variables delete asked on a terminal", () => {
   // by running the command from source, where `input` is the one module asked.
   const deleting = (cwd: string) =>
     asPerson(() =>
-      VariablesDelete.run(["SUPPORT_EMAIL", "--project-level", "--cwd", cwd, "--server", DEFAULT_SERVER]),
+      VariablesDelete.run([
+        "SUPPORT_EMAIL",
+        "--project-level",
+        "--cwd",
+        cwd,
+        "--server",
+        DEFAULT_SERVER,
+      ]),
     );
   const watchingDeletes = () => {
     const seen = { deleted: false };
