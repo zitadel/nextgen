@@ -55,6 +55,12 @@ checks the project the answer names as well. A session of another project
 reads as signed out and keeps its cookie, since it is live in its own app.
 With no project configured, no session counts as signed in.
 
+A session cookie is cleared only when it is dead: the backend answered `401`
+or `404` for it, or it is a JWT that fails verification. A backend that cannot
+answer (an outage, a timeout, any other status) leaves the cookie in place,
+and a Bearer token that signs no one in here leaves the cookie to be judged on
+its own.
+
 `resolveSession` is the one implementation of these rules; every server SDK's
 middleware calls it.
 

@@ -43,6 +43,12 @@ const getLog: string[] = [];
 
 const getHandler = http.get(`${API_BASE}/sessions/me`, ({ request }) => {
   getLog.push(request.url);
+  if (sessionStatus === 403) {
+    return HttpResponse.json(
+      { code: "sess.project_mismatch", message: "The session belongs to a different project." },
+      { status: 403 },
+    );
+  }
   if (sessionStatus !== 200) {
     return new HttpResponse(null, { status: sessionStatus });
   }
@@ -226,6 +232,27 @@ describe("<zitadel-session>", () => {
     expect(deleteLog[0]?.credentials).toBe("include");
     expect(events).toHaveLength(1);
     expect(events[0]?.detail).toEqual({ display: "", identifier: "alice@acme.com" });
+  });
+
+  // On a shared host the cookie may hold another project's session (the
+  // Console's, on localhost). Signing out of this app must not end it.
+  it.each([
+    ["the server refuses it", () => (sessionStatus = 403)],
+    ["an older server answers for it", () => (currentProjectId = "other")],
+  ])("leaves another project's session alone on Sign out when %s", async (_label, arrange) => {
+    arrange();
+    const element = mount();
+    await flush(element);
+
+    const events: CustomEvent[] = [];
+    element.addEventListener("zitadel-signout", (e) => events.push(e as CustomEvent));
+
+    activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
+    await new Promise((resolve) => setTimeout(resolve, 16));
+    await element.updateComplete;
+
+    expect(deleteLog).toHaveLength(0);
+    expect(events).toHaveLength(1);
   });
 
   it("navigates to post-sign-out-url after a successful revoke", async () => {

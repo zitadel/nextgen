@@ -12,6 +12,7 @@
  * and a random opaque string must both resolve to signed out.
  */
 
+import { _resetConfigForTesting, configureZitadel } from "@zitadel/api/config";
 import { generateKeyPairSync, createSign } from "node:crypto";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
@@ -122,6 +123,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
+  _resetConfigForTesting();
 });
 
 describe("auth()", () => {
@@ -394,6 +396,32 @@ describe("auth()", () => {
     const auth = await importAuth();
     expect(await auth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
     expect(console.warn).not.toHaveBeenCalled();
+  });
+
+  // Only the server's project-mismatch answer is a quiet "not signed in here";
+  // any other 403 (a proxy, a firewall) is a failure worth a log line.
+  it("warns on a 403 that is not a project mismatch", async () => {
+    routeFetch(nextKid(), () => jsonResponse({ code: "auth.csrf_invalid" }, 403));
+    mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
+
+    const auth = await importAuth();
+    expect(await auth(OPTIONS)).toEqual({ isAuthenticated: false, session: null });
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("HTTP 403"));
+  });
+
+  // A middleware built with createProxy(config) holds sessions to the handle's
+  // project; auth() reads it from the same handle when no variable names one.
+  it("falls back to the project of configureZitadel()", async () => {
+    vi.stubEnv("ZITADEL_PROJECT_ID", "");
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_PROJECT_ID", "");
+    configureZitadel({ projectId: PROJECT });
+    routeFetch(nextKid(), () =>
+      jsonResponse({ session_id: "sess-6", project_id: PROJECT, state: "active", user_id: "u6" }),
+    );
+    mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
+
+    const auth = await importAuth();
+    expect((await auth({ url: ISSUER })).isAuthenticated).toBe(true);
   });
 
   it("signs no one in, and says why, when no project is configured", async () => {

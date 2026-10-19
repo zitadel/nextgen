@@ -336,7 +336,10 @@ export type ProxyHandler = (req: NextRequest) => Promise<NextResponse | Response
  * ```
  *
  * Sessions are held to the handle's project unless `options.projectId` names
- * another.
+ * another. `auth()` runs in the server runtime, where the middleware's handle
+ * may not be configured: it reads `ZITADEL_PROJECT_ID` /
+ * `NEXT_PUBLIC_ZITADEL_PROJECT_ID`, else a handle configured there. When the
+ * project lives only in this handle, pass it as `auth({ projectId })` too.
  *
  * @param config  - The SDK handle from `configureZitadel()`.
  * @param options - Route protection and JWT options.

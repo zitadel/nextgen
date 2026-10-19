@@ -36,8 +36,9 @@ export function middlewareOptions(
   return {
     url:
       nonEmptyString(nextgen.url) ?? nonEmptyString(nextgen.issuerUrl) ?? "http://localhost:8080",
-    // Sessions are held to this project; with none stored, to the public
-    // project id the widgets sign users in to.
+    // Sessions are held to this project; with none set, to the public project
+    // id the widgets sign users in to, and with neither, to ZITADEL_PROJECT_ID
+    // (the middleware's own default).
     projectId: nonEmptyString(nextgen.projectId) ?? nonEmptyString(publicConfig.zitadelProjectId),
     proxyPath: nonEmptyString(nextgen.proxyPath) ?? "/__nextgen",
     loginPath: nonEmptyString(nextgen.loginPath) ?? "/login",

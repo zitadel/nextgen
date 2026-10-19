@@ -4,7 +4,7 @@ import {
   setApiCsrfRejectionHandler,
   setApiCsrfToken,
 } from "@zitadel/api/runtime/auth";
-import { ApiError } from "@zitadel/api/runtime/fetch";
+import { ApiError, apiErrorCode } from "@zitadel/api/runtime/fetch";
 
 import { api, apiBase } from "@/api/zitadel";
 import { clearSessionCaches } from "@/lib/session-cache";
@@ -110,7 +110,7 @@ async function readSession(): Promise<ConsoleSession | null> {
     const session = await api.getMySession({ project_id: projectId }, withCredentials);
     return session.project_id === projectId ? session : null;
   } catch (cause) {
-    if (cause instanceof ApiError && cause.status === 403) return null;
+    if (apiErrorCode(cause) === "sess.project_mismatch") return null;
     throw cause;
   }
 }

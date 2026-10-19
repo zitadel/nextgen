@@ -723,6 +723,38 @@ describe("server middleware", () => {
     expect(served.headers.get("set-cookie")).toBeNull();
   });
 
+  // The Bearer token and the cookie are separate credentials: a Bearer token
+  // that is not this app's neither signs anyone in nor costs the cookie.
+  it("signs in by the session cookie behind a Bearer JWT of another project", async () => {
+    const sign = signer();
+    const bearer = sign({ sub: "bearer-user", aud: OTHER_PROJECT });
+    const cookie = sign({ sub: "cookie-user" });
+
+    const served = await serve(
+      `${ORIGIN}/admin`,
+      { headers: { authorization: `Bearer ${bearer}`, cookie: `__nextgen_session=${cookie}` } },
+      OPTIONS,
+    );
+
+    expect(served.auth).toMatchObject({ isAuthenticated: true, session: { token: cookie } });
+    expect(served.headers.get("set-cookie")).toBeNull();
+  });
+
+  // The server answers 5xx, not 401, when it cannot judge a session, so an
+  // outage must not sign anyone out.
+  it("keeps a session cookie the backend could not judge", async () => {
+    sessionsMe(new Response(null, { status: 503 }));
+
+    const served = await serve(
+      `${ORIGIN}/`,
+      { headers: { cookie: "__nextgen_session=opaque-session-token" } },
+      OPTIONS,
+    );
+
+    expect(served.auth?.isAuthenticated).toBe(false);
+    expect(served.headers.get("set-cookie")).toBeNull();
+  });
+
   it("signs in a JWT whose audience includes this project", async () => {
     const sign = signer();
     const token = sign({ aud: ["https://api.example.com", PROJECT] });

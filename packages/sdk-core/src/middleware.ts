@@ -397,9 +397,26 @@ function noUser(): OpaqueSession {
 }
 
 /**
- * Validates an opaque session token by asking the backend
- * (`GET {issuerUrl}/sessions/me?project_id={projectId}`) whether the session is
- * live in this app's project.
+ * What the backend answers about an opaque session token:
+ *
+ * - `live`: it holds a live session for the token. `session.userId` is `null`
+ *   when the session names no user of this app's project (an anonymous
+ *   session, or a session of another project), so it signs no one in here.
+ * - `dead`: it holds no live session for the token (`401` or `404`), so a
+ *   cookie carrying the token can go.
+ * - `unknown`: there is no verdict: a timeout, a network error, a `5xx` or any
+ *   other answer, or an unreadable body. The session may well be live, so a
+ *   cookie carrying it stays. `status` is the answer's HTTP status, or `null`
+ *   when there was no usable answer.
+ */
+export type OpaqueSessionCheck =
+  | { readonly state: "live"; readonly session: OpaqueSession }
+  | { readonly state: "dead" }
+  | { readonly state: "unknown"; readonly status: number | null };
+
+/**
+ * Asks the backend (`GET {issuerUrl}/sessions/me?project_id={projectId}`)
+ * whether an opaque session token names a live session of this app's project.
  *
  * A live session of another project comes back with no user, like an
  * anonymous one: it signs no one in here, and its cookie is not dead. The
@@ -407,15 +424,63 @@ function noUser(): OpaqueSession {
  * project its answer names is checked as well, because a backend that predates
  * the parameter answers for any project.
  *
+ * Only a `401` or a `404` is a dead session. The server answers `500`, not
+ * `401`, when it cannot judge a token, so an outage never reads as a sign-out.
+ *
  * @param token     - The opaque session token from the `__nextgen_session` cookie.
  * @param issuerUrl - Base URL of the auth backend.
  * @param timeoutMs - How long to wait for the backend before giving up.
  * @param projectId - The project this app signs its users in to. Without one,
- *   no session can be shown to belong here, so none names a user.
- * @returns The live session — with a `null` `userId` when it names no user of
- *   this project — or `null` when the backend does not hold a live session for
- *   the token (any other non-2xx answer, a timeout, a network error, or an
- *   unreadable body).
+ *   no session can be shown to belong here: the answer is a live session that
+ *   names no user, and the backend is not asked.
+ */
+export async function checkOpaqueSessionToken(
+  token: string,
+  issuerUrl: string,
+  timeoutMs: number,
+  projectId: string,
+): Promise<OpaqueSessionCheck> {
+  if (!projectId) {
+    return { state: "live", session: noUser() };
+  }
+  let res: Response;
+  try {
+    res = await fetch(`${issuerUrl}/sessions/me?project_id=${encodeURIComponent(projectId)}`, {
+      method: "GET",
+      headers: { cookie: `__nextgen_session=${token}` },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch {
+    return { state: "unknown", status: null };
+  }
+  if (res.status === 401 || res.status === 404) {
+    return { state: "dead" };
+  }
+  if (res.status === 403 && (await errorCode(res)) === SESSION_PROJECT_MISMATCH) {
+    return { state: "live", session: noUser() };
+  }
+  if (!res.ok) {
+    return { state: "unknown", status: res.status };
+  }
+  let body: unknown;
+  try {
+    body = await res.json();
+  } catch {
+    return { state: "unknown", status: null };
+  }
+  return { state: "live", session: sessionInProject(body, projectId) };
+}
+
+/**
+ * Validates an opaque session token: {@link checkOpaqueSessionToken}, reduced
+ * to the live session (with a `null` `userId` when it names no user of this
+ * project) or `null` when the backend confirmed no live session, because the
+ * session is dead or because there was no verdict.
+ *
+ * @param token     - The opaque session token from the `__nextgen_session` cookie.
+ * @param issuerUrl - Base URL of the auth backend.
+ * @param timeoutMs - How long to wait for the backend before giving up.
+ * @param projectId - The project this app signs its users in to.
  */
 export async function validateOpaqueSessionToken(
   token: string,
@@ -423,43 +488,31 @@ export async function validateOpaqueSessionToken(
   timeoutMs: number,
   projectId: string,
 ): Promise<OpaqueSession | null> {
-  if (!projectId) {
+  const check = await checkOpaqueSessionToken(token, issuerUrl, timeoutMs, projectId);
+  return check.state === "live" ? check.session : null;
+}
+
+/**
+ * What a `GET /sessions/me` answer says about this app's project: a session of
+ * another project names no user here.
+ */
+function sessionInProject(body: unknown, projectId: string): OpaqueSession {
+  const answer = (typeof body === "object" && body !== null ? body : {}) as {
+    project_id?: unknown;
+    user_id?: unknown;
+    user?: { identifier?: unknown; identifier_property?: unknown; display?: unknown };
+  };
+  if (answer.project_id !== projectId) {
     return noUser();
   }
-  try {
-    const res = await fetch(
-      `${issuerUrl}/sessions/me?project_id=${encodeURIComponent(projectId)}`,
-      {
-        method: "GET",
-        headers: { cookie: `__nextgen_session=${token}` },
-        signal: AbortSignal.timeout(timeoutMs),
-      },
-    );
-    if (res.status === 403) {
-      return (await errorCode(res)) === SESSION_PROJECT_MISMATCH ? noUser() : null;
-    }
-    if (!res.ok) {
-      return null;
-    }
-    const body = (await res.json()) as {
-      project_id?: unknown;
-      user_id?: unknown;
-      user?: { identifier?: unknown; identifier_property?: unknown; display?: unknown };
-    };
-    if (body.project_id !== projectId) {
-      return noUser();
-    }
-    const text = (value: unknown): string | null =>
-      typeof value === "string" && value !== "" ? value : null;
-    return {
-      userId: text(body.user_id),
-      identifier: text(body.user?.identifier),
-      identifierProperty: text(body.user?.identifier_property),
-      display: text(body.user?.display),
-    };
-  } catch {
-    return null;
-  }
+  const text = (value: unknown): string | null =>
+    typeof value === "string" && value !== "" ? value : null;
+  return {
+    userId: text(answer.user_id),
+    identifier: text(answer.user?.identifier),
+    identifierProperty: text(answer.user?.identifier_property),
+    display: text(answer.user?.display),
+  };
 }
 
 /** The `code` of an error envelope, or `undefined` when the body is not one. */
@@ -485,7 +538,10 @@ export function jwtNamesProject(payload: JwtPayload, projectId: string): boolean
 
 /** The session tokens a request carries. */
 export interface SessionTokens {
-  /** The `Authorization: Bearer` token, which takes precedence, or `null`. */
+  /**
+   * The `Authorization: Bearer` token, or `null`. It takes precedence: when it
+   * signs a user of this project in, the cookie is not consulted.
+   */
   readonly bearer: string | null;
   /** The `__nextgen_session` cookie, or `null`. */
   readonly cookie: string | null;
@@ -509,9 +565,12 @@ export interface ResolvedSession {
   readonly auth: AuthResult;
   /**
    * Whether the response should clear the request's `__nextgen*` cookies so
-   * the browser stops sending dead credentials. A session cookie that is live
-   * but signs no one in here (an anonymous session, or a session of another
-   * project) is kept.
+   * the browser stops sending a dead session. Only the session cookie's own
+   * verdict decides. It is dead when the backend answered that its session is
+   * gone, or when it is a JWT that fails verification or names no user of this
+   * project. It stays when its session is live (signed in, anonymous, or
+   * another project's), when the backend gave no verdict, and when a Bearer
+   * token signed the request in and the cookie was never judged.
    */
   readonly clearCookies: boolean;
 }
@@ -535,17 +594,62 @@ function warnMissingProject(): void {
 }
 
 /**
+ * Judges a JWT. It signs its `sub` in when it verifies and its `aud` names
+ * this project. Held in a cookie, it is dead when it fails verification or
+ * names no user of this project; a verified JWT of another project is live
+ * there, so its cookie stays.
+ */
+async function judgeJwt(
+  token: string,
+  projectId: string,
+  options: ResolveSessionOptions,
+): Promise<ResolvedSession> {
+  const payload = isJwtShaped(token)
+    ? await verifyJwt(token, {
+        issuerUrl: options.url,
+        allowedAlgorithms: options.allowedAlgorithms,
+        clockSkewMs: options.clockSkewMs,
+        audience: options.audience,
+        allowedTokenTypes: options.allowedTokenTypes,
+        jwksTimeoutMs: options.jwksTimeoutMs,
+      })
+    : null;
+  if (!payload) {
+    return { auth: signedOut(), clearCookies: true };
+  }
+  const namesProject = jwtNamesProject(payload, projectId);
+  if (!payload.sub || !namesProject) {
+    return { auth: signedOut(), clearCookies: namesProject };
+  }
+  return {
+    auth: {
+      isAuthenticated: true,
+      session: {
+        userId: payload.sub,
+        identifier: payload.email ?? null,
+        identifierProperty: null,
+        display: payload.name ?? null,
+        token,
+      },
+    },
+    clearCookies: false,
+  };
+}
+
+/**
  * Judges which user, if any, a request is signed in as in this app's project.
  * The one implementation behind every server SDK's middleware, so they cannot
  * drift on who counts as signed in.
  *
- * - The Bearer token, else the session cookie, is first verified as a JWT. A
- *   verified JWT signs its `sub` in when its `aud` names the project.
- * - A session cookie that is not JWT-shaped is validated by the backend
- *   ({@link validateOpaqueSessionToken}) and signs its user in when the
- *   session is live in this project. A JWT-shaped token that failed
- *   verification never reaches the backend: the backend does not re-check JWT
- *   claims.
+ * - A Bearer token is judged first, as a JWT. When it signs a user of this
+ *   project in, that is the answer; otherwise the cookie speaks for itself.
+ * - A JWT-shaped session cookie signs its `sub` in when it verifies and its
+ *   `aud` names the project. It never reaches the backend, which does not
+ *   re-check JWT claims.
+ * - Any other session cookie is checked by the backend
+ *   ({@link checkOpaqueSessionToken}) and signs its user in when the session is
+ *   live in this project.
+ * - Only a cookie judged dead is cleared; see {@link ResolvedSession.clearCookies}.
  * - Without a project nothing signs in, and no cookie is cleared.
  */
 export async function resolveSession(
@@ -558,63 +662,36 @@ export async function resolveSession(
     return { auth: signedOut(), clearCookies: false };
   }
 
-  const token = tokens.bearer ?? tokens.cookie;
-  const payload = token
-    ? await verifyJwt(token, {
-        issuerUrl: url,
-        allowedAlgorithms: options.allowedAlgorithms,
-        clockSkewMs: options.clockSkewMs,
-        audience: options.audience,
-        allowedTokenTypes: options.allowedTokenTypes,
-        jwksTimeoutMs: options.jwksTimeoutMs,
-      })
-    : null;
-
-  if (token && payload) {
-    if (payload.sub && jwtNamesProject(payload, projectId)) {
-      return {
-        auth: {
-          isAuthenticated: true,
-          session: {
-            userId: payload.sub,
-            identifier: payload.email ?? null,
-            identifierProperty: null,
-            display: payload.name ?? null,
-            token,
-          },
-        },
-        clearCookies: false,
-      };
+  if (tokens.bearer !== null) {
+    const bearer = await judgeJwt(tokens.bearer, projectId, options);
+    if (bearer.auth.isAuthenticated) {
+      return { auth: bearer.auth, clearCookies: false };
     }
-    // A JWT of another project is live there: a cookie holding it stays.
-    const otherProjectCookie = token === tokens.cookie && !jwtNamesProject(payload, projectId);
-    return { auth: signedOut(), clearCookies: !otherProjectCookie };
   }
 
-  if (tokens.cookie && !isJwtShaped(tokens.cookie)) {
-    const opaque = await validateOpaqueSessionToken(
-      tokens.cookie,
-      url,
-      opaqueTokenTimeoutMs,
-      projectId,
-    );
-    if (opaque?.userId) {
-      return {
-        auth: {
-          isAuthenticated: true,
-          session: {
-            userId: opaque.userId,
-            identifier: opaque.identifier,
-            identifierProperty: opaque.identifierProperty,
-            display: opaque.display,
-            token: tokens.cookie,
-          },
-        },
-        clearCookies: false,
-      };
-    }
-    return { auth: signedOut(), clearCookies: opaque === null };
+  const cookie = tokens.cookie;
+  if (cookie === null) {
+    return { auth: signedOut(), clearCookies: false };
+  }
+  if (isJwtShaped(cookie)) {
+    return judgeJwt(cookie, projectId, options);
   }
 
-  return { auth: signedOut(), clearCookies: true };
+  const check = await checkOpaqueSessionToken(cookie, url, opaqueTokenTimeoutMs, projectId);
+  if (check.state === "live" && check.session.userId) {
+    return {
+      auth: {
+        isAuthenticated: true,
+        session: {
+          userId: check.session.userId,
+          identifier: check.session.identifier,
+          identifierProperty: check.session.identifierProperty,
+          display: check.session.display,
+          token: cookie,
+        },
+      },
+      clearCookies: false,
+    };
+  }
+  return { auth: signedOut(), clearCookies: check.state === "dead" };
 }

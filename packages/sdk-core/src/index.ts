@@ -12,12 +12,14 @@ export {
   filterResponseHeaders,
   requiresProjectSecret,
   validateOpaqueSessionToken,
+  checkOpaqueSessionToken,
   jwtNamesProject,
   resolveSession,
   SESSION_PROJECT_MISMATCH,
 } from "./middleware.js";
 export type {
   OpaqueSession,
+  OpaqueSessionCheck,
   SessionTokens,
   ResolveSessionOptions,
   ResolvedSession,

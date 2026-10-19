@@ -26,6 +26,10 @@ export class SessionController implements ReactiveController {
   // or after a framework assigns `project` post-mount.
   private identityRequested = false;
 
+  // The cookie holds a live session of another project: not this app's to
+  // revoke. On a shared host (localhost) it is, for example, the Console's.
+  private otherProjectSession = false;
+
   /**
    * @param resolve Returns the host's project and API handle, throwing while no
    *   project is resolvable.
@@ -67,7 +71,9 @@ export class SessionController implements ReactiveController {
   /**
    * Revokes the session with credentials; the server clears the cookie. Fires
    * `zitadel-signout` (after `onRevoked`) and resolves `true` on success; on failure sets
-   * `errorMessage` and resolves `false`.
+   * `errorMessage` and resolves `false`. When the identity read found a session
+   * of another project, nobody is signed in here: that session is left alone
+   * and sign-out completes without a revoke.
    */
   async signOut(onRevoked?: () => void): Promise<boolean> {
     this.loading = true;
@@ -75,7 +81,9 @@ export class SessionController implements ReactiveController {
     this.host.requestUpdate();
 
     try {
-      await revokeSession(this.resolve().api);
+      if (!this.otherProjectSession) {
+        await revokeSession(this.resolve().api);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       this.errorMessage = message || "Sign-out failed. Please try again.";
@@ -106,13 +114,16 @@ export class SessionController implements ReactiveController {
   private async loadIdentity({ api, project }: Resolved): Promise<void> {
     try {
       const session = await getSession(api, project.projectId);
+      if (session === null) {
+        this.otherProjectSession = true;
+        return;
+      }
       this.display = session.user?.display ?? "";
       this.identifier = session.user?.identifier ?? "";
       this.userId = session.user_id ?? "";
       this.host.requestUpdate();
     } catch {
-      // No active session, a session of another project, or not configured:
-      // render without an identity.
+      // No active session, or not configured: render without an identity.
     } finally {
       this.onIdentitySettled?.();
     }

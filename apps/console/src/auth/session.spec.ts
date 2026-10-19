@@ -316,6 +316,24 @@ describe("CSRF rejection", () => {
     expect(getApiCsrfToken()).toBe("tok_a");
   });
 
+  // Only the server's project-mismatch answer means another project's session.
+  // Any other 403 on the re-check (a proxy, a firewall) is an unreadable
+  // session, which must not cost the person their page.
+  it("keeps the page when the re-check is refused for another reason", async () => {
+    _setRuntimeForTesting({ mode: "standalone", console_project_id: "proj_test" });
+    stubSession("user_a");
+    stubCsrf(token("tok_a"));
+    await fetchSession();
+
+    server.use(
+      http.get("*/sessions/me", () => HttpResponse.text("<html>Forbidden</html>", { status: 403 })),
+    );
+    expect(await rejectWrite()).toBeUndefined();
+
+    expect(sessionPage.reload).not.toHaveBeenCalled();
+    expect(getApiCsrfToken()).toBe("tok_a");
+  });
+
   // Without a recorded person there is nothing to compare the session to, so
   // no token is handed back and nothing is retried.
   it("does not retry when this page has no person yet", async () => {
