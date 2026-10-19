@@ -3,7 +3,6 @@ package policy
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"maps"
 	"math"
@@ -66,9 +65,9 @@ func ParseInstance(data []byte) (*Instance, error) {
 }
 
 // settingValues checks the instance's config against the template and
-// returns the set settings in their canonical Go type (int64, bool,
-// string). Every problem is reported, not just the first.
-func settingValues(t *Template, config map[string]any) (map[string]any, error) {
+// returns the settings that are valid, in their canonical Go type (int64,
+// bool, string), and one problem per setting that is not.
+func settingValues(t *Template, config map[string]any) (map[string]any, []error) {
 	out := make(map[string]any, len(config))
 	var problems []error
 	for _, name := range slices.Sorted(maps.Keys(config)) {
@@ -84,10 +83,7 @@ func settingValues(t *Template, config map[string]any) (map[string]any, error) {
 		}
 		out[name] = value
 	}
-	if len(problems) > 0 {
-		return nil, fmt.Errorf("%w: %w", ErrInvalidInstance, errors.Join(problems...))
-	}
-	return out, nil
+	return out, problems
 }
 
 // coerceSetting checks one value against its setting and returns it in the

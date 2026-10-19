@@ -53,11 +53,12 @@ type compiledRule struct {
 	contextReads []string
 }
 
-// newEnv builds the CEL environment for one template: every setting and,
-// unless configOnly, every context leaf is a typed variable addressed by its
-// dotted path. The library is deliberately minimal: CEL's standard functions
+// newEnv builds the CEL environment for one template: every setting and
+// every given context leaf is a typed variable addressed by its dotted path.
+// Config rules get no leaves, so a reference to the context fails to
+// compile. The library is deliberately minimal: CEL's standard functions
 // plus the strings and lists extensions.
-func newEnv(t *Template, leaves []contextField, configOnly bool) (*cel.Env, error) {
+func newEnv(t *Template, leaves []contextField) (*cel.Env, error) {
 	opts := []cel.EnvOption{
 		// Pinned, so a cel-go upgrade cannot add functions to the rule
 		// environment unnoticed: strings v5 and lists v3 are the first
@@ -72,17 +73,15 @@ func newEnv(t *Template, leaves []contextField, configOnly bool) (*cel.Env, erro
 		}
 		opts = append(opts, cel.Variable(configVariable+"."+name, typ))
 	}
-	if !configOnly {
-		for _, leaf := range leaves {
-			if leaf.path == configVariable || strings.HasPrefix(leaf.path, configVariable+".") {
-				return nil, fmt.Errorf("context field %q: %q is reserved", leaf.path, configVariable)
-			}
-			typ, err := contextCELType(leaf.typ)
-			if err != nil {
-				return nil, fmt.Errorf("context field %q: %w", leaf.path, err)
-			}
-			opts = append(opts, cel.Variable(leaf.path, typ))
+	for _, leaf := range leaves {
+		if leaf.path == configVariable || strings.HasPrefix(leaf.path, configVariable+".") {
+			return nil, fmt.Errorf("context field %q: %q is reserved", leaf.path, configVariable)
 		}
+		typ, err := contextCELType(leaf.typ)
+		if err != nil {
+			return nil, fmt.Errorf("context field %q: %w", leaf.path, err)
+		}
+		opts = append(opts, cel.Variable(leaf.path, typ))
 	}
 	return cel.NewEnv(opts...)
 }

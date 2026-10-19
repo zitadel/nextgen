@@ -34,8 +34,12 @@ type Template struct {
 	// omits switches off the rule that reads it.
 	Config map[string]Setting `json:"config"`
 	// ConfigRules constrain the settings among each other. They read config
-	// only and are checked when an instance is validated, never when the
-	// operation runs.
+	// only and are checked whenever an instance is bound: on publish, in
+	// release validation and when it is resolved for an operation, never per
+	// evaluation. A stored instance that fails a config rule under the
+	// current template therefore fails its operation, so adding or changing
+	// one needs a migration; the compatibility test makes it show up as a
+	// change to testdata/settings_compat.json.
 	ConfigRules []Rule `json:"config_rules,omitempty"`
 	// Context is the schema of the derived values the rules receive. It
 	// doubles as the CEL type environment.

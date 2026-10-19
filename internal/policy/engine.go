@@ -7,8 +7,6 @@ import (
 	"maps"
 	"slices"
 	"strings"
-
-	"github.com/zitadel/nextgen/internal/maputil"
 )
 
 // Engine holds every compiled template and evaluates instances against
@@ -87,11 +85,11 @@ func compileTemplate(t *Template, limits Limits) (*compiledTemplate, error) {
 	if err != nil {
 		return nil, err
 	}
-	env, err := newEnv(t, leaves, false)
+	env, err := newEnv(t, leaves)
 	if err != nil {
 		return nil, err
 	}
-	configEnv, err := newEnv(t, nil, true)
+	configEnv, err := newEnv(t, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -199,12 +197,11 @@ func (e *Engine) Bind(ctx context.Context, operation string, inst *Instance) (*B
 	if inst.Config == nil {
 		return nil, fmt.Errorf("%w: config is required; use {} to switch every rule off", ErrInvalidInstance)
 	}
-	b.values, err = settingValues(ct.Template, inst.Config)
-	if err != nil {
-		return nil, err
-	}
-	b.configVars = configActivation(b.values)
+	// Every problem is reported at once: the setting problems, and the
+	// config rules whose settings are all valid.
 	var problems []error
+	b.values, problems = settingValues(ct.Template, inst.Config)
+	b.configVars = configActivation(b.values)
 	for _, rule := range ct.configRules {
 		if !rule.active(b.values) {
 			continue
@@ -253,9 +250,17 @@ func (b *Bound) Operation() string {
 }
 
 // Active reports whether a rule is switched on. A context builder asks it
-// before deriving an expensive field only that rule reads.
-func (b *Bound) Active(rule string) bool {
-	return b.bound() && slices.ContainsFunc(b.active, func(r *compiledRule) bool { return r.Name == rule })
+// before deriving an expensive field only that rule reads. A rule the
+// template does not have is an error rather than "off": a misspelled name
+// would otherwise skip the field and, with an empty list, allow.
+func (b *Bound) Active(rule string) (bool, error) {
+	if !b.bound() {
+		return false, ErrUnbound
+	}
+	if !slices.ContainsFunc(b.ct.rules, func(r *compiledRule) bool { return r.Name == rule }) {
+		return false, fmt.Errorf("%w: %q has no rule %q", ErrUnknownRule, b.ct.Operation, rule)
+	}
+	return slices.ContainsFunc(b.active, func(r *compiledRule) bool { return r.Name == rule }), nil
 }
 
 // Decision is the outcome of one evaluation. Allow is false when the
@@ -273,7 +278,9 @@ type Decision struct {
 //
 // Only the context fields an active rule reads are required; with no active
 // rule the context is not read at all. A required field that is missing,
-// nil or mistyped is an error, never a silent allow.
+// an untyped nil (JSON null) or mistyped is an error, never a silent allow.
+// A typed nil slice is an empty list: a builder that collected no entries
+// has nothing to report.
 func (b *Bound) Evaluate(ctx context.Context, requestContext map[string]any) (Decision, error) {
 	if !b.bound() {
 		return Decision{}, ErrUnbound
@@ -341,9 +348,8 @@ func (b *Bound) Constraints() (Constraints, error) {
 // on the path is not an object (a typed Go map such as map[string]int is
 // not one), so a broken builder is easy to find.
 func lookupLeaf(requestContext map[string]any, leaf contextField) (any, error) {
-	if value, ok := maputil.GetNested[any](requestContext, leaf.segments); ok {
-		return value, nil
-	}
+	// Walked by hand rather than with maputil.GetNested, so the error names
+	// the segment that broke.
 	var cur any = requestContext
 	for i, segment := range leaf.segments {
 		obj, ok := cur.(map[string]any)
@@ -355,7 +361,7 @@ func lookupLeaf(requestContext map[string]any, leaf contextField) (any, error) {
 			return nil, fmt.Errorf("%w: missing field %q", ErrContextMismatch, strings.Join(leaf.segments[:i+1], "."))
 		}
 	}
-	return nil, fmt.Errorf("%w: missing field %q", ErrContextMismatch, leaf.path)
+	return cur, nil
 }
 
 // active reports whether every setting the rule reads is set.
@@ -440,8 +446,9 @@ func coerceContext(leaf contextField, value any) (any, error) {
 	return nil, fmt.Errorf("field %q: unsupported type %q", leaf.path, leaf.typ)
 }
 
-// coerceList accepts a typed slice or a JSON-decoded one. An untyped nil is
-// not an empty list: a builder that forgot the field fails closed.
+// coerceList accepts a typed slice or a JSON-decoded one. An untyped nil
+// (JSON null) is not an empty list: a builder that forgot the field fails
+// closed. A typed nil slice is an empty list.
 func coerceList[T any](leaf contextField, value any) ([]T, error) {
 	switch v := value.(type) {
 	case []T:

@@ -281,13 +281,44 @@ func TestBind_WrongKind(t *testing.T) {
 	}
 }
 
+func mustActive(t *testing.T, b *policy.Bound, rule string) bool {
+	t.Helper()
+	active, err := b.Active(rule)
+	require.NoError(t, err)
+	return active
+}
+
+func TestBound_Evaluate_TypedNilListIsEmpty(t *testing.T) {
+	b := bindTest(t, testEngine(t), map[string]any{"max": 5})
+	for name, counts := range map[string]any{"[]int64(nil)": []int64(nil), "[]any(nil)": []any(nil)} {
+		t.Run(name, func(t *testing.T) {
+			d, err := b.Evaluate(t.Context(), map[string]any{"value": 3, "counts": counts})
+			require.NoError(t, err)
+			assert.True(t, d.Allow)
+		})
+	}
+}
+
+func TestBind_ReportsSettingAndConfigRuleProblemsTogether(t *testing.T) {
+	e, err := policy.New()
+	require.NoError(t, err)
+	err = e.ValidateInstance(t.Context(), &policy.Instance{
+		Kind: policy.KindPolicy, Operation: "auth.factor.password.set",
+		Config: map[string]any{"min_length": 20, "max_length": 10, "history_depth": 9},
+	})
+	require.ErrorIs(t, err, policy.ErrInvalidInstance)
+	assert.ErrorContains(t, err, `"history_depth"`)
+	assert.ErrorContains(t, err, "min_length_not_above_max_length")
+}
+
 func TestBound_UnboundFailsClosed(t *testing.T) {
 	var zero policy.Bound
 	_, err := zero.Evaluate(t.Context(), nil)
 	require.ErrorIs(t, err, policy.ErrUnbound)
 	_, err = zero.Constraints()
 	require.ErrorIs(t, err, policy.ErrUnbound)
-	assert.False(t, zero.Active("min"))
+	_, err = zero.Active("min")
+	require.ErrorIs(t, err, policy.ErrUnbound)
 	assert.Empty(t, zero.Operation())
 
 	var none *policy.Bound
@@ -298,8 +329,10 @@ func TestBound_UnboundFailsClosed(t *testing.T) {
 func TestBound_ActiveAndOnlyActiveFieldsRequired(t *testing.T) {
 	e := testEngine(t)
 	b := bindTest(t, e, map[string]any{"min": 2})
-	assert.True(t, b.Active("min"))
-	assert.False(t, b.Active("max"))
+	assert.True(t, mustActive(t, b, "min"))
+	assert.False(t, mustActive(t, b, "max"))
+	_, err := b.Active("mni")
+	require.ErrorIs(t, err, policy.ErrUnknownRule, "a misspelled rule is an error, not off")
 
 	// Only `min` is active and it reads only `value`; `flags` and `counts`
 	// may be left out.

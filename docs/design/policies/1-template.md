@@ -50,9 +50,11 @@ recommendation, no marker.
   `domain.UserPasswordHistoryDepth` kept ones storage returns. Raising a limit later
   widens what an instance may set and breaks none; lowering one would, so a
   test holds every template to the record in
-  `internal/policy/testdata/settings_compat.json`: settings may be added,
-  bounds widened and config rules dropped, never a setting removed, retyped
-  or narrowed, nor a config rule added or changed.
+  `internal/policy/testdata/settings_compat.json`, which must equal the
+  templates. Settings may be added, bounds widened and config rules dropped;
+  a record diff that removes, retypes or narrows a setting, or adds or
+  changes a config rule, is the signal that stored instances need a
+  migration first.
 - What the server enforces regardless of any policy stays in the domain. The
   64 cap is checked by `domain.HashPassword` whether or not a policy exists;
   `max_length` only lets a project go lower.
@@ -62,9 +64,13 @@ recommendation, no marker.
 Named boolean expressions over `config` alone (the context is not in scope,
 so a reference to it fails to compile). They catch combinations a single
 setting's bounds cannot express, such as a minimum above the maximum. A config
-rule runs when every setting it reads is set, and only when an instance is
-validated: on publish and in release validation, never when the operation
-runs. A config rule must read at least one setting.
+rule runs when every setting it reads is set, whenever an instance is
+bound: on publish, in release validation and when the instance is resolved
+for an operation, never per evaluation. A stored instance that fails a new
+config rule would therefore fail its operation, so the compatibility test
+makes adding or changing one show up as a change to
+`internal/policy/testdata/settings_compat.json`, which reviewers treat as a
+migration of stored instances. A config rule must read at least one setting.
 
 ## `context`
 

@@ -2,7 +2,9 @@ package policy_test
 
 import (
 	"encoding/json"
+	"maps"
 	"os"
+	"slices"
 	"testing"
 
 	"cel.dev/cel-go/cel"
@@ -48,9 +50,13 @@ type compatRecord struct {
 // operation.
 //
 // testdata/settings_compat.json records the settings an instance may hold and
-// the config rules it was checked against. A template may widen a bound, add
-// a setting or drop a config rule, and the record follows. Anything that
-// rejects more fails here and needs a migration of stored instances first.
+// the config rules it was checked against, and must equal the templates, so
+// every template change shows up as a change to the record. A template that
+// rejects more than the record fails here. A test cannot see history, so a
+// change that narrows the template and shrinks the record together passes:
+// a record diff that narrows a bound, removes or retypes a setting, or adds
+// or changes a config rule is the review signal that stored instances need a
+// migration first.
 func TestTemplates_StayCompatible(t *testing.T) {
 	data, err := os.ReadFile("testdata/settings_compat.json")
 	require.NoError(t, err)
@@ -89,13 +95,20 @@ func TestTemplates_StayCompatible(t *testing.T) {
 		}
 	}
 
-	// Every catalogued setting is recorded, so a new one cannot be narrowed
-	// before anyone notices it needs protecting.
+	// The record must also be current: a widening, a new setting or a
+	// dropped config rule updates it in the same change. Otherwise the
+	// baseline falls behind what stored instances hold, and a later
+	// narrowing (6 back to 5 after an unrecorded widening from 4 to 6) or a
+	// re-added rule passes the checks above.
+	assert.ElementsMatch(t, e.Operations(), slices.Collect(maps.Keys(recorded)), "operations differ from testdata/settings_compat.json")
 	for _, operation := range e.Operations() {
 		tpl, err := e.Template(operation)
 		require.NoError(t, err)
-		for name := range tpl.Config {
-			assert.Contains(t, recorded[operation].Settings, name, "%s: setting %q is not recorded in testdata/settings_compat.json", operation, name)
-		}
+		record := recorded[operation]
+		assert.Equal(t, tpl.Config, record.Settings, "%s: settings differ from testdata/settings_compat.json", operation)
+		// The loop above checks that every template rule is recorded
+		// unchanged, so equal counts also catch a rule dropped from the
+		// template.
+		assert.Len(t, record.ConfigRules, len(tpl.ConfigRules), "%s: config rules differ from testdata/settings_compat.json", operation)
 	}
 }

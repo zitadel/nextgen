@@ -41,11 +41,14 @@ context schema a contract the server enforces.
 
 Only the fields an active rule reads have to be present, and the engine
 knows which, since it reads them from the checked expressions. A required
-field that is missing, nil or mistyped is an error and the operation fails
-closed, never a silent allow. A builder asks the bound instance
-(`policy.Bound.Active`) whether a rule is on before it derives an expensive
-field only that rule reads, so with history off no history hash is
-verified.
+field that is missing, `null` (an untyped nil) or mistyped is an error and
+the operation fails closed, never a silent allow. A typed nil slice counts as
+an empty list, since a builder that collected no entries has nothing to
+report. A builder asks the bound instance (`policy.Bound.Active`) whether a
+rule is on before it derives an expensive field only that rule reads, so with
+history off no history hash is verified; naming a rule the template does not
+have is an error, so a misspelled name cannot skip the field and pass an
+empty list.
 
 Shared envelope fields (`user`, `request`) are added to the context only once
 a rule needs them: every field in the context is an attack surface

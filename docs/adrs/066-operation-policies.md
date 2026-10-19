@@ -78,7 +78,7 @@ password length, for one) is a guard in the domain, not a policy.
 - Instance (or just policy): the developer-authored half, the config values. A revisioned resource in the release, one per operation per project.
 - Setting: one value an instance may set. Omitted means off.
 - Rule: one named CEL expression in a template that must evaluate to `true`. It reads exactly one setting, carries that setting's name, and is active only when the setting is set.
-- Config rule: one named CEL expression over settings alone, checked when an instance is validated, never when the operation runs.
+- Config rule: one named CEL expression over settings alone, checked whenever an instance is bound (on publish, in release validation and when it is resolved for an operation), never per evaluation.
 - Decision: what evaluating an instance against a request context returns, `allow` or `deny` with the violated rules.
 
 ### Data model
@@ -113,8 +113,8 @@ One template per operation, defined by Zitadel and versioned with the server.
 
 `config` declares each setting's type and, for an integer, the bounds the
 server can technically support; there are no defaults. `config_rules`
-constrain the settings among each other and run only when an instance is
-validated. `context` is the schema of the derived values the rules receive
+constrain the settings among each other and run whenever an instance is
+bound, never per evaluation. `context` is the schema of the derived values the rules receive
 (the raw input stays out of it), and doubles as the CEL type environment.
 `rules` is a list of named boolean expressions. Each reads exactly one
 setting and carries its name, so the name is at once the rule, the setting,
@@ -182,8 +182,11 @@ discriminator that says which template that is.
   whenever it is resolved, so a template that rejects more would make every
   evaluation of that operation fail. A test checks every template against a
   record of the settings instances may hold and the config rules they were
-  checked against (`internal/policy/testdata/settings_compat.json`); anything
-  stricter needs a migration of stored instances first.
+  checked against (`internal/policy/testdata/settings_compat.json`), and
+  requires the record to equal the templates, so every template change shows
+  up in its diff. A test cannot see history: a stricter template passes if
+  the record shrinks with it, which is why such a record diff needs a
+  migration of stored instances before it is merged.
 
 ### Policy catalog
 
@@ -211,8 +214,8 @@ Adding an operation is five things, and nothing else registers it:
    operation and compiled and checked by `policy.New()` (at server start,
    once the gate wires the engine in);
 2. its settings and config rules recorded in
-   `internal/policy/testdata/settings_compat.json`, which keeps later
-   templates from rejecting stored instances;
+   `internal/policy/testdata/settings_compat.json`, so a later template
+   change that would reject stored instances shows up in review;
 3. a row in the catalog index naming the template, the settings, the rules,
    the context builder and the gate;
 4. a context builder in Go that derives the values the rules see for that
@@ -424,17 +427,18 @@ reserved the `policy` resource kind, the `pol_` id prefix and the `policies`
 key in the release bundle; instances occupy them. The handle is the
 `operation`: it is what two revisions of the same instance share, so a
 release cannot pin two revisions for one operation, and an instance carries
-no `name`. When scoped instances land
-([#1264](https://github.com/zitadel/nextgen/pull/1264)) the handle grows the
-audience key next to the operation, still derived from the document, so a
+no `name`. When scoped instances land, with an audience model such as the
+one proposed in [#1264](https://github.com/zitadel/nextgen/pull/1264), the
+handle grows the audience key next to the operation, still derived from the document, so a
 project default and a team override of the same operation are two resources
 without a naming field to keep in step with the audience. The resource slice
 copies branding (create-only, versioned, project-owned), not the user schema
 (URL identity and `$ref` handling a policy does not need). Templates are not
 release content: they ship with the server, and a release records the catalog
-version it was validated against. Release validation checks every instance
-against its template (unknown operation, unknown setting, out-of-bounds value)
-and rejects two instances for the same operation.
+version it was validated against. Release validation runs the same check as
+publishing (`policy.Engine.ValidateInstance`: known operation and settings,
+types, bounds, config rules) and rejects two instances for the same
+operation.
 
 ### Applicability
 

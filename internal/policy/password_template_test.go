@@ -171,7 +171,7 @@ func TestPasswordSet_Constraints(t *testing.T) {
 	noneConstraints, err := none.Constraints()
 	require.NoError(t, err)
 	assert.Empty(t, noneConstraints.Rules)
-	assert.False(t, none.Active("history_depth"))
+	assert.False(t, mustActive(t, none, "history_depth"))
 
 	b, err := e.Bind(t.Context(), passwordSet, passwordInstance(t, `{"min_length":12,"history_depth":4}`))
 	require.NoError(t, err)
@@ -181,7 +181,7 @@ func TestPasswordSet_Constraints(t *testing.T) {
 		Operation: passwordSet,
 		Rules:     map[string]any{"min_length": int64(12), "history_depth": int64(4)},
 	}, got)
-	assert.True(t, b.Active("history_depth"))
+	assert.True(t, mustActive(t, b, "history_depth"))
 }
 
 func TestPasswordSet_ValidateInstance(t *testing.T) {
