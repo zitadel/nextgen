@@ -32,11 +32,7 @@ export abstract class Check<Context> {
   /** Names of checks that must not have failed or been skipped for this one to run. */
   readonly dependsOn: readonly string[] = [];
 
-  /**
-   * `earlier` holds the results of the checks that already ran, for a check
-   * whose verdict depends on how the battery went and not on one named check.
-   */
-  abstract run(context: Context, earlier: readonly CheckResult[]): Promise<Outcome>;
+  abstract run(context: Context): Promise<Outcome>;
 }
 
 /** One check's result, given the results of the checks that ran before it. */
@@ -51,7 +47,7 @@ async function resultOf<Context>(
   });
   const outcome: Outcome =
     blocker === undefined
-      ? await (async () => check.run(context, earlier))().catch(
+      ? await (async () => check.run(context))().catch(
           (error: unknown): Outcome => ({
             status: "fail",
             message: error instanceof Error ? error.message : String(error),
