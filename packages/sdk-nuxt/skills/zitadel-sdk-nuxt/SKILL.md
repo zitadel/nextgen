@@ -100,7 +100,7 @@ an app without the module hand-rolls `server/middleware/auth.ts` with
 
 ## Widget props and events
 
-The widget props are documented in the `@zitadel/sdk-vue` skill; the table below lists the events.
+The widgets are rendered as raw custom elements, so bind their props by the element's own names, in kebab-case in a template (`post-sign-in-url`, `project-id`). The `@zitadel/sdk-vue` skill lists each prop under its wrapper name in camelCase. The table below lists the events.
 
 The widgets are plain custom elements, so each event is a DOM `CustomEvent` that carries its payload in `detail`. The events and payloads are the same ones every SPA SDK exposes as callbacks.
 
