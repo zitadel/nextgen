@@ -126,12 +126,17 @@ export class ScopesCheck extends DiscoveryCheck {
   readonly title = "Scopes";
 
   protected inspect(context: IdpContext, document: Discovery): Outcome {
+    // The server refuses a connection whose scopes lack openid, whatever the provider lists.
+    if (!context.scopes.includes("openid")) {
+      return {
+        status: "fail",
+        message: "The connection's scopes do not include openid",
+        recovery: `Add openid to oidc.scopes in .zitadel/idps/${context.slug}.json`,
+      };
+    }
     const supported = document.scopes_supported;
     if (supported === undefined) {
       return { status: "skipped", message: "The provider does not list the scopes it supports" };
-    }
-    if (context.scopes.length === 0) {
-      return { status: "skipped", message: "The connection asks for no scopes" };
     }
     const unlisted = context.scopes.filter((scope) => !supported.includes(scope));
     return unlisted.length === 0
