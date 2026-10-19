@@ -131,11 +131,17 @@ export async function watchSignInAudit(
   const known = new Set<string>();
   const misses = { count: 0 };
   const poll = async function* (): AsyncGenerator<SignInEvent> {
+    // The first read follows the baseline at once: a short timeout must still get one look at
+    // what happened while the page was opening. Later reads wait.
+    const reads = { done: 0 };
     while (!signal.aborted) {
-      await sleep(pollMs, signal);
-      if (signal.aborted) {
-        return;
+      if (reads.done > 0) {
+        await sleep(pollMs, signal);
+        if (signal.aborted) {
+          return;
+        }
       }
+      reads.done += 1;
       const fresh = await readNewAuditEvents(fetchPage, known, MAX_PAGES).then(
         (events) => {
           misses.count = 0;

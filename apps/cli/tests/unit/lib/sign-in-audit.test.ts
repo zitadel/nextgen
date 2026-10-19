@@ -261,6 +261,34 @@ describe("watchSignInAudit", () => {
     expect(early).toBe("still reading");
   });
 
+  it("reads once straight after the baseline, before it waits at all", async () => {
+    const stop = new AbortController();
+    const reads = [
+      page([]),
+      {
+        data: [
+          audit("auth.sso.authorization.failed", {
+            id: "evt_new",
+            payload: { connection_slug: "google" },
+          }),
+        ],
+      },
+    ];
+    const fetchPage = async (): Promise<AuditPage> => reads.shift() ?? { data: [] };
+    const waited: number[] = [];
+    const sleep = async (ms: number) => {
+      waited.push(ms);
+    };
+
+    const events = (await watchSignInAudit(fetchPage, "google", sleep, 1000, stop.signal))[
+      Symbol.asyncIterator
+    ]();
+    const first = await events.next();
+    stop.abort();
+
+    expect([first.value?.phase, waited]).toEqual(["callback_received", []]);
+  });
+
   it("carries on after a read fails once, since the person is still signing in", async () => {
     const stop = new AbortController();
     const reads: Array<() => AuditPage> = [
