@@ -349,9 +349,10 @@ describe("the reasons the runtime records", () => {
     "include %s, which the check describes in words",
     async (reason) => {
       const { outcome } = run([
-        event({ phase: "callback_received", status: "failed", reason, side: "journey" }),
+        sso({ phase: "callback_received", status: "failed", reason, side: "journey" }),
       ]);
 
+      expect(await outcome).toMatchObject({ status: "fail" });
       expect((await outcome).message).not.toContain(reason);
     },
   );

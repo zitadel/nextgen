@@ -53,12 +53,10 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 		// recorded, so a flow whose cookie lost that bind can catch up. Only
 		// the marker counts: a user factor alone can come from an unrelated
 		// identifier submission. The marker holds nothing else to read.
-		return &domain.FlowSSOParkedIdentity{
-			CheckID:         check.ID,
-			CollisionUserID: check.Result.CollisionUserID,
-			AttemptUserID:   attemptUserID,
-			ProviderSlug:    r.boundConnectionSlug(ctx, in.ProjectID, attempt),
-		}, nil
+		// The marker keeps no connection (a collision writes no sso factor either), so a
+		// request that lost its cookie after a collision cannot name the connection of a
+		// later failed handoff; that failure then records no event.
+		return &domain.FlowSSOParkedIdentity{CheckID: check.ID, CollisionUserID: check.Result.CollisionUserID, AttemptUserID: attemptUserID}, nil
 	}
 	if !ok || check.Result == nil {
 		if bound := boundThroughSSO(attempt); bound != nil {

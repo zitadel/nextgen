@@ -26,7 +26,8 @@ describe("signInEventOf", () => {
     ["auth.sso.exchange.failed", "exchange_finished", "failed", true],
     ["auth.sso.exchange.succeeded", "exchange_finished", "ok", true],
   ])("reads %s as %s (%s), about an exchange: %s", (type, phase, status, isSso) => {
-    expect(signInEventOf(audit(type), "google")).toMatchObject({
+    const payload = isSso ? { connection_slug: "google" } : undefined;
+    expect(signInEventOf(audit(type, { payload }), "google")).toMatchObject({
       slug: "google",
       phase,
       status,
@@ -40,6 +41,18 @@ describe("signInEventOf", () => {
       signInEventOf(audit("auth.attempt.handed_off"), "google")?.sso,
     ]).toEqual([undefined, undefined]);
   });
+
+  it.each([undefined, ""])(
+    "does not take an exchange that names no connection (%j) for this one's",
+    (connection_slug) => {
+      expect(
+        signInEventOf(
+          audit("auth.sso.exchange.succeeded", { payload: { connection_slug } }),
+          "google",
+        ),
+      ).toBeUndefined();
+    },
+  );
 
   it("does not read a link created for a user as part of an attempt, since it names none", () => {
     expect(signInEventOf(audit("idp.identity_link.created"), "google")).toBeUndefined();
@@ -87,7 +100,9 @@ describe("signInEventOf", () => {
   it("names the attempt by the payload when the event is about a check, else by the entity", () => {
     expect([
       signInEventOf(
-        audit("auth.sso.exchange.succeeded", { payload: { auth_attempt_id: "att_9" } }),
+        audit("auth.sso.exchange.succeeded", {
+          payload: { auth_attempt_id: "att_9", connection_slug: "g" },
+        }),
         "g",
       )?.flowId,
       signInEventOf(audit("auth.attempt.created"), "g")?.flowId,
@@ -129,7 +144,10 @@ describe("the SSO event types the runtime records", () => {
     (type) => {
       expect(SIGN_IN_EVENT_TYPES).toContain(type);
       expect(
-        signInEventOf(audit(type, { payload: { phase: "resolved" } }), "google"),
+        signInEventOf(
+          audit(type, { payload: { phase: "resolved", connection_slug: "google" } }),
+          "google",
+        ),
       ).toBeDefined();
     },
   );
@@ -196,7 +214,10 @@ describe("watchSignInAudit", () => {
       page(["evt_old"]),
       {
         data: [
-          audit("auth.sso.authorization.failed", { id: "evt_new" }),
+          audit("auth.sso.authorization.failed", {
+            id: "evt_new",
+            payload: { connection_slug: "google" },
+          }),
           audit("auth.attempt.created", { id: "evt_old" }),
         ],
       },
@@ -238,7 +259,14 @@ describe("watchSignInAudit", () => {
       () => {
         throw new Error("503");
       },
-      () => ({ data: [audit("auth.sso.authorization.failed", { id: "evt_new" })] }),
+      () => ({
+        data: [
+          audit("auth.sso.authorization.failed", {
+            id: "evt_new",
+            payload: { connection_slug: "google" },
+          }),
+        ],
+      }),
     ];
     const fetchPage = async (): Promise<AuditPage> => reads.shift()?.() ?? { data: [] };
 
@@ -268,30 +296,6 @@ describe("watchSignInAudit", () => {
 
     await expect(events.next()).rejects.toThrow("503");
     stop.abort();
-  });
-
-  it("takes an event with an empty connection slug for one that names none", async () => {
-    const stop = new AbortController();
-    const reads = [
-      page([]),
-      {
-        data: [
-          audit("auth.sso.authorization.failed", {
-            id: "evt_new",
-            payload: { connection_slug: "" },
-          }),
-        ],
-      },
-    ];
-    const fetchPage = async (): Promise<AuditPage> => reads.shift() ?? { data: [] };
-
-    const events = (await watchSignInAudit(fetchPage, "google", instantly, 0, stop.signal))[
-      Symbol.asyncIterator
-    ]();
-    const first = await events.next();
-    stop.abort();
-
-    expect(first.value).toMatchObject({ slug: "google" });
   });
 
   it("ends when the signal aborts", async () => {

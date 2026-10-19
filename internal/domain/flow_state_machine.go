@@ -1548,6 +1548,8 @@ func (r *FlowStateMachineRuntime) processSSOCollection(pc *processCtx, resolved 
 	walk("", attributes)
 	for path := range newSchemaReader(schema).RequiredPaths(present) {
 		if _, ok := present[path]; !ok {
+			// Nothing maps or collects this property, so no submission can create the user.
+			r.recordSSOFailure(pc.ctx, state, collected.ProviderSlug, ssoevent.PhaseUserCreated, ssoevent.ReasonUserInvalid)
 			return r.renderStepError(pc, resolved, new(FlowStepErrorSSOUserCannotBeCreated))
 		}
 	}

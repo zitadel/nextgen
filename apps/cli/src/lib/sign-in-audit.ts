@@ -66,6 +66,11 @@ export function signInEventOf(event: AuditEvent, slug: string): SignInEvent | un
   if (meaning === undefined || phase === undefined || !PHASES.includes(phase)) {
     return undefined;
   }
+  // An exchange with a connection is what ties an attempt to it, so it must say which
+  // connection; an older server's payload without a slug could be any provider's.
+  if (meaning.sso && connection === undefined) {
+    return undefined;
+  }
   const reason = text(payload?.reason);
   const side = text(payload?.side);
   return {

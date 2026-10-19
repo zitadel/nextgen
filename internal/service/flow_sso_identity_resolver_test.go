@@ -311,22 +311,6 @@ func TestFlowSSOIdentityResolver_LoadParked_BoundConnectionIsBestEffort(t *testi
 	assert.Equal(t, &domain.FlowSSOParkedIdentity{BoundUserID: "user-1", AttemptUserID: "user-1"}, got)
 }
 
-func TestFlowSSOIdentityResolver_LoadParked_CollisionMarkerNamesTheBoundConnection(t *testing.T) {
-	t.Parallel()
-	f := newSSOResolverFixture(t)
-	f.expectAttempt(parkedAttempt(&domain.SSOCallbackResult{CollisionUserID: "u-b"},
-		&domain.AuthFactorUser{UserID: "u-b"},
-		&domain.AuthFactorSSO{ConnectionID: "idp-1", AttemptID: ssoAttemptID},
-	))
-	f.expectNoRevisionOrLinkRead()
-	f.connections.EXPECT().Get(gomock.Any(), ssoProjectID, "idp-1").
-		Return(&domain.IDPConnection{ID: "idp-1", Slug: "google"}, nil)
-
-	got, err := f.resolver.LoadParked(t.Context(), loadInput())
-	require.NoError(t, err)
-	assert.Equal(t, "google", got.ProviderSlug)
-}
-
 func TestFlowSSOIdentityResolver_LoadParked_BoundAttemptWithParkedResultPrefersResult(t *testing.T) {
 	t.Parallel()
 	f := newSSOResolverFixture(t)

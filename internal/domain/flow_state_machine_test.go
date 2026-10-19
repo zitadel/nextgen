@@ -7034,6 +7034,27 @@ func TestFlowStateMachine_Process_SSOCollectionStepErrors(t *testing.T) {
 	}
 }
 
+// A property the schema requires that nothing maps or collects can never be
+// supplied, so the sign-in is told of as failing instead of looking stalled.
+func TestFlowStateMachine_Process_SSOCollectionRecordsAnUncreatableUser(t *testing.T) {
+	t.Parallel()
+	w, def, state := submittableCollectionStepWorld(t)
+	parked := unlinkedParked(map[string]any{"email": "alice@example.com"}, map[string]bool{"email": true})
+	parked.ProviderSlug = "google"
+	w.expectCollected(parked, nil).MinTimes(1).MaxTimes(2)
+	w.expectOwner("email", "alice@example.com", "")
+	w.expectOwner("username", "alice", "")
+
+	result, err := w.sm.Process(t.Context(), def, state, collectionSubmit(func(map[string]any) {}))
+
+	require.NoError(t, err)
+	require.NotNil(t, result.Step.Error)
+	assert.Equal(t, []domain.FlowSSOFailureInput{{
+		ProjectID: testProjectID, AttemptID: "att-1", ConnectionSlug: "google",
+		Phase: ssoevent.PhaseUserCreated, Reason: ssoevent.ReasonUserInvalid,
+	}}, w.ssoFailures)
+}
+
 // A submit whose row is gone or was claimed by another request: a user bound
 // on the attempt signs in through the retry, a handed-off attempt restarts,
 // and anything else shows the step again.
