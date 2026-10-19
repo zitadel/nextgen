@@ -102,7 +102,9 @@ from `@zitadel/sdk-next/client` inside the dynamic import, and set the
 for logout and profile UI. Sign-in/out navigate to `post-sign-in-url` /
 `post-sign-out-url`, so chrome re-reads on the next page load.
 
-## Widget events
+## Widget props and events
+
+The widget props are documented in the `@zitadel/sdk-react` skill; the table below lists the events.
 
 The widgets are plain custom elements, so each event is a DOM `CustomEvent` that carries its payload in `detail`. The events and payloads are the same ones every SPA SDK exposes as callbacks.
 

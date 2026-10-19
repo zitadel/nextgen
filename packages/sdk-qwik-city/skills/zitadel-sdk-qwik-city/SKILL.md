@@ -93,6 +93,10 @@ export default component$(() => (
 `<ZitadelSession project={project} postSignOutUrl="/login" />` renders the
 signed-in card with sign-out, and `<ZitadelLogout>` a sign-out control on its own.
 
+## Widget props and events
+
+This SDK is server-only. The widgets come from `@zitadel/sdk-qwik`, so read its skill for the widget props and events.
+
 ## Read these, don't guess
 
 The package README at `node_modules/@zitadel/sdk-qwik-city/README.md` and the

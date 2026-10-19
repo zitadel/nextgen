@@ -98,7 +98,9 @@ built server takes each one from `NUXT_NEXTGEN_<OPTION>` (a list as JSON). Only
 an app without the module hand-rolls `server/middleware/auth.ts` with
 `createNextgenMiddleware(...)` from `@zitadel/sdk-nuxt/server`.
 
-## Widget events
+## Widget props and events
+
+The widget props are documented in the `@zitadel/sdk-vue` skill; the table below lists the events.
 
 The widgets are plain custom elements, so each event is a DOM `CustomEvent` that carries its payload in `detail`. The events and payloads are the same ones every SPA SDK exposes as callbacks.
 

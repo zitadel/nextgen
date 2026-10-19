@@ -275,6 +275,36 @@ describe("widget loading ↔ SDK packages", () => {
     },
   );
 
+  // Every SDK's agent skill has the same sections in the same order, so an agent
+  // finds the same answer under the same heading in whichever skill it loads.
+  const SKILL_HEADINGS = [
+    "When to use",
+    "Install",
+    "Integrate",
+    "Widget props and events",
+    "Read these, don't guess",
+    "Gotchas",
+  ];
+
+  it.each(sdkDirs.filter((dir) => existsSync(`${packagesDir}${dir}/skills`)))(
+    "%s skill has the canonical sections",
+    (dir) => {
+      const skillsDir = `${packagesDir}${dir}/skills`;
+      const [skill] = readdirSync(skillsDir);
+      const outsideFences = read(`${skillsDir}/${skill}/SKILL.md`).replace(
+        /^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1[^\n]*$/gm,
+        "",
+      );
+      const headings = [...outsideFences.matchAll(/^(#{1,6}) (.+)$/gm)];
+      expect(headings.filter((match) => match[1] === "#").map((match) => match[2])).toEqual([
+        `@zitadel/${dir}`,
+      ]);
+      expect(headings.filter((match) => match[1] === "##").map((match) => match[2])).toEqual(
+        SKILL_HEADINGS,
+      );
+    },
+  );
+
   it("finds the in-repo demo apps", () => {
     expect(demoDirs.length).toBeGreaterThan(0);
   });
