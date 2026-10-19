@@ -3,11 +3,11 @@ import type { AuthResult, NextgenMiddlewareOptions } from "@zitadel/sdk-core/mid
 import {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
+  checkOpaqueSessionToken,
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
   requiresProjectSecret,
-  validateOpaqueSessionToken,
 } from "@zitadel/sdk-core/middleware";
 
 import { verifyJwt, base64UrlDecode } from "./lib/jwt";
@@ -22,8 +22,10 @@ const PROCESS_ENV: Record<string, string | undefined> =
 
 /**
  * The decision produced by {@link handleNextgenRequest}: either a ready-to-send
- * `Response` (proxy or login redirect) or an instruction to continue the request
- * with the resolved {@link AuthResult} attached to the router context.
+ * `Response` (proxy, login redirect, or a refusal: `400` for a request carrying
+ * the internal auth header, `503` for a protected route whose session the
+ * backend could not check) or an instruction to continue the request with the
+ * resolved {@link AuthResult} attached to the router context.
  */
 export type NextgenRequestDecision =
   | { readonly type: "proxy"; readonly response: Response }
@@ -265,34 +267,45 @@ export async function handleNextgenRequest(
   }
 
   let liveAnonymousSession = false;
+  let undecided = false;
   if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
-    const opaque = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
+    const check = await checkOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
     // A session without a user is anonymous: its sign-in has not verified a
     // factor yet. It is not signed in, but it is live — keep its cookie.
-    if (opaque?.userId) {
+    if (check.verdict === "live" && check.session.userId) {
       return {
         type: "continue",
         auth: {
           isAuthenticated: true,
           session: {
-            userId: opaque.userId,
-            identifier: opaque.identifier,
-            identifierProperty: opaque.identifierProperty,
-            display: opaque.display,
+            userId: check.session.userId,
+            identifier: check.session.identifier,
+            identifierProperty: check.session.identifierProperty,
+            display: check.session.display,
             token: cookieToken,
           },
         },
       };
     }
-    liveAnonymousSession = opaque !== null;
+    liveAnonymousSession = check.verdict === "live";
+    undecided = check.verdict === "undecided";
+  }
+
+  // The backend could not say whether the session is live. The user may well
+  // be signed in, so a protected route answers 503 rather than send them to
+  // the login page.
+  if (undecided && matchesRoutes(pathname, protectedRoutes)) {
+    return { type: "reject", response: new Response("Service Unavailable", { status: 503 }) };
   }
 
   // Dead credentials are cleared on every unauthenticated response so the
-  // browser stops replaying them (each replay costs a backend session check);
-  // a live anonymous session's cookie stays, since its sign-in may complete.
-  const setCookies = liveAnonymousSession
-    ? []
-    : [...cookies.keys()].filter((name) => name.startsWith("__nextgen")).map(clearCookie);
+  // browser stops replaying them (each replay costs a backend session check).
+  // Only the backend's refusal makes a cookie dead: a live anonymous session's
+  // sign-in may still complete, and a check without a verdict refused nothing.
+  const setCookies =
+    liveAnonymousSession || undecided
+      ? []
+      : [...cookies.keys()].filter((name) => name.startsWith("__nextgen")).map(clearCookie);
 
   if (matchesRoutes(pathname, protectedRoutes)) {
     const headers = new Headers({ location: loginRedirectUrl(loginPath, url2).toString() });

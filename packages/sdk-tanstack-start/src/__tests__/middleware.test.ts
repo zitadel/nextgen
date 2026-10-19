@@ -95,6 +95,29 @@ function sessionsMe(response: Response): void {
   );
 }
 
+/** Fails the opaque-session lookup on the network, as a backend that is down does. */
+function sessionsMeUnreachable(): void {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => {
+      throw new TypeError("fetch failed");
+    }),
+  );
+}
+
+/** Never answers the opaque-session lookup: it ends only when its signal aborts. */
+function sessionsMeSilent(): void {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      (_url: string, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+        }),
+    ),
+  );
+}
+
 type ServeOptions = NextgenMiddlewareOptions & { projectSecret?: string };
 
 interface ServeInit {
@@ -620,35 +643,6 @@ describe("server middleware", () => {
     expect(served.headers.get("set-cookie")).toBeNull();
   });
 
-  it("redirects a session whose answer has an empty body to login on a protected route", async () => {
-    sessionsMe(new Response(null, { status: 200 }));
-
-    const served = await serve(
-      `${ORIGIN}/admin`,
-      { headers: { cookie: "__nextgen_session=opaque-session-token" } },
-      OPTIONS,
-    );
-
-    expect(served.status).toBe(302);
-  });
-
-  it("redirects a session whose answer is not JSON to login on a protected route", async () => {
-    sessionsMe(
-      new Response("<html>Bad gateway</html>", {
-        status: 200,
-        headers: { "content-type": "text/html" },
-      }),
-    );
-
-    const served = await serve(
-      `${ORIGIN}/admin`,
-      { headers: { cookie: "__nextgen_session=opaque-session-token" } },
-      OPTIONS,
-    );
-
-    expect(served.status).toBe(302);
-  });
-
   it("redirects a session whose answer has a null user id to login on a protected route", async () => {
     sessionsMe(Response.json({ user_id: null }));
 
@@ -659,19 +653,6 @@ describe("server middleware", () => {
     );
 
     expect(served.status).toBe(302);
-  });
-
-  it("treats a 5xx answer from the session check as not signed in", async () => {
-    sessionsMe(new Response("Bad gateway", { status: 502 }));
-
-    const served = await serve(
-      `${ORIGIN}/`,
-      { headers: { cookie: "__nextgen_session=opaque-session-token" } },
-      OPTIONS,
-    );
-
-    expect(served.answered).toBe(false);
-    expect(served.auth?.isAuthenticated ?? false).toBe(false);
   });
 
   it("clears a dead session cookie on a public page", async () => {
@@ -685,6 +666,91 @@ describe("server middleware", () => {
 
     expect(served.headers.get("set-cookie")).toMatch(/__nextgen_session=/);
     expect(served.headers.get("set-cookie")).toMatch(/Max-Age=0|expires=.*1970/i);
+  });
+
+  it("clears a dead session cookie and redirects on a protected route", async () => {
+    sessionsMe(new Response(null, { status: 401 }));
+
+    const served = await serve(
+      `${ORIGIN}/admin`,
+      { headers: { cookie: "__nextgen_session=opaque-session-token" } },
+      OPTIONS,
+    );
+
+    expect(served.status).toBe(302);
+    expect(served.headers.get("set-cookie")).toMatch(/__nextgen_session=/);
+    expect(served.headers.get("set-cookie")).toMatch(/Max-Age=0|expires=.*1970/i);
+  });
+
+  it("clears the cookie of a session that is gone", async () => {
+    sessionsMe(
+      Response.json(
+        { code: "sess.not_found", message: "The session was not found" },
+        { status: 404 },
+      ),
+    );
+
+    const served = await serve(
+      `${ORIGIN}/`,
+      { headers: { cookie: "__nextgen_session=opaque-session-token" } },
+      OPTIONS,
+    );
+
+    expect(served.headers.get("set-cookie")).toMatch(/__nextgen_session=/);
+    expect(served.headers.get("set-cookie")).toMatch(/Max-Age=0|expires=.*1970/i);
+  });
+
+  // The backend answers 500, never 401, when it cannot decide whether a session
+  // is live (its token or key store failed), so that an outage does not sign
+  // every user out. Only its refusal makes a cookie dead.
+  describe.each([
+    ["a 500", () => sessionsMe(new Response(null, { status: 500 }))],
+    ["a 502", () => sessionsMe(new Response("Bad gateway", { status: 502 }))],
+    ["a 200 with an empty body", () => sessionsMe(new Response(null, { status: 200 }))],
+    [
+      "a 200 that is not JSON",
+      () =>
+        sessionsMe(
+          new Response("<html>Bad gateway</html>", {
+            status: 200,
+            headers: { "content-type": "text/html" },
+          }),
+        ),
+    ],
+    ["no answer in time", sessionsMeSilent],
+    ["a network error", sessionsMeUnreachable],
+  ])("when the session check gets %s", (_label, backend) => {
+    // Short, so that a backend that never answers times out quickly.
+    const options: ServeOptions = { ...OPTIONS, opaqueTokenTimeoutMs: 10 };
+
+    beforeEach(() => {
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      backend();
+    });
+
+    it("keeps the session cookie and renders a public page signed out", async () => {
+      const served = await serve(
+        `${ORIGIN}/`,
+        { headers: { cookie: "__nextgen_session=opaque-session-token" } },
+        options,
+      );
+
+      expect(served.answered).toBe(false);
+      expect(served.auth).toEqual({ isAuthenticated: false, session: null });
+      expect(served.headers.get("set-cookie")).toBeNull();
+    });
+
+    it("answers 503 on a protected route and keeps the session cookie", async () => {
+      const served = await serve(
+        `${ORIGIN}/admin`,
+        { headers: { cookie: "__nextgen_session=opaque-session-token" } },
+        options,
+      );
+
+      expect(served.answered).toBe(true);
+      expect(served.status).toBe(503);
+      expect(served.headers.get("set-cookie")).toBeNull();
+    });
   });
 
   it.each([

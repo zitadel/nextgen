@@ -1,5 +1,28 @@
 # @zitadel/cli
 
+## 1.0.0-alpha.27
+
+### Patch Changes
+
+- [#2054](https://github.com/zitadel/nextgen/pull/2054) [`de6f94b`](https://github.com/zitadel/nextgen/commit/de6f94b608e6831b57a46555eaa9cac282b9a47d) Thanks [@fforootd](https://github.com/fforootd)! - `zitadel setup` now creates new Next.js apps on Next.js 16.4.2 instead of 16.2.4. Next.js 16.2.4 has known advisories, among them a critical remote code execution and several ways around Middleware / Proxy, the layer `nextgenMiddleware` protects routes in. An app created by an earlier `zitadel setup` keeps the version it was created with: upgrade it with `npm install next@^16.4.2`.
+
+- [#2053](https://github.com/zitadel/nextgen/pull/2053) [`67dac68`](https://github.com/zitadel/nextgen/commit/67dac68bff6059f8efe208870ecbbbf3fd786534) Thanks [@fforootd](https://github.com/fforootd)! - `zitadel setup` no longer leaves a half-set-up app behind in a directory it
+  creates a new app in. It creates the app only once it has every answer, so
+  cancelling a question leaves the directory as it was. When a later step fails,
+  such as an unreachable server, a failed upload of the default schema, or Ctrl-C,
+  setup removes the app again and puts back what the directory held. The next run
+  then sets up a new app, with the `/` → `/login` redirect, instead of treating
+  the leftover skeleton as an app that existed before. In an empty directory,
+  `--dry-run` no longer runs the framework's generator (such as
+  `create-next-app`): it previews the project and writes nothing.
+
+- [#2058](https://github.com/zitadel/nextgen/pull/2058) [`3f81a75`](https://github.com/zitadel/nextgen/commit/3f81a75352439fcccdeada4eac9173e42ca75ae2) Thanks [@fforootd](https://github.com/fforootd)! - `zitadel stop` and `zitadel reset` no longer fail with `spawn docker ENOENT` on a machine without Docker. The default runtime does not need Docker, and where Docker is not installed there is no container to remove, so both now stop or reset the directory's local server as usual. `zitadel start` likewise no longer fails when it moves a directory that used `--runtime docker` back to the default runtime after Docker was uninstalled.
+
+- Updated dependencies [[`0f7a1e4`](https://github.com/zitadel/nextgen/commit/0f7a1e473c4c93b8da95c5b0cff6bbde07dc0701), [`bde5023`](https://github.com/zitadel/nextgen/commit/bde50236d51917b07070fbc443127fed52597ae5), [`2d4f5f0`](https://github.com/zitadel/nextgen/commit/2d4f5f06d635d8451f5e7d1b68312c7370be18c4)]:
+  - @zitadel/server@1.0.0-alpha.27
+  - @zitadel/api@1.0.0-alpha.27
+  - @zitadel/config@1.0.0-alpha.27
+
 ## 1.0.0-alpha.26
 
 ### Minor Changes

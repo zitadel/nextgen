@@ -5,11 +5,11 @@ import { useRuntimeConfig } from "#imports";
 import {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
+  checkOpaqueSessionToken,
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
   requiresProjectSecret,
-  validateOpaqueSessionToken,
 } from "@zitadel/sdk-core/middleware";
 import {
   defineEventHandler,
@@ -24,6 +24,7 @@ import {
 } from "h3";
 
 import { verifyJwt, base64UrlDecode } from "../lib/jwt";
+import { resolveProjectSecret, resolveUrl } from "../lib/settings";
 
 declare module "h3" {
   interface H3EventContext {
@@ -108,7 +109,6 @@ function buildUpstreamHeaders(event: H3Event): Headers {
  */
 export function createNextgenMiddleware(options: NextgenMiddlewareOptions = {}): EventHandler {
   const {
-    url = process.env.ZITADEL_URL ?? "http://localhost:8080",
     proxyPath = "/__nextgen",
     protectedRoutes = [],
     ignoredRoutes = [],
@@ -121,6 +121,10 @@ export function createNextgenMiddleware(options: NextgenMiddlewareOptions = {}):
     proxyTimeoutMs = 5000,
     opaqueTokenTimeoutMs = 5000,
   } = options;
+
+  // An empty `url` (the module's runtime config holds `""` until a value is
+  // set) counts as unset, so it falls back to `ZITADEL_URL`, then the default.
+  const url = resolveUrl({ url: options.url });
 
   // Guard against open-redirect: loginPath must be a relative path. An absolute
   // URL (e.g. "https://evil.com/phish") or a protocol-relative URL
@@ -201,7 +205,9 @@ async function proxyRequest(
   // the future publishable-key exchange path.
   if (requiresProjectSecret(method, suffix) && !upstreamHeaders.has("authorization")) {
     const config = useRuntimeConfig();
-    const projectSecret = (config.nextgen as { projectSecret?: string } | undefined)?.projectSecret;
+    const projectSecret = resolveProjectSecret(
+      config.nextgen as Record<string, unknown> | undefined,
+    );
     if (projectSecret) {
       upstreamHeaders.set("authorization", `Bearer ${projectSecret}`);
     }
@@ -312,11 +318,14 @@ interface AuthHandlerOptions {
  * Verifies the session token and writes the auth result to `event.context`.
  * Deletes all `__nextgen*` cookies when the token is present but invalid.
  * Redirects to the login page on protected routes with no valid session.
+ * When the backend cannot say whether the session is live, the cookies stay
+ * and a protected route answers `503`.
  *
  * @param event - The current H3 event.
  * @param opts  - Auth handler options.
+ * @returns The body of a response this handler answers itself, if any.
  */
-async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<void> {
+async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<string | undefined> {
   const {
     url,
     protectedRoutes,
@@ -369,33 +378,44 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<voi
   // failed verification (bad sig, wrong typ/alg) must be rejected — never
   // accepted by a backend call that doesn't re-check the JWT claims.
   let liveAnonymousSession = false;
+  let undecided = false;
   if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
-    const opaqueResult = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
+    const check = await checkOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
     // A session without a user id is an anonymous session — the flow has not
     // verified a user factor yet. Treat it as unauthenticated rather than
     // inventing a placeholder identity that no route handler can resolve.
-    if (opaqueResult?.userId) {
+    if (check.verdict === "live" && check.session.userId) {
       event.context.nextgenAuth = {
         isAuthenticated: true,
         session: {
-          userId: opaqueResult.userId,
-          identifier: opaqueResult.identifier,
-          identifierProperty: opaqueResult.identifierProperty,
-          display: opaqueResult.display,
+          userId: check.session.userId,
+          identifier: check.session.identifier,
+          identifierProperty: check.session.identifierProperty,
+          display: check.session.display,
           token: cookieToken,
         },
       };
       return;
     }
-    liveAnonymousSession = opaqueResult !== null;
+    liveAnonymousSession = check.verdict === "live";
+    undecided = check.verdict === "undecided";
   }
 
   event.context.nextgenAuth = { isAuthenticated: false, session: null };
 
-  // Clearing cookies stops the browser from replaying dead credentials. A
-  // live anonymous session is not dead — the backend confirmed it above, and
-  // an in-progress login flow may still complete it — so its cookie stays.
-  if (!liveAnonymousSession) {
+  // The backend could not say whether the session is live. The user may well
+  // be signed in, so a protected route answers 503 rather than send them to
+  // the login page.
+  if (undecided && matchesRoutes(pathname, protectedRoutes)) {
+    setResponseStatus(event, 503);
+    return "Service Unavailable";
+  }
+
+  // Clearing cookies stops the browser from replaying dead credentials. Only
+  // the backend's refusal makes a cookie dead: a live anonymous session is not
+  // dead — the backend confirmed it above, and an in-progress login flow may
+  // still complete it — and a check without a verdict refused nothing.
+  if (!liveAnonymousSession && !undecided) {
     for (const name of Object.keys(parseCookies(event))) {
       if (name.startsWith("__nextgen")) {
         deleteCookie(event, name);
@@ -405,8 +425,8 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<voi
 
   if (matchesRoutes(pathname, protectedRoutes)) {
     await sendRedirect(event, loginRedirectUrl(loginPath, getRequestURL(event)).toString(), 302);
-    return;
   }
+  return undefined;
 }
 
 /**

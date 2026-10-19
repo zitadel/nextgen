@@ -1,5 +1,12 @@
 # @zitadel/config
 
+## 1.0.0-alpha.27
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @zitadel/api@1.0.0-alpha.27
+
 ## 1.0.0-alpha.26
 
 ### Minor Changes

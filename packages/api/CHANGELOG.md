@@ -1,5 +1,7 @@
 # @zitadel/api
 
+## 1.0.0-alpha.27
+
 ## 1.0.0-alpha.26
 
 ### Minor Changes

@@ -1,5 +1,23 @@
 # @zitadel/server
 
+## 1.0.0-alpha.27
+
+### Patch Changes
+
+- [#2059](https://github.com/zitadel/nextgen/pull/2059) [`0f7a1e4`](https://github.com/zitadel/nextgen/commit/0f7a1e473c4c93b8da95c5b0cff6bbde07dc0701) Thanks [@fforootd](https://github.com/fforootd)! - The console's sign-in page is stricter about where it sends you after sign-in. A `?next=` that holds a backslash or a control character, or whose `.` and `..` segments leave a path starting with `//`, such as `/\evil.example`, `/%09/evil.example` or `/.//evil.example`, is ignored, and you land on the console's start page. A `next` with `..` segments now stays inside the console instead of climbing out of its path. A deployed console never sent anyone to another site this way: its path prefix, `/ui/console` or `/console` in the hosted cloud, kept these targets on its own origin.
+
+- [#2057](https://github.com/zitadel/nextgen/pull/2057) [`bde5023`](https://github.com/zitadel/nextgen/commit/bde50236d51917b07070fbc443127fed52597ae5) Thanks [@fforootd](https://github.com/fforootd)! - Creating a schema now always fails with `sch.fetch_timeout` when fetching it
+  and its `$ref` chain takes longer than `schema.resolve_timeout`. Previously a
+  fetch that finished just after the limit could still be accepted.
+
+- [#2060](https://github.com/zitadel/nextgen/pull/2060) [`2d4f5f0`](https://github.com/zitadel/nextgen/commit/2d4f5f06d635d8451f5e7d1b68312c7370be18c4) Thanks [@fforootd](https://github.com/fforootd)! - Signed-in sessions now last 24 hours by default. Until now a session expired
+  10 minutes after sign-in, so users were signed out every 10 minutes, even while
+  they were using the app. The 24 hours run from sign-in; using the session does
+  not extend them. Anonymous sessions created before sign-in still last 10
+  minutes. To choose another lifetime, set `session.default_ttl`
+  (`NEXTGEN_SESSION_DEFAULT_TTL`), up to `session.max_ttl` (30 days unless set);
+  `10m` keeps the old behavior.
+
 ## 1.0.0-alpha.26
 
 ### Minor Changes

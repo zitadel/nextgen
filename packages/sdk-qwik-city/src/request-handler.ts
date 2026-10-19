@@ -3,11 +3,11 @@ import type { AuthResult, NextgenMiddlewareOptions } from "@zitadel/sdk-core/mid
 import {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
+  checkOpaqueSessionToken,
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
   requiresProjectSecret,
-  validateOpaqueSessionToken,
 } from "@zitadel/sdk-core/middleware";
 
 import { verifyJwt, base64UrlDecode } from "./lib/jwt";
@@ -193,7 +193,9 @@ interface AuthHandlerOptions {
 /**
  * Verifies the session token and writes the auth result to `ev.sharedMap`. On a
  * protected route with no valid session it clears stale `__nextgen*` cookies and
- * throws `ev.redirect(...)` to send the browser to the login page.
+ * throws `ev.redirect(...)` to send the browser to the login page. When the
+ * backend cannot say whether the session is live, the cookies stay and a
+ * protected route answers `503`.
  */
 async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promise<void> {
   const {
@@ -243,24 +245,26 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
   }
 
   let liveAnonymousSession = false;
+  let undecided = false;
   if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
-    const opaque = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
+    const check = await checkOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
     // A session without a user is anonymous: its sign-in has not verified a
     // factor yet. It is not signed in, but it is live — keep its cookie.
-    if (opaque?.userId) {
+    if (check.verdict === "live" && check.session.userId) {
       ev.sharedMap.set(SHARED_MAP_KEY, {
         isAuthenticated: true,
         session: {
-          userId: opaque.userId,
-          identifier: opaque.identifier,
-          identifierProperty: opaque.identifierProperty,
-          display: opaque.display,
+          userId: check.session.userId,
+          identifier: check.session.identifier,
+          identifierProperty: check.session.identifierProperty,
+          display: check.session.display,
           token: cookieToken,
         },
       } satisfies AuthResult);
       return;
     }
-    liveAnonymousSession = opaque !== null;
+    liveAnonymousSession = check.verdict === "live";
+    undecided = check.verdict === "undecided";
   }
 
   ev.sharedMap.set(SHARED_MAP_KEY, {
@@ -268,11 +272,20 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
     session: null,
   } satisfies AuthResult);
 
+  // The backend could not say whether the session is live. The user may well
+  // be signed in, so a protected route answers 503 rather than send them to
+  // the login page.
+  if (undecided && matchesRoutes(pathname, protectedRoutes)) {
+    ev.send(new Response("Service Unavailable", { status: 503 }));
+    return;
+  }
+
   // Dead credentials are cleared on every unauthenticated response so the
-  // browser stops replaying them (each replay costs a backend session check);
-  // a live anonymous session's cookie stays, since its sign-in may complete.
+  // browser stops replaying them (each replay costs a backend session check).
+  // Only the backend's refusal makes a cookie dead: a live anonymous session's
+  // sign-in may still complete, and a check without a verdict refused nothing.
   // Qwik applies the deletion to whichever response goes out.
-  if (!liveAnonymousSession) {
+  if (!liveAnonymousSession && !undecided) {
     for (const name of Object.keys(ev.cookie.getAll())) {
       if (name.startsWith("__nextgen")) {
         ev.cookie.delete(name, { path: "/" });

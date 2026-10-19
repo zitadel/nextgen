@@ -14,7 +14,7 @@ building your own middleware or need the types without a framework wrapper.
 | `@zitadel/sdk-core` | The middleware, JWT, and runtime-resolution exports in one namespace. The `/types` widget contract is **not** re-exported from the root — import it from `@zitadel/sdk-core/types` |
 | `@zitadel/sdk-core/types` | The SPA widget contract (`ZitadelFlowStepDetail` and the other widget event/config/handler/props types the SPA SDKs re-export) |
 | `@zitadel/sdk-core/jwt` | `verifyJwt`, `decodeJwt`, `isJwtShaped`, `JWKS_TTL_MS` |
-| `@zitadel/sdk-core/middleware` | The middleware layer: `NextgenSession`, `AuthResult`, `NextgenMiddlewareOptions`, route matching (`matchesRoutes`), response-header filtering (`filterResponseHeaders`, `HOP_BY_HOP`) |
+| `@zitadel/sdk-core/middleware` | The middleware layer: `NextgenSession`, `AuthResult`, `NextgenMiddlewareOptions`, route matching (`matchesRoutes`), response-header filtering (`filterResponseHeaders`, `HOP_BY_HOP`), the opaque session check (`checkOpaqueSessionToken`) |
 
 It also exports `resolveZitadelRuntime` / `resolveZitadelRuntimeEnv` and
 `ZitadelRuntimeError` for resolving the runtime environment
@@ -42,7 +42,14 @@ middleware runs (`verifyJwt`):
 9. `nbf` and `iat` are validated with `clockSkewMs` tolerance when present.
 
 Opaque (non-JWT) session tokens are validated against the backend's
-`GET /sessions/me` instead, bounded by `opaqueTokenTimeoutMs`.
+`GET /sessions/me` instead, bounded by `opaqueTokenTimeoutMs`
+(`checkOpaqueSessionToken`). Only the backend's refusal makes the session
+cookie dead, and only then does the middleware clear the `__nextgen*`
+cookies: a `401`, or a `404` with the `sess.not_found` code for a session
+that is gone. Any other outcome (a `5xx`, no answer in time, a network error)
+is not a refusal: the request counts as signed out, the cookies stay, and a
+protected route answers `503 Service Unavailable` rather than send a user who
+may well be signed in to the login page.
 
 Framework-specific steps (header tunnelling, `auth()` re-verification) are
 documented in each framework SDK's README on top of this pipeline.
