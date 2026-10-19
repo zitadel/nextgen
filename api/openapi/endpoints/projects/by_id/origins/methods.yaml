@@ -9,11 +9,7 @@ post:
   tags:
     - Projects
   parameters:
-    - name: project_id
-      in: path
-      required: true
-      schema:
-        $ref: ../../../../components/schemas/project-id.yaml
+    - $ref: ../../../../components/parameters/project-id-path.yaml
   security:
     - oauth2:
         - origin.write

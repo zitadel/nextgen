@@ -28,9 +28,6 @@ wiring the middleware without the module.
 
 ```bash
 pnpm add @zitadel/sdk-nuxt@alpha
-# login/logout web components are a separate, non-transitive dependency under
-# strict package managers (pnpm, Yarn PnP) — declare it explicitly:
-pnpm add @zitadel/components@alpha
 ```
 
 Peer dependencies: `nuxt >=4`, `h3 >=1`.
@@ -58,14 +55,10 @@ itself loads only `.env`). A `nextgen.url` or
 `runtimeConfig.public.zitadelProjectId` in `nuxt.config.ts` wins over the
 variables.
 
-Register the web components in a **client-only** plugin — importing
-`@zitadel/components` from a page `<script setup>` runs during SSR and breaks:
-
-```ts
-// plugins/zitadel-components.client.ts
-import '@zitadel/components';
-export default defineNuxtPlugin(() => {});
-```
+The module also loads the web components in the browser through a client-only
+plugin and provides the business copy overlay as
+`useNuxtApp().$zitadelBusinessLocales`. Do not install or import
+`@zitadel/components` in the app.
 
 Login and logout pages bind the project handle from `useZitadelProject()` inside
 `<ClientOnly>`; navigation after each flow is driven by the URL props (there is
@@ -138,10 +131,9 @@ component attributes against the installed version rather than assuming.
   `runtimeConfig.public.zitadelProjectId`) the plugin silently skips
   `configureZitadel()`, so `useZitadelProject()` is `null` and
   `<zitadel-login>` never initializes.
-- **`@zitadel/components` is not transitive** under strict package managers —
-  add it to the app directly or imports fail to resolve.
-- **Never import components in page `<script setup>`** — it executes during SSR.
-  Use the `.client.ts` plugin and wrap the elements in `<ClientOnly>`.
+- **Do not depend on `@zitadel/components`.** The module loads the elements
+  itself; importing them in a page `<script setup>` would run during SSR, so
+  leave that to the module and wrap the elements in `<ClientOnly>`.
 - **Keep `proxyPath` at `/__nextgen` for external sign-in.** The module moves
   the server proxy and the widgets together, but a provider returns the browser
   to `/__nextgen/idp/{slug}/callback`, which is proxied only under the default

@@ -53,7 +53,7 @@ The Nuxt SDK registers server middleware and plugins so Nuxt pages can read Zita
     Every setup also writes `zitadel.json` and the `.zitadel/` folder, adds its entries to `.gitignore`, and adds managed sections to `AGENTS.md` and `README.md`. When setup created the app itself, it also writes `app/app.vue` and an `app/pages/index.vue` that redirects to `/login`.
   </Tab>
   <Tab>
-    Register the SDK's Nuxt module and configure it under `nextgen`. The module adds the server middleware and the plugin that exposes auth state.
+    Register the SDK's Nuxt module and configure it under `nextgen`. The module adds the server middleware, the plugin that exposes auth state, and the client plugin that loads the web components.
 
     ```ts
     export default defineNuxtConfig({
@@ -75,13 +75,7 @@ The Nuxt SDK registers server middleware and plugins so Nuxt pages can read Zita
 
     The module reads `ZITADEL_URL`, `NUXT_PUBLIC_ZITADEL_PROJECT_ID`, and `ZITADEL_PROJECT_SECRET` from the environment, or from `.env.local` when the environment has none, so the `.env.local` that setup writes works even though Nuxt itself loads only `.env`. A `nextgen.url` or `runtimeConfig.public.zitadelProjectId` in the config wins over the variables. The module reads them when `nuxt dev` or `nuxt build` runs. For a built server, set `NUXT_NEXTGEN_URL`, `NUXT_PUBLIC_ZITADEL_PROJECT_ID`, and `NUXT_NEXTGEN_PROJECT_SECRET` in its runtime environment instead, and build without the secret, in the environment and in files: the module reads `.env.local`, Nuxt reads `.env`, and whatever the build finds is written into `.output/`.
 
-    Register the web components on the client only, in `app/plugins/zitadel-components.client.ts` (`plugins/` in a project without an `app/` directory):
-
-    ```ts
-    import "@zitadel/components";
-
-    export default defineNuxtPlugin(() => {});
-    ```
+    The module also loads the web components on the client and provides the business copy overlay as `useNuxtApp().$zitadelBusinessLocales`, so the app does not install or import `@zitadel/components`.
   </Tab>
 </Tabs>
 

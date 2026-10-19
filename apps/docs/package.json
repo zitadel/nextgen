@@ -12,12 +12,13 @@
     "dev": "node scripts/bundle-openapi.mjs && next dev --port 3003",
     "build": "node scripts/bundle-openapi.mjs && next build",
     "start": "next start --port 3003",
-    "typecheck": "next typegen && tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json",
+    "typecheck": "next typegen && tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json && node scripts/sdk-samples.ts && tsc -p tsconfig.samples.json",
     "lint": "biome check .",
     "e2e": "playwright test",
     "e2e-deployment": "playwright test --config playwright.deployment.config.mts"
   },
   "dependencies": {
+    "@fumadocs/json-schema": "catalog:",
     "@modelcontextprotocol/server": "catalog:",
     "@vercel/analytics": "catalog:",
     "@vercel/speed-insights": "catalog:",
@@ -41,6 +42,7 @@
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "@zitadel/api": "workspace:*",
     "tailwindcss": "catalog:",
     "typescript": "catalog:"
   }

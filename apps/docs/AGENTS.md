@@ -78,10 +78,22 @@ So the template's root routes live under `/docs` here:
   which `lib/openapi.ts` imports. The content needs no generation step.
 - A page's Markdown (`/docs/cli.md`, or `/docs/cli` with `Accept:
   text/markdown`) is its processed Markdown; an operation's or a webhook's is
-  the operation or webhook with every schema it references (`docsLlms` in
-  `lib/source.ts`). `llms-full.txt` leaves the operations and webhooks out,
+  the operation or webhook with every schema it references, an operation's
+  with its call through `@zitadel/api` too (`docsLlms` in `lib/source.ts`). `llms-full.txt` leaves the operations and webhooks out,
   and its test fails on a Markdown link to one of them, so prose links to
   their section's page (a section page's `<Card>` is fine).
+- An operation's samples are its call through `@zitadel/api`, then cURL
+  (`components/api-page.tsx`), not Fumadocs' plain HTTP in languages Zitadel
+  ships no SDK for; a webhook's page shows its payload, not a call.
+  `lib/sdk-sample.ts` writes the call as orval generates the client, picking
+  the credential from the operation's security; the page calls it with the
+  request the reader is looking at, the Markdown with the default request
+  (`lib/default-request.ts`, with Fumadocs' own sampler).
+- `typecheck` compiles every operation's sample against `@zitadel/api`
+  (`scripts/sdk-samples.ts`, `tsconfig.samples.json`): a renamed operation, a
+  changed argument order or an example the schema rejects fails it. A new
+  security scheme fails it too, until `lib/sdk-sample.ts` knows how to
+  authenticate with it.
 
 ## Checks
 
