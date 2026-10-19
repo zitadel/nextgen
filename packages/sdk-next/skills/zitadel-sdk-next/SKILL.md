@@ -102,7 +102,9 @@ from `@zitadel/sdk-next/client` inside the dynamic import, and set the
 for logout and profile UI. Sign-in/out navigate to `post-sign-in-url` /
 `post-sign-out-url`, so chrome re-reads on the next page load.
 
-## Widget events
+## Widget props and events
+
+The widgets are rendered as raw custom elements, so set their props as the element's own kebab-case attributes (`post-sign-in-url`, `project-id`); `@zitadel/sdk-next/jsx` types them. The `@zitadel/sdk-react` skill lists each prop under its wrapper name in camelCase. The table below lists the events.
 
 The widgets are plain custom elements, so each event is a DOM `CustomEvent` that carries its payload in `detail`. The events and payloads are the same ones every SPA SDK exposes as callbacks.
 
@@ -159,7 +161,12 @@ Confirm names against those before writing code.
   unmatched public page always looks signed out — use `getSession()` there.
 - **A rejected `getSession()` means *unknown*, not signed out** (broken proxy /
   network / 5xx). Render a neutral or error state, never the signed-out CTA.
-- **Config handles:** `ZITADEL_URL` (backend, server-side) and
-  `NEXT_PUBLIC_ZITADEL_PROJECT_ID` (passed to `configureZitadel`). If the
-  middleware runs with custom verification options, pass the same ones to
-  `auth()` so both layers accept the same tokens.
+- **Config handles:** `ZITADEL_URL` (backend, server-side),
+  `ZITADEL_PROJECT_ID` (server-side) and `NEXT_PUBLIC_ZITADEL_PROJECT_ID`
+  (passed to `configureZitadel`). If the middleware runs with custom
+  verification options, pass the same ones to `auth()` so both layers accept
+  the same tokens.
+- **Sessions count only in the app's own project:** `projectId`, else
+  `ZITADEL_PROJECT_ID`, else `NEXT_PUBLIC_ZITADEL_PROJECT_ID`. With none set,
+  nobody is signed in. A session of another project on the same host reads as
+  signed out.

@@ -66,3 +66,12 @@ deterministic outcome gets it by construction (see the `orphaned` server shape i
 file they cover; command behaviour belongs in that command's spec, arranged
 through `ScaffoldedApp`. The layout rules are in
 [`tests/AGENTS.md`](../../../tests/AGENTS.md).
+
+The suite runs on CI's Linux, which has Docker, and on contributors' machines,
+Macs without Docker among them. So no test depends on whether Docker is
+installed: one that needs Docker to answer fakes it, and one about a machine
+without it takes `docker` off `PATH`. A process that stands in for a server whose
+data directory is checked must be one whose environment `ps` shows, such as Node:
+macOS keeps the environment of its own programs (`/bin/sleep`) out of `ps`, and a
+process whose environment names no data directory is trusted, so with `sleep` the
+test passes on Linux and fails on a Mac.

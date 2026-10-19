@@ -1,17 +1,17 @@
 import type { ZitadelProject } from "@zitadel/api/config";
-import type { NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
+import type { NextgenMiddlewareOptions, ResolveSessionOptions } from "@zitadel/sdk-core/middleware";
 import type { NextRequest } from "next/server";
 
 import {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
   filterResponseHeaders,
+  loginRedirectUrl,
   matchesRoutes,
   requiresProjectSecret,
+  resolveSession,
 } from "@zitadel/sdk-core/middleware";
 import { NextResponse } from "next/server";
-
-import { verifyJwt, isJwtShaped } from "./lib/jwt.js";
 
 /**
  * Clones the incoming request headers, injects `extra` key/value pairs,
@@ -34,6 +34,8 @@ function tunnelHeaders(req: NextRequest, extra: Readonly<Record<string, string>>
 
   const injectedNames = [];
 
+  // This is the only writer of x-nextgen-auth-token: it injects the verified
+  // value for server components, and a client-sent one never reaches here.
   for (const [name, value] of Object.entries(extra)) {
     headers.set(name, value);
     headers.set(`x-middleware-request-${name}`, value);
@@ -62,6 +64,9 @@ function tunnelHeaders(req: NextRequest, extra: Readonly<Record<string, string>>
  *   });
  * }
  *
+ * A session counts only in the app's own project: `projectId`, else
+ * `ZITADEL_PROJECT_ID`, else `NEXT_PUBLIC_ZITADEL_PROJECT_ID`.
+ *
  * export const config = {
  *   matcher: ["/__nextgen/:path*", "/profile/:path*"],
  * };
@@ -77,6 +82,7 @@ export async function nextgenMiddleware(
 ): Promise<NextResponse | Response> {
   const {
     url = process.env.ZITADEL_URL ?? "http://localhost:8080",
+    projectId = process.env.ZITADEL_PROJECT_ID || process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID,
     proxyPath = "/__nextgen",
     protectedRoutes = [],
     ignoredRoutes = [],
@@ -101,14 +107,16 @@ export async function nextgenMiddleware(
     );
   }
 
+  // Clients never send x-nextgen-auth-token: it is an internal channel. Refuse any
+  // request that carries it, on every route, before anything else runs.
+  if (req.headers.has("x-nextgen-auth-token")) {
+    return new Response("Bad Request", { status: 400 });
+  }
+
   const { pathname } = new URL(req.url);
 
   if (matchesRoutes(pathname, ignoredRoutes)) {
-    // Neutralise any client-supplied x-nextgen-auth-token on ignored routes.
-    // handleAuth is skipped for ignored routes, so we must strip the header
-    // here to prevent a forged value from reaching server components.
-    const headers = tunnelHeaders(req, { "x-nextgen-auth-token": "" });
-    return NextResponse.next({ request: { headers } });
+    return NextResponse.next();
   }
 
   if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
@@ -117,6 +125,7 @@ export async function nextgenMiddleware(
 
   return handleAuth(req, {
     url,
+    projectId,
     protectedRoutes,
     loginPath,
     allowedAlgorithms,
@@ -127,31 +136,6 @@ export async function nextgenMiddleware(
     opaqueTokenTimeoutMs,
     pathname,
   });
-}
-
-/**
- * Validates an opaque (non-JWT) session token by calling the backend's
- * `/sessions/me` endpoint. Returns `true` when the backend confirms the
- * session is live (HTTP 200), `false` otherwise.
- *
- * This is the fallback path for backends that issue encrypted opaque tokens
- * rather than self-contained JWTs.
- */
-async function validateOpaqueSessionToken(
-  token: string,
-  issuerUrl: string,
-  timeoutMs: number,
-): Promise<boolean> {
-  try {
-    const res = await fetch(`${issuerUrl}/sessions/me`, {
-      method: "GET",
-      headers: { cookie: `__nextgen_session=${token}` },
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
 }
 
 /**
@@ -192,7 +176,7 @@ async function proxyRequest(
   // upstream auth server sees the full proxy path. We never skip this even when
   // a chain is already present — a CDN or load balancer may have set XFF before
   // the request reached this edge node, and our hop must still be recorded.
-  const directIp = (req as unknown as { ip?: string }).ip ?? req.headers.get("x-real-ip");
+  const directIp = (req as unknown as { ip?: string }).ip;
   if (directIp) {
     const existingXff = upstreamHeaders.get("x-forwarded-for");
     upstreamHeaders.set("x-forwarded-for", existingXff ? `${existingXff}, ${directIp}` : directIp);
@@ -250,113 +234,59 @@ async function proxyRequest(
 
 /**
  * Options passed internally to {@link handleAuth} after destructuring the
- * public-facing {@link NextgenMiddlewareOptions}.
+ * public-facing {@link NextgenMiddlewareOptions}: the route policy, plus what
+ * the shared {@link resolveSession} judges the session by.
  */
-interface AuthHandlerOptions {
-  readonly url: string;
+interface AuthHandlerOptions extends ResolveSessionOptions {
   readonly protectedRoutes: readonly string[];
   readonly loginPath: string;
-  /**
-   * Forwarded from {@link NextgenMiddlewareOptions.allowedAlgorithms}.
-   * Declared as `readonly string[]` to match the {@link VerifyJwtOptions}
-   * contract and prevent accidental mutation between option destructuring
-   * and JWT verification.
-   */
-  readonly allowedAlgorithms: readonly string[] | undefined;
-  readonly clockSkewMs: number;
-  /**
-   * Forwarded from {@link NextgenMiddlewareOptions.audience}.
-   * Declared as `readonly string[]` to match the {@link VerifyJwtOptions}
-   * contract.
-   */
-  readonly audience: string | readonly string[] | undefined;
-  /**
-   * Forwarded from {@link NextgenMiddlewareOptions.allowedTokenTypes}.
-   * Declared as `readonly string[]` to match the {@link VerifyJwtOptions}
-   * contract and prevent accidental mutation between option destructuring
-   * and JWT verification.
-   */
-  readonly allowedTokenTypes: readonly string[];
-  readonly jwksTimeoutMs: number | undefined;
-  /**
-   * Forwarded from {@link NextgenMiddlewareOptions.opaqueTokenTimeoutMs};
-   * governs the `GET /sessions/me` fallback for opaque (non-JWT) tokens.
-   */
-  readonly opaqueTokenTimeoutMs: number;
   readonly pathname: string;
 }
 
 /**
- * Verifies the session token and tunnels the result to server components via
- * a request header. Redirects to the login page when the token is absent or
- * invalid on a protected route.
+ * Judges the session and tunnels the token of a signed-in user to server
+ * components via a request header, where `auth()` verifies it again.
+ * Redirects to the login page when nobody is signed in on a protected route.
+ * When the backend cannot say whether the session is live, the cookies stay
+ * and a protected route answers `503`.
  *
  * @param req  - The incoming edge request.
  * @param opts - Auth handler options.
- * @returns A `NextResponse` to continue or redirect.
+ * @returns A `NextResponse` to continue, redirect, or answer `503`.
  */
 async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<NextResponse> {
-  const {
-    url,
-    protectedRoutes,
-    loginPath,
-    allowedAlgorithms,
-    clockSkewMs,
-    audience,
-    allowedTokenTypes,
-    jwksTimeoutMs,
-    opaqueTokenTimeoutMs,
-    pathname,
-  } = opts;
+  const { protectedRoutes, loginPath, pathname, ...verification } = opts;
 
   const authHeader = req.headers.get("authorization");
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
   const cookieToken = req.cookies.get("__nextgen_session")?.value ?? null;
-  // Bearer token takes explicit precedence over the session cookie. API clients
-  // (e.g. mobile apps, CLIs) use Authorization headers while browsers use
-  // cookies; when both are present the caller clearly intended the Bearer token.
-  const token = bearerToken ?? cookieToken;
+  const { auth, clearCookies, undecided } = await resolveSession(
+    { bearer: bearerToken, cookie: cookieToken },
+    verification,
+  );
 
-  const payload = token
-    ? await verifyJwt(token, {
-        issuerUrl: url,
-        allowedAlgorithms,
-        clockSkewMs,
-        audience,
-        allowedTokenTypes,
-        jwksTimeoutMs,
-      })
-    : null;
-
-  if (payload && token && payload.sub) {
-    const tunnelled = tunnelHeaders(req, { "x-nextgen-auth-token": token });
+  if (auth.isAuthenticated) {
+    const tunnelled = tunnelHeaders(req, { "x-nextgen-auth-token": auth.session.token });
     return NextResponse.next({ request: { headers: tunnelled } });
   }
 
-  // The backend issues opaque encrypted session tokens rather than JWTs.
-  // Only fall back to /sessions/me validation when the token is definitively
-  // not a JWT (non-JSON segments). A token with a valid JWT structure that
-  // failed verification (bad sig, wrong typ/alg) must be rejected — never
-  // accepted by a backend call that doesn't re-check the JWT claims.
-  if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
-    const isValid = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
-    if (isValid) {
-      const tunnelled = tunnelHeaders(req, {
-        "x-nextgen-auth-token": cookieToken,
-      });
-      return NextResponse.next({ request: { headers: tunnelled } });
-    }
+  // The backend could not say whether the session is live. The user may well
+  // be signed in, so a protected route answers 503 rather than send them to
+  // the login page.
+  if (undecided && matchesRoutes(pathname, protectedRoutes)) {
+    return new NextResponse("Service Unavailable", { status: 503 });
   }
 
   const tunnelled = tunnelHeaders(req, { "x-nextgen-auth-token": "" });
-  const staleNextgenCookies = req.cookies
-    .getAll()
-    .filter((c: { name: string }) => c.name.startsWith("__nextgen"));
+  // Dead credentials are cleared so the browser stops replaying them. A live
+  // session that signs no one in here (an anonymous one, or one of another
+  // project) keeps its cookie, and so does one the backend gave no verdict on.
+  const staleNextgenCookies = clearCookies
+    ? req.cookies.getAll().filter((c: { name: string }) => c.name.startsWith("__nextgen"))
+    : [];
 
   if (matchesRoutes(pathname, protectedRoutes)) {
-    const loginUrl = new URL(loginPath, req.url);
-    loginUrl.searchParams.set("next", pathname);
-    const redirect = NextResponse.redirect(loginUrl, { status: 302 });
+    const redirect = NextResponse.redirect(loginRedirectUrl(loginPath, req.url), { status: 302 });
     for (const cookie of staleNextgenCookies) {
       redirect.cookies.delete(cookie.name);
     }
@@ -396,7 +326,7 @@ export type ProxyHandler = (req: NextRequest) => Promise<NextResponse | Response
  * import { createProxy } from "@zitadel/sdk-next/middleware";
  *
  * const zitadel = configureZitadel({
- *   projectId: "demo",
+ *   projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "",
  *   url: process.env.ZITADEL_URL,
  * });
  *
@@ -413,6 +343,12 @@ export type ProxyHandler = (req: NextRequest) => Promise<NextResponse | Response
  * export const middleware = proxy;
  * ```
  *
+ * Sessions are held to the handle's project unless `options.projectId` names
+ * another. `auth()` runs in the server runtime, where the middleware's handle
+ * may not be configured: it reads `ZITADEL_PROJECT_ID` /
+ * `NEXT_PUBLIC_ZITADEL_PROJECT_ID`, else a handle configured there. When the
+ * project lives only in this handle, pass it as `auth({ projectId })` too.
+ *
  * @param config  - The SDK handle from `configureZitadel()`.
  * @param options - Route protection and JWT options.
  * @returns A middleware handler function.
@@ -420,6 +356,7 @@ export type ProxyHandler = (req: NextRequest) => Promise<NextResponse | Response
 export function createProxy(config: ZitadelProject, options: ProxyOptions = {}): ProxyHandler {
   const mergedOptions: NextgenMiddlewareOptions = {
     ...options,
+    projectId: options.projectId ?? (config.projectId || undefined),
     proxyPath: config.proxyPath,
     url: config.url,
   };

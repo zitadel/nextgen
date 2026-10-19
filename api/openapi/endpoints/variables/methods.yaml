@@ -1,5 +1,6 @@
 get:
   operationId: getVariables
+  x-zitadel-cli: variables list
   summary: Get variables
   description: |
     Returns the project's variables, keyed by name, each with its value per
@@ -27,6 +28,7 @@ get:
 
 patch:
   operationId: updateVariables
+  x-zitadel-cli: variables set
   summary: Update variables
   description: |
     Enters, replaces and removes the project's variables for the requested
@@ -61,6 +63,16 @@ patch:
       application/json:
         schema:
           $ref: update-variables-request.yaml
+        examples:
+          set:
+            summary: Enter a value and a secret, and remove a name
+            value:
+              GOOGLE_CLIENT_ID: 1234567890-abc.apps.googleusercontent.com
+              GOOGLE_CLIENT_SECRET:
+                value: GOCSPX-example
+                secret: true
+              SESSION_TTL: 3600
+              LEGACY_CALLBACK_URL: null
   responses:
     '200':
       description: |

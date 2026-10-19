@@ -20,6 +20,7 @@
     purpose = 'login',
     flowName,
     postSignInUrl,
+    forcePostSignInUrl,
     resumeFlowId,
     locales,
     lang,
@@ -49,7 +50,14 @@
   // binding would assign `undefined` and overwrite the default.
   $effect(() => {
     if (el) {
-      assignGiven(el, { lang, variant, theme, suppressHeader, suppressPasswordToggle });
+      assignGiven(el, {
+        lang,
+        variant,
+        theme,
+        suppressHeader,
+        suppressPasswordToggle,
+        forcePostSignInUrl,
+      });
     }
   });
 

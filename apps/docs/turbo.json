@@ -8,8 +8,12 @@
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/api/openapi/**/*.yaml", "$TURBO_ROOT$/redocly.yaml"],
       "outputs": [".generated/openapi.mjs", ".generated/openapi.d.mts"]
     },
+    // The API reference's TypeScript samples compile against the client
+    // (scripts/sdk-samples.ts, tsconfig.samples.json), whose endpoints its
+    // generate task writes from the same spec, and whose runtime they call.
     "typecheck": {
-      "dependsOn": ["generate"]
+      "dependsOn": ["generate", "@zitadel/api#generate"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/api/src/**"]
     },
     // The build script bundles again before `next build`, because the
     // hosted cloud's docs service runs the script without a task runner.

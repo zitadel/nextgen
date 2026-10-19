@@ -59,3 +59,17 @@ func TestWithTransaction_unknownExecutorRunsDirectly(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 1, db.updates)
 }
+
+func TestWithTransaction_tracedTxnRunsDirectly(t *testing.T) {
+	t.Parallel()
+	existing := traced(tx{})
+	require.Equal(t, existing, traced(existing), "traced must not wrap twice")
+	called := false
+	err := withTransaction(t.Context(), existing, func(ctx context.Context, got queryExecutor) error {
+		called = true
+		assert.Equal(t, existing, got)
+		return nil
+	})
+	require.NoError(t, err)
+	assert.True(t, called)
+}
