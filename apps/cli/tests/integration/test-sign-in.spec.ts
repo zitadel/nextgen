@@ -250,7 +250,7 @@ describe("test sign-in", () => {
 
         const result = await app.run(["test", "sign-in", "--provider", ACME.slug]);
 
-        expect(result.stdout).not.toContain("accounts.google.com");
+        expect(`${result.stdout}${result.stderr}`).not.toContain("accounts.google.com");
       });
 
       it("refuses a live sign-in, which is one provider's, without a name", async () => {
@@ -267,7 +267,8 @@ describe("test sign-in", () => {
 
         const result = await app.run(["test", "sign-in"]);
 
-        expect([result.stdout.includes("acme-sso"), result.stdout.includes("google")]).toEqual([
+        const said = `${result.stdout}${result.stderr}`;
+        expect([said.includes("Checking acme-sso"), said.includes("Checking google")]).toEqual([
           true,
           true,
         ]);
@@ -282,7 +283,16 @@ describe("test sign-in", () => {
 
         const result = await app.run(["test", "sign-in", "--provider", "google"]);
 
-        expect(result).toPrint("Discovery document");
+        expect(result).toPrint("Discovery document: Fetched");
+      });
+
+      it("closes with a summary of what each provider's checks came to", async () => {
+        const app = await anAppWithTwoProviders();
+        platform.hasGoogle();
+
+        const result = await app.run(["test", "sign-in"]);
+
+        expect(result).toPrint("Sign-in checks");
       });
 
       it("shows what the provider reported without letting it drive the terminal", async () => {
@@ -292,7 +302,7 @@ describe("test sign-in", () => {
 
         const result = await app.run(["test", "sign-in", "--provider", "google"]);
 
-        expect(result.stdout).not.toContain("\u001b]0;");
+        expect(`${result.stdout}${result.stderr}`).not.toContain("\u001b]0;");
       });
 
       it("says the browser sign-in was not asked for", async () => {
