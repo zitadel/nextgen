@@ -59,6 +59,7 @@ export type {
   ZitadelLogoutProps,
   ZitadelProject,
   ZitadelSessionConfig,
+  ZitadelSessionErrorDetail,
   ZitadelSessionEventMap,
   ZitadelSessionHandlers,
   ZitadelSessionProps,
