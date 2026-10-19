@@ -639,12 +639,13 @@ func (UnimplementedHandler) GetLive(ctx context.Context) (r GetLiveRes, _ error)
 //
 // Returns the current state of the current session including its factors and all currently
 // satisfied assurance levels.
+// With `project_id`, the session is returned only when it belongs to that project.
 // `assurance_levels[]` may shrink over time as factor freshness windows expire,
 // without the session itself expiring. Use step-up authentication (a new `auth_attempt`
 // against the same `session_id`) to restore a dropped assurance level.
 //
 // GET /sessions/me
-func (UnimplementedHandler) GetMySession(ctx context.Context) (r GetMySessionRes, _ error) {
+func (UnimplementedHandler) GetMySession(ctx context.Context, params GetMySessionParams) (r GetMySessionRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

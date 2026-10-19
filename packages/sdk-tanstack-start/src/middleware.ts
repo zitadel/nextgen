@@ -3,14 +3,12 @@ import type { AuthResult, NextgenMiddlewareOptions } from "@zitadel/sdk-core/mid
 import {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
-  checkOpaqueSessionToken,
   filterResponseHeaders,
   loginRedirectUrl,
   matchesRoutes,
   requiresProjectSecret,
+  resolveSession,
 } from "@zitadel/sdk-core/middleware";
-
-import { verifyJwt, base64UrlDecode } from "./lib/jwt";
 
 /**
  * `process` is undefined in some edge/serverless runtimes; read env defensively
@@ -134,19 +132,6 @@ async function proxyRequest(
   });
 }
 
-const DECODER = new TextDecoder();
-
-function isJwtShaped(token: string): boolean {
-  const parts = token.split(".");
-  if (parts.length < 3 || !parts[0]) return false;
-  try {
-    const header = JSON.parse(DECODER.decode(base64UrlDecode(parts[0]))) as Record<string, unknown>;
-    return typeof header?.alg === "string" && !("enc" in header);
-  } catch {
-    return false;
-  }
-}
-
 function parseCookieHeader(header: string | null): Map<string, string> {
   const jar = new Map<string, string>();
   if (!header) return jar;
@@ -171,6 +156,9 @@ function clearCookie(name: string): string {
  * {@link NextgenRequestDecision} out) so it carries the full, independently
  * testable auth contract regardless of TanStack's evolving middleware surface.
  *
+ * A session counts only in the app's own project: `projectId`, else
+ * `ZITADEL_PROJECT_ID`, else `VITE_ZITADEL_PROJECT_ID`.
+ *
  * @param request - The incoming Web `Request`.
  * @param options - Configuration; `projectSecret` and `clientAddress` augment
  *   the shared {@link NextgenMiddlewareOptions}.
@@ -182,6 +170,7 @@ export async function handleNextgenRequest(
 ): Promise<NextgenRequestDecision> {
   const {
     url = PROCESS_ENV.ZITADEL_URL ?? "http://localhost:8080",
+    projectId = PROCESS_ENV.ZITADEL_PROJECT_ID || PROCESS_ENV.VITE_ZITADEL_PROJECT_ID,
     proxyPath = "/__nextgen",
     protectedRoutes = [],
     ignoredRoutes = [],
@@ -236,59 +225,22 @@ export async function handleNextgenRequest(
   const authHeader = request.headers.get("authorization");
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
   const cookieToken = cookies.get("__nextgen_session") ?? null;
-  // Bearer token takes explicit precedence over the session cookie.
-  const token = bearerToken ?? cookieToken;
+  const { auth, clearCookies, undecided } = await resolveSession(
+    { bearer: bearerToken, cookie: cookieToken },
+    {
+      url,
+      projectId,
+      allowedAlgorithms,
+      clockSkewMs,
+      audience,
+      allowedTokenTypes,
+      jwksTimeoutMs,
+      opaqueTokenTimeoutMs,
+    },
+  );
 
-  const payload = token
-    ? await verifyJwt(token, {
-        issuerUrl: url,
-        allowedAlgorithms,
-        clockSkewMs,
-        audience,
-        allowedTokenTypes,
-        jwksTimeoutMs,
-      })
-    : null;
-
-  if (payload && token && payload.sub) {
-    return {
-      type: "continue",
-      auth: {
-        isAuthenticated: true,
-        session: {
-          userId: payload.sub,
-          identifier: payload.email ?? null,
-          identifierProperty: null,
-          display: payload.name ?? null,
-          token,
-        },
-      },
-    };
-  }
-
-  let liveAnonymousSession = false;
-  let undecided = false;
-  if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
-    const check = await checkOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
-    // A session without a user is anonymous: its sign-in has not verified a
-    // factor yet. It is not signed in, but it is live — keep its cookie.
-    if (check.verdict === "live" && check.session.userId) {
-      return {
-        type: "continue",
-        auth: {
-          isAuthenticated: true,
-          session: {
-            userId: check.session.userId,
-            identifier: check.session.identifier,
-            identifierProperty: check.session.identifierProperty,
-            display: check.session.display,
-            token: cookieToken,
-          },
-        },
-      };
-    }
-    liveAnonymousSession = check.verdict === "live";
-    undecided = check.verdict === "undecided";
+  if (auth.isAuthenticated) {
+    return { type: "continue", auth };
   }
 
   // The backend could not say whether the session is live. The user may well
@@ -300,12 +252,12 @@ export async function handleNextgenRequest(
 
   // Dead credentials are cleared on every unauthenticated response so the
   // browser stops replaying them (each replay costs a backend session check).
-  // Only the backend's refusal makes a cookie dead: a live anonymous session's
-  // sign-in may still complete, and a check without a verdict refused nothing.
-  const setCookies =
-    liveAnonymousSession || undecided
-      ? []
-      : [...cookies.keys()].filter((name) => name.startsWith("__nextgen")).map(clearCookie);
+  // A live session that signs no one in here (an anonymous one, whose sign-in
+  // may still complete, or one of another project) keeps its cookie, and so
+  // does one the backend gave no verdict on.
+  const setCookies = clearCookies
+    ? [...cookies.keys()].filter((name) => name.startsWith("__nextgen")).map(clearCookie)
+    : [];
 
   if (matchesRoutes(pathname, protectedRoutes)) {
     const headers = new Headers({ location: loginRedirectUrl(loginPath, url2).toString() });
@@ -317,7 +269,7 @@ export async function handleNextgenRequest(
 
   return {
     type: "continue",
-    auth: { isAuthenticated: false, session: null },
+    auth,
     ...(setCookies.length > 0 ? { setCookies } : {}),
   };
 }

@@ -1,10 +1,11 @@
 import { auth } from "@zitadel/sdk-next/server";
+import { DEMO_PROJECT_ID } from "../../project";
 import { LogoutWidget } from "./widget";
 import { SessionDetails } from "./session-details";
 import { UserBadge } from "./user-badge";
 
 export default async function AdminPage() {
-  const session = await auth();
+  const session = await auth({ projectId: DEMO_PROJECT_ID });
 
   return (
     <main style={{ padding: "48px", maxWidth: "600px", margin: "0 auto" }}>

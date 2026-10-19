@@ -53,7 +53,10 @@ export const onRequest = createNextgenOnRequest({
 
 `url` and `projectSecret` default to `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET`,
 read per request from Qwik City's `requestEvent.env` (where Vite loads
-`.env.local`), falling back to `process.env`; pass them only to override. To run
+`.env.local`), falling back to `process.env`; pass them only to override.
+Sessions count only in the app's own project: `projectId`, else
+`ZITADEL_PROJECT_ID`, else `PUBLIC_ZITADEL_PROJECT_ID`, read the same way. With
+none set, nobody is signed in. To run
 alongside your own handler, export an array: `[createNextgenOnRequest({...}), myOnRequest]`.
 
 **2. Read auth server-side** with `getAuth(ev)` in a `routeLoader$`, action, or

@@ -62,6 +62,10 @@ export const startInstance = createStart(() => ({
 }));
 ```
 
+Sessions count only in the app's own project: `projectId`, else
+`ZITADEL_PROJECT_ID`, else `VITE_ZITADEL_PROJECT_ID`. With none set, nobody is
+signed in.
+
 The same proxy/verify/protect decision is exported as the framework-agnostic
 `handleNextgenRequest(request, options)` for a custom server entry.
 
