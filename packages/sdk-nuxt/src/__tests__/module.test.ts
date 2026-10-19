@@ -2,7 +2,7 @@ import type { Nuxt } from "@nuxt/schema";
 import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { addPlugin } from "@nuxt/kit";
+import { addPlugin, addTypeTemplate } from "@nuxt/kit";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import nextgenModule from "../module";
@@ -14,6 +14,7 @@ vi.mock("@nuxt/kit", async (importOriginal) => ({
   addPlugin: vi.fn(),
   addServerHandler: vi.fn(),
   addImportsDir: vi.fn(),
+  addTypeTemplate: vi.fn(),
 }));
 
 interface ModuleRuntimeConfig {
@@ -68,6 +69,20 @@ describe("@zitadel/sdk-nuxt module", () => {
       src: expect.stringMatching(/runtime[\\/]components\.client$/),
       mode: "client",
     });
+  });
+
+  it("types the business locales the client plugin provides", async () => {
+    await install();
+
+    const [template] = vi.mocked(addTypeTemplate).mock.calls[0] ?? [];
+    expect(template?.filename).toBe("types/zitadel-business-locales.d.ts");
+    const contents = String(
+      (template as { getContents: (data: unknown) => string }).getContents({}),
+    );
+    expect(contents).toContain("$zitadelBusinessLocales: ZitadelBusinessLocales");
+    expect(contents).toContain('declare module "#app"');
+    // The app does not install @zitadel/components, so the types must not import it.
+    expect(contents).not.toContain("@zitadel/components");
   });
 
   it("hands every middleware option to the server middleware", async () => {

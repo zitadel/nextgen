@@ -2,6 +2,7 @@ import {
   defineNuxtModule,
   addPlugin,
   addServerHandler,
+  addTypeTemplate,
   addImportsDir,
   createResolver,
 } from "@nuxt/kit";
@@ -37,6 +38,27 @@ function parseEnvLocal(rootDir: string): Record<string, string> {
   }
   return values;
 }
+
+/**
+ * The copy overlay the client plugin provides, as `useNuxtApp().$zitadelBusinessLocales`:
+ * extra locale strings keyed by primary language subtag.
+ */
+const BUSINESS_LOCALES_TYPES = `type ZitadelBusinessLocales = Record<string, Partial<Record<string, string>>>;
+
+declare module "#app" {
+  interface NuxtApp {
+    $zitadelBusinessLocales: ZitadelBusinessLocales;
+  }
+}
+
+declare module "vue" {
+  interface ComponentCustomProperties {
+    $zitadelBusinessLocales: ZitadelBusinessLocales;
+  }
+}
+
+export {};
+`;
 
 /**
  * Returns a lookup for the app's Zitadel settings: the process environment
@@ -108,6 +130,13 @@ const nextgenModule: NuxtModule<NextgenMiddlewareOptions> =
       // `@zitadel/components` itself. Client-only: registering custom elements
       // during SSR would break.
       addPlugin({ src: resolve("./runtime/components.client"), mode: "client" });
+      // Types the value the plugin above provides. Written into the app's own
+      // `.nuxt/types`, with the locale map spelled out, because the app does not
+      // install `@zitadel/components`, so a type import from it would not resolve.
+      addTypeTemplate({
+        filename: "types/zitadel-business-locales.d.ts",
+        getContents: () => BUSINESS_LOCALES_TYPES,
+      });
       addServerHandler({
         middleware: true,
         handler: resolve("./runtime/server/handler"),
