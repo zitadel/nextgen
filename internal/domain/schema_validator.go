@@ -52,8 +52,8 @@ type SchemaValidator struct {
 	// canonical URI of its latest known version.
 	latestSchemaURIByKind map[KnownSchemaKind]string
 	// builtinBases names the meta-schemas under the canonical base and under
-	// every legacy base, so a document declaring a legacy metaSchema still
-	// validates.
+	// every other known base, so a document declaring its metaSchema under
+	// another one still validates.
 	builtinBases BuiltinSchemaBases
 }
 
@@ -104,17 +104,8 @@ func NewSchemaValidator(builtinPublicBase string) (*SchemaValidator, error) {
 	return &SchemaValidator{
 		compiledSchemas:       compiledSchemas,
 		latestSchemaURIByKind: latestURIByKind,
-		builtinBases:          NewBuiltinSchemaBases(builtinPublicBase, LegacyBuiltinSchemaBases...),
+		builtinBases:          BuiltinSchemaBasesFor(builtinPublicBase),
 	}, nil
-}
-
-// BuiltinBases returns the namespace the built-in schemas are published under,
-// disabled on a nil validator.
-func (v *SchemaValidator) BuiltinBases() BuiltinSchemaBases {
-	if v == nil {
-		return BuiltinSchemaBases{}
-	}
-	return v.builtinBases
 }
 
 // ValidateAgainstMetaSchema validates the given tenant schema document against the appropriate meta-schema based on its declared "kind" property.
@@ -165,10 +156,9 @@ func (v *SchemaValidator) ValidateAgainstMetaSchema(schemaBs []byte) error {
 //
 // todo: support fetching compiled schema by version as well when multiple versions of the meta-schemas are available.
 func (v *SchemaValidator) GetBuiltinSchema(uri string) (*jsonschema.Schema, error) {
-	compiledSchema, ok := v.compiledSchemas[uri]
-	if !ok {
-		compiledSchema, ok = v.compiledSchemas[v.builtinBases.Canonicalize(uri)]
-	}
+	// The map is keyed by the canonical base; Canonicalize leaves every other
+	// URI alone, so one lookup serves both spellings.
+	compiledSchema, ok := v.compiledSchemas[v.builtinBases.Canonicalize(uri)]
 	if !ok {
 		return nil, fmt.Errorf("%w: %q", ErrUnknownSchemaURI, uri)
 	}

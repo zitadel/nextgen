@@ -241,7 +241,7 @@ type JSONSchemaResolver struct {
 	resolveTimeout  time.Duration
 	httpClient      *http.Client
 	// builtinBases is the namespace of product-built-in schemas: the configured
-	// public base and the [LegacyBuiltinSchemaBases]. When disabled, builtin
+	// public base and the other [KnownBuiltinSchemaBases]. When disabled, builtin
 	// embedded schemas are off and resolution uses only the store / HTTP ingest.
 	builtinBases BuiltinSchemaBases
 }
@@ -249,7 +249,7 @@ type JSONSchemaResolver struct {
 // NewJSONSchemaResolver wires a resolver with an LRU cache, resolve limits,
 // an optional HTTP client for ingestion, and an optional builtinPublicBase URL.
 // When builtinPublicBase is non-nil, schema URLs under that prefix, or under one
-// of the [LegacyBuiltinSchemaBases], are loaded from embedded templates
+// of the other [KnownBuiltinSchemaBases], are loaded from embedded templates
 // instead of the database; they are not persisted via [JSONSchemaStore.CreateJSONSchema].
 // No URL under those bases is ever fetched over HTTP.
 // Persistence is supplied per [JSONSchemaResolver.Resolve] call via [JSONSchemaStore].
@@ -275,7 +275,7 @@ func NewJSONSchemaResolver(
 	}
 	var bases BuiltinSchemaBases
 	if builtinPublicBase != nil {
-		bases = NewBuiltinSchemaBases(builtinPublicBase.String(), LegacyBuiltinSchemaBases...)
+		bases = BuiltinSchemaBasesFor(builtinPublicBase.String())
 	}
 	return &JSONSchemaResolver{
 		cache:           cache,
@@ -383,20 +383,6 @@ func (r *JSONSchemaResolver) loadSchemaPayload(ctx context.Context, store JSONSc
 		}
 	}
 	return r.getFromDatabase(ctx, store, projectID, schemaURL)
-}
-
-// builtinSchemaURLPathAfterBase reports whether schemaURL is under base and returns the path
-// after base (no leading slash), which matches the embed path under schema/ (for example
-// base https://iam.example.com/schema and schemaURL …/schema/user/v1/user.schema.json -> user/v1/user.schema.json).
-func builtinSchemaURLPathAfterBase(base, schemaURL string) (relPath string, underBase bool) {
-	if schemaURL == base {
-		return "", true
-	}
-	prefix := base + "/"
-	if !strings.HasPrefix(schemaURL, prefix) {
-		return "", false
-	}
-	return strings.TrimPrefix(schemaURL, prefix), true
 }
 
 func loadBuiltinSchemaBytes(relPath, canonicalSchemaURL string) ([]byte, error) {

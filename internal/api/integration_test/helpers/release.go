@@ -14,6 +14,7 @@ func (h *Harness) EnsureReleaseService(t testing.TB) service.ReleaseService {
 	if h.releaseService.value == nil {
 		h.releaseService.value = service.NewReleaseService(
 			h.EnsureServiceDB(t),
+			BuiltinSchemaBases(),
 		)
 	}
 	return h.releaseService.value

@@ -55,10 +55,14 @@ type ReleaseService interface {
 
 type releaseService struct {
 	v2Pool *DB
+	// builtinBases resolves a schema pointer given as a built-in schema's `$id`
+	// under whichever base the project stores it; the release pins the row
+	// that was found.
+	builtinBases domain.BuiltinSchemaBases
 }
 
-func NewReleaseService(v2Pool *DB) ReleaseService {
-	return &releaseService{v2Pool: v2Pool}
+func NewReleaseService(v2Pool *DB, builtinBases domain.BuiltinSchemaBases) ReleaseService {
+	return &releaseService{v2Pool: v2Pool, builtinBases: builtinBases}
 }
 
 // Create assembles a release from revisions that already exist.
@@ -198,7 +202,7 @@ func (s *releaseService) loadContent(ctx context.Context, projectID string, requ
 	for _, pointer := range requested {
 		switch pointer.Kind {
 		case domain.ReleasePointerKindSchema:
-			schema, err := stmts.GetJSONSchemaByID(ctx, projectID, pointer.RevisionID)
+			schema, err := s.builtinBases.GetJSONSchema(ctx, stmts, projectID, pointer.RevisionID)
 			if err != nil {
 				return content, mapRevisionLookupError(err, pointer)
 			}

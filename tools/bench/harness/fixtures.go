@@ -12,6 +12,7 @@ import (
 	"github.com/go-faster/jx"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
+	configdefaults "github.com/zitadel/nextgen/packages/config/defaults"
 )
 
 // Fixture declares what a benchmark target needs: one project and one user
@@ -44,9 +45,9 @@ type FixtureUser struct {
 	Schema   string `json:"schema,omitempty"`
 }
 
-// DefaultBuiltinSchemaBase mirrors the server's schema.builtin_public_base
+// DefaultBuiltinSchemaBase is the server's schema.builtin_public_base
 // default; a lane running a server with another base sets user.schema.
-const DefaultBuiltinSchemaBase = "https://preview.zitadel.com/schemas/v1"
+const DefaultBuiltinSchemaBase = configdefaults.DefaultBuiltinSchemaBase
 
 // LoadFixture reads and validates a fixture file.
 func LoadFixture(path string) (Fixture, error) {

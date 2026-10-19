@@ -13,6 +13,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	configdefaults "github.com/zitadel/nextgen/packages/config/defaults"
 )
 
 const (
@@ -39,8 +40,85 @@ func TestNewBuiltinSchemaBases(t *testing.T) {
 		assert.False(t, ok)
 		assert.Equal(t, testLegacyBase+"/user-schema.json", b.Canonicalize(testLegacyBase+"/user-schema.json"))
 	})
-	t.Run("the real legacy bases name nextgen.com", func(t *testing.T) {
-		assert.Contains(t, domain.LegacyBuiltinSchemaBases, "https://nextgen.com/api/schemas")
+	t.Run("the known bases name the current default and nextgen.com", func(t *testing.T) {
+		assert.Contains(t, domain.KnownBuiltinSchemaBases, configdefaults.DefaultBuiltinSchemaBase)
+		assert.Contains(t, domain.KnownBuiltinSchemaBases, "https://nextgen.com/api/schemas")
+	})
+}
+
+// A server pinned to a former base must still accept what a current CLI
+// mints, and the other way round: the alias set is symmetric.
+func TestBuiltinSchemaBasesFor(t *testing.T) {
+	const current = configdefaults.DefaultBuiltinSchemaBase
+	const former = "https://nextgen.com/api/schemas"
+
+	t.Run("a server on the current base aliases the former one", func(t *testing.T) {
+		b := domain.BuiltinSchemaBasesFor(current)
+		assert.Equal(t, current, b.Canonical())
+		assert.Equal(t, current+"/user-schema.json", b.Canonicalize(former+"/user-schema.json"))
+		assert.Contains(t, b.Equivalents(former+"/default-human-user.json"), current+"/default-human-user.json")
+	})
+	t.Run("a server pinned to the former base aliases the current one", func(t *testing.T) {
+		b := domain.BuiltinSchemaBasesFor(former)
+		assert.Equal(t, former, b.Canonical())
+		assert.Equal(t, former+"/user-schema.json", b.Canonicalize(current+"/user-schema.json"))
+		assert.Contains(t, b.Equivalents(current+"/default-human-user.json"), former+"/default-human-user.json")
+	})
+	t.Run("a self-hosted base keeps every known base as an alias", func(t *testing.T) {
+		b := domain.BuiltinSchemaBasesFor("https://iam.example.com/schema/")
+		assert.Equal(t, "https://iam.example.com/schema", b.Canonical())
+		assert.ElementsMatch(t, []string{
+			"https://iam.example.com/schema/x.json",
+			current + "/x.json",
+			former + "/x.json",
+		}, b.Equivalents(current+"/x.json"))
+	})
+}
+
+// The origin of a URL is read the way a browser reads it, so no spelling of
+// a built-in's host escapes the namespace; the path stays byte-exact.
+func TestBuiltinSchemaBases_HostSpelling(t *testing.T) {
+	b := testBases()
+
+	for _, spelling := range []string{
+		"https://EXAMPLE.test/schemas/v1/user-schema.json",
+		"https://example.test:443/schemas/v1/user-schema.json",
+		"https://example.test./schemas/v1/user-schema.json",
+		"HTTPS://example.test/schemas/v1/user-schema.json",
+		"https://NEXTGEN.com/api/schemas/user-schema.json",
+	} {
+		rel, ok := b.RelPath(spelling)
+		assert.True(t, ok, spelling)
+		assert.Equal(t, "user-schema.json", rel, spelling)
+		// The asked spelling stays first, so an exact row still wins.
+		assert.Equal(t, spelling, b.Equivalents(spelling)[0])
+		assert.Contains(t, b.Equivalents(spelling), testCanonicalBase+"/user-schema.json")
+	}
+
+	for _, outside := range []string{
+		"https://example.test:8443/schemas/v1/user-schema.json",
+		"http://example.test/schemas/v1/user-schema.json",
+		"https://user@example.test/schemas/v1/user-schema.json",
+		"https://example.test/Schemas/v1/user-schema.json",
+		"sch_01ABC",
+		"https://",
+	} {
+		_, ok := b.RelPath(outside)
+		assert.False(t, ok, outside)
+	}
+
+	// A query or fragment is part of the path and names no embedded document.
+	rel, ok := b.RelPath(testCanonicalBase + "/user-schema.json?x=1")
+	assert.True(t, ok)
+	assert.Equal(t, "user-schema.json?x=1", rel)
+
+	t.Run("a local base keeps its port", func(t *testing.T) {
+		local := domain.NewBuiltinSchemaBases("http://localhost:8080/schemas")
+		rel, ok := local.RelPath("http://LOCALHOST:8080/schemas/x.json")
+		assert.True(t, ok)
+		assert.Equal(t, "x.json", rel)
+		_, ok = local.RelPath("http://localhost/schemas/x.json")
+		assert.False(t, ok)
 	})
 }
 
@@ -183,12 +261,19 @@ func TestJSONSchemaResolver_LegacyBuiltinBase(t *testing.T) {
 		require.NotNil(t, schema)
 	})
 	t.Run("a missing row in the namespace is never fetched", func(t *testing.T) {
-		store := domainmock.NewMockJSONSchemaStore(gomock.NewController(t))
-		store.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj-1", gomock.Any()).Return(nil, database.NewNoRowFoundError(nil)).Times(2)
-		r := domain.NewJSONSchemaResolver(mustJSONSchemaCache(t, 128), 0, 0, noFetch, base)
+		for _, spelling := range []string{
+			testLegacyBase + "/default-human-user.json",
+			testCanonicalBase + "/default-human-user.json",
+			"https://EXAMPLE.test:443/schemas/v1/default-human-user.json",
+		} {
+			store := domainmock.NewMockJSONSchemaStore(gomock.NewController(t))
+			equivalents := domain.BuiltinSchemaBasesFor(testCanonicalBase).Equivalents(spelling)
+			store.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj-1", gomock.Any()).Return(nil, database.NewNoRowFoundError(nil)).Times(len(equivalents))
+			r := domain.NewJSONSchemaResolver(mustJSONSchemaCache(t, 128), 0, 0, noFetch, base)
 
-		_, err := r.Resolve(ctx, store, "proj-1", testLegacyBase+"/default-human-user.json", nil)
-		require.Error(t, err)
+			_, err := r.Resolve(ctx, store, "proj-1", spelling, nil)
+			require.Error(t, err, spelling)
+		}
 	})
 }
 
@@ -207,7 +292,12 @@ func TestSchemaValidator_LegacyMetaSchema(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, testCanonicalBase+"/user-schema.json", latest, "new documents are stamped with the canonical base")
 
-	assert.Equal(t, testCanonicalBase, v.BuiltinBases().Canonical())
-	var nilValidator *domain.SchemaValidator
-	assert.Empty(t, nilValidator.BuiltinBases().Canonical())
+	t.Run("a validator pinned to the former base accepts the current metaSchema", func(t *testing.T) {
+		pinned, err := domain.NewSchemaValidator("https://nextgen.com/api/schemas")
+		require.NoError(t, err)
+
+		current, err := pinned.GetBuiltinSchema(configdefaults.DefaultBuiltinSchemaBase + "/user-schema.json")
+		require.NoError(t, err)
+		require.NotNil(t, current)
+	})
 }

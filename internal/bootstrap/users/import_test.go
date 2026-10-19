@@ -35,8 +35,8 @@ func TestMain(m *testing.M) {
 var testServiceDB *service.DB
 
 // testBuiltinBases is the built-in namespace every import here runs under: a
-// canonical base of its own, aliased by the real legacy bases.
-var testBuiltinBases = domain.NewBuiltinSchemaBases("https://schemas.test/builtin/v1", domain.LegacyBuiltinSchemaBases...)
+// canonical base of its own, aliased by every base a real deployment knows.
+var testBuiltinBases = domain.BuiltinSchemaBasesFor("https://schemas.test/builtin/v1")
 
 func testPool(t *testing.T) *service.DB {
 	t.Helper()
@@ -218,7 +218,7 @@ func TestImport_legacySchemaURLUsesSeededRow(t *testing.T) {
 	t.Cleanup(func() { _, _ = stmts.DeleteProjectByID(context.Background(), projectID) })
 
 	seededURL := testBuiltinBases.Canonical() + "/default-human-user.json"
-	legacyURL := domain.LegacyBuiltinSchemaBases[0] + "/default-human-user.json"
+	legacyURL := "https://nextgen.com/api/schemas/default-human-user.json"
 	require.NoError(t, stmts.CreateJSONSchema(ctx, &domain.JSONSchema{
 		ProjectID: projectID,
 		URL:       seededURL,

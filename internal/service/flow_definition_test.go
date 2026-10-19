@@ -8,6 +8,7 @@ import (
 
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
@@ -630,6 +631,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 				v2PoolFromStatements(t, stmts),
 				tt.fields.builtinSchemaProvider,
 				tt.fields.validatorFn,
+				domain.BuiltinSchemaBases{},
 			)
 			gotFlowDef, err := fd.Create(tt.args.ctx, tt.args.req)
 			after := time.Now()
@@ -821,6 +823,7 @@ func Test_flowDefinitionService_Get(t *testing.T) {
 				v2PoolFromStatements(t, stmts),
 				builtinSchemaProvider,
 				validatorFn,
+				domain.BuiltinSchemaBases{},
 			)
 			got, err := fd.Get(context.Background(), tt.projectID, tt.id)
 			if tt.wantErr != nil {
@@ -1009,6 +1012,7 @@ func Test_flowDefinitionService_List(t *testing.T) {
 				v2PoolFromStatements(t, stmts),
 				builtinSchemaProvider,
 				validatorFn,
+				domain.BuiltinSchemaBases{},
 			)
 			got, err := fd.List(context.Background(), tt.req)
 			if tt.wantErr != nil {
@@ -1047,6 +1051,7 @@ func Test_flowDefinitionService_List_limit(t *testing.T) {
 				v2PoolFromStatements(t, stmts),
 				&mockBuiltinSchemaProvider{},
 				nil,
+				domain.BuiltinSchemaBases{},
 			)
 			_, err := fd.List(context.Background(), service.ListFlowDefinitionsRequest{
 				ProjectID: "project1",
@@ -1055,4 +1060,55 @@ func Test_flowDefinitionService_List_limit(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	}
+}
+
+// A flow may name the default user schema by its `$id` under a base the
+// project was not seeded under: the row is found under the base it is stored
+// at, and the definition records that schema's objectType.
+func TestFlowDefinitionService_CreateResolvesBuiltinSchemaUnderAnotherBase(t *testing.T) {
+	bases := domain.NewBuiltinSchemaBases("https://schemas.test/builtin/v1", "https://schemas.test/builtin/v0")
+	stored := &domain.JSONSchema{
+		URL:        "https://schemas.test/builtin/v1/default-human-user.json",
+		ObjectType: new("human-user"),
+		Schema:     tenantUserSchema,
+	}
+
+	ctrl := gomock.NewController(t)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	stubUserSchemas(stmts, stored)
+	stmts.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, fd *domain.FlowDefinition) error {
+		fd.ID = "flowdef_test01"
+		return nil
+	}).Times(1)
+
+	fd := service.NewFlowDefinitionService(
+		v2PoolFromStatements(t, stmts),
+		&mockBuiltinSchemaProvider{
+			latestSchemaURIFunc: func(domain.KnownSchemaKind) (string, error) {
+				return "https://example.com/schemas/flow-definition.json", nil
+			},
+		},
+		func(*jsonschema.Schema, domain.FlowDefinition) ([]domain.PivotingTarget, error) { return nil, nil },
+		bases,
+	)
+
+	got, err := fd.Create(context.Background(), service.FlowDefinitionRequest{
+		ProjectID:     "project1",
+		Name:          "login",
+		Status:        "active",
+		SchemaVersion: "1.0.0",
+		UserSchema:    "https://schemas.test/builtin/v0/default-human-user.json",
+		Purposes:      map[string]string{"login": "step_1"},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:        "step_1",
+				Fields:      []domain.Field{"email"},
+				Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "step_2"}},
+				Actions:     []domain.FlowStepAction{{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true}},
+			},
+			{Name: "step_2", Complete: new(domain.FlowStepCompleteRedirect)},
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "human-user", got.UserSchema)
 }
