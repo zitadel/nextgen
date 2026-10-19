@@ -115,6 +115,15 @@ describe("test sign-in", () => {
         expect(result).toHintAt("Name every endpoint");
       });
 
+      it("fails a connection that names a token endpoint and nothing else", async () => {
+        const app = await anAppWithTwoProviders();
+        await app.editOidc(ACME.slug, { token_endpoint: `${ACME.issuer}/token` });
+
+        const result = await app.run(["test", "sign-in", "--provider", ACME.slug, "--json"]);
+
+        expect(result).toHintAt("Name every endpoint");
+      });
+
       it("fails a connection whose own endpoint is not https", async () => {
         const app = await anAppWithTwoProviders();
         await app.editOidc(ACME.slug, {
