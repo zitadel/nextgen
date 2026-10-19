@@ -22,12 +22,20 @@ body {
 `;
 }
 
-/** `pages/index.vue` — redirects the app root to `/login`. */
+/**
+ * `pages/index.vue` — redirects the app root to `/login`. The redirect runs
+ * before render; the empty template only keeps Vue from warning that the page
+ * has nothing to render.
+ */
 export function indexPageTemplate(): string {
   return `<script setup lang="ts">
 ${MANAGED_MARKER}
 await navigateTo("/login", { replace: true });
 </script>
+
+<template>
+  <div />
+</template>
 `;
 }
 
