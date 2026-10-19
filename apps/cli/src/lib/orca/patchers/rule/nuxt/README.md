@@ -7,7 +7,7 @@ the session server-side — here through the `@zitadel/sdk-nuxt` module.
 
 - `app.vue` — router root
 - `pages/login.vue`, `pages/register.vue`, `pages/profile.vue` — auth pages
-- `nuxt.config.*` — registers `@zitadel/sdk-nuxt/module`, sets the login path and `/profile` as a protected route, lists the SDK's `@zitadel/*` runtime packages in `build.transpile` (a name match, so the app does not need them installed), and marks the `zitadel-*` elements as custom elements (edits the first matching `nuxt.config.{ts,mts,js,mjs}`). It writes no backend URL or project id: those come from `.env.local`
+- `nuxt.config.*` — registers `@zitadel/sdk-nuxt/module`, sets the login path and `/profile` as a protected route, and marks the `zitadel-*` elements as custom elements (edits the first matching `nuxt.config.{ts,mts,js,mjs}`). It writes no backend URL or project id: those come from `.env.local`
 - `.env.example`, `.env.local` — `NUXT_PUBLIC_ZITADEL_PROJECT_ID` (client-exposed),
   plus the shared `ZITADEL_*` keys the base patcher writes (`ZITADEL_PROJECT_ID`,
   `ZITADEL_PROJECT_SECRET`, `ZITADEL_ISSUER`, `ZITADEL_URL`, `ZITADEL_ENVIRONMENT`) —

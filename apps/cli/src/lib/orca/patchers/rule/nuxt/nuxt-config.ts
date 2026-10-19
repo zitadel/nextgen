@@ -39,17 +39,6 @@ export function nuxtConfigEdit(): (source: string | undefined) => string {
       changed = true;
     }
 
-    // The SDK module's Lit components and their style/token deps must be
-    // transpiled for SSR (matching the repo's own demo-nuxt config) or the build
-    // fails on the untranspiled ESM those transitive packages ship. Nuxt matches
-    // these entries by package name, so the app does not declare or import them.
-    const build = ensureEditableObject(config, "build");
-    for (const dep of ["@zitadel/api", "@zitadel/components", "@zitadel/design-tokens"]) {
-      if (ensureArrayItem(build, "transpile", dep)) {
-        changed = true;
-      }
-    }
-
     // Tell Vue's template compiler the `zitadel-*` Lit elements are custom
     // elements, not Vue components, so it renders them as native elements
     // instead of logging "Failed to resolve component" and mis-binding props.
