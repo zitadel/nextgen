@@ -40,9 +40,13 @@ export default defineNuxtPlugin(() => {
     (publicConfig.nextgenApiBase as string | undefined) ??
     "/__nextgen";
   const projectId = (publicConfig.zitadelProjectId as string | undefined) ?? "";
+  // `runtimeConfig.nextgen` is private, so it exists only on the server;
+  // reading it in the browser makes Nuxt warn (NUXT_E1003). The browser keeps
+  // the default, as it always did.
+  const privateConfig = import.meta.server ? runtimeConfig.nextgen : undefined;
   const url =
-    (runtimeConfig.nextgen?.url as string | undefined) ??
-    (runtimeConfig.nextgen?.issuerUrl as string | undefined) ??
+    (privateConfig?.url as string | undefined) ??
+    (privateConfig?.issuerUrl as string | undefined) ??
     "http://localhost:8080";
 
   if (proxyPath && projectId) {
