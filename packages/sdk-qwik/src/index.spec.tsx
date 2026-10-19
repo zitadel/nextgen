@@ -12,7 +12,7 @@ import {
   ZITADEL_LOGOUT_EVENT_HANDLERS,
   ZITADEL_SESSION_EVENT_HANDLERS,
 } from "@zitadel/sdk-core/types";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   LoginConfigHarness,
@@ -24,9 +24,20 @@ import {
 } from "./__tests__/config-parity-harness";
 import { PasswordToggleHarness, ResumeFlowIdHarness } from "./__tests__/login-prop-harness";
 import { UnsetPropHarness } from "./__tests__/unset-prop-harness";
+import { listenWithReplay, WRAPPER_MARKER } from "./early-events";
 import { businessLocales, ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
+
+/**
+ * Under SSR (Qwik Router) Qwik resumes the server markup instead of re-running
+ * the `ref` binder, so the widget boots from its attributes alone. These are the
+ * attributes the server must emit; the client render emits the same ones.
+ */
+function attributesOf(host: HTMLElement, tag: string, names: readonly string[]) {
+  const el = host.querySelector(tag);
+  return Object.fromEntries(names.map((name) => [name, el?.getAttribute(name) ?? null]));
+}
 
 const macrotask = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -76,6 +87,50 @@ async function dispatchUntilForwarded(
 }
 
 describe("ZitadelLogin", () => {
+  it("emits its config as attributes, which survive SSR resume", async () => {
+    const host = await renderWidget(
+      <ZitadelLogin
+        project={{ ...project, url: "http://auth.test" }}
+        purpose="register"
+        postSignInUrl="/profile"
+        flowName="signup"
+        suppressHeader
+        suppressPasswordToggle
+      />,
+    );
+
+    expect(
+      attributesOf(host, "zitadel-login", [
+        "project-id",
+        "proxy-path",
+        "url",
+        "purpose",
+        "post-sign-in-url",
+        "flow-name",
+        "suppress-header",
+        "suppress-password-toggle",
+      ]),
+    ).toEqual({
+      "project-id": "proj-test",
+      "proxy-path": "/__nextgen",
+      url: "http://auth.test",
+      purpose: "register",
+      "post-sign-in-url": "/profile",
+      "flow-name": "signup",
+      "suppress-header": "",
+      "suppress-password-toggle": "",
+    });
+  });
+
+  it("emits the discrete project id and proxy path as attributes", async () => {
+    const host = await renderWidget(<ZitadelLogin projectId="proj-test" proxyPath="/__nextgen" />);
+
+    expect(attributesOf(host, "zitadel-login", ["project-id", "proxy-path", "purpose"])).toEqual({
+      "project-id": "proj-test",
+      "proxy-path": "/__nextgen",
+      purpose: "login",
+    });
+  });
   it("binds the project handle as a property", async () => {
     const host = await renderWidget(<ZitadelLogin project={project} purpose="login" />);
     const el = host.querySelector<ZitadelLoginElement>("zitadel-login");
@@ -88,6 +143,24 @@ describe("ZitadelLogin", () => {
     const el = host.querySelector<ZitadelLoginElement>("zitadel-login");
     expect(el!.projectId).toBe("proj-test");
     expect(el!.proxyPath).toBe("/__nextgen");
+  });
+
+  it("binds an empty proxyPath as the origin root, matching its attribute", async () => {
+    const received: Record<string, unknown>[] = [];
+    const host = await renderWidget(
+      <ZitadelLogin
+        projectId="proj-test"
+        proxyPath=""
+        onFlowStep$={$((detail: object) => {
+          received.push(detail as Record<string, unknown>);
+        })}
+      />,
+    );
+    const el = host.querySelector<ZitadelLoginElement>("zitadel-login");
+    // The listener is wired by the same visible task that re-applies the config.
+    await dispatchUntilForwarded(el!, "zitadel-flow-step", { probe: 1 }, received);
+    expect(el!.getAttribute("proxy-path")).toBe("/");
+    expect(el!.proxyPath).toBe("/");
   });
 
   it("forwards resumeFlowId to the widget", async () => {
@@ -144,6 +217,17 @@ describe("ZitadelLogin", () => {
 });
 
 describe("ZitadelLogout", () => {
+  it("emits its config as attributes, which survive SSR resume", async () => {
+    const host = await renderWidget(<ZitadelLogout project={project} postSignOutUrl="/login" />);
+
+    expect(
+      attributesOf(host, "zitadel-logout", ["project-id", "proxy-path", "post-sign-out-url"]),
+    ).toEqual({
+      "project-id": "proj-test",
+      "proxy-path": "/__nextgen",
+      "post-sign-out-url": "/login",
+    });
+  });
   it("binds the project handle as a property", async () => {
     const host = await renderWidget(<ZitadelLogout project={project} />);
     const el = host.querySelector<ZitadelLogoutElement>("zitadel-logout");
@@ -156,6 +240,24 @@ describe("ZitadelLogout", () => {
     const el = host.querySelector<ZitadelLogoutElement>("zitadel-logout");
     expect(el!.projectId).toBe("proj-test");
     expect(el!.proxyPath).toBe("/__nextgen");
+  });
+
+  it("binds an empty proxyPath as the origin root, matching its attribute", async () => {
+    const received: Record<string, unknown>[] = [];
+    const host = await renderWidget(
+      <ZitadelLogout
+        projectId="proj-test"
+        proxyPath=""
+        onSignout$={$((detail: object) => {
+          received.push(detail as Record<string, unknown>);
+        })}
+      />,
+    );
+    const el = host.querySelector<ZitadelLogoutElement>("zitadel-logout");
+    // The listener is wired by the same visible task that re-applies the config.
+    await dispatchUntilForwarded(el!, "zitadel-signout", { probe: 1 }, received);
+    expect(el!.getAttribute("proxy-path")).toBe("/");
+    expect(el!.proxyPath).toBe("/");
   });
 
   it.each(Object.entries(ZITADEL_LOGOUT_EVENT_HANDLERS))(
@@ -192,6 +294,27 @@ describe("ZitadelLogout", () => {
 });
 
 describe("ZitadelSession", () => {
+  it("emits its config as attributes, which survive SSR resume", async () => {
+    const host = await renderWidget(
+      <ZitadelSession project={project} postSignOutUrl="/login" heading="Hi" logoutLabel="Leave" />,
+    );
+
+    expect(
+      attributesOf(host, "zitadel-session", [
+        "project-id",
+        "proxy-path",
+        "post-sign-out-url",
+        "heading",
+        "logout-label",
+      ]),
+    ).toEqual({
+      "project-id": "proj-test",
+      "proxy-path": "/__nextgen",
+      "post-sign-out-url": "/login",
+      heading: "Hi",
+      "logout-label": "Leave",
+    });
+  });
   it("binds the project handle as a property", async () => {
     const host = await renderWidget(<ZitadelSession project={project} />);
     const el = host.querySelector<ZitadelSessionElement>("zitadel-session");
@@ -206,6 +329,24 @@ describe("ZitadelSession", () => {
     const el = host.querySelector<ZitadelSessionElement>("zitadel-session");
     expect(el!.projectId).toBe("proj-test");
     expect(el!.proxyPath).toBe("/__nextgen");
+  });
+
+  it("binds an empty proxyPath as the origin root, matching its attribute", async () => {
+    const received: Record<string, unknown>[] = [];
+    const host = await renderWidget(
+      <ZitadelSession
+        projectId="proj-test"
+        proxyPath=""
+        onSignout$={$((detail: object) => {
+          received.push(detail as Record<string, unknown>);
+        })}
+      />,
+    );
+    const el = host.querySelector<ZitadelSessionElement>("zitadel-session");
+    // The listener is wired by the same visible task that re-applies the config.
+    await dispatchUntilForwarded(el!, "zitadel-signout", { probe: 1 }, received);
+    expect(el!.getAttribute("proxy-path")).toBe("/");
+    expect(el!.proxyPath).toBe("/");
   });
 
   it("forwards the surface variant/theme", async () => {
@@ -266,6 +407,165 @@ describe("ZitadelLogin suppressPasswordToggle", () => {
     await expect.poll(() => window.__unsetSuppressPasswordToggle).toBeTypeOf("function");
     window.__unsetSuppressPasswordToggle!();
     await expect.poll(() => el().suppressPasswordToggle).toBe(false);
+  });
+});
+
+describe("resumed server markup", () => {
+  it("starts a register flow from the attributes alone, before any binder runs", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    // What Qwik Router sends and then resumes: attributes only, no `ref` binder
+    // and no property handle.
+    host.innerHTML =
+      '<zitadel-login project-id="proj-test" proxy-path="/__resumed" purpose="register"></zitadel-login>';
+
+    await expect
+      .poll(() => fetchSpy.mock.calls.find(([input]) => String(input).includes("/__resumed")))
+      .toBeDefined();
+    const [input, init] = fetchSpy.mock.calls.find(([i]) => String(i).includes("/__resumed"))!;
+    expect(String(input)).toContain("/__resumed/");
+    expect(JSON.parse(String(init?.body))).toEqual({
+      purpose: "register",
+      project_id: "proj-test",
+    });
+  });
+});
+
+describe("a resumed flow that is already terminal", () => {
+  it("still reaches onFlowComplete$, which attaches after the widget has fetched", async () => {
+    const original = globalThis.fetch;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      if (!String(input).includes("/__nextgen/flow/flow_done")) {
+        return original(input, init);
+      }
+      return Response.json({
+        flow_id: "flow_done",
+        step: { name: "done", complete: "show" },
+        handoff_token: "ht_resumed",
+      });
+    });
+    const received: Record<string, unknown>[] = [];
+
+    await renderWidget(
+      <ZitadelLogin
+        project={project}
+        resumeFlowId="flow_done"
+        onFlowComplete$={$((detail) => {
+          received.push({ ...detail });
+        })}
+      />,
+    );
+
+    await expect.poll(() => received.map((detail) => detail.handoff_token)).toEqual(["ht_resumed"]);
+  });
+});
+
+describe("early event buffer", () => {
+  const emit = (el: Element, name: string, detail: Record<string, unknown>): void => {
+    el.dispatchEvent(new CustomEvent(name, { detail, bubbles: true, composed: true }));
+  };
+  const hostElement = (wrapper: boolean): HTMLElement => {
+    // A plain element: only the event plumbing is under test, not a live widget.
+    const el = document.createElement("div");
+    if (wrapper) {
+      el.setAttribute(WRAPPER_MARKER, "");
+    }
+    document.body.appendChild(el);
+    return el;
+  };
+  const replayed = (el: Element, names: readonly string[]): string[] => {
+    const seen: string[] = [];
+    const cleanup = listenWithReplay(
+      el,
+      Object.fromEntries(
+        names.map((name) => [
+          name,
+          (e: Event) => seen.push(`${name}:${JSON.stringify((e as CustomEvent).detail)}`),
+        ]),
+      ),
+    );
+    cleanup();
+    return seen;
+  };
+  const ALL = [
+    "zitadel-flow-step",
+    "zitadel-flow-input",
+    "zitadel-flow-complete",
+    "zitadel-flow-redirect",
+    "zitadel-flow-error",
+    "zitadel-signout",
+  ];
+
+  it("ignores events from a raw widget that no wrapper rendered", () => {
+    const raw = hostElement(false);
+    emit(raw, "zitadel-flow-complete", { handoff_token: "ht" });
+    emit(raw, "zitadel-signout", {});
+
+    expect(replayed(raw, ALL)).toEqual([]);
+  });
+
+  it("never retains flow input values, even for a wrapper host", () => {
+    const el = hostElement(true);
+    emit(el, "zitadel-flow-input", { name: "password", value: "hunter2" });
+    emit(el, "zitadel-flow-step", { step: "password" });
+
+    expect(replayed(el, ALL)).toEqual([]);
+  });
+
+  it("replays the terminal events of a wrapper host in order after a late attach", () => {
+    const el = hostElement(true);
+    emit(el, "zitadel-flow-error", { n: 1 });
+    emit(el, "zitadel-flow-redirect", { n: 2 });
+    emit(el, "zitadel-flow-complete", { n: 3 });
+    emit(el, "zitadel-signout", { n: 4 });
+
+    expect(replayed(el, ALL)).toEqual([
+      'zitadel-flow-error:{"n":1}',
+      'zitadel-flow-redirect:{"n":2}',
+      'zitadel-flow-complete:{"n":3}',
+      'zitadel-signout:{"n":4}',
+    ]);
+  });
+
+  it("keeps only the newest events per host", () => {
+    const el = hostElement(true);
+    for (let n = 0; n < 20; n++) {
+      emit(el, "zitadel-flow-error", { n });
+    }
+
+    const seen = replayed(el, ALL);
+    expect(seen).toHaveLength(8);
+    expect(seen[0]).toBe('zitadel-flow-error:{"n":12}');
+    expect(seen[7]).toBe('zitadel-flow-error:{"n":19}');
+  });
+
+  it("drops the buffer once the listeners attach and stops collecting", () => {
+    const el = hostElement(true);
+    emit(el, "zitadel-flow-complete", { n: 1 });
+    const live: string[] = [];
+    const cleanup = listenWithReplay(el, {
+      "zitadel-flow-complete": (e) => live.push(String((e as CustomEvent).detail.n)),
+    });
+    emit(el, "zitadel-flow-complete", { n: 2 });
+    cleanup();
+
+    expect(live).toEqual(["1", "2"]);
+    expect(replayed(el, ALL)).toEqual([]);
+  });
+
+  it("marks the host each wrapper renders", async () => {
+    const host = await renderWidget(
+      <>
+        <ZitadelLogin project={project} />
+        <ZitadelLogout project={project} />
+        <ZitadelSession project={project} />
+      </>,
+    );
+
+    for (const tag of ["zitadel-login", "zitadel-logout", "zitadel-session"]) {
+      expect(host.querySelector(tag)?.hasAttribute(WRAPPER_MARKER)).toBe(true);
+    }
   });
 });
 
