@@ -11,9 +11,10 @@ export {
   matchesRoutes,
   filterResponseHeaders,
   requiresProjectSecret,
+  checkOpaqueSessionToken,
   validateOpaqueSessionToken,
 } from "./middleware.js";
-export type { OpaqueSession } from "./middleware.js";
+export type { OpaqueSession, OpaqueSessionCheck } from "./middleware.js";
 export {
   verifyJwt,
   decodeJwt,

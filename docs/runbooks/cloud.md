@@ -404,6 +404,15 @@ The docs and the website run `next dev`. `.vercelignore` keeps `vercel dev`
 from watching what no deployment is built from, the desktop app's worktrees
 among them, and keeps a CLI deployment from uploading it.
 
+In a desktop-app worktree, which sits in the main checkout's
+`.claude/worktrees/`, it runs the worktree's `vercel.json` and services.
+`vercel dev` runs the nearest folder above the one it is given that holds a
+`vercel.json`, `.vercel` or `.git`, if that `vercel.json` has services: given
+a worktree's root, the main checkout. The script gives it `scripts/`.
+`CLOUD_DEV_DEBUG=1` logs the folder it runs as `Running from project root:`;
+in a worktree a second such line names the main checkout, where the CLI only
+looks for a `vercel link`.
+
 Where it differs from a deployment:
 
 - `vercel dev` drops a redirect's query, so an old

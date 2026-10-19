@@ -7,6 +7,8 @@ Framework SDKs keep auth traffic same-origin where possible.
 
 For Next.js and Nuxt, the SDK middleware proxies `/__nextgen/*` requests to the Zitadel backend, validates the session token, and redirects unauthenticated users away from protected routes. Zitadel issues encrypted session tokens, so the middleware checks each one against `GET /sessions/me`.
 
+Only Zitadel's refusal signs a user out. When that check answers `401`, or `404` for a session that is gone, the middleware clears the session cookie. When it gets no answer it can act on (Zitadel answers `5xx`, does not answer in time, or cannot be reached), the middleware keeps the cookie and renders the request signed out, and a protected route answers `503 Service Unavailable` instead of sending a user who may well be signed in to the login page. The next request checks again.
+
 This keeps the app in control of browser-visible routes and cookies while Zitadel remains the backend API.
 
 The default proxy path is:
