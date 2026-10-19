@@ -1,5 +1,6 @@
 import { css, html, nothing } from "lit";
 import { customElement } from "lit/decorators.js";
+import normalizeUrl from "normalize-url";
 import { property } from "../internal/property.js";
 
 import { resolveApi } from "./resolve-api.js";
@@ -10,16 +11,18 @@ import { baseHostStyles, t } from "../styles/index.js";
 import "../atoms/index.js";
 
 /**
- * A page's identity for the same-page and referrer checks: origin, path without
- * a trailing slash (hosts add or strip it with a redirect) and the query
- * parameters in key order. The fragment is ignored, since assigning one does
- * not reload.
+ * A page's identity for the same-page and referrer checks. Two URLs get the same
+ * key when they name the same page: a trailing slash (hosts add or strip it with a
+ * redirect), the order of the query parameters and the fragment do not matter
+ * (assigning a fragment does not reload). `www.` and tracking parameters do, so
+ * they are kept.
  */
 function pageKey(url: URL): string {
-  const path = url.pathname.replace(/\/+$/, "") || "/";
-  const params = new URLSearchParams(url.search);
-  params.sort();
-  return `${url.origin}${path}?${params.toString()}`;
+  return normalizeUrl(url.href, {
+    stripHash: true,
+    stripWWW: false,
+    removeQueryParameters: false,
+  });
 }
 
 /** Parses a URL, or returns `undefined` when `value` is not one. */
