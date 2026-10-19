@@ -33,17 +33,17 @@ describe("idpContext discovery", () => {
   });
 
   it("asks only once however many checks await it", async () => {
-    let asks = 0;
+    const asked: string[] = [];
     const context = idpContext(
       base(async (url) => {
-        asks += 1;
+        asked.push(url);
         return { status: 200, url, body: "{}" };
       }),
     );
 
     await Promise.all([context.discovery, context.discovery]);
 
-    expect(asks).toBe(1);
+    expect(asked).toHaveLength(1);
   });
 
   it.each([
@@ -71,10 +71,10 @@ describe("idpContext discovery", () => {
   });
 
   it("uses the endpoints the connection names, without asking the provider for a document", async () => {
-    let asks = 0;
+    const asked: string[] = [];
     const context = idpContext({
       ...base(async (url) => {
-        asks += 1;
+        asked.push(url);
         return { status: 200, url, body: "{}" };
       }),
       endpoints: {
@@ -85,8 +85,8 @@ describe("idpContext discovery", () => {
 
     const found = await context.discovery;
 
-    expect([asks, found]).toEqual([
-      0,
+    expect([asked, found]).toEqual([
+      [],
       {
         ok: true,
         url: "https://issuer.example/",

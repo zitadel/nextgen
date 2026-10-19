@@ -38,13 +38,13 @@ function fieldsOf(line: string): Record<string, unknown> | undefined {
   if (!line.includes(MESSAGE)) {
     return undefined;
   }
-  const fields: Record<string, unknown> = {};
-  for (const [, key, value] of line.matchAll(
-    /(?:^|\s)(?:[\w-]+\.)*(slug|flow_id|phase|status|result|reason|side)=("[^"]*"|\S*)/g,
-  )) {
-    fields[key as string] = (value as string).replace(/^"|"$/g, "");
-  }
-  return fields;
+  return Object.fromEntries(
+    [
+      ...line.matchAll(
+        /(?:^|\s)(?:[\w-]+\.)*(slug|flow_id|phase|status|result|reason|side)=("[^"]*"|\S*)/g,
+      ),
+    ].map(([, key, value]) => [key, (value as string).replace(/^"|"$/g, "")]),
+  );
 }
 
 /** The sign-in event on `line`, or `undefined` for any other line. */
@@ -87,23 +87,17 @@ export async function watchSignInEvents(
   pollMs: number,
   signal: AbortSignal,
 ): Promise<AsyncIterable<SignInEvent>> {
-  const seen = new Set((await read()).split("\n"));
-  return (async function* () {
-    while (!signal.aborted) {
-      await sleep(pollMs, signal);
-      if (signal.aborted) {
-        return;
-      }
-      for (const line of (await read()).split("\n")) {
-        if (seen.has(line)) {
-          continue;
-        }
-        seen.add(line);
-        const event = parseSignInEvent(line);
-        if (event !== undefined) {
-          yield event;
-        }
-      }
+  const poll = async function* (seen: ReadonlySet<string>): AsyncGenerator<SignInEvent> {
+    if (signal.aborted) {
+      return;
     }
-  })();
+    await sleep(pollMs, signal);
+    if (signal.aborted) {
+      return;
+    }
+    const fresh = [...new Set((await read()).split("\n"))].filter((line) => !seen.has(line));
+    yield* fresh.flatMap((line) => parseSignInEvent(line) ?? []);
+    yield* poll(new Set([...seen, ...fresh]));
+  };
+  return poll(new Set((await read()).split("\n")));
 }

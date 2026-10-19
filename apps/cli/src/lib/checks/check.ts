@@ -39,40 +39,46 @@ export abstract class Check<Context> {
   abstract run(context: Context, earlier: readonly CheckResult[]): Promise<Outcome>;
 }
 
+/** One check's result, given the results of the checks that ran before it. */
+async function resultOf<Context>(
+  check: Check<Context>,
+  context: Context,
+  earlier: readonly CheckResult[],
+): Promise<CheckResult> {
+  const blocker = check.dependsOn.find((name) => {
+    const status = earlier.find((result) => result.name === name)?.status;
+    return status !== "pass" && status !== "warn";
+  });
+  const outcome: Outcome =
+    blocker === undefined
+      ? await (async () => check.run(context, earlier))().catch(
+          (error: unknown): Outcome => ({
+            status: "fail",
+            message: error instanceof Error ? error.message : String(error),
+          }),
+        )
+      : {
+          status: "skipped",
+          message: `Needs "${earlier.find((result) => result.name === blocker)?.title ?? blocker}" first`,
+        };
+  return { name: check.name, title: check.title, ...outcome };
+}
+
 /**
  * Run `checks` in order against `context`. A check whose dependency failed or
  * was skipped is skipped; a check that throws fails with the error's message.
  * `onResult` is called as each check finishes, so a caller can show progress
  * instead of waiting for the whole battery.
  */
-export async function runChecks<Context>(
+export function runChecks<Context>(
   checks: readonly Check<Context>[],
   context: Context,
   onResult?: (result: CheckResult) => void,
 ): Promise<readonly CheckResult[]> {
-  const results: CheckResult[] = [];
-  for (const check of checks) {
-    const blocker = check.dependsOn.find((name) => {
-      const status = results.find((result) => result.name === name)?.status;
-      return status !== "pass" && status !== "warn";
-    });
-    let outcome: Outcome;
-    if (blocker !== undefined) {
-      const title = results.find((result) => result.name === blocker)?.title ?? blocker;
-      outcome = { status: "skipped", message: `Needs "${title}" first` };
-    } else {
-      try {
-        outcome = await check.run(context, results);
-      } catch (error) {
-        outcome = {
-          status: "fail",
-          message: error instanceof Error ? error.message : String(error),
-        };
-      }
-    }
-    const result = { name: check.name, title: check.title, ...outcome };
-    results.push(result);
+  return checks.reduce<Promise<readonly CheckResult[]>>(async (done, check) => {
+    const earlier = await done;
+    const result = await resultOf(check, context, earlier);
     onResult?.(result);
-  }
-  return results;
+    return [...earlier, result];
+  }, Promise.resolve([]));
 }

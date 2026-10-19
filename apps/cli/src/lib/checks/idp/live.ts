@@ -1,7 +1,22 @@
 import { Check, type CheckResult, type Outcome } from "../check";
-import type { IdpContext, SignInEvent, SignInPhase } from "./context";
+import type { IdpContext, LiveSignIn, SignInEvent, SignInPhase } from "./context";
 
 const TIMED_OUT = Symbol("timed out");
+
+/** What a sign-in is being followed through. */
+type Watching = {
+  readonly context: IdpContext;
+  readonly live: LiveSignIn;
+  readonly events: AsyncIterator<SignInEvent>;
+  readonly timedOut: Promise<typeof TIMED_OUT>;
+};
+
+/** Which attempt is being followed, how far it got, and which others were already mentioned. */
+type Progress = {
+  readonly attempt: string | undefined;
+  readonly last: SignInEvent | undefined;
+  readonly ignored: ReadonlySet<string>;
+};
 
 const PHASES: Readonly<Record<SignInPhase, string>> = {
   ceremony_started: "sending the browser to the provider",
@@ -119,46 +134,52 @@ export class LiveSignInCheck extends Check<IdpContext> {
       const events = (await live.watch(stop.signal))[Symbol.asyncIterator]();
       live.say(`Sign in with ${context.slug}: ${live.loginUrl}`);
       await live.open(live.loginUrl);
-
-      let attempt: string | undefined;
-      let last: SignInEvent | undefined;
-      const ignored = new Set<string>();
-      for (;;) {
-        const next = await Promise.race([events.next(), timedOut]);
-        if (next === TIMED_OUT || next.done) {
-          return this.unfinished(last);
-        }
-        const event = next.value;
-        if (event.slug !== context.slug) {
-          continue;
-        }
-        attempt ??= event.flowId;
-        if (event.flowId !== "" && event.flowId !== attempt) {
-          if (!ignored.has(event.flowId)) {
-            ignored.add(event.flowId);
-            live.say(`Ignoring another sign-in attempt (${event.flowId})`);
-          }
-          continue;
-        }
-        last = event;
-        if (event.status === "failed") {
-          return failure(event, context);
-        }
-        if (event.phase === "resolved" && event.result === "existing_user") {
-          return {
-            status: "warn",
-            message:
-              "The provider's sign-in worked, but the identity matches an existing account, so the flow asks the person to prove it; this check cannot see that step finish",
-          };
-        }
-        if (completes(event)) {
-          return { status: "pass", message: `sign-in completed with ${context.slug}` };
-        }
-        live.say(`  ${PHASES[event.phase]}: ok`);
-      }
+      return await this.follow(
+        { context, live, events, timedOut },
+        { attempt: undefined, last: undefined, ignored: new Set() },
+      );
     } finally {
       stop.abort();
     }
+  }
+
+  /** Reads events until the attempt being followed ends, or the clock runs out. */
+  private async follow(watching: Watching, progress: Progress): Promise<Outcome> {
+    const { context, live, events, timedOut } = watching;
+    const next = await Promise.race([events.next(), timedOut]);
+    if (next === TIMED_OUT || next.done) {
+      return this.unfinished(progress.last);
+    }
+    const event = next.value;
+    if (event.slug !== context.slug) {
+      return this.follow(watching, progress);
+    }
+    const attempt = progress.attempt ?? event.flowId;
+    if (event.flowId !== "" && event.flowId !== attempt) {
+      if (!progress.ignored.has(event.flowId)) {
+        live.say(`Ignoring another sign-in attempt (${event.flowId})`);
+      }
+      return this.follow(watching, {
+        ...progress,
+        attempt,
+        ignored: new Set([...progress.ignored, event.flowId]),
+      });
+    }
+    if (event.status === "failed") {
+      return failure(event, context);
+    }
+    if (event.phase === "resolved" && event.result === "existing_user") {
+      return {
+        status: "warn",
+        message:
+          "The provider's sign-in worked, but the identity matches an existing account, so the flow asks the person to prove it; this check cannot see that step finish",
+      };
+    }
+    if (completes(event)) {
+      return { status: "pass", message: `sign-in completed with ${context.slug}` };
+    }
+    live.say(`  ${PHASES[event.phase]}: ok`);
+    return this.follow(watching, { ...progress, attempt, last: event });
   }
 
   private unfinished(last: SignInEvent | undefined): Outcome {
