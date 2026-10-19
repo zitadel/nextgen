@@ -23,6 +23,7 @@
         "$TURBO_ROOT$/packages/sdk-vue/src/components.spec.ts",
         "$TURBO_ROOT$/packages/sdk-angular/src/lib/components.spec.ts",
         "$TURBO_ROOT$/packages/sdk-svelte/src/index.spec.ts",
+        "$TURBO_ROOT$/packages/sdk-*/src/__tests__/*.test.ts",
         "$TURBO_ROOT$/packages/sdk-*/package.json",
         "$TURBO_ROOT$/packages/sdk-*/README.md",
         "$TURBO_ROOT$/packages/sdk-*/skills/**/SKILL.md",

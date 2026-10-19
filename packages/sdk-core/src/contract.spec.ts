@@ -311,3 +311,77 @@ describe("widget loading ↔ SDK packages", () => {
     }
   });
 });
+
+/**
+ * The server SDKs' test titles.
+ *
+ * The four meta-framework SDKs test the same server behaviours, so their test
+ * files carry the same titles. A behaviour tested under another title, or left
+ * untested in one SDK, then shows up here instead of drifting unnoticed.
+ */
+describe("server SDK test titles", () => {
+  const packagesPath = `${resolve(process.cwd(), "..")}/`;
+  const TEST_FILES = {
+    "sdk-sveltekit": "sdk-sveltekit/src/__tests__/handle.test.ts",
+    "sdk-solid-start": "sdk-solid-start/src/__tests__/middleware.test.ts",
+    "sdk-qwik-city": "sdk-qwik-city/src/__tests__/request-handler.test.ts",
+    "sdk-tanstack-start": "sdk-tanstack-start/src/__tests__/middleware.test.ts",
+  } as const;
+
+  const CANONICAL_TITLES = [
+    "public route with no token continues as unauthenticated",
+    "protected route with no token redirects to /login?next=/admin",
+    "protected route with a valid cookie token authenticates",
+    "protected route with a valid Bearer token authenticates",
+    "Bearer token takes precedence over the session cookie",
+    "token with no sub claim is treated as unauthenticated",
+    "token with a disallowed typ is rejected",
+    "token with a disallowed algorithm is rejected",
+    'token with alg "none" is rejected without fetching JWKS',
+    "RS256 tokens are accepted by default",
+    "redirect preserves existing query params in loginPath",
+    "invalid token clears the stale session cookie and redirects",
+    "absolute loginPath throws",
+    "protocol-relative loginPath throws",
+    "strips x-nextgen-auth-token from proxied requests",
+    "forwards upstream Set-Cookie headers",
+    "appends the client IP to an existing X-Forwarded-For chain",
+    "sets X-Forwarded-For from the client IP when no chain exists",
+    "omits X-Forwarded-For when no client IP is available",
+    "skips auth handling on an ignored route",
+    "refuses the request when the header cannot be removed",
+    "lets the request through when removal fails but the header is absent",
+  ];
+
+  // SvelteKit and SolidStart swallow a failed removal of the inbound header
+  // instead of refusing the request, so neither has these two cases to test.
+  const EXCEPTIONS: Record<keyof typeof TEST_FILES, readonly string[]> = {
+    "sdk-sveltekit": [
+      "refuses the request when the header cannot be removed",
+      "lets the request through when removal fails but the header is absent",
+    ],
+    "sdk-solid-start": [
+      "refuses the request when the header cannot be removed",
+      "lets the request through when removal fails but the header is absent",
+    ],
+    "sdk-qwik-city": [],
+    "sdk-tanstack-start": [],
+  };
+
+  // Matches `it("title"` and the `it.each([...])("title"` form.
+  const TITLE = /(?:\bit\(|\]\)\()\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1/g;
+
+  const titlesOf = (sdk: keyof typeof TEST_FILES): string[] =>
+    [...readFileSync(`${packagesPath}${TEST_FILES[sdk]}`, "utf8").matchAll(TITLE)].map(
+      (match) => match[2]!,
+    );
+
+  it.each(Object.keys(TEST_FILES) as (keyof typeof TEST_FILES)[])(
+    "%s tests every canonical behaviour under its canonical title",
+    (sdk) => {
+      const titles = titlesOf(sdk);
+      const expected = CANONICAL_TITLES.filter((title) => !EXCEPTIONS[sdk].includes(title));
+      expect(expected.filter((title) => !titles.includes(title))).toEqual([]);
+    },
+  );
+});

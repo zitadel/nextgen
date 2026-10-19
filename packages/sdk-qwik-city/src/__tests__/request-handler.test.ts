@@ -139,7 +139,7 @@ describe("createNextgenOnRequest (Qwik City)", () => {
     vi.restoreAllMocks();
   });
 
-  it("public route with no token sets sharedMap to unauthenticated", async () => {
+  it("public route with no token continues as unauthenticated", async () => {
     const handler = createNextgenOnRequest({
       url: "http://localhost:4000",
       protectedRoutes: ["/admin"],
@@ -170,7 +170,7 @@ describe("createNextgenOnRequest (Qwik City)", () => {
 
   // Qwik Router defaults to `trailingSlash: true`, so `/profile/` is the
   // canonical URL and must not slip past `protectedRoutes: ["/profile"]`.
-  it("protected route requested with a trailing slash redirects to login", async () => {
+  it("protected route requested with Qwik Router's trailing slash redirects to login", async () => {
     const handler = createNextgenOnRequest({
       url: "http://localhost:4000",
       protectedRoutes: ["/profile"],
@@ -183,7 +183,7 @@ describe("createNextgenOnRequest (Qwik City)", () => {
     expect(h.redirected?.url).toContain("/login");
   });
 
-  it("protected route with a valid cookie token sets sharedMap to authenticated", async () => {
+  it("protected route with a valid cookie token authenticates", async () => {
     const kid = nextKid();
     const token = makeJwt(
       { sub: "user-qc", email: "qc@example.com", iss: "http://localhost:4000", exp: ts(3600) },
@@ -212,6 +212,29 @@ describe("createNextgenOnRequest (Qwik City)", () => {
     });
   });
 
+  it("protected route with a valid Bearer token authenticates", async () => {
+    const kid = nextKid();
+    const token = makeJwt(
+      { sub: "user-qc", email: "qc@example.com", iss: "http://localhost:4000", exp: ts(3600) },
+      kid,
+    );
+    vi.stubGlobal("fetch", mockJwks(kid));
+
+    const handler = createNextgenOnRequest({
+      url: "http://localhost:4000",
+      protectedRoutes: ["/admin"],
+    });
+    const h = makeHarness("http://localhost:3000/admin", { authorization: `Bearer ${token}` });
+
+    await run(handler, h.ev);
+
+    expect(h.redirected).toBeUndefined();
+    expect(getAuth(h.ev)).toMatchObject({
+      isAuthenticated: true,
+      session: { userId: "user-qc", token },
+    });
+  });
+
   it("Bearer token takes precedence over the session cookie", async () => {
     const kid = nextKid();
     const bearerToken = makeJwt(
@@ -235,7 +258,7 @@ describe("createNextgenOnRequest (Qwik City)", () => {
     expect(auth.isAuthenticated && auth.session.token).toBe(bearerToken);
   });
 
-  it("token with no sub redirects on a protected route", async () => {
+  it("token with no sub claim is treated as unauthenticated", async () => {
     const kid = nextKid();
     const token = makeJwt(
       { email: "qc@example.com", iss: "http://localhost:4000", exp: ts(3600) },
@@ -254,7 +277,7 @@ describe("createNextgenOnRequest (Qwik City)", () => {
     expect(getAuth(h.ev)).toEqual({ isAuthenticated: false, session: null });
   });
 
-  it("rejects a disallowed typ on a protected route", async () => {
+  it("token with a disallowed typ is rejected", async () => {
     const kid = nextKid();
     const token = makeJwt(
       { sub: "user-qc", iss: "http://localhost:4000", exp: ts(3600) },
@@ -274,7 +297,23 @@ describe("createNextgenOnRequest (Qwik City)", () => {
     expect(h.redirected?.status).toBe(302);
   });
 
-  it('rejects alg "none" without fetching JWKS', async () => {
+  it("token with a disallowed algorithm is rejected", async () => {
+    const kid = nextKid();
+    const token = makeJwt({ sub: "user-qc", iss: "http://localhost:4000", exp: ts(3600) }, kid);
+    vi.stubGlobal("fetch", mockJwks(kid));
+
+    const handler = createNextgenOnRequest({
+      url: "http://localhost:4000",
+      protectedRoutes: ["/admin"],
+      allowedAlgorithms: ["ES256"],
+    });
+    const h = makeHarness("http://localhost:3000/admin", { cookie: `__nextgen_session=${token}` });
+
+    await run(handler, h.ev);
+    expect(h.redirected?.status).toBe(302);
+  });
+
+  it('token with alg "none" is rejected without fetching JWKS', async () => {
     const kid = nextKid();
     const token = makeJwt(
       { sub: "user-qc", iss: "http://localhost:4000", exp: ts(3600) },
@@ -295,7 +334,38 @@ describe("createNextgenOnRequest (Qwik City)", () => {
     expect(vi.mocked(fetch)).not.toHaveBeenCalled();
   });
 
-  it("clears the stale session cookie and redirects when the token is invalid", async () => {
+  it("RS256 tokens are accepted by default", async () => {
+    const kid = nextKid();
+    const token = makeJwt({ sub: "user-qc", iss: "http://localhost:4000", exp: ts(3600) }, kid);
+    vi.stubGlobal("fetch", mockJwks(kid));
+
+    const handler = createNextgenOnRequest({
+      url: "http://localhost:4000",
+      protectedRoutes: ["/admin"],
+    });
+    const h = makeHarness("http://localhost:3000/admin", { cookie: `__nextgen_session=${token}` });
+
+    await run(handler, h.ev);
+    expect(getAuth(h.ev).isAuthenticated).toBe(true);
+  });
+
+  it("redirect preserves existing query params in loginPath", async () => {
+    const handler = createNextgenOnRequest({
+      url: "http://localhost:4000",
+      protectedRoutes: ["/admin"],
+      loginPath: "/login?tab=sso",
+    });
+    const h = makeHarness("http://localhost:3000/admin");
+
+    await run(handler, h.ev);
+
+    expect(h.redirected?.status).toBe(302);
+    const parsed = new URL(h.redirected?.url ?? "", "http://localhost:3000");
+    expect(parsed.searchParams.get("tab")).toBe("sso");
+    expect(parsed.searchParams.get("next")).toBe("/admin");
+  });
+
+  it("invalid token clears the stale session cookie and redirects", async () => {
     const kid = nextKid();
     const valid = makeJwt({ sub: "user-qc", iss: "http://localhost:4000", exp: ts(3600) }, kid);
     const parts = valid.split(".");
@@ -316,13 +386,13 @@ describe("createNextgenOnRequest (Qwik City)", () => {
   });
 
   describe("loginPath validation", () => {
-    it("throws on an absolute loginPath", () => {
+    it("absolute loginPath throws", () => {
       expect(() =>
         createNextgenOnRequest({ url: "http://localhost:4000", loginPath: "https://evil.test/x" }),
       ).toThrow(/loginPath must be a relative path/i);
     });
 
-    it("throws on a protocol-relative loginPath", () => {
+    it("protocol-relative loginPath throws", () => {
       expect(() =>
         createNextgenOnRequest({ url: "http://localhost:4000", loginPath: "//evil.test/x" }),
       ).toThrow(/loginPath must be a relative path/i);
@@ -330,7 +400,7 @@ describe("createNextgenOnRequest (Qwik City)", () => {
   });
 
   describe("proxy", () => {
-    it("strips x-nextgen-auth-token and forwards other headers", async () => {
+    it("strips x-nextgen-auth-token from proxied requests", async () => {
       let captured: Headers | undefined;
       vi.stubGlobal(
         "fetch",
@@ -350,7 +420,7 @@ describe("createNextgenOnRequest (Qwik City)", () => {
       expect(captured?.get("content-type")).toBe("application/json");
     });
 
-    it("sends the upstream response with Set-Cookie forwarded", async () => {
+    it("forwards upstream Set-Cookie headers", async () => {
       const upstreamHeaders = new Headers();
       upstreamHeaders.append("set-cookie", "__nextgen_session=abc; HttpOnly");
       vi.stubGlobal(
@@ -427,7 +497,7 @@ describe("createNextgenOnRequest (Qwik City)", () => {
       expect(captured()?.get("authorization")).toBe("Bearer pk-caller");
     });
 
-    it("appends the client IP to the X-Forwarded-For chain", async () => {
+    it("appends the client IP to an existing X-Forwarded-For chain", async () => {
       let captured: Headers | undefined;
       vi.stubGlobal(
         "fetch",
@@ -447,6 +517,26 @@ describe("createNextgenOnRequest (Qwik City)", () => {
       const xff = captured?.get("x-forwarded-for") ?? "";
       expect(xff).toContain("10.0.0.1");
       expect(xff).toContain("10.0.0.2");
+    });
+
+    it("sets X-Forwarded-For from the client IP when no chain exists", async () => {
+      const captured = captureUpstreamHeaders();
+
+      const handler = createNextgenOnRequest({ url: "http://localhost:4000" });
+      const h = makeHarness("http://localhost:3000/__nextgen/v1/flow", { clientIp: "10.0.0.2" });
+
+      await run(handler, h.ev);
+      expect(captured()?.get("x-forwarded-for")).toBe("10.0.0.2");
+    });
+
+    it("omits X-Forwarded-For when no client IP is available", async () => {
+      const captured = captureUpstreamHeaders();
+
+      const handler = createNextgenOnRequest({ url: "http://localhost:4000" });
+      const h = makeHarness("http://localhost:3000/__nextgen/v1/flow");
+
+      await run(handler, h.ev);
+      expect(captured()?.has("x-forwarded-for")).toBe(false);
     });
 
     it("does not proxy a path that only shares the prefix without a separator", async () => {

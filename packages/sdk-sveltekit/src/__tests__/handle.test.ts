@@ -127,7 +127,7 @@ describe("createNextgenHandle", () => {
     vi.restoreAllMocks();
   });
 
-  it("public route with no token sets locals to unauthenticated and resolves", async () => {
+  it("public route with no token continues as unauthenticated", async () => {
     const handle = createNextgenHandle({
       url: "http://localhost:4000",
       protectedRoutes: ["/admin"],
@@ -159,7 +159,7 @@ describe("createNextgenHandle", () => {
     expect(location).toContain("next=%2Fadmin");
   });
 
-  it("protected route with a valid cookie token sets locals to authenticated", async () => {
+  it("protected route with a valid cookie token authenticates", async () => {
     const kid = nextKid();
     const token = makeJwt(
       { sub: "user-sk", email: "sk@example.com", iss: "http://localhost:4000", exp: ts(3600) },
@@ -190,7 +190,7 @@ describe("createNextgenHandle", () => {
     });
   });
 
-  it("protected route with a valid Bearer token sets locals to authenticated", async () => {
+  it("protected route with a valid Bearer token authenticates", async () => {
     const kid = nextKid();
     const token = makeJwt(
       { sub: "user-sk", email: "sk@example.com", iss: "http://localhost:4000", exp: ts(3600) },
@@ -214,7 +214,7 @@ describe("createNextgenHandle", () => {
     });
   });
 
-  it("Bearer token takes precedence over the session cookie when both are present", async () => {
+  it("Bearer token takes precedence over the session cookie", async () => {
     const kid = nextKid();
     const bearerToken = makeJwt(
       { sub: "bearer-user", iss: "http://localhost:4000", exp: ts(3600) },
@@ -239,7 +239,7 @@ describe("createNextgenHandle", () => {
     expect(auth?.isAuthenticated && auth.session.token).toBe(bearerToken);
   });
 
-  it("token with no sub claim is treated as unauthenticated and redirects on a protected route", async () => {
+  it("token with no sub claim is treated as unauthenticated", async () => {
     const kid = nextKid();
     const token = makeJwt(
       { email: "sk@example.com", iss: "http://localhost:4000", exp: ts(3600) },
@@ -261,24 +261,7 @@ describe("createNextgenHandle", () => {
     expect(event.locals.nextgenAuth).toEqual({ isAuthenticated: false, session: null });
   });
 
-  it("accepts RS256 tokens by default", async () => {
-    const kid = nextKid();
-    const token = makeJwt({ sub: "user-sk", iss: "http://localhost:4000", exp: ts(3600) }, kid);
-    vi.stubGlobal("fetch", mockJwks(kid));
-
-    const handle = createNextgenHandle({
-      url: "http://localhost:4000",
-      protectedRoutes: ["/admin"],
-    });
-    const { event, resolve } = makeEvent("http://localhost:3000/admin", {
-      cookie: `__nextgen_session=${token}`,
-    });
-
-    await run(handle, event, resolve);
-    expect(event.locals.nextgenAuth?.isAuthenticated).toBe(true);
-  });
-
-  it("rejects a token with a disallowed typ on a protected route", async () => {
+  it("token with a disallowed typ is rejected", async () => {
     const kid = nextKid();
     const token = makeJwt(
       { sub: "user-sk", iss: "http://localhost:4000", exp: ts(3600) },
@@ -300,7 +283,7 @@ describe("createNextgenHandle", () => {
     expect(res.status).toBe(302);
   });
 
-  it("rejects a token with a disallowed algorithm on a protected route", async () => {
+  it("token with a disallowed algorithm is rejected", async () => {
     const kid = nextKid();
     const token = makeJwt({ sub: "user-sk", iss: "http://localhost:4000", exp: ts(3600) }, kid);
     vi.stubGlobal("fetch", mockJwks(kid));
@@ -318,7 +301,7 @@ describe("createNextgenHandle", () => {
     expect(res.status).toBe(302);
   });
 
-  it('rejects alg "none" on a protected route without fetching JWKS', async () => {
+  it('token with alg "none" is rejected without fetching JWKS', async () => {
     const kid = nextKid();
     const token = makeJwt(
       { sub: "user-sk", iss: "http://localhost:4000", exp: ts(3600) },
@@ -341,7 +324,24 @@ describe("createNextgenHandle", () => {
     expect(vi.mocked(fetch)).not.toHaveBeenCalled();
   });
 
-  it("preserves existing query params in loginPath when redirecting", async () => {
+  it("RS256 tokens are accepted by default", async () => {
+    const kid = nextKid();
+    const token = makeJwt({ sub: "user-sk", iss: "http://localhost:4000", exp: ts(3600) }, kid);
+    vi.stubGlobal("fetch", mockJwks(kid));
+
+    const handle = createNextgenHandle({
+      url: "http://localhost:4000",
+      protectedRoutes: ["/admin"],
+    });
+    const { event, resolve } = makeEvent("http://localhost:3000/admin", {
+      cookie: `__nextgen_session=${token}`,
+    });
+
+    await run(handle, event, resolve);
+    expect(event.locals.nextgenAuth?.isAuthenticated).toBe(true);
+  });
+
+  it("redirect preserves existing query params in loginPath", async () => {
     const handle = createNextgenHandle({
       url: "http://localhost:4000",
       protectedRoutes: ["/admin"],
@@ -356,7 +356,7 @@ describe("createNextgenHandle", () => {
     expect(parsed.searchParams.get("next")).toBe("/admin");
   });
 
-  it("clears the stale session cookie and redirects when the token is invalid", async () => {
+  it("invalid token clears the stale session cookie and redirects", async () => {
     const kid = nextKid();
     const valid = makeJwt({ sub: "user-sk", iss: "http://localhost:4000", exp: ts(3600) }, kid);
     const parts = valid.split(".");
@@ -379,7 +379,7 @@ describe("createNextgenHandle", () => {
   });
 
   describe("loginPath validation", () => {
-    it("throws synchronously when loginPath is an absolute URL", () => {
+    it("absolute loginPath throws", () => {
       expect(() =>
         createNextgenHandle({
           url: "http://localhost:4000",
@@ -389,7 +389,7 @@ describe("createNextgenHandle", () => {
       ).toThrow(/loginPath must be a relative path/i);
     });
 
-    it("throws synchronously when loginPath is a protocol-relative URL", () => {
+    it("protocol-relative loginPath throws", () => {
       expect(() =>
         createNextgenHandle({
           url: "http://localhost:4000",
@@ -423,7 +423,7 @@ describe("createNextgenHandle", () => {
       expect(capturedHeaders?.get("content-type")).toBe("application/json");
     });
 
-    it("forwards upstream Set-Cookie headers verbatim", async () => {
+    it("forwards upstream Set-Cookie headers", async () => {
       const upstreamHeaders = new Headers();
       upstreamHeaders.append("set-cookie", "__nextgen_session=abc; HttpOnly; SameSite=Lax");
       vi.stubGlobal(
@@ -508,7 +508,7 @@ describe("createNextgenHandle", () => {
   });
 
   describe("X-Forwarded-For", () => {
-    it("appends the client IP to an existing chain", async () => {
+    it("appends the client IP to an existing X-Forwarded-For chain", async () => {
       let capturedHeaders: Headers | undefined;
       vi.stubGlobal(
         "fetch",
@@ -530,7 +530,7 @@ describe("createNextgenHandle", () => {
       expect(xff).toContain("10.0.0.2");
     });
 
-    it("sets the chain from the client IP when none exists", async () => {
+    it("sets X-Forwarded-For from the client IP when no chain exists", async () => {
       let capturedHeaders: Headers | undefined;
       vi.stubGlobal(
         "fetch",
@@ -549,7 +549,7 @@ describe("createNextgenHandle", () => {
       expect(capturedHeaders?.get("x-forwarded-for")).toBe("10.0.0.2");
     });
 
-    it("omits the chain when no client IP is available", async () => {
+    it("omits X-Forwarded-For when no client IP is available", async () => {
       let capturedHeaders: Headers | undefined;
       vi.stubGlobal(
         "fetch",
@@ -568,7 +568,7 @@ describe("createNextgenHandle", () => {
   });
 
   describe("ignored routes", () => {
-    it("skips auth handling and resolves on an ignored route", async () => {
+    it("skips auth handling on an ignored route", async () => {
       const handle = createNextgenHandle({
         url: "http://localhost:4000",
         protectedRoutes: ["/health"],
