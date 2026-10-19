@@ -8,6 +8,12 @@ SolidStart middleware and helpers for Nextgen Auth.
 pnpm add @zitadel/sdk-solid-start@alpha
 ```
 
+## Requirements
+
+Peer dependencies: `@solidjs/start ^2.0.0` and `solid-js ^1.8.0`.
+
+TypeScript ≥ 5.0 — the published type definitions re-export with `export type *`, which TypeScript introduced in 5.0.
+
 ## Setup
 
 ### 1. Middleware

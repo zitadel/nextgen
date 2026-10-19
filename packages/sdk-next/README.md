@@ -12,6 +12,12 @@ Requires Next.js 15.2.3 or later. Earlier 15.x releases skip middleware for a
 request that sends an `x-middleware-subrequest` header (CVE-2025-29927), which
 on self-hosted deployments would let any request past `protectedRoutes`.
 
+## Requirements
+
+Peer dependencies: `next >=15.2.3`, `react >=18` and `react-dom >=18`.
+
+TypeScript ≥ 5.0 — the published type definitions re-export with `export type *`, which TypeScript introduced in 5.0.
+
 ## Entry points
 
 | Import                         | Runs in                          | Provides                                         |

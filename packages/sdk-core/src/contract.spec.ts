@@ -311,3 +311,33 @@ describe("widget loading ↔ SDK packages", () => {
     }
   });
 });
+
+describe("SDK READMEs ↔ opening structure", () => {
+  // Vitest runs with the package directory as cwd; `import.meta.url` is rewritten under jsdom.
+  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+  const readmeDirs = readdirSync(packagesDir).filter(
+    (dir) => dir.startsWith("sdk-") && dir !== "sdk-core",
+  );
+
+  const headings = (dir: string): { title: string[]; sections: string[] } => {
+    let fenced = false;
+    const title: string[] = [];
+    const sections: string[] = [];
+    for (const line of readFileSync(`${packagesDir}${dir}/README.md`, "utf8").split("\n")) {
+      if (/^\s*(```|~~~)/.test(line)) fenced = !fenced;
+      else if (!fenced && line.startsWith("# ")) title.push(line.slice(2).trim());
+      else if (!fenced && line.startsWith("## ")) sections.push(line.slice(3).trim());
+    }
+    return { title, sections };
+  };
+
+  it("covers all twelve framework SDKs", () => {
+    expect(readmeDirs).toHaveLength(12);
+  });
+
+  it.each(readmeDirs)("%s README opens with its title, Installation and Requirements", (dir) => {
+    const { title, sections } = headings(dir);
+    expect(title[0]).toBe(`@zitadel/${dir}`);
+    expect(sections.slice(0, 2)).toEqual(["Installation", "Requirements"]);
+  });
+});

@@ -19,6 +19,12 @@ build and leaves `dependencies` external, and ecosystem packages belong in the
 bundle. Qwik's starter `vite.config.ts` also throws if a package is listed in
 both sections.
 
+## Requirements
+
+Peer dependencies: `@qwik.dev/core` and `@qwik.dev/router`, both `^2.0.0-beta.45`.
+
+TypeScript ≥ 5.0 — the published type definitions re-export with `export type *`, which TypeScript introduced in 5.0.
+
 ## Setup
 
 ### 1. Request handler

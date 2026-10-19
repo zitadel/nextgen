@@ -8,6 +8,12 @@ TanStack Start request middleware and helpers for Nextgen Auth.
 pnpm add @zitadel/sdk-tanstack-start@alpha
 ```
 
+## Requirements
+
+Peer dependencies: `@tanstack/react-start >=1`, `react >=18` and `react-dom >=18`.
+
+TypeScript ≥ 5.0 — the published type definitions re-export with `export type *`, which TypeScript introduced in 5.0.
+
 ## Setup
 
 ### 1. Request middleware
