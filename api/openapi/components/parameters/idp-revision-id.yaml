@@ -1,0 +1,7 @@
+name: revision_id
+in: path
+required: true
+description: The revision id, allocated when the revision was written.
+schema:
+  type: string
+example: idprev_01KWH3B72K7M7F0N9WD3P2E4YN

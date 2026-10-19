@@ -36,8 +36,8 @@ type Connection struct {
 }
 
 // VerificationSource is a verified_claims value in typed form. The stored
-// value is a boolean, a $-pointer, or a claim name; Kind says which, so the
-// callback switches on it instead of re-inspecting the raw JSON.
+// value is the boolean true or a claim name; Kind says which, so the callback
+// switches on it instead of re-inspecting the raw JSON.
 type VerificationSource struct {
 	Kind VerificationKind
 	// Claim is the provider claim read when Kind is VerifyByClaim.
@@ -55,14 +55,7 @@ const (
 	// VerifyByTrust is the stored boolean true: the provider's word is
 	// taken, so the property is verified on every attempt.
 	VerifyByTrust VerificationKind = "trust"
-	// VerifyByStrategy is the stored "$supplementary_fetch": the property
-	// is verified when the selected strategy reports its mapped claim as
-	// verified.
-	VerifyByStrategy VerificationKind = "strategy"
 )
-
-// strategyPointer is the only $-value the schema defines.
-const strategyPointer = "$supplementary_fetch"
 
 // connectionBody mirrors the stored revision. Pointers mark the fields whose
 // absence means "apply the engine default".
@@ -92,19 +85,16 @@ type oidcBody struct {
 	StaticAuthorizeParameters map[string]string `json:"static_authorize_parameters"`
 }
 
-// ParseConnection turns a stored revision into the engine's view. The schema
-// already enforced the rules re-checked here during create/revise, so a rejection
-// means the stored body cannot serve an attempt, not that a request was bad.
+// ParseConnection turns a stored revision into the engine's view. Create and
+// revise run the schema and then this parse, so a stored revision passed both:
+// a rejection means the stored body cannot serve an attempt, not that a request
+// was bad. revisionID may be empty when the parse only checks a document.
 func ParseConnection(revisionID string, body []byte) (Connection, error) {
 	var stored connectionBody
 	if err := json.Unmarshal(body, &stored); err != nil {
 		return Connection{}, domain.ErrInternal(fmt.Errorf("decode connection revision: %w", err))
 	}
-	switch stored.Protocol {
-	case "oidc":
-	case "oauth2":
-		return Connection{}, domain.ErrIDPOAuth2Unsupported()
-	default:
+	if stored.Protocol != "oidc" {
 		return Connection{}, domain.ErrInternal(fmt.Errorf("unknown protocol %q", stored.Protocol))
 	}
 	if stored.OIDC == nil {
@@ -121,20 +111,6 @@ func ParseConnection(revisionID string, body []byte) (Connection, error) {
 		return Connection{}, err
 	}
 	verifiedClaims := parseVerifiedClaims(stored.VerifiedClaims)
-	// The schema accepts the pointer on any protocol, but the oidc block
-	// selects no strategy, so it can never resolve. Refusing it here stops
-	// the submit before the redirect instead of failing the callback after
-	// the user consented. The write-time check is #1029.
-	var strategyProperties []string
-	for property, source := range verifiedClaims {
-		if source.Kind == VerifyByStrategy {
-			strategyProperties = append(strategyProperties, property)
-		}
-	}
-	if len(strategyProperties) > 0 {
-		slices.Sort(strategyProperties)
-		return Connection{}, domain.ErrIDPStrategyPointerUnsupported(strategyProperties)
-	}
 
 	conn := Connection{
 		RevisionID:       revisionID,
@@ -171,10 +147,10 @@ func ParseConnection(revisionID string, body []byte) (Connection, error) {
 }
 
 // parseVerifiedClaims turns each raw verified_claims value into a
-// VerificationSource. A $ value other than the strategy pointer is reserved
-// and dropped rather than read as a claim name, since a provider may send a
-// claim by that name. A value that is neither a string nor true is dropped
-// too. Either evaluates as unverified, the same as an absent entry.
+// VerificationSource. A $ value is reserved and dropped rather than read as a
+// claim name, since a provider may send a claim by that name. A value that is
+// neither a string nor true is dropped too. Either evaluates as unverified,
+// the same as an absent entry.
 func parseVerifiedClaims(stored map[string]any) map[string]VerificationSource {
 	// An absent block stays nil, as ClaimMapping does.
 	if stored == nil {
@@ -188,10 +164,6 @@ func parseVerifiedClaims(stored map[string]any) map[string]VerificationSource {
 				sources[property] = VerificationSource{Kind: VerifyByTrust}
 			}
 		case string:
-			if v == strategyPointer {
-				sources[property] = VerificationSource{Kind: VerifyByStrategy}
-				continue
-			}
 			if strings.HasPrefix(v, "$") {
 				continue
 			}
@@ -225,25 +197,30 @@ func requireTLS(oidc *oidcBody) error {
 // requireAllOrNoEndpoints enforces the two supported shapes:
 // 1. no endpoint set: fetched from the discovery document.
 // 2. every endpoint the connection needs is set: requires no discovery.
+//
+// userinfo_endpoint is not needed under id_token_mapping, but setting it
+// still opts out of discovery, so it then needs the others like any endpoint
+// would. Set alone, discovery would run and silently ignore it.
 func requireAllOrNoEndpoints(oidc *oidcBody) error {
-	endpoints := map[string]string{
-		"authorization_endpoint": oidc.AuthorizationEndpoint,
-		"token_endpoint":         oidc.TokenEndpoint,
-		"jwks_uri":               oidc.JWKSURI,
-	}
-	if !oidc.IDTokenMapping {
-		endpoints["userinfo_endpoint"] = oidc.UserinfoEndpoint
-	}
-	var missing []string
-	for name, value := range endpoints {
-		if value == "" {
-			missing = append(missing, name)
-		}
-	}
-	if len(missing) == 0 || len(missing) == len(endpoints) {
+	if oidc.AuthorizationEndpoint == "" && oidc.TokenEndpoint == "" && oidc.JWKSURI == "" && oidc.UserinfoEndpoint == "" {
 		return nil
 	}
-	slices.Sort(missing)
+	var missing []string
+	for _, endpoint := range []struct{ name, value string }{
+		{"authorization_endpoint", oidc.AuthorizationEndpoint},
+		{"jwks_uri", oidc.JWKSURI},
+		{"token_endpoint", oidc.TokenEndpoint},
+	} {
+		if endpoint.value == "" {
+			missing = append(missing, endpoint.name)
+		}
+	}
+	if oidc.UserinfoEndpoint == "" && !oidc.IDTokenMapping {
+		missing = append(missing, "userinfo_endpoint")
+	}
+	if len(missing) == 0 {
+		return nil
+	}
 	return domain.ErrIDPEndpointsPartial(missing)
 }
 

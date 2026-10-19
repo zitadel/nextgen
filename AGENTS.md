@@ -122,6 +122,8 @@ Repo tooling:
 | Run normal local checks            | `moon ci :lint :typecheck :build :test`  |
 | Mirror CI locally                  | `moon run workspace:check -- --full`     |
 | Rerun one failed task              | `moon run <project>:<task>`              |
+| Run the hosted cloud locally       | `moon run workspace:cloud`               |
+| Check a deployment of the cloud    | `CLOUD_URL=<url> pnpm check:cloud`       |
 
 ### I am adding Zitadel to my app
 
@@ -189,7 +191,9 @@ smoke/real/embedded/platform, demo mock/real, the CLI journey matrix, and the
 kit's real-instance suite), and ci.yml runs `e2e:all` in a step of its own
 after the build-and-test graph, whenever moon finds it affected. A plain
 `:test` (and `pnpm run check`) stays unit tests; `moon run e2e:all` runs the
-whole suite locally, which boots real servers and needs browsers installed. The canonical details are in
+whole suite locally, which boots real servers and needs browsers installed; the
+journey lane also needs prebuilt tarballs (`moon run release:pack`, then
+`JOURNEY_TARBALLS_DIR`). The canonical details are in
 [packages/testing/AGENTS.md](packages/testing/AGENTS.md). (More in
 [CONTRIBUTING.md](CONTRIBUTING.md#running-integration-and-end-to-end-tests)):
 
@@ -263,7 +267,8 @@ upward**. When deciding where a new test belongs:
    The docs site's suite is the one that lives beside its app,
    `apps/docs/tests/`: written against a URL, it runs on the local build
    (`docs:e2e`) and on every deployment of the hosted cloud
-   (`docs:e2e-deployment`, see
+   (`docs:e2e-deployment`; `pnpm check:cloud` runs it beside the console's
+   deployment suite, see
    [docs/runbooks/cloud.md](docs/runbooks/cloud.md#deployment-checks)).
 
 The consumer journey suite is the exception to the checked-in demo ownership

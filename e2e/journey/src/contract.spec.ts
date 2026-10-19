@@ -3,6 +3,8 @@ import { join } from "node:path";
 
 import { expect, test } from "@playwright/test";
 
+import { requiredEnv } from "./support";
+
 test("setup completed and installed local registry packages", async () => {
   const outputDir = requiredEnv("JOURNEY_OUTPUT_DIR");
   const appDir = requiredEnv("JOURNEY_APP_DIR");
@@ -16,7 +18,15 @@ test("setup completed and installed local registry packages", async () => {
   const metadata = JSON.parse(await readFile(join(outputDir, "metadata.json"), "utf8"));
   expect(setup.data.framework).toBe(metadata.framework);
   const packageJson = JSON.parse(await readFile(join(appDir, "package.json"), "utf8"));
-  expect(packageJson.dependencies?.[metadata.sdkPackage]).toBeTruthy();
+  // The framework SDK must be declared, but the section depends on the
+  // framework's bundling model: most apps externalise runtime deps and list it
+  // under `dependencies`, whereas Qwik City's Vite config bundles its
+  // ecosystem packages and so requires them in `devDependencies`. Accept
+  // either — the contract is "declared as a dependency", not which section.
+  const sdkVersion =
+    packageJson.dependencies?.[metadata.sdkPackage] ??
+    packageJson.devDependencies?.[metadata.sdkPackage];
+  expect(sdkVersion).toBeTruthy();
 
   await expectLocalLockfileResolution({
     appDir,
@@ -28,7 +38,10 @@ test("setup completed and installed local registry packages", async () => {
 test("doctor detects and repairs managed-file drift", async () => {
   const outputDir = requiredEnv("JOURNEY_OUTPUT_DIR");
   const metadata = JSON.parse(await readFile(join(outputDir, "metadata.json"), "utf8"));
-  test.skip(metadata.framework !== "next", "the drift probe runs on the Next suite only");
+  test.skip(
+    metadata.framework !== "next" || metadata.preset !== null || metadata.preexistingApp,
+    "the drift probe runs in the fresh-app lane's Next suite only",
+  );
 
   type Check = { name: string; status: string };
   const drift = JSON.parse(await readFile(join(outputDir, "doctor-drift.json"), "utf8")) as {
@@ -99,10 +112,4 @@ async function readOptionalFile(path: string): Promise<string | null> {
     }
     throw error;
   }
-}
-
-function requiredEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`${name} is required`);
-  return value;
 }

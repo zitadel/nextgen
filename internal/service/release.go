@@ -93,25 +93,26 @@ func (s *releaseService) Create(ctx context.Context, input CreateReleaseInput) (
 		return nil, err
 	}
 
-	// NewRelease first: it rejects duplicate handles before ValidateRelease
-	// walks documents that may be incomplete for that case.
+	// NewRelease first: it rejects duplicate handles and unpinnable revisions
+	// before ValidateRelease walks documents that may be incomplete for that case.
 	entity, err := s.newReleaseEntity(ctx, input.ProjectID, content, releaseMetadataFromCreate(input))
 	if err != nil {
-		return nil, err
-	}
-	if err := domain.ValidateRelease(content); err != nil {
 		return nil, err
 	}
 
 	// Read before insert so the common re-deploy answers without burning an
 	// id. The unique index on (project_id, content_hash) is what makes this
 	// correct under concurrency; the read only spares the round trip.
+	// A set already released answers with that release; validation is skipped.
 	existing, err := s.getByContentHash(ctx, input.ProjectID, entity.ContentHash)
 	if err != nil {
 		return nil, err
 	}
 	if existing != nil {
 		return &CreateReleaseOutput{Release: existing}, nil
+	}
+	if err := domain.ValidateRelease(content); err != nil {
+		return nil, err
 	}
 
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
@@ -149,7 +150,7 @@ func (s *releaseService) newReleaseEntity(
 	actor, _ := audit.ActorFromContext(ctx)
 	meta.CreatedBy = actor.ActorID
 	meta.CreatedByType = actor.ActorType
-	return domain.NewRelease(projectID, content.Pointers(), meta)
+	return domain.NewRelease(projectID, content, meta)
 }
 
 func insertRelease(ctx context.Context, stmts AllStatements, entity *domain.Release) error {
@@ -260,12 +261,6 @@ func (s *releaseService) loadContent(ctx context.Context, projectID string, requ
 			schema, err := stmts.GetJSONSchemaByID(ctx, projectID, pointer.RevisionID)
 			if err != nil {
 				return content, mapRevisionLookupError(err, pointer)
-			}
-			// A schema registered by URL whose document was never parsed declares
-			// no objectType, so nothing says which resource it is a revision of.
-			if schema.ObjectType == nil || *schema.ObjectType == "" {
-				return content, domain.ErrReleaseRevisionUnpinnable(
-					fmt.Sprintf("schema %q declares no objectType", pointer.RevisionID))
 			}
 			content.Schemas = append(content.Schemas, schema)
 

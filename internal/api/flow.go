@@ -16,6 +16,7 @@ import (
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -189,18 +190,15 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 		}
 		// Parsed here, not by the generated decoder: a request-URI parse
 		// leaves a fragment in the path, and a hash-routed page needs it
-		// back as a fragment.
-		returnTarget, err := url.Parse(rawTarget)
+		// back as a fragment. ParseRedirectTarget is the one place that
+		// decides whether a caller-supplied URL is safe to send a browser to.
+		returnTarget, err := httputil.ParseRedirectTarget(rawTarget)
 		if err != nil {
-			return nil, domain.ErrRequestInvalid().WithMessage(fmt.Sprintf("return_target %q is not a URL", rawTarget))
+			return nil, domain.ErrRequestInvalid().WithMessage(fmt.Sprintf("return_target %q is %v", rawTarget, err))
 		}
-		// No page URL carries userinfo; it is only ever a way to dress a
-		// foreign host up as the origin.
-		if returnTarget.User != nil {
-			return nil, domain.ErrRequestInvalid().WithMessage("return_target must not carry userinfo")
-		}
-		// A relative or scheme-less target fails here too: its origin lacks
-		// a scheme or a host, which the request origin always has.
+		// The target is a page on the origin that sent this request. The
+		// scheme and host are always set once it parses, so a relative target
+		// never gets this far.
 		if !strings.EqualFold(returnTarget.Scheme+"://"+returnTarget.Host, requestOrigin) {
 			return nil, domain.ErrRequestInvalid().WithMessage(fmt.Sprintf("return_target %q is not on the request origin %q", rawTarget, requestOrigin))
 		}
@@ -298,7 +296,7 @@ func (h *Handler) openState(ctx context.Context, raw string) (*domain.FlowState,
 		return nil, domain.ErrFlowCookieInvalid()
 	}
 
-	header, err := domain.DecodeJWEHeader(raw)
+	header, err := domain.DecodeStoredKeyJWEHeader(raw)
 	if err != nil {
 		return nil, domain.ErrFlowCookieInvalid()
 	}
@@ -445,26 +443,35 @@ func toFlowStepChallenge(c domain.FlowStepChallenge) api.FlowStepChallenge {
 	return out
 }
 
-// validateOriginAgainstProject returns an error if the origin is not in the
-// project's PreviewOrigins allowlist. An empty allowlist means allow all
-// (development/test mode).
+// validateOriginAgainstProject returns an error if the origin is not admitted
+// for the project. An empty allowlist means allow all (development/test mode).
+// Loopback hosts are admitted without a stored pattern. Only primary patterns
+// admit requests; preview patterns bound which URLs a preview deploy may
+// register and do not authorize Origin headers by themselves.
 //
-// Matching is deliberately exact — no loopback aliasing between localhost,
-// 127.0.0.1, and [::1]. The WebAuthn RP ID derives from the origin hostname
-// (passkeyRPFromOrigin), so a passkey registered under one loopback spelling
-// can never assert under another; aliasing here would replace this clear 400
-// with a confusing "no passkey found" during the ceremony.
+// Primary matching is exact — no aliasing between localhost, 127.0.0.1, and
+// [::1] for stored patterns. The WebAuthn RP ID derives from the origin
+// hostname (passkeyRPFromOrigin), so a passkey registered under one loopback
+// spelling can never assert under another.
 func validateOriginAgainstProject(originStr string, project *domain.Project) error {
-	if len(project.PreviewOrigins) == 0 {
+	if len(project.Origins) == 0 {
 		return nil
 	}
-	for _, allowed := range project.PreviewOrigins {
-		if allowed == originStr {
+	if u, err := url.Parse(originStr); err == nil && isLoopbackHost(u.Hostname()) {
+		return nil
+	}
+	patterns := make([]string, 0, len(project.Origins))
+	for _, allowed := range project.Origins {
+		if allowed.Kind != domain.OriginKindPrimary {
+			continue
+		}
+		if allowed.Pattern == originStr {
 			return nil
 		}
+		patterns = append(patterns, allowed.Pattern)
 	}
 	return fmt.Errorf("origin %q is not allowed for this project (allowed: %s)",
-		originStr, strings.Join(project.PreviewOrigins, ", "))
+		originStr, strings.Join(patterns, ", "))
 }
 
 // passkeyRPFromOrigin derives the WebAuthn relying-party id (the origin host,

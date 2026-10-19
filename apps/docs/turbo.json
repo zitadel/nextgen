@@ -8,8 +8,12 @@
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/api/openapi/**/*.yaml", "$TURBO_ROOT$/redocly.yaml"],
       "outputs": [".generated/openapi.mjs", ".generated/openapi.d.mts"]
     },
+    // The API reference's TypeScript samples compile against the client
+    // (scripts/sdk-samples.ts, tsconfig.samples.json), whose endpoints its
+    // generate task writes from the same spec, and whose runtime they call.
     "typecheck": {
-      "dependsOn": ["generate"]
+      "dependsOn": ["generate", "@zitadel/api#generate"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/api/src/**"]
     },
     // The build script bundles again before `next build`, because the
     // hosted cloud's docs service runs the script without a task runner.
@@ -34,15 +38,17 @@
     // serves the build on port 3003.
     "e2e": {
       "dependsOn": ["build"],
-      "passThroughEnv": ["DOCS_*", "VERCEL_AUTOMATION_BYPASS_SECRET", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "GITHUB_*"]
+      "passThroughEnv": ["PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "GITHUB_*"]
     },
     // The same suite against a deployment of the hosted cloud, which
-    // DOCS_BASE_URL names (VERCEL_AUTOMATION_BYPASS_SECRET opens its
-    // protection); .github/workflows/deployment-checks.yml runs it for every
-    // deployment. The script refuses to run without DOCS_BASE_URL.
+    // CLOUD_URL names (playwright.deployment.config.mts;
+    // VERCEL_AUTOMATION_BYPASS_SECRET opens its protection). The root's
+    // `pnpm check:cloud` runs it beside every other deployment suite, and
+    // .github/workflows/deployment-checks.yml runs it for every deployment.
+    // The config refuses to run without CLOUD_URL.
     "e2e-deployment": {
       "cache": false,
-      "passThroughEnv": ["DOCS_*", "VERCEL_AUTOMATION_BYPASS_SECRET", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "GITHUB_*"]
+      "passThroughEnv": ["CLOUD_URL", "VERCEL_AUTOMATION_BYPASS_SECRET", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "GITHUB_*"]
     }
   }
 }

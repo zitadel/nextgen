@@ -5,8 +5,8 @@ import { fileURLToPath } from "node:url";
 import { forwardedArgs, isDirectRun, run, runCapture } from "./dev-process.mjs";
 import { upsertProductGithubRelease } from "./release-github.mjs";
 import {
-  findPrereleaseOnlyPackages,
-  prereleaseOnlyMessage,
+  findPublishBlockers,
+  publishBlockersMessage,
   readLocalPackages,
   readPrereleaseTag,
 } from "./release-dist-tags.mjs";
@@ -66,10 +66,22 @@ async function commandSnapshot(options) {
 
   await run("go", ["mod", "download"], { cwd: repoRoot });
   await buildServerBinaries({ repoRoot, outDir, version: release.version, gitInfo: info });
-  await stageServerNpmBinaries({ repoRoot, outDir, version: release.version });
-  await createArchives({ repoRoot, outDir, version: release.version });
-  await packPublicPackages({ repoRoot, outDir, version: release.version });
-  await prepareDockerContext({ repoRoot, outDir, version: release.version });
+  // Three independent lanes over the built binaries, run side by side: each
+  // writes only its own output (the platform packages' bin/ and then npm/,
+  // archives/, docker-context/). Every lane settles before the first failure
+  // is rethrown, so a failing lane never leaves another's processes running.
+  const lanes = await Promise.allSettled([
+    (async () => {
+      await stageServerNpmBinaries({ repoRoot, outDir, version: release.version });
+      await packPublicPackages({ repoRoot, outDir, version: release.version });
+    })(),
+    createArchives({ repoRoot, outDir, version: release.version }),
+    prepareDockerContext({ repoRoot, outDir, version: release.version }),
+  ]);
+  const failedLane = lanes.find((lane) => lane.status === "rejected");
+  if (failedLane) {
+    throw failedLane.reason;
+  }
   await writeReleaseMetadata({ repoRoot, outDir, release, gitInfo: info });
 
   if (!options.skipContainer) {
@@ -135,7 +147,7 @@ async function commandPublish(options) {
 
   await assertNoUnrecordedPendingChangesets();
   await assertMainBranch(options, { allowDryRunBypass: !options.recoverVersion });
-  await assertPrereleaseTagApplies();
+  await assertPackagesPublishable();
 
   if (options.dryRun) {
     await commandSnapshot({ skipContainer: true });
@@ -170,17 +182,16 @@ async function commandPublish(options) {
   await upsertProductGithubRelease({ repoRoot, outDir, log: console.log });
 }
 
-// Fails before anything is published when `changeset publish` would put a
-// package on `latest` instead of the prerelease tag (see release-dist-tags.mjs).
-async function assertPrereleaseTagApplies() {
+// Fails before anything is published when `changeset publish` would publish a
+// package npm has never seen, which trusted publishing cannot create, or would
+// put a package on `latest` instead of the prerelease tag (see
+// release-dist-tags.mjs).
+async function assertPackagesPublishable() {
   const tag = await readPrereleaseTag(repoRoot);
-  if (!tag) {
-    return;
-  }
   const packages = await readLocalPackages(repoRoot, PUBLIC_PACKAGE_DIRS);
-  const stuck = await findPrereleaseOnlyPackages(packages, tag);
-  if (stuck.length > 0) {
-    throw new Error(prereleaseOnlyMessage(stuck, tag));
+  const blockers = await findPublishBlockers(packages, tag);
+  if (blockers.unpublished.length > 0 || blockers.prereleaseOnly.length > 0) {
+    throw new Error(publishBlockersMessage(blockers, tag));
   }
 }
 

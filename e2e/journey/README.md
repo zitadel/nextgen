@@ -7,8 +7,9 @@ demo apps. Instead, it builds the current workspace packages, publishes packed
 tarballs to a temporary registry, creates empty app directories outside the
 repo, runs the customer local CLI flow through `npx`, starts the generated apps,
 and verifies that real users can register, log out, and log in again across
-all eight frameworks: Next, Nuxt, React, Vue, Angular, Solid, Svelte, and
-Qwik (`scripts/frameworks.mjs` is the authoritative list).
+every supported framework: the SPA families (React, Vue, Angular, Solid,
+Svelte, Qwik) and the meta-frameworks (Next, Nuxt, SvelteKit, TanStack Start,
+SolidStart, Qwik City). `scripts/frameworks.mjs` is the authoritative list.
 
 ## Local runner
 
@@ -46,8 +47,9 @@ moon run e2e:journey -- --concurrency 2
 moon run e2e:journey -- --tarballs-dir dist/release/<version>/npm
 ```
 
-- `--framework <id>` runs one framework (`next`, `nuxt`, `react`, `vue`,
-  `angular`, `solid`, `svelte`, or `qwik`) instead of the full matrix.
+- `--framework <id>` runs one framework (any id in `frameworkIds` in
+  `scripts/frameworks.mjs`, e.g. `next`, `sveltekit`, `qwik-city`) instead of
+  the full matrix.
 - `--suite frameworks|testkit` selects the lane: `frameworks` (default) runs
   the scaffold journey matrix; `testkit` runs the `@zitadel/testing` consumer
   lane.
@@ -80,19 +82,39 @@ Useful environment overrides:
 - `JOURNEY_ZITADEL_PORT` for single-framework runs only
 - `JOURNEY_EDGE_PORT` for single-framework `--remote` runs only
 - `JOURNEY_TARBALLS_DIR` to use prebuilt release npm tarballs
-- `JOURNEY_CI=1`, `JOURNEY_MATRIX`, `JOURNEY_RUNTIME` and `JOURNEY_WORK_DIR`
-  for `--ci`, `--matrix`, `--runtime` and `--work-dir`. Arguments on the
-  command line win. CI's turbo job sets these: turbo puts arguments after `--`
-  into every task's cache key, so the journey's dependencies would rebuild
-  instead of coming from the cache.
+- `JOURNEY_TARBALLS_REQUIRED=1` to refuse to pack without them. The
+  `e2e:journey-local` lane sets it: the e2e lanes beside it read the dist
+  folders a pack wipes and rebuilds.
+- `JOURNEY_CI=1`, `JOURNEY_CONCURRENCY`, `JOURNEY_MATRIX`, `JOURNEY_RUNTIME`
+  and `JOURNEY_WORK_DIR` for `--ci`, `--concurrency`, `--matrix`, `--runtime`
+  and `--work-dir`. Arguments on the command line win. CI's turbo job sets
+  these: turbo puts arguments after `--` into every task's cache key, so the
+  journey's dependencies would rebuild instead of coming from the cache. They
+  are also how ci.yml reaches `e2e:journey-local`, whose command moon fixes.
 - `JOURNEY_ENABLE_PASSKEY=0` as a local-only escape hatch while debugging
   passkey setup. CI must run passkey coverage — the `passkey-first` preset
   lane, which is the only shipped preset whose flow offers a passkey.
 
+### Phase timings
+
+Every runner line starts with the time since the runner started
+(`[journey-local 1:12]`), so the log reads as a timeline even where a task
+runner prints a task's output only when it ends. Once the lanes have finished,
+passed or failed, the runner prints a table: a row per lane with when it began,
+the seconds each phase took (doctor, start, setup, the drift probe, the
+testkit's stop and install, app start, Playwright, teardown) and the phase a
+failed lane failed in, and a line with the shared steps before the lanes
+(Playwright browsers, the registry). In GitHub Actions the table also goes to
+the job summary. `scripts/timings.mjs` defines the phases; prepare-app records
+its CLI steps in `timings.json` in the lane's work dir, which the runner reads.
+
 ## CI gate
 
 The required PR CI job runs the framework matrix against the default binary
-runtime. It does not use public Zitadel packages or GHCR images; it publishes
+runtime. The matrix skips SvelteKit, TanStack Start, SolidStart and Qwik City
+(`ciExcludedFrameworkIds` in `scripts/frameworks.mjs`): their scaffolders track
+upstream `create-*@latest` releases, so a red lane could come from outside the PR.
+They stay registered and run by hand with `--framework`. It does not use public Zitadel packages or GHCR images; it publishes
 the current workflow's package tarballs to Verdaccio and runs the same `npx`
 local setup flow against the generated app. The Docker fallback journey remains
 an opt-in local/manual check via

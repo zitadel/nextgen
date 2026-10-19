@@ -1,6 +1,7 @@
 import { expect, test } from "@zitadel/testing/playwright";
 
-import { expectNoErrorBoundary, signIn } from "./support";
+import { expectNoErrorBoundary, openAddTeam, uniqueName } from "../support/screens";
+import { signIn } from "../support/sign-in";
 
 /**
  * End-to-end coverage for the Teams screens against a real instance.
@@ -13,44 +14,33 @@ import { expectNoErrorBoundary, signIn } from "./support";
  * stamped rather than what the console assumed.
  */
 
-test.describe.configure({ mode: "parallel" });
-
-/** A name unique per test, so the parallel workers never collide on the project's unique-name rule. */
-function teamName(prefix: string): string {
-  return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
 test("creates a team through the drawer and lists it", async ({ page, zitadel, seed }) => {
-  await signIn(page, zitadel.handle, await seed.user());
-  const name = teamName("acme");
+  await signIn(page, zitadel, await seed.user());
+  const name = uniqueName("acme");
 
   await page.goto("/teams");
   await expect(page.getByRole("heading", { name: "Teams", exact: true })).toBeVisible();
-
-  await page.getByRole("button", { name: "Add", exact: true }).click();
-  const drawer = page.getByRole("dialog", { name: "Add team" });
-  await expect(drawer).toBeVisible();
+  const addTeam = await openAddTeam(page);
 
   // The submit stays disabled until the one required field has a value.
-  await expect(drawer.getByRole("button", { name: "Add team", exact: true })).toBeDisabled();
-  await drawer.getByLabel("Team name").fill(name);
-  await drawer.getByRole("button", { name: "Add team", exact: true }).click();
+  await expect(addTeam.submit).toBeDisabled();
+  await addTeam.name.fill(name);
+  await addTeam.submit.click();
 
-  await expect(drawer).toBeHidden();
+  await expect(addTeam.drawer).toBeHidden();
   await expect(page.getByRole("link", { name, exact: true })).toBeVisible();
   await expectNoErrorBoundary(page);
 });
 
 test("opens a team from the list and renames it", async ({ page, zitadel, seed }) => {
-  await signIn(page, zitadel.handle, await seed.user());
-  const name = teamName("rename");
+  await signIn(page, zitadel, await seed.user());
+  const name = uniqueName("rename");
   const renamed = `${name}-renamed`;
 
   await page.goto("/teams");
-  await page.getByRole("button", { name: "Add", exact: true }).click();
-  const drawer = page.getByRole("dialog", { name: "Add team" });
-  await drawer.getByLabel("Team name").fill(name);
-  await drawer.getByRole("button", { name: "Add team", exact: true }).click();
+  const addTeam = await openAddTeam(page);
+  await addTeam.name.fill(name);
+  await addTeam.submit.click();
 
   await page.getByRole("link", { name, exact: true }).click();
   await expect(page).toHaveURL(/\/teams\/team_[A-Z0-9]+\?project=/);
@@ -69,14 +59,13 @@ test("opens a team from the list and renames it", async ({ page, zitadel, seed }
 });
 
 test("shows the status the API stamped on a team", async ({ page, zitadel, seed }) => {
-  await signIn(page, zitadel.handle, await seed.user());
-  const name = teamName("status");
+  await signIn(page, zitadel, await seed.user());
+  const name = uniqueName("status");
 
   await page.goto("/teams");
-  await page.getByRole("button", { name: "Add", exact: true }).click();
-  const drawer = page.getByRole("dialog", { name: "Add team" });
-  await drawer.getByLabel("Team name").fill(name);
-  await drawer.getByRole("button", { name: "Add team", exact: true }).click();
+  const addTeam = await openAddTeam(page);
+  await addTeam.name.fill(name);
+  await addTeam.submit.click();
 
   // `team-status` returns `active`; the console renders that value rather than
   // the design's `Inactive`/`Active` wording, so this asserts the API's own word.

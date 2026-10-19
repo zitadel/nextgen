@@ -63,21 +63,36 @@ func requireUnresolved(t *testing.T, err error, message string) {
 	assert.Equal(t, message, domErr.Message)
 }
 
-func TestReleaseContentPointers(t *testing.T) {
+func TestNewReleaseFromEveryKind(t *testing.T) {
 	t.Parallel()
 
-	content := domain.ReleaseContent{
+	release, err := domain.NewRelease("proj_1", domain.ReleaseContent{
 		Schemas:         []*domain.JSONSchema{humanUser(humanUserDocument)},
 		FlowDefinitions: []*domain.FlowDefinition{loginFlow()},
 		IDPConnections:  []*domain.IDPConnection{google},
 		Branding:        &domain.Branding{ID: "brnd_1"},
-	}
+	}, domain.ReleaseMetadata{})
+	require.NoError(t, err)
 	assert.Equal(t, []domain.ReleasePointer{
-		{Kind: domain.ReleasePointerKindSchema, Handle: "human-user", RevisionID: "sch_1"},
+		{Kind: domain.ReleasePointerKindBranding, Handle: "default", RevisionID: "brnd_1"},
 		{Kind: domain.ReleasePointerKindFlowDefinition, Handle: "default-login", RevisionID: "flowdef_1"},
 		{Kind: domain.ReleasePointerKindIDP, Handle: "google", RevisionID: "idprev_1"},
-		{Kind: domain.ReleasePointerKindBranding, Handle: "default", RevisionID: "brnd_1"},
-	}, content.Pointers())
+		{Kind: domain.ReleasePointerKindSchema, Handle: "human-user", RevisionID: "sch_1"},
+	}, release.Pointers)
+}
+
+// Safe without NewRelease first: two revisions of one schema are refused,
+// not silently collapsed.
+func TestValidateReleaseRejectsSameSchemaTwice(t *testing.T) {
+	t.Parallel()
+
+	later := humanUser(humanUserWithoutEmail)
+	later.URL = "sch_2"
+	err := domain.ValidateRelease(domain.ReleaseContent{
+		Schemas:         []*domain.JSONSchema{humanUser(humanUserDocument), later},
+		FlowDefinitions: []*domain.FlowDefinition{loginFlow()},
+	})
+	assert.ErrorIs(t, err, domain.ErrReleaseInvalid(nil, nil))
 }
 
 func TestValidateRelease(t *testing.T) {
@@ -130,6 +145,16 @@ func TestValidateReleaseSchemaSSOProviders(t *testing.T) {
 
 	content.IDPConnections = []*domain.IDPConnection{google}
 	assert.NoError(t, domain.ValidateRelease(content))
+}
+
+func TestValidateReleaseIgnoresDisabledSSOProviders(t *testing.T) {
+	t.Parallel()
+
+	disabled := humanUser([]byte(`{
+  "type": "object",
+  "x-auth-methods": {"sso": {"enabled": false, "providers": ["google"]}}
+}`))
+	assert.NoError(t, domain.ValidateRelease(domain.ReleaseContent{Schemas: []*domain.JSONSchema{disabled}}))
 }
 
 func TestValidateReleaseFlowMustFitItsSchema(t *testing.T) {

@@ -264,3 +264,18 @@ func TestIDPIdentityLinkStatements_CreateInsideUserTransactionRollsBackTogether(
 		assert.Equal(t, f.userID, got.UserID, "the existing link is untouched")
 	})
 }
+
+func TestIDPIdentityLinkStatements_ListUnlinkedUserIsEmpty(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		f := newIDPIdentityLinkFixture(t, d.stmts)
+		got, err := d.stmts.ListIDPIdentityLinks(t.Context(), &database.ListOptions[domain.IDPIdentityLinkField]{
+			Filter: database.And(
+				database.Equal(database.Col(domain.IDPIdentityLinkFieldProjectID), f.projectID),
+				database.Equal(database.Col(domain.IDPIdentityLinkFieldUserID), f.userID),
+			),
+		})
+		require.NoError(t, err)
+		assert.Empty(t, got.Items)
+		assert.Empty(t, got.NextCursor)
+	})
+}

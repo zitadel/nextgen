@@ -122,47 +122,77 @@ const (
 	ReleaseFieldCreatedAt
 )
 
-// NewRelease validates the pinned set, orders it canonically and derives its
-// content hash. The ID is left empty for the dialect to mint, and CreatedAt is
-// stamped by the insert.
-func NewRelease(projectID string, pointers []ReleasePointer, metadata ReleaseMetadata) (*Release, error) {
-	if len(pointers) == 0 {
-		return nil, ErrReleaseInvalid("a release must pin at least one revision", nil)
+// ReleaseContent is the revisions a release references, loaded. A release
+// keeps only their pointers; [ValidateRelease] reads the content.
+type ReleaseContent struct {
+	Schemas         []*JSONSchema
+	FlowDefinitions []*FlowDefinition
+	IDPConnections  []*IDPConnection
+	Branding        *Branding
+}
+
+// Pointers returns one pointer per revision, under the handle it declares,
+// in canonical order. It refuses a revision without a handle or id, and two
+// revisions of the same resource. Build uses this for auto-pin bookkeeping
+// and the pointer cap before [NewRelease] / [ValidateRelease].
+func (c ReleaseContent) Pointers() ([]ReleasePointer, error) {
+	return c.pointers()
+}
+
+// pointers returns one pointer per revision, under the handle it declares,
+// in canonical order. It refuses a revision without a handle or id, and two
+// revisions of the same resource.
+func (c ReleaseContent) pointers() ([]ReleasePointer, error) {
+	var pointers []ReleasePointer
+	for _, schema := range c.Schemas {
+		// A schema registered by URL whose document was never parsed declares
+		// no objectType, so nothing says which resource it is a revision of.
+		if schema.ObjectType == nil || *schema.ObjectType == "" {
+			return nil, ErrReleaseRevisionUnpinnable(fmt.Sprintf("schema %q declares no objectType", schema.URL))
+		}
+		pointers = append(pointers, ReleasePointer{Kind: ReleasePointerKindSchema, Handle: *schema.ObjectType, RevisionID: schema.URL})
+	}
+	for _, flow := range c.FlowDefinitions {
+		pointers = append(pointers, ReleasePointer{Kind: ReleasePointerKindFlowDefinition, Handle: flow.Name, RevisionID: flow.ID})
+	}
+	for _, idp := range c.IDPConnections {
+		pointers = append(pointers, ReleasePointer{Kind: ReleasePointerKindIDP, Handle: idp.Slug, RevisionID: idp.RevisionID})
+	}
+	if c.Branding != nil {
+		pointers = append(pointers, ReleasePointer{Kind: ReleasePointerKindBranding, Handle: ReleaseBrandingHandle, RevisionID: c.Branding.ID})
 	}
 
-	// Reported against the caller's indices, so the message points at the
-	// pointer they sent rather than at wherever it lands once ordered.
-	for i, pointer := range pointers {
-		if !pointer.Kind.IsAReleasePointerKind() {
-			return nil, ErrReleaseInvalid(fmt.Sprintf("pointer %d has an unknown kind", i), nil)
-		}
-		if strings.TrimSpace(pointer.Handle) == "" {
-			return nil, ErrReleaseInvalid(fmt.Sprintf("pointer %d has an empty handle", i), nil)
-		}
-		if strings.TrimSpace(pointer.RevisionID) == "" {
-			return nil, ErrReleaseInvalid(fmt.Sprintf("pointer %d has an empty revision id", i), nil)
+	for _, pointer := range pointers {
+		if strings.TrimSpace(pointer.Handle) == "" || strings.TrimSpace(pointer.RevisionID) == "" {
+			return nil, ErrReleaseInvalid(fmt.Sprintf("%s %q has an empty handle or revision id", pointer.Kind, pointer.RevisionID), nil)
 		}
 	}
 
-	// Sorts into a new slice: the caller's argument is not ours to reorder.
 	sorted := slices.SortedFunc(slices.Values(pointers), compareReleasePointers)
-
-	// Adjacent after sorting, so one pass finds every collision. A release
-	// describes one state of the project, so two revisions of the same
-	// resource are a contradiction rather than an ordering problem.
-	//
-	// Rules between revisions are [ValidateRelease]'s.
+	// Adjacent after sorting, so one pass finds every collision.
 	for i := 1; i < len(sorted); i++ {
 		if sorted[i].Kind == sorted[i-1].Kind && sorted[i].Handle == sorted[i-1].Handle {
-			return nil, ErrReleaseInvalid(
-				fmt.Sprintf("%s %q is pinned twice", sorted[i].Kind, sorted[i].Handle), nil)
+			return nil, ErrReleaseInvalid(fmt.Sprintf("%s %q is referenced twice", sorted[i].Kind, sorted[i].Handle), nil)
 		}
 	}
+	return sorted, nil
+}
 
+// NewRelease derives a release's pointers from its content and their content
+// hash. The ID is left empty for the dialect to mint, and CreatedAt is stamped
+// by the insert.
+func NewRelease(projectID string, content ReleaseContent, metadata ReleaseMetadata) (*Release, error) {
+	pointers, err := content.pointers()
+	if err != nil {
+		return nil, err
+	}
+	if len(pointers) == 0 {
+		return nil, ErrReleaseInvalid("a release must reference at least one revision", nil)
+	}
 	return &Release{
 		ProjectID:   projectID,
-		ContentHash: releaseContentHash(sorted),
-		Pointers:    sorted,
+		ContentHash: releaseContentHash(pointers),
+		Pointers:    pointers,
 		Metadata:    metadata,
 	}, nil
 }

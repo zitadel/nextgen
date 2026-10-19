@@ -1,9 +1,10 @@
-import { readdir, readFile } from "node:fs/promises";
+import { readdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 import { PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
+import { packageName, readManifest } from "./lib.mjs";
 
 const [tarballsDir, ...flags] = process.argv.slice(2);
 if (!tarballsDir || tarballsDir.startsWith("--")) {
@@ -17,7 +18,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "../../..");
 // Journey registries and release artifact dirs carry the same set: exactly
 // the public release packages, nothing on top.
-const requiredPackageNames = new Set(await Promise.all(PUBLIC_PACKAGE_DIRS.map(packageName)));
+const requiredPackageNames = new Set(
+  await Promise.all(PUBLIC_PACKAGE_DIRS.map((dir) => packageName(repoRoot, dir))),
+);
 const dependencyFields = [
   "dependencies",
   "devDependencies",
@@ -71,20 +74,6 @@ assertValidVersions(manifests);
 console.log(
   `verified ${manifests.size} installable tarballs; required packages present: ${[...requiredPackageNames].sort().join(", ")}`,
 );
-
-function readManifest(tarball) {
-  const result = spawnSync("tar", ["-xOf", tarball, "package/package.json"], {
-    encoding: "utf8",
-  });
-  if (result.status !== 0) {
-    throw new Error(`failed to read package.json from ${tarball}: ${result.stderr}`);
-  }
-  const manifest = JSON.parse(result.stdout);
-  if (typeof manifest.name !== "string" || typeof manifest.version !== "string") {
-    throw new Error(`${tarball} has invalid package metadata`);
-  }
-  return manifest;
-}
 
 function assertInstallableManifest(tarball, manifest) {
   for (const field of dependencyFields) {
@@ -149,12 +138,4 @@ function assertValidVersions(manifests) {
   if (invalid.length > 0) {
     throw new Error(`public package tarballs must use semver versions: ${invalid.join(", ")}`);
   }
-}
-
-async function packageName(relativePath) {
-  const pkg = JSON.parse(await readFile(join(repoRoot, relativePath, "package.json"), "utf8"));
-  if (typeof pkg.name !== "string" || pkg.name.length === 0) {
-    throw new Error(`${relativePath}/package.json has no name`);
-  }
-  return pkg.name;
 }

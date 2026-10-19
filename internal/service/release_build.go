@@ -132,7 +132,11 @@ func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (*C
 		if err := s.autoPinReferences(ctx, stmts, input.ProjectID, &content); err != nil {
 			return err
 		}
-		if len(content.Pointers()) > maxReleasePointers {
+		pointers, err := content.Pointers()
+		if err != nil {
+			return err
+		}
+		if len(pointers) > maxReleasePointers {
 			return domain.ErrReleaseInvalid(
 				fmt.Sprintf("a release may pin at most %d resources", maxReleasePointers), nil)
 		}
@@ -329,7 +333,11 @@ func (s *releaseService) autoPinReferences(
 		handle string
 	}
 	included := map[key]bool{}
-	for _, pointer := range content.Pointers() {
+	pointers, err := content.Pointers()
+	if err != nil {
+		return err
+	}
+	for _, pointer := range pointers {
 		included[key{pointer.Kind, pointer.Handle}] = true
 	}
 

@@ -7,37 +7,14 @@ import (
 	"github.com/ianlancetaylor/jsonschema"
 )
 
-// ReleaseContent is the revisions a release references, loaded for
-// [ValidateRelease].
-type ReleaseContent struct {
-	Schemas         []*JSONSchema
-	FlowDefinitions []*FlowDefinition
-	IDPConnections  []*IDPConnection
-	Branding        *Branding
-}
-
-// Pointers returns one pointer per revision, under the handle it declares.
-func (c ReleaseContent) Pointers() []ReleasePointer {
-	var pointers []ReleasePointer
-	for _, schema := range c.Schemas {
-		pointers = append(pointers, ReleasePointer{Kind: ReleasePointerKindSchema, Handle: *schema.ObjectType, RevisionID: schema.URL})
-	}
-	for _, flow := range c.FlowDefinitions {
-		pointers = append(pointers, ReleasePointer{Kind: ReleasePointerKindFlowDefinition, Handle: flow.Name, RevisionID: flow.ID})
-	}
-	for _, idp := range c.IDPConnections {
-		pointers = append(pointers, ReleasePointer{Kind: ReleasePointerKindIDP, Handle: idp.Slug, RevisionID: idp.RevisionID})
-	}
-	if c.Branding != nil {
-		pointers = append(pointers, ReleasePointer{Kind: ReleasePointerKindBranding, Handle: ReleaseBrandingHandle, RevisionID: c.Branding.ID})
-	}
-	return pointers
-}
-
 // ValidateRelease checks the rules that hold between a release's revisions.
 // Rules are called directly: the spec's error sets are inferred from static
 // calls only.
 func ValidateRelease(content ReleaseContent) error {
+	pointers, err := content.pointers()
+	if err != nil {
+		return err
+	}
 	documents := make(map[string]*jsonschema.Schema, len(content.Schemas))
 	for _, schema := range content.Schemas {
 		document, err := schema.Document()
@@ -46,7 +23,7 @@ func ValidateRelease(content ReleaseContent) error {
 		}
 		documents[*schema.ObjectType] = document
 	}
-	if err := validateReleaseReferencesClosed(content, documents); err != nil {
+	if err := validateReleaseReferencesClosed(content, pointers, documents); err != nil {
 		return err
 	}
 	return validateReleaseFlowDefinitions(content, documents)
@@ -54,13 +31,16 @@ func ValidateRelease(content ReleaseContent) error {
 
 // validateReleaseReferencesClosed requires every handle a revision names to
 // be in the release.
-func validateReleaseReferencesClosed(content ReleaseContent, documents map[string]*jsonschema.Schema) error {
+//
+// Flow-to-flow transitions are not checked: cross-flow navigation is not
+// implemented end to end yet.
+func validateReleaseReferencesClosed(content ReleaseContent, pointers []ReleasePointer, documents map[string]*jsonschema.Schema) error {
 	type key struct {
 		kind   ReleasePointerKind
 		handle string
 	}
 	included := make(map[key]bool)
-	for _, pointer := range content.Pointers() {
+	for _, pointer := range pointers {
 		included[key{pointer.Kind, pointer.Handle}] = true
 	}
 

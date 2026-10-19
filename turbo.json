@@ -51,7 +51,7 @@
     "TMPDIR",
     "LC_ALL",
     // Vercel keeps corepack enabled for a turbo build only when this is
-    // listed here (it checks the file); the scripts run `corepack pnpm`.
+    // listed here (it checks the file); the cloud's builds run its `pnpm`.
     "COREPACK_HOME"
   ],
   // The root files moon's .moon/tasks/*.yml list as implicitInputs: a change
@@ -208,6 +208,12 @@
       "dependsOn": ["@zitadel/console#build", "@zitadel/login-ui#build"],
       "inputs": ["scripts/run-server.mjs", "scripts/dev-process.mjs", "scripts/task-runner.mjs"],
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "GOFLAGS"]
+    },
+    "//#cloud": {
+      "cache": false,
+      "persistent": true,
+      "inputs": ["scripts/run-cloud.mjs", "scripts/dev-process.mjs", "scripts/task-runner.mjs"],
+      "passThroughEnv": ["CLOUD_DEV_PORT", "CLOUD_DEV_DEBUG", "NEXTGEN_*", "GOFLAGS"]
     },
     "//#server-debug": {
       "cache": false,

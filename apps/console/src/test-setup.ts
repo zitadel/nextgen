@@ -72,8 +72,20 @@ for (const method of ["error", "warn"] as const) {
 // two are far enough apart — which a busy machine makes them. Specs assert on
 // what a screen asked for, not on when a hover happened, so every router a spec
 // builds starts with preload off. Production keeps it.
+//
+// Every screen is a code-split chunk the router imports on its first visit.
+// Left to the first render, that cold import runs inside the file's first
+// `findBy*`, and on a busy CI runner it alone can outlast asyncUtilTimeout: the
+// file's first test fails while the rest pass. So the mock imports every
+// screen's chunk before it hands out the router; the route objects keep them
+// loaded for every router the file builds.
 vi.mock("./router", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./router")>();
+  const { createMemoryHistory } = await import("@tanstack/react-router");
+  const preloadRouter = actual.createAppRouter({ history: createMemoryHistory() });
+  await Promise.all(
+    Object.values(preloadRouter.routesById).map((route) => preloadRouter.loadRouteChunk(route)),
+  );
   return {
     ...actual,
     createAppRouter: (...args: Parameters<typeof actual.createAppRouter>) => {

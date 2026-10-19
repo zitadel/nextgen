@@ -9,8 +9,12 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-type userSchemaStatements interface {
+type userSchemaReader interface {
 	GetJSONSchemaByID(ctx context.Context, projectID, schemaID string) (*domain.JSONSchema, error)
+}
+
+type userSchemaStatements interface {
+	userSchemaReader
 	ListJSONSchemas(ctx context.Context, filter *database.ListOptions[domain.JSONSchemaField], opts JSONSchemaQueryOptions) (*database.ListResult[*domain.JSONSchema], error)
 }
 
@@ -23,17 +27,11 @@ type userSchemaStatements interface {
 func resolveUserSchema(ctx context.Context, stmts userSchemaStatements, projectID, ref string) (*domain.JSONSchema, error) {
 	handle := ref
 	if isUserSchemaID(ref) {
-		schema, err := stmts.GetJSONSchemaByID(ctx, projectID, ref)
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-			return nil, domain.ErrJSONSchemaNotFound()
-		}
+		objectType, err := userSchemaObjectType(ctx, stmts, projectID, ref)
 		if err != nil {
-			return nil, domain.ErrInternal(err).WithMessage("failed to get schema from database")
+			return nil, err
 		}
-		if schema.ObjectType == nil {
-			return nil, domain.ErrJSONSchemaNotFound()
-		}
-		handle = *schema.ObjectType
+		handle = objectType
 	}
 	result, err := stmts.ListJSONSchemas(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.JSONSchemaField]{
 		Filter: database.And(
@@ -49,6 +47,43 @@ func resolveUserSchema(ctx context.Context, stmts userSchemaStatements, projectI
 		return nil, domain.ErrJSONSchemaNotFound()
 	}
 	return result.Items[0], nil
+}
+
+// userSchemaObjectType returns the objectType the schema id (`$id` URL or
+// minted sch_ id) is a revision of. Every revision of a schema shares it.
+func userSchemaObjectType(ctx context.Context, stmts userSchemaReader, projectID, schemaID string) (string, error) {
+	schema, err := stmts.GetJSONSchemaByID(ctx, projectID, schemaID)
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+		return "", domain.ErrJSONSchemaNotFound()
+	}
+	if err != nil {
+		return "", domain.ErrInternal(err).WithMessage("failed to get schema from database")
+	}
+	if schema.ObjectType == nil {
+		return "", domain.ErrJSONSchemaNotFound()
+	}
+	return *schema.ObjectType, nil
+}
+
+// sameUserSchema reports whether a user's schema id and a flow's schema id are
+// revisions of one user schema. A user keeps the revision it was created under
+// (users.schema_url) while a flow runs against the newest one, and every
+// republish mints a new id, so comparing the ids directly would treat each
+// existing user as a user of another schema once the schema changes (#1507:
+// users on older revisions keep signing in). Equal ids need no read.
+func sameUserSchema(ctx context.Context, stmts userSchemaReader, projectID, userSchemaID, flowSchemaID string) (bool, error) {
+	if userSchemaID == flowSchemaID {
+		return true, nil
+	}
+	userType, err := userSchemaObjectType(ctx, stmts, projectID, userSchemaID)
+	if err != nil {
+		return false, err
+	}
+	flowType, err := userSchemaObjectType(ctx, stmts, projectID, flowSchemaID)
+	if err != nil {
+		return false, err
+	}
+	return userType == flowType, nil
 }
 
 func isUserSchemaID(ref string) bool {

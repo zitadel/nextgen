@@ -13,7 +13,7 @@ import { notFound } from "next/navigation";
 import { OpenAPIPage } from "@/components/api-page";
 import { getMDXComponents } from "@/components/mdx";
 import { getPageImageUrl, getPageMarkdownUrl, gitConfig } from "@/lib/shared";
-import { source } from "@/lib/source";
+import { openapiPageProps, source } from "@/lib/source";
 
 export default async function Page(props: PageProps<"/docs/[[...slug]]">) {
   const params = await props.params;
@@ -24,7 +24,11 @@ export default async function Page(props: PageProps<"/docs/[[...slug]]">) {
   const header = (
     <>
       <DocsTitle>{page.data.title}</DocsTitle>
-      <DocsDescription className="mb-0">{page.data.description}</DocsDescription>
+      {/* An API page's body shows its whole description, so its header is
+          the title, as in Fumadocs' OpenAPI recipe (lib/description.ts). */}
+      {page.type === "docs" && (
+        <DocsDescription className="mb-0">{page.data.description}</DocsDescription>
+      )}
       <div className="flex flex-row gap-2 items-center border-b pb-6">
         <MarkdownCopyButton markdownUrl={markdownUrl} />
         <ViewOptionsPopover
@@ -45,7 +49,7 @@ export default async function Page(props: PageProps<"/docs/[[...slug]]">) {
       <DocsPage full>
         {header}
         <DocsBody>
-          <OpenAPIPage {...page.data.getOpenAPIPageProps()} />
+          <OpenAPIPage {...openapiPageProps(page)} />
         </DocsBody>
       </DocsPage>
     );

@@ -9,7 +9,7 @@ example:
   name: login
   texts:
     title_key: login.title
-    description_key: login.description
+    description_key: login.description.sso
   fields:
     - name: email
       type: email

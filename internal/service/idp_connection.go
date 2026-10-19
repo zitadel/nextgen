@@ -8,6 +8,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/idp"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/idpconnection"
 )
@@ -149,6 +150,12 @@ var errIDPSlugTaken = errors.New("identity provider connection slug taken")
 // validate checks document against the idp-connection.json schema and returns
 // its slug. The request decoder cannot do this alone: its model drops the
 // schema's root allOf, which ties each protocol to its block.
+//
+// The engine's parse then runs on the document, so a connection the engine
+// would refuse at sign-in is refused here, while the author can still fix it:
+// an oidc block that sets an endpoint without the others. The parse's other
+// rules repeat the schema's, which already passed, so any other refusal is
+// reported as req.invalid.
 func (s *idpConnectionService) validate(document []byte) (string, error) {
 	uri, err := s.schemas.LatestSchemaURI(domain.SchemaKindIDPConnection)
 	if err != nil {
@@ -164,6 +171,12 @@ func (s *idpConnectionService) validate(document []byte) (string, error) {
 	}
 	if err := schema.Validate(doc); err != nil {
 		return "", domain.ErrRequestInvalid().WithDetails(domain.FlattenValidationErrors(err)).WithParent(err)
+	}
+	if _, err := idp.ParseConnection("", document); err != nil {
+		if de, ok := errors.AsType[domain.Error](err); ok && de.Code == domain.ErrIDPEndpointsPartial(nil).Code {
+			return "", err
+		}
+		return "", domain.ErrRequestInvalid().WithParent(err)
 	}
 	slug, _ := doc["slug"].(string)
 	return slug, nil
