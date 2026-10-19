@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
+import { FRAMEWORK_IDS } from "../../../../../../helpers/framework-ids";
 import { AngularPatcher } from "../../../../../../../src/lib/orca/patchers/rule/angular";
 import type {
   FileOp,
@@ -220,7 +221,7 @@ function setBearer(proxyReq) {
     const dep = new AngularPatcher()
       .plan(ctx())
       .ops.find((op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep");
-    expect(dep).toMatchObject({ name: "@zitadel/sdk-angular", version: "alpha" });
+    expect(dep).toMatchObject({ name: "@zitadel/sdk-angular", version: "0.1.0-alpha.0" });
   });
 });
 
@@ -300,5 +301,11 @@ describe("the generated proxy.conf.cjs, run by Vite against a remote https serve
 
     expect(response.ok).toBe(false);
     expect(remote.requests).toHaveLength(reached);
+  });
+});
+
+describe("AngularPatcher.canPatch", () => {
+  it.each(FRAMEWORK_IDS)("matches %s only when it is its own framework", (id) => {
+    expect(new AngularPatcher().canPatch(id)).toBe(id === "angular");
   });
 });

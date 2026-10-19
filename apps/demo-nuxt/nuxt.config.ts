@@ -7,14 +7,6 @@ export default defineNuxtConfig({
       // own compilerOptions are written into the generated file and win over
       // the base; the base adds the repo's strictness and `@zitadel/source`.
       extends: "../../../tsconfig.base.json",
-      compilerOptions: {
-        paths: {
-          // vue-tsc cannot resolve @zitadel/api subpath exports from the
-          // generated .nuxt tsconfig because it lacks project references.
-          // Map them explicitly so the SessionDetails component type-checks.
-          "@zitadel/api/config": ["../../../packages/api/src/runtime/config.ts"],
-        },
-      },
     },
   },
   nextgen: {
@@ -24,8 +16,11 @@ export default defineNuxtConfig({
   compatibilityDate: "2026-04-30",
   css: ["~/assets/css/demo-host.css"],
   ssr: true,
-  build: {
-    transpile: ["@zitadel/api", "@zitadel/components", "@zitadel/design-tokens"],
+  vue: {
+    compilerOptions: {
+      // The `zitadel-*` widgets are Lit custom elements, not Vue components.
+      isCustomElement: (tag) => tag.startsWith("zitadel-"),
+    },
   },
   runtimeConfig: {
     zitadelUrl: process.env.ZITADEL_URL ?? "http://localhost:8080",

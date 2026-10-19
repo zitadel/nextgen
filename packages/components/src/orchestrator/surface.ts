@@ -1,5 +1,5 @@
 import { LitElement } from "lit";
-import { property } from "lit/decorators.js";
+import { property } from "../internal/property.js";
 import type { ZitadelProject } from "@zitadel/api/config";
 
 import type { Branding } from "./branding.js";
@@ -40,9 +40,22 @@ export class ZitadelConfigured extends LitElement {
    */
   @property({ type: String }) accessor url = "";
 
+  /**
+   * The project's publishable key (ADR 036), set declaratively in HTML. It is
+   * browser-safe by construction (an origin-scoped bearer), so it may sit in
+   * markup; it lets a server-rendered page start its first request already
+   * authenticated. Never put a project secret here.
+   */
+  @property({ type: String, attribute: "publishable-key" }) accessor publishableKey = "";
+
   /** Declarative config read from this element's attributes. */
   protected get projectAttrs(): ProjectAttrs {
-    return { projectId: this.projectId, proxyPath: this.proxyPath, url: this.url };
+    return {
+      projectId: this.projectId,
+      proxyPath: this.proxyPath,
+      url: this.url,
+      publishableKey: this.publishableKey,
+    };
   }
 }
 

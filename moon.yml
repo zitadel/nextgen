@@ -31,6 +31,15 @@ tasks:
       persistent: true
       runInCI: false
 
+  # The hosted cloud on localhost: `vercel dev -L` over vercel.json's
+  # services, on a throwaway master key and SQLite (scripts/run-cloud.mjs).
+  cloud:
+    command: "node scripts/run-cloud.mjs"
+    options:
+      cache: false
+      persistent: true
+      runInCI: false
+
   # Deprecated alias for `e2e:journey` (the journey moved into the e2e project).
   # Hands over to it, passing any runner flags straight through.
   journey:

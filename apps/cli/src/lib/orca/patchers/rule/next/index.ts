@@ -3,6 +3,7 @@ import { basename, join } from "node:path";
 
 import { ZitadelError } from "../../../../errors";
 import { MANAGED_MARKER } from "../../../../paths";
+import { sdkVersionForCli } from "../../../../public-cli";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher, PREFLIGHT_FORCE_NOTE } from "../base";
@@ -239,7 +240,7 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
     {
       kind: "add-dep",
       name: renderer.dependency.name,
-      version: dependencyVersionForCli(ctx.cliVersion, renderer.dependency.version),
+      version: sdkVersionForCli(ctx.cliVersion),
     },
     // `next dev` takes its port from the command line only, so without this
     // the app can serve a port the project does not allow as an origin.
@@ -310,13 +311,4 @@ async function isFile(path: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-function dependencyVersionForCli(cliVersion: string, fallback: string): string {
-  const normalized = cliVersion.trim().replace(/^v/, "");
-  if (/^\d+\.\d+\.\d+-alpha\.\d+$/.test(normalized)) {
-    return normalized;
-  }
-  const prerelease = normalized.match(/^\d+\.\d+\.\d+-([0-9A-Za-z]+)(?:[.-]|$)/)?.[1];
-  return prerelease ?? fallback;
 }

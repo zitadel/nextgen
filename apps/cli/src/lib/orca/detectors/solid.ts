@@ -1,6 +1,7 @@
 import { hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
 import type { Detector, FrameworkFacts } from "./types";
+import { enforceVersionFloor } from "./version-floor";
 
 /**
  * Detects a Vite + Solid single-page app: depends on `solid-js` and `vite` but
@@ -10,17 +11,22 @@ import type { Detector, FrameworkFacts } from "./types";
  */
 export class SolidDetector implements Detector {
   readonly framework = "solid";
+  readonly displayName = "Solid";
+  readonly versionPackage = "solid-js";
+  readonly versionFloor = "1.6";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
     const pkg = await readPackageJson(cwd).catch(() => undefined);
     if (
       !pkg ||
       hasDependency(pkg, "@solidjs/start") ||
-      !hasDependency(pkg, "solid-js") ||
+      !hasDependency(pkg, this.versionPackage) ||
       !hasDependency(pkg, "vite")
     ) {
       return null;
     }
+
+    await enforceVersionFloor(this, pkg, cwd);
 
     const devPort = await detectDevPort(cwd, pkg);
     return { id: "solid", appDir: "src", devPort, url: issuerFromPort(devPort) };

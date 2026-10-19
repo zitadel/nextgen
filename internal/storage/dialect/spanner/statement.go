@@ -45,6 +45,7 @@ func (s statements) Statements() service.AllStatements {
 func (s statements) IsStatements() {}
 
 func newStatements(db queryExecutor) statements {
+	db = traced(db)
 	return statements{
 		projectStatements:             newProjectStatements(db),
 		originStatements:              newOriginStatements(db),

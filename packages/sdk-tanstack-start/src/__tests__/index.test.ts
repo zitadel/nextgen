@@ -1,0 +1,49 @@
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, expectTypeOf, it } from "vitest";
+
+import * as index from "../index";
+import type { AuthResult, AuthState, NextgenSession, UnauthState } from "../index";
+
+// The package ships only what its build emits, so an `exports` target the build
+// misses breaks every consumer that imports it. `test` runs after `build`.
+describe("package manifest", () => {
+  const packageRoot = resolve(import.meta.dirname, "../..");
+  const manifest = JSON.parse(readFileSync(resolve(packageRoot, "package.json"), "utf8")) as {
+    main?: string;
+    module?: string;
+    types?: string;
+    exports: unknown;
+    peerDependencies: Record<string, string>;
+  };
+
+  function targets(value: unknown): string[] {
+    if (typeof value === "string") return value.startsWith("./") ? [value] : [];
+    if (value && typeof value === "object") return Object.values(value).flatMap(targets);
+    return [];
+  }
+
+  it("ships every exports target in dist", () => {
+    const declared = targets([manifest.exports, manifest.main, manifest.module, manifest.types]);
+    expect(declared.length).toBeGreaterThan(0);
+    expect(declared.filter((file) => !existsSync(resolve(packageRoot, file)))).toEqual([]);
+  });
+
+  it("declares its supported peer ranges", () => {
+    expect(manifest.peerDependencies).toEqual({
+      "@tanstack/react-start": ">=1",
+      react: ">=18",
+      "react-dom": ">=18",
+    });
+  });
+});
+
+describe("index entry", () => {
+  // A server route imports its helpers and their types from one place, as it
+  // does with every other server SDK.
+  it("exports the types its helpers answer with", () => {
+    expectTypeOf(index.getAuth).returns.toEqualTypeOf<AuthResult>();
+    expectTypeOf<AuthState["session"]>().toEqualTypeOf<NextgenSession>();
+    expectTypeOf<UnauthState["session"]>().toEqualTypeOf<null>();
+  });
+});
