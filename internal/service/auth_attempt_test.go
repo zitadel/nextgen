@@ -573,7 +573,7 @@ func TestAuthAttemptService_SetSSOCallbackResult(t *testing.T) {
 }
 
 func TestAuthAttemptService_VerifyProof(t *testing.T) {
-	rejectErr := errors.New("user not found")
+	rejectErr := database.NewNoRowFoundError(nil)
 	succeedErr := errors.New("persist succeeded check failed")
 
 	newUserChallengeAttempt := func() *domain.AuthAttempt {
@@ -652,6 +652,27 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 		})
 		// No AuthAttemptChallengeFailed: a server-side inconsistency is not a failed check.
 		stmts.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj", "sch_v2").Return(nil, new(database.NoRowFoundError))
+
+		svc := newAuthAttemptSvc(ctrl, stmts, nil, users)
+		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
+			ProjectID: "proj", AttemptID: "att-1", ChallengeID: "ch-1", Proof: userProof,
+		})
+
+		assert.Nil(t, got)
+		assert.ErrorIs(t, err, domain.ErrInternal(nil))
+		assert.NotErrorIs(t, err, domain.ErrAuthAttemptProofRejected(nil))
+	})
+
+	t.Run("storage fault on the users read is an internal error, not a rejected proof", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		users := mocks.NewMockUserLookup(ctrl)
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
+			return newUserChallengeAttempt(), nil
+		})
+		// No AuthAttemptChallengeFailed: a fault on the server's side is not a failed check.
+		expectLineage(stmts)
+		users.EXPECT().GetByAttributes(gomock.Any(), "proj", gomock.Any(), gomock.Any()).Return(nil, errors.New("connection reset"))
 
 		svc := newAuthAttemptSvc(ctrl, stmts, nil, users)
 		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{

@@ -40,6 +40,13 @@ func (f fakeUserSchemas) ListJSONSchemas(_ context.Context, opts *database.ListO
 	return out, nil
 }
 
+// unlistedUserSchemas resolves schema ids but lists no revision.
+type unlistedUserSchemas struct{ fakeUserSchemas }
+
+func (unlistedUserSchemas) ListJSONSchemas(context.Context, *database.ListOptions[domain.JSONSchemaField], JSONSchemaQueryOptions) (*database.ListResult[*domain.JSONSchema], error) {
+	return &database.ListResult[*domain.JSONSchema]{}, nil
+}
+
 func TestResolveUserSchema(t *testing.T) {
 	human := &domain.JSONSchema{URL: "https://example.com/user.json", ObjectType: new("human-user")}
 	machine := &domain.JSONSchema{URL: "sch_machine", ObjectType: new("machine-user")}
@@ -113,6 +120,7 @@ func TestUserSchemaRevisionURLs(t *testing.T) {
 
 	tests := []struct {
 		name     string
+		stmts    userSchemaStatements
 		schemaID string
 		want     []string
 		wantErr  error
@@ -120,10 +128,17 @@ func TestUserSchemaRevisionURLs(t *testing.T) {
 		{name: "one revision", schemaID: staff.URL, want: []string{staff.URL}},
 		{name: "several revisions", schemaID: v2.URL, want: []string{v1.URL, v2.URL}},
 		{name: "unknown id", schemaID: "sch_unknown", wantErr: domain.ErrJSONSchemaNotFound()},
+		// The id resolves but the listing finds no revision: an empty list
+		// would compile to broken SQL in the users read.
+		{name: "no revisions listed", stmts: unlistedUserSchemas{schemas}, schemaID: v2.URL, wantErr: domain.ErrInternal(nil)},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := userSchemaRevisionURLs(t.Context(), schemas, "proj", tt.schemaID)
+			stmts := tt.stmts
+			if stmts == nil {
+				stmts = schemas
+			}
+			got, err := userSchemaRevisionURLs(t.Context(), stmts, "proj", tt.schemaID)
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 				return

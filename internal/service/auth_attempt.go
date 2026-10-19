@@ -741,7 +741,8 @@ func (s *authAttemptService) buildChallenge(ctx context.Context, attempt *domain
 // 058 §5). Users keep the revision they were created under while the flow runs
 // on the newest one, and a same-named property on another schema can neither
 // match nor collide. The bound schema comes from the stored flow, so one the
-// project does not hold is an internal error, not a rejected proof.
+// project does not hold is an internal error, not a rejected proof. So is a
+// users read that fails for any reason other than finding no user or several.
 //
 // Without one, the direct-API path, the value resolves against the designated
 // identifiers of every schema in the project. Any status, as the flow path:
@@ -756,10 +757,16 @@ func (s *authAttemptService) resolveIdentifier(ctx context.Context, projectID st
 		if err != nil {
 			return nil, err
 		}
-		return s.users.GetByAttributes(ctx, projectID, schemaURLs, []domain.Attribute{{
+		user, err := s.users.GetByAttributes(ctx, projectID, schemaURLs, []domain.Attribute{{
 			Key:   domain.AttributeKey(p.AttributeName),
 			Value: p.LoginName,
 		}})
+		_, noRow := errors.AsType[*database.NoRowFoundError](err)
+		_, manyRows := errors.AsType[*database.MultipleRowsFoundError](err)
+		if err != nil && !noRow && !manyRows {
+			return nil, domain.ErrInternal(err).WithMessage("failed to look up the user")
+		}
+		return user, err
 	}
 	return resolveDesignatedUser(ctx, s.stmts.Statements(), projectID, p.LoginName, false, "auth_attempt")
 }

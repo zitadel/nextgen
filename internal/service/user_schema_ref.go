@@ -108,6 +108,9 @@ func userSchemaRevisionURLs(ctx context.Context, stmts userSchemaStatements, pro
 		}
 		urls = append(urls, schema.URL)
 	}
+	if len(urls) == 0 {
+		return nil, domain.ErrInternal(nil).WithMessage("bound user schema has no revisions")
+	}
 	return urls, nil
 }
 
