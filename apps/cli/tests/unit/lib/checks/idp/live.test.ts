@@ -279,6 +279,30 @@ describe("LiveSignInCheck", () => {
 
     expect(steps).toEqual(["baseline read", "opened"]);
   });
+
+  it("starts the time to sign in only once the baseline is read and the page is open", async () => {
+    const steps: string[] = [];
+    const base = aRuntime(SIGNED_IN).live;
+    const live: LiveSignIn = {
+      ...base,
+      open: async () => {
+        steps.push("opened");
+      },
+      watch: async (signal) => {
+        await new Promise<void>((resolve) => setTimeout(resolve, 5));
+        steps.push("baseline read");
+        return base.watch(signal);
+      },
+      sleep: (ms, signal) => {
+        steps.push("clock started");
+        return base.sleep(ms, signal);
+      },
+    };
+
+    await new LiveSignInCheck().run(aContext(live), [PASSED]);
+
+    expect(steps).toEqual(["baseline read", "opened", "clock started"]);
+  });
 });
 
 const RUNTIME_EVENTS = readFileSync(

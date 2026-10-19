@@ -113,10 +113,30 @@ describe("test sign-in", () => {
         expect(result).toExplain("No connection named google");
       });
 
+      it("refuses a live sign-in when the client secret variable is not set", async () => {
+        const app = await aSetUpApp();
+        await app.enableSso("google", CREDENTIALS);
+        await app.deleteVariable("GOOGLE_CLIENT_SECRET");
+        await app.markClaimed();
+        platform.hasGoogle();
+
+        const result = await app.run([
+          "test",
+          "sign-in",
+          "--provider",
+          "google",
+          "--live",
+          "--json",
+        ]);
+
+        expect(result).toFailWith("E_CREDENTIAL_MISSING");
+      });
+
       it("refuses a live sign-in when the client secret variable is not a secret", async () => {
         const app = await aSetUpApp();
         await app.enableSso("google", CREDENTIALS);
         await app.setVariable("GOOGLE_CLIENT_SECRET", "42");
+        await app.markClaimed();
         platform.hasGoogle();
 
         const result = await app.run([
@@ -145,11 +165,17 @@ describe("test sign-in", () => {
         "--json",
       ];
 
-      async function aSignedUpApp() {
+      async function anUnclaimedApp() {
         const app = await aSetUpApp();
         await app.enableSso("google", CREDENTIALS);
         await app.apply();
         platform.hasGoogle();
+        return app;
+      }
+
+      async function aSignedUpApp() {
+        const app = await anUnclaimedApp();
+        await app.markClaimed();
         return app;
       }
 
@@ -214,13 +240,10 @@ describe("test sign-in", () => {
       });
 
       it("refuses an unclaimed project, whose events are hidden, before it opens anything", async () => {
-        const app = await aSignedUpApp();
+        const app = await anUnclaimedApp();
         platform.recordsSignIn([]);
 
-        const result = await app.runWithoutServer(LIVE, {
-          BROWSER: "none",
-          ZITADEL_API_BASE: "https://demo.zitadel.cloud",
-        });
+        const result = await app.run(LIVE, { BROWSER: "none" });
 
         expect(result).toHintAt("Claim it");
       });

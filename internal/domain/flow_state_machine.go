@@ -431,6 +431,12 @@ func (r *FlowStateMachineRuntime) Render(ctx context.Context, def *FlowDefinitio
 	return FlowStepResult{State: state, Step: step}, nil
 }
 
+// ssoFailureRecorded marks an error whose SSO failure event has been recorded
+// where it happened, so a caller further up does not record it again.
+type ssoFailureRecorded struct{ error }
+
+func (e *ssoFailureRecorded) Unwrap() error { return e.error }
+
 // recordSSOFailure records, as an audit event, that an SSO sign-in failed after
 // its exchange. It is best effort: a failure to record it never changes the flow.
 func (r *FlowStateMachineRuntime) recordSSOFailure(ctx context.Context, state *FlowState, slug string, phase ssoevent.Phase, reason ssoevent.Reason) {
@@ -460,6 +466,9 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 	}
 	parked, err := r.ssoIdentities.LoadParked(ctx, loadInput)
 	if err != nil {
+		if failure, ok := errors.AsType[*SSOLoadFailure](err); ok {
+			r.recordSSOFailure(ctx, state, failure.ProviderSlug, ssoevent.PhaseResolved, failure.Reason)
+		}
 		return FlowStepResult{}, false, fmt.Errorf("flow state machine: load parked sso identity: %w", err)
 	}
 	// An earlier request bound the attempt but its handoff failed, and the
@@ -480,6 +489,9 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 			msg := FlowStepErrorSSOUnavailable
 			result, err := r.renderStepError(pc, resolvedFields, &msg)
 			return result, false, err
+		}
+		if parked.ProviderSlug != "" {
+			state.SSOProviderSlug = parked.ProviderSlug
 		}
 		return r.retrySSOHandoff(pc, resolvedFields, parked.BoundUserID, false)
 	}
@@ -514,7 +526,9 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 			return result, false, err
 		}
 		state.SSOResolvedCheckID = parked.CheckID
-		state.SSOProviderSlug = parked.ProviderSlug
+		if parked.ProviderSlug != "" {
+			state.SSOProviderSlug = parked.ProviderSlug
+		}
 		recordResolvedUser(state, parked.CollisionUserID)
 		// The marker replaced the row a collection step creates from, so that
 		// step cannot be shown again. An entry step can: it starts a new ceremony.
@@ -575,7 +589,10 @@ func (r *FlowStateMachineRuntime) resolveSSOIdentity(ctx context.Context, def *F
 			return result, true, err
 		}
 		if err != nil {
-			r.recordSSOFailure(ctx, state, parked.ProviderSlug, ssoevent.PhaseResolved, ssoevent.ReasonInternal)
+			// The creation recorded its own failure, with the phase it failed in.
+			if _, recorded := errors.AsType[*ssoFailureRecorded](err); !recorded {
+				r.recordSSOFailure(ctx, state, parked.ProviderSlug, ssoevent.PhaseResolved, ssoevent.ReasonInternal)
+			}
 			return FlowStepResult{}, false, err
 		}
 		// Creation bound the attempt, so a concurrent render can win the
@@ -686,6 +703,7 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 		// retrying from the bind, not a failure of this sign-in.
 		if !errors.Is(err, ErrSSOStateInvalid()) {
 			r.recordSSOFailure(ctx, state, parked.ProviderSlug, ssoevent.PhaseUserCreated, ssoevent.ReasonInternal)
+			return "", &ssoFailureRecorded{fmt.Errorf("flow state machine: create sso user: %w", err)}
 		}
 		return "", fmt.Errorf("flow state machine: create sso user: %w", err)
 	}
@@ -1371,6 +1389,8 @@ func (r *FlowStateMachineRuntime) dropResolvedUser(pc *processCtx, reason string
 		return fmt.Errorf("flow state machine: rotate auth attempt on %s: %w", reason, err)
 	}
 	pc.state.AuthAttemptID = attemptID
+	// The new attempt has not signed in with any connection yet.
+	pc.state.SSOProviderSlug = ""
 	return nil
 }
 

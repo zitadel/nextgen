@@ -3,6 +3,8 @@ package domain
 import (
 	"context"
 	"errors"
+
+	"github.com/zitadel/nextgen/internal/instrumentation/ssoevent"
 )
 
 // ErrSSOOwnerOtherSchema reports a unique value held by a user of another
@@ -114,3 +116,16 @@ type FlowSSOCreateInput struct {
 	// Password is empty unless the definition collects one on the way.
 	Password string
 }
+
+// SSOLoadFailure is the error of an identity load that failed for a reason
+// the sign-in's audit trail names, with the connection it was loading. It wraps
+// the error the flow acts on, so callers that only look at that are unchanged.
+type SSOLoadFailure struct {
+	ProviderSlug string
+	Reason       ssoevent.Reason
+	Err          error
+}
+
+func (e *SSOLoadFailure) Error() string { return e.Err.Error() }
+
+func (e *SSOLoadFailure) Unwrap() error { return e.Err }

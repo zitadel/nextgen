@@ -119,18 +119,23 @@ export async function watchSignInAudit(
   pollMs: number,
   signal: AbortSignal,
 ): Promise<AsyncIterable<SignInEvent>> {
-  const poll = async function* (known: ReadonlySet<string>): AsyncGenerator<SignInEvent> {
-    if (signal.aborted) {
-      return;
+  const known = new Set<string>();
+  const poll = async function* (): AsyncGenerator<SignInEvent> {
+    while (!signal.aborted) {
+      await sleep(pollMs, signal);
+      if (signal.aborted) {
+        return;
+      }
+      const fresh = await readNewAuditEvents(fetchPage, known, MAX_PAGES);
+      for (const event of fresh) {
+        known.add(event.id);
+      }
+      yield* fresh.flatMap((event) => signInEventOf(event, slug) ?? []);
     }
-    await sleep(pollMs, signal);
-    if (signal.aborted) {
-      return;
-    }
-    const fresh = await readNewAuditEvents(fetchPage, known, MAX_PAGES);
-    yield* fresh.flatMap((event) => signInEventOf(event, slug) ?? []);
-    yield* poll(new Set([...known, ...fresh.map((event) => event.id)]));
   };
   const baseline = await readNewAuditEvents(fetchPage, new Set(), 1);
-  return poll(new Set(baseline.map((event) => event.id)));
+  for (const event of baseline) {
+    known.add(event.id);
+  }
+  return poll();
 }

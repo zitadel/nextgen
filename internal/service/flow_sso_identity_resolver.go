@@ -9,6 +9,7 @@ import (
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/idp"
+	"github.com/zitadel/nextgen/internal/instrumentation/ssoevent"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -52,11 +53,17 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 		// recorded, so a flow whose cookie lost that bind can catch up. Only
 		// the marker counts: a user factor alone can come from an unrelated
 		// identifier submission. The marker holds nothing else to read.
-		return &domain.FlowSSOParkedIdentity{CheckID: check.ID, CollisionUserID: check.Result.CollisionUserID, AttemptUserID: attemptUserID}, nil
+		return &domain.FlowSSOParkedIdentity{
+			CheckID:         check.ID,
+			CollisionUserID: check.Result.CollisionUserID,
+			AttemptUserID:   attemptUserID,
+			ProviderSlug:    r.boundConnectionSlug(ctx, in.ProjectID, attempt),
+		}, nil
 	}
 	if !ok || check.Result == nil {
 		if bound := boundThroughSSO(attempt); bound != nil {
 			bound.AttemptUserID = attemptUserID
+			bound.ProviderSlug = r.boundConnectionSlug(ctx, in.ProjectID, attempt)
 			return bound, nil
 		}
 		return nil, nil
@@ -136,7 +143,11 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 			slog.String("flow_schema_url", in.UserSchemaURL),
 			slog.String("user_schema_url", user.SchemaURL),
 		)
-		return nil, domain.ErrFlowRestartRequired()
+		return nil, &domain.SSOLoadFailure{
+			ProviderSlug: connection.Slug,
+			Reason:       ssoevent.ReasonOtherSchema,
+			Err:          domain.ErrFlowRestartRequired(),
+		}
 	}
 	parked.Link = &domain.FlowSSOLinkedUser{LinkID: link.ID, UserID: link.UserID}
 	return parked, nil
@@ -189,6 +200,22 @@ func (r *FlowSSOIdentityResolver) LoadCollected(ctx context.Context, in domain.F
 		Claims:       result.Claims,
 		Verified:     result.Verified,
 	}, nil
+}
+
+// boundConnectionSlug is the slug of the connection the attempt's own SSO bind
+// used, or empty when it cannot be told. A request that lost its cookie has no
+// other way to say which connection a failed handoff belongs to; the lookup is
+// best effort, since it only labels an audit event.
+func (r *FlowSSOIdentityResolver) boundConnectionSlug(ctx context.Context, projectID string, attempt *domain.AuthAttempt) string {
+	sso, ok := domain.CheckAs[*domain.AuthFactorSSO](attempt, domain.AuthCheckTypeSSO)
+	if !ok || sso.AttemptID != attempt.ID {
+		return ""
+	}
+	connection, err := r.connections.Get(ctx, projectID, sso.ConnectionID)
+	if err != nil {
+		return ""
+	}
+	return connection.Slug
 }
 
 // boundThroughSSO reports the user an earlier BindLinked recorded, while the

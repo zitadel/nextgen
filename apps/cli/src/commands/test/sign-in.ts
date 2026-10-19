@@ -16,8 +16,8 @@ import {
   runChecks,
   type Send,
 } from "../../lib/checks/idp";
-import { claimState } from "../../lib/claim-state";
-import { ZitadelError } from "../../lib/errors";
+import { isAttached } from "../../lib/claim-state";
+import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { type ConnectionFile, callbackUriFor, readConnectionFiles } from "../../lib/idp";
 import { isObject } from "../../lib/json";
 import { wrapForBox } from "../../lib/box";
@@ -278,7 +278,7 @@ export default class TestSignIn extends BaseCommand {
    */
   private async requireClaimed(cwd: string): Promise<void> {
     const secret = await readZitadelSecret(cwd);
-    if (claimState({ secret, server: this.meta.source }).kind === "detached") {
+    if (!isAttached(secret)) {
       throw new ZitadelError(
         "E_VALIDATION",
         "The project is not claimed, so its events are hidden",
@@ -300,10 +300,11 @@ export default class TestSignIn extends BaseCommand {
     const held = await client.getVariable(name, { project_id: projectId, kind: "primary" }).then(
       ({ primary }) => primary,
       (error: unknown) => {
-        if (error instanceof ZitadelError && error.code === "E_NOT_FOUND") {
+        const failure = toZitadelError(error);
+        if (failure.code === "E_NOT_FOUND") {
           return undefined;
         }
-        throw error;
+        throw failure;
       },
     );
     if (held === undefined || typeof held !== "object") {

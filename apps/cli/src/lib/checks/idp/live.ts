@@ -129,12 +129,14 @@ export class LiveSignInCheck extends Check<IdpContext> {
 
     const stop = new AbortController();
     try {
-      const timedOut = live
-        .sleep(live.timeoutMs, stop.signal)
-        .then((): typeof TIMED_OUT => TIMED_OUT);
       const events = (await live.watch(stop.signal))[Symbol.asyncIterator]();
       live.say(`Sign in with ${context.slug}: ${live.loginUrl}`);
       await live.open(live.loginUrl);
+      // The budget is for the person to sign in, so it starts once the baseline is read and
+      // the page is open, not while the CLI is still getting ready.
+      const timedOut = live
+        .sleep(live.timeoutMs, stop.signal)
+        .then((): typeof TIMED_OUT => TIMED_OUT);
       return await this.follow(
         { context, live, events, timedOut },
         { attempt: undefined, last: undefined, ignored: new Set() },
