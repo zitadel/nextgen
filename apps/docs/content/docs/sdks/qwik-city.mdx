@@ -1,0 +1,106 @@
+---
+title: Qwik City SDK
+description: An onRequest plugin and helpers for Qwik City (Qwik Router) applications.
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { File, Files } from "fumadocs-ui/components/files";
+import { Step, Steps } from "fumadocs-ui/components/steps";
+import { Tab, Tabs } from "fumadocs-ui/components/tabs";
+
+The Qwik City SDK is an `onRequest` plugin that proxies and verifies sessions on the server. The login and logout widgets come from the [Qwik SDK](/docs/sdks/qwik).
+
+<Callout title="Qwik 2 required" type="warn">
+  The SDK peers Qwik 2: `@qwik.dev/core` and `@qwik.dev/router`, the package Qwik City was renamed to. A Qwik 1 app (`@builder.io/qwik-city`) is not supported, because the widgets need Qwik 2. Migrate the app to `@qwik.dev/*` first. The CLI scaffolds new apps on Qwik 2.
+</Callout>
+
+## Install
+
+Install both packages as dev dependencies. Qwik bundles `devDependencies` into the server build, and its starter `vite.config.ts` refuses to start when a package is listed in both sections.
+
+<Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
+  <Tab>
+    ```sh
+    pnpm add -D @zitadel/sdk-qwik-city@alpha @zitadel/sdk-qwik@alpha
+    ```
+  </Tab>
+  <Tab>
+    ```sh
+    npm install -D @zitadel/sdk-qwik-city@alpha @zitadel/sdk-qwik@alpha
+    ```
+  </Tab>
+  <Tab>
+    ```sh
+    yarn add -D @zitadel/sdk-qwik-city@alpha @zitadel/sdk-qwik@alpha
+    ```
+  </Tab>
+</Tabs>
+
+## Setup
+
+<Tabs items={["CLI generated", "Manual"]}>
+  <Tab>
+    The CLI adds the plugin, the routes, environment files, and both SDK packages. No config file changes: Qwik City picks up `plugin@*.ts` route files on its own.
+
+    <Files>
+      <File name="src/routes/plugin@nextgen.ts" />
+      <File name="src/routes/index.tsx" />
+      <File name="src/routes/login/index.tsx" />
+      <File name="src/routes/register/index.tsx" />
+      <File name="src/routes/profile/index.tsx" />
+      <File name=".env.local" />
+      <File name=".env.example" />
+      <File name="package.json" />
+    </Files>
+
+    Every setup also writes `zitadel.json` and the `.zitadel/` folder, adds its entries to `.gitignore`, and adds managed sections to `AGENTS.md` and `README.md`.
+  </Tab>
+  <Tab>
+    Create `src/routes/plugin@nextgen.ts`. The handler reads `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET` per request from the request event's `env`, which is where Vite loads `.env.local`:
+
+    ```ts
+    import { createNextgenOnRequest } from "@zitadel/sdk-qwik-city/server";
+
+    export const onRequest = createNextgenOnRequest({
+      protectedRoutes: ["/profile"],
+      loginPath: "/login",
+    });
+    ```
+
+    Render the widget from a route:
+
+    ```tsx
+    import { component$ } from "@qwik.dev/core";
+    import { ZitadelLogin, configureZitadel } from "@zitadel/sdk-qwik";
+
+    const project = configureZitadel({
+      projectId: import.meta.env.PUBLIC_ZITADEL_PROJECT_ID ?? "",
+      proxyPath: "/__nextgen",
+    });
+
+    export default component$(() => (
+      <ZitadelLogin project={project} purpose="login" postSignInUrl="/profile" />
+    ));
+    ```
+  </Tab>
+</Tabs>
+
+## Runtime model
+
+<Steps>
+  <Step>The plugin proxies same-origin `/__nextgen/*` requests to the backend, attaching the project secret only to the session handoff.</Step>
+  <Step>It verifies the session token and stores the result on the request's `sharedMap`; read it with `getAuth(ev)` in a `routeLoader$`, action, or endpoint.</Step>
+  <Step>It redirects unauthenticated requests for `protectedRoutes` to `loginPath`. A route matches with or without a trailing slash, since Qwik Router serves `/profile/` by default.</Step>
+</Steps>
+
+## Verify
+
+- Start the app with `npm run dev`. Setup already wrote the URL, the secret, and the project id to `.env.local`.
+- Visit `/login` and register a user.
+- Confirm `/profile` shows signed-in state.
+- Log out and confirm `/profile` redirects to `/login`.
+
+## See also
+
+- [SDK proxy](/docs/concepts/sdk-proxy) — why `/__nextgen/*` must be same-origin and which call carries the project secret.
+- [`@zitadel/sdk-qwik-city` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-qwik-city) and the [CLI Qwik City patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/qwik-city).

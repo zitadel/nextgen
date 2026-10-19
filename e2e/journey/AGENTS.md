@@ -54,8 +54,9 @@ ADR 044) — both shapes run the same CLI path and browser journeys.
   expires.
 - CI must run `npx @zitadel/cli@alpha doctor --runtime binary`,
   `start --runtime binary`, and
-  `setup --framework <next|nuxt|react|vue|angular|solid|svelte|qwik> --server local`
-  from the fresh app directory with `--non-interactive --json`.
+  `setup --framework <id> --server local` from the fresh app directory with
+  `--non-interactive --json`, for every id in `frameworkIds`
+  (`scripts/frameworks.mjs`) — the SPA families and the meta-frameworks alike.
 - The remote https lane (`--remote`; in `--ci`, react with the passkey-first
   preset) is the one exception to `--server local`: setup points `--server` at
   `scripts/https-edge.mjs`, a local https edge for `zitadel.test` in front of

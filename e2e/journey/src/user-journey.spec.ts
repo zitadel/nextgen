@@ -14,6 +14,8 @@ import {
   type ProfileEntry,
 } from "@zitadel/testing/playwright";
 
+import { frameworkForId } from "../scripts/frameworks.mjs";
+
 test.describe.configure({ mode: "serial" });
 test.setTimeout(60_000);
 
@@ -24,7 +26,9 @@ const framework = process.env.JOURNEY_FRAMEWORK ?? "next";
 // `??`: the runner passes an empty string for "default preset", and an
 // empty preset must still register the password-first journeys.
 const preset = process.env.JOURNEY_PRESET || "password-first";
-const expectsProtectedRouteRedirect = framework === "next" || framework === "nuxt";
+// Frameworks whose server SDK guards /profile (the registry's flag) must
+// redirect a signed-out visit to /login; the SPA families have no server.
+const expectsProtectedRouteRedirect = frameworkForId(framework).expectsProtectedRouteRedirect;
 const loginUrl = /\/login(?:[/?#]|$)/;
 const profileUrl = /\/profile(?:[/?#]|$)/;
 

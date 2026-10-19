@@ -12,6 +12,12 @@ There are two ways to wire the SDK. **The module is what `zitadel setup`
 scaffolds** and the recommended path; the direct-middleware surface remains
 for hand-rolled setups.
 
+## Requirements
+
+Peer dependencies: `nuxt >=4` and `h3 >=1`.
+
+TypeScript ≥ 5.0, the floor shared by every SDK; see the [compatibility notes](https://github.com/zitadel/nextgen/blob/main/packages/AGENTS.md).
+
 ## Surface 1 — the Nuxt module (recommended, CLI-scaffolded)
 
 Register the module under the `nextgen` config key:
@@ -88,23 +94,12 @@ export default defineEventHandler((event) => {
 
 ### Login page
 
-Register the shared components in a client-only plugin
-(`plugins/zitadel-components.client.ts` — do **not** import
-`@zitadel/components` from page `<script setup>`, that runs during SSR).
-Under strict package managers (pnpm, Yarn PnP) `@zitadel/components` is not
-resolvable as a transitive dependency, so declare it in your app first:
+The module loads the widget elements in the browser for you, through a
+client-only plugin, and provides the business copy overlay as
+`useNuxtApp().$zitadelBusinessLocales`. There is nothing to install or register
+beyond `@zitadel/sdk-nuxt`; do not import `@zitadel/components` yourself.
 
-```bash
-pnpm add @zitadel/components@alpha
-```
-
-```ts
-import "@zitadel/components";
-
-export default defineNuxtPlugin(() => {});
-```
-
-Then render `<zitadel-login>` inside `<ClientOnly>`, binding the project
+Render `<zitadel-login>` inside `<ClientOnly>`, binding the project
 handle from the auto-imported `useZitadelProject()` composable — there is no
 `api-base` attribute:
 
@@ -120,6 +115,14 @@ const project = useZitadelProject();
     </ClientOnly>
   </main>
 </template>
+```
+
+To call the Zitadel API from your own code, use the auto-imported `useZitadelApi()` composable (for example from `onMounted`). It returns the typed client of the project the plugin configured from your project id, and throws if no project id is set, so you do not install `@zitadel/api` either.
+
+```ts
+onMounted(async () => {
+  const session = await useZitadelApi().getMySession();
+});
 ```
 
 ## Widget events

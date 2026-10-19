@@ -53,6 +53,10 @@ describe("detectProjectFacts", () => {
     ["angular", "@angular/core", "Angular 3.0.1"],
     ["solid", "solid-js", "Solid 3.0.1"],
     ["svelte", "svelte", "Svelte 3.0.1"],
+    ["sveltekit", "@sveltejs/kit", "SvelteKit 3.0.1"],
+    ["solid-start", "@solidjs/start", "SolidStart 3.0.1"],
+    ["qwik-city", "@qwik.dev/router", "Qwik City 3.0.1"],
+    ["tanstack-start", "@tanstack/react-start", "TanStack Start 3.0.1"],
     ["qwik", "@qwik.dev/core", "Qwik 3.0.1"],
   ])("names %s with the version of %s", async (framework, dependency, line) => {
     const facts = await detectProjectFacts(await app({ [dependency]: "^3.0.1" }), framework);

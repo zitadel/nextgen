@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ZitadelLogin, ZitadelLogout, ZitadelSession } from "@zitadel/components";
 import { DISPATCHED_EVENTS } from "@zitadel/components/events";
@@ -203,4 +204,295 @@ describe("server-render cases ↔ SDK specs", () => {
   it.each(SPECS)("%s carries the same cases as the React spec", (spec) => {
     expect(casesIn(spec)).toBe(casesIn(SPECS[0]!));
   });
+});
+
+/**
+ * Apps go through their SDK. Each SDK that renders the widgets lists
+ * `@zitadel/components` as its own dependency, so the elements load from the SDK
+ * and the app never installs or imports `components` by name; no SDK's docs tell
+ * a user to add it.
+ */
+describe("widget loading ↔ SDK packages", () => {
+  // Vitest runs with the package directory as cwd; `import.meta.url` is rewritten under jsdom.
+  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+  const sdkDirs = readdirSync(packagesDir).filter((dir) => dir.startsWith("sdk-"));
+  const WIDGET_SDKS = [
+    "sdk-angular",
+    "sdk-next",
+    "sdk-nuxt",
+    "sdk-qwik",
+    "sdk-react",
+    "sdk-solid",
+    "sdk-svelte",
+    "sdk-vue",
+  ];
+
+  const read = (path: string): string => readFileSync(path, "utf8");
+
+  it.each(WIDGET_SDKS)("%s depends on @zitadel/components itself", (dir) => {
+    const manifest = JSON.parse(read(`${packagesDir}${dir}/package.json`)) as {
+      dependencies?: Record<string, string>;
+      peerDependencies?: Record<string, string>;
+    };
+    expect(manifest.dependencies?.["@zitadel/components"]).toBeDefined();
+    expect(manifest.peerDependencies?.["@zitadel/components"]).toBeUndefined();
+  });
+
+  // Apps go through their framework's SDK, which owns these packages as its own
+  // dependencies, so no demo declares or imports them.
+  const SDK_OWNED = ["@zitadel/components", "@zitadel/api", "@zitadel/design-tokens"];
+  const appsDir = `${resolve(process.cwd(), "../..")}/apps/`;
+  const demoDirs = readdirSync(appsDir).filter((dir) => dir.startsWith("demo-"));
+  const SKIPPED_DIRS = /^(node_modules|dist|\.output|\.next.*|\.nuxt.*)$/;
+  const SOURCE_FILE = /\.(?:[cm]?[jt]sx?|vue|svelte|astro)$/;
+  const SDK_OWNED_IMPORT =
+    /(?:from|import|require)\s*\(?\s*["'](@zitadel\/(?:components|api|design-tokens))(?:\/[^"']*)?["']/;
+
+  const sourceFiles = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      if (entry.isDirectory()) {
+        return SKIPPED_DIRS.test(entry.name) ? [] : sourceFiles(`${dir}/${entry.name}`);
+      }
+      return SOURCE_FILE.test(entry.name) ? [`${dir}/${entry.name}`] : [];
+    });
+
+  // The checks above read files outside this package, so both runners must list
+  // them as test inputs; otherwise a change there neither reruns the test nor
+  // invalidates its cached result.
+  it.each(["moon.yml", "turbo.json"])(
+    "%s lists the files the checks read as test inputs",
+    (file) => {
+      const config = read(`${packagesDir}sdk-core/${file}`);
+      for (const input of [
+        "packages/sdk-*/src/__tests__/*.test.ts",
+        "packages/sdk-*/src/__tests__/*/*.test.ts",
+        "packages/sdk-*/package.json",
+        "packages/sdk-*/README.md",
+        "packages/sdk-*/skills/**/SKILL.md",
+        "apps/demo-*/package.json",
+        "apps/demo-*/**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts,vue,svelte,astro}",
+      ]) {
+        expect(config, `${file} has no test input ${input}`).toContain(input);
+      }
+    },
+  );
+
+  // Every SDK's agent skill has the same sections in the same order, so an agent
+  // finds the same answer under the same heading in whichever skill it loads.
+  const SKILL_HEADINGS = [
+    "When to use",
+    "Install",
+    "Integrate",
+    "Widget props and events",
+    "Read these, don't guess",
+    "Gotchas",
+  ];
+
+  it.each(sdkDirs.filter((dir) => existsSync(`${packagesDir}${dir}/skills`)))(
+    "%s skill has the canonical sections",
+    (dir) => {
+      const skillsDir = `${packagesDir}${dir}/skills`;
+      const [skill] = readdirSync(skillsDir);
+      const outsideFences = read(`${skillsDir}/${skill}/SKILL.md`).replace(
+        /^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1[^\n]*$/gm,
+        "",
+      );
+      const headings = [...outsideFences.matchAll(/^(#{1,6}) (.+)$/gm)];
+      expect(headings.filter((match) => match[1] === "#").map((match) => match[2])).toEqual([
+        `@zitadel/${dir}`,
+      ]);
+      expect(headings.filter((match) => match[1] === "##").map((match) => match[2])).toEqual(
+        SKILL_HEADINGS,
+      );
+    },
+  );
+
+  it("finds the in-repo demo apps", () => {
+    expect(demoDirs.length).toBeGreaterThan(0);
+  });
+
+  it.each(demoDirs)("%s does not declare the SDK-owned packages as dependencies", (dir) => {
+    const manifest = JSON.parse(read(`${appsDir}${dir}/package.json`)) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    const declared = Object.keys({ ...manifest.dependencies, ...manifest.devDependencies });
+    expect(declared.filter((name) => SDK_OWNED.includes(name))).toEqual([]);
+  });
+
+  it.each(demoDirs)("%s never imports the SDK-owned packages", (dir) => {
+    const offenders = sourceFiles(`${appsDir}${dir}`).flatMap((path) => {
+      const match = read(path).match(SDK_OWNED_IMPORT);
+      return match ? [`${path.slice(appsDir.length)} imports ${match[1]}`] : [];
+    });
+    expect(offenders).toEqual([]);
+  });
+
+  it.each(sdkDirs)("%s docs never tell an app to install @zitadel/components", (dir) => {
+    const skillsDir = `${packagesDir}${dir}/skills`;
+    const docs = [
+      `${packagesDir}${dir}/README.md`,
+      ...(existsSync(skillsDir)
+        ? readdirSync(skillsDir).map((skill) => `${skillsDir}/${skill}/SKILL.md`)
+        : []),
+    ].filter((path) => existsSync(path));
+    for (const path of docs) {
+      expect(read(path)).not.toMatch(
+        /(?:pnpm|npm|yarn|bun)\s+(?:add|install|i)\b[^\n]*@zitadel\/components/,
+      );
+    }
+  });
+});
+
+describe("SDK READMEs ↔ opening structure", () => {
+  // Vitest runs with the package directory as cwd; `import.meta.url` is rewritten under jsdom.
+  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+  const readmeDirs = readdirSync(packagesDir).filter(
+    (dir) => dir.startsWith("sdk-") && dir !== "sdk-core",
+  );
+
+  const headings = (dir: string): { title: string[]; sections: string[] } => {
+    let fenced = false;
+    const title: string[] = [];
+    const sections: string[] = [];
+    for (const line of readFileSync(`${packagesDir}${dir}/README.md`, "utf8").split("\n")) {
+      if (/^\s*(```|~~~)/.test(line)) fenced = !fenced;
+      else if (!fenced && line.startsWith("# ")) title.push(line.slice(2).trim());
+      else if (!fenced && line.startsWith("## ")) sections.push(line.slice(3).trim());
+    }
+    return { title, sections };
+  };
+
+  it("covers all twelve framework SDKs", () => {
+    expect(readmeDirs).toHaveLength(12);
+  });
+
+  // The TypeScript floor is stated once, in packages/AGENTS.md; every README links it
+  // instead of restating the reason, so six copies cannot drift.
+  it.each(readmeDirs)(
+    "%s README lists its peer dependencies as the manifest declares them",
+    (dir) => {
+      const readme = readFileSync(`${packagesDir}${dir}/README.md`, "utf8");
+      const requirements = readme.slice(readme.indexOf("## Requirements"));
+      const peers = JSON.parse(readFileSync(`${packagesDir}${dir}/package.json`, "utf8")) as {
+        peerDependencies?: Record<string, string>;
+      };
+      expect(requirements).toContain("Peer dependencies:");
+      for (const name of Object.keys(peers.peerDependencies ?? {})) {
+        expect(requirements, `${dir} README does not mention ${name}`).toContain(name);
+      }
+    },
+  );
+
+  it.each(readmeDirs)("%s README links the shared TypeScript floor", (dir) => {
+    const readme = readFileSync(`${packagesDir}${dir}/README.md`, "utf8");
+    const requirements = readme.slice(readme.indexOf("## Requirements"));
+    expect(requirements).toContain(
+      "TypeScript ≥ 5.0, the floor shared by every SDK; see the [compatibility notes](https://github.com/zitadel/nextgen/blob/main/packages/AGENTS.md).",
+    );
+    expect(readme).not.toContain("export type *");
+  });
+
+  it.each(readmeDirs)("%s README opens with its title, Installation and Requirements", (dir) => {
+    const { title, sections } = headings(dir);
+    expect(title[0]).toBe(`@zitadel/${dir}`);
+    expect(sections.slice(0, 2)).toEqual(["Installation", "Requirements"]);
+  });
+});
+
+/**
+ * The server SDKs' test titles.
+ *
+ * The six meta-framework SDKs test the same server behaviours, so their test
+ * files carry the same titles. A behaviour tested under another title, or left
+ * untested in one SDK, then shows up here instead of drifting unnoticed.
+ */
+describe("server SDK test titles", () => {
+  const packagesPath = `${resolve(process.cwd(), "..")}/`;
+  const TEST_FILES = {
+    "sdk-next": "sdk-next/src/__tests__/middleware.test.ts",
+    "sdk-nuxt": "sdk-nuxt/src/__tests__/server/middleware.test.ts",
+    "sdk-sveltekit": "sdk-sveltekit/src/__tests__/handle.test.ts",
+    "sdk-solid-start": "sdk-solid-start/src/__tests__/middleware.test.ts",
+    "sdk-qwik-city": "sdk-qwik-city/src/__tests__/request-handler.test.ts",
+    "sdk-tanstack-start": "sdk-tanstack-start/src/__tests__/middleware.test.ts",
+  } as const;
+
+  const CANONICAL_TITLES = [
+    "public route with no token continues as unauthenticated",
+    "protected route with no token redirects to /login?next=/admin",
+    "protected route with a valid cookie token authenticates",
+    "protected route with a valid Bearer token authenticates",
+    "Bearer token takes precedence over the session cookie",
+    "token with no sub claim is treated as unauthenticated",
+    "token with a disallowed typ is rejected",
+    "token with a disallowed algorithm is rejected",
+    'token with alg "none" is rejected without fetching JWKS',
+    "RS256 tokens are accepted by default",
+    "redirect preserves existing query params in loginPath",
+    "invalid token clears the stale session cookie and redirects",
+    "absolute loginPath throws",
+    "protocol-relative loginPath throws",
+    "strips x-nextgen-auth-token from proxied requests",
+    "forwards upstream Set-Cookie headers",
+    "appends the client IP to an existing X-Forwarded-For chain",
+    "sets X-Forwarded-For from the client IP when no chain exists",
+    "omits X-Forwarded-For when no client IP is available",
+    "skips auth handling on an ignored route",
+    "refuses the request when the header cannot be removed",
+    "lets the request through when removal fails but the header is absent",
+  ];
+
+  // SvelteKit and SolidStart swallow a failed removal of the inbound header
+  // instead of refusing the request, so neither has these two cases to test.
+  // Next.js never removes it from the incoming request: it builds a fresh,
+  // mutable header set with the header overwritten. Nuxt deletes it from the
+  // plain Node header object, which cannot refuse the deletion.
+  const EXCEPTIONS: Record<keyof typeof TEST_FILES, readonly string[]> = {
+    "sdk-sveltekit": [
+      "refuses the request when the header cannot be removed",
+      "lets the request through when removal fails but the header is absent",
+    ],
+    "sdk-solid-start": [
+      "refuses the request when the header cannot be removed",
+      "lets the request through when removal fails but the header is absent",
+    ],
+    "sdk-qwik-city": [],
+    "sdk-tanstack-start": [],
+    "sdk-next": [
+      "refuses the request when the header cannot be removed",
+      "lets the request through when removal fails but the header is absent",
+    ],
+    "sdk-nuxt": [
+      "refuses the request when the header cannot be removed",
+      "lets the request through when removal fails but the header is absent",
+    ],
+  };
+
+  // Matches `it("title"` and the `it.each([...])("title"` form.
+  const TITLE = /(?:\bit\(|\]\)\()\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1/g;
+
+  const titlesOf = (sdk: keyof typeof TEST_FILES): string[] =>
+    [...readFileSync(`${packagesPath}${TEST_FILES[sdk]}`, "utf8").matchAll(TITLE)].map(
+      (match) => match[2]!,
+    );
+
+  it.each(Object.keys(TEST_FILES) as (keyof typeof TEST_FILES)[])(
+    "%s tests every canonical behaviour under its canonical title",
+    (sdk) => {
+      const titles = titlesOf(sdk);
+      const expected = CANONICAL_TITLES.filter((title) => !EXCEPTIONS[sdk].includes(title));
+      expect(expected.filter((title) => !titles.includes(title))).toEqual([]);
+    },
+  );
+
+  it.each(Object.keys(TEST_FILES) as (keyof typeof TEST_FILES)[])(
+    "%s lists the canonical titles in the canonical order",
+    (sdk) => {
+      const titles = titlesOf(sdk);
+      const listed = CANONICAL_TITLES.filter((title) => titles.includes(title));
+      const inFile = titles.filter((title) => CANONICAL_TITLES.includes(title));
+      expect(inFile).toEqual(listed);
+    },
+  );
 });

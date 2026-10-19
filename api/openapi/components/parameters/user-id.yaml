@@ -1,0 +1,7 @@
+name: user_id
+in: path
+required: true
+description: The unique identifier of the user.
+schema:
+  $ref: '../schemas/user-id.yaml'
+example: user_01KWH3B72K7M7F0N9WD3P2E4YM
