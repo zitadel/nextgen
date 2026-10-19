@@ -443,20 +443,12 @@ describe("server SDK test titles", () => {
     "lets the request through when removal fails but the header is absent",
   ];
 
-  // SvelteKit and SolidStart swallow a failed removal of the inbound header
-  // instead of refusing the request, so neither has these two cases to test.
   // Next.js never removes it from the incoming request: it builds a fresh,
   // mutable header set with the header overwritten. Nuxt deletes it from the
   // plain Node header object, which cannot refuse the deletion.
   const EXCEPTIONS: Record<keyof typeof TEST_FILES, readonly string[]> = {
-    "sdk-sveltekit": [
-      "refuses the request when the header cannot be removed",
-      "lets the request through when removal fails but the header is absent",
-    ],
-    "sdk-solid-start": [
-      "refuses the request when the header cannot be removed",
-      "lets the request through when removal fails but the header is absent",
-    ],
+    "sdk-sveltekit": [],
+    "sdk-solid-start": [],
     "sdk-qwik-city": [],
     "sdk-tanstack-start": [],
     "sdk-next": [
