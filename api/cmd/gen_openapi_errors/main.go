@@ -921,8 +921,9 @@ func acceptsSessionCookie(op methodsFileOperation) bool {
 }
 
 // remappedErrors are domain sentinels that errorResponse answers under another
-// code, on every operation, so none of them ever reaches a client. Each one's
-// public code is a transport error, already in every union.
+// code on every operation, so no operation's union lists them. Each one's
+// public code is a transport error, already in every union. gen_error_schemas
+// still writes their schema, as it does for every domain code.
 var remappedErrors = []string{
 	// Attributes failing the user schema answer req.invalid, the way request
 	// validation answers a malformed body.
