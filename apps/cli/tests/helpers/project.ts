@@ -7,6 +7,7 @@ import { Readable } from "node:stream";
 
 import { expect } from "vitest";
 
+import { aFakeAppGeneratorPath } from "./app-generator";
 import { aFakeServerBinary, trackLocalServerDir, type ServerShape } from "./local-server";
 import { cliPackageRoot } from "./oclif-build";
 import { nextPort } from "./ports";
@@ -226,6 +227,25 @@ export class ScaffoldedApp {
       PACKAGE_MANAGER_LOG: npm.logPath,
       PATH: `${npm.binDir}:${process.env.PATH ?? ""}`,
     });
+  }
+
+  /**
+   * `setup --framework next` in a directory without an app, so setup creates
+   * one: with stand-ins for the generator on PATH, nothing is downloaded.
+   */
+  async setupNewApp(extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli(
+      [
+        "setup",
+        "--non-interactive",
+        "--json",
+        "--skip-install",
+        "--framework",
+        "next",
+        ...extraArgs,
+      ],
+      { PATH: await aFakeAppGeneratorPath() },
+    );
   }
 
   /** The client secret is never a flag, so it is piped as a script would. */
@@ -1002,6 +1022,17 @@ export async function anApp({
     join(path, "app/layout.tsx"),
     "export default function RootLayout({ children }: { children: React.ReactNode }) { return <html><body>{children}</body></html>; }\n",
   );
+  return new ScaffoldedApp(path);
+}
+
+/**
+ * An empty directory for setup to create a new app in, under a name npm
+ * accepts for a package, which setup requires of one.
+ */
+export async function aNewAppDirectory(): Promise<ScaffoldedApp> {
+  const parent = await mkdtemp(join(tmpdir(), "zitadel-new-"));
+  const path = join(parent, "my-app");
+  await mkdir(path);
   return new ScaffoldedApp(path);
 }
 

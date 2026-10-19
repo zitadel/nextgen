@@ -75,6 +75,7 @@ import {
   type FrameworkFacts,
   type Orca,
   type ScaffoldTarget,
+  type UndoableScaffold,
 } from "../../lib/orca";
 import {
   AVAILABLE_RENDERER_IDS,
@@ -141,11 +142,12 @@ const RENDERER_FLAG_DESCRIPTION =
 
 /** `zitadel setup` — create a project and scaffold local auth.
  *
- * Detects (or, for an empty directory, scaffolds then re-detects) the
- * framework, runs the wizard prompts to fill in any answers not pre-supplied
- * by flags, creates the remote project without server fallback defaults,
- * patches the local files via `Orca`'s framework patcher, then scaffolds and
- * uploads editable schema/flow config from `.zitadel/**`.
+ * Detects the framework (or, for an empty directory, picks the one to
+ * scaffold), runs the wizard prompts to fill in any answers not pre-supplied
+ * by flags, scaffolds the new app only then (never on a dry run), creates the
+ * remote project without server fallback defaults, patches the local files via
+ * `Orca`'s framework patcher, then scaffolds and uploads editable schema/flow
+ * config from `.zitadel/**`.
  *
  * Every interactive question lives in {@link SETUP_PROMPTS} (the main wizard
  * — each entry is a small class) and {@link PickFrameworkPrompt} (the
@@ -295,15 +297,21 @@ export default class Setup extends BaseCommand {
     const orca = createOrca();
 
     consola.start(`Detecting framework in ${shortPath(cwd)}`);
-    let framework: FrameworkFacts;
-    let scaffoldedFramework = false;
-    // Whether `--force` scaffolded beside entries the directory already held,
+    // The app the questions are about: the one detected here, or else a new
+    // one. Setup creates a new app only once it has every answer, just before
+    // it patches it, so cancelling a question leaves the directory as it was,
+    // and a dry run never creates one. Until then only its framework and dev
+    // port are known.
+    let app: Readonly<{ framework: string; devPort: number }>;
+    let detected: FrameworkFacts | undefined;
+    // Whether `--force` scaffolds beside entries the directory already held,
     // other than the local runtime `start` leaves, which counts as empty.
     let scaffoldedBesideFiles = false;
     try {
-      framework = await orca.detect(cwd, flags.framework);
+      detected = await orca.detect(cwd, flags.framework);
+      app = { framework: detected.id, devPort: detected.devPort };
       consola.success(
-        `Detected ${framework.id}${framework.devPort ? ` (dev port ${framework.devPort})` : ""}`,
+        `Detected ${detected.id}${detected.devPort ? ` (dev port ${detected.devPort})` : ""}`,
       );
     } catch (error) {
       if (error instanceof ZitadelError && error.code === "E_FRAMEWORK_NOT_DETECTED") {
@@ -313,10 +321,10 @@ export default class Setup extends BaseCommand {
         }
         consola.info(
           target.scaffoldable
-            ? "Fresh app directory — scaffolding a fresh project"
-            : "Non-empty directory with --force — scaffolding a fresh project",
+            ? "Fresh app directory — setup scaffolds a new project"
+            : "Non-empty directory with --force — setup scaffolds a new project",
         );
-        framework = await orca.scaffold(
+        app = await orca.planScaffold(
           cwd,
           await resolveScaffoldFramework(flags.framework, nonInteractive, orca, {
             retry: retryOptionsFromFlags(flags),
@@ -324,18 +332,17 @@ export default class Setup extends BaseCommand {
             cliVersion: this.config.version,
             ask: wizardInput,
           }),
-          force,
         );
-        scaffoldedFramework = true;
         scaffoldedBesideFiles = !target.scaffoldable;
-        consola.success(`Scaffolded ${framework.id} skeleton`);
       } else {
         throw error;
       }
     }
+    // A new app, created below, or on a dry run only previewed.
+    const scaffoldedFramework = detected === undefined;
 
     this.recordTelemetry({
-      framework: framework.id,
+      framework: app.framework,
       renderer: flags.renderer ?? "react",
       scaffolded_skeleton: scaffoldedFramework,
       skip_install: Boolean(flags["skip-install"]),
@@ -360,26 +367,25 @@ export default class Setup extends BaseCommand {
           `--dev-port must be an integer in 1..65535, got ${devPort}`,
         );
       }
-      framework = {
-        ...framework,
-        devPort,
-        url: issuerFromPort(devPort),
-      };
+      app = { ...app, devPort };
     }
 
     let answers: SetupAnswers = {
       server: this.meta.source,
-      devPort: framework.devPort,
+      devPort: app.devPort,
       preset: (flags.preset as SetupPreset | undefined) ?? DEFAULT_SETUP_PRESET,
       useCase: (flags["use-case"] as SetupUseCase | undefined) ?? DEFAULT_SETUP_USE_CASE,
       sso: ssoFromCommandLine === undefined ? [] : [ssoFromCommandLine],
     };
 
     if (!nonInteractive && !dryRun) {
-      intro("Zitadel setup");
+      // Asking which framework to scaffold opened the wizard already.
+      if (!scaffoldedFramework || flags.framework !== undefined) {
+        intro("Zitadel setup");
+      }
       const promptCtx = {
         input: wizardInput,
-        framework,
+        framework: { id: app.framework },
         cwd,
         frameworkChosen: scaffoldedFramework || flags.framework !== undefined,
         serverFlag: this.meta.serverFlag,
@@ -416,18 +422,14 @@ export default class Setup extends BaseCommand {
     });
 
     const issuer = issuerFromPort(answers.devPort);
-    // The DevPortPrompt can change the port interactively, so fold the answer
-    // back into the framework: the patched dev-server config reads
-    // `framework.devPort`, and it must agree with the issuer and the registered
-    // origin (both derived from `answers.devPort`).
-    framework = { ...framework, devPort: answers.devPort, url: issuer };
+    const rendererId = flags.renderer ?? "react";
 
     // Fresh scaffolds keep the widgets' full-page chrome; a pre-existing
     // route-based app gets embeddable cards inside its own layout (ADR 044).
-    const posture = derivePosture(framework.id, scaffoldedFramework);
-    const patchContext = (project: CreateProject201): PatchContext => ({
+    const posture = derivePosture(app.framework, scaffoldedFramework);
+    const patchContext = (framework: FrameworkFacts, project: CreateProject201): PatchContext => ({
       framework,
-      rendererId: flags.renderer ?? "react",
+      rendererId,
       project,
       issuer,
       server: answers.server,
@@ -437,19 +439,11 @@ export default class Setup extends BaseCommand {
       preset: answers.preset,
       useCase: answers.useCase,
     });
-    const patcher = orca.patcherFor(framework.id);
-    if (!dryRun) {
-      // Patch as a dry run first, against a placeholder project: a file setup
-      // would refuse to overwrite (E_CONFLICT), such as an existing app's own
-      // root component, stops setup here, before it creates a project and
-      // writes `zitadel.json`. Without this, the conflict surfaced after both,
-      // and every rerun skipped the directory as already set up.
-      await patcher.patch(patchContext(dryRunProject(issuer)), { cwd, dryRun: true, force });
-    }
-    // The same for the schema, flow and connection files, which setup writes
-    // only once the project exists: a conflict on one of those left the
-    // project behind, and the rerun's `.env.local` kept pointing at it.
-    // Read-only, so a dry run reports them too.
+    const patcher = orca.patcherFor(app.framework);
+    // The schema, flow and connection files setup writes only once the project
+    // exists: a conflict on one of those left the project behind, and the
+    // rerun's `.env.local` kept pointing at it. Checked before anything is
+    // written, a new app included. Read-only, so a dry run reports them too.
     await assertNoSetupResourceConflicts({
       cwd,
       force,
@@ -458,119 +452,183 @@ export default class Setup extends BaseCommand {
       sso: answers.sso,
     });
 
-    // `POST /projects` is unauthenticated. CLI-managed projects opt out of
-    // server fallback defaults, then setup uploads the local default schema and
-    // flow files through the typed resource APIs and records the returned IDs.
-    consola.start(`Creating project on ${answers.server}${dryRun ? " (dry run)" : ""}`);
-    const unauthClient = createZitadelClient({ baseUrl: answers.server });
-    const projectName = defaultProjectName(cwd, framework.id);
-    // Register the app's own origin so the backend's origin check allows
-    // requests the dev proxy forwards from it.
-    const project = dryRun
-      ? dryRunProject(issuer)
-      : await createProjectWithLocalHint(
-          unauthClient,
-          answers.server,
-          this.meta.cliVersion,
-          projectName,
-          issuer,
-          {
-            // Resolved values, not raw flags: the wizard may have picked the
-            // preset, use case, or dev port interactively, and the retry must
-            // reproduce those choices — the issuer registered with the
-            // project derives from the port.
-            ...retryOptionsFromFlags(flags),
-            framework: framework.id,
-            preset: answers.preset,
-            useCase: answers.useCase,
-            devPort: answers.devPort,
-            sso: answers.sso.map((answer) => answer.selection),
-          },
-        );
-    consola.success(`Created project ${project.id}`);
-    this.recordTelemetry({ step: "project_created" });
+    // A new app is created only now, with every answer in hand. A dry run
+    // creates none, so it has no app to patch.
+    let created = detected;
+    let newApp: UndoableScaffold | undefined;
+    if (created === undefined && dryRun) {
+      consola.info(`Would scaffold a new ${app.framework} project (dry run)`);
+    } else if (created === undefined) {
+      consola.start(`Scaffolding a new ${app.framework} project`);
+      newApp = await orca.scaffoldUndoably(cwd, app.framework, force);
+      created = newApp.facts;
+      consola.success(`Scaffolded ${created.id} skeleton`);
+    }
+    // The DevPortPrompt can change the port interactively, so fold the answer
+    // back into the framework: the patched dev-server config reads
+    // `framework.devPort`, and it must agree with the issuer and the registered
+    // origin (both derived from `answers.devPort`).
+    const framework =
+      created === undefined ? undefined : { ...created, devPort: answers.devPort, url: issuer };
 
-    const ctx = patchContext(project);
-    // `.env.local` as it is before the patch merges this project's id and
-    // secret into it, so a failure below can put it back.
-    const envLocalBefore = await readEnvLocal(cwd);
-    consola.start(`Patching project files${dryRun ? " (dry run)" : ""}`);
+    // A new app is kept only once its default resources are in place. A
+    // failure before that, Ctrl-C included, removes it again and puts back
+    // what the directory held, so the rerun scaffolds a new app instead of
+    // taking a half-set-up one for an app the developer brought.
+    let project: CreateProject201;
     let result: Awaited<ReturnType<typeof patcher.patch>>;
+    let resourceResult: MaterializeSetupResourcesResult;
     try {
-      result = await patcher.patch(ctx, { cwd, dryRun, force });
-    } catch (error) {
-      // The dry run above already ruled out conflicts, so this is an I/O
-      // failure partway through. Remove the setup markers and put
-      // `.env.local` back, as a failed resource upload does below, so a rerun
-      // starts over.
-      if (!dryRun) {
+      if (framework !== undefined && !dryRun) {
+        // Patch as a dry run first, against a placeholder project: a file setup
+        // would refuse to overwrite (E_CONFLICT), such as an existing app's own
+        // root component, stops setup here, before it creates a project and
+        // writes `zitadel.json`. Without this, the conflict surfaced after both,
+        // and every rerun skipped the directory as already set up.
+        await patcher.patch(patchContext(framework, dryRunProject(issuer)), {
+          cwd,
+          dryRun: true,
+          force,
+        });
+      }
+
+      // `POST /projects` is unauthenticated. CLI-managed projects opt out of
+      // server fallback defaults, then setup uploads the local default schema and
+      // flow files through the typed resource APIs and records the returned IDs.
+      consola.start(`Creating project on ${answers.server}${dryRun ? " (dry run)" : ""}`);
+      const unauthClient = createZitadelClient({ baseUrl: answers.server });
+      const projectName = defaultProjectName(cwd, app.framework);
+      // Register the app's own origin so the backend's origin check allows
+      // requests the dev proxy forwards from it.
+      project = dryRun
+        ? dryRunProject(issuer)
+        : await createProjectWithLocalHint(
+            unauthClient,
+            answers.server,
+            this.meta.cliVersion,
+            projectName,
+            issuer,
+            {
+              // Resolved values, not raw flags: the wizard may have picked the
+              // preset, use case, or dev port interactively, and the retry must
+              // reproduce those choices — the issuer registered with the
+              // project derives from the port.
+              ...retryOptionsFromFlags(flags),
+              framework: app.framework,
+              preset: answers.preset,
+              useCase: answers.useCase,
+              devPort: answers.devPort,
+              sso: answers.sso.map((answer) => answer.selection),
+            },
+          );
+      consola.success(`Created project ${project.id}`);
+      this.recordTelemetry({ step: "project_created" });
+
+      // `.env.local` as it is before the patch merges this project's id and
+      // secret into it, so a failure below can put it back.
+      const envLocalBefore = await readEnvLocal(cwd);
+      if (framework === undefined) {
+        // What the patch writes depends on the files the scaffold creates.
+        consola.info("Would patch the new project (dry run): its files come from the scaffold");
+        result = { dryRun, files: [], filesWritten: [], filesSkipped: [], depsAdded: [] };
+      } else {
+        consola.start(`Patching project files${dryRun ? " (dry run)" : ""}`);
+        try {
+          result = await patcher.patch(patchContext(framework, project), { cwd, dryRun, force });
+        } catch (error) {
+          // The dry run above already ruled out conflicts, so this is an I/O
+          // failure partway through. Remove the setup markers and put
+          // `.env.local` back, as a failed resource upload does below, so a
+          // rerun starts over.
+          if (!dryRun) {
+            await removeSetupMarkers(cwd);
+            await restoreEnvLocal(cwd, envLocalBefore);
+          }
+          throw error;
+        }
+      }
+      for (const file of result.filesWritten) {
+        const sentence = describeWrittenFile(relativeDisplay(cwd, file), dryRun);
+        if (sentence) consola.info(sentence);
+      }
+      for (const file of result.filesSkipped) {
+        consola.info(`Left ${relativeDisplay(cwd, file)} unchanged (already matches target)`);
+      }
+      try {
+        resourceResult = dryRun
+          ? { filesWritten: [] }
+          : await materializeSetupResources({
+              cwd,
+              // Verbatim: the canonical bodies are written back to the project.
+              client: createZitadelClient(
+                { baseUrl: answers.server, token: project.project_secret },
+                { verbatim: true },
+              ),
+              projectId: project.id,
+              force,
+              preset: answers.preset,
+              useCase: answers.useCase,
+              sso: answers.sso,
+              cliVersion: this.meta.cliVersion,
+            });
+      } catch (error) {
+        // Setup is not atomic: the patcher already wrote `zitadel.json` (the
+        // marker the already-initialized guard skips on) and `.zitadel/secret`.
+        // Remove both so a rerun starts a fresh setup instead of being skipped
+        // forever with no default schema or login flow anywhere. The
+        // half-provisioned project has no usable resources, so its credentials
+        // are not worth keeping, and `.env.local`, where the patch merged them,
+        // goes back to what it held before.
+        // Only these, and never a connection file: those are tenant-owned, and
+        // setup neither writes over nor removes one -- unless it is part of a
+        // new app, which goes as a whole.
         await removeSetupMarkers(cwd);
         await restoreEnvLocal(cwd, envLocalBefore);
+        const cause = toZitadelError(error);
+        throw new ZitadelError(cause.code, `Default resource setup failed: ${cause.message}`, {
+          // The cause knows its own remedy when it has one -- a file setup
+          // declined to touch is fixed by deciding what to do with that file,
+          // not by rerunning with --force.
+          hint:
+            cause.hint ??
+            (newApp === undefined
+              ? "The project was created but its default schema/flow upload did not finish. " +
+                "Re-run `zitadel setup` to start over; --force overwrites the files setup " +
+                "scaffolds. It does not cover a connection under .zitadel/idps/ -- those are " +
+                "yours, so setup never replaces or removes one; delete it to scaffold a fresh " +
+                "one, or keep it and enable the provider after setup to reuse it."
+              : "The project was created but its default schema/flow upload did not finish, " +
+                "so setup removed the new app again. Re-run setup as before to start over."),
+          nextCommands:
+            cause.nextCommands ?? (newApp === undefined ? ["zitadel setup --force"] : []),
+          details: cause.details,
+        });
+      }
+    } catch (error) {
+      if (newApp !== undefined) {
+        await removeNewApp(newApp, cwd);
       }
       throw error;
     }
-    for (const file of result.filesWritten) {
-      const sentence = describeWrittenFile(relativeDisplay(cwd, file), dryRun);
-      if (sentence) consola.info(sentence);
-    }
-    for (const file of result.filesSkipped) {
-      consola.info(`Left ${relativeDisplay(cwd, file)} unchanged (already matches target)`);
-    }
-    let resourceResult: MaterializeSetupResourcesResult;
     try {
-      resourceResult = dryRun
-        ? { filesWritten: [] }
-        : await materializeSetupResources({
-            cwd,
-            // Verbatim: the canonical bodies are written back to the project.
-            client: createZitadelClient(
-              { baseUrl: answers.server, token: project.project_secret },
-              { verbatim: true },
-            ),
-            projectId: project.id,
-            force,
-            preset: answers.preset,
-            useCase: answers.useCase,
-            sso: answers.sso,
-            cliVersion: this.meta.cliVersion,
-          });
+      await newApp?.keep();
     } catch (error) {
-      // Setup is not atomic: the patcher already wrote `zitadel.json` (the
-      // marker the already-initialized guard skips on) and `.zitadel/secret`.
-      // Remove both so a rerun starts a fresh setup instead of being skipped
-      // forever with no default schema or login flow anywhere. The
-      // half-provisioned project has no usable resources, so its credentials
-      // are not worth keeping, and `.env.local`, where the patch merged them,
-      // goes back to what it held before.
-      // Only these, and never a connection file: those are tenant-owned, and
-      // setup neither writes over nor removes one.
-      await removeSetupMarkers(cwd);
-      await restoreEnvLocal(cwd, envLocalBefore);
-      const cause = toZitadelError(error);
-      throw new ZitadelError(cause.code, `Default resource setup failed: ${cause.message}`, {
-        // The cause knows its own remedy when it has one -- a file setup
-        // declined to touch is fixed by deciding what to do with that file,
-        // not by rerunning with --force.
-        hint:
-          cause.hint ??
-          "The project was created but its default schema/flow upload did not finish. " +
-            "Re-run `zitadel setup` to start over; --force overwrites the files setup " +
-            "scaffolds. It does not cover a connection under .zitadel/idps/ -- those are " +
-            "yours, so setup never replaces or removes one; delete it to scaffold a fresh " +
-            "one, or keep it and enable the provider after setup to reuse it.",
-        nextCommands: cause.nextCommands ?? ["zitadel setup --force"],
-        details: cause.details,
-      });
+      // Setup itself is done; only what the scaffold replaced is left behind.
+      reportWarning(
+        `Could not delete what the new app replaced, kept beside ${cwd}: ${toZitadelError(error).message}`,
+      );
     }
     for (const file of resourceResult.filesWritten) {
       const sentence = describeWrittenFile(relativeDisplay(cwd, file), dryRun);
       if (sentence) consola.info(sentence);
     }
     const allFilesWritten = [...result.filesWritten, ...resourceResult.filesWritten];
-    consola.success(
-      `Patched ${allFilesWritten.length} file${allFilesWritten.length === 1 ? "" : "s"}` +
-        (result.filesSkipped.length > 0 ? ` (${result.filesSkipped.length} unchanged)` : ""),
-    );
+    if (framework !== undefined) {
+      consola.success(
+        `Patched ${allFilesWritten.length} file${allFilesWritten.length === 1 ? "" : "s"}` +
+          (result.filesSkipped.length > 0 ? ` (${result.filesSkipped.length} unchanged)` : ""),
+      );
+    }
     this.recordTelemetry({
       step: "files_patched",
       files_written_count: allFilesWritten.length,
@@ -625,7 +683,7 @@ export default class Setup extends BaseCommand {
       }
     }
 
-    if (!dryRun) {
+    if (framework !== undefined && !dryRun) {
       // Record what was actually scaffolded so `doctor` can later verify the
       // app files without guessing from current templates (missing vs edited
       // vs user-adopted) and `doctor --fix` can restore exactly the missing
@@ -634,10 +692,7 @@ export default class Setup extends BaseCommand {
       try {
         await writeScaffoldManifest({
           cwd,
-          actions: orca.patcherFor(framework.id).artifacts({
-            framework,
-            rendererId: ctx.rendererId,
-          }),
+          actions: orca.patcherFor(framework.id).artifacts({ framework, rendererId }),
           written: [...result.filesWritten, ...result.filesSkipped],
           scaffoldedFramework,
           devPort: answers.devPort,
@@ -773,7 +828,7 @@ export default class Setup extends BaseCommand {
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
     if (!this.jsonEnabled()) {
-      const projectFacts = await detectProjectFacts(cwd, framework.id);
+      const projectFacts = await detectProjectFacts(cwd, app.framework);
       const sections = buildSummary({
         projectFacts,
         writtenRel,
@@ -819,7 +874,7 @@ export default class Setup extends BaseCommand {
       data: {
         title: "Zitadel is ready.",
         project: { project_id: project.id, issuer },
-        framework: framework.id,
+        framework: app.framework,
         server: answers.server,
         files_written: allFilesWritten.map((file) => relativeDisplay(cwd, file)),
         // Typed per-artifact rows for the scaffolded app files (the sync
@@ -971,6 +1026,22 @@ async function resolveScaffoldFramework(
  */
 export async function localServerHostsPlatform(server: string, timeoutMs = 1500): Promise<boolean> {
   return Boolean(await readPlatformRuntime(server, timeoutMs));
+}
+
+/**
+ * Removes a new app setup scaffolded but could not finish setting up, and puts
+ * back what the directory held. A failure to do so is reported, not thrown:
+ * the error that stopped setup is the one the developer needs.
+ */
+async function removeNewApp(newApp: UndoableScaffold, cwd: string): Promise<void> {
+  try {
+    await newApp.undo();
+    consola.info(`Removed the new app, so ${shortPath(cwd)} holds what it did before setup`);
+  } catch (error) {
+    reportWarning(
+      `Could not remove the new app setup scaffolded in ${cwd}: ${toZitadelError(error).message}`,
+    );
+  }
 }
 
 /**
