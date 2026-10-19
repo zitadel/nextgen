@@ -7,7 +7,7 @@
 "@zitadel/sdk-sveltekit": minor
 "@zitadel/sdk-solid-start": minor
 "@zitadel/sdk-tanstack-start": minor
-"@zitadel/sdk-qwik-city": minor
+"@zitadel/sdk-qwik-router": minor
 "@zitadel/components": patch
 "@zitadel/testing": patch
 "@zitadel/cli": patch

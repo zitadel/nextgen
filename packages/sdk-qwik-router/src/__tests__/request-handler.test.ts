@@ -1,5 +1,5 @@
 /**
- * Server middleware contract for Qwik City. The cases below are identical in every
+ * Server middleware contract for Qwik Router. The cases below are identical in every
  * server SDK; only the glue between `serve` and this SDK's handler differs.
  */
 

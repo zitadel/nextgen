@@ -95,7 +95,7 @@ describe("Orca selection", () => {
       "solid",
       "sveltekit",
       "svelte",
-      "qwik-city",
+      "qwik-router",
       "qwik",
       "angular",
     ]);

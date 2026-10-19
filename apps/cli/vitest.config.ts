@@ -1,6 +1,9 @@
+import { availableParallelism } from "node:os";
+
 import { defineConfig } from "vitest/config";
 
 import { baseTest } from "../../vitest.shared.mjs";
+import { PORT_WORKERS } from "./tests/helpers/ports";
 
 export default defineConfig({
   cacheDir: ".vitest",
@@ -17,6 +20,11 @@ export default defineConfig({
     // tests `*.test.ts` (tests/AGENTS.md).
     include: ["tests/**/*.{test,spec}.ts"],
     setupFiles: ["./tests/helpers/matchers.ts"],
+    // Every file running at the same time takes its ports from a block of its
+    // own (tests/helpers/ports.ts), and there are PORT_WORKERS blocks. Vitest's
+    // default of a worker per core but one would outnumber them on a bigger
+    // machine, so it stops there.
+    maxWorkers: Math.min(Math.max(availableParallelism() - 1, 1), PORT_WORKERS),
     // The integration specs drive the built CLI against a `usePlatformMock()`
     // HTTP server. Under CI's parallel worker pool that mock occasionally
     // isn't ready when a spec's `aSetUpApp()` arrange runs, and the

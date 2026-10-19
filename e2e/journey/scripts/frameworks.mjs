@@ -10,7 +10,7 @@ export const frameworkIds = [
   "sveltekit",
   "tanstack-start",
   "solid-start",
-  "qwik-city",
+  "qwik-router",
 ];
 
 /**
@@ -21,7 +21,7 @@ export const frameworkIds = [
  * and a red lane for a reason outside a PR would flake the whole team. Take an id
  * off this list once its scaffold is pinned and has been stable.
  */
-export const ciExcludedFrameworkIds = ["sveltekit", "tanstack-start", "solid-start", "qwik-city"];
+export const ciExcludedFrameworkIds = ["sveltekit", "tanstack-start", "solid-start", "qwik-router"];
 
 /** The frameworks the CI fresh-app matrix runs. */
 export const ciFrameworkIds = frameworkIds.filter((id) => !ciExcludedFrameworkIds.includes(id));
@@ -126,9 +126,9 @@ export const frameworks = [
     devServerArgs: viteDevArgs,
   },
   {
-    id: "qwik-city",
-    displayName: "Qwik City",
-    sdkPackageDir: "packages/sdk-qwik-city",
+    id: "qwik-router",
+    displayName: "Qwik Router",
+    sdkPackageDir: "packages/sdk-qwik-router",
     readyPath: "/login",
     expectsProtectedRouteRedirect: true,
     devServerArgs: viteDevArgs,

@@ -1,4 +1,4 @@
-id: "sdk-qwik-city"
+id: "sdk-qwik-router"
 language: "typescript"
 layer: "library"
 stack: "frontend"
@@ -15,7 +15,7 @@ tasks:
     deps:
       - "sdk-core:build"
     options:
-      mutex: "sdk-qwik-city-dist"
+      mutex: "sdk-qwik-router-dist"
 
   build-release:
     script: |
@@ -34,7 +34,7 @@ tasks:
       # build-release rewrites the same dist/ that a consuming demo build
       # resolves modules from; the mutex keeps the two from overlapping in the
       # full CI graph.
-      mutex: "sdk-qwik-city-dist"
+      mutex: "sdk-qwik-router-dist"
 
   test:
     deps:
