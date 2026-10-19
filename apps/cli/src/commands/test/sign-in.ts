@@ -1,7 +1,6 @@
 import { Flags } from "@oclif/core";
 import { idpProvider, IDP_PROVIDERS, referencedVariable } from "@zitadel/config/idp";
 import { consola } from "consola";
-import pc from "picocolors";
 
 import {
   createZitadelClient,
@@ -22,20 +21,15 @@ import { type ConnectionFile, callbackUriFor, readConnectionFiles } from "../../
 import { isObject } from "../../lib/json";
 import { DEFAULT_LOCAL_SERVER_URL, readRuntimeMetadata } from "../../lib/local-server/runtime";
 import { LocalServer } from "../../lib/local-server/server";
+import { wrapForBox } from "../../lib/box";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
+import { reportWarning } from "../../lib/warnings";
 import { readDevelopmentIssuer, readZitadelConfig, readZitadelSecret } from "../../lib/project";
 import { resolveCwd } from "../../lib/paths";
 import { publicCliCommand } from "../../lib/public-cli";
 import { watchSignInEvents } from "../../lib/sign-in-events";
 import { buildSyncPlan, enumeratePlanResources, makeSyncers } from "../../lib/sync";
 
-const GLYPHS = {
-  pass: pc.green("✔"),
-  warn: pc.yellow("!"),
-  fail: pc.red("✖"),
-  skipped: pc.dim("–"),
-};
-const TITLE_WIDTH = 26;
 const REQUEST_TIMEOUT_MS = 10_000;
 const DEFAULT_TIMEOUT_SECONDS = 300;
 const LOG_POLL_MS = 1_000;
@@ -150,7 +144,6 @@ export default class TestSignIn extends BaseCommand {
           server,
           live,
           timeoutSeconds: flags.timeout,
-          heading: connections.length > 1,
         }),
       ],
       Promise.resolve([]),
@@ -167,6 +160,15 @@ export default class TestSignIn extends BaseCommand {
       providers,
     };
     const summary = `${data.passed} passed, ${data.warned} warned, ${data.failed} failed, ${data.skipped} skipped`;
+    consola.box({
+      title: "Sign-in checks",
+      message: wrapForBox(summaryOf(providers, live)),
+      style: {
+        padding: 1,
+        borderStyle: "rounded",
+        borderColor: data.failed > 0 ? "red" : data.warned > 0 ? "yellow" : "green",
+      },
+    });
     const broken = providers.filter((report) => report.failed > 0);
     const [first] = broken;
     if (first !== undefined) {
@@ -183,13 +185,7 @@ export default class TestSignIn extends BaseCommand {
         },
       );
     }
-    return this.emit({
-      status: "ok",
-      data,
-      pretty: live
-        ? `\n${summary}. A sign-in that created a user left it in the project.`
-        : `\n${summary}. A real sign-in is the only check that proves the whole journey: add --live to try one.`,
-    });
+    return this.emit({ status: "ok", data });
   }
 
   /** Runs the battery for one connection, printing each check as it finishes. */
@@ -199,7 +195,6 @@ export default class TestSignIn extends BaseCommand {
     readonly server: LocalServer;
     readonly live: boolean;
     readonly timeoutSeconds: number;
-    readonly heading: boolean;
   }): Promise<ProviderReport> {
     const { connection, projectIssuer, server, live } = options;
     const { cwd } = this.meta;
@@ -211,12 +206,9 @@ export default class TestSignIn extends BaseCommand {
       await this.requireApplied(cwd);
     }
 
-    if (options.heading) {
-      consola.log(`\n${pc.bold(slug)}`);
-    } else if (process.stdout.isTTY) {
-      consola.info(`Provider  ${slug}`);
+    consola.start(`Checking ${slug}`);
+    if (process.stdout.isTTY) {
       consola.info(`Callback  ${callbackUri}`);
-      consola.log("");
     }
     const catalogId = IDP_PROVIDERS.find((id) => id === slug);
     const results = await runChecks(
@@ -246,7 +238,7 @@ export default class TestSignIn extends BaseCommand {
                 // Under --json consola is silent, so the login URL a person has to open would reach
                 // nobody; stderr keeps stdout clean for the envelope and still shows it.
                 say: (message) =>
-                  this.jsonEnabled() ? process.stderr.write(`${message}\n`) : consola.log(message),
+                  this.jsonEnabled() ? process.stderr.write(`${message}\n`) : consola.info(message),
                 watch: (signal) =>
                   watchSignInEvents(
                     async () => (await server.logs({ tail: LOG_TAIL })).logs,
@@ -259,7 +251,7 @@ export default class TestSignIn extends BaseCommand {
             }
           : {}),
       }),
-      (result) => consola.log(line(result)),
+      report,
     );
     const count = (status: CheckResult["status"]) =>
       results.filter((result) => result.status === status).length;
@@ -426,13 +418,54 @@ function stringsIn(value: unknown): string[] {
 }
 
 /**
- * One result for a terminal. A message can carry what the provider's discovery
- * document said, which nobody here vouches for, so a control character in it is
- * shown escaped instead of reaching the terminal.
+ * One result as a log line, in the CLI's own voice: a pass is a success, a
+ * warning goes through `reportWarning` so `--json` keeps it, a failure is an
+ * error with the line to act on under it, and a check that could not tell is
+ * said so. A message can carry what the provider's discovery document said,
+ * which nobody here vouches for, so a control character in it is shown escaped
+ * instead of reaching the terminal.
  */
-function line({ status, title, message, recovery }: CheckResult): string {
-  const row = `  ${GLYPHS[status]} ${title.padEnd(TITLE_WIDTH)}${pc.dim(escaped(message))}`;
-  return recovery === undefined ? row : `${row}\n    ${pc.cyan("→")} ${escaped(recovery)}`;
+function report({ status, title, message, recovery }: CheckResult): void {
+  const text = `${title}: ${escaped(message)}${recovery === undefined ? "" : `\n${escaped(recovery)}`}`;
+  switch (status) {
+    case "pass":
+      consola.success(text);
+      return;
+    case "warn":
+      reportWarning(text);
+      return;
+    case "fail":
+      consola.error(text);
+      return;
+    case "skipped":
+      consola.info(`Skipped ${text}`);
+      return;
+  }
+}
+
+/** What each provider's checks came to, and what to do next, for the closing box. */
+function summaryOf(providers: readonly ProviderReport[], live: boolean): string {
+  const width = Math.max(...providers.map((report) => report.provider.length));
+  const rows = providers.map((report) => {
+    const counts = (
+      [
+        [report.passed, "passed"],
+        [report.warned, "warned"],
+        [report.failed, "failed"],
+        [report.skipped, "skipped"],
+      ] as const
+    )
+      .filter(([count]) => count > 0)
+      .map(([count, word]) => `${count} ${word}`);
+    return `${report.provider.padEnd(width)}  ${counts.join(", ")}`;
+  });
+  return [
+    ...rows,
+    "",
+    live
+      ? "A sign-in that created a user left it in the project."
+      : "Only a real sign-in proves the whole journey: add --live to try one.",
+  ].join("\n");
 }
 
 const escaped = (text: string) => escapeControlCharacters(text, { keepLayout: false });
