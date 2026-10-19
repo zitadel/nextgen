@@ -36,6 +36,8 @@ export { businessLocales } from "@zitadel/sdk-react";
 // shipping them. react.test.tsx fails when this list and sdk-react's drift.
 export type {
   CreateFlowBodyPurpose,
+  forwardStandardAttributes,
+  standardAttributes,
   ZITADEL_LOGIN_EVENT_HANDLERS,
   ZITADEL_LOGIN_EVENTS,
   ZITADEL_LOGOUT_EVENT_HANDLERS,

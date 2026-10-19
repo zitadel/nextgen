@@ -299,3 +299,41 @@ export type ZitadelLogoutProps = ZitadelLogoutConfig & ZitadelLogoutHandlers;
 
 /** Full prop set for a `ZitadelSession` wrapper (config + plain-callback handlers). */
 export type ZitadelSessionProps = ZitadelSessionConfig & ZitadelSessionHandlers;
+
+/* ───────────────────────  Standard element attributes  ───────────────────────
+ * The one definition, shared by the SDKs whose framework cannot spread a
+ * component's remaining props onto the widget element without clobbering the
+ * widget's own props (Solid, Qwik, Angular).
+ * ───────────────────────────────────────────────────────────────────────── */
+
+const STANDARD_ATTRIBUTE = /^(?:class|style|id|title|slot|hidden|role|tabindex|data-.+|aria-.+)$/i;
+
+/**
+ * The standard HTML attributes among the given props: `class`, `style`, `id`,
+ * `title`, `slot`, `hidden`, `role`, `tabindex`, `data-*` and `aria-*`. A widget
+ * element takes these as plain DOM attributes, and none of them is a widget
+ * prop, so a wrapper can pass the result to the element ahead of its own
+ * attributes. Anything else is left out, so no stray prop can reach the
+ * widget's configuration.
+ */
+export function standardAttributes(props: object): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(props).filter(([name]) => STANDARD_ATTRIBUTE.test(name)),
+  );
+}
+
+/**
+ * Moves the standard attributes (see {@link standardAttributes}) from one
+ * element to another, once. For a wrapper whose own tag receives the attributes
+ * a consumer wrote, but whose widget is a different element inside it. `slot`
+ * is copied and stays, because the parent's shadow root reads it on the tag.
+ */
+export function forwardStandardAttributes(from: Element, to: Element): void {
+  const attributes = Object.fromEntries(
+    Array.from(from.attributes, (attribute) => [attribute.name, attribute.value]),
+  );
+  for (const [name, value] of Object.entries(standardAttributes(attributes))) {
+    to.setAttribute(name, String(value));
+    if (name.toLowerCase() !== "slot") from.removeAttribute(name);
+  }
+}

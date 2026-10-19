@@ -92,7 +92,7 @@ Each widget event reaches the callback in the last column, which receives the ev
 <zitadel-auth-login [project]="project" class="login" data-testid="login" aria-label="Sign in" />
 ```
 
-Angular puts these on the wrapper's own tag, which is a different element from the widget, so the wrapper copies them to the widget element, once at start and again when the tag's attributes change, for plain attributes, bindings such as `[class.active]` and `[attr.aria-label]`, and `ngClass`. `id`, `title`, `hidden`, `role`, `tabindex`, `data-*` and `aria-*` are moved, so the page never holds two elements with the same `id` or `data-testid`; `class`, `style` and `slot` stay on the tag as well. The tag renders no box of its own (`display: contents`). A binding that later sets a moved attribute to `null` removes it from the tag, where nothing sees it go, so the widget element keeps its last value. `@ViewChild(ZitadelLoginComponent).element` is the widget element.
+Angular puts these on the wrapper's own tag, which is a different element from the widget, so the wrapper moves them to the widget element once, when the view is ready (`slot` is copied and stays, because the parent's shadow root reads it on the tag). That covers plain attributes such as `class="login"`; a binding on the tag that changes later, such as `[class.active]` or `[attr.aria-label]`, is not carried over. `@ViewChild(ZitadelLoginComponent).element` is the widget element.
 
 ## Server rendering
 

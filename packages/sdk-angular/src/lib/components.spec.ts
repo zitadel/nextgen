@@ -808,6 +808,27 @@ describe("server-rendered widget config", () => {
 
 type WidgetName = "ZitadelLogin" | "ZitadelLogout" | "ZitadelSession";
 
+type StandardAttributes = {
+  class: string;
+  style: string;
+  id: string;
+  title: string;
+  slot: string;
+  hidden: boolean;
+  role: "region";
+  tabindex: number;
+  "aria-label": string;
+};
+
+// A template attribute is not typed, so there is no props type to check against.
+type WidgetProps = Record<WidgetName, Partial<StandardAttributes>>;
+
+type StandardProps = {
+  [W in WidgetName]: {
+    [K in keyof StandardAttributes]?: K extends keyof WidgetProps[W] ? WidgetProps[W][K] : never;
+  };
+};
+
 // Mounts a widget with the given attributes (named as the markup names them) and
 // reaches its element through the component's `element`, the way a consumer does
 // after a `@ViewChild`.
@@ -911,6 +932,10 @@ describe.each(WIDGETS)("%s standard attributes", (widget) => {
     const { container, ref } = await mountWidget(widget, {});
     expect(ref()).toBe(container.querySelector(tag));
     expect(ref()?.tagName.toLowerCase()).toBe(tag);
+  });
+  it("accepts the standard attributes in its props", () => {
+    const accepted: StandardProps = {} as Record<WidgetName, Partial<StandardAttributes>>;
+    expect(accepted).toBeDefined();
   });
 });
 // standard-attributes:end

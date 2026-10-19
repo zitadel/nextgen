@@ -25,6 +25,7 @@ import {
   type QRL,
   type Signal,
 } from "@qwik.dev/core";
+import { standardAttributes } from "@zitadel/sdk-core/types";
 import {
   configureZitadel,
   getApi,
@@ -33,7 +34,6 @@ import {
   type ZitadelProject,
 } from "@zitadel/api/config";
 
-import { standardAttributes } from "./attributes";
 import { listenWithReplay, WRAPPER_MARKER } from "./early-events";
 
 export { configureZitadel, getApi, getZitadelConfig };

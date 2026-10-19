@@ -17,7 +17,7 @@ import { defineComponent, h, mergeProps, type PropType, ref, toRaw } from "vue";
 import "@zitadel/components";
 
 import { forceAttr } from "./forceAttr";
-import type { WithZitadelWidgetAttributes } from "./widgetAttributes";
+import type { WithZitadelWidgetAttributes } from "../types";
 
 /**
  * Vue wrapper for the `<zitadel-login>` Lit web component.

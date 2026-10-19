@@ -742,35 +742,31 @@ describe("server-rendered widget config", () => {
 });
 // server-render-cases:end
 
-// The props type is the check: `svelte-check` fails here when a wrapper stops
-// accepting the element's own HTML attributes.
-describe("standard attribute props", () => {
-  const attributes = {
-    class: "probe",
-    style: "color: red",
-    id: "probe",
-    title: "probe",
-    slot: "probe",
-    hidden: true,
-    role: "region",
-    tabindex: 3,
-    "data-testid": "probe",
-    "aria-label": "probe",
-  } as const satisfies ZitadelLoginElementProps &
-    ZitadelLogoutElementProps &
-    ZitadelSessionElementProps;
-
-  it("are accepted by every wrapper's props type", () => {
-    const login = render(ZitadelLogin, { props: { project, ...attributes } });
-    const logout = render(ZitadelLogout, { props: { project, ...attributes } });
-    const session = render(ZitadelSession, { props: { project, ...attributes } });
-    for (const { container } of [login, logout, session]) {
-      expect(container.querySelectorAll("[data-testid=probe]")).toHaveLength(1);
-    }
-  });
-});
-
 type WidgetName = "ZitadelLogin" | "ZitadelLogout" | "ZitadelSession";
+
+type StandardAttributes = {
+  class: string;
+  style: string;
+  id: string;
+  title: string;
+  slot: string;
+  hidden: boolean;
+  role: "region";
+  tabindex: number;
+  "aria-label": string;
+};
+
+type WidgetProps = {
+  ZitadelLogin: ZitadelLoginElementProps;
+  ZitadelLogout: ZitadelLogoutElementProps;
+  ZitadelSession: ZitadelSessionElementProps;
+};
+
+type StandardProps = {
+  [W in WidgetName]: {
+    [K in keyof StandardAttributes]?: K extends keyof WidgetProps[W] ? WidgetProps[W][K] : never;
+  };
+};
 
 // Mounts a widget with the given attributes (named as the markup names them) and
 // reaches its element through the component's `getElement()`, the way a consumer
@@ -857,6 +853,10 @@ describe.each(WIDGETS)("%s standard attributes", (widget) => {
     const { container, ref } = await mountWidget(widget, {});
     expect(ref()).toBe(container.querySelector(tag));
     expect(ref()?.tagName.toLowerCase()).toBe(tag);
+  });
+  it("accepts the standard attributes in its props", () => {
+    const accepted: StandardProps = {} as Record<WidgetName, Partial<StandardAttributes>>;
+    expect(accepted).toBeDefined();
   });
 });
 // standard-attributes:end

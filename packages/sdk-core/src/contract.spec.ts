@@ -238,6 +238,7 @@ describe("standard-attribute tests ↔ SDK specs", () => {
     "forwards the slot to the widget element",
     "lets a widget prop win over a standard attribute of the same name",
     "gives access to the widget element through a ref",
+    "accepts the standard attributes in its props",
   ];
 
   // Matches `it("title"` and the `describe.each(WIDGETS)("title"` form.

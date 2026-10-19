@@ -7,6 +7,7 @@ import type {
   ZitadelFlowInputDetail,
   ZitadelFlowStepDetail,
 } from "@zitadel/sdk-core/types";
+import { forwardStandardAttributes } from "@zitadel/sdk-core/types";
 
 import {
   Component,
@@ -18,11 +19,9 @@ import {
   Output,
   ViewChild,
   type AfterViewInit,
-  type OnDestroy,
 } from "@angular/core";
 
 import type { ZitadelProject } from "./config";
-import { forwardHostAttributes } from "./host-attributes";
 
 // Registers <zitadel-login> / <zitadel-logout> with the browser.
 import "@zitadel/components";
@@ -54,8 +53,6 @@ import "@zitadel/components";
   selector: "zitadel-auth-login",
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  // The tag only hosts the widget; its box is the widget element's own.
-  styles: [":host { display: contents; }"],
   template: `<zitadel-login
     #el
     [project]="project"
@@ -82,7 +79,7 @@ import "@zitadel/components";
     (zitadel-flow-error)="onFlowError($event)"
   ></zitadel-login>`,
 })
-export class ZitadelLoginComponent implements AfterViewInit, OnDestroy {
+export class ZitadelLoginComponent implements AfterViewInit {
   @Input() project?: ZitadelProject;
   @Input() projectId?: string;
   @Input() proxyPath?: string;
@@ -107,15 +104,10 @@ export class ZitadelLoginComponent implements AfterViewInit, OnDestroy {
   @ViewChild("el") private elementRef?: ElementRef<ZitadelLoginElement>;
 
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
-  private stopForwarding?: () => void;
 
   ngAfterViewInit(): void {
     const element = this.element;
-    if (element) this.stopForwarding = forwardHostAttributes(this.host.nativeElement, element);
-  }
-
-  ngOnDestroy(): void {
-    this.stopForwarding?.();
+    if (element) forwardStandardAttributes(this.host.nativeElement, element);
   }
 
   /** The underlying `<zitadel-login>` custom element, or `null` before view init. */

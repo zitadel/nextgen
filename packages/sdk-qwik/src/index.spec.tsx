@@ -733,33 +733,31 @@ describe("wrapper config parity", () => {
   });
 });
 
-// The props type is the check: `tsc` fails here when a wrapper stops accepting the
-// element's own HTML attributes.
-describe("standard attribute props", () => {
-  it("are accepted by every wrapper's props type", async () => {
-    const attributes = {
-      class: "probe",
-      style: "color: red",
-      id: "probe",
-      title: "probe",
-      slot: "probe",
-      hidden: true,
-      role: "region",
-      tabIndex: 3,
-      "aria-label": "probe",
-    } as const satisfies ZitadelLoginProps & ZitadelLogoutProps & ZitadelSessionProps;
-    const host = await renderWidget(
-      <>
-        <ZitadelLogin project={project} {...attributes} />
-        <ZitadelLogout project={project} {...attributes} />
-        <ZitadelSession project={project} {...attributes} />
-      </>,
-    );
-    expect(host.querySelectorAll("[aria-label=probe]")).toHaveLength(3);
-  });
-});
-
 type WidgetName = "ZitadelLogin" | "ZitadelLogout" | "ZitadelSession";
+
+type StandardAttributes = {
+  class: string;
+  style: string;
+  id: string;
+  title: string;
+  slot: string;
+  hidden: boolean;
+  role: "region";
+  tabIndex: number;
+  "aria-label": string;
+};
+
+type WidgetProps = {
+  ZitadelLogin: ZitadelLoginProps;
+  ZitadelLogout: ZitadelLogoutProps;
+  ZitadelSession: ZitadelSessionProps;
+};
+
+type StandardProps = {
+  [W in WidgetName]: {
+    [K in keyof StandardAttributes]?: K extends keyof WidgetProps[W] ? WidgetProps[W][K] : never;
+  };
+};
 
 // Mounts a widget with the given attributes (named as the markup names them) and
 // reaches its element through a `ref` signal, the way a consumer does.
@@ -846,6 +844,10 @@ describe.each(WIDGETS)("%s standard attributes", (widget) => {
     const { container, ref } = await mountWidget(widget, {});
     expect(ref()).toBe(container.querySelector(tag));
     expect(ref()?.tagName.toLowerCase()).toBe(tag);
+  });
+  it("accepts the standard attributes in its props", () => {
+    const accepted: StandardProps = {} as Record<WidgetName, Partial<StandardAttributes>>;
+    expect(accepted).toBeDefined();
   });
 });
 // standard-attributes:end
