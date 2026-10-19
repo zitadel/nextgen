@@ -121,11 +121,12 @@ function installOnce(): Offline {
     if (options.path) {
       return Reflect.apply(connect, this, [normalized]) as net.Socket;
     }
-    const host = (options.host ?? "localhost").replace(/^\[(.*)\]$/, "$1");
+    // `||`, as `connect` itself defaults it: an empty host is localhost too.
+    const host = (options.host || "localhost").replace(/^\[(.*)\]$/, "$1");
     const lookup = options.lookup ?? dns.lookup;
     const named = net.isIP(host) === 0;
-    // Only the system resolver can say where any other name points, and asking
-    // it is already a request off the machine.
+    // Any other name is the system resolver's to place, and asking it can
+    // already be a request off the machine.
     const elsewhere = named ? lookup === resolver && host !== "localhost" : !isLocalAddress(host);
     if (elsewhere) {
       const error = refuse(`${host}:${String(options.port)}`);
