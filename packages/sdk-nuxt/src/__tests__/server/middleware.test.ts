@@ -1,4 +1,4 @@
-import { createApp, toWebHandler, getRequestHeader, type H3EventContext } from "h3";
+import { createApp, toWebHandler, type H3EventContext } from "h3";
 import { generateKeyPairSync, createSign } from "node:crypto";
 import { describe, it, expect, expectTypeOf, vi, beforeEach } from "vitest";
 
@@ -86,6 +86,43 @@ function makeWebRequest(
   if (cookie) headers.cookie = cookie;
   if (authorization) headers.authorization = authorization;
   return new Request(url, { headers, method });
+}
+
+type ServeOptions = NonNullable<Parameters<typeof createNextgenMiddleware>[0]>;
+interface ServeInit {
+  readonly method?: string;
+  readonly headers?: Record<string, string>;
+}
+
+// A refusal or a proxied answer comes back as `response`; a request the
+// middleware lets through reaches the app's own handler and yields none.
+async function serve(
+  url: string,
+  init: ServeInit = {},
+  options: ServeOptions = {},
+): Promise<{ response?: Response; request: Request }> {
+  let reached = false;
+  const app = createApp();
+  app.use(createNextgenMiddleware(options));
+  app.use("/", () => {
+    reached = true;
+    return { ok: true };
+  });
+  const request = new Request(url, init);
+  const response = await toWebHandler(app)(request);
+  return { response: reached ? undefined : response, request };
+}
+
+function captureFetch(response: () => Response = () => new Response("{}", { status: 200 })) {
+  const calls: { url: string; headers: Headers }[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockImplementation((url: string, init: RequestInit) => {
+      calls.push({ url: String(url), headers: new Headers(init?.headers) });
+      return Promise.resolve(response());
+    }),
+  );
+  return calls;
 }
 
 describe("createNextgenMiddleware (H3)", () => {
@@ -510,35 +547,6 @@ describe("createNextgenMiddleware (H3)", () => {
         loginPath: "//evil.example.com/phish",
       }),
     ).toThrow(/loginPath must be a relative path/i);
-  });
-
-  it("strips x-nextgen-auth-token from proxied requests", async () => {
-    let capturedHeaders: Headers | undefined;
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockImplementation((_url: string, init: RequestInit) => {
-        capturedHeaders = init.headers as Headers;
-        return Promise.resolve(new Response("{}", { status: 200 }));
-      }),
-    );
-
-    const app = createApp();
-    app.use(createNextgenMiddleware({ url: "http://localhost:4000" }));
-
-    const handler = toWebHandler(app);
-    await handler(
-      new Request("http://localhost:3000/__nextgen/v1/flow", {
-        method: "GET",
-        headers: {
-          "x-nextgen-auth-token": "secret-session-token",
-          "content-type": "application/json",
-        },
-      }),
-    );
-
-    expect(capturedHeaders).toBeDefined();
-    expect((capturedHeaders as Headers).has("x-nextgen-auth-token")).toBe(false);
-    expect((capturedHeaders as Headers).get("content-type")).toBe("application/json");
   });
 
   it("forwards upstream Set-Cookie headers", async () => {
@@ -999,98 +1007,47 @@ describe("createNextgenMiddleware (H3)", () => {
     });
   });
 
-  describe("inbound header stripping: x-nextgen-auth-token (T-1)", () => {
-    it("strips client-supplied x-nextgen-auth-token so route handlers cannot read it", async () => {
-      const app = createApp();
-      app.use(
-        createNextgenMiddleware({
-          url: "http://localhost:4000",
-          protectedRoutes: [],
-        }),
+  describe("inbound x-nextgen-auth-token", () => {
+    it("refuses a request that carries the auth header", async () => {
+      const { response } = await serve(
+        "http://localhost:3000/admin",
+        { headers: { "x-nextgen-auth-token": "forged" } },
+        { protectedRoutes: ["/admin"] },
       );
 
-      let capturedToken: string | undefined;
-      app.use("/", (event) => {
-        capturedToken = getRequestHeader(event, "x-nextgen-auth-token");
-        return { ok: true };
-      });
-
-      const handler = toWebHandler(app);
-      await handler(
-        new Request("http://localhost:3000/", {
-          headers: { "x-nextgen-auth-token": "forged-session-token" },
-        }),
-      );
-
-      // The client-supplied value must not be visible to downstream handlers
-      expect(capturedToken).toBeUndefined();
+      expect(response?.status).toBe(400);
+      expect(await response?.text()).toBe("Bad Request");
     });
 
-    it("strips the header regardless of whether a valid session token is present", async () => {
-      const kid = nextKid();
-      const exp = Math.floor(Date.now() / 1000) + 3600;
-      const token = makeJwt(
-        {
-          sub: "user-nuxt",
-          email: "nuxt@example.com",
-          iss: "http://localhost:4000",
-          exp,
-        },
-        kid,
-      );
-      vi.stubGlobal("fetch", mockJwks(kid));
-
-      const app = createApp();
-      app.use(
-        createNextgenMiddleware({
-          url: "http://localhost:4000",
-          protectedRoutes: [],
-        }),
+    it("refuses a request that carries the auth header on an ignored route", async () => {
+      const { response } = await serve(
+        "http://localhost:3000/health",
+        { headers: { "x-nextgen-auth-token": "forged" } },
+        { ignoredRoutes: ["/health"] },
       );
 
-      let capturedToken: string | undefined;
-      app.use("/", (event) => {
-        capturedToken = getRequestHeader(event, "x-nextgen-auth-token");
-        return { ok: true };
-      });
-
-      const handler = toWebHandler(app);
-      await handler(
-        new Request("http://localhost:3000/", {
-          headers: {
-            cookie: `__nextgen_session=${token}`,
-            "x-nextgen-auth-token": "forged-session-token",
-          },
-        }),
-      );
-
-      // Even with a valid session cookie, the attacker-supplied header is gone
-      expect(capturedToken).toBeUndefined();
+      expect(response?.status).toBe(400);
+      expect(await response?.text()).toBe("Bad Request");
     });
 
-    it("strips client-supplied x-nextgen-auth-token on ignored routes", async () => {
-      const app = createApp();
-      app.use(
-        createNextgenMiddleware({
-          url: "http://localhost:4000",
-          ignoredRoutes: ["/health"],
-        }),
+    it("refuses a request that carries the auth header on the proxy path", async () => {
+      const calls = captureFetch();
+
+      const { response } = await serve(
+        "http://localhost:3000/__nextgen/v1/flow",
+        { headers: { "x-nextgen-auth-token": "forged" } },
+        { url: "http://localhost:4000" },
       );
 
-      let capturedToken: string | undefined;
-      app.use("/health", (event) => {
-        capturedToken = getRequestHeader(event, "x-nextgen-auth-token");
-        return { ok: true };
-      });
+      expect(response?.status).toBe(400);
+      expect(await response?.text()).toBe("Bad Request");
+      expect(calls).toHaveLength(0);
+    });
 
-      const handler = toWebHandler(app);
-      await handler(
-        new Request("http://localhost:3000/health", {
-          headers: { "x-nextgen-auth-token": "forged-session-token" },
-        }),
-      );
+    it("lets a request without the auth header through", async () => {
+      const { response } = await serve("http://localhost:3000/");
 
-      expect(capturedToken).toBeUndefined();
+      expect(response).toBeUndefined();
     });
   });
 });

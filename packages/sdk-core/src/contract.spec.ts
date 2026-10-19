@@ -433,33 +433,16 @@ describe("server SDK test titles", () => {
     "invalid token clears the stale session cookie and redirects",
     "absolute loginPath throws",
     "protocol-relative loginPath throws",
-    "strips x-nextgen-auth-token from proxied requests",
     "forwards upstream Set-Cookie headers",
     "appends the client IP to an existing X-Forwarded-For chain",
     "sets X-Forwarded-For from the client IP when no chain exists",
     "omits X-Forwarded-For when no client IP is available",
     "skips auth handling on an ignored route",
-    "refuses the request when the header cannot be removed",
-    "lets the request through when removal fails but the header is absent",
+    "refuses a request that carries the auth header",
+    "refuses a request that carries the auth header on an ignored route",
+    "refuses a request that carries the auth header on the proxy path",
+    "lets a request without the auth header through",
   ];
-
-  // Next.js never removes it from the incoming request: it builds a fresh,
-  // mutable header set with the header overwritten. Nuxt deletes it from the
-  // plain Node header object, which cannot refuse the deletion.
-  const EXCEPTIONS: Record<keyof typeof TEST_FILES, readonly string[]> = {
-    "sdk-sveltekit": [],
-    "sdk-solid-start": [],
-    "sdk-qwik-city": [],
-    "sdk-tanstack-start": [],
-    "sdk-next": [
-      "refuses the request when the header cannot be removed",
-      "lets the request through when removal fails but the header is absent",
-    ],
-    "sdk-nuxt": [
-      "refuses the request when the header cannot be removed",
-      "lets the request through when removal fails but the header is absent",
-    ],
-  };
 
   // Matches `it("title"` and the `it.each([...])("title"` form.
   const TITLE = /(?:\bit\(|\]\)\()\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1/g;
@@ -473,8 +456,7 @@ describe("server SDK test titles", () => {
     "%s tests every canonical behaviour under its canonical title",
     (sdk) => {
       const titles = titlesOf(sdk);
-      const expected = CANONICAL_TITLES.filter((title) => !EXCEPTIONS[sdk].includes(title));
-      expect(expected.filter((title) => !titles.includes(title))).toEqual([]);
+      expect(CANONICAL_TITLES.filter((title) => !titles.includes(title))).toEqual([]);
     },
   );
 

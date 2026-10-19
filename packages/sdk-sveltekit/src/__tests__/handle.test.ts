@@ -401,28 +401,6 @@ describe("createNextgenHandle", () => {
   });
 
   describe("proxy", () => {
-    it("strips x-nextgen-auth-token from proxied requests", async () => {
-      let capturedHeaders: Headers | undefined;
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockImplementation((_url: string, init: RequestInit) => {
-          capturedHeaders = init.headers as Headers;
-          return Promise.resolve(new Response("{}", { status: 200 }));
-        }),
-      );
-
-      const handle = createNextgenHandle({ url: "http://localhost:4000" });
-      const { event, resolve } = makeEvent("http://localhost:3000/__nextgen/v1/flow", {
-        headers: { "x-nextgen-auth-token": "secret", "content-type": "application/json" },
-      });
-
-      await run(handle, event, resolve);
-
-      expect(resolve).not.toHaveBeenCalled();
-      expect(capturedHeaders?.has("x-nextgen-auth-token")).toBe(false);
-      expect(capturedHeaders?.get("content-type")).toBe("application/json");
-    });
-
     it("forwards upstream Set-Cookie headers", async () => {
       const upstreamHeaders = new Headers();
       upstreamHeaders.append("set-cookie", "__nextgen_session=abc; HttpOnly; SameSite=Lax");
@@ -805,42 +783,46 @@ describe("shared server SDK cases", () => {
   });
 
   describe("inbound x-nextgen-auth-token", () => {
-    it.each([
-      ["a public route", "http://localhost:3000/"],
-      ["an ignored route", "http://localhost:3000/health"],
-    ])("is stripped on %s", async (_l, url) => {
-      const { request } = await serve(
-        url,
+    it("refuses a request that carries the auth header", async () => {
+      const { response } = await serve(
+        "http://localhost:3000/admin",
+        { headers: { "x-nextgen-auth-token": "forged" } },
+        { protectedRoutes: ["/admin"] },
+      );
+
+      expect(response?.status).toBe(400);
+      expect(await response?.text()).toBe("Bad Request");
+    });
+
+    it("refuses a request that carries the auth header on an ignored route", async () => {
+      const { response } = await serve(
+        "http://localhost:3000/health",
         { headers: { "x-nextgen-auth-token": "forged" } },
         { ignoredRoutes: ["/health"] },
       );
 
-      expect(request.headers.has("x-nextgen-auth-token")).toBe(false);
+      expect(response?.status).toBe(400);
+      expect(await response?.text()).toBe("Bad Request");
     });
 
-    it("refuses the request when the header cannot be removed", async () => {
-      const { event, resolve } = makeEvent("http://localhost:3000/", {
-        headers: { "x-nextgen-auth-token": "forged" },
-      });
-      event.request.headers.delete = () => {
-        throw new TypeError("immutable");
-      };
+    it("refuses a request that carries the auth header on the proxy path", async () => {
+      const calls = captureFetch();
 
-      const response = await run(createNextgenHandle(), event, resolve);
+      const { response } = await serve(
+        "http://localhost:3000/__nextgen/v1/flow",
+        { headers: { "x-nextgen-auth-token": "forged" } },
+        { url: "http://localhost:4000" },
+      );
 
-      expect(response.status).toBe(400);
-      expect(resolve).not.toHaveBeenCalled();
+      expect(response?.status).toBe(400);
+      expect(await response?.text()).toBe("Bad Request");
+      expect(calls).toHaveLength(0);
     });
 
-    it("lets the request through when removal fails but the header is absent", async () => {
-      const { event, resolve } = makeEvent("http://localhost:3000/");
-      event.request.headers.delete = () => {
-        throw new TypeError("immutable");
-      };
+    it("lets a request without the auth header through", async () => {
+      const { response } = await serve("http://localhost:3000/");
 
-      await run(createNextgenHandle(), event, resolve);
-
-      expect(resolve).toHaveBeenCalledTimes(1);
+      expect(response).toBeUndefined();
     });
   });
 
