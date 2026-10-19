@@ -49,7 +49,33 @@
       "root": "apps/website",
       "framework": "nextjs",
       "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
-      "buildCommand": "pnpm run build"
+      "buildCommand": "turbo run build --filter=@zitadel/components && pnpm run build"
+    },
+    "schemas": {
+      "root": "apps/cloud",
+      "installCommand": "true",
+      "buildCommand": "node ../../scripts/render-builtin-schemas.mjs",
+      "devCommand": "node ../../scripts/render-builtin-schemas.mjs --serve",
+      "outputDirectory": "../../dist/cloud-schemas",
+      "headers": [
+        {
+          "source": "/schemas/v1/(.*)",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/schema+json"
+            },
+            {
+              "key": "Cache-Control",
+              "value": "public, max-age=3600, stale-while-revalidate=86400"
+            },
+            {
+              "key": "Access-Control-Allow-Origin",
+              "value": "*"
+            }
+          ]
+        }
+      ]
     }
   },
   "redirects": [
@@ -94,6 +120,12 @@
       }
     },
     {
+      "source": "/schemas/v1/(.*)",
+      "destination": {
+        "service": "schemas"
+      }
+    },
+    {
       "source": "/docs",
       "destination": {
         "service": "docs"
@@ -125,6 +157,12 @@
     },
     {
       "source": "/favicons/(.*)",
+      "destination": {
+        "service": "website"
+      }
+    },
+    {
+      "source": "/llms.txt",
       "destination": {
         "service": "website"
       }

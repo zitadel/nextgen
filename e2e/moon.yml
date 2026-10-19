@@ -180,6 +180,22 @@ tasks:
       cache: false
       runInCI: false
 
+  # The built-in schemas on a deployment of the hosted cloud, which CLOUD_URL
+  # names, as the `schemas` service publishes them under /schemas/v1/: each
+  # one this commit renders (the spec imports the renderer), labelled, cached
+  # and routed as vercel.json says. HTTP only, nothing to build or boot; run
+  # beside the console's suite and, like it, not a dependency of `all`.
+  schemas-deployment:
+    command: "corepack pnpm exec playwright test --config schemas/playwright.deployment.config.mts"
+    inputs:
+      - "schemas/**/*"
+      - "@group(laneShared)"
+      - "/scripts/render-builtin-schemas.mjs"
+      - "/api/openapi/endpoints/schemas/*.json"
+    options:
+      cache: false
+      runInCI: false
+
   # ── demo-next lanes (former @zitadel/demo-next-e2e) ──────────────────────────
 
   # Mock lane: the demo against the standalone @zitadel/api-mock TCP server.

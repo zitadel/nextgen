@@ -1,5 +1,6 @@
 get:
   operationId: getEvent
+  x-zitadel-cli: events get
   summary: Get event by ID
   description: |
     Loads a single event by `(project_id, id)`. Requires `events.read`.
@@ -13,12 +14,7 @@ get:
     - oauth2:
         - events.read
   parameters:
-    - name: id
-      in: path
-      required: true
-      schema:
-        type: string
-      description: Managed event id (`evt_<opaque>`).
+    - $ref: ../../../components/parameters/event-id.yaml
     - $ref: ../../../components/parameters/project-id.yaml
   responses:
     '200':

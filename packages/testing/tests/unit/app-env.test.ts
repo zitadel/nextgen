@@ -27,6 +27,7 @@ describe("applyAppEnvTemplate", () => {
   it("locks the @zitadel/sdk-next env contract", () => {
     expect(applyAppEnvTemplate(nextAppEnv, handle)).toEqual({
       ZITADEL_URL: "http://localhost:8092",
+      ZITADEL_PROJECT_ID: "proj_1",
       NEXT_PUBLIC_ZITADEL_PROJECT_ID: "proj_1",
       ZITADEL_PROJECT_SECRET: "secret_1",
     });

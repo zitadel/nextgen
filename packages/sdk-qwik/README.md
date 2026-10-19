@@ -10,7 +10,9 @@ pnpm add @zitadel/sdk-qwik@alpha
 
 ## Requirements
 
-TypeScript ≥ 5.0 — the published type definitions re-export with `export type *`, which TypeScript introduced in 5.0.
+Peer dependencies: `@qwik.dev/core ^2.0.0-beta.45`.
+
+TypeScript ≥ 5.0, the floor shared by every SDK; see the [compatibility notes](https://github.com/zitadel/nextgen/blob/main/packages/AGENTS.md).
 
 ## Usage
 
@@ -50,7 +52,8 @@ The signed-in session card is `<ZitadelSession project={project} />` (exported a
 | `proxyPath` | `string` | `"/__nextgen"` | Login, Logout, Session | Same-origin path the widget calls. |
 | `purpose` | `CreateFlowBodyPurpose` | `"login"` | Login | Flow purpose. |
 | `flowName` | `string` | unset | Login | Runs the flow definition with this `name`; unset runs the project's default flow for the purpose. |
-| `postSignInUrl` | `string` | unset | Login | Where to navigate after a completed sign-in. |
+| `postSignInUrl` | `string` | unset | Login | Where to navigate after a completed sign-in. When the page's `next` query parameter names a path on the same origin, as the server SDKs' middleware sets it for a signed-out visit to a protected route, the widget returns there instead. |
+| `forcePostSignInUrl` | `boolean` | `false` | Login | Navigates to `postSignInUrl` even when the page's `next` query parameter names a path, for a page that uses `next` for something of its own. |
 | `postSignOutUrl` | `string` | unset | Logout, Session | Where to navigate after sign-out. |
 | `resumeFlowId` | `string` or `null` | unset | Login | An existing flow's id to resume instead of starting a new flow; unset, `null` or `""` falls back to the `flow` query parameter, and an id that no longer resolves starts a new flow. |
 | `variant` | `"widget"` or `"page"` | `"widget"` | Login, Session | `widget` is content-sized and paints no page chrome; `page` claims the viewport, paints the surface background and loads the brand font, and on Login focuses the first field. |
@@ -79,7 +82,7 @@ Each widget event reaches the callback in the last column, which receives the ev
 
 ## Server rendering
 
-If your app renders on the server, pass `projectId` and `proxyPath` to the `ZitadelLogin` wrapper as strings (it writes them as the `project-id` and `proxy-path` attributes; use those hyphenated names only on a raw `<zitadel-login>` element), because a widget that starts before its configuration arrives shows an error instead of the flow. `ZitadelLogout` and `ZitadelSession` do the same, and the other string and boolean options (`purpose`, `flowName`, `postSignInUrl`, `resumeFlowId`, `postSignOutUrl`, `variant`, `theme`, `heading`, `logoutLabel`, `lang`, `suppressHeader`, `suppressPasswordToggle`) are written as attributes too. A `project` handle contributes its `projectId`, `proxyPath`, `url` and `publishableKey` as attributes; the rest of the handle, and `locales`, are set as element properties after hydration, so a widget that needs `locales` still gets them only on the client. The `on…$` callbacks are attached once the page is interactive, so the wrappers hold the widget's terminal events (`zitadel-flow-complete`, `zitadel-flow-redirect`, `zitadel-flow-error` and `zitadel-signout`, at most eight per widget) until then and replay them to the callbacks in order; a resumed flow that is already finished still reaches `onFlowComplete$`. Step and input events are never held, so field values are not retained, and a raw `<zitadel-login>` you render yourself is not buffered at all.
+If your app renders on the server, pass `projectId` and `proxyPath` to the `ZitadelLogin` wrapper as strings (it writes them as the `project-id` and `proxy-path` attributes; use those hyphenated names only on a raw `<zitadel-login>` element), because a widget that starts before its configuration arrives shows an error instead of the flow. `ZitadelLogout` and `ZitadelSession` do the same, and the other string and boolean options (`purpose`, `flowName`, `postSignInUrl`, `forcePostSignInUrl`, `resumeFlowId`, `postSignOutUrl`, `variant`, `theme`, `heading`, `logoutLabel`, `lang`, `suppressHeader`, `suppressPasswordToggle`) are written as attributes too. A `project` handle contributes its `projectId`, `proxyPath`, `url` and `publishableKey` as attributes; the rest of the handle, and `locales`, are set as element properties after hydration, so a widget that needs `locales` still gets them only on the client. The `on…$` callbacks are attached once the page is interactive, so the wrappers hold the widget's terminal events (`zitadel-flow-complete`, `zitadel-flow-redirect`, `zitadel-flow-error` and `zitadel-signout`, at most eight per widget) until then and replay them to the callbacks in order; a resumed flow that is already finished still reaches `onFlowComplete$`. Step and input events are never held, so field values are not retained, and a raw `<zitadel-login>` you render yourself is not buffered at all.
 
 ## Proxying to the backend (deployment)
 
