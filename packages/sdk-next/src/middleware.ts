@@ -9,6 +9,7 @@ import {
   loginRedirectUrl,
   matchesRoutes,
   requiresProjectSecret,
+  validateOpaqueSessionToken,
 } from "@zitadel/sdk-core/middleware";
 import { NextResponse } from "next/server";
 
@@ -132,31 +133,6 @@ export async function nextgenMiddleware(
     opaqueTokenTimeoutMs,
     pathname,
   });
-}
-
-/**
- * Validates an opaque (non-JWT) session token by calling the backend's
- * `/sessions/me` endpoint. Returns `true` when the backend confirms the
- * session is live (HTTP 200), `false` otherwise.
- *
- * This is the fallback path for backends that issue encrypted opaque tokens
- * rather than self-contained JWTs.
- */
-async function validateOpaqueSessionToken(
-  token: string,
-  issuerUrl: string,
-  timeoutMs: number,
-): Promise<boolean> {
-  try {
-    const res = await fetch(`${issuerUrl}/sessions/me`, {
-      method: "GET",
-      headers: { cookie: `__nextgen_session=${token}` },
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
 }
 
 /**
@@ -343,20 +319,26 @@ async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<N
   // not a JWT (non-JSON segments). A token with a valid JWT structure that
   // failed verification (bad sig, wrong typ/alg) must be rejected — never
   // accepted by a backend call that doesn't re-check the JWT claims.
+  let liveAnonymousSession = false;
   if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
-    const isValid = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
-    if (isValid) {
+    const opaque = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
+    // A session without a user is anonymous: its sign-in has not verified a
+    // factor yet. It is not signed in, but it is live — keep its cookie.
+    if (opaque?.userId) {
       const tunnelled = tunnelHeaders(req, {
         "x-nextgen-auth-token": cookieToken,
       });
       return NextResponse.next({ request: { headers: tunnelled } });
     }
+    liveAnonymousSession = opaque !== null;
   }
 
   const tunnelled = tunnelHeaders(req, { "x-nextgen-auth-token": "" });
-  const staleNextgenCookies = req.cookies
-    .getAll()
-    .filter((c: { name: string }) => c.name.startsWith("__nextgen"));
+  // Dead credentials are cleared so the browser stops replaying them; a live
+  // anonymous session's cookie stays, since its sign-in may still complete.
+  const staleNextgenCookies = liveAnonymousSession
+    ? []
+    : req.cookies.getAll().filter((c: { name: string }) => c.name.startsWith("__nextgen"));
 
   if (matchesRoutes(pathname, protectedRoutes)) {
     const redirect = NextResponse.redirect(loginRedirectUrl(loginPath, req.url), { status: 302 });

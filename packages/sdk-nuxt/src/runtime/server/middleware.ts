@@ -9,6 +9,7 @@ import {
   loginRedirectUrl,
   matchesRoutes,
   requiresProjectSecret,
+  validateOpaqueSessionToken,
 } from "@zitadel/sdk-core/middleware";
 import {
   defineEventHandler,
@@ -270,46 +271,6 @@ function isJwtShaped(token: string): boolean {
     return typeof header?.alg === "string" && !("enc" in header);
   } catch {
     return false;
-  }
-}
-
-/**
- * Validates an opaque (non-JWT) session token by calling the backend's
- * `/sessions/me` endpoint. Returns the response JSON when the backend
- * confirms the session is live (HTTP 200), `null` otherwise.
- *
- * This is the fallback path for backends that issue encrypted opaque tokens
- * rather than self-contained JWTs.
- */
-async function validateOpaqueSessionToken(
-  token: string,
-  issuerUrl: string,
-  timeoutMs: number,
-): Promise<{
-  userId?: string;
-  identifier: string | null;
-  identifierProperty: string | null;
-  display: string | null;
-} | null> {
-  try {
-    const res = await fetch(`${issuerUrl}/sessions/me`, {
-      method: "GET",
-      headers: { cookie: `__nextgen_session=${token}` },
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    if (!res.ok) return null;
-    const body = (await res.json()) as {
-      user_id?: string;
-      user?: { identifier?: string; identifier_property?: string; display?: string };
-    };
-    return {
-      userId: body.user_id,
-      identifier: body.user?.identifier ?? null,
-      identifierProperty: body.user?.identifier_property ?? null,
-      display: body.user?.display ?? null,
-    };
-  } catch {
-    return null;
   }
 }
 

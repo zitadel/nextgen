@@ -598,9 +598,7 @@ describe("server middleware", () => {
 
   // CreateSession sets the cookie before any factor is verified: an abandoned
   // sign-in must not open protected routes.
-  // Known gap: the middleware treats any 200 from /sessions/me as signed in, so an
-  // anonymous session is let through. Drop `.fails` once it checks for a user.
-  it.fails("redirects an anonymous session on a protected route to login", async () => {
+  it("redirects an anonymous session on a protected route to login", async () => {
     sessionsMe(Response.json({}));
 
     const served = await serve(
@@ -622,6 +620,74 @@ describe("server middleware", () => {
     );
 
     expect(served.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("treats a 200 session without a user as anonymous on a public route", async () => {
+    sessionsMe(Response.json({}));
+
+    const served = await serve(
+      `${ORIGIN}/`,
+      { headers: { cookie: "__nextgen_session=opaque-session-token" } },
+      OPTIONS,
+    );
+
+    expect(served.answered).toBe(false);
+    expect(served.auth?.isAuthenticated ?? false).toBe(false);
+    expect(served.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("redirects a session whose answer has an empty body to login on a protected route", async () => {
+    sessionsMe(new Response(null, { status: 200 }));
+
+    const served = await serve(
+      `${ORIGIN}/admin`,
+      { headers: { cookie: "__nextgen_session=opaque-session-token" } },
+      OPTIONS,
+    );
+
+    expect(served.status).toBe(302);
+  });
+
+  it("redirects a session whose answer is not JSON to login on a protected route", async () => {
+    sessionsMe(
+      new Response("<html>Bad gateway</html>", {
+        status: 200,
+        headers: { "content-type": "text/html" },
+      }),
+    );
+
+    const served = await serve(
+      `${ORIGIN}/admin`,
+      { headers: { cookie: "__nextgen_session=opaque-session-token" } },
+      OPTIONS,
+    );
+
+    expect(served.status).toBe(302);
+  });
+
+  it("redirects a session whose answer has a null user id to login on a protected route", async () => {
+    sessionsMe(Response.json({ user_id: null }));
+
+    const served = await serve(
+      `${ORIGIN}/admin`,
+      { headers: { cookie: "__nextgen_session=opaque-session-token" } },
+      OPTIONS,
+    );
+
+    expect(served.status).toBe(302);
+  });
+
+  it("treats a 5xx answer from the session check as not signed in", async () => {
+    sessionsMe(new Response("Bad gateway", { status: 502 }));
+
+    const served = await serve(
+      `${ORIGIN}/`,
+      { headers: { cookie: "__nextgen_session=opaque-session-token" } },
+      OPTIONS,
+    );
+
+    expect(served.answered).toBe(false);
+    expect(served.auth?.isAuthenticated ?? false).toBe(false);
   });
 
   it("clears a dead session cookie on a public page", async () => {
