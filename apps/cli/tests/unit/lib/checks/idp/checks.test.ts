@@ -57,13 +57,12 @@ async function resultsFor(
 }
 
 describe("IDP_CHECKS", () => {
-  it("passes every check for a provider that accepts the connection, except the sign-in it was not asked for", async () => {
+  it("passes every check for a provider that accepts the connection", async () => {
     const { by } = await resultsFor();
 
-    expect(IDP_CHECKS.map((check) => by(check.name)?.status)).toEqual([
-      ...Array(IDP_CHECKS.length - 1).fill("pass"),
-      "skipped",
-    ]);
+    expect(IDP_CHECKS.map((check) => by(check.name)?.status)).toEqual(
+      Array(IDP_CHECKS.length).fill("pass"),
+    );
   });
 
   it("fails discovery, and skips what needs it, for a provider that cannot be read", async () => {

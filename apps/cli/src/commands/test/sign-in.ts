@@ -1,13 +1,7 @@
-import { Flags } from "@oclif/core";
 import { idpProvider, IDP_PROVIDERS, referencedVariable } from "@zitadel/config/idp";
 import { consola } from "consola";
 
-import {
-  createZitadelClient,
-  escapeControlCharacters,
-  type ZitadelClient,
-} from "../../lib/api-client";
-import { openInBrowser } from "../../lib/browser";
+import { createZitadelClient, escapeControlCharacters } from "../../lib/api-client";
 import {
   type CheckResult,
   IDP_CHECKS,
@@ -19,39 +13,12 @@ import {
 import { ZitadelError } from "../../lib/errors";
 import { type ConnectionFile, callbackUriFor, readConnectionFiles } from "../../lib/idp";
 import { isObject } from "../../lib/json";
-import { DEFAULT_LOCAL_SERVER_URL, readRuntimeMetadata } from "../../lib/local-server/runtime";
-import { LocalServer } from "../../lib/local-server/server";
 import { wrapForBox } from "../../lib/box";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { reportWarning } from "../../lib/warnings";
 import { readDevelopmentIssuer, readZitadelConfig, readZitadelSecret } from "../../lib/project";
-import { resolveCwd } from "../../lib/paths";
-import { publicCliCommand } from "../../lib/public-cli";
-import { watchSignInEvents } from "../../lib/sign-in-events";
-import { buildSyncPlan, enumeratePlanResources, makeSyncers } from "../../lib/sync";
 
 const REQUEST_TIMEOUT_MS = 10_000;
-const DEFAULT_TIMEOUT_SECONDS = 300;
-const LOG_POLL_MS = 1_000;
-/** How much of the log's end one poll reads; a sign-in writes a few lines. */
-const LOG_TAIL = 2_000;
-/** The resource kinds a sign-in depends on: the connection, the user schema and the login flow. */
-const SIGN_IN_KINDS = ["idp", "schema", "flow"];
-
-/** Resolves after `ms`, or as soon as `signal` aborts. */
-const wait = (ms: number, signal: AbortSignal) =>
-  new Promise<void>((resolve) => {
-    const timer = setTimeout(resolve, ms);
-    signal.addEventListener(
-      "abort",
-      () => {
-        clearTimeout(timer);
-        resolve();
-      },
-      { once: true },
-    );
-  });
-
 /** One GET, following redirects, bounded in time and in the body it keeps. */
 const send: Send = async (url) => {
   const response = await fetch(url, {
@@ -84,51 +51,18 @@ const send: Send = async (url) => {
 export default class TestSignIn extends BaseCommand {
   static override description = "Check that a sign-in provider is set up correctly.";
   static override group = CommandGroups.configuration;
-  static override examples = [
-    "<%= config.bin %> test sign-in --provider google",
-    "<%= config.bin %> test sign-in --provider google --live",
-  ];
+  static override examples = ["<%= config.bin %> test sign-in --provider google"];
   static override flags = {
     provider: nonBlankString({
       description: "Connection to check. Defaults to every connection the Project has.",
-    }),
-    live: Flags.boolean({
-      description:
-        "After the checks, sign in through a browser and watch the runtime's log. Off by default.",
-    }),
-    timeout: Flags.integer({
-      description: "Seconds to wait for the browser sign-in.",
-      default: DEFAULT_TIMEOUT_SECONDS,
-      min: 1,
     }),
   };
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(TestSignIn);
-    const live = flags.live;
-    if (live) {
-      const runtime = await readRuntimeMetadata(
-        resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined),
-      );
-      await this.toMeta(flags, {
-        resolveServer: false,
-        source: runtime?.server_url ?? DEFAULT_LOCAL_SERVER_URL,
-      });
-    } else {
-      await this.toMeta(flags);
-    }
+    await this.toMeta(flags);
     const { cwd } = this.meta;
-    const server = LocalServer.at(cwd, { cliVersion: this.meta.cliVersion });
-    if (live) {
-      await this.requireRunning(server);
-    }
-
     const connections = await this.connections(cwd, flags.provider);
-    if (connections.length > 1 && live) {
-      throw new ZitadelError("E_VALIDATION", "A live sign-in belongs to one provider", {
-        hint: `Name one with --provider: ${connections.map(slugOf).join(", ")}`,
-      });
-    }
     const projectIssuer = readDevelopmentIssuer(await readZitadelConfig(cwd));
     if (projectIssuer === undefined) {
       throw new ZitadelError("E_VALIDATION", "zitadel.json names no development issuer", {
@@ -138,13 +72,7 @@ export default class TestSignIn extends BaseCommand {
     const providers = await connections.reduce<Promise<readonly ProviderReport[]>>(
       async (done, connection) => [
         ...(await done),
-        await this.checkProvider({
-          connection,
-          projectIssuer,
-          server,
-          live,
-          timeoutSeconds: flags.timeout,
-        }),
+        await this.checkProvider(connection, projectIssuer),
       ],
       Promise.resolve([]),
     );
@@ -162,7 +90,7 @@ export default class TestSignIn extends BaseCommand {
     const summary = `${data.passed} passed, ${data.warned} warned, ${data.failed} failed, ${data.skipped} skipped`;
     consola.box({
       title: "Sign-in checks",
-      message: wrapForBox(summaryOf(providers, live)),
+      message: wrapForBox(summaryOf(providers)),
       style: {
         padding: 1,
         borderStyle: "rounded",
@@ -189,22 +117,14 @@ export default class TestSignIn extends BaseCommand {
   }
 
   /** Runs the battery for one connection, printing each check as it finishes. */
-  private async checkProvider(options: {
-    readonly connection: ConnectionFile;
-    readonly projectIssuer: string;
-    readonly server: LocalServer;
-    readonly live: boolean;
-    readonly timeoutSeconds: number;
-  }): Promise<ProviderReport> {
-    const { connection, projectIssuer, server, live } = options;
+  private async checkProvider(
+    connection: ConnectionFile,
+    projectIssuer: string,
+  ): Promise<ProviderReport> {
     const { cwd } = this.meta;
     const slug = slugOf(connection);
     const oidc = isObject(connection.body.oidc) ? connection.body.oidc : {};
     const callbackUri = callbackUriFor(projectIssuer, slug);
-    if (live) {
-      await this.requireSecretVariable(cwd, oidc.client_secret);
-      await this.requireApplied(cwd);
-    }
 
     consola.start(`Checking ${slug}`);
     if (process.stdout.isTTY) {
@@ -227,29 +147,6 @@ export default class TestSignIn extends BaseCommand {
         consoleUrl: catalogId === undefined ? undefined : idpProvider(catalogId).consoleUrl,
         probes: PROVIDER_PROBES.get(slug),
         request: send,
-        ...(live
-          ? {
-              live: {
-                loginUrl: `${projectIssuer.replace(/\/$/, "")}/login`,
-                timeoutMs: options.timeoutSeconds * 1000,
-                open: async (url) => {
-                  await openInBrowser(url);
-                },
-                // Under --json consola is silent, so the login URL a person has to open would reach
-                // nobody; stderr keeps stdout clean for the envelope and still shows it.
-                say: (message) =>
-                  this.jsonEnabled() ? process.stderr.write(`${message}\n`) : consola.info(message),
-                watch: (signal) =>
-                  watchSignInEvents(
-                    async () => (await server.logs({ tail: LOG_TAIL })).logs,
-                    wait,
-                    LOG_POLL_MS,
-                    signal,
-                  ),
-                sleep: wait,
-              },
-            }
-          : {}),
       }),
       report,
     );
@@ -263,84 +160,6 @@ export default class TestSignIn extends BaseCommand {
       failed: count("fail"),
       skipped: count("skipped"),
       checks: results,
-    };
-  }
-
-  /** A sign-in needs the runtime it is watching, so a stopped one is refused before anything opens. */
-  private async requireRunning(server: LocalServer): Promise<void> {
-    if ((await server.status()).lifecycle !== "running") {
-      throw new ZitadelError("E_VALIDATION", "The local Zitadel runtime is not running", {
-        hint: "A live sign-in is watched through the runtime's log. Start it, or run without --live.",
-        nextCommands: [publicCliCommand("start", this.meta.cliVersion)],
-      });
-    }
-  }
-
-  /** The client secret is write-only, so the most that can be known is that the project holds one. */
-  private async requireSecretVariable(cwd: string, written: unknown): Promise<void> {
-    const name = typeof written === "string" ? referencedVariable(written) : undefined;
-    if (name === undefined) {
-      return;
-    }
-    const { client, projectId } = await this.projectClient(cwd);
-    const held = await client.getVariable(name, { project_id: projectId, kind: "primary" }).then(
-      ({ primary }) => primary,
-      (error: unknown) => {
-        if (error instanceof ZitadelError && error.code === "E_NOT_FOUND") {
-          return undefined;
-        }
-        throw error;
-      },
-    );
-    if (held === undefined || typeof held !== "object") {
-      throw new ZitadelError(
-        "E_CREDENTIAL_MISSING",
-        `The client secret variable ${name} is ${held === undefined ? "not set" : "not a secret"}`,
-        {
-          hint: `Publish it with: zitadel variables set ${name} --project-level --secret`,
-          nextCommands: [
-            publicCliCommand(
-              `variables set ${name} --project-level --secret`,
-              this.meta.cliVersion,
-            ),
-          ],
-        },
-      );
-    }
-  }
-
-  /** What the runtime serves is what gets signed in with, so files it has not received are refused. */
-  private async requireApplied(cwd: string): Promise<void> {
-    const { client, projectId } = await this.projectClient(cwd);
-    const plan = await buildSyncPlan(
-      cwd,
-      makeSyncers({ client, projectId, env: this.meta.env, cwd }),
-      true,
-    );
-    const pending = enumeratePlanResources(plan).filter((change) =>
-      SIGN_IN_KINDS.includes(change.kind),
-    );
-    if (pending.length > 0) {
-      throw new ZitadelError(
-        "E_VALIDATION",
-        `${pending.length} change${pending.length === 1 ? "" : "s"} to the connection, schema or flow ${pending.length === 1 ? "is" : "are"} not applied yet`,
-        {
-          hint: `The sign-in would run against the old files: ${pending.map((change) => change.file).join(", ")}`,
-          nextCommands: [publicCliCommand("apply", this.meta.cliVersion)],
-          details: { pending },
-        },
-      );
-    }
-  }
-
-  private async projectClient(cwd: string): Promise<{ client: ZitadelClient; projectId: string }> {
-    const secret = await readZitadelSecret(cwd);
-    return {
-      client: createZitadelClient(
-        { baseUrl: this.meta.source, token: secret.project_secret },
-        { verbatim: true },
-      ),
-      projectId: secret.project_id,
     };
   }
 
@@ -444,7 +263,7 @@ function report({ status, title, message, recovery }: CheckResult): void {
 }
 
 /** What each provider's checks came to, and what to do next, for the closing box. */
-function summaryOf(providers: readonly ProviderReport[], live: boolean): string {
+function summaryOf(providers: readonly ProviderReport[]): string {
   const width = Math.max(...providers.map((report) => report.provider.length));
   const rows = providers.map((report) => {
     const counts = (
@@ -459,13 +278,9 @@ function summaryOf(providers: readonly ProviderReport[], live: boolean): string 
       .map(([count, word]) => `${count} ${word}`);
     return `${report.provider.padEnd(width)}  ${counts.join(", ")}`;
   });
-  return [
-    ...rows,
-    "",
-    live
-      ? "A sign-in that created a user left it in the project."
-      : "Only a real sign-in proves the whole journey: add --live to try one.",
-  ].join("\n");
+  return [...rows, "", "These checks cannot prove a sign-in works: sign in once to be sure."].join(
+    "\n",
+  );
 }
 
 const escaped = (text: string) => escapeControlCharacters(text, { keepLayout: false });

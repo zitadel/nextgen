@@ -9,16 +9,8 @@ import {
 } from "./checks";
 import type { IdpContext, ProviderProbes } from "./context";
 import { GOOGLE_PROBES } from "./google";
-import { LiveSignInCheck } from "./live";
 
-export {
-  idpContext,
-  type IdpContext,
-  type LiveSignIn,
-  type Send,
-  type SignInEvent,
-  type SignInPhase,
-} from "./context";
+export { idpContext, type IdpContext, type Send } from "./context";
 export { type CheckResult, runChecks } from "../check";
 
 /** Every check a connection goes through, in the order they are shown. */
@@ -29,7 +21,6 @@ export const IDP_CHECKS: readonly Check<IdpContext>[] = [
   new ClaimsCheck(),
   new PkceCheck(),
   new AuthorizeProbeCheck(),
-  new LiveSignInCheck(),
 ];
 
 /**

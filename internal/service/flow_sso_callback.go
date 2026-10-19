@@ -10,34 +10,9 @@ import (
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/idp"
-	"github.com/zitadel/nextgen/internal/instrumentation/ssoevent"
 )
 
 var errSSOCallbackMixUp = errors.New("sso callback answered by another connection")
-
-// errSSOSecretMissing marks a client secret the exchange could not read, so
-// the exchange_finished event can name it.
-var errSSOSecretMissing = errors.New("sso client secret unavailable")
-
-// exchangeFailure is the reason the exchange_finished event gives for err.
-func exchangeFailure(err error) ssoevent.Reason {
-	switch {
-	case errors.Is(err, domain.ErrIDPExchangeFailed(nil)):
-		return ssoevent.ReasonExchangeFailed
-	case errors.Is(err, domain.ErrIDPIDTokenInvalid(nil)):
-		return ssoevent.ReasonIDTokenInvalid
-	case errors.Is(err, domain.ErrIDPUserinfoFailed(nil)):
-		return ssoevent.ReasonUserinfoFailed
-	case errors.Is(err, domain.ErrIDPSubjectInvalid(nil)):
-		return ssoevent.ReasonSubjectInvalid
-	case errors.Is(err, domain.ErrIDPDiscoveryFailed(nil)):
-		return ssoevent.ReasonDiscoveryFailed
-	case errors.Is(err, errSSOSecretMissing):
-		return ssoevent.ReasonSecretMissing
-	default:
-		return ssoevent.ReasonInternal
-	}
-}
 
 // refusedEventType is the event a callback refused before its exchange is
 // recorded with, chosen like for any other callback: a failure after a code
@@ -114,28 +89,18 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 	// answered exactly like an unknown state.
 	projectID := domain.SSOStateProjectID(in.State)
 	if projectID == "" {
-		ssoevent.Emit(ctx, ssoevent.Event{Slug: in.ConnectionSlug, Phase: ssoevent.PhaseCallbackReceived, Reason: ssoevent.ReasonStateInvalid})
 		return FlowSSOCallbackOutput{}, domain.ErrSSOStateInvalid()
 	}
 	check, err := c.attempts.ConsumeSSOState(ctx, projectID, in.State, in.BindingNonce)
 	if err != nil {
-		reason := ssoevent.ReasonInternal
-		if errors.Is(err, domain.ErrSSOStateInvalid()) {
-			reason = ssoevent.ReasonStateInvalid
-		}
-		ssoevent.Emit(ctx, ssoevent.Event{Slug: in.ConnectionSlug, Phase: ssoevent.PhaseCallbackReceived, Reason: reason})
 		return FlowSSOCallbackOutput{}, err
 	}
 	// Bound only after the consume: until a record matches, the project
 	// comes from the query alone.
 	audit.BindPublicRequest(ctx, projectID, "", "")
 	pending := check.Pending
-	event := func(phase ssoevent.Phase, reason ssoevent.Reason) {
-		ssoevent.Emit(ctx, ssoevent.Event{Slug: pending.ProviderSlug, FlowID: check.AuthAttemptID, Phase: phase, Reason: reason})
-	}
 
 	if in.ConnectionSlug != pending.ProviderSlug {
-		event(ssoevent.PhaseCallbackReceived, ssoevent.ReasonStateMismatch)
 		return c.fail(ctx, projectID, check, fmt.Errorf("%w: the callback path names connection %q, the state pins %q", errSSOCallbackMixUp, in.ConnectionSlug, pending.ProviderSlug), refusedEventType(in))
 	}
 
@@ -145,7 +110,6 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 		conn, connErr = c.pinnedConnection(ctx, projectID, pending)
 	}
 	if in.Issuer != "" && connErr == nil && in.Issuer != conn.OIDC.Issuer {
-		event(ssoevent.PhaseCallbackReceived, ssoevent.ReasonStateMismatch)
 		return c.fail(ctx, projectID, check, fmt.Errorf("%w: the callback's iss %q is not the issuer %q of connection %q", errSSOCallbackMixUp, in.Issuer, conn.OIDC.Issuer, pending.ProviderSlug), refusedEventType(in))
 	}
 	if in.Error != "" {
@@ -159,12 +123,9 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 		// access_denied is the person saying no and gets its own key. Every
 		// other code is the provider failing.
 		key := domain.FlowStepErrorSSOFailed
-		reason := ssoevent.ReasonProviderError
 		if in.Error == oauthErrorAccessDenied {
 			key = domain.FlowStepErrorSSOCancelled
-			reason = ssoevent.ReasonProviderDenied
 		}
-		event(ssoevent.PhaseCallbackReceived, reason)
 		// The description and URI are logged for the operator and never
 		// stored: the user sees only the localized key.
 		getLoggingContext(ctx, "flow").Warn("sso provider returned an error",
@@ -178,18 +139,14 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 	}
 
 	if in.Code == "" {
-		event(ssoevent.PhaseCallbackReceived, ssoevent.ReasonNoCode)
 		return c.fail(ctx, projectID, check, errors.New("the callback carried neither a code nor an error"), domain.EventTypeAuthSSOAuthorizationFailed)
 	}
 
-	event(ssoevent.PhaseCallbackReceived, "")
 	if connErr != nil {
-		event(ssoevent.PhaseExchangeFinished, ssoevent.ReasonConnectionBroken)
 		return c.fail(ctx, projectID, check, connErr, domain.EventTypeAuthSSOExchangeFailed)
 	}
 	identity, err := c.exchange(ctx, projectID, in.Code, pending, conn)
 	if err != nil {
-		event(ssoevent.PhaseExchangeFinished, exchangeFailure(err))
 		return c.fail(ctx, projectID, check, err, domain.EventTypeAuthSSOExchangeFailed)
 	}
 	result := &domain.SSOCallbackResult{
@@ -202,17 +159,10 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 		// The row was replaced or removed, so storing the error key would
 		// fail the same way.
 		if errors.Is(err, domain.ErrSSOStateInvalid()) {
-			event(ssoevent.PhaseExchangeFinished, ssoevent.ReasonStateInvalid)
 			return FlowSSOCallbackOutput{}, err
 		}
-		event(ssoevent.PhaseExchangeFinished, ssoevent.ReasonInternal)
 		return c.fail(ctx, projectID, check, domain.ErrInternal(err), domain.EventTypeAuthSSOExchangeFailed)
 	}
-	claimNames := make([]string, 0, len(identity.Claims))
-	for name := range identity.Claims {
-		claimNames = append(claimNames, name)
-	}
-	ssoevent.Emit(ctx, ssoevent.Event{Slug: pending.ProviderSlug, FlowID: check.AuthAttemptID, Phase: ssoevent.PhaseExchangeFinished, ClaimNames: claimNames})
 	return FlowSSOCallbackOutput{ReturnTarget: pending.ReturnTarget}, nil
 }
 
@@ -258,7 +208,7 @@ func (c *FlowSSOCallback) resolveClientSecret(ctx context.Context, projectID str
 		// The schema accepts only a whole-value `${{ NAME }}` reference. The
 		// value is not echoed: it may be a pasted secret, and this error is
 		// logged.
-		return "", fmt.Errorf("%w: client_secret is not a variable reference", errSSOSecretMissing)
+		return "", errors.New("client_secret is not a variable reference")
 	}
 	// The primary value, as the redirect resolved the client_id.
 	// TODO: take the kind from the origin the request came in on once the
@@ -274,7 +224,7 @@ func (c *FlowSSOCallback) resolveClientSecret(ctx context.Context, projectID str
 		secret, _ = vars[0].Value.(string)
 	}
 	if secret == "" {
-		return "", fmt.Errorf("%w: client_secret variable %q is missing, not a secret, or not a string", errSSOSecretMissing, name)
+		return "", fmt.Errorf("client_secret variable %q is missing, not a secret, or not a string", name)
 	}
 	return secret, nil
 }

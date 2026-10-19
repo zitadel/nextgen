@@ -78,21 +78,4 @@ describe("runChecks", () => {
 
     expect(result).toMatchObject({ status: "skipped", message: 'Needs "missing" first' });
   });
-
-  it("hands a check the results of the checks before it", async () => {
-    class Counting extends Check<null> {
-      readonly name = "count";
-      readonly title = "Count";
-      async run(_context: null, earlier: readonly CheckResult[]): Promise<Outcome> {
-        return { status: "pass", message: earlier.map((result) => result.name).join(",") };
-      }
-    }
-
-    const results = await runChecks(
-      [new Fixed("a", pass), new Fixed("b", pass), new Counting()],
-      null,
-    );
-
-    expect(results[2]?.message).toBe("a,b");
-  });
 });

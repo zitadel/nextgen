@@ -16,7 +16,7 @@ describe("PROVIDER_PROBES", () => {
 });
 
 describe("IDP_CHECKS", () => {
-  it("is the six checks that need no browser, then the live sign-in", () => {
+  it("is the six checks that need no browser", () => {
     expect(IDP_CHECKS.map((check) => check.name)).toEqual([
       "discovery",
       "issuer",
@@ -24,12 +24,7 @@ describe("IDP_CHECKS", () => {
       "claims",
       "pkce",
       "callback-uri",
-      "sign-in",
     ]);
-  });
-
-  it("runs the live sign-in last, so it sees how every other check went", () => {
-    expect(IDP_CHECKS.at(-1)?.name).toBe("sign-in");
   });
 
   it("gives every check its own name, since dependencies are named", () => {

@@ -385,12 +385,8 @@ callback URI. It never needs the client secret, which the platform stores
 write-only. Each entry of `data.providers[].checks` has a `status` of `pass`,
 `warn`, `fail` or `skipped`, and a `skipped` check is never a pass: it says the
 check could not tell. A failure exits `E_VALIDATION` naming the providers that
-failed, with the one thing to do in `hint`. Add `--live` (with `--provider` when
-there are several) only when a person is at the machine: it opens the login page
-and waits for them to sign in, then reports from the runtime's log which phase
-failed and on which side; a wrong secret shows up there as a provider-side
-failure at the exchange. It needs the local runtime running and the files
-applied, and leaves any user it created in the project.
+failed, with the one thing to do in `hint`. The checks cannot prove a sign-in
+works end to end: only a person signing in does.
 
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
 then re-run `plan` and `apply`. See the reference below for driving the login UI
