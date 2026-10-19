@@ -11,9 +11,10 @@ import (
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
 )
 
-// Libraries such as the Spanner client start their own root spans from
-// background work. Only a job root that carries zotel.JobRoot may start a
-// trace next to a request.
+// TestNewSampler checks which roots start a trace: a request, a Consumer root
+// linked to a sampled span, and a background job run. Any other root is
+// dropped, such as the Internal roots libraries like the Spanner client start
+// from their own background work.
 func TestNewSampler(t *testing.T) {
 	link := func(flags trace.TraceFlags) trace.Link {
 		return trace.Link{SpanContext: trace.NewSpanContext(trace.SpanContextConfig{
