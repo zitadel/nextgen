@@ -13,7 +13,7 @@ export const SESSION_COOKIE_NAME = "__nextgen_session";
 
 /**
  * The cookie an app keeps its session in on its own origin behind a server SDK
- * (Next.js, Nuxt, SvelteKit, SolidStart, TanStack Start, Qwik City) or the dev
+ * (Next.js, Nuxt, SvelteKit, SolidStart, TanStack Start, Qwik Router) or the dev
  * proxy `zitadel setup` writes for an SPA: `__nextgen_session_<projectId>`. The
  * proxy renames the server's cookie, so the apps and the Console on one host
  * keep a session each (ADR 073).
