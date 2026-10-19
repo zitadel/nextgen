@@ -9,6 +9,7 @@ import {
   formatFrameworkLine,
   relativeDisplayPath,
 } from "../../../../src/commands/setup/summary";
+import { stripAnsi } from "../../../helpers/run-cli";
 
 describe("relativeDisplayPath", () => {
   it("normalizes Windows paths for repository-style suffix matching", () => {
@@ -97,6 +98,8 @@ describe("detectProjectFacts", () => {
     const facts = await detectProjectFacts(await app({ react: spec }), "react");
 
     expect(facts.frameworkVersion).toBeUndefined();
-    expect(formatFrameworkLine({ ...facts, typescript: false })).toMatch(/^React · /);
+    // The separator is dimmed wherever picocolors sees colour support (CI is
+    // set and NO_COLOR is not, as in ci-turbo), so compare the plain text.
+    expect(stripAnsi(formatFrameworkLine({ ...facts, typescript: false }))).toMatch(/^React · /);
   });
 });
