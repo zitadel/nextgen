@@ -1,5 +1,6 @@
 get:
   operationId: GetUserByID
+  x-zitadel-cli: users get
   summary: Get user by ID
   tags:
     - Users
@@ -61,6 +62,7 @@ get:
 
 patch:
   operationId: PatchUserByID
+  x-zitadel-cli: users update
   summary: Update user by ID
   description: |
     Partially updates a user's schema-defined attributes, and optionally
@@ -129,6 +131,7 @@ patch:
 
 delete:
     operationId: DeleteUserByID
+    x-zitadel-cli: users delete
     summary: Delete user by ID
     tags:
       - Users

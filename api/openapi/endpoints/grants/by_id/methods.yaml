@@ -1,5 +1,6 @@
 get:
   operationId: getGrant
+  x-zitadel-cli: grants get
   summary: Get grant
   description: |
     Loads a grant by `(project_id, id)` that this API manages (user or team
@@ -75,6 +76,7 @@ get:
 
 delete:
   operationId: deleteGrant
+  x-zitadel-cli: grants delete
   summary: Revoke grant
   description: |
     Soft-revokes a grant this API manages and emits `authz.revoked`.

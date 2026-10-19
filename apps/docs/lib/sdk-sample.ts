@@ -184,7 +184,8 @@ export function operationParameters(
   return parameters;
 }
 
-function pathParameterNames(path: string): string[] {
+/** The path parameters, in the order the path names them. */
+export function pathParameterNames(path: string): string[] {
   return [...path.matchAll(/\{([^}]+)\}/g)].map((match) => match[1] ?? "");
 }
 
