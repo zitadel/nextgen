@@ -31,6 +31,23 @@ describe("idpContext discovery", () => {
     expect(found).toMatchObject({ ok: true, document: { issuer: "https://issuer.example" } });
   });
 
+  it.each(["scopes_supported", "claims_supported", "code_challenge_methods_supported"])(
+    "reads %s as absent when the provider answers a string instead of a list",
+    async (field) => {
+      const context = idpContext(
+        base(async (url) => ({
+          status: 200,
+          url,
+          body: JSON.stringify({ [field]: "openid email" }),
+        })),
+      );
+
+      const found = await context.discovery;
+
+      expect(found).toMatchObject({ ok: true, document: { [field]: undefined } });
+    },
+  );
+
   it("asks only once however many checks await it", async () => {
     const asked: string[] = [];
     const context = idpContext(
