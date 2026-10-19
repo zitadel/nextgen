@@ -213,14 +213,6 @@ async function handleAuth(
   } = opts;
   const { pathname } = url2;
 
-  // Strip any client-supplied x-nextgen-auth-token so downstream server code
-  // cannot read an attacker-controlled value; getAuth(event) is canonical.
-  try {
-    event.request.headers.delete("x-nextgen-auth-token");
-  } catch {
-    // Immutable headers on this adapter — nothing to strip.
-  }
-
   const cookies = parseCookieHeader(event.request.headers.get("cookie"));
   const authHeader = event.request.headers.get("authorization");
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
@@ -365,12 +357,19 @@ export function createNextgenMiddleware(
     const url2 = new URL(event.request.url);
     const { pathname } = url2;
 
-    if (matchesRoutes(pathname, ignoredRoutes)) {
-      try {
-        event.request.headers.delete("x-nextgen-auth-token");
-      } catch {
-        // Immutable headers on this adapter — nothing to strip.
+    // Strip any client-supplied x-nextgen-auth-token so downstream server code
+    // cannot read an attacker-controlled value; getAuth(event) is canonical.
+    // If the adapter's headers are immutable the value cannot be removed, so
+    // refuse the request rather than let it reach downstream handlers.
+    try {
+      event.request.headers.delete("x-nextgen-auth-token");
+    } catch {
+      if (event.request.headers.has("x-nextgen-auth-token")) {
+        return new Response("Bad Request", { status: 400 });
       }
+    }
+
+    if (matchesRoutes(pathname, ignoredRoutes)) {
       return;
     }
 
