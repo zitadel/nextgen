@@ -102,6 +102,10 @@ are not available.
 card with sign-out, and `<ZitadelLogout>` a sign-out control on its own; mount
 them the same way.
 
+## Widget props and events
+
+This SDK is server-only. The widgets come from `@zitadel/sdk-svelte`, so read its skill for the widget props and events.
+
 ## Read these, don't guess
 
 The package README at `node_modules/@zitadel/sdk-sveltekit/README.md` and the

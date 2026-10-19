@@ -113,6 +113,10 @@ export function LoginPage() {
 `<ZitadelSession project={project} postSignOutUrl="/login" />` renders the
 signed-in card with sign-out, and `<ZitadelLogout>` a sign-out control on its own.
 
+## Widget props and events
+
+This SDK is not server-only: its `/react` entry wraps the widgets from `@zitadel/sdk-react`, so no other package is needed. Read the `@zitadel/sdk-react` skill for the widget props and events.
+
 ## Read these, don't guess
 
 The package README at `node_modules/@zitadel/sdk-tanstack-start/README.md` and
