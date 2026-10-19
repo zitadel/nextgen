@@ -63,6 +63,7 @@ post:
 
 get:
   operationId: listFlowDefinitions
+  x-zitadel-cli: flow-definitions list
   summary: List flow definitions
   description: |
     Retrieves a list of all flow definitions, newest by creation time first.

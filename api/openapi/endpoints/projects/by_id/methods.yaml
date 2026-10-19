@@ -1,5 +1,6 @@
 get:
   operationId: getProject
+  x-zitadel-cli: projects get
   summary: Get project
   description: |
     Returns the current state of a project.
@@ -42,6 +43,7 @@ get:
 
 patch:
   operationId: patchProject
+  x-zitadel-cli: projects update
   summary: Update project
   description: |
     Updates the state of a project.

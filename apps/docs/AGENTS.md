@@ -79,12 +79,14 @@ So the template's root routes live under `/docs` here:
 - A page's Markdown (`/docs/cli.md`, or `/docs/cli` with `Accept:
   text/markdown`) is its processed Markdown; an operation's or a webhook's is
   the operation or webhook with every schema it references, an operation's
-  with its call through `@zitadel/api` too (`docsLlms` in `lib/source.ts`). `llms-full.txt` leaves the operations and webhooks out,
+  with its call through `@zitadel/api` and its CLI command too (`docsLlms` in
+  `lib/source.ts`). `llms-full.txt` leaves the operations and webhooks out,
   and its test fails on a Markdown link to one of them, so prose links to
   their section's page (a section page's `<Card>` is fine).
-- An operation's samples are its call through `@zitadel/api`, then cURL
-  (`components/api-page.tsx`), not Fumadocs' plain HTTP in languages Zitadel
-  ships no SDK for; a webhook's page shows its payload, not a call.
+- An operation's samples are its call through `@zitadel/api`, its `zitadel`
+  command where the spec names one (`x-zitadel-cli`, `lib/cli-sample.ts`), then
+  cURL (`components/api-page.tsx`), not Fumadocs' plain HTTP in languages
+  Zitadel ships no SDK for; a webhook's page shows its payload, not a call.
   `lib/sdk-sample.ts` writes the call as orval generates the client, picking
   the credential from the operation's security; the page calls it with the
   request the reader is looking at, the Markdown with the default request

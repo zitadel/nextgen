@@ -1,5 +1,6 @@
 get:
   operationId: getIdpById
+  x-zitadel-cli: idps get
   summary: Get an identity provider connection by id
   description: |
     Reads a connection by its id, at its newest revision.

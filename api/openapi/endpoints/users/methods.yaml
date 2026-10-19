@@ -1,5 +1,6 @@
 post:
   operationId: createUser
+  x-zitadel-cli: users create
   summary: Create user
   tags:
     - Users
