@@ -404,8 +404,10 @@ describe("SDK READMEs ↔ opening structure", () => {
  * The server SDKs' test titles.
  *
  * The six meta-framework SDKs test the same server behaviours, so their test
- * files carry the same titles. A behaviour tested under another title, or left
- * untested in one SDK, then shows up here instead of drifting unnoticed.
+ * files carry exactly the same tests: the same titles, in the same order, with
+ * none missing and none extra. A behaviour tested under another title, left
+ * untested in one SDK, or tested only in one shows up here instead of drifting
+ * unnoticed.
  */
 describe("server SDK test titles", () => {
   const packagesPath = `${resolve(process.cwd(), "..")}/`;
@@ -421,52 +423,79 @@ describe("server SDK test titles", () => {
   const CANONICAL_TITLES = [
     "public route with no token continues as unauthenticated",
     "protected route with no token redirects to /login?next=/admin",
+    "protected route requested with a trailing slash redirects to login",
     "protected route with a valid cookie token authenticates",
     "protected route with a valid Bearer token authenticates",
     "Bearer token takes precedence over the session cookie",
     "token with no sub claim is treated as unauthenticated",
+    "token with no sub claim is rejected on a protected route",
+    "token with no sub claim continues as unauthenticated on a public route",
     "token with a disallowed typ is rejected",
     "token with a disallowed algorithm is rejected",
     'token with alg "none" is rejected without fetching JWKS',
     "RS256 tokens are accepted by default",
     "redirect preserves existing query params in loginPath",
     "invalid token clears the stale session cookie and redirects",
+    "accepts a relative loginPath and redirects correctly",
     "absolute loginPath throws",
     "protocol-relative loginPath throws",
+    "refuses a request that carries the auth header on the proxy path",
     "forwards upstream Set-Cookie headers",
+    "forwards an upstream Location %s onto this app as %s",
+    "keeps a caller-supplied credential on the handoff exchange",
     "appends the client IP to an existing X-Forwarded-For chain",
     "sets X-Forwarded-For from the client IP when no chain exists",
     "omits X-Forwarded-For when no client IP is available",
+    "does not proxy a path that only shares the prefix without a separator",
     "skips auth handling on an ignored route",
+    "hands the auth result to the next handler when the request continues",
+    "reads a missing session from %j as signed out",
+    "returns the redirect without continuing on a protected route miss",
+    "is assignable to the framework's request handler type",
+    "signs in a live session that names a user",
+    "redirects an anonymous session on a protected route to login",
+    "keeps an anonymous session's cookie, since its sign-in may still complete",
+    "clears a dead session cookie on a public page",
+    "does not attach the project secret to %s %s",
+    "attaches the project secret only to POST /sessions/exchange, ignoring the query",
+    "preserves the upstream session cache policy",
+    "keeps the path but never the internal host of an upstream redirect",
+    "ignores a client-injected x-middleware-override-headers",
+    "proxies an exact match of proxyPath",
+    "proxies paths under proxyPath",
     "refuses a request that carries the auth header",
     "refuses a request that carries the auth header on an ignored route",
-    "refuses a request that carries the auth header on the proxy path",
     "lets a request without the auth header through",
+    "sends the exchange bearer from %s",
+    "proxies to the backend from %s",
   ];
 
-  // Matches `it("title"` and the `it.each([...])("title"` form.
-  const TITLE = /(?:\bit\(|\]\)\()\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1/g;
+  // Matches `it("title"`, `it.fails("title"` and the `it.each([...])("title"` form.
+  const TITLE = /(?:\bit(?:\.fails)?\(|\]\)\()\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1/g;
 
   const titlesOf = (sdk: keyof typeof TEST_FILES): string[] =>
     [...readFileSync(`${packagesPath}${TEST_FILES[sdk]}`, "utf8").matchAll(TITLE)].map(
       (match) => match[2]!,
     );
 
-  it.each(Object.keys(TEST_FILES) as (keyof typeof TEST_FILES)[])(
-    "%s tests every canonical behaviour under its canonical title",
-    (sdk) => {
-      const titles = titlesOf(sdk);
-      expect(CANONICAL_TITLES.filter((title) => !titles.includes(title))).toEqual([]);
-    },
-  );
+  const firstDifference = (titles: readonly string[]): string => {
+    const length = Math.max(titles.length, CANONICAL_TITLES.length);
+    for (let index = 0; index < length; index++) {
+      if (titles[index] !== CANONICAL_TITLES[index]) {
+        return `test ${index + 1} is ${JSON.stringify(titles[index])}, expected ${JSON.stringify(CANONICAL_TITLES[index])}`;
+      }
+    }
+    return "";
+  };
 
   it.each(Object.keys(TEST_FILES) as (keyof typeof TEST_FILES)[])(
-    "%s lists the canonical titles in the canonical order",
+    "%s carries exactly the canonical tests, in the canonical order",
     (sdk) => {
       const titles = titlesOf(sdk);
-      const listed = CANONICAL_TITLES.filter((title) => titles.includes(title));
-      const inFile = titles.filter((title) => CANONICAL_TITLES.includes(title));
-      expect(inFile).toEqual(listed);
+      expect(
+        firstDifference(titles),
+        `${sdk} has ${titles.length} tests, expected ${CANONICAL_TITLES.length}`,
+      ).toBe("");
     },
   );
 });
