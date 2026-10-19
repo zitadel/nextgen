@@ -2,6 +2,9 @@ import type { HttpResponse, ProviderProbes, Verdict } from "./context";
 
 const UNKNOWN: Verdict = { kind: "unknown" };
 
+/** Where Google sends a request it accepts, when nobody is signed in. */
+const SIGN_IN_PAGE = "/v3/signin/identifier";
+
 /**
  * Google's wording, read off its live endpoints: an unregistered redirect URI
  * and an unknown client both end on an error page whose URL names the cause in
@@ -10,8 +13,8 @@ const UNKNOWN: Verdict = { kind: "unknown" };
  * `invalid_client` when either is not.
  */
 export const GOOGLE_PROBES: ProviderProbes = {
-  authorize({ url }: HttpResponse): Verdict {
-    const { pathname, searchParams } = new URL(url);
+  authorize({ status, url }: HttpResponse): Verdict {
+    const { hostname, pathname, searchParams } = new URL(url);
     const refusal = Buffer.from(searchParams.get("authError") ?? "", "base64url").toString(
       "latin1",
     );
@@ -29,7 +32,7 @@ export const GOOGLE_PROBES: ProviderProbes = {
         reason: "Google does not know this client ID (invalid_client)",
       };
     }
-    return pathname.includes("/signin/") && !pathname.includes("/oauth/error")
+    return status === 200 && hostname === "accounts.google.com" && pathname === SIGN_IN_PAGE
       ? { kind: "accepted" }
       : UNKNOWN;
   },

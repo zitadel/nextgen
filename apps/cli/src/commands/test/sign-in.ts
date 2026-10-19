@@ -58,7 +58,8 @@ const wait = (ms: number, signal: AbortSignal) =>
 const send: Send = async (url, init) => {
   const response = await fetch(url, {
     ...init,
-    redirect: "follow",
+    // A POST carries the client secret, so it is never forwarded to wherever a redirect points.
+    redirect: init === undefined ? "follow" : "manual",
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   return {
@@ -174,6 +175,7 @@ export default class TestSignIn extends BaseCommand {
           ...stringsIn(connection.body.verified_claims),
         ],
         callbackUri,
+        endpoints: endpointsOf(oidc),
         consoleUrl: catalogId === undefined ? undefined : idpProvider(catalogId).consoleUrl,
         probes: PROVIDER_PROBES[slug],
         request: send,
@@ -349,6 +351,14 @@ export default class TestSignIn extends BaseCommand {
     }
     return primary;
   }
+}
+
+/** The endpoints the connection names itself, which the server then uses without discovery. */
+function endpointsOf(oidc: Record<string, unknown>) {
+  const { authorization_endpoint: authorization, token_endpoint: token } = oidc;
+  return typeof authorization === "string" && typeof token === "string"
+    ? { authorization, token }
+    : undefined;
 }
 
 /** The string members of an array or the string values of an object; anything else has none. */

@@ -40,6 +40,7 @@ function aContext(
     scopes: ["openid", "email"],
     claims: ["email"],
     callbackUri: "http://localhost:3000/__nextgen/idp/acme/callback",
+    endpoints: undefined,
     consoleUrl: "https://console.example",
     probes: ACCEPTING,
     request: async (url, init): Promise<HttpResponse> => {
@@ -91,13 +92,55 @@ describe("IDP_CHECKS", () => {
     });
   });
 
-  it("fails a scope the provider does not support", async () => {
+  it("only warns about a scope the provider does not list, since it may accept it anyway", async () => {
     const { by } = await resultsFor({ scopes: ["openid", "offline_access"] });
 
     expect(by("scopes")).toMatchObject({
-      status: "fail",
+      status: "warn",
       message: expect.stringContaining("offline_access"),
     });
+  });
+
+  it("fails an issuer that differs only by a trailing slash, as the server would", async () => {
+    const { by } = await resultsFor({ issuer: "https://issuer.example/" });
+
+    expect(by("issuer")?.status).toBe("fail");
+  });
+
+  it("refuses to send the secret to a token endpoint that is not HTTPS", async () => {
+    const { by, sent } = await resultsFor(
+      {},
+      { ...DOCUMENT, token_endpoint: "http://issuer.example/token" },
+    );
+
+    expect([
+      by("client-secret")?.status,
+      sent.some((request) => request.url.endsWith("/token")),
+    ]).toEqual(["fail", false]);
+  });
+
+  it("sends the secret to a token endpoint on this machine over plain HTTP", async () => {
+    const { by } = await resultsFor(
+      {},
+      { ...DOCUMENT, token_endpoint: "http://localhost:9000/token" },
+    );
+
+    expect(by("client-secret")?.status).toBe("pass");
+  });
+
+  it("uses the endpoints the connection names, and has no discovery document to compare", async () => {
+    const { by, sent } = await resultsFor({
+      endpoints: {
+        authorization: "https://idp.example/authorize",
+        token: "https://idp.example/token",
+      },
+    });
+
+    expect([by("discovery")?.message, by("issuer")?.status, sent.map((r) => r.url)]).toEqual([
+      "Using the endpoints written in the connection",
+      "skipped",
+      [expect.stringContaining("https://idp.example/authorize?"), "https://idp.example/token"],
+    ]);
   });
 
   it("only warns about a claim the provider does not list", async () => {

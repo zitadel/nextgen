@@ -10,6 +10,7 @@ const base = (request: Send): Omit<IdpContext, "discovery"> => ({
   scopes: ["openid"],
   claims: [],
   callbackUri: "http://localhost:3000/cb",
+  endpoints: undefined,
   consoleUrl: undefined,
   probes: undefined,
   request,
@@ -67,5 +68,34 @@ describe("idpContext discovery", () => {
     const found = await idpContext(base(request as Send)).discovery;
 
     expect(found).toMatchObject({ ok: false, reason: expect.stringContaining(reason) });
+  });
+
+  it("uses the endpoints the connection names, without asking the provider for a document", async () => {
+    let asks = 0;
+    const context = idpContext({
+      ...base(async (url) => {
+        asks += 1;
+        return { status: 200, url, body: "{}" };
+      }),
+      endpoints: {
+        authorization: "https://idp.example/authorize",
+        token: "https://idp.example/token",
+      },
+    });
+
+    const found = await context.discovery;
+
+    expect([asks, found]).toEqual([
+      0,
+      {
+        ok: true,
+        url: "https://issuer.example/",
+        source: "connection",
+        document: {
+          authorization_endpoint: "https://idp.example/authorize",
+          token_endpoint: "https://idp.example/token",
+        },
+      },
+    ]);
   });
 });

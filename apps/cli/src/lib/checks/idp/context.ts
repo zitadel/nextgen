@@ -10,7 +10,13 @@ export type Discovery = {
 
 /** Never rejects: a provider that cannot be reached is a result, not a crash. */
 export type DiscoveryResult =
-  | { readonly ok: true; readonly url: string; readonly document: Discovery }
+  | {
+      readonly ok: true;
+      readonly url: string;
+      readonly document: Discovery;
+      /** `connection` when the connection names its own endpoints, so nothing was fetched. */
+      readonly source: "discovery" | "connection";
+    }
   | { readonly ok: false; readonly url: string; readonly reason: string };
 
 /** What one HTTP exchange came back with, after any redirects. */
@@ -85,8 +91,12 @@ export type LiveSignIn = {
   readonly open: (url: string) => Promise<void>;
   /** Progress shown while waiting. */
   readonly say: (message: string) => void;
-  /** Events from the moment of the call on, until `signal` aborts. */
-  readonly watch: (signal: AbortSignal) => AsyncIterable<SignInEvent>;
+  /**
+   * Events from the moment the promise resolves on, until `signal` aborts. It
+   * resolves only once what the log already holds has been read, so an attempt
+   * made after that is never mistaken for an old one.
+   */
+  readonly watch: (signal: AbortSignal) => Promise<AsyncIterable<SignInEvent>>;
   /** Resolves after `ms`, or as soon as `signal` aborts. */
   readonly sleep: (ms: number, signal: AbortSignal) => Promise<void>;
 };
@@ -102,6 +112,11 @@ export type IdpContext = {
   /** The provider's own claim names the connection's mappings read. */
   readonly claims: readonly string[];
   readonly callbackUri: string;
+  /**
+   * The endpoints the connection names itself, as the server uses them without
+   * reading a discovery document; `undefined` when it names none.
+   */
+  readonly endpoints: { readonly authorization: string; readonly token: string } | undefined;
   readonly consoleUrl: string | undefined;
   readonly probes: ProviderProbes | undefined;
   readonly discovery: Promise<DiscoveryResult>;
@@ -110,7 +125,11 @@ export type IdpContext = {
   readonly live?: LiveSignIn;
 };
 
-/** The one way a check reaches the network. */
+/**
+ * The one way a check reaches the network. A POST carries the client secret,
+ * so it is never forwarded to wherever a redirect points: a redirect answer is
+ * returned as it is.
+ */
 export type Send = (
   url: string,
   init?: { readonly method: "POST"; readonly body: URLSearchParams },
@@ -121,6 +140,20 @@ export type Send = (
  * every check that needs the document shares it.
  */
 export function idpContext(input: Omit<IdpContext, "discovery">): IdpContext {
+  if (input.endpoints !== undefined) {
+    return {
+      ...input,
+      discovery: Promise.resolve({
+        ok: true,
+        url: input.issuer,
+        source: "connection",
+        document: {
+          authorization_endpoint: input.endpoints.authorization,
+          token_endpoint: input.endpoints.token,
+        },
+      }),
+    };
+  }
   const url = `${input.issuer.replace(/\/$/, "")}/.well-known/openid-configuration`;
   const discovery = input.request(url).then(
     (response): DiscoveryResult => {
@@ -128,7 +161,12 @@ export function idpContext(input: Omit<IdpContext, "discovery">): IdpContext {
         return { ok: false, url, reason: `${url} answered ${response.status}` };
       }
       try {
-        return { ok: true, url, document: JSON.parse(response.body) as Discovery };
+        return {
+          ok: true,
+          url,
+          source: "discovery",
+          document: JSON.parse(response.body) as Discovery,
+        };
       } catch {
         return { ok: false, url, reason: `${url} did not return JSON` };
       }

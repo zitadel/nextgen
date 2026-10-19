@@ -36,7 +36,7 @@ function aRuntime(events: readonly SignInEvent[]) {
       opened.push(url);
     },
     say: (message) => said.push(message),
-    watch: (signal) =>
+    watch: async (signal) =>
       (async function* () {
         yield* events;
         await new Promise<void>((resolve) => signal.addEventListener("abort", () => resolve()));
@@ -63,6 +63,7 @@ function aContext(live: LiveSignIn | undefined, overrides: Partial<IdpContext> =
     scopes: ["openid"],
     claims: [],
     callbackUri: "http://localhost:3000/__nextgen/idp/acme/callback",
+    endpoints: undefined,
     consoleUrl: "https://console.example",
     probes: undefined,
     request: async (url) => ({ status: 404, url, body: "" }),
@@ -110,10 +111,6 @@ describe("LiveSignInCheck", () => {
 
   it.each([
     ["a known identity bound to its user", event({ phase: "resolved", result: "linked" })],
-    [
-      "an identity bound to the user owning a claim",
-      event({ phase: "resolved", result: "existing_user" }),
-    ],
     ["a user created for the identity", event({ phase: "user_created" })],
   ])("passes on %s", async (_name, last) => {
     const { outcome } = run([
@@ -248,7 +245,7 @@ describe("LiveSignInCheck", () => {
     const base = aRuntime([event({ phase: "resolved", result: "linked" })]).live;
     const live: LiveSignIn = {
       ...base,
-      watch: (signal) => {
+      watch: async (signal) => {
         signal.addEventListener("abort", () => aborted.push(true));
         return base.watch(signal);
       },
@@ -257,5 +254,37 @@ describe("LiveSignInCheck", () => {
     await new LiveSignInCheck().run(aContext(live), [PASSED]);
 
     expect(aborted).toEqual([true]);
+  });
+
+  it("only warns when the identity belongs to an existing account, which still has to be proved", async () => {
+    const { outcome } = run([
+      event({ phase: "callback_received" }),
+      event({ phase: "resolved", result: "existing_user" }),
+    ]);
+
+    expect(await outcome).toMatchObject({
+      status: "warn",
+      message: expect.stringContaining("existing account"),
+    });
+  });
+
+  it("opens the browser only once the log it compares against has been read", async () => {
+    const steps: string[] = [];
+    const base = aRuntime([event({ phase: "resolved", result: "linked" })]).live;
+    const live: LiveSignIn = {
+      ...base,
+      open: async () => {
+        steps.push("opened");
+      },
+      watch: async (signal) => {
+        await new Promise<void>((resolve) => setTimeout(resolve, 5));
+        steps.push("baseline read");
+        return base.watch(signal);
+      },
+    };
+
+    await new LiveSignInCheck().run(aContext(live), [PASSED]);
+
+    expect(steps).toEqual(["baseline read", "opened"]);
   });
 });

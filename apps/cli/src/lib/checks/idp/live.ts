@@ -79,8 +79,7 @@ function completes(event: SignInEvent): boolean {
     return false;
   }
   return (
-    event.phase === "user_created" ||
-    (event.phase === "resolved" && (event.result === "linked" || event.result === "existing_user"))
+    event.phase === "user_created" || (event.phase === "resolved" && event.result === "linked")
   );
 }
 
@@ -117,7 +116,7 @@ export class LiveSignInCheck extends Check<IdpContext> {
       const timedOut = live
         .sleep(live.timeoutMs, stop.signal)
         .then((): typeof TIMED_OUT => TIMED_OUT);
-      const events = live.watch(stop.signal)[Symbol.asyncIterator]();
+      const events = (await live.watch(stop.signal))[Symbol.asyncIterator]();
       live.say(`Sign in with ${context.slug}: ${live.loginUrl}`);
       await live.open(live.loginUrl);
 
@@ -144,6 +143,13 @@ export class LiveSignInCheck extends Check<IdpContext> {
         last = event;
         if (event.status === "failed") {
           return failure(event, context);
+        }
+        if (event.phase === "resolved" && event.result === "existing_user") {
+          return {
+            status: "warn",
+            message:
+              "The provider's sign-in worked, but the identity matches an existing account, so the flow asks the person to prove it; this check cannot see that step finish",
+          };
         }
         if (completes(event)) {
           return { status: "pass", message: `sign-in completed with ${context.slug}` };

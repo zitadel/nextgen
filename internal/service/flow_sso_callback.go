@@ -202,6 +202,7 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 		// The row was replaced or removed, so storing the error key would
 		// fail the same way.
 		if errors.Is(err, domain.ErrSSOStateInvalid()) {
+			event(ssoevent.PhaseExchangeFinished, ssoevent.ReasonStateInvalid)
 			return FlowSSOCallbackOutput{}, err
 		}
 		event(ssoevent.PhaseExchangeFinished, ssoevent.ReasonInternal)
