@@ -197,7 +197,7 @@ export default class TestSignIn extends BaseCommand {
         configuredEndpoints: configuredEndpoints(oidc),
         issuer: typeof oidc.issuer === "string" ? oidc.issuer : "",
         clientId: await this.clientId(cwd, oidc.client_id),
-        scopes: stringsIn(oidc.scopes),
+        scopes: stringList(oidc.scopes),
         claims: [
           ...stringsIn(connection.body.claim_mapping),
           ...stringsIn(connection.body.verified_claims),
@@ -299,6 +299,14 @@ type ProviderReport = {
 };
 
 const slugOf = (file: ConnectionFile) => String(file.body.slug);
+
+/**
+ * An array of strings as written, or nothing when it is anything else: the server cannot read a
+ * list with a number in it or an object in its place, so it must not be quietly repaired.
+ */
+function stringList(value: unknown): string[] {
+  return Array.isArray(value) && value.every((member) => typeof member === "string") ? value : [];
+}
 
 /** The string members of an array or the string values of an object; anything else has none. */
 function stringsIn(value: unknown): string[] {
