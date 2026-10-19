@@ -66,6 +66,36 @@ function mockJwks(kid: string): ReturnType<typeof vi.fn> {
   return vi.fn().mockResolvedValue(new Response(JSON.stringify(jwks), { status: 200 }));
 }
 
+type ServeOptions = NonNullable<Parameters<typeof nextgenMiddleware>[1]>;
+interface ServeInit {
+  readonly method?: string;
+  readonly headers?: Record<string, string>;
+}
+
+// A refusal or a proxied answer comes back as `response`; a request the
+// middleware lets through to the app carries `x-middleware-next` and yields none.
+async function serve(
+  url: string,
+  init: ServeInit = {},
+  options: ServeOptions = {},
+): Promise<{ response?: Response; request: NextRequest }> {
+  const request = new NextRequest(url, init);
+  const response = await nextgenMiddleware(request, options);
+  return { response: response.headers.has("x-middleware-next") ? undefined : response, request };
+}
+
+function captureFetch(response: () => Response = () => new Response("{}", { status: 200 })) {
+  const calls: { url: string; headers: Headers }[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockImplementation((url: string, init: RequestInit) => {
+      calls.push({ url: String(url), headers: new Headers(init?.headers) });
+      return Promise.resolve(response());
+    }),
+  );
+  return calls;
+}
+
 describe("nextgenMiddleware", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -373,28 +403,6 @@ describe("nextgenMiddleware", () => {
         loginPath: "//evil.example.com/phish",
       }),
     ).rejects.toThrow(/loginPath must be a relative path/i);
-  });
-
-  it("strips x-nextgen-auth-token from proxied requests", async () => {
-    let capturedHeaders: Headers | undefined;
-    const upstreamFetch = vi.fn().mockImplementation((_url: string, init: RequestInit) => {
-      capturedHeaders = init.headers as Headers;
-      return Promise.resolve(new Response("{}", { status: 200 }));
-    });
-    vi.stubGlobal("fetch", upstreamFetch);
-
-    const req = new NextRequest("http://localhost:3000/__nextgen/v1/flow", {
-      method: "GET",
-      headers: {
-        "x-nextgen-auth-token": "secret-session-token",
-        "content-type": "application/json",
-      },
-    });
-    await nextgenMiddleware(req, { url: "http://localhost:4000" });
-
-    expect(capturedHeaders).toBeDefined();
-    expect((capturedHeaders as Headers).has("x-nextgen-auth-token")).toBe(false);
-    expect((capturedHeaders as Headers).get("content-type")).toBe("application/json");
   });
 
   it("forwards upstream Set-Cookie headers", async () => {
@@ -720,77 +728,47 @@ describe("nextgenMiddleware", () => {
     });
   });
 
-  describe("inbound header override: x-nextgen-auth-token (T-1)", () => {
-    it("overwrites client-supplied x-nextgen-auth-token with the verified value (empty for unauthenticated)", async () => {
-      const req = new NextRequest("http://localhost:3000/", {
-        headers: { "x-nextgen-auth-token": "forged-session-token" },
-      });
-      const res = await nextgenMiddleware(req, {
-        url: "http://localhost:4000",
-        protectedRoutes: ["/admin"],
-      });
-
-      // tunnelHeaders always overwrites x-nextgen-auth-token with the
-      // middleware-determined value (empty string when unauthenticated).
-      // The client's forged value must not survive into server components.
-      const tunnelled =
-        res.headers.get("x-nextgen-auth-token") ??
-        res.headers.get("x-middleware-request-x-nextgen-auth-token");
-      expect(tunnelled).toBe("");
-      expect(tunnelled).not.toBe("forged-session-token");
-    });
-
-    it("overwrites client-supplied x-nextgen-auth-token with the real token when authenticated", async () => {
-      const kid = nextKid();
-      const exp = Math.floor(Date.now() / 1000) + 3600;
-      const token = makeJwt(
-        {
-          sub: "user-123",
-          email: "user@example.com",
-          iss: "http://localhost:4000",
-          exp,
-        },
-        kid,
+  describe("inbound x-nextgen-auth-token", () => {
+    it("refuses a request that carries the auth header", async () => {
+      const { response } = await serve(
+        "http://localhost:3000/admin",
+        { headers: { "x-nextgen-auth-token": "forged" } },
+        { protectedRoutes: ["/admin"] },
       );
-      vi.stubGlobal("fetch", mockJwks(kid));
 
-      const req = makeRequest("http://localhost:3000/admin", `__nextgen_session=${token}`);
-      // Inject a fake x-nextgen-auth-token alongside the real cookie
-      Object.defineProperty(req, "headers", {
-        value: new Headers({
-          cookie: `__nextgen_session=${token}`,
-          "x-nextgen-auth-token": "forged-session-token",
-        }),
-        writable: false,
-      });
-
-      const res = await nextgenMiddleware(req, {
-        url: "http://localhost:4000",
-        protectedRoutes: ["/admin"],
-      });
-
-      // The tunnelled value must be the real verified token, not the forged one
-      const tunnelled =
-        res.headers.get("x-nextgen-auth-token") ??
-        res.headers.get("x-middleware-request-x-nextgen-auth-token");
-      expect(tunnelled).toBe(token);
-      expect(tunnelled).not.toBe("forged-session-token");
+      expect(response?.status).toBe(400);
+      expect(await response?.text()).toBe("Bad Request");
     });
 
-    it("neutralises client-supplied x-nextgen-auth-token on ignored routes", async () => {
-      const req = new NextRequest("http://localhost:3000/health", {
-        headers: { "x-nextgen-auth-token": "forged-session-token" },
-      });
-      const res = await nextgenMiddleware(req, {
-        url: "http://localhost:4000",
-        ignoredRoutes: ["/health"],
-      });
+    it("refuses a request that carries the auth header on an ignored route", async () => {
+      const { response } = await serve(
+        "http://localhost:3000/health",
+        { headers: { "x-nextgen-auth-token": "forged" } },
+        { ignoredRoutes: ["/health"] },
+      );
 
-      const tunnelled =
-        res.headers.get("x-nextgen-auth-token") ??
-        res.headers.get("x-middleware-request-x-nextgen-auth-token");
-      expect(tunnelled).toBe("");
-      expect(tunnelled).not.toBe("forged-session-token");
+      expect(response?.status).toBe(400);
+      expect(await response?.text()).toBe("Bad Request");
+    });
+
+    it("refuses a request that carries the auth header on the proxy path", async () => {
+      const calls = captureFetch();
+
+      const { response } = await serve(
+        "http://localhost:3000/__nextgen/v1/flow",
+        { headers: { "x-nextgen-auth-token": "forged" } },
+        { url: "http://localhost:4000" },
+      );
+
+      expect(response?.status).toBe(400);
+      expect(await response?.text()).toBe("Bad Request");
+      expect(calls).toHaveLength(0);
+    });
+
+    it("lets a request without the auth header through", async () => {
+      const { response } = await serve("http://localhost:3000/");
+
+      expect(response).toBeUndefined();
     });
   });
 });

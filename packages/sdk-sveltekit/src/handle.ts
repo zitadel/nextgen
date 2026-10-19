@@ -395,16 +395,10 @@ export function createNextgenHandle(
   return async ({ event, resolve }) => {
     const { pathname } = event.url;
 
-    // Strip any client-supplied x-nextgen-auth-token so downstream server code
-    // cannot read an attacker-controlled value; getAuth(event) is canonical.
-    // If the adapter's headers are immutable the value cannot be removed, so
-    // refuse the request rather than let it reach downstream handlers.
-    try {
-      event.request.headers.delete("x-nextgen-auth-token");
-    } catch {
-      if (event.request.headers.has("x-nextgen-auth-token")) {
-        return new Response("Bad Request", { status: 400 });
-      }
+    // Clients never send x-nextgen-auth-token: it is an internal channel. Refuse any
+    // request that carries it, on every route, before anything else runs.
+    if (event.request.headers.has("x-nextgen-auth-token")) {
+      return new Response("Bad Request", { status: 400 });
     }
 
     if (matchesRoutes(pathname, ignoredRoutes)) {
