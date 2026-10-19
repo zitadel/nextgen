@@ -1,6 +1,7 @@
 import { generateOGImage } from "fumadocs-ui/og";
 import { notFound } from "next/navigation";
 
+import { cardLayout, lineHeight } from "@/lib/og-layout";
 import { appName, getPageImageUrl } from "@/lib/shared";
 import { source } from "@/lib/source";
 
@@ -11,17 +12,24 @@ export async function GET(_req: Request, { params }: RouteContext<"/docs/og/[...
   const page = source.getPage(slug.slice(0, -1));
   if (!page) notFound();
 
-  // Fumadocs' card sets the title in 82px type and the description in 52px and
-  // clips neither, so a long title and a long description run into each other
-  // and into the site's name. It has room for two lines of title and two of
-  // description, or one of title and three of description; a title of up to 22
-  // characters fits on one line.
-  const descriptionLines = (page.data.title?.length ?? 0) <= 22 ? 3 : 2;
+  // Fumadocs' card, with the title sized to fit and the description clamped
+  // to the room left (lib/og-layout.ts).
+  const title = page.data.title ?? "";
+  const { titleSize, descriptionSize, descriptionLines } = cardLayout(title);
 
   return generateOGImage({
-    title: <span style={{ display: "block", lineClamp: 2 }}>{page.data.title}</span>,
+    title: <span style={{ display: "block", fontSize: titleSize, lineHeight }}>{title}</span>,
     description: page.data.description && (
-      <span style={{ display: "block", lineClamp: descriptionLines }}>{page.data.description}</span>
+      <span
+        style={{
+          display: "block",
+          fontSize: descriptionSize,
+          lineHeight,
+          lineClamp: descriptionLines,
+        }}
+      >
+        {page.data.description}
+      </span>
     ),
     site: appName,
   });

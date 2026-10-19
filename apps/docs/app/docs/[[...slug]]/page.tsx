@@ -24,9 +24,8 @@ export default async function Page(props: PageProps<"/docs/[[...slug]]">) {
   const header = (
     <>
       <DocsTitle>{page.data.title}</DocsTitle>
-      {/* An operation's or a webhook's body shows its whole description,
-          formatted, so its header is the title, as in Fumadocs' OpenAPI recipe.
-          The page's own description is a sentence of it (lib/source.ts). */}
+      {/* An API page's body shows its whole description, so its header is
+          the title, as in Fumadocs' OpenAPI recipe (lib/description.ts). */}
       {page.type === "docs" && (
         <DocsDescription className="mb-0">{page.data.description}</DocsDescription>
       )}

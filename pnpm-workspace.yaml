@@ -103,6 +103,7 @@ catalog:
   radix-ui: ^1.6.4
   react: ^19.2.8
   react-dom: ^19.2.8
+  remark: ^15.0.1
   rosie-skills: ^0.8.5
   safe-stable-stringify: ^2.5.0
   sanitize-html: ^2.18.0

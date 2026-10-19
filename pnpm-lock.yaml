@@ -246,6 +246,9 @@ catalogs:
     react-dom:
       specifier: ^19.2.8
       version: 19.2.8
+    remark:
+      specifier: ^15.0.1
+      version: 15.0.1
     rosie-skills:
       specifier: ^0.8.5
       version: 0.8.5
@@ -784,6 +787,9 @@ importers:
       react-dom:
         specifier: 'catalog:'
         version: 19.2.8(react@19.2.8)
+      remark:
+        specifier: 'catalog:'
+        version: 15.0.1
       shiki:
         specifier: 'catalog:'
         version: 4.2.0

@@ -76,10 +76,11 @@ So the template's root routes live under `/docs` here:
   document (`lib/source.ts`).
 - An operation's or a webhook's OpenAPI `description` is Markdown for the
   body of its page, which shows all of it; the page's header is its title.
-  The page's own description, in its metadata, on its Open Graph image and in
-  `llms.txt`, is the first sentence of it as plain text
-  (`lib/description.ts`), so that sentence should say on its own what the
-  operation does.
+  Everything else (the metadata, the Open Graph image, `llms.txt`, search)
+  gets its first sentence as plain text or the whole of it, as
+  `lib/description.ts` explains. The spec's side of that, a first sentence
+  that stands on its own, is in
+  [`api/openapi/AGENTS.md`](../../api/openapi/AGENTS.md#descriptions--the-first-sentence-stands-alone).
 - `moon run docs:generate` bundles `api/openapi` into `.generated/openapi.mjs`,
   which `lib/openapi.ts` imports. The content needs no generation step.
 - A page's Markdown (`/docs/cli.md`, or `/docs/cli` with `Accept:
