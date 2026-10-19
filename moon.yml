@@ -104,6 +104,8 @@ tasks:
       - "scripts/release-manifest.mjs"
       - "scripts/render-builtin-schemas.mjs"
       - "scripts/render-builtin-schemas.test.mjs"
+      # Read by that test: it renders every built-in schema.
+      - "api/openapi/endpoints/schemas/*.json"
       # The task delegates to the package `test` script and its file-existence
       # guard, so both are behavioral inputs.
       - "package.json"
