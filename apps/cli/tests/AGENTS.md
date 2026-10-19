@@ -158,6 +158,18 @@ on that hides the race rather than fixing it. This is the per-worker allocation
 journey runner. A listener a test holds until it is over may listen on zero:
 nobody can take a port that is held.
 
+## Network
+
+No test leaves the machine. [`helpers/offline.ts`](helpers/offline.ts) runs
+before every file and fails a test that connects anywhere but loopback, naming
+where it tried to go: refusing the request alone would not do, because the CLI
+carries on past a server it cannot reach. A unit test answers the platform with
+msw — `setupServer(...setupPlatformHandlers())` with
+`onUnhandledRequest: "error"`, plus a handler that refuses where the failure is
+what the test is about — and a spec with `usePlatformMock()`. A command run
+without `--server` talks to `DEFAULT_SERVER`, the real platform, so it needs
+the same arrangement as any other.
+
 ## Prohibited in specs
 
 - **No doubles of our own modules.** A spec that stubs something in `src/` has
