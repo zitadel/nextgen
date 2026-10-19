@@ -89,6 +89,8 @@ host are stripped).
 caller still decides which hosts it accepts, for example by comparing the origin
 with the request's.
 
-When a new way around the check turns up, add the input to the table in
-`internal/httputil/redirect_test.go` and fix the function. Do not add a second
+When a new way around the check turns up, add the input to
+`internal/httputil/testdata/redirect_targets.json` and fix the function. The
+API mock's port of the check (`packages/api-mock/src/redirect-target.ts`) reads
+the same file, so fix it there too. Do not add a second
 check at the call site.

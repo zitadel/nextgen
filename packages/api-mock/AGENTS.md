@@ -125,10 +125,14 @@ front instead); their fixture emails (`passkey-cancel@…`, `passkey-unsupported
 
 Choosing a provider is the `sso` submit; it answers `sso-redirect` with a
 `redirect_url` and records the submission's `return_target`. As on the engine
-(`internal/api/flow.go`), that target must be on the request origin (the
-`Origin` header, else the request's own host) and carry no userinfo, or the
+(`internal/api/flow.go`), that target must pass `parseRedirectTarget`
+(`src/redirect-target.ts`, a port of `httputil.ParseRedirectTarget`) and be on
+the request origin (the `Origin` header, else the request's own host), or the
 submit is refused with `req.invalid`: the callback redirects to it, and this
-mock is publicly deployed, so anything else is an open redirect. The provider's
+mock is publicly deployed, so anything else is an open redirect. The refused and
+accepted targets are one list, `internal/httputil/testdata/redirect_targets.json`,
+read by the Go tests and by `src/redirect-target.spec.ts`; a new way around the
+check goes there and into both implementations. The provider's
 return is **not** a submit: as on the engine (`internal/api/idp_callback.go`),
 it is `GET /__nextgen/idp/callback` (also `/idp/callback`, the path an SDK proxy
 forwards), answered with `303` to the recorded `return_target`, after which the
