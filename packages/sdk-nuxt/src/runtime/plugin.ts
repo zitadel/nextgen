@@ -1,6 +1,7 @@
 import { defineNuxtPlugin, useRequestEvent, useRuntimeConfig, useState } from "#imports";
 import { configureZitadel } from "@zitadel/api/config";
 
+import { DEFAULT_URL, resolveUrl } from "./lib/settings";
 import type { ClientAuthResult } from "./types";
 
 export default defineNuxtPlugin(() => {
@@ -44,10 +45,7 @@ export default defineNuxtPlugin(() => {
   // reading it in the browser makes Nuxt warn (NUXT_E1003). The browser keeps
   // the default, as it always did.
   const privateConfig = import.meta.server ? runtimeConfig.nextgen : undefined;
-  const url =
-    (privateConfig?.url as string | undefined) ??
-    (privateConfig?.issuerUrl as string | undefined) ??
-    "http://localhost:8080";
+  const url = import.meta.server ? resolveUrl(privateConfig) : DEFAULT_URL;
 
   if (proxyPath && projectId) {
     configureZitadel({ proxyPath, projectId, url });

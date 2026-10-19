@@ -10,6 +10,7 @@ import {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
   filterResponseHeaders,
+  loginRedirectUrl,
   matchesRoutes,
   proxySessionCookies,
   requiresProjectSecret,
@@ -26,6 +27,8 @@ import {
   setResponseStatus,
   readRawBody,
 } from "h3";
+
+import { resolveProjectSecret, resolveUrl } from "../lib/settings";
 
 declare module "h3" {
   interface H3EventContext {
@@ -113,7 +116,6 @@ function buildUpstreamHeaders(event: H3Event): Headers {
  */
 export function createNextgenMiddleware(options: NextgenMiddlewareOptions = {}): EventHandler {
   const {
-    url = process.env.ZITADEL_URL ?? "http://localhost:8080",
     projectId = process.env.ZITADEL_PROJECT_ID || process.env.NUXT_PUBLIC_ZITADEL_PROJECT_ID,
     proxyPath = "/__nextgen",
     protectedRoutes = [],
@@ -127,6 +129,10 @@ export function createNextgenMiddleware(options: NextgenMiddlewareOptions = {}):
     proxyTimeoutMs = 5000,
     opaqueTokenTimeoutMs = 5000,
   } = options;
+
+  // An empty `url` (the module's runtime config holds `""` until a value is
+  // set) counts as unset, so it falls back to `ZITADEL_URL`, then the default.
+  const url = resolveUrl({ url: options.url });
 
   // Guard against open-redirect: loginPath must be a relative path. An absolute
   // URL (e.g. "https://evil.com/phish") or a protocol-relative URL
@@ -227,7 +233,9 @@ async function proxyRequest(
   // the future publishable-key exchange path.
   if (requiresProjectSecret(method, suffix) && !upstreamHeaders.has("authorization")) {
     const config = useRuntimeConfig();
-    const projectSecret = (config.nextgen as { projectSecret?: string } | undefined)?.projectSecret;
+    const projectSecret = resolveProjectSecret(
+      config.nextgen as Record<string, unknown> | undefined,
+    );
     if (projectSecret) {
       upstreamHeaders.set("authorization", `Bearer ${projectSecret}`);
     }
@@ -286,17 +294,19 @@ interface AuthHandlerOptions extends ResolveSessionOptions {
 /**
  * Judges the session and writes the auth result to `event.context`, sets the
  * session cookies the judgement asks for, and redirects to the login page on
- * protected routes when nobody is signed in.
+ * protected routes when nobody is signed in. When the backend cannot say
+ * whether the session is live, a protected route answers `503` instead.
  *
  * @param event - The current H3 event.
  * @param opts  - Auth handler options.
+ * @returns The body of a response this handler answers itself, if any.
  */
-async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<void> {
+async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<string | undefined> {
   const { protectedRoutes, loginPath, pathname, ...verification } = opts;
 
   const authHeader = getRequestHeader(event, "authorization");
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  const { auth, cookies } = await resolveSession(
+  const { auth, undecided, cookies } = await resolveSession(
     {
       bearer: bearerToken,
       cookie: (name) => getCookie(event, name),
@@ -306,20 +316,28 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<voi
   );
 
   event.context.nextgenAuth = auth;
+
+  // The backend could not say whether the session is live. The user may well
+  // be signed in, so a protected route answers 503 rather than send them to
+  // the login page.
+  if (undecided && matchesRoutes(pathname, protectedRoutes)) {
+    setResponseStatus(event, 503);
+    return "Service Unavailable";
+  }
+
   // A dead session's cookie is cleared so the browser stops replaying it, and a
   // session of this project still under the shared name moves to the project's
   // own cookie. A live session that signs no one in here (an anonymous one,
   // whose sign-in may still complete, or one of another project) keeps its
-  // cookie.
+  // cookie, and so does one the backend gave no verdict on.
   for (const cookie of cookies) {
     appendResponseHeader(event, "set-cookie", serializeSessionCookie(cookie));
   }
 
   if (!auth.isAuthenticated && matchesRoutes(pathname, protectedRoutes)) {
-    const loginUrl = new URL(loginPath, getRequestURL(event));
-    loginUrl.searchParams.set("next", pathname);
-    await sendRedirect(event, loginUrl.toString(), 302);
+    await sendRedirect(event, loginRedirectUrl(loginPath, getRequestURL(event)).toString(), 302);
   }
+  return undefined;
 }
 
 /**

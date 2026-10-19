@@ -174,8 +174,19 @@ export interface ZitadelLoginConfig {
    * the flow file). Omit to run the project's default flow for the purpose.
    */
   readonly flowName?: string;
-  /** Where to navigate after a completed sign-in. */
+  /**
+   * Where to navigate after a completed sign-in. When the page's `next` query
+   * parameter names a path on the same origin, the widget returns there
+   * instead: the server SDKs' middleware sends a signed-out request for a
+   * protected route to the login page with `?next=<path>`.
+   */
   readonly postSignInUrl?: string;
+  /**
+   * Go to {@link postSignInUrl} even when the page's `next` query parameter
+   * names a path, for a page that uses `next` for something of its own.
+   * @default false
+   */
+  readonly forcePostSignInUrl?: boolean;
   /**
    * An existing flow's id to resume instead of starting a new flow, for
    * example one kept across a reload. Unset or `null` falls back to the `flow` query

@@ -9,6 +9,7 @@ import {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
   filterResponseHeaders,
+  loginRedirectUrl,
   matchesRoutes,
   proxySessionCookies,
   requiresProjectSecret,
@@ -201,7 +202,8 @@ interface AuthHandlerOptions extends ResolveSessionOptions {
  * Verifies the session token, writes the auth result to `event.locals`, and
  * either continues the request (`resolve`) or redirects to the login page on a
  * protected route with no valid session. Either way the response carries the
- * session cookies the judgement asks for.
+ * session cookies the judgement asks for. When the backend cannot say whether
+ * the session is live, a protected route answers `503` instead.
  *
  * @param event   - The current SvelteKit request event.
  * @param resolve - The downstream resolver from the `handle` hook.
@@ -218,21 +220,31 @@ async function handleAuth(
 
   const authHeader = event.request.headers.get("authorization");
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  const { auth, cookies: sessionCookies } = await resolveSession(
+  const {
+    auth,
+    undecided,
+    cookies: sessionCookies,
+  } = await resolveSession(
     { bearer: bearerToken, cookie: (name) => event.cookies.get(name), requestUrl: event.url },
     verification,
   );
 
   event.locals.nextgenAuth = auth;
+
+  // The backend could not say whether the session is live. The user may well
+  // be signed in, so a protected route answers 503 rather than send them to
+  // the login page.
+  if (undecided && matchesRoutes(pathname, protectedRoutes)) {
+    return new Response("Service Unavailable", { status: 503 });
+  }
+
   // A dead session's cookie is cleared so the browser stops replaying it, and a
   // session of this project still under the shared name moves to the project's
   // own cookie. A live session that signs no one in here (an anonymous one,
   // whose sign-in may still complete, or one of another project) keeps its
-  // cookie.
+  // cookie, and so does one the backend gave no verdict on.
   if (!auth.isAuthenticated && matchesRoutes(pathname, protectedRoutes)) {
-    const loginUrl = new URL(loginPath, event.url);
-    loginUrl.searchParams.set("next", pathname);
-    const headers = new Headers({ location: loginUrl.toString() });
+    const headers = new Headers({ location: loginRedirectUrl(loginPath, event.url).toString() });
     for (const cookie of sessionCookies) {
       headers.append("set-cookie", serializeSessionCookie(cookie));
     }

@@ -61,7 +61,7 @@ The middleware runs on every request and does three things in one pass:
    never reaches the browser.
 2. **Verifies** the session JWT via JWKS using the Web Crypto API and writes the
    result to `event.locals.nextgenAuth`.
-3. **Redirects** unauthenticated requests to `loginPath` for protected routes.
+3. **Redirects** unauthenticated requests to `loginPath` for protected routes, with the requested path and query string in `?next=`, where `<zitadel-login>` returns after sign-in.
 
 To compose with your own handlers, spread the config's `onRequest`:
 

@@ -33,7 +33,9 @@ import { useTheme } from "@/theme";
  * `?next=` carries the router-relative path the `_authed` guard intercepted;
  * it is sanitized against open redirects and re-joined with the Vite
  * `BASE_URL` so the widget's document-level navigation lands inside the
- * deployed prefix (`/ui/console` in production, `/` in dev).
+ * deployed prefix (`/ui/console` in production, `/` in dev). The widget would
+ * otherwise return to the page's `next` itself, which here lacks the prefix,
+ * so `forcePostSignInUrl` keeps it on `postSignInUrl`.
  *
  * The widget resolves its own colour mode (element `theme` → tenant branding
  * → dark) and, in the widget variant, paints no surface of its own. A page
@@ -118,6 +120,7 @@ function LoginScreen() {
           purpose="login"
           theme={theme}
           postSignInUrl={postSignInUrl}
+          forcePostSignInUrl
         />
       ) : (
         <NoProjectSetupHint />

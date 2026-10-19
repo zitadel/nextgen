@@ -16,6 +16,9 @@ if (sampleRate && !(Number(sampleRate) >= 0 && Number(sampleRate) <= 1)) {
 /** @type {import('next').NextConfig} */
 const config = {
   reactStrictMode: true,
+  // Keeps `next dev` from writing Next's agent rules into AGENTS.md when an
+  // AI coding agent runs it (apps/AGENTS.md).
+  agentRules: false,
   // Everything the docs serve lives under /docs, their scripts and styles
   // too: on the cloud's host every other path belongs to another service
   // (repo-root vercel.json), /_next/ to the website.

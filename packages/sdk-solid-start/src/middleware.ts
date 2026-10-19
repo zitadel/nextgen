@@ -8,6 +8,7 @@ import {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
   filterResponseHeaders,
+  loginRedirectUrl,
   matchesRoutes,
   proxySessionCookies,
   requiresProjectSecret,
@@ -189,7 +190,8 @@ interface AuthHandlerOptions extends ResolveSessionOptions {
  * Judges the session, writes the auth result to `event.locals`, and returns a
  * redirect `Response` on a protected route when nobody is signed in (otherwise
  * `undefined` to continue). Either way the response carries the session
- * cookies the judgement asks for.
+ * cookies the judgement asks for. When the backend cannot say whether the
+ * session is live, a protected route answers `503` instead.
  */
 async function handleAuth(
   event: SolidFetchEvent,
@@ -202,7 +204,11 @@ async function handleAuth(
   const cookies = parseCookieHeader(event.request.headers.get("cookie"));
   const authHeader = event.request.headers.get("authorization");
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  const { auth, cookies: sessionCookies } = await resolveSession(
+  const {
+    auth,
+    undecided,
+    cookies: sessionCookies,
+  } = await resolveSession(
     { bearer: bearerToken, cookie: (name) => cookies.get(name), requestUrl: url2 },
     verification,
   );
@@ -212,13 +218,19 @@ async function handleAuth(
   // replay costs a backend session check), and a session of this project still
   // under the shared name moves to the project's own cookie. A live session that
   // signs no one in here (an anonymous one, whose sign-in may still complete, or
-  // one of another project) keeps its cookie.
+  // one of another project) keeps its cookie, and so does one the backend gave
+  // no verdict on.
   const setCookies = sessionCookies.map(serializeSessionCookie);
 
+  // The backend could not say whether the session is live. The user may well
+  // be signed in, so a protected route answers 503 rather than send them to
+  // the login page.
+  if (undecided && matchesRoutes(pathname, protectedRoutes)) {
+    return new Response("Service Unavailable", { status: 503 });
+  }
+
   if (!auth.isAuthenticated && matchesRoutes(pathname, protectedRoutes)) {
-    const loginUrl = new URL(loginPath, url2);
-    loginUrl.searchParams.set("next", pathname);
-    const headers = new Headers({ location: loginUrl.toString() });
+    const headers = new Headers({ location: loginRedirectUrl(loginPath, url2).toString() });
     for (const cookie of setCookies) {
       headers.append("set-cookie", cookie);
     }

@@ -12,8 +12,6 @@ import { resolve as resolvePath } from "node:path";
 import type { NuxtModule } from "@nuxt/schema";
 import type { NextgenMiddlewareOptions } from "./runtime/types";
 
-/** Where `zitadel start` runs the local server by default. */
-const DEFAULT_URL = "http://localhost:8080";
 const DEFAULT_PROXY_PATH = "/__nextgen";
 
 /**
@@ -90,8 +88,10 @@ const nextgenModule: NuxtModule<NextgenMiddlewareOptions> =
       const proxyPath = options.proxyPath ?? DEFAULT_PROXY_PATH;
 
       nuxt.options.runtimeConfig.nextgen = {
-        // A `nextgen.url` in nuxt.config wins over `ZITADEL_URL`.
-        url: options.url || setting("ZITADEL_URL") || DEFAULT_URL,
+        // Only a URL the app set in nuxt.config is kept. The key exists (empty)
+        // so `NUXT_NEXTGEN_URL` can set it at runtime; `ZITADEL_URL` is read by
+        // the running server and never baked into the build.
+        url: options.url || (nuxt.options.dev ? setting("ZITADEL_URL") : undefined) || "",
         // The project a session must belong to for its user to count as signed
         // in. Unset, the handler falls back to the public project id the
         // widgets sign users in to.
@@ -112,11 +112,12 @@ const nextgenModule: NuxtModule<NextgenMiddlewareOptions> =
         proxyTimeoutMs: options.proxyTimeoutMs,
         opaqueTokenTimeoutMs: options.opaqueTokenTimeoutMs,
         jwtKey: options.jwtKey,
-        // Server-only — never exposed to the client. Override at deploy time via
-        // `NUXT_NEXTGEN_PROJECT_SECRET`. Left undefined when the env var (and
-        // `.env.local`) provide no value, so the middleware surfaces a missing
-        // exchange bearer instead of silently sending an empty one.
-        projectSecret: setting("ZITADEL_PROJECT_SECRET"),
+        // Server-only. Never filled from the build environment, which would
+        // copy it into `.output/`: the running server reads it from
+        // `NUXT_NEXTGEN_PROJECT_SECRET` or `ZITADEL_PROJECT_SECRET`. Only
+        // `nuxt dev`, which writes no build output, fills it from `.env.local`
+        // that the dev server would not otherwise see.
+        projectSecret: (nuxt.options.dev ? setting("ZITADEL_PROJECT_SECRET") : undefined) ?? "",
       };
 
       // Expose SDK-initializer values to the client-side plugin so it can

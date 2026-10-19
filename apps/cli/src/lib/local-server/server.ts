@@ -448,7 +448,8 @@ export class LocalServer {
    * signalled and a pid that is no longer the server is left alone (see
    * `BinaryLauncher.stopRecord`). For a container, or with no record at all, the
    * container named for this directory is removed if there is one: a start that
-   * failed halfway can leave a container behind with no record of it.
+   * failed halfway can leave a container behind with no record of it. Where
+   * Docker is not installed there is none, and that is not an error.
    */
   private async halt(): Promise<StopReport> {
     const runtime = await readRuntimeMetadata(this.cwd);

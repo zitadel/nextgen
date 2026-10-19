@@ -21,6 +21,16 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
   abstract readonly supportedFrameworks: ReadonlyArray<string>;
   /** The Node the framework CLI this scaffolder runs accepts, and how it treats any other. */
   abstract readonly nodeEngines: NodeEngines;
+  /**
+   * The packages a fresh app gets at an exact version because this scaffolder
+   * pins them, as `name@version`: the framework CLI, when it runs a fixed
+   * release, and any package that release writes at a fixed version. A
+   * framework CLI run `@latest`, and the ranges it writes, move to patched
+   * releases by themselves; a pin stays on its version until someone bumps
+   * it, so `cli:check-advisories` checks each against the npm advisory
+   * database.
+   */
+  readonly pinnedPackages: ReadonlyArray<string> = [];
 
   private readonly nodeVersion: string;
   private readonly platform: NodeJS.Platform;

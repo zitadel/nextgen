@@ -62,7 +62,7 @@ The middleware runs on every matched route and does three things in one pass:
 
 1. **Proxies** `/__nextgen/*` requests to the auth backend
 2. **Verifies** the session JWT via JWKS using the Web Crypto API
-3. **Redirects** unauthenticated requests to `loginPath` for protected routes
+3. **Redirects** unauthenticated requests to `loginPath` for protected routes, with the requested path and query string in `?next=`, where `<zitadel-login>` returns after sign-in
 
 ### 2. Reading auth in a Server Component
 

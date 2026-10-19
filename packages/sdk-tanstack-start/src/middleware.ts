@@ -4,6 +4,7 @@ import {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
   filterResponseHeaders,
+  loginRedirectUrl,
   matchesRoutes,
   proxySessionCookies,
   requiresProjectSecret,
@@ -21,8 +22,10 @@ const PROCESS_ENV: Record<string, string | undefined> =
 
 /**
  * The decision produced by {@link handleNextgenRequest}: either a ready-to-send
- * `Response` (proxy or login redirect) or an instruction to continue the request
- * with the resolved {@link AuthResult} attached to the router context.
+ * `Response` (proxy, login redirect, or a refusal: `400` for a request carrying
+ * the internal auth header, `503` for a protected route whose session the
+ * backend could not check) or an instruction to continue the request with the
+ * resolved {@link AuthResult} attached to the router context.
  */
 export type NextgenRequestDecision =
   | { readonly type: "proxy"; readonly response: Response }
@@ -44,7 +47,10 @@ export type NextgenRequestDecision =
 export type NextgenRequestOptions = NextgenMiddlewareOptions & {
   /** Project secret, sent as the bearer on the `POST /sessions/exchange` handoff only. */
   readonly projectSecret?: string;
-  /** Direct client address appended to the `X-Forwarded-For` chain. */
+  /**
+   * Direct client address appended to the `X-Forwarded-For` chain. Supply the
+   * address your server runtime provides; a request header is never used.
+   */
   readonly clientAddress?: string;
 };
 
@@ -62,7 +68,7 @@ function buildUpstreamHeaders(
     headers.set(key, value);
   }
 
-  const clientIp = clientAddress ?? request.headers.get("x-real-ip") ?? undefined;
+  const clientIp = clientAddress;
   if (clientIp) {
     const existingXff = headers.get("x-forwarded-for");
     headers.set("x-forwarded-for", existingXff ? `${existingXff}, ${clientIp}` : clientIp);
@@ -240,7 +246,11 @@ export async function handleNextgenRequest(
   const cookies = parseCookieHeader(request.headers.get("cookie"));
   const authHeader = request.headers.get("authorization");
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  const { auth, cookies: sessionCookies } = await resolveSession(
+  const {
+    auth,
+    undecided,
+    cookies: sessionCookies,
+  } = await resolveSession(
     { bearer: bearerToken, cookie: (name) => cookies.get(name), requestUrl: url2 },
     {
       url,
@@ -258,13 +268,19 @@ export async function handleNextgenRequest(
   // replay costs a backend session check), and a session of this project still
   // under the shared name moves to the project's own cookie. A live session that
   // signs no one in here (an anonymous one, whose sign-in may still complete, or
-  // one of another project) keeps its cookie.
+  // one of another project) keeps its cookie, and so does one the backend gave
+  // no verdict on.
   const setCookies = sessionCookies.map(serializeSessionCookie);
 
+  // The backend could not say whether the session is live. The user may well
+  // be signed in, so a protected route answers 503 rather than send them to
+  // the login page.
+  if (undecided && matchesRoutes(pathname, protectedRoutes)) {
+    return { type: "reject", response: new Response("Service Unavailable", { status: 503 }) };
+  }
+
   if (!auth.isAuthenticated && matchesRoutes(pathname, protectedRoutes)) {
-    const loginUrl = new URL(loginPath, url2);
-    loginUrl.searchParams.set("next", pathname);
-    const headers = new Headers({ location: loginUrl.toString() });
+    const headers = new Headers({ location: loginRedirectUrl(loginPath, url2).toString() });
     for (const cookie of setCookies) {
       headers.append("set-cookie", cookie);
     }
@@ -328,8 +344,7 @@ export function createNextgenRequestMiddleware(
   options: NextgenRequestOptions = {},
 ): (ctx: RequestMiddlewareContext) => Promise<Response> {
   return async ({ request, next }: RequestMiddlewareContext): Promise<Response> => {
-    const clientAddress = options.clientAddress ?? request.headers.get("x-real-ip") ?? undefined;
-    const decision = await handleNextgenRequest(request, { ...options, clientAddress });
+    const decision = await handleNextgenRequest(request, options);
 
     if (decision.type === "continue") {
       const result = await next({ context: { [CONTEXT_KEY]: decision.auth } });

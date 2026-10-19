@@ -117,6 +117,29 @@ function sessionsMe(response: Response): void {
   );
 }
 
+/** Fails the opaque-session lookup on the network, as a backend that is down does. */
+function sessionsMeUnreachable(): void {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => {
+      throw new TypeError("fetch failed");
+    }),
+  );
+}
+
+/** Never answers the opaque-session lookup: it ends only when its signal aborts. */
+function sessionsMeSilent(): void {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      (_url: string, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+        }),
+    ),
+  );
+}
+
 /**
  * Asserts that an answer moved this project's session `token` out of the shared
  * cookie: it sets the app's own cookie, HttpOnly, for the session's lifetime,
@@ -258,6 +281,22 @@ describe("server middleware", () => {
     expect(served.status).toBe(302);
     expect(served.headers.get("location")).toContain("/login");
     expect(served.headers.get("location")).toContain("next=%2Fadmin");
+  });
+
+  it("protected route with a query string redirects to /login?next=/admin?tab=x", async () => {
+    const served = await serve(`${ORIGIN}/admin?tab=x`, {}, OPTIONS);
+
+    expect(served.status).toBe(302);
+    const location = new URL(served.headers.get("location") ?? "", ORIGIN);
+    expect(`${location.pathname}${location.search}`).toBe("/login?next=%2Fadmin%3Ftab%3Dx");
+  });
+
+  it("does not nest a next parameter the request already carries", async () => {
+    const served = await serve(`${ORIGIN}/admin?tab=x&next=%2Fbilling`, {}, OPTIONS);
+
+    expect(served.status).toBe(302);
+    const location = new URL(served.headers.get("location") ?? "", ORIGIN);
+    expect(location.searchParams.getAll("next")).toEqual(["/admin?tab=x"]);
   });
 
   // Routers that canonicalise to a trailing slash request `/profile/`, which
@@ -612,9 +651,33 @@ describe("server middleware", () => {
   it("omits X-Forwarded-For when no client IP is available", async () => {
     const calls = captureFetch();
 
-    await serve(`${ORIGIN}/__nextgen/v1/flow`, {}, PROXY);
+    await serve(`${ORIGIN}/__nextgen/v1/flow`, { headers: { "x-real-ip": "10.9.9.9" } }, PROXY);
 
     expect(calls[0]?.headers.has("x-forwarded-for")).toBe(false);
+  });
+
+  it("ignores a client-supplied x-real-ip when the runtime provides an address", async () => {
+    const calls = captureFetch();
+
+    await serve(
+      `${ORIGIN}/__nextgen/v1/flow`,
+      { headers: { "x-real-ip": "10.9.9.9" }, clientIp: "10.0.0.2" },
+      PROXY,
+    );
+
+    expect(calls[0]?.headers.get("x-forwarded-for")).toBe("10.0.0.2");
+  });
+
+  it("ignores a client-supplied x-real-ip when an X-Forwarded-For chain exists", async () => {
+    const calls = captureFetch();
+
+    await serve(
+      `${ORIGIN}/__nextgen/v1/flow`,
+      { headers: { "x-forwarded-for": "10.0.0.1", "x-real-ip": "10.9.9.9" }, clientIp: "10.0.0.2" },
+      PROXY,
+    );
+
+    expect(calls[0]?.headers.get("x-forwarded-for")).toBe("10.0.0.1, 10.0.0.2");
   });
 
   it("does not proxy a path that only shares the prefix without a separator", async () => {
@@ -730,6 +793,79 @@ describe("server middleware", () => {
 
     expect(served.headers.get("set-cookie")).toMatch(new RegExp(`^${SESSION}=;`));
     expect(served.headers.get("set-cookie")).toMatch(/Max-Age=0|expires=.*1970/i);
+  });
+
+  it("clears a dead session cookie and redirects on a protected route", async () => {
+    sessionsMe(new Response(null, { status: 401 }));
+
+    const served = await serve(
+      `${ORIGIN}/admin`,
+      { headers: { cookie: `${SESSION}=opaque-session-token` } },
+      OPTIONS,
+    );
+
+    expect(served.status).toBe(302);
+    expect(served.headers.get("set-cookie")).toMatch(new RegExp(`^${SESSION}=;`));
+    expect(served.headers.get("set-cookie")).toMatch(/Max-Age=0|expires=.*1970/i);
+  });
+
+  it("clears the cookie of a session that is gone", async () => {
+    sessionsMe(
+      Response.json(
+        { code: "sess.not_found", message: "The session was not found" },
+        { status: 404 },
+      ),
+    );
+
+    const served = await serve(
+      `${ORIGIN}/`,
+      { headers: { cookie: `${SESSION}=opaque-session-token` } },
+      OPTIONS,
+    );
+
+    expect(served.headers.get("set-cookie")).toMatch(new RegExp(`^${SESSION}=;`));
+    expect(served.headers.get("set-cookie")).toMatch(/Max-Age=0|expires=.*1970/i);
+  });
+
+  // The backend answers 500, never 401, when it cannot decide whether a session
+  // is live (its token or key store failed), so that an outage does not sign
+  // every user out. Only its refusal makes a cookie dead.
+  describe.each([
+    ["a 500", () => sessionsMe(new Response(null, { status: 500 }))],
+    ["no answer in time", sessionsMeSilent],
+    ["a network error", sessionsMeUnreachable],
+  ])("when the session check gets %s", (_label, backend) => {
+    // Short, so that a backend that never answers times out quickly.
+    const options: ServeOptions = { ...OPTIONS, opaqueTokenTimeoutMs: 10 };
+
+    beforeEach(() => {
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      backend();
+    });
+
+    it("keeps the session cookie and renders a public page signed out", async () => {
+      const served = await serve(
+        `${ORIGIN}/`,
+        { headers: { cookie: `${SESSION}=opaque-session-token` } },
+        options,
+      );
+
+      expect(served.answered).toBe(false);
+      expect(served.auth).toEqual({ isAuthenticated: false, session: null });
+      expect(served.headers.get("set-cookie")).toBeNull();
+    });
+
+    it("answers 503 on a protected route and keeps the session cookie", async () => {
+      const served = await serve(
+        `${ORIGIN}/admin`,
+        { headers: { cookie: `${SESSION}=opaque-session-token` } },
+        options,
+      );
+
+      expect(served.answered).toBe(true);
+      expect(served.status).toBe(503);
+      expect(served.headers.get("set-cookie")).toBeNull();
+    });
   });
 
   it("does not sign in a live session of another project", async () => {

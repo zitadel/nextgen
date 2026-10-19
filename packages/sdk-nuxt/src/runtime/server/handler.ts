@@ -2,6 +2,7 @@ import type { NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
 
 import { useRuntimeConfig } from "#imports";
 
+import { resolveUrl } from "../lib/settings";
 import { createNextgenMiddleware } from "./middleware";
 
 function nonEmptyString(value: unknown): string | undefined {
@@ -34,8 +35,7 @@ export function middlewareOptions(
   publicConfig: Record<string, unknown> = {},
 ): NextgenMiddlewareOptions {
   return {
-    url:
-      nonEmptyString(nextgen.url) ?? nonEmptyString(nextgen.issuerUrl) ?? "http://localhost:8080",
+    url: resolveUrl(nextgen),
     // Sessions are held to this project; with none stored, to the public
     // project id the widgets sign users in to.
     projectId: nonEmptyString(nextgen.projectId) ?? nonEmptyString(publicConfig.zitadelProjectId),

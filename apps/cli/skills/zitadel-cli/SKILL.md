@@ -299,7 +299,12 @@ directory. Any other non-empty directory stops setup with a hint to pass
 `--force`. Pass it only for a directory whose contents may be replaced: files
 the new app also has, such as `package.json`, are overwritten. Without a
 terminal `setup` cannot ask which framework to scaffold, so pass `--framework`;
-the error lists the choices in `details.frameworks`.
+the error lists the choices in `details.frameworks`. `setup --dry-run` creates
+no app: where it would scaffold one, it previews the project, and
+`data.files_written` is empty, because those files depend on the generated app.
+When setup fails after scaffolding a new app, before its default schema and
+flow are uploaded, it removes the app again and puts back what the directory
+held, so rerunning the same `setup` starts over.
 
 `start` reuses a server already running in the directory only when it is the
 release this CLI ships; one an earlier release started is restarted, and its

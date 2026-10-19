@@ -8,6 +8,7 @@ import {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
   filterResponseHeaders,
+  loginRedirectUrl,
   matchesRoutes,
   proxySessionCookies,
   requiresProjectSecret,
@@ -203,6 +204,8 @@ interface AuthHandlerOptions extends ResolveSessionOptions {
  * Judges the session and writes the auth result to `ev.sharedMap`. Sets the
  * session cookies the judgement asks for, and on a protected route with nobody
  * signed in throws `ev.redirect(...)` to send the browser to the login page.
+ * When the backend cannot say whether the session is live, a protected route
+ * answers `503` instead.
  */
 async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promise<void> {
   const { protectedRoutes, loginPath, ...verification } = opts;
@@ -211,7 +214,11 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
   const cookies = parseCookieHeader(ev.request.headers.get("cookie"));
   const authHeader = ev.request.headers.get("authorization");
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  const { auth, cookies: sessionCookies } = await resolveSession(
+  const {
+    auth,
+    undecided,
+    cookies: sessionCookies,
+  } = await resolveSession(
     {
       bearer: bearerToken,
       cookie: (name) => ev.cookie.get(name)?.value ?? cookies.get(name),
@@ -221,12 +228,21 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
   );
 
   ev.sharedMap.set(SHARED_MAP_KEY, auth);
+
+  // The backend could not say whether the session is live. The user may well
+  // be signed in, so a protected route answers 503 rather than send them to
+  // the login page.
+  if (undecided && matchesRoutes(pathname, protectedRoutes)) {
+    ev.send(new Response("Service Unavailable", { status: 503 }));
+    return;
+  }
+
   // A dead session's cookie is cleared so the browser stops replaying it (each
   // replay costs a backend session check), and a session of this project still
   // under the shared name moves to the project's own cookie. A live session that
   // signs no one in here (an anonymous one, whose sign-in may still complete, or
-  // one of another project) keeps its cookie. Qwik applies the changes to
-  // whichever response goes out.
+  // one of another project) keeps its cookie, and so does one the backend gave
+  // no verdict on. Qwik applies the changes to whichever response goes out.
   for (const cookie of sessionCookies) {
     if (cookie.maxAge === 0) {
       ev.cookie.delete(cookie.name, { path: "/" });
@@ -242,8 +258,7 @@ async function handleAuth(ev: QwikRequestEvent, opts: AuthHandlerOptions): Promi
   }
 
   if (!auth.isAuthenticated && matchesRoutes(pathname, protectedRoutes)) {
-    const loginUrl = new URL(loginPath, ev.url);
-    loginUrl.searchParams.set("next", pathname);
+    const loginUrl = loginRedirectUrl(loginPath, ev.url);
     throw ev.redirect(302, `${loginUrl.pathname}${loginUrl.search}`);
   }
 }

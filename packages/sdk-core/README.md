@@ -14,7 +14,7 @@ building your own middleware or need the types without a framework wrapper.
 | `@zitadel/sdk-core` | The middleware, JWT, and runtime-resolution exports in one namespace. The `/types` widget contract is **not** re-exported from the root — import it from `@zitadel/sdk-core/types` |
 | `@zitadel/sdk-core/types` | The SPA widget contract (`ZitadelFlowStepDetail` and the other widget event/config/handler/props types the SPA SDKs re-export) |
 | `@zitadel/sdk-core/jwt` | `verifyJwt`, `decodeJwt`, `isJwtShaped`, `JWKS_TTL_MS` |
-| `@zitadel/sdk-core/middleware` | The middleware layer: `NextgenSession`, `AuthResult`, `NextgenMiddlewareOptions`, route matching (`matchesRoutes`), response-header filtering (`filterResponseHeaders`, `HOP_BY_HOP`), session judgement (`resolveSession`), and the session cookie per project (`sessionCookieName`, `proxySessionCookies`, `serializeSessionCookie`) |
+| `@zitadel/sdk-core/middleware` | The middleware layer: `NextgenSession`, `AuthResult`, `NextgenMiddlewareOptions`, route matching (`matchesRoutes`), response-header filtering (`filterResponseHeaders`, `HOP_BY_HOP`), session judgement (`resolveSession`, the opaque session check `checkOpaqueSessionToken`), and the session cookie per project (`sessionCookieName`, `proxySessionCookies`, `serializeSessionCookie`) |
 
 It also exports `resolveZitadelRuntime` / `resolveZitadelRuntimeEnv` and
 `ZitadelRuntimeError` for resolving the runtime environment
@@ -44,7 +44,14 @@ middleware runs (`verifyJwt`):
 10. `aud` must name the app's project (`projectId`).
 
 Opaque (non-JWT) session tokens are validated against the backend's
-`GET /sessions/me?project_id=…` instead, bounded by `opaqueTokenTimeoutMs`.
+`GET /sessions/me?project_id=…` instead, bounded by `opaqueTokenTimeoutMs`
+(`checkOpaqueSessionToken`). Only the backend's refusal makes the session
+cookie dead, and only then does the middleware clear it: a `401`, or a `404`
+with the `sess.not_found` code for a session that is gone. Any other outcome (a
+`5xx`, no answer in time, a network error) is not a refusal: the request counts
+as signed out, the cookie stays, and a protected route answers
+`503 Service Unavailable` rather than send a user who may well be signed in to
+the login page.
 
 A session belongs to one project, while a browser sends the session cookie
 to every app on the same host, including the Console of a local server. So a
@@ -73,7 +80,7 @@ session in a cookie of its own, `sessionCookieName(projectId)`:
   app's cookie under the server's name. No other session cookie, the
   Console's or another app's, goes up.
 - **The middleware** (`resolveSession`) reads the app's cookie, and clears only
-  that cookie when it holds a dead session.
+  that cookie when the backend refuses its session.
 - **A session kept under the server's name** before the change, by this app or,
   on `localhost`, by the Console, is read only where the server holds it to the
   app's project: by the middleware, and by the proxy for the session probe

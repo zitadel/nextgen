@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 
-import { ZitadelError } from "../../errors";
+import { ZitadelError, isErrno } from "../../errors";
 import {
   EMPTY_ENV,
   EMPTY_SUMMARY,
@@ -269,9 +269,23 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
     return { exists: true, running: running === "true", id, image: imageParts.join(" ") };
   }
 
-  /** Stops and removes the container. `false` when there was none to remove. */
+  /**
+   * Stops and removes the container. `false` when there was none to remove,
+   * which is also the answer where Docker is not installed: the default runtime
+   * runs without it, so `stop`, `reset` and a `start` that moves a directory off
+   * a container must not fail for want of a `docker` to ask.
+   */
   static async remove(containerName: string): Promise<boolean> {
-    const inspect = await DockerLauncher.inspect(containerName);
+    let inspect: Awaited<ReturnType<typeof DockerLauncher.inspect>>;
+    try {
+      inspect = await DockerLauncher.inspect(containerName);
+    } catch (error) {
+      // No `docker` on PATH: Docker is not installed, so it runs no container.
+      if (isErrno(error, "ENOENT")) {
+        return false;
+      }
+      throw error;
+    }
     if (!inspect.exists) {
       return false;
     }
