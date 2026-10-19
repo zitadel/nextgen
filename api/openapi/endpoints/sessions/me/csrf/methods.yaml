@@ -9,8 +9,13 @@ get:
     HttpOnly cookie is still the credential, and a cross-site page cannot
     read this response. It stays the same for the life of the session, so a
     client fetches it once per session.
+
+    With `project_id`, the token is returned only when the session belongs to
+    that project.
   tags:
     - Sessions
+  parameters:
+    - $ref: ../../../../components/parameters/session-project-id.yaml
   security:
     - nextgenSession: []
   responses:
@@ -32,3 +37,12 @@ get:
         application/json:
           schema:
             $ref: ../../../../components/schemas/errors/auth-unauthorized.yaml
+    '403':
+      description: The session belongs to a different project than `project_id`.
+      headers:
+        Cache-Control:
+          $ref: ../../../../components/headers/cache-control-private-no-store.yaml
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/schemas/errors/sess-project_mismatch.yaml

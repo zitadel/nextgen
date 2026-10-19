@@ -248,7 +248,7 @@ describe("<zitadel-logout>", () => {
 
     expect(requestLog).toHaveLength(1);
     expect(requestLog[0]?.method).toBe("DELETE");
-    expect(requestLog[0]?.url).toBe(`${API_BASE}/sessions/me`);
+    expect(requestLog[0]?.url).toBe(`${API_BASE}/sessions/me?project_id=test`);
     expect(requestLog[0]?.credentials).toBe("include");
     expect(signoutEvents).toHaveLength(1);
     expect(signoutEvents[0]?.detail).toEqual({
@@ -293,7 +293,7 @@ describe("<zitadel-logout>", () => {
       await new Promise((resolve) => setTimeout(resolve, 32));
 
       expect(requestLog).toHaveLength(1);
-      expect(requestLog[0]?.url).toBe(`${API_BASE}/sessions/me`);
+      expect(requestLog[0]?.url).toBe(`${API_BASE}/sessions/me?project_id=test`);
       expect(requestLog[0]?.credentials).toBe("include");
     } finally {
       configureZitadel({ proxyPath: API_BASE, projectId: "test" });

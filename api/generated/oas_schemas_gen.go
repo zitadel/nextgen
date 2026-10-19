@@ -62782,13 +62782,14 @@ func (*RequestApiDef) requestApiRes() {}
 
 // RevokeMySessionErrorResponse represents sum type.
 type RevokeMySessionErrorResponse struct {
-	Type             RevokeMySessionErrorResponseType // switch on this field
-	AuthCsrfInvalid  AuthCsrfInvalid
-	AuthUnauthorized AuthUnauthorized
-	EvtInvalid       EvtInvalid
-	Internal         Internal
-	ReqInvalid       ReqInvalid
-	SessNotFound     SessNotFound
+	Type                RevokeMySessionErrorResponseType // switch on this field
+	AuthCsrfInvalid     AuthCsrfInvalid
+	AuthUnauthorized    AuthUnauthorized
+	EvtInvalid          EvtInvalid
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+	SessNotFound        SessNotFound
+	SessProjectMismatch SessProjectMismatch
 }
 
 // RevokeMySessionErrorResponseType is oneOf type of RevokeMySessionErrorResponse.
@@ -62796,12 +62797,13 @@ type RevokeMySessionErrorResponseType string
 
 // Possible values for RevokeMySessionErrorResponseType.
 const (
-	AuthCsrfInvalidRevokeMySessionErrorResponse  RevokeMySessionErrorResponseType = "auth.csrf_invalid"
-	AuthUnauthorizedRevokeMySessionErrorResponse RevokeMySessionErrorResponseType = "auth.unauthorized"
-	EvtInvalidRevokeMySessionErrorResponse       RevokeMySessionErrorResponseType = "evt.invalid"
-	InternalRevokeMySessionErrorResponse         RevokeMySessionErrorResponseType = "internal"
-	ReqInvalidRevokeMySessionErrorResponse       RevokeMySessionErrorResponseType = "req.invalid"
-	SessNotFoundRevokeMySessionErrorResponse     RevokeMySessionErrorResponseType = "sess.not_found"
+	AuthCsrfInvalidRevokeMySessionErrorResponse     RevokeMySessionErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedRevokeMySessionErrorResponse    RevokeMySessionErrorResponseType = "auth.unauthorized"
+	EvtInvalidRevokeMySessionErrorResponse          RevokeMySessionErrorResponseType = "evt.invalid"
+	InternalRevokeMySessionErrorResponse            RevokeMySessionErrorResponseType = "internal"
+	ReqInvalidRevokeMySessionErrorResponse          RevokeMySessionErrorResponseType = "req.invalid"
+	SessNotFoundRevokeMySessionErrorResponse        RevokeMySessionErrorResponseType = "sess.not_found"
+	SessProjectMismatchRevokeMySessionErrorResponse RevokeMySessionErrorResponseType = "sess.project_mismatch"
 )
 
 // IsAuthCsrfInvalid reports whether RevokeMySessionErrorResponse is AuthCsrfInvalid.
@@ -62832,6 +62834,11 @@ func (s RevokeMySessionErrorResponse) IsReqInvalid() bool {
 // IsSessNotFound reports whether RevokeMySessionErrorResponse is SessNotFound.
 func (s RevokeMySessionErrorResponse) IsSessNotFound() bool {
 	return s.Type == SessNotFoundRevokeMySessionErrorResponse
+}
+
+// IsSessProjectMismatch reports whether RevokeMySessionErrorResponse is SessProjectMismatch.
+func (s RevokeMySessionErrorResponse) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchRevokeMySessionErrorResponse
 }
 
 // SetAuthCsrfInvalid sets RevokeMySessionErrorResponse to AuthCsrfInvalid.
@@ -62960,6 +62967,27 @@ func NewSessNotFoundRevokeMySessionErrorResponse(v SessNotFound) RevokeMySession
 	return s
 }
 
+// SetSessProjectMismatch sets RevokeMySessionErrorResponse to SessProjectMismatch.
+func (s *RevokeMySessionErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchRevokeMySessionErrorResponse
+	s.SessProjectMismatch = v
+}
+
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if RevokeMySessionErrorResponse is SessProjectMismatch.
+func (s RevokeMySessionErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
+		return v, false
+	}
+	return s.SessProjectMismatch, true
+}
+
+// NewSessProjectMismatchRevokeMySessionErrorResponse returns new RevokeMySessionErrorResponse from SessProjectMismatch.
+func NewSessProjectMismatchRevokeMySessionErrorResponse(v SessProjectMismatch) RevokeMySessionErrorResponse {
+	var s RevokeMySessionErrorResponse
+	s.SetSessProjectMismatch(v)
+	return s
+}
+
 // RevokeMySessionErrorResponseStatusCode wraps RevokeMySessionErrorResponse with StatusCode.
 type RevokeMySessionErrorResponseStatusCode struct {
 	StatusCode int
@@ -62987,6 +63015,76 @@ func (s *RevokeMySessionErrorResponseStatusCode) SetResponse(val RevokeMySession
 }
 
 func (*RevokeMySessionErrorResponseStatusCode) revokeMySessionRes() {}
+
+// RevokeMySessionForbidden represents sum type.
+type RevokeMySessionForbidden struct {
+	Type                RevokeMySessionForbiddenType // switch on this field
+	SessProjectMismatch SessProjectMismatch
+	AuthCsrfInvalid     AuthCsrfInvalid
+}
+
+// RevokeMySessionForbiddenType is oneOf type of RevokeMySessionForbidden.
+type RevokeMySessionForbiddenType string
+
+// Possible values for RevokeMySessionForbiddenType.
+const (
+	SessProjectMismatchRevokeMySessionForbidden RevokeMySessionForbiddenType = "sess.project_mismatch"
+	AuthCsrfInvalidRevokeMySessionForbidden     RevokeMySessionForbiddenType = "auth.csrf_invalid"
+)
+
+// IsSessProjectMismatch reports whether RevokeMySessionForbidden is SessProjectMismatch.
+func (s RevokeMySessionForbidden) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchRevokeMySessionForbidden
+}
+
+// IsAuthCsrfInvalid reports whether RevokeMySessionForbidden is AuthCsrfInvalid.
+func (s RevokeMySessionForbidden) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidRevokeMySessionForbidden
+}
+
+// SetSessProjectMismatch sets RevokeMySessionForbidden to SessProjectMismatch.
+func (s *RevokeMySessionForbidden) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchRevokeMySessionForbidden
+	s.SessProjectMismatch = v
+}
+
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if RevokeMySessionForbidden is SessProjectMismatch.
+func (s RevokeMySessionForbidden) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
+		return v, false
+	}
+	return s.SessProjectMismatch, true
+}
+
+// NewSessProjectMismatchRevokeMySessionForbidden returns new RevokeMySessionForbidden from SessProjectMismatch.
+func NewSessProjectMismatchRevokeMySessionForbidden(v SessProjectMismatch) RevokeMySessionForbidden {
+	var s RevokeMySessionForbidden
+	s.SetSessProjectMismatch(v)
+	return s
+}
+
+// SetAuthCsrfInvalid sets RevokeMySessionForbidden to AuthCsrfInvalid.
+func (s *RevokeMySessionForbidden) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidRevokeMySessionForbidden
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if RevokeMySessionForbidden is AuthCsrfInvalid.
+func (s RevokeMySessionForbidden) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidRevokeMySessionForbidden returns new RevokeMySessionForbidden from AuthCsrfInvalid.
+func NewAuthCsrfInvalidRevokeMySessionForbidden(v AuthCsrfInvalid) RevokeMySessionForbidden {
+	var s RevokeMySessionForbidden
+	s.SetAuthCsrfInvalid(v)
+	return s
+}
+
+func (*RevokeMySessionForbidden) revokeMySessionRes() {}
 
 // RevokeMySessionNoContent is response for RevokeMySession operation.
 type RevokeMySessionNoContent struct {
@@ -65429,7 +65527,8 @@ func (s *SessProjectMismatchHeaders) SetResponse(val SessProjectMismatch) {
 	s.Response = val
 }
 
-func (*SessProjectMismatchHeaders) getMySessionRes() {}
+func (*SessProjectMismatchHeaders) getMySessionCsrfTokenRes() {}
+func (*SessProjectMismatchHeaders) getMySessionRes()          {}
 
 // Merged schema.
 // Ref: #

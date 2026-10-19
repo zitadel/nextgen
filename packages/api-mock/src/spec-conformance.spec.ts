@@ -185,6 +185,67 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     }
   });
 
+  // Mirrors the server: the CSRF token read and sign-out hold the session to
+  // the project they name the way the read does, and a refused sign-out leaves
+  // the session and its cookie alone.
+  test("GET /sessions/me/csrf and DELETE /sessions/me with project_id refuse a session of another project", async () => {
+    const handoff = await signHandoffToken({ sub: "app-user@example.com", iss: BASE });
+    const exchange = await fetch(`${BASE}/sessions/exchange?project_id=proj_me_signout`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ handoff_token: handoff }),
+    });
+    expect(exchange.status).toBe(200);
+    const cookie =
+      exchange.headers
+        .getSetCookie()
+        .find((c) => c.startsWith("__nextgen_session="))
+        ?.split(";")[0] ?? "";
+    const headers = { cookie };
+
+    const refusedToken = await fetch(`${BASE}/sessions/me/csrf?project_id=proj_me_other`, {
+      headers,
+    });
+    expect(refusedToken.status).toBe(403);
+    expect(refusedToken.headers.get("cache-control")).toBe("private, no-store");
+    expect(await refusedToken.json()).toMatchObject({ code: "sess.project_mismatch" });
+
+    const refusedSignOut = await fetch(`${BASE}/sessions/me?project_id=proj_me_other`, {
+      method: "DELETE",
+      headers,
+    });
+    expect(refusedSignOut.status).toBe(403);
+    expect(await refusedSignOut.json()).toMatchObject({ code: "sess.project_mismatch" });
+    expect(refusedSignOut.headers.getSetCookie()).toEqual([]);
+
+    for (const invalid of ["", "proj%20me"]) {
+      const rejectedToken = await fetch(`${BASE}/sessions/me/csrf?project_id=${invalid}`, {
+        headers,
+      });
+      expect(rejectedToken.status).toBe(400);
+      const rejectedSignOut = await fetch(`${BASE}/sessions/me?project_id=${invalid}`, {
+        method: "DELETE",
+        headers,
+      });
+      expect(rejectedSignOut.status).toBe(400);
+    }
+
+    // The refusals ended nothing: its own project still gets its token and
+    // signs it out.
+    const token = await fetch(`${BASE}/sessions/me/csrf?project_id=proj_me_signout`, {
+      headers,
+    });
+    expect(token.status).toBe(200);
+    expect(await token.json()).toEqual({ csrf_token: csrfTokenFor(cookie.split("=")[1] ?? "") });
+
+    const signedOut = await fetch(`${BASE}/sessions/me?project_id=proj_me_signout`, {
+      method: "DELETE",
+      headers,
+    });
+    expect(signedOut.status).toBe(204);
+    expect(signedOut.headers.getSetCookie().some((c) => /^__nextgen_session=;/.test(c))).toBe(true);
+  });
+
   test("GET /sessions/me returns body parseable by GetMySessionResponse with a user ref", async () => {
     const handoff = await signHandoffToken({ sub: "me@example.com", iss: BASE });
     const exchange = await fetch(`${BASE}/sessions/exchange?project_id=proj_me`, {

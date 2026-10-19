@@ -129,7 +129,7 @@ function setup(auth: Authentication, csrf: boolean): string[] {
         ? [
             "",
             "// A write the session cookie authenticates carries the session's CSRF token.",
-            "setApiCsrfToken((await client.getMySessionCsrfToken()).csrf_token);",
+            `setApiCsrfToken((await client.getMySessionCsrfToken({ project_id: ${JSON.stringify(exampleProjectId)} })).csrf_token);`,
           ]
         : []),
     ];

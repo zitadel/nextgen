@@ -93858,6 +93858,22 @@ func (s RevokeMySessionErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case SessProjectMismatchRevokeMySessionErrorResponse:
+		e.FieldStart("code")
+		e.Str("sess.project_mismatch")
+		{
+			s := s.SessProjectMismatch
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	}
 }
 
@@ -93902,6 +93918,9 @@ func (s *RevokeMySessionErrorResponse) Decode(d *jx.Decoder) error {
 				case "sess.not_found":
 					s.Type = SessNotFoundRevokeMySessionErrorResponse
 					found = true
+				case "sess.project_mismatch":
+					s.Type = SessProjectMismatchRevokeMySessionErrorResponse
+					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
 				}
@@ -93940,6 +93959,10 @@ func (s *RevokeMySessionErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.SessNotFound.Decode(d); err != nil {
 			return err
 		}
+	case SessProjectMismatchRevokeMySessionErrorResponse:
+		if err := s.SessProjectMismatch.Decode(d); err != nil {
+			return err
+		}
 	default:
 		return errors.Errorf("inferred invalid type: %s", s.Type)
 	}
@@ -93955,6 +93978,120 @@ func (s RevokeMySessionErrorResponse) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *RevokeMySessionErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes RevokeMySessionForbidden as json.
+func (s RevokeMySessionForbidden) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s RevokeMySessionForbidden) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case SessProjectMismatchRevokeMySessionForbidden:
+		e.FieldStart("code")
+		e.Str("sess.project_mismatch")
+		{
+			s := s.SessProjectMismatch
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AuthCsrfInvalidRevokeMySessionForbidden:
+		e.FieldStart("code")
+		e.Str("auth.csrf_invalid")
+		{
+			s := s.AuthCsrfInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes RevokeMySessionForbidden from json.
+func (s *RevokeMySessionForbidden) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode RevokeMySessionForbidden to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "sess.project_mismatch":
+					s.Type = SessProjectMismatchRevokeMySessionForbidden
+					found = true
+				case "auth.csrf_invalid":
+					s.Type = AuthCsrfInvalidRevokeMySessionForbidden
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case SessProjectMismatchRevokeMySessionForbidden:
+		if err := s.SessProjectMismatch.Decode(d); err != nil {
+			return err
+		}
+	case AuthCsrfInvalidRevokeMySessionForbidden:
+		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s RevokeMySessionForbidden) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *RevokeMySessionForbidden) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

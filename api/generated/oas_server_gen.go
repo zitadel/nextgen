@@ -536,9 +536,11 @@ type Handler interface {
 	// HttpOnly cookie is still the credential, and a cross-site page cannot
 	// read this response. It stays the same for the life of the session, so a
 	// client fetches it once per session.
+	// With `project_id`, the token is returned only when the session belongs to
+	// that project.
 	//
 	// GET /sessions/me/csrf
-	GetMySessionCsrfToken(ctx context.Context) (GetMySessionCsrfTokenRes, error)
+	GetMySessionCsrfToken(ctx context.Context, params GetMySessionCsrfTokenParams) (GetMySessionCsrfTokenRes, error)
 	// GetMyUser implements getMyUser operation.
 	//
 	// Returns the user signed in to the session that authenticates the request.
@@ -891,9 +893,11 @@ type Handler interface {
 	// exchange) is required. Idempotent: if the session is already gone this still
 	// returns 204. Any tokens derived from the session are invalidated, and the
 	// cookie itself is cleared in the response.
+	// With `project_id`, only a session of that project is deleted. A session of
+	// another project is left alone, and so is its cookie.
 	//
 	// DELETE /sessions/me
-	RevokeMySession(ctx context.Context) (RevokeMySessionRes, error)
+	RevokeMySession(ctx context.Context, params RevokeMySessionParams) (RevokeMySessionRes, error)
 	// RevokeRelease implements revokeRelease operation.
 	//
 	// Marks the release revoked, so that its content is never served again.

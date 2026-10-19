@@ -309,8 +309,10 @@ design tokens and `branding.font_url` into its shadow root on each update.
 Session menu / sign-out control for embedded apps. Reads the signed-in
 identity from `getMySession` (`GET /sessions/me`) — the same source as
 `<zitadel-session>` — calls `revokeMySession` (`DELETE /sessions/me`) through
-the SDK handle, and clears the session. Uses the same token adoption as
-`<zitadel-login>` (`applyBaseTokens`).
+the SDK handle, and clears the session. The read and the revoke name the
+handle's project: a session of another project on the same host, such as the
+Console's on `localhost`, shows no identity and stays signed in. Uses the same
+token adoption as `<zitadel-login>` (`applyBaseTokens`).
 
 | Property | Type | Notes |
 | --- | --- | --- |

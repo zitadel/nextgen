@@ -105,6 +105,42 @@ function lookupSession(req: express.Request): SessionLookup {
   }
   return { status: "active", token, session };
 }
+
+/**
+ * Answers a `project_id` outside the project-id pattern with a 400 and returns
+ * `true`, as the server validates a present one before it reads the session.
+ * The `/sessions/me` routes all take it.
+ */
+function refuseInvalidProjectParam(req: express.Request, res: express.Response): boolean {
+  const projectParam = req.query.project_id;
+  if (projectParam !== undefined && !/^[a-zA-Z0-9_-]+$/.test(String(projectParam))) {
+    res.status(400).json(errorBody("req.invalid", "project_id is not a valid project id."));
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Answers a session of another project than the request's `project_id` with
+ * `403 sess.project_mismatch` and returns `true`, as the server refuses one on
+ * every `/sessions/me` route, the way an app on a shared host sees one. The
+ * refusal clears no cookie: the session is live in its own project.
+ */
+function refuseOtherProjectSession(
+  req: express.Request,
+  res: express.Response,
+  session: StoredSession,
+): boolean {
+  const projectId = req.query.project_id;
+  if (typeof projectId === "string" && session.project_id !== projectId) {
+    res
+      .status(403)
+      .json(errorBody("sess.project_mismatch", "The session belongs to a different project."));
+    return true;
+  }
+  return false;
+}
+
 /**
  * A session's CSRF token (ADR 053 §5), served by GET /sessions/me/csrf and
  * checked on claim/complete. Derived from the session cookie exactly as the Go
@@ -363,13 +399,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
   // GET /sessions/me — validate opaque session cookie and return session data.
   // Mirrors the Go server's GetMySession handler.
   app.get("/sessions/me", (req: express.Request, res: express.Response) => {
-    // Mirrors the server, which validates a present project_id against the
-    // project-id pattern before it reads the session.
-    const projectParam = req.query.project_id;
-    if (projectParam !== undefined && !/^[a-zA-Z0-9_-]+$/.test(String(projectParam))) {
-      res.status(400).json(errorBody("req.invalid", "project_id is not a valid project id."));
-      return;
-    }
+    if (refuseInvalidProjectParam(req, res)) return;
     const found = lookupSession(req);
     switch (found.status) {
       case "missing":
@@ -382,17 +412,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
         res.status(401).json(errorBody("unauthenticated", "session expired"));
         return;
       case "active": {
-        // Mirrors the server: a read that names a project refuses a session
-        // of any other project, the way an app on a shared host sees one.
-        const projectId = req.query.project_id;
-        if (typeof projectId === "string" && found.session.project_id !== projectId) {
-          res
-            .status(403)
-            .json(
-              errorBody("sess.project_mismatch", "The session belongs to a different project."),
-            );
-          return;
-        }
+        if (refuseOtherProjectSession(req, res, found.session)) return;
         res.json(found.session);
       }
     }
@@ -403,17 +423,20 @@ export function createMockApp(options: { issuer: string }): express.Express {
   app.get("/sessions/me/csrf", (req: express.Request, res: express.Response) => {
     // Both the token and the 401 are session state: neither may be stored.
     res.setHeader("Cache-Control", "private, no-store");
+    if (refuseInvalidProjectParam(req, res)) return;
     const found = lookupSession(req);
     if (found.status !== "active") {
       res.status(401).json(errorBody("auth.unauthorized", "Missing or invalid session token."));
       return;
     }
+    if (refuseOtherProjectSession(req, res, found.session)) return;
     res.json({ csrf_token: csrfTokenFor(found.token) });
   });
 
   // DELETE /sessions/me — revoke the current session (logout). Mirrors the
   // Go server's revokeMySession handler and the SDK proxy's logout call.
   app.delete("/sessions/me", (req: express.Request, res: express.Response) => {
+    if (refuseInvalidProjectParam(req, res)) return;
     const found = lookupSession(req);
     switch (found.status) {
       case "missing":
@@ -426,6 +449,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
         res.status(409).json(errorBody("session_revoked", "session already revoked or expired"));
         return;
       case "active":
+        if (refuseOtherProjectSession(req, res, found.session)) return;
         sessionStore.delete(found.token);
     }
     res.setHeader("Set-Cookie", [

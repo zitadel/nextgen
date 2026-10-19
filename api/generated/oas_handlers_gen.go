@@ -7762,6 +7762,8 @@ func (s *Server) handleGetMySessionRequest(args [0]string, argsEscaped bool, w h
 // HttpOnly cookie is still the credential, and a cross-site page cannot
 // read this response. It stays the same for the life of the session, so a
 // client fetches it once per session.
+// With `project_id`, the token is returned only when the session belongs to
+// that project.
 //
 // GET /sessions/me/csrf
 func (s *Server) handleGetMySessionCsrfTokenRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -7879,6 +7881,16 @@ func (s *Server) handleGetMySessionCsrfTokenRequest(args [0]string, argsEscaped 
 			return
 		}
 	}
+	params, err := decodeGetMySessionCsrfTokenParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
 
 	var rawBody []byte
 
@@ -7891,13 +7903,18 @@ func (s *Server) handleGetMySessionCsrfTokenRequest(args [0]string, argsEscaped 
 			OperationID:      "getMySessionCsrfToken",
 			Body:             nil,
 			RawBody:          rawBody,
-			Params:           middleware.Parameters{},
-			Raw:              r,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+			},
+			Raw: r,
 		}
 
 		type (
 			Request  = struct{}
-			Params   = struct{}
+			Params   = GetMySessionCsrfTokenParams
 			Response = GetMySessionCsrfTokenRes
 		)
 		response, err = middleware.HookMiddleware[
@@ -7907,14 +7924,14 @@ func (s *Server) handleGetMySessionCsrfTokenRequest(args [0]string, argsEscaped 
 		](
 			m,
 			mreq,
-			nil,
+			unpackGetMySessionCsrfTokenParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.GetMySessionCsrfToken(ctx)
+				response, err = s.h.GetMySessionCsrfToken(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.GetMySessionCsrfToken(ctx)
+		response, err = s.h.GetMySessionCsrfToken(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -15158,6 +15175,8 @@ func (s *Server) handleRemovePreviewRequest(args [1]string, argsEscaped bool, w 
 // exchange) is required. Idempotent: if the session is already gone this still
 // returns 204. Any tokens derived from the session are invalidated, and the
 // cookie itself is cleared in the response.
+// With `project_id`, only a session of that project is deleted. A session of
+// another project is left alone, and so is its cookie.
 //
 // DELETE /sessions/me
 func (s *Server) handleRevokeMySessionRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -15275,6 +15294,16 @@ func (s *Server) handleRevokeMySessionRequest(args [0]string, argsEscaped bool, 
 			return
 		}
 	}
+	params, err := decodeRevokeMySessionParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
 
 	var rawBody []byte
 
@@ -15287,13 +15316,18 @@ func (s *Server) handleRevokeMySessionRequest(args [0]string, argsEscaped bool, 
 			OperationID:      "revokeMySession",
 			Body:             nil,
 			RawBody:          rawBody,
-			Params:           middleware.Parameters{},
-			Raw:              r,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+			},
+			Raw: r,
 		}
 
 		type (
 			Request  = struct{}
-			Params   = struct{}
+			Params   = RevokeMySessionParams
 			Response = RevokeMySessionRes
 		)
 		response, err = middleware.HookMiddleware[
@@ -15303,14 +15337,14 @@ func (s *Server) handleRevokeMySessionRequest(args [0]string, argsEscaped bool, 
 		](
 			m,
 			mreq,
-			nil,
+			unpackRevokeMySessionParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.RevokeMySession(ctx)
+				response, err = s.h.RevokeMySession(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.RevokeMySession(ctx)
+		response, err = s.h.RevokeMySession(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)

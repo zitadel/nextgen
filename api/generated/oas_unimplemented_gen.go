@@ -658,9 +658,11 @@ func (UnimplementedHandler) GetMySession(ctx context.Context, params GetMySessio
 // HttpOnly cookie is still the credential, and a cross-site page cannot
 // read this response. It stays the same for the life of the session, so a
 // client fetches it once per session.
+// With `project_id`, the token is returned only when the session belongs to
+// that project.
 //
 // GET /sessions/me/csrf
-func (UnimplementedHandler) GetMySessionCsrfToken(ctx context.Context) (r GetMySessionCsrfTokenRes, _ error) {
+func (UnimplementedHandler) GetMySessionCsrfToken(ctx context.Context, params GetMySessionCsrfTokenParams) (r GetMySessionCsrfTokenRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -1121,9 +1123,11 @@ func (UnimplementedHandler) RemovePreview(ctx context.Context, req *RemovePrevie
 // exchange) is required. Idempotent: if the session is already gone this still
 // returns 204. Any tokens derived from the session are invalidated, and the
 // cookie itself is cleared in the response.
+// With `project_id`, only a session of that project is deleted. A session of
+// another project is left alone, and so is its cookie.
 //
 // DELETE /sessions/me
-func (UnimplementedHandler) RevokeMySession(ctx context.Context) (r RevokeMySessionRes, _ error) {
+func (UnimplementedHandler) RevokeMySession(ctx context.Context, params RevokeMySessionParams) (r RevokeMySessionRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

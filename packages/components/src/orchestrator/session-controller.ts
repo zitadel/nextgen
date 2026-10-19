@@ -26,8 +26,10 @@ export class SessionController implements ReactiveController {
   // or after a framework assigns `project` post-mount.
   private identityRequested = false;
 
-  // The cookie holds a live session of another project: not this app's to
-  // revoke. On a shared host (localhost) it is, for example, the Console's.
+  // The identity read found a live session of another project: not this app's
+  // to revoke. On a shared host (localhost) it is, for example, the Console's.
+  // The revoke names the project too, so a current server refuses it anyway;
+  // one that predates that check revokes whatever session the cookie holds.
   private otherProjectSession = false;
 
   /**
@@ -69,11 +71,12 @@ export class SessionController implements ReactiveController {
   }
 
   /**
-   * Revokes the session with credentials; the server clears the cookie. Fires
-   * `zitadel-signout` (after `onRevoked`) and resolves `true` on success; on failure sets
-   * `errorMessage` and resolves `false`. When the identity read found a session
-   * of another project, nobody is signed in here: that session is left alone
-   * and sign-out completes without a revoke.
+   * Revokes the session in the host's project with credentials; the server
+   * clears the cookie. Fires `zitadel-signout` (after `onRevoked`) and resolves
+   * `true` on success; on failure sets `errorMessage` and resolves `false`. When
+   * the session belongs to another project, found by the identity read or
+   * refused by the server's revoke, nobody is signed in here: that session is
+   * left alone and sign-out completes.
    */
   async signOut(onRevoked?: () => void): Promise<boolean> {
     this.loading = true;
@@ -82,7 +85,8 @@ export class SessionController implements ReactiveController {
 
     try {
       if (!this.otherProjectSession) {
-        await revokeSession(this.resolve().api);
+        const { api, project } = this.resolve();
+        await revokeSession(api, project.projectId);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
