@@ -16,7 +16,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"maps"
 	"regexp"
@@ -155,14 +154,16 @@ func ParseTemplate(data []byte) (*Template, error) {
 	if err := rejectDuplicateKeys(data); err != nil {
 		return nil, fmt.Errorf("policy template: %w", err)
 	}
+	// json.Unmarshal in checkTemplateKeys also rejects data after the
+	// template.
+	if err := checkTemplateKeys(data); err != nil {
+		return nil, fmt.Errorf("policy template: %w", err)
+	}
 	var t Template
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&t); err != nil {
 		return nil, fmt.Errorf("policy template: %w", err)
-	}
-	if err := dec.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
-		return nil, errors.New("policy template: unexpected data after the template")
 	}
 	if err := t.validate(); err != nil {
 		return nil, fmt.Errorf("policy template %q: %w", t.Operation, err)
@@ -293,4 +294,54 @@ func (c ContextSchema) clone() ContextSchema {
 		}
 	}
 	return out
+}
+
+// checkTemplateKeys requires the struct-backed keys of a template to be
+// spelled exactly. encoding/json matches field names without case, so
+// DisallowUnknownFields alone accepts "Operation" or "Maximum". The context
+// schema is a plain map and needs no check.
+func checkTemplateKeys(data []byte) error {
+	var doc map[string]json.RawMessage
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return err
+	}
+	if err := exactKeys("template", doc, "operation", "config", "config_rules", "context", "rules"); err != nil {
+		return err
+	}
+	if raw, ok := doc["config"]; ok {
+		var settings map[string]map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &settings); err != nil {
+			return fmt.Errorf("config: %w", err)
+		}
+		for name, setting := range settings {
+			if err := exactKeys(fmt.Sprintf("setting %q", name), setting, "type", "minimum", "maximum"); err != nil {
+				return err
+			}
+		}
+	}
+	for _, key := range []string{"rules", "config_rules"} {
+		raw, ok := doc[key]
+		if !ok {
+			continue
+		}
+		var rules []map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &rules); err != nil {
+			return fmt.Errorf("%s: %w", key, err)
+		}
+		for i, rule := range rules {
+			if err := exactKeys(fmt.Sprintf("%s[%d]", key, i), rule, "name", "expression"); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func exactKeys(where string, obj map[string]json.RawMessage, allowed ...string) error {
+	for key := range obj {
+		if !slices.Contains(allowed, key) {
+			return fmt.Errorf("%s: unknown field %q, want one of %v", where, key, allowed)
+		}
+	}
+	return nil
 }

@@ -94,14 +94,20 @@ func compileTemplate(t *Template, limits Limits) (*compiledTemplate, error) {
 		return nil, err
 	}
 	ct := &compiledTemplate{Template: t, leaves: make(map[string]contextField, len(leaves))}
+	inputs := map[string]struct{}{configVariable: {}}
 	for _, leaf := range leaves {
 		ct.leaves[leaf.path] = leaf
+		inputs[leaf.segments[0]] = struct{}{}
 	}
 	for _, rule := range t.Rules {
 		cr, err := compileRule(env, rule, limits)
 		if err != nil {
 			return nil, err
 		}
+		if names := shadowingVariables(cr.ast, inputs); len(names) > 0 {
+			return nil, fmt.Errorf("rule %q: comprehension variables %v shadow a context field or config; rename them", rule.Name, names)
+		}
+		cr.ast = nil // only needed for the checks above
 		// One setting per rule, named after it: the rule name is then the
 		// key of both the violation and the constraint, and its value is
 		// that setting. A rule reading no setting would have to run without
@@ -130,6 +136,10 @@ func compileTemplate(t *Template, limits Limits) (*compiledTemplate, error) {
 		if err != nil {
 			return nil, fmt.Errorf("config %w", err)
 		}
+		if names := shadowingVariables(cr.ast, inputs); len(names) > 0 {
+			return nil, fmt.Errorf("config rule %q: comprehension variables %v shadow a context field or config; rename them", rule.Name, names)
+		}
+		cr.ast = nil
 		if len(cr.reads) == 0 {
 			return nil, fmt.Errorf("config rule %q: reads no setting", rule.Name)
 		}

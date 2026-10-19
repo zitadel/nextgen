@@ -109,6 +109,11 @@ to take the newest N entries of `history_matches`, so the builder may hand
 over every kept password it has and the rule still compares only the last N.
 Extra entries are ignored, never counted against the user.
 
+A comprehension variable must not reuse the name of a context field or
+`config` (`history_matches.exists(candidate, candidate)` is refused): inside
+the comprehension the name would mean the local variable, and the engine
+would count an input the rule does not read.
+
 Rules are atomic by construction: an expression must type-check to `bool`,
 stays under a length cap, and its statically estimated cost stays under a
 limit, all checked by `policy.New()`

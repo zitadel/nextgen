@@ -7,6 +7,7 @@ import (
 
 	"cel.dev/cel-go/cel"
 	"cel.dev/cel-go/checker"
+	celast "cel.dev/cel-go/common/ast"
 	"cel.dev/cel-go/common/types"
 	"cel.dev/cel-go/ext"
 )
@@ -48,6 +49,8 @@ type compiledRule struct {
 	program cel.Program
 	// reads are the settings the expression references, sorted.
 	reads []string
+	// ast is the checked expression, kept for the template-level checks.
+	ast *cel.Ast
 	// contextReads are the context fields the expression references, sorted.
 	// Only the fields an active rule reads have to be in the request context.
 	contextReads []string
@@ -152,6 +155,7 @@ func compileRule(env *cel.Env, rule Rule, limits Limits) (*compiledRule, error) 
 	reads, contextReads := references(ast)
 	return &compiledRule{
 		Rule:         rule,
+		ast:          ast,
 		program:      program,
 		reads:        reads,
 		contextReads: contextReads,
@@ -200,4 +204,25 @@ func (s sizeEstimator) EstimateSize(element checker.AstNode) *checker.SizeEstima
 
 func (s sizeEstimator) EstimateCallCost(_, _ string, _ *checker.AstNode, _ []checker.AstNode) *checker.CallEstimate {
 	return nil
+}
+
+// shadowingVariables lists the comprehension variables of an expression
+// that reuse the name of a declared input: `config`, or the first segment of
+// a context field. Inside the comprehension such a name means the local
+// variable, so the reference map would count an input the rule does not
+// read, and a context without that field would be refused.
+func shadowingVariables(ast *cel.Ast, inputs map[string]struct{}) []string {
+	var out []string
+	celast.PreOrderVisit(ast.NativeRep().Expr(), celast.NewExprVisitor(func(e celast.Expr) {
+		if e.Kind() != celast.ComprehensionKind {
+			return
+		}
+		comp := e.AsComprehension()
+		for _, name := range []string{comp.IterVar(), comp.IterVar2()} {
+			if _, taken := inputs[name]; taken && name != "" && !slices.Contains(out, name) {
+				out = append(out, name)
+			}
+		}
+	}))
+	return out
 }

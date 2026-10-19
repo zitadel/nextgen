@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"maps"
 	"math"
+	"math/big"
 	"slices"
+	"strconv"
+	"strings"
 )
 
 // Instance is the developer-authored half of a policy: the settings a
@@ -118,6 +121,26 @@ func coerceSetting(name string, setting Setting, raw any) (any, error) {
 	return nil, fmt.Errorf("setting %q: unsupported type %q", name, setting.Type)
 }
 
+// maxNumberText and maxNumberExponent bound a JSON number before it is
+// parsed exactly. They leave room for any int64 written with a fraction or
+// an exponent ("9223372036854775807.000", "1.2e1"), and keep big.Rat from
+// building a huge number such as 10^999999 (an 8-character "1e999999").
+const (
+	maxNumberText     = 32
+	maxNumberExponent = 20
+)
+
+// numberExponentInRange reports whether a JSON number's exponent, if it has
+// one, lies within ±maxNumberExponent.
+func numberExponentInRange(text string) bool {
+	i := strings.IndexAny(text, "eE")
+	if i < 0 {
+		return true
+	}
+	exp, err := strconv.Atoi(text[i+1:])
+	return err == nil && exp >= -maxNumberExponent && exp <= maxNumberExponent
+}
+
 // toInt64 accepts the integer shapes JSON decoding and Go callers produce.
 func toInt64(raw any) (int64, bool) {
 	switch v := raw.(type) {
@@ -135,16 +158,25 @@ func toInt64(raw any) (int64, bool) {
 		}
 		return int64(v), true
 	case json.Number:
-		// "12" parses directly; "12.0" and "1.2e1" are the same integer
-		// and must be accepted as a float64 decoder would accept them.
+		// "12" parses directly; "12.0" and "1.2e1" are the same integer and
+		// are accepted too. Other forms are parsed exactly as a rational, so
+		// 0.99999999999999999 stays a fraction instead of rounding to 1 the
+		// way a float64 would.
 		if n, err := v.Int64(); err == nil {
 			return n, true
 		}
-		f, err := v.Float64()
-		if err != nil {
+		// big.Rat accepts exponents up to a million and digit runs of any
+		// length, and would build the whole number before the bounds check.
+		// Every valid setting is a small integer, so a long text or a large
+		// exponent is refused before it is parsed.
+		if len(v) > maxNumberText || !numberExponentInRange(v.String()) {
 			return 0, false
 		}
-		return toInt64(f)
+		r, ok := new(big.Rat).SetString(v.String())
+		if !ok || !r.IsInt() || !r.Num().IsInt64() {
+			return 0, false
+		}
+		return r.Num().Int64(), true
 	}
 	return 0, false
 }

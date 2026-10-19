@@ -177,6 +177,34 @@ func TestParseTemplate_RejectsDuplicateKeys(t *testing.T) {
 	assert.Contains(t, err.Error(), `duplicate key "maximum"`)
 }
 
+func TestParseTemplate_RejectsCaseVariantKeys(t *testing.T) {
+	for name, replace := range map[string][2]string{
+		"envelope": {`"operation": "test.op"`, `"Operation": "test.op"`},
+		"setting": {`"minimum": 1, "maximum": 10 },
+    "max"`, `"minimum": 1, "Maximum": 10 },
+    "max"`},
+		"rule": {`{ "name": "min", "expression"`, `{ "name": "min", "Expression"`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			doc := strings.Replace(testTemplate, replace[0], replace[1], 1)
+			require.NotEqual(t, testTemplate, doc)
+			_, err := policy.ParseTemplate([]byte(doc))
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "unknown field")
+		})
+	}
+}
+
+func TestNew_RejectsShadowingComprehensionVariable(t *testing.T) {
+	doc := strings.Replace(testTemplate,
+		`"value <= config.max && counts.all(c, c <= config.max)"`,
+		`"counts.all(value, value <= config.max)"`, 1)
+	require.NotEqual(t, testTemplate, doc)
+	_, err := policy.New(policy.WithTemplates(mustTemplate(t, doc)))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "shadow")
+}
+
 func TestParseTemplate_RejectsUnicodeCaseVariantKeys(t *testing.T) {
 	// "rule\u017f" (long s) folds to "rules" in encoding/json without being
 	// its lower case; it must count as a duplicate, not override the rules.
@@ -196,7 +224,7 @@ func TestParseInstance_DuplicateKeysInNestedValues(t *testing.T) {
 func TestParseTemplate_RejectsTrailingData(t *testing.T) {
 	_, err := policy.ParseTemplate([]byte(testTemplate + " {}"))
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unexpected data")
+	assert.Contains(t, err.Error(), "after top-level value")
 }
 
 func TestNew_RejectsDuplicateOperation(t *testing.T) {
@@ -408,6 +436,22 @@ func TestParseInstance(t *testing.T) {
 	decimal, err := policy.ParseInstance([]byte(`{"kind":"policy","operation":"test.op","config":{"min":2.0,"max":1e1}}`))
 	require.NoError(t, err)
 	require.NoError(t, testEngine(t).ValidateInstance(t.Context(), decimal), "2.0 and 1e1 are integers")
+
+	for name, config := range map[string]string{
+		"fraction just below the minimum":      `{"min":0.99999999999999999}`,
+		"fraction just above the maximum":      `{"max":10.0000000000000001}`,
+		"integer beyond float64's exact range": `{"min":9007199254740993}`,
+		"integer beyond int64":                 `{"min":9223372036854775808}`,
+		"exponent form beyond int64":           `{"min":1e19}`,
+		"huge exponent":                        `{"min":1e999999}`,
+		"long digit run":                       `{"min":` + strings.Repeat("1", 40) + `.0}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			inst, err := policy.ParseInstance([]byte(`{"kind":"policy","operation":"test.op","config":` + config + `}`))
+			require.NoError(t, err)
+			require.ErrorIs(t, testEngine(t).ValidateInstance(t.Context(), inst), policy.ErrInvalidInstance)
+		})
+	}
 
 	for name, doc := range map[string]string{
 		"unknown field":           `{"kind":"policy","operation":"test.op","config":{},"audience":{}}`,
