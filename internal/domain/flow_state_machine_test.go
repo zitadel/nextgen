@@ -7064,6 +7064,44 @@ func TestFlowStateMachine_Process_SSOCollectionRecordsAnUncreatableUser(t *testi
 	}}, w.ssoFailures)
 }
 
+// Going back from the collection step abandons the identity the connection sent, so the attempt
+// that exchanged with it must not be the one the person finishes another way.
+func TestFlowStateMachine_Process_BackFromCollectionRotatesTheAttempt(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := purposeNavDefinition()
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	gomock.InOrder(
+		w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil),
+		w.authAttemptService.EXPECT().SubmitIdentifier(gomock.Any(), gomock.Any()).Return("user_alice", nil),
+		w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-2", nil),
+	)
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+	next, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": "alice@example.com"},
+	})
+	require.NoError(t, err)
+	// The connection exchanged, but no user was resolved from it.
+	next.State.CollectedData.UserID = ""
+	next.State.SSOProviderSlug = "google"
+
+	back, err := w.sm.Process(t.Context(), def, next.State, domain.FlowSubmitInput{Action: "back"})
+
+	require.NoError(t, err)
+	assert.Equal(t, "attempt-2", back.State.AuthAttemptID)
+	assert.Empty(t, back.State.SSOProviderSlug)
+}
+
 // A collision the collection step cannot route ends the sign-in, so it is recorded.
 func TestFlowStateMachine_Process_SSOCollectionRecordsAnUnroutableCollision(t *testing.T) {
 	t.Parallel()

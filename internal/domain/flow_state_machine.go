@@ -1390,7 +1390,10 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 // attempt to escape → no rotation (idle navigation must not mint attempt
 // rows). reason names the caller for the wrapped error.
 func (r *FlowStateMachineRuntime) dropResolvedUser(pc *processCtx, reason string) error {
-	hadResolvedUser := pc.state.CollectedData.UserID != ""
+	// An attempt that exchanged with a connection but resolved no user yet (the claims were
+	// incomplete and the person went back) is rotated too: finishing it another way would hand
+	// it off as a sign-in the connection took no part in, which a live check cannot tell.
+	hadResolvedUser := pc.state.CollectedData.UserID != "" || pc.state.SSOProviderSlug != ""
 	clearUserBoundState(pc.state)
 	if !hadResolvedUser {
 		return nil
