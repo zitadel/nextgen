@@ -13,7 +13,6 @@ import {
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import {
   GetBrandingByIdResponse,
-  GetEnvironmentByNameResponse,
   GetFlowDefinitionResponse,
   CreateIdpBody,
   GetGrantResponse,
@@ -25,7 +24,6 @@ import {
   GetTeamResponse,
   GetUserByIDResponse,
   ListBrandingResponse,
-  ListEnvironmentsResponse,
   ListEventsResponse,
   ListFlowDefinitionsResponse,
   ListReleasesResponse,
@@ -39,6 +37,7 @@ import {
   QueryUsersResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { ApiError } from "@zitadel/api/runtime/fetch";
+import { isVariableReference } from "@zitadel/config/idp";
 import { consola } from "consola";
 
 import { createZitadelClient, type ZitadelClient } from "../lib/api-client";
@@ -51,6 +50,7 @@ import {
   type ResourceRegistry,
   type Schema,
   type UpdateSpec,
+  type WriteShape,
 } from "../lib/oclif/crud";
 import { readZitadelSecret } from "../lib/project";
 
@@ -67,12 +67,14 @@ export type Platform = Readonly<{ client: ZitadelClient; projectId: string }>;
 const create = <B>(
   schema: Schema<B>,
   call: (ctx: Platform, body: B) => Promise<unknown>,
-): CreateSpec<Platform, B> => ({ schema, call });
+  shape: WriteShape = {},
+): CreateSpec<Platform, B> => ({ ...shape, schema, call });
 
 const update = <B>(
   schema: Schema<B>,
   call: (ctx: Platform, id: string, body: B) => Promise<unknown>,
-): UpdateSpec<Platform, B> => ({ schema, call });
+  shape: WriteShape = {},
+): UpdateSpec<Platform, B> => ({ ...shape, schema, call });
 
 // Infers a structured-query list's request type `B` from its `body` schema. A
 // `GET` list has no body, so it is written as a plain object (request stays `Json`).
@@ -159,8 +161,7 @@ export const RESOURCES = {
         { field: "status", operations: FILTER_OPERATIONS },
       ],
       sorts: ["created_at", "name", "status"],
-      call: ({ client, projectId }, body) =>
-        client.queryTeams(body, { project_id: projectId }),
+      call: ({ client, projectId }, body) => client.queryTeams(body, { project_id: projectId }),
     }),
     get: { call: ({ client }, id) => client.getTeam(id), response: GetTeamResponse },
     create: create(CreateTeamBody, ({ client, projectId }, body) =>
@@ -190,8 +191,7 @@ export const RESOURCES = {
         { field: "lifecycle_owner_team_id", operations: FILTER_OPERATIONS },
       ],
       sorts: ["created_at", "user_id"],
-      call: ({ client, projectId }, body) =>
-        client.querySessions(body, { project_id: projectId }),
+      call: ({ client, projectId }, body) => client.querySessions(body, { project_id: projectId }),
     }),
     get: { call: ({ client }, id) => client.getSession(id), response: GetSessionResponse },
     // The endpoint terminates the session rather than removing a record, so
@@ -262,14 +262,7 @@ export const RESOURCES = {
     idField: "id",
     columns: ["id", "user.user_id", "team.team_id", "relation", "created_at", "expires_at"],
     heading: "id",
-    detail: [
-      "user.user_id",
-      "team.team_id",
-      "relation",
-      "object_type",
-      "created_at",
-      "expires_at",
-    ],
+    detail: ["user.user_id", "team.team_id", "relation", "object_type", "created_at", "expires_at"],
     list: list({
       items: "grants",
       body: QueryGrantsBody,
@@ -282,15 +275,18 @@ export const RESOURCES = {
         { field: "expires_at", operations: FILTER_OPERATIONS },
       ],
       sorts: ["created_at", "expires_at", "id"],
-      call: ({ client, projectId }, body) =>
-        client.queryGrants(body, { project_id: projectId }),
+      call: ({ client, projectId }, body) => client.queryGrants(body, { project_id: projectId }),
     }),
     get: {
       call: ({ client, projectId }, id) => client.getGrant(id, { project_id: projectId }),
       response: GetGrantResponse,
     },
-    create: create(CreateGrantBody, ({ client, projectId }, body) =>
-      client.createGrant(body, { project_id: projectId }),
+    create: create(
+      CreateGrantBody,
+      ({ client, projectId }, body) => client.createGrant(body, { project_id: projectId }),
+      // A grant names exactly one of `user` and `team`, which the required
+      // fields alone cannot say, so the example names the principal itself.
+      { example: "--relation viewer --user-identifier alice@acme.com" },
     ),
     delete: {
       call: ({ client, projectId }, id) => client.deleteGrant(id, { project_id: projectId }),
@@ -317,17 +313,26 @@ export const RESOURCES = {
         { field: "created_at", operations: FILTER_OPERATIONS },
       ],
       sorts: ["slug", "created_at"],
-      call: ({ client, projectId }, body) =>
-        client.queryIdps(body, { project_id: projectId }),
+      call: ({ client, projectId }, body) => client.queryIdps(body, { project_id: projectId }),
     }),
     get: {
       call: ({ client, projectId }, id) => client.getIdpById(id, { project_id: projectId }),
       response: GetIdpByIdResponse,
     },
-    // The body nests everything under `idp`, so there are no field flags to
-    // generate; `--data` and `--file` carry it.
-    create: create(CreateIdpBody, ({ client, projectId }, body) =>
-      client.createIdp(body, { project_id: projectId }),
+    // The body nests the connection under `idp`. Rooted there, the flags and
+    // `--set` paths address the connection itself (`--oidc-issuer`), and
+    // `--file` takes the same document as `.zitadel/idps/<slug>.json`. A slug
+    // that already exists is revised rather than duplicated (#1217).
+    create: create(
+      CreateIdpBody,
+      ({ client, projectId }, body) => client.createIdp(body, { project_id: projectId }),
+      {
+        root: "idp",
+        // The `oidc` block is optional to the generated schema, which cannot
+        // say that the protocol requires it, so the example spells it out.
+        example:
+          "--slug acme-sso --protocol oidc --display-name 'Acme SSO' --oidc-issuer https://sso.acme.example --oidc-client-id <client_id> --oidc-client-secret '${{ ACME_SSO_CLIENT_SECRET }}' --oidc-scopes openid --oidc-scopes profile --oidc-scopes email",
+      },
     ),
   },
 
@@ -337,14 +342,12 @@ export const RESOURCES = {
     idField: "id",
     columns: ["id", "name", "created_at"],
     heading: "name",
-    detail: ["id", "preview_origins", "created_at", "updated_at"],
+    detail: ["id", "origins", "created_at", "updated_at"],
     list: list({
       items: "projects",
       body: QueryProjectsBody,
       response: QueryProjectsResponse,
-      filters: [
-        { field: "created_at", operations: FILTER_OPERATIONS },
-      ],
+      filters: [{ field: "created_at", operations: FILTER_OPERATIONS }],
       sorts: ["created_at"],
       call: ({ client }, body) => client.queryProjects(body),
     }),
@@ -419,29 +422,6 @@ export const RESOURCES = {
         }
         return current;
       },
-    },
-  },
-
-  environments: {
-    group: CommandGroups.configuration,
-    singular: "environment",
-    idField: "id",
-    // Addressed by its public handle: `GET /environments/{name}`, and the name
-    // is what a deploy target is called everywhere else in the CLI.
-    idArg: "name",
-    columns: ["name", "id", "created_at"],
-    heading: "name",
-    detail: ["name", "id", "project_id", "created_at"],
-    list: {
-      items: "environments",
-      response: ListEnvironmentsResponse,
-      call: ({ client, projectId }, params) =>
-        client.listEnvironments({ ...params, project_id: projectId }),
-    },
-    get: {
-      call: ({ client, projectId }, name) =>
-        client.getEnvironmentByName(name, { project_id: projectId }),
-      response: GetEnvironmentByNameResponse,
     },
   },
 
@@ -550,6 +530,10 @@ export const RESOURCES = {
  */
 export const RESOURCE_COMMANDS = buildResourceCommands<Platform>(RESOURCES, {
   operations: FILTER_OPERATIONS,
+  // A `${{ NAME }}` reference to a project variable (ADR 062) names a
+  // credential without revealing it, and is the only form a connection's
+  // `client_secret` takes, so it may stand on a command line.
+  references: { matches: isVariableReference, example: "'${{ NAME }}'" },
   connect: async ({ cwd, source }) => {
     const secret = await readZitadelSecret(cwd);
     // Which project and server a verb is about is worth stating to a human, and

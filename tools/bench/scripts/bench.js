@@ -4,9 +4,14 @@
 // through __ENV: the Go module reads it from its own process environment.
 // Scenarios run one at a time; run together they contend for the same machine
 // and the cheap one starves the others.
-import nextgen from 'k6/x/nextgen';
+import nextgen from "k6/x/nextgen";
 
-const shape = { executor: 'constant-vus', vus: Number(__ENV.VUS || 1), duration: __ENV.DUR || '10s', gracefulStop: '5s' };
+const shape = {
+  executor: "constant-vus",
+  vus: Number(__ENV.VUS || 1),
+  duration: __ENV.DUR || "10s",
+  gracefulStop: "5s",
+};
 
 // An empty threshold on a sub-metric makes k6 keep and report it in its own
 // end-of-test summary: every metric per operation, and the error counter
@@ -17,8 +22,8 @@ for (const name of nextgen.submetrics()) thresholds[name] = [];
 
 export const options = {
   scenarios: {
-    login: { ...shape, exec: 'login' },
-    getUser: { ...shape, exec: 'getUser' },
+    login: { ...shape, exec: "login" },
+    getUser: { ...shape, exec: "getUser" },
   },
   thresholds,
 };

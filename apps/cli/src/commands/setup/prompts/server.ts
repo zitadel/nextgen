@@ -1,8 +1,9 @@
-import { select, spinner, text } from "@clack/prompts";
+import { spinner } from "@clack/prompts";
 
-import { detectHealthyLocalServer } from "../../../lib/local-server/runtime";
+import type { Parsed } from "@zitadel/config/idp";
+
+import { LocalServer } from "../../../lib/local-server/server";
 import { DEFAULT_SERVER } from "../../../lib/server";
-import { bail } from "./cancel";
 import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
 
 /** Sentinel returned by the choice select when the user picks "Custom URL". */
@@ -13,7 +14,7 @@ const CUSTOM = "__custom__";
  * local server we detected, or a custom URL.
  *
  * Before asking, it looks for a healthy local Zitadel server the same way the
- * rest of the CLI does (`detectHealthyLocalServer`: the runtime metadata that
+ * rest of the CLI does (`LocalServer.detectUrl`: the runtime metadata that
  * `zitadel start` wrote to `.zitadel/local/runtime.json`, falling back to a
  * `/healthz` probe on the default localhost port). A detected server becomes
  * an extra option in the choice list *and* the preselected answer — a user
@@ -34,7 +35,9 @@ export class ServerPrompt implements SetupPrompt {
     }
     const detected = await detectLocalServer(ctx.cwd);
 
-    const choice = await select({
+    const choice = await ctx.input({
+      kind: "select",
+      name: "server",
       message: "Which server should zitadel.json point to?",
       options: [
         {
@@ -55,40 +58,38 @@ export class ServerPrompt implements SetupPrompt {
       ],
       initialValue: detected ?? answers.server ?? DEFAULT_SERVER,
     });
-    bail(choice);
     if (choice !== CUSTOM) {
-      return { ...answers, server: choice as string };
+      return { ...answers, server: choice };
     }
-    const custom = await text({
+    const custom = await ctx.input({
+      kind: "text",
+      name: "server URL",
       message: "Server URL",
       placeholder: "https://zitadel.internal",
-      validate: (value) => {
+      parse: (value): Parsed<string> => {
         try {
-          new URL(value ?? "");
-          return;
+          new URL(value);
+          return { ok: true, value };
         } catch {
-          return "Must be a valid URL";
+          return { ok: false, problem: "Must be a valid URL" };
         }
       },
     });
-    bail(custom);
-    return { ...answers, server: custom as string };
+    return { ...answers, server: custom };
   }
 }
 
 /**
- * Wraps {@link detectHealthyLocalServer} in a spinner: the unhealthy paths
+ * Wraps {@link LocalServer.detectUrl} in a spinner: the unhealthy paths
  * block on up to two 1.5s `/healthz` probes, long enough that the wizard
  * should say what it is doing.
  */
 async function detectLocalServer(cwd: string): Promise<string | undefined> {
   const s = spinner();
   s.start("Checking for a local Zitadel server");
-  const detected = await detectHealthyLocalServer(cwd);
+  const detected = await LocalServer.detectUrl(cwd);
   s.stop(
-    detected
-      ? `Found local Zitadel server at ${detected}.`
-      : "No local Zitadel server detected.",
+    detected ? `Found local Zitadel server at ${detected}.` : "No local Zitadel server detected.",
   );
   return detected;
 }

@@ -2,28 +2,17 @@ import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { _setRuntimeForTesting } from "../runtime/runtime";
+import { server } from "@/test/msw";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
 vi.mock("@/auth/session", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/auth/session")>();
-  const { makeTestSession } = await import("@/auth/session.fixture");
+  const { makeTestSession } = await import("@/test/session.fixture");
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
-});
-
-vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
-
-const server = setupServer();
-
-beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
-afterEach(() => server.resetHandlers());
-afterAll(() => {
-  server.close();
-  vi.unstubAllEnvs();
 });
 
 async function renderAt(path: string) {
@@ -67,8 +56,8 @@ describe("landing routes", () => {
     );
     const router = await renderAt("/");
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/teams"));
-    expect(router.state.location.search).toMatchObject({ project: "proj_1" });
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/teams"));
+    expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" });
     expect(await screen.findByRole("heading", { name: "Teams" })).toBeInTheDocument();
     expect(teamQueries).toEqual(["proj_1"]);
   });
@@ -81,8 +70,8 @@ describe("landing routes", () => {
     );
     const router = await renderAt("/");
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
-    expect(router.state.location.search).not.toHaveProperty("project");
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+    expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
   });
 
   it("keeps a scoped deep link's target while the person picks a project", async () => {
@@ -92,15 +81,28 @@ describe("landing routes", () => {
       http.get("http://localhost/api/users/me/projects", () =>
         HttpResponse.json({ projects: [project("proj_1", "Acme"), project("proj_2", "Globex")] }),
       ),
+      // The link's own screen, once it is reached.
+      http.get("http://localhost/api/users/usr_1", () =>
+        HttpResponse.json({ id: "usr_1", schema: "sch_1", attributes: {}, metadata: {} }),
+      ),
+      http.get("http://localhost/api/users/usr_1/passkeys", () =>
+        HttpResponse.json({ passkeys: [] }),
+      ),
+      http.get("http://localhost/api/users/usr_1/identity_links", () =>
+        HttpResponse.json({ identity_links: [] }),
+      ),
+      http.get("http://localhost/api/schemas/sch_1", () =>
+        HttpResponse.json({ id: "sch_1", schema: { properties: {} }, metadata: {} }),
+      ),
     );
     const router = await renderAt("/users/usr_1");
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
-    expect(router.state.location.search).toMatchObject({ next: "/users/usr_1" });
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+    expect(router.state.resolvedLocation?.search).toMatchObject({ next: "/users/usr_1" });
 
     await userEvent.click(await screen.findByRole("link", { name: "Globex" }));
-    await waitFor(() => expect(router.state.location.pathname).toBe("/users/usr_1"));
-    expect(router.state.location.search).toEqual({ project: "proj_2" });
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/users/usr_1"));
+    expect(router.state.resolvedLocation?.search).toEqual({ project: "proj_2" });
   });
 
   it("selects the only project on an unscoped screen too", async () => {
@@ -112,8 +114,10 @@ describe("landing routes", () => {
     );
     const router = await renderAt("/projects");
 
-    await waitFor(() => expect(router.state.location.search).toMatchObject({ project: "proj_1" }));
-    expect(router.state.location.pathname).toBe("/projects");
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" }),
+    );
+    expect(router.state.resolvedLocation?.pathname).toBe("/projects");
   });
 
   it("asks for the person's projects once for the guard and the switcher", async () => {
@@ -123,12 +127,14 @@ describe("landing routes", () => {
     server.use(
       http.get("http://localhost/api/users/me/projects", ({ request }) => {
         if (!new URL(request.url).searchParams.has("limit")) unpaged += 1;
-        return HttpResponse.json({ projects: [project("proj_1", "Acme"), project("proj_2", "Globex")] });
+        return HttpResponse.json({
+          projects: [project("proj_1", "Acme"), project("proj_2", "Globex")],
+        });
       }),
     );
     const router = await renderAt("/");
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
     const pill = await screen.findByRole("button", { name: "Switch project" });
     await waitFor(() => expect(pill).toHaveTextContent("Select a project"));
     expect(unpaged).toBe(1);
@@ -147,8 +153,8 @@ describe("landing routes", () => {
     );
     const router = await renderAt("/");
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/teams"));
-    expect(router.state.location.search).toMatchObject({ project: "proj_1" });
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/teams"));
+    expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" });
   });
 
   it("does not take one listed project as the only one while more pages follow", async () => {
@@ -159,8 +165,8 @@ describe("landing routes", () => {
     );
     const router = await renderAt("/");
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
-    expect(router.state.location.search).not.toHaveProperty("project");
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+    expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
   });
 
   it("selects nothing for a person with no projects", async () => {
@@ -172,8 +178,8 @@ describe("landing routes", () => {
     );
     const router = await renderAt("/");
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
-    expect(router.state.location.search).not.toHaveProperty("project");
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+    expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
     expect(await screen.findByText("No projects yet.")).toBeInTheDocument();
   });
 
@@ -187,8 +193,8 @@ describe("landing routes", () => {
     );
     const router = await renderAt("/");
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/projects"));
-    expect(router.state.location.search).not.toHaveProperty("project");
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+    expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
   });
 
   it("lands on Profile from settings", async () => {
@@ -201,7 +207,7 @@ describe("landing routes", () => {
     );
     const router = await renderAt("/settings");
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/settings/profile"));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/settings/profile"));
     expect(await screen.findByRole("heading", { name: "Profile" })).toBeInTheDocument();
     // No screen claims WORKSPACE, so the heading is absent and no Admins row
     // survives from when that screen lived here.

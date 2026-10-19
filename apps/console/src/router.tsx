@@ -1,13 +1,14 @@
 import { type RouterHistory, createRouter } from "@tanstack/react-router";
 
 import { ErrorState, NotFoundState, PendingState } from "./components/boundaries";
+import { basePath } from "./lib/base-path";
 import { routeTree } from "./routeTree.gen";
 
 /**
  * The single place that constructs the app router (Console ADR 0001).
  *
  * `basepath` is derived from the Vite `base` via `import.meta.env.BASE_URL`
- * so the router prefix always tracks `vite.config.mts` — `/ui/console/` for
+ * so the router prefix always tracks `vite.config.ts` — `/ui/console/` for
  * production/preview builds, `/` for the dev server — without being hardcoded
  * here. The router stays agnostic to the literal value.
  *
@@ -15,7 +16,7 @@ import { routeTree } from "./routeTree.gen";
  * shared pending/error/not-found boundaries) with an in-memory history.
  */
 export function createAppRouter(options?: { history?: RouterHistory }) {
-  const basepath = import.meta.env.BASE_URL.replace(/\/$/, "") || undefined;
+  const basepath = basePath() || undefined;
 
   return createRouter({
     routeTree,

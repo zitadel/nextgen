@@ -4,3 +4,4 @@ description: The unique identifier of the project
 required: true
 schema:
   $ref: '../schemas/project-id.yaml'
+example: proj_01KWH1P4MYS7F0N9WD3P2E4YM5

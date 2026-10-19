@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/server",
-  "version": "1.0.0-alpha.24",
+  "version": "1.0.0-alpha.25",
   "description": "Zitadel server binary launcher.",
   "homepage": "https://github.com/zitadel/nextgen#readme",
   "bugs": {
@@ -16,9 +16,33 @@
   "bin": {
     "zitadel-server": "./bin/zitadel-server.js"
   },
+  "exports": {
+    "./binary": {
+      "types": "./bin/binary.d.ts",
+      "default": "./bin/binary.js"
+    },
+    "./bin/zitadel-server.js": "./bin/zitadel-server.js",
+    "./package.json": "./package.json"
+  },
   "files": [
     "bin"
   ],
+  "scripts": {
+    "openapi": "cd ../.. && node scripts/lint-openapi.mjs",
+    "format": "cd ../.. && node scripts/go-format-check.mjs",
+    "generate": "cd ../.. && node scripts/task-guard.mjs --mutex generated-sources -- node scripts/go-generate.mjs",
+    "clean-generated": "cd ../.. && node scripts/task-guard.mjs --mutex generated-sources -- node scripts/clean-generated.mjs",
+    "check-generate": "cd ../.. && node scripts/task-guard.mjs --mutex generated-sources -- node scripts/check-go-generate.mjs",
+    "check-generate-pruned": "cd ../.. && node scripts/task-guard.mjs --mutex generated-sources -- node scripts/check-go-generate.mjs --prune",
+    "vet": "cd ../.. && go vet ./...",
+    "lint": "cd ../.. && node scripts/go-lint.mjs",
+    "test": "cd ../.. && go test -v -timeout 10m ./...",
+    "test-postgres": "cd ../.. && go test -v -count=1 -tags postgres_integration -timeout 10m ./...",
+    "test-spanner": "cd ../.. && go test -v -count=1 -tags spanner_integration -timeout 10m -p 1 ./...",
+    "test-sqlite": "cd ../.. && go test -v -count=1 -tags sqlite_integration -timeout 5m ./...",
+    "build": "cd ../.. && node scripts/server-build.mjs",
+    "prepack": "publint --strict"
+  },
   "publishConfig": {
     "access": "public"
   },

@@ -115,7 +115,10 @@ export function appTemplateHtml(ctx: PatchContext): string {
  * parser. The prefix strip and the bearer are each provided in both the
  * http-proxy-middleware form (`pathRewrite`/`onProxyReq`) and the Vite form
  * (`rewrite`/`configure`), so both fire whichever proxy layer Angular's
- * dev server uses.
+ * dev server uses. Like the Vite proxy (`vite-support.ts`), it addresses the
+ * backend by its own name (`changeOrigin`), which a remote https server
+ * requires, and forwards the app's origin in `X-Forwarded-Host` and
+ * `X-Forwarded-Proto` (`xfwd`).
  */
 export function proxyConfTemplate(): string {
   return `${MANAGED_MARKER}
@@ -155,7 +158,8 @@ function stripPrefix(path) {
 module.exports = {
   "${PROXY_PATH}": {
     target: server,
-    changeOrigin: false,
+    changeOrigin: true,
+    xfwd: true,
     pathRewrite: stripPrefix,
     rewrite: stripPrefix,
     onProxyReq: setBearer,
@@ -182,10 +186,33 @@ function setBearer(proxyReq) {
 }`;
 
 /**
- * Creates the managed Angular proxy and upgrades the exact insecure hook the
- * CLI emitted before the exchange-only policy. Other edits are preserved; a
- * safe custom proxy is left untouched, while an unrecognized proxy that may
- * still over-forward the project secret is surfaced for manual review.
+ * The managed entry as emitted before it forwarded the app's origin, and what
+ * replaces it. Keeping the browser's `Host` also kept `localhost` as the TLS
+ * server name, so that proxy could reach no remote https server.
+ */
+const HOST_KEEPING_ENTRY = `    target: server,
+    changeOrigin: false,
+`;
+
+const ORIGIN_FORWARDING_ENTRY = `    target: server,
+    changeOrigin: true,
+    xfwd: true,
+`;
+
+/** Upgrades the exact host-keeping entry, unless the file already chose its own `xfwd`. */
+function forwardAppOrigin(source: string): string {
+  if (/\bxfwd\s*:/.test(source)) {
+    return source;
+  }
+  return source.replace(HOST_KEEPING_ENTRY, ORIGIN_FORWARDING_ENTRY);
+}
+
+/**
+ * Creates the managed Angular proxy and upgrades the exact shapes earlier CLIs
+ * emitted: the insecure unconditional bearer hook and the host-keeping entry.
+ * Other edits are preserved; a safe custom proxy is left untouched, while an
+ * unrecognized proxy that may still over-forward the project secret is
+ * surfaced for manual review.
  */
 export function proxyConfEdit(): (source: string | undefined) => string {
   return (source) => {
@@ -193,9 +220,9 @@ export function proxyConfEdit(): (source: string | undefined) => string {
       return proxyConfTemplate();
     }
     if (source.includes(MANAGED_MARKER) && source.includes(LEGACY_UNCONDITIONAL_BEARER)) {
-      return source.replace(LEGACY_UNCONDITIONAL_BEARER, EXCHANGE_ONLY_BEARER);
+      return forwardAppOrigin(source.replace(LEGACY_UNCONDITIONAL_BEARER, EXCHANGE_ONLY_BEARER));
     }
     assertNoUnreviewedProjectSecretProxy(source, "proxy.conf.cjs");
-    return source;
+    return source.includes(MANAGED_MARKER) ? forwardAppOrigin(source) : source;
   };
 }

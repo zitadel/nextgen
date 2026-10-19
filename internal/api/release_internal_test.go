@@ -2,9 +2,14 @@ package api
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
+	"github.com/go-faster/jx"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
@@ -63,13 +68,77 @@ func TestReleaseAccessRow(t *testing.T) {
 	// pinning too. How that gate narrows a partial view is machinery every
 	// resource shares, and TestRequireProjectListAccess already covers it.
 	t.Run("listing refuses with the same release-flavored codes", func(t *testing.T) {
-		_, err := requireProjectListAccess(operator, stmts, "proj_b", releaseAccess, domain.ResourceKindRelease)
+		_, _, err := requireProjectListAccess(operator, stmts, "proj_b", releaseAccess, domain.ResourceKindRelease)
 		assertDomainCode(t, err, domain.ErrReleaseNotFound().Code)
 
-		_, err = requireProjectListAccess(preview, stmts, "proj_a", releaseAccess, domain.ResourceKindRelease)
+		_, _, err = requireProjectListAccess(preview, stmts, "proj_a", releaseAccess, domain.ResourceKindRelease)
 		assertDomainCode(t, err, domain.ErrReleasePermissionDenied().Code)
 
-		_, err = requireProjectListAccess(context.Background(), stmts, "proj_a", releaseAccess, domain.ResourceKindRelease)
+		_, _, err = requireProjectListAccess(context.Background(), stmts, "proj_a", releaseAccess, domain.ResourceKindRelease)
 		assertDomainCode(t, err, domain.ErrReleaseNotFound().Code)
 	})
+}
+
+// Pins the request contract of POST /releases/build at the decoder: a closed
+// bundle with a single branding. A generator or schema change that loosens it
+// fails here rather than reaching the handler.
+func TestBuildReleaseRequestShape(t *testing.T) {
+	t.Parallel()
+
+	accepted := map[string]string{
+		"branding only": `{"bundle":{"branding":{}}}`,
+		// Every kind is optional, and a kind's array may be empty. An empty
+		// bundle as a whole is the server's to refuse, not the decoder's.
+		"empty kinds": `{"bundle":{"schemas":[],"flow_definitions":[]}}`,
+		"schema url":  `{"bundle":{"schemas":[{"kind":"schema-url","url":"https://acme.example/human.json"}]}}`,
+	}
+	for name, body := range accepted {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			_, err := decodeBuildReleaseRequest(body)
+			require.NoError(t, err)
+		})
+	}
+
+	refused := map[string]string{
+		"no bundle":          `{"message":"no content"}`,
+		"pointers":           `{"pointers":[{"kind":"schema","revision_id":"sch_1"}],"bundle":{"branding":{}}}`,
+		"unknown bundle key": `{"bundle":{"flowDefinitions":[{}]}}`,
+		// A project has one branding: an array of them is refused at
+		// decoding, before it can be materialised element by element.
+		"branding as an array": `{"bundle":{"branding":[{},{}]}}`,
+	}
+	for name, body := range refused {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			_, err := decodeBuildReleaseRequest(body)
+			assert.Error(t, err)
+		})
+	}
+}
+
+// decodeBuildReleaseRequest runs what the server runs on a request body:
+// decode, then validate.
+func decodeBuildReleaseRequest(body string) (api.BuildReleaseRequest, error) {
+	var req api.BuildReleaseRequest
+	if err := req.Decode(jx.DecodeStr(body)); err != nil {
+		return req, err
+	}
+	return req, req.Validate()
+}
+
+// Pins revoke's answer until the service can revoke: 501, not the 500 the
+// generated stub's sentinel would map to.
+func TestRevokeReleaseNotImplemented(t *testing.T) {
+	_, err := (&Handler{}).RevokeRelease(t.Context(), api.RevokeReleaseParams{})
+	require.Error(t, err)
+	assert.Equal(t, http.StatusNotImplemented, errorResponse(err).StatusCode)
+}
+
+// Pins build's answer until the service can build: 501, not the 500 the
+// generated stub's sentinel would map to.
+func TestBuildReleaseNotImplemented(t *testing.T) {
+	_, err := (&Handler{}).BuildRelease(t.Context(), &api.BuildReleaseRequest{}, api.BuildReleaseParams{})
+	require.Error(t, err)
+	assert.Equal(t, http.StatusNotImplemented, errorResponse(err).StatusCode)
 }

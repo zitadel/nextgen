@@ -56,7 +56,7 @@ describe("console", () => {
 
         const result = await app.run(["console", "--json"]);
 
-        expect(result).toExplain("No local admin in this directory");
+        expect(result).toExplain("No local admin in this directory or its parents");
       });
 
       it("refuses a directory that was never set up", async () => {

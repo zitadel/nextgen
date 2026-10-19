@@ -1,6 +1,12 @@
 get:
   operationId: GetUserByID
+  x-zitadel-cli: users get
   summary: Get user by ID
+  description: |
+    Returns a user by its id, with the attributes its schema defines.
+
+    With `team_id`, the user is returned only while they are an active member of
+    that team.
   tags:
     - Users
   parameters:
@@ -21,13 +27,14 @@ get:
 
         Only active memberships match. A user who has been invited but has not
         accepted is not served.
+
+        It reads the user's memberships, so it takes the same permission as the
+        `team_id` filter on `POST /users/query`: `team_membership.read` for a
+        project secret, read on the whole project for a Console session.
+        Otherwise the answer is `403 user.permission_denied`.
       schema:
         $ref: ../../../components/schemas/team-id.yaml
-    - name: user_id
-      in: path
-      required: true
-      schema:
-        $ref: ../../../components/schemas/user-id.yaml
+    - $ref: ../../../components/parameters/user-id.yaml
   security:
     - oauth2:
         - user.read
@@ -56,6 +63,7 @@ get:
 
 patch:
   operationId: PatchUserByID
+  x-zitadel-cli: users update
   summary: Update user by ID
   description: |
     Partially updates a user's schema-defined attributes, and optionally
@@ -65,11 +73,7 @@ patch:
   tags:
     - Users
   parameters:
-    - name: user_id
-      in: path
-      required: true
-      schema:
-        $ref: ../../../components/schemas/user-id.yaml
+    - $ref: ../../../components/parameters/user-id.yaml
   security:
     - oauth2:
         - user.write
@@ -124,15 +128,18 @@ patch:
 
 delete:
     operationId: DeleteUserByID
+    x-zitadel-cli: users delete
     summary: Delete user by ID
+    description: |
+      Deletes a user and removes them from every team they belong to.
+
+      The user is removed, not deactivated, and the deletion emits `user.deleted`.
+      With a project secret the request is idempotent: deleting a user that exists
+      in no project succeeds without changing anything.
     tags:
       - Users
     parameters:
-      - name: user_id
-        in: path
-        required: true
-        schema:
-          $ref: ../../../components/schemas/user-id.yaml
+      - $ref: ../../../components/parameters/user-id.yaml
     security:
       - oauth2:
           - user.delete

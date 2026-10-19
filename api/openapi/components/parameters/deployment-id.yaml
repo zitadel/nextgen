@@ -4,3 +4,4 @@ required: true
 description: The unique identifier of the deployment.
 schema:
   $ref: '../schemas/deployment-id.yaml'
+example: dep_01KX4SB9C8E1F0N9WD3P2E4YM5

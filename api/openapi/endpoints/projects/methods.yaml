@@ -1,6 +1,13 @@
 post:
   operationId: createProject
   summary: Create project
+  description: |
+    Creates a project and returns its project secret and preview secret, which no
+    other endpoint returns.
+
+    The request needs no credential and is rate-limited. Unless `seed_defaults` is
+    `false`, the project starts with a default user schema and flow; the CLI turns
+    that off and uploads its own from `.zitadel/`.
   tags:
     - Projects
   security: []

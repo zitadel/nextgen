@@ -5,17 +5,20 @@ import { tmpdir } from "node:os";
 import { describe, expect, it, vi } from "vitest";
 
 import { createZitadelClient } from "@zitadel/api/client";
+import { ApiError } from "@zitadel/api/runtime/fetch";
 import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/defaults";
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
 
 import {
   buildSyncPlan,
   hashForState,
+  readLocalFlowUserSchemas,
   runSyncLoop,
+  toStatePath,
   writeBackResource,
 } from "../../../../src/lib/sync/loop";
 import { makeSyncers } from "../../../../src/lib/sync/syncers";
-import { FatalFetchError } from "../../../../src/lib/sync/types";
+import { FatalFetchError, type ZitadelState } from "../../../../src/lib/sync/types";
 import { ZitadelError } from "../../../../src/lib/errors";
 import type { ResourceSyncer } from "../../../../src/lib/sync/syncers";
 
@@ -30,7 +33,12 @@ async function writeState(cwd: string, state: object): Promise<void> {
   await writeFile(join(cwd, ".zitadel/state.json"), JSON.stringify(state));
 }
 
-async function writeResource(cwd: string, dir: string, name: string, contents: object): Promise<void> {
+async function writeResource(
+  cwd: string,
+  dir: string,
+  name: string,
+  contents: object,
+): Promise<void> {
   await mkdir(join(cwd, dir), { recursive: true });
   await writeFile(join(cwd, dir, name), JSON.stringify(contents));
 }
@@ -60,8 +68,8 @@ describe("buildSyncPlan", () => {
       const actions = await buildSyncPlan(cwd, [syncer]);
 
       expect(actions).toHaveLength(1);
-      expect(actions[0].kind).toBe("create");
-      expect(actions[0].path).toBe(".zitadel/schemas/user.json");
+      expect(actions[0]!.kind).toBe("create");
+      expect(actions[0]!.path).toBe(".zitadel/schemas/user.json");
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }
@@ -105,9 +113,9 @@ describe("buildSyncPlan", () => {
       const actions = await buildSyncPlan(cwd, [syncer]);
 
       expect(actions).toHaveLength(1);
-      expect(actions[0].kind).toBe("skip");
-      if (actions[0].kind === "skip") {
-        expect(actions[0].reason).toBe("no-change");
+      expect(actions[0]!.kind).toBe("skip");
+      if (actions[0]!.kind === "skip") {
+        expect(actions[0]!.reason).toBe("no-change");
       }
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -127,9 +135,9 @@ describe("buildSyncPlan", () => {
       const actions = await buildSyncPlan(cwd, [syncer]);
 
       expect(actions).toHaveLength(1);
-      expect(actions[0].kind).toBe("skip");
-      if (actions[0].kind === "skip") {
-        expect(actions[0].reason).toBe("immutable");
+      expect(actions[0]!.kind).toBe("skip");
+      if (actions[0]!.kind === "skip") {
+        expect(actions[0]!.reason).toBe("immutable");
       }
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -159,10 +167,10 @@ describe("buildSyncPlan", () => {
       const actions = await buildSyncPlan(cwd, [syncer]);
 
       expect(actions).toHaveLength(1);
-      expect(actions[0].kind).toBe("revise");
-      if (actions[0].kind === "revise") {
-        expect(actions[0].previousId).toBe("sch_A");
-        expect(actions[0].affectedPaths).toEqual([".zitadel/flows/signin.json"]);
+      expect(actions[0]!.kind).toBe("revise");
+      if (actions[0]!.kind === "revise") {
+        expect(actions[0]!.previousId).toBe("sch_A");
+        expect(actions[0]!.affectedPaths).toEqual([".zitadel/flows/signin.json"]);
       }
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -185,9 +193,9 @@ describe("buildSyncPlan", () => {
       const actions = await buildSyncPlan(cwd, [syncer]);
 
       expect(actions).toHaveLength(1);
-      expect(actions[0].kind).toBe("skip");
-      if (actions[0].kind === "skip") {
-        expect(actions[0].reason).toBe("no-change");
+      expect(actions[0]!.kind).toBe("skip");
+      if (actions[0]!.kind === "skip") {
+        expect(actions[0]!.reason).toBe("no-change");
       }
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -201,16 +209,19 @@ describe("buildSyncPlan", () => {
         framework: "next",
         resources: { ".zitadel/flows/default.json": { id: "flow-001", hash: "old-hash" } },
       });
-      await writeResource(cwd, ".zitadel/flows", "default.json", { kind: "flow-definition", version: 2 });
+      await writeResource(cwd, ".zitadel/flows", "default.json", {
+        kind: "flow-definition",
+        version: 2,
+      });
 
       const syncer = makeSyncer({ directory: ".zitadel/flows", mutable: true });
       const actions = await buildSyncPlan(cwd, [syncer]);
 
       expect(actions).toHaveLength(1);
-      expect(actions[0].kind).toBe("update");
-      if (actions[0].kind === "update") {
-        expect(actions[0].id).toBe("flow-001");
-        expect(actions[0].path).toBe(".zitadel/flows/default.json");
+      expect(actions[0]!.kind).toBe("update");
+      if (actions[0]!.kind === "update") {
+        expect(actions[0]!.id).toBe("flow-001");
+        expect(actions[0]!.path).toBe(".zitadel/flows/default.json");
       }
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -230,10 +241,10 @@ describe("buildSyncPlan", () => {
       const actions = await buildSyncPlan(cwd, [syncer]);
 
       expect(actions).toHaveLength(1);
-      expect(actions[0].kind).toBe("delete");
-      if (actions[0].kind === "delete") {
-        expect(actions[0].id).toBe("old-id");
-        expect(actions[0].path).toBe(".zitadel/schemas/old.json");
+      expect(actions[0]!.kind).toBe("delete");
+      if (actions[0]!.kind === "delete") {
+        expect(actions[0]!.id).toBe("old-id");
+        expect(actions[0]!.path).toBe(".zitadel/schemas/old.json");
       }
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -255,9 +266,9 @@ describe("buildSyncPlan", () => {
       const actions = await buildSyncPlan(cwd, [syncer], true);
 
       expect(fetchFn).toHaveBeenCalledWith("old-id");
-      expect(actions[0].kind).toBe("delete");
-      if (actions[0].kind === "delete") {
-        expect(actions[0].oldContent).toEqual(fetchedContent);
+      expect(actions[0]!.kind).toBe("delete");
+      if (actions[0]!.kind === "delete") {
+        expect(actions[0]!.oldContent).toEqual(fetchedContent);
       }
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -301,9 +312,9 @@ describe("buildSyncPlan", () => {
       const syncer = makeSyncer({ fetch: fetchFn });
       const actions = await buildSyncPlan(cwd, [syncer], true);
 
-      expect(actions[0].kind).toBe("delete");
-      if (actions[0].kind === "delete") {
-        expect(actions[0].oldContent).toBeNull();
+      expect(actions[0]!.kind).toBe("delete");
+      if (actions[0]!.kind === "delete") {
+        expect(actions[0]!.oldContent).toBeNull();
       }
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -319,7 +330,10 @@ describe("buildSyncPlan validation (real syncers)", () => {
       await writeResource(cwd, ".zitadel/schemas", "user.json", { type: 123 });
 
       await expect(
-        buildSyncPlan(cwd, makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" })),
+        buildSyncPlan(
+          cwd,
+          makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" }),
+        ),
       ).rejects.toMatchObject({ code: "E_VALIDATION" });
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -333,7 +347,10 @@ describe("buildSyncPlan validation (real syncers)", () => {
       await writeResource(cwd, ".zitadel/flows", "default.json", { version: 99, kind: "wrong" });
 
       await expect(
-        buildSyncPlan(cwd, makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" })),
+        buildSyncPlan(
+          cwd,
+          makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" }),
+        ),
       ).rejects.toMatchObject({ code: "E_VALIDATION" });
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -400,7 +417,7 @@ describe("runSyncLoop", () => {
       await writeResource(cwd, ".zitadel/schemas", "user.json", { kind: "user-schema" });
 
       const syncer = makeSyncer();
-      
+
       await runSyncLoop(cwd, [syncer]);
 
       expect(syncer.create).toHaveBeenCalledOnce();
@@ -456,12 +473,9 @@ describe("runSyncLoop", () => {
       expect(syncer.update).not.toHaveBeenCalled();
 
       const state = JSON.parse(
-        await (await import("node:fs/promises")).readFile(
-          join(cwd, ".zitadel/state.json"),
-          "utf8",
-        ),
+        await (await import("node:fs/promises")).readFile(join(cwd, ".zitadel/state.json"), "utf8"),
       ) as { resources: Record<string, { id: string }> };
-      expect(state.resources[".zitadel/schemas/user.json"].id).toBe("sch_B");
+      expect(state!.resources[".zitadel/schemas/user.json"]!.id).toBe("sch_B");
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }
@@ -480,7 +494,7 @@ describe("runSyncLoop", () => {
       await writeResource(cwd, ".zitadel/flows", "default.json", data);
 
       const syncer = makeSyncer({ directory: ".zitadel/flows", mutable: true });
-      
+
       await runSyncLoop(cwd, [syncer]);
 
       expect(syncer.update).not.toHaveBeenCalled();
@@ -498,10 +512,13 @@ describe("runSyncLoop", () => {
           ".zitadel/flows/default.json": { id: "flow-001", hash: "old-hash" },
         },
       });
-      await writeResource(cwd, ".zitadel/flows", "default.json", { kind: "flow-definition", version: 2 });
+      await writeResource(cwd, ".zitadel/flows", "default.json", {
+        kind: "flow-definition",
+        version: 2,
+      });
 
       const syncer = makeSyncer({ directory: ".zitadel/flows", mutable: true });
-      
+
       await runSyncLoop(cwd, [syncer]);
 
       expect(syncer.update).toHaveBeenCalledOnce();
@@ -554,7 +571,7 @@ describe("normalized hashing and write-back", () => {
 
       // A legacy-format state hash must never read as an edit — a spurious
       // mismatch would publish an unintended update/revision.
-      expect(actions[0].kind).toBe("skip");
+      expect(actions[0]!.kind).toBe("skip");
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }
@@ -578,7 +595,7 @@ describe("normalized hashing and write-back", () => {
       const syncer = makeSyncer({ directory: ".zitadel/flows", mutable: true });
       const actions = await buildSyncPlan(cwd, [syncer]);
 
-      expect(actions[0].kind).toBe("skip");
+      expect(actions[0]!.kind).toBe("skip");
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }
@@ -597,7 +614,7 @@ describe("normalized hashing and write-back", () => {
 
       const actions = await buildSyncPlan(cwd, [syncer]);
 
-      expect(actions[0].kind).toBe("skip");
+      expect(actions[0]!.kind).toBe("skip");
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }
@@ -621,7 +638,7 @@ describe("normalized hashing and write-back", () => {
 
       const actions = await buildSyncPlan(cwd, [syncer]);
 
-      expect(actions[0].kind).toBe("skip");
+      expect(actions[0]!.kind).toBe("skip");
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }
@@ -841,7 +858,12 @@ describe("auto-repin on schema revise", () => {
         },
       });
       await writeResource(cwd, ".zitadel/schemas", "user.json", { ...SCHEMA_BODY, v: 2 });
-      await writeResource(cwd, ".zitadel/flows", "default.json", validFlowBody("sch_A", { version: 2 }));
+      await writeResource(
+        cwd,
+        ".zitadel/flows",
+        "default.json",
+        validFlowBody("sch_A", { version: 2 }),
+      );
 
       const schemaSyncer = makeSchemaSyncer();
       const create = vi.fn().mockResolvedValue({ id: "flow-002" });
@@ -1365,7 +1387,11 @@ describe("plan-time flow validation", () => {
       if (created?.kind === "create") {
         expect(created.warnings?.map((w) => w.rule)).toContain("warn/default-flow-swap");
         expect(created.warnings?.at(-1)?.message).toContain(
-          "becomes the new default for login and register",
+          "this flow definition becomes the project default for login and register",
+        );
+        expect(created.warnings?.at(-1)?.message).toContain(
+          'give the flow definition an "audience" before its first apply and select it by flowName, ' +
+            "or pin flow-name on the pages that should keep the current project default.",
         );
       }
       expect(actions.find((a) => a.path === FLOW_PATH)?.kind).toBe("skip");
@@ -1405,7 +1431,7 @@ describe("plan-time flow validation", () => {
       if (revised?.kind === "revise") {
         expect(revised.warnings?.map((w) => w.rule)).toContain("warn/default-flow-swap");
         expect(revised.warnings?.at(-1)?.message).toContain(
-          "this revision becomes the newest active flow and the default for login and register",
+          "this revision becomes the newest active flow definition and the project default for login and register",
         );
       }
     } finally {
@@ -1466,9 +1492,7 @@ describe("plan-time flow validation", () => {
       const created = actions.find((a) => a.path === FLOW_PATH);
       expect(created?.kind).toBe("create");
       if (created?.kind === "create") {
-        expect(created.warnings?.map((w) => w.rule) ?? []).not.toContain(
-          "warn/default-flow-swap",
-        );
+        expect(created.warnings?.map((w) => w.rule) ?? []).not.toContain("warn/default-flow-swap");
       }
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -1500,9 +1524,7 @@ describe("plan-time flow validation", () => {
       const created = actions.find((a) => a.path === ".zitadel/flows/team-login.json");
       expect(created?.kind).toBe("create");
       if (created?.kind === "create") {
-        expect(created.warnings?.map((w) => w.rule) ?? []).not.toContain(
-          "warn/default-flow-swap",
-        );
+        expect(created.warnings?.map((w) => w.rule) ?? []).not.toContain("warn/default-flow-swap");
       }
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -1521,7 +1543,7 @@ describe("plan-time flow validation", () => {
         string,
         Record<string, { enabled: boolean }>
       >;
-      schemaBody["x-auth-methods"].passkey.enabled = false;
+      schemaBody["x-auth-methods"]!.passkey!.enabled = false;
       const schemaSyncer = makeSyncer({ normalize: normalizeSchemaBody });
       await writeState(cwd, {
         framework: "next",
@@ -1530,7 +1552,7 @@ describe("plan-time flow validation", () => {
         },
       });
       await writeResource(cwd, ".zitadel/schemas", "user.json", schemaBody);
-      const flow = getDefaultLoginFlow({ userSchemaUrl: "sch_A", preset: "passkey-first" });
+      const flow = getDefaultLoginFlow({ preset: "passkey-first" });
       await writeResource(cwd, ".zitadel/flows", "default.json", flow);
 
       const plan = buildSyncPlan(cwd, [schemaSyncer, makeFlowSyncer()]);
@@ -1568,6 +1590,380 @@ describe("plan-time flow validation", () => {
       expect(actions.find((a) => a.path === FLOW_PATH)?.kind).toBe("create");
     } finally {
       vi.unstubAllEnvs();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("a resource the platform cannot delete yet", () => {
+  const IDPS = ".zitadel/idps";
+  const unsupported = (overrides: Partial<ResourceSyncer> = {}) =>
+    makeSyncer({
+      kind: "idp",
+      directory: IDPS,
+      mutable: true,
+      deletion: "unsupported",
+      ...overrides,
+    });
+
+  async function aProjectThatLostItsFile(): Promise<string> {
+    const cwd = makeCwd();
+    await writeState(cwd, {
+      framework: "next",
+      resources: { [`${IDPS}/acme.json`]: { id: "idp_1", hash: "abc" } },
+    });
+    await mkdir(join(cwd, IDPS), { recursive: true });
+    return cwd;
+  }
+
+  const stateOf = async (cwd: string) =>
+    Object.keys(
+      (JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8")) as ZitadelState)
+        .resources,
+    ).sort();
+
+  it("plans a skip for a removed file, not a delete", async () => {
+    const cwd = await aProjectThatLostItsFile();
+    try {
+      const actions = await buildSyncPlan(cwd, [unsupported()]);
+
+      expect(actions).toEqual([
+        expect.objectContaining({
+          kind: "skip",
+          path: `${IDPS}/acme.json`,
+          reason: "unsupported-deletion",
+          id: "idp_1",
+        }),
+      ]);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("does not read the stored resource for a file it will not delete", async () => {
+    const cwd = await aProjectThatLostItsFile();
+    try {
+      const fetch = vi.fn().mockResolvedValue({});
+
+      await buildSyncPlan(cwd, [unsupported({ fetch })], true);
+
+      expect(fetch).not.toHaveBeenCalled();
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("sends no deletion on apply", async () => {
+    const cwd = await aProjectThatLostItsFile();
+    try {
+      const syncer = unsupported();
+
+      await runSyncLoop(cwd, [syncer]);
+
+      expect(syncer.delete).not.toHaveBeenCalled();
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps the state entry on apply", async () => {
+    const cwd = await aProjectThatLostItsFile();
+    try {
+      await runSyncLoop(cwd, [unsupported()]);
+
+      expect(await stateOf(cwd)).toEqual([`${IDPS}/acme.json`]);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("reports the kept removals on apply", async () => {
+    const cwd = await aProjectThatLostItsFile();
+    try {
+      const result = await runSyncLoop(cwd, [unsupported()]);
+
+      expect(result.unsupported).toEqual([`${IDPS}/acme.json`]);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  describe("when the same resource comes back under a new file", () => {
+    async function aRenamedProject(): Promise<string> {
+      const cwd = await aProjectThatLostItsFile();
+      await writeResource(cwd, IDPS, "renamed.json", { slug: "acme" });
+      return cwd;
+    }
+    const holdingIt = () =>
+      unsupported({
+        preflight: vi
+          .fn()
+          .mockResolvedValue({ id: "idp_1", definition: { slug: "acme", stored: true } }),
+        create: vi.fn().mockResolvedValue({ id: "idp_1" }),
+      });
+
+    it("plans a move, not a create and a removal", async () => {
+      const cwd = await aRenamedProject();
+      try {
+        const actions = await buildSyncPlan(cwd, [holdingIt()]);
+
+        expect(actions).toEqual([
+          expect.objectContaining({
+            kind: "create",
+            path: `${IDPS}/renamed.json`,
+            movedFrom: `${IDPS}/acme.json`,
+          }),
+        ]);
+      } finally {
+        await rm(cwd, { recursive: true, force: true });
+      }
+    });
+
+    it("carries what the platform stores, so the plan can show what changes", async () => {
+      const cwd = await aRenamedProject();
+      try {
+        const [action] = await buildSyncPlan(cwd, [holdingIt()]);
+
+        expect(action).toMatchObject({ oldContent: { slug: "acme", stored: true } });
+      } finally {
+        await rm(cwd, { recursive: true, force: true });
+      }
+    });
+
+    it("forgets the old path on apply", async () => {
+      const cwd = await aRenamedProject();
+      try {
+        await runSyncLoop(cwd, [holdingIt()]);
+
+        expect(await stateOf(cwd)).toEqual([`${IDPS}/renamed.json`]);
+      } finally {
+        await rm(cwd, { recursive: true, force: true });
+      }
+    });
+
+    it("reports a move, with where it came from", async () => {
+      const cwd = await aRenamedProject();
+      try {
+        const result = await runSyncLoop(cwd, [holdingIt()]);
+
+        expect(result.applied).toEqual([
+          expect.objectContaining({
+            action: "move",
+            file: `${IDPS}/renamed.json`,
+            moved_from: `${IDPS}/acme.json`,
+          }),
+        ]);
+      } finally {
+        await rm(cwd, { recursive: true, force: true });
+      }
+    });
+
+    it("keeps no loose end for the old path", async () => {
+      const cwd = await aRenamedProject();
+      try {
+        const result = await runSyncLoop(cwd, [holdingIt()]);
+
+        expect(result.unsupported).toEqual([]);
+      } finally {
+        await rm(cwd, { recursive: true, force: true });
+      }
+    });
+  });
+
+  it("keeps the old path when the new file is a different resource", async () => {
+    const cwd = await aProjectThatLostItsFile();
+    try {
+      await writeResource(cwd, IDPS, "other.json", { slug: "other" });
+      const syncer = unsupported({ create: vi.fn().mockResolvedValue({ id: "idp_2" }) });
+
+      await runSyncLoop(cwd, [syncer]);
+
+      expect(await stateOf(cwd)).toEqual([`${IDPS}/acme.json`, `${IDPS}/other.json`]);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("does not drop a file that is still there because it shares an id", async () => {
+    const cwd = makeCwd();
+    // With the checks switched off, two files can claim one slug.
+    vi.stubEnv("ZITADEL_SKIP_FLOW_VALIDATION", "1");
+    try {
+      await writeState(cwd, {
+        framework: "next",
+        resources: { [`${IDPS}/a.json`]: { id: "idp_1", hash: "abc" } },
+      });
+      await writeResource(cwd, IDPS, "a.json", { slug: "same" });
+      await writeResource(cwd, IDPS, "b.json", { slug: "same" });
+      const syncer = unsupported({ create: vi.fn().mockResolvedValue({ id: "idp_1" }) });
+
+      await runSyncLoop(cwd, [syncer]);
+
+      expect(await stateOf(cwd)).toEqual([`${IDPS}/a.json`, `${IDPS}/b.json`]);
+    } finally {
+      vi.unstubAllEnvs();
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("readLocalFlowUserSchemas", () => {
+  it("keys each flow by the path state tracks it under", async () => {
+    const cwd = makeCwd();
+    try {
+      await writeResource(cwd, ".zitadel/flows", "login.json", { user_schema: "sch_1" });
+
+      expect([...(await readLocalFlowUserSchemas(cwd)).keys()]).toEqual([
+        ".zitadel/flows/login.json",
+      ]);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("toStatePath", () => {
+  it("tracks a file under forward slashes whatever separator the platform uses", () => {
+    expect(toStatePath("C:\\work\\app\\.zitadel\\idps\\x.json", "C:\\work\\app", "\\")).toBe(
+      ".zitadel/idps/x.json",
+    );
+  });
+
+  it("leaves a path that already uses forward slashes as it is", () => {
+    expect(toStatePath("/work/app/.zitadel/idps/x.json", "/work/app", "/")).toBe(
+      ".zitadel/idps/x.json",
+    );
+  });
+});
+
+describe("a syncer's preflight", () => {
+  const IDPS = ".zitadel/idps";
+  const tracked = {
+    framework: "next",
+    resources: { [`${IDPS}/acme.json`]: { id: "idp_1", hash: "old" } },
+  };
+
+  async function aProjectWithAnEditedFile(): Promise<string> {
+    const cwd = makeCwd();
+    await writeState(cwd, tracked);
+    await writeResource(cwd, IDPS, "acme.json", { slug: "acme", changed: true });
+    return cwd;
+  }
+
+  const syncer = (overrides: Partial<ResourceSyncer> = {}) =>
+    makeSyncer({ kind: "idp", directory: IDPS, mutable: true, ...overrides });
+
+  it("is given the stored body of an update", async () => {
+    const cwd = await aProjectWithAnEditedFile();
+    try {
+      const preflight = vi.fn().mockResolvedValue(undefined);
+
+      await buildSyncPlan(cwd, [
+        syncer({ preflight, fetch: vi.fn().mockResolvedValue({ slug: "acme" }) }),
+      ]);
+
+      expect(preflight).toHaveBeenCalledWith(`${IDPS}/acme.json`, expect.anything(), {
+        slug: "acme",
+      });
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("is given nothing stored for a create", async () => {
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, { framework: "next", resources: {} });
+      await writeResource(cwd, IDPS, "acme.json", { slug: "acme" });
+      const preflight = vi.fn().mockResolvedValue(undefined);
+
+      await buildSyncPlan(cwd, [syncer({ preflight })]);
+
+      expect(preflight).toHaveBeenCalledWith(`${IDPS}/acme.json`, expect.anything(), null);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("is not asked when the files already fail a local check", async () => {
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, { framework: "next", resources: {} });
+      await writeResource(cwd, ".zitadel/flows", "login.json", {
+        name: "login",
+        status: "active",
+        purposes: { login: "start" },
+        steps: [{ name: "start", transitions: { submit: { target: "missing" } } }],
+      });
+      await writeResource(cwd, IDPS, "acme.json", { slug: "acme" });
+      const preflight = vi.fn().mockResolvedValue(undefined);
+      const flow = makeSyncer({ kind: "flow", directory: ".zitadel/flows", mutable: true });
+
+      await expect(buildSyncPlan(cwd, [flow, syncer({ preflight })])).rejects.toMatchObject({
+        code: "E_VALIDATION",
+      });
+      expect(preflight).not.toHaveBeenCalled();
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("stops the run before anything is written when it throws", async () => {
+    const cwd = await aProjectWithAnEditedFile();
+    try {
+      const refusing = syncer({
+        preflight: vi.fn().mockRejectedValue(new ZitadelError("E_VALIDATION", "no")),
+        fetch: vi.fn().mockResolvedValue({}),
+      });
+
+      await expect(runSyncLoop(cwd, [refusing])).rejects.toMatchObject({ code: "E_VALIDATION" });
+      expect(refusing.update).not.toHaveBeenCalled();
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("is given nothing stored when the resource is gone from the platform", async () => {
+    const cwd = await aProjectWithAnEditedFile();
+    try {
+      const preflight = vi.fn().mockResolvedValue(undefined);
+      const gone = vi.fn().mockRejectedValue(new ApiError(404, "http://x/idps/idp_1", {}, "gone"));
+
+      await buildSyncPlan(cwd, [syncer({ preflight, fetch: gone })]);
+
+      expect(preflight).toHaveBeenCalledWith(`${IDPS}/acme.json`, expect.anything(), null);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("stops the plan when the stored body cannot be read for any other reason", async () => {
+    const cwd = await aProjectWithAnEditedFile();
+    try {
+      const preflight = vi.fn().mockResolvedValue(undefined);
+      const unavailable = vi
+        .fn()
+        .mockRejectedValue(new ApiError(503, "http://x/idps/idp_1", {}, "unavailable"));
+
+      await expect(
+        buildSyncPlan(cwd, [syncer({ preflight, fetch: unavailable })]),
+      ).rejects.toMatchObject({ status: 503 });
+      expect(preflight).not.toHaveBeenCalled();
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("raises a refused read as the refusal, not as a failed fetch", async () => {
+    const cwd = await aProjectWithAnEditedFile();
+    try {
+      const refusal = new ZitadelError("E_VALIDATION", "resolved secret");
+      const fetch = vi.fn().mockRejectedValue(new FatalFetchError(refusal));
+
+      await expect(buildSyncPlan(cwd, [syncer({ preflight: vi.fn(), fetch })])).rejects.toBe(
+        refusal,
+      );
+    } finally {
       await rm(cwd, { recursive: true, force: true });
     }
   });

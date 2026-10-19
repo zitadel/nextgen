@@ -73,28 +73,28 @@ func (b brandingStatements) GetBrandingByID(ctx context.Context, projectID, id s
 
 // ListBrandings implements [service.BrandingStatements].
 func (b brandingStatements) ListBrandings(ctx context.Context, filter *database.ListOptions[domain.BrandingField]) (*database.ListResult[*domain.Branding], error) {
-	var compiler statementCompiler
-	if err := compileList(ctx, &compiler, brandingQuery, filter, branding.Schema, "zitadel_nextgen.branding", "id"); err != nil {
+	items, nextCursor, err := pagination.Page(filter.Pagination, branding.Schema, func(limit uint32) ([]*domain.Branding, error) {
+		filter := filter.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileList(ctx, &compiler, brandingQuery, filter, branding.Schema, "zitadel_nextgen.branding", "id"); err != nil {
+			return nil, err
+		}
+
+		rows, err := b.client.Query(ctx, compiler.String(), compiler.args...)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+
+		items, err := pgx.CollectRows(rows, b.scanBranding)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+
+		return items, nil
+	})
+	if err != nil {
 		return nil, err
 	}
-
-	rows, err := b.client.Query(ctx, compiler.String(), compiler.args...)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-
-	items, err := pgx.CollectRows(rows, b.scanBranding)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-
-	nextCursor := pagination.MarshalNext(
-		filter.Pagination.OrderBy,
-		items,
-		branding.Schema,
-		filter.Pagination.Limit,
-	)
-
 	return &database.ListResult[*domain.Branding]{
 		Items:      items,
 		NextCursor: nextCursor,

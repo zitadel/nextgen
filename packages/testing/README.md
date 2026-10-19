@@ -14,7 +14,7 @@ the real login journey immediately.
 
 The repo previously had two extremes: the demo e2e suites run against
 `@zitadel/api-mock` (fast, but fake — no user store, no real crypto), and
-`cli-journey-e2e` runs the real packaged product but creates users by clicking
+the CLI journey (`e2e/journey`) runs the real packaged product but creates users by clicking
 through the registration UI, serialized per suite. This kit fills the middle:
 **real server, programmatic seeding, parallel-safe per-test users.**
 
@@ -104,12 +104,14 @@ test("member sees the dashboard", async ({ authenticatedPage }) => {
 Underneath sits `seed.session()`, whose `sessionToken` also drives session
 APIs without any browser — backend tests call the instance directly with the
 cookie header (`cookie: __nextgen_session=<sessionToken>`, the SDK
-middleware's own headless pattern). Scope: password flows (the shipped
-`password-first` presets). A flow step demanding anything beyond the user's
-email and password — a challenge, another factor — fails with the step name;
-log in through the UI for those. `seed.identity()` complements registration
-specs: an unused email+password that creates nothing, so the flow under test
-must create the user.
+middleware's own headless pattern; `SESSION_COOKIE_NAME` holds the name).
+Scope: password flows (the shipped `password-first` presets). A flow step
+demanding anything beyond the user's email and password — a challenge,
+another factor — fails with the step name; log in through the UI for those.
+`seed.identity()` complements registration specs: an unused email+password
+that creates nothing, so the flow under test must create the user. It needs
+no instance, so a spec without `withZitadel()` — against an app you started
+yourself — imports it as `identity()`.
 
 ### Drive the login flow
 
@@ -170,9 +172,9 @@ for local tests; raw IP origins like `127.0.0.1` are invalid. The default
 step; boot `preset: "passkey-first"` for one-tap discoverable-credential
 login flows.
 
-The two in-repo consumers are `apps/demo-next-e2e/playwright.real.config.mts`
-and `apps/console-e2e/playwright.real.config.mts` — run them with
-`moon run demo-next-e2e:e2e-real` / `moon run console-e2e:e2e-real`.
+The two in-repo consumers are `e2e/demo-next/playwright.real.config.mts`
+and `e2e/console/playwright.real.config.mts` — run them with
+`moon run e2e:demo-next-real` / `moon run e2e:console-real`.
 
 ### Composable pieces
 
@@ -191,12 +193,14 @@ import {
   startLocalZitadel, // boot + bootstrap an ephemeral instance
   connectZitadel,    // attach to an existing instance via its handle
   writeHandshake, readHandshakeSync, waitForHandshake,
+  identity,          // unused { email, password }, no instance needed
+  SESSION_COOKIE_NAME, // "__nextgen_session"
 } from "@zitadel/testing";
 
 const z = await startLocalZitadel({
   port,          // default: free port
   dir,           // default: temp dir, removed on stop (caller dirs are kept)
-  appOrigins,    // registered as the project's preview_origins
+  appOrigins,    // registered as the project's origins
   useCase,       // "minimal" (default) | "consumer" | "business"
   preset,        // "password-first" (default)
   serverBinary,  // ZITADEL_SERVER_BINARY override (path to a built server binary)
@@ -225,7 +229,8 @@ per test, `zitadel` per worker, `passkey` on demand), the flow ceremonies
 `withZitadel(options)` returning `{ webServer }` for the config,
 `enableVirtualPasskey(page)` for non-fixture pages, and
 `nextAppEnv`/`applyAppEnvTemplate` for the env-template mechanism described
-above.
+above. `identity()` and `SESSION_COOKIE_NAME` are on both entry points, so a
+Playwright spec imports everything from this one.
 
 ## How it works
 
@@ -286,7 +291,7 @@ or export.
 **One instance per suite, one fresh user per test.** Emails are unique per
 project, so per-test `seed.user()` calls are isolation enough for login-flow
 tests, and tests run fully parallel against the shared instance
-(demonstrated by `demo-next-e2e:e2e-real`, 2 workers).
+(demonstrated by `e2e:demo-next-real`, 2 workers).
 
 Typical timings with the SQLite local default (dated estimates from a July 2026 dev build — orders of magnitude, not a benchmark; remeasure locally before relying on them):
 
@@ -297,7 +302,7 @@ Typical timings with the SQLite local default (dated estimates from a July 2026 
 | Stop | typically under a second |
 | Bootstrap (project + schema + flow) | ~100ms |
 | Seed one user (create + password) | ~50ms |
-| Full `e2e-real` suite (boot + Next dev + 2 browser tests) | ~25s |
+| Full `e2e:demo-next-real` suite (boot + Next dev + 2 browser tests) | ~25s |
 
 **Instance-per-worker is not worth it for browser e2e**: the app dev server
 boots once with one project's env, and every extra worker would pay the full
@@ -321,7 +326,7 @@ own suites run `moon run server:build` and point the kit at the result via
 `serverBinaryHint` exists for this). Most in-repo moon tasks set
 `NEXTGEN_SERVER_LOGIN_ENABLED=false` / `NEXTGEN_SERVER_CONSOLE_ENABLED=false`
 because they drive the app-embedded login, not the server-hosted `/ui/*`; the
-exception is `console-e2e:e2e-embedded`, which keeps both surfaces on and
+exception is `e2e:console-embedded`, which keeps both surfaces on and
 omits `app` — the binary-served `/ui/*` pages are its subject. Customer
 installs need none of this.
 
@@ -342,8 +347,8 @@ Zitadel" when the app under test and Playwright share one machine. The layers
 on top, in intended order:
 
 1. **Registration fixtures.** Landed: `zitadel.identity()` plus the
-   demo-next-e2e registration spec driving the real registration UI and
-   verifying the created user through the API. `cli-journey-e2e` keeps the
+   demo-next real-lane registration spec driving the real registration UI and
+   verifying the created user through the API. The CLI journey keeps the
    packaged-product registration coverage.
 2. **Email/OTP capture.** `zitadel.email.waitForCode(address)` for
    verification flows. Blocked on a server-side story (dev SMTP sink or

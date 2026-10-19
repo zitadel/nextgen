@@ -71,7 +71,7 @@ describe("validateLoginTemplate", () => {
   });
 
   it("rejects oversized templates", () => {
-    const filler = `{% mandatory_gates %}` + "a".repeat(MAX_TEMPLATE_BYTES);
+    const filler = `{% mandatory_gates %}${"a".repeat(MAX_TEMPLATE_BYTES)}`;
     expect(rules(filler)).toContain("size");
   });
 });

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
+  article,
   capitalize,
   dryRunResult,
   idArg,
@@ -69,8 +70,21 @@ describe("dryRunResult redaction", () => {
 describe("idArg", () => {
   it("declares a required positional named after the resource", () => {
     const args = idArg({ singular: "user", idField: "id", columns: [] });
-    expect(args.id.required).toBe(true);
-    expect(args.id.description).toBe("user id");
+    expect(args!.id!.required).toBe(true);
+    expect(args!.id!.description).toBe("user id");
+  });
+});
+
+describe("article", () => {
+  it.each([
+    ["identity provider connection", "an"],
+    ["event", "an"],
+    ["team", "a"],
+    // Spelled with a vowel, said with a "yoo".
+    ["user", "a"],
+    ["unique id", "a"],
+  ])('%s takes "%s"', (phrase, expected) => {
+    expect(article(phrase)).toBe(expected);
   });
 });
 

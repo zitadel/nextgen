@@ -2,12 +2,7 @@ import { createHash } from "node:crypto";
 
 import { escapeControlCharacters } from "../api-client";
 import { stableStringify } from "../json";
-import type {
-  ResourceSyncer,
-  SyncAction,
-  SyncActionWarning,
-  SyncPlanSummary,
-} from "./types.js";
+import type { ResourceSyncer, SyncAction, SyncActionWarning, SyncPlanSummary } from "./types.js";
 
 /**
  * Count the non-`skip` actions in a {@link buildSyncPlan} result. Pure; the
@@ -16,13 +11,35 @@ import type {
  */
 export function summarizePlan(actions: ReadonlyArray<SyncAction>): SyncPlanSummary {
   const active = actions.filter((a) => a.kind !== "skip");
+  const moved = (a: SyncAction) => a.kind === "create" && a.movedFrom !== undefined;
   return {
-    creates: active.filter((a) => a.kind === "create").length,
+    creates: active.filter((a) => a.kind === "create" && !moved(a)).length,
     updates: active.filter((a) => a.kind === "update").length,
     revisions: active.filter((a) => a.kind === "revise").length,
     deletes: active.filter((a) => a.kind === "delete").length,
+    moves: active.filter(moved).length,
+    unsupported_deletions: actions.filter(isUnsupportedDeletion).length,
     total: active.length,
   };
+}
+
+/** A removed file whose resource the platform cannot delete yet; planned as a skip. */
+export type UnsupportedDeletion = Extract<
+  SyncAction,
+  { kind: "skip"; reason: "unsupported-deletion" }
+>;
+
+/** Whether an action is a removed file that will be kept on the platform. */
+export function isUnsupportedDeletion(action: SyncAction): action is UnsupportedDeletion {
+  return action.kind === "skip" && action.reason === "unsupported-deletion";
+}
+
+/** What to tell the developer about one removed file, in a plan and in an apply. */
+export function unsupportedDeletionNote(action: UnsupportedDeletion): string {
+  return (
+    `${action.path} was removed, but deleting ${action.syncer.kind} resources is not supported yet (#1013), ` +
+    `so nothing was deleted on the platform. Restore the file if you did not mean to remove it.`
+  );
 }
 
 /**
@@ -37,6 +54,13 @@ export function collectPlanWarnings(
   for (const action of actions) {
     for (const warning of warningsOf(action)) {
       out.push({ path: action.path, rule: warning.rule, message: warning.message });
+    }
+    if (isUnsupportedDeletion(action)) {
+      out.push({
+        path: action.path,
+        rule: "unsupported-deletion",
+        message: unsupportedDeletionNote(action),
+      });
     }
   }
   return out;
@@ -62,10 +86,12 @@ function warningsOf(action: SyncAction): ReadonlyArray<SyncActionWarning> {
  */
 export type PlanResourceChange = {
   kind: ResourceSyncer["kind"];
-  action: "create" | "update" | "revision" | "delete";
+  action: "create" | "update" | "revision" | "delete" | "move";
   file: string;
   id?: string;
   previous_id?: string;
+  /** For a move: the removed file the resource used to be in. */
+  moved_from?: string;
 };
 
 /**
@@ -73,14 +99,21 @@ export type PlanResourceChange = {
  * envelope-ready {@link PlanResourceChange} rows. Pure; the structural
  * counterpart of {@link summarizePlan} — counts and rows always agree.
  */
-export function enumeratePlanResources(
-  actions: ReadonlyArray<SyncAction>,
-): PlanResourceChange[] {
+export function enumeratePlanResources(actions: ReadonlyArray<SyncAction>): PlanResourceChange[] {
   const out: PlanResourceChange[] = [];
   for (const action of actions) {
     switch (action.kind) {
       case "create":
-        out.push({ kind: action.syncer.kind, action: "create", file: action.path });
+        out.push(
+          action.movedFrom === undefined
+            ? { kind: action.syncer.kind, action: "create", file: action.path }
+            : {
+                kind: action.syncer.kind,
+                action: "move",
+                file: action.path,
+                moved_from: action.movedFrom,
+              },
+        );
         break;
       case "update":
         out.push({ kind: action.syncer.kind, action: "update", file: action.path, id: action.id });
@@ -115,12 +148,17 @@ export function enumeratePlanResources(
 export function renderPlan(actions: ReadonlyArray<SyncAction>, tty: boolean): string {
   const active = actions.filter((a) => a.kind !== "skip");
 
+  const unsupported = actions.filter(isUnsupportedDeletion);
+  const unsupportedNote = unsupported.map((a) =>
+    paint(`# ${unsupportedDeletionNote(a)}`, A.yellow, tty),
+  );
+
   if (active.length === 0) {
-    return paint(
-      "No changes. Your Zitadel configuration matches the current state.",
-      A.bold,
-      tty,
-    );
+    const headline =
+      unsupported.length === 0
+        ? "No changes. Your Zitadel configuration matches the current state."
+        : `Nothing to apply, but ${unsupported.length} removed file${unsupported.length === 1 ? "" : "s"} cannot be deleted from the platform yet.`;
+    return [paint(headline, A.bold, tty), ...unsupportedNote].join("\n");
   }
 
   const out: string[] = [];
@@ -133,7 +171,7 @@ export function renderPlan(actions: ReadonlyArray<SyncAction>, tty: boolean): st
 
   out.push("");
 
-  const { creates, updates, revisions, deletes } = summarizePlan(actions);
+  const { creates, updates, revisions, deletes, moves } = summarizePlan(actions);
 
   const parts: string[] = [];
   if (creates > 0) {
@@ -144,6 +182,9 @@ export function renderPlan(actions: ReadonlyArray<SyncAction>, tty: boolean): st
   }
   if (revisions > 0) {
     parts.push(`${revisions} new revision${revisions === 1 ? "" : "s"}`);
+  }
+  if (moves > 0) {
+    parts.push(`${moves} moved`);
   }
   if (deletes > 0) {
     parts.push(`${deletes} to destroy`);
@@ -162,6 +203,7 @@ export function renderPlan(actions: ReadonlyArray<SyncAction>, tty: boolean): st
     );
   }
 
+  out.push(...unsupportedNote);
   return out.join("\n");
 }
 
@@ -529,8 +571,8 @@ function renderDiff(
 
   for (const key of allKeys) {
     const pk = fieldLabel(key).padEnd(maxLen);
-    const hasOld = Object.prototype.hasOwnProperty.call(oldObj, key);
-    const hasNew = Object.prototype.hasOwnProperty.call(newObj, key);
+    const hasOld = Object.hasOwn(oldObj, key);
+    const hasNew = Object.hasOwn(newObj, key);
     const oldVal = oldObj[key];
     const newVal = newObj[key];
 
@@ -686,7 +728,35 @@ function renderBlock(action: SyncAction, tty: boolean): string[] {
 
   switch (action.kind) {
     case "create": {
-      const header = `${blkPad}# ${action.path} will be created`;
+      if (action.movedFrom !== undefined && action.oldContent !== undefined) {
+        // The platform already holds the resource, so show what changes in it
+        // the way an update does, under a header that says where it came from.
+        const [, ...diff] = renderBlock(
+          {
+            kind: "update",
+            path: action.path,
+            syncer: action.syncer,
+            id: "",
+            content: action.content,
+            hash: action.hash,
+            oldContent: action.oldContent,
+            ...(action.warnings ? { warnings: action.warnings } : {}),
+          },
+          tty,
+        );
+        return [
+          paint(
+            `${blkPad}# ${action.path} will take over the ${action.syncer.kind} that was in ${action.movedFrom}`,
+            A.bold,
+            tty,
+          ),
+          ...diff,
+        ];
+      }
+      const header =
+        action.movedFrom === undefined
+          ? `${blkPad}# ${action.path} will be created`
+          : `${blkPad}# ${action.path} will take over the ${action.syncer.kind} that was in ${action.movedFrom}`;
       const opening = `${blkPad}+ resource "${action.syncer.kind}" "${resourceName(action.path)}" {`;
       lines.push(paint(header, A.bold, tty));
       lines.push(paint(opening, A.green, tty));

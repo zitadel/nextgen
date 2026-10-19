@@ -161,6 +161,12 @@ export interface ZitadelLoginConfig {
    * @default false
    */
   readonly suppressHeader?: boolean;
+  /**
+   * Hide the show/hide button on password fields. The button is shown by
+   * default, as NIST SP 800-63B recommends.
+   * @default false
+   */
+  readonly suppressPasswordToggle?: boolean;
   /** Flow purpose. @default "login" */
   readonly purpose?: CreateFlowBodyPurpose;
   /**
@@ -170,6 +176,13 @@ export interface ZitadelLoginConfig {
   readonly flowName?: string;
   /** Where to navigate after a completed sign-in. */
   readonly postSignInUrl?: string;
+  /**
+   * An existing flow's id to resume instead of starting a new flow, for
+   * example one kept across a reload. Unset or `null` falls back to the `flow` query
+   * parameter a provider callback brings back; an id that no longer resolves
+   * starts a new flow.
+   */
+  readonly resumeFlowId?: string | null;
   /**
    * Copy overrides merged over the builtin locale dictionaries, keyed by
    * primary language subtag. Each dictionary may be partial — the widget

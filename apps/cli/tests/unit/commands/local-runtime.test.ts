@@ -3,7 +3,11 @@ import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
+
+import { cancel, confirm, isCancel } from "@clack/prompts";
 
 import {
   CONTAINER_DATA_DIR,
@@ -15,7 +19,9 @@ import {
   writeRuntimeMetadata,
   type RuntimeMetadata,
 } from "../../../src/lib/local-server/runtime";
+import Reset from "../../../src/commands/reset";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
+import { asTerminal } from "../../helpers/terminal";
 
 const tempDirs: string[] = [];
 const servers: Server[] = [];
@@ -41,10 +47,12 @@ afterEach(async () => {
     }
   }
   for (const pid of binaryPids.splice(0)) {
-    try {
-      process.kill(pid, "SIGKILL");
-    } catch {
-      // Already stopped by the command under test.
+    for (const target of [-pid, pid]) {
+      try {
+        process.kill(target, "SIGKILL");
+      } catch {
+        // Already stopped by the command under test.
+      }
     }
   }
   for (const server of servers.splice(0)) {
@@ -420,7 +428,11 @@ describe("local runtime commands", () => {
     const serverUrl = await startHealthServer();
     const port = Number(new URL(serverUrl).port);
     const recorded = { injected: ["NEXTGEN_GOOGLE_SECRET"] };
-    await writeRuntimeMetadata(cwd, { ...runtimeFor(cwd, serverUrl), image, env: recorded });
+    await writeRuntimeMetadata(cwd, {
+      ...runtimeFor(cwd, serverUrl),
+      image,
+      env: recorded,
+    } as Parameters<typeof writeRuntimeMetadata>[1]);
 
     const result = await runCliForTest(
       ["start", "--cwd", cwd, "--json", "--runtime", "docker", "--port", String(port)],
@@ -437,6 +449,43 @@ describe("local runtime commands", () => {
     expect((await readRuntimeMetadata(cwd))?.env).toEqual(recorded);
     const dockerCalls = await readDockerCalls(fake.logPath);
     expect(dockerCalls.some((args) => args[0] === "run")).toBe(false);
+  });
+
+  it("start restarts a server another CLI release started instead of reusing it", async () => {
+    // After an upgrade the folder may still run the previous release's server.
+    // Its API is that release's, and setup against it fails halfway.
+    const cwd = await tempProject("zitadel-start-binary-release-");
+    const fake = await fakeServerBinary();
+    const port = await freePort();
+
+    const older = await runCliForTest(["start", "--cwd", cwd, "--json", "--port", String(port)], {
+      ZITADEL_SERVER_BINARY: fake.binPath,
+      ZITADEL_SERVER_BINARY_VERSION: "1.0.0-alpha.1",
+    });
+    expect(older.exitCode).toBe(0);
+    const olderPid = (parseJson(older.stdout) as { data: { runtime: { pid: number } } }).data
+      .runtime.pid;
+    binaryPids.push(olderPid);
+
+    const newer = await runCliForTest(["start", "--cwd", cwd, "--port", String(port)], {
+      ZITADEL_SERVER_BINARY: fake.binPath,
+      ZITADEL_SERVER_BINARY_VERSION: "1.0.0-alpha.2",
+    });
+
+    expect(newer.exitCode).toBe(0);
+    expect(newer.stdout).toContain(
+      "Restarting the local Zitadel server on 1.0.0-alpha.2: it ran 1.0.0-alpha.1.",
+    );
+    expect(newer.stdout).not.toContain("already running");
+    const runtime = await readRuntimeMetadata(cwd);
+    expect(runtime).toMatchObject({ backend: "binary", server_version: "1.0.0-alpha.2" });
+    const newerPid = runtime?.backend === "binary" ? runtime.pid : 0;
+    binaryPids.push(newerPid);
+    expect(newerPid).not.toBe(olderPid);
+    expect(() => process.kill(olderPid, 0)).toThrow();
+
+    const stop = await runCliForTest(["stop", "--cwd", cwd, "--json"]);
+    expect(stop.exitCode).toBe(0);
   });
 
   it("start --json defaults to the npm binary runtime and writes metadata", async () => {
@@ -527,8 +576,8 @@ describe("local runtime commands", () => {
   });
 
   // The platform project and the local admin travel together: a harness that
-  // wants a bare single-project instance opts out of both (apps/console-e2e's
-  // real and embedded lanes do). The project's env files reach the server over
+  // wants a bare single-project instance opts out of both (the e2e project's
+  // console real and embedded lanes do). The project's env files reach the server over
   // the shell and the user file forces the bootstrap on, so an opt-out in
   // `.env.local` must be read by the CLI too. And the server refuses to
   // bootstrap the platform project while pinned to another one, so a pin means
@@ -606,7 +655,9 @@ describe("local runtime commands", () => {
     };
     expect(envelope.status).toBe("ok");
     expect(envelope.data.urls.api).toBe(serverUrl);
-    expect(envelope.data.next_actions.join("\n")).toContain("From your app directory");
+    expect(envelope.data.next_actions.join("\n")).toContain(
+      "Run setup in this directory or one inside it",
+    );
     expect(envelope.data.next_actions.join("\n")).toContain("Setup installs dependencies");
     // As in the binary case: no platform project on the fake server, so no
     // link and no `console` suggestion.
@@ -870,6 +921,53 @@ describe("local runtime commands", () => {
     await expect(readRuntimeMetadata(cwd)).resolves.toBeUndefined();
   });
 
+  describe("reset asked on a terminal", () => {
+    // The built CLI bundles its own prompts, so a prompt can only be answered
+    // by running the command from source, where `input` is the one module asked.
+    const resetting = async (answer: unknown, cancelled: boolean) => {
+      const cwd = await tempProject("zitadel-reset-asked-");
+      const paths = localRuntimePaths(cwd);
+      await mkdir(paths.dataDir, { recursive: true });
+      await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:8080"));
+      vi.mocked(isCancel).mockReturnValue(cancelled);
+      vi.mocked(confirm).mockResolvedValueOnce(answer as never);
+      const outcome = await asTerminal(() => Reset.run(["--cwd", cwd])).then(
+        (envelope) => ({ envelope: JSON.parse(JSON.stringify(envelope)) as unknown }),
+        (error: unknown) => ({ error }),
+      );
+      return {
+        outcome,
+        kept: await stat(paths.dataDir).then(
+          () => true,
+          () => false,
+        ),
+      };
+    };
+
+    afterEach(() => {
+      vi.mocked(confirm).mockReset();
+      vi.mocked(isCancel).mockReset();
+      vi.mocked(isCancel).mockReturnValue(false);
+    });
+
+    it("is skipped, deleting nothing, when the answer is no", async () => {
+      const { outcome, kept } = await resetting(false, false);
+
+      expect(outcome).toMatchObject({
+        envelope: { status: "skipped", reason: "reset-cancelled" },
+      });
+      expect(kept).toBe(true);
+    });
+
+    it("fails, deleting nothing, on Ctrl-C", async () => {
+      const { outcome, kept } = await resetting(Symbol("cancel"), true);
+
+      expect(outcome).toHaveProperty("error");
+      expect(cancel).toHaveBeenCalledWith("Cancelled.");
+      expect(kept).toBe(true);
+    });
+  });
+
   it("reset without --force suggests the published force command in non-interactive mode", async () => {
     const cwd = await tempProject("zitadel-reset-needs-force-");
     const fake = await fakeDocker();
@@ -916,6 +1014,9 @@ const childProcess = require("node:child_process");
 const fs = require("node:fs");
 const args = process.argv.slice(2);
 fs.appendFileSync(process.env.DOCKER_LOG, JSON.stringify(args) + "\\n");
+const stateDir = ${JSON.stringify(join(binDir, "containers"))};
+fs.mkdirSync(stateDir, { recursive: true });
+const stateFile = (name) => stateDir + "/" + name;
 function startHealthServer() {
   const publishIndex = args.indexOf("--publish");
   const publish = publishIndex >= 0 ? args[publishIndex + 1] : "";
@@ -961,6 +1062,11 @@ if (args[0] === "manifest" && args[1] === "inspect") {
   process.exit(${options.imageAvailable === false ? "1" : "0"});
 }
 if (args[0] === "inspect") {
+  const inspected = args[args.length - 1];
+  if (fs.existsSync(stateFile(inspected))) {
+    console.log("container-test-id true " + fs.readFileSync(stateFile(inspected), "utf8"));
+    process.exit(0);
+  }
   if (${options.existingContainerImage ? "true" : "false"}) {
     console.log("container-test-id true ${options.existingContainerImage ?? ""}");
     process.exit(0);
@@ -968,11 +1074,16 @@ if (args[0] === "inspect") {
   process.exit(1);
 }
 if (args[0] === "run") {
+  const nameIndex = args.indexOf("--name");
+  const migrateIndex = args.indexOf("--migrate");
+  const image = migrateIndex >= 0 ? args[migrateIndex - 1] : args[args.length - 1];
+  if (nameIndex >= 0) fs.writeFileSync(stateFile(args[nameIndex + 1]), image);
   startHealthServer();
   console.log("container-test-id");
   process.exit(0);
 }
 if (args[0] === "stop" || args[0] === "rm") {
+  fs.rmSync(stateFile(args[args.length - 1]), { force: true });
   process.exit(0);
 }
 if (args[0] === "logs") {
@@ -1157,10 +1268,6 @@ function runtimeFor(cwd: string, serverUrl: string): RuntimeMetadata {
     created_at: "2026-06-09T00:00:00.000Z",
     cli_version: "0.0.0-test",
   };
-}
-
-function runtimePidOf(stdout: string): number {
-  return (parseJson(stdout) as { data: { runtime: { pid: number } } }).data.runtime.pid;
 }
 
 async function expectedDefaultImage(): Promise<string> {

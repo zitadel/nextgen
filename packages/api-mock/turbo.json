@@ -1,0 +1,21 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "typecheck": {
+      "dependsOn": ["@zitadel/config#build"]
+    },
+    "build": {
+      "dependsOn": ["@zitadel/config#build"]
+    },
+    // The node `unit` and real-Chromium `browser` projects in one Vitest run.
+    // The script retries a failed suite (#1490).
+    "test": {
+      "dependsOn": ["install-browsers", "@zitadel/config#build"]
+    },
+    // bin/start.ts runs the source and imports api's generated client and config.
+    "start": {
+      "dependsOn": ["@zitadel/config#build"]
+    }
+  }
+}

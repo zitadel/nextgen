@@ -2,21 +2,25 @@ post:
   operationId: createRelease
   summary: Create a release
   description: |
-    Bundles a release from revisions that already exist, supplied as
-    `(kind, revision_id)` pairs. No new revisions are allocated — use the
-    per-kind create endpoints for that, then pin the ids here.
+    Assembles a release from existing revisions, given as
+    `(kind, revision_id)` pairs. To build one from files on disk, use
+    `POST /releases/build`.
 
-    Every referenced `revision_id` must exist in the project. Each one's handle
-    is read from the revision itself and recorded on the release, so a resource
-    is always pinned under the identity it declares.
+    Each revision must exist in the project and is recorded under the handle
+    it declares. The release must be complete and consistent:
 
-    Creating a release does not deploy it. A release is environment-agnostic
-    and the same release can later be deployed to any number of environments
-    unchanged.
+    - Every handle its revisions name must be in the release: a flow's
+      `user_schema`, and the IDP connections named by a flow step's
+      `sso_providers` or a schema's `x-auth-methods.sso.providers`. A missing
+      one answers `rel.unresolved_reference`, naming the resource and the
+      handle, e.g. `flow_definition default-login: user_schema human-user not found`.
+    - Every flow is validated as on save, against the user schema revision
+      in the release. A flow that fails answers `rel.invalid`, with the
+      reason in `details`.
 
-    Idempotent on the pinned set: metadata is excluded from the comparison, so
-    re-submitting the same revisions with a different `message` returns the
-    release that already pins them rather than creating a second one.
+    Idempotent on the set of revisions: the same revisions with a different
+    `message` answer `200` with the existing release. A new release answers
+    `201`. Creating a release does not deploy it.
   tags:
     - Releases
   parameters:
@@ -36,7 +40,8 @@ post:
             description: |
               A project has several user schemas and several flow definitions,
               so `schema` and `flow_definition` each appear more than once.
-              Branding appears once because a project has one.
+              Branding appears once because a project has one, and each IDP
+              connection is pinned by its own revision.
             value:
               pointers:
                 - kind: schema
@@ -49,18 +54,11 @@ post:
                   revision_id: flowdef_01KWHG3B72K7M7F0N9WD3P2E4
                 - kind: branding
                   revision_id: brnd_01KWH1P4MYS7F0N9WD3P2E4YM5
+                - kind: idp
+                  revision_id: idprev_01KWHF2XY6RN7F0N9WD3P2E4YM
               message: add phone_number to human-user
               git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
               git_dirty: false
-          singleSchema:
-            summary: The smallest valid release
-            description: |
-              One pointer, no metadata. A release must pin at least one
-              revision; everything else is optional.
-            value:
-              pointers:
-                - kind: schema
-                  revision_id: sch_01KWHF18816ZQE7F0N9WD3P2E4
   responses:
     '200':
       description: |
@@ -80,6 +78,7 @@ post:
               value:
                 id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
                 project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                content_hash: sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f
                 metadata:
                   message: add phone_number to human-user
                   git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
@@ -87,19 +86,14 @@ post:
                   created_at: '2026-07-14T09:11:00Z'
                   created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
                   created_by_type: human
+                revoked_at: null
                 pointers:
                   - kind: schema
                     handle: human-user
-                    revision_id: https://example.com/schemas/default-human-user.json
-                  - kind: schema
-                    handle: machine-user
-                    revision_id: sch_01KWHF2XY6RN7F0N9WD3P2E4YM
+                    revision_id: sch_01KWHF18816ZQE7F0N9WD3P2E4
                   - kind: flow_definition
                     handle: default-login
                     revision_id: flowdef_01KWHG09JXA7F0N9WD3P2E4YM5
-                  - kind: flow_definition
-                    handle: b2b-login
-                    revision_id: flowdef_01KWHG3B72K7M7F0N9WD3P2E4
                   - kind: branding
                     handle: default
                     revision_id: brnd_01KWH1P4MYS7F0N9WD3P2E4YM5
@@ -110,22 +104,26 @@ post:
           schema:
             $ref: release.yaml
           examples:
-            created:
-              summary: A newly assembled release
+            pinnedByCI:
+              summary: Pinned from a pipeline, with a dirty tree
               description: |
-                Each pointer carries the handle the server read from the
-                revision it pins — `objectType` for a schema, `name` for a flow
-                definition, and `default` for branding.
+                A project secret names no user, so `created_by` is null while
+                `created_by_type` still reports `service` — the release was
+                assembled by a machine. `git_dirty` records that the working
+                tree had uncommitted changes, so the content does not
+                correspond exactly to `git_sha`.
               value:
-                id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+                id: rel_01KX4A2B9C7F0N9WD3P2E4YM5D2
                 project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                content_hash: sha256:4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293
                 metadata:
-                  message: add phone_number to human-user
-                  git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
-                  git_dirty: false
-                  created_at: '2026-07-14T09:11:00Z'
-                  created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
-                  created_by_type: human
+                  message: deploy from CI
+                  git_sha: 8d4e1a0f2b3c4d5e6f708192a3b4c5d6e7f80912
+                  git_dirty: true
+                  created_at: '2026-07-15T11:02:00Z'
+                  created_by: null
+                  created_by_type: service
+                revoked_at: null
                 pointers:
                   - kind: schema
                     handle: human-user
@@ -141,50 +139,31 @@ post:
                     revision_id: flowdef_01KWHG3B72K7M7F0N9WD3P2E4
                   - kind: branding
                     handle: default
-                    revision_id: brnd_01KWH1P4MYS7F0N9WD3P2E4YM5
-            createdByCI:
-              summary: Assembled from a pipeline, with a dirty tree
-              description: |
-                A project secret names no user, so `created_by` is null while
-                `created_by_type` still reports `service` — the release was
-                assembled by a machine. `git_dirty` records that the working
-                tree had uncommitted changes, so the content does not
-                correspond exactly to `git_sha`.
-              value:
-                id: rel_550e8400-e29b-41d4-a716-446655440000
-                project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
-                metadata:
-                  message: deploy from CI
-                  git_sha: 8d4e1a0f2b3c4d5e6f708192a3b4c5d6e7f80912
-                  git_dirty: true
-                  created_at: '2026-07-15T11:02:00Z'
-                  created_by: null
-                  created_by_type: service
-                pointers:
-                  - kind: schema
-                    handle: human-user
-                    revision_id: sch_01KWHF18816ZQE7F0N9WD3P2E4
-                  - kind: flow_definition
-                    handle: default-login
-                    revision_id: flowdef_01KWHG09JXA7F0N9WD3P2E4YM5
-                  - kind: branding
-                    handle: default
                     revision_id: brnd_01KWH8Q5NZT7F0N9WD3P2E4YM6
     default:
       $ref: createRelease-error-response.yaml
 
 get:
   operationId: listReleases
+  x-zitadel-cli: releases list
   summary: List releases
   description: |
     Lists the project's releases, newest first.
 
-    Entries carry metadata only — the pinned set is omitted. Read one release
-    with `GET /releases/{release_id}` to get its pointers.
+    Entries carry the digest, the metadata and `revoked_at` — the pinned set
+    is omitted.
+    Read one release with `GET /releases/{release_id}` to get its pointers.
+
+    `content_hash` looks a release up by its content, as the CLI does when a
+    person types the digest a transcript printed. The project holds at most
+    one release per digest, so the filtered list has one entry or none, and
+    an unknown digest is an empty list rather than an error. Paths take the
+    `rel_` id only; the matched entry's `id` is what to use there.
   tags:
     - Releases
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
+    - $ref: ../../components/parameters/release-content-hash-filter.yaml
     - $ref: ../../components/parameters/limit.yaml
     - $ref: ../../components/parameters/page-token.yaml
   security:
@@ -204,6 +183,7 @@ get:
                 releases:
                   - id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
                     project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                    content_hash: sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f
                     metadata:
                       message: add phone_number to human-user
                       git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
@@ -211,8 +191,10 @@ get:
                       created_at: '2026-07-14T09:11:00Z'
                       created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
                       created_by_type: human
+                    revoked_at: null
                   - id: rel_01KX2ZJ4B8C7F0N9WD3P2E4YM5
                     project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                    content_hash: sha256:0f1e2d3c4b5a69788796a5b4c3d2e1f0091827364554637281909a8b7c6d5e4f
                     metadata:
                       message: initial import
                       git_sha: 0f1e2d3c4b5a69788796a5b4c3d2e1f009182736
@@ -220,6 +202,7 @@ get:
                       created_at: '2026-07-13T08:00:00Z'
                       created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
                       created_by_type: human
+                    revoked_at: '2026-07-14T10:30:00Z'
                 next_page_token: v1.dGhpcyBpcyBvcGFxdWU.SflKxwRJSMeKKF2QT4fw
             lastPage:
               summary: The final page
@@ -230,6 +213,7 @@ get:
                 releases:
                   - id: rel_01KX2ZJ4B8C7F0N9WD3P2E4YM5
                     project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                    content_hash: sha256:0f1e2d3c4b5a69788796a5b4c3d2e1f0091827364554637281909a8b7c6d5e4f
                     metadata:
                       message: initial import
                       git_sha: null
@@ -237,5 +221,29 @@ get:
                       created_at: '2026-07-13T08:00:00Z'
                       created_by: null
                       created_by_type: null
+                    revoked_at: null
+            byContentHash:
+              summary: Looked up by digest
+              description: |
+                The `content_hash` filter matched one release. The same filter
+                with a digest no release of the project carries answers
+                `releases: []`.
+              value:
+                releases:
+                  - id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+                    project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                    content_hash: sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f
+                    metadata:
+                      message: add phone_number to human-user
+                      git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
+                      git_dirty: false
+                      created_at: '2026-07-14T09:11:00Z'
+                      created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                      created_by_type: human
+                    revoked_at: null
+            unknownDigest:
+              summary: A digest no release carries
+              value:
+                releases: []
     default:
       $ref: listReleases-error-response.yaml

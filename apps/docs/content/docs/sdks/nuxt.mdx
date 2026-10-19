@@ -11,7 +11,7 @@ import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 The Nuxt SDK registers server middleware and plugins so Nuxt pages can read Zitadel auth state.
 
 <Callout title="Generated setup" type="info">
-  The CLI edits the first matching `nuxt.config.{ts,mts,js,mjs}` and keeps the backend URL server-side while exposing only the project id publicly.
+  The CLI edits the first matching `nuxt.config.{ts,mts,js,mjs}` and writes the backend URL and the project id to `.env.local`. The module keeps the URL on the server and gives the browser only the project id and the proxy path.
 </Callout>
 
 ## Install
@@ -19,17 +19,17 @@ The Nuxt SDK registers server middleware and plugins so Nuxt pages can read Zita
 <Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
   <Tab>
     ```sh
-    pnpm add @zitadel/sdk-nuxt
+    pnpm add @zitadel/sdk-nuxt@alpha
     ```
   </Tab>
   <Tab>
     ```sh
-    npm install @zitadel/sdk-nuxt
+    npm install @zitadel/sdk-nuxt@alpha
     ```
   </Tab>
   <Tab>
     ```sh
-    yarn add @zitadel/sdk-nuxt
+    yarn add @zitadel/sdk-nuxt@alpha
     ```
   </Tab>
 </Tabs>
@@ -38,41 +38,44 @@ The Nuxt SDK registers server middleware and plugins so Nuxt pages can read Zita
 
 <Tabs items={["CLI generated", "Manual"]}>
   <Tab>
-    The CLI adds pages, plugins, module config, environment files, and the SDK package.
+    The CLI adds pages, module config, environment files, and the SDK package, and nothing else: the SDK loads the web components and exposes the auth state itself. On the Nuxt 4 layout, pages go under `app/`.
 
     <Files>
-      <File name="pages/login.vue" />
-      <File name="pages/register.vue" />
-      <File name="pages/profile.vue" />
-      <File name="plugins/zitadel-components.client.ts" />
-      <File name="plugins/auth.server.ts" />
+      <File name="app/pages/login.vue" />
+      <File name="app/pages/register.vue" />
+      <File name="app/pages/profile.vue" />
       <File name="nuxt.config.ts" />
+      <File name=".env.local" />
+      <File name=".env.example" />
+      <File name="package.json" />
     </Files>
+
+    Every setup also writes `zitadel.json` and the `.zitadel/` folder, adds its entries to `.gitignore`, and adds managed sections to `AGENTS.md` and `README.md`. When setup created the app itself, it also writes `app/app.vue` and an `app/pages/index.vue` that redirects to `/login`.
   </Tab>
   <Tab>
-    Create server middleware and runtime config:
-
-    ```ts
-    import { createNextgenMiddleware } from "@zitadel/sdk-nuxt/server";
-
-    const { nextgen } = useRuntimeConfig();
-
-    export default createNextgenMiddleware({
-      url: nextgen.url,
-      protectedRoutes: ["/profile"],
-      loginPath: "/login",
-    });
-    ```
+    Register the SDK's Nuxt module and configure it under `nextgen`. The module adds the server middleware, the plugin that exposes auth state, and the client plugin that loads the web components.
 
     ```ts
     export default defineNuxtConfig({
-      runtimeConfig: {
-        nextgen: {
-          url: process.env.ZITADEL_URL ?? "http://localhost:4000",
+      modules: ["@zitadel/sdk-nuxt/module"],
+      nextgen: {
+        loginPath: "/login",
+        protectedRoutes: ["/profile"],
+      },
+      build: {
+        transpile: ["@zitadel/api", "@zitadel/components", "@zitadel/design-tokens"],
+      },
+      vue: {
+        compilerOptions: {
+          isCustomElement: (tag) => tag.startsWith("zitadel-"),
         },
       },
     });
     ```
+
+    The module reads `ZITADEL_URL`, `NUXT_PUBLIC_ZITADEL_PROJECT_ID`, and `ZITADEL_PROJECT_SECRET` from the environment, or from `.env.local` when the environment has none, so the `.env.local` that setup writes works even though Nuxt itself loads only `.env`. A `nextgen.url` or `runtimeConfig.public.zitadelProjectId` in the config wins over the variables. The module reads them when `nuxt dev` or `nuxt build` runs. For a built server, set `NUXT_NEXTGEN_URL`, `NUXT_PUBLIC_ZITADEL_PROJECT_ID`, and `NUXT_NEXTGEN_PROJECT_SECRET` in its runtime environment instead, and build without the secret, in the environment and in files: the module reads `.env.local`, Nuxt reads `.env`, and whatever the build finds is written into `.output/`.
+
+    The module also loads the web components on the client and provides the business copy overlay as `useNuxtApp().$zitadelBusinessLocales`, so the app does not install or import `@zitadel/components`.
   </Tab>
 </Tabs>
 
@@ -80,19 +83,36 @@ The Nuxt SDK registers server middleware and plugins so Nuxt pages can read Zita
 
 <Steps>
   <Step>Register Nitro middleware for same-origin `/__nextgen/*` proxying.</Step>
-  <Step>Verify the session JWT and attach auth state to the request event.</Step>
-  <Step>Use a server plugin to make auth state available to pages.</Step>
+  <Step>Validate the session token and attach auth state to the request event.</Step>
+  <Step>Copy the auth state into Nuxt state during server rendering, so pages read it with `useAuth()`.</Step>
 </Steps>
+
+## Widget events
+
+The widgets are plain custom elements, so each event is a DOM `CustomEvent` that carries its payload in `detail`. The events and payloads are the same ones every SPA SDK exposes as callbacks.
+
+| Widget event | Fires when | Detail | Widgets |
+| --- | --- | --- | --- |
+| `zitadel-flow-step` | Login shows a step, the first one included. | `{ step }` | Login |
+| `zitadel-flow-input` | The visitor edits a field. | `{ name, value }` | Login |
+| `zitadel-flow-complete` | The flow reaches a terminal step. | `{ behavior, redirect_uri?, handoff_token?, handoff_token_expires_at? }` | Login |
+| `zitadel-flow-redirect` | The widget hands the browser to an identity provider; nobody is signed in yet. | `{ redirect_url, step }` | Login |
+| `zitadel-flow-error` | The flow reports an error. | `{ message }` | Login |
+| `zitadel-signout` | The user signs out. | `{ display, identifier }` | Logout, Session |
+
+```vue
+<zitadel-login :project="project" post-sign-in-url="/admin" @zitadel-flow-complete="track" />
+```
 
 ## Verify
 
-- Start the app with `ZITADEL_URL` and `NUXT_PUBLIC_ZITADEL_PROJECT_ID`.
+- Start the app. Setup already wrote the URL, the project id, and the secret to `.env.local`; for a manual setup, provide them as the Manual tab describes.
 - Visit `/login` and register a user.
 - Confirm `/profile` shows signed-in state.
 - Log out and confirm protected pages redirect to `/login`.
 
 ## See also
 
-- [SDK proxy](/docs/concepts/sdk-proxy) — why `/__nextgen/*` must be same-origin and how the project key is attached.
+- [SDK proxy](/docs/concepts/sdk-proxy) — why `/__nextgen/*` must be same-origin and which call carries the project secret.
 - [`apps/demo-nuxt`](https://github.com/zitadel/nextgen/tree/main/apps/demo-nuxt) — a runnable Nuxt example in this repo.
 - [`@zitadel/sdk-nuxt` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-nuxt) and the [CLI Nuxt patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/nuxt).

@@ -22,9 +22,7 @@ export async function main(args = forwardedArgs()) {
 
 export async function cleanPublicPackageDistArtifacts(root = repoRoot) {
   await Promise.all(
-    PUBLIC_PACKAGE_DIRS.map((dir) =>
-      rm(join(root, dir, "dist"), { recursive: true, force: true }),
-    ),
+    PUBLIC_PACKAGE_DIRS.map((dir) => rm(join(root, dir, "dist"), { recursive: true, force: true })),
   );
 }
 

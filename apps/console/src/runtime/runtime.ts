@@ -67,7 +67,7 @@ export type ConsoleRuntimeResult =
 /**
  * Absolute same-origin path, deliberately not under the console's BASE_URL:
  * the Go server serves it at the root mux (dev: proxied in
- * `vite.config.mts`), independent of where the SPA is mounted.
+ * `vite.config.ts`), independent of where the SPA is mounted.
  */
 export const RUNTIME_URL = "/console/runtime.json";
 

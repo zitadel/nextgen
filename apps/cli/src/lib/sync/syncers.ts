@@ -10,7 +10,7 @@ import { consola } from "consola";
 
 import type { ZitadelClient } from "@zitadel/api/client";
 import { DEFAULT_FLOW_SCHEMA_URI } from "@zitadel/config/defaults";
-import { isVariableReference } from "@zitadel/config/idp";
+import { isVariableReference, missingEndpoints, referencedVariable } from "@zitadel/config/idp";
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
 import {
   brandingConfigSchema,
@@ -30,9 +30,12 @@ import {
 import { FLOWS_DIR, flowEnvRefs } from "../flows";
 import { IDPS_DIR, refuseResolvedSecret } from "../idp";
 import { SCHEMAS_DIR } from "../user-schema";
+import { primaryValues } from "../variables";
 import { ZitadelError } from "../errors";
 import { FatalFetchError } from "./types.js";
 import type { ResourceSyncer } from "./types.js";
+
+export type { ResourceSyncer } from "./types.js";
 
 /** Runtime environment lookup used to resolve `${VAR}` / `*_env` references. */
 type EnvLookup = Record<string, string | undefined>;
@@ -54,7 +57,7 @@ export function makeSyncers(opts: {
    * when inlining templates for hashing and upload.
    */
   cwd: string;
-}): ReadonlyArray<ResourceSyncer> {
+}): readonly [SchemaSyncer, IdpConnectionSyncer, FlowDefinitionSyncer, BrandingSyncer] {
   return [
     new SchemaSyncer(opts.client, opts.projectId, opts.env),
     // Before flows: a flow step naming a connection slug is only valid once
@@ -105,6 +108,30 @@ function assertEnvRefs(data: object, env: EnvLookup): void {
   }
 }
 
+type ConnectionBody = {
+  slug?: string;
+  protocol?: string;
+  subject_claim?: string;
+  oidc?: {
+    issuer?: string;
+    client_id?: string;
+    client_secret?: string;
+  };
+};
+
+/** The fields that make a connection the one its linked users came through. */
+const IDENTITY_FIELDS = [
+  { name: "slug", read: (body: ConnectionBody) => body.slug },
+  { name: "protocol", read: (body: ConnectionBody) => body.protocol },
+  { name: "oidc.issuer", read: (body: ConnectionBody) => body.oidc?.issuer },
+  {
+    name: "subject_claim",
+    // The engine reads an absent subject claim as `sub`, so a file that
+    // leaves it out and one that says `sub` are the same connection.
+    read: (body: ConnectionBody) => body.subject_claim ?? "sub",
+  },
+] as const;
+
 /**
  * Syncs `.zitadel/idps/*.json`, one identity provider connection per file.
  *
@@ -114,8 +141,8 @@ function assertEnvRefs(data: object, env: EnvLookup): void {
  * be re-pinned.
  *
  * Deletion is not supported yet (#1013): what should happen to users already
- * linked to a connection is undesigned, so a removed file is reported and no
- * deletion is sent.
+ * linked to a connection is undesigned, so a removed file is reported by plan
+ * and apply and no deletion is sent.
  *
  * `fetch` reads the stored connection so an update plans with a field-level
  * diff, as every other resource does. It refuses a body whose `client_secret`
@@ -129,21 +156,44 @@ class IdpConnectionSyncer implements ResourceSyncer {
   readonly directory = IDPS_DIR;
   readonly mutable = true;
   readonly revisioned = false;
+  readonly deletion = "unsupported";
 
-  constructor(
-    private readonly client: ZitadelClient,
-    private readonly projectId: string,
-  ) {}
+  private readonly client: ZitadelClient;
+  private readonly projectId: string;
+  private variables: Promise<ReadonlyMap<string, boolean>> | undefined;
+
+  constructor(client: ZitadelClient, projectId: string) {
+    this.client = client;
+    this.projectId = projectId;
+  }
 
   /**
    * Parse against the generated `CreateIdpBody.idp` Zod, the orval-emitted
    * equivalent of `idp-connection.json`. A literal `client_secret` fails that
    * pattern, so it is caught here and named plainly: it is the one mistake
    * that would publish a credential.
+   *
+   * A valid document is then held to the server's endpoint rule: an `oidc`
+   * block names no endpoint or every one it needs. The server refuses anything
+   * in between, so it is refused here, before an apply could stop part-way.
    */
-  validate(data: object): void {
+  validate(data: object, path = "Connection file"): void {
     const result = idpConnectionConfigSchema.safeParse(data);
     if (result.success) {
+      const missing = missingEndpoints((data as ConnectionBody).oidc);
+      if (missing.length > 0) {
+        throw new ZitadelError(
+          "E_VALIDATION",
+          `${path}: oidc names some endpoints but not ${missing.join(", ")}`,
+          {
+            hint:
+              "Name every endpoint (authorization_endpoint, jwks_uri, token_endpoint, and " +
+              "userinfo_endpoint unless id_token_mapping is true), or none to read them from " +
+              "the issuer's discovery document.",
+            details: { file: path, missing },
+          },
+        );
+      }
       return;
     }
     // Only a stored value that is not a reference is the mistake this names.
@@ -164,7 +214,7 @@ class IdpConnectionSyncer implements ResourceSyncer {
         : "Connection file is not a valid identity provider connection",
       {
         hint: literalSecret
-          ? 'Use "client_secret": "${{ NAME }}" and publish the value with `variables set NAME --secret`.'
+          ? 'Use "client_secret": "${{ NAME }}" and publish the value with `variables set NAME --project-level --secret`.'
           : undefined,
         details: { issues: result.error.issues },
       },
@@ -226,10 +276,151 @@ class IdpConnectionSyncer implements ResourceSyncer {
     return definition;
   }
 
+  /** Never reached: `deletion` is unsupported, so the loop reports a removed file and sends nothing. */
   async delete(_id: string): Promise<void> {
-    throw new ZitadelError("E_NOT_IMPLEMENTED", "Deleting an identity provider connection is not supported yet", {
-      hint: "Restore the file, or remove the connection on the platform once deletion is designed (#1013).",
-    });
+    throw new ZitadelError(
+      "E_NOT_IMPLEMENTED",
+      "Deleting an identity provider connection is not supported yet",
+      { hint: "Restore the file (#1013)." },
+    );
+  }
+
+  identityOf(stored: object): string | undefined {
+    return (stored as ConnectionBody).slug;
+  }
+
+  /**
+   * What the files alone cannot say. An edit may not change what the
+   * connection is: its `slug`, `issuer` or `subject_claim` would re-key the
+   * users already linked to it, so it is refused naming the field. And a
+   * `client_secret` naming a variable the project does not hold would
+   * publish a connection that cannot sign anyone in.
+   */
+  async preflight(
+    path: string,
+    data: object,
+    old: object | null,
+  ): Promise<{ id: string; definition: object } | undefined> {
+    const next = data as ConnectionBody;
+    // A file the platform does not track yet may still name a connection it
+    // holds, such as one moved here from a removed file, so the stored copy is
+    // looked up by slug and judged the same way.
+    const found = old === null ? await this.findBySlug(next.slug) : undefined;
+    const previous = old ?? found?.definition ?? null;
+    if (previous !== null) {
+      const stored = previous as ConnectionBody;
+      const changed = IDENTITY_FIELDS.filter(
+        ({ read }) =>
+          read(stored) !== undefined && read(next) !== undefined && read(stored) !== read(next),
+      );
+      if (changed.length > 0) {
+        throw new ZitadelError(
+          "E_VALIDATION",
+          `${path}: ${changed.map(({ name }) => name).join(", ")} of the connection ${JSON.stringify(stored.slug)} cannot be edited`,
+          {
+            hint:
+              "These fields identify the connection and the users linked through it. " +
+              "Restore the stored value, or add a new connection file with its own slug.",
+            details: {
+              fields: changed.map(({ name, read }) => ({
+                name,
+                stored: read(stored),
+                local: read(next),
+              })),
+            },
+          },
+        );
+      }
+    }
+
+    await this.checkVariables(path, next);
+    return found;
+  }
+
+  /** The stored connection with this slug, which a create would revise. */
+  private async findBySlug(
+    slug: string | undefined,
+  ): Promise<{ id: string; definition: object } | undefined> {
+    if (slug === undefined) {
+      return undefined;
+    }
+    const { idps } = await this.client.queryIdps(
+      { filter: [{ field: "slug", operation: "equals", value: slug }], limit: 1 },
+      { project_id: this.projectId },
+    );
+    const [match] = idps;
+    return match === undefined ? undefined : { id: match.id, definition: match.definition };
+  }
+
+  /**
+   * What the engine needs from the variables a connection names: they exist,
+   * the client id is a plain one it can put in the authorize URL, and the
+   * client secret is a secret one. A variable that cannot be read stops the
+   * run, like a stored copy that cannot be.
+   */
+  private async checkVariables(path: string, next: ConnectionBody): Promise<void> {
+    const block = next.oidc;
+    const named = [
+      { field: "client_id", secret: false, name: referencedVariable(block?.client_id ?? "") },
+      {
+        field: "client_secret",
+        secret: true,
+        name: referencedVariable(block?.client_secret ?? ""),
+      },
+    ].flatMap((credential) =>
+      credential.name === undefined ? [] : [{ ...credential, name: credential.name }],
+    );
+    if (named.length === 0) {
+      return;
+    }
+    this.variables ??= this.client
+      .getVariables({ project_id: this.projectId, kind: "primary" })
+      .then(
+        (held) =>
+          new Map(
+            Object.entries(primaryValues(held)).map(([name, value]) => [
+              name,
+              typeof value === "object",
+            ]),
+          ),
+      );
+    const held = await this.variables;
+    const [id, secret] = named;
+    if (id !== undefined && secret !== undefined && id.name === secret.name) {
+      throw new ZitadelError(
+        "E_VALIDATION",
+        `${path}: client_id and client_secret both name the variable ${id.name}`,
+        {
+          hint: "Give each its own variable: a plain one for the client id, a secret one for the client secret.",
+          details: { variable: id.name, file: path },
+        },
+      );
+    }
+    for (const { field, secret: wantsSecret, name } of named) {
+      const isSecret = held.get(name);
+      if (isSecret === undefined) {
+        throw new ZitadelError(
+          "E_CREDENTIAL_MISSING",
+          `${path}: ${field} names the variable ${name}, which the project does not have`,
+          {
+            hint: `Publish it with \`variables set ${name} --project-level${wantsSecret ? " --secret" : ""}\`, then re-run.`,
+            details: { variable: name, field, file: path },
+          },
+        );
+      }
+      if (isSecret !== wantsSecret) {
+        throw new ZitadelError(
+          "E_VALIDATION",
+          `${path}: ${field} names the variable ${name}, which is ${isSecret ? "a secret" : "not a secret"}`,
+          {
+            hint: wantsSecret
+              ? `The client secret must be a secret variable: publish it with \`variables set ${name} --project-level --secret\`.`
+              : `The client id must be a plain variable the engine can read back: publish it with \`variables set ${name} --project-level\`, without --secret.`,
+            details: { variable: name, field, file: path, secret: isSecret },
+          },
+        );
+      }
+    }
   }
 }
 
@@ -239,16 +430,21 @@ class SchemaSyncer implements ResourceSyncer {
   readonly mutable = false;
   readonly revisioned = true;
   readonly normalize = normalizeSchemaBody;
-  // Deliberately no `normalizeWrite`: the server stores schema bytes
-  // verbatim, so stripping spelled-out x-* defaults from the local file
-  // would drop them from the next published revision. Canonical schema
-  // bodies are written back as-is; `normalize` is comparison-only.
+  // No `normalizeWrite`: write-back writes the schema as the server returns
+  // it. That is the re-encoded body, not the uploaded bytes — the server
+  // decodes a schema into ogen's typed `UserSchema`, which sets
+  // `x-audit: false` on every property that omits it — so a rewritten file
+  // spells those defaults out. `normalize` is comparison-only.
 
-  constructor(
-    private readonly client: ZitadelClient,
-    private readonly projectId: string,
-    private readonly env: EnvLookup,
-  ) {}
+  private readonly client: ZitadelClient;
+  private readonly projectId: string;
+  private readonly env: EnvLookup;
+
+  constructor(client: ZitadelClient, projectId: string, env: EnvLookup) {
+    this.client = client;
+    this.projectId = projectId;
+    this.env = env;
+  }
 
   /**
    * Parse against the generated `CreateSchemaBody` Zod (the orval-emitted
@@ -292,7 +488,10 @@ class SchemaSyncer implements ResourceSyncer {
    * loudly if a caller reaches it.
    */
   async update(_id: string, _data: object): Promise<{ canonical?: object }> {
-    throw new ZitadelError("E_NOT_IMPLEMENTED", "schemas are revisioned — edit publishes a new revision, not an update");
+    throw new ZitadelError(
+      "E_NOT_IMPLEMENTED",
+      "schemas are revisioned — edit publishes a new revision, not an update",
+    );
   }
 
   async delete(id: string): Promise<void> {
@@ -329,11 +528,15 @@ class FlowDefinitionSyncer implements ResourceSyncer {
   // strips (envelope keys, the empty `audience` echo) is transport noise.
   readonly normalizeWrite = normalizeFlowBody;
 
-  constructor(
-    private readonly client: ZitadelClient,
-    private readonly projectId: string,
-    private readonly env: EnvLookup,
-  ) {}
+  private readonly client: ZitadelClient;
+  private readonly projectId: string;
+  private readonly env: EnvLookup;
+
+  constructor(client: ZitadelClient, projectId: string, env: EnvLookup) {
+    this.client = client;
+    this.projectId = projectId;
+    this.env = env;
+  }
 
   /**
    * Validates one flow file against the canonical `flowConfigSchema` (the
@@ -409,12 +612,17 @@ class BrandingSyncer implements ResourceSyncer {
   /** One project, one branding descriptor — extra .json files fail the scan. */
   readonly singletonFile = "branding.json";
 
-  constructor(
-    private readonly client: ZitadelClient,
-    private readonly projectId: string,
-    private readonly env: EnvLookup,
-    private readonly cwd: string,
-  ) {}
+  private readonly client: ZitadelClient;
+  private readonly projectId: string;
+  private readonly env: EnvLookup;
+  private readonly cwd: string;
+
+  constructor(client: ZitadelClient, projectId: string, env: EnvLookup, cwd: string) {
+    this.client = client;
+    this.projectId = projectId;
+    this.env = env;
+    this.cwd = cwd;
+  }
 
   /**
    * The comparison form is the wire body with the template inlined, so an

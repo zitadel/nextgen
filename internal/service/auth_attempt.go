@@ -53,6 +53,28 @@ type AuthAttemptService interface {
 	// errors: domain.ErrAuthAttemptNotFound, domain.ErrAuthAttemptInvalidState, domain.ErrAuthAttemptAlreadyHandedOff, domain.ErrInternal
 	IssueSSOState(ctx context.Context, input IssueSSOStateInput) (*domain.SSOState, error)
 
+	// ConsumeSSOState consumes the single-use SSO state record. It returns
+	// what the submit step stored for the callback: the OIDC nonce, the
+	// encrypted PKCE verifier, the redirect URI and the return target. The
+	// binding cookie value must match the record. Every failure is
+	// ErrSSOStateInvalid.
+	//
+	// errors: domain.ErrSSOStateInvalid, domain.ErrInternal
+	ConsumeSSOState(ctx context.Context, projectID, state, bindingNonce string) (*domain.SSOCallbackCheck, error)
+
+	// SetSSOCallbackResult stores the callback's outcome on the consumed
+	// record, where the next flow render picks it up. It succeeds once per
+	// issued state; a second write, or a write after a re-issue, returns
+	// ErrSSOStateInvalid.
+	//
+	// The write emits eventType, the ceremony's outcome. The caller chooses it
+	// because only the caller knows whether a code arrived: an error key alone
+	// does not say. The bind later emits auth.check.succeeded for the user
+	// factor it adds.
+	//
+	// errors: domain.ErrSSOStateInvalid, domain.ErrInternal
+	SetSSOCallbackResult(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, result *domain.SSOCallbackResult, eventType domain.EventType) error
+
 	// VerifyProof verifies the submitted proof against the challenge identified by ChallengeID.
 	//
 	// On success, it persists the verification and marks the attempt complete if all
@@ -407,7 +429,7 @@ func (s *authAttemptService) IssueSSOState(ctx context.Context, input IssueSSOSt
 	if err := attempt.PrepareChallenge(domain.AuthCheckTypeSSOCallback); err != nil {
 		return nil, err
 	}
-	state, err := domain.NewSSOState(input.ProviderSlug, input.ConnectionRevisionID, input.RedirectURI, input.ReturnTarget, input.PKCEEncrypter)
+	state, err := domain.NewSSOState(input.ProjectID, input.ProviderSlug, input.ConnectionRevisionID, input.RedirectURI, input.ReturnTarget, input.PKCEEncrypter)
 	if err != nil {
 		return nil, err
 	}
@@ -415,6 +437,40 @@ func (s *authAttemptService) IssueSSOState(ctx context.Context, input IssueSSOSt
 		return nil, err
 	}
 	return state, nil
+}
+
+// ConsumeSSOState implements [AuthAttemptService]. The record is stored under
+// the state's hash, so the plain state is hashed here and never compared raw.
+func (s *authAttemptService) ConsumeSSOState(ctx context.Context, projectID, state, bindingNonce string) (*domain.SSOCallbackCheck, error) {
+	return s.stmts.Statements().ConsumeSSOState(ctx, projectID, domain.HashSecret(state), bindingNonce)
+}
+
+// SetSSOCallbackResult implements [AuthAttemptService]. check is the record
+// ConsumeSSOState returned.
+func (s *authAttemptService) SetSSOCallbackResult(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, result *domain.SSOCallbackResult, eventType domain.EventType) error {
+	return s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().SetSSOCallbackResult(ctx, projectID, check.StateHash, result); err != nil {
+			return err
+		}
+		// The session the event carries lives on the attempt.
+		attempt, err := tx.Statements().GetAuthAttemptByID(ctx, projectID, check.AuthAttemptID)
+		if err != nil {
+			return err
+		}
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       eventType,
+			Category:   domain.EventCategoryAuth,
+			ProjectID:  projectID,
+			EntityType: "check",
+			EntityID:   check.ID,
+			SessionID:  attempt.SessionID,
+			Payload: domain.AuthCheckPayload{
+				CheckID:       check.ID,
+				CheckType:     check.Type().String(),
+				AuthAttemptID: check.AuthAttemptID,
+			},
+		})
+	})
 }
 
 // VerifyProof verifies the submitted proof against the challenge identified by ChallengeID.

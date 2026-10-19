@@ -1,11 +1,16 @@
+import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 
-import { expect, onTestFinished } from "vitest";
+import { expect } from "vitest";
 
+import { aFakeServerBinary, trackLocalServerDir, type ServerShape } from "./local-server";
+import { cliPackageRoot } from "./oclif-build";
+import { nextPort } from "./ports";
+import { aBinaryRecord } from "./runtime-record";
 import { parseJson, runCliForTest } from "./run-cli";
 
 const SCHEMA_FILE = ".zitadel/schemas/default-human-user.json";
@@ -31,6 +36,7 @@ export interface Envelope<T = Record<string, unknown>> {
   readonly message?: string;
   readonly hint?: string;
   readonly next_commands?: string[];
+  readonly warnings?: string[];
   readonly cli_version?: string;
   readonly command?: string;
   readonly source?: string;
@@ -100,12 +106,24 @@ export interface UserSchemaDocument {
   "x-auth-methods"?: Record<string, { enabled: boolean; providers?: string[] }>;
 }
 
+/** A connection file as committed, which the developer owns and edits. */
+export interface ConnectionDocument {
+  slug: string;
+  protocol?: string;
+  display_name?: string;
+  subject_claim?: string;
+  oidc: { issuer: string; client_id?: string; client_secret?: string };
+  claim_mapping?: Record<string, string>;
+  verified_claims?: Record<string, string>;
+}
+
 /** The login flow as committed, which the developer owns and edits. */
 export interface FlowDocument {
   purposes: Record<string, string>;
   steps: Array<{
     name: string;
     fields?: string[];
+    actions?: Array<{ name: string; text_key?: string }>;
     transitions?: Record<string, unknown>;
     sso_providers?: string[];
   }>;
@@ -116,35 +134,6 @@ interface PackageJson {
 }
 
 /**
- * A port from this worker's own block, because a bind-then-close probe races
- * the other vitest workers: a reserved port gets taken as an outbound source
- * port before the CLI binds it.
- *
- * The band sits below every platform's ephemeral range — macOS allocates from
- * 49152 and Linux from 32768 — so a reserved port cannot be taken as an
- * outbound source port by another worker's traffic before the CLI binds it.
- * It also stays clear of the repository's other deferred-bind reservations,
- * 22000-23999 for the journey runner and 24000-31999 for embedded Postgres,
- * which hand out ports before their processes bind just as this does, and of
- * the fixed ports the other suites pin above 18000.
- *
- * Indexed by `VITEST_POOL_ID`, the reusable 1-based pool slot.
- * `VITEST_WORKER_ID` is a unique worker identity that keeps climbing as files
- * spawn workers, so indexing by it walks the block past 65535 and hands the
- * CLI a port that cannot exist. The modulo bounds it either way.
- */
-const PORT_FIRST = 16_000;
-const PORT_LAST = 18_000;
-const PORT_BLOCK = 200;
-const PORT_BLOCKS = Math.floor((PORT_LAST - PORT_FIRST) / PORT_BLOCK);
-const POOL_SLOT = Math.max(1, Number(process.env.VITEST_POOL_ID ?? 1));
-const PORT_BASE = PORT_FIRST + ((POOL_SLOT - 1) % PORT_BLOCKS) * PORT_BLOCK;
-let portOffset = 0;
-function nextPort(): number {
-  return PORT_BASE + (portOffset++ % PORT_BLOCK);
-}
-
-/**
  * Files the developer commits and hand-edits.
  *
  * A spec reads one only where the committed content is itself the behaviour —
@@ -152,7 +141,11 @@ function nextPort(): number {
  * literally, because a secret in version control cannot be scrubbed later.
  */
 class CommittedFiles {
-  constructor(private readonly root: string) {}
+  private readonly root: string;
+
+  constructor(root: string) {
+    this.root = root;
+  }
 
   idpConnection(slug: string): Promise<{ oidc: { client_id: string; client_secret: string } }> {
     return this.read(`.zitadel/idps/${slug}.json`) as Promise<{
@@ -183,6 +176,27 @@ class CommittedFiles {
   }
 }
 
+/** What a developer says about a connection the catalog does not list. */
+export type CustomConnection = {
+  slug: string;
+  displayName: string;
+  issuer: string;
+  scopes?: string;
+};
+
+/** The flags describing a connection, under `--` for `auth-method sso enable` or `--sso-` for `setup`. */
+function customFlags(connection: CustomConnection, prefix: string): string[] {
+  return [
+    `${prefix}slug`,
+    connection.slug,
+    `${prefix}display-name`,
+    connection.displayName,
+    `${prefix}issuer`,
+    connection.issuer,
+    ...(connection.scopes === undefined ? [] : [`${prefix}scopes`, connection.scopes]),
+  ];
+}
+
 /**
  * A scaffolded app for the specs to drive the CLI against.
  *
@@ -191,9 +205,11 @@ class CommittedFiles {
  * command surfaces it. Sync state and the mock's own store are never read.
  */
 export class ScaffoldedApp {
+  readonly path: string;
   readonly committed: CommittedFiles;
 
-  constructor(readonly path: string) {
+  constructor(path: string) {
+    this.path = path;
     this.committed = new CommittedFiles(path);
   }
 
@@ -226,10 +242,14 @@ export class ScaffoldedApp {
     );
   }
 
-  /** `sso enable` without `--json`, for a spec asserting what the developer reads. */
+  /**
+   * `auth-method sso enable` without `--json`, for a spec asserting what the
+   * developer reads.
+   */
   enableSsoRendered(provider: string, credentials: Credentials): Promise<CliResult> {
     return this.pipingStdin(credentials.secret, () =>
       this.cli([
+        "auth-method",
         "sso",
         "enable",
         "--non-interactive",
@@ -244,6 +264,7 @@ export class ScaffoldedApp {
   enableSso(provider: string, credentials: Credentials): Promise<CliResult> {
     return this.pipingSecret(credentials.secret, () =>
       this.cli([
+        "auth-method",
         "sso",
         "enable",
         "--non-interactive",
@@ -256,6 +277,100 @@ export class ScaffoldedApp {
     );
   }
 
+  /** `auth-method password|passkey enable`. */
+  enableMethod(method: "password" | "passkey", extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli(["auth-method", method, "enable", "--non-interactive", "--json", ...extraArgs]);
+  }
+
+  /** `auth-method password|passkey disable`. */
+  disableMethod(method: "password" | "passkey", extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli([
+      "auth-method",
+      method,
+      "disable",
+      "--non-interactive",
+      "--json",
+      ...extraArgs,
+    ]);
+  }
+
+  /**
+   * `auth-method password|passkey enable` without `--json`, for what the
+   * developer reads.
+   */
+  enableMethodRendered(method: "password" | "passkey"): Promise<CliResult> {
+    return this.cli(["auth-method", method, "enable", "--non-interactive"]);
+  }
+
+  /**
+   * `auth-method password|passkey disable` without `--json`, for what the
+   * developer reads.
+   */
+  disableMethodRendered(method: "password" | "passkey"): Promise<CliResult> {
+    return this.cli(["auth-method", method, "disable", "--non-interactive"]);
+  }
+
+  /**
+   * `auth-method sso disable` without `--json`, for what the developer reads.
+   */
+  disableSsoRendered(provider: string): Promise<CliResult> {
+    return this.cli(["auth-method", "sso", "disable", "--non-interactive", "--provider", provider]);
+  }
+
+  /** `auth-method sso disable`. */
+  disableSso(provider: string, extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli([
+      "auth-method",
+      "sso",
+      "disable",
+      "--non-interactive",
+      "--json",
+      "--provider",
+      provider,
+      ...extraArgs,
+    ]);
+  }
+
+  /** `auth-method sso enable` for a connection the developer describes, secret piped as a script would. */
+  enableCustomSso(connection: CustomConnection, credentials: Credentials): Promise<CliResult> {
+    return this.enableSsoWith(
+      [
+        "--provider",
+        "custom",
+        ...customFlags(connection, "--"),
+        "--client-id",
+        credentials.clientId,
+      ],
+      credentials.secret,
+    );
+  }
+
+  /** `auth-method sso enable` with exactly these flags, for a spec asserting how it refuses. */
+  enableSsoWith(args: string[], secret = "a-client-secret"): Promise<CliResult> {
+    return this.pipingSecret(secret, () =>
+      this.cli(["auth-method", "sso", "enable", "--non-interactive", "--json", ...args]),
+    );
+  }
+
+  /** `setup` with exactly these flags and this on stdin, for a spec asserting how it refuses. */
+  setupSsoWith(args: string[], secret: string): Promise<CliResult> {
+    return this.pipingSecret(secret, () => this.setup(["--framework", "next", ...args]));
+  }
+
+  /** `setup` with a custom connection described on the command line. */
+  setupWithCustomSso(connection: CustomConnection, credentials: Credentials): Promise<CliResult> {
+    return this.setupSsoWith(
+      [
+        "--sso",
+        "custom",
+        ...customFlags(connection, "--sso-"),
+        "--sso-client-id",
+        credentials.clientId,
+      ],
+      credentials.secret,
+    );
+  }
+
   /** Runs `doctor` against a fake docker on PATH and a port from this worker. */
   async doctor(extraArgs: string[] = []): Promise<CliResult> {
     const docker = await fakeDocker();
@@ -263,6 +378,130 @@ export class ScaffoldedApp {
       PATH: `${docker.binDir}:${process.env.PATH ?? ""}`,
       DOCKER_LOG: docker.logPath,
     });
+  }
+
+  /** An app in a directory inside this one, the way a developer nests one under `start`. */
+  async appInside(name: string): Promise<ScaffoldedApp> {
+    await mkdir(join(this.path, name), { recursive: true });
+    return new ScaffoldedApp(join(this.path, name));
+  }
+
+  /** Runs `doctor` without naming a port, so it checks the one this directory's server uses. */
+  async doctorAtItsServer(): Promise<CliResult> {
+    const docker = await fakeDocker();
+    return this.cli(["doctor", "--json"], {
+      PATH: `${docker.binDir}:${process.env.PATH ?? ""}`,
+      DOCKER_LOG: docker.logPath,
+    });
+  }
+
+  /** The port a `doctor` run reported it checked. */
+  doctoredPortOf(result: CliResult): number {
+    return this.envelopeOf<{ port: number }>(result).data.port;
+  }
+
+  /** The argument lists a failed `doctor` run offered as recovery, for an agent to run as they are. */
+  suggestedArgsOf(result: CliResult): string[][] {
+    const { details } = this.envelopeOf<Record<string, unknown>>(result) as unknown as {
+      details?: { suggested_args?: string[][] };
+    };
+    return details?.suggested_args ?? [];
+  }
+
+  /** Leaves this directory with the record of a local server that is not running. */
+  async writeStoppedServerRecord(): Promise<void> {
+    await mkdir(join(this.path, ".zitadel/local"), { recursive: true });
+    await writeFile(
+      join(this.path, ".zitadel/local/runtime.json"),
+      JSON.stringify(aBinaryRecord({ port: nextPort() })),
+    );
+  }
+
+  /** Leaves this directory with a record of its local server that is JSON but not a record. */
+  async writeMalformedServerRecord(): Promise<void> {
+    await mkdir(join(this.path, ".zitadel/local"), { recursive: true });
+    await writeFile(join(this.path, ".zitadel/local/runtime.json"), JSON.stringify({ x: 1 }));
+  }
+
+  /**
+   * Starts this app's local server from a stand-in for the server binary, on a
+   * port from this worker unless one is named.
+   */
+  async startLocalServer({
+    shape = "plain",
+    port = nextPort(),
+  }: {
+    shape?: ServerShape;
+    port?: number;
+  } = {}): Promise<CliResult> {
+    trackLocalServerDir(this.path);
+    return this.cli(["start", "--port", String(port), "--json"], {
+      ZITADEL_SERVER_BINARY: await aFakeServerBinary(shape),
+    });
+  }
+
+  /** Starts the server again without naming a port, so the one the directory had is used. */
+  async restartLocalServer(): Promise<CliResult> {
+    trackLocalServerDir(this.path);
+    return this.cli(["start", "--json"], {
+      ZITADEL_SERVER_BINARY: await aFakeServerBinary("plain"),
+    });
+  }
+
+  /**
+   * Two starts racing in this app's directory, each its own process: the
+   * in-process runner captures output globally, so two runs at once in it
+   * would garble each other's.
+   */
+  async startLocalServerTwiceAtOnce(): Promise<CliResult[]> {
+    trackLocalServerDir(this.path);
+    const env = { ...process.env, ZITADEL_SERVER_BINARY: await aFakeServerBinary("plain") };
+    const port = String(nextPort());
+    const results = await Promise.all(
+      [0, 1].map(
+        () =>
+          new Promise<CliResult>((resolve) => {
+            execFile(
+              process.execPath,
+              [
+                join(cliPackageRoot, "bin/run.js"),
+                ...["start", "--cwd", this.path, "--server", MOCK_SERVER_URL],
+                ...["--port", port, "--json"],
+              ],
+              { env },
+              (error, stdout, stderr) =>
+                resolve({
+                  exitCode: typeof error?.code === "number" ? error.code : 0,
+                  stdout,
+                  stderr,
+                }),
+            );
+          }),
+      ),
+    );
+    return results;
+  }
+
+  /** The port a start reported its server on. */
+  localPortOf(result: CliResult): number {
+    return this.envelopeOf<{ runtime: { port: number } }>(result).data.runtime.port;
+  }
+
+  /** The process a start reported its server as. */
+  localPidOf(result: CliResult): number {
+    return this.envelopeOf<{ runtime: { pid: number } }>(result).data.runtime.pid;
+  }
+
+  /** Leaves this directory with a record of its local server that cannot be read. */
+  async corruptLocalServerRecord(): Promise<void> {
+    await mkdir(join(this.path, ".zitadel/local"), { recursive: true });
+    await writeFile(join(this.path, ".zitadel/local/runtime.json"), "{not json");
+  }
+
+  /** The lifecycle `status` reports for the local server. */
+  async localServerLifecycle(): Promise<string> {
+    const status = await this.cli(["status", "--json"]);
+    return this.envelopeOf<{ server: { lifecycle: string } }>(status).data.server.lifecycle;
   }
 
   status(extraArgs: string[] = []): Promise<CliResult> {
@@ -316,6 +555,24 @@ export class ScaffoldedApp {
         "set",
         name,
         "--project-level",
+        "--json",
+        ...(secret ? ["--secret"] : []),
+      ]),
+    );
+  }
+
+  /**
+   * Sets a project variable when nothing was piped in: stdin is the keyboard,
+   * which is what a script that forgot the pipe has.
+   */
+  setVariableWithNothingPiped(name: string, { secret = false } = {}): Promise<CliResult> {
+    return this.withKeyboardOnStdin(() =>
+      this.cli([
+        "variables",
+        "set",
+        name,
+        "--project-level",
+        "--non-interactive",
         "--json",
         ...(secret ? ["--secret"] : []),
       ]),
@@ -428,6 +685,15 @@ export class ScaffoldedApp {
     return writeFile(join(this.path, relativePath), contents);
   }
 
+  /** Leaves `version` of `name` in the app's `node_modules`, as its lockfile installed it. */
+  async hasInstalled(name: string, version: string): Promise<void> {
+    await mkdir(join(this.path, "node_modules", name), { recursive: true });
+    await this.writeProjectFile(
+      `node_modules/${name}/package.json`,
+      JSON.stringify({ name, version }),
+    );
+  }
+
   deleteProjectFile(relativePath: string): Promise<void> {
     return rm(join(this.path, relativePath));
   }
@@ -444,6 +710,59 @@ export class ScaffoldedApp {
   /** Edits the committed user schema, as the developer owning it would. */
   editUserSchema(edit: (schema: UserSchemaDocument) => void): Promise<void> {
     return this.editDocument(SCHEMA_FILE, edit);
+  }
+
+  /** Edits the password step of the committed login flow, as the developer owning it would. */
+  editPasswordStep(edit: (step: FlowDocument["steps"][number]) => void): Promise<void> {
+    return this.editLoginFlow((flow) => {
+      const step = flow.steps.find((candidate) => candidate.name === "password");
+      if (step === undefined) {
+        throw new Error("the login flow has no password step");
+      }
+      edit(step);
+    });
+  }
+
+  /** Edits a committed connection file, as the developer owning it would. */
+  editConnection(slug: string, edit: (connection: ConnectionDocument) => void): Promise<void> {
+    return this.editDocument(`.zitadel/idps/${slug}.json`, edit);
+  }
+
+  /** Adds a second connection file that claims the same slug as an existing one. */
+  async copyConnection(slug: string, name: string): Promise<void> {
+    await this.writeProjectFile(
+      `.zitadel/idps/${name}.json`,
+      await this.readProjectFile(`.zitadel/idps/${slug}.json`),
+    );
+  }
+
+  /** The project-relative path of a connection's file, as a command reports it. */
+  connectionFile(slug: string): string {
+    return `.zitadel/idps/${slug}.json`;
+  }
+
+  /** Adds a connection no schema lists, so removing it breaks nothing else. */
+  async addUnlistedConnection(slug: string): Promise<void> {
+    const prefix = slug.toUpperCase().replaceAll("-", "_");
+    await this.copyConnection("google", slug);
+    await this.editConnection(slug, (connection) => {
+      connection.slug = slug;
+      connection.oidc.client_id = `\${{ ${prefix}_CLIENT_ID }}`;
+      connection.oidc.client_secret = `\${{ ${prefix}_CLIENT_SECRET }}`;
+    });
+    await this.setVariable(`${prefix}_CLIENT_ID`, "a-client-id");
+    await this.setVariable(`${prefix}_CLIENT_SECRET`, "a-client-secret", { secret: true });
+  }
+
+  /** Removes a committed connection file, as the developer owning it would. */
+  removeConnection(slug: string): Promise<void> {
+    return this.deleteProjectFile(`.zitadel/idps/${slug}.json`);
+  }
+
+  /** Renames a committed connection file without touching its contents. */
+  async renameConnection(slug: string, name: string): Promise<void> {
+    await this.copyConnection(slug, name);
+    await this.removeConnection(slug);
   }
 
   /** Edits the committed login flow, as the developer owning it would. */
@@ -482,6 +801,7 @@ export class ScaffoldedApp {
         project_id: projectId,
         project_secret: "sk",
         preview_secret: "sk",
+        primary_origins: [],
         preview_origins: [],
         created_at: "2026-01-01T00:00:00.000Z",
       }),
@@ -522,6 +842,19 @@ export class ScaffoldedApp {
     return this.pipingStdin(secret, run);
   }
 
+  /** Runs with a terminal on stdin, so a read would never end and has to be refused. */
+  private async withKeyboardOnStdin<T>(run: () => Promise<T>): Promise<T> {
+    const original = Object.getOwnPropertyDescriptor(process, "stdin");
+    Object.defineProperty(process, "stdin", { value: { isTTY: true }, configurable: true });
+    try {
+      return await run();
+    } finally {
+      if (original) {
+        Object.defineProperty(process, "stdin", original);
+      }
+    }
+  }
+
   /**
    * `runCliForTest` runs in-process, so a scripted run would otherwise read
    * the test runner's own stdin and block on a stream that never ends.
@@ -544,10 +877,13 @@ export class ScaffoldedApp {
 
 /** The project's files and their hashes at a moment in time. */
 export class ProjectSnapshot {
-  private constructor(
-    private readonly root: string,
-    private readonly files: Map<string, string>,
-  ) {}
+  private readonly root: string;
+  private readonly files: Map<string, string>;
+
+  private constructor(root: string, files: Map<string, string>) {
+    this.root = root;
+    this.files = files;
+  }
 
   static async of(root: string): Promise<ProjectSnapshot> {
     return new ProjectSnapshot(root, await hashTree(root));
@@ -636,13 +972,17 @@ export function assertEnvelope(result: CliResult, args: string[] = []): void {
 
 /**
  * A minimal app in a temp directory, the pre-existing-app posture setup
- * scaffolds into. Removes itself when the test finishes.
+ * scaffolds into. The dir is left under the OS temp dir rather than deleted on
+ * teardown: CI runners are ephemeral and the OS reclaims `tmpdir()` entries, so
+ * skipping the recursive delete avoids the transient ENOTEMPTY/EBUSY race it can
+ * hit on a busy filesystem (the CLI awaits every write, so nothing is in flight).
  */
 export async function anApp({
   nextVersion = "^16.0.0",
-}: { nextVersion?: string } = {}): Promise<ScaffoldedApp> {
+}: {
+  nextVersion?: string;
+} = {}): Promise<ScaffoldedApp> {
   const path = await mkdtemp(join(tmpdir(), "zitadel-next-"));
-  onTestFinished(() => rm(path, { recursive: true, force: true }));
 
   await mkdir(join(path, "app"), { recursive: true });
   await writeFile(
@@ -676,7 +1016,6 @@ export async function aSetUpApp(extraArgs: string[] = []): Promise<ScaffoldedApp
 /** A fake `npm` on PATH that records its invocation instead of installing. */
 async function fakePackageManager(): Promise<{ binDir: string; logPath: string }> {
   const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-pm-"));
-  onTestFinished(() => rm(binDir, { recursive: true, force: true }));
   const logPath = join(binDir, "package-manager.log");
   const binPath = join(binDir, "npm");
   await writeFile(
@@ -698,7 +1037,6 @@ process.stderr.write("fake npm stderr\\n");
 /** A fake `docker` on PATH, so doctor's runtime probe needs no daemon. */
 async function fakeDocker(): Promise<{ binDir: string; logPath: string }> {
   const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-docker-"));
-  onTestFinished(() => rm(binDir, { recursive: true, force: true }));
   const logPath = join(binDir, "docker.log");
   const dockerPath = join(binDir, "docker");
   await writeFile(

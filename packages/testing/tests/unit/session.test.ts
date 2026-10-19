@@ -184,15 +184,11 @@ describe("seedSession", () => {
       ),
     );
     const zitadel = connectZitadel({ ...handle, appOrigin: undefined });
-    await expect(zitadel.seedSession()).rejects.toThrow(
-      /No Origin header was sent.*appOrigins/s,
-    );
+    await expect(zitadel.seedSession()).rejects.toThrow(/No Origin header was sent.*appOrigins/s);
   });
 
   it("caps the number of flow steps instead of looping", async () => {
-    server.use(
-      http.post(`${BASE}/flow/:id/submit`, () => HttpResponse.json(identifierStep)),
-    );
+    server.use(http.post(`${BASE}/flow/:id/submit`, () => HttpResponse.json(identifierStep)));
     const zitadel = connectZitadel(handle);
     await expect(zitadel.seedSession()).rejects.toThrow(/did not complete within 6 steps/);
   });

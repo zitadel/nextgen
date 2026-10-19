@@ -46,9 +46,20 @@ func releasePointers(revision string) []domain.ReleasePointer {
 	}
 }
 
+// releaseContent holds the revisions [releasePointers] describes.
+func releaseContent(revision string) domain.ReleaseContent {
+	return domain.ReleaseContent{
+		Schemas: []*domain.JSONSchema{
+			{URL: "https://example.com/schemas/human-user.json?v=" + revision, ObjectType: new("human-user")},
+		},
+		FlowDefinitions: []*domain.FlowDefinition{{ID: "flowdef_" + revision, Name: "default-login"}},
+		Branding:        &domain.Branding{ID: "brnd_" + revision},
+	}
+}
+
 func createRelease(t *testing.T, stmts service.AllStatements, projectID, revision string, metadata domain.ReleaseMetadata) *domain.Release {
 	t.Helper()
-	entity, err := domain.NewRelease(projectID, releasePointers(revision), metadata)
+	entity, err := domain.NewRelease(projectID, releaseContent(revision), metadata)
 	require.NoError(t, err)
 	require.NoError(t, stmts.CreateRelease(t.Context(), entity))
 	scope, err := stmts.GetResourceScopeInProject(t.Context(), domain.ResourceKindRelease, projectID, entity.ID)
@@ -151,7 +162,7 @@ func TestReleaseStatements_ContentHashUniquePerProject(t *testing.T) {
 
 		// Same pinned set, different metadata: metadata is excluded from the
 		// hash, so this collides.
-		dup, err := domain.NewRelease(projectID, releasePointers("0001"), domain.ReleaseMetadata{Message: new("second")})
+		dup, err := domain.NewRelease(projectID, releaseContent("0001"), domain.ReleaseMetadata{Message: new("second")})
 		require.NoError(t, err)
 		err = d.stmts.CreateRelease(t.Context(), dup)
 		assert.ErrorIs(t, err, new(database.IntegrityViolationError))
@@ -242,5 +253,97 @@ func TestReleaseStatements_GetByIDs(t *testing.T) {
 		empty, err := d.stmts.GetReleasesByIDs(t.Context(), projectID, nil)
 		require.NoError(t, err)
 		assert.Empty(t, empty)
+	})
+}
+
+// Revocation is the one change a release takes. The first revoke stamps it,
+// and every read path hands the stamp back.
+func TestReleaseStatements_Revoke(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureReleaseProject(t, d.stmts)
+		entity := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{Message: new("first")})
+		assert.Nil(t, entity.RevokedAt)
+
+		revoked, err := d.stmts.RevokeRelease(t.Context(), projectID, entity.ID)
+		require.NoError(t, err)
+		require.NotNil(t, revoked.RevokedAt)
+		assert.WithinDuration(t, time.Now(), *revoked.RevokedAt, 5*time.Second)
+		assert.Equal(t, entity.ContentHash, revoked.ContentHash)
+		assert.Equal(t, entity.Pointers, revoked.Pointers)
+		assert.Equal(t, "first", *revoked.Metadata.Message)
+
+		byID, err := d.stmts.GetReleaseByID(t.Context(), projectID, entity.ID)
+		require.NoError(t, err)
+		require.NotNil(t, byID.RevokedAt)
+		assert.True(t, revoked.RevokedAt.Equal(*byID.RevokedAt))
+
+		byHash, err := d.stmts.GetReleaseByContentHash(t.Context(), projectID, entity.ContentHash)
+		require.NoError(t, err)
+		require.NotNil(t, byHash.RevokedAt)
+
+		byIDs, err := d.stmts.GetReleasesByIDs(t.Context(), projectID, []string{entity.ID})
+		require.NoError(t, err)
+		require.Len(t, byIDs, 1)
+		require.NotNil(t, byIDs[0].RevokedAt)
+
+		listed, err := d.stmts.ListReleases(unfilteredListCtx(t), release.ListOptions(projectID, 50))
+		require.NoError(t, err)
+		require.Len(t, listed.Items, 1)
+		require.NotNil(t, listed.Items[0].RevokedAt)
+	})
+}
+
+// There is no un-revoke, and revoking again does not move the stamp: the
+// answer names the first revocation.
+func TestReleaseStatements_RevokeTwiceKeepsFirstStamp(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureReleaseProject(t, d.stmts)
+		entity := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
+
+		first, err := d.stmts.RevokeRelease(t.Context(), projectID, entity.ID)
+		require.NoError(t, err)
+		require.NotNil(t, first.RevokedAt)
+
+		second, err := d.stmts.RevokeRelease(t.Context(), projectID, entity.ID)
+		require.NoError(t, err)
+		require.NotNil(t, second.RevokedAt)
+		assert.True(t, first.RevokedAt.Equal(*second.RevokedAt),
+			"second revoke moved the stamp from %s to %s", first.RevokedAt, second.RevokedAt)
+	})
+}
+
+// Revoking one release leaves its siblings servable.
+func TestReleaseStatements_RevokeTouchesOnlyTheNamedRelease(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureReleaseProject(t, d.stmts)
+		target := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
+		sibling := createRelease(t, d.stmts, projectID, "0002", domain.ReleaseMetadata{})
+
+		_, err := d.stmts.RevokeRelease(t.Context(), projectID, target.ID)
+		require.NoError(t, err)
+
+		got, err := d.stmts.GetReleaseByID(t.Context(), projectID, sibling.ID)
+		require.NoError(t, err)
+		assert.Nil(t, got.RevokedAt)
+	})
+}
+
+// The revoke is scoped to the project, so a release of another project answers
+// not found exactly as an unknown id does.
+func TestReleaseStatements_RevokeUnknownIsNoRowFound(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureReleaseProject(t, d.stmts)
+		otherProject := ensureReleaseProject(t, d.stmts)
+		foreign := createRelease(t, d.stmts, otherProject, "0001", domain.ReleaseMetadata{})
+
+		_, err := d.stmts.RevokeRelease(t.Context(), projectID, "rel_does_not_exist")
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+
+		_, err = d.stmts.RevokeRelease(t.Context(), projectID, foreign.ID)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+
+		got, err := d.stmts.GetReleaseByID(t.Context(), otherProject, foreign.ID)
+		require.NoError(t, err)
+		assert.Nil(t, got.RevokedAt)
 	})
 }

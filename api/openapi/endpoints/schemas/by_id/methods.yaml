@@ -1,5 +1,6 @@
 get:
   operationId: getSchemaById
+  x-zitadel-cli: schemas get
   summary: Get schema by ID
   description: |
     Get a schema by its ID. A schema ID identifies one immutable revision, so
@@ -19,11 +20,7 @@ get:
         - schema.read
     - nextgenSession: []
   parameters:
-    - name: id
-      in: path
-      required: true
-      schema:
-        type: string
+    - $ref: ../../../components/parameters/schema-id.yaml
     - $ref: ../../../components/parameters/team-id.yaml
     - $ref: ../../../components/parameters/project-id-query.yaml
   responses:

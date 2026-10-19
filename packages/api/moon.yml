@@ -7,9 +7,8 @@ tasks:
   generate:
     command: "corepack pnpm run generate"
     inputs:
+      - "**/*"
       - "/api/openapi/**/*.yaml"
-      - "orval.config.ts"
-      - "src/runtime/**/*.ts"
     outputs:
       - "src/generated/**/*"
     options:
@@ -17,22 +16,13 @@ tasks:
       # and its checks rewrite or prune; see the mutex note on server:generate.
       mutex: "generated-sources"
 
-  lint:
-    command: "corepack pnpm exec oxlint ."
-    deps:
-      - "generate"
-
   typecheck:
-    command: "corepack pnpm exec tsc --build tsconfig.json"
     deps:
       - "generate"
 
   build:
-    command: "corepack pnpm run build"
     deps:
       - "generate"
-    outputs:
-      - "dist/**/*"
 
   build-release:
     script: |
@@ -55,6 +45,5 @@ tasks:
       mutex: "public-dist"
 
   test:
-    command: "corepack pnpm run test:all"
     deps:
       - "generate"

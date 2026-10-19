@@ -1,5 +1,7 @@
 import type { GetVariable200, GetVariables200 } from "@zitadel/api/generated/model";
 
+import type { Parsed } from "@zitadel/config/idp";
+
 import { escapeControlCharacters } from "./api-client";
 import { ZitadelError } from "./errors";
 
@@ -14,23 +16,35 @@ export type VariableRow = {
   value?: string | number | boolean;
 };
 
+/** One value on the wire: a bare scalar, or `{"secret": true}` for a secret. */
+export type VariableValue = NonNullable<GetVariable200["primary"]>;
+
+/** The primary values of a read, keyed by name. */
+export function primaryValues(body: GetVariables200): Record<string, VariableValue> {
+  return Object.fromEntries(
+    Object.entries(body).flatMap(([name, byKind]) =>
+      byKind.primary === undefined ? [] : [[name, byKind.primary]],
+    ),
+  );
+}
+
 /**
  * Project one wire value into a row. Both endpoints answer in the same two
  * forms — a bare scalar for a non-secret, `{"secret": true}` for a secret — so
  * the collection and the single-name read share this.
  */
-export function toVariableRow(name: string, value: GetVariable200): VariableRow {
+export function toVariableRow(name: string, value: VariableValue): VariableRow {
   return typeof value === "object" && value !== null
     ? { name, secret: true }
     : { name, secret: false, value };
 }
 
 /**
- * Project the wire map into rows, sorted by name so output is stable between
+ * Project the values into rows, sorted by name so output is stable between
  * runs.
  */
-export function toVariableRows(body: GetVariables200): VariableRow[] {
-  return Object.entries(body)
+export function toVariableRows(values: Record<string, VariableValue>): VariableRow[] {
+  return Object.entries(values)
     .map(([name, value]) => toVariableRow(name, value))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -99,8 +113,10 @@ export function assertVariableName(name: string): void {
 
 /**
  * The scalar types a variable can hold — the API's JSON scalars (ADR 062 §1).
- * A whole-field reference keeps its value's type, so `"retry": "${{ RETRY }}"`
- * resolves to `5`, not `"5"`, only when the value was stored as a number.
+ * The server resolves `${{ NAME }}` only in an OIDC connection's `client_id`
+ * and `client_secret` (`flow_sso_redirect_issuer.go`, `flow_sso_callback.go`),
+ * and both must hold a string, so no reference resolves to a number or boolean
+ * yet.
  */
 export const VARIABLE_TYPES = ["string", "number", "boolean"] as const;
 
@@ -114,42 +130,48 @@ export type VariableType = (typeof VARIABLE_TYPES)[number];
 const JSON_NUMBER = /^-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?$/;
 
 /**
- * Turn what was typed or piped into the scalar to store, as the type asks.
+ * Turn what was typed or piped into the scalar to store, as the type asks, or
+ * say what is wrong with it. The problem carries its hint, so a caller that
+ * only has the problem to show loses nothing.
  *
  * The type is stated, never guessed: an integer past 2^53 has no exact JSON
  * number, so an ID or a numeric credential would be stored with different
  * digits than were entered. It is refused rather than silently rounded.
  */
-export function parseVariableValue(raw: string, type: VariableType): string | number | boolean {
+export function parseVariableValue(
+  raw: string,
+  type: VariableType,
+): Parsed<string | number | boolean> {
+  const refuse = (problem: string, hint: string): Parsed<never> => ({
+    ok: false,
+    problem: `${problem} ${hint}`,
+  });
   switch (type) {
     case "string":
-      return raw;
+      return { ok: true, value: raw };
     case "boolean":
       if (raw === "true" || raw === "false") {
-        return raw === "true";
+        return { ok: true, value: raw === "true" };
       }
-      throw new ZitadelError(
-        "E_VALIDATION",
+      return refuse(
         `Expected true or false, got ${JSON.stringify(raw)}.`,
-        {
-          hint: "A boolean variable is exactly `true` or `false`.",
-        },
+        "A boolean variable is exactly `true` or `false`.",
       );
     case "number": {
       const value = Number(raw);
       if (!JSON_NUMBER.test(raw) || !Number.isFinite(value)) {
-        throw new ZitadelError("E_VALIDATION", `Expected a number, got ${JSON.stringify(raw)}.`, {
-          hint: "Write it as a JSON number, such as 5, -1.5 or 1e3.",
-        });
-      }
-      if (Number.isInteger(value) && !Number.isSafeInteger(value)) {
-        throw new ZitadelError(
-          "E_VALIDATION",
-          `${raw} is too large to store exactly as a number.`,
-          { hint: "Store it as a string, which keeps every digit." },
+        return refuse(
+          `Expected a number, got ${JSON.stringify(raw)}.`,
+          "Write it as a JSON number, such as 5, -1.5 or 1e3.",
         );
       }
-      return value;
+      if (Number.isInteger(value) && !Number.isSafeInteger(value)) {
+        return refuse(
+          `${raw} is too large to store exactly as a number.`,
+          "Store it as a string, which keeps every digit.",
+        );
+      }
+      return { ok: true, value };
     }
   }
 }

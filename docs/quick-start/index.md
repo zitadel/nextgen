@@ -40,10 +40,10 @@ register a user -> log out -> log in with the same user -> profile shows Signed 
 ```
 
 For deterministic automated proof from this repository, run
-`corepack pnpm run journey`; it exercises fresh-app setup plus registration,
+`moon run e2e:journey`; it exercises fresh-app setup plus registration,
 logout, and login across the supported frameworks.
 
-The managed local Zitadel server listens on http://localhost:8080 by default.
+The managed local Zitadel server listens on http://localhost:8080 for the first directory you start. Each directory runs its own server, so the next one gets 8081 and so on, and `start` prints the URLs.
 The CLI stores runtime metadata in `.zitadel/local/runtime.json` and keeps the
 server data under `.zitadel/local/` (SQLite by default; the Docker fallback
 mounts `.zitadel/local/nextgen-data` into the container). If you start from a fresh
@@ -73,6 +73,8 @@ Next.js Network URL). Preview origins are exact-match, and WebAuthn RP IDs
 are hostname-based, so those spellings are not interchangeable.
 
 ## Local Runtime URLs
+
+The table shows port 8080; use the port `zitadel start` printed if your directory got another.
 
 | Surface | URL |
 | ------- | --- |

@@ -35,7 +35,9 @@ describe("design-tokens public surface", () => {
     const keys: string[] = [];
     collectKeys("", tokens, keys);
     const referencing = keys.filter((key) => {
-      const value = key.split(".").reduce<unknown>((node, part) => (node as Record<string, unknown>)[part], tokens);
+      const value = key
+        .split(".")
+        .reduce<unknown>((node, part) => (node as Record<string, unknown>)[part], tokens);
       return typeof value === "string" && value.includes("var(");
     });
     expect(referencing).toEqual([]);

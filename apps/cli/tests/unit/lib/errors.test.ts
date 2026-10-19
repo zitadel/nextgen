@@ -17,6 +17,7 @@ describe("EXIT_CODES", () => {
       E_CONFLICT: 5,
       E_PORT_IN_USE: 5,
       E_VALIDATION: 3,
+      E_CREDENTIAL_MISSING: 3,
       E_NOT_IMPLEMENTED: 2,
       E_CANCELLED: 130,
     });
@@ -81,9 +82,7 @@ describe("toZitadelError", () => {
     const result = toZitadelError(errno);
     expect(result.code).toBe("E_CONFLICT");
     expect(result.message).toBe("file exists");
-    expect(result.hint).toBe(
-      "A file already exists. Use --force to overwrite or remove it first.",
-    );
+    expect(result.hint).toBe("A file already exists. Use --force to overwrite or remove it first.");
   });
 
   it("maps ENOENT errno errors to E_VALIDATION", () => {
@@ -175,7 +174,10 @@ describe("toZitadelError", () => {
       {
         code: "flowdef.invalid",
         message: "flow definition: invalid",
-        details: { details: "required fields [company] in user schema are missing in the flow definition steps" },
+        details: {
+          details:
+            "required fields [company] in user schema are missing in the flow definition steps",
+        },
       },
       "PUT http://mock/flow_definitions/flow_1?project_id=proj_1 returned 400",
     );
@@ -273,5 +275,49 @@ describe("fields the platform blames", () => {
 
   it("adds no hint when the envelope blames nothing", () => {
     expect(immutable({ code: "req.invalid", message: "nope" }).hint).toBeUndefined();
+  });
+});
+
+/**
+ * `idp.endpoints_partial` names the endpoints a connection left out only in
+ * the envelope, so the hint carries them, as it does the blamed fields.
+ */
+describe("endpoints the platform reports missing", () => {
+  const partial = (body: unknown) =>
+    toZitadelError(
+      new ApiError(400, "http://localhost:8140/idps?project_id=p", body, "Bad Request"),
+    );
+
+  it("names them, in the server's order, as the server nests them", () => {
+    const error = partial({
+      code: "idp.endpoints_partial",
+      message: "identity provider connection: the endpoints are partially set",
+      details: { details: { missing: ["jwks_uri", "userinfo_endpoint"] } },
+    });
+
+    expect(error.code).toBe("E_VALIDATION");
+    expect(error.hint).toBe(
+      "The server reports these endpoints missing: jwks_uri, userinfo_endpoint.",
+    );
+  });
+
+  it("says endpoint, singular, when one is missing", () => {
+    const error = partial({
+      code: "idp.endpoints_partial",
+      details: { missing: ["token_endpoint"] },
+    });
+
+    expect(error.hint).toBe("The server reports this endpoint missing: token_endpoint.");
+  });
+
+  it("keeps the blamed fields when an envelope lists both", () => {
+    const error = partial({
+      code: "req.invalid",
+      details: { details: { fields: ["oidc.issuer"], missing: ["jwks_uri"] } },
+    });
+
+    expect(error.hint).toBe(
+      "The server rejected this field: oidc.issuer. The server reports this endpoint missing: jwks_uri.",
+    );
   });
 });

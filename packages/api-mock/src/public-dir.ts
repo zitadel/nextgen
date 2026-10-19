@@ -27,8 +27,4 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const apiMockPublicDir = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  "..",
-  "public",
-);
+export const apiMockPublicDir = resolve(dirname(fileURLToPath(import.meta.url)), "..", "public");

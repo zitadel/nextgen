@@ -1,0 +1,28 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "typecheck": {
+      "dependsOn": ["@zitadel/components#build", "@zitadel/sdk-core#build"]
+    },
+    // demo-nuxt:build resolves modules from this dist; moon shared a mutex
+    // (`sdk-nuxt-dist`) between the two builders and demo-nuxt. Under turbo the
+    // dev build is ordered before demo-nuxt's by its edge, and the release
+    // build never shares an invocation with demo-nuxt (see the release order
+    // in tools/release/turbo.json).
+    "build": {
+      "dependsOn": ["@zitadel/components#build", "@zitadel/sdk-core#build"]
+    },
+    "build-release": {
+      "dependsOn": ["@zitadel/components#build-release", "@zitadel/sdk-core#build-release"]
+    },
+    "test": {
+      "dependsOn": ["build"]
+    },
+    // tsup's declaration pass resolves the workspace packages, which need
+    // api's generated client and the built dependencies.
+    "dev": {
+      "dependsOn": ["@zitadel/components#build", "@zitadel/sdk-core#build"]
+    }
+  }
+}

@@ -1,0 +1,83 @@
+# Agent Instructions — `e2e/console`
+
+Playwright project for the console's five runtime boundaries. Defer to root
+[`AGENTS.md`](../../AGENTS.md) for repo-wide rules; lane descriptions and the
+secret-handling caveat live in [`README.md`](README.md).
+
+## The five lanes
+
+- `moon run e2e:console-smoke` — **embedded shell smoke**: Vite-preview of the
+  built console under its production embed base `/ui/console/`. No live API.
+- `moon run e2e:console-real` — **real-instance resource coverage**: one
+  ephemeral real instance via `@zitadel/testing`
+  ([`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md)), console
+  served by the Vite dev server through its (credential-free) API proxy; each
+  test's user is granted access through the API and signs in with its
+  session cookie (`signIn` in `support/sign-in.ts`). Playwright workers share the
+  instance and seed a fresh user per test.
+- `moon run e2e:console-embedded` — **embedded production-path coverage**:
+  the built Go binary serves the console, hosted login, and API from one
+  origin, with no Vite proxy. This is the only lane that proves the API base
+  and Go mux agree on the request path customers receive.
+- `moon run e2e:console-platform` — **platform-project coverage**: the
+  same binary with the platform project bootstrapped (the server default). An
+  operator signs up through the console, is granted the harness project by
+  email, and uses the screens on the session cookie alone. The console selects
+  that project on its own (the operator's only grant, as `?project=`), so the
+  screens run in a project other than the one the console signs into.
+- `moon run e2e:console-deployment` — **hosted-cloud deployment
+  coverage**: no server of its own; it checks a deployment that `CLOUD_URL`
+  names, where the console is a Vercel service at `/console/` beside the
+  server. It pins the routing (`/console/runtime.json` to the server, the old
+  `/ui/console` links redirected) and the signed-out sign-in screen down to
+  the login widget's first step. It holds no credential but
+  `VERCEL_AUTOMATION_BYPASS_SECRET`, so it records no traces and writes no
+  HTML report. `pnpm check:cloud` runs it beside the docs' deployment suite.
+
+Console screens act on the selected project (`?project=`, see
+[`apps/console/AGENTS.md`](../../apps/console/AGENTS.md)). The guard only ever selects
+a project the signed-in person holds a grant on: their only project, else
+none. `console-real` grants each signed-in user the harness project (`signIn` in
+`support/sign-in.ts`), so it is selected there; a user with no grant lands on
+Projects with nothing selected. The project the console signs into comes from
+the instance's `/console/runtime.json` in every lane; no lane pins it. A spec
+that navigates by URL either lets the guard fill it in or names it, and asserts
+it survives navigation where that is the point.
+
+The first four lanes are dependencies of `e2e:all`, which the `full-pr` job
+runs in its own e2e step whenever one of them is affected (they carry
+`runInCI: "skip"`, which only keeps them out of the build-and-test graph; see
+[`../moon.yml`](../moon.yml)). `console-deployment` is not part of it
+(`runInCI: false`): `deployment-checks.yml` runs it against every cloud
+deployment. The `@zitadel/testing` interaction is documented in
+[`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md).
+
+## Shared helpers
+
+`support/` holds what more than one spec uses: the console sign-in (`sign-in.ts`,
+grant then login), the API arrangements on the typed client (`api.ts`), screen
+helpers (`screens.ts`), the runtime-document stubs (`runtime.ts`) and the
+console copy the specs assert on (`copy.ts`). Two of them have importers with
+less in reach: `runtime.ts` imports only `@playwright/test`, because the smoke
+lane builds no test kit, and `copy.ts` imports nothing, because the journey's
+claim suite reads it (the journey lanes list it as an input).
+
+## Hard rules
+
+- **Port pinning**: `REAL_ZITADEL_PORT: 8093`, `EMBEDDED_ZITADEL_PORT: 8095`
+  and `PLATFORM_ZITADEL_PORT: 8097` are fixed pins deliberately outside the
+  deferred-bind blocks — the full doctrine (why config-time ports cannot live
+  in the dynamically scanned reservation domains, and the neighbor map) is in
+  the lane configs (`playwright.*.config.mts`) and
+  [`../journey/scripts/ports.mjs`](../journey/scripts/ports.mjs). Do not
+  move any of these lanes onto a scanned block, and sweep orphans with
+  `moon run workspace:cli -- stop --all`.
+- **Secrets**: the `.zitadel-testing/` handshake contains the project secret —
+  gitignored, never uploaded as a CI artifact. Failure artifacts are limited
+  to Playwright results and the HTML report.
+- **Test placement**: this project covers only console runtime boundaries
+  (embed base, dev proxy, live resource data, binary-served production path,
+  the hosted cloud's routing).
+  Screen behavior belongs in `apps/console` Vitest specs
+  (`src/routes/**/*.spec.tsx`); component behavior in the component packages —
+  same layering rule as root `AGENTS.md` Testing Layers.

@@ -51,6 +51,19 @@ func TestMigrateCommandAppliesSchemaIdempotently(t *testing.T) {
 	assert.True(t, sqliteHasGooseTable(t, defaultSQLitePath(dataDir)))
 }
 
+// Migrations never use the master keys, so migrate neither requires one nor
+// generates one: a generated key would be a throwaway on a build machine or in
+// a one-off job, and a stray key file in a data dir the server later shares.
+func TestMigrateCommandGeneratesNoMasterKey(t *testing.T) {
+	dataDir, configPath := tempServerConfig(t)
+
+	cmd := NewCommand()
+	cmd.SetArgs([]string{"migrate", "--config", configPath})
+	require.NoError(t, cmd.Execute())
+
+	assert.NoDirExists(t, filepath.Join(dataDir, defaultMasterKeyDirName))
+}
+
 func TestStartDatabaseSkipsMigrationsUnlessRequested(t *testing.T) {
 	dataDir, configPath := tempServerConfig(t)
 	cfg, err := loadConfig(configPath)

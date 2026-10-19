@@ -1,13 +1,7 @@
 import type { CreateFlowDefinitionBodyFlowDefinition } from "@zitadel/api/generated/model";
 
-/**
- * Canonical URI for the human-user JSON Schema the default flow
- * references. The local `.zitadel/schemas/user.json` body is derived
- * from this same shape; the URI is the spec-required pointer the
- * platform stores against each flow.
- */
-const USER_SCHEMA_URI =
-  "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml";
+/** The `objectType` of the human-user schema the default flow runs against. */
+const USER_SCHEMA = "human-user";
 
 /**
  * Build the default username-and-password flow.
@@ -37,13 +31,11 @@ const USER_SCHEMA_URI =
  * @param fields - User-schema property names to collect on the register
  *   step, in display order (e.g. `["email", "given_name"]`).
  */
-export function buildFlow(
-  fields: ReadonlyArray<string>,
-): CreateFlowDefinitionBodyFlowDefinition {
+export function buildFlow(fields: ReadonlyArray<string>): CreateFlowDefinitionBodyFlowDefinition {
   return {
     name: "default",
     status: "active",
-    user_schema: USER_SCHEMA_URI,
+    user_schema: USER_SCHEMA,
     purposes: {
       login: "identifier",
       register: "register-profile",

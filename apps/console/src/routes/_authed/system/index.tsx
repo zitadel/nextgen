@@ -3,9 +3,9 @@ import { CircleCheck } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-import { api } from "../../../api/zitadel";
-import { Page } from "../../../components/layout";
-import { PageHeader } from "../../../components/resource-page";
+import { api } from "@/api/zitadel";
+import { Page } from "@/components/layout";
+import { PageHeader } from "@/components/resource-page";
 
 export const Route = createFileRoute("/_authed/system/")({
   loader: async () => {

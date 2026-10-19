@@ -36,7 +36,9 @@ const targetDir = join(packageRoot, "meta-schemas");
  * the `generated-sources` mutex so it never reads a half-generated source tree.
  */
 function syncMetaSchemas() {
-  const files = readdirSync(sourceDir).filter((name) => name.endsWith(".json")).sort();
+  const files = readdirSync(sourceDir)
+    .filter((name) => name.endsWith(".json"))
+    .sort();
   if (files.length === 0) {
     throw new Error(`no meta-schemas found in ${sourceDir}`);
   }

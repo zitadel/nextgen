@@ -6,11 +6,7 @@ import {
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { z } from "zod";
 
-import {
-  isBrandingColor,
-  isBrandingFontFamily,
-  MAX_BRANDING_URL_BYTES,
-} from "./branding-css.js";
+import { isBrandingColor, isBrandingFontFamily, MAX_BRANDING_URL_BYTES } from "./branding-css.js";
 import { isCanonicalLoopbackHttpUrl } from "./branding-url.js";
 
 export const schemaConfigSchema = CreateSchemaBody;
@@ -85,7 +81,10 @@ export const brandingConfigSchema = z
     // in internal/domain/branding_css.go).
     validateBrandingPalette(value.theme?.light?.palette, "theme.light", ctx);
     validateBrandingPalette(value.theme?.dark?.palette, "theme.dark", ctx);
-    if (value.typography?.font_family !== undefined && !isBrandingFontFamily(value.typography.font_family)) {
+    if (
+      value.typography?.font_family !== undefined &&
+      !isBrandingFontFamily(value.typography.font_family)
+    ) {
       ctx.addIssue({
         code: "custom",
         message:
@@ -171,13 +170,22 @@ function validateBrandingAssetUrl(
   // than an image, so it stays https everywhere. Check the raw URL so WHATWG
   // normalisation cannot make plan accept a host spelling that the Go save
   // gate rejects.
-  if (options.loopback !== false && parsed.protocol === "http:" && isCanonicalLoopbackHttpUrl(value)) {
+  if (
+    options.loopback !== false &&
+    parsed.protocol === "http:" &&
+    isCanonicalLoopbackHttpUrl(value)
+  ) {
     return;
   }
   if (parsed.protocol !== "https:" || parsed.host === "") {
+    // Worded as the server words it (validateBrandingFontURL,
+    // validateBrandingAssetURL): only a field with the carve-out mentions it.
     ctx.addIssue({
       code: "custom",
-      message: `${field} must be an absolute https URL (http is allowed for canonical loopback development hosts only).`,
+      message:
+        options.loopback === false
+          ? `${field} must be an absolute https URL.`
+          : `${field} must be an absolute https URL (http is allowed for canonical loopback development hosts only).`,
     });
   }
 }

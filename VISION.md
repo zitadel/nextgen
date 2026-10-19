@@ -117,7 +117,7 @@ live under [packages/](packages/). The OpenAPI 3.1 sources under
 [api/openapi/](api/openapi/) are the contract of record, configuration is
 repo state with `plan` and `apply`
 ([ADR 035](docs/adrs/035-configuration-environments.md)), and the docs
-site publishes LLM-readable text at `/llms.txt` and answers documentation
+site publishes LLM-readable text at `/docs/llms.txt` and answers documentation
 queries over MCP. `zitadel claim` and the claim lifecycle behind
 create-first, claim-later are shipped
 ([ADR 046](docs/adrs/046-claim-lifecycle-v2.md)): the server serves the

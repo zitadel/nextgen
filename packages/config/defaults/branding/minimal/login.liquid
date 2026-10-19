@@ -38,6 +38,7 @@
           type="{{ f.type }}"
           value="{{ f.value }}"
           {% if f.autocomplete %}autocomplete="{{ f.autocomplete }}"{% endif %}
+          {% if f.read_only %}readonly{% endif %}
           {% if f.required %}required{% endif %}
           {% if field_placeholder != "" %}placeholder="{{ field_placeholder }}"{% endif %}
           {% if field_err != "" %}invalid error="{{ field_err }}"{% endif %}

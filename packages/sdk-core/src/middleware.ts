@@ -14,6 +14,13 @@
  */
 export const HOP_BY_HOP: ReadonlySet<string> = new Set([
   "connection",
+  // content-length is not hop-by-hop per RFC 7230, but it must be stripped: the
+  // proxy re-sends a freshly buffered body, so the fetch implementation computes
+  // the correct content-length itself. Forwarding the client's value is at best
+  // redundant and at worst fatal — undici rejects a manually-set content-length
+  // alongside a body with `UND_ERR_INVALID_ARG: invalid content-length header`,
+  // which surfaced as an opaque "fetch failed" in the Qwik City proxy.
+  "content-length",
   // host is not a hop-by-hop header per RFC 7230, but it must be stripped so
   // the fetch implementation derives the correct Host from the upstream URL
   // rather than forwarding the client's Host and causing SNI/vhost mismatches.
@@ -40,22 +47,51 @@ export const INTERNAL_HEADERS: ReadonlySet<string> = new Set(["x-nextgen-auth-to
  * Returns `true` when `pathname` matches at least one entry in `routes`.
  *
  * An entry ending with `*` matches any path that starts with the prefix
- * before the `*`. All other entries require an exact match.
+ * before the `*`. All other entries match exactly, ignoring a trailing slash
+ * on either side: `/profile` and `/profile/` name the same route, and several
+ * frameworks (Qwik Router by default) serve the slashed form as canonical. An
+ * exact compare would let `/profile/` past a `protectedRoutes: ["/profile"]`.
  *
  * @param pathname - The URL pathname to test.
  * @param routes   - The list of route patterns to match against.
  * @returns `true` if at least one pattern matches.
  */
 export function matchesRoutes(pathname: string, routes: readonly string[]): boolean {
-  if (routes.length === 0) {
-    return false;
-  }
-  return routes.some((pattern) => {
-    if (pattern.endsWith("*")) {
-      return pathname.startsWith(pattern.slice(0, -1));
+  // A linear scan, not /\/+$/: that regex backtracks quadratically on a long
+  // run of slashes, and the pathname is attacker-controlled on every request.
+  const withoutTrailingSlash = (path: string): string => {
+    let end = path.length;
+    while (end > 1 && path.charCodeAt(end - 1) === 0x2f) {
+      end--;
     }
-    return pathname === pattern;
+    return path.slice(0, end);
+  };
+  const path = withoutTrailingSlash(pathname);
+
+  return routes.some((route) => {
+    if (route.endsWith("*")) {
+      return pathname.startsWith(route.slice(0, -1));
+    }
+    return path === withoutTrailingSlash(route);
   });
+}
+
+// ─── Proxy credentials ───────────────────────────────────────────────────────
+
+/**
+ * Whether a proxied call may carry the confidential project secret.
+ *
+ * ADR 036: the browser flow needs the secret only for the handoff exchange
+ * (`POST /sessions/exchange`). Stamping it onto every proxied operation would
+ * turn the app's public `/__nextgen/*` boundary into an open relay carrying
+ * project-level authority for any anonymous caller.
+ *
+ * @param method   - The proxied request's HTTP method.
+ * @param pathname - The path after the proxy prefix, e.g. `/sessions/exchange`.
+ * @returns `true` only for the handoff exchange.
+ */
+export function requiresProjectSecret(method: string, pathname: string): boolean {
+  return method.toUpperCase() === "POST" && pathname === "/sessions/exchange";
 }
 
 // ─── Response header filtering ───────────────────────────────────────────────
@@ -82,8 +118,8 @@ export function matchesRoutes(pathname: string, routes: readonly string[]): bool
  * widget performs it, never as a proxied header.
  *
  * A relative reference resolves against the path it came from (RFC 3986 §5),
- * so `next?flow=x` answered to `/__nextgen/idp/callback` means
- * `/__nextgen/idp/next?flow=x`. An unparseable value is the one case with
+ * so `next?flow=x` answered to `/__nextgen/idp/google/callback` means
+ * `/__nextgen/idp/google/next?flow=x`. An unparseable value is the one case with
  * nothing to forward.
  */
 function ontoThisApp(location: string, selfUrl: string | undefined): string | undefined {
@@ -105,8 +141,8 @@ function ontoThisApp(location: string, selfUrl: string | undefined): string | un
  * `location` to a redirect that can only land on this app.
  *
  * `location` was stripped outright until the identity-provider callback
- * needed it: the provider returns the browser to `/__nextgen/idp/callback`,
- * and the engine answers `302` back to the page the sign-in started on. That
+ * needed it: the provider returns the browser to `/__nextgen/idp/{slug}/callback`,
+ * and the engine answers `303` back to the page the sign-in started on. That
  * is a top-level navigation with no JavaScript in the loop, so a dropped
  * `Location` leaves the browser on an empty page. Outbound redirects to a
  * provider do not travel this way -- they arrive as `step.redirect_url` in a
@@ -214,6 +250,10 @@ export type NextgenMiddlewareOptions = {
 
   /**
    * URL path prefix that is reverse-proxied to the auth backend.
+   *
+   * Sign-in with an external provider currently requires the default: the
+   * provider returns to `/__nextgen/idp/{slug}/callback`, which is proxied only under
+   * the default prefix.
    * @default "/__nextgen"
    */
   proxyPath?: string;
@@ -301,3 +341,63 @@ export type NextgenMiddlewareOptions = {
    */
   opaqueTokenTimeoutMs?: number;
 };
+
+// ─── Opaque session tokens ───────────────────────────────────────────────────
+
+/**
+ * What the backend reports for an opaque (non-JWT) session token.
+ *
+ * `userId` is `null` for an anonymous session: `CreateSession` sets the
+ * session cookie before any user factor is verified, so an abandoned or
+ * in-progress sign-in holds a live session that names no user. Such a session
+ * is **not** signed in, but it is not dead either — its flow may still
+ * complete — so callers keep its cookie instead of clearing it.
+ */
+export interface OpaqueSession {
+  readonly userId: string | null;
+  readonly identifier: string | null;
+  readonly identifierProperty: string | null;
+  readonly display: string | null;
+}
+
+/**
+ * Validates an opaque session token by asking the backend
+ * (`GET {issuerUrl}/sessions/me`) whether the session is live.
+ *
+ * @param token     - The opaque session token from the `__nextgen_session` cookie.
+ * @param issuerUrl - Base URL of the auth backend.
+ * @param timeoutMs - How long to wait for the backend before giving up.
+ * @returns The live session — with a `null` `userId` when it is anonymous — or
+ *   `null` when the backend does not hold a live session for the token (any
+ *   non-2xx answer, a timeout, a network error, or an unreadable body).
+ */
+export async function validateOpaqueSessionToken(
+  token: string,
+  issuerUrl: string,
+  timeoutMs: number,
+): Promise<OpaqueSession | null> {
+  try {
+    const res = await fetch(`${issuerUrl}/sessions/me`, {
+      method: "GET",
+      headers: { cookie: `__nextgen_session=${token}` },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res.ok) {
+      return null;
+    }
+    const body = (await res.json()) as {
+      user_id?: unknown;
+      user?: { identifier?: unknown; identifier_property?: unknown; display?: unknown };
+    };
+    const text = (value: unknown): string | null =>
+      typeof value === "string" && value !== "" ? value : null;
+    return {
+      userId: text(body.user_id),
+      identifier: text(body.user?.identifier),
+      identifierProperty: text(body.user?.identifier_property),
+      display: text(body.user?.display),
+    };
+  } catch {
+    return null;
+  }
+}

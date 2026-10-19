@@ -100,9 +100,12 @@ export type ZitadelState = {
  * does not say which it is.
  */
 export class FatalFetchError extends Error {
-  constructor(readonly reason: Error) {
+  readonly reason: Error;
+
+  constructor(reason: Error) {
     super(reason.message);
     this.name = "FatalFetchError";
+    this.reason = reason;
   }
 }
 
@@ -124,9 +127,10 @@ export interface ResourceSyncer {
    * Throws `E_VALIDATION` (a `ZitadelError`) on the first invalid input.
    * The sync engine calls this for every file it reads, so a malformed
    * schema or flow fails the run before any platform mutation — `plan`
-   * and `apply` both go through here.
+   * and `apply` both go through here. `path` is the file's project-relative
+   * path, for messages that name it.
    */
-  validate(data: object): void;
+  validate(data: object, path?: string): void;
   /**
    * Create the resource on the platform. `canonical` is the server's
    * stored representation when the response (or a follow-up fetch)
@@ -147,15 +151,32 @@ export interface ResourceSyncer {
    */
   update(id: string, data: object): Promise<{ id?: string; canonical?: object }>;
   delete(id: string): Promise<void>;
+  /**
+   * `"unsupported"` when the platform cannot delete this resource yet. A file
+   * removed locally is then reported by `plan` and `apply` and never sent, and
+   * its state entry stays so the report repeats until the file is restored.
+   */
+  readonly deletion?: "unsupported";
+  /**
+   * Checks that need the platform, run for every create and update before any
+   * mutation, given the file `path`. It answers with the id of the resource a create would revise, when one already holds its identity, so the planner can tell a moved file from a new one. `old` is the stored body of an update (null for a create, or
+   * when it could not be read). Throws to stop the plan.
+   */
+  /** What names a stored resource, for matching a removed file to the resource it kept. */
+  identityOf?(stored: object): string | undefined;
+  preflight?(
+    path: string,
+    data: object,
+    old: object | null,
+  ): Promise<{ id: string; definition: object } | undefined>;
   fetch?(id: string): Promise<object>;
   /**
    * Reduce a body to its canonical comparison form: strip server-echoed
    * noise (empty `audience`) and spelled-out meta-schema defaults
    * (`x-audit` et al) so hashing and diff rendering treat semantically
-   * identical bodies as identical. Comparison only — never applied to
-   * upload payloads or written to files (the server does not materialize
-   * the stripped defaults, so dropping them from stored bytes would lose
-   * them).
+   * identical bodies as identical — the server applies those defaults
+   * itself when it stores a schema. Comparison only: uploads send the file
+   * as written, and write-back writes the {@link normalizeWrite} form.
    */
   normalize?(data: object): object;
   /**
@@ -178,6 +199,10 @@ export type SyncPlanSummary = {
   updates: number;
   revisions: number;
   deletes: number;
+  /** Files that moved: the same resource, under a new file name. */
+  moves: number;
+  /** Removed files whose resource cannot be deleted yet; not part of `total`. */
+  unsupported_deletions: number;
   total: number;
 };
 
@@ -219,6 +244,13 @@ export type SyncAction =
       hash: string;
       repin?: FlowRepin;
       warnings?: ReadonlyArray<SyncActionWarning>;
+      /**
+       * The removed file this one replaces: the platform already holds the
+       * resource, so the write revises it rather than creating another.
+       */
+      movedFrom?: string;
+      /** For a move: what the platform stores, so the plan can show what changes. */
+      oldContent?: object;
     }
   | {
       kind: "update";
@@ -244,4 +276,11 @@ export type SyncAction =
       warnings?: ReadonlyArray<SyncActionWarning>;
     }
   | { kind: "delete"; path: string; syncer: ResourceSyncer; id: string; oldContent: object | null }
-  | { kind: "skip"; path: string; reason: "immutable" | "no-change" };
+  | { kind: "skip"; path: string; reason: "immutable" | "no-change" }
+  | {
+      kind: "skip";
+      path: string;
+      reason: "unsupported-deletion";
+      syncer: ResourceSyncer;
+      id: string;
+    };

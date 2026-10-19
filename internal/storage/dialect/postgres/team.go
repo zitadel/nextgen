@@ -115,28 +115,28 @@ func (ts teamStatements) UpdateTeam(ctx context.Context, team *domain.Team) erro
 
 // ListTeams implements [service.TeamStatements].
 func (ts teamStatements) ListTeams(ctx context.Context, filter *database.ListOptions[domain.TeamField]) (*database.ListResult[*domain.Team], error) {
-	var compiler statementCompiler
-	if err := compileList(ctx, &compiler, teamQuery, filter, teamSchema, "zitadel_nextgen.teams", "id"); err != nil {
+	teams, nextCursor, err := pagination.Page(filter.Pagination, teamSchema, func(limit uint32) ([]*domain.Team, error) {
+		filter := filter.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileList(ctx, &compiler, teamQuery, filter, teamSchema, "zitadel_nextgen.teams", "id"); err != nil {
+			return nil, err
+		}
+
+		rows, err := ts.client.Query(ctx, compiler.String(), compiler.args...)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+
+		teams, err := pgx.CollectRows(rows, ts.scanTeam)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+
+		return teams, nil
+	})
+	if err != nil {
 		return nil, err
 	}
-
-	rows, err := ts.client.Query(ctx, compiler.String(), compiler.args...)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-
-	teams, err := pgx.CollectRows(rows, ts.scanTeam)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-
-	nextCursor := pagination.MarshalNext(
-		filter.Pagination.OrderBy,
-		teams,
-		teamSchema,
-		filter.Pagination.Limit,
-	)
-
 	return &database.ListResult[*domain.Team]{
 		Items:      teams,
 		NextCursor: nextCursor,

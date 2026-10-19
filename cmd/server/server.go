@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -246,6 +247,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		schemaValidator,
 		keyService,
 		hasherFactory,
+		cfg.Origins.SharedHosts,
 	)
 
 	// Bootstrap runs here rather than straight after the migrations because it
@@ -265,7 +267,6 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	schemaService := service.NewSchemaService(serviceDBPool, schemaResolverWithHTTP, schemaValidator)
 	flowDefinitionSvc := service.NewFlowDefinitionService(
 		serviceDBPool,
-		schemaService,
 		schemaValidator,
 		nil,
 	)
@@ -280,11 +281,9 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	claimService := service.NewClaimService(serviceDBPool, consoleBase, cfg.Platform.ResolvedProjectID())
 	grantService := service.NewGrantService(serviceDBPool, userRefs, cfg.Platform.ResolvedProjectID())
 	brandingService := service.NewBrandingService(serviceDBPool)
-	environmentService := service.NewEnvironmentService(serviceDBPool)
 	variableService := service.NewVariableService(serviceDBPool, keyService)
 	releaseService := service.NewReleaseService(serviceDBPool)
 	idpConnectionService := service.NewIDPConnectionService(serviceDBPool, schemaValidator)
-	deploymentService := service.NewDeploymentService(serviceDBPool)
 	eventService := service.NewEventService(serviceDBPool)
 	projectHashers := service.NewProjectHasherResolver(serviceDBPool, hasherFactory)
 	userService := service.NewUserService(
@@ -322,10 +321,11 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		createUserHandler,
 		flowAuth,
 		service.NewFlowSSOProviderResolver(idpConnectionService),
-		service.NewFlowSSOIdentityResolver(serviceDBPool, idpConnectionService, userService, schemaStore),
+		service.NewFlowSSOIdentityResolver(serviceDBPool, idpConnectionService, userService, schemaStore, projectHashers),
 		service.NewFlowSSORedirectIssuer(idpConnectionService, authAttemptSvc, keyService, variableService, egressClient),
 		time.Now,
 	)
+	ssoCallback := service.NewFlowSSOCallback(idpConnectionService, authAttemptSvc, keyService, variableService, egressClient)
 
 	flowService := service.NewFlowService(serviceDBPool, stateMachine)
 	tokenService := service.NewTokenService(keyService, serviceDBPool)
@@ -378,10 +378,8 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			flowDefinitionSvc,
 			teamService,
 			brandingService,
-			environmentService,
 			releaseService,
 			idpConnectionService,
-			deploymentService,
 			eventService,
 			tokenService,
 			keyService,
@@ -406,6 +404,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	}
 
 	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), oasServer,
+		api.NewIDPCallbackHandler(ssoCallback),
 		standaloneRuntimeResolver(projectService, tokenService, keyService, cfg.Platform.ResolvedProjectID()),
 		requestEventBuf)
 	if err != nil {
@@ -487,7 +486,24 @@ func consoleBaseURL(publicBase, consolePath string) (string, error) {
 // environment, which is what a command-line flag has to do.
 type configOverride func(*viper.Viper)
 
+// loadConfig reads the configuration the server serves with: readConfig's,
+// plus the master keys, one generated when none is configured and
+// generation is on.
 func loadConfig(configPath string, overrides ...configOverride) (Config, error) {
+	cfg, err := readConfig(configPath, overrides...)
+	if err != nil {
+		return Config{}, err
+	}
+	if err := ensureServerMasterKey(&cfg.Server); err != nil {
+		return Config{}, err
+	}
+	return cfg, nil
+}
+
+// readConfig reads and validates the configuration without touching the
+// master keys, which only serving needs: `migrate` reads its configuration
+// here, so it neither requires a master key nor generates one.
+func readConfig(configPath string, overrides ...configOverride) (Config, error) {
 	v := viper.NewWithOptions(viper.ExperimentalBindStruct())
 	v.SetEnvPrefix("NEXTGEN")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
@@ -568,6 +584,9 @@ func loadConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("httpclient.allow_https_downgrade", false)
 	v.SetDefault("httpclient.deny_list", httputil.DefaultDenyList)
 	v.SetDefault("httpclient.allow_list", []string{})
+	// origins.shared_hosts is not SetDefault'd: viper merges map defaults with
+	// overrides, which would break replace-defaults. Nil after unmarshal means
+	// "use DefaultSharedHosts"; an explicit empty map disables the checks.
 	v.SetDefault("session.default_ttl", domain.SessionAnonymousTTL)
 	v.SetDefault("session.max_ttl", 720*time.Hour)
 	// Empty means "the deployment's first-created non-platform project is the
@@ -638,12 +657,16 @@ func loadConfig(configPath string, overrides ...configOverride) (Config, error) 
 		// reaching non-string slice fields such as []zlog.Stream.
 		mapstructure.StringToTimeDurationHookFunc(),
 		stringToWeakSliceHookFunc(","),
+		stringToRegexpHookFunc(),
 		// Lets enum types generated by enumer (zlog.Level, zlog.Stream,
 		// instrumentation.LogFormat, ...) decode from their documented string
 		// names via the encoding.TextUnmarshaler they already implement.
 		mapstructure.TextUnmarshallerHookFunc(),
 	))); err != nil {
 		return Config{}, fmt.Errorf("decode config: %w", err)
+	}
+	if cfg.Origins.SharedHosts == nil {
+		cfg.Origins.SharedHosts = domain.DefaultSharedHosts
 	}
 	// Create the data dir configuration actually selected, not the default
 	// computed above — an explicit empty data_dir still means the default.
@@ -653,11 +676,10 @@ func loadConfig(configPath string, overrides ...configOverride) (Config, error) 
 	if err := ensureServerDataDir(cfg.Server.DataDir); err != nil {
 		return Config{}, err
 	}
-	if err := ensureServerMasterKey(&cfg.Server); err != nil {
+	if err := cfg.Validate(); err != nil {
 		return Config{}, err
 	}
-
-	return cfg, cfg.Validate()
+	return cfg, nil
 }
 
 // stringToWeakSliceHookFunc splits a string into a slice on sep, without
@@ -678,6 +700,18 @@ func stringToWeakSliceHookFunc(sep string) mapstructure.DecodeHookFunc {
 	}
 }
 
+// stringToRegexpHookFunc compiles string config values into *regexp.Regexp
+// (including map values of that type). Bad patterns fail config load.
+func stringToRegexpHookFunc() mapstructure.DecodeHookFunc {
+	regexpPtr := reflect.TypeOf((*regexp.Regexp)(nil))
+	return func(f reflect.Type, t reflect.Type, data any) (any, error) {
+		if f.Kind() != reflect.String || t != regexpPtr {
+			return data, nil
+		}
+		return regexp.Compile(data.(string))
+	}
+}
+
 // mustBindEnv panics on viper's documented "this can't fail in
 // normal use" BindEnv error path. Keeps the env wiring readable
 // without sprinkling error handling at every binding.
@@ -689,7 +723,7 @@ func mustBindEnv(v *viper.Viper, key string) {
 
 // ----------------------------- HTTP --------------------------------------
 
-func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer) (*http.ServeMux, error) {
+func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer) (*http.ServeMux, error) {
 	mux := http.NewServeMux()
 
 	if cfg.LoginEnabled {
@@ -727,16 +761,27 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 		mux.Handle(consoleRuntimePath, newConsoleRuntimeHandler(runtime))
 	}
 
-	mux.Handle("/",
-		middleware.Chain(apiHandler,
+	chain := func(h http.Handler, redactQuery ...string) http.Handler {
+		return middleware.Chain(h,
 			func(next http.Handler) http.Handler { return middleware.WithRequestContextMiddleware(reqIdGen, next) },
-			middleware.WithLogging,
+			func(next http.Handler) http.Handler { return middleware.WithLogging(next, redactQuery...) },
 			api.WithRequestHostMiddleware,
 			middleware.WithUserAgentMiddleware,
 			api.WithSessionStateNoStore,
+			api.WithCSRFRequest,
 			func(next http.Handler) http.Handler { return audit.WithRequestEventMiddleware(requestEvents, next) },
-		),
-	)
+		)
+	}
+	// The same chain: the callback reads its cookie by the request scheme
+	// (WithRequestHostMiddleware). Its code is a credential and its state is
+	// single-use, so the request log hides both: a log line must not be able
+	// to replay a sign-in. Both spellings serve one handler: the prefixed path
+	// arrives when the instance is the browser origin, the stripped one through
+	// a scaffolded app's SDK proxy.
+	callback := chain(idpCallbackHandler, "code", "state")
+	mux.Handle(api.IDPCallbackPattern, callback)
+	mux.Handle(api.IDPCallbackUpstreamPattern, callback)
+	mux.Handle("/", chain(apiHandler))
 	return mux, nil
 }
 

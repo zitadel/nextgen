@@ -4,11 +4,19 @@
  * application, and how to compose the connection document.
  *
  * One class per provider, because a provider is not only a table of values.
- * Google is pure data today; GitHub speaks OAuth2 rather than OIDC, has no
- * family-name claim, and needs a second request to read an email at all. A
- * shape that only holds data forces that behaviour somewhere else, where it
- * stops being the provider's business and starts being a branch in shared code.
+ * Google is pure data today; another vendor may not emit a claim, or need a
+ * protocol setting of its own. A shape that only holds data forces that
+ * behaviour somewhere else, where it stops being the provider's business and
+ * starts being a branch in shared code.
  */
+
+import type {
+  ClientIdVariable,
+  ClientSecretVariable,
+  ConnectionSlug,
+  DisplayName,
+  Issuer,
+} from "./types.js";
 
 /**
  * Whether the vendor accepts many redirect URIs on a single client, or needs a
@@ -19,7 +27,7 @@ export type CallbackGuidance = "multi_uri_client" | "app_per_environment";
 
 /** Where a connection points, when not at the vendor. */
 export type ConnectionEndpoints = {
-  readonly issuer?: string;
+  readonly issuer?: Issuer;
 };
 
 /** What a connection document needs beyond the provider's own knowledge. */
@@ -27,7 +35,7 @@ export type ScaffoldOptions = {
   /** Properties the target user schema defines, which bounds the claim mapping. */
   readonly schemaProperties: Iterable<string>;
   /** Slug to write under; defaults to the provider's own. */
-  readonly slug?: string;
+  readonly slug?: ConnectionSlug;
   /** `$schema` pointer, relative to `.zitadel/idps/`. */
   readonly schemaRef?: string;
   /** Point the connection somewhere other than the vendor (local testing). */
@@ -36,22 +44,28 @@ export type ScaffoldOptions = {
 
 export interface IdpProvider {
   /** Default connection slug, and the name `--provider` takes. */
-  readonly slug: string;
+  readonly slug: ConnectionSlug;
   /** Written to the connection and shown on the sign-in button. */
-  readonly displayName: string;
+  readonly displayName: DisplayName;
   /**
    * Written to the connection as `template`. Keys vendor knowledge only —
    * glyphs, button branding, the setup scan — and carries no protocol
-   * behaviour.
+   * behaviour. A custom connection has none, and the field is left out of its
+   * document: the login UI then shows a text-only button.
    */
-  readonly template: string;
-  /** Where the developer registers the application. */
-  readonly consoleUrl: string;
-  /** The vendor's own integration documentation. */
-  readonly docsUrl: string;
-  readonly callbackGuidance: CallbackGuidance;
+  readonly template: string | undefined;
+  /**
+   * Where the developer registers the application. `undefined` for a provider
+   * the catalog knows nothing about: a custom connection points at the
+   * developer's own provider, so there is no console to send them to.
+   */
+  readonly consoleUrl: string | undefined;
+  /** The vendor's own integration documentation, when there is one. */
+  readonly docsUrl: string | undefined;
+  /** `undefined` when nothing is known about how the provider takes redirect URIs. */
+  readonly callbackGuidance: CallbackGuidance | undefined;
   /** The issuer the vendor publishes, and the default when one is asked for. */
-  readonly issuer: string;
+  readonly issuer: Issuer;
   /**
    * The claims this provider emits, keyed by schema property name, narrowed to
    * the properties the target schema actually defines.
@@ -63,8 +77,8 @@ export interface IdpProvider {
 
 /** The project variables a connection's two credentials reference. */
 export type CredentialVariables = {
-  readonly clientId: string;
-  readonly clientSecret: string;
+  readonly clientId: ClientIdVariable;
+  readonly clientSecret: ClientSecretVariable;
 };
 
 /**
@@ -74,10 +88,10 @@ export type CredentialVariables = {
  * connection for the same provider under a slug of its own, and its
  * credentials belong to that connection, not to the provider.
  */
-export function credentialVariables(slug: string): CredentialVariables {
+export function credentialVariables(slug: ConnectionSlug): CredentialVariables {
   return {
-    clientId: credentialVariable(slug, "CLIENT_ID"),
-    clientSecret: credentialVariable(slug, "CLIENT_SECRET"),
+    clientId: credentialVariable(slug, "CLIENT_ID") as ClientIdVariable,
+    clientSecret: credentialVariable(slug, "CLIENT_SECRET") as ClientSecretVariable,
   };
 }
 
@@ -96,7 +110,7 @@ export function credentialVariable(slug: string, suffix: string): string {
  * `idp-connection.json` requires: a whole-value placeholder, with no text
  * around it that would be rendered into the resolved credential.
  */
-export function variableReference(name: string): string {
+export function variableReference(name: ClientIdVariable | ClientSecretVariable): string {
   return `\${{ ${name} }}`;
 }
 
