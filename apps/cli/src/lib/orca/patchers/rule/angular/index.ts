@@ -1,6 +1,6 @@
 import { ZitadelError } from "../../../../errors";
 import { isObject, parseJsonObject, setTopLevelJsonKey } from "../../../../json";
-import { npmDistTagForCliVersion } from "../../../../public-cli";
+import { sdkVersionForCli } from "../../../../public-cli";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
@@ -116,7 +116,7 @@ export class AngularPatcher extends AbstractRulePatcher {
       {
         kind: "add-dep",
         name: SDK_DEPENDENCY,
-        version: npmDistTagForCliVersion(ctx.cliVersion),
+        version: sdkVersionForCli(ctx.cliVersion),
       },
     ];
   }

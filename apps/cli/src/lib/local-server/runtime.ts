@@ -5,6 +5,7 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 import { isErrno, ZitadelError } from "../errors";
+import { isPortableShellWord } from "../public-cli";
 import { parseJsonObject } from "../json";
 import { EMPTY_SUMMARY, type EnvSummary, isEnvSummary } from "./env-vars";
 
@@ -243,8 +244,18 @@ export async function readNearestRuntimeMetadata(
   cwd: string,
 ): Promise<{ dir: string; runtime: RuntimeMetadata } | undefined> {
   const dir = await findUpward(cwd, LOCAL_RUNTIME_FILE);
-  const runtime = dir ? await readRuntimeMetadata(dir) : undefined;
-  return dir && runtime ? { dir, runtime } : undefined;
+  if (!dir) {
+    return undefined;
+  }
+  let runtime: RuntimeMetadata | undefined;
+  try {
+    runtime = await readRuntimeMetadata(dir);
+  } catch (error) {
+    // A record in a parent is recovered where it is: the bare commands would
+    // act on the working directory instead.
+    throw dir === cwd ? error : retargetMalformedRuntime(error, dir);
+  }
+  return runtime ? { dir, runtime } : undefined;
 }
 
 /**
@@ -488,5 +499,31 @@ function malformedRuntime(input: Record<string, unknown>): ZitadelError {
     hint: "Run `zitadel reset --force`, then `zitadel start`.",
     nextCommands: ["zitadel reset --force", "zitadel start"],
     details: input,
+  });
+}
+
+/**
+ * The malformed-record error again, with its recovery aimed at `dir`. The
+ * commands are written out only when `dir` can sit in them unquoted on every
+ * shell (POSIX, PowerShell, cmd.exe quote differently); otherwise the
+ * arguments are handed over as `details.suggested_args`, which no shell reads.
+ */
+export function retargetMalformedRuntime(error: unknown, dir: string): unknown {
+  if (!(error instanceof ZitadelError) || error.message !== `${LOCAL_RUNTIME_FILE} is malformed`) {
+    return error;
+  }
+  const resetArgs = ["reset", "--force", "--cwd", dir];
+  const startArgs = ["start", "--cwd", dir];
+  const suggestedArgs = [resetArgs, startArgs];
+  const portable = suggestedArgs.every((args) => args.every(isPortableShellWord));
+  const reset = `zitadel ${resetArgs.join(" ")}`;
+  const start = `zitadel ${startArgs.join(" ")}`;
+  return new ZitadelError(error.code, error.message, {
+    hint: portable
+      ? `Run \`${reset}\`, then \`${start}\`.`
+      : `Run \`zitadel reset --force\`, then \`zitadel start\`, each with --cwd ${dir} ` +
+        "(details.suggested_args holds the exact arguments).",
+    ...(portable ? { nextCommands: [reset, start] } : {}),
+    details: { ...(error.details as Record<string, unknown>), suggested_args: suggestedArgs },
   });
 }

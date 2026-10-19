@@ -44,6 +44,11 @@ own `pnpm run build`.
 | [`build.sh`](build.sh) | the `server` service's build: login UI, launcher, migrations |
 | [`setup-secrets.sh`](setup-secrets.sh) | mints an environment's master key and root admin (with [`admin-document.mjs`](admin-document.mjs)) and sets them on the Vercel project; the originals go to 1Password |
 
+`pnpm run cloud` runs the same services on http://localhost:3000 with
+`vercel dev`, the server on SQLite and a throwaway master key
+([`scripts/run-cloud.mjs`](../../scripts/run-cloud.mjs); the runbook's
+[Running the cloud locally](../../docs/runbooks/cloud.md#running-the-cloud-locally)).
+
 Every deployment is tested once it is built:
 [`deployment-checks.yml`](../../.github/workflows/deployment-checks.yml) runs the services'
 contract suites against the deployment's URL (the runbook's

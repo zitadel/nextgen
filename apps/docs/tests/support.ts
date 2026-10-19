@@ -4,16 +4,65 @@ import type { APIResponse } from "@playwright/test";
 export interface IndexedPage {
   title: string;
   url: string;
+  description?: string;
 }
 
 /** The pages the index lists, in its order. */
 export function parseIndex(index: string): IndexedPage[] {
-  return [...index.matchAll(/^\s*- \[([^\]]+)\]\(([^)\s]+)\)/gm)].map(
-    ([, title = "", url = ""]) => ({
+  return [...index.matchAll(/^\s*- \[([^\]]+)\]\(([^)\s]+)\)(?:: (.*))?$/gm)].map(
+    ([, title = "", url = "", description]) => ({
       title,
       url,
+      ...(description !== undefined && { description }),
     }),
   );
+}
+
+/**
+ * The lines of /docs/llms.txt that are not where the page tree puts a line:
+ * its `# ` heading, a `> ` summary, then one `- ` line per page, folder or
+ * separator, each folder followed by its children one level deeper. A
+ * description that runs over several lines breaks out of its entry.
+ */
+export function indexStrays(index: string): string[] {
+  const lines = index.split("\n").filter((line) => line.trim() !== "");
+  const strays: string[] = [];
+  let level = -1;
+  let folder = false;
+  lines.forEach((line, i) => {
+    if (i === 0 && line.startsWith("# ")) return;
+    if (level === -1 && line.startsWith("> ")) return;
+    const entry = /^((?: {2})*)- (\S.*)$/.exec(line);
+    const depth = entry ? (entry[1] ?? "").length / 2 : Number.NaN;
+    if (!entry || depth > level + 1 || (folder && depth !== level + 1)) {
+      strays.push(line);
+      return;
+    }
+    const text = entry[2] ?? "";
+    folder = !text.startsWith("[") && !/^\*\*.+\*\*$/.test(text);
+    level = depth;
+  });
+  if (folder) strays.push("(a folder without pages at the end)");
+  return strays;
+}
+
+/**
+ * What keeps a page's description from being one line of plain text, if
+ * anything; for an API page, Markdown left over from its OpenAPI description
+ * (lib/description.ts).
+ */
+export function descriptionProblem(description: string): string | undefined {
+  if (/[`\n]/.test(description)) return "a backtick or a line break";
+  if (description.length > 160) return `${description.length} characters`;
+  if (/^(?:#|>|-|\||\d+\.)(?:\s|$)/.test(description)) return "Markdown block syntax";
+  const remnant = [
+    ["[", /\[/],
+    ["**", /\*\*/],
+    ["emphasis", /(?:^|[\s(])([*_])[^\s*_][^*_]*?(?<=[^\s*_])\1(?=$|[\s.,;:!?)])/],
+    ["\\", /\\/],
+    ["&amp;", /&amp;/],
+  ] as const;
+  return remnant.find(([, pattern]) => pattern.test(description))?.[0];
 }
 
 /** A page's Markdown URL: the page's URL plus `.md`; the overview's is `/docs/index.md`. */
@@ -38,6 +87,22 @@ export function escapeHtml(text: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#x27;");
+}
+
+/** The text React escaped into an attribute, unescaped. */
+function unescapeHtml(text: string): string {
+  return text
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
+
+/** The content of a page's `<meta>` tag, by its `name` or `property`, if it has one. */
+export function metaContent(html: string, key: string): string | undefined {
+  const tag = html.match(new RegExp(`<meta (?:name|property)="${key}" content="([^"]*)"`));
+  return tag ? unescapeHtml(tag[1] ?? "") : undefined;
 }
 
 /** Runs `fn` over `items`, at most `limit` at a time, keeping the order of the results. */

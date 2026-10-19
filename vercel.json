@@ -4,6 +4,7 @@
     "server": {
       "root": ".",
       "framework": "go",
+      "entrypoint": "apps/cloud/launcher/main.go",
       "buildCommand": "sh apps/cloud/build.sh"
     },
     "console": {
@@ -11,6 +12,7 @@
       "framework": "vite",
       "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
       "buildCommand": "CONSOLE_BASE_PATH=/console/ CONSOLE_VERCEL_INSIGHTS=1 turbo run build",
+      "devCommand": "NODE_ENV=production CONSOLE_BASE_PATH=/console/ vite build --outDir node_modules/.cloud-dev && vite preview --outDir node_modules/.cloud-dev --base / --port $PORT --strictPort",
       "outputDirectory": "../../internal/staticui/console/dist",
       "rewrites": [
         {
@@ -18,7 +20,7 @@
           "destination": "/:path"
         },
         {
-          "source": "/:path*",
+          "source": "/((?!assets/).*)",
           "destination": "/index.html"
         }
       ]
@@ -28,6 +30,7 @@
       "framework": "storybook",
       "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
       "buildCommand": "turbo run build",
+      "devCommand": "NODE_ENV=production storybook build --output-dir node_modules/.cloud-dev --quiet && vite preview --outDir node_modules/.cloud-dev --base / --port $PORT --strictPort",
       "outputDirectory": "dist",
       "rewrites": [
         {

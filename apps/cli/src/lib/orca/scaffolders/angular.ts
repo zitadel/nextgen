@@ -2,6 +2,10 @@ import { rm } from "node:fs/promises";
 import { basename, join } from "node:path";
 
 import { AbstractCLIScaffolder } from "./cli";
+import type { NodeEngines } from "./node-engines";
+
+/** The Angular CLI setup runs, for both `ng new` and the engine lookup. */
+const ANGULAR_CLI = "@angular/cli@latest";
 
 /**
  * Derives a valid Angular project name from the target directory. `ng new`
@@ -25,18 +29,27 @@ function angularProjectName(cwd: string): string {
  * managed component uses only `templateUrl`, so `app.css` would otherwise be a
  * dangling file eject never cleans up. Unlike `create-vite`/`nuxi`, `ng new`
  * needs a real project name plus `--directory .` to populate the current dir.
- * Requires a Node version Angular supports (^22.22.3 || ^24.15.0 || >=26).
+ *
+ * The Angular CLI refuses Node versions outside its `engines.node` range, so
+ * {@link nodeEngines} declares it with `refuse` enforcement and the base
+ * class checks the range before `ng new` runs.
  */
 export class AngularScaffolder extends AbstractCLIScaffolder {
   readonly displayName = "Angular";
   readonly supportedFrameworks: ReadonlyArray<string> = ["angular"];
+  readonly nodeEngines: NodeEngines = {
+    label: "The Angular CLI",
+    spec: ANGULAR_CLI,
+    fallback: "^22.22.3 || ^24.15.0 || >=26.0.0",
+    enforcement: "refuse",
+  };
 
-  async scaffold(cwd: string, _framework: string): Promise<void> {
+  protected async create(cwd: string, _framework: string): Promise<void> {
     this.runCommand(
       "npx",
       [
         "-y",
-        "@angular/cli@latest",
+        ANGULAR_CLI,
         "new",
         angularProjectName(cwd),
         "--directory",

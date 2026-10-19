@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { FRAMEWORK_IDS } from "../../../../../../helpers/framework-ids";
 import type {
   FileOp,
   ScaffoldPlan,
@@ -48,7 +49,9 @@ describe("NuxtPatcher.plan", () => {
     expect(writeContents(plan, "app/pages/login.vue")).not.toContain("align-items: center");
     // The embedding alternative is named where a developer will see it.
     expect(writeContents(plan, "app/pages/login.vue")).toContain('variant="widget"');
-    expect(writeContents(plan, "app/plugins/auth.server.ts")).toContain(MANAGED_MARKER);
+    // The SDK module loads the elements and seeds the auth state itself.
+    expect(writeContents(plan, "app/plugins/auth.server.ts")).toBeUndefined();
+    expect(writeContents(plan, "app/plugins/zitadel-components.client.ts")).toBeUndefined();
     const edit = plan.ops.find(
       (op): op is Extract<FileOp, { kind: "edit" }> =>
         op.kind === "edit" && String(op.path).includes("nuxt.config"),
@@ -69,12 +72,21 @@ describe("NuxtPatcher.plan", () => {
       // already imports, and a plain :locales binding suffices even on the
       // raw custom element — Vue sets bindings whose key exists on the
       // element as DOM properties (no React-18 ref detour as in Next).
-      expect(page).toContain("businessLocales, useZitadelProject");
+      expect(page).toContain("const { $zitadelBusinessLocales: businessLocales } = useNuxtApp();");
       expect(page).toContain(':locales="businessLocales"');
     }
     // Consumer scaffolds keep the neutral built-ins, like minimal ones.
     const consumer = new NuxtPatcher().plan({ ...ctx(), useCase: "consumer" });
     expect(writeContents(consumer, "app/pages/login.vue")).not.toContain("businessLocales");
+  });
+
+  it("imports nothing from @zitadel/* in any generated page", () => {
+    for (const useCase of ["business", "consumer", undefined] as const) {
+      const plan = new NuxtPatcher().plan({ ...ctx(), useCase });
+      for (const path of ["login", "register", "profile"]) {
+        expect(writeContents(plan, `app/pages/${path}.vue`)).not.toContain("@zitadel/");
+      }
+    }
   });
 
   it("leaves profile page chrome to the session card's page surface", () => {
@@ -89,7 +101,7 @@ describe("NuxtPatcher.plan", () => {
     expect(profile).toContain('variant="widget"');
   });
 
-  it("writes at the root for a Nuxt 3 project (appDir '.')", () => {
+  it("writes at the root for a Nuxt 4 root-layout project (appDir '.')", () => {
     const plan = new NuxtPatcher().plan(ctx("."));
     expect(writeContents(plan, "app.vue")).toContain(MANAGED_MARKER);
     expect(writeContents(plan, "pages/login.vue")).toContain(MANAGED_MARKER);
@@ -127,11 +139,13 @@ describe("NuxtPatcher.plan", () => {
     }
   });
 
-  it("adds the SDK dependency at the CLI's prerelease tag", () => {
-    const dep = new NuxtPatcher()
+  it("adds the SDK as the only @zitadel dependency, at the CLI's prerelease tag", () => {
+    const deps = new NuxtPatcher()
       .plan(ctx())
-      .ops.find((op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep");
-    expect(dep).toMatchObject({ name: "@zitadel/sdk-nuxt", version: "alpha" });
+      .ops.filter((op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep");
+    expect(deps).toEqual([
+      expect.objectContaining({ name: "@zitadel/sdk-nuxt", version: "0.1.0-alpha.0" }),
+    ]);
   });
 });
 
@@ -155,6 +169,27 @@ describe("NuxtPatcher.artifacts", () => {
       framework: { id: "nuxt", appDir: "app", devPort: 3000, url: "http://localhost:3000" },
       rendererId: "react",
     });
-    expect(artifacts.conditionalFiles).toEqual(["app/app.vue", "app/pages/index.vue"]);
+    expect(artifacts.conditionalFiles).toEqual(
+      expect.arrayContaining(["app/app.vue", "app/pages/index.vue"]),
+    );
+  });
+
+  it("keeps the plugins older setups wrote as retired, conditionally present files", () => {
+    // Not written any more, but eject still removes them from older apps and
+    // doctor must not fail on their absence.
+    const artifacts = new NuxtPatcher().artifacts({
+      framework: { id: "nuxt", appDir: "app", devPort: 3000, url: "http://localhost:3000" },
+      rendererId: "react",
+    });
+    for (const path of ["app/plugins/auth.server.ts", "app/plugins/zitadel-components.client.ts"]) {
+      expect(artifacts.markedFiles).toContain(path);
+      expect(artifacts.conditionalFiles).toContain(path);
+    }
+  });
+});
+
+describe("NuxtPatcher.canPatch", () => {
+  it.each(FRAMEWORK_IDS)("matches %s only when it is its own framework", (id) => {
+    expect(new NuxtPatcher().canPatch(id)).toBe(id === "nuxt");
   });
 });
