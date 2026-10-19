@@ -4,13 +4,17 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.opentelemetry.io/otel/attribute"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
 )
 
-func TestNewSampler_links(t *testing.T) {
+// Libraries such as the Spanner client start their own root spans from
+// background work. Only a job root that carries zotel.JobRoot may start a
+// trace next to a request.
+func TestNewSampler(t *testing.T) {
 	link := func(flags trace.TraceFlags) trace.Link {
 		return trace.Link{SpanContext: trace.NewSpanContext(trace.SpanContextConfig{
 			TraceID:    trace.TraceID{1},
@@ -24,6 +28,7 @@ func TestNewSampler_links(t *testing.T) {
 		name   string
 		parent trace.SpanContext
 		kind   trace.SpanKind
+		attrs  []attribute.KeyValue
 		links  []trace.Link
 		want   tracesdk.SamplingDecision
 	}{
@@ -31,7 +36,9 @@ func TestNewSampler_links(t *testing.T) {
 		{name: "consumer root with a sampled link is sampled", kind: trace.SpanKindConsumer, links: []trace.Link{unsampled, sampled}, want: tracesdk.RecordAndSample},
 		{name: "consumer root without a sampled link is dropped", kind: trace.SpanKindConsumer, links: []trace.Link{unsampled}, want: tracesdk.Drop},
 		{name: "consumer root without links is dropped", kind: trace.SpanKindConsumer, want: tracesdk.Drop},
-		{name: "internal root is sampled", kind: trace.SpanKindInternal, want: tracesdk.RecordAndSample},
+		{name: "job root is sampled", kind: trace.SpanKindInternal, attrs: []attribute.KeyValue{zotel.JobRoot}, want: tracesdk.RecordAndSample},
+		{name: "internal root without the job marker is dropped", kind: trace.SpanKindInternal, want: tracesdk.Drop},
+		{name: "kindless root is dropped", kind: trace.SpanKindUnspecified, want: tracesdk.Drop},
 		{name: "client root is dropped even with a sampled link", kind: trace.SpanKindClient, links: []trace.Link{sampled}, want: tracesdk.Drop},
 		{name: "consumer child of an unsampled parent is dropped even with a sampled link", parent: unsampled.SpanContext, kind: trace.SpanKindConsumer, links: []trace.Link{sampled}, want: tracesdk.Drop},
 	} {
@@ -41,6 +48,7 @@ func TestNewSampler_links(t *testing.T) {
 				TraceID:       trace.TraceID{2},
 				Name:          "root",
 				Kind:          tt.kind,
+				Attributes:    tt.attrs,
 				Links:         tt.links,
 			})
 			assert.Equal(t, tt.want, got.Decision)

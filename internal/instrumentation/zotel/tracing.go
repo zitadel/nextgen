@@ -7,6 +7,7 @@ import (
 
 	google_trace "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace"
 	"go.opentelemetry.io/contrib/exporters/autoexport"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
@@ -32,12 +33,18 @@ func NewTracerProvider(ctx context.Context, cfg ExporterConfig, traceIDRatio flo
 	return tracerProvider, nil
 }
 
+// JobRoot marks the root span of one run of a background job. Pass it with
+// trace.WithAttributes, together with the Internal kind, when starting that
+// span: the sampler samples an Internal root only when it carries JobRoot, so
+// the root spans libraries start from background work do not become traces.
+var JobRoot = attribute.Bool("zitadel.job.root", true)
+
 // NewSampler returns the same sampler that [NewTracerProvider] builds, for
 // tests that set up their own provider. A Server root (a request) and an
-// Internal root (a run of a background job) are sampled at fraction. A
-// Consumer root linked to a sampled span is always sampled, so work done later
-// for a sampled request (the audit flush) stays in the trace. Any other root
-// is dropped. A child follows its parent.
+// Internal root that carries [JobRoot] (a run of a background job) are sampled
+// at fraction. A Consumer root linked to a sampled span is always sampled, so
+// work done later for a sampled request (the audit flush) stays in the trace.
+// Any other root is dropped. A child follows its parent.
 func NewSampler(fraction float64) trace.Sampler {
 	ratio := trace.TraceIDRatioBased(fraction)
 	return trace.ParentBased(

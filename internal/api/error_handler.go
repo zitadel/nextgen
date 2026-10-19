@@ -151,12 +151,16 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 
 // serverFaultResponse answers a [domain.IsServerFault] error: 501 for a
 // feature that is not implemented, 503 for a transient failure worth retrying,
-// and 500 for everything else.
+// and 500 for everything else. Only the outermost domain error counts, the
+// one whose code the body carries: an internal error that wraps an
+// unavailable one is a 500.
 func serverFaultResponse(err error) *api.ErrorDetailsStatusCode {
-	switch {
-	case errors.Is(err, domain.ErrNotImplemented()):
+	var e domain.Error
+	errors.As(err, &e)
+	switch e.Code {
+	case domain.ErrNotImplemented().Code:
 		return errorResponseWithStatusCode(http.StatusNotImplemented, err)
-	case errors.Is(err, domain.ErrUnavailable()):
+	case domain.ErrUnavailable().Code:
 		return errorResponseWithStatusCode(http.StatusServiceUnavailable, err)
 	default:
 		return internalErrorResponse(err)

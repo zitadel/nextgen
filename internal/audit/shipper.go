@@ -10,6 +10,8 @@ import (
 	"os"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/events"
 )
@@ -115,6 +117,10 @@ func (s *Shipper) Start(ctx context.Context) error {
 		}
 		s.sinks = append(s.sinks, sink)
 	}
+	if len(s.sinks) == 0 {
+		close(s.done)
+		return nil
+	}
 	go s.loop()
 	return nil
 }
@@ -134,13 +140,8 @@ func (s *Shipper) loop() {
 }
 
 func (s *Shipper) shipOnce() {
-	ctx, span := startJobSpan("audit.ShipEvents")
-	defer span.End()
-	listCtx, cancel := context.WithTimeout(ctx, shipListTimeout)
-	projects, err := s.src.ListClaimedProjectIDs(listCtx)
-	cancel()
+	projects, err := s.listProjects()
 	if err != nil {
-		failJobSpan(ctx, err)
 		slog.Error("event shipper: list claimed projects failed",
 			slog.String("error", err.Error()),
 		)
@@ -148,17 +149,39 @@ func (s *Shipper) shipOnce() {
 	}
 	for _, sink := range s.sinks {
 		for _, projectID := range projects {
-			s.shipProject(ctx, sink, projectID)
+			s.shipProject(sink, projectID)
 		}
 	}
 }
 
-func (s *Shipper) shipProject(ctx context.Context, sink *domain.EventSink, projectID string) {
+// listProjects lists the claimed projects under a job span of its own, ended
+// before any project is shipped.
+func (s *Shipper) listProjects() ([]string, error) {
+	ctx, span := startJobSpan("audit.ListClaimedProjects")
+	defer span.End()
+	ctx, cancel := context.WithTimeout(ctx, shipListTimeout)
+	defer cancel()
+	projects, err := s.src.ListClaimedProjectIDs(ctx)
+	if err != nil {
+		failJobSpan(ctx, err)
+	}
+	return projects, err
+}
+
+// shipProject ships one project to one sink under its own job span, so a
+// trace covers one pair rather than a whole tick.
+func (s *Shipper) shipProject(sink *domain.EventSink, projectID string) {
+	ctx, span := startJobSpan("audit.ShipEvents",
+		attribute.String("zitadel.event_sink.id", sink.ID),
+		attribute.String("zitadel.project.id", projectID),
+	)
+	defer span.End()
 	ctx, cancel := context.WithTimeout(ctx, shipProjectTimeout)
 	defer cancel()
 
 	cursor, err := s.src.GetEventSinkCursor(ctx, sink.ID, projectID)
 	if err != nil {
+		failJobSpan(ctx, err)
 		slog.Error("event shipper: get cursor failed",
 			slog.String("sink_id", sink.ID),
 			slog.String("project_id", projectID),
@@ -179,6 +202,7 @@ func (s *Shipper) shipProject(ctx context.Context, sink *domain.EventSink, proje
 		}
 		batch, err := s.src.ListEventsAfterCursor(ctx, projectID, cursor.LastCreatedAt, cursor.LastEventID, shipPageSize)
 		if err != nil {
+			failJobSpan(ctx, err)
 			slog.Error("event shipper: list after cursor failed",
 				slog.String("sink_id", sink.ID),
 				slog.String("project_id", projectID),
@@ -192,6 +216,7 @@ func (s *Shipper) shipProject(ctx context.Context, sink *domain.EventSink, proje
 		var last *domain.Event
 		for _, ev := range batch {
 			if err := s.deliver(ctx, sink, ev); err != nil {
+				failJobSpan(ctx, err)
 				slog.Error("event shipper: deliver failed",
 					slog.String("sink_id", sink.ID),
 					slog.String("project_id", projectID),
@@ -219,6 +244,7 @@ func (s *Shipper) upsertCursor(ctx context.Context, sinkID, projectID string, cu
 		return true
 	}
 	if err := s.src.UpsertEventSinkCursor(ctx, cursor); err != nil {
+		failJobSpan(ctx, err)
 		slog.Error("event shipper: upsert cursor failed",
 			slog.String("sink_id", sinkID),
 			slog.String("project_id", projectID),
