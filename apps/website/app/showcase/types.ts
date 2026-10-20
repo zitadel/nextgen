@@ -1,12 +1,14 @@
 import type { ZlField } from "@zitadel/components/atoms";
 
 /**
- * What setup writes into the app, under `root`: the files that matter, each
- * with what it is (`highlight` for the ones the next steps edit, `page` for
- * the ones the browser beside it can open), and a line for the rest.
+ * What setup writes into the app, under `root`: the `command` that writes
+ * it, the files that matter, each with what it is (`highlight` for the ones
+ * the next steps edit, `page` for the ones the browser beside it can open),
+ * and a line for the rest.
  */
 export type Scaffold = {
   root: string;
+  command: string;
   entries: { path: string; note: string; highlight?: boolean; page?: Page }[];
   rest: string;
 };

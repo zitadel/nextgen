@@ -1,3 +1,4 @@
+import { setupCommand, startCommand } from "../commands";
 import type { Page, Screen, Session } from "./types";
 
 // The login's screens the steps show, drawn live from its atoms
@@ -71,7 +72,7 @@ export const sessions: Session[] = [
       "`start` runs Zitadel on your machine and signs you in to its console. Users, passwords and sessions live there, not in your app.",
     recording: {
       title: "myapp",
-      command: "npx @zitadel/cli@alpha start",
+      command: startCommand,
       output: [
         "Console: signed in as admin@zitadel.localhost. Open this link (works once):",
         "http://localhost:8080/ui/console/login?handoff=…",
@@ -86,6 +87,7 @@ export const sessions: Session[] = [
       "`setup` writes the login pages into your app, with your user model and login flow as files beside them. `npm run dev` serves them.",
     scaffold: {
       root: "myapp",
+      command: setupCommand,
       entries: [
         { path: "app/login/page.tsx", note: "Login page", page: login },
         { path: "app/register/page.tsx", note: "Registration page", page: registration },
