@@ -32,7 +32,7 @@ Start app by hand, or adjusting a scaffolded wiring.
 pnpm add @zitadel/sdk-tanstack-start@alpha
 ```
 
-Peer deps: `@tanstack/react-start >=1`, `react >=18`, `react-dom >=18`.
+Peer deps: `@tanstack/react-start >=1.168.10`, `react >=18`, `react-dom >=18`.
 
 ## Integrate
 

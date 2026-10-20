@@ -456,7 +456,7 @@ describe("DependencyCheck", () => {
     ],
     [
       "tanstack-start",
-      { react: "^19", "@tanstack/react-start": "^1" },
+      { react: "^19", "@tanstack/react-start": "^1.168.10" },
       "@zitadel/sdk-tanstack-start",
     ],
     [
