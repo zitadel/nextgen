@@ -9,12 +9,17 @@
 -- CONCURRENTLY, so the parent index is created ON ONLY the parent, which is
 -- instant and leaves it invalid, the partition's index is built CONCURRENTLY,
 -- and attaching it makes the parent valid. NO TRANSACTION above is for the
--- CONCURRENTLY build. Every step converges on a rerun after a failure:
--- attaching an index that is already attached does nothing.
+-- CONCURRENTLY build.
+--
+-- A failed or cancelled build leaves an INVALID partition index behind, so the
+-- build is preceded by a DROP, as in 000019: a rerun rebuilds it instead of
+-- keeping the leftover, which attaching would not repair. The attach is the
+-- last step, so a failure always leaves the partition index unattached.
 CREATE INDEX IF NOT EXISTS idx_users_schema_url
     ON ONLY zitadel_nextgen.users (project_id, schema_url);
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_users_part_0_schema_url
+DROP INDEX CONCURRENTLY IF EXISTS zitadel_nextgen.idx_users_part_0_schema_url;
+CREATE INDEX CONCURRENTLY idx_users_part_0_schema_url
     ON zitadel_nextgen.users_part_0 (project_id, schema_url);
 
 ALTER INDEX zitadel_nextgen.idx_users_schema_url

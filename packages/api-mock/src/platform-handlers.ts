@@ -1155,7 +1155,14 @@ export function setupPlatformHandlers() {
       // and the generated zod does not coerce, so out-of-range limits are
       // rejected by the schema (1-100) rather than silently normalised.
       const { limit, ...rest } = queryRecord(request);
-      const raw = { ...rest, ...(limit === undefined ? {} : { limit: Number(limit) }) };
+      // `expand` repeats (`expand=in_use&expand=…`) and is an array in the
+      // spec; queryRecord keeps only its last value.
+      const expand = new URL(request.url).searchParams.getAll("expand");
+      const raw = {
+        ...rest,
+        ...(limit === undefined ? {} : { limit: Number(limit) }),
+        ...(expand.length === 0 ? {} : { expand }),
+      };
       const query = parse(ListSchemasQueryParams, raw, "invalid_query");
       if (!query.ok) {
         return query.response;
@@ -1181,13 +1188,15 @@ export function setupPlatformHandlers() {
         return HttpResponse.json(errorBody("req.invalid", "invalid page token"), { status: 400 });
       }
       const page = records.slice(start, start + query.data.limit);
+      // The mock keeps no users, so no revision is ever in use.
+      const inUse = query.data.expand?.includes("in_use") ? { in_use: false } : {};
       const next =
         start + query.data.limit < records.length ? String(start + query.data.limit) : undefined;
       const responseBody: ListSchemas200 = {
         schemas: page.map((r) => ({
           id: r.id,
           schema: r.body,
-          metadata: { created_at: r.createdAt },
+          metadata: { created_at: r.createdAt, ...inUse },
         })),
         next_page_token: next,
       };

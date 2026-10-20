@@ -127,6 +127,12 @@ describe("zitadel resources", () => {
     // ...and a GET list is described in the same vocabulary, narrowed to what
     // it actually accepts, so an agent never has to guess per transport.
     expect(find("events", "category")?.operations).toEqual(["equals"]);
+    // A query-body field narrowed to what the server implements for it.
+    expect(find("users", "schema_object_type")?.operations).toEqual([
+      "equals",
+      "not_equals",
+      "contains",
+    ]);
     expect(find("events", "category")?.combine).toBe("or");
     expect(find("schemas", "revisions")?.values).toEqual(["all", "latest"]);
 
