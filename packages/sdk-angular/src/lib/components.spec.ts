@@ -300,6 +300,13 @@ describe("server-rendered widget config", () => {
     });
   });
 
+  it("writes the login language into the server markup only when one is set", async () => {
+    const unset = await serverRender(`<zitadel-auth-login />`, [ZitadelLoginComponent]);
+    expect(attributesOf(unset, widgetTags.login)).not.toHaveProperty("lang");
+    const set = await serverRender(`<zitadel-auth-login lang="de" />`, [ZitadelLoginComponent]);
+    expect(attributesOf(set, widgetTags.login)).toMatchObject({ lang: "de" });
+  });
+
   it("puts the session config into the server markup", async () => {
     const html = await serverRender(`<zitadel-auth-session postSignOutUrl="/bye" heading="Hi" />`, [
       ZitadelSessionComponent,

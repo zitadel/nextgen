@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { defineConfig } from "vitest/config";
+import { defineConfig, type Plugin } from "vitest/config";
 
 import { baseTest, edgeProject } from "../../vitest.shared.mjs";
 
@@ -9,6 +9,30 @@ import { baseTest, edgeProject } from "../../vitest.shared.mjs";
 const alias = {
   "server-only": fileURLToPath(new URL("./src/__tests__/stubs/server-only.ts", import.meta.url)),
 };
+
+/**
+ * Next compiles a `"use client"` module, in the server graph the edge entries
+ * run in, into references that throw when called there, and runs the real module
+ * only in the client graph. Vitest has one graph, where the real module would
+ * run against the server build of React, which has no `createContext`. This
+ * does what Next does: it swaps each such module for its throwing references.
+ */
+function clientReferences(): Plugin {
+  return {
+    name: "client-references",
+    enforce: "post",
+    transform(code) {
+      if (!/^\s*["']use client["']/.test(code)) return null;
+      const names = [...code.matchAll(/^export function (\w+)/gm)].map((match) => match[1]);
+      return names
+        .map(
+          (name) =>
+            `export function ${name}() { throw new Error("${name} is a client reference and cannot be called on the server"); }`,
+        )
+        .join("\n");
+    },
+  };
+}
 
 export default defineConfig({
   cacheDir: ".vitest",
@@ -28,19 +52,23 @@ export default defineConfig({
         },
       },
       // `/middleware` is the SDK's edge entry (see the README), and the JWT
-      // helpers it verifies sessions with: both must run in the edge VM. So
-      // must `/client`, which registers the elements in the browser: the
-      // components package resolves to its entry without the elements under
-      // `edge-light` (see its package.json).
-      edgeProject({
-        include: [
-          "src/__tests__/middleware.test.ts",
-          "src/__tests__/lib/jwt.test.ts",
-          "src/__tests__/client.edge.test.ts",
-        ],
-        conditions: ["edge-light"],
-        alias,
-      }),
+      // helpers it verifies sessions with: both must run in the edge VM. So must
+      // `/client`, which registers the elements in the browser: the components
+      // package resolves to its entry without the elements under `edge-light`
+      // (see its package.json).
+      {
+        ...edgeProject({
+          include: [
+            "src/__tests__/middleware.test.ts",
+            "src/__tests__/lib/jwt.test.ts",
+            "src/__tests__/index.test.ts",
+            "src/__tests__/server.test.ts",
+            "src/__tests__/client.edge.test.ts",
+          ],
+          conditions: ["react-server", "edge-light"],
+        }),
+        plugins: [clientReferences()],
+      },
     ],
   },
 });

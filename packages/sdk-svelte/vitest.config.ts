@@ -1,7 +1,7 @@
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { configDefaults, defineConfig } from "vitest/config";
 
-import { baseTest } from "../../vitest.shared.mjs";
+import { baseTest, edgeProject } from "../../vitest.shared.mjs";
 
 /**
  * Two projects in one config:
@@ -45,6 +45,10 @@ export default defineConfig({
           include: ["src/**/*.ssr.spec.ts"],
           exclude: [...configDefaults.exclude, ".svelte-kit/**"],
         },
+      },
+      {
+        ...edgeProject({ include: ["src/index.ssr.spec.ts"], conditions: ["worker"] }),
+        plugins: [svelte()],
       },
     ],
   },

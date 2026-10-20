@@ -46,6 +46,7 @@
     "svelte": "^5.0.0"
   },
   "devDependencies": {
+    "@edge-runtime/vm": "catalog:",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@testing-library/svelte": "^5.3.1",
     "@types/node": "catalog:",

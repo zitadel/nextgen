@@ -1,7 +1,7 @@
 import solid from "vite-plugin-solid";
 import { defineConfig } from "vitest/config";
 
-import { baseTest } from "../../vitest.shared.mjs";
+import { baseTest, edgeProject } from "../../vitest.shared.mjs";
 
 /**
  * Three projects in one config, one per way Solid compiles the wrappers:
@@ -42,6 +42,10 @@ export default defineConfig({
           environment: "node",
           include: ["src/**/*.ssr.spec.tsx"],
         },
+      },
+      {
+        ...edgeProject({ include: ["src/index.ssr.spec.tsx"], conditions: ["worker"] }),
+        plugins: [solid({ ssr: true })],
       },
       {
         cacheDir: ".vitest/hydrate",

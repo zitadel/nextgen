@@ -1,3 +1,5 @@
+import { globSync } from "node:fs";
+
 /**
  * Shared Vitest `test` defaults, spread into every project's own config:
  *
@@ -80,10 +82,17 @@ export const sourceConditions = ["@zitadel/source"];
  * `conditions` are extra resolve conditions, e.g. `sourceConditions`; `alias`
  * is the package's own `resolve.alias`.
  *
+ * Throws when `include` matches no file in the working directory.
+ *
  * @param {import("./vitest.shared.d.mts").EdgeProjectOptions} options
  * @returns {import("./vitest.shared.d.mts").EdgeProject}
  */
 export function edgeProject({ include, exclude = [], conditions = [], alias = {} }) {
+  // A pattern that matches nothing would leave the project running no spec
+  // and every run green, so fail when the config loads instead.
+  if (globSync(include, { cwd: process.cwd() }).length === 0) {
+    throw new Error(`edgeProject: no spec matches ${include.join(", ")} in ${process.cwd()}`);
+  }
   return {
     cacheDir: ".vitest/edge",
     resolve: { conditions, alias },

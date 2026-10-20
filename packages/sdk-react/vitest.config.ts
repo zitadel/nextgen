@@ -37,8 +37,8 @@ export default defineConfig({
       },
       // The wrapper must load on an edge runtime, which has no DOM: the
       // components package resolves to its entry without the elements under
-      // `edge-light` (see its package.json).
-      edgeProject({ include: ["src/**/*.edge.spec.{ts,tsx}"], conditions: ["edge-light"] }),
+      // `worker` (see its package.json).
+      edgeProject({ include: ["src/**/*.edge.spec.{ts,tsx}"], conditions: ["worker"] }),
     ],
   },
 });
