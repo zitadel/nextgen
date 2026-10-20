@@ -27,6 +27,7 @@ import {
   sessionConfig,
 } from "./__tests__/config-parity-harness";
 import { PasswordToggleHarness, ResumeFlowIdHarness } from "./__tests__/login-prop-harness";
+import { resumeServerLogin } from "./__tests__/resume-server-markup";
 import { UnsetPropHarness } from "./__tests__/unset-prop-harness";
 import { listenWithReplay, WRAPPER_MARKER } from "./early-events";
 import {
@@ -447,6 +448,50 @@ describe("resumed server markup", () => {
       purpose: "register",
       project_id: "proj-test",
     });
+  });
+});
+
+describe("resuming a server-rendered login", () => {
+  const resumed = { projectId: "proj-global", proxyPath: "https://flow.test.invalid" };
+
+  it("starts its first flow with the purpose the server rendered", async () => {
+    const fetched = vi.spyOn(globalThis, "fetch");
+
+    const { host, firstStep } = await resumeServerLogin({ project: resumed, purpose: "register" });
+
+    await expect.poll(() => widgetIn(host, widgetTags.login).project).toEqual(resumed);
+    await firstStep;
+    const bodies = await Promise.all(
+      fetched.mock.calls.map(async ([input, init]) =>
+        JSON.parse(
+          String(init?.body ?? (input instanceof Request ? await input.clone().text() : "null")),
+        ),
+      ),
+    );
+    const created = bodies.filter((body) => body?.project_id);
+    expect(created).toHaveLength(1);
+    expect(created[0]).toMatchObject({ purpose: "register" });
+  });
+
+  it("loads the supplied flow on its first request instead of creating one", async () => {
+    const fetched = vi.spyOn(globalThis, "fetch");
+
+    const { host, firstStep } = await resumeServerLogin({
+      project: resumed,
+      resumeFlowId: "flow_123",
+    });
+    const rendered = widgetIn(host, widgetTags.login);
+
+    expect(rendered.getAttribute("resume-flow-id")).toBe("flow_123");
+    await expect.poll(() => rendered.project).toEqual(resumed);
+    await firstStep;
+    await rendered.updateComplete;
+    await Promise.all(fetched.mock.results.map((result) => result.value));
+    const [first] = fetched.mock.calls.map(([input, init]) => new Request(input, init));
+    expect(first?.method).toBe("GET");
+    expect(first?.url).toContain("flow_123");
+    expect(widgetIn(host, widgetTags.login)).toBe(rendered);
+    expect(fetched).toHaveBeenCalledTimes(1);
   });
 });
 
