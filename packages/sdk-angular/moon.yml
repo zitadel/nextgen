@@ -11,6 +11,8 @@ dependsOn:
 tasks:
   typecheck:
     deps:
+      # public-api.edge.spec.ts imports this package's built dist.
+      - "~:build"
       - "api-mock:build"
       - "components:build"
       - "sdk-core:build"

@@ -3,7 +3,7 @@
   "extends": ["//"],
   "tasks": {
     "typecheck": {
-      "dependsOn": ["@zitadel/api-mock#build", "@zitadel/design-tokens#build"]
+      "dependsOn": ["build", "@zitadel/api-mock#build", "@zitadel/design-tokens#build"]
     },
     // The standalone bundle inlines @zitadel/config/template (see
     // tsdown.config.ts); without this edge the two builds race and rolldown
