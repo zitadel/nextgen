@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import "./zl-select.js";
 import type { ZlSelect, ZlSelectChangeDetail, ZlSelectOption } from "./zl-select.js";
@@ -158,33 +158,31 @@ describe("<zl-select> markup", () => {
     expect(changes).toEqual([{ name: "country", value: "us" }]);
   });
 
-  it("keeps zl-change inside the widget, capture phase included", async () => {
+  it("keeps zl-change inside the widget", async () => {
+    // Arrange
+    const heardOnPage = vi.fn();
+    const heardInWidget = vi.fn();
+    const host = document.body.appendChild(document.createElement("div"));
     const root = host.attachShadow({ mode: "open" });
-    const el = document.createElement("zl-select");
-    el.name = "country";
-    el.options = OPTIONS;
-    root.appendChild(el);
-    await el.updateComplete;
-    const eventsSeenByPage: string[] = [];
-    const recordPageEvent = (): void => {
-      eventsSeenByPage.push("change");
-    };
-    for (const pageTarget of [window, document]) {
-      for (const useCapture of [true, false]) {
-        pageTarget.addEventListener("zl-change", recordPageEvent, useCapture);
-      }
-    }
-    const eventsSeenByWidget: string[] = [];
-    el.addEventListener("zl-change", () => {
-      eventsSeenByWidget.push("change");
+    const element = document.createElement("zl-select");
+    element.name = "country";
+    element.options = OPTIONS;
+    window.addEventListener("zl-change", heardOnPage, true);
+    element.addEventListener("zl-change", heardInWidget);
+    onTestFinished(() => {
+      window.removeEventListener("zl-change", heardOnPage, true);
+      host.remove();
     });
-    const select = native(el);
+    root.append(element);
+    await element.updateComplete;
 
-    select.value = "us";
-    select.dispatchEvent(new Event("change", { bubbles: true }));
+    // Act
+    native(element).value = "us";
+    native(element).dispatchEvent(new Event("change", { bubbles: true }));
 
-    expect(eventsSeenByWidget).toEqual(["change"]);
-    expect(eventsSeenByPage).toEqual([]);
+    // Assert
+    expect(heardInWidget).toHaveBeenCalledOnce();
+    expect(heardOnPage).not.toHaveBeenCalled();
   });
 
   it("lets the user clear back to the empty option", async () => {

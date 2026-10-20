@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import "./zl-field.js";
 import type { ZlField } from "./zl-field.js";
@@ -300,36 +300,30 @@ describe("<zl-field> password toggle", () => {
 });
 
 describe("<zl-field> events", () => {
-  it("keeps zl-input inside the widget, capture phase included", async () => {
-    const host = document.createElement("div");
-    document.body.appendChild(host);
+  const input = (field: ZlField) => field.shadowRoot?.querySelector("input") as HTMLInputElement;
+
+  it("keeps zl-input inside the widget", async () => {
+    // Arrange
+    const heardOnPage = vi.fn();
+    const heardInWidget = vi.fn();
+    const host = document.body.appendChild(document.createElement("div"));
     const root = host.attachShadow({ mode: "open" });
-    const field = document.createElement("zl-field");
-    field.name = "pw";
-    root.appendChild(field);
-    await field.updateComplete;
-    const eventsSeenByPage: string[] = [];
-    document.addEventListener(
-      "zl-input",
-      () => {
-        eventsSeenByPage.push("input");
-      },
-      true,
-    );
-    const eventsSeenByWidget: string[] = [];
-    field.addEventListener("zl-input", () => {
-      eventsSeenByWidget.push("input");
+    const element = document.createElement("zl-field");
+    window.addEventListener("zl-input", heardOnPage, true);
+    element.addEventListener("zl-input", heardInWidget);
+    onTestFinished(() => {
+      window.removeEventListener("zl-input", heardOnPage, true);
+      host.remove();
     });
-    const native = field.shadowRoot?.querySelector("input");
-    if (!native) {
-      throw new Error("no native input");
-    }
+    root.append(element);
+    await element.updateComplete;
 
-    native.value = "hunter2";
-    native.dispatchEvent(new Event("input", { bubbles: true }));
+    // Act
+    input(element).value = "hunter2";
+    input(element).dispatchEvent(new Event("input", { bubbles: true }));
 
-    expect(eventsSeenByWidget).toEqual(["input"]);
-    expect(eventsSeenByPage).toEqual([]);
-    host.remove();
+    // Assert
+    expect(heardInWidget).toHaveBeenCalledOnce();
+    expect(heardOnPage).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import "./zl-checkbox.js";
 import type { ZlCheckbox, ZlCheckboxChangeDetail } from "./zl-checkbox.js";
@@ -77,37 +77,29 @@ describe("<zl-checkbox> form participation (chromium)", () => {
     expect(nativeChanges).toBe(1);
   });
 
-  it("keeps zl-change inside the widget, capture phase included", async () => {
-    const host = document.createElement("div");
-    document.body.appendChild(host);
+  it("keeps zl-change inside the widget", async () => {
+    // Arrange
+    const heardOnPage = vi.fn();
+    const heardInWidget = vi.fn();
+    const host = document.body.appendChild(document.createElement("div"));
     const root = host.attachShadow({ mode: "open" });
-    const checkbox = document.createElement("zl-checkbox");
-    checkbox.name = "terms";
-    root.appendChild(checkbox);
-    await checkbox.updateComplete;
-    const eventsSeenByPage: string[] = [];
-    const recordPageEvent = (): void => {
-      eventsSeenByPage.push("change");
-    };
-    for (const pageTarget of [window, document]) {
-      for (const useCapture of [true, false]) {
-        pageTarget.addEventListener("zl-change", recordPageEvent, useCapture);
-      }
-    }
-    const eventsSeenByWidget: string[] = [];
-    checkbox.addEventListener("zl-change", () => {
-      eventsSeenByWidget.push("change");
+    const element = document.createElement("zl-checkbox");
+    element.name = "terms";
+    window.addEventListener("zl-change", heardOnPage, true);
+    element.addEventListener("zl-change", heardInWidget);
+    onTestFinished(() => {
+      window.removeEventListener("zl-change", heardOnPage, true);
+      host.remove();
     });
-    const input = checkbox.shadowRoot?.querySelector("input");
-    if (!input) {
-      throw new Error("no native checkbox");
-    }
+    root.append(element);
+    await element.updateComplete;
 
-    input.click();
+    // Act
+    element.shadowRoot?.querySelector("input")?.click();
 
-    expect(eventsSeenByWidget).toEqual(["change"]);
-    expect(eventsSeenByPage).toEqual([]);
-    host.remove();
+    // Assert
+    expect(heardInWidget).toHaveBeenCalledOnce();
+    expect(heardOnPage).not.toHaveBeenCalled();
   });
 
   it("restores the default checked state when the host form is reset", async () => {

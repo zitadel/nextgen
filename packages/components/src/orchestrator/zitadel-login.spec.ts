@@ -20,7 +20,17 @@ import {
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  onTestFinished,
+  vi,
+} from "vitest";
 
 import "./zitadel-login.js";
 import type { ZlAlert } from "../atoms/zl-alert.js";
@@ -159,97 +169,94 @@ describe("<zitadel-login> against the typed Flow API", () => {
       );
     }
 
-    /** Types the value into the field `f` and returns what a page listener saw on the document. */
-    async function flowInputEventsWhileTyping(
-      kind: FieldKind,
-      autocomplete?: string,
-    ): Promise<unknown[]> {
-      serveStepWithField(kind, autocomplete);
-      const element = await mount(host);
-      await waitFor(() => element.shadowRoot?.querySelector('zl-field[name="f"]'));
-      const details: unknown[] = [];
-      const recordDetail = (event: Event): void => {
-        if (event instanceof CustomEvent) {
-          details.push(event.detail);
-        }
-      };
-      document.addEventListener("zitadel-flow-input", recordDetail);
-      type(element, "f", TYPED_VALUE);
-      document.removeEventListener("zitadel-flow-input", recordDetail);
-      return details;
-    }
-
-    const rows: ReadonlyArray<{
+    const SECRET_FIELD_CASES: ReadonlyArray<{
       kind: FieldKind;
       autocomplete?: string;
-      secret: boolean;
       description: string;
     }> = [
       {
         kind: "password",
         autocomplete: "current-password",
-        secret: true,
-        description: "a password field for the current password is not dispatched",
+        description: "a password field for the current password",
       },
-      {
-        kind: "password",
-        secret: true,
-        description: "a password field without an autocomplete token is not dispatched",
-      },
+      { kind: "password", description: "a password field without an autocomplete token" },
       {
         kind: "password",
         autocomplete: "new-password",
-        secret: true,
-        description: "a password field for a new password is not dispatched",
+        description: "a password field for a new password",
       },
-      {
-        kind: "text",
-        autocomplete: "one-time-code",
-        secret: true,
-        description: "a one-time-code field is not dispatched",
-      },
+      { kind: "text", autocomplete: "one-time-code", description: "a one-time-code field" },
       {
         kind: "text",
         autocomplete: "ONE-TIME-CODE",
-        secret: true,
-        description: "a one-time-code token in uppercase is not dispatched",
+        description: "a one-time-code token in uppercase",
       },
       {
         kind: "text",
         autocomplete: "section-x one-time-code",
-        secret: true,
-        description: "a one-time-code token among several tokens is not dispatched",
-      },
-      {
-        kind: "email",
-        autocomplete: "username",
-        secret: false,
-        description: "an email field for a username is dispatched with its name and value",
-      },
-      {
-        kind: "text",
-        secret: false,
-        description: "a plain text field without an autocomplete token is dispatched",
-      },
-      {
-        kind: "tel",
-        autocomplete: "tel",
-        secret: false,
-        description: "a telephone field is dispatched",
-      },
-      {
-        kind: "number",
-        secret: false,
-        description: "a number field is dispatched",
+        description: "a one-time-code token among several tokens",
       },
     ];
 
-    it.each(rows)("$description", async ({ kind, autocomplete, secret }) => {
-      const details = await flowInputEventsWhileTyping(kind, autocomplete);
+    const PLAIN_FIELD_CASES: ReadonlyArray<{
+      kind: FieldKind;
+      autocomplete?: string;
+      description: string;
+    }> = [
+      { kind: "email", autocomplete: "username", description: "an email field for a username" },
+      { kind: "text", description: "a plain text field without an autocomplete token" },
+      { kind: "tel", autocomplete: "tel", description: "a telephone field" },
+      { kind: "number", description: "a number field" },
+    ];
 
-      const expected = secret ? [] : [{ name: "f", value: TYPED_VALUE }];
-      expect(details).toEqual(expected);
-    });
+    it.each(SECRET_FIELD_CASES)(
+      "does not dispatch zitadel-flow-input for $description",
+      async ({ kind, autocomplete }) => {
+        // Arrange
+        const heardOnPage = vi.fn();
+        const host = document.body.appendChild(document.createElement("div"));
+        serveStepWithField(kind, autocomplete);
+        document.addEventListener("zitadel-flow-input", heardOnPage);
+        onTestFinished(() => {
+          document.removeEventListener("zitadel-flow-input", heardOnPage);
+          host.remove();
+        });
+        const element = await mount(host);
+        await waitFor(() => element.shadowRoot?.querySelector('zl-field[name="f"]'));
+
+        // Act
+        type(element, "f", TYPED_VALUE);
+
+        // Assert
+        expect(heardOnPage).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each(PLAIN_FIELD_CASES)(
+      "dispatches zitadel-flow-input with name and value for $description",
+      async ({ kind, autocomplete }) => {
+        // Arrange
+        const heardOnPage = vi.fn();
+        const host = document.body.appendChild(document.createElement("div"));
+        serveStepWithField(kind, autocomplete);
+        document.addEventListener("zitadel-flow-input", heardOnPage);
+        onTestFinished(() => {
+          document.removeEventListener("zitadel-flow-input", heardOnPage);
+          host.remove();
+        });
+        const element = await mount(host);
+        await waitFor(() => element.shadowRoot?.querySelector('zl-field[name="f"]'));
+
+        // Act
+        type(element, "f", TYPED_VALUE);
+
+        // Assert
+        expect(heardOnPage).toHaveBeenCalledOnce();
+        expect(heardOnPage.mock.calls[0]?.[0]).toMatchObject({
+          detail: { name: "f", value: TYPED_VALUE },
+        });
+      },
+    );
   });
 
   it("starts a flow on mount and renders the first step", async () => {
