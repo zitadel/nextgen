@@ -9,11 +9,13 @@ import type { NodeEngines } from "./node-engines";
  * starter `src/routes/index.tsx` so the patcher can write the managed landing
  * page without colliding with boilerplate.
  *
- * Uses `create-start-app` in its default (full TanStack Start) mode — NOT
- * `create-tsrouter-app --add-ons start`, which produces a router-only SPA
- * without `@tanstack/react-start` (so the detector would not recognise it).
- * `--framework react` selects the React variant; `--no-examples`/`--no-toolchain`
- * keep the output minimal. `vite.config.*` is left in place — auth is wired
+ * Uses `@tanstack/cli create` (which replaces the deprecated
+ * `create-start-app`) in its default (full TanStack Start) mode — NOT
+ * `--router-only`, which produces a router-only SPA without
+ * `@tanstack/react-start` (so the detector would not recognise it).
+ * `--framework react` selects the React variant, `--deployment nitro` keeps the
+ * Nitro target, and `--no-examples`/`--no-toolchain`/`--no-intent` keep the
+ * output minimal. `vite.config.*` is left in place — auth is wired
  * through `src/start.ts` (the framework's server entry, which the patcher
  * writes), so no config edit is needed.
  */
@@ -22,8 +24,8 @@ export class TanStackStartScaffolder extends AbstractCLIScaffolder {
   readonly supportedFrameworks: ReadonlyArray<string> = ["tanstack-start"];
 
   readonly nodeEngines: NodeEngines = {
-    label: "create-start-app",
-    spec: "create-start-app@latest",
+    label: "@tanstack/cli",
+    spec: "@tanstack/cli@latest",
     fallback: "^20.19.0 || >=22.12.0",
     enforcement: "warn",
   };
@@ -33,12 +35,16 @@ export class TanStackStartScaffolder extends AbstractCLIScaffolder {
       "npx",
       [
         "-y",
-        "create-start-app@latest",
+        "@tanstack/cli@latest",
+        "create",
         ".",
         "--framework",
         "react",
+        "--deployment",
+        "nitro",
         "--no-examples",
         "--no-toolchain",
+        "--no-intent",
         "--no-git",
         "-y",
       ],

@@ -21,6 +21,30 @@ afterEach(async () => {
   }
 });
 
+describe("TanStackStartDetector version floor", () => {
+  it.each(["1.168.9", "1.168.0", "1.100.0"])(
+    "refuses @tanstack/react-start %s, which does not export createCsrfMiddleware",
+    async (version) => {
+      await expect(
+        new TanStackStartDetector().detect(
+          await project({ react: "^19", "@tanstack/react-start": version }),
+        ),
+      ).rejects.toMatchObject({ code: "E_UNSUPPORTED_PROJECT_SHAPE" });
+    },
+  );
+
+  it.each(["1.168.10", "1.169.3", "^1.168.10", "2.0.0", "latest"])(
+    "accepts @tanstack/react-start %s",
+    async (version) => {
+      expect(
+        await new TanStackStartDetector().detect(
+          await project({ react: "^19", "@tanstack/react-start": version }),
+        ),
+      ).not.toBeNull();
+    },
+  );
+});
+
 describe("TanStackStartDetector", () => {
   it("recognises a TanStack Start app by react + @tanstack/react-start and reports appDir 'src'", async () => {
     const facts = await new TanStackStartDetector().detect(
