@@ -229,10 +229,13 @@ export async function packPublicPackages(options = {}) {
   await mapWithConcurrency(PUBLIC_PACKAGE_DIRS, 8, async (dir) => {
     const manifest = await readPackageManifest(repoRoot, join(dir, "package.json"));
     await assertPublishDirectoryReady({ repoRoot, dir, manifest });
-    await runFn("corepack", ["pnpm", "--dir", dir, "pack", "--pack-destination", tarballsDir], {
-      cwd: repoRoot,
-      env: process.env,
-    });
+    // --silent: pnpm 12 lists every packed file (over a thousand for the API
+    // package) and aborts with exit 134 when that burst hits a full output pipe.
+    await runFn(
+      "corepack",
+      ["pnpm", "--dir", dir, "pack", "--pack-destination", tarballsDir, "--silent"],
+      { cwd: repoRoot, env: process.env },
+    );
   });
 
   return tarballsDir;
