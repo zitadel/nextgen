@@ -23,7 +23,7 @@ widgets need Qwik 2.
 - `package.json` — adds `@zitadel/sdk-qwik-router` and `@zitadel/sdk-qwik` as
   `devDependencies` (Qwik bundles those into the server build; the writer moves an existing
   `dependencies` entry rather than listing a package twice), and pins the dev script to the
-  registered port with `--strictPort`
+  registered port with `--strictPort` (an edit eject cannot revert)
 
 No config file is edited: the plugin is a plain route file, so every managed file carries
 the marker.

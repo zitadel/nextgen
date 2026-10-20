@@ -23,10 +23,10 @@ React detector, which excludes `@tanstack/react-start`.
   `ZITADEL_PROJECT_SECRET`, `ZITADEL_ISSUER`, `ZITADEL_URL`,
   `ZITADEL_ENVIRONMENT`)
 - `package.json` — adds `@zitadel/sdk-tanstack-start` (and nothing else from `@zitadel/*`),
-  and pins the dev script to the registered port with `--strictPort`
+  and pins the dev script to the registered port with `--strictPort` (an edit eject cannot revert)
 
-No config file is edited: `src/start.ts` is a plain file, so every managed file carries the
-marker.
+No config file is edited: the start entry is a plain file, so every managed file carries
+the marker.
 
 ## How the proxy works
 

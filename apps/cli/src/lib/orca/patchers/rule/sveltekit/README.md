@@ -21,7 +21,7 @@ from `@zitadel/sdk-svelte`, which is written with runes); older versions are ref
   `ZITADEL_PROJECT_SECRET`, `ZITADEL_ISSUER`, `ZITADEL_URL`,
   `ZITADEL_ENVIRONMENT`)
 - `package.json` — adds `@zitadel/sdk-sveltekit` and `@zitadel/sdk-svelte`, and pins the
-  dev script to the registered port with `--strictPort` (the one edit eject cannot revert)
+  dev script to the registered port with `--strictPort` (an edit eject cannot revert)
 
 No config file is edited: the hook is a plain file, so every managed file carries the marker.
 

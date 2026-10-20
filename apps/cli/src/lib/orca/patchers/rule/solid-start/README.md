@@ -24,7 +24,7 @@ middleware in `app.config.ts` and has no `vite.config`, so it is refused.
   `ZITADEL_PROJECT_SECRET`, `ZITADEL_ISSUER`, `ZITADEL_URL`,
   `ZITADEL_ENVIRONMENT`)
 - `package.json` — adds `@zitadel/sdk-solid-start` and `@zitadel/sdk-solid`, and pins the
-  dev script to the registered port with `--strictPort`
+  dev script to the registered port with `--strictPort` (an edit eject cannot revert)
 
 ## How the proxy works
 
