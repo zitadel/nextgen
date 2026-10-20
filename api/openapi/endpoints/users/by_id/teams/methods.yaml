@@ -19,6 +19,7 @@ get:
     - oauth2:
         - user.read
         - team_membership.read
+    - nextgenSession: []
   responses:
     '200':
       description: The teams of a user are returned

@@ -6,24 +6,32 @@ import {
   type ZitadelConfig,
   type ZitadelProject,
 } from "@zitadel/api/config";
-import {
+import type {
   ZitadelLogin as ZitadelLoginElement,
   ZitadelLogout as ZitadelLogoutElement,
   ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
-import { isStandardAttributeName, standardAttributes, widgetTags } from "@zitadel/sdk-core/types";
+import {
+  isStandardAttributeName,
+  standardAttributes,
+  widgetTags,
+  ZITADEL_LOGIN_EVENTS,
+  ZITADEL_LOGOUT_EVENTS,
+  ZITADEL_SESSION_EVENTS,
+  type WidgetTag,
+  type ZitadelLoginEventMap,
+  type ZitadelLogoutEventMap,
+  type ZitadelSessionEventMap,
+} from "@zitadel/sdk-core/types";
 import * as React from "react";
+// Registers <zitadel-login>, <zitadel-logout> and <zitadel-session> in the browser.
+// The edge build of the components package has no elements, so this does nothing there.
+import "@zitadel/components";
 
 import type {
-  ZitadelFlowCompleteDetail,
-  ZitadelFlowRedirectDetail,
-  ZitadelFlowErrorDetail,
-  ZitadelFlowInputDetail,
-  ZitadelFlowStepDetail,
   ZitadelLoginProps,
   ZitadelLogoutProps,
   ZitadelSessionProps,
-  ZitadelSignoutDetail,
   ZitadelWidgetAttributes,
 } from "./types";
 
@@ -59,6 +67,44 @@ export { businessLocales } from "@zitadel/components";
  * }
  * ```
  */
+/** What `createComponent` takes as the element class: a constructor and its prototype. */
+type ElementClass<Tag extends WidgetTag> = {
+  new (): HTMLElementTagNameMap[Tag];
+  prototype: HTMLElementTagNameMap[Tag];
+};
+
+/**
+ * The one boundary: `createComponent` types its class as a constructor but only
+ * reads `name` and `prototype`; a predicate narrows the stand-in without a cast.
+ */
+function isElementClass<Tag extends WidgetTag>(value: object): value is ElementClass<Tag> {
+  return "name" in value && "prototype" in value;
+}
+
+/** The detail each widget event carries, by event name. */
+type EventDetails = ZitadelLoginEventMap & ZitadelLogoutEventMap & ZitadelSessionEventMap;
+
+/**
+ * The second boundary: `createComponent` reads the event a handler receives from
+ * the brand on its event name, which exists only in the type; a predicate
+ * narrows the name to it after checking the name is a widget event.
+ */
+function isEventName<Name extends keyof EventDetails>(
+  name: Name,
+): name is Name & EventName<CustomEvent<EventDetails[Name]>> {
+  return [...ZITADEL_LOGIN_EVENTS, ...ZITADEL_LOGOUT_EVENTS, ...ZITADEL_SESSION_EVENTS].some(
+    (event) => event === name,
+  );
+}
+
+/** A widget event's name, typed with the event it dispatches. */
+function eventName<Name extends keyof EventDetails>(
+  name: Name,
+): EventName<CustomEvent<EventDetails[Name]>> {
+  if (!isEventName(name)) throw new Error(`${name} is not a widget event`);
+  return name;
+}
+
 /**
  * `createComponent` binds every key found on the element's prototype as a DOM
  * property, and a property is never written into server markup. The widget
@@ -70,23 +116,37 @@ export { businessLocales } from "@zitadel/components";
  * are hidden too, so they are in the server markup; in the browser `createComponent`
  * keeps them, since it removes such an attribute when its prop goes, which React 19
  * does not do for a custom element.
+ *
+ * No element class is imported, because loading one needs a DOM and an edge
+ * runtime has none. In the browser the prototype is the one of the class
+ * registered under `tag`, looked up whenever a prop is classified. On the
+ * server there is no class to ask: a prop this wrapper passes is a property
+ * unless it is hidden, a standard attribute or a kebab-case attribute name.
  */
-function asAttributes<T extends typeof HTMLElement>(
-  elementClass: T,
+function asAttributes<Tag extends WidgetTag>(
+  tag: Tag,
   ...keys: readonly string[]
-): T {
+): ElementClass<Tag> {
   const hidden = new Set<PropertyKey>(keys);
-  const prototype = new Proxy(elementClass.prototype, {
-    has: (target, key) =>
-      !hidden.has(key) &&
-      !(
-        typeof document === "undefined" &&
-        typeof key === "string" &&
-        isStandardAttributeName(key)
-      ) &&
-      key in target,
-  });
-  return { name: elementClass.name, prototype } as unknown as T;
+  const prototype = new Proxy(
+    {},
+    {
+      has: (_target, key) => {
+        if (hidden.has(key)) return false;
+        if (typeof document !== "undefined")
+          return key in (customElements.get(tag)?.prototype ?? {});
+        return (
+          typeof key === "string" &&
+          !["children", "localName", "ref"].includes(key) &&
+          !isStandardAttributeName(key) &&
+          !key.includes("-")
+        );
+      },
+    },
+  );
+  const elementClass = { name: tag, prototype };
+  if (!isElementClass<Tag>(elementClass)) throw new Error(`${tag} has no element class`);
+  return elementClass;
 }
 
 /**
@@ -116,41 +176,31 @@ function projectAttributes(props: {
 const ZitadelLoginElementReact = createComponent({
   react: React,
   tagName: widgetTags.login,
-  elementClass: asAttributes(
-    ZitadelLoginElement,
-    "purpose",
-    "resumeFlowId",
-    "postSignInUrl",
-    "url",
-  ),
+  elementClass: asAttributes(widgetTags.login, "purpose", "resumeFlowId", "postSignInUrl", "url"),
   events: {
-    onZitadelFlowStep: "zitadel-flow-step" as EventName<CustomEvent<ZitadelFlowStepDetail>>,
-    onZitadelFlowInput: "zitadel-flow-input" as EventName<CustomEvent<ZitadelFlowInputDetail>>,
-    onZitadelFlowComplete: "zitadel-flow-complete" as EventName<
-      CustomEvent<ZitadelFlowCompleteDetail>
-    >,
-    onZitadelFlowRedirect: "zitadel-flow-redirect" as EventName<
-      CustomEvent<ZitadelFlowRedirectDetail>
-    >,
-    onZitadelFlowError: "zitadel-flow-error" as EventName<CustomEvent<ZitadelFlowErrorDetail>>,
+    onZitadelFlowStep: eventName("zitadel-flow-step"),
+    onZitadelFlowInput: eventName("zitadel-flow-input"),
+    onZitadelFlowComplete: eventName("zitadel-flow-complete"),
+    onZitadelFlowRedirect: eventName("zitadel-flow-redirect"),
+    onZitadelFlowError: eventName("zitadel-flow-error"),
   },
 });
 
 const ZitadelLogoutElementReact = createComponent({
   react: React,
   tagName: widgetTags.logout,
-  elementClass: asAttributes(ZitadelLogoutElement, "url"),
+  elementClass: asAttributes(widgetTags.logout, "url"),
   events: {
-    onZitadelSignout: "zitadel-signout" as EventName<CustomEvent<ZitadelSignoutDetail>>,
+    onZitadelSignout: eventName("zitadel-signout"),
   },
 });
 
 const ZitadelSessionElementReact = createComponent({
   react: React,
   tagName: widgetTags.session,
-  elementClass: asAttributes(ZitadelSessionElement, "url"),
+  elementClass: asAttributes(widgetTags.session, "url"),
   events: {
-    onZitadelSignout: "zitadel-signout" as EventName<CustomEvent<ZitadelSignoutDetail>>,
+    onZitadelSignout: eventName("zitadel-signout"),
   },
 });
 

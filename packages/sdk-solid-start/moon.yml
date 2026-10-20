@@ -9,7 +9,8 @@ dependsOn:
 tasks:
   typecheck:
     deps:
-      - "sdk-core:build"
+      # The edge spec imports this package's built dist.
+      - "build"
 
   build:
     deps:

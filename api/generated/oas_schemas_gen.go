@@ -56236,13 +56236,20 @@ func (*PatchUserByIDUnauthorized) patchUserByIDRes() {}
 // is validated as a whole against the user's schema, so a patch that deletes
 // or invalidates a required property is rejected with `user.invalid`.
 // `schema` moves the user to another registered schema — the ADR 009 §4
-// upgrade mechanism. The request must be self-contained: merged attributes
-// are validated against the new schema before commit, and every uniqueness
-// claim is recomputed under the new schema's annotations.
+// upgrade mechanism. The target must be a revision of the user's current
+// schema (the same `objectType`), newer or older; a schema of another
+// `objectType` is rejected with `user.invalid`. A schema stored without an
+// `objectType` is a revision of nothing, so a user cannot move to or from
+// one. The request must be
+// self-contained: merged attributes are validated against the new schema
+// before commit, and every uniqueness claim is recomputed under the new
+// schema's annotations. Values removed by an earlier move are not restored
+// by moving back.
 // Ref: #
 type PatchUserRequest struct {
 	// The schema the user follows after this patch. Omit it to keep the
-	// current schema. The schema must already be registered via `/schemas`.
+	// current schema. The schema must already be registered via `/schemas`
+	// and be a revision of the user's current schema.
 	Schema OptString `json:"schema"`
 	// The changed attributes only. `null` deletes an attribute; omitted
 	// keys are untouched.

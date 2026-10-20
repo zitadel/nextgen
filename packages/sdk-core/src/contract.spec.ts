@@ -482,6 +482,7 @@ describe("widget loading ↔ SDK packages", () => {
     "sdk-react",
     "sdk-solid",
     "sdk-svelte",
+    "sdk-tanstack-start",
     "sdk-vue",
   ];
 
@@ -660,6 +661,298 @@ describe("SDK READMEs ↔ opening structure", () => {
     const { title, sections } = headings(dir);
     expect(title[0]).toBe(`@zitadel/${dir}`);
     expect(sections.slice(0, 2)).toEqual(["Installation", "Requirements"]);
+  });
+});
+
+/**
+ * What every client SDK entry holds in common about `@zitadel/components`: the
+ * side-effect import that registers the elements in the browser, and the
+ * `businessLocales` re-export, each with the same comment, once. Nothing else
+ * of the package is re-exported: an element class (as a value or as a type)
+ * would pull the elements entry into a bundle that has to load on the edge, and
+ * would make one SDK export what the others do not.
+ */
+const IMPORT_BLOCK = [
+  "// Registers <zitadel-login>, <zitadel-logout> and <zitadel-session> in the browser.",
+  "// The edge build of the components package has no elements, so this does nothing there.",
+  'import "@zitadel/components";',
+].join("\n");
+
+const EXPORT_BLOCK = [
+  "// Re-exported so scaffolded apps can wire the business copy overlay without a",
+  "// direct @zitadel/components dependency (strict package managers reject those).",
+  'export { businessLocales } from "@zitadel/components";',
+].join("\n");
+
+const BUSINESS_LOCALES_EXPORT = 'export { businessLocales } from "@zitadel/components"';
+
+/** Every `export … from "@zitadel/components"` statement of a source. */
+const EXPORTS_FROM_COMPONENTS = /\bexport\s[^;]*?from\s*["']@zitadel\/components["']/g;
+
+/** A line that imports `@zitadel/components` for its side effect, however it is written. */
+const REGISTERING_IMPORT_LINE = /^\s*import\s*["']@zitadel\/components["']/;
+
+/** A line that re-exports `businessLocales`, however it is written. */
+const BUSINESS_LOCALES_LINE = /^\s*export\s*\{[^}]*\bbusinessLocales\b/;
+
+/** How often the lines of `block` follow each other in `lines`, each matching whole and exactly. */
+const blocksIn = (lines: readonly string[], block: string): number => {
+  const wanted = block.split("\n");
+  return lines.filter((_, at) => wanted.every((line, offset) => lines[at + offset] === line))
+    .length;
+};
+
+/** What is wrong with the way a client SDK entry uses `@zitadel/components`. */
+const entryProblems = (source: string): string[] => {
+  const found: string[] = [];
+  const lines = source.split("\n");
+  if (
+    blocksIn(lines, IMPORT_BLOCK) !== 1 ||
+    lines.filter((line) => REGISTERING_IMPORT_LINE.test(line)).length !== 1
+  ) {
+    found.push("does not hold the registering import, with its comment, exactly once");
+  }
+  if (
+    blocksIn(lines, EXPORT_BLOCK) !== 1 ||
+    lines.filter((line) => BUSINESS_LOCALES_LINE.test(line)).length !== 1
+  ) {
+    found.push("does not hold the businessLocales re-export, with its comment, exactly once");
+  }
+  for (const statement of source.match(EXPORTS_FROM_COMPONENTS) ?? []) {
+    if (statement !== BUSINESS_LOCALES_EXPORT) {
+      found.push(`re-exports more than businessLocales: ${statement.replace(/\s+/g, " ")}`);
+    }
+  }
+  return found;
+};
+
+describe("client SDK entries ↔ @zitadel/components", () => {
+  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+  const ENTRIES: [string, string][] = [
+    ["sdk-react", "sdk-react/src/index.tsx"],
+    ["sdk-vue", "sdk-vue/src/index.ts"],
+    ["sdk-angular", "sdk-angular/src/public-api.ts"],
+    ["sdk-svelte", "sdk-svelte/src/lib/index.ts"],
+    ["sdk-solid", "sdk-solid/src/index.tsx"],
+    ["sdk-qwik", "sdk-qwik/src/index.tsx"],
+    ["sdk-next", "sdk-next/src/client.ts"],
+    ["sdk-nuxt", "sdk-nuxt/src/index.ts"],
+    ["sdk-tanstack-start", "sdk-tanstack-start/src/react.tsx"],
+  ];
+
+  it.each(ENTRIES)("%s registers the elements and re-exports no element class", (_sdk, path) => {
+    expect(entryProblems(readFileSync(`${packagesDir}${path}`, "utf8"))).toEqual([]);
+  });
+
+  describe("the guard", () => {
+    const good = `${IMPORT_BLOCK}\n\n${EXPORT_BLOCK}\nexport const x = 1;\n`;
+
+    it("accepts the canonical lines", () => {
+      expect(entryProblems(good)).toEqual([]);
+    });
+
+    it("sees a missing import and a missing re-export", () => {
+      expect(entryProblems(good.replace(IMPORT_BLOCK, ""))).toHaveLength(1);
+      expect(entryProblems(good.replace(EXPORT_BLOCK, ""))).toHaveLength(1);
+    });
+
+    it("sees a repeated import", () => {
+      expect(entryProblems(`${IMPORT_BLOCK}\n${good}`)).toHaveLength(1);
+    });
+
+    it("sees a reworded comment", () => {
+      expect(entryProblems(good.replace("Registers", "Loads"))).toHaveLength(1);
+    });
+
+    it.each([
+      ["a trailing comment", 'import "@zitadel/components";', 'import "@zitadel/components"; // x'],
+      ["extra whitespace", 'import "@zitadel/components";', 'import  "@zitadel/components";'],
+      ["trailing whitespace", 'import "@zitadel/components";', 'import "@zitadel/components"; '],
+      ["an indent", 'import "@zitadel/components";', '  import "@zitadel/components";'],
+      [
+        "a trailing comment on the re-export",
+        'export { businessLocales } from "@zitadel/components";',
+        'export { businessLocales } from "@zitadel/components"; // x',
+      ],
+      [
+        "extra whitespace in the re-export",
+        'export { businessLocales } from "@zitadel/components";',
+        'export {  businessLocales } from "@zitadel/components";',
+      ],
+    ])("sees %s", (_, line, changed) => {
+      expect(entryProblems(good.replace(line, changed))).not.toEqual([]);
+    });
+
+    it("sees a second import or re-export beside the canonical lines", () => {
+      expect(entryProblems(`${good}import "@zitadel/components"; // x\n`)).toHaveLength(1);
+      expect(entryProblems(`${good}import '@zitadel/components';\n`)).toHaveLength(1);
+      expect(
+        entryProblems(`${good}export { businessLocales } from "@zitadel/components"; // x\n`),
+      ).toHaveLength(1);
+    });
+
+    it.each([
+      'export { ZitadelLogin } from "@zitadel/components";',
+      'export type { ZitadelLogout, ZitadelSession } from "@zitadel/components";',
+      'export { businessLocales, ZitadelSession } from "@zitadel/components";',
+      'export * from "@zitadel/components";',
+      'export {\n  ZitadelLogin,\n} from "@zitadel/components";',
+    ])("sees %j", (statement) => {
+      expect(entryProblems(`${good}${statement}\n`)).not.toEqual([]);
+    });
+
+    it("lets an entry import an element class as a type for its own use", () => {
+      expect(
+        entryProblems(`import type { ZitadelLogin } from "@zitadel/components";\n${good}`),
+      ).toEqual([]);
+    });
+  });
+});
+
+/**
+ * The client SDK edge specs. Each loads its built package inside the edge VM and
+ * carries the same `edge-entry` block and, but for `@zitadel/sdk-next/client`,
+ * which renders no widget, the same `edge-render` block: the same titles and the
+ * same body, byte for byte. Only the render call and the imports are the
+ * framework's.
+ */
+const EDGE_COMMENT =
+  "      // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.";
+
+/** What is wrong with the way a Vitest config declares its edge project. */
+const edgeConfigProblems = (source: string): string[] => {
+  const lines = source.split("\n");
+  const at = lines.indexOf(EDGE_COMMENT);
+  const found: string[] = [];
+  if (
+    !lines.some((line) =>
+      /^import \{[^}]*\bedgeProject\b[^}]*\} from "\.\.\/\.\.\/vitest\.shared\.mjs";$/.test(line),
+    )
+  ) {
+    found.push("does not import edgeProject from the shared module");
+  }
+  if (at === -1 || lines.indexOf(EDGE_COMMENT, at + 1) !== -1) {
+    found.push("does not have the shared comment exactly once");
+  } else if (!(lines[at + 1] ?? "").startsWith("      edgeProject(")) {
+    found.push("does not declare the edge project right under the shared comment");
+  }
+  return found;
+};
+
+describe("client SDK edge specs", () => {
+  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+  const read = (path: string): string => readFileSync(`${packagesDir}${path}`, "utf8");
+
+  const ENTRY_TITLES = [
+    "the SDK entry in the edge runtime",
+    "runs without a DOM",
+    "keeps the locale data it re-exports",
+  ];
+  const EDGE_TITLES = [
+    "the SDK in the edge runtime",
+    "renders the login widget as its custom element with its attributes",
+    "renders the session widget as its custom element with its attributes",
+    "renders the logout widget as its custom element with its attributes",
+    "writes the purpose and the resumed flow into the login markup",
+    "omits the language when none is set",
+  ];
+
+  const WRAPPERS = {
+    "sdk-react": "sdk-react/src/index.edge.spec.tsx",
+    "sdk-vue": "sdk-vue/src/index.edge.spec.ts",
+    "sdk-angular": "sdk-angular/src/public-api.edge.spec.ts",
+    "sdk-svelte": "sdk-svelte/src/index.edge.spec.ts",
+    "sdk-solid": "sdk-solid/src/index.edge.spec.tsx",
+    "sdk-qwik": "sdk-qwik/src/index.edge.spec.tsx",
+  };
+  const NEXT = { "sdk-next": "sdk-next/src/__tests__/client.edge.test.ts" };
+
+  const sourcesOf = (specs: Record<string, string>): Record<string, string> =>
+    Object.fromEntries(Object.entries(specs).map(([sdk, path]) => [sdk, read(path)]));
+
+  it("has the entry block in every client SDK, sdk-next included", () => {
+    expect(problems(sourcesOf({ ...WRAPPERS, ...NEXT }), "edge-entry", ENTRY_TITLES)).toEqual([]);
+  });
+
+  it("has the render block in every SDK that renders widgets", () => {
+    expect(problems(sourcesOf(WRAPPERS), "edge-render", EDGE_TITLES)).toEqual([]);
+  });
+
+  it("declares the edge project the same way in every config", () => {
+    const configs = [
+      "components",
+      "sdk-angular",
+      "sdk-next",
+      "sdk-nuxt",
+      "sdk-qwik",
+      "sdk-qwik-router",
+      "sdk-react",
+      "sdk-solid",
+      "sdk-solid-start",
+      "sdk-svelte",
+      "sdk-sveltekit",
+      "sdk-tanstack-start",
+      "sdk-vue",
+    ].map((dir) => `${dir}/vitest.config.ts`);
+    expect(
+      [...configs, "sdk-core/vite.config.ts"].flatMap((path) =>
+        edgeConfigProblems(read(path)).map((problem) => `${path}: ${problem}`),
+      ),
+    ).toEqual([]);
+  });
+
+  describe("the config guard", () => {
+    const good = `import { baseTest, edgeProject } from "../../vitest.shared.mjs";\n${EDGE_COMMENT}\n      edgeProject({}),\n`;
+
+    it("accepts the shared import and comment", () => {
+      expect(edgeConfigProblems(good)).toEqual([]);
+    });
+
+    it("sees a missing import, a missing, repeated or reworded comment and a detached call", () => {
+      expect(edgeConfigProblems(good.replace("edgeProject }", "baseTest }"))).toHaveLength(1);
+      expect(edgeConfigProblems(good.replace(EDGE_COMMENT, ""))).not.toEqual([]);
+      expect(edgeConfigProblems(`${good}${EDGE_COMMENT}\n`)).not.toEqual([]);
+      expect(edgeConfigProblems(good.replace("Runs", "Run"))).not.toEqual([]);
+      expect(edgeConfigProblems(good.replace("      edgeProject", "      other"))).toHaveLength(1);
+    });
+  });
+});
+
+/**
+ * The server SDK edge specs. Each sends requests through its built package inside
+ * the edge VM and carries the same `edge-server` block: the same titles and the
+ * same body, byte for byte. Only the glue that hands a request to the framework's
+ * handler, above the block, is the framework's.
+ */
+describe("server SDK edge specs", () => {
+  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+
+  const SERVER_TITLES = [
+    "the server SDK in the edge runtime",
+    "answers a protected route with a redirect to the login path",
+    "forwards the proxy path to the backend",
+    "forwards a GET on the proxy path as a GET",
+    "refuses a request that carries the auth header before forwarding it",
+    "passes an unprotected route through",
+  ];
+
+  const SERVERS = {
+    "sdk-sveltekit": "sdk-sveltekit/src/__tests__/handle.edge.test.ts",
+    "sdk-solid-start": "sdk-solid-start/src/__tests__/middleware.edge.test.ts",
+    "sdk-tanstack-start": "sdk-tanstack-start/src/__tests__/middleware.edge.test.ts",
+    "sdk-qwik-router": "sdk-qwik-router/src/__tests__/request-handler.edge.test.ts",
+    "sdk-next": "sdk-next/src/__tests__/middleware.edge.test.ts",
+    "sdk-nuxt": "sdk-nuxt/src/__tests__/server/middleware.edge.test.ts",
+  };
+
+  it("has the server block in every server SDK", () => {
+    const sources = Object.fromEntries(
+      Object.entries(SERVERS).map(([sdk, path]) => [
+        sdk,
+        readFileSync(`${packagesDir}${path}`, "utf8"),
+      ]),
+    );
+    expect(problems(sources, "edge-server", SERVER_TITLES)).toEqual([]);
   });
 });
 

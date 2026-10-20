@@ -2,8 +2,9 @@
   "$schema": "https://turborepo.dev/schema.json",
   "extends": ["//"],
   "tasks": {
+    // The edge spec imports this package's built dist.
     "typecheck": {
-      "dependsOn": ["@zitadel/components#build", "@zitadel/sdk-core#build"]
+      "dependsOn": ["build"]
     },
     // demo-nuxt:build resolves modules from this dist; moon shared a mutex
     // (`sdk-nuxt-dist`) between the two builders and demo-nuxt. Under turbo the

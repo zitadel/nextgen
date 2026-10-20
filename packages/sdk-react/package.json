@@ -45,6 +45,7 @@
     "react-dom": ">=18"
   },
   "devDependencies": {
+    "@edge-runtime/vm": "catalog:",
     "@testing-library/react": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
