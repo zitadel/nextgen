@@ -3,7 +3,6 @@
 package integration_test
 
 import (
-	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -224,10 +223,11 @@ func requireProofRejected(t *testing.T, client *helpers.ApiClient, attemptID api
 		ChallengeID: challengeID,
 	})
 	require.NoError(t, err)
-	rejected, ok := verifyResp.(*api.VerifyChallengeProofErrorResponseStatusCode)
+	// Named 409 (rel.revoked) on this operation makes ogen decode every 409 as
+	// ErrorDetails, including att.proof_rejected which still answers 409.
+	rejected, ok := verifyResp.(*api.ErrorDetails)
 	require.True(t, ok, "expected a rejection, got %s", helpers.MustMarshal(t, verifyResp))
-	require.Equal(t, http.StatusConflict, rejected.StatusCode, helpers.MustMarshal(t, rejected))
-	require.Equal(t, api.AttProofRejectedVerifyChallengeProofErrorResponse, rejected.Response.Type, helpers.MustMarshal(t, rejected))
+	require.Equal(t, api.ErrorCode("att.proof_rejected"), rejected.Code, helpers.MustMarshal(t, rejected))
 }
 
 func issueAttemptChallenge(t *testing.T, client *helpers.ApiClient, attemptID api.AttemptID, method api.ChallengeMethod) api.ChallengeID {
