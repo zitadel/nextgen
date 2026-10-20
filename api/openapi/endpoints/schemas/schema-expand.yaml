@@ -1,0 +1,15 @@
+type: string
+description: |
+  Extra fields to add onto each returned schema (ADR 059).
+
+  - `in_use`: whether any user of the project is on this revision, as
+    `metadata.in_use`. A revision in use cannot be deleted, and the users on it
+    are found with `POST /users/query` filtering on `schema`. The property is
+    omitted entirely when not requested, so "did not ask" is distinguishable
+    from `false`.
+
+    Requires `user.read` in addition to `schema.read`. A Console session
+    carries no scopes; it may ask for `in_use` when it may read the whole
+    project, and is refused with `403` otherwise.
+enum:
+  - in_use

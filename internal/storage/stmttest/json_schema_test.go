@@ -171,3 +171,28 @@ func TestJSONSchemaStatements_RejectsTiedRevisionTimestamps(t *testing.T) {
 		t.Cleanup(func() { _ = d.stmts.DeleteJSONSchemaByID(context.Background(), projectID, other) })
 	})
 }
+
+// A revision is in use while any user of its project is on it. Another
+// project's users never count, even on a schema with the same url.
+func TestJSONSchemaStatements_URLsInUse(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		otherProjectID := ensureProject(t, d.stmts)
+		base := "https://example.com/schemas/" + uniqueSuffix(t) + "-"
+		used, unused := base+"used", base+"unused"
+
+		createJSONSchemaRevision(t, d.stmts, projectID, used, nil)
+		createJSONSchemaRevision(t, d.stmts, projectID, unused, nil)
+		createJSONSchemaRevision(t, d.stmts, otherProjectID, unused, nil)
+		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, used, "user_in_use", "in-use@example.com", "In Use")))
+		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, otherProjectID, unused, "user_other_project", "other@example.com", "Other")))
+
+		inUse, err := d.stmts.JSONSchemaURLsInUse(t.Context(), projectID, []string{used, unused, base + "missing"})
+		require.NoError(t, err)
+		assert.Equal(t, []string{used}, inUse)
+
+		inUse, err = d.stmts.JSONSchemaURLsInUse(t.Context(), projectID, nil)
+		require.NoError(t, err)
+		assert.Empty(t, inUse)
+	})
+}

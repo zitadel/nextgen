@@ -46,6 +46,25 @@ func (js jsonSchemaStatements) CreateJSONSchema(ctx context.Context, schema *dom
 
 const deleteByIDJSONSchemaStmt = `DELETE FROM zitadel_nextgen.json_schemas WHERE project_id = $1 AND url = $2`
 
+// jsonSchemaURLsInUseQuery probes users once per listed schema through
+// idx_users_schema_url, so its cost follows the page, not the user count.
+const jsonSchemaURLsInUseQuery = `SELECT s.url FROM zitadel_nextgen.json_schemas s
+WHERE s.project_id = $1 AND s.url = ANY ($2::text[])
+  AND EXISTS (SELECT 1 FROM zitadel_nextgen.users u WHERE u.project_id = s.project_id AND u.schema_url = s.url)`
+
+// JSONSchemaURLsInUse implements [service.JSONSchemaStatements].
+func (js jsonSchemaStatements) JSONSchemaURLsInUse(ctx context.Context, projectID string, schemaURLs []string) ([]string, error) {
+	rows, err := js.client.Query(ctx, jsonSchemaURLsInUseQuery, projectID, schemaURLs)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	urls, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return urls, nil
+}
+
 // DeleteJSONSchemaByID implements [service.JSONSchemaStatements].
 func (js jsonSchemaStatements) DeleteJSONSchemaByID(ctx context.Context, projectID, schemaID string) error {
 	return withTransaction(ctx, js.client, func(ctx context.Context, tx queryExecutor) error {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/zitadel/nextgen/internal/audit"
@@ -36,6 +37,7 @@ type ListSchemasInput struct {
 	// LatestRevisionPerObjectType asks for the newest revision of each object
 	// type instead of the full revision history.
 	LatestRevisionPerObjectType bool
+	IncludeInUse                bool
 	PageToken                   string
 	Limit                       int
 }
@@ -376,6 +378,20 @@ func (s *SchemaService) ListSchemas(ctx context.Context, input ListSchemasInput)
 	}, JSONSchemaQueryOptions{LatestRevisionPerObjectType: input.LatestRevisionPerObjectType})
 	if err != nil {
 		return nil, mapListError(err, "failed to list schemas")
+	}
+
+	if input.IncludeInUse && len(result.Items) > 0 {
+		urls := make([]string, len(result.Items))
+		for i, schema := range result.Items {
+			urls[i] = schema.URL
+		}
+		inUse, err := s.v2Pool.Statements().JSONSchemaURLsInUse(ctx, input.ProjectID, urls)
+		if err != nil {
+			return nil, domain.ErrInternal(err).WithMessage("failed to check which schemas are in use")
+		}
+		for _, schema := range result.Items {
+			schema.InUse = new(slices.Contains(inUse, schema.URL))
+		}
 	}
 
 	return &ListSchemasOutput{

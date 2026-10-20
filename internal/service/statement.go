@@ -149,6 +149,7 @@ type JSONSchemaStatements interface {
 	CreateJSONSchema(ctx context.Context, entity *domain.JSONSchema) error
 	GetJSONSchemaByID(ctx context.Context, projectID, schemaID string) (*domain.JSONSchema, error)
 	ListJSONSchemas(ctx context.Context, filter *database.ListOptions[domain.JSONSchemaField], opts JSONSchemaQueryOptions) (*database.ListResult[*domain.JSONSchema], error)
+	JSONSchemaURLsInUse(ctx context.Context, projectID string, schemaURLs []string) ([]string, error)
 	DeleteJSONSchemaByID(ctx context.Context, projectID, schemaID string) error
 }
 

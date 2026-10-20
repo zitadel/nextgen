@@ -79,6 +79,31 @@ func (js jsonSchemaStatements) CreateJSONSchema(ctx context.Context, schema *dom
 	})
 }
 
+// jsonSchemaURLsInUseQuery probes users once per listed schema through
+// idx_users_schema_url, so its cost follows the page, not the user count.
+const jsonSchemaURLsInUseQuery = `SELECT s.url FROM json_schemas s
+WHERE s.project_id = @p1 AND s.url IN UNNEST(@p2)
+  AND EXISTS (SELECT 1 FROM users u WHERE u.project_id = s.project_id AND u.schema_url = s.url)`
+
+// JSONSchemaURLsInUse implements [service.JSONSchemaStatements].
+func (js jsonSchemaStatements) JSONSchemaURLsInUse(ctx context.Context, projectID string, schemaURLs []string) ([]string, error) {
+	var urls []string
+	err := js.db.Query(ctx, buildStatement(jsonSchemaURLsInUseQuery, projectID, schemaURLs).statement(), func(iter *spanner.RowIterator) error {
+		return iter.Do(func(row *spanner.Row) error {
+			var url string
+			if err := row.Columns(&url); err != nil {
+				return err
+			}
+			urls = append(urls, url)
+			return nil
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+	return urls, nil
+}
+
 // DeleteJSONSchemaByID implements [service.JSONSchemaStatements].
 func (js jsonSchemaStatements) DeleteJSONSchemaByID(ctx context.Context, projectID, schemaID string) error {
 	return withTransaction(ctx, js.db, func(ctx context.Context, tx queryExecutor) error {

@@ -65631,6 +65631,50 @@ func NewUserSchemaSchemaDocument(v UserSchema) SchemaDocument {
 	return s
 }
 
+// Extra fields to add onto each returned schema (ADR 059).
+// - `in_use`: whether any user of the project is on this revision, as
+// `metadata.in_use`. A revision in use cannot be deleted, and the users on it
+// are found with `POST /users/query` filtering on `schema`. The property is
+// omitted entirely when not requested, so "did not ask" is distinguishable
+// from `false`.
+// Requires `user.read` in addition to `schema.read`. A Console session
+// carries no scopes; it may ask for `in_use` when it may read the whole
+// project, and is refused with `403` otherwise.
+// Ref: #
+type SchemaExpand string
+
+const (
+	SchemaExpandInUse SchemaExpand = "in_use"
+)
+
+// AllValues returns all SchemaExpand values.
+func (SchemaExpand) AllValues() []SchemaExpand {
+	return []SchemaExpand{
+		SchemaExpandInUse,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s SchemaExpand) MarshalText() ([]byte, error) {
+	switch s {
+	case SchemaExpandInUse:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *SchemaExpand) UnmarshalText(data []byte) error {
+	switch SchemaExpand(data) {
+	case SchemaExpandInUse:
+		*s = SchemaExpandInUse
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // SchemaHeaders wraps Schema with response headers.
 type SchemaHeaders struct {
 	CacheControl OptString
@@ -65663,6 +65707,9 @@ func (*SchemaHeaders) getMyUserSchemaRes() {}
 type SchemaMetadata struct {
 	// The time when the schema was created.
 	CreatedAt time.Time `json:"created_at"`
+	// Whether any user of the project is on this revision. Only set when
+	// `GET /schemas` is asked for it with `expand=in_use`; omitted otherwise.
+	InUse OptBool `json:"in_use"`
 }
 
 // GetCreatedAt returns the value of CreatedAt.
@@ -65670,9 +65717,19 @@ func (s *SchemaMetadata) GetCreatedAt() time.Time {
 	return s.CreatedAt
 }
 
+// GetInUse returns the value of InUse.
+func (s *SchemaMetadata) GetInUse() OptBool {
+	return s.InUse
+}
+
 // SetCreatedAt sets the value of CreatedAt.
 func (s *SchemaMetadata) SetCreatedAt(val time.Time) {
 	s.CreatedAt = val
+}
+
+// SetInUse sets the value of InUse.
+func (s *SchemaMetadata) SetInUse(val OptBool) {
+	s.InUse = val
 }
 
 type SchemaURI url.URL

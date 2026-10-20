@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"slices"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -66,10 +67,21 @@ func (h *Handler) GetSchemaById(ctx context.Context, params api.GetSchemaByIdPar
 }
 
 func (h *Handler) ListSchemas(ctx context.Context, params api.ListSchemasParams) (api.ListSchemasRes, error) {
-	ctx, _, err := h.requireProjectListAccess(ctx, string(params.ProjectID), schemaAccess, domain.ResourceKindSchema)
+	ctx, projectWide, err := h.requireProjectListAccess(ctx, string(params.ProjectID), schemaAccess, domain.ResourceKindSchema)
 	if err != nil {
 		return nil, err
 	}
+
+	includeInUse := slices.Contains(params.Expand, api.SchemaExpandInUse)
+	scopeCtx, _ := GetScopeContext(ctx)
+	sessionReads := projectWide && scopeCtx.PrincipalType == domain.AuthzPrincipalTypeUser
+	if includeInUse && !sessionReads {
+		if err := requireExpandScope(ctx, "user.read", domain.ErrJSONSchemaPermissionDenied,
+			"expanding a schema's in_use flag requires user.read"); err != nil {
+			return nil, err
+		}
+	}
+
 	// The wire enum and the domain enum carry the same values, but the mapping
 	// is explicit so an added kind cannot silently pass through unrecognised.
 	var kind *domain.JSONSchemaKind
@@ -90,6 +102,7 @@ func (h *Handler) ListSchemas(ctx context.Context, params api.ListSchemasParams)
 		ObjectTypes:                 objectTypes,
 		Kind:                        kind,
 		LatestRevisionPerObjectType: params.Revisions.Value == api.ListSchemasRevisionsLatest,
+		IncludeInUse:                includeInUse,
 		PageToken:                   string(params.PageToken.Value),
 		Limit:                       int(params.Limit.Value),
 	})
@@ -120,10 +133,14 @@ func domainSchemaToApiSchema(schema *domain.JSONSchema) (*api.Schema, error) {
 		return nil, err
 	}
 
+	metadata := api.SchemaMetadata{CreatedAt: schema.CreatedAt}
+	if schema.InUse != nil {
+		metadata.InUse = api.NewOptBool(*schema.InUse)
+	}
 	return &api.Schema{
 		ID:       schema.URL,
 		Schema:   api.NewUserSchemaSchemaDocument(document),
-		Metadata: api.SchemaMetadata{CreatedAt: schema.CreatedAt},
+		Metadata: metadata,
 	}, nil
 }
 

@@ -4302,6 +4302,45 @@ func (c *MockAllStatementsIssueSSOStateCall) DoAndReturn(f func(context.Context,
 	return c
 }
 
+// JSONSchemaURLsInUse mocks base method.
+func (m *MockAllStatements) JSONSchemaURLsInUse(ctx context.Context, projectID string, schemaURLs []string) ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "JSONSchemaURLsInUse", ctx, projectID, schemaURLs)
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// JSONSchemaURLsInUse indicates an expected call of JSONSchemaURLsInUse.
+func (mr *MockAllStatementsMockRecorder) JSONSchemaURLsInUse(ctx, projectID, schemaURLs any) *MockAllStatementsJSONSchemaURLsInUseCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "JSONSchemaURLsInUse", reflect.TypeOf((*MockAllStatements)(nil).JSONSchemaURLsInUse), ctx, projectID, schemaURLs)
+	return &MockAllStatementsJSONSchemaURLsInUseCall{Call: call}
+}
+
+// MockAllStatementsJSONSchemaURLsInUseCall wrap *gomock.Call
+type MockAllStatementsJSONSchemaURLsInUseCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsJSONSchemaURLsInUseCall) Return(arg0 []string, arg1 error) *MockAllStatementsJSONSchemaURLsInUseCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsJSONSchemaURLsInUseCall) Do(f func(context.Context, string, []string) ([]string, error)) *MockAllStatementsJSONSchemaURLsInUseCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsJSONSchemaURLsInUseCall) DoAndReturn(f func(context.Context, string, []string) ([]string, error)) *MockAllStatementsJSONSchemaURLsInUseCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ListAuthorizedProjects mocks base method.
 func (m *MockAllStatements) ListAuthorizedProjects(ctx context.Context, homeProjectID, userID string, page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
 	m.ctrl.T.Helper()
@@ -7779,6 +7818,45 @@ func (c *MockJSONSchemaStatementsIsStatementsCall) Do(f func()) *MockJSONSchemaS
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockJSONSchemaStatementsIsStatementsCall) DoAndReturn(f func()) *MockJSONSchemaStatementsIsStatementsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// JSONSchemaURLsInUse mocks base method.
+func (m *MockJSONSchemaStatements) JSONSchemaURLsInUse(ctx context.Context, projectID string, schemaURLs []string) ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "JSONSchemaURLsInUse", ctx, projectID, schemaURLs)
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// JSONSchemaURLsInUse indicates an expected call of JSONSchemaURLsInUse.
+func (mr *MockJSONSchemaStatementsMockRecorder) JSONSchemaURLsInUse(ctx, projectID, schemaURLs any) *MockJSONSchemaStatementsJSONSchemaURLsInUseCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "JSONSchemaURLsInUse", reflect.TypeOf((*MockJSONSchemaStatements)(nil).JSONSchemaURLsInUse), ctx, projectID, schemaURLs)
+	return &MockJSONSchemaStatementsJSONSchemaURLsInUseCall{Call: call}
+}
+
+// MockJSONSchemaStatementsJSONSchemaURLsInUseCall wrap *gomock.Call
+type MockJSONSchemaStatementsJSONSchemaURLsInUseCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockJSONSchemaStatementsJSONSchemaURLsInUseCall) Return(arg0 []string, arg1 error) *MockJSONSchemaStatementsJSONSchemaURLsInUseCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockJSONSchemaStatementsJSONSchemaURLsInUseCall) Do(f func(context.Context, string, []string) ([]string, error)) *MockJSONSchemaStatementsJSONSchemaURLsInUseCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockJSONSchemaStatementsJSONSchemaURLsInUseCall) DoAndReturn(f func(context.Context, string, []string) ([]string, error)) *MockJSONSchemaStatementsJSONSchemaURLsInUseCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

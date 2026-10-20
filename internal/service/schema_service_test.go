@@ -302,3 +302,57 @@ func TestSchemaService_ListSchemas(t *testing.T) {
 		})
 	}
 }
+
+// in_use is one batched read over the page's urls after the list ran, and is
+// left nil when not asked for so the handler can tell "did not ask" from false.
+func TestSchemaService_ListSchemas_InUse(t *testing.T) {
+	t.Parallel()
+
+	t.Run("marks each listed schema", func(t *testing.T) {
+		t.Parallel()
+
+		svc, statements := newMockedSchemaService(t)
+		statements.EXPECT().
+			ListJSONSchemas(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(&database.ListResult[*domain.JSONSchema]{
+				Items: []*domain.JSONSchema{{URL: "sch_b"}, {URL: "sch_a"}},
+			}, nil)
+		statements.EXPECT().
+			JSONSchemaURLsInUse(gomock.Any(), "proj_a", []string{"sch_b", "sch_a"}).
+			Return([]string{"sch_a"}, nil)
+
+		out, err := svc.ListSchemas(context.Background(), service.ListSchemasInput{ProjectID: "proj_a", IncludeInUse: true})
+		require.NoError(t, err)
+		require.Len(t, out.Items, 2)
+		assert.Equal(t, new(false), out.Items[0].InUse)
+		assert.Equal(t, new(true), out.Items[1].InUse)
+	})
+
+	t.Run("not asked for leaves it unset", func(t *testing.T) {
+		t.Parallel()
+
+		svc, statements := newMockedSchemaService(t)
+		statements.EXPECT().
+			ListJSONSchemas(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(&database.ListResult[*domain.JSONSchema]{Items: []*domain.JSONSchema{{URL: "sch_a"}}}, nil)
+
+		out, err := svc.ListSchemas(context.Background(), service.ListSchemasInput{ProjectID: "proj_a"})
+		require.NoError(t, err)
+		assert.Nil(t, out.Items[0].InUse)
+	})
+
+	t.Run("statement error is wrapped", func(t *testing.T) {
+		t.Parallel()
+
+		svc, statements := newMockedSchemaService(t)
+		statements.EXPECT().
+			ListJSONSchemas(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(&database.ListResult[*domain.JSONSchema]{Items: []*domain.JSONSchema{{URL: "sch_a"}}}, nil)
+		statements.EXPECT().
+			JSONSchemaURLsInUse(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(nil, errors.New("boom"))
+
+		_, err := svc.ListSchemas(context.Background(), service.ListSchemasInput{ProjectID: "proj_a", IncludeInUse: true})
+		require.ErrorIs(t, err, domain.ErrInternal(nil))
+	})
+}

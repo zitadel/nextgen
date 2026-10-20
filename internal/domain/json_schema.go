@@ -107,6 +107,7 @@ type JSONSchema struct {
 	Kind       JSONSchemaKind
 	CreatedAt  time.Time
 	Schema     []byte
+	InUse      *bool
 }
 
 // Document parses the stored schema document.

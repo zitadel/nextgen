@@ -12350,6 +12350,15 @@ func (s SchemaDocument) Validate() error {
 	}
 }
 
+func (s SchemaExpand) Validate() error {
+	switch s {
+	case "in_use":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
 func (s *SchemaHeaders) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer

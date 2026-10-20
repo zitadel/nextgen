@@ -276,3 +276,82 @@ func countOccurrences(haystack []string, needle string) int {
 	}
 	return n
 }
+
+// expand=in_use reports per revision whether any user is on it, and is absent
+// unless asked for. Its gate is pinned by TestConsoleSessionSchemaInUseNeedsProjectRead.
+func TestListSchemasInUse(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	const objectType = "list-schemas-in-use"
+	createSchema := func(t *testing.T, title string) string {
+		t.Helper()
+		doc := fmt.Sprintf(`{
+			"title": %q,
+			"$schema": "https://json-schema.org/draft/2020-12/schema",
+			"objectType": %q,
+			"metaSchema": "%s/user-schema.json",
+			"kind": "user-schema",
+			"type": "object",
+			"x-auth-methods": {
+				"passkey": { "enabled": true }
+			},
+			"properties": {
+				"givenName": { "type": "string" }
+			}
+		}`, title, objectType, helpers.BuiltinSchemaBaseURL)
+		sch := api.UserSchema{}
+		require.NoError(t, sch.UnmarshalJSON([]byte(doc)))
+		resp, err := client.CreateSchema(
+			t.Context(),
+			api.CreateSchemaReq{Type: api.UserSchemaCreateSchemaReq, UserSchema: sch},
+			api.CreateSchemaParams{ProjectID: api.ProjectID(project.ID)},
+		)
+		require.NoError(t, err)
+		require.IsType(t, &api.CreateSchemaResponse{}, resp, helpers.MustMarshal(t, resp))
+		return resp.(*api.CreateSchemaResponse).ID
+	}
+	v1 := createSchema(t, "in use v1")
+	v2 := createSchema(t, "in use v2")
+
+	email, err := domain.NewCreateAttribute("email", helpers.RandString(8)+"@example.com", domain.AttributeUniquenessProject)
+	require.NoError(t, err)
+	require.NoError(t, harness.EnsureUserFixture(t).Create(t.Context(), &domain.CreateUser{
+		ProjectID:  project.ID,
+		SchemaURL:  v1,
+		ID:         "user_" + helpers.RandString(8),
+		Attributes: domain.CreateAttributes{*email},
+	}))
+
+	listInUse := func(t *testing.T, client *helpers.ApiClient, expand []api.SchemaExpand) map[string]api.OptBool {
+		t.Helper()
+		res, err := client.ListSchemas(t.Context(), api.ListSchemasParams{
+			ProjectID:  api.ProjectID(project.ID),
+			ObjectType: api.NewOptString(objectType),
+			Expand:     expand,
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListSchemasResponse{}, res, helpers.MustMarshal(t, res))
+		inUse := make(map[string]api.OptBool)
+		for _, schema := range res.(*api.ListSchemasResponse).Schemas {
+			inUse[schema.ID] = schema.Metadata.InUse
+		}
+		return inUse
+	}
+	expandInUse := []api.SchemaExpand{api.SchemaExpandInUse}
+
+	t.Run("absent unless asked for", func(t *testing.T) {
+		assert.Equal(t, map[string]api.OptBool{v1: {}, v2: {}}, listInUse(t, client, nil))
+	})
+
+	t.Run("marks each revision", func(t *testing.T) {
+		assert.Equal(t, map[string]api.OptBool{v1: api.NewOptBool(true), v2: api.NewOptBool(false)}, listInUse(t, client, expandInUse))
+	})
+
+}
