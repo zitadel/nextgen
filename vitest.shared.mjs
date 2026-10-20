@@ -61,6 +61,14 @@ export const baseTest = {
 };
 
 /**
+ * The specs that run only in the edge VM: `<entry>.edge.<spec|test>.<ext>`, the
+ * spec of the entry `<entry>` with the suffix the package uses for its tests
+ * (see `packages/AGENTS.md`). `edgeProject()` always runs them, and the
+ * package's other projects leave them out.
+ */
+export const edgeSpecs = "src/**/*.edge.{test,spec}.{ts,tsx}";
+
+/**
  * Resolve sibling `@zitadel/*` workspace packages to their TypeScript source
  * (matching the repo tsconfig's custom condition), so tests exercise shipped
  * code. Spread into `resolve.conditions` for workspace-source consumers.
@@ -121,12 +129,14 @@ function rejectNodeBuiltins(allowedPackages) {
  * set: no DOM, no `Buffer`, no Node built-ins. A spec that passes there also
  * works on any runtime offering that subset, Cloudflare Workers included.
  *
- * Dependencies resolve with the `browser` condition, as Wrangler and Next
- * bundle for the edge, so a dependency that only works with a DOM (Lit's
- * browser build, for one) fails to load here instead of resolving to its Node
- * build, which would hide it. Add it to a config's `projects`:
+ * It runs the `edgeSpecs` and, in `include`, a package's canonical specs that
+ * must also pass there. Dependencies resolve with the `browser` condition, as
+ * Wrangler and Next bundle for the edge, so a dependency that only works with a
+ * DOM (Lit's browser build, for one) fails to load here instead of resolving to
+ * its Node build, which would hide it. Add it as the last entry of a config's
+ * `projects`:
  *
- *   projects: [edgeProject({ include: ["src/jwt.spec.ts"] }), ...]
+ *   projects: [..., edgeProject({ include: ["src/jwt.test.ts"] })]
  *
  * `conditions` are extra resolve conditions, e.g. `sourceConditions`; `alias`
  * is the package's own `resolve.alias`; `plugins` are its own Vite plugins,
@@ -140,7 +150,7 @@ function rejectNodeBuiltins(allowedPackages) {
  * @returns {import("./vitest.shared.d.mts").EdgeProject}
  */
 export function edgeProject({
-  include,
+  include = [],
   exclude = [],
   conditions = [],
   alias = {},
@@ -149,8 +159,9 @@ export function edgeProject({
 }) {
   // A pattern that matches nothing would leave the project running no spec
   // and every run green, so fail when the config loads instead.
-  if (globSync(include, { cwd: process.cwd() }).length === 0) {
-    throw new Error(`edgeProject: no spec matches ${include.join(", ")} in ${process.cwd()}`);
+  const specs = [edgeSpecs, ...include];
+  if (globSync(specs, { cwd: process.cwd() }).length === 0) {
+    throw new Error(`edgeProject: no spec matches ${specs.join(", ")} in ${process.cwd()}`);
   }
   return {
     cacheDir: ".vitest/edge",
@@ -161,7 +172,7 @@ export function edgeProject({
       name: "edge",
       globals: true,
       environment: "edge-runtime",
-      include,
+      include: specs,
       exclude,
       server: { deps: { inline: true } },
     },

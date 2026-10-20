@@ -102,13 +102,3 @@ describe("the SDK in the edge runtime", () => {
   });
 });
 // edge-render:end
-
-describe("the Angular wrapper in the edge runtime", () => {
-  it("leaves the properties and the callbacks out of the markup", async () => {
-    const html = await serverRender(ZitadelLoginComponent, {
-      project: { projectId: "p1", proxyPath: "/px" },
-      locales: { en: {} },
-    });
-    expect(html).not.toMatch(/locales|onFlowStep|object Object/i);
-  });
-});

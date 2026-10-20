@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
-import { baseTest, edgeProject } from "../../vitest.shared.mjs";
+import { baseTest, edgeProject, edgeSpecs } from "../../vitest.shared.mjs";
 
 // Stub Nuxt's `#imports` virtual module so vitest can resolve sources that
 // pull from it (e.g. `useRuntimeConfig`) without bootstrapping Nuxt's module
@@ -24,16 +24,17 @@ export default defineConfig({
           globals: true,
           environment: "node",
           include: ["src/**/*.{test,spec}.{ts,tsx}"],
-          exclude: ["src/**/*.edge.spec.ts"],
+          exclude: [edgeSpecs],
         },
       },
-      // The server middleware runs on edge Nitro presets, so its canonical tests
-      // must run in the edge VM too, which has no `node:` modules and no socket.
-      // h3 depends on `node-mock-http` for its Node adapter, which Nitro's edge
-      // presets polyfill with unenv; nothing of ours reaches a Node built-in.
+      // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.
       edgeProject({
-        include: ["src/__tests__/server/middleware.test.ts", "src/**/*.edge.spec.ts"],
+        // The server middleware runs on edge Nitro presets, so its canonical tests
+        // must run in the edge VM too, which has no `node:` modules and no socket.
+        include: ["src/__tests__/server/middleware.test.ts"],
         alias,
+        // h3 depends on `node-mock-http` for its Node adapter, which Nitro's edge
+        // presets polyfill with unenv; nothing of ours reaches a Node built-in.
         polyfilledPackages: ["node-mock-http"],
       }),
     ],

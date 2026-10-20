@@ -765,28 +765,123 @@ describe("client SDK entries ↔ @zitadel/components", () => {
 });
 
 /**
- * The edge specs of the client SDKs.
+ * The edge specs.
  *
- * Each loads its entry in the edge VM and checks it between the same markers,
- * byte for byte, so every SDK is held to the same facts. The `edge-entry` block
- * is in every client SDK, `@zitadel/sdk-next/client` included: the entry loads
- * without a DOM and keeps the locale data it re-exports. The `edge-render`
- * block, which renders a login, a session and a logout, is in every SDK that
- * renders widgets; `@zitadel/sdk-next/client` registers elements and renders
- * none, so it has only the first. Only the glue outside a block,
- * `renderWidget` and the imports, is the framework's. The comparison itself is
- * tested on the backend-url block below.
+ * An edge spec is named after the entry it loads, `<entry>.edge.<spec|test>.<ext>`,
+ * in the directory where the package keeps the spec of that entry, with the
+ * suffix the package uses for its tests (`packages/AGENTS.md`). Within a family
+ * the specs carry the same titles in the same order: the client wrappers the
+ * `edge-entry` and `edge-render` blocks, the other specs a list of their own.
+ * The blocks are also held to the same body, byte for byte, so every wrapper is
+ * held to the same facts; only the glue outside a block, `renderWidget` and the
+ * imports, is the framework's. The comparison is tested on the backend-url block
+ * below.
  */
-describe("client SDK edge specs", () => {
+const EDGE_SPEC_NAME = /^(.+)\.edge\.(spec|test)\.tsx?$/;
+
+type EdgeSpec = {
+  /** The spec, relative to the packages directory. */
+  readonly path: string;
+  /** The source file of the entry it loads, relative to the packages directory. */
+  readonly entry: string;
+  /** Every title in the spec, in order. */
+  readonly titles: readonly string[];
+};
+
+type EdgeFiles = {
+  read(path: string): string;
+  exists(path: string): boolean;
+  /** The `spec` and `test` suffixes of the test files in a directory, edge specs left out. */
+  suffixes(directory: string): readonly string[];
+};
+
+/** What is wrong with the edge specs: their name, the entry they mirror, or their titles. */
+const edgeSpecProblems = (specs: Readonly<Record<string, EdgeSpec>>, files: EdgeFiles): string[] =>
+  Object.entries(specs).flatMap(([sdk, { path, entry, titles }]) => {
+    const name = path.slice(path.lastIndexOf("/") + 1);
+    const parts = EDGE_SPEC_NAME.exec(name);
+    if (!parts) return [`${sdk}: ${name} is not named <entry>.edge.<spec|test>.<ext>`];
+    const found: string[] = [];
+    const entryName = entry.slice(entry.lastIndexOf("/") + 1).replace(/\.tsx?$/, "");
+    if (parts[1] !== entryName || !files.exists(entry)) {
+      found.push(`${sdk}: ${name} does not mirror the entry ${entry}`);
+    }
+    const suffixes = files.suffixes(path.slice(0, path.lastIndexOf("/")));
+    if (!suffixes.includes(parts[2] ?? "") || suffixes.some((suffix) => suffix !== parts[2])) {
+      found.push(`${sdk}: ${name} does not use the suffix of the tests beside it`);
+    }
+    const difference = firstDifference(titlesIn(files.read(path)), titles);
+    if (difference) found.push(`${sdk}: ${difference}`);
+    return found;
+  });
+
+/** The `edgeProject` argument names, in the order a config writes them. */
+const EDGE_ARGUMENTS = [
+  "include",
+  "exclude",
+  "conditions",
+  "alias",
+  "polyfilledPackages",
+  "plugins",
+];
+
+const EDGE_ARGUMENT =
+  /^(include|exclude|conditions|alias|polyfilledPackages|plugins)(?::\s*(?:\[[^\]]*\]|[A-Za-z]+\(\)|sourceConditions))?,\s*/;
+
+const EDGE_DECLARATION =
+  /^ {6}\/\/ Runs the edge specs in the edge-runtime VM; see edgeProject in vitest\.shared\.mjs\.\n {6}edgeProject\(\{\n([\s\S]*?)\n {6}\}\),\n {4}\],\n {2}\},\n\}\);\n$/m;
+
+const EDGE_IMPORT =
+  /^import \{[^}]*\bedgeProject\b[^}]*\} from "\.\.\/\.\.\/vitest\.shared\.mjs";$/m;
+
+/**
+ * What is wrong with the edge project declared in each config: it must be
+ * imported from the shared module, be the last entry of `projects`, have the
+ * one comment above it, and pass only the arguments of {@link EDGE_ARGUMENTS},
+ * in that order. The value of an argument is the package's own; nothing else
+ * may differ.
+ */
+const edgeConfigProblems = (configs: Readonly<Record<string, string>>): string[] =>
+  Object.entries(configs).flatMap(([sdk, source]) => {
+    if (!EDGE_IMPORT.test(source))
+      return [`${sdk}: does not import edgeProject from the shared module`];
+    const declaration = EDGE_DECLARATION.exec(source);
+    if (!declaration) {
+      return [`${sdk}: the edge project is not the last project, under the shared comment`];
+    }
+    let rest = (declaration[1] ?? "")
+      .split("\n")
+      .filter((line) => !/^\s*\/\//.test(line))
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (rest !== "" && !rest.endsWith(",")) rest += ",";
+    const names: string[] = [];
+    for (let match = EDGE_ARGUMENT.exec(rest); match; match = EDGE_ARGUMENT.exec(rest)) {
+      names.push(match[1] ?? "");
+      rest = rest.slice(match[0].length);
+    }
+    if (rest !== "")
+      return [`${sdk}: passes ${JSON.stringify(rest)}, which edgeProject takes no such way`];
+    const order = names.map((name) => EDGE_ARGUMENTS.indexOf(name));
+    if (order.some((position, index) => index > 0 && position <= (order[index - 1] ?? 0))) {
+      return [`${sdk}: passes ${names.join(", ")}, not in the order ${EDGE_ARGUMENTS.join(", ")}`];
+    }
+    return [];
+  });
+
+describe("edge specs", () => {
   const packagesDir = `${resolve(process.cwd(), "..")}/`;
-  const RENDERING = {
-    "sdk-react": "sdk-react/src/index.edge.spec.tsx",
-    "sdk-vue": "sdk-vue/src/index.edge.spec.ts",
-    "sdk-angular": "sdk-angular/src/public-api.edge.spec.ts",
-    "sdk-svelte": "sdk-svelte/src/index.edge.spec.ts",
-    "sdk-solid": "sdk-solid/src/index.edge.spec.tsx",
-    "sdk-qwik": "sdk-qwik/src/index.edge.spec.tsx",
-  } as const;
+  const files: EdgeFiles = {
+    read: (path) => readFileSync(`${packagesDir}${path}`, "utf8"),
+    exists: (path) => existsSync(`${packagesDir}${path}`),
+    suffixes: (directory) =>
+      readdirSync(`${packagesDir}${directory}`).flatMap((file) => {
+        const suffix = /\.(spec|test)\.[cm]?[jt]sx?$/.exec(file)?.[1];
+        return suffix && !file.includes(".edge.") ? [suffix] : [];
+      }),
+  };
+
   const ENTRY_TITLES = [
     "the SDK entry in the edge runtime",
     "runs without a DOM",
@@ -799,28 +894,135 @@ describe("client SDK edge specs", () => {
     "omits the language when none is set",
   ];
 
-  const sourcesOf = (specs: Record<string, string>): Record<string, string> =>
-    Object.fromEntries(
-      Object.entries(specs).map(([sdk, path]) => [
+  /** The client wrappers, which render the widgets: the blocks, and nothing else. */
+  const WRAPPERS = {
+    "sdk-react": { path: "sdk-react/src/index.edge.spec.tsx", entry: "sdk-react/src/index.tsx" },
+    "sdk-vue": { path: "sdk-vue/src/index.edge.spec.ts", entry: "sdk-vue/src/index.ts" },
+    "sdk-angular": {
+      path: "sdk-angular/src/public-api.edge.spec.ts",
+      entry: "sdk-angular/src/public-api.ts",
+    },
+    "sdk-svelte": {
+      path: "sdk-svelte/src/index.edge.spec.ts",
+      entry: "sdk-svelte/src/lib/index.ts",
+    },
+    "sdk-solid": { path: "sdk-solid/src/index.edge.spec.tsx", entry: "sdk-solid/src/index.tsx" },
+    "sdk-qwik": { path: "sdk-qwik/src/index.edge.spec.tsx", entry: "sdk-qwik/src/index.tsx" },
+  } as const;
+
+  const CLIENT: Record<string, EdgeSpec> = {
+    ...Object.fromEntries(
+      Object.entries(WRAPPERS).map(([sdk, spec]) => [
         sdk,
-        readFileSync(`${packagesDir}${path}`, "utf8"),
+        { ...spec, titles: [...ENTRY_TITLES, ...EDGE_TITLES] },
       ]),
-    );
+    ),
+    // Registers the elements in the browser and renders no widget, so it has only the
+    // `edge-entry` block.
+    "sdk-next": {
+      path: "sdk-next/src/__tests__/client.edge.test.ts",
+      entry: "sdk-next/src/client.ts",
+      titles: [
+        ...ENTRY_TITLES,
+        "the client entry in the edge runtime",
+        "keeps the configuration it re-exports",
+        "exports no element class",
+      ],
+    },
+  };
+
+  /** The server SDKs run their canonical tests in the edge VM; these are the specs beyond them. */
+  const SERVER: Record<string, EdgeSpec> = {
+    "sdk-nuxt": {
+      path: "sdk-nuxt/src/__tests__/server/middleware.edge.test.ts",
+      entry: "sdk-nuxt/src/runtime/server/middleware.ts",
+      titles: [
+        "the server middleware in the edge runtime",
+        "never reads the request or the response through the event's Node shim",
+      ],
+    },
+  };
+
+  const COMPONENTS: Record<string, EdgeSpec> = {
+    components: {
+      path: "components/src/server.edge.spec.ts",
+      entry: "components/src/server.ts",
+      titles: [
+        "the server entry in the edge runtime",
+        "runs without a DOM",
+        "keeps the locale data the SDKs re-export",
+        "defines no element",
+        "runs the pure helpers it exports",
+        "finds the entries that need no DOM in the exports map",
+        "loads $subpath",
+      ],
+    },
+  };
+
+  const sourcesOf = (specs: Record<string, { path: string }>): Record<string, string> =>
+    Object.fromEntries(Object.entries(specs).map(([sdk, { path }]) => [sdk, files.read(path)]));
 
   it("has the entry block in every client SDK, sdk-next included", () => {
-    const sources = sourcesOf({
-      ...RENDERING,
-      "sdk-next": "sdk-next/src/__tests__/client.edge.test.ts",
-    });
-    expect(problems(sources, "edge-entry", ENTRY_TITLES)).toEqual([]);
+    expect(problems(sourcesOf(CLIENT), "edge-entry", ENTRY_TITLES)).toEqual([]);
   });
 
   it("has the render block in every SDK that renders widgets", () => {
-    expect(problems(sourcesOf(RENDERING), "edge-render", EDGE_TITLES)).toEqual([]);
+    expect(problems(sourcesOf(WRAPPERS), "edge-render", EDGE_TITLES)).toEqual([]);
+  });
+
+  it.each([
+    ["client SDK", CLIENT],
+    ["server SDK", SERVER],
+    ["components", COMPONENTS],
+  ] as const)("names, places and titles every %s edge spec the same way", (_, specs) => {
+    expect(edgeSpecProblems(specs, files)).toEqual([]);
+  });
+
+  it("knows every edge spec", () => {
+    const known = new Set(
+      Object.values({ ...CLIENT, ...SERVER, ...COMPONENTS }).map((spec) => spec.path),
+    );
+    const found: string[] = [];
+    const walk = (directory: string): void => {
+      for (const entry of readdirSync(`${packagesDir}${directory}`, { withFileTypes: true })) {
+        const path = `${directory}/${entry.name}`;
+        if (entry.isDirectory()) {
+          if (!["node_modules", "dist", "build", ".svelte-kit"].includes(entry.name)) walk(path);
+        } else if (EDGE_SPEC_NAME.test(entry.name)) found.push(path);
+      }
+    };
+    for (const entry of readdirSync(packagesDir, { withFileTypes: true })) {
+      if (entry.isDirectory() && existsSync(`${packagesDir}${entry.name}/src`)) {
+        walk(`${entry.name}/src`);
+      }
+    }
+    expect(found.sort()).toEqual([...known].sort());
+  });
+
+  const CONFIGS = [
+    "components/vitest.config.ts",
+    "sdk-angular/vitest.config.ts",
+    "sdk-core/vite.config.ts",
+    "sdk-next/vitest.config.ts",
+    "sdk-nuxt/vitest.config.ts",
+    "sdk-qwik/vitest.config.ts",
+    "sdk-qwik-router/vitest.config.ts",
+    "sdk-react/vitest.config.ts",
+    "sdk-solid/vitest.config.ts",
+    "sdk-solid-start/vitest.config.ts",
+    "sdk-svelte/vitest.config.ts",
+    "sdk-sveltekit/vitest.config.ts",
+    "sdk-tanstack-start/vitest.config.ts",
+    "sdk-vue/vitest.config.ts",
+  ];
+
+  it("declares the edge project the same way in every config", () => {
+    const configs = Object.fromEntries(CONFIGS.map((path) => [path, files.read(path)]));
+    expect(edgeConfigProblems(configs)).toEqual([]);
   });
 
   it("every server SDK runs its canonical middleware tests in the edge VM", () => {
-    const CONFIGS = {
+    const SERVER_CONFIGS = {
       "sdk-next": ["sdk-next/vitest.config.ts", "middleware.test.ts"],
       "sdk-nuxt": ["sdk-nuxt/vitest.config.ts", "server/middleware.test.ts"],
       "sdk-sveltekit": ["sdk-sveltekit/vitest.config.ts", "handle.test.ts"],
@@ -828,11 +1030,117 @@ describe("client SDK edge specs", () => {
       "sdk-qwik-router": ["sdk-qwik-router/vitest.config.ts", "request-handler.test.ts"],
       "sdk-tanstack-start": ["sdk-tanstack-start/vitest.config.ts", "middleware.test.ts"],
     } as const;
-    for (const [sdk, [config, file]] of Object.entries(CONFIGS)) {
-      const source = readFileSync(`${packagesDir}${config}`, "utf8");
+    for (const [sdk, [config, file]] of Object.entries(SERVER_CONFIGS)) {
+      const source = files.read(config);
       const edge = source.slice(source.indexOf("edgeProject({"));
       expect(edge, `${sdk} does not run ${file} in the edge VM`).toContain(`src/__tests__/${file}`);
     }
+  });
+
+  // The guards' own logic, on sources they are made to reject.
+  describe("the guards", () => {
+    const good = `import { describe, it } from "vitest";\ndescribe("the x in the edge runtime", () => {\n  it("runs", () => {});\n});\n`;
+    const spec: EdgeSpec = {
+      path: "p/src/index.edge.spec.ts",
+      entry: "p/src/index.ts",
+      titles: ["the x in the edge runtime", "runs"],
+    };
+    const fakeFiles = (overrides: Partial<EdgeFiles> = {}, source = good): EdgeFiles => ({
+      read: () => source,
+      exists: () => true,
+      suffixes: () => ["spec"],
+      ...overrides,
+    });
+    const check = (changed: Partial<EdgeSpec>, overrides?: Partial<EdgeFiles>, source?: string) =>
+      edgeSpecProblems({ p: { ...spec, ...changed } }, fakeFiles(overrides, source));
+
+    it("accepts a spec named for its entry, with the titles of its family", () => {
+      expect(check({})).toEqual([]);
+    });
+
+    it("sees a spec that is not named <entry>.edge.<spec|test>.<ext>", () => {
+      expect(check({ path: "p/src/index.edge.ts" })).toHaveLength(1);
+      expect(check({ path: "p/src/index.edges.spec.ts" })).toHaveLength(1);
+      expect(check({ path: "p/src/edge.index.spec.ts" })).toHaveLength(1);
+    });
+
+    it("sees a spec named for another entry than the one it loads", () => {
+      expect(check({ path: "p/src/public-api.edge.spec.ts" })).toHaveLength(1);
+      expect(check({}, { exists: () => false })).toHaveLength(1);
+    });
+
+    it("sees a suffix the package does not use for its tests", () => {
+      expect(check({ path: "p/src/index.edge.test.ts" })).toHaveLength(1);
+      expect(check({}, { suffixes: () => ["spec", "test"] })).toHaveLength(1);
+      expect(check({}, { suffixes: () => [] })).toHaveLength(1);
+    });
+
+    it("sees a renamed, dropped, extra and reordered title", () => {
+      expect(check({}, {}, good.replace('"runs"', '"works"'))).toHaveLength(1);
+      expect(check({}, {}, good.replace('  it("runs", () => {});\n', ""))).toHaveLength(1);
+      expect(check({}, {}, good.replace("});\n", '  it("extra", () => {});\n});\n'))).toHaveLength(
+        1,
+      );
+      expect(check({ titles: ["runs", "the x in the edge runtime"] })).toHaveLength(1);
+    });
+
+    const declaration = (args: string, comment = true): string =>
+      [
+        'import { baseTest, edgeProject } from "../../vitest.shared.mjs";',
+        "export default defineConfig({",
+        "  test: {",
+        "    projects: [",
+        "      {},",
+        ...(comment
+          ? [
+              "      // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.",
+            ]
+          : []),
+        "      edgeProject({",
+        args,
+        "      }),",
+        "    ],",
+        "  },",
+        "});",
+        "",
+      ].join("\n");
+    const configCheck = (source: string) => edgeConfigProblems({ p: source });
+    const args =
+      '        include: ["a"],\n        conditions: ["worker"],\n        plugins: [x()],';
+
+    it("accepts the declaration with the arguments it may pass", () => {
+      expect(configCheck(declaration(args))).toEqual([]);
+      expect(
+        configCheck(declaration('        alias,\n        polyfilledPackages: ["a"],')),
+      ).toEqual([]);
+      expect(
+        configCheck(declaration("        // why\n        conditions: sourceConditions,")),
+      ).toEqual([]);
+    });
+
+    it("sees a declaration without the shared comment or not last", () => {
+      expect(configCheck(declaration(args, false))).toHaveLength(1);
+      expect(
+        configCheck(declaration(args).replace("// Runs the edge", "// Run the edge")),
+      ).toHaveLength(1);
+      expect(configCheck(declaration(args).replace("    ],", "      {},\n    ],"))).toHaveLength(1);
+    });
+
+    it("sees an argument it may not pass, or one out of order", () => {
+      expect(configCheck(declaration('        name: "edge",'))).toHaveLength(1);
+      expect(
+        configCheck(declaration('        conditions: ["worker"],\n        include: ["a"],')),
+      ).toHaveLength(1);
+      expect(
+        configCheck(declaration('        include: ["a"],\n        include: ["b"],')),
+      ).toHaveLength(1);
+    });
+
+    it("sees an edgeProject that is not the shared one", () => {
+      expect(
+        configCheck(declaration(args).replace("../../vitest.shared.mjs", "./edge.mjs")),
+      ).toHaveLength(1);
+    });
   });
 });
 

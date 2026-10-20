@@ -4,7 +4,7 @@ import { transformAsync } from "@babel/core";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vitest/config";
 
-import { baseTest, edgeProject } from "../../vitest.shared.mjs";
+import { baseTest, edgeProject, edgeSpecs } from "../../vitest.shared.mjs";
 
 /**
  * Finishes the partially compiled Angular code in the edge project, the step
@@ -28,6 +28,11 @@ function angularLinker(): Plugin {
     },
   };
 }
+
+// The edge spec loads the built package, as a consumer's app does.
+const alias = {
+  "@zitadel/sdk-angular": fileURLToPath(new URL("./dist/index.js", import.meta.url)),
+};
 
 // The analog plugin compiles the Angular components so specs can render them
 // through TestBed; it reads `tsconfig.spec.json` (the lib config plus the specs)
@@ -57,18 +62,15 @@ export default defineConfig({
           pool: "forks",
           setupFiles: ["src/test-setup.ts"],
           include: ["src/**/*.{test,spec}.{ts,tsx}"],
-          exclude: ["src/**/*.edge.spec.ts"],
+          exclude: [edgeSpecs],
         },
       },
-      // The edge spec loads the built package, as a consumer's app does, and
-      // `workerd` selects the Lit-free entry of `@zitadel/components`, as
-      // Wrangler does. The build is a dependency of the test task.
+      // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.
       edgeProject({
-        include: ["src/**/*.edge.spec.ts"],
+        // `workerd` selects the Lit-free entry of `@zitadel/components`, as
+        // Wrangler does. The build is a dependency of the test task.
         conditions: ["workerd"],
-        alias: {
-          "@zitadel/sdk-angular": fileURLToPath(new URL("./dist/index.js", import.meta.url)),
-        },
+        alias,
         plugins: [angularLinker()],
       }),
     ],

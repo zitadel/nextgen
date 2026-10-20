@@ -1,7 +1,7 @@
 import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 
-import { baseTest, edgeProject, sourceConditions } from "../../vitest.shared.mjs";
+import { baseTest, edgeProject, edgeSpecs, sourceConditions } from "../../vitest.shared.mjs";
 import { liquidRaw } from "./vite-liquid-plugin.ts";
 
 /** Shared plugins for every project in this config. */
@@ -45,11 +45,9 @@ export default defineConfig({
           setupFiles: ["src/internal/lit-dev-mode.ts"],
           environment: "jsdom",
           include: ["src/**/*.spec.ts"],
-          exclude: ["src/**/*.browser.spec.ts", "src/**/*.edge.spec.ts"],
+          exclude: ["src/**/*.browser.spec.ts", edgeSpecs],
         },
       },
-      // The Lit-free server entry, loaded from `dist/` inside the edge VM.
-      edgeProject({ include: ["src/**/*.edge.spec.ts"], plugins: sharedPlugins() }),
       {
         cacheDir: ".vitest/browser",
         plugins: sharedPlugins(),
@@ -72,6 +70,11 @@ export default defineConfig({
           },
         },
       },
+      // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.
+      edgeProject({
+        // The Lit-free server entry, loaded from `dist/` inside the edge VM.
+        plugins: sharedPlugins(),
+      }),
     ],
   },
 });

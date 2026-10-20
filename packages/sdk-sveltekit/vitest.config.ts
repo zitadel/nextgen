@@ -17,9 +17,12 @@ export default defineConfig({
           include: ["src/**/*.{test,spec}.{ts,tsx}"],
         },
       },
-      // The `/server` entry is what runs on the edge, with the JWT helpers it
-      // verifies sessions with: both must run in the edge VM.
-      edgeProject({ include: ["src/__tests__/handle.test.ts", "src/__tests__/lib/jwt.test.ts"] }),
+      // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.
+      edgeProject({
+        // The `/server` entry is what runs on the edge, with the JWT helpers it
+        // verifies sessions with: both must run in the edge VM.
+        include: ["src/__tests__/handle.test.ts", "src/__tests__/lib/jwt.test.ts"],
+      }),
     ],
   },
 });

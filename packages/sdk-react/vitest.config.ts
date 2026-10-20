@@ -1,6 +1,6 @@
 import { defineConfig } from "vitest/config";
 
-import { baseTest, edgeProject } from "../../vitest.shared.mjs";
+import { baseTest, edgeProject, edgeSpecs } from "../../vitest.shared.mjs";
 
 /**
  * `resolve.conditions: ['browser']` makes Vitest resolve the *browser* build of
@@ -31,14 +31,17 @@ export default defineConfig({
           globals: true,
           environment: "jsdom",
           include: ["src/**/*.{test,spec}.{ts,tsx}"],
-          exclude: ["src/**/*.edge.spec.{ts,tsx}"],
+          exclude: [edgeSpecs],
           setupFiles: ["src/test-setup.ts"],
         },
       },
-      // The wrapper must load on an edge runtime, which has no DOM: the
-      // components package resolves to its entry without the elements under
-      // `worker` (see its package.json).
-      edgeProject({ include: ["src/**/*.edge.spec.{ts,tsx}"], conditions: ["worker"] }),
+      // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.
+      edgeProject({
+        // The wrapper must load on an edge runtime, which has no DOM: the
+        // components package resolves to its entry without the elements under
+        // `worker` (see its package.json).
+        conditions: ["worker"],
+      }),
     ],
   },
 });

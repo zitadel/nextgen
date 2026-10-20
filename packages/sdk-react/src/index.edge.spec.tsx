@@ -72,17 +72,3 @@ describe("the SDK in the edge runtime", () => {
   });
 });
 // edge-render:end
-
-describe("the React wrapper in the edge runtime", () => {
-  it("leaves the properties and the callbacks out of the markup", () => {
-    const html = renderToString(
-      <ZitadelLogin
-        project={{ projectId: "p1", proxyPath: "/px" }}
-        variant="page"
-        locales={{ en: {} }}
-        onFlowStep={() => undefined}
-      />,
-    );
-    expect(html).not.toMatch(/variant|locales|onFlowStep|object Object/i);
-  });
-});

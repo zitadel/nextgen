@@ -39,6 +39,10 @@ change needs a changeset, and the whole train versions together.
   the conditions the framework's own edge bundler adds (`react-server` and
   `edge-light` for Next, `worker` for Solid and Qwik), never generic ones. Add
   one only where the README claims edge, and leave Node-only entries out.
+  A spec that runs only there is named after its entry, `<entry>.edge.<spec|test>.<ext>`,
+  sits where the package keeps the spec of that entry and uses the suffix of
+  the package's own tests; the contract spec in `sdk-core` holds every edge
+  spec's name, titles and config to one shape.
 - **One Agent Skill per framework SDK**, at `<pkg>/skills/<name>/SKILL.md`,
   plus `skills/zitadel-components/SKILL.md` for `@zitadel/components`; the
   top-level `skills/zitadel` routes to them. A new framework SDK adds its

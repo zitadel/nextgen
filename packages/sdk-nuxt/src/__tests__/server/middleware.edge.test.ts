@@ -10,11 +10,11 @@ const NODE_ACCESS = /\.node\b/;
  * with a middleware that reads it. Edge presets have no such shim, hence the
  * middleware may reach the request only through h3's accessors.
  */
-describe("server middleware source", () => {
-  const source = readFileSync(new URL("./middleware.ts", import.meta.url), "utf8").replace(
-    COMMENTS,
-    "",
-  );
+describe("the server middleware in the edge runtime", () => {
+  const source = readFileSync(
+    new URL("../../runtime/server/middleware.ts", import.meta.url),
+    "utf8",
+  ).replace(COMMENTS, "");
 
   it("never reads the request or the response through the event's Node shim", () => {
     expect(source).not.toMatch(NODE_ACCESS);

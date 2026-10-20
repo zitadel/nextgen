@@ -1,6 +1,6 @@
 import { defineConfig } from "vitest/config";
 
-import { baseTest, edgeProject } from "../../vitest.shared.mjs";
+import { baseTest, edgeProject, edgeSpecs } from "../../vitest.shared.mjs";
 
 export default defineConfig({
   cacheDir: ".vitest",
@@ -16,13 +16,16 @@ export default defineConfig({
           environment: "jsdom",
           setupFiles: ["src/test-setup.ts"],
           include: ["src/**/*.{test,spec}.{ts,tsx}"],
-          exclude: ["src/**/*.edge.spec.ts"],
+          exclude: [edgeSpecs],
         },
       },
-      // The SDK imports `@zitadel/components` for registration and locale
-      // data only, so on the edge it resolves to the components' Lit-free
-      // entry; `workerd` selects it, as Wrangler does.
-      edgeProject({ include: ["src/**/*.edge.spec.ts"], conditions: ["workerd"] }),
+      // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.
+      edgeProject({
+        // The SDK imports `@zitadel/components` for registration and locale
+        // data only, so on the edge it resolves to the components' Lit-free
+        // entry; `workerd` selects it, as Wrangler does.
+        conditions: ["workerd"],
+      }),
     ],
   },
 });

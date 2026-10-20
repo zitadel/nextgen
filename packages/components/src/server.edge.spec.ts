@@ -18,14 +18,14 @@ const NEEDS_A_DOM = ["./standalone", "./atoms", "./manifests", "./orchestrator"]
  * export with the package root's is checked in `server.spec.ts`, which needs a
  * DOM to import the root.
  */
-describe("server entry in the edge runtime", () => {
+describe("the server entry in the edge runtime", () => {
   it("runs without a DOM", () => {
     expect(typeof HTMLElement).toBe("undefined");
     expect(typeof document).toBe("undefined");
     expect(typeof customElements).toBe("undefined");
   });
 
-  it("loads and keeps the locale data the SDKs re-export", () => {
+  it("keeps the locale data the SDKs re-export", () => {
     expect(entry.businessLocales).toBeTypeOf("object");
     expect(Object.keys(entry.businessLocales).length).toBeGreaterThan(0);
   });

@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vitest/config";
 
-import { baseTest, edgeProject } from "../../vitest.shared.mjs";
+import { baseTest, edgeProject, edgeSpecs } from "../../vitest.shared.mjs";
 
 // auth.ts imports "server-only", whose default entry throws to keep server
 // modules out of client bundles. Tests run outside both module graphs, so
@@ -48,21 +48,21 @@ export default defineConfig({
           globals: true,
           environment: "jsdom",
           include: ["src/**/*.{test,spec}.{ts,tsx}"],
-          exclude: ["src/**/*.edge.test.{ts,tsx}"],
+          exclude: [edgeSpecs],
         },
       },
-      // `/middleware` is the SDK's edge entry (see the README), and the JWT
-      // helpers it verifies sessions with: both must run in the edge VM. So must
-      // `/client`, which registers the elements in the browser: the components
-      // package resolves to its entry without the elements under `edge-light`
-      // (see its package.json).
+      // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.
       edgeProject({
+        // `/middleware` is the SDK's edge entry (see the README), and the JWT
+        // helpers it verifies sessions with: both must run in the edge VM. So
+        // must `/client` (its edge spec), which registers the elements in the
+        // browser: the components package resolves to its entry without the
+        // elements under `edge-light` (see its package.json).
         include: [
           "src/__tests__/middleware.test.ts",
           "src/__tests__/lib/jwt.test.ts",
           "src/__tests__/index.test.ts",
           "src/__tests__/server.test.ts",
-          "src/__tests__/client.edge.test.ts",
         ],
         conditions: ["react-server", "edge-light"],
         plugins: [clientReferences()],

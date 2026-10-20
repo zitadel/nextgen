@@ -23,9 +23,12 @@ export interface BaseTest {
 export declare const baseTest: BaseTest;
 export declare const sourceConditions: string[];
 
+/** The glob of the specs that run only in the edge VM. */
+export declare const edgeSpecs: string;
+
 export interface EdgeProjectOptions {
-  /** Spec files the project runs, relative to the package root. */
-  include: string[];
+  /** Canonical specs that also run in the edge VM, relative to the package root. */
+  include?: string[];
   /** Spec files that read the filesystem or need Node built-ins. */
   exclude?: string[];
   /** Extra resolve conditions, for example `sourceConditions`. */

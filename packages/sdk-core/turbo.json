@@ -38,12 +38,12 @@
         "$TURBO_ROOT$/packages/sdk-next/src/client.ts",
         "$TURBO_ROOT$/packages/sdk-nuxt/src/index.ts",
         "$TURBO_ROOT$/packages/sdk-tanstack-start/src/react.tsx",
-        "$TURBO_ROOT$/packages/sdk-react/src/index.edge.spec.tsx",
-        "$TURBO_ROOT$/packages/sdk-vue/src/index.edge.spec.ts",
-        "$TURBO_ROOT$/packages/sdk-angular/src/public-api.edge.spec.ts",
-        "$TURBO_ROOT$/packages/sdk-svelte/src/index.edge.spec.ts",
-        "$TURBO_ROOT$/packages/sdk-solid/src/index.edge.spec.tsx",
-        "$TURBO_ROOT$/packages/sdk-qwik/src/index.edge.spec.tsx",
+        // The edge specs, the entries they mirror, the tests beside them (for their suffix)
+        // and the configs that declare the edge project.
+        "$TURBO_ROOT$/packages/*/src/**/*.{spec,test}.{ts,tsx}",
+        "$TURBO_ROOT$/packages/sdk-nuxt/src/runtime/server/middleware.ts",
+        "$TURBO_ROOT$/packages/components/src/server.ts",
+        "$TURBO_ROOT$/packages/components/vitest.config.ts",
         "$TURBO_ROOT$/packages/sdk-*/vitest.config.ts",
         "$TURBO_ROOT$/packages/sdk-*/src/__tests__/*.test.ts",
         "$TURBO_ROOT$/packages/sdk-*/src/__tests__/*/*.test.ts",

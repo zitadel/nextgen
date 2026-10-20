@@ -33,6 +33,7 @@ export default defineConfig({
           include: ["src/**/*.{test,spec}.{ts,tsx}"],
         },
       },
+      // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.
       edgeProject({
         include: ["src/**/*.spec.ts"],
         // Reads the SDK packages' sources and manifests from disk.

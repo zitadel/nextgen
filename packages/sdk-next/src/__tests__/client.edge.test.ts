@@ -24,7 +24,7 @@ describe("the SDK entry in the edge runtime", () => {
  * class from `@zitadel/components`, whose edge entry has none. It renders no
  * widget, so it has no `edge-render` block.
  */
-describe("client entry in the edge runtime", () => {
+describe("the client entry in the edge runtime", () => {
   it("keeps the configuration it re-exports", () => {
     expect(client.configureZitadel).toBeTypeOf("function");
     expect(client.getApi).toBeTypeOf("function");

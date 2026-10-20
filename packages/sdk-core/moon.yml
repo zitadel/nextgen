@@ -60,12 +60,12 @@ tasks:
       - "/packages/sdk-next/src/client.ts"
       - "/packages/sdk-nuxt/src/index.ts"
       - "/packages/sdk-tanstack-start/src/react.tsx"
-      - "/packages/sdk-react/src/index.edge.spec.tsx"
-      - "/packages/sdk-vue/src/index.edge.spec.ts"
-      - "/packages/sdk-angular/src/public-api.edge.spec.ts"
-      - "/packages/sdk-svelte/src/index.edge.spec.ts"
-      - "/packages/sdk-solid/src/index.edge.spec.tsx"
-      - "/packages/sdk-qwik/src/index.edge.spec.tsx"
+      # The edge specs, the entries they mirror, the tests beside them (for their suffix)
+      # and the configs that declare the edge project.
+      - "/packages/*/src/**/*.{spec,test}.{ts,tsx}"
+      - "/packages/sdk-nuxt/src/runtime/server/middleware.ts"
+      - "/packages/components/src/server.ts"
+      - "/packages/components/vitest.config.ts"
       - "/packages/sdk-*/vitest.config.ts"
       # And the meta-framework SDKs' server tests, to check they share their titles.
       - "/packages/sdk-*/src/__tests__/*.test.ts"

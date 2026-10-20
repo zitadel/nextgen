@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { edgeProject } from "./vitest.shared.mjs";
+import { edgeProject, edgeSpecs } from "./vitest.shared.mjs";
 
 const [plugin] = edgeProject({ include: ["vitest.shared.test.mjs"] }).plugins;
 const transform = (code, id = "/repo/packages/sdk/src/entry.ts") => plugin.transform(code, id);
@@ -13,6 +13,11 @@ describe("edgeProject", () => {
       environment: "edge-runtime",
       server: { deps: { inline: true } },
     });
+  });
+
+  it("always runs the edge specs, then the canonical specs it is given", () => {
+    const { test } = edgeProject({ include: ["vitest.shared.test.mjs"] });
+    expect(test.include).toEqual([edgeSpecs, "vitest.shared.test.mjs"]);
   });
 
   it("keeps the package's own plugins ahead of the built-in check", () => {
