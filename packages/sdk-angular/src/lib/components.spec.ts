@@ -7,7 +7,7 @@ import type {
 import { Component, type Type } from "@angular/core";
 import { bootstrapApplication, provideClientHydration } from "@angular/platform-browser";
 import { provideServerRendering, renderApplication } from "@angular/platform-server";
-import { render } from "@testing-library/angular";
+import { render, waitFor } from "@testing-library/angular";
 import { _resetConfigForTesting, configureZitadel } from "@zitadel/api/config";
 import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import {
@@ -355,6 +355,33 @@ describe("hydrating a server-rendered login", () => {
     expect(created).toHaveLength(1);
     expect(created[0]).toMatchObject({ purpose: "register" });
     expect(globalProject.projectId).toBe("proj-global");
+  });
+
+  it("loads the supplied flow on its first request instead of creating one", async () => {
+    configureZitadel({
+      projectId: "proj-global",
+      proxyPath: "https://flow.test.invalid",
+    });
+    const template = `<zitadel-auth-login resumeFlowId="flow_123" />`;
+    const fetched = vi.spyOn(globalThis, "fetch");
+    const html = await serverRender(template, [ZitadelLoginComponent]);
+    document.body.innerHTML = html
+      .slice(html.indexOf("<body"), html.indexOf("</body>"))
+      .replace(/^<body[^>]*>/, "");
+
+    @Component({
+      selector: "app-root",
+      standalone: true,
+      imports: [ZitadelLoginComponent],
+      template,
+    })
+    class Root {}
+    await bootstrapApplication(Root, { providers: [provideClientHydration()] });
+
+    await waitFor(() => expect(fetched).toHaveBeenCalled());
+    const first = new Request(fetched.mock.calls[0]![0], fetched.mock.calls[0]![1]);
+    expect(first.method).toBe("GET");
+    expect(first.url).toContain("flow_123");
   });
 });
 

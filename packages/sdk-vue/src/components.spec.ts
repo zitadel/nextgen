@@ -286,6 +286,29 @@ describe("hydrating a server-rendered login", () => {
     expect(created[0]).toMatchObject({ purpose: "register" });
     host.remove();
   });
+
+  it("loads the supplied flow on its first request instead of creating one", async () => {
+    const globalProject = configureZitadel({
+      projectId: "proj-global",
+      proxyPath: "https://flow.test.invalid",
+    });
+    const fetched = vi.spyOn(globalThis, "fetch");
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const app = () =>
+      createSSRApp({
+        render: () => h(ZitadelLogin, { project: globalProject, resumeFlowId: "flow_123" }),
+      });
+    host.innerHTML = await renderToString(app());
+
+    app().mount(host);
+
+    await waitFor(() => expect(fetched).toHaveBeenCalled());
+    const first = new Request(fetched.mock.calls[0]![0], fetched.mock.calls[0]![1]);
+    expect(first.method).toBe("GET");
+    expect(first.url).toContain("flow_123");
+    host.remove();
+  });
 });
 
 describe("businessLocales", () => {

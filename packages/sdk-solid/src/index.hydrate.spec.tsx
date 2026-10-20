@@ -1,3 +1,4 @@
+import { waitFor } from "@solidjs/testing-library";
 import { _resetConfigForTesting, configureZitadel } from "@zitadel/api/config";
 import type { ComponentProps } from "solid-js";
 import { hydrate } from "solid-js/web";
@@ -74,6 +75,31 @@ describe("hydrating a server-rendered login", () => {
     const created = bodies.filter((body) => body?.project_id);
     expect(created).toHaveLength(1);
     expect(created[0]).toMatchObject({ purpose: "register" });
+    dispose();
+    host.remove();
+  });
+
+  it("loads the supplied flow on its first request instead of creating one", async () => {
+    const globalProject = configureZitadel({
+      projectId: "proj-global",
+      proxyPath: "https://flow.test.invalid",
+    });
+    const fetched = vi.spyOn(globalThis, "fetch");
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    host.innerHTML = await serverMarkup({ project: globalProject, resumeFlowId: "flow_123" });
+
+    // What the server's hydration script defines before the client hydrates.
+    Object.assign(window, { _$HY: { events: [], completed: new WeakSet(), r: {} } });
+    const dispose = hydrate(
+      () => <ZitadelLogin project={globalProject} resumeFlowId="flow_123" />,
+      host,
+    );
+
+    await waitFor(() => expect(fetched).toHaveBeenCalled());
+    const first = new Request(fetched.mock.calls[0]![0], fetched.mock.calls[0]![1]);
+    expect(first.method).toBe("GET");
+    expect(first.url).toContain("flow_123");
     dispose();
     host.remove();
   });
