@@ -22,11 +22,15 @@ import { signIn } from "../support/sign-in";
 // version, so the cases below are parked with the block, not deleted; restore
 // them alongside the block and the unit specs when both reasons clear.
 
-/** Signs in, lands on /users and opens the drawer. */
+/**
+ * Signs in, lands on /users and opens the drawer, with the seeded schema picked
+ * unless `pick` is false.
+ */
 async function openDrawer(
   page: Page,
   zitadel: Parameters<typeof signIn>[1],
   user: Parameters<typeof signIn>[2],
+  { pick = true }: { pick?: boolean } = {},
 ) {
   await signIn(page, zitadel, user);
   await page.goto("/users");
@@ -34,27 +38,40 @@ async function openDrawer(
   await page.getByRole("button", { name: "Add", exact: true }).click();
   const drawer = page.getByRole("dialog", { name: "Add user" });
   await expect(drawer).toBeVisible();
+  if (pick) await pickSeededSchema(page, drawer, zitadel);
+  return drawer;
+}
+
+/**
+ * Picks the seeded schema in the open drawer, by name: the drawer preselects
+ * only a project's single schema, and specs running in parallel on the
+ * instance add schemas of their own.
+ */
+async function pickSeededSchema(
+  page: Page,
+  drawer: Locator,
+  zitadel: Parameters<typeof signIn>[1],
+) {
+  await drawer.getByRole("combobox", { name: "User Schema" }).click();
+  await page.getByRole("option", { name: (await projectSchema(zitadel)).name }).click();
+  // Closed before a test reopens it, so its options never pass for the new list.
+  await expect(page.getByRole("option")).toHaveCount(0);
   // One fetch gates the form: the drawer shows "Loading schemas…" until the
   // list — which carries each schema's document (#921) — resolves and the
   // fields mount. Locator actions auto-wait through it, but one-shot reads
   // (`renderedFields`) and raw key presses don't — so only hand tests a drawer
   // whose form is actually on screen.
   await expect(drawer.locator('input[data-slot="input"]').first()).toBeVisible();
-  return drawer;
 }
 
 /** The schema the console is scoped to, straight from the API. */
-async function projectSchema(zitadel: {
-  api: { getSchemaById: (id: string) => Promise<unknown> };
-  handle: { schemaId: string };
-}) {
-  const envelope = (await zitadel.api.getSchemaById(zitadel.handle.schemaId)) as {
-    schema?: { properties?: Record<string, unknown>; required?: string[] };
-  };
-  const schema = envelope.schema ?? {};
+async function projectSchema(zitadel: Parameters<typeof signIn>[1]) {
+  const { schema } = await zitadel.api.getSchemaById(zitadel.handle.schemaId);
   return {
+    // As the picker lists it (`schemaDisplayName`).
+    name: String(schema.title ?? schema.objectType ?? zitadel.handle.schemaId),
     properties: Object.keys(schema.properties ?? {}).sort(),
-    required: new Set(schema.required ?? []),
+    required: new Set((schema.required as string[] | undefined) ?? []),
   };
 }
 
@@ -72,12 +89,9 @@ test("renders exactly the properties the API's schema defines", async ({ page, z
   const schema = await projectSchema(zitadel);
   const drawer = await openDrawer(page, zitadel, await seed.user());
 
-  // Both loading labels are excluded, not just the empty one: "Loading schemas…"
-  // is also `not "Select schema"`, so waiting on that alone let the assertion
-  // below run mid-fetch and compare against an empty field set.
+  // The picker names the seeded schema, so the fields below are its own.
   const picker = drawer.getByRole("combobox", { name: "User Schema" });
-  await expect(picker).not.toContainText("Select schema");
-  await expect(picker).not.toContainText("Loading schemas");
+  await expect(picker).toContainText(schema.name);
 
   // Polled rather than read once: `evaluateAll` takes a single snapshot and does
   // not retry, so it can land between the schema resolving and its fields
@@ -137,7 +151,17 @@ test("discards the draft when cancelled", async ({ page, zitadel, seed }) => {
   // Nothing was created, and reopening starts clean.
   await expect(page.getByText(email)).toHaveCount(0);
   await page.getByRole("button", { name: "Add", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "Add user" }).getByLabel("Email")).toHaveValue("");
+  // Read before any pick: picking a schema clears the values itself. With one
+  // schema the fields mount empty, with several none mount until a pick, and a
+  // kept draft would show in either case.
+  await expect(drawer.getByRole("combobox", { name: "User Schema" })).not.toHaveAttribute(
+    "aria-disabled",
+    "true",
+  );
+  const values = await drawer
+    .locator("input")
+    .evaluateAll((inputs) => inputs.map((input) => (input as HTMLInputElement).value));
+  expect(values).not.toContain(email);
 });
 
 test("closes from the header without creating anything", async ({ page, zitadel, seed }) => {
@@ -254,6 +278,19 @@ test("can be completed with the keyboard alone", async ({ page, zitadel, seed })
   await page.getByRole("button", { name: "Add", exact: true }).press("Enter");
   const drawer = page.getByRole("dialog", { name: "Add user" });
   await expect(drawer).toBeVisible();
+  // The seeded schema, picked without a pointer (see `pickSeededSchema`).
+  const picker = drawer.getByRole("combobox", { name: "User Schema" });
+  await expect(picker).not.toHaveAttribute("aria-disabled", "true");
+  await picker.press("ArrowDown");
+  await expect(page.getByPlaceholder("Search schemas")).toBeFocused();
+  await page.keyboard.type(schema.name);
+  // Enter acts on the highlighted option, which the filter moves after typing.
+  await expect(page.getByRole("option", { name: schema.name })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("option")).toHaveCount(0);
   // Same readiness gate as `openDrawer`: a raw Tab loop never auto-waits, so
   // the schema-driven form must be on screen before traversal starts.
   await expect(drawer.locator('input[data-slot="input"]').first()).toBeVisible();
@@ -276,7 +313,8 @@ test("opens and selects in the schema picker with the keyboard", async ({
   zitadel,
   seed,
 }) => {
-  const drawer = await openDrawer(page, zitadel, await seed.user());
+  // Not picked on open, so only the keyboard selection below can name it.
+  const drawer = await openDrawer(page, zitadel, await seed.user(), { pick: false });
   const picker = drawer.getByRole("combobox", { name: "User Schema" });
   // The trigger is disabled until the schema list resolves; pressing before then
   // is a race the component correctly ignores.
@@ -288,10 +326,14 @@ test("opens and selects in the schema picker with the keyboard", async ({
   // The search field takes focus so typing filters immediately.
   expect(await focused(page)).toBe("Search schemas");
 
+  // Filtered to the seeded schema, since parallel specs can add others.
+  const { name } = await projectSchema(zitadel);
+  await page.keyboard.type(name);
   await page.keyboard.press("ArrowDown");
+  await expect(page.getByRole("option", { name })).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("Enter");
   await expect(page.getByRole("option")).toHaveCount(0);
-  await expect(picker).not.toContainText("Select schema");
+  await expect(picker).toContainText(name);
 });
 
 // test("reaches and operates the project picker with the keyboard", async ({ page, zitadel, seed }) => {

@@ -100,6 +100,75 @@ describe("user detail", () => {
     expect(screen.getByLabelText("Email")).toHaveValue("maya@acme.com");
   });
 
+  it("links the user's schema revision to its schema page", async () => {
+    stub();
+    await renderDetail();
+
+    const panel = within(await screen.findByRole("tabpanel"));
+    const link = await panel.findByRole("link", { name: "Business sch_business" });
+    // The `_authed` layout retains the selected project across navigation.
+    expect(link).toHaveAttribute("href", scopedPath("/schemas/sch_business"));
+  });
+
+  it("shows a URI schema id verbatim and links to it encoded", async () => {
+    // The seeded default schema's id is its `$id` URL, not an `sch_*` id.
+    const uri = "https://server.test/schemas/user.json";
+    stub({
+      user: {
+        id: USER_ID,
+        schema: uri,
+        identifier: "maya@acme.com",
+        identifier_property: "email",
+        attributes: { email: "maya@acme.com" },
+      },
+    });
+    server.use(
+      http.get(`${SCHEMAS_URL}/:schemaId`, () =>
+        HttpResponse.json({ id: uri, schema: { ...BUSINESS, title: "Default" } }),
+      ),
+    );
+    await renderDetail();
+
+    const panel = within(await screen.findByRole("tabpanel"));
+    const link = await panel.findByRole("link", { name: `Default ${uri}` });
+    expect(link).toHaveAttribute("href", scopedPath(`/schemas/${encodeURIComponent(uri)}`));
+  });
+
+  it("names an untitled schema by its id in the revision link", async () => {
+    stub();
+    server.use(
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json({ id: "sch_business", schema: { ...BUSINESS, title: undefined } }),
+      ),
+    );
+    await renderDetail();
+
+    const panel = within(await screen.findByRole("tabpanel"));
+    expect(await panel.findByRole("link", { name: "sch_business sch_business" })).toBeVisible();
+  });
+
+  it("renders no revision link when the schema cannot be read", async () => {
+    stub();
+    server.use(
+      http.get(`${SCHEMAS_URL}/sch_business`, () => new HttpResponse(null, { status: 403 })),
+    );
+    await renderDetail();
+
+    const panel = within(await screen.findByRole("tabpanel"));
+    expect(await panel.findByText(/This user’s schema could not be read/)).toBeInTheDocument();
+    expect(panel.queryByRole("link")).not.toBeInTheDocument();
+  });
+
+  it("does not rank the revision as latest or outdated", async () => {
+    // A user's revision is shown as a fact; no marker says how it compares.
+    stub();
+    await renderDetail();
+    const panel = await screen.findByRole("tabpanel");
+    await within(panel).findByRole("link", { name: "Business sch_business" });
+
+    expect(panel).not.toHaveTextContent(/latest|outdated/i);
+  });
+
   it("reads the user's schema in the selected project", async () => {
     // Schema ids are unique per project only, and the server resolves an
     // ambiguous one in the caller's own project unless `project_id` names it.

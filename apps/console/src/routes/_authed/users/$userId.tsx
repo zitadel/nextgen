@@ -1,5 +1,5 @@
 import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
-import { Key, type LucideIcon, Shield, User, UserRoundCog } from "lucide-react";
+import { GitCommitHorizontal, Key, type LucideIcon, Shield, User } from "lucide-react";
 import { useId } from "react";
 
 import { api } from "@/api/zitadel";
@@ -17,7 +17,7 @@ import { EYEBROW } from "@/components/typography";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field, FieldContent, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -43,7 +43,6 @@ import { userAttributes, userIdentity, userIdentitySecondary, userMetadata } fro
  *   - **Last sign-in**: no such field anywhere on the user
  *   - **Save** on the profile form: no `PATCH`/`PUT /users/{user_id}` (#693), so
  *     the fields render read-only rather than offering an edit that cannot land
- *   - the **`v1 · live`** schema badge: schema versioning is #445
  *   - the **Password** row's "last changed": no timestamp is exposed
  *   - **unlinking** a provider account: links are written only by a sign-in
  *
@@ -94,8 +93,8 @@ export const Route = createFileRoute("/_authed/users/$userId")({
 // The panel body is 24px in from the card edge and 20px down, with 16px between
 // the header, the divider and the content.
 const CARD_HEAD = "flex items-center gap-3 px-6 pt-5 pb-4";
-// 18px between fields on both axes.
-const GRID = "grid gap-4.5 px-6 pt-4 pb-5 sm:grid-cols-2";
+// Label and control split the wide row in halves, as on Settings → Profile.
+const LABEL_HALF = "@md/field-group:min-w-px @md/field-group:flex-[1_0_0]!";
 const ROW = "flex items-center justify-between gap-4 px-6 pt-4 pb-5";
 // A row's secondary text: counts, dates, and the states that stand in for them.
 const ROW_NOTE = "text-muted-foreground text-[13px] leading-[22px]";
@@ -115,6 +114,7 @@ function UserDetail() {
   const fields = schema ? schemaFields(schema) : [];
   const metadata = userMetadata(user);
   const schemaName = schema ? schemaDisplayName(schema, "Unknown") : "Unknown";
+  const schemaId = field(user, "schema");
 
   return (
     <DetailPage>
@@ -146,14 +146,37 @@ function UserDetail() {
 
         <TabsContent value="overview" className="flex flex-col gap-4">
           <Card className={DETAIL_CARD}>
-            <CardHead icon={UserRoundCog} eyebrow="User schema" title={schemaName} />
-            <Separator className={PANEL_RULE} />
+            {/* The row wraps rather than truncate the id, and the box grows
+                past its 24px when the id breaks across lines. */}
+            <div className="flex flex-wrap items-center gap-2 px-6 pt-5 pb-6">
+              <span className="text-foreground font-serif text-base leading-5">User schema</span>
+              {schema && schemaId && (
+                <Button
+                  asChild
+                  variant="secondary"
+                  size="xs"
+                  className="h-auto min-h-6 max-w-full flex-wrap justify-start py-0.5 whitespace-normal has-[>svg]:px-2"
+                >
+                  <Link to="/schemas/$schemaId" params={{ schemaId }}>
+                    {/* The space separates name and id in the link's accessible name. */}
+                    {schemaDisplayName(schema, schemaId)}{" "}
+                    <GitCommitHorizontal className="size-4" strokeWidth={1.5} aria-hidden />
+                    <Badge
+                      variant="ghost"
+                      className="h-auto min-h-5 min-w-0 shrink overflow-visible py-0 font-mono font-normal break-all whitespace-normal"
+                    >
+                      {schemaId}
+                    </Badge>
+                  </Link>
+                </Button>
+              )}
+            </div>
             {fields.length === 0 ? (
-              <p className="text-muted-foreground px-6 py-5 text-sm">
+              <p className="text-muted-foreground px-6 pb-5 text-sm">
                 This user&rsquo;s schema could not be read, so its attributes cannot be labelled.
               </p>
             ) : (
-              <div className={GRID}>
+              <FieldGroup className="gap-4 px-6 pb-5">
                 {fields.map((entry) => (
                   <ProfileField
                     key={entry.key}
@@ -161,7 +184,7 @@ function UserDetail() {
                     value={displayValue(attributes, entry.key) ?? ""}
                   />
                 ))}
-              </div>
+              </FieldGroup>
             )}
           </Card>
 
@@ -287,11 +310,13 @@ function ProfileField({ label, value }: { label: string; value: string }) {
   const id = useId();
 
   return (
-    <Field>
-      <FieldLabel htmlFor={id} className="text-foreground">
+    <Field orientation="responsive">
+      <FieldLabel htmlFor={id} className={`text-foreground ${LABEL_HALF}`}>
         {label}
       </FieldLabel>
-      <Input id={id} readOnly value={value} />
+      <FieldContent>
+        <Input id={id} readOnly value={value} />
+      </FieldContent>
     </Field>
   );
 }
