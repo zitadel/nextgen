@@ -1596,16 +1596,21 @@ describe("<zitadel-login> against the typed Flow API", () => {
       await waitFor(() => element.shadowRoot?.querySelector('zl-field[type="password"]'));
     }
 
-    it("renders no visible control for the kind: back action (gesture-only)", async () => {
+    it("renders no generic control for the kind: back action, only the account's change link", async () => {
       const element = await mount(host);
       await navigateToRegisterPassword(element);
 
       // The step carries a kind: "back" action on the wire, but the template
-      // renders nothing for it — the browser's back gesture is the affordance
-      // (ADR 022). The kind-based exclusion also keeps it out of the generic
-      // secondary-button loop.
-      expect(element.shadowRoot?.querySelector('[data-action="back"]')).toBeNull();
+      // renders no Back button for it — the browser's back gesture is the
+      // affordance for step traversal (ADR 022). The kind-based exclusion also
+      // keeps it out of the generic secondary-button loop. The one control
+      // wired to it is the contextual correction beside the account the step
+      // names.
       expect(element.shadowRoot?.querySelector('[data-testid="zitadel-action-back"]')).toBeNull();
+      const wired = element.shadowRoot?.querySelectorAll('[data-action="back"]') ?? [];
+      expect(Array.from(wired, (el) => el.getAttribute("data-testid"))).toEqual([
+        "zitadel-action-change-account",
+      ]);
     });
 
     it("pushes a single sentinel entry without touching the URL", async () => {
