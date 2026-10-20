@@ -112,8 +112,11 @@ var _ api.SecurityHandler = (*SecurityHandler)(nil)
 // request. Only a credential the server judged and rejected (malformed,
 // undecryptable, naming an unknown key, expired or revoked) is an unsatisfied
 // requirement: 401. Anything else means the server could not tell (the token
-// store or key store failed), so it becomes an internal error and the error
-// handler answers 500. Collapsing it into a 401 would tell every client its
+// store or key store failed). A domain server fault passes on unchanged, so the
+// error handler answers it with its own status (500, 501 or 503). Any other
+// error becomes an internal one, an unclassified error included: the error
+// handler takes a security error without a domain server fault for a refused
+// credential. Collapsing a failure into a 401 would tell every client its
 // session is dead during an outage, and SDKs clear their session cookie on a
 // 401.
 func introspectionFailure(err error) error {
@@ -123,7 +126,7 @@ func introspectionFailure(err error) error {
 		errors.Is(err, domain.ErrEncryptionKeyNotFound()) {
 		return ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
-	if errors.Is(err, domain.ErrInternal(nil)) {
+	if e, ok := errors.AsType[domain.Error](err); ok && domain.IsServerFault(e) {
 		return err
 	}
 	return domain.ErrInternal(err)
