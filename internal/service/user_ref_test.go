@@ -217,7 +217,7 @@ func TestCreateUser_SurvivesRefResolutionFailure(t *testing.T) {
 		Return(nil, errors.New("schema listing down"))
 
 	svcPool := service.NewPool(pool)
-	svc := service.NewUserService(svcPool, schemaStore, nil, service.StatementsUserRefResolver{Pool: svcPool})
+	svc := service.NewUserService(svcPool, schemaStore, nil, service.StatementsUserRefResolver{Pool: svcPool}, domain.BuiltinSchemaBases{})
 	user, err := svc.CreateUser(t.Context(), service.CreateUserInput{
 		ProjectID:  "proj",
 		SchemaURL:  "https://s/human",

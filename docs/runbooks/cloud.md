@@ -56,12 +56,12 @@ Any `NEXTGEN_*` variable overrides a default.
 
 The server names its built-in schemas (the user schema, the flow definition,
 the IdP connection, branding and the documents they `$ref`) by URL under its
-`schema.builtin_public_base`, `https://preview.zitadel.com/schemas/v1`. The
-base is an identifier namespace: the server resolves these documents from the
-copies it embeds and never fetches them. The `schemas` service makes each
-identifier resolve for editors and people:
-`https://preview.zitadel.com/schemas/v1/user-schema.json` answers with the
-document whose `$id` it is.
+`schema.builtin_public_base`, `https://zitadel.com/schemas/v1`. The base is
+an identifier namespace: the server resolves these documents from the copies
+it embeds and never fetches them. The `schemas` service publishes each
+document for editors and people under the same path on this project:
+`/schemas/v1/user-schema.json` answers with the document whose `$id` is
+`https://zitadel.com/schemas/v1/user-schema.json`.
 
 - **The build** renders every file in `api/openapi/endpoints/schemas/` the
   way the server renders it for its own validator
@@ -76,19 +76,21 @@ document whose `$id` it is.
   ahead of the server's catch-all; a name that is no built-in is the
   service's 404. The API keeps `/schemas` and `/schemas/{id}`: a schema id
   never holds a slash.
+- **zitadel.com** answers for the namespace itself by forwarding
+  `/schemas/v1/:path*` to this project, or by running
+  `node scripts/render-builtin-schemas.mjs` in its own build. Until it does,
+  the identifiers do not resolve, which nothing in the product needs.
 - **Previews** serve the same documents. One fetched from
   `cloud-….vercel.app` still says it is
-  `https://preview.zitadel.com/schemas/v1/<name>`, and its `$ref`s lead there.
+  `https://zitadel.com/schemas/v1/<name>`, and its `$ref`s lead there.
 - **Versions:** through alpha, `/schemas/v1/` serves main's latest, while
   editors validate against the copies `zitadel setup` writes into a project's
   `.zitadel/meta/`. What `v1` promises across releases is decided before 1.0
   ([schema versioning](../design/schema-engine/versioning.md#published-copies)).
-- **Moving the namespace** to `https://zitadel.com/schemas/v1`, when the
-  preview moves: change `HOSTED_BASE` in the renderer together with the
-  server's default base, and let zitadel.com, also on Vercel, serve the same
-  files, by running
-  `node scripts/render-builtin-schemas.mjs --base https://zitadel.com/schemas/v1`
-  in its build or by rewriting `/schemas/v1/:path*` to this project.
+- **Changing the namespace** means changing `HOSTED_BASE` in the renderer
+  together with the server's default base (the renderer's tests hold the two
+  equal) and adding the new base to `domain.KnownBuiltinSchemaBases`, so every
+  identifier minted under an earlier one keeps resolving.
 
 ## Database
 

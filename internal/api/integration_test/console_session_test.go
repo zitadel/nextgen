@@ -772,7 +772,7 @@ func TestConsoleSessionRevokedStopsAuthorizing(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, queryUsers(), "the live session authorizes")
 
-	revoked, err := session.RevokeMySession(t.Context())
+	revoked, err := session.RevokeMySession(t.Context(), api.RevokeMySessionParams{})
 	require.NoError(t, err)
 	require.IsType(t, &api.RevokeMySessionNoContent{}, revoked, helpers.MustMarshal(t, revoked))
 

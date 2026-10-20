@@ -7,6 +7,7 @@
  * - `GET    /flow/{id}`         — `getFlowStep`
  * - `POST   /sessions/exchange` — `exchangeHandoff`
  * - `GET    /sessions/me`       — `getMySession`
+ * - `GET    /sessions/me/csrf`  — `getMySessionCsrfToken`
  * - `DELETE /sessions/me`       — `revokeMySession`
  *
  * The wrappers exist for one reason: every API call must run with
@@ -30,7 +31,7 @@ import type {
   GetMySession200,
   SubmitFlowStepBody,
 } from "@zitadel/api/generated/model";
-import { ApiError, apiErrorCode } from "@zitadel/api/runtime/fetch";
+import { ApiError, CSRF_HEADER, apiErrorCode } from "@zitadel/api/runtime/fetch";
 
 const apiRequestInit: RequestInit = { credentials: "include" };
 
@@ -121,9 +122,32 @@ export async function getSession(
 /**
  * Revokes the current session (`DELETE /sessions/me`) with credentials. The
  * server deletes the session and clears the cookie via `Set-Cookie: Max-Age=0`.
- * It answers `204` with no body, so the answer is `undefined`; the caller checks
- * that, since anything else did not come from the backend.
+ * Sign-out is a write, so it carries the session's CSRF token (ADR 053 §5),
+ * read first from `GET /sessions/me/csrf` and sent on this one request only:
+ * the element shares the page with the host app's own API client.
+ *
+ * Both calls name the element's project. Two refusals leave nothing of this
+ * app's to revoke, so the call resolves: a session that is already gone, signed
+ * out in another tab or expired (`401 auth.unauthorized`), and a session of
+ * another project on the same server (`403 sess.project_mismatch`), which stays
+ * live and keeps its cookie. Any other failure rejects.
+ *
+ * The server answers `204` with no body, so the answer is `undefined`; the
+ * caller checks that, since anything else did not come from the backend.
  */
-export async function revokeSession(api: ZitadelApi): Promise<unknown> {
-  return api.revokeMySession(apiRequestInit);
+export async function revokeSession(api: ZitadelApi, projectId: string): Promise<unknown> {
+  const params = projectId ? { project_id: projectId } : undefined;
+  try {
+    const { csrf_token } = await api.getMySessionCsrfToken(params, apiRequestInit);
+    return await api.revokeMySession(params, {
+      ...apiRequestInit,
+      headers: { [CSRF_HEADER]: csrf_token },
+    });
+  } catch (error) {
+    const code = apiErrorCode(error);
+    if (code === "auth.unauthorized" || code === "sess.project_mismatch") {
+      return undefined;
+    }
+    throw error;
+  }
 }

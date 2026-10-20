@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { BAR_BUTTON } from "./window";
 
 // Copies `text`, and says so for a moment. Where the browser offers no
 // clipboard (an insecure origin), it does nothing: the text stays selectable.
@@ -39,10 +40,15 @@ export function CopyButton({
         type="button"
         onClick={copy}
         aria-label={withLabel ? undefined : `Copy ${label}`}
-        className={`inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-transparent px-1.5 font-sans font-semibold text-xs leading-4 transition-colors hover:border-border-secondary hover:text-text-primary ${copied ? "text-success" : "text-text-secondary"} ${className}`}
+        className={`${BAR_BUTTON} ${copied ? "text-success" : "text-text-secondary"} ${className}`}
       >
         {copied ? <Check /> : <Copy />}
-        {withLabel && <span>{copied ? "Copied" : "Copy"}</span>}
+        {withLabel && (
+          <span>
+            {copied ? "Copied" : "Copy"}
+            <span className="sr-only"> {label}</span>
+          </span>
+        )}
       </button>
       <span role="status" className="sr-only">
         {copied ? "Copied" : ""}

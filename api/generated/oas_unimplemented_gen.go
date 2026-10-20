@@ -658,9 +658,11 @@ func (UnimplementedHandler) GetMySession(ctx context.Context, params GetMySessio
 // HttpOnly cookie is still the credential, and a cross-site page cannot
 // read this response. It stays the same for the life of the session, so a
 // client fetches it once per session.
+// With `project_id`, the token is returned only when the session belongs to
+// that project.
 //
 // GET /sessions/me/csrf
-func (UnimplementedHandler) GetMySessionCsrfToken(ctx context.Context) (r GetMySessionCsrfTokenRes, _ error) {
+func (UnimplementedHandler) GetMySessionCsrfToken(ctx context.Context, params GetMySessionCsrfTokenParams) (r GetMySessionCsrfTokenRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -669,18 +671,22 @@ func (UnimplementedHandler) GetMySessionCsrfToken(ctx context.Context) (r GetMyS
 // Returns the user signed in to the session that authenticates the request.
 // The project and the user both come from the session cookie, so a caller only
 // ever reads their own user.
+// With `project_id`, the user is returned only when the session belongs to
+// that project.
 //
 // GET /users/me
-func (UnimplementedHandler) GetMyUser(ctx context.Context) (r GetMyUserRes, _ error) {
+func (UnimplementedHandler) GetMyUser(ctx context.Context, params GetMyUserParams) (r GetMyUserRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
 // GetMyUserSchema implements getMyUserSchema operation.
 //
 // The schema the signed-in user's own record is validated against.
+// With `project_id`, the schema is returned only when the session belongs to
+// that project.
 //
 // GET /users/me/schema
-func (UnimplementedHandler) GetMyUserSchema(ctx context.Context) (r GetMyUserSchemaRes, _ error) {
+func (UnimplementedHandler) GetMyUserSchema(ctx context.Context, params GetMyUserSchemaParams) (r GetMyUserSchemaRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -904,6 +910,9 @@ func (UnimplementedHandler) ListIdpRevisions(ctx context.Context, params ListIdp
 // This is not the same question as `queryProjects`, which answers with the one
 // project the calling credential is bound to. Here the session is the caller
 // and the grants are the answer, so the list spans projects.
+// With `project_id`, the projects are listed only when the session belongs to
+// that project. It names the project the session was signed in to, not one to
+// list.
 //
 // GET /users/me/projects
 func (UnimplementedHandler) ListMyProjects(ctx context.Context, params ListMyProjectsParams) (r ListMyProjectsRes, _ error) {
@@ -913,6 +922,8 @@ func (UnimplementedHandler) ListMyProjects(ctx context.Context, params ListMyPro
 // ListMyTeams implements listMyTeams operation.
 //
 // The signed-in user's own team roster, ordered by team name.
+// With `project_id`, the teams are listed only when the session belongs to
+// that project.
 //
 // GET /users/me/teams
 func (UnimplementedHandler) ListMyTeams(ctx context.Context, params ListMyTeamsParams) (r ListMyTeamsRes, _ error) {
@@ -998,9 +1009,11 @@ func (UnimplementedHandler) ListUserTeams(ctx context.Context, params ListUserTe
 // Partially updates the caller's own schema-defined attributes. The merged
 // result is validated against the user's schema before commit. Concurrent
 // writes are last-write-wins.
+// With `project_id`, the user is updated only when the session belongs to
+// that project.
 //
 // PATCH /users/me
-func (UnimplementedHandler) PatchMyUser(ctx context.Context, req *PatchMyUserRequest) (r PatchMyUserRes, _ error) {
+func (UnimplementedHandler) PatchMyUser(ctx context.Context, req *PatchMyUserRequest, params PatchMyUserParams) (r PatchMyUserRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -1136,12 +1149,15 @@ func (UnimplementedHandler) RemovePreview(ctx context.Context, req *RemovePrevie
 //
 // Logs out by permanently deleting the session.
 // The `__nextgen_session` cookie issued at creation (or superseded by a handoff
-// exchange) is required. Idempotent: if the session is already gone this still
-// returns 204. Any tokens derived from the session are invalidated, and the
-// cookie itself is cleared in the response.
+// exchange) is required, with the session's token from `GET /sessions/me/csrf`
+// in the `X-Zitadel-CSRF` header. Idempotent: if the session is already gone
+// this still returns 204. Any tokens derived from the session are invalidated,
+// and the cookie itself is cleared in the response.
+// With `project_id`, only a session of that project is deleted. A session of
+// another project is left alone, and so is its cookie.
 //
 // DELETE /sessions/me
-func (UnimplementedHandler) RevokeMySession(ctx context.Context) (r RevokeMySessionRes, _ error) {
+func (UnimplementedHandler) RevokeMySession(ctx context.Context, params RevokeMySessionParams) (r RevokeMySessionRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

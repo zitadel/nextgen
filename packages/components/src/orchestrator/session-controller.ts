@@ -126,10 +126,6 @@ export class SessionController implements ReactiveController {
   // so it is replayed once the host is back.
   private missedSessionMissing = false;
 
-  // The cookie holds a live session of another project: not this app's to
-  // revoke. On a shared host (localhost) it is, for example, the Console's.
-  private otherProjectSession = false;
-
   private readonly host: ReactiveControllerHost & HTMLElement;
   private readonly resolve: () => Resolved;
   private readonly options: SessionControllerOptions;
@@ -183,16 +179,17 @@ export class SessionController implements ReactiveController {
   }
 
   /**
-   * Revokes the session with credentials; the server clears the cookie. Fires
-   * `zitadel-signout` (after `onRevoked`) and resolves `true` on success; a host
-   * removed meanwhile resolves `false` and fires it once put back. The
-   * backend answering that there is no session (see {@link isNoSession}) means
-   * it is already gone, which is what signing out asks for, so it succeeds the
-   * same way. Any other failure, a gateway's 401 or 404 included, revoked
-   * nothing: it sets `errorMessage`, fires `zitadel-session-error` and
-   * resolves `false`. When the identity read found a session of another
-   * project, nobody is signed in here: that session is left alone and sign-out
-   * completes without a revoke.
+   * Revokes the session in the host's project with credentials; the server
+   * clears the cookie. Fires `zitadel-signout` (after `onRevoked`) and resolves
+   * `true` on success; a host removed meanwhile resolves `false` and fires it
+   * once put back. The backend answering that there is no session (see
+   * {@link isNoSession}) means it is already gone, which is what signing out
+   * asks for, so it succeeds the same way. Any other failure, a gateway's 401
+   * or 404 included, revoked nothing: it sets `errorMessage`, fires
+   * `zitadel-session-error` and resolves `false`. The revoke is sent whatever
+   * the identity read found, since the cookie may have changed since: one of
+   * another project that the server refuses to revoke leaves nobody signed in
+   * here, so sign-out completes and the other project's session stays.
    */
   async signOut(onRevoked?: () => void): Promise<boolean> {
     this.loading = true;
@@ -200,13 +197,12 @@ export class SessionController implements ReactiveController {
     this.host.requestUpdate();
 
     try {
-      if (!this.otherProjectSession) {
-        const answer = await revokeSession(this.resolve().api);
-        // The backend answers `204` with no body. Anything else (an SPA host's
-        // page, a proxy's `{}`) did not come from the backend, so nothing was revoked.
-        if (answer !== undefined) {
-          throw new UnexpectedAnswerError("Could not sign out: the response is not the backend's.");
-        }
+      const { api, project } = this.resolve();
+      const answer = await revokeSession(api, project.projectId);
+      // The backend answers `204` with no body. Anything else (an SPA host's
+      // page, a proxy's `{}`) did not come from the backend, so nothing was revoked.
+      if (answer !== undefined) {
+        throw new UnexpectedAnswerError("Could not sign out: the response is not the backend's.");
       }
     } catch (error) {
       if (!isNoSession(error)) {
@@ -263,9 +259,8 @@ export class SessionController implements ReactiveController {
     try {
       const session = (await getSession(api, project.projectId)) as Partial<SessionIdentity> | null;
       if (session === null) {
-        // A live session of another project: not this app's to show or revoke,
-        // and not an answer that nobody is signed in, so the surface stays.
-        this.otherProjectSession = true;
+        // A live session of another project: not this app's to show, and not
+        // an answer that nobody is signed in, so the surface stays.
         missing = false;
       } else {
         // A 200 without the session JSON's non-empty `session_id` (an SPA host's
