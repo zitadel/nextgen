@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
+import manifest from "../package.json";
 import * as entry from "../dist/server.mjs";
+
+/**
+ * Entries that define elements or import Lit and so need a DOM. Every other
+ * entry in the exports map must load in the edge VM, so a new one is tested
+ * here unless it is added to this list on purpose.
+ */
+const NEEDS_A_DOM = ["./standalone", "./atoms", "./manifests", "./orchestrator"];
 
 /**
  * Loads the built `server.ts` inside the `edge-runtime` VM (the `edge` project
@@ -30,5 +38,21 @@ describe("server entry in the edge runtime", () => {
     expect(entry.zitadelTrustmarkInnerHtml).toBeTypeOf("function");
     expect(entry.TEMPLATE_NAMES).toBeTypeOf("object");
     expect(entry.publishedSides(undefined)).toBeInstanceOf(Array);
+  });
+
+  const domFree = Object.entries(manifest.exports).flatMap(([subpath, target]) => {
+    const file = typeof target === "object" && "import" in target ? target.import : undefined;
+    const isEntry = file !== undefined && !subpath.includes("*") && !NEEDS_A_DOM.includes(subpath);
+    return isEntry && subpath !== "." ? [{ subpath, file }] : [];
+  });
+
+  it("finds the entries that need no DOM in the exports map", () => {
+    expect(domFree.map((entry) => entry.subpath)).toEqual(
+      expect.arrayContaining(["./events", "./tokens"]),
+    );
+  });
+
+  it.each(domFree)("loads $subpath", async ({ file }) => {
+    expect(Object.keys(await import(`../${file.slice(2)}`)).length).toBeGreaterThan(0);
   });
 });

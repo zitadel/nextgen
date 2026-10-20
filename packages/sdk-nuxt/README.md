@@ -16,7 +16,7 @@ for hand-rolled setups.
 
 Peer dependencies: `nuxt >=4` and `h3 >=1`.
 
-The Nitro middleware reads Node's `event.node.req`, so it runs on Node-based Nitro presets and is not an edge-runtime entry.
+The Nitro middleware reads the request and writes the response only through h3's accessors (`getRequestHeaders`, `getRequestIP`, `setResponseHeader` and the like), never `event.node`, and reads a proxied request body through the web `Request`. It is tested on Node and inside the `edge-runtime` VM over a web-style h3 event. It has not been deployed to a Cloudflare, Vercel Edge or other edge Nitro preset, and h3 1.x still builds its event on a Node-shaped shim there. On a preset that reports no connection address, `X-Forwarded-For` is left as the proxy chain it received, with the address added only when the runtime provides it (`event.context.clientAddress` or the socket).
 
 TypeScript ≥ 5.0, the floor shared by every SDK; see the [compatibility notes](https://github.com/zitadel/nextgen/blob/main/packages/AGENTS.md).
 
