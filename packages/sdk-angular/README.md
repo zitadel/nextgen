@@ -86,6 +86,14 @@ A secret field is a password, a one-time or recovery code, or any field the step
 <zitadel-auth-login [project]="project" theme="light" (flowComplete)="track($event)" />
 ```
 
+## Standard HTML attributes
+
+The Angular components are tags (`zitadel-auth-login`, `zitadel-auth-logout` and `zitadel-auth-session`), and a tag already carries the standard HTML attributes: put `class`, `style`, `id`, `data-*` or `aria-*` on it and Angular applies them to the tag, not to the widget inside it.
+
+```html
+<zitadel-auth-login [project]="project" class="login" data-testid="login" aria-label="Sign in" />
+```
+
 ## Server rendering
 
 If your app renders on the server, mount the widget on the client only, after hydration (the `zitadel-auth-login` wrapper sets `projectId` and `proxyPath` as element properties, so adding them to the wrapper does not put them in server markup), or use a raw `<zitadel-login>` element with `project-id` and `proxy-path` as attributes, because a widget that starts before its configuration arrives shows an error instead of the flow.

@@ -11,6 +11,7 @@ import {
   ZitadelLogout as ZitadelLogoutElement,
   ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
+import { isStandardAttributeName, standardAttributes, widgetTags } from "@zitadel/sdk-core/types";
 import * as React from "react";
 
 import type {
@@ -23,6 +24,7 @@ import type {
   ZitadelLogoutProps,
   ZitadelSessionProps,
   ZitadelSignoutDetail,
+  ZitadelWidgetAttributes,
 } from "./types";
 
 export { configureZitadel, getApi, getZitadelConfig };
@@ -64,6 +66,10 @@ export { businessLocales } from "@zitadel/components";
  * that define that flow must reach the browser as attributes. This hides the
  * given keys from that lookup: they are passed through as plain attributes
  * (server markup included) and the element still reads them as properties.
+ * On the server the standard HTML attributes (`id`, `title`, `slot`, `role`, …)
+ * are hidden too, so they are in the server markup; in the browser `createComponent`
+ * keeps them, since it removes such an attribute when its prop goes, which React 19
+ * does not do for a custom element.
  */
 function asAttributes<T extends typeof HTMLElement>(
   elementClass: T,
@@ -71,7 +77,14 @@ function asAttributes<T extends typeof HTMLElement>(
 ): T {
   const hidden = new Set<PropertyKey>(keys);
   const prototype = new Proxy(elementClass.prototype, {
-    has: (target, key) => !hidden.has(key) && key in target,
+    has: (target, key) =>
+      !hidden.has(key) &&
+      !(
+        typeof document === "undefined" &&
+        typeof key === "string" &&
+        isStandardAttributeName(key)
+      ) &&
+      key in target,
   });
   return { name: elementClass.name, prototype } as unknown as T;
 }
@@ -102,7 +115,7 @@ function projectAttributes(props: {
 
 const ZitadelLoginElementReact = createComponent({
   react: React,
-  tagName: "zitadel-login",
+  tagName: widgetTags.login,
   elementClass: asAttributes(
     ZitadelLoginElement,
     "purpose",
@@ -125,7 +138,7 @@ const ZitadelLoginElementReact = createComponent({
 
 const ZitadelLogoutElementReact = createComponent({
   react: React,
-  tagName: "zitadel-logout",
+  tagName: widgetTags.logout,
   elementClass: asAttributes(ZitadelLogoutElement, "url"),
   events: {
     onZitadelSignout: "zitadel-signout" as EventName<CustomEvent<ZitadelSignoutDetail>>,
@@ -134,7 +147,7 @@ const ZitadelLogoutElementReact = createComponent({
 
 const ZitadelSessionElementReact = createComponent({
   react: React,
-  tagName: "zitadel-session",
+  tagName: widgetTags.session,
   elementClass: asAttributes(ZitadelSessionElement, "url"),
   events: {
     onZitadelSignout: "zitadel-signout" as EventName<CustomEvent<ZitadelSignoutDetail>>,
@@ -155,16 +168,17 @@ const ZitadelSessionElementReact = createComponent({
  * React hosts need them: the widget exposes slots (`attribution-trailing`)
  * that are filled with light-DOM content.
  */
-export type ZitadelLoginReactProps = ZitadelLoginProps & {
-  children?: React.ReactNode;
-  /**
-   * Preview mode, for an operator surface: the flow starts as usual, then the
-   * element shows the served step in this state and submits nothing.
-   */
-  previewState?: ZitadelLoginElement["previewState"];
-  /** The terminal step the `success` preview paints; the element's `done` when unset. */
-  previewSuccessStep?: string;
-};
+export type ZitadelLoginReactProps = ZitadelLoginProps &
+  ZitadelWidgetAttributes & {
+    children?: React.ReactNode;
+    /**
+     * Preview mode, for an operator surface: the flow starts as usual, then the
+     * element shows the served step in this state and submits nothing.
+     */
+    previewState?: ZitadelLoginElement["previewState"];
+    /** The terminal step the `success` preview paints; the element's `done` when unset. */
+    previewSuccessStep?: string;
+  };
 
 export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginReactProps>(
   function ZitadelLogin(
@@ -181,6 +195,8 @@ export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginRe
     },
     ref,
   ) {
+    // The standard HTML attributes are the only extra props the element takes.
+    const attributes = standardAttributes(props);
     const keyed = Boolean(props.project?.publishableKey);
     const [mounted, setMounted] = React.useState(false);
     React.useEffect(() => setMounted(true), []);
@@ -190,8 +206,20 @@ export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginRe
     if (keyed && !mounted) return null;
     return (
       <ZitadelLoginElementReact
-        {...props}
+        {...attributes}
         ref={ref}
+        project={props.project}
+        projectId={props.projectId}
+        proxyPath={props.proxyPath}
+        variant={props.variant}
+        theme={props.theme}
+        suppressHeader={props.suppressHeader}
+        suppressPasswordToggle={props.suppressPasswordToggle}
+        forcePostSignInUrl={props.forcePostSignInUrl}
+        locales={props.locales}
+        lang={props.lang}
+        previewState={props.previewState}
+        previewSuccessStep={props.previewSuccessStep}
         purpose={purpose ?? "login"}
         flow-name={props.flowName}
         {...projectAttributes(props)}
@@ -202,12 +230,17 @@ export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginRe
         onZitadelFlowComplete={onFlowComplete && ((event) => onFlowComplete(event.detail))}
         onZitadelFlowRedirect={onFlowRedirect && ((event) => onFlowRedirect(event.detail))}
         onZitadelFlowError={onFlowError && ((event) => onFlowError(event.detail))}
-      />
+      >
+        {props.children}
+      </ZitadelLoginElementReact>
     );
   },
 );
 
 ZitadelLogin.displayName = "ZitadelLogin";
+
+/** Props of `ZitadelLogout`: the widget's own plus the standard HTML attributes. */
+export type ZitadelLogoutReactProps = ZitadelLogoutProps & ZitadelWidgetAttributes;
 
 /**
  * React component wrapping the `<zitadel-logout>` web component. Binds the
@@ -218,11 +251,17 @@ ZitadelLogin.displayName = "ZitadelLogin";
  * A forwarded `ref` resolves to the underlying `<zitadel-logout>` DOM element,
  * so consumers can imperatively access the upgraded web component.
  */
-export const ZitadelLogout = React.forwardRef<ZitadelLogoutElement, ZitadelLogoutProps>(
+export const ZitadelLogout = React.forwardRef<ZitadelLogoutElement, ZitadelLogoutReactProps>(
   function ZitadelLogout({ onSignout, ...props }, ref) {
+    // The standard HTML attributes are the only extra props the element takes.
+    const attributes = standardAttributes(props);
     return (
       <ZitadelLogoutElementReact
-        {...props}
+        {...attributes}
+        project={props.project}
+        projectId={props.projectId}
+        proxyPath={props.proxyPath}
+        theme={props.theme}
         {...projectAttributes(props)}
         post-sign-out-url={props.postSignOutUrl}
         ref={ref}
@@ -234,6 +273,9 @@ export const ZitadelLogout = React.forwardRef<ZitadelLogoutElement, ZitadelLogou
 
 ZitadelLogout.displayName = "ZitadelLogout";
 
+/** Props of `ZitadelSession`: the widget's own plus the standard HTML attributes. */
+export type ZitadelSessionReactProps = ZitadelSessionProps & ZitadelWidgetAttributes;
+
 /**
  * React component wrapping the `<zitadel-session>` web component — the
  * post-sign-in "signed in as" card. Binds the `ZitadelProject` handle as a DOM
@@ -242,11 +284,21 @@ ZitadelLogout.displayName = "ZitadelLogout";
  *
  * A forwarded `ref` resolves to the underlying `<zitadel-session>` DOM element.
  */
-export const ZitadelSession = React.forwardRef<ZitadelSessionElement, ZitadelSessionProps>(
+export const ZitadelSession = React.forwardRef<ZitadelSessionElement, ZitadelSessionReactProps>(
   function ZitadelSession({ onSignout, ...props }, ref) {
+    // The standard HTML attributes are the only extra props the element takes.
+    const attributes = standardAttributes(props);
     return (
       <ZitadelSessionElementReact
-        {...props}
+        {...attributes}
+        project={props.project}
+        projectId={props.projectId}
+        proxyPath={props.proxyPath}
+        heading={props.heading}
+        logoutLabel={props.logoutLabel}
+        variant={props.variant}
+        theme={props.theme}
+        suppressHeader={props.suppressHeader}
         {...projectAttributes(props)}
         post-sign-out-url={props.postSignOutUrl}
         ref={ref}

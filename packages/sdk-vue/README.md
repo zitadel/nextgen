@@ -78,6 +78,16 @@ A secret field is a password, a one-time or recovery code, or any field the step
 <ZitadelLogin :project="project" theme="light" @flowComplete="track" />
 ```
 
+## Standard HTML attributes
+
+`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` also take the standard HTML attributes (`class`, `style`, `id`, `title`, `slot`, `hidden`, `role`, `tabindex`, `data-*` and `aria-*`) and pass them to the widget element, so you can position, style and label the widget without an extra wrapper element. Nothing else reaches the element: any other prop is ignored.
+
+```vue
+<ZitadelLogin :project="project" class="login" data-testid="login" aria-label="Sign in" />
+```
+
+Vue's `strictTemplates` rejects `data-*` attributes on a component whose props type does not declare them, and this one cannot declare them without breaking Vue's own overloads.
+
 ## Server rendering
 
 If your app renders on the server, mount the widget on the client only, after hydration (the `ZitadelLogin` wrapper sets `projectId` and `proxyPath` as element properties, so adding them to the wrapper does not put them in server markup), or use a raw `<zitadel-login>` element with `project-id` and `proxy-path` as attributes, because a widget that starts before its configuration arrives shows an error instead of the flow.
