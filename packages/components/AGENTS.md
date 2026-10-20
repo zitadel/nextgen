@@ -1,313 +1,103 @@
-# Components Agent Notes
+# Agent Instructions — `packages/components`
 
-Scoped instructions for `packages/components/`. Read together with the
-[root `AGENTS.md`](../../AGENTS.md).
+The Lit atoms (`<zl-*>`) and the orchestrators under `src/orchestrator/`
+(`<zitadel-login>`, `<zitadel-logout>`, `<zitadel-session>`). Consumer docs:
+[`README.md`](README.md). To add an atom, follow the recipe in
+[`apps/storybook/AGENTS.md`](../../apps/storybook/AGENTS.md).
 
-## What's in here
+## Theming and types
 
-Lit-based atoms (`<zl-*>`) and the orchestrators for the auth flow API:
-`<zitadel-login>` (flow runner), `<zitadel-logout>`, and `<zitadel-session>`
-(session surface), all under `src/orchestrator/`. Consumed directly by tenant
-pages and indirectly by the `apps/console` shell. See [`README.md`](README.md)
-for consumer-facing docs.
+- The theme mode is resolved in `src/orchestrator/theme-controller.ts` and
+  `surface.ts`, strongest first: the page's `theme` property, the branding's
+  `theme.mode`, the variant's default (amended ADR 014 §5). Orchestrator CSS
+  uses the semantic tokens, never a mode-specific colour.
+- Wire shapes come from `@zitadel/api/generated/model`, and the orchestrator
+  stores them as they are. Never add a shadow type that mirrors orval
+  (`FlowResponse`, `FlowStep`, …); if the wire shape is unusable, fix
+  `packages/api/orval.config.ts`.
+- `src/orchestrator/branding.ts` aliases the generated branding model;
+  `attribution` is its one client extension. A new appearance key goes into
+  `api/openapi/` first.
+- The orchestrator calls the API through `src/orchestrator/api-client.ts`,
+  configured with `configureZitadel(...)` from `@zitadel/api/config`. There is
+  no `api-base` attribute.
 
-## Theming
+## Source conventions
 
-Mode resolution is owned by `src/orchestrator/theme-controller.ts` +
-`surface.ts`, which stamp `data-theme` / `data-theme-dark` on the host. The
-precedence is strongest-first: the embedding page's `theme` property → stored
-branding `theme.mode` → a variant-derived default (`dark` for
-`variant="page"`, `auto` for `variant="widget"`) — see amended ADR 014 §5 and
-`theme.browser.spec.ts`. Never hardcode mode-specific colors in orchestrator
-CSS; consume the semantic tokens, which flip via `[data-theme="light"]`.
+- Declare every `@property` and `@state` with `accessor`
+  (`@property() accessor name = "";`). A plain field shadows Lit's accessor
+  under `useDefineForClassFields` (Vite, tsdown, esbuild), and changes are
+  silently missed.
+- The orchestrator elements take `property` from `src/internal/property.ts`,
+  not `lit/decorators.js`: assigning `undefined` or `null` restores the
+  default, so framework wrappers can pass unset props through.
+- An atom that holds a value extends `FormAtom` (`src/internal/form-atom.ts`),
+  which owns `ElementInternals`, focus delegation, reset, restore and
+  `<fieldset disabled>`. Never hand-roll form association; the decision is in
+  [`form-participation.md`](../../docs/design/branding/form-participation.md).
+- Pass `toggleAttribute` and `classList.toggle` a real boolean, never a bare
+  property: `undefined` toggles on every render, and wrappers assign
+  `undefined` for unset props where TypeScript cannot see it.
+- Never call `CSS.escape` in runtime code: jsdom does not ship it.
+- Atom CSS references `var(--zl-*)`; a Lit `css` template uses the `t` helper
+  (`src/styles/tokens.ts`). New tokens belong in `@zitadel/design-tokens`.
+- A new attribute or part on an atom goes into its manifest
+  (`src/manifests.ts`): the sanitiser's allowlist and `exportparts` derive
+  from `manifestRegistry`, so an unlisted part is unreachable.
+- Never mutate `innerHTML`; only the orchestrator renders Liquid output, with
+  `unsafeHTML` inside `render()`.
+- Coordinate before adding a `template` accessor to `<zitadel-login>`: it
+  changes the public surface.
+- Comments explain why, not what.
 
-The orchestrator calls `@zitadel/api` (orval-generated typed fetch
-client) through the wrappers in `src/orchestrator/api-client.ts`. There is
-no transport abstraction, no wire-vs-internal type split, and no shadow
-types — the orchestrator stores the orval `CreateFlow201` shape directly
-and the Liquid renderer reads it through the `LiquidContext` projection.
+### Input atoms expose a real native control
 
-Tests intercept at the network layer with MSW. The unit tests and the
-Storybook orchestrator stories both source their handlers from
-`@zitadel/api-mock` (`setupMockHandlers()` for `msw/node`; the same handlers
-via `msw-storybook-addon` in [`apps/storybook`](../../apps/storybook/README.md)).
-Configure the SDK with `configureZitadel({ projectId, proxyPath })`
-from `@zitadel/api/config`; the element reads the global handle via
-`getZitadelConfig()`, or you can assign the returned handle to the element's
-`project` property. There is no `api-base` attribute.
+Agents, Playwright, password managers and screen readers drive native controls
+and the accessibility tree, not ARIA widgets hand-rolled in shadow DOM.
 
-## Type boundaries
-
-There are exactly three places types live in this package:
-
-- **Wire shapes** — never declared here; imported from
-  `@zitadel/api/generated/model` (`CreateFlow201`,
-  `CreateFlow201Step`, `CreateFlowBody`, `SubmitFlowStepBody`, …).
-- **Branding** — `src/orchestrator/branding.ts` names the branding shape the
-  orchestrator paints (`Branding`, `BrandingPalette`, `BrandingShape`,
-  `BrandingTheme`, `BrandingThemeSide`, `BrandingTypography`, `FlowLayout`).
-  The appearance blocks are wire fields, so these are aliases of the generated
-  model, not declarations. `attribution` is the one real client extension: it
-  belongs to the embedding, not to the stored revision. Do not add an
-  appearance key here — add it to `api/openapi/` and re-export it.
-- **Template context** — `src/orchestrator/template-context.ts` carries
-  the projection tenant Liquid templates can reference (`FlowMessage`,
-  `FlowIdentity`, `FlowError[]`, `LiquidContext`). Lifted from the wire
-  by the orchestrator at render time.
-
-Do not introduce new shadow types that mirror orval. If the wire shape is
-fine, use it directly.
-
-## Source-level conventions
-
-### Lit reactivity — always use `accessor`
-
-All `@property` and `@state` declarations must use the `accessor` keyword:
-
-```ts
-@property() accessor name = "";
-@state() private accessor hasHelp = false;
-```
-
-Plain class fields (`@property() name = "";`) shadow Lit's auto-generated
-accessors when the build target is `es2022` or any toolchain that sets
-`useDefineForClassFields: true` (Vite, tsdown, esbuild). Lit logs a console
-error in dev mode and silently fails to detect changes in prod. The fix is
-not "turn off the warning" — it is the `accessor` keyword.
-
-### Orchestrator properties import `property` from `internal/property.ts`
-
-The orchestrator elements (`surface.ts`, `<zitadel-login>`, `<zitadel-session>`,
-`<zitadel-logout>`) declare their public properties with `property` from
-`src/internal/property.ts`, not from `lit/decorators.js`. It is Lit's decorator,
-plus one rule: assigning `undefined` or `null` (or removing the attribute)
-restores the property's declared default. Framework wrappers assign `undefined`
-for a prop the caller did not set, so the default lives in the element and no
-wrapper needs its own "assign only when given" code. A property whose default is
-`undefined` or `null` is left as assigned. `@state` is unaffected.
-
-### Atoms are form-associated by default
-
-Every input atom (e.g. `<zl-field>`) must:
-
-- declare `static formAssociated = true`,
-- attach `ElementInternals` in the constructor,
-- mirror its value via `internals.setFormValue()` and validity via
-  `internals.setValidity()`,
-- implement `formResetCallback` and `formStateRestoreCallback`,
-- enable `delegatesFocus: true` on its shadow root.
-
-This is what makes password managers, browser autofill, native form submission
-and validation work through Shadow DOM. The decision is documented in
-[`docs/design/branding/form-participation.md`](../../docs/design/branding/form-participation.md);
-read that before touching `zl-field` or adding new input atoms.
-
-`jsdom` only partially implements `ElementInternals`. Form-association tests
-go in `*.browser.spec.ts` files (real Chromium); jsdom-friendly aria/markup
-checks go in `*.spec.ts`.
-
-### Input atoms expose a real native control (agent-first)
-
-The Zitadel CLI is an agent-facing product: an agent must be able to fill the
-generated auth UI and register a user. Automation drivers — Playwright
-(`selectOption`, `fill`, `getByTestId`), the chrome-devtools accessibility
-snapshot, the Codex in-app browser, password managers, and screen readers — all
-operate through **real native form controls and the accessibility tree**, not
-through hand-rolled ARIA widgets in Shadow DOM. A purely custom widget (a
-`<div role="combobox">` + `<ul role="listbox">`, for example) is opaque to them:
-its options never surface as targetable nodes.
-
-So every input atom must make its operable, accessible, automatable control a
-**real native element**:
-
-- `<zl-field>` → native `<input>`.
-- `<zl-checkbox>` → native `<input type="checkbox">`.
-- `<zl-select>` → native `<select>` with real `<option>`s.
-
-That native element must:
-
-- carry a stable `data-testid` of the form `zitadel-<kind>-<name>` (e.g.
-  `zitadel-input-email`, `zitadel-checkbox-newsletterOptIn`,
-  `zitadel-select-maritalStatus`), so tests/agents target it by name;
-- re-dispatch a composed native `change` (and `input` where applicable) across
-  the shadow boundary, and keep `internals.setFormValue()` in sync on every
-  change — so a value set directly on the native control (autofill, an agent,
-  programmatic `selectOption`) is still captured before submit;
-- stay in the accessibility tree and the tab order. Visually hide it with
-  `opacity: 0` / `pointer-events: none` (see `<zl-checkbox>`, `<zl-select>`
-  surface CSS) — **never** `display: none`, `visibility: hidden`, or
-  `aria-hidden`, which would drop it from the a11y tree and the tab order.
-
-When a design needs styling the native control can't provide (e.g. a custom
-dropdown popup), keep the styled UI as a **pointer-only visual layer**: mark it
-`aria-hidden` and out of the tab order so it doesn't duplicate the native
-control for AT/agents, and route its state through `data-*` hooks rather than
-ARIA. The native control remains the single source of truth; the visual layer
-just mirrors `value` and feeds the same change path. `<zl-select>` is the
-reference implementation. This convention was established in PR #279 (fields,
-buttons) and extended to selects.
-
-### No `CSS.escape` in runtime code
-
-`jsdom` 29 does not ship `CSS.escape`. Code that runs in tests must not rely
-on it — query the DOM directly (`querySelectorAll` + `getAttribute` filtering)
-rather than building attribute selectors with `CSS.escape(value)`.
-
-### `toggleAttribute` / `classList.toggle` need a real boolean, never a bare prop
-
-On `Element.toggleAttribute(name, force)` and `classList.toggle(name, force)`,
-`force` is an *optional* boolean. Passing `undefined` is treated as omitting the
-argument, so the flag *toggles* on every call instead of being set — while other
-non-boolean values are Web IDL–coerced to a boolean (`null`/`""`/`0` remove, a
-non-empty string or object add). `undefined` is the dangerous one, because a flag
-stamped once per render as `el.toggleAttribute("data-x", this.someFlag)` then
-flips on and off each commit whenever `someFlag` is `undefined`, which flickers
-the UI.
-
-A boolean reactive property reaches `undefined` more easily than it looks: a
-framework wrapper that binds an unset optional prop (e.g. the Angular SDK's
-`[suppressHeader]` from an `@Input() suppressHeader?: boolean`) assigns
-`undefined` to the element. TypeScript does **not** catch this — a custom
-element's property assignment crosses an untyped DOM boundary and is never
-checked against the element's own property types, so the `boolean` type is a
-compile-time promise the runtime can violate.
-
-So always coerce to a real boolean **at the call site**: compute it
-(`variant !== "page"`, `theme === "dark"`) or guard it (`this.suppressHeader ===
-true`). Never hand a bare reactive property straight to a toggle — and in review,
-flag any `toggleAttribute`/`classList.toggle` whose second argument isn't an
-obvious boolean expression. The failure this guards against was a flickering
-card header (`data-suppress-header` flipping every render); the regression test
-is in `orchestrator-surface.spec.ts` ("keeps the header shown and stable when
-suppressHeader is unset").
-
-### Templates are sanitised
-
-Output from the Liquid pipeline is run through DOMPurify with an allowlist
-built from `manifestRegistry`. When you add a new attribute or part to an atom,
-update its manifest in `manifests.ts`: `exportparts` forwarding is derived from
-the manifest's `parts`, so an unlisted part cannot be reached through the
-orchestrator. On `zl-*` elements the sanitiser keeps any lowercase attribute
-name; on other elements, anything not in the allowlist is silently stripped.
-
-### Tokens, not magic values
-
-An atom's `zl-<atom>.css` references `var(--zl-*)` directly. Styles written in
-a Lit `css` template consume tokens through the `t` helper
-(`src/styles/tokens.ts`), which wraps the `@zitadel/design-tokens` `cssVars`
-tree as Lit `CSSResult` values (e.g. `t.theme.background`). Tokens
-themselves are owned by the `@zitadel/design-tokens` package — add new ones
-there, not here. The orchestrator maps `branding` tokens to CSS variables on
-its own shadow root — do not reach for inline styles in atoms.
-
-### Comments
-
-Comments explain *why*, not *what*. Skip comments like
-`// increment counter` or `// import the module`. Useful comments call out
-trade-offs, browser quirks, or constraints the code itself can't convey.
+- The operable control is native: `<zl-field>` an `<input>`, `<zl-checkbox>`
+  an `<input type="checkbox">`, `<zl-select>` a `<select>` with real
+  `<option>`s.
+- It carries `data-testid="zitadel-<kind>-<name>"`, re-dispatches a composed
+  `change` (and `input`) across the shadow boundary, and keeps
+  `setFormValue()` in sync on every change.
+- Hide it with `opacity: 0` and `pointer-events: none`, never `display: none`,
+  `visibility: hidden` or `aria-hidden`.
+- Styling it cannot take (a custom popup) is a pointer-only layer:
+  `aria-hidden`, out of the tab order, its state in `data-*` hooks.
+  `<zl-select>` is the reference.
 
 ## Tests
 
-Two Vitest projects, one config (`vitest.config.ts`):
+- `pnpm test` runs both projects of `vitest.config.ts`: `unit` (jsdom) and
+  `browser` (Chromium, `*.browser.spec.ts`). `pnpm test:unit` is the fast lane;
+  `pnpm test:browser` runs the browser project alone.
+- Put a test in the lowest project that proves it (the ladder in
+  [`packages/testing/AGENTS.md`](../testing/AGENTS.md#which-layer-a-test-belongs-in)):
+  form association and focus in `browser`, markup and ARIA in `unit`.
+- A new atom ships with a manifest entry, a unit spec, a browser spec if it
+  takes input, and a spec that the sanitiser keeps it.
+- Mock the Flow API with `setupMockHandlers()` from `@zitadel/api-mock`, never
+  hand-rolled handlers.
+- The sign-in handover (exchange, `Set-Cookie`, navigation) is covered by the
+  demo e2e lanes. After touching `maybeCompleteFlow` or `postSignInUrl`, run
+  both: each exercises a different SDK middleware.
+- The demos load this package's `dist/`: in a manual loop, run
+  `moon run components:build` after an orchestrator change.
 
-- `unit` — `jsdom`. The fast local lane; what `pnpm test` runs.
-- `browser` — Chromium via `@vitest/browser-playwright`. Run alone with
-  `pnpm test:browser`. Tests in `*.browser.spec.ts` only.
+### The browser project's cold start
 
-Both run together in CI via `pnpm test:all` (what `moon run components:test`
-invokes), producing one aggregated junit.xml.
+A cold run pre-bundles a large graph for 60–120 s or more before the first
+test; a warm `.vitest` cache brings that down to seconds.
 
-Always cover form-associated behaviour, focus delegation, and Enter-to-submit
-in the browser project. Anything markup-only (aria attributes, classes, slot
-projection) belongs in the unit project for speed.
-
-### The `browser` project "hangs" — it doesn't, it's cold-start
-
-The browser project launches real headless Chromium via Playwright **and**
-resolves the whole workspace from source (`resolve.conditions:
-["@zitadel/source"]`). On a cold run Vite pre-bundles a large graph (`lit`, the
-generated `@zitadel/api` client, `dompurify`, `liquidjs`) **before the first
-test**: that warm-up is 60–120s+ and variable, while the tests themselves run in
-~1s. With a warm `.vitest` cache the same run finishes in seconds. CI
-pays this cold start deliberately: `moon ci :... :test` runs `test:all` (both
-projects), and the `components:test` task pulls in Chromium via an
-`install-browsers` moon dep. Locally, `pnpm test` stays on the fast jsdom
-`unit` project.
-
-What actually makes it look stuck, and how to avoid it:
-
-- **Don't pipe through `tail`** (or any buffering filter). It withholds all
-  output until EOF, so the entire warm-up looks frozen. Let it stream.
-- **Don't kill a run mid-flight and immediately retry.** An interrupted run
-  leaves a zombie Chromium + Vite dev server holding the port; the next run logs
-  `Port 63315 is in use, trying another one...` and stalls retrying. If you did
-  interrupt one, clear it first:
-
-  ```sh
-  pkill -f vitest; pkill -f chrome-headless-shell
-  ```
-
-- **Run it directly and patiently**, expecting a slow first run then fast reruns:
-
-  ```sh
-  corepack pnpm --filter @zitadel/components test:browser
-  ```
-
-- For a single file: `corepack pnpm --filter @zitadel/components exec vitest run --project browser <name>`.
-
-`vitest run` exits non-zero on any failure, so a `0` exit is authoritative even
-when the non-TTY summary line doesn't flush to a redirected log.
-
-When a test needs the Flow API, prefer `setupMockHandlers()` from
-`@zitadel/api-mock` over hand-rolled handlers — it walks the same
-xstate machine the Storybook orchestrator stories use, so step fixtures and
-step routing stay consistent.
-
-The full sign-in handover (terminal step → session exchange → real
-`Set-Cookie` on the demo origin → full-page navigation to a protected
-route) is covered end-to-end in `e2e/demo-next/` and
-`e2e/demo-nuxt/`, not here. The terminal `handoff_token` is exchanged
-through the generated `exchangeSession` wrapper in `api-client.ts` (which
-hits the SDK proxy path); there is no `session-exchange-path` attribute. Unit
-coverage lives in `zitadel-login.spec.ts`. When a
-change touches `maybeCompleteFlow` or the `postSignInUrl` path, run **both**
-e2e projects — they exercise different SDK middlewares against the same
-orchestrator code, which is how a regression in one framework slips past the
-other.
-
-When iterating against a long-running demo dev server, remember the demo
-loads this package's built `dist/` (not source). The Moon e2e tasks depend on
-the relevant build tasks so CI is safe; manual loops need a fresh
-`moon run components:build` after orchestrator changes.
-
-### Workbench
-
-The interactive workbench is [`apps/storybook`](../../apps/storybook/README.md)
-(`moon run storybook:dev`, `:6006`): the Lit atoms and the
-`<zitadel-login>` orchestrator (MSW via `msw-storybook-addon`). Its bundler aliases this package to source
-(`apps/storybook/.storybook/main.ts`), so the dev server hot-reloads atom edits without a rebuild.
+- Let it stream: a buffering filter such as `tail` makes it look frozen.
+- Never kill a run and retry at once: a stray Chromium and Vite server keep
+  the port (`Port … is in use`). Clear them first:
+  `pkill -f vitest; pkill -f chrome-headless-shell`.
+- One file: `corepack pnpm --filter @zitadel/components exec vitest run --project browser <name>`.
+- A `0` exit is authoritative even when the summary line does not flush.
 
 ## Build
 
-`tsdown.config.ts` produces ESM + `.d.mts` and externalises `lit`, `liquidjs`,
-`dompurify`, and `lucide` so npm consumers dedupe
-with their own copies. Do not bundle those in by default — that breaks shared
-instances and bloats the package. `@zitadel/api` and `@zitadel/design-tokens`
-are inlined; `@zitadel/config` stays external in the library build and is
-inlined only into the standalone file.
-
-## Don't
-
-- Don't bypass Lit's render with manual `innerHTML` mutation. Use `unsafeHTML`
-  inside a `render()` (the orchestrator already does this for Liquid output;
-  atoms should never need it).
-- Don't add a `template` accessor on `<zitadel-login>` casually — it changes
-  the public surface. There is an open follow-up to do this properly with
-  per-tenant template caching; coordinate before implementing.
-- Don't ship a new atom without a manifest entry, a unit spec, a browser spec
-  if it owns user input, and an entry in the orchestrator's sanitiser
-  allowlist (which reads from `manifestRegistry` automatically — but verify
-  with a spec).
-- Don't re-introduce a `FlowResponse` / `FlowStep` / `FlowField` alias that
-  duplicates orval. If the wire isn't usable directly, fix that in
-  `packages/api/orval.config.ts` so the typed client improves for everyone.
+`tsdown.config.ts` keeps `lit`, `liquidjs`, `dompurify` and `lucide` external
+in the library build so consumers share one copy; never bundle them there.

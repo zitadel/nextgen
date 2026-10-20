@@ -15,10 +15,10 @@ import type { ZitadelSession } from "./zitadel-session.js";
 const API_BASE = "https://session.test.invalid";
 const deleteLog: { url: string; method: string; credentials: string }[] = [];
 
-function sessionBody(identifier: string, userId: string) {
+function sessionBody(identifier: string, userId: string, projectId: string) {
   const body: Record<string, unknown> = {
     session_id: "sess_test",
-    project_id: "test",
+    project_id: projectId,
     state: "active",
     user_id: userId,
     factors: [],
@@ -37,13 +37,22 @@ function sessionBody(identifier: string, userId: string) {
 
 let currentEmail = "alice@acme.com";
 let currentUserId = "user_test";
+let currentProjectId = "test";
 let sessionStatus = 200;
+const getLog: string[] = [];
 
-const getHandler = http.get(`${API_BASE}/sessions/me`, () => {
+const getHandler = http.get(`${API_BASE}/sessions/me`, ({ request }) => {
+  getLog.push(request.url);
+  if (sessionStatus === 403) {
+    return HttpResponse.json(
+      { code: "sess.project_mismatch", message: "The session belongs to a different project." },
+      { status: 403 },
+    );
+  }
   if (sessionStatus !== 200) {
     return new HttpResponse(null, { status: sessionStatus });
   }
-  return HttpResponse.json(sessionBody(currentEmail, currentUserId));
+  return HttpResponse.json(sessionBody(currentEmail, currentUserId, currentProjectId));
 });
 
 const deleteHandler = http.delete(`${API_BASE}/sessions/me`, ({ request }) => {
@@ -64,8 +73,10 @@ beforeAll(() => {
 
 afterEach(() => {
   deleteLog.length = 0;
+  getLog.length = 0;
   currentEmail = "alice@acme.com";
   currentUserId = "user_test";
+  currentProjectId = "test";
   sessionStatus = 200;
   server.resetHandlers(getHandler, deleteHandler);
 });
@@ -146,6 +157,24 @@ describe("<zitadel-session>", () => {
     expect(element.shadowRoot?.querySelector(".identity")).toBeNull();
   });
 
+  it("asks for the session in its own project", async () => {
+    const element = mount();
+    await flush(element);
+    expect(new URL(getLog[0] ?? "").searchParams.get("project_id")).toBe("test");
+  });
+
+  // One host's cookie reaches every app on it, so the session it holds may be
+  // another project's: the server refuses it, or an older one answers for it.
+  it.each([
+    ["the server refuses it", () => (sessionStatus = 403)],
+    ["an older server answers for it", () => (currentProjectId = "other")],
+  ])("omits the identity of another project's session when %s", async (_label, arrange) => {
+    arrange();
+    const element = mount();
+    await flush(element);
+    expect(element.shadowRoot?.querySelector(".identity")).toBeNull();
+  });
+
   it("suppress-header visually hides the heading but keeps it accessible", async () => {
     currentEmail = "alice@acme.com";
     const element = mount("<zitadel-session suppress-header></zitadel-session>");
@@ -203,6 +232,27 @@ describe("<zitadel-session>", () => {
     expect(deleteLog[0]?.credentials).toBe("include");
     expect(events).toHaveLength(1);
     expect(events[0]?.detail).toEqual({ display: "", identifier: "alice@acme.com" });
+  });
+
+  // On a shared host the cookie may hold another project's session (the
+  // Console's, on localhost). Signing out of this app must not end it.
+  it.each([
+    ["the server refuses it", () => (sessionStatus = 403)],
+    ["an older server answers for it", () => (currentProjectId = "other")],
+  ])("leaves another project's session alone on Sign out when %s", async (_label, arrange) => {
+    arrange();
+    const element = mount();
+    await flush(element);
+
+    const events: CustomEvent[] = [];
+    element.addEventListener("zitadel-signout", (e) => events.push(e as CustomEvent));
+
+    activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-logout"]'));
+    await new Promise((resolve) => setTimeout(resolve, 16));
+    await element.updateComplete;
+
+    expect(deleteLog).toHaveLength(0);
+    expect(events).toHaveLength(1);
   });
 
   it("navigates to post-sign-out-url after a successful revoke", async () => {

@@ -9584,11 +9584,27 @@ func (*BuildReleaseCreated) buildReleaseRes() {}
 
 // BuildReleaseErrorResponse represents sum type.
 type BuildReleaseErrorResponse struct {
-	Type             BuildReleaseErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	NotImplemented   NotImplemented
-	ReqInvalid       ReqInvalid
+	Type                     BuildReleaseErrorResponseType // switch on this field
+	AuthUnauthorized         AuthUnauthorized
+	EvtInvalid               EvtInvalid
+	FlowdefInvalid           FlowdefInvalid
+	IdpFieldImmutable        IdpFieldImmutable
+	IdpNotFound              IdpNotFound
+	Internal                 Internal
+	SchFetchDenied           SchFetchDenied
+	SchFetchDowngrade        SchFetchDowngrade
+	SchFetchTimeout          SchFetchTimeout
+	SchFetchTooLarge         SchFetchTooLarge
+	SchFetchTooManyRedirects SchFetchTooManyRedirects
+	SchNotFound              SchNotFound
+	RelInvalid               RelInvalid
+	RelNotFound              RelNotFound
+	RelPermissionDenied      RelPermissionDenied
+	RelProjectNotFound       RelProjectNotFound
+	RelRevisionUnpinnable    RelRevisionUnpinnable
+	RelUnresolvedReference   RelUnresolvedReference
+	ReqInvalid               ReqInvalid
+	FlowdefSchemaFetchFailed FlowdefSchemaFetchFailed
 }
 
 // BuildReleaseErrorResponseType is oneOf type of BuildReleaseErrorResponse.
@@ -9596,10 +9612,26 @@ type BuildReleaseErrorResponseType string
 
 // Possible values for BuildReleaseErrorResponseType.
 const (
-	AuthUnauthorizedBuildReleaseErrorResponse BuildReleaseErrorResponseType = "auth.unauthorized"
-	InternalBuildReleaseErrorResponse         BuildReleaseErrorResponseType = "internal"
-	NotImplementedBuildReleaseErrorResponse   BuildReleaseErrorResponseType = "not_implemented"
-	ReqInvalidBuildReleaseErrorResponse       BuildReleaseErrorResponseType = "req.invalid"
+	AuthUnauthorizedBuildReleaseErrorResponse         BuildReleaseErrorResponseType = "auth.unauthorized"
+	EvtInvalidBuildReleaseErrorResponse               BuildReleaseErrorResponseType = "evt.invalid"
+	FlowdefInvalidBuildReleaseErrorResponse           BuildReleaseErrorResponseType = "flowdef.invalid"
+	IdpFieldImmutableBuildReleaseErrorResponse        BuildReleaseErrorResponseType = "idp.field_immutable"
+	IdpNotFoundBuildReleaseErrorResponse              BuildReleaseErrorResponseType = "idp.not_found"
+	InternalBuildReleaseErrorResponse                 BuildReleaseErrorResponseType = "internal"
+	SchFetchDeniedBuildReleaseErrorResponse           BuildReleaseErrorResponseType = "sch.fetch_denied"
+	SchFetchDowngradeBuildReleaseErrorResponse        BuildReleaseErrorResponseType = "sch.fetch_downgrade"
+	SchFetchTimeoutBuildReleaseErrorResponse          BuildReleaseErrorResponseType = "sch.fetch_timeout"
+	SchFetchTooLargeBuildReleaseErrorResponse         BuildReleaseErrorResponseType = "sch.fetch_too_large"
+	SchFetchTooManyRedirectsBuildReleaseErrorResponse BuildReleaseErrorResponseType = "sch.fetch_too_many_redirects"
+	SchNotFoundBuildReleaseErrorResponse              BuildReleaseErrorResponseType = "sch.not_found"
+	RelInvalidBuildReleaseErrorResponse               BuildReleaseErrorResponseType = "rel.invalid"
+	RelNotFoundBuildReleaseErrorResponse              BuildReleaseErrorResponseType = "rel.not_found"
+	RelPermissionDeniedBuildReleaseErrorResponse      BuildReleaseErrorResponseType = "rel.permission_denied"
+	RelProjectNotFoundBuildReleaseErrorResponse       BuildReleaseErrorResponseType = "rel.project_not_found"
+	RelRevisionUnpinnableBuildReleaseErrorResponse    BuildReleaseErrorResponseType = "rel.revision_unpinnable"
+	RelUnresolvedReferenceBuildReleaseErrorResponse   BuildReleaseErrorResponseType = "rel.unresolved_reference"
+	ReqInvalidBuildReleaseErrorResponse               BuildReleaseErrorResponseType = "req.invalid"
+	FlowdefSchemaFetchFailedBuildReleaseErrorResponse BuildReleaseErrorResponseType = "flowdef.schema_fetch_failed"
 )
 
 // IsAuthUnauthorized reports whether BuildReleaseErrorResponse is AuthUnauthorized.
@@ -9607,19 +9639,99 @@ func (s BuildReleaseErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedBuildReleaseErrorResponse
 }
 
+// IsEvtInvalid reports whether BuildReleaseErrorResponse is EvtInvalid.
+func (s BuildReleaseErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidBuildReleaseErrorResponse
+}
+
+// IsFlowdefInvalid reports whether BuildReleaseErrorResponse is FlowdefInvalid.
+func (s BuildReleaseErrorResponse) IsFlowdefInvalid() bool {
+	return s.Type == FlowdefInvalidBuildReleaseErrorResponse
+}
+
+// IsIdpFieldImmutable reports whether BuildReleaseErrorResponse is IdpFieldImmutable.
+func (s BuildReleaseErrorResponse) IsIdpFieldImmutable() bool {
+	return s.Type == IdpFieldImmutableBuildReleaseErrorResponse
+}
+
+// IsIdpNotFound reports whether BuildReleaseErrorResponse is IdpNotFound.
+func (s BuildReleaseErrorResponse) IsIdpNotFound() bool {
+	return s.Type == IdpNotFoundBuildReleaseErrorResponse
+}
+
 // IsInternal reports whether BuildReleaseErrorResponse is Internal.
 func (s BuildReleaseErrorResponse) IsInternal() bool {
 	return s.Type == InternalBuildReleaseErrorResponse
 }
 
-// IsNotImplemented reports whether BuildReleaseErrorResponse is NotImplemented.
-func (s BuildReleaseErrorResponse) IsNotImplemented() bool {
-	return s.Type == NotImplementedBuildReleaseErrorResponse
+// IsSchFetchDenied reports whether BuildReleaseErrorResponse is SchFetchDenied.
+func (s BuildReleaseErrorResponse) IsSchFetchDenied() bool {
+	return s.Type == SchFetchDeniedBuildReleaseErrorResponse
+}
+
+// IsSchFetchDowngrade reports whether BuildReleaseErrorResponse is SchFetchDowngrade.
+func (s BuildReleaseErrorResponse) IsSchFetchDowngrade() bool {
+	return s.Type == SchFetchDowngradeBuildReleaseErrorResponse
+}
+
+// IsSchFetchTimeout reports whether BuildReleaseErrorResponse is SchFetchTimeout.
+func (s BuildReleaseErrorResponse) IsSchFetchTimeout() bool {
+	return s.Type == SchFetchTimeoutBuildReleaseErrorResponse
+}
+
+// IsSchFetchTooLarge reports whether BuildReleaseErrorResponse is SchFetchTooLarge.
+func (s BuildReleaseErrorResponse) IsSchFetchTooLarge() bool {
+	return s.Type == SchFetchTooLargeBuildReleaseErrorResponse
+}
+
+// IsSchFetchTooManyRedirects reports whether BuildReleaseErrorResponse is SchFetchTooManyRedirects.
+func (s BuildReleaseErrorResponse) IsSchFetchTooManyRedirects() bool {
+	return s.Type == SchFetchTooManyRedirectsBuildReleaseErrorResponse
+}
+
+// IsSchNotFound reports whether BuildReleaseErrorResponse is SchNotFound.
+func (s BuildReleaseErrorResponse) IsSchNotFound() bool {
+	return s.Type == SchNotFoundBuildReleaseErrorResponse
+}
+
+// IsRelInvalid reports whether BuildReleaseErrorResponse is RelInvalid.
+func (s BuildReleaseErrorResponse) IsRelInvalid() bool {
+	return s.Type == RelInvalidBuildReleaseErrorResponse
+}
+
+// IsRelNotFound reports whether BuildReleaseErrorResponse is RelNotFound.
+func (s BuildReleaseErrorResponse) IsRelNotFound() bool {
+	return s.Type == RelNotFoundBuildReleaseErrorResponse
+}
+
+// IsRelPermissionDenied reports whether BuildReleaseErrorResponse is RelPermissionDenied.
+func (s BuildReleaseErrorResponse) IsRelPermissionDenied() bool {
+	return s.Type == RelPermissionDeniedBuildReleaseErrorResponse
+}
+
+// IsRelProjectNotFound reports whether BuildReleaseErrorResponse is RelProjectNotFound.
+func (s BuildReleaseErrorResponse) IsRelProjectNotFound() bool {
+	return s.Type == RelProjectNotFoundBuildReleaseErrorResponse
+}
+
+// IsRelRevisionUnpinnable reports whether BuildReleaseErrorResponse is RelRevisionUnpinnable.
+func (s BuildReleaseErrorResponse) IsRelRevisionUnpinnable() bool {
+	return s.Type == RelRevisionUnpinnableBuildReleaseErrorResponse
+}
+
+// IsRelUnresolvedReference reports whether BuildReleaseErrorResponse is RelUnresolvedReference.
+func (s BuildReleaseErrorResponse) IsRelUnresolvedReference() bool {
+	return s.Type == RelUnresolvedReferenceBuildReleaseErrorResponse
 }
 
 // IsReqInvalid reports whether BuildReleaseErrorResponse is ReqInvalid.
 func (s BuildReleaseErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidBuildReleaseErrorResponse
+}
+
+// IsFlowdefSchemaFetchFailed reports whether BuildReleaseErrorResponse is FlowdefSchemaFetchFailed.
+func (s BuildReleaseErrorResponse) IsFlowdefSchemaFetchFailed() bool {
+	return s.Type == FlowdefSchemaFetchFailedBuildReleaseErrorResponse
 }
 
 // SetAuthUnauthorized sets BuildReleaseErrorResponse to AuthUnauthorized.
@@ -9640,6 +9752,90 @@ func (s BuildReleaseErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok
 func NewAuthUnauthorizedBuildReleaseErrorResponse(v AuthUnauthorized) BuildReleaseErrorResponse {
 	var s BuildReleaseErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEvtInvalid sets BuildReleaseErrorResponse to EvtInvalid.
+func (s *BuildReleaseErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidBuildReleaseErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if BuildReleaseErrorResponse is EvtInvalid.
+func (s BuildReleaseErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from EvtInvalid.
+func NewEvtInvalidBuildReleaseErrorResponse(v EvtInvalid) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
+// SetFlowdefInvalid sets BuildReleaseErrorResponse to FlowdefInvalid.
+func (s *BuildReleaseErrorResponse) SetFlowdefInvalid(v FlowdefInvalid) {
+	s.Type = FlowdefInvalidBuildReleaseErrorResponse
+	s.FlowdefInvalid = v
+}
+
+// GetFlowdefInvalid returns FlowdefInvalid and true boolean if BuildReleaseErrorResponse is FlowdefInvalid.
+func (s BuildReleaseErrorResponse) GetFlowdefInvalid() (v FlowdefInvalid, ok bool) {
+	if !s.IsFlowdefInvalid() {
+		return v, false
+	}
+	return s.FlowdefInvalid, true
+}
+
+// NewFlowdefInvalidBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from FlowdefInvalid.
+func NewFlowdefInvalidBuildReleaseErrorResponse(v FlowdefInvalid) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetFlowdefInvalid(v)
+	return s
+}
+
+// SetIdpFieldImmutable sets BuildReleaseErrorResponse to IdpFieldImmutable.
+func (s *BuildReleaseErrorResponse) SetIdpFieldImmutable(v IdpFieldImmutable) {
+	s.Type = IdpFieldImmutableBuildReleaseErrorResponse
+	s.IdpFieldImmutable = v
+}
+
+// GetIdpFieldImmutable returns IdpFieldImmutable and true boolean if BuildReleaseErrorResponse is IdpFieldImmutable.
+func (s BuildReleaseErrorResponse) GetIdpFieldImmutable() (v IdpFieldImmutable, ok bool) {
+	if !s.IsIdpFieldImmutable() {
+		return v, false
+	}
+	return s.IdpFieldImmutable, true
+}
+
+// NewIdpFieldImmutableBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from IdpFieldImmutable.
+func NewIdpFieldImmutableBuildReleaseErrorResponse(v IdpFieldImmutable) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetIdpFieldImmutable(v)
+	return s
+}
+
+// SetIdpNotFound sets BuildReleaseErrorResponse to IdpNotFound.
+func (s *BuildReleaseErrorResponse) SetIdpNotFound(v IdpNotFound) {
+	s.Type = IdpNotFoundBuildReleaseErrorResponse
+	s.IdpNotFound = v
+}
+
+// GetIdpNotFound returns IdpNotFound and true boolean if BuildReleaseErrorResponse is IdpNotFound.
+func (s BuildReleaseErrorResponse) GetIdpNotFound() (v IdpNotFound, ok bool) {
+	if !s.IsIdpNotFound() {
+		return v, false
+	}
+	return s.IdpNotFound, true
+}
+
+// NewIdpNotFoundBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from IdpNotFound.
+func NewIdpNotFoundBuildReleaseErrorResponse(v IdpNotFound) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetIdpNotFound(v)
 	return s
 }
 
@@ -9664,24 +9860,255 @@ func NewInternalBuildReleaseErrorResponse(v Internal) BuildReleaseErrorResponse 
 	return s
 }
 
-// SetNotImplemented sets BuildReleaseErrorResponse to NotImplemented.
-func (s *BuildReleaseErrorResponse) SetNotImplemented(v NotImplemented) {
-	s.Type = NotImplementedBuildReleaseErrorResponse
-	s.NotImplemented = v
+// SetSchFetchDenied sets BuildReleaseErrorResponse to SchFetchDenied.
+func (s *BuildReleaseErrorResponse) SetSchFetchDenied(v SchFetchDenied) {
+	s.Type = SchFetchDeniedBuildReleaseErrorResponse
+	s.SchFetchDenied = v
 }
 
-// GetNotImplemented returns NotImplemented and true boolean if BuildReleaseErrorResponse is NotImplemented.
-func (s BuildReleaseErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
-	if !s.IsNotImplemented() {
+// GetSchFetchDenied returns SchFetchDenied and true boolean if BuildReleaseErrorResponse is SchFetchDenied.
+func (s BuildReleaseErrorResponse) GetSchFetchDenied() (v SchFetchDenied, ok bool) {
+	if !s.IsSchFetchDenied() {
 		return v, false
 	}
-	return s.NotImplemented, true
+	return s.SchFetchDenied, true
 }
 
-// NewNotImplementedBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from NotImplemented.
-func NewNotImplementedBuildReleaseErrorResponse(v NotImplemented) BuildReleaseErrorResponse {
+// NewSchFetchDeniedBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from SchFetchDenied.
+func NewSchFetchDeniedBuildReleaseErrorResponse(v SchFetchDenied) BuildReleaseErrorResponse {
 	var s BuildReleaseErrorResponse
-	s.SetNotImplemented(v)
+	s.SetSchFetchDenied(v)
+	return s
+}
+
+// SetSchFetchDowngrade sets BuildReleaseErrorResponse to SchFetchDowngrade.
+func (s *BuildReleaseErrorResponse) SetSchFetchDowngrade(v SchFetchDowngrade) {
+	s.Type = SchFetchDowngradeBuildReleaseErrorResponse
+	s.SchFetchDowngrade = v
+}
+
+// GetSchFetchDowngrade returns SchFetchDowngrade and true boolean if BuildReleaseErrorResponse is SchFetchDowngrade.
+func (s BuildReleaseErrorResponse) GetSchFetchDowngrade() (v SchFetchDowngrade, ok bool) {
+	if !s.IsSchFetchDowngrade() {
+		return v, false
+	}
+	return s.SchFetchDowngrade, true
+}
+
+// NewSchFetchDowngradeBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from SchFetchDowngrade.
+func NewSchFetchDowngradeBuildReleaseErrorResponse(v SchFetchDowngrade) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetSchFetchDowngrade(v)
+	return s
+}
+
+// SetSchFetchTimeout sets BuildReleaseErrorResponse to SchFetchTimeout.
+func (s *BuildReleaseErrorResponse) SetSchFetchTimeout(v SchFetchTimeout) {
+	s.Type = SchFetchTimeoutBuildReleaseErrorResponse
+	s.SchFetchTimeout = v
+}
+
+// GetSchFetchTimeout returns SchFetchTimeout and true boolean if BuildReleaseErrorResponse is SchFetchTimeout.
+func (s BuildReleaseErrorResponse) GetSchFetchTimeout() (v SchFetchTimeout, ok bool) {
+	if !s.IsSchFetchTimeout() {
+		return v, false
+	}
+	return s.SchFetchTimeout, true
+}
+
+// NewSchFetchTimeoutBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from SchFetchTimeout.
+func NewSchFetchTimeoutBuildReleaseErrorResponse(v SchFetchTimeout) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetSchFetchTimeout(v)
+	return s
+}
+
+// SetSchFetchTooLarge sets BuildReleaseErrorResponse to SchFetchTooLarge.
+func (s *BuildReleaseErrorResponse) SetSchFetchTooLarge(v SchFetchTooLarge) {
+	s.Type = SchFetchTooLargeBuildReleaseErrorResponse
+	s.SchFetchTooLarge = v
+}
+
+// GetSchFetchTooLarge returns SchFetchTooLarge and true boolean if BuildReleaseErrorResponse is SchFetchTooLarge.
+func (s BuildReleaseErrorResponse) GetSchFetchTooLarge() (v SchFetchTooLarge, ok bool) {
+	if !s.IsSchFetchTooLarge() {
+		return v, false
+	}
+	return s.SchFetchTooLarge, true
+}
+
+// NewSchFetchTooLargeBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from SchFetchTooLarge.
+func NewSchFetchTooLargeBuildReleaseErrorResponse(v SchFetchTooLarge) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetSchFetchTooLarge(v)
+	return s
+}
+
+// SetSchFetchTooManyRedirects sets BuildReleaseErrorResponse to SchFetchTooManyRedirects.
+func (s *BuildReleaseErrorResponse) SetSchFetchTooManyRedirects(v SchFetchTooManyRedirects) {
+	s.Type = SchFetchTooManyRedirectsBuildReleaseErrorResponse
+	s.SchFetchTooManyRedirects = v
+}
+
+// GetSchFetchTooManyRedirects returns SchFetchTooManyRedirects and true boolean if BuildReleaseErrorResponse is SchFetchTooManyRedirects.
+func (s BuildReleaseErrorResponse) GetSchFetchTooManyRedirects() (v SchFetchTooManyRedirects, ok bool) {
+	if !s.IsSchFetchTooManyRedirects() {
+		return v, false
+	}
+	return s.SchFetchTooManyRedirects, true
+}
+
+// NewSchFetchTooManyRedirectsBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from SchFetchTooManyRedirects.
+func NewSchFetchTooManyRedirectsBuildReleaseErrorResponse(v SchFetchTooManyRedirects) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetSchFetchTooManyRedirects(v)
+	return s
+}
+
+// SetSchNotFound sets BuildReleaseErrorResponse to SchNotFound.
+func (s *BuildReleaseErrorResponse) SetSchNotFound(v SchNotFound) {
+	s.Type = SchNotFoundBuildReleaseErrorResponse
+	s.SchNotFound = v
+}
+
+// GetSchNotFound returns SchNotFound and true boolean if BuildReleaseErrorResponse is SchNotFound.
+func (s BuildReleaseErrorResponse) GetSchNotFound() (v SchNotFound, ok bool) {
+	if !s.IsSchNotFound() {
+		return v, false
+	}
+	return s.SchNotFound, true
+}
+
+// NewSchNotFoundBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from SchNotFound.
+func NewSchNotFoundBuildReleaseErrorResponse(v SchNotFound) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetSchNotFound(v)
+	return s
+}
+
+// SetRelInvalid sets BuildReleaseErrorResponse to RelInvalid.
+func (s *BuildReleaseErrorResponse) SetRelInvalid(v RelInvalid) {
+	s.Type = RelInvalidBuildReleaseErrorResponse
+	s.RelInvalid = v
+}
+
+// GetRelInvalid returns RelInvalid and true boolean if BuildReleaseErrorResponse is RelInvalid.
+func (s BuildReleaseErrorResponse) GetRelInvalid() (v RelInvalid, ok bool) {
+	if !s.IsRelInvalid() {
+		return v, false
+	}
+	return s.RelInvalid, true
+}
+
+// NewRelInvalidBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from RelInvalid.
+func NewRelInvalidBuildReleaseErrorResponse(v RelInvalid) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetRelInvalid(v)
+	return s
+}
+
+// SetRelNotFound sets BuildReleaseErrorResponse to RelNotFound.
+func (s *BuildReleaseErrorResponse) SetRelNotFound(v RelNotFound) {
+	s.Type = RelNotFoundBuildReleaseErrorResponse
+	s.RelNotFound = v
+}
+
+// GetRelNotFound returns RelNotFound and true boolean if BuildReleaseErrorResponse is RelNotFound.
+func (s BuildReleaseErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
+	if !s.IsRelNotFound() {
+		return v, false
+	}
+	return s.RelNotFound, true
+}
+
+// NewRelNotFoundBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from RelNotFound.
+func NewRelNotFoundBuildReleaseErrorResponse(v RelNotFound) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelPermissionDenied sets BuildReleaseErrorResponse to RelPermissionDenied.
+func (s *BuildReleaseErrorResponse) SetRelPermissionDenied(v RelPermissionDenied) {
+	s.Type = RelPermissionDeniedBuildReleaseErrorResponse
+	s.RelPermissionDenied = v
+}
+
+// GetRelPermissionDenied returns RelPermissionDenied and true boolean if BuildReleaseErrorResponse is RelPermissionDenied.
+func (s BuildReleaseErrorResponse) GetRelPermissionDenied() (v RelPermissionDenied, ok bool) {
+	if !s.IsRelPermissionDenied() {
+		return v, false
+	}
+	return s.RelPermissionDenied, true
+}
+
+// NewRelPermissionDeniedBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from RelPermissionDenied.
+func NewRelPermissionDeniedBuildReleaseErrorResponse(v RelPermissionDenied) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetRelPermissionDenied(v)
+	return s
+}
+
+// SetRelProjectNotFound sets BuildReleaseErrorResponse to RelProjectNotFound.
+func (s *BuildReleaseErrorResponse) SetRelProjectNotFound(v RelProjectNotFound) {
+	s.Type = RelProjectNotFoundBuildReleaseErrorResponse
+	s.RelProjectNotFound = v
+}
+
+// GetRelProjectNotFound returns RelProjectNotFound and true boolean if BuildReleaseErrorResponse is RelProjectNotFound.
+func (s BuildReleaseErrorResponse) GetRelProjectNotFound() (v RelProjectNotFound, ok bool) {
+	if !s.IsRelProjectNotFound() {
+		return v, false
+	}
+	return s.RelProjectNotFound, true
+}
+
+// NewRelProjectNotFoundBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from RelProjectNotFound.
+func NewRelProjectNotFoundBuildReleaseErrorResponse(v RelProjectNotFound) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetRelProjectNotFound(v)
+	return s
+}
+
+// SetRelRevisionUnpinnable sets BuildReleaseErrorResponse to RelRevisionUnpinnable.
+func (s *BuildReleaseErrorResponse) SetRelRevisionUnpinnable(v RelRevisionUnpinnable) {
+	s.Type = RelRevisionUnpinnableBuildReleaseErrorResponse
+	s.RelRevisionUnpinnable = v
+}
+
+// GetRelRevisionUnpinnable returns RelRevisionUnpinnable and true boolean if BuildReleaseErrorResponse is RelRevisionUnpinnable.
+func (s BuildReleaseErrorResponse) GetRelRevisionUnpinnable() (v RelRevisionUnpinnable, ok bool) {
+	if !s.IsRelRevisionUnpinnable() {
+		return v, false
+	}
+	return s.RelRevisionUnpinnable, true
+}
+
+// NewRelRevisionUnpinnableBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from RelRevisionUnpinnable.
+func NewRelRevisionUnpinnableBuildReleaseErrorResponse(v RelRevisionUnpinnable) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetRelRevisionUnpinnable(v)
+	return s
+}
+
+// SetRelUnresolvedReference sets BuildReleaseErrorResponse to RelUnresolvedReference.
+func (s *BuildReleaseErrorResponse) SetRelUnresolvedReference(v RelUnresolvedReference) {
+	s.Type = RelUnresolvedReferenceBuildReleaseErrorResponse
+	s.RelUnresolvedReference = v
+}
+
+// GetRelUnresolvedReference returns RelUnresolvedReference and true boolean if BuildReleaseErrorResponse is RelUnresolvedReference.
+func (s BuildReleaseErrorResponse) GetRelUnresolvedReference() (v RelUnresolvedReference, ok bool) {
+	if !s.IsRelUnresolvedReference() {
+		return v, false
+	}
+	return s.RelUnresolvedReference, true
+}
+
+// NewRelUnresolvedReferenceBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from RelUnresolvedReference.
+func NewRelUnresolvedReferenceBuildReleaseErrorResponse(v RelUnresolvedReference) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetRelUnresolvedReference(v)
 	return s
 }
 
@@ -9703,6 +10130,27 @@ func (s BuildReleaseErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidBuildReleaseErrorResponse(v ReqInvalid) BuildReleaseErrorResponse {
 	var s BuildReleaseErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetFlowdefSchemaFetchFailed sets BuildReleaseErrorResponse to FlowdefSchemaFetchFailed.
+func (s *BuildReleaseErrorResponse) SetFlowdefSchemaFetchFailed(v FlowdefSchemaFetchFailed) {
+	s.Type = FlowdefSchemaFetchFailedBuildReleaseErrorResponse
+	s.FlowdefSchemaFetchFailed = v
+}
+
+// GetFlowdefSchemaFetchFailed returns FlowdefSchemaFetchFailed and true boolean if BuildReleaseErrorResponse is FlowdefSchemaFetchFailed.
+func (s BuildReleaseErrorResponse) GetFlowdefSchemaFetchFailed() (v FlowdefSchemaFetchFailed, ok bool) {
+	if !s.IsFlowdefSchemaFetchFailed() {
+		return v, false
+	}
+	return s.FlowdefSchemaFetchFailed, true
+}
+
+// NewFlowdefSchemaFetchFailedBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from FlowdefSchemaFetchFailed.
+func NewFlowdefSchemaFetchFailedBuildReleaseErrorResponse(v FlowdefSchemaFetchFailed) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetFlowdefSchemaFetchFailed(v)
 	return s
 }
 
@@ -23416,7 +23864,11 @@ type FlowSubmitRequest struct {
 	SessionToken OptString `json:"session_token"`
 	// Which action to take. Must be a key from the step's `actions` dictionary:
 	// - A regular action (e.g., "submit", "register", "back")
-	// - The reserved value "sso" — triggers SSO redirect (requires `sso_provider_id`).
+	// - The reserved value "sso" — triggers SSO redirect (requires `sso_provider_id`)
+	// A name the current step does not declare is refused with 400
+	// (`flow.invalid_action`). That includes the outcome names the engine
+	// routes on its own (`user_not_found`, `user_already_exists`,
+	// `sso_user_not_found`, `sso_authenticated`), which are never actions.
 	Action string `json:"action"`
 	// User input values. Keys match field names from the step's `fields` dictionary.
 	Fields OptFlowSubmitRequestFields `json:"fields"`
@@ -28272,11 +28724,12 @@ func (*GetLiveOK) getLiveRes() {}
 
 // GetMySessionErrorResponse represents sum type.
 type GetMySessionErrorResponse struct {
-	Type             GetMySessionErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	ReqInvalid       ReqInvalid
-	SessNotFound     SessNotFound
+	Type                GetMySessionErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	ReqInvalid          ReqInvalid
+	SessNotFound        SessNotFound
+	SessProjectMismatch SessProjectMismatch
 }
 
 // GetMySessionErrorResponseType is oneOf type of GetMySessionErrorResponse.
@@ -28284,10 +28737,11 @@ type GetMySessionErrorResponseType string
 
 // Possible values for GetMySessionErrorResponseType.
 const (
-	AuthUnauthorizedGetMySessionErrorResponse GetMySessionErrorResponseType = "auth.unauthorized"
-	InternalGetMySessionErrorResponse         GetMySessionErrorResponseType = "internal"
-	ReqInvalidGetMySessionErrorResponse       GetMySessionErrorResponseType = "req.invalid"
-	SessNotFoundGetMySessionErrorResponse     GetMySessionErrorResponseType = "sess.not_found"
+	AuthUnauthorizedGetMySessionErrorResponse    GetMySessionErrorResponseType = "auth.unauthorized"
+	InternalGetMySessionErrorResponse            GetMySessionErrorResponseType = "internal"
+	ReqInvalidGetMySessionErrorResponse          GetMySessionErrorResponseType = "req.invalid"
+	SessNotFoundGetMySessionErrorResponse        GetMySessionErrorResponseType = "sess.not_found"
+	SessProjectMismatchGetMySessionErrorResponse GetMySessionErrorResponseType = "sess.project_mismatch"
 )
 
 // IsAuthUnauthorized reports whether GetMySessionErrorResponse is AuthUnauthorized.
@@ -28308,6 +28762,11 @@ func (s GetMySessionErrorResponse) IsReqInvalid() bool {
 // IsSessNotFound reports whether GetMySessionErrorResponse is SessNotFound.
 func (s GetMySessionErrorResponse) IsSessNotFound() bool {
 	return s.Type == SessNotFoundGetMySessionErrorResponse
+}
+
+// IsSessProjectMismatch reports whether GetMySessionErrorResponse is SessProjectMismatch.
+func (s GetMySessionErrorResponse) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchGetMySessionErrorResponse
 }
 
 // SetAuthUnauthorized sets GetMySessionErrorResponse to AuthUnauthorized.
@@ -28391,6 +28850,27 @@ func (s GetMySessionErrorResponse) GetSessNotFound() (v SessNotFound, ok bool) {
 func NewSessNotFoundGetMySessionErrorResponse(v SessNotFound) GetMySessionErrorResponse {
 	var s GetMySessionErrorResponse
 	s.SetSessNotFound(v)
+	return s
+}
+
+// SetSessProjectMismatch sets GetMySessionErrorResponse to SessProjectMismatch.
+func (s *GetMySessionErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchGetMySessionErrorResponse
+	s.SessProjectMismatch = v
+}
+
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if GetMySessionErrorResponse is SessProjectMismatch.
+func (s GetMySessionErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
+		return v, false
+	}
+	return s.SessProjectMismatch, true
+}
+
+// NewSessProjectMismatchGetMySessionErrorResponse returns new GetMySessionErrorResponse from SessProjectMismatch.
+func NewSessProjectMismatchGetMySessionErrorResponse(v SessProjectMismatch) GetMySessionErrorResponse {
+	var s GetMySessionErrorResponse
+	s.SetSessProjectMismatch(v)
 	return s
 }
 
@@ -49874,6 +50354,52 @@ func (o OptSessPermissionDeniedDetails) Or(d SessPermissionDeniedDetails) SessPe
 	return d
 }
 
+// NewOptSessProjectMismatchDetails returns new OptSessProjectMismatchDetails with value set to v.
+func NewOptSessProjectMismatchDetails(v SessProjectMismatchDetails) OptSessProjectMismatchDetails {
+	return OptSessProjectMismatchDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSessProjectMismatchDetails is optional SessProjectMismatchDetails.
+type OptSessProjectMismatchDetails struct {
+	Value SessProjectMismatchDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSessProjectMismatchDetails was set.
+func (o OptSessProjectMismatchDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSessProjectMismatchDetails) Reset() {
+	var v SessProjectMismatchDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSessProjectMismatchDetails) SetTo(v SessProjectMismatchDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSessProjectMismatchDetails) Get() (v SessProjectMismatchDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSessProjectMismatchDetails) Or(d SessProjectMismatchDetails) SessProjectMismatchDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptSessTokenCreationFailedDetails returns new OptSessTokenCreationFailedDetails with value set to v.
 func NewOptSessTokenCreationFailedDetails(v SessTokenCreationFailedDetails) OptSessTokenCreationFailedDetails {
 	return OptSessTokenCreationFailedDetails{
@@ -65278,6 +65804,87 @@ func (s *SessPermissionDeniedDetails) init() SessPermissionDeniedDetails {
 	}
 	return m
 }
+
+// Merged schema.
+// Ref: #
+type SessProjectMismatch struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSessProjectMismatchDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SessProjectMismatch) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SessProjectMismatch) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SessProjectMismatch) GetDetails() OptSessProjectMismatchDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SessProjectMismatch) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SessProjectMismatch) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SessProjectMismatch) SetDetails(val OptSessProjectMismatchDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SessProjectMismatchDetails map[string]jx.Raw
+
+func (s *SessProjectMismatchDetails) init() SessProjectMismatchDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// SessProjectMismatchHeaders wraps SessProjectMismatch with response headers.
+type SessProjectMismatchHeaders struct {
+	CacheControl OptString
+	Response     SessProjectMismatch
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *SessProjectMismatchHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetResponse returns the value of Response.
+func (s *SessProjectMismatchHeaders) GetResponse() SessProjectMismatch {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *SessProjectMismatchHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetResponse sets the value of Response.
+func (s *SessProjectMismatchHeaders) SetResponse(val SessProjectMismatch) {
+	s.Response = val
+}
+
+func (*SessProjectMismatchHeaders) getMySessionRes() {}
 
 // Merged schema.
 // Ref: #

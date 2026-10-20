@@ -37,37 +37,16 @@ func NewBrandingService(v2Pool *DB) *BrandingService {
 }
 
 // Create validates and publishes a new branding revision.
-func (s *BrandingService) Create(ctx context.Context, input CreateBrandingInput) (*domain.Branding, error) {
-	entity, err := domain.NewBranding(
-		input.ProjectID,
-		input.Layout,
-		input.LiquidTemplate,
-		input.LogoURL,
-		input.HeroURL,
-		input.Theme,
-		input.Typography,
-		input.Shape,
-	)
+func (s *BrandingService) Create(ctx context.Context, input CreateBrandingInput) (_ *domain.Branding, err error) {
+	ctx, end := startSpan(ctx, "BrandingService.Create")
+	defer end(&err)
+
+	entity, err := prepareBranding(input)
 	if err != nil {
 		return nil, err
 	}
 	if err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		if err := tx.Statements().CreateBranding(ctx, entity); err != nil {
-			return err
-		}
-		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
-			Type:       domain.EventTypeBrandingCreated,
-			Category:   domain.EventCategoryAdmin,
-			ProjectID:  entity.ProjectID,
-			EntityType: "branding",
-			EntityID:   entity.ID,
-			Payload: domain.BrandingPayload{
-				Layout:  entity.Layout,
-				LogoURL: entity.LogoURL,
-				FontURL: entity.Typography.FontURL,
-				HeroURL: entity.HeroURL,
-			},
-		})
+		return s.createBranding(ctx, tx.Statements(), entity)
 	}); err != nil {
 		// The only integrity constraint reachable from user input is the FK to
 		// projects (the ULID primary key cannot realistically collide), so a
@@ -83,8 +62,92 @@ func (s *BrandingService) Create(ctx context.Context, input CreateBrandingInput)
 	return entity, nil
 }
 
+func prepareBranding(input CreateBrandingInput) (*domain.Branding, error) {
+	return domain.NewBranding(
+		input.ProjectID,
+		input.Layout,
+		input.LiquidTemplate,
+		input.LogoURL,
+		input.HeroURL,
+		input.Theme,
+		input.Typography,
+		input.Shape,
+	)
+}
+
+// createBranding inserts a prepared branding revision and emits its event on stmts.
+func (s *BrandingService) createBranding(ctx context.Context, stmts AllStatements, entity *domain.Branding) error {
+	if err := stmts.CreateBranding(ctx, entity); err != nil {
+		return err
+	}
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeBrandingCreated,
+		Category:   domain.EventCategoryAdmin,
+		ProjectID:  entity.ProjectID,
+		EntityType: "branding",
+		EntityID:   entity.ID,
+		Payload: domain.BrandingPayload{
+			Layout:  entity.Layout,
+			LogoURL: entity.LogoURL,
+			FontURL: entity.Typography.FontURL,
+			HeroURL: entity.HeroURL,
+		},
+	})
+}
+
+// resolveOrCreateBranding reuses any existing branding revision whose content
+// matches (preferring the newest match), otherwise inserts the prepared revision.
+func (s *BrandingService) resolveOrCreateBranding(
+	ctx context.Context,
+	stmts AllStatements,
+	projectID string,
+	prepared *domain.Branding,
+) (*domain.Branding, error) {
+	match, err := matchingBranding(ctx, stmts, projectID, prepared)
+	if err != nil {
+		return nil, err
+	}
+	if match != nil {
+		return match, nil
+	}
+	if err := s.createBranding(ctx, stmts, prepared); err != nil {
+		return nil, err
+	}
+	return prepared, nil
+}
+
+// matchingBranding returns the newest revision whose content equals want, or
+// nil when none match. Scanning history lets Build reuse an older revision
+// when the newest has diverged (A→B→A content-hash reuse).
+func matchingBranding(ctx context.Context, stmts AllStatements, projectID string, want *domain.Branding) (*domain.Branding, error) {
+	result, err := stmts.ListBrandings(WithAuthzListUnrestricted(ctx), branding.ListOptions(projectID, maxHistoricalRevisions))
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to list branding")
+	}
+	for _, item := range result.Items {
+		if want.Equal(item) {
+			return item, nil
+		}
+	}
+	return nil, nil
+}
+
+func latestBranding(ctx context.Context, stmts AllStatements, projectID string) (*domain.Branding, error) {
+	result, err := stmts.ListBrandings(WithAuthzListUnrestricted(ctx), branding.ListOptions(projectID, 1))
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to list branding")
+	}
+	if len(result.Items) == 0 {
+		return nil, nil
+	}
+	return result.Items[0], nil
+}
+
 // Get returns a single revision by id.
-func (s *BrandingService) Get(ctx context.Context, projectID, id string) (*domain.Branding, error) {
+func (s *BrandingService) Get(ctx context.Context, projectID, id string) (_ *domain.Branding, err error) {
+	ctx, end := startSpan(ctx, "BrandingService.Get")
+	defer end(&err)
+
 	entity, err := s.v2Pool.Statements().GetBrandingByID(ctx, projectID, id)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -97,7 +160,10 @@ func (s *BrandingService) Get(ctx context.Context, projectID, id string) (*domai
 
 // GetLatest returns the newest revision for the project, or nil (no error)
 // when the project has none — callers fall back to built-in defaults.
-func (s *BrandingService) GetLatest(ctx context.Context, projectID string) (*domain.Branding, error) {
+func (s *BrandingService) GetLatest(ctx context.Context, projectID string) (_ *domain.Branding, err error) {
+	ctx, end := startSpan(ctx, "BrandingService.GetLatest")
+	defer end(&err)
+
 	result, err := s.v2Pool.Statements().ListBrandings(WithAuthzListUnrestricted(ctx), branding.ListOptions(projectID, 1))
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to resolve latest branding revision")
@@ -116,7 +182,10 @@ const maxBrandingListRevisions = 100
 
 // List returns the newest revisions for the project, newest first, capped at
 // maxBrandingListRevisions.
-func (s *BrandingService) List(ctx context.Context, projectID string) ([]*domain.Branding, error) {
+func (s *BrandingService) List(ctx context.Context, projectID string) (_ []*domain.Branding, err error) {
+	ctx, end := startSpan(ctx, "BrandingService.List")
+	defer end(&err)
+
 	result, err := s.v2Pool.Statements().ListBrandings(ctx, branding.ListOptions(projectID, maxBrandingListRevisions))
 	if err != nil {
 		return nil, mapListError(err, "failed to list branding revisions")

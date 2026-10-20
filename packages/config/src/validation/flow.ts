@@ -74,12 +74,14 @@ const DECLARABLE_ACTION_KINDS = new Set(["submit", "passkey", "passkey_register"
 
 /**
  * Action names the engine claims, with the reason the validator reports.
- * Mirrors `flowBackActionName` and `FlowActionSSO` in flow_state_machine.go.
+ * Mirrors `flowBackActionName` and `FlowActionSSO` in flow_state_machine.go,
+ * and `reservedOutcomes` in flow_definition_validator.go.
  * A Map, not an object, so a name like `constructor` cannot match by accident.
  */
-const RESERVED_ACTION_NAMES = new Map([
+const RESERVED_ACTION_NAMES = new Map<string, string>([
   ["back", "engine-injected back navigation"],
   ["sso", "sso submissions"],
+  ...RESERVED_OUTCOMES.map((outcome): [string, string] => [outcome, "flow outcomes"]),
 ]);
 
 /** Mirrors `authMethodPrefix` in flow_definition.go. */

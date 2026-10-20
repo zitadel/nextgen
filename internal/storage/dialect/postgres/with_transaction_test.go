@@ -118,3 +118,46 @@ func TestWithTransaction_beginnerRollsBackOnError(t *testing.T) {
 	assert.True(t, inner.rolledBack)
 	assert.Equal(t, 1, inner.execs)
 }
+
+func TestWithTransaction_tracedBeginnerCommitsOnSuccess(t *testing.T) {
+	t.Parallel()
+	inner := &stubTx{}
+	client := traced(&stubBeginner{tx: inner})
+	require.Equal(t, client, traced(client), "traced must not wrap twice")
+	err := withTransaction(t.Context(), client, func(ctx context.Context, tx queryExecutor) error {
+		require.IsType(t, tracedExecutor{}, tx)
+		assert.Same(t, inner, untraced(tx))
+		_, err := tx.Exec(ctx, "UPDATE")
+		return err
+	})
+	require.NoError(t, err)
+	assert.True(t, inner.committed)
+	assert.False(t, inner.rolledBack)
+	assert.Equal(t, 1, inner.execs)
+}
+
+func TestWithTransaction_tracedBeginnerRollsBackOnError(t *testing.T) {
+	t.Parallel()
+	inner := &stubTx{}
+	want := errors.New("boom")
+	err := withTransaction(t.Context(), traced(&stubBeginner{tx: inner}), func(ctx context.Context, tx queryExecutor) error {
+		_, _ = tx.Exec(ctx, "UPDATE")
+		return want
+	})
+	require.ErrorIs(t, err, want)
+	assert.False(t, inner.committed)
+	assert.True(t, inner.rolledBack)
+}
+
+func TestWithTransaction_tracedNonBeginnerRunsDirectly(t *testing.T) {
+	t.Parallel()
+	exec := &stubExecutor{}
+	client := traced(exec)
+	err := withTransaction(t.Context(), client, func(ctx context.Context, tx queryExecutor) error {
+		assert.Equal(t, client, tx)
+		_, err := tx.Exec(ctx, "UPDATE")
+		return err
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 1, exec.execs)
+}

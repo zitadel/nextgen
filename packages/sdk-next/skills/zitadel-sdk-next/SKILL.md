@@ -161,7 +161,12 @@ Confirm names against those before writing code.
   unmatched public page always looks signed out — use `getSession()` there.
 - **A rejected `getSession()` means *unknown*, not signed out** (broken proxy /
   network / 5xx). Render a neutral or error state, never the signed-out CTA.
-- **Config handles:** `ZITADEL_URL` (backend, server-side) and
-  `NEXT_PUBLIC_ZITADEL_PROJECT_ID` (passed to `configureZitadel`). If the
-  middleware runs with custom verification options, pass the same ones to
-  `auth()` so both layers accept the same tokens.
+- **Config handles:** `ZITADEL_URL` (backend, server-side),
+  `ZITADEL_PROJECT_ID` (server-side) and `NEXT_PUBLIC_ZITADEL_PROJECT_ID`
+  (passed to `configureZitadel`). If the middleware runs with custom
+  verification options, pass the same ones to `auth()` so both layers accept
+  the same tokens.
+- **Sessions count only in the app's own project:** `projectId`, else
+  `ZITADEL_PROJECT_ID`, else `NEXT_PUBLIC_ZITADEL_PROJECT_ID`. With none set,
+  nobody is signed in. A session of another project on the same host reads as
+  signed out.
