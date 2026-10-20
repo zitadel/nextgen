@@ -482,6 +482,7 @@ describe("widget loading ↔ SDK packages", () => {
     "sdk-react",
     "sdk-solid",
     "sdk-svelte",
+    "sdk-tanstack-start",
     "sdk-vue",
   ];
 
@@ -718,18 +719,11 @@ describe("client SDK entries ↔ @zitadel/components", () => {
     ["sdk-qwik", "sdk-qwik/src/index.tsx"],
     ["sdk-next", "sdk-next/src/client.ts"],
     ["sdk-nuxt", "sdk-nuxt/src/index.ts"],
+    ["sdk-tanstack-start", "sdk-tanstack-start/src/react.tsx"],
   ];
 
   it.each(ENTRIES)("%s registers the elements and re-exports no element class", (_sdk, path) => {
     expect(entryProblems(readFileSync(`${packagesDir}${path}`, "utf8"))).toEqual([]);
-  });
-
-  // The TanStack Start widgets are sdk-react's, and the package has no direct
-  // dependency on the components, so it takes the locales from sdk-react.
-  it("sdk-tanstack-start takes the locales from sdk-react and exports no element class", () => {
-    const source = readFileSync(`${packagesDir}sdk-tanstack-start/src/react.tsx`, "utf8");
-    expect(source).toContain('export { businessLocales } from "@zitadel/sdk-react";');
-    expect(source.match(EXPORTS_FROM_COMPONENTS)).toBeNull();
   });
 
   describe("the guard", () => {

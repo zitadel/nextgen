@@ -24,8 +24,13 @@ import {
   ZitadelSession as ReactZitadelSession,
 } from "@zitadel/sdk-react";
 import * as React from "react";
+// Registers <zitadel-login>, <zitadel-logout> and <zitadel-session> in the browser.
+// The edge build of the components package has no elements, so this does nothing there.
+import "@zitadel/components";
 
-export { businessLocales } from "@zitadel/sdk-react";
+// Re-exported so scaffolded apps can wire the business copy overlay without a
+// direct @zitadel/components dependency (strict package managers reject those).
+export { businessLocales } from "@zitadel/components";
 // Every type `@zitadel/sdk-react` exports. A TanStack Start app installs only
 // this package, so under a strict package manager it cannot import
 // `@zitadel/sdk-react` to type a widget callback.

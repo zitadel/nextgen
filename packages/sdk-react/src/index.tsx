@@ -74,6 +74,14 @@ type ElementClass<Tag extends WidgetTag> = {
 };
 
 /**
+ * The one boundary: `createComponent` types its class as a constructor but only
+ * reads `name` and `prototype`; a predicate narrows the stand-in without a cast.
+ */
+function isElementClass<Tag extends WidgetTag>(value: object): value is ElementClass<Tag> {
+  return "name" in value && "prototype" in value;
+}
+
+/**
  * `createComponent` binds every key found on the element's prototype as a DOM
  * property, and a property is never written into server markup. The widget
  * starts its first flow when it upgrades, before React hydrates, so the keys
@@ -112,7 +120,9 @@ function asAttributes<Tag extends WidgetTag>(
       },
     },
   );
-  return { name: tag, prototype } as unknown as ElementClass<Tag>;
+  const elementClass = { name: tag, prototype };
+  if (!isElementClass<Tag>(elementClass)) throw new Error(`${tag} has no element class`);
+  return elementClass;
 }
 
 /**
