@@ -301,11 +301,9 @@ func TestPatchUserMigration(t *testing.T) {
 	}
 
 	// Moving a user to a schema of another object type is not a revision
-	// change, but nothing refuses it today: the target only has to accept the
-	// resulting attributes. #1507 §4 ("Restrict unsupported migrations")
-	// narrows what a migration may change; when that lands this case flips to
-	// the refusal it decides on.
-	t.Run("another object type is not refused", func(t *testing.T) {
+	// change, so it is refused even though the target would accept the
+	// attributes (#1507 §4, "Restrict unsupported migrations").
+	t.Run("another object type is refused", func(t *testing.T) {
 		t.Parallel()
 
 		properties := map[string]any{
@@ -315,7 +313,22 @@ func TestPatchUserMigration(t *testing.T) {
 		to := createRevision(t, "migration-cross-type-to", 1, properties)
 		userID := createUser(t, from, map[string]any{"givenName": "Ada"})
 
-		assertUser(t, patch(t, userID, to, nil), userID, to, map[string]any{"givenName": "Ada"})
+		resp := patch(t, userID, to, nil)
+		require.IsType(t, &api.PatchUserByIDBadRequest{}, resp, helpers.MustMarshal(t, resp))
+		invalid := resp.(*api.PatchUserByIDBadRequest)
+		assert.Equal(t, api.ErrorCode(domain.ErrUserInvalid().Code), invalid.Code)
+		assert.JSONEq(t, `{
+			"schema": "`+to+`",
+			"object_type": "migration-cross-type-to",
+			"current_schema": "`+from+`",
+			"current_object_type": "migration-cross-type-from"
+		}`, string(invalid.Details.Value["details"]))
+
+		got, err := client.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: userID})
+		require.NoError(t, err)
+		require.IsType(t, &api.User{}, got, helpers.MustMarshal(t, got))
+		assert.Equal(t, from, got.(*api.User).Schema, "the user stays on its schema")
+		assert.JSONEq(t, `{"givenName": "Ada"}`, helpers.MustMarshal(t, got.(*api.User).Attributes))
 	})
 }
 

@@ -703,6 +703,103 @@ func TestPatchUser(t *testing.T) {
 		assert.IsType(t, &api.PatchUserByIDBadRequest{}, resp, helpers.MustMarshal(t, resp))
 	})
 
+	// Two revisions of one logical schema: v2 drops nickname and requires
+	// country. Both are closed, so a value the target does not declare must be
+	// removed by the patch.
+	revisionSchema := func(revision string, properties, required string) string {
+		return `{
+			"title": "PatchRevisionsSchema",
+			"metaSchema": "https://test.example.schemas.com/schemas/user-schema.json",
+			"$id": "https://patch-revisions.example.com/schemas/` + revision + `.json",
+			"kind": "user-schema",
+			"objectType": "patch-revisions-user",
+			"type": "object",
+			"additionalProperties": false,
+			"x-identifier": "email",
+			"x-auth-methods": {"password": {"enabled": true}},
+			"required": ` + required + `,
+			"properties": {
+				"email": {"type": "string", "format": "email", "x-unique": "project"},
+				` + properties + `
+			}
+		}`
+	}
+	revisionV1 := harness.CreateUserSchema(t, project, revisionSchema("v1",
+		`"nickname": {"type": "string"}`, `["email"]`))
+	revisionV2 := harness.CreateUserSchema(t, project, revisionSchema("v2",
+		`"country": {"type": "string"}`, `["email", "country"]`))
+
+	createRevisionUser := func(t *testing.T, email string) *domain.User {
+		t.Helper()
+		user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+			ProjectID:  project.ID,
+			SchemaURL:  revisionV1,
+			Attributes: map[string]any{"email": email, "nickname": "Nick"},
+		})
+		require.NoError(t, err)
+		return user
+	}
+	getUser := func(t *testing.T, userID string) *api.User {
+		t.Helper()
+		resp, err := client.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(userID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
+		return resp.(*api.User)
+	}
+	requireUserInvalid := func(t *testing.T, resp api.PatchUserByIDRes) {
+		t.Helper()
+		require.IsType(t, &api.PatchUserByIDBadRequest{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode(domain.ErrUserInvalid().Code), resp.(*api.PatchUserByIDBadRequest).Code)
+	}
+
+	t.Run("an older revision is validated like a newer one", func(t *testing.T) {
+		t.Parallel()
+		user := createRevisionUser(t, "testpatchuser.olderrevision@example.com")
+		params := api.PatchUserByIDParams{UserID: api.UserID(user.ID)}
+
+		// Forward: v2 requires country and does not declare nickname.
+		resp, err := client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+			"schema": revisionV2,
+		}), params)
+		require.NoError(t, err)
+		requireUserInvalid(t, resp)
+		unchanged := getUser(t, user.ID)
+		assert.Equal(t, revisionV1, unchanged.Schema)
+		assert.Equal(t, "Nick", userProp(t, *unchanged, "nickname"))
+
+		resp, err = client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+			"schema":     revisionV2,
+			"attributes": map[string]any{"country": "CH", "nickname": nil},
+		}), params)
+		require.NoError(t, err)
+		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, revisionV2, resp.(*api.User).Schema)
+
+		// Backward: v1 does not declare country, so the same validation
+		// refuses keeping it, and the user is left unchanged.
+		resp, err = client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+			"schema": revisionV1,
+		}), params)
+		require.NoError(t, err)
+		requireUserInvalid(t, resp)
+		unchanged = getUser(t, user.ID)
+		assert.Equal(t, revisionV2, unchanged.Schema)
+		assert.Equal(t, "CH", userProp(t, *unchanged, "country"))
+
+		resp, err = client.PatchUserByID(t.Context(), patchUserRequest(t, map[string]any{
+			"schema":     revisionV1,
+			"attributes": map[string]any{"country": nil},
+		}), params)
+		require.NoError(t, err)
+		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
+		moved := resp.(*api.User)
+		assert.Equal(t, revisionV1, moved.Schema)
+		_, hasCountry := moved.Attributes["country"]
+		assert.False(t, hasCountry)
+		_, hasNickname := moved.Attributes["nickname"]
+		assert.False(t, hasNickname, "v1 declares nickname, but the value removed by the forward move stays removed")
+	})
+
 	t.Run("duplicate mail address", func(t *testing.T) {
 		t.Parallel()
 		createUser(t, "testpatchuser.taken@example.com")

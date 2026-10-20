@@ -392,6 +392,58 @@ func TestNewPatchUser(t *testing.T) {
 	})
 }
 
+func TestCheckUserSchemaMigration(t *testing.T) {
+	t.Parallel()
+
+	schema := func(url string, objectType *string) *domain.JSONSchema {
+		return &domain.JSONSchema{ProjectID: "proj_1", URL: url, ObjectType: objectType}
+	}
+	humanV1 := schema("https://example.test/human/v1.json", new("human-user"))
+	humanV2 := schema("https://example.test/human/v2.json", new("human-user"))
+	machine := schema("https://example.test/machine.json", new("machine-user"))
+	fetched := schema("https://example.test/fetched.json", nil)
+
+	t.Run("a revision of the same objectType passes in either direction", func(t *testing.T) {
+		t.Parallel()
+		assert.NoError(t, domain.CheckUserSchemaMigration(humanV1, humanV2))
+		assert.NoError(t, domain.CheckUserSchemaMigration(humanV2, humanV1))
+	})
+
+	t.Run("another objectType is refused and both are named", func(t *testing.T) {
+		t.Parallel()
+		err := domain.CheckUserSchemaMigration(humanV1, machine)
+		require.ErrorIs(t, err, domain.ErrUserInvalid())
+
+		var de domain.Error
+		require.ErrorAs(t, err, &de)
+		assert.Equal(t, map[string]string{
+			"schema":              "https://example.test/machine.json",
+			"object_type":         "machine-user",
+			"current_schema":      "https://example.test/human/v1.json",
+			"current_object_type": "human-user",
+		}, de.Details)
+	})
+
+	// Without an objectType there is nothing to group revisions by, so such a
+	// schema is a revision of nothing but itself.
+	t.Run("a schema without objectType is refused on either side", func(t *testing.T) {
+		t.Parallel()
+		require.ErrorIs(t, domain.CheckUserSchemaMigration(fetched, humanV1), domain.ErrUserInvalid())
+		require.ErrorIs(t, domain.CheckUserSchemaMigration(humanV1, fetched), domain.ErrUserInvalid())
+		require.ErrorIs(t, domain.CheckUserSchemaMigration(fetched, schema("https://example.test/other.json", nil)), domain.ErrUserInvalid())
+	})
+
+	// The meta-schema accepts an empty objectType, which groups nothing either.
+	t.Run("an empty objectType is no shared logical schema", func(t *testing.T) {
+		t.Parallel()
+		err := domain.CheckUserSchemaMigration(
+			schema("https://example.test/empty-a.json", new("")),
+			schema("https://example.test/empty-b.json", new("")),
+		)
+		require.ErrorIs(t, err, domain.ErrUserInvalid())
+	})
+}
+
 // A user is stored as its attribute rows, so an empty document is refused at
 // the domain rather than reaching the dialects' identical guard, which would
 // answer 500. All-optional schemas make it a document the schema accepts.
