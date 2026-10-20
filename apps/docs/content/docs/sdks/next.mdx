@@ -77,6 +77,18 @@ The Next.js SDK wires App Router applications through one server-side middleware
   </Tab>
 </Tabs>
 
+## Change the dev port
+
+The project allows one origin, `http://localhost:<port>`, so setup pins the `dev` script to that port: `next dev --port 3000`. When the port is taken, `next dev` exits with `EADDRINUSE` instead of moving to another port the project does not allow. To run the app on another port, run setup again in the app with the port you want:
+
+```sh
+npx @zitadel/cli@alpha setup --dev-port 3101
+```
+
+It allows the new origin on the server, then moves the `dev` script, `ZITADEL_ISSUER` in `.env.local` and `zitadel.json` to the new port. If the server refuses, nothing changes. Restart the dev server and open `http://localhost:3101/login`. A social sign-in provider has the redirect URI registered with the old port: the command prints the new one to add at the provider.
+
+Don't change the port in only one of these places. Starting the app with `PORT=3101` or `npm run dev -- --port 3101` leaves `ZITADEL_ISSUER` and the allowed origin on the old port, and sign-in breaks.
+
 ## Runtime model
 
 <Steps>

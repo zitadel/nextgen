@@ -202,6 +202,18 @@ export interface Patcher {
    * edited or user-adopted — are never overwritten.
    */
   repair(ctx: PatchContext, opts: PatchExecOptions): Promise<PatchResult>;
+  /**
+   * Move an integrated app from `previousIssuer` to `ctx.issuer`: re-pin the
+   * dev server's port and rewrite every file that names the old origin
+   * (`.env.local`, `zitadel.json`, the README and AGENTS.md guidance). Backs
+   * `setup --dev-port` on an app setup already patched. Never touches the
+   * platform.
+   */
+  moveDevPort(
+    ctx: PatchContext,
+    previousIssuer: string,
+    opts: PatchExecOptions,
+  ): Promise<PatchResult>;
   /** Describe the files/dirs this integration owns, for marker-aware ejection. */
   artifacts(view: PatchView): EjectActions;
   /**

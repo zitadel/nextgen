@@ -352,6 +352,20 @@ auth flow in a visible browser by registering a unique user, logging out, loggin
 back in with the same email/password, and ending on the signed-in profile page.
 Do not treat a rendered login or registration form as completion.
 
+To move a set-up app to another dev port (the dev server exits with
+`EADDRINUSE`, or another app needs the port), run `setup --dev-port <port>` in
+the app; never change the port in one file by hand. In a directory with a
+`zitadel.json`, `setup` returns `status: "skipped"` with `reason:
+"already-initialized"`, unless `--dev-port` is given: then it moves the app.
+It allows the new origin on the server first, and a refusal changes nothing.
+It then rewrites the dev script or dev-server config, `ZITADEL_ISSUER` in
+`.env.local`, `zitadel.json`, `.zitadel/secret` and the README/AGENTS.md
+guidance, and removes the old origin. `data.previous_issuer` and `data.issuer`
+name both origins, and `data.moved` is `false` when the app was already on that
+port. A social sign-in provider still redirects to the old port: `warnings`
+names the redirect URI to add at each provider. Restart the dev server
+afterwards.
+
 To change how users sign in after setup, use the `auth-method` commands. Each
 sign-in method has its own command, with `--schema` when the project has more
 than one:

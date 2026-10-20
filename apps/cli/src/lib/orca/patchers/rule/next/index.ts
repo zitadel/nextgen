@@ -79,6 +79,10 @@ export class NextPatcher extends AbstractRulePatcher {
     }
   }
 
+  protected devPortOps(ctx: PatchContext): FileOp[] {
+    return [devScriptPortOp(ctx.issuer)];
+  }
+
   protected routeOps(ctx: PatchContext): FileOp[] {
     return nextCodeOps(ctx, getRenderer(ctx.rendererId));
   }
