@@ -512,7 +512,10 @@ func sideOf(reason ssoevent.Reason) string {
 }
 
 // RecordSSOFailure implements [AuthAttemptService].
-func (s *authAttemptService) RecordSSOFailure(ctx context.Context, in domain.FlowSSOFailureInput) error {
+func (s *authAttemptService) RecordSSOFailure(ctx context.Context, in domain.FlowSSOFailureInput) (err error) {
+	ctx, end := startSpan(ctx, "AuthAttemptService.RecordSSOFailure")
+	defer end(&err)
+
 	return s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		// The session the event carries lives on the attempt.
 		attempt, err := tx.Statements().GetAuthAttemptByID(ctx, in.ProjectID, in.AttemptID)
