@@ -3,6 +3,11 @@ import { format } from "node:util";
 
 import { run } from "@oclif/core";
 
+import {
+  _setProcessTableForTesting,
+  type ProcessRow,
+  type ProcessTable,
+} from "../../src/lib/local-server/process-table";
 import { publicCliCommand } from "../../src/lib/public-cli";
 import { cliPackageRoot } from "./oclif-build";
 
@@ -17,11 +22,16 @@ const cliVersion = JSON.parse(
  * `run*` functions to stdout exactly as in production. Requires the CLI to have
  * been built (vitest global setup builds `dist/index.mjs`). `root` is the
  * package oclif loads; pass a staged copy to exercise a published layout.
+ *
+ * The run never reads the host's processes: the commands see `processes` as the
+ * machine's whole process table, empty unless a test gives rows. A running
+ * Zitadel on the developer's machine therefore changes no result.
  */
 export async function runCliForTest(
   argv: string[],
   env: NodeJS.ProcessEnv = {},
   root: string = cliPackageRoot,
+  processes: ReadonlyArray<ProcessRow> = [],
 ) {
   let stdout = "";
   let stderr = "";
@@ -32,6 +42,7 @@ export async function runCliForTest(
   const overlaid = Object.keys(env);
   const previous = new Map(overlaid.map((key) => [key, process.env[key]]));
   Object.assign(process.env, env);
+  _setProcessTableForTesting(aProcessTable(processes));
 
   // Capture both direct stream writes (e.g. consola) and oclif's `ux.stdout`/
   // `ux.stderr`, which go through `console.log`/`console.error`.
@@ -60,6 +71,7 @@ export async function runCliForTest(
     process.stderr.write = originalErr;
     console.log = originalLog;
     console.error = originalConsoleError;
+    _setProcessTableForTesting(undefined);
     for (const key of overlaid) {
       const prior = previous.get(key);
       if (prior === undefined) {
@@ -71,6 +83,15 @@ export async function runCliForTest(
   }
 
   return { exitCode, stdout, stderr };
+}
+
+/** A process table holding exactly the rows given. */
+function aProcessTable(rows: ReadonlyArray<ProcessRow>): ProcessTable {
+  return {
+    list: () => Promise.resolve(rows),
+    commandOf: (pid, fallback) =>
+      Promise.resolve(rows.find((row) => row.pid === pid)?.command ?? fallback),
+  };
 }
 
 function exitCodeOf(error: unknown): number {

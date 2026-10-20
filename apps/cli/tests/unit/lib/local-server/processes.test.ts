@@ -8,6 +8,7 @@ vi.mock("node:child_process", () => ({
 
 const mockExecFile = vi.mocked(execFile);
 
+import { _setProcessTableForTesting } from "../../../../src/lib/local-server/process-table";
 import { discoverManagedRuntimeProcesses } from "../../../../src/lib/local-server/processes";
 
 function whenPs(
@@ -30,6 +31,7 @@ function whenPs(
 
 beforeEach(() => {
   mockExecFile.mockReset();
+  _setProcessTableForTesting(undefined);
 });
 
 describe("discoverManagedRuntimeProcesses", () => {
@@ -106,6 +108,43 @@ describe("discoverManagedRuntimeProcesses", () => {
     await expect(discoverManagedRuntimeProcesses()).resolves.toMatchObject({
       supported: false,
       processes: [],
+    });
+  });
+
+  describe("given a process table of its own", () => {
+    it("reads that table and never runs ps", async () => {
+      mockExecFile.mockImplementation(() => {
+        throw new Error("the host's process table was read");
+      });
+      _setProcessTableForTesting({
+        list: () =>
+          Promise.resolve([
+            {
+              pid: 7,
+              ppid: 1,
+              command: "node /tmp/app/node_modules/@zitadel/server/bin/zitadel-server.js",
+            },
+          ]),
+        commandOf: (_pid, fallback) => Promise.resolve(fallback),
+      });
+
+      const discovery = await discoverManagedRuntimeProcesses();
+
+      expect(discovery).toMatchObject({ supported: true, processes: [{ pid: 7 }] });
+      expect(mockExecFile).not.toHaveBeenCalled();
+    });
+
+    it("reports discovery unsupported when the table cannot be read", async () => {
+      _setProcessTableForTesting({
+        list: () => Promise.reject(new Error("table unreadable")),
+        commandOf: (_pid, fallback) => Promise.resolve(fallback),
+      });
+
+      await expect(discoverManagedRuntimeProcesses()).resolves.toEqual({
+        supported: false,
+        processes: [],
+        error: "table unreadable",
+      });
     });
   });
 });

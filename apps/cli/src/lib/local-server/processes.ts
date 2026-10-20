@@ -1,6 +1,8 @@
 import { execFile } from "node:child_process";
 import { basename } from "node:path";
 
+import { installedProcessTable, type ProcessRow, type ProcessTable } from "./process-table";
+
 export type ManagedRuntimeProcess = Readonly<{
   command: string;
   data_dir?: string;
@@ -15,11 +17,13 @@ export type ManagedRuntimeDiscovery = Readonly<{
   supported: boolean;
 }>;
 
-type ProcessRow = Readonly<{
-  command: string;
-  pid: number;
-  ppid?: number;
-}>;
+/** The real table: `ps`. The only reader of the host's processes. */
+export const psProcessTable: ProcessTable = {
+  async list(timeoutMs) {
+    return parsePsRows(await runPs(["axo", "pid=,ppid=,command="], timeoutMs));
+  },
+  commandOf: hydrateCommand,
+};
 
 export async function discoverManagedRuntimeProcesses(opts?: {
   readonly timeoutMs?: number;
@@ -28,9 +32,11 @@ export async function discoverManagedRuntimeProcesses(opts?: {
     return { supported: false, processes: [], error: "process sweep is not available on Windows" };
   }
 
+  const table = installedProcessTable() ?? psProcessTable;
+  const timeoutMs = opts?.timeoutMs ?? 1000;
   let rows: ReadonlyArray<ProcessRow>;
   try {
-    rows = parsePsRows(await runPs(["axo", "pid=,ppid=,command="], opts?.timeoutMs ?? 1000));
+    rows = await table.list(timeoutMs);
   } catch (error) {
     return { supported: false, processes: [], error: errorMessage(error) };
   }
@@ -39,7 +45,7 @@ export async function discoverManagedRuntimeProcesses(opts?: {
   const hydrated = await Promise.all(
     candidates.map(async (row) => ({
       ...row,
-      command: await hydrateCommand(row.pid, row.command, opts?.timeoutMs ?? 1000),
+      command: await table.commandOf(row.pid, row.command, timeoutMs),
     })),
   );
   const processes = hydrated

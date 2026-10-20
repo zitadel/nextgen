@@ -603,7 +603,6 @@ async function fakeDocker(): Promise<{ binDir: string; logPath: string }> {
   tempDirs.push(binDir);
   const logPath = join(binDir, "docker.log");
   const dockerPath = join(binDir, "docker");
-  const psPath = join(binDir, "ps");
   await writeFile(
     dockerPath,
     `#!/usr/bin/env node
@@ -622,8 +621,6 @@ process.exit(0);
 `,
   );
   await chmod(dockerPath, 0o755);
-  await writeFile(psPath, "#!/usr/bin/env node\nprocess.exit(0);\n");
-  await chmod(psPath, 0o755);
   return { binDir, logPath };
 }
 
@@ -643,6 +640,83 @@ async function startHealthServer(): Promise<string> {
   }
   return `http://127.0.0.1:${String(address.port)}`;
 }
+
+describe("doctor's managed runtime process check", () => {
+  const HOST_WIDE_SERVER = {
+    pid: 999_991,
+    ppid: 1,
+    command: "/usr/local/bin/node /tmp/app/node_modules/@zitadel/server/bin/zitadel-server.js",
+  };
+
+  /** A `ps` that fails, so a doctor that reads the host's table cannot find it supported. */
+  async function failingPs(): Promise<string> {
+    const binDir = await mkdtemp(join(tmpdir(), "zitadel-failing-ps-"));
+    tempDirs.push(binDir);
+    await writeFile(join(binDir, "ps"), "#!/usr/bin/env node\nprocess.exit(1);\n");
+    await chmod(join(binDir, "ps"), 0o755);
+    return binDir;
+  }
+
+  async function doctorSeeing(processes: Parameters<typeof runCliForTest>[3]) {
+    const cwd = await makeHealthyProject();
+    const fake = await fakeDocker();
+    const res = await runCliForTest(
+      [
+        "doctor",
+        "--cwd",
+        cwd,
+        "--json",
+        "--port",
+        String(nextPort()),
+        "--server",
+        "https://api.zitadel.cloud",
+      ],
+      {
+        PATH: `${await failingPs()}:${fake.binDir}:${process.env.PATH ?? ""}`,
+        DOCKER_LOG: fake.logPath,
+      },
+      undefined,
+      processes,
+    );
+    return parseJson(res.stdout);
+  }
+
+  it("reports the managed processes of the table it is given", async () => {
+    const json = await doctorSeeing([HOST_WIDE_SERVER]);
+
+    expect(json).toMatchObject({
+      data: {
+        checks: expect.arrayContaining([
+          expect.objectContaining({
+            name: "managed-runtime-processes",
+            status: "warn",
+            details: {
+              supported: true,
+              scope: "host",
+              processes: [expect.objectContaining({ pid: 999_991 })],
+            },
+          }),
+        ]),
+      },
+    });
+  });
+
+  it("reports none for an empty table, whatever the host runs", async () => {
+    const json = await doctorSeeing([]);
+
+    expect(json).toMatchObject({
+      data: {
+        checks: expect.arrayContaining([
+          expect.objectContaining({
+            name: "managed-runtime-processes",
+            status: "pass",
+            details: { supported: true, scope: "host", processes: [] },
+          }),
+        ]),
+      },
+    });
+  });
+});
 
 describe("failureAdvice for a runtime found in a parent directory", () => {
   const failed = [{ name: "runtime", status: "fail" as const, message: "not healthy" }];
