@@ -437,6 +437,20 @@ export function createMockApp(options: { issuer: string }): express.Express {
       res.status(401).json(errorBody("auth.unauthorized", "Missing or invalid session token."));
       return;
     }
+    // ADR 053 §5: sign-out is a cookie-authenticated write, so it carries the
+    // session's CSRF token. Checked before the project hold, in the same order
+    // as the Go server's security handler.
+    if (req.get("x-zitadel-csrf") !== csrfTokenFor(found.token)) {
+      res
+        .status(403)
+        .json(
+          errorBody(
+            "auth.csrf_invalid",
+            "The request failed cross-site request forgery validation.",
+          ),
+        );
+      return;
+    }
     if (refuseForProject(req, res, found.session)) return;
     sessionStore.delete(found.token);
     res.setHeader("Set-Cookie", [

@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	internalapi "github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
 )
@@ -271,6 +272,11 @@ func TestMySession_HoldsTheSessionToTheNamedProject(t *testing.T) {
 		req, err := http.NewRequestWithContext(t.Context(), method, target, nil)
 		require.NoError(t, err)
 		req.AddCookie(sessionCookie)
+		if method == http.MethodDelete {
+			// Sign-out is a write: the project hold is checked once the
+			// session's CSRF token has passed (ADR 053 §5).
+			req.Header.Set(internalapi.CSRFHeader, internalapi.CSRFToken(sessionCookie.Value))
+		}
 		resp, err := testServer.Client().Do(req)
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = resp.Body.Close() })

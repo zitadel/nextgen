@@ -119,6 +119,8 @@ func TestMySessionHoldsTheSessionToTheNamedProject(t *testing.T) {
 
 				req := httptest.NewRequest(op.method, op.path+tc.query, nil)
 				req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "cookie"})
+				// Sign-out is a write: the hold is checked once the token passed.
+				req.Header.Set(CSRFHeader, CSRFToken("cookie"))
 				rec := httptest.NewRecorder()
 				WithCSRFRequest(srv).ServeHTTP(rec, req)
 

@@ -929,9 +929,10 @@ type Invoker interface {
 	//
 	// Logs out by permanently deleting the session.
 	// The `__nextgen_session` cookie issued at creation (or superseded by a handoff
-	// exchange) is required. Idempotent: if the session is already gone this still
-	// returns 204. Any tokens derived from the session are invalidated, and the
-	// cookie itself is cleared in the response.
+	// exchange) is required, with the session's token from `GET /sessions/me/csrf`
+	// in the `X-Zitadel-CSRF` header. Idempotent: if the session is already gone
+	// this still returns 204. Any tokens derived from the session are invalidated,
+	// and the cookie itself is cleared in the response.
 	// With `project_id`, only a session of that project is deleted. A session of
 	// another project is left alone, and so is its cookie.
 	//
@@ -13096,9 +13097,10 @@ func (c *Client) sendRemovePreview(ctx context.Context, request *RemovePreviewRe
 //
 // Logs out by permanently deleting the session.
 // The `__nextgen_session` cookie issued at creation (or superseded by a handoff
-// exchange) is required. Idempotent: if the session is already gone this still
-// returns 204. Any tokens derived from the session are invalidated, and the
-// cookie itself is cleared in the response.
+// exchange) is required, with the session's token from `GET /sessions/me/csrf`
+// in the `X-Zitadel-CSRF` header. Idempotent: if the session is already gone
+// this still returns 204. Any tokens derived from the session are invalidated,
+// and the cookie itself is cleared in the response.
 // With `project_id`, only a session of that project is deleted. A session of
 // another project is left alone, and so is its cookie.
 //
