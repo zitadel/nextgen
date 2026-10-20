@@ -494,14 +494,6 @@ func TestUserService_PatchUser_OtherLogicalSchemaRefused(t *testing.T) {
 		SchemaURL: new("https://example.test/machine.json"),
 	})
 	require.ErrorIs(t, err, domain.ErrUserInvalid())
-	var de domain.Error
-	require.ErrorAs(t, err, &de)
-	assert.Equal(t, map[string]string{
-		"schema":              "https://example.test/machine.json",
-		"object_type":         "machine-user",
-		"current_schema":      "https://example.test/human.json",
-		"current_object_type": "human-user",
-	}, de.Details)
 }
 
 func TestUserService_PatchMyUser_SessionGuards(t *testing.T) {

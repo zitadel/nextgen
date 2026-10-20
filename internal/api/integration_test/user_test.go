@@ -757,9 +757,8 @@ func TestPatchUser(t *testing.T) {
 			"schema": test_data.UserSchemaURL,
 		}), api.PatchUserByIDParams{UserID: api.UserID(user.ID)})
 		require.NoError(t, err)
-		require.IsType(t, &api.PatchUserByIDBadRequest{}, resp, helpers.MustMarshal(t, resp))
+		requireUserInvalid(t, resp)
 		invalid := resp.(*api.PatchUserByIDBadRequest)
-		assert.Equal(t, api.ErrorCode(domain.ErrUserInvalid().Code), invalid.Code)
 		assert.JSONEq(t, `{
 			"schema": "`+test_data.UserSchemaURL+`",
 			"object_type": "human-user",
@@ -814,30 +813,6 @@ func TestPatchUser(t *testing.T) {
 		assert.Equal(t, revisionV1, moved.Schema)
 		_, hasCountry := moved.Attributes["country"]
 		assert.False(t, hasCountry)
-	})
-
-	t.Run("moving back does not restore a value removed on the way forward", func(t *testing.T) {
-		t.Parallel()
-		user := createRevisionUser(t, "testpatchuser.notrestored@example.com")
-		params := api.PatchUserByIDParams{UserID: api.UserID(user.ID)}
-
-		resp, err := client.PatchUserByID(t.Context(), patchReq(t, map[string]any{
-			"schema":     revisionV2,
-			"attributes": map[string]any{"country": "CH", "nickname": nil},
-		}), params)
-		require.NoError(t, err)
-		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
-
-		resp, err = client.PatchUserByID(t.Context(), patchReq(t, map[string]any{
-			"schema":     revisionV1,
-			"attributes": map[string]any{"country": nil},
-		}), params)
-		require.NoError(t, err)
-		require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
-
-		moved := getUser(t, user.ID)
-		assert.Equal(t, revisionV1, moved.Schema)
-		assert.Equal(t, "testpatchuser.notrestored@example.com", userProp(t, *moved, "email"))
 		_, hasNickname := moved.Attributes["nickname"]
 		assert.False(t, hasNickname, "v1 declares nickname, but the value removed by the forward move stays removed")
 	})

@@ -51,9 +51,6 @@ type UserSchemaUnknownDetails struct {
 }
 
 func CheckUserSchemaMigration(current, target *JSONSchema) error {
-	if current.URL == target.URL {
-		return nil
-	}
 	currentObjectType, targetObjectType := gu.Value(current.ObjectType), gu.Value(target.ObjectType)
 	if currentObjectType != "" && currentObjectType == targetObjectType {
 		return nil

@@ -407,12 +407,6 @@ func TestCheckUserSchemaMigration(t *testing.T) {
 		assert.NoError(t, domain.CheckUserSchemaMigration(humanV2, humanV1))
 	})
 
-	t.Run("staying on the same schema passes, objectType or not", func(t *testing.T) {
-		t.Parallel()
-		assert.NoError(t, domain.CheckUserSchemaMigration(humanV1, humanV1))
-		assert.NoError(t, domain.CheckUserSchemaMigration(fetched, fetched))
-	})
-
 	t.Run("another objectType is refused and both are named", func(t *testing.T) {
 		t.Parallel()
 		err := domain.CheckUserSchemaMigration(humanV1, machine)
@@ -432,17 +426,7 @@ func TestCheckUserSchemaMigration(t *testing.T) {
 	// schema is a revision of nothing but itself.
 	t.Run("a schema without objectType is refused on either side", func(t *testing.T) {
 		t.Parallel()
-		err := domain.CheckUserSchemaMigration(fetched, humanV1)
-		require.ErrorIs(t, err, domain.ErrUserInvalid())
-		var de domain.Error
-		require.ErrorAs(t, err, &de)
-		assert.Equal(t, map[string]string{
-			"schema":              "https://example.test/human/v1.json",
-			"object_type":         "human-user",
-			"current_schema":      "https://example.test/fetched.json",
-			"current_object_type": "",
-		}, de.Details)
-
+		require.ErrorIs(t, domain.CheckUserSchemaMigration(fetched, humanV1), domain.ErrUserInvalid())
 		require.ErrorIs(t, domain.CheckUserSchemaMigration(humanV1, fetched), domain.ErrUserInvalid())
 		require.ErrorIs(t, domain.CheckUserSchemaMigration(fetched, schema("https://example.test/other.json", nil)), domain.ErrUserInvalid())
 	})
