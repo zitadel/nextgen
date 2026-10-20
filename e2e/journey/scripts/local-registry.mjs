@@ -147,16 +147,27 @@ export async function publishTarballs(repoRoot, tarballsDir, registryUrl, npmrcP
 
 export async function startLocalRegistry(input) {
   const log = input.log ?? (() => undefined);
+  // Otherwise the readiness check passes against whatever holds the port,
+  // the packages go there, and the Verdaccio started here exits unseen.
+  const port = String(input.registryPort);
+  if (await isServing(`http://127.0.0.1:${port}/-/ping`)) {
+    throw new Error(
+      `127.0.0.1:${port} is already in use, likely by a Verdaccio an earlier run left ` +
+        `behind. Stop that process (lsof -i :${port}), or pick another port ` +
+        "(ZITADEL_CLI_LOCAL_REGISTRY_PORT for the CLI wrapper).",
+    );
+  }
   log("starting Verdaccio");
   await mkdir(dirname(input.paths.registryLogPath), { recursive: true });
   const logFile = await open(input.paths.registryLogPath, "a", 0o600);
   try {
+    // Verdaccio's own bin under this Node, one process: through `corepack
+    // pnpm exec`, stopLocalRegistry's signal reached only corepack, and pnpm
+    // and Verdaccio kept serving the port.
     const child = spawn(
-      "corepack",
+      process.execPath,
       [
-        "pnpm",
-        "exec",
-        "verdaccio",
+        join(input.repoRoot, "node_modules", "verdaccio", "bin", "verdaccio"),
         "--config",
         input.paths.verdaccioConfigPath,
         "--listen",
@@ -224,6 +235,16 @@ export async function waitForHttp(url, label, child, log = () => undefined) {
     await delay(1000);
   }
   throw new Error(`timed out waiting for ${label} at ${url}: ${lastError?.message}`);
+}
+
+// Anything but a refused connection means something holds the port.
+async function isServing(url) {
+  try {
+    await fetch(url, { signal: AbortSignal.timeout(2000) });
+    return true;
+  } catch (error) {
+    return error?.cause?.code !== "ECONNREFUSED";
+  }
 }
 
 export function npmEnvironment(env, registryUrl, npmrcPath) {
