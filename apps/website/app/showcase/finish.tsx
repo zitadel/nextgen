@@ -7,7 +7,7 @@ const order = (index: number) => ({ "--i": index }) as CSSProperties;
 
 /**
  * The end of the steps: the login is live, and the way on is the quickstart.
- * Its dot on the spine is a check in the stepper's last colour, green; as the
+ * Its dot on the spine is a check in the stepper's last color, green; as the
  * spine's fill reaches it (spine.tsx sets data-reached), the check pops with
  * a ring, the card lights in green from above, and its lines rise in one
  * after another (globals.css, .finish-*). Without script, or for reduced

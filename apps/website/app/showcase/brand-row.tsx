@@ -49,7 +49,7 @@ function Control({
   );
 }
 
-/** The three choices: a brand colour (presets or any colour), the corners, the heading face. */
+/** The three choices: a brand color (presets or any color), the corners, the heading face. */
 function Controls({
   choice,
   change,
@@ -60,7 +60,7 @@ function Controls({
   const custom = !COLORS.some(({ value }) => value === choice.color);
   return (
     <div className={`flex flex-col gap-2.5 border-window-border border-b py-3.5 ${WINDOW_INSET}`}>
-      <Control label="Colour">
+      <Control label="Color">
         {COLORS.map(({ name, value }) => (
           <button
             key={value}
@@ -78,7 +78,7 @@ function Controls({
           />
         ))}
         <label
-          title="Any colour"
+          title="Any color"
           className={`relative flex size-6 cursor-pointer items-center justify-center rounded-full border text-text-secondary text-xs leading-none has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-text-primary has-[:focus-visible]:outline-offset-2 hover:text-text-primary ${
             custom ? "border-text-primary border-solid" : "border-white/20 border-dashed"
           }`}
@@ -89,7 +89,7 @@ function Controls({
             type="color"
             value={choice.color}
             onChange={(event) => change({ color: event.target.value })}
-            aria-label="Any brand colour"
+            aria-label="Any brand color"
             className="absolute inset-0 size-full cursor-pointer opacity-0"
           />
         </label>
@@ -164,7 +164,7 @@ function ThemeSwitch({ light, onChange }: { light: boolean; onChange: (light: bo
 
 /**
  * The fifth step, live (zitadel/new-website's BrandPlayground): the visitor
- * picks a brand colour, the corners and a heading face; the stylesheet card
+ * picks a brand color, the corners and a heading face; the stylesheet card
  * rewrites its lines, and the login in the browser frame, the fourth step's
  * result built from the product's own atoms (login-preview.tsx), takes the
  * look, in dark or light. Before shows it without the stylesheet.

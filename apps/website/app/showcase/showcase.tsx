@@ -5,15 +5,15 @@ import { brandStep, sessions } from "./sessions";
 import { Spine } from "./spine";
 import { stepColor, stepId } from "./step";
 
-// The recorded steps, the brand's and the finish: the stepper's colours
+// The recorded steps, the brand's and the finish: the stepper's colors
 // spread over them, the finish's the last, green.
 const COUNT = sessions.length + 2;
 
 const LABELS = [...sessions.map(({ label }) => label), brandStep.label];
 
 /**
- * A link to the step labelled `label`: its anchor, its number and its colour
- * as --step, for the hero to point into the steps in their own colours.
+ * A link to the step labeled `label`: its anchor, its number and its color
+ * as --step, for the hero to point into the steps in their own colors.
  */
 export function stepLink(label: string) {
   const index = LABELS.indexOf(label);

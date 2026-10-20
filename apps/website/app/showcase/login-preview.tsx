@@ -127,21 +127,21 @@ export function LoginPreview({
     if (!near) {
       return;
     }
-    let cancelled = false;
+    let canceled = false;
     loadAtoms().then(
       (loaded) => {
-        if (!cancelled) {
+        if (!canceled) {
           setLayers(loaded);
         }
       },
       () => {
-        if (!cancelled) {
+        if (!canceled) {
           setFailed(true);
         }
       },
     );
     return () => {
-      cancelled = true;
+      canceled = true;
     };
   }, [near]);
 

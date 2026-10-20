@@ -8,7 +8,7 @@ import { SiteFooter } from "./site-footer";
 import { SiteHeader } from "./site-header";
 
 /**
- * One of the three things the hero's line says are yours, in the colour of
+ * One of the three things the hero's line says are yours, in the color of
  * the step that changes it, linking down to that step.
  */
 function Yours({ step, children }: { step: string; children: string }) {
@@ -39,7 +39,7 @@ export default function Home() {
           aria-labelledby="hero-title"
           className="hero relative flex flex-col items-center overflow-hidden px-6 pt-10 pb-28"
         >
-          {/* As much air over the content as under it, so it stays centred. */}
+          {/* As much air over the content as under it, so it stays centered. */}
           <div aria-hidden="true" className="flex-1" />
           {/* The title sets the width; the line under it fills it and wraps
               inside it (.hero-lede), so the two read as one block. */}

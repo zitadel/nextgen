@@ -65,7 +65,7 @@
 
   /* The text of the page's two display titles, the hero's and the finish's
      (showcase/finish.tsx), in one look: white at the top, and toward the
-     foot of each line the process's colours, --title-from on its left to
+     foot of each line the process's colors, --title-from on its left to
      --title-to on its right (the hero: Zitadel's orange to the finish's
      green; the finish: its own green). Cloned per line, so a title that
      wraps lights every line alike. */
@@ -108,8 +108,8 @@
   }
 
   /* The three things the line says are yours (page.tsx): set in mono, a
-     faint underline in the colour of the step that changes it (--step), and
-     that colour on hover, as a link down to that step. */
+     faint underline in the color of the step that changes it (--step), and
+     that color on hover, as a link down to that step. */
   .yours {
     font-family: var(--font-mono);
     font-size: 0.9em;
@@ -131,7 +131,7 @@
   }
 
   /* A step's dot (step.tsx, finish.tsx), on the rail and in a phone's
-     gutter: lit in its step's colour once reached (spine.tsx), the rail's
+     gutter: lit in its step's color once reached (spine.tsx), the rail's
      with a glow. */
   .step-dot {
     border: 1px solid var(--color-border-secondary);

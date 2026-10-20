@@ -11,7 +11,7 @@ const DOTS_WIDTH = "w-[2.625rem]";
 
 /**
  * A title bar's button, as the copy button is wherever it stands: 28px high,
- * its edge showing on hover. Each adds its colour.
+ * its edge showing on hover. Each adds its color.
  */
 export const BAR_BUTTON =
   "inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-transparent px-1.5 font-sans font-semibold text-xs leading-4 transition-colors hover:border-window-border hover:text-text-primary";
@@ -35,7 +35,7 @@ export function segment(on: boolean): string {
  * editors and browsers: a raised surface with a hairline edge, lit from the
  * top, and a title bar of one height (h-11), so two windows side by side start
  * their content on one line. `title` fills the middle of the bar, a name
- * centred in it or a browser's address; `end` holds the window's controls. The body fills the
+ * centered in it or a browser's address; `end` holds the window's controls. The body fills the
  * window, so windows stretched to one height keep their surface to the bottom.
  */
 export function Window({
@@ -58,7 +58,7 @@ export function Window({
         <div className="flex min-w-0 flex-1 justify-center font-mono text-text-muted text-xs leading-4">
           {typeof title === "string" ? <span className="truncate">{title}</span> : title}
         </div>
-        {/* Without controls, as wide as the dots, so the title sits centred. */}
+        {/* Without controls, as wide as the dots, so the title sits centered. */}
         {end ? (
           <div className="flex shrink-0 items-center gap-2">{end}</div>
         ) : (

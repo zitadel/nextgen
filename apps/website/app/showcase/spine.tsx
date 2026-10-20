@@ -8,12 +8,12 @@ const READING_LINE = 0.6;
 
 /**
  * The line through the steps' dots (step.tsx, finish.tsx), from the first
- * dot's centre to the last's, in the rail beside the steps from a tablet up
+ * dot's center to the last's, in the rail beside the steps from a tablet up
  * and in the page's gutter on a phone, where it ends in the finish's card: a quiet track, and
  * over it the fill, drawn down to the reading line as the visitor scrolls.
  * The fill's gradient spans the whole track, Zitadel's orange to the
- * finish's green, so each stretch keeps its colour as the fill grows, and
- * meets each dot in that dot's own colour (stepColor).
+ * finish's green, so each stretch keeps its color as the fill grows, and
+ * meets each dot in that dot's own color (stepColor).
  *
  * Each step whose dot the fill has passed gets data-reached, which lights
  * it; at the bottom of the page every step counts as reached, so a tall
@@ -40,7 +40,7 @@ export function Spine() {
       const line = window.innerHeight * READING_LINE;
       const bottom =
         window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2;
-      const centres: number[] = [];
+      const centers: number[] = [];
       for (const step of list.querySelectorAll<HTMLElement>("[data-step]")) {
         // A step has a dot for the rail and one for a phone's gutter; the
         // one the screen shows counts.
@@ -50,12 +50,12 @@ export function Spine() {
         if (!dot) {
           continue;
         }
-        const centre = dot.top + dot.height / 2 - top;
-        step.toggleAttribute("data-reached", bottom || top + centre <= line);
-        centres.push(centre);
+        const center = dot.top + dot.height / 2 - top;
+        step.toggleAttribute("data-reached", bottom || top + center <= line);
+        centers.push(center);
       }
-      const start = centres[0] ?? 0;
-      const length = (centres.at(-1) ?? 0) - start;
+      const start = centers[0] ?? 0;
+      const length = (centers.at(-1) ?? 0) - start;
       const reach = bottom ? length : Math.min(Math.max(line - top - start, 0), length);
       for (const element of [track.current, fill.current]) {
         element?.style.setProperty("top", `${start}px`);

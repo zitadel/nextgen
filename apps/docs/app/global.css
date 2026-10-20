@@ -1,5 +1,5 @@
 @import "tailwindcss";
-/* Fumadocs' preset for a shadcn/ui theme: its colours read the standard shadcn
+/* Fumadocs' preset for a shadcn/ui theme: its colors read the standard shadcn
    names (--background, --sidebar, …), which the console's palette fills in
    below. */
 @import "fumadocs-ui/css/shadcn.css";
@@ -47,15 +47,15 @@
   --sidebar-ring: var(--zl-sidebar-ring);
   --sidebar-primary-foreground: var(--zl-sidebar-primary-foreground);
 
-  /* The callouts' colours the design system has; info and idea stay
+  /* The callouts' colors the design system has; info and idea stay
      Fumadocs'. */
   --color-fd-success: var(--zl-success);
   --color-fd-warning: var(--zl-warning);
 
-  /* Code in the design system's syntax colours (lib/code-theme.ts), each role
+  /* Code in the design system's syntax colors (lib/code-theme.ts), each role
      aliased as the console aliases it (apps/console/src/styles.css). Only the
      plain text differs: the console shows JSON and YAML, where it is the
-     punctuation grey; here it is mostly shell and TypeScript, so it is the
+     punctuation gray; here it is mostly shell and TypeScript, so it is the
      foreground. */
   --zl-shiki-foreground: var(--zl-foreground);
   --zl-shiki-token-keyword: var(--zl-syntax-key);

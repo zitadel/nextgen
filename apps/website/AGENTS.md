@@ -20,7 +20,7 @@ The hosted cloud's front page at `/`. Shared app rules:
 - Load every face through `next/font/local` from `app/fonts/`, never
   `next/font/google`: its build-time download has failed builds.
 - Each file is the latin subset Google Fonts serves `next/font/google`, byte
-  for byte. Keep each SIL OFL licence (`*-OFL.txt`) beside its file. APK
+  for byte. Keep each SIL OFL license (`*-OFL.txt`) beside its file. APK
   Futural is licensed, not open.
 - To update one, take the file under `/* latin */` from the stylesheet served
   to `next/font/google`'s user agent (Azeret Mono's family is
@@ -67,7 +67,7 @@ The hosted cloud's front page at `/`. Shared app rules:
   package's `tokens` and `cssVars`, the light side from its `tokensCss`; JSX
   types are in `app/zl-elements.d.ts`.
 - Every window is `app/window.tsx` and every command line
-  `app/command-line.tsx`; colours come from the `@theme` in `app/globals.css`.
+  `app/command-line.tsx`; colors come from the `@theme` in `app/globals.css`.
 - Next resolves `@zitadel/components` to its `dist/`, so `build` and `dev`
   depend on `components:build` in moon and in turbo.
 

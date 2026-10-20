@@ -5,9 +5,9 @@ import { type CSSProperties, Fragment, type ReactNode } from "react";
 export const RAIL = "md:grid-cols-[2.5rem_minmax(0,1fr)] md:gap-x-8";
 
 /**
- * The `index`th of `count` steps' colour, as --step: its place on the
+ * The `index`th of `count` steps' color, as --step: its place on the
  * stepper's ramp from orange to green (globals.css), mixed in OKLCH so it
- * warms through yellow rather than greying through brown.
+ * warms through yellow rather than graying through brown.
  */
 export function stepColor(index: number, count: number): CSSProperties {
   const share = count > 1 ? Math.round((index / (count - 1)) * 100) : 0;
@@ -53,7 +53,7 @@ export function Sentences({ text }: { text: string }) {
  * same way round every time: its number and heading, the line under it, then
  * the terminal, the files or the diff beside the page they produce, at one
  * height. Its dot sits on the spine, in the rail beside it from a tablet up
- * and in the gutter on a phone, lit in the step's colour once the visitor
+ * and in the gutter on a phone, lit in the step's color once the visitor
  * reaches it (spine.tsx sets data-reached on the step; .step-dot in
  * globals.css).
  */
