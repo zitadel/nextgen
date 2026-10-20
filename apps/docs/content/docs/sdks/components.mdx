@@ -52,7 +52,7 @@ The components speak to the configured API base, usually the same-origin `/__nex
 
 For browser automation, remember that the native controls live inside shadow roots, and that the published package closes them, so Playwright locators and `el.shadowRoot` find nothing until the roots are opened. With `@zitadel/testing/playwright`, its `test` and `widgetTest` open them for you; otherwise call `openShadowRoots(page)` from that package before the first navigation. Drivers on the Chrome DevTools protocol can read the closed roots through `DOM.getDocument` with `pierce: true` and the accessibility tree.
 
-A closed root keeps casual page scripts away from a field. It is not a security boundary: a script that inspects the element's own properties, one that runs before the widget, native key events and browser extensions all get past it, and only a cross-origin iframe would isolate a field from its host page.
+A closed root keeps casual page scripts away from a field. It is not a security boundary: any script on the page, at any time, can read the element's `renderRoot` or `attachInternals().shadowRoot`, walk its own properties, patch `attachShadow` or `HTMLInputElement.prototype.value`, or read the selection, and the browser always delivers key, input, paste and composition events to the page. Only a cross-origin iframe would isolate a field from its host page.
 
 If your app renders on the server, mount the widget on the client only, after hydration, or give a raw `<zitadel-login>` element `project-id` and `proxy-path` as attributes, because a widget that starts before its configuration arrives shows an error instead of the flow.
 

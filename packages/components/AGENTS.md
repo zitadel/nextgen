@@ -129,6 +129,6 @@ server resolves `dist`, so it gets closed roots too.
 - Playwright pierces open roots only. Use `test` or `widgetTest` from
   `@zitadel/testing/playwright`, which open them; never patch `attachShadow`
   in a suite.
-- A closed root is a guard against casual reads, not a boundary: Lit's own
-  properties on the element still lead to the root. Say so wherever you
+- A closed root is a guard against casual reads, not a boundary: `renderRoot`,
+  `attachInternals().shadowRoot` and Lit's own properties still lead to the root. Say so wherever you
   document it, and name a cross-origin iframe as the only real isolation.
