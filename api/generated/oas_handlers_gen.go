@@ -8142,6 +8142,8 @@ func (s *Server) handleGetMyUserRequest(args [0]string, argsEscaped bool, w http
 // handleGetMyUserSchemaRequest handles getMyUserSchema operation.
 //
 // The schema the signed-in user's own record is validated against.
+// With `project_id`, the schema is returned only when the session belongs to
+// that project.
 //
 // GET /users/me/schema
 func (s *Server) handleGetMyUserSchemaRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -8259,6 +8261,16 @@ func (s *Server) handleGetMyUserSchemaRequest(args [0]string, argsEscaped bool, 
 			return
 		}
 	}
+	params, err := decodeGetMyUserSchemaParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
 
 	var rawBody []byte
 
@@ -8271,13 +8283,18 @@ func (s *Server) handleGetMyUserSchemaRequest(args [0]string, argsEscaped bool, 
 			OperationID:      "getMyUserSchema",
 			Body:             nil,
 			RawBody:          rawBody,
-			Params:           middleware.Parameters{},
-			Raw:              r,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+			},
+			Raw: r,
 		}
 
 		type (
 			Request  = struct{}
-			Params   = struct{}
+			Params   = GetMyUserSchemaParams
 			Response = GetMyUserSchemaRes
 		)
 		response, err = middleware.HookMiddleware[
@@ -8287,14 +8304,14 @@ func (s *Server) handleGetMyUserSchemaRequest(args [0]string, argsEscaped bool, 
 		](
 			m,
 			mreq,
-			nil,
+			unpackGetMyUserSchemaParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.GetMyUserSchema(ctx)
+				response, err = s.h.GetMyUserSchema(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.GetMyUserSchema(ctx)
+		response, err = s.h.GetMyUserSchema(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -11785,6 +11802,8 @@ func (s *Server) handleListMyProjectsRequest(args [0]string, argsEscaped bool, w
 // handleListMyTeamsRequest handles listMyTeams operation.
 //
 // The signed-in user's own team roster, ordered by team name.
+// With `project_id`, the teams are listed only when the session belongs to
+// that project.
 //
 // GET /users/me/teams
 func (s *Server) handleListMyTeamsRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -11933,6 +11952,10 @@ func (s *Server) handleListMyTeamsRequest(args [0]string, argsEscaped bool, w ht
 					Name: "page_token",
 					In:   "query",
 				}: params.PageToken,
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
 			},
 			Raw: r,
 		}

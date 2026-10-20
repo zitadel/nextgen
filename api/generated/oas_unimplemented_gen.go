@@ -682,9 +682,11 @@ func (UnimplementedHandler) GetMyUser(ctx context.Context, params GetMyUserParam
 // GetMyUserSchema implements getMyUserSchema operation.
 //
 // The schema the signed-in user's own record is validated against.
+// With `project_id`, the schema is returned only when the session belongs to
+// that project.
 //
 // GET /users/me/schema
-func (UnimplementedHandler) GetMyUserSchema(ctx context.Context) (r GetMyUserSchemaRes, _ error) {
+func (UnimplementedHandler) GetMyUserSchema(ctx context.Context, params GetMyUserSchemaParams) (r GetMyUserSchemaRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -920,6 +922,8 @@ func (UnimplementedHandler) ListMyProjects(ctx context.Context, params ListMyPro
 // ListMyTeams implements listMyTeams operation.
 //
 // The signed-in user's own team roster, ordered by team name.
+// With `project_id`, the teams are listed only when the session belongs to
+// that project.
 //
 // GET /users/me/teams
 func (UnimplementedHandler) ListMyTeams(ctx context.Context, params ListMyTeamsParams) (r ListMyTeamsRes, _ error) {

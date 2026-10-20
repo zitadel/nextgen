@@ -246,8 +246,10 @@ func (h *Handler) ListUserTeams(ctx context.Context, params api.ListUserTeamsPar
 	return &res, nil
 }
 
+// ListMyTeams lists the teams of the cookie's user, held to project_id when the
+// caller names one (requireSelf).
 func (h *Handler) ListMyTeams(ctx context.Context, params api.ListMyTeamsParams) (api.ListMyTeamsRes, error) {
-	self, err := requireSelf(ctx)
+	self, err := requireSelf(ctx, params.ProjectID)
 	if err != nil {
 		return nil, err
 	}
@@ -333,9 +335,9 @@ func (h *Handler) PatchUserByID(ctx context.Context, req *api.PatchUserRequest, 
 }
 
 // PatchMyUser updates the user of the cookie's session, held to project_id when
-// the caller names one (requireSelfInProject).
+// the caller names one (requireSelf).
 func (h *Handler) PatchMyUser(ctx context.Context, req *api.PatchMyUserRequest, params api.PatchMyUserParams) (api.PatchMyUserRes, error) {
-	self, err := requireSelfInProject(ctx, params.ProjectID)
+	self, err := requireSelf(ctx, params.ProjectID)
 	if err != nil {
 		return nil, err
 	}
@@ -374,9 +376,9 @@ func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordR
 }
 
 // GetMyUser reads the user of the cookie's session, held to project_id when the
-// caller names one (requireSelfInProject).
+// caller names one (requireSelf).
 func (h *Handler) GetMyUser(ctx context.Context, params api.GetMyUserParams) (api.GetMyUserRes, error) {
-	self, err := requireSelfInProject(ctx, params.ProjectID)
+	self, err := requireSelf(ctx, params.ProjectID)
 	if err != nil {
 		return nil, err
 	}
@@ -387,8 +389,10 @@ func (h *Handler) GetMyUser(ctx context.Context, params api.GetMyUserParams) (ap
 	return domainUserToApiUser(user)
 }
 
-func (h *Handler) GetMyUserSchema(ctx context.Context) (api.GetMyUserSchemaRes, error) {
-	self, err := requireSelf(ctx)
+// GetMyUserSchema reads the schema of the cookie's user, held to project_id when
+// the caller names one (requireSelf).
+func (h *Handler) GetMyUserSchema(ctx context.Context, params api.GetMyUserSchemaParams) (api.GetMyUserSchemaRes, error) {
+	self, err := requireSelf(ctx, params.ProjectID)
 	if err != nil {
 		return nil, err
 	}
