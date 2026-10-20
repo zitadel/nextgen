@@ -31,7 +31,7 @@ func newMockedReleaseService(t *testing.T) (service.ReleaseService, *servicemock
 		AnyTimes()
 	statementer.EXPECT().Statements().Return(statements).AnyTimes()
 	statements.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-	return service.NewReleaseService(service.NewPool(pool)), statements
+	return service.NewReleaseService(service.NewPool(pool), nil, nil, nil, nil), statements
 }
 
 // loginFlow collects email, which human-user-v2.json dropped.
