@@ -16,6 +16,9 @@
 
 ## Decisions
 
+### D20 · The Users table shows each value once — 2026-10-20 · [standing]
+The User cell carries the display name with the identifier under it, so there is no Identifier column, and a schema column that only repeats a row's name or identifier is dropped (under the default schema, the email). The ID column gives way first and truncates. Refines D4. The console's landing (`/`) is Users, where people who just signed up appear.
+
 ### D19 · List page actions sit beside the title — 2026-10-07 · [standing]
 The primary action of a list screen (Add) stays on the title row at every breakpoint, never stretched to full width or dropped under the title. Search is out of the page headers until there is a console-wide solution.
 
