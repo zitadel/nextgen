@@ -14,7 +14,7 @@
   <div class="content">
     <div class="content-main">
       <h1>Cells</h1>
-      <p class="muted">Cell topology, join spare cells, and edit pairwise inter-cell delays. Same-cell hops are 0; unlisted labeled pairs are 0; unlabeled URLs default to 50ms.</p>
+      <p class="muted">Ops surface: topology + join spare. WAN pairwise delays are fixed defaults in code (broadcast to cells at UI startup).</p>
       {{if .Flash}}<div class="flash-ok">{{.Flash}}</div>{{end}}
       {{if .FlashErr}}<div class="flash-err">{{.FlashErr}}</div>{{end}}
 
@@ -45,22 +45,19 @@
       </div>
 
       <div class="panel">
-        <h2>Pairwise delay matrix (ms)</h2>
-        <p class="muted">Saved locally and broadcast to every cell via <code>POST /v1/admin/delays</code>.</p>
-        <form method="post" action="/cells/delays">
-          <table class="delay-matrix">
-            <thead><tr><th>Pair</th><th>Delay (ms)</th></tr></thead>
-            <tbody>
-            {{range .DelayPairs}}
-              <tr>
-                <td><code>{{.Left}}</code> ↔ <code>{{.Right}}</code></td>
-                <td><input type="number" min="0" max="5000" name="delay_{{.Key}}" value="{{.Ms}}"/></td>
-              </tr>
-            {{end}}
-            </tbody>
-          </table>
-          <button type="submit">Save delays</button>
-        </form>
+        <h2>Pairwise delays (fixed)</h2>
+        <p class="muted">Read-only defaults. Same-cell = 0; unlisted labeled pairs = 0; unlabeled URLs = 50ms.</p>
+        <table class="delay-matrix">
+          <thead><tr><th>Pair</th><th>Delay (ms)</th></tr></thead>
+          <tbody>
+          {{range .DelayPairs}}
+            <tr>
+              <td><code>{{.Left}}</code> ↔ <code>{{.Right}}</code></td>
+              <td>{{.Ms}}</td>
+            </tr>
+          {{end}}
+          </tbody>
+        </table>
       </div>
     </div>
     {{template "layout-trace-drawer" .}}

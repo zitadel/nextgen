@@ -16,7 +16,7 @@
       {{template "layout-breadcrumbs" .}}
       {{with .Workspace}}
       <h1>Workspace <code>{{.ID}}</code></h1>
-      <p class="muted">{{.Name}} · home cell <code>{{.HomeCell}}</code> (default when adding the first site; sites may pick other cells).</p>
+      <p class="muted">{{.Name}} — sites below. Open a site to observe Lab results.</p>
       {{end}}
       {{if .Flash}}<div class="flash-ok">{{.Flash}}</div>{{end}}
       {{if .FlashErr}}<div class="flash-err">{{.FlashErr}}</div>{{end}}
@@ -44,13 +44,11 @@
 
       <div class="panel">
         <h2>Add site</h2>
-        <p class="muted">Creates a project on the chosen cell with this workspace_id, then attaches to the lookup parent (default <code>platform</code>).</p>
+        <p class="muted">Creates a project on the chosen cell with this workspace_id, then attaches lookup parent to <code>platform</code>.</p>
         {{with .Workspace}}
         <form method="post" action="/workspaces/{{.ID}}/sites">
           <label for="id">Site id</label>
           <input id="id" name="id" required placeholder="{{.ID}}-fra"/>
-          <label for="name">Name</label>
-          <input id="name" name="name" placeholder="optional"/>
           <label for="cell">Cell</label>
           <select id="cell" name="cell" required>
             {{$home := .HomeCell}}
@@ -58,36 +56,8 @@
             <option value="{{.Label}}" {{if eq .Label $home}}selected{{end}}>{{.Label}}</option>
             {{end}}
           </select>
-          <label for="parent_project_id">Lookup parent project</label>
-          <input id="parent_project_id" name="parent_project_id" value="platform"/>
+          <input type="hidden" name="parent_project_id" value="platform"/>
           <button type="submit">Add site</button>
-        </form>
-        {{end}}
-      </div>
-
-      <div class="panel">
-        <h2>Expand site</h2>
-        <p class="muted">Sibling site on another cell (copies optional chat app).</p>
-        {{with .Workspace}}
-        <form method="post" action="/create/expand">
-          <input type="hidden" name="workspace_id" value="{{.ID}}"/>
-          <label for="source_site_id">Source site</label>
-          <select id="source_site_id" name="source_site_id" required>
-            <option value="">Select…</option>
-            {{range $.Sites}}
-            <option value="{{.ID}}">{{.ID}} @ {{.HostLabel}}</option>
-            {{end}}
-          </select>
-          <label for="expand_cell">New cell</label>
-          <select id="expand_cell" name="cell" required>
-            {{range $.Cells}}
-            <option value="{{.Label}}">{{.Label}}</option>
-            {{end}}
-          </select>
-          <label for="expand_id">New site id (optional)</label>
-          <input id="expand_id" name="id" placeholder="auto from cell"/>
-          <label><input type="checkbox" name="copy_chat" value="1" checked/> Copy chat app</label>
-          <button type="submit">Expand</button>
         </form>
         {{end}}
       </div>

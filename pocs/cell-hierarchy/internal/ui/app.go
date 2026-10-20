@@ -82,13 +82,24 @@ func NewApp(cells []CellRef, logger *log.Logger) (*App, error) {
 	a.Peer.OnHop = a.onHop
 	a.seedDefaultDelays()
 	a.seedWorkspaces()
+	// Best-effort: push fixed delay matrix to cells once they are reachable.
+	go a.broadcastDefaultDelaysSoon()
 	return a, nil
+}
+
+// labObserveHint appends where to look after a Lab mutation.
+func labObserveHint(projectID string) string {
+	if projectID == "" {
+		projectID = "acme-fra"
+	}
+	return " · Trace drawer /trace-view · observe /projects/" + projectID
 }
 
 func (a *App) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", a.handleHome)
 	mux.HandleFunc("GET /tree", a.handleTree)
+	// Delay editor removed from UI; handler kept for tests / manual POST.
 	mux.HandleFunc("POST /cells/delays", a.handleCellsDelays)
 
 	mux.HandleFunc("GET /workspaces", a.handleWorkspacesList)
@@ -104,6 +115,7 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("GET /create", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/workspaces", http.StatusSeeOther)
 	})
+	// Legacy create/expand POST handlers retained for scripts/tests; not linked in UI.
 	mux.HandleFunc("POST /create/site", a.handleCreateSiteLegacy)
 	mux.HandleFunc("POST /create/expand", a.handleExpandSite)
 	mux.HandleFunc("POST /create/project", a.handleCreateProject)
@@ -112,16 +124,7 @@ func (a *App) Handler() http.Handler {
 
 	mux.HandleFunc("GET /cells/{label}", a.handleCellDetail)
 	mux.HandleFunc("GET /projects/{id}", a.handleProjectDetail)
-	mux.HandleFunc("POST /projects/{id}/users", a.handleProjectCreateUser)
-	mux.HandleFunc("POST /projects/{id}/users/delete", a.handleProjectDeleteUser)
-	mux.HandleFunc("POST /projects/{id}/teams", a.handleProjectCreateTeam)
-	mux.HandleFunc("POST /projects/{id}/teams/delete", a.handleProjectDeleteTeam)
-	mux.HandleFunc("POST /projects/{id}/apps", a.handleProjectCreateApp)
-	mux.HandleFunc("POST /projects/{id}/apps/delete", a.handleProjectDeleteApp)
-	mux.HandleFunc("POST /projects/{id}/groups", a.handleProjectCreateGroup)
-	mux.HandleFunc("POST /projects/{id}/groups/delete", a.handleProjectDeleteGroup)
-	mux.HandleFunc("POST /projects/{id}/tuples", a.handleProjectCreateTuple)
-	mux.HandleFunc("POST /projects/{id}/tuples/tombstone", a.handleProjectTombstoneTuple)
+	// Project page is observe-only — no mutation POST routes.
 
 	mux.HandleFunc("GET /lab", a.handleScenarios)
 	mux.HandleFunc("GET /scenarios", func(w http.ResponseWriter, r *http.Request) {
@@ -289,8 +292,6 @@ type projectDetail struct {
 	Users     []userRow
 	Lookup    []lookupRow
 	Apps      []cell.AppView
-	Teams     []cell.TeamView
-	Groups    []cell.GroupView
 	Tuples    []cell.TupleView
 	Interests []cell.InterestView
 	FlashOK   string
@@ -451,8 +452,6 @@ func (a *App) handleProjectDetail(w http.ResponseWriter, r *http.Request) {
 		Users     []userRow           `json:"users"`
 		Lookup    []lookupRow         `json:"lookup"`
 		Apps      []cell.AppView      `json:"apps"`
-		Teams     []cell.TeamView     `json:"teams"`
-		Groups    []cell.GroupView    `json:"groups"`
 		Tuples    []cell.TupleView    `json:"tuples"`
 		Interests []cell.InterestView `json:"interests"`
 	}
@@ -462,8 +461,6 @@ func (a *App) handleProjectDetail(w http.ResponseWriter, r *http.Request) {
 		detail.Users = raw.Users
 		detail.Lookup = raw.Lookup
 		detail.Apps = raw.Apps
-		detail.Teams = raw.Teams
-		detail.Groups = raw.Groups
 		detail.Tuples = raw.Tuples
 		detail.Interests = raw.Interests
 	}
@@ -536,7 +533,7 @@ func (a *App) handleScenarioCreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.appendTrace(note, out.Trace, "created")
-	http.Redirect(w, r, "/lab?ok="+url.QueryEscape("created "+email+" on "+projectID), http.StatusSeeOther)
+	http.Redirect(w, r, "/lab?ok="+url.QueryEscape("created "+email+" on "+projectID+labObserveHint(projectID)), http.StatusSeeOther)
 }
 
 func (a *App) handleScenarioLookup(w http.ResponseWriter, r *http.Request) {
@@ -569,7 +566,7 @@ func (a *App) handleScenarioLookup(w http.ResponseWriter, r *http.Request) {
 		note = "hit home=" + res.HomeProjectID + " at=" + res.FoundAtProjectID
 	}
 	a.appendTrace("lookup walk from "+projectID+": "+key, hops, note)
-	http.Redirect(w, r, "/lab?ok="+url.QueryEscape(note), http.StatusSeeOther)
+	http.Redirect(w, r, "/lab?ok="+url.QueryEscape(note+labObserveHint(projectID)), http.StatusSeeOther)
 }
 
 func (a *App) handleScenarioGrantJoe(w http.ResponseWriter, r *http.Request) {
@@ -588,7 +585,7 @@ func (a *App) handleScenarioGrantJoe(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/lab?err="+url.QueryEscape(err.Error()), http.StatusSeeOther)
 		return
 	}
-	http.Redirect(w, r, "/lab?ok="+url.QueryEscape("granted joe viewer on "+projectID+"/chat"), http.StatusSeeOther)
+	http.Redirect(w, r, "/lab?ok="+url.QueryEscape("granted joe viewer on "+projectID+"/chat"+labObserveHint(projectID)), http.StatusSeeOther)
 }
 
 func (a *App) handleScenarioSignInJoe(w http.ResponseWriter, r *http.Request) {
@@ -715,7 +712,7 @@ func (a *App) handleScenarioSignInJoe(w http.ResponseWriter, r *http.Request) {
 	if !online.Allowed {
 		msg += " — denied: " + online.Reason
 	}
-	http.Redirect(w, r, "/lab?ok="+url.QueryEscape(msg), http.StatusSeeOther)
+	http.Redirect(w, r, "/lab?ok="+url.QueryEscape(msg+labObserveHint(resourceProject)), http.StatusSeeOther)
 }
 
 func (a *App) handleScenarioSeedGroupChain(w http.ResponseWriter, r *http.Request) {
@@ -786,6 +783,7 @@ func (a *App) handleScenarioGroupCheckJoe(w http.ResponseWriter, r *http.Request
 	a.setGroupCheck(result)
 
 	msg := fmt.Sprintf("group check @%s: %s · %dms · %d cross-cell hops", projectID, res.Reason, res.TotalMs, res.CrossCellHops)
+	msg += labObserveHint(projectID)
 	if !res.Allowed {
 		http.Redirect(w, r, "/lab?err="+url.QueryEscape(msg), http.StatusSeeOther)
 		return
@@ -923,7 +921,7 @@ func (a *App) handleScenarioBlockJoe(w http.ResponseWriter, r *http.Request) {
 	a.setLifecycle(result)
 	msg := fmt.Sprintf("blocked joe · epoch=%d · online=%v (%s) · offline=%v (%s)",
 		result.Epoch, result.OnlineAllowed, result.OnlineReason, result.OfflineAllowed, result.OfflineReason)
-	http.Redirect(w, r, "/lab?ok="+url.QueryEscape(msg), http.StatusSeeOther)
+	http.Redirect(w, r, "/lab?ok="+url.QueryEscape(msg+labObserveHint(result.ResourceProject)), http.StatusSeeOther)
 }
 
 func (a *App) handleScenarioDeleteJoe(w http.ResponseWriter, r *http.Request) {
@@ -942,7 +940,7 @@ func (a *App) handleScenarioDeleteJoe(w http.ResponseWriter, r *http.Request) {
 	msg := fmt.Sprintf("deleted joe · %s tuples active %d→%d (tombstoned %d) · interests notified=%d · lookup=%s",
 		result.ResourceProject, result.USTuplesBefore, result.USTuplesActiveAfter,
 		result.USTuplesTombstonedAfter, len(result.InterestsNotified), result.LookupState)
-	http.Redirect(w, r, "/lab?ok="+url.QueryEscape(msg), http.StatusSeeOther)
+	http.Redirect(w, r, "/lab?ok="+url.QueryEscape(msg+labObserveHint(result.ResourceProject)), http.StatusSeeOther)
 }
 
 func (a *App) runLifecycleScenario(ctx context.Context, action, resourceCellLabel string) (*lifecycleResult, error) {
@@ -1210,7 +1208,7 @@ func (a *App) handleScenarioGlobalLogin(w http.ResponseWriter, r *http.Request) 
 	}
 	a.setGlobalLogin(result)
 	msg := fmt.Sprintf("global login %s → %s @ %s", email, result.HomeProject, result.HomeCell)
-	http.Redirect(w, r, "/lab?ok="+url.QueryEscape(msg), http.StatusSeeOther)
+	http.Redirect(w, r, "/lab?ok="+url.QueryEscape(msg+labObserveHint(result.HomeProject)), http.StatusSeeOther)
 }
 
 func (a *App) setGlobalLogin(gl *globalLoginResult) {

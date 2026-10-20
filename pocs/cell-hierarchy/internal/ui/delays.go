@@ -31,6 +31,26 @@ func (a *App) seedDefaultDelays() {
 	a.Peer.SetDelayConfig(a.delayPairs, labels)
 }
 
+// broadcastDefaultDelaysSoon retries pushing the fixed matrix to every cell.
+// Cells may not be up when the UI process starts; failures are logged and ignored.
+func (a *App) broadcastDefaultDelaysSoon() {
+	for attempt := 0; attempt < 8; attempt++ {
+		time.Sleep(time.Duration(500*(attempt+1)) * time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		err := a.broadcastDelays(ctx)
+		cancel()
+		if err == nil {
+			if a.Log != nil {
+				a.Log.Printf("broadcast default pairwise delays to %d cells", len(a.Cells))
+			}
+			return
+		}
+		if a.Log != nil {
+			a.Log.Printf("broadcast delays attempt %d: %v", attempt+1, err)
+		}
+	}
+}
+
 func (a *App) labelMap() map[string]string {
 	labels := map[string]string{}
 	for _, c := range a.Cells {

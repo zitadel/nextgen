@@ -1,47 +1,43 @@
-# Cell hierarchy POC — sites & workspaces
+# Cell hierarchy POC
 
-Greenfield multi-container Go cells with SQLite membership, join/heartbeat, **sites as projects** (workspace UX metadata), user lookup float-up with **provenance**, regional apps/grants with home-cell interest registration, inspectable home-issued JWTs, resource-cell auth checks, cross-cell group Expand/Check, user block/delete with grant tombstones, workspace/site forms, Global login discovery, **pairwise inter-cell delays**, and an HTMX UI with a shared left nav and Global Trace of every PeerClient hop.
+Prove multi-cell architecture — not an IAM admin console.
 
-Lives under `pocs/cell-hierarchy/` as a nested Go module (not wired into Moon/CI).
+## Proof questions
 
-## UI navigation
+1. **Cells join under platform** — membership tree, join spare from Cells.
+2. **Sites pick a cell; workspace is a label** — projects carry `workspace_id`; workspace is UX grouping only.
+3. **Lookup floats up; global login finds home** — no region picker; platform project is the entry.
+4. **Foreign grant + interest; delete tombstones grant** — interest fan-out; tombstone badges stay visible.
+5. **Cross-cell group check hops in Trace** — OnHop + server Trace show expand hops.
 
-One shared left nav on every page:
+## Simplified UI
 
-| Section | Link | Route |
-|---|---|---|
-| Ops → Cells | Topology, join spare, delay matrix | `GET /` |
-| Ops → Lab | Scenario demos (was Scenarios) | `GET /lab` (`/scenarios` redirects) |
-| Ops → Trace | Full Global Trace | `GET /trace-view` |
-| Customer → Workspaces | List/create workspaces | `GET /workspaces` |
+| Nav | Role |
+|---|---|
+| **Cells** `/` | Ops: topology tree, join spare, read-only delay defaults |
+| **Lab** `/lab` | Primary demo script (mutations) |
+| **Trace** `/trace-view` | Global Trace of every PeerClient hop |
+| **Workspaces** `/workspaces` | List/create workspace (id/name); add site (id + cell) |
 
-Standalone top links for Join / Create / Tree are gone. Join lives on Cells; create workspace/site under Workspaces. Customer pages show breadcrumbs (`Workspaces / {id} / {site}`).
+- **Project `/projects/{id}`** — observe-only (users, apps, tuples with tombstones, interests, lookup provenance). No add/delete forms. Mutations happen in Lab.
+- **Cells** — no delay editor; WAN delays are fixed in code and broadcast once at UI startup.
+- **Lab** — numbered happy path: create joe → grant → global login → group check → delete → observe tombstones.
+- Dead standalone create/join pages redirect away; cell APIs remain for Lab.
 
 ## Topology
 
-### Cell tree (ops / membership)
-
 ```text
-platform (parent cell, is_parent=true)     port 8100
-├── eu-1  EU · Frankfurt                   port 8101
-├── eu-2  EU · Lisbon                      port 8102
-├── us-1  US · Iowa                        port 8103
-└── us-2  US · San Francisco               port 8104
-spare (unjoined)                           port 8105
+platform (parent cell)     port 8100
+├── eu-1  EU · Frankfurt   port 8101
+├── eu-2  EU · Lisbon      port 8102
+├── us-1  US · Iowa        port 8103
+└── us-2  US · San Francisco port 8104
+spare (unjoined)           port 8105
 ```
 
-### Sites = projects; Workspace = UX registry
+Sites = projects on a cell. Workspace = name metadata. Lookup parent for sites is `platform`.
 
-Each **site** is a project on one cell. A **workspace** is name + **home_cell** metadata (no parent project). Creating a workspace does not create a site. Sites carry `workspace_id`; the UI also keeps a small registry (`.local/workspaces.json`, seeded with `acme` / home `eu-1`).
-
-```text
-platform PROJECT  [lookup ON]  ← global login / lookup zone
-└── acme-fra      [workspace=acme]  hosted on eu-1
-```
-
-## Pairwise delays
-
-The Cells page edits a delay matrix (ms). Defaults:
+## Pairwise delays (fixed)
 
 | Pair | ms |
 |---|---|
@@ -52,11 +48,11 @@ The Cells page edits a delay matrix (ms). Defaults:
 | eu-2 ↔ us-2 | 250 |
 | us-1 ↔ us-2 | 10 |
 
-Same-cell = 0. Both labels known but pair unset = 0. Either side unlabeled = 50ms. Saving posts to the UI and broadcasts `POST /v1/admin/delays` to every cell so cell-to-cell peer hops sleep the same matrix. Lab no longer has a flat delay slider.
+Same-cell = 0. Unlisted labeled pairs = 0. Unlabeled side = 50ms. Defaults live in `DefaultPairDelays`; UI PeerClient seeds them and broadcasts `POST /v1/admin/delays` to cells at startup.
 
 ## Global Trace
 
-`PeerClient.OnHop` fires after every outbound HTTP (success or fail). The UI sets `Peer.OnHop` and wraps mutating handlers with `beginTrace` / `endTrace` (or `appendTrace`, which drains the OnHop buffer). Server-returned `Trace` arrays (CreateUser float, FGA, AuthCheck, DeleteUser, …) are still merged in. Background page polls without `beginTrace` stay silent.
+`PeerClient.OnHop` fires after every outbound HTTP. Lab actions wrap with `beginTrace` / `appendTrace`. Server `Trace` arrays merge in.
 
 ## Quick start
 
@@ -68,17 +64,13 @@ cd pocs/cell-hierarchy
 
 | Surface | URL |
 |---|---|
-| UI (Cells) | http://localhost:3000 |
+| Lab (start here) | http://localhost:3000/lab |
+| Cells | http://localhost:3000 |
 | Workspaces | http://localhost:3000/workspaces |
-| Lab | http://localhost:3000/lab |
 | Trace | http://localhost:3000/trace-view |
-| Cells API | http://localhost:8100–8105 |
+| Observe site | http://localhost:3000/projects/acme-fra |
 
-Bootstrap: joins (all leaves → platform) then `scripts/bootstrap-projects.sh`.
-
-## Project overview CRUD
-
-Day-to-day resource management lives on **`/projects/{id}`** with breadcrumbs back to the workspace. Mutations append to Global Trace (outbound hops + server Trace).
+Bootstrap: joins (leaves → platform) then `scripts/bootstrap-projects.sh`.
 
 ## Locked decisions
 
@@ -94,4 +86,4 @@ Day-to-day resource management lives on **`/projects/{id}`** with breadcrumbs ba
 cd pocs/cell-hierarchy && go test ./...
 ```
 
-Covers: PeerClient OnHop, pairwise delay sleep, admin delays broadcast, workspace create + add site, plus prior join/auth/FGA/site coverage.
+Covers: PeerClient OnHop, pairwise delay sleep, admin delays, workspace create + add site, join/auth/FGA/lifecycle/site coverage. Project UI mutations are gone — cell APIs under `/v1/...` remain.
